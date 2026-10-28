@@ -15,7 +15,8 @@ import 'package:go_router/go_router.dart';
 
 import '../admin/admin_route.dart' show adminPathOf;
 import '../app/providers/session.dart';
-import '../forum/providers.dart' show newPostRequestProvider;
+import '../app/router.dart' show NewChatLocation;
+import '../forum/new_chat_view.dart' show openNewChat;
 import '../onboarding/onboarding_controller.dart';
 import '../running/providers.dart' show activeRunCountProvider;
 import '../switcher/quick_switcher.dart' show showQuickSwitcher;
@@ -63,6 +64,8 @@ class SidebarView extends StatelessWidget {
     this.onToggleGroup,
     this.onAdd,
     this.onHold,
+    this.selectedNewChat,
+    this.onOpenNewChat,
   });
 
   /// `branding.product_name` of the instance.
@@ -131,6 +134,12 @@ class SidebarView extends StatelessWidget {
   /// Collapses or expands the thread group of a channel (01 6.8 item 7).
   final void Function(ChannelId channel, bool expanded)? onToggleGroup;
 
+  /// The new chat row the route selects, or null (brief M4-41).
+  final SidebarNewChatSelection? selectedNewChat;
+
+  /// Opens a new chat row of a forum: its draft (entry null) or a sent post; null for none.
+  final void Function(ChannelId forum, String? entry)? onOpenNewChat;
+
   /// The "+" action of a forum row (01 6.8 item 8), or null for none.
   final ValueChanged<ChannelId>? onAdd;
 
@@ -168,6 +177,8 @@ class SidebarView extends StatelessWidget {
           onOpenThread: onOpenThread,
           onToggleGroup: onToggleGroup,
           onAdd: onAdd,
+          selectedNewChat: selectedNewChat,
+          onOpenNewChat: onOpenNewChat,
         ),
       ),
       // The group scrolls within a share of the column, so the spaces keep their room.
@@ -255,7 +266,11 @@ class SidebarColumn extends ConsumerWidget {
     this.selectedThread,
     this.selectedHost,
     this.phone = false,
+    this.newChat,
   });
+
+  /// The new chat row the route selects (the new chat view of a forum, M4-41), or null.
+  final SidebarNewChatSelection? newChat;
 
   /// The channel of the route, or null.
   final ChannelId? selectedChannel;
@@ -304,13 +319,14 @@ class SidebarColumn extends ConsumerWidget {
             ?.forumViewDao
             .setGroupCollapsed(channel, collapsed: !expanded),
       ),
-      // Until M4-41 fills it, "+" opens the forum overview with "New post" (brief M4-40 Scope).
-      onAdd: phone
+      // 01 6.8 item 8: "+" opens the new chat view of the forum, its draft when one exists; a
+      // collapsed group expands, so the draft row shows and is selected.
+      onAdd: phone ? null : (channel) => openNewChat(context, ref, channel),
+      selectedNewChat: newChat,
+      onOpenNewChat: phone
           ? null
-          : (channel) {
-              ref.read(newPostRequestProvider.notifier).request(channel);
-              context.go('/c/${channel.value}');
-            },
+          : (forum, entry) =>
+                context.go(NewChatLocation.pathOf(forum, entry: entry)),
       onHold: phone ? null : (held) => hold.set(held: held),
       onSettings: () => context.go('/settings'),
       onStatus: () => context.go('/status'),

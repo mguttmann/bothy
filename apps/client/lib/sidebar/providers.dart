@@ -11,7 +11,14 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../app/providers/ports.dart';
 import '../app/providers/session.dart';
 import '../app/router.dart';
-import '../forum/providers.dart' show channelRunsProvider, forumThreadsProvider;
+import '../forum/providers.dart'
+    show
+        channelDraftProvider,
+        channelRunsProvider,
+        forumThreadsProvider,
+        PendingPost,
+        pendingPostsProvider,
+        unsentChannelDraftProvider;
 import 'sidebar_model.dart';
 import 'sidebar_order.dart';
 import 'sidebar_threads.dart';
@@ -176,6 +183,36 @@ class ChannelThreads extends _$ChannelThreads {
   }
 }
 
+/// The rows of the forum [channelId] above its thread rows (01 6.8 item 8, brief M4-41): the
+/// draft row while the person's draft of a new post has text (the unsent write of this device,
+/// else the stored draft) or the new chat view of the forum is open and writing, then the posts sent from this device that the server has not created
+/// yet, newest first. Empty for other channels.
+@riverpod
+List<SidebarNewChatRow> newChatRows(Ref ref, String channelId) {
+  final channel = ref.watch(storedChannelOfRouteProvider(channelId)).value;
+  if (channel == null || channel.kind != ChannelKind.forum) return const [];
+  final route = ref.watch(lastRouteSelectionProvider);
+  final writing =
+      route.newChat && route.channel == channel.id && route.sentEntry == null;
+  // A draft write this device has not had confirmed is newer than the stored draft (04 13).
+  final text =
+      ref.watch(unsentChannelDraftProvider(channelId)).value ??
+      ref.watch(channelDraftProvider(channelId)).value?.contentMd ??
+      '';
+  final hasDraft = text.trim().isNotEmpty;
+  return [
+    if (writing || hasDraft) const SidebarNewChatRow.draft(),
+    for (final p
+        in ref.watch(pendingPostsProvider(channelId)).value ??
+            const <PendingPost>[])
+      SidebarNewChatRow.sent(
+        entryId: p.entryId,
+        title: p.title,
+        failed: p.failed,
+      ),
+  ];
+}
+
 /// The channel rows of [spaceId]: counters ([channelCounts]), active run, muted state and the
 /// thread group with its collapse state on this device (01 6.8); direct messages and archived
 /// channels are not part of the tree.
@@ -203,6 +240,7 @@ List<SidebarChannel> channelsOfSpace(Ref ref, String spaceId) {
           muted: isMuted(c.id, prefs, now: now),
           group: ref.watch(channelThreadsProvider(c.id.value)),
           expanded: !collapsed.contains(c.id),
+          newChatRows: ref.watch(newChatRowsProvider(c.id.value)),
         ),
   ];
 }
@@ -250,7 +288,13 @@ Stream<Channel?> storedChannelOfRoute(Ref ref, String channelId) {
 /// `/t/<id>`), its kind and the thread; empty for other paths or targets not stored here.
 final class RouteSelection {
   /// Creates the selection.
-  const RouteSelection({this.channel, this.kind, this.thread});
+  const RouteSelection({
+    this.channel,
+    this.kind,
+    this.thread,
+    this.newChat = false,
+    this.sentEntry,
+  });
 
   /// The selected channel, or null.
   final ChannelId? channel;
@@ -260,6 +304,13 @@ final class RouteSelection {
 
   /// The selected thread, or null.
   final ThreadId? thread;
+
+  /// Whether the route is the new chat view of [channel] (01 6.8 item 8, M4-41): its draft
+  /// row, or the row of [sentEntry], is the selected one.
+  final bool newChat;
+
+  /// The outbox entry of the post the new chat view sent and waits for, or null.
+  final String? sentEntry;
 
   /// The forum whose post list shows, or null (brief M4-19 Design note 5).
   ChannelId? get forum => kind == ChannelKind.forum ? channel : null;
@@ -292,6 +343,16 @@ Future<RouteSelection> routeSelection(Ref ref, String path) async {
         storedChannelOfRouteProvider(channelId.value).future,
       );
       return RouteSelection(channel: channelId, kind: channel?.kind);
+    case NewChatLocation(:final channelId, :final sentEntry):
+      final channel = await ref.watch(
+        storedChannelOfRouteProvider(channelId.value).future,
+      );
+      return RouteSelection(
+        channel: channelId,
+        kind: channel?.kind,
+        newChat: true,
+        sentEntry: sentEntry,
+      );
     case ThreadLocation(:final threadId):
       thread = threadId;
       // The thread may arrive later (a deep link); its post list shows once it is stored.

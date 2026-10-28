@@ -17,14 +17,11 @@ import 'package:l10n/l10n.dart';
 
 import '../app/providers/ports.dart';
 import '../app/providers/session.dart';
-import '../keyboard/app_shortcuts.dart';
-import '../keyboard/intents.dart';
 import '../menus/thread_menu.dart';
-import '../sync/thread_ops.dart';
 import 'done_section.dart';
 import 'failed_post_notice.dart';
 import 'forum_model.dart';
-import 'new_post_dialog.dart';
+import 'new_chat_view.dart' show editRefusedPost, openNewChat;
 import 'post_list_header.dart';
 import 'post_row.dart';
 import 'providers.dart';
@@ -348,104 +345,62 @@ class PostListColumn extends ConsumerWidget {
     final tags = ref.watch(forumTagsProvider(id)).value ?? const [];
     void loadMore() =>
         unawaited(ref.read(forumPagerProvider(id, sort).notifier).loadMore());
-    Future<void> newPost() async {
-      final input = await showNewPostDialog(context, tags);
-      final engine = ref.read(syncEngineProvider);
-      if (input == null || engine == null) return;
-      await ThreadOps.enqueue(
-        engine,
-        forum: channelId,
-        title: input.title,
-        contentMd: input.contentMd,
-        tagIds: input.tagIds,
-      );
-    }
+    // 01 D15, 6.8 item 8: "New chat" or "New post" opens the new chat view (M4-41).
+    void newPost() => openNewChat(context, ref, channelId);
 
-    // The "+" of the sidebar asked for a new post in this forum: open the dialog once the
-    // overview shows (brief M4-40 Scope; M4-41 replaces it with the new chat view).
-    if (ref.watch(newPostRequestProvider) == channelId) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!context.mounted) return;
-        if (ref.read(newPostRequestProvider.notifier).take(channelId)) {
-          unawaited(newPost());
-        }
-      });
-    }
     final pinned = ref.watch(overviewPinnedProvider).value ?? false;
-    // M4-24: Cmd+N or Ctrl+N opens "New post" of the forum on screen (01 7).
-    return KeyboardActions(
-      handlers: {
-        ShortcutAction.newPost: KeyboardHandler(() => unawaited(newPost())),
+    // Cmd+N or Ctrl+N is the shell's: the forum of the focused or selected row (01 7).
+    return PostListView(
+      forum: forum,
+      filter: filter,
+      model: model,
+      tags: tags,
+      names: ref.watch(principalNamesProvider).value ?? const {},
+      now: ref.watch(appPortsProvider).clock.now(),
+      doneCollapsed: ref.watch(doneCollapsedProvider(id)).value ?? true,
+      morePages: pager.hasMore,
+      selectedThread: selectedThread,
+      onNearEnd: pager.loading ? null : loadMore,
+      autoLoad: !pager.failed,
+      initialOffset: ref.read(postListOffsetProvider(id)),
+      onOffset: (o) => ref.read(postListOffsetProvider(id).notifier).keep(o),
+      failedPosts: ref.watch(failedPostsProvider(id)).value ?? const [],
+      onRetryPost: (f) {
+        final engine = ref.read(syncEngineProvider);
+        if (engine != null) unawaited(engine.outbox.retry(f.entryId));
       },
-      child: PostListView(
-        forum: forum,
-        filter: filter,
-        model: model,
-        tags: tags,
-        names: ref.watch(principalNamesProvider).value ?? const {},
-        now: ref.watch(appPortsProvider).clock.now(),
-        doneCollapsed: ref.watch(doneCollapsedProvider(id)).value ?? true,
-        morePages: pager.hasMore,
-        selectedThread: selectedThread,
-        onNearEnd: pager.loading ? null : loadMore,
-        autoLoad: !pager.failed,
-        initialOffset: ref.read(postListOffsetProvider(id)),
-        onOffset: (o) => ref.read(postListOffsetProvider(id).notifier).keep(o),
-        failedPosts: ref.watch(failedPostsProvider(id)).value ?? const [],
-        onRetryPost: (f) {
-          final engine = ref.read(syncEngineProvider);
-          if (engine != null) unawaited(engine.outbox.retry(f.entryId));
-        },
-        onEditPost: (f) async {
-          final input = await showNewPostDialog(
-            context,
-            tags,
-            initial: NewPost(
-              title: f.title,
-              contentMd: f.contentMd,
-              tagIds: f.tagIds,
-            ),
-          );
-          final engine = ref.read(syncEngineProvider);
-          if (input == null || engine == null) return;
-          // A failed entry is replaced by a new one with the changed post (04 13.3).
-          await engine.outbox.edit(f.entryId, {
-            'title': input.title,
-            'content_md': input.contentMd,
-            'tag_ids': [for (final t in input.tagIds) t.value],
-          });
-        },
-        onDiscardPost: (f) {
-          final engine = ref.read(syncEngineProvider);
-          if (engine != null) unawaited(engine.outbox.discard(f.entryId));
-        },
-        onNewPost: newPost,
-        onView: (view) =>
-            ref.read(postListFilterOfProvider(id).notifier).setView(view),
-        onTags: (tags) =>
-            ref.read(postListFilterOfProvider(id).notifier).setTags(tags),
-        onSort: (sort) =>
-            ref.read(postListFilterOfProvider(id).notifier).setSort(sort),
-        onToggleDone: (collapsed) => unawaited(
-          ref
-              .read(localDatabaseProvider)
-              ?.forumViewDao
-              .setDoneCollapsed(channelId, collapsed: collapsed),
-        ),
-        onOpenPost: (thread) => context.go('/t/${thread.value}'),
-        pinned: pinned,
-        onPin: () => unawaited(
-          ref
-              .read(localDatabaseProvider)
-              ?.forumViewDao
-              .setOverviewPinned(pinned: !pinned),
-        ),
-        onSearch: () => context.go(
-          Uri(
-            path: '/search',
-            queryParameters: {'q': '${forumFilter(forum.name)} '},
-          ).toString(),
-        ),
+      // A refused post goes back into the new chat view to be changed (D-M4-41-3).
+      onEditPost: (f) => unawaited(editRefusedPost(context, ref, channelId, f)),
+      onDiscardPost: (f) {
+        final engine = ref.read(syncEngineProvider);
+        if (engine != null) unawaited(engine.outbox.discard(f.entryId));
+      },
+      onNewPost: newPost,
+      onView: (view) =>
+          ref.read(postListFilterOfProvider(id).notifier).setView(view),
+      onTags: (tags) =>
+          ref.read(postListFilterOfProvider(id).notifier).setTags(tags),
+      onSort: (sort) =>
+          ref.read(postListFilterOfProvider(id).notifier).setSort(sort),
+      onToggleDone: (collapsed) => unawaited(
+        ref
+            .read(localDatabaseProvider)
+            ?.forumViewDao
+            .setDoneCollapsed(channelId, collapsed: collapsed),
+      ),
+      onOpenPost: (thread) => context.go('/t/${thread.value}'),
+      pinned: pinned,
+      onPin: () => unawaited(
+        ref
+            .read(localDatabaseProvider)
+            ?.forumViewDao
+            .setOverviewPinned(pinned: !pinned),
+      ),
+      onSearch: () => context.go(
+        Uri(
+          path: '/search',
+          queryParameters: {'q': '${forumFilter(forum.name)} '},
+        ).toString(),
       ),
     );
   }

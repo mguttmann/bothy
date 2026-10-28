@@ -2008,16 +2008,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get newPostTitle => 'Title';
 
   @override
-  String get newPostMessage => 'First message';
-
-  @override
   String get newPostTags => 'Tags';
-
-  @override
-  String get newPostCreate => 'Create post';
-
-  @override
-  String get newPostCancel => 'Cancel';
 
   @override
   String get adminTitle => 'Administration';
@@ -7998,7 +7989,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get shortcutSearchInThread => 'Search in thread';
 
   @override
-  String get shortcutNewPost => 'New post or new chat in the current forum';
+  String get shortcutNewPost =>
+      'New post or new chat in the forum of the focused or selected row';
 
   @override
   String get shortcutFocusInput => 'Focus the input';
@@ -9186,8 +9178,4 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get newChatTitleMissing => 'Enter a title to send.';
-
-  @override
-  String get newChatEditing =>
-      'This post was not sent. Change it and send it again.';
 }

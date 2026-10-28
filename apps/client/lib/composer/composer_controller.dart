@@ -32,7 +32,9 @@ final class ContentTooLong extends ComposerError {
   final int limit;
 }
 
-/// The composer of one thread.
+/// The composer of one thread, or of the first message of a new post (brief M4-41: [thread]
+/// is null, the draft is the forum's draft of a new post and [send] hands the text to
+/// [sendNew]).
 ///
 /// Every change of the text by the person ([onChanged]) marks the draft as being edited
 /// (`DraftEditing`, 04 14), writes it through the [DraftWriter], sends `typing.start` through
@@ -47,7 +49,8 @@ final class ContentTooLong extends ComposerError {
 /// composer.onChanged('Hello @sa');
 /// ```
 final class ComposerController extends ChangeNotifier {
-  /// Creates the controller of [thread] in [channel].
+  /// Creates the controller of [thread] in [channel]; without a thread, [sendNew] sends the
+  /// first message of a new post in [channel] (no typing indicator: there is no thread yet).
   ComposerController({
     required this.thread,
     required this.channel,
@@ -57,7 +60,11 @@ final class ComposerController extends ChangeNotifier {
     this._typing,
     this.deviceId,
     this.measurements,
+    this.sendNew,
   });
+
+  /// Sends the first message of a new post (the text, trimmed); used when [thread] is null.
+  final Future<void> Function(String body)? sendNew;
 
   /// The measurement points of the app metrics: a send reports `client.send_local.duration`
   /// (brief M4-31), or nothing when null.
@@ -67,13 +74,13 @@ final class ComposerController extends ChangeNotifier {
   /// person types (04 14: `overwrote_newer` only for another device's newer write).
   final DeviceId? deviceId;
 
-  /// The thread.
-  final ThreadId thread;
+  /// The thread, or null for the first message of a new post.
+  final ThreadId? thread;
 
   /// Its channel.
   final ChannelId channel;
 
-  final ThreadActions _actions;
+  final ThreadActions? _actions;
   final DraftWriter _drafts;
   final DraftEditingRegistry _editing;
   final TypingThrottle? _typing;
@@ -132,7 +139,8 @@ final class ComposerController extends ChangeNotifier {
     error = null;
     _markEditing();
     final typing = _typing;
-    if (typing != null) {
+    final thread = this.thread;
+    if (typing != null && thread != null) {
       if (value.isEmpty) {
         typing.onCleared(thread);
       } else {
@@ -294,11 +302,16 @@ final class ComposerController extends ChangeNotifier {
     error = null;
     _dirty = false;
     _markEditing();
-    _typing?.onSent(thread);
+    final thread = this.thread;
+    if (thread != null) _typing?.onSent(thread);
     notifyListeners();
     final files = attach?.take();
     await _drafts.dropWaiting();
-    await _actions.send(thread, body, replyTo: reply, attachments: files);
+    if (thread == null) {
+      await sendNew?.call(body);
+    } else {
+      await _actions?.send(thread, body, replyTo: reply, attachments: files);
+    }
     // The outbox write is done; the history shows it in the next frame.
     if (started != null) measurements!.sendShown(started);
     return true;

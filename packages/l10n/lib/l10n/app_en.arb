@@ -2890,21 +2890,9 @@
   "@newPostTitle": {
     "description": "Label of the title field of the dialog that creates a forum post."
   },
-  "newPostMessage": "First message",
-  "@newPostMessage": {
-    "description": "Label of the field for the first message of a new forum post."
-  },
   "newPostTags": "Tags",
   "@newPostTags": {
     "description": "Label of the tag selection of the dialog that creates a forum post."
-  },
-  "newPostCreate": "Create post",
-  "@newPostCreate": {
-    "description": "Button of the dialog that creates the forum post."
-  },
-  "newPostCancel": "Cancel",
-  "@newPostCancel": {
-    "description": "Button of the dialog that closes it without creating a post."
   },
   "adminTitle": "Administration",
   "@adminTitle": {
@@ -12197,7 +12185,7 @@
   "@shortcutSearchInThread": {
     "description": "Row of the list of shortcuts (01 7)."
   },
-  "shortcutNewPost": "New post or new chat in the current forum",
+  "shortcutNewPost": "New post or new chat in the forum of the focused or selected row",
   "@shortcutNewPost": {
     "description": "Row of the list of shortcuts (01 7)."
   },
@@ -13839,9 +13827,5 @@
   "newChatTitleMissing": "Enter a title to send.",
   "@newChatTitleMissing": {
     "description": "Hint of the new chat view in a forum without an operator agent while the title is empty (01 section 6.8 item 8)."
-  },
-  "newChatEditing": "This post was not sent. Change it and send it again.",
-  "@newChatEditing": {
-    "description": "Notice of the new chat view when it edits a post the server refused (01 section 6.6)."
   }
 }

@@ -463,65 +463,352 @@ final class OverviewPinnedProvider
 
 String _$overviewPinnedHash() => r'307bd82dc92691c6e5ed00e8feccba092aa98bbf';
 
-/// A new post the "+" of a forum row asked for (01 6.8 item 8; until M4-41 it opens the
-/// overview with the "New post" dialog): the forum, or null. The overview of that forum takes it
-/// once it shows ([take]).
+/// The person's stored draft of a new post in [channelId] (03 `drafts` with `thread_id` NULL;
+/// 01 6.8 item 8, brief M4-41), or null.
 
-@ProviderFor(NewPostRequest)
-final newPostRequestProvider = NewPostRequestProvider._();
+@ProviderFor(channelDraft)
+final channelDraftProvider = ChannelDraftFamily._();
 
-/// A new post the "+" of a forum row asked for (01 6.8 item 8; until M4-41 it opens the
-/// overview with the "New post" dialog): the forum, or null. The overview of that forum takes it
-/// once it shows ([take]).
-final class NewPostRequestProvider
-    extends $NotifierProvider<NewPostRequest, ChannelId?> {
-  /// A new post the "+" of a forum row asked for (01 6.8 item 8; until M4-41 it opens the
-  /// overview with the "New post" dialog): the forum, or null. The overview of that forum takes it
-  /// once it shows ([take]).
-  NewPostRequestProvider._()
+/// The person's stored draft of a new post in [channelId] (03 `drafts` with `thread_id` NULL;
+/// 01 6.8 item 8, brief M4-41), or null.
+
+final class ChannelDraftProvider
+    extends $FunctionalProvider<AsyncValue<Draft?>, Draft?, Stream<Draft?>>
+    with $FutureModifier<Draft?>, $StreamProvider<Draft?> {
+  /// The person's stored draft of a new post in [channelId] (03 `drafts` with `thread_id` NULL;
+  /// 01 6.8 item 8, brief M4-41), or null.
+  ChannelDraftProvider._({
+    required ChannelDraftFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'channelDraftProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$channelDraftHash();
+
+  @override
+  String toString() {
+    return r'channelDraftProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $StreamProviderElement<Draft?> $createElement($ProviderPointer pointer) =>
+      $StreamProviderElement(pointer);
+
+  @override
+  Stream<Draft?> create(Ref ref) {
+    final argument = this.argument as String;
+    return channelDraft(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is ChannelDraftProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$channelDraftHash() => r'0d37d6d1ebe13a2763ae9d30b5f90f2ac0d2bea9';
+
+/// The person's stored draft of a new post in [channelId] (03 `drafts` with `thread_id` NULL;
+/// 01 6.8 item 8, brief M4-41), or null.
+
+final class ChannelDraftFamily extends $Family
+    with $FunctionalFamilyOverride<Stream<Draft?>, String> {
+  ChannelDraftFamily._()
+    : super(
+        retry: null,
+        name: r'channelDraftProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// The person's stored draft of a new post in [channelId] (03 `drafts` with `thread_id` NULL;
+  /// 01 6.8 item 8, brief M4-41), or null.
+
+  ChannelDraftProvider call(String channelId) =>
+      ChannelDraftProvider._(argument: channelId, from: this);
+
+  @override
+  String toString() => r'channelDraftProvider';
+}
+
+/// The new posts of the forum [channelId] that wait in the outbox or were refused, newest first.
+/// Threads from a message (`parent_message_id`) are not posts of the forum's list.
+
+@ProviderFor(pendingPosts)
+final pendingPostsProvider = PendingPostsFamily._();
+
+/// The new posts of the forum [channelId] that wait in the outbox or were refused, newest first.
+/// Threads from a message (`parent_message_id`) are not posts of the forum's list.
+
+final class PendingPostsProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<List<PendingPost>>,
+          List<PendingPost>,
+          Stream<List<PendingPost>>
+        >
+    with
+        $FutureModifier<List<PendingPost>>,
+        $StreamProvider<List<PendingPost>> {
+  /// The new posts of the forum [channelId] that wait in the outbox or were refused, newest first.
+  /// Threads from a message (`parent_message_id`) are not posts of the forum's list.
+  PendingPostsProvider._({
+    required PendingPostsFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'pendingPostsProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$pendingPostsHash();
+
+  @override
+  String toString() {
+    return r'pendingPostsProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $StreamProviderElement<List<PendingPost>> $createElement(
+    $ProviderPointer pointer,
+  ) => $StreamProviderElement(pointer);
+
+  @override
+  Stream<List<PendingPost>> create(Ref ref) {
+    final argument = this.argument as String;
+    return pendingPosts(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is PendingPostsProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$pendingPostsHash() => r'1bb820f7d7af5c1b8541f41db40f00d104d5832e';
+
+/// The new posts of the forum [channelId] that wait in the outbox or were refused, newest first.
+/// Threads from a message (`parent_message_id`) are not posts of the forum's list.
+
+final class PendingPostsFamily extends $Family
+    with $FunctionalFamilyOverride<Stream<List<PendingPost>>, String> {
+  PendingPostsFamily._()
+    : super(
+        retry: null,
+        name: r'pendingPostsProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// The new posts of the forum [channelId] that wait in the outbox or were refused, newest first.
+  /// Threads from a message (`parent_message_id`) are not posts of the forum's list.
+
+  PendingPostsProvider call(String channelId) =>
+      PendingPostsProvider._(argument: channelId, from: this);
+
+  @override
+  String toString() => r'pendingPostsProvider';
+}
+
+/// The text of the newest draft write of the person's draft of a new post in [channelId] that
+/// this device has not had confirmed yet, or null when none waits (04 13; brief M4-41): newer
+/// than the stored draft, so the draft row and the new chat view use it, also after a restart
+/// while offline. A new post queued after that write ends the draft (`clear_draft`), so it
+/// gives null then.
+
+@ProviderFor(unsentChannelDraft)
+final unsentChannelDraftProvider = UnsentChannelDraftFamily._();
+
+/// The text of the newest draft write of the person's draft of a new post in [channelId] that
+/// this device has not had confirmed yet, or null when none waits (04 13; brief M4-41): newer
+/// than the stored draft, so the draft row and the new chat view use it, also after a restart
+/// while offline. A new post queued after that write ends the draft (`clear_draft`), so it
+/// gives null then.
+
+final class UnsentChannelDraftProvider
+    extends $FunctionalProvider<AsyncValue<String?>, String?, Stream<String?>>
+    with $FutureModifier<String?>, $StreamProvider<String?> {
+  /// The text of the newest draft write of the person's draft of a new post in [channelId] that
+  /// this device has not had confirmed yet, or null when none waits (04 13; brief M4-41): newer
+  /// than the stored draft, so the draft row and the new chat view use it, also after a restart
+  /// while offline. A new post queued after that write ends the draft (`clear_draft`), so it
+  /// gives null then.
+  UnsentChannelDraftProvider._({
+    required UnsentChannelDraftFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'unsentChannelDraftProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$unsentChannelDraftHash();
+
+  @override
+  String toString() {
+    return r'unsentChannelDraftProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $StreamProviderElement<String?> $createElement($ProviderPointer pointer) =>
+      $StreamProviderElement(pointer);
+
+  @override
+  Stream<String?> create(Ref ref) {
+    final argument = this.argument as String;
+    return unsentChannelDraft(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is UnsentChannelDraftProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$unsentChannelDraftHash() =>
+    r'26f0c109140a25a2f22a449c9dbc50cafcb6e43c';
+
+/// The text of the newest draft write of the person's draft of a new post in [channelId] that
+/// this device has not had confirmed yet, or null when none waits (04 13; brief M4-41): newer
+/// than the stored draft, so the draft row and the new chat view use it, also after a restart
+/// while offline. A new post queued after that write ends the draft (`clear_draft`), so it
+/// gives null then.
+
+final class UnsentChannelDraftFamily extends $Family
+    with $FunctionalFamilyOverride<Stream<String?>, String> {
+  UnsentChannelDraftFamily._()
+    : super(
+        retry: null,
+        name: r'unsentChannelDraftProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// The text of the newest draft write of the person's draft of a new post in [channelId] that
+  /// this device has not had confirmed yet, or null when none waits (04 13; brief M4-41): newer
+  /// than the stored draft, so the draft row and the new chat view use it, also after a restart
+  /// while offline. A new post queued after that write ends the draft (`clear_draft`), so it
+  /// gives null then.
+
+  UnsentChannelDraftProvider call(String channelId) =>
+      UnsentChannelDraftProvider._(argument: channelId, from: this);
+
+  @override
+  String toString() => r'unsentChannelDraftProvider';
+}
+
+/// A title and tags the new chat view of a forum starts with (brief M4-41): "Edit" of a refused
+/// post hands them over, because the server's draft has neither (D-M4-41-2). The view takes
+/// them once ([take]).
+
+@ProviderFor(NewChatPreset)
+final newChatPresetProvider = NewChatPresetProvider._();
+
+/// A title and tags the new chat view of a forum starts with (brief M4-41): "Edit" of a refused
+/// post hands them over, because the server's draft has neither (D-M4-41-2). The view takes
+/// them once ([take]).
+final class NewChatPresetProvider
+    extends
+        $NotifierProvider<
+          NewChatPreset,
+          Map<ChannelId, (String, List<ForumTagId>)>
+        > {
+  /// A title and tags the new chat view of a forum starts with (brief M4-41): "Edit" of a refused
+  /// post hands them over, because the server's draft has neither (D-M4-41-2). The view takes
+  /// them once ([take]).
+  NewChatPresetProvider._()
     : super(
         from: null,
         argument: null,
         retry: null,
-        name: r'newPostRequestProvider',
+        name: r'newChatPresetProvider',
         isAutoDispose: false,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
 
   @override
-  String debugGetCreateSourceHash() => _$newPostRequestHash();
+  String debugGetCreateSourceHash() => _$newChatPresetHash();
 
   @$internal
   @override
-  NewPostRequest create() => NewPostRequest();
+  NewChatPreset create() => NewChatPreset();
 
   /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(ChannelId? value) {
+  Override overrideWithValue(Map<ChannelId, (String, List<ForumTagId>)> value) {
     return $ProviderOverride(
       origin: this,
-      providerOverride: $SyncValueProvider<ChannelId?>(value),
+      providerOverride:
+          $SyncValueProvider<Map<ChannelId, (String, List<ForumTagId>)>>(value),
     );
   }
 }
 
-String _$newPostRequestHash() => r'd2e0c2c779bb45d300fc6ee98772bfa9d0fa6f61';
+String _$newChatPresetHash() => r'e812885311b0ba9d154cda00c66eb3158a71fde3';
 
-/// A new post the "+" of a forum row asked for (01 6.8 item 8; until M4-41 it opens the
-/// overview with the "New post" dialog): the forum, or null. The overview of that forum takes it
-/// once it shows ([take]).
+/// A title and tags the new chat view of a forum starts with (brief M4-41): "Edit" of a refused
+/// post hands them over, because the server's draft has neither (D-M4-41-2). The view takes
+/// them once ([take]).
 
-abstract class _$NewPostRequest extends $Notifier<ChannelId?> {
-  ChannelId? build();
+abstract class _$NewChatPreset
+    extends $Notifier<Map<ChannelId, (String, List<ForumTagId>)>> {
+  Map<ChannelId, (String, List<ForumTagId>)> build();
   @$mustCallSuper
   @override
   WhenComplete runBuild() {
-    final ref = this.ref as $Ref<ChannelId?, ChannelId?>;
+    final ref =
+        this.ref
+            as $Ref<
+              Map<ChannelId, (String, List<ForumTagId>)>,
+              Map<ChannelId, (String, List<ForumTagId>)>
+            >;
     final element =
         ref.element
             as $ClassProviderElement<
-              AnyNotifier<ChannelId?, ChannelId?>,
-              ChannelId?,
+              AnyNotifier<
+                Map<ChannelId, (String, List<ForumTagId>)>,
+                Map<ChannelId, (String, List<ForumTagId>)>
+              >,
+              Map<ChannelId, (String, List<ForumTagId>)>,
               Object?,
               Object?
             >;
@@ -1093,3 +1380,52 @@ abstract class _$ForumPager extends $Notifier<PagerState> {
     return element.handleCreate(ref, () => build(_$args.$1, _$args.$2));
   }
 }
+
+/// The threads this run's new posts created (brief M4-41), or an empty registry without a
+/// session.
+
+@ProviderFor(createdPosts)
+final createdPostsProvider = CreatedPostsProvider._();
+
+/// The threads this run's new posts created (brief M4-41), or an empty registry without a
+/// session.
+
+final class CreatedPostsProvider
+    extends $FunctionalProvider<CreatedPosts, CreatedPosts, CreatedPosts>
+    with $Provider<CreatedPosts> {
+  /// The threads this run's new posts created (brief M4-41), or an empty registry without a
+  /// session.
+  CreatedPostsProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'createdPostsProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$createdPostsHash();
+
+  @$internal
+  @override
+  $ProviderElement<CreatedPosts> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  CreatedPosts create(Ref ref) {
+    return createdPosts(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(CreatedPosts value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<CreatedPosts>(value),
+    );
+  }
+}
+
+String _$createdPostsHash() => r'ebbc508c25e007f4af20d801806a45d585cf4750';

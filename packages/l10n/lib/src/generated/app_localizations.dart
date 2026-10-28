@@ -3391,29 +3391,11 @@ abstract class AppLocalizations {
   /// **'Title'**
   String get newPostTitle;
 
-  /// Label of the field for the first message of a new forum post.
-  ///
-  /// In en, this message translates to:
-  /// **'First message'**
-  String get newPostMessage;
-
   /// Label of the tag selection of the dialog that creates a forum post.
   ///
   /// In en, this message translates to:
   /// **'Tags'**
   String get newPostTags;
-
-  /// Button of the dialog that creates the forum post.
-  ///
-  /// In en, this message translates to:
-  /// **'Create post'**
-  String get newPostCreate;
-
-  /// Button of the dialog that closes it without creating a post.
-  ///
-  /// In en, this message translates to:
-  /// **'Cancel'**
-  String get newPostCancel;
 
   /// Heading of the administration navigation (01 section 5.2 A1).
   ///
@@ -12873,7 +12855,7 @@ abstract class AppLocalizations {
   /// Row of the list of shortcuts (01 7).
   ///
   /// In en, this message translates to:
-  /// **'New post or new chat in the current forum'**
+  /// **'New post or new chat in the forum of the focused or selected row'**
   String get shortcutNewPost;
 
   /// Row of the list of shortcuts (01 7).
@@ -14837,12 +14819,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Enter a title to send.'**
   String get newChatTitleMissing;
-
-  /// Notice of the new chat view when it edits a post the server refused (01 section 6.6).
-  ///
-  /// In en, this message translates to:
-  /// **'This post was not sent. Change it and send it again.'**
-  String get newChatEditing;
 }
 
 class _AppLocalizationsDelegate

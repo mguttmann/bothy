@@ -1558,7 +1558,7 @@ Windows key). There is no shortcut that triggers an approval.
 | Quick switcher | Cmd+K | Ctrl+K |
 | Search | Cmd+Shift+F | Ctrl+Shift+F |
 | Search in thread | Cmd+F | Ctrl+F |
-| New post or new chat in the current forum | Cmd+N | Ctrl+N |
+| New post or new chat in the current forum (the forum of the focused or selected row, 6.8) | Cmd+N | Ctrl+N |
 | Focus the input | Esc then Tab, or Cmd+L | Esc then Tab, or Ctrl+L |
 | Next or previous channel or thread row in the sidebar | Option+Arrow down / up | Alt+Arrow down / up |
 | Next or previous unread channel or thread row | Option+Shift+Arrow down / up | Alt+Shift+Arrow down / up |
@@ -1577,13 +1577,6 @@ Windows key). There is no shortcut that triggers an approval.
 | Settings | Cmd+, | Ctrl+, |
 | List of shortcuts | Cmd+/ | Ctrl+/ |
 | Open hosts and terminal | Cmd+Shift+T | Ctrl+Shift+T |
-
-Planned with the threads in the sidebar (addendum of 2026-10-27, 6.8, R-PR-17). The table above
-is the shipped state and the app checks it row by row; M4-41 changes this row in the same change
-as the bindings:
-
-- "New post or new chat in the current forum" gets the addition "(the forum of the focused or
-  selected row, 6.8)" (M4-41).
 
 **In the terminal** all keys go to the shell, including Ctrl combinations such as Ctrl+C, Ctrl+D
 and Ctrl+K. App shortcuts work there only with the platform modifier: on macOS with Cmd, on

@@ -747,6 +747,113 @@ abstract class _$ChannelThreads extends $Notifier<SidebarThreadGroup?> {
   }
 }
 
+/// The rows of the forum [channelId] above its thread rows (01 6.8 item 8, brief M4-41): the
+/// draft row while the person's draft of a new post has text (the unsent write of this device,
+/// else the stored draft) or the new chat view of the forum is open and writing, then the posts sent from this device that the server has not created
+/// yet, newest first. Empty for other channels.
+
+@ProviderFor(newChatRows)
+final newChatRowsProvider = NewChatRowsFamily._();
+
+/// The rows of the forum [channelId] above its thread rows (01 6.8 item 8, brief M4-41): the
+/// draft row while the person's draft of a new post has text (the unsent write of this device,
+/// else the stored draft) or the new chat view of the forum is open and writing, then the posts sent from this device that the server has not created
+/// yet, newest first. Empty for other channels.
+
+final class NewChatRowsProvider
+    extends
+        $FunctionalProvider<
+          List<SidebarNewChatRow>,
+          List<SidebarNewChatRow>,
+          List<SidebarNewChatRow>
+        >
+    with $Provider<List<SidebarNewChatRow>> {
+  /// The rows of the forum [channelId] above its thread rows (01 6.8 item 8, brief M4-41): the
+  /// draft row while the person's draft of a new post has text (the unsent write of this device,
+  /// else the stored draft) or the new chat view of the forum is open and writing, then the posts sent from this device that the server has not created
+  /// yet, newest first. Empty for other channels.
+  NewChatRowsProvider._({
+    required NewChatRowsFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'newChatRowsProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$newChatRowsHash();
+
+  @override
+  String toString() {
+    return r'newChatRowsProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $ProviderElement<List<SidebarNewChatRow>> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  List<SidebarNewChatRow> create(Ref ref) {
+    final argument = this.argument as String;
+    return newChatRows(ref, argument);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(List<SidebarNewChatRow> value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<List<SidebarNewChatRow>>(value),
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is NewChatRowsProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$newChatRowsHash() => r'7b1b30124e5a14b589035c2f9f31c0e53d70314d';
+
+/// The rows of the forum [channelId] above its thread rows (01 6.8 item 8, brief M4-41): the
+/// draft row while the person's draft of a new post has text (the unsent write of this device,
+/// else the stored draft) or the new chat view of the forum is open and writing, then the posts sent from this device that the server has not created
+/// yet, newest first. Empty for other channels.
+
+final class NewChatRowsFamily extends $Family
+    with $FunctionalFamilyOverride<List<SidebarNewChatRow>, String> {
+  NewChatRowsFamily._()
+    : super(
+        retry: null,
+        name: r'newChatRowsProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// The rows of the forum [channelId] above its thread rows (01 6.8 item 8, brief M4-41): the
+  /// draft row while the person's draft of a new post has text (the unsent write of this device,
+  /// else the stored draft) or the new chat view of the forum is open and writing, then the posts sent from this device that the server has not created
+  /// yet, newest first. Empty for other channels.
+
+  NewChatRowsProvider call(String channelId) =>
+      NewChatRowsProvider._(argument: channelId, from: this);
+
+  @override
+  String toString() => r'newChatRowsProvider';
+}
+
 /// The channel rows of [spaceId]: counters ([channelCounts]), active run, muted state and the
 /// thread group with its collapse state on this device (01 6.8); direct messages and archived
 /// channels are not part of the tree.
@@ -821,7 +928,7 @@ final class ChannelsOfSpaceProvider
   }
 }
 
-String _$channelsOfSpaceHash() => r'b993f192e8ef260e2ba7711d53623f82cc7464ca';
+String _$channelsOfSpaceHash() => r'5d497ca53f57e1e9dbba9d27dae45facf74c9a13';
 
 /// The channel rows of [spaceId]: counters ([channelCounts]), active run, muted state and the
 /// thread group with its collapse state on this device (01 6.8); direct messages and archived
@@ -1231,7 +1338,7 @@ final class RouteSelectionProvider
   }
 }
 
-String _$routeSelectionHash() => r'd440e99f2d13185f83e8d49cc223152a206da66d';
+String _$routeSelectionHash() => r'6a84685cb9b1aabe894d5a37c000f029d0d1fe28';
 
 /// The selection of [path] (path and query of the router), read from the local database; the
 /// selected sidebar row and the post list follow it (brief M4-19 Design note 5).

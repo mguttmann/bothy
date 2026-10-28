@@ -17,15 +17,18 @@ import 'package:go_router/go_router.dart';
 import 'package:l10n/l10n.dart';
 import 'package:sync_engine/sync_engine.dart';
 
+import '../../forum/new_chat_view.dart';
 import '../../forum/post_list_column.dart';
 import '../../forum/providers.dart' show overviewPinnedProvider;
 import '../../keyboard/app_shortcuts.dart';
 import '../../keyboard/intents.dart';
 import '../../session_column/session_column.dart';
 import '../../settings/settings_providers.dart';
+import '../../sidebar/channel_entry.dart';
 import '../../sidebar/providers.dart';
 import '../../sidebar/sidebar_column.dart';
-import '../../sidebar/sidebar_model.dart' show SidebarNavigation, SidebarTarget;
+import '../../sidebar/sidebar_model.dart'
+    show SidebarNavigation, SidebarNewChatSelection, SidebarTarget;
 import '../../switcher/providers.dart';
 import '../../switcher/quick_switcher.dart' show showQuickSwitcher;
 import '../../terminal/host_terminal_page.dart';
@@ -117,6 +120,7 @@ class DesktopShell extends ConsumerWidget {
     // The cross-cutting views, the run graph and the terminal of a host have no session
     // column.
     final host = parsed is HostLocation ? parsed : null;
+    final newChat = parsed is NewChatLocation ? parsed : null;
     final isView =
         parsed is ViewLocation || parsed is RunGraphLocation || host != null;
     final hasSession = !isView && sessionThread != null;
@@ -146,6 +150,15 @@ class DesktopShell extends ConsumerWidget {
                 .setOverviewPinned(pinned: !pinned),
           ),
         ),
+        // 01 7, 6.8 item 8: Cmd+N or Ctrl+N starts a new chat in the forum of the focused
+        // sidebar row, else of the selected one; on a text channel it does nothing (M4-41).
+        ShortcutAction.newPost: KeyboardHandler(() {
+          final forum = newChatForum(
+            WidgetsBinding.instance.focusManager.primaryFocus?.context,
+            selected: selection.forum,
+          );
+          if (forum != null) openNewChat(context, ref, forum);
+        }),
         ShortcutAction.nextChannel: KeyboardHandler(nav.next),
         ShortcutAction.previousChannel: KeyboardHandler(nav.previous),
         ShortcutAction.nextUnreadChannel: KeyboardHandler(nav.nextUnread),
@@ -175,7 +188,8 @@ class DesktopShell extends ConsumerWidget {
                     .toDouble(),
                 minWidthThreeColumns: config.desktopMinWidthThreeColumns
                     .toDouble(),
-                stackShowsHistory: parsed is ThreadLocation || host != null,
+                stackShowsHistory:
+                    parsed is ThreadLocation || host != null || newChat != null,
                 showPostList: forum != null && host == null,
                 listPinned: pinned,
                 // The cross-cutting views (search, mentions, Running now) have no session.
@@ -189,6 +203,12 @@ class DesktopShell extends ConsumerWidget {
                   selectedChannel: host == null ? selection.channel : null,
                   selectedThread: host == null ? selection.thread : null,
                   selectedHost: host?.hostId?.value,
+                  newChat: newChat == null
+                      ? null
+                      : SidebarNewChatSelection(
+                          newChat.channelId,
+                          entry: newChat.sentEntry,
+                        ),
                 ),
                 postList: forum == null
                     ? const SizedBox.expand()
@@ -199,6 +219,13 @@ class DesktopShell extends ConsumerWidget {
                       ),
                 history: host != null
                     ? HostTerminalPage(hostId: host.hostId?.value)
+                    : newChat != null
+                    // 01 6.8 item 8: the new chat view in the content column (M4-41).
+                    ? NewChatView(
+                        key: ValueKey('newChat.${location.toString()}'),
+                        forum: newChat.channelId,
+                        sentEntry: newChat.sentEntry,
+                      )
                     : HistoryArea(location: location),
                 session: SessionColumn(threadId: sessionThread),
               ),
@@ -208,4 +235,15 @@ class DesktopShell extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// The forum Cmd+N or Ctrl+N starts a new chat in (01 7, 6.8 item 8; brief M4-41): the forum of
+/// the sidebar row that has the focus ([focused] is the context of the focused node), else the
+/// [selected] forum of the route. A focused row of a text channel gives null, because threads
+/// there come from messages (01 3.1).
+ChannelId? newChatForum(BuildContext? focused, {required ChannelId? selected}) {
+  final row = focused?.findAncestorWidgetOfExactType<ChannelEntry>();
+  if (row == null) return selected;
+  final channel = row.entry.channel;
+  return channel.kind == ChannelKind.forum ? channel.id : null;
 }

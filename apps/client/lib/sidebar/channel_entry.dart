@@ -41,7 +41,16 @@ class ChannelEntry extends StatefulWidget {
     this.onToggleGroup,
     this.onAdd,
     this.onParent,
+    this.selectedNewChat,
+    this.onOpenNewChat,
   });
+
+  /// The new chat row the route selects, or null (brief M4-41).
+  final SidebarNewChatSelection? selectedNewChat;
+
+  /// Opens a new chat row of this forum: its draft (null) or the sent post of an outbox entry;
+  /// null shows none.
+  final ValueChanged<String?>? onOpenNewChat;
 
   /// The channel with its counters, states and thread group.
   final SidebarChannel entry;
@@ -75,12 +84,13 @@ class _ChannelEntryState extends State<ChannelEntry> {
   final FocusNode _channel = FocusNode(debugLabel: 'sidebar.channel');
   final FocusNode _allPosts = FocusNode(debugLabel: 'sidebar.allPosts');
   final Map<ThreadId, FocusNode> _threads = {};
+  final Map<String, FocusNode> _newChats = {};
 
   @override
   void dispose() {
     _channel.dispose();
     _allPosts.dispose();
-    for (final n in _threads.values) {
+    for (final n in [..._threads.values, ..._newChats.values]) {
       n.dispose();
     }
     super.dispose();
@@ -89,16 +99,28 @@ class _ChannelEntryState extends State<ChannelEntry> {
   FocusNode _threadNode(ThreadId id) =>
       _threads.putIfAbsent(id, () => FocusNode(debugLabel: 'sidebar.thread'));
 
-  /// Drops the nodes of rows that left, so the map does not grow with every thread ever shown.
-  void _prune(Iterable<ThreadId> shown) {
-    final keep = shown.toSet();
+  /// The key of a new chat row: its outbox entry, or `draft`.
+  static String _newChatKey(SidebarNewChatRow row) => row.entryId ?? 'draft';
+
+  FocusNode _newChatNode(SidebarNewChatRow row) => _newChats.putIfAbsent(
+    _newChatKey(row),
+    () => FocusNode(debugLabel: 'sidebar.newChat'),
+  );
+
+  /// Drops the nodes of rows that left, so the maps do not grow with every row ever shown.
+  void _prune(Iterable<ThreadId> shown, Iterable<String> newChats) {
+    _dropAbsent(_threads, shown.toSet());
+    _dropAbsent(_newChats, newChats.toSet());
+  }
+
+  static void _dropAbsent<K>(Map<K, FocusNode> nodes, Set<K> keep) {
     final gone = [
-      for (final id in _threads.keys)
+      for (final id in nodes.keys)
         if (!keep.contains(id)) id,
     ];
     for (final id in gone) {
       // The row that held it is gone from the tree in this build; dispose after the frame.
-      final node = _threads.remove(id)!;
+      final node = nodes.remove(id)!;
       WidgetsBinding.instance.addPostFrameCallback((_) => node.dispose());
     }
   }
@@ -112,8 +134,13 @@ class _ChannelEntryState extends State<ChannelEntry> {
     final grouped = toggle != null && e.hasGroup;
     if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
       if (!grouped) return KeyEventResult.ignored;
+      final newChats = widget.onOpenNewChat == null
+          ? const <SidebarNewChatRow>[]
+          : e.visibleNewChatRows;
       if (!e.expanded) {
         toggle(true);
+      } else if (newChats.isNotEmpty) {
+        _newChatNode(newChats.first).requestFocus();
       } else if (e.visibleThreads.isNotEmpty) {
         _threadNode(e.visibleThreads.first.thread.id).requestFocus();
       }
@@ -153,10 +180,22 @@ class _ChannelEntryState extends State<ChannelEntry> {
     final e = w.entry;
     final grouped = w.onOpenThread != null;
     final rows = grouped ? e.visibleThreads : const <SidebarThread>[];
-    _prune([for (final r in rows) r.thread.id]);
-    final threadSelected = rows.any((r) => r.thread.id == w.selectedThread);
+    final newChats = grouped && w.onOpenNewChat != null
+        ? e.visibleNewChatRows
+        : const <SidebarNewChatRow>[];
+    _prune(
+      [for (final r in rows) r.thread.id],
+      [for (final r in newChats) _newChatKey(r)],
+    );
+    final newChat = w.selectedNewChat;
+    final threadSelected =
+        rows.any((r) => r.thread.id == w.selectedThread) ||
+        (newChat != null && newChat.forum == e.channel.id);
     final forum = e.channel.kind == ChannelKind.forum;
     final rest = grouped ? e.allPostsCounts : null;
+    final addLabel = e.channel.projectBound
+        ? l.sidebarNewChatIn(e.channel.name)
+        : l.sidebarNewPostIn(e.channel.name);
     final channelRow = Padding(
       padding: const EdgeInsetsDirectional.only(
         start: DsSpace.s16,
@@ -166,6 +205,9 @@ class _ChannelEntryState extends State<ChannelEntry> {
       // directional focus for every row inside it.
       child: ChannelMenu(
         channel: e.channel,
+        // 01 6.8 item 8: the context menu of a forum has the same entry as "+".
+        newChatLabel: forum && w.onAdd != null ? addLabel : null,
+        onNewChat: forum ? w.onAdd : null,
         child: Focus(
           canRequestFocus: false,
           skipTraversal: true,
@@ -182,22 +224,29 @@ class _ChannelEntryState extends State<ChannelEntry> {
             focusNode: _channel,
             groupExpanded: grouped && e.hasGroup ? e.expanded : null,
             onToggleGroup: grouped && e.hasGroup ? w.onToggleGroup : null,
-            addLabel: forum && w.onAdd != null
-                ? (e.channel.projectBound
-                      ? l.sidebarNewChatIn(e.channel.name)
-                      : l.sidebarNewPostIn(e.channel.name))
-                : null,
+            addLabel: forum && w.onAdd != null ? addLabel : null,
             onAdd: forum ? w.onAdd : null,
           ),
         ),
       ),
     );
-    if (rows.isEmpty) return channelRow;
+    if (rows.isEmpty && newChats.isEmpty) return channelRow;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
         channelRow,
+        // The draft row and the sent posts at the top of the group (01 6.8 item 8, M4-41).
+        for (final (i, r) in newChats.indexed)
+          NewChatEntry(
+            channel: e.channel.id,
+            row: r,
+            selected: newChat?.selects(e.channel.id, r) ?? false,
+            last: rest == null && rows.isEmpty && i == newChats.length - 1,
+            onOpen: () => w.onOpenNewChat!(r.entryId),
+            focusNode: _newChatNode(r),
+            onKeyEvent: _onRowKey,
+          ),
         for (final (i, r) in rows.indexed)
           ThreadEntry(
             entry: r,

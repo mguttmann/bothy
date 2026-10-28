@@ -548,10 +548,7 @@
   "postListFailureReason": "Grund: {reason}",
   "postListLabel": "Beitragsliste von {forum}",
   "newPostTitle": "Titel",
-  "newPostMessage": "Erste Nachricht",
   "newPostTags": "Tags",
-  "newPostCreate": "Beitrag erstellen",
-  "newPostCancel": "Abbrechen",
   "adminTitle": "Verwaltung",
   "adminBack": "Zurück zum Chat",
   "adminNavPeople": "Personen",
@@ -2127,7 +2124,7 @@
   "shortcutQuickSwitcher": "Schnellwechsel",
   "shortcutSearch": "Suche",
   "shortcutSearchInThread": "Im Thread suchen",
-  "shortcutNewPost": "Neuer Beitrag oder neuer Chat im aktuellen Forum",
+  "shortcutNewPost": "Neuer Beitrag oder neuer Chat im Forum der fokussierten oder ausgewählten Zeile",
   "shortcutFocusInput": "Zum Eingabefeld",
   "shortcutChannel": "Nächster oder vorheriger Kanal oder Thread in der Seitenleiste",
   "shortcutUnreadChannel": "Nächster oder vorheriger ungelesener Kanal oder Thread",
@@ -2454,6 +2451,5 @@
   "sidebarDraftNotSent": "Nicht gesendet",
   "newChatTitleOptional": "Titel (optional)",
   "newChatTitleAgentHint": "Der Agent benennt den Chat nach seiner ersten Antwort.",
-  "newChatTitleMissing": "Gib einen Titel ein, um zu senden.",
-  "newChatEditing": "Dieser Beitrag wurde nicht gesendet. Ändere ihn und sende ihn erneut."
+  "newChatTitleMissing": "Gib einen Titel ein, um zu senden."
 }
