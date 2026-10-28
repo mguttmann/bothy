@@ -419,25 +419,6 @@ export class MemoryInboxStore implements InboxStore {
   }
 
   /**
-   * Counts a redelivery; see {@link InboxStore.redelivered}.
-   *
-   * @param eventId - The envelope `id`.
-   * @param token - The token of the redelivery, if any.
-   * @param iat - Its `iat`.
-   * @param jti - Its `jti`.
-   * @returns The entry after the update.
-   * @throws `RangeError` when the event is not stored.
-   */
-  redelivered(
-    eventId: string,
-    token: Secret | undefined,
-    iat: number | undefined,
-    jti: string | undefined,
-  ): Promise<InboxEntry> {
-    return this.update(eventId, (e) => afterRedelivery(e, token, iat, jti));
-  }
-
-  /**
    * Replaces the token; see {@link InboxStore.replaceToken}.
    *
    * @param eventId - The envelope `id`.
@@ -458,6 +439,25 @@ export class MemoryInboxStore implements InboxStore {
     return this.update(eventId, (e) =>
       afterGrant(e, token, iat, jti, replaces),
     );
+  }
+
+  /**
+   * Counts a redelivery; see {@link InboxStore.redelivered}.
+   *
+   * @param eventId - The envelope `id`.
+   * @param token - The token of the redelivery, if any.
+   * @param iat - Its `iat`.
+   * @param jti - Its `jti`.
+   * @returns The entry after the update.
+   * @throws `RangeError` when the event is not stored.
+   */
+  redelivered(
+    eventId: string,
+    token: Secret | undefined,
+    iat: number | undefined,
+    jti: string | undefined,
+  ): Promise<InboxEntry> {
+    return this.update(eventId, (e) => afterRedelivery(e, token, iat, jti));
   }
 
   /**
