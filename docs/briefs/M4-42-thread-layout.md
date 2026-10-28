@@ -71,7 +71,7 @@ Fragments: `docs/decisions.d/M4-42.md` (`D-M4-42-<n>`), changelog fragment `chan
 - Do not modify files outside the scope above, except the fragments and READMEs named in this brief.
 - Tests bind no port and make no network call; time comes from the injected clock.
 - Never lower a threshold, disable a gate, delete a test or raise `repo.max_file_kb`.
-- Where the merged code names a type, file, provider or make target differently from this brief, follow the code and list each difference in the report.
+- This brief was written after M4-40 and M4-41 merged, in the manner of D-W-100 and D-W-114. Where the merged code names a package, type, function, file, provider or make target differently from this brief, follow the code and list each difference in the report; where it behaves differently from the specification, stop with `Verdict: BLOCKED <reason>`.
 
 ## Design notes
 
@@ -112,8 +112,12 @@ Commands that must pass, from the repository root:
 
 ## Report
 
+Write to `{{REPORT_PATH}}`:
+
 1. First line exactly `Verdict: DONE` or `Verdict: BLOCKED <reason>`.
 2. Commits, changed files, test results (the red run before the change and the green run after).
 3. Review and red team verdicts and the findings fixed.
 4. What is not proven (for example a platform test that ran only in CI).
 5. Follow-ups that could not be done in this scope, each with its reason, and every difference to the names of this brief.
+
+Then write `{{DONE_PATH}}` with `exit=0 sha=<sha>` or `exit=1 <reason>`.
