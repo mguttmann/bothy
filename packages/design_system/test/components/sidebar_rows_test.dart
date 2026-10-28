@@ -1341,4 +1341,77 @@ void main() {
       );
     });
   });
+
+  group('space row action (01 6.9 item 1, M4-43)', () {
+    testWidgets('"+" shows on hover, focus and touch and starts the action', (
+      tester,
+    ) async {
+      final handle = tester.ensureSemantics();
+      const label = 'New project in Engineering';
+      var added = 0;
+      Future<DsSpaceRowState> show({
+        DsDensityMode density = DsDensityMode.comfortable,
+        bool withAction = true,
+      }) async {
+        await pumpDs(
+          tester,
+          _onSidebar(
+            DsSpaceRow(
+              const DsSpaceRowData(
+                id: 's',
+                name: 'Engineering',
+                icon: 'headset',
+                category: DsCategory.loch,
+              ),
+              onToggle: (_) {},
+              addLabel: withAction ? label : null,
+              onAdd: withAction ? () => added++ : null,
+            ),
+          ),
+          density: density,
+        );
+        return tester.state<DsSpaceRowState>(find.byType(DsSpaceRow));
+      }
+
+      var state = await show();
+      expect(state.addVisible, isFalse);
+      expect(find.bySemanticsLabel(label), findsNothing);
+      expect(_icon(DsIcons.actionNew), findsNothing);
+
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await mouse.addPointer(location: Offset.zero);
+      addTearDown(mouse.removePointer);
+      await mouse.moveTo(tester.getCenter(find.byType(DsSpaceRow)));
+      await tester.pump();
+      expect(state.addVisible, isTrue);
+      expect(find.byTooltip(label), findsOneWidget);
+      await tester.tap(find.bySemanticsLabel(label));
+      expect(added, 1);
+      await mouse.moveTo(const Offset(590, 500));
+      await tester.pump();
+      expect(state.addVisible, isFalse);
+
+      // Keyboard: the row, then Tab reaches the action and Enter starts it.
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pump();
+      expect(state.addVisible, isTrue);
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      expect(added, 2);
+      primaryFocus?.unfocus();
+      await tester.pump();
+
+      state = await show(density: DsDensityMode.touch);
+      expect(state.addVisible, isTrue);
+      expect(
+        tester.getSemantics(find.bySemanticsLabel(label)),
+        isSemantics(isButton: true, hasTapAction: true),
+      );
+
+      state = await show(withAction: false, density: DsDensityMode.touch);
+      expect(state.addVisible, isFalse);
+      expect(dsSemanticsProblems(tester), isEmpty);
+      handle.dispose();
+    });
+  });
 }

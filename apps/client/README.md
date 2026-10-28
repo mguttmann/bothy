@@ -52,6 +52,7 @@ SHA-256 of uploads and downloads), and for files and voice (M4-22, docs/DECISION
 | `lib/app/layout/` | the desktop shell, the four columns and their stored widths |
 | `lib/sidebar/` | the sidebar column (M4-19): head, space tree, channel rows, foot, personal order, `SidebarNavigation` for M4-24; the thread groups with their selection, rows and "All posts" (M4-40) |
 | `lib/forum/` | the forum overview D15 (M4-19, M4-40): head with the kind sentence, "Pin" and filters, rows, Done section, paging, and the new chat view (M4-41) |
+| `lib/new_project/` | the new project dialog (M4-43): name suggestion and field checks, the steps of `NewProjectFlow`, the port over the API and the outbox, the dialog |
 | `lib/thread/` | the history column (M4-20): header, message list with paging, gaps and jumps, message tiles and actions, outbox rows, dialogs (versions, conflict, delete, reactions, title, move), the D2 layout |
 | `lib/composer/` | the composer (M4-20): send path, draft sync, mention suggestions, templates |
 | `lib/session_column/` | the frame of the session column with the agent part (M4-21) and the sections "Pinned" (M4-20) and "Files" (M4-22) |
@@ -712,6 +713,26 @@ scrolls, or a screen reader runs while M1 is the page on screen (Design note 1).
 channel and its rows are nested nodes of the semantics tree, so screen readers get the levels
 space, channel, thread. There is no pinned column and no Cmd+Shift+O on the phone; the collapse
 state of a group is kept per device as on the desktop. Rulings: docs/decisions.d/M5-15.md.
+
+### New project (M4-43)
+
+For an owner (`getMe` `is_owner`) every space row on the desktop has "+" ("New project in
+`space`", shown on hover and focus) and the space menu starts with the same entry (01 6.9). It
+opens `lib/new_project/new_project_dialog.dart` with four modes: an empty project, a clone of an
+`https` repository, an existing folder under the runner's projects folder, and an idea. The name
+is suggested from the URL or the first words of the idea until the person types one
+(`ui.new_project_name_max_chars`), and the runner is the space's default operator unless another
+active agent is chosen. "Create" runs `NewProjectFlow`: `createChannel` (forum, one
+`Idempotency-Key` per name), `setChannelOperator` only for another runner, `putProjectBinding`
+with `provision` (`init`, `clone` or `none`), then `getChannelBehavior` every
+`ui.new_project_poll_interval` until the binding is ready or carries a `ready_reason` other than
+`provisioning`; for an idea it first stores the idea as the forum's new post draft and, once
+ready, sends it through the outbox with `clear_draft` and an empty title. The dialog lists the
+steps with their states, names a failed step with one sentence (a problem of the server, a
+cancelled step-up, no answer, or the runner's reason of 09 18.12), and "Try again" resumes there
+with the fields of the steps not done; after `ui.new_project_wait` without readiness it says that
+the runner has not finished. When every step is done it opens the forum, for an idea the new
+chat. The phone has no entry (D-M4-43-12). Rulings: docs/decisions.d/M4-43.md.
 
 ## Notification levels and channel export
 

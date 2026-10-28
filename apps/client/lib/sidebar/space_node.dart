@@ -36,6 +36,7 @@ class SpaceNode extends StatefulWidget {
     this.onOpenThread,
     this.onToggleGroup,
     this.onAdd,
+    this.onNewProject,
     this.selectedNewChat,
     this.onOpenNewChat,
     this.onMoveUp,
@@ -73,6 +74,9 @@ class SpaceNode extends StatefulWidget {
   /// The "+" action of a forum row (01 6.8 item 8), or null for none.
   final ValueChanged<ChannelId>? onAdd;
 
+  /// The action "New project" of the space row and its menu (01 6.9 item 1), or null for none.
+  final ValueChanged<Space>? onNewProject;
+
   /// Wraps the space row so it starts a drag of the space (the list's drag listener), or null.
   final Widget Function(Widget row)? dragHandle;
 
@@ -108,12 +112,18 @@ class _SpaceNodeState extends State<SpaceNode> {
       :onOpenThread,
       :onToggleGroup,
       :onAdd,
+      :onNewProject,
       :selectedNewChat,
       :onOpenNewChat,
       :onMoveUp,
       :onMoveDown,
       :dragHandle,
     ) = widget;
+    final space = node.entry.space;
+    final newProject = onNewProject == null ? null : () => onNewProject(space);
+    final newProjectLabel = newProject == null
+        ? null
+        : l.newProjectIn(space.name);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
@@ -136,11 +146,15 @@ class _SpaceNodeState extends State<SpaceNode> {
                 padding: const EdgeInsets.only(top: DsSpace.s4),
                 child: SpaceMenu(
                   space: node.entry.space,
+                  newProjectLabel: newProjectLabel,
+                  onNewProject: newProject,
                   child: DsSpaceRow(
                     node.rowData,
                     key: ValueKey('sidebar.space.${node.entry.space.id.value}'),
                     onToggle: onToggle,
                     focusNode: _row,
+                    addLabel: newProjectLabel,
+                    onAdd: newProject,
                   ),
                 ),
               ),

@@ -31,6 +31,7 @@ class SpaceTree extends StatelessWidget {
     this.onOpenThread,
     this.onToggleGroup,
     this.onAdd,
+    this.onNewProject,
     this.selectedNewChat,
     this.onOpenNewChat,
   });
@@ -67,6 +68,9 @@ class SpaceTree extends StatelessWidget {
 
   /// The "+" action of a forum row, or null for none.
   final ValueChanged<ChannelId>? onAdd;
+
+  /// The action "New project" of a space row and its menu (01 6.9 item 1), or null for none.
+  final ValueChanged<Space>? onNewProject;
 
   @override
   Widget build(BuildContext context) {
@@ -110,6 +114,7 @@ class SpaceTree extends StatelessWidget {
               onOpenThread: onOpenThread,
               onToggleGroup: onToggleGroup,
               onAdd: onAdd,
+              onNewProject: onNewProject,
               selectedNewChat: selectedNewChat,
               onOpenNewChat: onOpenNewChat,
               onMoveUp: i > 0 ? () => onMove(id, i - 1) : null,

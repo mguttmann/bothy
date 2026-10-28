@@ -14837,6 +14837,288 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Enter a title to send.'**
   String get newChatTitleMissing;
+
+  /// Label of the action at a space row and of the space menu entry that opens the new project dialog, and the title of that dialog (01 section 6.9).
+  ///
+  /// In en, this message translates to:
+  /// **'New project in {name}'**
+  String newProjectIn(String name);
+
+  /// Label of the mode choice of the new project dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Start with'**
+  String get newProjectModeLabel;
+
+  /// Mode of the new project dialog: a new empty folder with Git.
+  ///
+  /// In en, this message translates to:
+  /// **'Empty project'**
+  String get newProjectModeEmpty;
+
+  /// Mode of the new project dialog: clone an https repository.
+  ///
+  /// In en, this message translates to:
+  /// **'Clone repository'**
+  String get newProjectModeClone;
+
+  /// Mode of the new project dialog: bind a folder that exists under the runner's projects folder.
+  ///
+  /// In en, this message translates to:
+  /// **'Existing folder'**
+  String get newProjectModeExisting;
+
+  /// Mode of the new project dialog: an empty project whose first chat is the idea.
+  ///
+  /// In en, this message translates to:
+  /// **'Start from an idea'**
+  String get newProjectModeIdea;
+
+  /// Label of the name field of the new project dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get newProjectName;
+
+  /// Hint below the name field of the new project dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Used for the forum and the folder.'**
+  String get newProjectNameHint;
+
+  /// Error of the name field of the new project dialog; max is ui.new_project_name_max_chars.
+  ///
+  /// In en, this message translates to:
+  /// **'Use letters, digits, dots, underscores or hyphens, starting with a letter or digit, at most {max} characters.'**
+  String newProjectNameInvalid(int max);
+
+  /// Label of the URL field of the new project dialog in the clone mode.
+  ///
+  /// In en, this message translates to:
+  /// **'Repository URL (https)'**
+  String get newProjectUrl;
+
+  /// Error of the URL field of the new project dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter an https URL with a server name, without user name, query or fragment.'**
+  String get newProjectUrlInvalid;
+
+  /// Label of the folder field of the new project dialog in the existing folder mode.
+  ///
+  /// In en, this message translates to:
+  /// **'Folder in the runner\'s projects folder'**
+  String get newProjectFolder;
+
+  /// Error of the folder field of the new project dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a folder inside the projects folder, for example team/website.'**
+  String get newProjectFolderInvalid;
+
+  /// Label of the idea field of the new project dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Your idea'**
+  String get newProjectIdea;
+
+  /// Error of the empty idea field of the new project dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Describe the idea.'**
+  String get newProjectIdeaRequired;
+
+  /// Label of the runner choice of the new project dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Runner'**
+  String get newProjectRunner;
+
+  /// Entry of the runner choice for the space's default operator.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} (default of the space)'**
+  String newProjectRunnerSpace(String name);
+
+  /// Error of the runner choice of the new project dialog without a runner.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose the agent that works on the project.'**
+  String get newProjectRunnerMissing;
+
+  /// Button of the new project dialog that starts the steps.
+  ///
+  /// In en, this message translates to:
+  /// **'Create'**
+  String get newProjectCreate;
+
+  /// Button of the new project dialog after a failed step.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get newProjectRetry;
+
+  /// Button of the new project dialog that closes it and keeps what exists.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get newProjectClose;
+
+  /// Button of the new project dialog before the start.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get newProjectCancel;
+
+  /// Step of the new project dialog: create the forum.
+  ///
+  /// In en, this message translates to:
+  /// **'Create forum'**
+  String get newProjectStepForum;
+
+  /// Step of the new project dialog: set the runner as the forum's operator.
+  ///
+  /// In en, this message translates to:
+  /// **'Assign runner'**
+  String get newProjectStepRunner;
+
+  /// Step of the new project dialog: create the project binding.
+  ///
+  /// In en, this message translates to:
+  /// **'Bind project'**
+  String get newProjectStepBind;
+
+  /// Step of the new project dialog: the runner checks the folder.
+  ///
+  /// In en, this message translates to:
+  /// **'Prepare folder'**
+  String get newProjectStepFolder;
+
+  /// Step of the new project dialog: the runner creates the folder.
+  ///
+  /// In en, this message translates to:
+  /// **'Creating folder'**
+  String get newProjectStepCreating;
+
+  /// Step of the new project dialog: the runner clones the repository.
+  ///
+  /// In en, this message translates to:
+  /// **'Cloning'**
+  String get newProjectStepCloning;
+
+  /// Step of the new project dialog: the idea becomes the first chat.
+  ///
+  /// In en, this message translates to:
+  /// **'Send the idea'**
+  String get newProjectStepIdea;
+
+  /// Screen reader text of a step of the new project dialog with its state.
+  ///
+  /// In en, this message translates to:
+  /// **'{step}: {state, select, waiting{waiting} running{running} finished{finished} other{failed}}'**
+  String newProjectStepState(String step, String state);
+
+  /// Notice of the new project dialog after ui.new_project_wait without readiness (01 section 6.9 item 6).
+  ///
+  /// In en, this message translates to:
+  /// **'The runner has not finished yet. You can close this dialog; the forum becomes ready by itself.'**
+  String get newProjectSlow;
+
+  /// Failure of the step create forum: the name is taken.
+  ///
+  /// In en, this message translates to:
+  /// **'This space already has a channel with this name. Choose another name.'**
+  String get newProjectErrNameTaken;
+
+  /// Failure of the step bind project: workspace_ref taken.
+  ///
+  /// In en, this message translates to:
+  /// **'This folder is already bound to another forum.'**
+  String get newProjectErrFolderBound;
+
+  /// Failure of a step of the new project dialog: the step-up was cancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'The confirmation was cancelled. Try again to continue.'**
+  String get newProjectErrStepUp;
+
+  /// Failure of a step of the new project dialog without an answer of the server.
+  ///
+  /// In en, this message translates to:
+  /// **'The server cannot be reached. Try again when you are online.'**
+  String get newProjectErrOffline;
+
+  /// Failure of the step prepare folder: reason workspace_exists (09 section 18.12).
+  ///
+  /// In en, this message translates to:
+  /// **'A folder with this name already exists on the runner. Choose another name, or bind it as an existing folder.'**
+  String get newProjectErrWorkspaceExists;
+
+  /// Failure of the step prepare folder: reason clone_failed.
+  ///
+  /// In en, this message translates to:
+  /// **'The repository could not be cloned. Check the URL and the runner\'s access to it.'**
+  String get newProjectErrCloneFailed;
+
+  /// Failure of the step prepare folder: reason init_failed.
+  ///
+  /// In en, this message translates to:
+  /// **'The runner could not create the folder.'**
+  String get newProjectErrInitFailed;
+
+  /// Failure of the step prepare folder: reason provision_timeout.
+  ///
+  /// In en, this message translates to:
+  /// **'Creating the folder took too long, so the runner stopped it.'**
+  String get newProjectErrTimeout;
+
+  /// Failure of the step prepare folder: reason provision_refused.
+  ///
+  /// In en, this message translates to:
+  /// **'The runner refused the name or the URL.'**
+  String get newProjectErrRefused;
+
+  /// Failure of the step prepare folder: reason workspace_missing.
+  ///
+  /// In en, this message translates to:
+  /// **'The folder does not exist in the runner\'s projects folder.'**
+  String get newProjectErrMissing;
+
+  /// Failure of the step prepare folder: reason not_a_git_worktree.
+  ///
+  /// In en, this message translates to:
+  /// **'The folder is not a Git repository.'**
+  String get newProjectErrNotGit;
+
+  /// Failure of the step prepare folder: reason not_writable.
+  ///
+  /// In en, this message translates to:
+  /// **'The runner may not write to the folder.'**
+  String get newProjectErrNotWritable;
+
+  /// Failure of the step prepare folder: reason outside_root.
+  ///
+  /// In en, this message translates to:
+  /// **'The folder is outside the runner\'s projects folder.'**
+  String get newProjectErrOutsideRoot;
+
+  /// Failure of the step prepare folder with a reason the app does not know; code is the reason code.
+  ///
+  /// In en, this message translates to:
+  /// **'The runner reports that the project is not ready ({code}).'**
+  String newProjectErrNotReady(String code);
+
+  /// Reason of the audit entries of the project binding and the runner assignment of the new project dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'New project from the app'**
+  String get newProjectAuditReason;
+
+  /// Purpose shown by the step-up prompt of the new project dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Create the project {name}'**
+  String stepUpPurposeNewProject(String name);
 }
 
 class _AppLocalizationsDelegate

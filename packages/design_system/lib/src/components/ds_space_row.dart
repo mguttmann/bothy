@@ -40,10 +40,15 @@ Color dsCategoryOnSidebar(BuildContext context, DsCategory category) {
 /// the row shows [DsSpaceRowData.expanded] until the caller passes the new value (the state is
 /// synchronized through `sidebar.update`). Screen readers get the expanded or collapsed state.
 ///
+/// A space where the person may add a project passes [addLabel] and [onAdd] for the action "+"
+/// (`action.new`) at the trailing edge (01 6.9 item 1): it is built on hover, while the keyboard
+/// focus is on or inside the row, and always in the density `touch`, like the "+" of a forum row
+/// (components.md 7); a Tab after the row reaches it.
+///
 /// ```dart
 /// DsSpaceRow(space, onToggle: (expanded) => setExpanded(space.id, expanded))
 /// ```
-class DsSpaceRow extends StatelessWidget {
+class DsSpaceRow extends StatefulWidget {
   /// The alpha of the icon tile in the category color; the token set has no tint role for a
   /// tile on the sidebar (components.md 7 "a lightly tinted tile of the same color").
   static const double _tileTint = 0.16;
@@ -54,7 +59,12 @@ class DsSpaceRow extends StatelessWidget {
     super.key,
     required this.onToggle,
     this.focusNode,
-  });
+    this.addLabel,
+    this.onAdd,
+  }) : assert(
+         (addLabel == null) == (onAdd == null),
+         'addLabel and onAdd come together',
+       );
 
   /// The space.
   final DsSpaceRowData data;
@@ -66,8 +76,86 @@ class DsSpaceRow extends StatelessWidget {
   /// left on a channel goes to its space, D-SB-8); null makes its own.
   final FocusNode? focusNode;
 
+  /// The label and tooltip of the action "+", for example "New project in Engineering"; null
+  /// for no action.
+  final String? addLabel;
+
+  /// Starts the action "+"; null for no action.
+  final VoidCallback? onAdd;
+
+  @override
+  State<DsSpaceRow> createState() => DsSpaceRowState();
+}
+
+/// State of [DsSpaceRow]; exposes whether the action "+" is built to tests.
+class DsSpaceRowState extends State<DsSpaceRow> {
+  bool _hovered = false;
+  bool _focusInside = false;
+
+  /// Whether the action "+" is built now: hover, focus on or inside the row, or the density
+  /// `touch`.
+  @visibleForTesting
+  bool get addVisible =>
+      widget.addLabel != null &&
+      widget.onAdd != null &&
+      (_hovered ||
+          _focusInside ||
+          context.dsDensity.targetMin >= DsDensity.touch.targetMin);
+
   @override
   Widget build(BuildContext context) {
+    final row = _row(context);
+    final label = widget.addLabel;
+    // Without an action the row is the node itself, as before the action existed.
+    if (label == null || widget.onAdd == null) return row;
+    final line = Row(
+      children: [
+        Expanded(child: row),
+        if (addVisible) ...[
+          Tooltip(
+            message: label,
+            excludeFromSemantics: true,
+            child: DsTappable(
+              onTap: widget.onAdd,
+              label: label,
+              onSidebar: true,
+              hoverColor: context.dsColors.surfaceSidebarHover,
+              excludeChildSemantics: true,
+              child: Center(
+                widthFactor: 1,
+                heightFactor: 1,
+                child: DsIcon(
+                  DsIcons.actionNew,
+                  size: DsIconSizeRole.sm,
+                  color: context.dsColors.textOnSidebarSecondary,
+                  decorative: true,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: DsSpace.s4),
+        ],
+      ],
+    );
+    // Hover and focus decide whether "+" is built; this node only listens, it never takes the
+    // focus or a Tab stop itself.
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: Focus(
+        canRequestFocus: false,
+        skipTraversal: true,
+        includeSemantics: false,
+        onFocusChange: (focused) => setState(() => _focusInside = focused),
+        child: line,
+      ),
+    );
+  }
+
+  Widget _row(BuildContext context) {
+    final data = widget.data;
+    final onToggle = widget.onToggle;
+    final focusNode = widget.focusNode;
     final l = dsL10n(context);
     final c = context.dsColors;
     final tint = dsCategoryOnSidebar(context, data.category);
@@ -117,7 +205,7 @@ class DsSpaceRow extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.all(DsSpace.s2),
                   decoration: BoxDecoration(
-                    color: tint.withValues(alpha: _tileTint),
+                    color: tint.withValues(alpha: DsSpaceRow._tileTint),
                     borderRadius: BorderRadius.circular(DsRadius.sm),
                   ),
                   child: VectorGraphic(
