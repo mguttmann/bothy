@@ -411,6 +411,7 @@ class _SentPaneState extends ConsumerState<_SentPane> {
   StreamSubscription<String>? _created;
   bool _left = false;
   bool _checking = false;
+  bool _recheck = false;
 
   @override
   void initState() {
@@ -433,23 +434,43 @@ class _SentPaneState extends ConsumerState<_SentPane> {
 
   /// The entry is missing from the forum's waiting posts. The outbox's stream follows a write
   /// a moment later, so right after the send that list can predate the entry; the outbox
-  /// decides: a waiting or refused entry keeps the view, and an entry that was confirmed or is
-  /// gone without this run seeing its answer (another run sent it) leaves to the overview,
-  /// which shows the post.
+  /// decides: a waiting or refused entry keeps the view. A confirmed or deleted entry is
+  /// created: the echo of its first message can confirm it before the answer of the request
+  /// (04 13.2), and the stored first message (its `client_msg_id` is the entry) names the new
+  /// post's thread. Only without any of these (another run sent it, and its messages are not
+  /// stored here) does the view leave to the overview, which shows the post.
   Future<void> _checkLeft() async {
-    if (_checking || _left) return;
+    if (_left) return;
+    if (_checking) {
+      // A change during a check may postdate what it read: check once more afterwards.
+      _recheck = true;
+      return;
+    }
     _checking = true;
-    final entry = await ref
-        .read(localDatabaseProvider)
-        ?.outboxDao
-        .byId(widget.entry);
-    _checking = false;
-    if (!mounted || _left) return;
-    final thread = ref.read(createdPostsProvider).threadOf(widget.entry);
-    if (thread != null) return _open(thread);
-    if (entry != null && entry.state != OutboxState.confirmed) return;
-    _left = true;
-    context.go('/c/${widget.forum.value}');
+    try {
+      do {
+        _recheck = false;
+        final db = ref.read(localDatabaseProvider);
+        final entry = await db?.outboxDao.byId(widget.entry);
+        final waits = entry != null && entry.state != OutboxState.confirmed;
+        final echoed = waits
+            ? null
+            : await db?.messagesDao.threadOfClientMsg(
+                MessageId.parse(widget.entry),
+              );
+        if (!mounted || _left) return;
+        final thread =
+            ref.read(createdPostsProvider).threadOf(widget.entry) ?? echoed;
+        if (thread != null) return _open(thread);
+        if (!waits) {
+          _left = true;
+          context.go('/c/${widget.forum.value}');
+          return;
+        }
+      } while (_recheck);
+    } finally {
+      _checking = false;
+    }
   }
 
   @override

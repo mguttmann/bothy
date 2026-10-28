@@ -2,8 +2,9 @@
 
 // The view of a sent new post (brief M4-41 requirement 14; 01 6.6): it waits while the outbox
 // holds the entry, also when the list of the forum's waiting posts it watches still predates the
-// send, opens the new post's history once the server created it, and leaves to the overview
-// only when the entry is gone without this run seeing its answer.
+// send, opens the new post's history once the server created it (by the answer of the request
+// or by the echo of the first message, which can come first), and leaves to the overview only
+// when the entry is gone and nothing names its thread.
 
 import 'package:client/forum/new_chat_view.dart';
 import 'package:client/forum/providers.dart';
@@ -14,6 +15,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../support/column_host.dart';
 import '../support/structure.dart';
+import '../support/thread_fixtures.dart' show msg;
 
 void main() {
   final forum = channel(1, kind: ChannelKind.forum, name: 'server');
@@ -85,6 +87,29 @@ void main() {
         created: CreatedPosts(),
       );
       expect(host.visited.last, overview);
+      await host.dispose(tester);
+    },
+  );
+
+  testWidgets(
+    'an entry its echo confirmed opens the history of the stored first message',
+    (tester) async {
+      final host = await openHost(tester);
+      const entry = '01a18171-cbe5-72dc-92e0-f704ca0ea3ec';
+      // The echo of the first message stored it and deleted the entry before the answer of
+      // the request recorded the thread (04 13.2).
+      await tester.runAsync(
+        () => host.db.messagesDao.upsertIfNewer(
+          msg(
+            1,
+            threadN: 7,
+            author: alex,
+          ).copyWith(clientMsgId: MessageId.parse(entry)),
+        ),
+      );
+      await pumpSent(tester, host, entry, created: CreatedPosts());
+      expect(host.visited.last, '/t/${threadId(7).value}');
+      expect(host.visited, isNot(contains(overview)));
       await host.dispose(tester);
     },
   );
