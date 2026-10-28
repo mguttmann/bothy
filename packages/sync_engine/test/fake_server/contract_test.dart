@@ -162,6 +162,22 @@ void main() {
           ..firstMessage.contentMd = 'Since Monday',
       ),
     );
+    // The draft of a new post and an untitled post that clears it (M4-41).
+    await prefs.putChannelDraft(
+      channelId: forum,
+      draftPut: DraftPut((b) => b..contentMd = 'Scanner jams'),
+    );
+    await prefs.listMyDrafts();
+    await api.getThreadsApi().createThread(
+      channelId: forum,
+      threadCreate: ThreadCreate(
+        (b) => b
+          ..firstMessage.clientMsgId = h.server.world.nextId()
+          ..firstMessage.contentMd = 'Scanner jams'
+          ..firstMessage.clearDraft = true,
+      ),
+    );
+    await prefs.deleteChannelDraft(channelId: forum);
     // The thread view (M4-20): revisions, read position back, pins, state, title, move,
     // templates and a thread from a message.
     final world = h.server.world;

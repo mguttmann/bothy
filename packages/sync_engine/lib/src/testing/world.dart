@@ -749,7 +749,8 @@ final class FakeWorld {
   /// Read states (API `ReadState`) by `<principal>|<thread>`.
   final Map<String, JsonMap> readStates = {};
 
-  /// Drafts (API `Draft`) by `<principal>|<thread>`.
+  /// Drafts (API `Draft`) by `<principal>|<thread>`; the draft of a new post in a forum (no
+  /// `thread_id`, 03 table drafts) by `<principal>|channel:<channel>`.
   final Map<String, JsonMap> drafts = {};
 
   /// Settings (API `UserSetting`) by principal and key.
@@ -1860,6 +1861,115 @@ final class FakeWorld {
     );
   }
 
+  /// Stores the draft of a new post of [principalId] in the forum [channelId] from a
+  /// `DraftPut` [body] (`putChannelDraft`, 04 14, 03 table drafts with `thread_id` NULL) and
+  /// returns the `DraftPutResult`. The version and `overwrote_newer` follow [putDraft]; a draft
+  /// without content (only white space) and without `file_ids` deletes the row like
+  /// [deleteChannelDraft] and answers the empty final state with the last version plus one (1
+  /// without a row), as the server's `putDraft` does. [deviceId] is the writing device.
+  ///
+  /// Throws [FakeProblem]: `404` for a channel the principal does not see, `403 forbidden`
+  /// below `write` (as [createThread]), `400 validation_failed` for a channel that is not a
+  /// forum (the server's `NotAForum`) and for a `reply_to_message_id`.
+  JsonMap putChannelDraft(
+    String principalId,
+    String channelId,
+    JsonMap body, {
+    String? deviceId,
+  }) {
+    _draftForum(principalId, channelId);
+    if (body['reply_to_message_id'] != null) {
+      throw const FakeProblem(
+        400,
+        'validation_failed',
+        errors: [
+          {'pointer': '/reply_to_message_id', 'code': 'not_allowed'},
+        ],
+      );
+    }
+    final key = '$principalId|channel:$channelId';
+    final previous = drafts[key];
+    final base = body['base_version'] as int?;
+    final previousVersion = (previous?['version'] as int?) ?? 0;
+    final content = body['content_md'] as String? ?? '';
+    final files = body['file_ids'] as List<Object?>? ?? <Object?>[];
+    final empty = content.trim().isEmpty && files.isEmpty;
+    final draft = <String, Object?>{
+      'id': previous?['id'] ?? nextId(),
+      'channel_id': channelId,
+      'content_md': empty ? '' : content,
+      'file_ids': empty ? <Object?>[] : files,
+      'version': previousVersion + 1,
+      'updated_by_device_id': ?deviceId,
+      'updated_at': stamp(),
+    };
+    if (empty) {
+      deleteChannelDraft(principalId, channelId);
+    } else {
+      drafts[key] = draft;
+      append(
+        'draft.updated',
+        resource: {
+          'kind': 'draft',
+          'id': draft['id'],
+          'version': draft['version'],
+        },
+        scope: _channelScopeOf(channelId),
+        payload: {'draft': draft},
+        actor: principalId,
+        audience: principalId,
+      );
+    }
+    return {
+      'draft': draft,
+      'overwrote_newer':
+          base != null && previous != null && base < previousVersion,
+    };
+  }
+
+  /// Deletes the draft of a new post of [principalId] in the forum [channelId]
+  /// (`deleteChannelDraft`) and appends `draft.deleted` without `thread_id`; nothing happens
+  /// without one. Throws [FakeProblem] as [putChannelDraft] for the channel.
+  void deleteChannelDraft(String principalId, String channelId) {
+    _draftForum(principalId, channelId);
+    _dropChannelDraft(principalId, channelId);
+  }
+
+  /// Checks that [principalId] may keep a draft of a new post in [channelId]: a forum it sees
+  /// with at least `write`. Throws [FakeProblem] as [putChannelDraft].
+  void _draftForum(String principalId, String channelId) {
+    final channel = channels[channelId];
+    if (channel == null || !seesChannel(principalId, channelId)) {
+      throw const FakeProblem(404, 'not_found');
+    }
+    if (channel.access[principalId] == 'read') {
+      throw const FakeProblem(403, 'forbidden');
+    }
+    if (channel.json['kind'] != 'forum') {
+      throw const FakeProblem(400, 'validation_failed');
+    }
+  }
+
+  /// Removes the channel draft of [principalId] in [channelId] and appends `draft.deleted`
+  /// when one existed (the server's `deleteDraft` and `OnMessagePosted` with `CreatedThread`).
+  void _dropChannelDraft(String principalId, String channelId) {
+    final draft = drafts.remove('$principalId|channel:$channelId');
+    if (draft == null) return;
+    append(
+      'draft.deleted',
+      resource: {'kind': 'draft', 'id': draft['id']},
+      scope: _channelScopeOf(channelId),
+      payload: {'draft_id': draft['id'], 'channel_id': channelId},
+      actor: principalId,
+      audience: principalId,
+    );
+  }
+
+  JsonMap _channelScopeOf(String channelId) => {
+    'space_id': ?channels[channelId]!.spaceId,
+    'channel_id': channelId,
+  };
+
   /// Stores the setting [key] of [principalId] and appends `settings.updated`.
   JsonMap putSetting(
     String principalId,
@@ -1976,9 +2086,10 @@ final class FakeWorld {
   ///
   /// Throws [FakeProblem]: `404` for a channel the principal does not see, `403 forbidden`
   /// below `write`, `400 validation_failed` for a forum post without `first_message`
-  /// (`required_for_forum_post`, as the server of M1-56), without a title, with a tag that is
-  /// not a tag of the forum, and for a thread from a message (`parent_message_id`), which the
-  /// fake does not model.
+  /// (`required_for_forum_post`, as the server of M1-56), with a tag that is not a tag of the
+  /// forum, and for a thread from a message (`parent_message_id`), which the fake does not
+  /// model. A post without a title gets `title_source = auto`; `first_message.clear_draft`
+  /// deletes the principal's channel draft of the forum with `draft.deleted`.
   JsonMap createThread(String principalId, String channelId, JsonMap body) {
     final channel = channels[channelId];
     if (channel == null || !seesChannel(principalId, channelId)) {
@@ -2001,8 +2112,9 @@ final class FakeWorld {
     if (first == null) {
       throw invalid('/first_message', 'required_for_forum_post');
     }
+    // An empty title is allowed (the server's CheckThreadTitle); the post then waits for its
+    // auto title (`title_source = auto`).
     final title = (body['title'] as String?)?.trim() ?? '';
-    if (title.isEmpty) throw invalid('/title', 'required');
     final tagIds = [...?(body['tag_ids'] as List<Object?>?)?.cast<String>()];
     for (final tag in tagIds) {
       if (forumTags[tag]?['channel_id'] != channelId) {
@@ -2010,7 +2122,9 @@ final class FakeWorld {
       }
     }
     final id = addThread(channelId, title, createdBy: principalId);
-    final thread = threads[id]!..['tag_ids'] = tagIds;
+    final thread = threads[id]!
+      ..['tag_ids'] = tagIds
+      ..['title_source'] = title.isEmpty ? 'auto' : 'manual';
     append(
       'thread.created',
       resource: {'kind': 'thread', 'id': id, 'version': thread['version']},
@@ -2018,7 +2132,14 @@ final class FakeWorld {
       payload: {'thread': thread},
       actor: principalId,
     );
-    final message = createMessage(principalId, id, first).message;
+    // `clear_draft` of the first message clears the channel draft of the forum, not a draft of
+    // the new thread (the server's OnMessagePosted with CreatedThread).
+    final message = createMessage(
+      principalId,
+      id,
+      {...first}..remove('clear_draft'),
+    ).message;
+    if (first['clear_draft'] == true) _dropChannelDraft(principalId, channelId);
     return {'thread': thread, 'first_message': message};
   }
 
