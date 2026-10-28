@@ -25,7 +25,8 @@ import 'view_models.dart';
 /// States: empty (send disabled), text, command selected ([command] with its options as
 /// placeholders), incomplete options (send disabled with the reason "Missing option: {name}"),
 /// [offline] (a hint that sending goes to the queue; sending stays possible) and [readOnly]
-/// (the field is replaced by the note "Read only in this channel").
+/// (the field is replaced by the note "Read only in this channel"). With [sendEnabled] false
+/// the send button is disabled and Enter does not send; the text stays.
 ///
 /// Keyboard: Enter sends and Shift+Enter makes a new line; with [enterSends] false the two
 /// swap (`composer.enter_sends`). Arrow up in the empty field calls [onEditLast]. While
@@ -52,6 +53,7 @@ class DsComposer extends StatefulWidget {
     this.onAttach,
     this.onVoice,
     this.hasAttachments = false,
+    this.sendEnabled = true,
     this.command,
     this.offline = false,
     this.readOnly = false,
@@ -94,6 +96,12 @@ class DsComposer extends StatefulWidget {
 
   /// Whether files are attached: then the message may be sent without text.
   final bool hasAttachments;
+
+  /// Whether the caller allows sending now. False disables the send button and makes Enter
+  /// do nothing (the text stays in the field; Shift+Enter still makes a new line): a caller
+  /// that needs more than text, for example a required title, keeps sending off until it has
+  /// it. True leaves the other rules (text or attachments, no missing option) in charge.
+  final bool sendEnabled;
 
   /// The chosen command, or null.
   final DsComposerCommand? command;
@@ -166,6 +174,7 @@ class DsComposerState extends State<DsComposer> {
   }
 
   bool get _canSend =>
+      widget.sendEnabled &&
       (_text.text.trim().isNotEmpty || widget.hasAttachments) &&
       _missingOption == null;
 
