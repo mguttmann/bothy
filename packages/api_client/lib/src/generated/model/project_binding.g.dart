@@ -16,7 +16,11 @@ class _$ProjectBinding extends ProjectBinding {
   @override
   final ProjectRunnerConfig runnerConfig;
   @override
+  final ProjectProvision? provision;
+  @override
   final bool ready;
+  @override
+  final String? readyReason;
   @override
   final int version;
 
@@ -28,7 +32,9 @@ class _$ProjectBinding extends ProjectBinding {
     this.repositoryUrl,
     this.defaultBranch,
     required this.runnerConfig,
+    this.provision,
     required this.ready,
+    this.readyReason,
     required this.version,
   }) : super._();
   @override
@@ -46,7 +52,9 @@ class _$ProjectBinding extends ProjectBinding {
         repositoryUrl == other.repositoryUrl &&
         defaultBranch == other.defaultBranch &&
         runnerConfig == other.runnerConfig &&
+        provision == other.provision &&
         ready == other.ready &&
+        readyReason == other.readyReason &&
         version == other.version;
   }
 
@@ -57,7 +65,9 @@ class _$ProjectBinding extends ProjectBinding {
     _$hash = $jc(_$hash, repositoryUrl.hashCode);
     _$hash = $jc(_$hash, defaultBranch.hashCode);
     _$hash = $jc(_$hash, runnerConfig.hashCode);
+    _$hash = $jc(_$hash, provision.hashCode);
     _$hash = $jc(_$hash, ready.hashCode);
+    _$hash = $jc(_$hash, readyReason.hashCode);
     _$hash = $jc(_$hash, version.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
@@ -70,7 +80,9 @@ class _$ProjectBinding extends ProjectBinding {
           ..add('repositoryUrl', repositoryUrl)
           ..add('defaultBranch', defaultBranch)
           ..add('runnerConfig', runnerConfig)
+          ..add('provision', provision)
           ..add('ready', ready)
+          ..add('readyReason', readyReason)
           ..add('version', version))
         .toString();
   }
@@ -100,9 +112,17 @@ class ProjectBindingBuilder
   set runnerConfig(ProjectRunnerConfigBuilder? runnerConfig) =>
       _$this._runnerConfig = runnerConfig;
 
+  ProjectProvision? _provision;
+  ProjectProvision? get provision => _$this._provision;
+  set provision(ProjectProvision? provision) => _$this._provision = provision;
+
   bool? _ready;
   bool? get ready => _$this._ready;
   set ready(bool? ready) => _$this._ready = ready;
+
+  String? _readyReason;
+  String? get readyReason => _$this._readyReason;
+  set readyReason(String? readyReason) => _$this._readyReason = readyReason;
 
   int? _version;
   int? get version => _$this._version;
@@ -119,7 +139,9 @@ class ProjectBindingBuilder
       _repositoryUrl = $v.repositoryUrl;
       _defaultBranch = $v.defaultBranch;
       _runnerConfig = $v.runnerConfig.toBuilder();
+      _provision = $v.provision;
       _ready = $v.ready;
+      _readyReason = $v.readyReason;
       _version = $v.version;
       _$v = null;
     }
@@ -153,11 +175,13 @@ class ProjectBindingBuilder
             repositoryUrl: repositoryUrl,
             defaultBranch: defaultBranch,
             runnerConfig: runnerConfig.build(),
+            provision: provision,
             ready: BuiltValueNullFieldError.checkNotNull(
               ready,
               r'ProjectBinding',
               'ready',
             ),
+            readyReason: readyReason,
             version: BuiltValueNullFieldError.checkNotNull(
               version,
               r'ProjectBinding',

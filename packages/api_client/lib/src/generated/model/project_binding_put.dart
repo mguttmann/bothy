@@ -3,6 +3,7 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:api_client/src/generated/model/project_provision.dart';
 import 'package:api_client/src/generated/model/project_runner_config.dart';
 import 'package:built_value/built_value.dart';
 import 'package:built_value/serializer.dart';
@@ -16,6 +17,7 @@ part 'project_binding_put.g.dart';
 /// * [repositoryUrl]
 /// * [defaultBranch]
 /// * [runnerConfig]
+/// * [provision]
 /// * [reason]
 @BuiltValue()
 abstract class ProjectBindingPut
@@ -31,6 +33,10 @@ abstract class ProjectBindingPut
 
   @BuiltValueField(wireName: r'runner_config')
   ProjectRunnerConfig? get runnerConfig;
+
+  @BuiltValueField(wireName: r'provision')
+  ProjectProvision? get provision;
+  // enum provisionEnum {  none,  init,  clone,  };
 
   @BuiltValueField(wireName: r'reason')
   String get reason;
@@ -85,6 +91,13 @@ class _$ProjectBindingPutSerializer
       yield serializers.serialize(
         object.runnerConfig,
         specifiedType: const FullType(ProjectRunnerConfig),
+      );
+    }
+    if (object.provision != null) {
+      yield r'provision';
+      yield serializers.serialize(
+        object.provision,
+        specifiedType: const FullType(ProjectProvision),
       );
     }
     yield r'reason';
@@ -149,6 +162,14 @@ class _$ProjectBindingPutSerializer
           ) as ProjectRunnerConfig?;
           if (valueDes == null) continue;
           result.runnerConfig.replace(valueDes);
+          break;
+        case r'provision':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(ProjectProvision),
+          ) as ProjectProvision?;
+          if (valueDes == null) continue;
+          result.provision = valueDes;
           break;
         case r'reason':
           final valueDes = serializers.deserialize(

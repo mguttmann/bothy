@@ -11,13 +11,18 @@ class _$ProjectReadiness extends ProjectReadiness {
   final String channelId;
   @override
   final bool ready;
+  @override
+  final String? reason;
 
   factory _$ProjectReadiness([
     void Function(ProjectReadinessBuilder)? updates,
   ]) => (ProjectReadinessBuilder()..update(updates))._build();
 
-  _$ProjectReadiness._({required this.channelId, required this.ready})
-    : super._();
+  _$ProjectReadiness._({
+    required this.channelId,
+    required this.ready,
+    this.reason,
+  }) : super._();
   @override
   ProjectReadiness rebuild(void Function(ProjectReadinessBuilder) updates) =>
       (toBuilder()..update(updates)).build();
@@ -31,7 +36,8 @@ class _$ProjectReadiness extends ProjectReadiness {
     if (identical(other, this)) return true;
     return other is ProjectReadiness &&
         channelId == other.channelId &&
-        ready == other.ready;
+        ready == other.ready &&
+        reason == other.reason;
   }
 
   @override
@@ -39,6 +45,7 @@ class _$ProjectReadiness extends ProjectReadiness {
     var _$hash = 0;
     _$hash = $jc(_$hash, channelId.hashCode);
     _$hash = $jc(_$hash, ready.hashCode);
+    _$hash = $jc(_$hash, reason.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -47,7 +54,8 @@ class _$ProjectReadiness extends ProjectReadiness {
   String toString() {
     return (newBuiltValueToStringHelper(r'ProjectReadiness')
           ..add('channelId', channelId)
-          ..add('ready', ready))
+          ..add('ready', ready)
+          ..add('reason', reason))
         .toString();
   }
 }
@@ -64,6 +72,10 @@ class ProjectReadinessBuilder
   bool? get ready => _$this._ready;
   set ready(bool? ready) => _$this._ready = ready;
 
+  String? _reason;
+  String? get reason => _$this._reason;
+  set reason(String? reason) => _$this._reason = reason;
+
   ProjectReadinessBuilder() {
     ProjectReadiness._defaults(this);
   }
@@ -73,6 +85,7 @@ class ProjectReadinessBuilder
     if ($v != null) {
       _channelId = $v.channelId;
       _ready = $v.ready;
+      _reason = $v.reason;
       _$v = null;
     }
     return this;
@@ -105,6 +118,7 @@ class ProjectReadinessBuilder
             r'ProjectReadiness',
             'ready',
           ),
+          reason: reason,
         );
     replace(_$result);
     return _$result;

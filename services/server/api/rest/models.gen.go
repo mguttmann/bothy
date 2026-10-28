@@ -3450,6 +3450,27 @@ func (e PrincipalKind) Valid() bool {
 	}
 }
 
+// Defines values for ProjectProvision.
+const (
+	ProjectProvisionClone ProjectProvision = "clone"
+	ProjectProvisionInit  ProjectProvision = "init"
+	ProjectProvisionNone  ProjectProvision = "none"
+)
+
+// Valid indicates whether the value is a known member of the ProjectProvision enum.
+func (e ProjectProvision) Valid() bool {
+	switch e {
+	case ProjectProvisionClone:
+		return true
+	case ProjectProvisionInit:
+		return true
+	case ProjectProvisionNone:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PushEnvironment.
 const (
 	Production PushEnvironment = "production"
@@ -12888,7 +12909,15 @@ type ProfileUpdate struct {
 type ProjectBinding struct {
 	// DefaultBranch Examples: main
 	DefaultBranch *string `json:"default_branch,omitempty"`
-	Ready         bool    `json:"ready"`
+
+	// Provision Whether the serving runner creates the folder of the binding (09 18.12). `none` creates nothing and the folder must exist; `init` creates an empty folder with `git init`; `clone` clones `repository_url`, which must be `https`. With `init` or `clone` the `workspace_ref` is one segment of `^[A-Za-z0-9][A-Za-z0-9._-]*$`. Absent means `none`; the server always sends it.
+	Provision *ProjectProvision `json:"provision,omitempty"`
+	Ready     bool              `json:"ready"`
+
+	// ReadyReason The code the serving runner reported with `ready` false (09 18.12, for example `provisioning` or `clone_failed`); absent while `ready` is true and before the first report.
+	//
+	// Examples: provisioning
+	ReadyReason *string `json:"ready_reason,omitempty"`
 
 	// RepositoryUrl Display only; the server never fetches this URL.
 	//
@@ -12910,6 +12939,9 @@ type ProjectBindingPut struct {
 	// DefaultBranch Examples: main
 	DefaultBranch *string `json:"default_branch,omitempty"`
 
+	// Provision Whether the serving runner creates the folder of the binding (09 18.12). `none` creates nothing and the folder must exist; `init` creates an empty folder with `git init`; `clone` clones `repository_url`, which must be `https`. With `init` or `clone` the `workspace_ref` is one segment of `^[A-Za-z0-9][A-Za-z0-9._-]*$`. Absent means `none`; the server always sends it.
+	Provision *ProjectProvision `json:"provision,omitempty"`
+
 	// Reason Examples: Website project moves to this forum
 	Reason string `json:"reason"`
 
@@ -12923,11 +12955,17 @@ type ProjectBindingPut struct {
 	WorkspaceRef string `json:"workspace_ref"`
 }
 
+// ProjectProvision Whether the serving runner creates the folder of the binding (09 18.12). `none` creates nothing and the folder must exist; `init` creates an empty folder with `git init`; `clone` clones `repository_url`, which must be `https`. With `init` or `clone` the `workspace_ref` is one segment of `^[A-Za-z0-9][A-Za-z0-9._-]*$`. Absent means `none`; the server always sends it.
+type ProjectProvision string
+
 // ProjectReadiness defines model for ProjectReadiness.
 type ProjectReadiness struct {
 	// ChannelId UUIDv7 (RFC 9562), lowercase canonical form.
 	ChannelId Uuid `json:"channel_id"`
 	Ready     bool `json:"ready"`
+
+	// Reason Why the forum is not ready, a code of 09 18.12 (for example `provisioning`, `workspace_exists`, `clone_failed`); only with `ready` false. Stored as `project_bindings.ready_reason`.
+	Reason *string `json:"reason,omitempty"`
 }
 
 // ProjectRunnerConfig Schema `project_runner_config.v1`. No secrets.

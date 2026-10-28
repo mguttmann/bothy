@@ -7060,10 +7060,21 @@ export interface components {
             /** @example main */
             default_branch?: string;
             runner_config: components["schemas"]["ProjectRunnerConfig"];
+            provision?: components["schemas"]["ProjectProvision"];
             ready: boolean;
+            /**
+             * @description The code the serving runner reported with `ready` false (09 18.12, for example `provisioning` or `clone_failed`); absent while `ready` is true and before the first report.
+             * @example provisioning
+             */
+            ready_reason?: string;
             /** Format: int64 */
             version: number;
         };
+        /**
+         * @description Whether the serving runner creates the folder of the binding (09 18.12). `none` creates nothing and the folder must exist; `init` creates an empty folder with `git init`; `clone` clones `repository_url`, which must be `https`. With `init` or `clone` the `workspace_ref` is one segment of `^[A-Za-z0-9][A-Za-z0-9._-]*$`. Absent means `none`; the server always sends it.
+         * @enum {string}
+         */
+        ProjectProvision: "none" | "init" | "clone";
         ProjectBindingPut: {
             /** @example website */
             workspace_ref: string;
@@ -7072,6 +7083,7 @@ export interface components {
             /** @example main */
             default_branch?: string;
             runner_config?: components["schemas"]["ProjectRunnerConfig"];
+            provision?: components["schemas"]["ProjectProvision"];
             /** @example Website project moves to this forum */
             reason: string;
         };
@@ -7927,6 +7939,8 @@ export interface components {
         ProjectReadiness: {
             channel_id: components["schemas"]["Uuid"];
             ready: boolean;
+            /** @description Why the forum is not ready, a code of 09 18.12 (for example `provisioning`, `workspace_exists`, `clone_failed`); only with `ready` false. Stored as `project_bindings.ready_reason`. */
+            reason?: string;
         };
         HeartbeatAck: {
             presence: components["schemas"]["AgentRuntimeStatus"];

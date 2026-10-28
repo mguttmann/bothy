@@ -46,6 +46,9 @@ const List<AppConfigKey> appConfigKeys = <AppConfigKey>[
   AppConfigKey('ui.livebox_visible_steps', 'App', AppConfigKind.integer, '6'),
   AppConfigKey('ui.message_collapse_lines', 'App', AppConfigKind.integer, '24'),
   AppConfigKey('ui.message_group_window', 'App', AppConfigKind.duration, '5m'),
+  AppConfigKey('ui.new_project_name_max_chars', 'App', AppConfigKind.integer, '40'),
+  AppConfigKey('ui.new_project_poll_interval', 'App', AppConfigKind.duration, '2s'),
+  AppConfigKey('ui.new_project_wait', 'App', AppConfigKind.duration, '2m'),
   AppConfigKey('ui.quick_switch_max_results', 'App', AppConfigKind.integer, '20'),
   AppConfigKey('ui.sidebar_thread_window', 'App', AppConfigKind.duration, '72h'),
   AppConfigKey('ui.sidebar_threads_per_channel', 'App', AppConfigKind.integer, '8'),
@@ -154,6 +157,12 @@ extension AppConfigValues on AppConfig {
   int get messageCollapseLines => value<int>('ui.message_collapse_lines');
   /// `ui.message_group_window` (duration, default `5m`).
   Duration get messageGroupWindow => value<Duration>('ui.message_group_window');
+  /// `ui.new_project_name_max_chars` (integer, default `40`).
+  int get newProjectNameMaxChars => value<int>('ui.new_project_name_max_chars');
+  /// `ui.new_project_poll_interval` (duration, default `2s`).
+  Duration get newProjectPollInterval => value<Duration>('ui.new_project_poll_interval');
+  /// `ui.new_project_wait` (duration, default `2m`).
+  Duration get newProjectWait => value<Duration>('ui.new_project_wait');
   /// `ui.quick_switch_max_results` (integer, default `20`).
   int get quickSwitchMaxResults => value<int>('ui.quick_switch_max_results');
   /// `ui.sidebar_thread_window` (duration, default `72h`).

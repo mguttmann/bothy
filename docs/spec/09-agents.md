@@ -635,7 +635,7 @@ Top-level members (openapi `Heartbeat`, closed; an unknown member is `400 valida
 | `reported_tool_class` | the tool class the runtime actually loaded, section 2.4 |
 | `rate_limit` | state of the provider's rate limits: `state` `ok`, `near_limit`, `limited` or `unknown`, and `resets_at` when known; never quotas, keys or subscription names. Stored as exactly these two members in `agents.reported_details.rate_limit`; a heartbeat without it clears the stored one (full state). Display in the backend view of [25-visualization.md](25-visualization.md), section 6.2 |
 | `details` | closed object, keys below |
-| `project_readiness` | runners only: list of `{channel_id, ready}`, one entry per bound forum, distinct `channel_id` values (sets `project_bindings.ready`, M2-03) |
+| `project_readiness` | runners only: list of `{channel_id, ready, reason}`, one entry per bound forum, distinct `channel_id` values (sets `project_bindings.ready`, M2-03); `reason` is optional, a code of 18.12 in the code form below, sent only with `ready` false and stored as `project_bindings.ready_reason` (M4-43) |
 
 Keys of `details` (closed; any other key, also inside `capabilities`, `adapter` and `runtime`, is
 an unknown member):
@@ -653,7 +653,9 @@ Forms (the server checks them itself on both transports, SEC-IN-1): names `^[a-z
 versions `^[0-9A-Za-z][0-9A-Za-z.+_-]*$`, codes (`billing_evidence.provider`,
 `billing_evidence.method`, each entry of `degraded_reasons`) `^[a-z0-9][a-z0-9_.:-]*$`, the code
 form of SEC-AUD-5, so `method` enters the audit details unchanged. Lists carry no duplicates; a
-channel listed twice in `project_readiness` is one field error at `/project_readiness`. Lengths are
+channel listed twice in `project_readiness` is one field error at `/project_readiness`, and a
+`reason` that breaks the code form or comes with `ready` true is one at
+`/project_readiness/<i>/reason`. Lengths are
 bounded by `http.max_json_body_bytes`. Reason: the heartbeat carries no secrets, contents or paths,
 and these forms make path separators, whitespace, control and bidi characters and most key formats
 unrepresentable. A violation answers one `validation_failed` with every field error and its JSON
@@ -2414,10 +2416,12 @@ name. Reason: fail closed; a too high report only blocks starts whose token carr
   `project_readiness` (`channel_id`, `ready`; section 4.8): the reference resolves, the target is
   a folder, `.git` exists in it (a folder or a file, so linked work trees count) and the runner
   user may read, write and search it. A forum that is not ready carries a log code of the runner:
-  `outside_root`, `workspace_missing`, `not_a_git_worktree` or `not_writable`. The runner
+  `outside_root`, `workspace_missing`, `not_a_git_worktree` or `not_writable`, or one of the creation codes of 18.12; it sends that code
+as `reason` with the entry (M4-43). The runner
   computes readiness at start, after every change of its channel cache and before every
-  heartbeat, and sends a heartbeat at once when `agent.config_changed` changed a readiness. The
-  server sets `project_bindings.ready`; without `ready`, `agent.invoke` rejects with
+  heartbeat, and sends a heartbeat at once when `agent.config_changed` changed a readiness or a
+  folder creation of 18.12 ended. The server sets `project_bindings.ready` and
+  `project_bindings.ready_reason`; without `ready`, `agent.invoke` rejects with
   `project_not_ready`.
 - Schema `project_runner_config.v1` (`project_bindings.runner_config`, OpenAPI
   `ProjectRunnerConfig`, M2-03): a closed JSON object (unknown members are rejected) with the
@@ -2432,7 +2436,8 @@ name. Reason: fail closed; a too high report only blocks starts whose token carr
   key (all of them when the binding has no `allowed_tools`); under `chat` there are no tools and
   `bypassPermissions` of `host` honours no allow list (D-M2-34-8).
 - Binding changes (`putProjectBinding`, `deleteProjectBinding`, M2-03): every effective change of
-  the binding and every change of the effective operator of the forum sets `ready` to `false`; an
+  the binding and every change of the effective operator of the forum sets `ready` to `false` and
+  clears `ready_reason`; an
   identical PUT changes nothing. Only reports of the effective operator for a bound forum that is
   not archived and not in an archived space are applied; a readiness change writes no event, no audit entry and no new
   `settings_version`.
@@ -2944,6 +2949,61 @@ sequenceDiagram
     R->>S: run.finish completed (costs as difference)
 ```
 
+### 18.12 Creating the project folder
+
+Addendum of 2026-10-28 (M4-43, [design note](../design/new-project.md), D-M4-43-2 to D-M4-43-6).
+A binding's `provision` (03 `project_bindings`) asks the serving runner to create the folder of a
+new project; `none` (the default) asks for nothing and the folder must exist.
+
+1. **When.** The runner checks every bound forum it serves whenever it computes readiness (18.1).
+   For `provision` `init` or `clone` it looks up the forum in its creation record
+   (`<runner.state_dir>/provisioned.json`, mode `0600`: per forum the `workspace_ref` of the
+   folder it created). Recorded with the same `workspace_ref`: plain readiness of 18.1. Not
+   recorded and the target exists (any file type, also a dangling link): not ready with
+   `workspace_exists`; the runner never writes into such a folder. Not recorded and the target is
+   missing: the runner starts the creation in the background and reports `provisioning` until it
+   ends; at most one creation per forum runs at a time.
+2. **Checks.** Before any file operation the runner refuses with `provision_refused`: a
+   `workspace_ref` that is not one segment of `^[A-Za-z0-9][A-Za-z0-9._-]*$`; a target that 18.1
+   would not resolve or whose parent is not the real path of the root; for `clone` a
+   `repository_url` that is not `https://` with a host and without user information, query or
+   fragment, or that starts with `-`; a `default_branch` that starts with `-`. The server checks
+   the same shape at `putProjectBinding` (03); the runner does not trust it.
+3. **`init`.** `mkdir` of the target (exclusive, it fails when something appeared meanwhile), then
+   `git init --quiet` in it, with `--initial-branch <default_branch>` when the binding names one.
+4. **`clone`.** `git clone --quiet --no-recurse-submodules -- <repository_url> <tmp>` into a fresh
+   folder `<runner.projects_root>/.provision-<uuid>`, then a rename to the target, which fails when
+   the target appeared meanwhile; the remote's default branch is checked out.
+5. **Process.** `runner.git_bin` from the cleaned `PATH`, an argument list without a shell, the
+   environment allow list of 18.2 plus `GIT_TERMINAL_PROMPT=0` and `GIT_ALLOW_PROTOCOL=https`, the
+   working folder the root (or the new target for `init`), stdin closed, the time limit
+   `runner.provision_timeout` (then SIGKILL to the process group). Output goes to the log only as
+   the exit code; it can hold URLs and is never sent to the server.
+6. **Outcome.** Success adds the forum to the record, computes readiness again and sends a
+   heartbeat at once. A failure removes only the folder the runner created in this attempt (the
+   `init` target, the `.provision-<uuid>` folder) and reports, until the next attempt,
+   `init_failed`, `clone_failed`, `provision_timeout` or `provision_refused`. The same binding
+   content (`workspace_ref`, `provision`, `repository_url`, `default_branch`) is not tried again
+   before `runner.provision_retry_after`, unless the runner restarts.
+7. **Never.** The runner never deletes or moves a folder it did not create in the running
+   attempt, never writes outside `runner.projects_root`, and a removed binding or a changed
+   `workspace_ref` leaves a created folder in place.
+
+Reasons of a not ready forum (`ProjectReadiness.reason`, `project_bindings.ready_reason`):
+
+| Code | Meaning |
+|---|---|
+| `outside_root` | the reference does not resolve to a strict descendant of the root (18.1) |
+| `workspace_missing` | the folder does not exist and the binding asks for no creation |
+| `not_a_git_worktree` | the folder has no `.git` |
+| `not_writable` | the runner user may not read, write or search the folder |
+| `provisioning` | the runner is creating the folder |
+| `workspace_exists` | `init` or `clone` found a folder it did not create |
+| `init_failed` | `mkdir` or `git init` failed |
+| `clone_failed` | `git clone` or the rename failed |
+| `provision_timeout` | the creation exceeded `runner.provision_timeout` |
+| `provision_refused` | a check of item 2 refused the binding |
+
 ## 19. Decisions of this chapter
 
 | No. | Decision | Reason |
@@ -2976,6 +3036,7 @@ sequenceDiagram
 | R-AG-26 | The runner links a task step to the tool call that started it (`tool_use_id`), and the server keeps one summary step per parent and collapses a finished step with only its summary step into its parent's summary (5.3, 18.4, addendum of 2026-10-24). | Only the runner knows which step belongs to a tool use ID; merging old steps must not flatten the tree. |
 | R-AG-27 | The run graph is derived from the run document by one shared function in `bothy_viz`; a node other than the root shows only a cost the adapter reported for it, only for `organization` and as "Estimate" (5.6, addendum of 2026-10-24). | All apps draw the same tree from the same data; a split of the run cost over subagents would be wrong when they use different models. |
 | R-AG-28 | The Claude Code runner runs every session of a project in the project folder and creates no worktree per thread; parallel sessions of a project are separate posts (18.1, addendum of 2026-10-27). | The owner starts several chats per project and opens a worktree through the agent when he wants one; a worktree per post would change readiness, cleanup and the working folder contract without need. |
+| R-AG-29 | The Claude Code runner creates the folder of a binding with `provision` `init` or `clone` under `runner.projects_root` itself, with `git` from an argument list, only for a one-segment name, only for an `https` URL, never into an existing folder it did not create, and reports the outcome as a readiness reason (18.12, addendum of 2026-10-28). | The owner creates projects from the app; the runner owns the projects root and works in the folder as its user, the server never touches host files or fetches the URL (D-M4-43-2 to D-M4-43-6). |
 
 ## 20. Alignment with the core contract
 
@@ -3055,6 +3116,9 @@ configuration of the respective program outside the server.
 | `hermes_adapter.max_message_bytes` | Hermes adapter | `262144` | longest answer (`MAX_MESSAGE_LENGTH`); the default equals `message.max_content_bytes`, both change together |
 | `hermes_adapter.attachment_text_max_bytes` | Hermes adapter | `32768` | longest attachment text the adapter inlines as a data block; the default equals `agent.context_message_max_bytes` |
 | `runner.claude_bin` | Runner | `claude` | program, searched in the cleaned `PATH` |
+| `runner.git_bin` | Runner | `git` | program for the folder creation of 18.12, searched in the cleaned `PATH` |
+| `runner.provision_timeout` | Runner | `10m` | time limit of one folder creation (`git init` or `git clone`, 18.12) |
+| `runner.provision_retry_after` | Runner | `5m` | a failed folder creation is not tried again for the same binding content before this time (18.12) |
 | `runner.projects_root` | Runner | no default, required | root of all project folders |
 | `runner.state_dir` | Runner | no default, required | state, recordings, incoming files |
 | `runner.followup_grace` | Runner | `30s` | stdin stays open for follow-ups after `result` |
