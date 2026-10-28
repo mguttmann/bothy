@@ -598,7 +598,7 @@ final class SidebarHoldProvider extends $NotifierProvider<SidebarHold, bool> {
   }
 }
 
-String _$sidebarHoldHash() => r'264382c69ce6d1fbee5e8edc1e736a1304b5ac44';
+String _$sidebarHoldHash() => r'22354f24fab977e10f0a3df0450fadf675a40514';
 
 /// Whether the pointer is over the sidebar or the keyboard focus is in it: while it holds, a
 /// thread row that no longer qualifies stays in place (01 6.8 item 4; brief M4-40 Design note
