@@ -38,10 +38,19 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # The Windows image has no yq, and flutter-action fetches it from Chocolatey when it reads
+      # flutter-version-file; that feed fails often, so the pin is read here (test_ci_toolchains.py).
+      - name: Flutter pin of the workspace
+        id: flutter-pin
+        shell: bash
+        run: |
+          version="$(sed -n -E 's/^  flutter: ([0-9]+\.[0-9]+\.[0-9]+)$/\1/p' pubspec.yaml)"
+          test -n "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           channel: stable
-          flutter-version-file: pubspec.yaml
+          flutter-version: ${{ steps.flutter-pin.outputs.version }}
           cache: true
       - name: Analyze the suites and their drivers
         shell: bash

@@ -104,7 +104,10 @@ Go and Flutter are not pinned gate tools; they come from the components themselv
   (`test_go_directives_agree`) holds that.
 - Flutter from `environment.flutter` of the root `pubspec.yaml` of the Dart workspace, one exact
   version that the root and every member repeat (`test_flutter_pins_agree`, docs/DECISIONS.md
-  D-M4-01-1); CI reads it with `flutter-version-file: pubspec.yaml`. The pure Dart packages use
+  D-M4-01-1); CI reads it with `flutter-version-file: pubspec.yaml`, except in jobs on Windows
+  runners (also a matrix that includes Windows), where a step `flutter-pin` reads it and passes
+  `flutter-version`, because the version file makes the Flutter action install `yq` from
+  Chocolatey there (PL/60). The pure Dart packages use
   `flutter test` only as their test runner.
 
 ## GitHub Actions
