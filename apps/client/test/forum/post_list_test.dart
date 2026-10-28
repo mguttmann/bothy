@@ -241,15 +241,18 @@ void main() {
     );
     await tester.tap(find.byKey(ValueKey('postList.failed.edit.${entry.id}')));
     await host.settle(tester);
-    expect(find.text('Release plan'), findsWidgets, reason: 'prefilled');
-    await tester.tap(find.byKey(ValueKey('newPost.tag.${tagId(1).value}')));
-    await tester.pump();
-    await tester.tap(find.byKey(const ValueKey('newPost.create')));
-    await host.settle(tester);
+    // D-M4-41-3: the refused post goes back into the new chat view of the forum: its text
+    // becomes the forum's draft of a new post, the refused entry leaves the outbox.
     final after = await host.run(tester, host.db.outboxDao.allEntries);
-    expect(after.single.id, isNot(entry.id));
-    expect(after.single.state, isNot(OutboxState.failed));
-    expect(jsonDecode(after.single.payload), containsPair('tag_ids', isEmpty));
+    expect(after.single.kind, ThreadOps.putChannelDraft);
+    expect(
+      jsonDecode(after.single.payload),
+      allOf(
+        containsPair('channel_id', channelId(1).value),
+        containsPair('content_md', 'Version 2.'),
+      ),
+    );
+    expect(host.visited.last, '/c/${channelId(1).value}/new');
     await host.dispose(tester);
   });
 
