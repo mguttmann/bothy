@@ -14807,6 +14807,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Pin or unpin the forum overview as a column'**
   String get shortcutPinOverview;
+
+  /// Screen reader word of the draft row "New chat" of a forum in the sidebar (01 section 6.8 item 8).
+  ///
+  /// In en, this message translates to:
+  /// **'Draft'**
+  String get sidebarDraftState;
+
+  /// Mark of a new post in the sidebar that the server refused; the forum overview offers Try again (01 section 6.6).
+  ///
+  /// In en, this message translates to:
+  /// **'Not sent'**
+  String get sidebarDraftNotSent;
+
+  /// Label of the title field of the new chat view in a forum with an operator agent (01 section 6.8 item 8).
+  ///
+  /// In en, this message translates to:
+  /// **'Title (optional)'**
+  String get newChatTitleOptional;
+
+  /// Hint below the optional title field of the new chat view (09 section 12).
+  ///
+  /// In en, this message translates to:
+  /// **'The agent names the chat after its first answer.'**
+  String get newChatTitleAgentHint;
+
+  /// Hint of the new chat view in a forum without an operator agent while the title is empty (01 section 6.8 item 8).
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a title to send.'**
+  String get newChatTitleMissing;
+
+  /// Notice of the new chat view when it edits a post the server refused (01 section 6.6).
+  ///
+  /// In en, this message translates to:
+  /// **'This post was not sent. Change it and send it again.'**
+  String get newChatEditing;
 }
 
 class _AppLocalizationsDelegate

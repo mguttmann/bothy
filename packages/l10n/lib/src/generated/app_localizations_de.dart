@@ -9213,4 +9213,24 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get shortcutPinOverview =>
       'Übersicht des Forums als Spalte anheften oder lösen';
+
+  @override
+  String get sidebarDraftState => 'Entwurf';
+
+  @override
+  String get sidebarDraftNotSent => 'Nicht gesendet';
+
+  @override
+  String get newChatTitleOptional => 'Titel (optional)';
+
+  @override
+  String get newChatTitleAgentHint =>
+      'Der Agent benennt den Chat nach seiner ersten Antwort.';
+
+  @override
+  String get newChatTitleMissing => 'Gib einen Titel ein, um zu senden.';
+
+  @override
+  String get newChatEditing =>
+      'Dieser Beitrag wurde nicht gesendet. Ändere ihn und sende ihn erneut.';
 }

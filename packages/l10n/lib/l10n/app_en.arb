@@ -13819,5 +13819,29 @@
   "shortcutPinOverview": "Pin or unpin the forum overview as a column",
   "@shortcutPinOverview": {
     "description": "Row of the list of shortcuts (01 7)."
+  },
+  "sidebarDraftState": "Draft",
+  "@sidebarDraftState": {
+    "description": "Screen reader word of the draft row \"New chat\" of a forum in the sidebar (01 section 6.8 item 8)."
+  },
+  "sidebarDraftNotSent": "Not sent",
+  "@sidebarDraftNotSent": {
+    "description": "Mark of a new post in the sidebar that the server refused; the forum overview offers Try again (01 section 6.6)."
+  },
+  "newChatTitleOptional": "Title (optional)",
+  "@newChatTitleOptional": {
+    "description": "Label of the title field of the new chat view in a forum with an operator agent (01 section 6.8 item 8)."
+  },
+  "newChatTitleAgentHint": "The agent names the chat after its first answer.",
+  "@newChatTitleAgentHint": {
+    "description": "Hint below the optional title field of the new chat view (09 section 12)."
+  },
+  "newChatTitleMissing": "Enter a title to send.",
+  "@newChatTitleMissing": {
+    "description": "Hint of the new chat view in a forum without an operator agent while the title is empty (01 section 6.8 item 8)."
+  },
+  "newChatEditing": "This post was not sent. Change it and send it again.",
+  "@newChatEditing": {
+    "description": "Notice of the new chat view when it edits a post the server refused (01 section 6.6)."
   }
 }

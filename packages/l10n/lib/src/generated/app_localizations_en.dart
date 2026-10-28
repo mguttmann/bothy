@@ -9170,4 +9170,24 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get shortcutPinOverview =>
       'Pin or unpin the forum overview as a column';
+
+  @override
+  String get sidebarDraftState => 'Draft';
+
+  @override
+  String get sidebarDraftNotSent => 'Not sent';
+
+  @override
+  String get newChatTitleOptional => 'Title (optional)';
+
+  @override
+  String get newChatTitleAgentHint =>
+      'The agent names the chat after its first answer.';
+
+  @override
+  String get newChatTitleMissing => 'Enter a title to send.';
+
+  @override
+  String get newChatEditing =>
+      'This post was not sent. Change it and send it again.';
 }

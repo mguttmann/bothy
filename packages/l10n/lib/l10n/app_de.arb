@@ -2449,5 +2449,11 @@
   "overviewPin": "Anheften",
   "overviewUnpin": "Lösen",
   "overviewSearch": "In {forum} suchen",
-  "shortcutPinOverview": "Übersicht des Forums als Spalte anheften oder lösen"
+  "shortcutPinOverview": "Übersicht des Forums als Spalte anheften oder lösen",
+  "sidebarDraftState": "Entwurf",
+  "sidebarDraftNotSent": "Nicht gesendet",
+  "newChatTitleOptional": "Titel (optional)",
+  "newChatTitleAgentHint": "Der Agent benennt den Chat nach seiner ersten Antwort.",
+  "newChatTitleMissing": "Gib einen Titel ein, um zu senden.",
+  "newChatEditing": "Dieser Beitrag wurde nicht gesendet. Ändere ihn und sende ihn erneut."
 }
