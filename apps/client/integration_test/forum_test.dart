@@ -2,12 +2,14 @@
 
 // A forum post from "New post" to Done and back (brief M4-19 Tests; 01 6.1): the post shows
 // at the top, closing it on the server moves it into the collapsed Done section, and a new
-// message opens it again.
+// message opens it again. "New post" of the overview opens the new chat view (brief M4-41,
+// D-M4-41-3); the forum has no operator agent, so the post needs a title.
 
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 
+import 'support/new_chat.dart';
 import 'support/test_app.dart';
 
 void main() {
@@ -49,17 +51,13 @@ void main() {
       await app.waitFor(find.byKey(ValueKey('postList.post.$older')));
 
       await tester.tap(find.byKey(const ValueKey('postList.newPost')));
-      await app.waitFor(find.byKey(const ValueKey('newPost.dialog')));
-      await tester.enterText(
-        find.byKey(const ValueKey('newPost.title')),
-        'Printer jam on floor 2',
-      );
-      await tester.enterText(
-        find.byKey(const ValueKey('newPost.message')),
-        'The printer stops after one page.',
-      );
+      await app.waitFor(newChatField);
+      await tester.enterText(newChatField, 'The printer stops after one page.');
       await tester.pump();
-      await tester.tap(find.byKey(const ValueKey('newPost.create')));
+      expect(newChatSendEnabled(), isFalse, reason: 'no title, no operator');
+      await tester.enterText(newChatTitle, 'Printer jam on floor 2');
+      await until(tester, 'send enabled', newChatSendEnabled);
+      await tester.tap(newChatSend);
       await until(
         tester,
         'the post on the server',
@@ -72,6 +70,13 @@ void main() {
                 (t) => t['title'] == 'Printer jam on floor 2',
               )['id']!
               as String;
+      // The history of the new post opens; the overview shows it at the top.
+      await until(
+        tester,
+        'the history opens',
+        () => currentRoute(tester) == '/t/$created',
+      );
+      await tester.tap(find.byKey(ValueKey('sidebar.channel.$forum')));
       final row = find.byKey(ValueKey('postList.post.$created'));
       final olderRow = find.byKey(ValueKey('postList.post.$older'));
       await app.waitFor(row);

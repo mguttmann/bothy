@@ -780,6 +780,216 @@ void main() {
     );
   });
 
+  group('sidebar draft row', () {
+    Future<DsSidebarDraftRowState> show(
+      WidgetTester tester, {
+      String title = '',
+      DsDraftRowState state = DsDraftRowState.draft,
+      bool selected = false,
+      bool last = false,
+      VoidCallback? onOpen,
+      FocusNode? focusNode,
+      DsDensityMode density = DsDensityMode.comfortable,
+    }) async {
+      await pumpDs(
+        tester,
+        _onSidebar(
+          DsSidebarDraftRow(
+            title: title,
+            state: state,
+            selected: selected,
+            last: last,
+            focusNode: focusNode,
+            onOpen: onOpen ?? () {},
+          ),
+        ),
+        density: density,
+      );
+      return tester.state<DsSidebarDraftRowState>(
+        find.byType(DsSidebarDraftRow),
+      );
+    }
+
+    testWidgets('a blank title reads "New chat", in italics, secondary color', (
+      tester,
+    ) async {
+      final l = await en();
+      final c = DsColors.light;
+      for (final title in ['', '   ']) {
+        final s = await show(tester, title: title);
+        final text = tester.widget<Text>(
+          find.text('\u2068${l.sidebarNewChat}\u2069'),
+        );
+        expect(text.style?.fontStyle, FontStyle.italic);
+        expect(text.style?.color, c.textOnSidebarSecondary);
+        expect(text.style?.fontSize, DsType.bodySm.fontSize);
+        expect(text.maxLines, 1);
+        expect(text.overflow, TextOverflow.ellipsis);
+        expect(s.nameColor, c.textOnSidebarSecondary);
+        expect(s.italic, isTrue);
+        expect(s.background, isNull);
+        expect(find.byTooltip(l.sidebarNewChat), findsOneWidget);
+        // A draft is no automatic title: no mark, no run icon, no badge.
+        expect(find.text(l.threadTitleAutomatic), findsNothing);
+        expect(_glyphs(tester), isEmpty);
+        expect(find.byType(DsBadge), findsNothing);
+      }
+    });
+
+    testWidgets('a draft with a title shows it with the tooltip', (
+      tester,
+    ) async {
+      const long =
+          'Review: grant the deploy key to the build runner of the staging host';
+      final s = await show(tester, title: long);
+      final text = tester.widget<Text>(find.text('\u2068$long\u2069'));
+      expect(text.style?.fontStyle, FontStyle.italic);
+      expect(s.italic, isTrue);
+      expect(find.byTooltip(long), findsOneWidget);
+    });
+
+    testWidgets('label per state, the selected flag, one node', (tester) async {
+      final handle = tester.ensureSemantics();
+      final l = await en();
+      for (final (state, word) in [
+        (DsDraftRowState.draft, l.sidebarDraftState),
+        (DsDraftRowState.sending, l.messageSending),
+        (DsDraftRowState.failed, l.sidebarDraftNotSent),
+      ]) {
+        for (final selected in [false, true]) {
+          await show(tester, state: state, selected: selected);
+          final label = '${l.sidebarNewChat}, $word';
+          expect(
+            tester.getSemantics(find.bySemanticsLabel(label)),
+            isSemantics(label: label, isSelected: selected, hasTapAction: true),
+            reason: '${state.name} $selected',
+          );
+          // The badge text is part of the row label, not a node of its own.
+          expect(
+            find.bySemanticsLabel(RegExp('^$word\$')),
+            findsNothing,
+            reason: state.name,
+          );
+          expect(dsSemanticsProblems(tester), isEmpty);
+        }
+      }
+      await show(tester, title: 'Export format', state: DsDraftRowState.failed);
+      expect(
+        find.bySemanticsLabel('Export format, ${l.sidebarDraftNotSent}'),
+        findsOneWidget,
+      );
+      handle.dispose();
+    });
+
+    testWidgets('sending shows the badge; failed the icon and the badge', (
+      tester,
+    ) async {
+      final l = await en();
+      final c = DsColors.light;
+      await show(tester, state: DsDraftRowState.sending);
+      var badge = tester.widget<DsBadge>(find.byType(DsBadge));
+      expect(badge.text, l.messageSending);
+      expect(badge.background, c.surfaceSidebarHover);
+      expect(badge.foreground, c.textOnSidebarSecondary);
+      expect(_glyphs(tester), isEmpty);
+
+      await show(tester, state: DsDraftRowState.failed);
+      badge = tester.widget<DsBadge>(find.byType(DsBadge));
+      expect(badge.text, l.sidebarDraftNotSent);
+      expect(badge.background, c.surfaceSidebarHover);
+      expect(badge.foreground, c.textOnSidebarSecondary);
+      final icon = tester.widget<DsIcon>(_icon(DsIcons.runFailed));
+      expect(icon.color, c.categoryRowanOnSidebar);
+      expect(icon.size, DsIconSizeRole.sm);
+      expect(icon.decorative, isTrue);
+      // The icon stands before the text, the badge after it.
+      final text = find.text('\u2068${l.sidebarNewChat}\u2069');
+      expect(
+        tester.getTopLeft(_icon(DsIcons.runFailed)).dx,
+        lessThan(tester.getTopLeft(text).dx),
+      );
+      expect(
+        tester.getTopLeft(find.byType(DsBadge)).dx,
+        greaterThan(tester.getTopRight(text).dx),
+      );
+    });
+
+    testWidgets('selected background; a tap and Enter open the draft', (
+      tester,
+    ) async {
+      final c = DsColors.light;
+      var opened = 0;
+      final s = await show(tester, selected: true, onOpen: () => opened++);
+      expect(s.background, c.surfaceSidebarSelected);
+      await tester.tap(find.byType(DsSidebarDraftRow));
+      expect(opened, 1);
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      expect(opened, 2);
+      expect(_draggable(), findsNothing);
+    });
+
+    testWidgets('a focus node of the caller focuses the row', (tester) async {
+      final node = FocusNode();
+      addTearDown(node.dispose);
+      var opened = 0;
+      await show(tester, focusNode: node, onOpen: () => opened++);
+      node.requestFocus();
+      await tester.pump();
+      expect(node.hasPrimaryFocus, isTrue);
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      expect(opened, 1);
+    });
+
+    testWidgets('height, indent and tree line of the thread row', (
+      tester,
+    ) async {
+      for (final (density, tokens) in [
+        (DsDensityMode.comfortable, DsDensity.comfortable),
+        (DsDensityMode.compact, DsDensity.compact),
+      ]) {
+        await pumpDs(
+          tester,
+          _onSidebar(
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                DsSidebarDraftRow(title: 'Draft title', onOpen: () {}),
+                DsSidebarThreadRow(
+                  const DsSidebarThreadRowData(id: 't', title: 'Export format'),
+                  last: true,
+                  onOpen: () {},
+                ),
+              ],
+            ),
+          ),
+          density: density,
+        );
+        expect(
+          tester.getSize(find.byType(DsSidebarDraftRow)).height,
+          tokens.rowChannel,
+          reason: density.name,
+        );
+        expect(
+          tester.getTopLeft(find.text('\u2068Draft title\u2069')).dx,
+          tester.getTopLeft(find.text('\u2068Export format\u2069')).dx,
+          reason: density.name,
+        );
+        // The same tree line frame as the thread row below it.
+        final paints = tester.widgetList<CustomPaint>(
+          find.descendant(
+            of: find.byType(DsSidebarDraftRow),
+            matching: find.byType(CustomPaint),
+          ),
+        );
+        expect(
+          paints.where((p) => '${p.painter.runtimeType}' == '_TreeLinePainter'),
+          hasLength(1),
+        );
+      }
+    });
+  });
+
   group('all posts row', () {
     testWidgets('text, marks of the posts not shown, never a total', (
       tester,
@@ -942,6 +1152,36 @@ void main() {
           );
         },
       );
+    }
+
+    for (final locale in [const Locale('de'), const Locale('en')]) {
+      for (final state in DsDraftRowState.values) {
+        testWidgets(
+          'the draft row (${state.name}) fits a narrow sidebar at text scale 2 '
+          '(${locale.languageCode})',
+          (tester) async {
+            for (final title in ['', 'Gateway: resume after network change']) {
+              await narrow(
+                tester,
+                DsSidebarDraftRow(
+                  title: title,
+                  state: state,
+                  selected: true,
+                  onOpen: () {},
+                ),
+                locale: locale,
+              );
+              expect(tester.takeException(), isNull, reason: title);
+              final l = locale.languageCode == 'de' ? await de() : await en();
+              final text = title.isEmpty ? l.sidebarNewChat : title;
+              expect(
+                tester.getSize(find.text('\u2068$text\u2069')).width,
+                greaterThan(0),
+              );
+            }
+          },
+        );
+      }
     }
 
     testWidgets('a full channel row and thread row fit at text scale 2', (

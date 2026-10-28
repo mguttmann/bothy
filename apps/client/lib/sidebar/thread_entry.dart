@@ -9,6 +9,7 @@ import 'package:domain/domain.dart';
 import 'package:flutter/material.dart';
 
 import '../menus/thread_menu.dart';
+import 'sidebar_model.dart';
 import 'sidebar_threads.dart';
 
 /// The row of [entry] in the group of [channel].
@@ -121,6 +122,71 @@ class AllPostsEntry extends StatelessWidget {
         key: ValueKey('sidebar.allPosts.${channel.value}'),
         unreadCount: counts.unread,
         mentionCount: counts.mentions,
+        onOpen: onOpen,
+        focusNode: focusNode,
+      ),
+    ),
+  );
+}
+
+/// A new chat row at the top of a forum group (01 6.8 item 8, brief M4-41): the draft row "New
+/// chat" or a sent post that the server has not created yet.
+///
+/// A click or Enter calls [onOpen] (the new chat view of the forum, with the sent post's entry
+/// for a sent one). The row has no menu and cannot be dragged (01 6.8 item 10).
+class NewChatEntry extends StatelessWidget {
+  /// Creates the entry.
+  const NewChatEntry({
+    super.key,
+    required this.channel,
+    required this.row,
+    required this.selected,
+    required this.last,
+    required this.onOpen,
+    this.focusNode,
+    this.onKeyEvent,
+  });
+
+  /// The forum.
+  final ChannelId channel;
+
+  /// The row.
+  final SidebarNewChatRow row;
+
+  /// Whether the route shows this row.
+  final bool selected;
+
+  /// Whether it is the last row of the group (the tree line ends there).
+  final bool last;
+
+  /// Opens the row.
+  final VoidCallback onOpen;
+
+  /// The focus node of the row, for the arrow keys of the tree (D-SB-8).
+  final FocusNode? focusNode;
+
+  /// Handles a key while the row has the focus (the arrow keys of the tree), or null.
+  final FocusOnKeyEventCallback? onKeyEvent;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsetsDirectional.only(
+      start: DsSpace.s16,
+      end: DsSpace.s4,
+    ),
+    child: Focus(
+      canRequestFocus: false,
+      skipTraversal: true,
+      includeSemantics: false,
+      onKeyEvent: onKeyEvent,
+      child: DsSidebarDraftRow(
+        key: ValueKey(
+          'sidebar.newChat.${channel.value}.${row.entryId ?? 'draft'}',
+        ),
+        title: row.title,
+        state: row.state,
+        selected: selected,
+        last: last,
         onOpen: onOpen,
         focusNode: focusNode,
       ),

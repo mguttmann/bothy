@@ -22,6 +22,7 @@ Widget _composer({
   ValueChanged<DsSuggestion>? onAcceptSuggestion,
   VoidCallback? onDismissSuggestions,
   bool hasAttachments = false,
+  bool sendEnabled = true,
 }) => DsComposer(
   targetName: 'general',
   followupAgentName: followupAgentName,
@@ -38,6 +39,7 @@ Widget _composer({
   onAcceptSuggestion: onAcceptSuggestion,
   onDismissSuggestions: onDismissSuggestions,
   hasAttachments: hasAttachments,
+  sendEnabled: sendEnabled,
 );
 
 Future<void> _focus(WidgetTester tester) async {
@@ -217,6 +219,52 @@ void main() {
     );
     await tester.tap(find.bySemanticsLabel(l.composerSend));
     expect(sent, ['']);
+  });
+
+  testWidgets('sendEnabled false keeps the text and does not send (M4-41)', (
+    tester,
+  ) async {
+    final l = await en();
+    final sent = <String>[];
+    // An own controller: a send would clear it, so the kept text proves no send happened.
+    await pumpDs(tester, _composer(onSend: sent.add, sendEnabled: false));
+    await _focus(tester);
+    await tester.enterText(find.byType(TextField), 'hello');
+    await tester.pump();
+    expect(
+      tester.getSemantics(find.bySemanticsLabel(l.composerSend)),
+      isSemantics(isButton: true, hasEnabledState: true, isEnabled: false),
+    );
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pump();
+    await tester.tap(find.bySemanticsLabel(l.composerSend));
+    await tester.pump();
+    expect(sent, isEmpty);
+    final field = tester.widget<TextField>(find.byType(TextField));
+    expect(field.controller!.text, 'hello');
+    // Shift+Enter still makes a new line.
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.shift);
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.shift);
+    expect(field.controller!.text, 'hello\n');
+
+    // Switched on again, the same text sends.
+    await pumpDs(tester, _composer(onSend: sent.add));
+    await tester.tap(find.bySemanticsLabel(l.composerSend));
+    expect(sent, ['hello\n']);
+  });
+
+  testWidgets('sendEnabled false also holds attachments back (M4-41)', (
+    tester,
+  ) async {
+    final l = await en();
+    final sent = <String>[];
+    await pumpDs(
+      tester,
+      _composer(onSend: sent.add, hasAttachments: true, sendEnabled: false),
+    );
+    await tester.tap(find.bySemanticsLabel(l.composerSend));
+    expect(sent, isEmpty);
   });
 
   testWidgets('incomplete options disable send with the reason', (

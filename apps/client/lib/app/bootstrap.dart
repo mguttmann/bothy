@@ -434,6 +434,7 @@ final class InstanceServices {
     required this.draftEditing,
     required this.fileCache,
     required this.uploads,
+    required this.createdPosts,
     required this.terminalApi,
     required this.versions,
     required this._stopWatching,
@@ -520,6 +521,7 @@ final class InstanceServices {
       root: Directory('${folder.path}${Platform.pathSeparator}files'),
     );
     final uploads = UploadProgress();
+    final createdPosts = CreatedPosts();
     final versions = VersionWatch(
       discovery: ports.discovery,
       address: instance.address,
@@ -566,6 +568,9 @@ final class InstanceServices {
           executors,
           api,
           (thread) => engine.catchUp.storeConfirmedThread(thread),
+          // M4-41: the draft of a new post and the thread a new chat created.
+          storeDraft: (result) => engine.catchUp.applyDraftPutResult(result),
+          onCreated: createdPosts.record,
         );
         AppMessageOps.register(
           executors,
@@ -635,6 +640,7 @@ final class InstanceServices {
       draftEditing: draftEditing,
       fileCache: fileCache,
       uploads: uploads,
+      createdPosts: createdPosts,
       terminalApi: terminalApi,
       versions: versions,
       stopWatching: stopWatching,
@@ -670,6 +676,9 @@ final class InstanceServices {
 
   /// The progress of the uploads of this run.
   final UploadProgress uploads;
+
+  /// The threads this run's new posts created (brief M4-41).
+  final CreatedPosts createdPosts;
 
   /// The REST client of the terminal (brief M4-36): the session's DPoP and refresh, without
   /// the interceptor that answers `401 step_up_required` itself, because the terminal view

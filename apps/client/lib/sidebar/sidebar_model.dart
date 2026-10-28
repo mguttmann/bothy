@@ -12,6 +12,40 @@ import 'package:domain/domain.dart';
 import 'sidebar_order.dart';
 import 'sidebar_threads.dart';
 
+/// A row at the top of a forum's group that is not a thread yet (01 6.8 item 8, brief M4-41):
+/// the draft row "New chat" of the person's draft of a new post, or a new post this device sent
+/// and the server has not created yet ("sending", or "not sent" after a refusal, 01 6.6). It
+/// counts toward neither the bound of the group nor the counters.
+final class SidebarNewChatRow {
+  /// The draft row of the forum.
+  const SidebarNewChatRow.draft() : entryId = null, title = '', failed = false;
+
+  /// The row of the sent post of outbox entry [entryId] with its [title] ('' without one);
+  /// [failed] after the server refused it.
+  const SidebarNewChatRow.sent({
+    required String this.entryId,
+    required this.title,
+    this.failed = false,
+  });
+
+  /// The outbox entry of a sent post, or null for the draft row.
+  final String? entryId;
+
+  /// The title of a sent post; empty reads "New chat".
+  final String title;
+
+  /// Whether the server refused the sent post.
+  final bool failed;
+
+  /// Whether it is the draft row.
+  bool get isDraft => entryId == null;
+
+  /// The row data state of `DsSidebarDraftRow`.
+  DsDraftRowState get state => isDraft
+      ? DsDraftRowState.draft
+      : (failed ? DsDraftRowState.failed : DsDraftRowState.sending);
+}
+
 /// A channel row of the sidebar with what it shows.
 final class SidebarChannel {
   /// Creates the entry.
@@ -22,7 +56,13 @@ final class SidebarChannel {
     required this.muted,
     this.group,
     this.expanded = true,
+    this.newChatRows = const [],
   });
+
+  /// The rows of a forum above its thread rows that are not threads yet: the draft row and the
+  /// sent posts (01 6.8 item 8, M4-41); they show while the group is expanded and count
+  /// toward neither the bound nor the counters.
+  final List<SidebarNewChatRow> newChatRows;
 
   /// The channel.
   final Channel channel;
@@ -38,20 +78,27 @@ final class SidebarChannel {
   /// Whether the thread group is expanded on this device (01 6.8 item 7; default expanded).
   final bool expanded;
 
-  /// Whether the channel shows thread rows (and so its own arrow, 01 6.8 item 7).
-  bool get hasGroup => group?.hasRows ?? false;
+  /// Whether the channel shows thread rows or new chat rows (and so its own arrow, 01 6.8
+  /// item 7).
+  bool get hasGroup => _hasThreadRows || newChatRows.isNotEmpty;
+
+  bool get _hasThreadRows => group?.hasRows ?? false;
 
   /// The thread rows on screen: those of an expanded group, else none.
   List<SidebarThread> get visibleThreads =>
-      hasGroup && expanded ? group!.rows : const [];
+      _hasThreadRows && expanded ? group!.rows : const [];
 
-  /// The counters the channel row shows: with a group those of D-SB-5 (an expanded group
-  /// counts only what no row below it shows), else [counts].
-  ThreadCounts get rowCounts => hasGroup ? group!.channelCounts : counts;
+  /// The new chat rows on screen: those of an expanded group, else none.
+  List<SidebarNewChatRow> get visibleNewChatRows =>
+      expanded ? newChatRows : const [];
+
+  /// The counters the channel row shows: with thread rows those of D-SB-5 (an expanded group
+  /// counts only what no row below it shows), else [counts]; new chat rows count nothing.
+  ThreadCounts get rowCounts => _hasThreadRows ? group!.channelCounts : counts;
 
   /// The counters of "All posts" of an expanded forum group, or null when it has none.
   ThreadCounts? get allPostsCounts =>
-      hasGroup && expanded ? group!.allPostsCounts : null;
+      _hasThreadRows && expanded ? group!.allPostsCounts : null;
 
   /// Whether a run of the channel has not ended (`runs`).
   final bool runActive;
@@ -295,4 +342,21 @@ final class SidebarNavigation {
     open(target);
     return true;
   }
+}
+
+/// The new chat row the route selects (brief M4-41): the draft row of [forum] while its new chat
+/// view writes ([entry] null), or the row of the sent post of outbox entry [entry].
+final class SidebarNewChatSelection {
+  /// Creates the selection.
+  const SidebarNewChatSelection(this.forum, {this.entry});
+
+  /// The forum.
+  final ChannelId forum;
+
+  /// The outbox entry of the sent post, or null for the draft row.
+  final String? entry;
+
+  /// Whether [row] of [channel] is the selected row.
+  bool selects(ChannelId channel, SidebarNewChatRow row) =>
+      channel == forum && row.entryId == entry;
 }

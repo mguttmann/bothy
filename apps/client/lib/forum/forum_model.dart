@@ -115,7 +115,8 @@ final class PostItem {
     final operator = thread.operatorAgentId;
     return DsThreadRowData(
       id: thread.id.value,
-      title: thread.title,
+      // A post sent without a title reads "New chat" until its agent names it (09 12, M4-41).
+      title: thread.title.trim().isEmpty ? l.sidebarNewChat : thread.title,
       timeLabel: timeLabel,
       unreadCount: counts.unread,
       mentionCount: counts.mentions,

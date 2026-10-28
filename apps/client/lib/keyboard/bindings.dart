@@ -242,9 +242,11 @@ final List<ShortcutRow> shortcutRows = [
   ShortcutRow('Search in thread', [
     _primary(ShortcutAction.searchInThread, LogicalKeyboardKey.keyF),
   ]),
-  ShortcutRow('New post or new chat in the current forum', [
-    _primary(ShortcutAction.newPost, LogicalKeyboardKey.keyN),
-  ]),
+  ShortcutRow(
+    'New post or new chat in the current forum '
+    '(the forum of the focused or selected row, 6.8)',
+    [_primary(ShortcutAction.newPost, LogicalKeyboardKey.keyN)],
+  ),
   ShortcutRow('Focus the input', [
     _same(ShortcutAction.focusInput, ShortcutKind.history, const [
       KeyStroke(LogicalKeyboardKey.escape),

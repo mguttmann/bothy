@@ -100,6 +100,8 @@ class ThreadHeader extends StatelessWidget {
     final l = AppLocalizations.of(context);
     final colors = context.dsColors;
     final d = data;
+    // A post sent without a title reads "New chat" until its agent names it (09 12, M4-41).
+    final untitled = !d.mainHistory && d.title.trim().isEmpty;
     Widget action(String key, DsGlyph glyph, String label, VoidCallback tap) =>
         Tooltip(
           message: label,
@@ -162,7 +164,9 @@ class ThreadHeader extends StatelessWidget {
               Semantics(
                 header: true,
                 child: Text(
-                  dsIsolate(d.mainHistory ? '# ${d.title}' : d.title),
+                  untitled
+                      ? l.sidebarNewChat
+                      : dsIsolate(d.mainHistory ? '# ${d.title}' : d.title),
                   key: const ValueKey('thread.title'),
                   style: dsTextStyle(DsType.heading)
                       .copyWith(color: colors.textPrimary),

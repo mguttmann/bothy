@@ -36,6 +36,8 @@ class SpaceNode extends StatefulWidget {
     this.onOpenThread,
     this.onToggleGroup,
     this.onAdd,
+    this.selectedNewChat,
+    this.onOpenNewChat,
     this.onMoveUp,
     this.onMoveDown,
     this.dragHandle,
@@ -61,6 +63,12 @@ class SpaceNode extends StatefulWidget {
 
   /// Collapses or expands the thread group of a channel.
   final void Function(ChannelId channel, bool expanded)? onToggleGroup;
+
+  /// The new chat row the route selects, or null (brief M4-41).
+  final SidebarNewChatSelection? selectedNewChat;
+
+  /// Opens a new chat row of a forum: its draft (entry null) or a sent post; null for none.
+  final void Function(ChannelId forum, String? entry)? onOpenNewChat;
 
   /// The "+" action of a forum row (01 6.8 item 8), or null for none.
   final ValueChanged<ChannelId>? onAdd;
@@ -100,6 +108,8 @@ class _SpaceNodeState extends State<SpaceNode> {
       :onOpenThread,
       :onToggleGroup,
       :onAdd,
+      :selectedNewChat,
+      :onOpenNewChat,
       :onMoveUp,
       :onMoveDown,
       :dragHandle,
@@ -150,6 +160,10 @@ class _SpaceNodeState extends State<SpaceNode> {
                   ? null
                   : (expanded) => onToggleGroup(c.channel.id, expanded),
               onAdd: onAdd == null ? null : () => onAdd(c.channel.id),
+              selectedNewChat: selectedNewChat,
+              onOpenNewChat: onOpenNewChat == null
+                  ? null
+                  : (entry) => onOpenNewChat(c.channel.id, entry),
               onParent: _row.requestFocus,
             ),
       ],

@@ -48,7 +48,8 @@ final class TargetResolver {
         return _remote(
           () => _api.getSpacesApi().getSpace(spaceId: spaceId.value),
         );
-      case ChannelLocation(:final channelId):
+      case ChannelLocation(:final channelId) ||
+          NewChatLocation(:final channelId):
         if (await _db.structureDao.channelById(channelId) != null) {
           return TargetStatus.visible;
         }

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The thread rows of the sidebar tree and the row "All posts" (components.md section 7,
-/// 01 6.8 items 1, 5 and 6).
+/// The thread rows of the sidebar tree, the draft row "New chat" and the row "All posts"
+/// (components.md section 7, 01 6.8 items 1, 5, 6 and 8).
 library;
 
 import 'package:flutter/material.dart';
@@ -227,6 +227,157 @@ class DsSidebarThreadRowState extends State<DsSidebarThreadRow> {
             decorative: true,
           ),
         ],
+      ],
+    );
+  }
+}
+
+/// The sending state of a [DsSidebarDraftRow] (01 6.6 and 6.8 item 8).
+enum DsDraftRowState {
+  /// The person writes the new post; nothing is sent yet.
+  draft,
+
+  /// The post is in the outbox (`thread.create`) and the server has not confirmed it yet.
+  sending,
+
+  /// The server refused the post; the forum overview offers Try again.
+  failed,
+}
+
+/// The draft row "New chat" at the top of a forum group: the person's draft of a new post in
+/// this forum (components.md 7, 01 6.8 item 8).
+///
+/// Same height, indent, tree line and selected, hover and focus states as
+/// [DsSidebarThreadRow]. The text is [title], or "New chat" while the title is blank, in
+/// italics in `type.body-sm` and `color.text.on-sidebar-secondary`, one line cut with an
+/// ellipsis, the full text in a tooltip. [state] [DsDraftRowState.sending] adds the badge
+/// "Sending" after the text; [DsDraftRowState.failed] puts the `run.failed` icon
+/// (`category.rowan.on-sidebar`, `icon.size.sm`) before the text and the badge "Not sent" after
+/// it (01 6.6). The badges take the sidebar pairing of the "automatic" mark and share the width
+/// with the text, so nothing overflows in a narrow sidebar at text scale 2.
+///
+/// One screen reader node with the label "{Text}, {State}" (the state is "Draft", "Sending" or
+/// "Not sent") and the selected flag. Enter or a tap calls [onOpen]. The row cannot be dragged
+/// (01 6.8 item 10).
+///
+/// ```dart
+/// DsSidebarDraftRow(title: draft.title, selected: true, onOpen: () => openDraft(forum.id))
+/// ```
+class DsSidebarDraftRow extends StatefulWidget {
+  /// Creates the draft row with the draft's [title] (blank reads "New chat"), which [onOpen]
+  /// opens; [state] is the sending state, [selected] whether the new chat view is open,
+  /// [last] whether the row ends its group and [focusNode] the caller's node, if any.
+  const DsSidebarDraftRow({
+    super.key,
+    required this.title,
+    required this.onOpen,
+    this.state = DsDraftRowState.draft,
+    this.selected = false,
+    this.last = false,
+    this.focusNode,
+  });
+
+  /// The title the person typed for the new post; blank reads "New chat".
+  final String title;
+
+  /// Opens the new chat view with the draft.
+  final VoidCallback onOpen;
+
+  /// The sending state of the draft.
+  final DsDraftRowState state;
+
+  /// Whether the new chat view of this draft is the open view.
+  final bool selected;
+
+  /// Whether the row is the last of its group; the tree line then ends at its middle. In a
+  /// forum group "All posts" is last, so the draft row of a forum is not.
+  final bool last;
+
+  /// The focus node of the row, so the caller's tree navigation can move the keyboard focus
+  /// to it (01 6.8 item 7, D-SB-8); null for one of its own.
+  final FocusNode? focusNode;
+
+  @override
+  State<DsSidebarDraftRow> createState() => DsSidebarDraftRowState();
+}
+
+/// State of [DsSidebarDraftRow]; exposes the resolved text style and colors to tests.
+class DsSidebarDraftRowState extends State<DsSidebarDraftRow> {
+  /// The text color; a draft always reads in `color.text.on-sidebar-secondary`.
+  @visibleForTesting
+  Color get nameColor => context.dsColors.textOnSidebarSecondary;
+
+  /// Whether the text is in italics; a draft always is (components.md 7).
+  @visibleForTesting
+  bool get italic => true;
+
+  /// The row background of the selected state, or null.
+  @visibleForTesting
+  Color? get background =>
+      widget.selected ? context.dsColors.surfaceSidebarSelected : null;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = dsL10n(context);
+    final c = context.dsColors;
+    final text = widget.title.trim().isEmpty ? l.sidebarNewChat : widget.title;
+    final badge = switch (widget.state) {
+      DsDraftRowState.draft => null,
+      DsDraftRowState.sending => l.messageSending,
+      DsDraftRowState.failed => l.sidebarDraftNotSent,
+    };
+    final label = '$text, ${badge ?? l.sidebarDraftState}';
+    return _SidebarTreeRow(
+      label: label,
+      selected: widget.selected,
+      last: widget.last,
+      unreadBar: false,
+      background: background,
+      onOpen: widget.onOpen,
+      focusNode: widget.focusNode,
+      children: [
+        if (widget.state == DsDraftRowState.failed) ...[
+          DsIcon(
+            DsIcons.runFailed,
+            size: DsIconSizeRole.sm,
+            color: c.categoryRowanOnSidebar,
+            decorative: true,
+          ),
+          const SizedBox(width: DsSpace.s6),
+        ],
+        Expanded(
+          child: Row(
+            children: [
+              Flexible(
+                child: Tooltip(
+                  message: text,
+                  excludeFromSemantics: true,
+                  child: Text(
+                    dsIsolate(text),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: dsTextStyle(DsType.bodySm).copyWith(
+                      color: nameColor,
+                      fontStyle: italic ? FontStyle.italic : null,
+                    ),
+                  ),
+                ),
+              ),
+              if (badge != null) ...[
+                const SizedBox(width: DsSpace.s6),
+                // The pairing of the "automatic" mark of the thread row; Flexible, so text and
+                // badge share a narrow width at text scale 2 instead of overflowing the row.
+                Flexible(
+                  child: DsBadge(
+                    text: badge,
+                    background: c.surfaceSidebarHover,
+                    foreground: c.textOnSidebarSecondary,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
       ],
     );
   }

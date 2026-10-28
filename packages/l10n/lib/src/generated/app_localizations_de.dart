@@ -2024,16 +2024,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get newPostTitle => 'Titel';
 
   @override
-  String get newPostMessage => 'Erste Nachricht';
-
-  @override
   String get newPostTags => 'Tags';
-
-  @override
-  String get newPostCreate => 'Beitrag erstellen';
-
-  @override
-  String get newPostCancel => 'Abbrechen';
 
   @override
   String get adminTitle => 'Verwaltung';
@@ -8034,7 +8025,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get shortcutNewPost =>
-      'Neuer Beitrag oder neuer Chat im aktuellen Forum';
+      'Neuer Beitrag oder neuer Chat im Forum der fokussierten oder ausgewählten Zeile';
 
   @override
   String get shortcutFocusInput => 'Zum Eingabefeld';
@@ -9213,4 +9204,20 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get shortcutPinOverview =>
       'Übersicht des Forums als Spalte anheften oder lösen';
+
+  @override
+  String get sidebarDraftState => 'Entwurf';
+
+  @override
+  String get sidebarDraftNotSent => 'Nicht gesendet';
+
+  @override
+  String get newChatTitleOptional => 'Titel (optional)';
+
+  @override
+  String get newChatTitleAgentHint =>
+      'Der Agent benennt den Chat nach seiner ersten Antwort.';
+
+  @override
+  String get newChatTitleMissing => 'Gib einen Titel ein, um zu senden.';
 }

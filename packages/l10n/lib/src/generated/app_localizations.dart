@@ -3391,29 +3391,11 @@ abstract class AppLocalizations {
   /// **'Title'**
   String get newPostTitle;
 
-  /// Label of the field for the first message of a new forum post.
-  ///
-  /// In en, this message translates to:
-  /// **'First message'**
-  String get newPostMessage;
-
   /// Label of the tag selection of the dialog that creates a forum post.
   ///
   /// In en, this message translates to:
   /// **'Tags'**
   String get newPostTags;
-
-  /// Button of the dialog that creates the forum post.
-  ///
-  /// In en, this message translates to:
-  /// **'Create post'**
-  String get newPostCreate;
-
-  /// Button of the dialog that closes it without creating a post.
-  ///
-  /// In en, this message translates to:
-  /// **'Cancel'**
-  String get newPostCancel;
 
   /// Heading of the administration navigation (01 section 5.2 A1).
   ///
@@ -12873,7 +12855,7 @@ abstract class AppLocalizations {
   /// Row of the list of shortcuts (01 7).
   ///
   /// In en, this message translates to:
-  /// **'New post or new chat in the current forum'**
+  /// **'New post or new chat in the forum of the focused or selected row'**
   String get shortcutNewPost;
 
   /// Row of the list of shortcuts (01 7).
@@ -14807,6 +14789,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Pin or unpin the forum overview as a column'**
   String get shortcutPinOverview;
+
+  /// Screen reader word of the draft row "New chat" of a forum in the sidebar (01 section 6.8 item 8).
+  ///
+  /// In en, this message translates to:
+  /// **'Draft'**
+  String get sidebarDraftState;
+
+  /// Mark of a new post in the sidebar that the server refused; the forum overview offers Try again (01 section 6.6).
+  ///
+  /// In en, this message translates to:
+  /// **'Not sent'**
+  String get sidebarDraftNotSent;
+
+  /// Label of the title field of the new chat view in a forum with an operator agent (01 section 6.8 item 8).
+  ///
+  /// In en, this message translates to:
+  /// **'Title (optional)'**
+  String get newChatTitleOptional;
+
+  /// Hint below the optional title field of the new chat view (09 section 12).
+  ///
+  /// In en, this message translates to:
+  /// **'The agent names the chat after its first answer.'**
+  String get newChatTitleAgentHint;
+
+  /// Hint of the new chat view in a forum without an operator agent while the title is empty (01 section 6.8 item 8).
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a title to send.'**
+  String get newChatTitleMissing;
 }
 
 class _AppLocalizationsDelegate

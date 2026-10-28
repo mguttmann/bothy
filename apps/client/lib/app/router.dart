@@ -86,6 +86,24 @@ final class ChannelLocation extends AppLocation {
   final ChannelId channelId;
 }
 
+/// `/c/{channel_id}/new?entry={outbox_entry_id}`: the new chat view of a forum (01 6.8 item 8,
+/// brief M4-41); [sentEntry] is the outbox entry of the post it sent and waits for, or null
+/// while the person writes.
+final class NewChatLocation extends AppLocation {
+  /// Creates the location.
+  const NewChatLocation(this.channelId, {this.sentEntry});
+
+  /// The forum.
+  final ChannelId channelId;
+
+  /// The outbox entry of the sent post, or null.
+  final String? sentEntry;
+
+  /// The path of the view of [forum], with the sent [entry].
+  static String pathOf(ChannelId forum, {String? entry}) =>
+      '/c/${forum.value}/new${entry == null ? '' : '?entry=$entry'}';
+}
+
 /// `/t/{thread_id}?m={message_id}`.
 final class ThreadLocation extends AppLocation {
   /// Creates the location.
@@ -195,6 +213,13 @@ AppLocation parseLocation(Uri location) {
     case 'c' when rest.length == 1:
       final channel = id(ChannelId.parse, rest.single);
       if (channel != null) return ChannelLocation(channel);
+    case 'c' when rest.length == 2 && rest.last == 'new':
+      final channel = id(ChannelId.parse, rest.first);
+      final entry = location.queryParameters['entry'];
+      // The entry is a UUIDv7 like every outbox ID (04 5).
+      if (channel != null && (entry == null || _uuid.hasMatch(entry))) {
+        return NewChatLocation(channel, sentEntry: entry);
+      }
     case 't' when rest.length == 1:
       final thread = id(ThreadId.parse, rest.single);
       final m = location.queryParameters['m'];
@@ -229,6 +254,10 @@ AppLocation parseLocation(Uri location) {
   }
   return const UnknownLocation();
 }
+
+final RegExp _uuid = RegExp(
+  r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+);
 
 /// Where the router sends a request for [location] (Design note 4).
 ///

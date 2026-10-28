@@ -575,6 +575,71 @@ Widget sidebarThreadsSheet() => Sheet([
   ]),
 ]);
 
+/// The draft row "New chat" of M4-41 at the top of its forum group (components.md 7, 01 6.8
+/// item 8 and 6.6): a blank draft selected, a titled draft, a draft that is sending and one
+/// the server refused, each below the forum row and above a thread row and "All posts".
+Widget sidebarDraftsSheet() => Sheet([
+  _sidebar([
+    _forum(
+      const DsChannelRowData(
+        id: 'c1',
+        name: 'server',
+        kind: DsChannelKind.forum,
+        projectBound: true,
+      ),
+      expanded: true,
+    ),
+    DsSidebarDraftRow(title: '', selected: true, onOpen: () {}),
+    DsSidebarThreadRow(
+      const DsSidebarThreadRowData(
+        id: 't1',
+        title: 'Gateway: resume after network change',
+        runState: DsRunState.running,
+      ),
+      onOpen: () {},
+    ),
+    DsSidebarAllPostsRow(onOpen: () {}),
+    _forum(
+      const DsChannelRowData(
+        id: 'c2',
+        name: 'requests',
+        kind: DsChannelKind.forum,
+      ),
+      expanded: true,
+    ),
+    DsSidebarDraftRow(
+      title: 'Export format for the monthly report',
+      onOpen: () {},
+    ),
+    DsSidebarAllPostsRow(onOpen: () {}),
+    _forum(
+      const DsChannelRowData(
+        id: 'c3',
+        name: 'releases',
+        kind: DsChannelKind.forum,
+      ),
+      expanded: true,
+    ),
+    DsSidebarDraftRow(
+      title: 'Release notes 2.4',
+      state: DsDraftRowState.sending,
+      selected: true,
+      onOpen: () {},
+    ),
+    DsSidebarAllPostsRow(onOpen: () {}),
+    _forum(
+      const DsChannelRowData(
+        id: 'c4',
+        name: 'ideas',
+        kind: DsChannelKind.forum,
+      ),
+      expanded: true,
+    ),
+    DsSidebarDraftRow(title: '', state: DsDraftRowState.failed, onOpen: () {}),
+    DsSidebarAllPostsRow(onOpen: () {}),
+  ]),
+]);
+
 const _header = DsComponentHeader(
   agentName: 'Robin',
   runLabel: 'R-12',
@@ -796,6 +861,7 @@ final Map<String, Widget Function()> sheets = {
   'rows': rowsSheet,
   'sidebar_channels': sidebarChannelsSheet,
   'sidebar_threads': sidebarThreadsSheet,
+  'sidebar_drafts': sidebarDraftsSheet,
   'message_components_active': componentsActiveSheet,
   'message_components_final': componentsFinalSheet,
   'composer': composerSheet,

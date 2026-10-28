@@ -78,22 +78,119 @@ Stream<bool> overviewPinned(Ref ref) {
       : db.forumViewDao.watchOverviewPinned();
 }
 
-/// A new post the "+" of a forum row asked for (01 6.8 item 8; until M4-41 it opens the
-/// overview with the "New post" dialog): the forum, or null. The overview of that forum takes it
-/// once it shows ([take]).
+/// The person's stored draft of a new post in [channelId] (03 `drafts` with `thread_id` NULL;
+/// 01 6.8 item 8, brief M4-41), or null.
+@riverpod
+Stream<Draft?> channelDraft(Ref ref, String channelId) {
+  final db = ref.watch(localDatabaseProvider);
+  return db == null
+      ? Stream.value(null)
+      : db.personalDao.watchDraft(channelId: ChannelId.parse(channelId));
+}
+
+/// A new post of a forum this device sent and the server has not created yet: a `createThread`
+/// entry of the outbox that is not confirmed (01 6.6; brief M4-41).
+final class PendingPost {
+  /// Creates the post of entry [entryId].
+  const PendingPost({
+    required this.entryId,
+    required this.title,
+    required this.failed,
+    required this.createdAt,
+  });
+
+  /// The outbox entry.
+  final String entryId;
+
+  /// The title, '' without one.
+  final String title;
+
+  /// Whether the server refused it (`failed`).
+  final bool failed;
+
+  /// When it was put into the outbox.
+  final DateTime createdAt;
+}
+
+/// The new posts of the forum [channelId] that wait in the outbox or were refused, newest first.
+/// Threads from a message (`parent_message_id`) are not posts of the forum's list.
+@riverpod
+Stream<List<PendingPost>> pendingPosts(Ref ref, String channelId) {
+  final db = ref.watch(localDatabaseProvider);
+  if (db == null) return Stream.value(const []);
+  return db.outboxDao.watchEntriesFor(null).map((entries) {
+    final posts = <PendingPost>[];
+    for (final e in entries) {
+      if (e.kind != ThreadOps.createThread ||
+          e.state == OutboxState.confirmed) {
+        continue;
+      }
+      final body = decodePayload(e.payload);
+      if (body['channel_id'] != channelId ||
+          body['parent_message_id'] != null) {
+        continue;
+      }
+      posts.add(
+        PendingPost(
+          entryId: e.id,
+          title: body['title'] as String? ?? '',
+          failed: e.state == OutboxState.failed,
+          createdAt: e.createdAt,
+        ),
+      );
+    }
+    return posts..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+  });
+}
+
+/// The text of the newest draft write of the person's draft of a new post in [channelId] that
+/// this device has not had confirmed yet, or null when none waits (04 13; brief M4-41): newer
+/// than the stored draft, so the draft row and the new chat view use it, also after a restart
+/// while offline. A new post queued after that write ends the draft (`clear_draft`), so it
+/// gives null then.
+@riverpod
+Stream<String?> unsentChannelDraft(Ref ref, String channelId) {
+  final db = ref.watch(localDatabaseProvider);
+  if (db == null) return Stream.value(null);
+  return db.outboxDao.watchEntriesFor(null).map((entries) {
+    String? text;
+    for (final e in entries) {
+      if (e.state.isFinal) continue;
+      final body = decodePayload(e.payload);
+      if (body['channel_id'] != channelId) continue;
+      if (e.kind == ThreadOps.putChannelDraft) {
+        text = body['content_md'] as String? ?? '';
+      } else if (e.kind == ThreadOps.deleteChannelDraft ||
+          (e.kind == ThreadOps.createThread &&
+              body['parent_message_id'] == null)) {
+        text = null;
+      }
+    }
+    return text;
+  });
+}
+
+/// A title and tags the new chat view of a forum starts with (brief M4-41): "Edit" of a refused
+/// post hands them over, because the server's draft has neither (D-M4-41-2). The view takes
+/// them once ([take]).
 @Riverpod(keepAlive: true)
-class NewPostRequest extends _$NewPostRequest {
+class NewChatPreset extends _$NewChatPreset {
   @override
-  ChannelId? build() => null;
+  Map<ChannelId, (String, List<ForumTagId>)> build() => const {};
 
-  /// Asks for a new post in [forum].
-  void request(ChannelId forum) => state = forum;
+  /// Sets [title] and [tags] for the next new chat view of [forum].
+  void set(ChannelId forum, String title, List<ForumTagId> tags) =>
+      state = {...state, forum: (title, tags)};
 
-  /// Takes the request when it is for [forum]: clears it and returns true, else false.
-  bool take(ChannelId forum) {
-    if (state != forum) return false;
-    state = null;
-    return true;
+  /// Takes the preset of [forum], or null.
+  (String, List<ForumTagId>)? take(ChannelId forum) {
+    final preset = state[forum];
+    if (preset == null) return null;
+    state = {
+      for (final MapEntry(:key, :value) in state.entries)
+        if (key != forum) key: value,
+    };
+    return preset;
   }
 }
 
@@ -251,3 +348,9 @@ class ForumPager extends _$ForumPager {
     }
   }
 }
+
+/// The threads this run's new posts created (brief M4-41), or an empty registry without a
+/// session.
+@riverpod
+CreatedPosts createdPosts(Ref ref) =>
+    ref.watch(signedInServicesProvider)?.createdPosts ?? CreatedPosts();

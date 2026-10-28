@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// Handlers of the personal state: read states, drafts, settings and the sidebar (04 14).
+/// Handlers of the personal state: read states, thread and channel drafts, settings and the
+/// sidebar (04 14).
 library;
 
 import '../rest_fake.dart';
@@ -35,6 +36,22 @@ void registerPersonalHandlers(RestFake rest) {
     )
     ..handle('deleteThreadDraft', (r) {
       world.deleteDraft(r.person.id, r.param('thread_id'));
+      return const FakeResponse.noContent();
+    })
+    ..handle(
+      'putChannelDraft',
+      (r) => FakeResponse(
+        200,
+        world.putChannelDraft(
+          r.person.id,
+          r.param('channel_id'),
+          r.json,
+          deviceId: r.session!.deviceId,
+        ),
+      ),
+    )
+    ..handle('deleteChannelDraft', (r) {
+      world.deleteChannelDraft(r.person.id, r.param('channel_id'));
       return const FakeResponse.noContent();
     })
     ..handle('listMyReadStates', (r) {

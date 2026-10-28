@@ -246,6 +246,8 @@ class _ClientAppState extends ConsumerState<ClientApp> {
     for (final path in const [
       '/s/:id',
       '/c/:id',
+      // The new chat view of a forum (01 6.8 item 8, M4-41).
+      '/c/:id/new',
       '/t/:id',
       '/running',
       '/running/:id',

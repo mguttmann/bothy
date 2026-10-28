@@ -31,6 +31,8 @@ class SpaceTree extends StatelessWidget {
     this.onOpenThread,
     this.onToggleGroup,
     this.onAdd,
+    this.selectedNewChat,
+    this.onOpenNewChat,
   });
 
   /// The spaces in order with their channels.
@@ -56,6 +58,12 @@ class SpaceTree extends StatelessWidget {
 
   /// Collapses or expands the thread group of a channel.
   final void Function(ChannelId channel, bool expanded)? onToggleGroup;
+
+  /// The new chat row the route selects, or null (brief M4-41).
+  final SidebarNewChatSelection? selectedNewChat;
+
+  /// Opens a new chat row of a forum: its draft (entry null) or a sent post; null for none.
+  final void Function(ChannelId forum, String? entry)? onOpenNewChat;
 
   /// The "+" action of a forum row, or null for none.
   final ValueChanged<ChannelId>? onAdd;
@@ -102,6 +110,8 @@ class SpaceTree extends StatelessWidget {
               onOpenThread: onOpenThread,
               onToggleGroup: onToggleGroup,
               onAdd: onAdd,
+              selectedNewChat: selectedNewChat,
+              onOpenNewChat: onOpenNewChat,
               onMoveUp: i > 0 ? () => onMove(id, i - 1) : null,
               onMoveDown: i < nodes.length - 1 ? () => onMove(id, i + 1) : null,
               // Only the space row starts a drag: a channel or thread row must never move

@@ -51,7 +51,7 @@ SHA-256 of uploads and downloads), and for files and voice (M4-22, docs/DECISION
 | `lib/app/providers/` | Riverpod providers (generated `*.g.dart`): ports, session, engine, settings, targets |
 | `lib/app/layout/` | the desktop shell, the four columns and their stored widths |
 | `lib/sidebar/` | the sidebar column (M4-19): head, space tree, channel rows, foot, personal order, `SidebarNavigation` for M4-24; the thread groups with their selection, rows and "All posts" (M4-40) |
-| `lib/forum/` | the forum overview D15 (M4-19, M4-40): head with the kind sentence, "Pin" and filters, rows, Done section, "New post" dialog, paging |
+| `lib/forum/` | the forum overview D15 (M4-19, M4-40): head with the kind sentence, "Pin" and filters, rows, Done section, paging, and the new chat view (M4-41) |
 | `lib/thread/` | the history column (M4-20): header, message list with paging, gaps and jumps, message tiles and actions, outbox rows, dialogs (versions, conflict, delete, reactions, title, move), the D2 layout |
 | `lib/composer/` | the composer (M4-20): send path, draft sync, mention suggestions, templates |
 | `lib/session_column/` | the frame of the session column with the agent part (M4-21) and the sections "Pinned" (M4-20) and "Files" (M4-22) |
@@ -659,8 +659,27 @@ keeps it as its own column next to the history, with the width `post_list` of
 `layout.column_widths`; the choice is kept per device in `shell_view_state`, and below
 `ui.desktop_min_width_three_columns` a pinned overview returns to the content column. The channel
 icons tell a text channel, a forum and a project forum (`channel.project`) apart and explain the
-kind in their tooltip. Until M4-41 the "+" of a forum row opens the overview with the "New post"
-dialog. Rulings: docs/decisions.d/M4-40.md.
+kind in their tooltip. Rulings: docs/decisions.d/M4-40.md.
+
+### New chat from the sidebar (M4-41)
+
+Every forum row has "+" ("New chat in `forum`" in a project forum, "New post in `forum`"
+otherwise), the same entry in the forum's context menu, and Cmd+N (Ctrl+N) starts it in the forum
+of the focused sidebar row, else of the selected one; on a text channel Cmd+N does nothing (01 6.8
+item 8, 7). It opens the new chat view `lib/forum/new_chat_view.dart` at `/c/<forum>/new` in the
+content column, without a dialog: the operator line, the title (optional with an operator agent,
+which names the chat after its first answer, 09 12; required without one), the tags and the
+composer with the focus; Esc leaves to the overview. The text is the person's draft of a new post
+(03 `drafts` with `thread_id` NULL), written through the outbox as `putChannelDraft` by the
+`DraftWriter` of the composer, so it survives a restart and reaches the other devices; a second
+"+" opens the same draft, and an empty draft is deleted when the person leaves the view. While a
+draft or the view exists, the forum's group starts with the draft row "New chat" in italics.
+Sending puts one `createThread` with `clear_draft` into the outbox (the server deletes the draft
+with the first message); the row shows "Sending" (or "Not sent" with the reason after a refusal)
+until the server created the post, then the post row takes its place and its history opens. The
+"New post" dialog of M4-19 is gone: "New chat" and "New post" of the overview open the view, and
+"Edit" of a refused post moves it back into the view. No git worktree, folder or runner request
+is involved (09 18.1). Rulings: docs/decisions.d/M4-41.md.
 
 ## Notification levels and channel export
 
@@ -857,7 +876,7 @@ to `bindings.dart`:
 | Quick switcher | Cmd+K | Ctrl+K |
 | Search | Cmd+Shift+F | Ctrl+Shift+F |
 | Search in thread | Cmd+F | Ctrl+F |
-| New post or new chat in the current forum | Cmd+N | Ctrl+N |
+| New post or new chat in the current forum (the forum of the focused or selected row, 6.8) | Cmd+N | Ctrl+N |
 | Focus the input | Esc then Tab, or Cmd+L | Esc then Tab, or Ctrl+L |
 | Next or previous channel or thread row in the sidebar | Option+Arrow down / up | Alt+Arrow down / up |
 | Next or previous unread channel or thread row | Option+Shift+Arrow down / up | Alt+Shift+Arrow down / up |

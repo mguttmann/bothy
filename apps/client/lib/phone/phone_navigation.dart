@@ -144,7 +144,10 @@ PhoneTab tabOf(
       return current == PhoneTab.mentions || current == PhoneTab.running
           ? current
           : PhoneTab.spaces;
-    case SpaceLocation() || ChannelLocation() || ViewLocation():
+    case SpaceLocation() ||
+        ChannelLocation() ||
+        NewChatLocation() ||
+        ViewLocation():
       return PhoneTab.spaces;
     case UnknownLocation() || OnboardingLocation():
       return current;
