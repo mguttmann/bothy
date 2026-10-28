@@ -2993,6 +2993,7 @@ paths:
                         topic: Customer tickets
                         sort_key: a1
                         read_only: false
+                        project_bound: false
                         operator:
                           mode: inherit
                         version: 3
@@ -6125,6 +6126,7 @@ paths:
                         topic: Customer tickets
                         sort_key: a1
                         read_only: false
+                        project_bound: false
                         operator:
                           mode: inherit
                         version: 3
@@ -6189,6 +6191,7 @@ paths:
                     topic: Customer tickets
                     sort_key: a1
                     read_only: false
+                    project_bound: false
                     operator:
                       mode: inherit
                     version: 3
@@ -6247,6 +6250,7 @@ paths:
                       topic: Customer tickets
                       sort_key: a1
                       read_only: false
+                      project_bound: false
                       operator:
                         mode: inherit
                       version: 3
@@ -6313,6 +6317,7 @@ paths:
                     topic: Customer tickets
                     sort_key: a1
                     read_only: false
+                    project_bound: false
                     operator:
                       mode: inherit
                     version: 3
@@ -6383,6 +6388,7 @@ paths:
                     topic: Customer tickets
                     sort_key: a1
                     read_only: false
+                    project_bound: false
                     operator:
                       mode: inherit
                     version: 3
@@ -6449,6 +6455,7 @@ paths:
                     topic: Customer tickets
                     sort_key: a1
                     read_only: false
+                    project_bound: false
                     operator:
                       mode: inherit
                     version: 3
@@ -6642,6 +6649,7 @@ paths:
                     topic: Customer tickets
                     sort_key: a1
                     read_only: false
+                    project_bound: false
                     operator:
                       mode: inherit
                     version: 3
@@ -6717,6 +6725,7 @@ paths:
                     topic: Customer tickets
                     sort_key: a1
                     read_only: true
+                    project_bound: false
                     operator:
                       mode: inherit
                     version: 4
@@ -7369,6 +7378,7 @@ paths:
                         topic: Customer tickets
                         sort_key: a1
                         read_only: false
+                        project_bound: false
                         operator:
                           mode: inherit
                         version: 3
@@ -7432,6 +7442,7 @@ paths:
                     topic: Customer tickets
                     sort_key: a1
                     read_only: false
+                    project_bound: false
                     operator:
                       mode: inherit
                     version: 3
@@ -11293,6 +11304,7 @@ paths:
                         topic: Customer tickets
                         sort_key: a1
                         read_only: false
+                        project_bound: false
                         operator:
                           mode: inherit
                         version: 3
@@ -11330,6 +11342,20 @@ paths:
                         is_estimate: true
                       step_count: 1
                       queued_at: '2026-10-10T09:30:00.000Z'
+                    active_threads:
+                    - id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
+                      channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
+                      kind: thread
+                      title: Invoice export fails
+                      title_source: auto
+                      state: open
+                      last_message_seq: 5301
+                      last_activity_at: '2026-10-10T09:30:00.000Z'
+                      message_count: 1
+                      created_by: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
+                      created_at: '2026-10-10T09:30:00.000Z'
+                      version: 3
+                      tag_ids: []
                     agents:
                     - agent_id: 0192f4a0-7b1c-7d07-84b0-358556a08a99
                       state: unknown
@@ -20315,6 +20341,7 @@ webhooks:
                       topic: Customer tickets
                       sort_key: a1
                       read_only: false
+                      project_bound: false
                       operator:
                         mode: inherit
                       version: 3
@@ -20374,6 +20401,7 @@ webhooks:
                       topic: Customer tickets
                       sort_key: a1
                       read_only: false
+                      project_bound: false
                       operator:
                         mode: inherit
                       version: 3
@@ -20481,6 +20509,7 @@ webhooks:
                       topic: Customer tickets
                       sort_key: a1
                       read_only: false
+                      project_bound: false
                       operator:
                         mode: inherit
                       version: 3
@@ -24253,6 +24282,7 @@ components:
       - settings_version
       - created_at
       - read_only
+      - project_bound
       properties:
         id:
           $ref: '#/components/schemas/Uuid'
@@ -24280,6 +24310,9 @@ components:
         read_only:
           type: boolean
           description: Write-protected for every principal including owners; only a running import writes (05, rule 1.8).
+        project_bound:
+          type: boolean
+          description: True exactly when a project binding exists for the forum (03 `project_bindings`, R-DM-54); derived, never stored. Creating or deleting a binding raises `version` and writes `channel.updated`; changing a binding and a readiness report do not.
         main_thread_id:
           $ref: '#/components/schemas/Uuid'
           description: Thread with `kind = main` of text and DM channels.
@@ -25730,6 +25763,7 @@ components:
       - drafts
       - features
       - sync_epoch
+      - active_threads
       properties:
         head_seq:
           type: integer
@@ -25767,6 +25801,11 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/RunSummary'
+        active_threads:
+          type: array
+          description: Per visible channel the open threads (`kind = thread`, as `getThread`, without messages) with an active run, the open threads in `unread_threads`, plus the open threads whose `last_activity_at` lies within `sync.snapshot_thread_window`, newest activity first, until the channel has `sync.snapshot_threads_per_channel` entries; threads with an active run and unread threads count toward this bound but are never left out (04 6.3 item 4, R-SY-28). Ordered by channel, then by descending `last_activity_at`. The client keeps them current through `thread.*` and `message.created`.
+          items:
+            $ref: '#/components/schemas/Thread'
         agents:
           type: array
           items:

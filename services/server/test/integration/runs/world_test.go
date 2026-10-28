@@ -347,7 +347,8 @@ func newEmptyWorldWithChat(t *testing.T, search searchlang.Map, chatCfg chatapp.
 	must(t, rn.BindInvocationTokens(tokenConfig, w.keys, fixedInstance{id: w.issuer}, w.clk))
 	reads, err := wire.NewSyncReads(syncapp.CatchUpConfig{PageSize: 500, MaxEvents: 100000},
 		wire.SyncReadDeps{Pool: pool, UoW: uow, Authorizer: w.az, Chat: c.Service, Messaging: m.Service, Personal: personal.Service, Agents: ag.Service,
-			Directory: w.id.Directory, Flags: settings.Admin, Runs: rn.Service})
+			Directory: w.id.Directory, Flags: settings.Admin, Runs: rn.Service,
+			Snapshot: syncapp.SnapshotConfig{ThreadWindow: 7 * 24 * time.Hour, ThreadsPerChannel: 20}})
 	must(t, err)
 	built, err := routes.Build(wire.Handlers{Access: authzhttp.New(w.admin), Agents: ag.Handlers, Spaces: c.Handlers, Channels: c.ChannelHandlers,
 		People: w.id.PeopleHandlers, Threads: c.ThreadHandlers, Behavior: c.BehaviorHandlers, Messages: m.Handlers, Admin: settings.Handlers, Personal: personal.Handlers,

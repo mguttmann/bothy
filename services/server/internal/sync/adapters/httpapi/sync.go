@@ -85,7 +85,8 @@ func SnapshotREST(v sync.SnapshotView) (rest.Snapshot, error) {
 			DisplayName: v.Principal.DisplayName, AvatarFileId: optionalID(v.Principal.AvatarFileID)},
 		Spaces: make([]rest.SpaceView, 0, len(v.Spaces)), Channels: make([]rest.ChannelView, 0, len(v.Channels)),
 		Sidebar: make([]rest.SidebarState, 0, len(v.Sidebar)), UnreadThreads: make([]rest.UnreadThread, 0, len(v.UnreadThreads)),
-		ActiveRuns: make([]rest.RunSummary, 0, len(v.ActiveRuns)), Agents: make([]rest.AgentPresence, 0, len(v.Agents)),
+		ActiveRuns: make([]rest.RunSummary, 0, len(v.ActiveRuns)), ActiveThreads: make([]rest.Thread, 0, len(v.ActiveThreads)),
+		Agents:   make([]rest.AgentPresence, 0, len(v.Agents)),
 		Settings: make([]rest.UserSetting, 0, len(v.Settings)), Drafts: make([]rest.DraftRef, 0, len(v.Drafts)),
 		Features: make([]rest.EvaluatedFlag, 0, len(v.Features)),
 	}
@@ -104,6 +105,9 @@ func SnapshotREST(v sync.SnapshotView) (rest.Snapshot, error) {
 	}
 	for _, r := range v.ActiveRuns {
 		out.ActiveRuns = append(out.ActiveRuns, runREST(r))
+	}
+	for _, th := range v.ActiveThreads {
+		out.ActiveThreads = append(out.ActiveThreads, threadREST(th))
 	}
 	for _, a := range v.Agents {
 		p := rest.AgentPresence{AgentId: rest.Uuid(a.AgentID), State: rest.AgentRuntimeState(a.State)}
@@ -148,7 +152,7 @@ func channelViewREST(c sync.SnapshotChannel) rest.ChannelView {
 		Id: rest.Uuid(c.ID), SpaceId: optionalID(c.SpaceID), Kind: rest.ChannelKind(c.Kind), Name: c.Name, Topic: c.Topic, SortKey: c.SortKey,
 		Operator: rest.ChannelOperator{Mode: rest.OperatorMode(c.OperatorMode), AgentId: optionalID(c.OperatorAgentID),
 			EffectiveAgentId: optionalID(c.EffectiveOperatorID)},
-		ReadOnly: c.ReadOnly, MainThreadId: optionalID(c.MainThreadID), ArchivedAt: optionalTime(c.ArchivedAt),
+		ReadOnly: c.ReadOnly, ProjectBound: c.ProjectBound, MainThreadId: optionalID(c.MainThreadID), ArchivedAt: optionalTime(c.ArchivedAt),
 		CreatedAt: c.CreatedAt.UTC().Truncate(time.Millisecond), Version: c.Version, SettingsVersion: c.SettingsVersion,
 	}
 	if c.ForumDefaultSort != "" {
@@ -161,6 +165,10 @@ func channelViewREST(c sync.SnapshotChannel) rest.ChannelView {
 	}
 	return rest.ChannelView{Channel: ch, Level: rest.Level(c.Level), Capabilities: capabilities(c.Capabilities)}
 }
+
+// threadREST converts an active thread of the snapshot (schema Thread, as getThread answers it):
+// empty values become absent members, never null (ADR 0053); the tags are always an array.
+func threadREST(th sync.SnapshotThread) rest.Thread { return rest.ThreadOf(rest.ThreadFields(th)) }
 
 // sidebarREST converts a sidebar state (schema SidebarState).
 func sidebarREST(st sync.SidebarState) rest.SidebarState {

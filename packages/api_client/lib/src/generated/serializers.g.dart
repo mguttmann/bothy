@@ -1428,6 +1428,10 @@ Serializers _$serializers =
             () => ListBuilder<RunSummary>(),
           )
           ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(Thread)]),
+            () => ListBuilder<Thread>(),
+          )
+          ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(AgentPresence)]),
             () => ListBuilder<AgentPresence>(),
           )

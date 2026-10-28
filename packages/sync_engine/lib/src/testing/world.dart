@@ -1016,6 +1016,7 @@ final class FakeWorld {
       'sort_key': 'a${channels.length}',
       'operator': _inheritOperator(spaceId),
       'read_only': false,
+      'project_bound': false,
       'version': 1,
       'settings_version': 1,
       'created_at': stamp(),
@@ -1197,9 +1198,59 @@ final class FakeWorld {
       messages[id]!,
   ];
 
+  /// The bound of `active_threads` per channel in the fake: the default of
+  /// `sync.snapshot_threads_per_channel` (04 18). The fake has no `sync.snapshot_thread_window`:
+  /// every open thread counts as active within it.
+  static const snapshotThreadsPerChannel = 20;
+
+  /// The API `active_threads` of [principalId] (04 6.3 item 4, R-SY-28): per visible channel, in
+  /// the order of the channels, the open threads of kind `thread` with an active run or in
+  /// [unread], plus the newest others until the channel holds [snapshotThreadsPerChannel];
+  /// newest activity first.
+  List<JsonMap> activeThreads(String principalId, List<JsonMap> unread) {
+    final pinned = {for (final u in unread) u['thread_id']};
+    bool kept(JsonMap t) =>
+        pinned.contains(t['id']) || activeRunOf(t['id']! as String) != null;
+    return [
+      for (final c in channels.values)
+        if (c.access.containsKey(principalId))
+          ..._boundedThreads(_openThreads(principalId, c.id), kept),
+    ];
+  }
+
+  /// The open threads of kind `thread` of [channelId] that [principalId] sees, newest activity
+  /// first.
+  List<JsonMap> _openThreads(String principalId, String channelId) =>
+      [
+        for (final t in threads.values)
+          if (t['channel_id'] == channelId &&
+              t['kind'] == 'thread' &&
+              t['state'] == 'open' &&
+              seesThread(principalId, t['id']! as String))
+            t,
+      ]..sort(
+        (a, b) => (b['last_activity_at']! as String).compareTo(
+          a['last_activity_at']! as String,
+        ),
+      );
+
+  /// Every thread of [open] that [kept] holds, plus the others in their order until the list has
+  /// [snapshotThreadsPerChannel] entries.
+  static List<JsonMap> _boundedThreads(
+    List<JsonMap> open,
+    bool Function(JsonMap) kept,
+  ) {
+    var room = snapshotThreadsPerChannel - open.where(kept).length;
+    return [
+      for (final t in open)
+        if (kept(t) || room-- > 0) t,
+    ];
+  }
+
   /// The API `Snapshot` of [principalId] (04 6.3 item 4, 04 7.3).
   JsonMap snapshot(String principalId) {
     final person = people[principalId]!;
+    final unread = unreadThreads(principalId);
     return {
       'head_seq': headSeq,
       'permission_version': permissionVersion,
@@ -1209,13 +1260,14 @@ final class FakeWorld {
       'spaces': spaceViews(principalId),
       'channels': channelViews(principalId),
       'sidebar': sidebarOf(principalId),
-      'unread_threads': unreadThreads(principalId),
+      'unread_threads': unread,
       'active_runs': [
         for (final r in runs.values)
           if (_active(r) &&
               seesChannel(principalId, r['channel_id']! as String))
             runSummary(r),
       ],
+      'active_threads': activeThreads(principalId, unread),
       'agents': <Object?>[],
       'settings': [...?settings[principalId]?.values],
       'drafts': [

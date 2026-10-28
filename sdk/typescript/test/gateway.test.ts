@@ -120,6 +120,7 @@ function ready(principal = AGENT): Json {
     sidebar: [],
     unread_threads: [],
     active_runs: [],
+    active_threads: [],
     agents: [],
     settings: [],
     drafts: [],

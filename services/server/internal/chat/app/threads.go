@@ -24,6 +24,7 @@ import (
 var (
 	_ chat.Threads         = (*Service)(nil)
 	_ chat.ThreadsByParent = (*Service)(nil)
+	_ chat.ActiveThreads   = (*Service)(nil)
 )
 
 // threadResource describes the thread th for authorize: its channel as path hint and its creator
@@ -226,6 +227,27 @@ func (s *Service) Counters(ctx context.Context, channelIDs []ids.ID) ([]chat.Thr
 		return []chat.ThreadCounter{}, nil
 	}
 	return s.d.Store.ThreadCounters(ctx, channelIDs)
+}
+
+// ActiveThreads implements chat.ActiveThreads (M2-52, 04 section 6.3 item 4, R-SY-28): one store
+// read with the window measured from the clock of the service, then thread.read per thread in
+// filter mode (07 section 7.4 rule 3, as the unread threads of the snapshot), then the tags and
+// billing modes as in Get. No channel returns none without a query.
+func (s *Service) ActiveThreads(ctx context.Context, a actor.Actor, q chat.ActiveThreadsQuery) ([]chat.Thread, error) {
+	if len(q.ChannelIDs) == 0 {
+		return []chat.Thread{}, nil
+	}
+	rows, err := s.d.Store.ActiveThreads(ctx, ActiveThreadQuery{
+		ChannelIDs: q.ChannelIDs, PinnedIDs: q.PinnedIDs, Since: s.now().Add(-q.Window), PerChannel: q.PerChannel,
+	})
+	if err != nil {
+		return nil, err
+	}
+	visible, err := s.readableThreads(authorize.Filter(ctx), a, rows, make([]domain.Thread, 0, len(rows)), len(rows))
+	if err != nil {
+		return nil, err
+	}
+	return s.views(ctx, visible)
 }
 
 // Get implements chat.Threads: thread.read, then 404 for an unknown id.

@@ -4950,6 +4950,30 @@
       "doc": "Window in which the gateway gathers the live-box patches of a run into one run.updated per connection."
     },
     {
+      "name": "sync.snapshot_thread_window",
+      "env": "BOTHY_SYNC__SNAPSHOT_THREAD_WINDOW",
+      "kind": "duration",
+      "default": "7d",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "04-sync-protocol.md",
+      "doc": "An open thread with activity within this window is in active_threads of the snapshot."
+    },
+    {
+      "name": "sync.snapshot_threads_per_channel",
+      "env": "BOTHY_SYNC__SNAPSHOT_THREADS_PER_CHANNEL",
+      "kind": "int",
+      "default": "20",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "1000",
+      "chapter": "04-sync-protocol.md",
+      "doc": "Bound of active_threads per channel, except threads with an active run or unread for the caller."
+    },
+    {
       "name": "sync.tail_batch_size",
       "env": "BOTHY_SYNC__TAIL_BATCH_SIZE",
       "kind": "int",

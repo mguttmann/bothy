@@ -177,7 +177,7 @@ func channelREST(c chat.Channel) rest.Channel {
 		Id: rest.Uuid(c.ID), SpaceId: optionalID(c.SpaceID), Kind: rest.ChannelKind(c.Kind), Name: c.Name, Topic: c.Topic, SortKey: c.SortKey,
 		Operator: rest.ChannelOperator{Mode: rest.OperatorMode(c.Operator.Mode), AgentId: optionalID(c.Operator.AgentID),
 			EffectiveAgentId: optionalID(c.Operator.EffectiveAgentID)},
-		ReadOnly: c.ReadOnly, MainThreadId: optionalID(c.MainThreadID), ArchivedAt: optionalTime(c.ArchivedAt),
+		ReadOnly: c.ReadOnly, ProjectBound: c.ProjectBound, MainThreadId: optionalID(c.MainThreadID), ArchivedAt: optionalTime(c.ArchivedAt),
 		CreatedAt: c.CreatedAt.UTC().Truncate(time.Millisecond), Version: c.Version, SettingsVersion: c.SettingsVersion,
 	}
 	if c.ForumDefaultSort != "" {

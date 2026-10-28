@@ -30,6 +30,17 @@ type ChannelRow struct {
 	ProjectBound, ProjectReady bool
 }
 
+// ActiveThreadQuery is the store query of chat.ActiveThreads (M2-52).
+type ActiveThreadQuery struct {
+	// ChannelIDs are the channels in the order of the result; PinnedIDs the threads never left
+	// out (active runs and unread threads of the caller).
+	ChannelIDs, PinnedIDs []ids.ID
+	// Since is the server time minus sync.snapshot_thread_window.
+	Since time.Time
+	// PerChannel is sync.snapshot_threads_per_channel.
+	PerChannel int
+}
+
 // ServedTarget is one target an agent serves for I1 (10 section 5.2): a channel with its space,
 // or a space alone (ChannelID zero) whose default operator is the agent.
 type ServedTarget struct {
@@ -184,6 +195,12 @@ type Store interface {
 	LocateThreads(ctx context.Context, threads []ids.ID) ([]chat.ThreadInfo, error)
 	// ListThreads returns the threads of q in the order of its sort.
 	ListThreads(ctx context.Context, q ThreadQuery) ([]domain.Thread, error)
+	// ActiveThreads returns the open threads of kind thread of q in one statement (M2-52, 04
+	// section 6.3 item 4): every pinned thread of q.ChannelIDs, plus per channel the threads with
+	// last_activity_at at or after q.Since, newest first, until the channel holds q.PerChannel
+	// entries with its pinned ones counted; ordered as q.ChannelIDs, then by descending
+	// last_activity_at and id, without duplicates.
+	ActiveThreads(ctx context.Context, q ActiveThreadQuery) ([]domain.Thread, error)
 	// ThreadTags returns the live tags of each of threads in the order of the tags; a thread
 	// without tags is absent.
 	ThreadTags(ctx context.Context, threads []ids.ID) (map[ids.ID][]ids.ID, error)

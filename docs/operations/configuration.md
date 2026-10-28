@@ -282,8 +282,8 @@ Source: [04-sync-protocol.md](../spec/04-sync-protocol.md), section 18.
 | `sync.outbound_queue_max` | `BOTHY_SYNC__OUTBOUND_QUEUE_MAX` | Server | int | `10000` | frames in the outbound queue of a connection until `4014` | active |
 | `sync.idempotency_key_ttl` | `BOTHY_SYNC__IDEMPOTENCY_KEY_TTL` | Server | duration | `24h` | retention of `Idempotency-Key` | active |
 | `sync.max_focused_threads` | `BOTHY_SYNC__MAX_FOCUSED_THREADS` | Server | int | `20` | threads in `focus` per connection | active |
-| `sync.snapshot_thread_window` | `BOTHY_SYNC__SNAPSHOT_THREAD_WINDOW` | Server |  | `7d` | an open thread with activity within this window is in `active_threads` of the snapshot (6.3 item 4) | planned (M2) |
-| `sync.snapshot_threads_per_channel` | `BOTHY_SYNC__SNAPSHOT_THREADS_PER_CHANNEL` | Server |  | `20` | bound of `active_threads` per channel, except threads with an active run or unread for the caller (6.3 item 4) | planned (M2) |
+| `sync.snapshot_thread_window` | `BOTHY_SYNC__SNAPSHOT_THREAD_WINDOW` | Server | duration | `7d` | an open thread with activity within this window is in `active_threads` of the snapshot (6.3 item 4) | active |
+| `sync.snapshot_threads_per_channel` | `BOTHY_SYNC__SNAPSHOT_THREADS_PER_CHANNEL` | Server | int | `20` | bound of `active_threads` per channel, except threads with an active run or unread for the caller (6.3 item 4) | active |
 | `sync.run_patch_coalesce_interval` | `BOTHY_SYNC__RUN_PATCH_COALESCE_INTERVAL` | Server | duration | `250ms` | collection window for `run.updated` | active |
 | `sync.typing_min_interval` | `BOTHY_SYNC__TYPING_MIN_INTERVAL` | Server | duration | `5s` | `typing.start` at most this often | active |
 | `sync.typing_ttl` | `BOTHY_SYNC__TYPING_TTL` | Server | duration | `8s` | typing indicator without renewal | active |

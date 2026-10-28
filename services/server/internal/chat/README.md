@@ -1,6 +1,6 @@
 # Module `chat`
 
-Status: spaces and the sidebar (M1-52), channels and forum tags (M1-53), operators with I1 (M1-54), threads (M1-55), moving threads (M1-62), channel behaviour with agent configuration (M2-02) and the project binding with readiness (M2-03) built; `createThread` is built in `messaging` (M1-56); `Threads.InfoForShare` for the read states and drafts of sync (M1-61); `Threads.Counters` for the unread counters of the snapshot of sync (M1-63); `Threads.UnreadCandidates` for the badge of notify (M3-19); `SearchReads` for the search coordinator (M3-14).
+Status: spaces and the sidebar (M1-52), channels and forum tags (M1-53), operators with I1 (M1-54), threads (M1-55), moving threads (M1-62), channel behaviour with agent configuration (M2-02) and the project binding with readiness (M2-03) built; `createThread` is built in `messaging` (M1-56); `Threads.InfoForShare` for the read states and drafts of sync (M1-61); `Threads.Counters` for the unread counters of the snapshot of sync (M1-63); `ActiveThreads` and `Channel.project_bound` for the snapshot and the sidebar (M2-52); `Threads.UnreadCandidates` for the badge of notify (M3-19); `SearchReads` for the search coordinator (M3-14).
 The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
 ## Purpose
@@ -217,6 +217,18 @@ checks under the lock (archive state, If-Match, no-op) and before the operator c
   with `push.deliver` (13 section 8). The store is the port `app.UnreadStore` beside `Store`
   (`Deps.Unread`, which falls back to `Store` when it implements the port, like `Behaviors`);
   without one the method answers internal.
+- Port `chat.ActiveThreads` (`threads.go`, M2-52, 04 6.3 item 4, R-SY-28): `ActiveThreads(ctx, a,
+  ActiveThreadsQuery{ChannelIDs, PinnedIDs, Window, PerChannel})` returns the active threads of
+  the snapshot of sync in one statement (query `ActiveThreads`, `Store.ActiveThreads`): the open
+  threads of kind `thread` among the pinned ids (sync passes the threads of the caller's active
+  runs and unread threads) through the primary key, plus per channel a `LATERAL` read over
+  `threads_channel_state_activity_idx` of the open threads with `last_activity_at` at or after the
+  clock of the service minus `Window`, newest first, limited to `PerChannel` minus the pinned
+  threads of the channel; both parts carry the whole row, the result follows the channel list,
+  then descending activity. `TestActiveThreads_QueryPlan` holds the plan (index scans only) on a
+  seeded database. Each thread is kept only after `thread.read` in filter mode and comes with its
+  tags and billing mode as in `Get`. A port of its own, so the implementations of `Threads` stay
+  unchanged.
 - Port `chat.ThreadsByParent` (`threads.go`, M2-27): `ThreadByParentMessage(ctx, messageID)`
   returns the `ThreadInfo` of the thread whose `parent_message_id` is `messageID` and `found =
   false` when no thread started from it, without authorization (callers authorize first). It is a
@@ -488,7 +500,14 @@ canary class `manage_only` of `test/canary`.
   the optional `If-Match` (`412`, with `current` when a binding exists), the plan, the write
   (`409` for a taken `workspace_ref`), `settingsChanged` and the audit entry (`channel_id`, `op`,
   `version`, `ready_reset`, `reason`; a DELETE `channel_id` and `op`). DELETE without a binding is
-  `404` without an audit entry.
+  `404` without an audit entry. A created and a deleted binding change `project_bound` of the
+  channel (M2-52, R-DM-54): the same unit raises `channels.version` by one and appends
+  `channel.updated` with the new `project_bound`, `version` and `settings_version`; a replaced
+  binding, an identical PUT and a readiness report change no channel member and write none.
+- `Channel.project_bound` (M2-52, 03 `project_bindings`): derived from the `LEFT JOIN` on
+  `project_bindings` of every channel read (`ChannelRow.ProjectBound`), never stored; it is in
+  `getChannel`, `listSpaceChannels`, the snapshot, the view-as snapshot of authz and every channel
+  event payload.
 - Readiness: `ApplyProjectReadiness` is the only writer of `ready` besides the resets; it applies
   only reports of the effective operator for a bound forum that is not archived, locks spaces,
   channels and bindings in this order and ascending id, and writes no event, no audit entry and no
@@ -503,10 +522,10 @@ canary class `manage_only` of `test/canary`.
 
 | Operation | Action | Event |
 |---|---|---|
-| `putProjectBinding` | `channel.project.bind` (owner, step-up, optional If-Match on the binding version) | `channel.settings_changed`, `agent.config_changed` to the effective operator |
-| `deleteProjectBinding` | `channel.project.bind` (owner, step-up) | the same |
+| `putProjectBinding` | `channel.project.bind` (owner, step-up, optional If-Match on the binding version) | `channel.settings_changed`, `agent.config_changed` to the effective operator; on create also `channel.updated` (M2-52) |
+| `deleteProjectBinding` | `channel.project.bind` (owner, step-up) | the same, with `channel.updated` |
 
-Rulings: docs/DECISIONS.md D-M2-03-1 to D-M2-03-13. Tests: `domain/project_binding_test.go`,
+Rulings: docs/DECISIONS.md D-M2-03-1 to D-M2-03-13, docs/decisions.d/M2-52.md. Tests: `domain/project_binding_test.go`,
 `test/integration/project_binding_test.go`, `migrations/chat_project_bindings_test.go` and the
 canary scenario `test/canary/scenario_project.go`.
 

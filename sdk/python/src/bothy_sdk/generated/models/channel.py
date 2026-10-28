@@ -32,6 +32,9 @@ class Channel:
         operator (ChannelOperator):
         read_only (bool): Write-protected for every principal including owners; only a running import writes (05, rule
             1.8).
+        project_bound (bool): True exactly when a project binding exists for the forum (03 `project_bindings`, R-DM-54);
+            derived, never stored. Creating or deleting a binding raises `version` and writes `channel.updated`; changing a
+            binding and a readiness report do not.
         version (int):
         settings_version (int):
         created_at (datetime.datetime): RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
@@ -50,6 +53,7 @@ class Channel:
     sort_key: str
     operator: ChannelOperator
     read_only: bool
+    project_bound: bool
     version: int
     settings_version: int
     created_at: datetime.datetime
@@ -75,6 +79,8 @@ class Channel:
         operator = self.operator.to_dict()
 
         read_only = self.read_only
+
+        project_bound = self.project_bound
 
         version = self.version
 
@@ -120,6 +126,7 @@ class Channel:
                 "sort_key": sort_key,
                 "operator": operator,
                 "read_only": read_only,
+                "project_bound": project_bound,
                 "version": version,
                 "settings_version": settings_version,
                 "created_at": created_at,
@@ -158,6 +165,8 @@ class Channel:
         operator = ChannelOperator.from_dict(d.pop("operator"))
 
         read_only = d.pop("read_only")
+
+        project_bound = d.pop("project_bound")
 
         version = d.pop("version")
 
@@ -217,6 +226,7 @@ class Channel:
             sort_key=sort_key,
             operator=operator,
             read_only=read_only,
+            project_bound=project_bound,
             version=version,
             settings_version=settings_version,
             created_at=created_at,

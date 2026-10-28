@@ -82,6 +82,40 @@ type ThreadCounter struct {
 	LastMessageSeq, UnreadFloorSeq int64
 }
 
+// ActiveThreadsQuery is the selection of the active threads of the snapshot (04 section 6.3 item
+// 4, R-SY-28, M2-52).
+type ActiveThreadsQuery struct {
+	// ChannelIDs are the visible channels of the snapshot in its order; the result follows it.
+	ChannelIDs []ids.ID
+	// PinnedIDs are the threads that are never left out: the threads of the caller's active runs
+	// and of its unread_threads. A pinned id outside ChannelIDs, closed or of kind main is absent.
+	PinnedIDs []ids.ID
+	// Window is sync.snapshot_thread_window: an open thread whose last_activity_at is not older
+	// than the server time minus Window qualifies by activity.
+	Window time.Duration
+	// PerChannel is sync.snapshot_threads_per_channel: the pinned threads of a channel count toward
+	// it, the threads of the window fill the rest, newest activity first.
+	PerChannel int
+}
+
+// ActiveThreads reads the active threads of the snapshot. It is a port of its own, so the
+// implementations of Threads stay unchanged; sync builds the snapshot with it (M2-52).
+type ActiveThreads interface {
+	// ActiveThreads returns the open threads of kind thread of q in one read: every pinned thread
+	// of q.ChannelIDs, plus per channel the threads with activity within q.Window, newest first,
+	// until the channel holds q.PerChannel entries (the pinned ones count, but none is left out).
+	// Each thread is kept only when a may read it (thread.read in filter mode). The result is
+	// ordered as q.ChannelIDs, then by descending last_activity_at; no thread appears twice; the
+	// tags and the billing mode are filled as in Get. Errors: the database error, the errors of
+	// authorize.
+	//
+	// Example:
+	//
+	//	list, err := threads.ActiveThreads(ctx, a, chat.ActiveThreadsQuery{ChannelIDs: visible, PinnedIDs: running,
+	//		Window: cfg.ThreadWindow, PerChannel: cfg.ThreadsPerChannel})
+	ActiveThreads(ctx context.Context, a actor.Actor, q ActiveThreadsQuery) ([]Thread, error)
+}
+
 // ThreadsByParent finds the thread that started from a message (03 threads: parent_message_id is
 // unique). It is a port of its own, so the implementations of Threads stay unchanged; the module
 // apps answers the replay of an incoming webhook post that created such a thread with it (M2-27

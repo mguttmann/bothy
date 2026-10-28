@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/agents"
 	"github.com/OWNER/bothy/services/server/internal/chat"
@@ -118,6 +119,10 @@ func (s *snapStubs) ActiveRuns(context.Context, actor.Actor, []ids.ID) ([]syncmo
 	return nil, s.err("runs")
 }
 
+func (s *snapStubs) ActiveThreads(_ context.Context, _ actor.Actor, q chat.ActiveThreadsQuery) ([]chat.Thread, error) {
+	return []chat.Thread{{ID: ids.New(), ChannelID: q.ChannelIDs[0], Kind: "thread", State: "open"}}, s.err("active_threads")
+}
+
 func (s *snapStubs) EvaluateAll(context.Context, instance.FlagSubject) ([]instance.EvaluatedFlag, error) {
 	return nil, s.err("flags")
 }
@@ -127,13 +132,14 @@ func (s *snapStubs) EvaluateAll(context.Context, instance.FlagSubject) ([]instan
 func TestSnapshot_ReturnsEveryCollaboratorError(t *testing.T) {
 	t.Parallel()
 	steps := []string{"", "authorize", "head", "epoch", "scope", "principal", "user", "spaces", "channels", "sidebar", "settings",
-		"drafts", "counters", "read_states", "mentions", "thread", "runs", "agents", "flags"}
+		"drafts", "counters", "read_states", "mentions", "thread", "runs", "active_threads", "agents", "flags"}
 	for _, step := range steps {
 		t.Run("fail="+step, func(t *testing.T) {
 			t.Parallel()
 			s := &snapStubs{fail: step, space: ids.New()}
 			snap, err := app.NewSnapshot(app.SnapshotDeps{Head: s, Epoch: s, Authorizer: s, Directory: s, Structure: s, Threads: s, Store: s,
-				Mentions: s, Settings: s, Drafts: drafts{s: s}, Agents: agentList{s: s}, Runs: s, Flags: s})
+				Mentions: s, Settings: s, Drafts: drafts{s: s}, Agents: agentList{s: s}, Runs: s, Flags: s, ActiveThreads: s,
+				Config: app.SnapshotConfig{ThreadWindow: time.Hour, ThreadsPerChannel: 1}})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -148,9 +154,24 @@ func TestSnapshot_ReturnsEveryCollaboratorError(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if v.HeadSeq != 9 || len(v.Spaces) != 1 || v.Spaces[0].ID != s.space || len(v.Channels) != 1 || len(v.UnreadThreads) != 1 {
+			if v.HeadSeq != 9 || len(v.Spaces) != 1 || v.Spaces[0].ID != s.space || len(v.Channels) != 1 || len(v.UnreadThreads) != 1 ||
+				len(v.ActiveThreads) != 1 || v.ActiveThreads[0].ChannelID != v.Channels[0].ID {
 				t.Fatalf("snapshot %+v", v)
 			}
 		})
+	}
+}
+
+// TestNewSnapshot_RefusesZeroBounds (M2-52): every collaborator present, but a thread window or a
+// bound per channel below 1 is refused, so no snapshot is built without the keys of 04 18.
+func TestNewSnapshot_RefusesZeroBounds(t *testing.T) {
+	t.Parallel()
+	s := &snapStubs{space: ids.New()}
+	for _, cfg := range []app.SnapshotConfig{{}, {ThreadWindow: time.Hour}, {ThreadsPerChannel: 1}} {
+		_, err := app.NewSnapshot(app.SnapshotDeps{Head: s, Epoch: s, Authorizer: s, Directory: s, Structure: s, Threads: s, Store: s,
+			Mentions: s, Settings: s, Drafts: drafts{s: s}, Agents: agentList{s: s}, Runs: s, Flags: s, ActiveThreads: s, Config: cfg})
+		if err == nil {
+			t.Fatalf("config %+v accepted", cfg)
+		}
 	}
 }

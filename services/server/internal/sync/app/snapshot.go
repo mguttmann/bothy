@@ -5,6 +5,7 @@ package app
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/agents"
 	"github.com/OWNER/bothy/services/server/internal/chat"
@@ -45,6 +46,22 @@ type SnapshotStore interface {
 	ReadStatesInChannels(ctx context.Context, user ids.ID, channels []ids.ID) ([]sync.ReadState, error)
 }
 
+// ActiveThreadSource is the part of chat the snapshot reads its active threads with
+// (chat.ActiveThreads, M2-52).
+type ActiveThreadSource interface {
+	ActiveThreads(ctx context.Context, a actor.Actor, q chat.ActiveThreadsQuery) ([]chat.Thread, error)
+}
+
+// SnapshotConfig are the bounds of the active threads of the snapshot (04 section 18).
+type SnapshotConfig struct {
+	// ThreadWindow is sync.snapshot_thread_window: an open thread with activity within it is an
+	// active thread.
+	ThreadWindow time.Duration `config:"sync.snapshot_thread_window"`
+	// ThreadsPerChannel is sync.snapshot_threads_per_channel: the bound per channel, which threads
+	// with an active run and unread threads count toward but are never left out for.
+	ThreadsPerChannel int `config:"sync.snapshot_threads_per_channel"`
+}
+
 // AgentLister is the part of agents.Agents behind listAgents.
 type AgentLister interface {
 	List(ctx context.Context, a actor.Actor, p agents.Page) (agents.AgentPage, error)
@@ -78,6 +95,9 @@ type SnapshotDeps struct {
 	Agents   AgentLister
 	Runs     RunSummarySource
 	Flags    FlagEvaluator
+	// ActiveThreads reads the active threads (chat, M2-52) within the bounds of Config.
+	ActiveThreads ActiveThreadSource
+	Config        SnapshotConfig
 }
 
 // SnapshotService implements sync.Snapshot (M1-63). It is safe for concurrent use.
@@ -88,11 +108,16 @@ type SnapshotService struct {
 // Compile-time check: the incoming port.
 var _ sync.Snapshot = (*SnapshotService)(nil)
 
-// NewSnapshot returns the use case. Errors: a missing collaborator.
+// NewSnapshot returns the use case. Errors: a missing collaborator, a thread window or a bound per
+// channel below 1.
 func NewSnapshot(d SnapshotDeps) (*SnapshotService, error) {
 	if d.Head == nil || d.Epoch == nil || d.Authorizer == nil || d.Directory == nil || d.Structure == nil || d.Threads == nil ||
-		d.Store == nil || d.Mentions == nil || d.Settings == nil || d.Drafts == nil || d.Agents == nil || d.Runs == nil || d.Flags == nil {
+		d.Store == nil || d.Mentions == nil || d.Settings == nil || d.Drafts == nil || d.Agents == nil || d.Runs == nil || d.Flags == nil ||
+		d.ActiveThreads == nil {
 		return nil, errors.New("sync: NewSnapshot needs every collaborator")
+	}
+	if d.Config.ThreadWindow <= 0 || d.Config.ThreadsPerChannel < 1 {
+		return nil, errors.New("sync: sync.snapshot_thread_window and sync.snapshot_threads_per_channel must be positive")
 	}
 	return &SnapshotService{d: d}, nil
 }
@@ -139,6 +164,9 @@ func (s *SnapshotService) Build(ctx context.Context) (sync.SnapshotView, error) 
 		return sync.SnapshotView{}, err
 	}
 	v.ActiveRuns = append(v.ActiveRuns, runs...)
+	if err := s.activeThreads(ctx, a, channels, &v); err != nil {
+		return sync.SnapshotView{}, err
+	}
 	if err := s.agents(ctx, a, &v); err != nil {
 		return sync.SnapshotView{}, err
 	}
@@ -156,7 +184,8 @@ func (s *SnapshotService) Build(ctx context.Context) (sync.SnapshotView, error) 
 func emptyView() sync.SnapshotView {
 	return sync.SnapshotView{
 		Spaces: []sync.SnapshotSpace{}, Channels: []sync.SnapshotChannel{}, Sidebar: []sync.SidebarState{},
-		UnreadThreads: []sync.UnreadThread{}, ActiveRuns: []sync.RunSummary{}, Agents: []sync.AgentPresence{},
+		UnreadThreads: []sync.UnreadThread{}, ActiveRuns: []sync.RunSummary{}, ActiveThreads: []sync.SnapshotThread{},
+		Agents:   []sync.AgentPresence{},
 		Settings: []sync.UserSetting{}, Drafts: []sync.DraftRef{}, Features: []sync.EvaluatedFlag{},
 	}
 }
@@ -298,6 +327,43 @@ func (s *SnapshotService) positions(ctx context.Context, a actor.Actor, channels
 	return read, position, mentions, nil
 }
 
+// activeThreads fills the active threads (04 section 6.3 item 4, R-SY-28): the threads of the
+// active runs and the unread threads of the same snapshot are pinned, so they are never left
+// out, and chat adds the threads active within sync.snapshot_thread_window up to
+// sync.snapshot_threads_per_channel per channel in one read. It runs after head_seq like every
+// other part (READ COMMITTED), so a thread event above head_seq arrives by catch-up or live
+// even when the thread is in the snapshot already, and one at or below it is in the snapshot.
+func (s *SnapshotService) activeThreads(ctx context.Context, a actor.Actor, channels []ids.ID, v *sync.SnapshotView) error {
+	if len(channels) == 0 {
+		return nil
+	}
+	pinned := make([]ids.ID, 0, len(v.ActiveRuns)+len(v.UnreadThreads))
+	for _, r := range v.ActiveRuns {
+		pinned = append(pinned, r.ThreadID)
+	}
+	for _, u := range v.UnreadThreads {
+		pinned = append(pinned, u.ThreadID)
+	}
+	list, err := s.d.ActiveThreads.ActiveThreads(ctx, a, chat.ActiveThreadsQuery{
+		ChannelIDs: channels, PinnedIDs: pinned, Window: s.d.Config.ThreadWindow, PerChannel: s.d.Config.ThreadsPerChannel,
+	})
+	if err != nil {
+		return err
+	}
+	for _, th := range list {
+		v.ActiveThreads = append(v.ActiveThreads, threadOf(th))
+	}
+	return nil
+}
+
+// threadOf converts a thread of chat; the tags are never nil.
+func threadOf(th chat.Thread) sync.SnapshotThread {
+	if th.TagIDs == nil {
+		th.TagIDs = []ids.ID{}
+	}
+	return sync.SnapshotThread(th)
+}
+
 // agents fills the agents a may read (agent.read per item, the listing behind listAgents) with
 // their presence: state and reported billing mode as the listing shows them, which takes them from
 // the presence tracker of the process (agents.Presence, M2-20). Only agents have presence; a
@@ -342,7 +408,7 @@ func channelOf(cv chat.ChannelView) sync.SnapshotChannel {
 		ID: c.ID, SpaceID: c.SpaceID, Kind: c.Kind, Name: c.Name, Topic: c.Topic, SortKey: c.SortKey,
 		OperatorMode: c.Operator.Mode, OperatorAgentID: c.Operator.AgentID, EffectiveOperatorID: c.Operator.EffectiveAgentID,
 		ForumDefaultSort: c.ForumDefaultSort, DefaultNotificationLevel: c.DefaultNotificationLevel, ReadOnly: c.ReadOnly,
-		MainThreadID: c.MainThreadID, CreatedAt: c.CreatedAt, ArchivedAt: c.ArchivedAt, Version: c.Version,
+		ProjectBound: c.ProjectBound, MainThreadID: c.MainThreadID, CreatedAt: c.CreatedAt, ArchivedAt: c.ArchivedAt, Version: c.Version,
 		SettingsVersion: c.SettingsVersion, Level: cv.Level, Capabilities: nonNil(cv.Capabilities),
 	}
 }

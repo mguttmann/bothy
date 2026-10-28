@@ -8,6 +8,7 @@ import 'package:api_client/src/generated/model/space_view.dart';
 import 'package:api_client/src/generated/model/draft_ref.dart';
 import 'package:api_client/src/generated/model/agent_presence.dart';
 import 'package:built_collection/built_collection.dart';
+import 'package:api_client/src/generated/model/thread.dart';
 import 'package:api_client/src/generated/model/run_summary.dart';
 import 'package:api_client/src/generated/model/unread_thread.dart';
 import 'package:api_client/src/generated/model/principal_ref.dart';
@@ -32,6 +33,7 @@ part 'snapshot.g.dart';
 /// * [sidebar]
 /// * [unreadThreads] - Only threads with unread messages or mentions.
 /// * [activeRuns]
+/// * [activeThreads] - Per visible channel the open threads (`kind = thread`, as `getThread`, without messages) with an active run, the open threads in `unread_threads`, plus the open threads whose `last_activity_at` lies within `sync.snapshot_thread_window`, newest activity first, until the channel has `sync.snapshot_threads_per_channel` entries; threads with an active run and unread threads count toward this bound but are never left out (04 6.3 item 4, R-SY-28). Ordered by channel, then by descending `last_activity_at`. The client keeps them current through `thread.*` and `message.created`.
 /// * [agents]
 /// * [settings]
 /// * [drafts]
@@ -69,6 +71,10 @@ abstract class Snapshot implements Built<Snapshot, SnapshotBuilder> {
 
   @BuiltValueField(wireName: r'active_runs')
   BuiltList<RunSummary> get activeRuns;
+
+  /// Per visible channel the open threads (`kind = thread`, as `getThread`, without messages) with an active run, the open threads in `unread_threads`, plus the open threads whose `last_activity_at` lies within `sync.snapshot_thread_window`, newest activity first, until the channel has `sync.snapshot_threads_per_channel` entries; threads with an active run and unread threads count toward this bound but are never left out (04 6.3 item 4, R-SY-28). Ordered by channel, then by descending `last_activity_at`. The client keeps them current through `thread.*` and `message.created`.
+  @BuiltValueField(wireName: r'active_threads')
+  BuiltList<Thread> get activeThreads;
 
   @BuiltValueField(wireName: r'agents')
   BuiltList<AgentPresence> get agents;
@@ -155,6 +161,11 @@ class _$SnapshotSerializer implements PrimitiveSerializer<Snapshot> {
     yield serializers.serialize(
       object.activeRuns,
       specifiedType: const FullType(BuiltList, [FullType(RunSummary)]),
+    );
+    yield r'active_threads';
+    yield serializers.serialize(
+      object.activeThreads,
+      specifiedType: const FullType(BuiltList, [FullType(Thread)]),
     );
     yield r'agents';
     yield serializers.serialize(
@@ -272,6 +283,13 @@ class _$SnapshotSerializer implements PrimitiveSerializer<Snapshot> {
             specifiedType: const FullType(BuiltList, [FullType(RunSummary)]),
           ) as BuiltList<RunSummary>;
           result.activeRuns.replace(valueDes);
+          break;
+        case r'active_threads':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(BuiltList, [FullType(Thread)]),
+          ) as BuiltList<Thread>;
+          result.activeThreads.replace(valueDes);
           break;
         case r'agents':
           final valueDes = serializers.deserialize(

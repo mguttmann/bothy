@@ -206,7 +206,14 @@ type World struct {
 type SyncOptions struct {
 	CatchUp       syncapp.CatchUpConfig
 	PartitionSize int64
+	// Snapshot are the bounds of the active threads of the snapshot (M2-52); the zero value takes
+	// DefaultSnapshot.
+	Snapshot syncapp.SnapshotConfig
 }
+
+// DefaultSnapshot are the defaults of sync.snapshot_thread_window and
+// sync.snapshot_threads_per_channel (04 section 18), the bounds of a world without its own.
+var DefaultSnapshot = syncapp.SnapshotConfig{ThreadWindow: 7 * 24 * time.Hour, ThreadsPerChannel: 20}
 
 // syncIdentity is the identity configuration of a NewSync world: the keys NewIdentity requires.
 var syncIdentity = identityapp.Config{
@@ -354,7 +361,7 @@ func build(t *testing.T, subscribe Subscribe, personal bool, so *SyncOptions, no
 		w.personal(subs, pool, uow, az, appender, c, m, &handlers)
 	}
 	if so != nil {
-		w.syncReads(so.CatchUp, pool, uow, az, hook, rec, appender, c, m, &handlers)
+		w.syncReads(*so, pool, uow, az, hook, rec, appender, c, m, &handlers)
 	}
 	if notifyCfg != nil {
 		w.notify(*notifyCfg, nsubs, pool, uow, az, appender, c, dir, log, &handlers)
@@ -393,7 +400,7 @@ func (w *World) personal(subs *syncapp.Subscribers, pool *pg.Pool, uow *pg.UnitO
 
 // syncReads adds catch-up and snapshot of sync to the world and to handlers (NewSync) over the
 // instance settings, identity and agents modules it builds with w.
-func (w *World) syncReads(cfg syncapp.CatchUpConfig, pool *pg.Pool, uow *pg.UnitOfWork, az authorize.Authorizer, hook *authzapp.RightsHook,
+func (w *World) syncReads(so SyncOptions, pool *pg.Pool, uow *pg.UnitOfWork, az authorize.Authorizer, hook *authzapp.RightsHook,
 	rec *auditapp.Recorder, appender *syncapp.Appender, c *wire.Chat, m *wire.Messaging, handlers *wire.Handlers) {
 	w.t.Helper()
 	log := slog.New(w.Logs)
@@ -425,8 +432,13 @@ func (w *World) syncReads(cfg syncapp.CatchUpConfig, pool *pg.Pool, uow *pg.Unit
 	if err != nil {
 		w.t.Fatal(err)
 	}
-	r, err := wire.NewSyncReads(cfg, wire.SyncReadDeps{Pool: pool, UoW: uow, Authorizer: az, Chat: c.Service, Messaging: m.Service,
-		Personal: w.Personal, Agents: ag.Service, Directory: identityapp.NewDirectory(identitypg.NewRepository(pool)), Flags: writes.Flags, Runs: rn.Service})
+	snap := so.Snapshot
+	if snap == (syncapp.SnapshotConfig{}) {
+		snap = DefaultSnapshot
+	}
+	r, err := wire.NewSyncReads(so.CatchUp, wire.SyncReadDeps{Pool: pool, UoW: uow, Authorizer: az, Chat: c.Service, Messaging: m.Service,
+		Personal: w.Personal, Agents: ag.Service, Directory: identityapp.NewDirectory(identitypg.NewRepository(pool)), Flags: writes.Flags, Runs: rn.Service,
+		Snapshot: snap})
 	if err != nil {
 		w.t.Fatal(err)
 	}

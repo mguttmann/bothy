@@ -35,3 +35,48 @@ func IDs(list []ids.ID) []Uuid {
 	}
 	return out
 }
+
+// ThreadFields are the values of a Thread document. The layout equals chat.Thread and
+// sync.SnapshotThread field for field, so both convert to it and share ThreadOf (one conversion
+// for getThread and the active threads of the snapshot, M2-52). Zero values are absent members.
+type ThreadFields struct {
+	ID, ChannelID                      ids.ID
+	Kind                               string
+	ParentMessageID                    ids.ID
+	Title, TitleSource                 string
+	State                              string
+	ClosedAt                           time.Time
+	ClosedBy                           ids.ID
+	OperatorAgentID                    ids.ID
+	BillingMode                        string
+	LastMessageSeq, UnreadFloorSeq     int64
+	MessageCount                       int
+	CreatedBy                          ids.ID
+	CreatedAt, LastActivityAt, MovedAt time.Time
+	Version                            int64
+	TagIDs                             []ids.ID
+}
+
+// ThreadOf converts a thread (schema Thread): empty values become absent members, never null
+// (ADR 0053); unread_floor_seq only when not 0, billing_mode only with an operator; tag_ids always
+// present.
+func ThreadOf(th ThreadFields) Thread {
+	out := Thread{
+		Id: Uuid(th.ID), ChannelId: Uuid(th.ChannelID), Kind: ThreadKind(th.Kind),
+		ParentMessageId: OptionalID(th.ParentMessageID), Title: th.Title, TitleSource: ThreadTitleSource(th.TitleSource),
+		State: ThreadState(th.State), ClosedAt: OptionalTime(th.ClosedAt), ClosedBy: OptionalID(th.ClosedBy),
+		OperatorAgentId: OptionalID(th.OperatorAgentID), LastMessageSeq: th.LastMessageSeq,
+		LastActivityAt: th.LastActivityAt.UTC().Truncate(time.Millisecond), MessageCount: th.MessageCount,
+		CreatedBy: Uuid(th.CreatedBy), CreatedAt: th.CreatedAt.UTC().Truncate(time.Millisecond), MovedAt: OptionalTime(th.MovedAt),
+		Version: th.Version, TagIds: IDs(th.TagIDs),
+	}
+	if th.UnreadFloorSeq != 0 {
+		v := th.UnreadFloorSeq
+		out.UnreadFloorSeq = &v
+	}
+	if th.BillingMode != "" && !th.OperatorAgentID.IsZero() {
+		m := BillingMode(th.BillingMode)
+		out.BillingMode = &m
+	}
+	return out
+}

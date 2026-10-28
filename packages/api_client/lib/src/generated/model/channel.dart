@@ -26,6 +26,7 @@ part 'channel.g.dart';
 /// * [forumDefaultSort]
 /// * [defaultNotificationLevel] - Default for people without an own setting (13, 3.1); absent means none.
 /// * [readOnly] - Write-protected for every principal including owners; only a running import writes (05, rule 1.8).
+/// * [projectBound] - True exactly when a project binding exists for the forum (03 `project_bindings`, R-DM-54); derived, never stored. Creating or deleting a binding raises `version` and writes `channel.updated`; changing a binding and a readiness report do not.
 /// * [mainThreadId] - Thread with `kind = main` of text and DM channels.
 /// * [dmParticipantIds]
 /// * [archivedAt] - RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
@@ -70,6 +71,10 @@ abstract class Channel implements Built<Channel, ChannelBuilder> {
   /// Write-protected for every principal including owners; only a running import writes (05, rule 1.8).
   @BuiltValueField(wireName: r'read_only')
   bool get readOnly;
+
+  /// True exactly when a project binding exists for the forum (03 `project_bindings`, R-DM-54); derived, never stored. Creating or deleting a binding raises `version` and writes `channel.updated`; changing a binding and a readiness report do not.
+  @BuiltValueField(wireName: r'project_bound')
+  bool get projectBound;
 
   /// Thread with `kind = main` of text and DM channels.
   @BuiltValueField(wireName: r'main_thread_id')
@@ -169,6 +174,11 @@ class _$ChannelSerializer implements PrimitiveSerializer<Channel> {
     yield r'read_only';
     yield serializers.serialize(
       object.readOnly,
+      specifiedType: const FullType(bool),
+    );
+    yield r'project_bound';
+    yield serializers.serialize(
+      object.projectBound,
       specifiedType: const FullType(bool),
     );
     if (object.mainThreadId != null) {
@@ -306,6 +316,13 @@ class _$ChannelSerializer implements PrimitiveSerializer<Channel> {
             specifiedType: const FullType(bool),
           ) as bool;
           result.readOnly = valueDes;
+          break;
+        case r'project_bound':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(bool),
+          ) as bool;
+          result.projectBound = valueDes;
           break;
         case r'main_thread_id':
           final valueDes = serializers.deserialize(

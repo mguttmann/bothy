@@ -155,6 +155,10 @@ func (s *server) startSyncReads(context.Context) error {
 	if err != nil {
 		return err
 	}
+	snap, err := SnapshotConfig(s.values)
+	if err != nil {
+		return err
+	}
 	s.mu.Lock()
 	pool, a, az, c, m, p, rn, ag, st := s.pool, s.audit, s.authorizer, s.chat, s.messaging, s.personal, s.runs, s.agents, s.settings
 	s.mu.Unlock()
@@ -165,7 +169,7 @@ func (s *server) startSyncReads(context.Context) error {
 		return errors.New("wire: catch-up and snapshot need audit, chat, messaging, the personal data and runs")
 	}
 	r, err := NewSyncReads(cfg, SyncReadDeps{Pool: pool, UoW: a.UoW(), Authorizer: az, Chat: c.Service, Messaging: m.Service, Personal: p.Service,
-		Runs:   rn.Service,
+		Runs: rn.Service, Snapshot: snap,
 		Agents: ag.Service, Directory: identityapp.NewDirectory(identitypg.NewRepository(pool)), Flags: st.Admin})
 	if err != nil {
 		return err

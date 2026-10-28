@@ -86,6 +86,7 @@ Map<String, Object?> channelJson(
   'sort_key': 'a$n',
   'operator': {'mode': 'inherit'},
   'read_only': readOnly,
+  'project_bound': false,
   'version': version,
   'settings_version': 1,
   'created_at': at,
