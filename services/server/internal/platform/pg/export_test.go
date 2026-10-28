@@ -22,3 +22,7 @@ func SetMeterProviderForTest(mp metric.MeterProvider) (restore func()) {
 	meterProvider = func() metric.MeterProvider { return mp }
 	return func() { meterProvider = old }
 }
+
+// TimedOut is timedOut for the external tests: the end of a deadline, of the context or of the
+// socket.
+var TimedOut = timedOut

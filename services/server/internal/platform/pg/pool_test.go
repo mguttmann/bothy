@@ -462,8 +462,9 @@ func TestWaitReadyKeepsTheCause(t *testing.T) {
 
 // withCause runs wait, a wait for the database that fails for good (a wrong password, a missing
 // database), with a window of 1.5 s and returns its error. When no attempt ended within the
-// window (a loaded host), the error carries only the end of the window and no cause; withCause
-// then tries again with a doubled window, until the windows add up to testkit.Patience.
+// window (a loaded host), the error carries only the end of the window and no cause (the end of
+// the context or an i/o timeout of the socket, pg.TimedOut); withCause then tries again with a
+// doubled window, until the windows add up to testkit.Patience.
 func withCause(wait func(window time.Duration) error) error {
 	var err error
 	spent := time.Duration(0)
@@ -471,7 +472,7 @@ func withCause(wait func(window time.Duration) error) error {
 		err = wait(window)
 		spent += window
 		var pgErr *pgconn.PgError
-		if err == nil || errors.As(err, &pgErr) || !errors.Is(err, context.DeadlineExceeded) {
+		if err == nil || errors.As(err, &pgErr) || !pg.TimedOut(err) {
 			return err
 		}
 	}
