@@ -9318,7 +9318,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get newProjectErrWorkspaceExists =>
-      'A folder with this name already exists on the runner. Choose another name, or bind it as an existing folder.';
+      'A folder with this name already exists on the runner. Change the folder name and try again.';
 
   @override
   String get newProjectErrCloneFailed =>

@@ -78,7 +78,8 @@ enum NewProjectField {
   /// The repository URL of [NewProjectMode.clone].
   url,
 
-  /// The folder of [NewProjectMode.existing].
+  /// The folder of the binding: typed for [NewProjectMode.existing], otherwise the name until
+  /// the runner refuses it.
   folder,
 
   /// The idea of [NewProjectMode.idea].
@@ -261,6 +262,11 @@ final class NewProjectFlow extends ChangeNotifier {
   set mode(NewProjectMode value) {
     if (!canEdit(NewProjectField.mode) || value == _mode) return;
     _mode = value;
+    if (value != NewProjectMode.existing) {
+      // A created folder takes the name; a folder typed for "existing" would be hidden here.
+      _folderTyped = false;
+      _folder = _name;
+    }
     _suggest();
     notifyListeners();
   }
@@ -284,7 +290,9 @@ final class NewProjectFlow extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// The folder of an existing project, relative to the runner's projects folder.
+  /// The folder of the binding, relative to the runner's projects folder: for an existing
+  /// project the folder the person names, otherwise the name unless the person changed it
+  /// after the runner refused the folder (a taken folder, 01 6.9 item 5).
   String get folder => _folder;
   set folder(String value) {
     if (!canEdit(NewProjectField.folder)) return;
@@ -391,15 +399,17 @@ final class NewProjectFlow extends ChangeNotifier {
   Set<NewProjectField> get invalidFields => {
     if (!isProjectName(_name, maxChars: nameMaxChars)) NewProjectField.name,
     if (_mode == NewProjectMode.clone && !isCloneUrl(_url)) NewProjectField.url,
-    if (_mode == NewProjectMode.existing && !isFolderRef(_folder))
+    if (_mode == NewProjectMode.existing
+        ? !isFolderRef(_folder)
+        // A created folder that is the name shares the name's error.
+        : _folder != _name && !isProjectName(_folder, maxChars: nameMaxChars))
       NewProjectField.folder,
     if (_mode == NewProjectMode.idea && _idea.trim().isEmpty)
       NewProjectField.idea,
     if (_runner == null) NewProjectField.runner,
   };
 
-  String get _workspaceRef =>
-      _mode == NewProjectMode.existing ? _folder : _name;
+  String get _workspaceRef => _folder;
 
   String get _provision => switch (_mode) {
     NewProjectMode.existing => 'none',

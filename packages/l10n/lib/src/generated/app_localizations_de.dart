@@ -9361,7 +9361,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get newProjectErrWorkspaceExists =>
-      'Auf dem Runner gibt es schon einen Ordner mit diesem Namen. Wähle einen anderen Namen oder verbinde ihn als vorhandenen Ordner.';
+      'Auf dem Runner gibt es schon einen Ordner mit diesem Namen. Ändere den Ordnernamen und versuche es erneut.';
 
   @override
   String get newProjectErrCloneFailed =>

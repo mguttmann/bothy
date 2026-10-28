@@ -2490,7 +2490,7 @@
   "newProjectErrFolderBound": "Dieser Ordner ist schon mit einem anderen Forum verbunden.",
   "newProjectErrStepUp": "Die Bestätigung wurde abgebrochen. Versuche es erneut, um fortzufahren.",
   "newProjectErrOffline": "Der Server ist nicht erreichbar. Versuche es erneut, sobald du online bist.",
-  "newProjectErrWorkspaceExists": "Auf dem Runner gibt es schon einen Ordner mit diesem Namen. Wähle einen anderen Namen oder verbinde ihn als vorhandenen Ordner.",
+  "newProjectErrWorkspaceExists": "Auf dem Runner gibt es schon einen Ordner mit diesem Namen. Ändere den Ordnernamen und versuche es erneut.",
   "newProjectErrCloneFailed": "Das Repository konnte nicht geklont werden. Prüfe die URL und den Zugriff des Runners darauf.",
   "newProjectErrInitFailed": "Der Runner konnte den Ordner nicht anlegen.",
   "newProjectErrTimeout": "Das Anlegen des Ordners hat zu lange gedauert, deshalb hat der Runner es abgebrochen.",

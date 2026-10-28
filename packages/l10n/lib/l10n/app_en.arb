@@ -14008,7 +14008,7 @@
   "@newProjectErrOffline": {
     "description": "Failure of a step of the new project dialog without an answer of the server."
   },
-  "newProjectErrWorkspaceExists": "A folder with this name already exists on the runner. Choose another name, or bind it as an existing folder.",
+  "newProjectErrWorkspaceExists": "A folder with this name already exists on the runner. Change the folder name and try again.",
   "@newProjectErrWorkspaceExists": {
     "description": "Failure of the step prepare folder: reason workspace_exists (09 section 18.12)."
   },

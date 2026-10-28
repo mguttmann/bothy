@@ -259,8 +259,20 @@ void main() {
         'readiness',
       ]);
       expect(find.text(l.newProjectStepCreating), findsOneWidget);
-      await tester.tap(find.byKey(const ValueKey('newProject.close')));
+      // The name is locked with the forum; the folder is shown to change it.
+      final folder = find.byKey(const ValueKey('newProject.folder'));
+      expect(tester.widget<TextField>(folder).enabled, isTrue);
+      await tester.enterText(folder, 'shopping-list');
+      port.answers
+        ..clear()
+        ..add(const BindingReadiness(ready: true));
+      await tester.tap(find.byKey(const ValueKey('newProject.retry')));
       await tester.pumpAndSettle();
+      expect(
+        port.calls.where((c) => c.startsWith('bind')).last,
+        'bind shopping-list init -',
+      );
+      expect(port.calls.last, 'postIdea');
       expect(find.byType(NewProjectDialog), findsNothing);
     },
   );

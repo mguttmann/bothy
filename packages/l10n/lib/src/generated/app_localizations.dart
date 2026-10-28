@@ -15051,7 +15051,7 @@ abstract class AppLocalizations {
   /// Failure of the step prepare folder: reason workspace_exists (09 section 18.12).
   ///
   /// In en, this message translates to:
-  /// **'A folder with this name already exists on the runner. Choose another name, or bind it as an existing folder.'**
+  /// **'A folder with this name already exists on the runner. Change the folder name and try again.'**
   String get newProjectErrWorkspaceExists;
 
   /// Failure of the step prepare folder: reason clone_failed.

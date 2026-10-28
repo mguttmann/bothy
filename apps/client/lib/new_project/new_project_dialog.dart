@@ -310,7 +310,9 @@ class _NewProjectDialogState extends State<NewProjectDialog> {
                   filled: _name.text.isNotEmpty,
                 ),
               ),
-              if (flow.mode == NewProjectMode.existing)
+              // A created folder takes the name; once the forum exists the name is locked, so
+              // the folder is shown to change it after a taken folder (01 6.9 item 5).
+              if (flow.mode == NewProjectMode.existing || flow.forum != null)
                 _field(
                   key: 'newProject.folder',
                   controller: _folder,

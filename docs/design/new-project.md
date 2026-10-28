@@ -130,7 +130,9 @@ the forum opens it, as 01 6.8 item 8 already does.
 **D-M4-43-10 Name suggestion.** The name is suggested from the last path segment of the URL
 without `.git`, or from the first words of the idea, lowercased, other characters folded to
 hyphens, at most `ui.new_project_name_max_chars` characters; it stays editable and is used for the
-forum name and the folder name. Reason: the owner's former agent chose such names; one name for
+forum name and the folder name. After the runner refuses the folder (a folder that exists, or one
+bound to another forum) the forum's name is fixed and the dialog shows the folder name to change
+before "Try again". Reason: the owner's former agent chose such names; one name for
 forum and folder keeps them recognisable.
 
 **D-M4-43-11 Runner choice.** The dialog offers the active agents; the default is the space's

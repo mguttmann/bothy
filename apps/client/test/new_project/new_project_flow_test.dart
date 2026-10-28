@@ -263,6 +263,87 @@ void main() {
     expect(h.flow.finished, isTrue);
   });
 
+  test(
+    'a taken folder: the folder changes, binds again and the project is ready',
+    () async {
+      final h = Harness();
+      h.port.answers.add(
+        const BindingReadiness(ready: false, reason: 'workspace_exists'),
+      );
+      h.flow
+        ..mode = NewProjectMode.idea
+        ..idea = 'A website for the club';
+      await h.flow.run();
+      expect(h.flow.failedStep, NewProjectStep.prepareFolder);
+      expect(h.flow.failure?.code, 'workspace_exists');
+      expect(h.flow.canEdit(NewProjectField.name), isFalse);
+      expect(h.flow.canEdit(NewProjectField.folder), isTrue);
+      expect(h.flow.folder, 'a-website-for-the');
+      h.port.answers
+        ..clear()
+        ..add(_ready);
+      h.flow.folder = 'club-website';
+      await h.flow.run();
+      expect(h.port.calls.where((c) => c.startsWith('bind')), [
+        'bind a-website-for-the init -',
+        'bind club-website init -',
+      ]);
+      expect(
+        h.port.calls.where((c) => c.startsWith('createForum')),
+        hasLength(1),
+      );
+      expect(h.flow.finished, isTrue);
+      expect(h.flow.sentEntry, 'entry-1');
+    },
+  );
+
+  test(
+    'a folder bound to another forum: the folder changes and binds',
+    () async {
+      final h = Harness();
+      h.port
+        ..failBind = const NewProjectFailure.problem('conflict')
+        ..answers.add(_ready);
+      h.flow
+        ..mode = NewProjectMode.empty
+        ..name = 'website';
+      await h.flow.run();
+      expect(h.flow.failedStep, NewProjectStep.bindProject);
+      expect(h.flow.failure?.code, 'conflict');
+      expect(h.flow.canEdit(NewProjectField.folder), isTrue);
+      h.flow.folder = 'website-2';
+      expect(
+        h.flow.name,
+        'website',
+        reason: 'the forum exists; its name stays',
+      );
+      await h.flow.run();
+      expect(h.port.calls.where((c) => c.startsWith('bind')), [
+        'bind website init -',
+        'bind website-2 init -',
+      ]);
+      expect(h.flow.finished, isTrue);
+    },
+  );
+
+  test(
+    'a created folder must be one segment; a mode change drops a typed folder',
+    () async {
+      final h = Harness();
+      h.flow
+        ..mode = NewProjectMode.existing
+        ..name = 'website'
+        ..folder = 'team/website'
+        ..mode = NewProjectMode.empty;
+      expect(h.flow.folder, 'website');
+      expect(h.flow.invalidFields, isEmpty);
+      h.port.failBind = const NewProjectFailure.problem('conflict');
+      await h.flow.run();
+      h.flow.folder = 'team/website';
+      expect(h.flow.invalidFields, {NewProjectField.folder});
+    },
+  );
+
   test('a cancelled step-up fails its step and resumes there', () async {
     final h = Harness();
     h.port
