@@ -41,6 +41,21 @@ final class MessagesDao {
     return row == null ? null : messageFromRow(row);
   }
 
+  /// The thread of the stored message sent with [clientMsgId] (03 `messages.client_msg_id`,
+  /// the ID of the outbox entry that sent it), or null while none is stored.
+  ///
+  /// The echo of a new post's first message can confirm its `createThread` entry before the
+  /// answer of the request arrives; the stored first message then names the thread the server
+  /// created (brief M4-41). Example: `await dao.threadOfClientMsg(MessageId.parse(entry.id))`.
+  Future<ThreadId?> threadOfClientMsg(MessageId clientMsgId) async {
+    final row =
+        await (_db.select(_db.messages)
+              ..where((t) => t.clientMsgId.equals(clientMsgId.value))
+              ..limit(1))
+            .getSingleOrNull();
+    return row == null ? null : ThreadId.parse(row.threadId);
+  }
+
   /// Up to [limit] messages of [threadId] before position [before] (all positions when null),
   /// in ascending `thread_seq`; the page that scrolling up loads.
   Future<List<Message>> pageBefore(

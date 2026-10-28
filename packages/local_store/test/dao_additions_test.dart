@@ -2,7 +2,8 @@
 
 // The DAO methods M4-14 added: deleting a setting and a notification preference by the
 // version rule (04 14, `deleted: true`) and reading the reactions of a message inside a
-// transaction (the `me` flag of `reaction.*`); M4-33 the watched quiet hours rules.
+// transaction (the `me` flag of `reaction.*`); M4-33 the watched quiet hours rules; M4-41 the
+// thread of a message by its client_msg_id.
 
 import 'package:domain/domain.dart';
 import 'package:local_store/local_store.dart';
@@ -125,4 +126,15 @@ void main() {
     final pinned = await dao.watchPinned(threadId(1)).first;
     expect([for (final m in pinned) m.threadSeq.value], [1, 3]);
   });
+
+  test(
+    'threadOfClientMsg names the thread of a sent message (M4-41)',
+    () async {
+      final dao = db.messagesDao;
+      await dao.upsertIfNewer(message(2, 1));
+      // The first message of a new post carries the outbox entry as its client_msg_id.
+      expect(await dao.threadOfClientMsg(messageId(2, 1)), threadId(2));
+      expect(await dao.threadOfClientMsg(messageId(3, 1)), isNull);
+    },
+  );
 }
