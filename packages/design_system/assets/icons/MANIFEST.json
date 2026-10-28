@@ -5,7 +5,7 @@
   "license_file": "LICENSE",
   "license_sha256": "b5b1f1da112d18ea2147decfd48ddc1bf2b5aeb6c265381579340e95b15a2bb2",
   "compiler": "vector_graphics_compiler@1.3.1",
-  "total_bytes": 74608,
+  "total_bytes": 75620,
   "glyphs": {
     "bold/caret-down": {
       "asset": "assets/icons/bold/caret-down.vec",
@@ -141,6 +141,15 @@
       "source_sha256": "3d874ce4d52dcc3bd861d76f3b4b4e38d464fcfeef380a34181fe9ebe708fd02",
       "used_by": [
         "action.mute"
+      ]
+    },
+    "fill/brackets-angle": {
+      "asset": "assets/icons/fill/brackets-angle.vec",
+      "asset_sha256": "528ad32eab799a394a32483aed95073b392231781f06aed8fe1e9fcbd09f552d",
+      "source": "tools/design-tokens/vendor/phosphor/brackets-angle-fill.svg",
+      "source_sha256": "7b5c60cd24451db253700e4910511245b2ddb31c2d6feb8b679bbbb9e812f68d",
+      "used_by": [
+        "channel.project"
       ]
     },
     "fill/buildings": {
@@ -721,6 +730,15 @@
       "source_sha256": "b38cdb3a15dcf00cfa4811e318b021e25c6a87b47acbb11888e16d107a5642da",
       "used_by": [
         "space-icons:book-open"
+      ]
+    },
+    "regular/brackets-angle": {
+      "asset": "assets/icons/regular/brackets-angle.vec",
+      "asset_sha256": "6bfc8550fcc05777b211a9657ad39f624b9899bbb7cd333fd3e5c4efa2aba54d",
+      "source": "tools/design-tokens/vendor/phosphor/brackets-angle.svg",
+      "source_sha256": "8b0e8473d7d3340d52cd1a2e5099236c12db4a85f405b0ced2ed36d5f1d3222b",
+      "used_by": [
+        "channel.project"
       ]
     },
     "regular/briefcase": {

@@ -13,7 +13,8 @@
 /// The core components (docs/design/components.md) take the view models of
 /// `view_models.dart` and read every text from `package:l10n`: [DsMessage], [DsMarkdown],
 /// [DsLiveBox], [DsToolChip], [DsStatusLine], [DsTriggerStateIcon], [DsThreadRow],
-/// [DsSpaceRow], [DsChannelRow], [DsMessageComponents], [DsComposer], [DsSuggestionList],
+/// [DsSpaceRow], [DsChannelRow], [DsSidebarThreadRow], [DsSidebarAllPostsRow],
+/// [DsMessageComponents], [DsComposer], [DsSuggestionList],
 /// [DsBillingBadge], [DsCostText], [DsBanner] and the [LiveAnnouncer].
 library;
 
@@ -28,6 +29,7 @@ export 'src/components/ds_live_box.dart';
 export 'src/components/ds_menu_item.dart';
 export 'src/components/ds_message.dart';
 export 'src/components/ds_message_components.dart';
+export 'src/components/ds_sidebar_thread_row.dart';
 export 'src/components/ds_space_row.dart';
 export 'src/components/ds_status_line.dart';
 export 'src/components/ds_suggestion_list.dart';

@@ -107,6 +107,7 @@ Full list: `design/tokens/icon.tokens.json`, resolved in
 | `run.cancelled` | `prohibit` | regular | Run canceled |
 | `step.tool_call`, `step.subagent`, `step.workflow`, `step.background_job` | `wrench`, `robot`, `flow-arrow`, `clock-countdown` | regular | Step kinds (`run_steps.kind`) |
 | `channel.text`, `channel.forum` | `hash`, `chats-circle` | bold, regular | Channel kinds |
+| `channel.project` | `brackets-angle` | regular | Forum with a project binding (01 6.8 item 11) |
 | `billing.personal`, `billing.organization` | `user-circle`, `buildings` | fill | Backend policy badge |
 | `security.step-up` | `shield-check` | fill | Fresh confirmation needed, approval cards |
 | `action.stop` | `stop-circle` | fill | Stop run |
