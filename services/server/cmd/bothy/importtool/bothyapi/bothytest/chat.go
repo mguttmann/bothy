@@ -135,7 +135,7 @@ func channelJSON(ch *channel, spaceID string) map[string]any {
 		op = map[string]any{memberMode: "agent", "agent_id": ch.operator, "effective_agent_id": ch.operator}
 	}
 	out := map[string]any{"id": ch.id, memberName: ch.name, memberKind: ch.kind, "space_id": spaceID, memberSortKey: ch.sortKey,
-		"topic": ch.topic, "read_only": ch.readOnly, "operator": op, "settings_version": 1, memberVersion: 1,
+		"topic": ch.topic, "read_only": ch.readOnly, "project_bound": false, "operator": op, "settings_version": 1, memberVersion: 1,
 		memberCreatedAt: stamp(ch.created)}
 	if m := ch.main(); m != nil {
 		out["main_thread_id"] = m.id
