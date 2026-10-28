@@ -39,10 +39,17 @@ abstract final class MigrationRules {
       await migrator.deleteTable(table.actualTableName);
       await migrator.createTable(table);
     }
-    await migrator.database.customStatement(
-      'UPDATE sync_state SET cursor = NULL, sync_epoch = NULL',
-    );
+    await resetCursor(migrator);
   }
+
+  /// Clears `sync_state.cursor` and `sync_epoch` and keeps every other row, so the next
+  /// connection loads a whole snapshot (04 7.3); a step uses it alone when it adds a mirror
+  /// column that only the snapshot fills for the rows it keeps (M4-40: `channels.project_bound`).
+  /// Without a `sync_state` row nothing changes: the first connection loads the snapshot anyway.
+  static Future<void> resetCursor(Migrator migrator) =>
+      migrator.database.customStatement(
+        'UPDATE sync_state SET cursor = NULL, sync_epoch = NULL',
+      );
 
   /// Migrates [tables] row by row into their new layout (`Migrator.alterTable`); new columns
   /// take their defaults.

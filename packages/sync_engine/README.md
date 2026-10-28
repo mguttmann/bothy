@@ -103,9 +103,12 @@ same limit after the visible ones) and
 
 - `ready` without a stored cursor (the first connection, or a cursor dropped by a failed
   resync) empties the mirror and applies the whole snapshot in one transaction with
-  `cursor = head_seq` and the epoch, then goes `live` at once (no catch-up follows an `identify`
-  without a cursor); with a cursor only what is not an event (counters, agent
-  presence, feature flags, active run summaries) and the catch-up delivers the rest.
+  `cursor = head_seq` and the epoch, the `active_threads` of the held channels included, so the
+  sidebar lists the open threads without a list request per channel (R-SY-28, M4-40), then goes
+  `live` at once (no catch-up follows an `identify` without a cursor); with a cursor only what is
+  not an event (counters, agent presence, feature flags, active run summaries) and the catch-up
+  delivers the rest, the threads included: the snapshot's state stored before the replayed older
+  `thread.*` events could be undone by one of them.
 - A gateway page is the run of `dispatch` frames up to the next `cursor` frame or
   `catchup.complete`; it is applied with `SyncStateDao.commitPage` and the cursor of that frame
   (never below the stored one) and the epoch. Pages above `client.sync.parse_offload_bytes`
@@ -139,6 +142,10 @@ same limit after the visible ones) and
 - A new message that does not continue the loaded range of its thread is stored, the gap is
   recorded and loaded with `Fetcher.range`; `MessagesDao.watchContiguous` hides it until then. A
   failed fill stays recorded; `onFocus` retries it.
+- A `message.created` of a thread the database does not hold queues one `getThread` after the
+  commit (R-SY-28, M4-40): `SyncContext.threadLoads` keeps it to one load per thread while it is
+  queued or running, the thread is stored only while its channel is held, and a failed load is
+  logged without content, so the next message of the thread tries again.
 
 ### Appliers
 
@@ -149,14 +156,14 @@ through the `Fetcher` instead.
 
 | Event type | Local tables | Rule |
 |---|---|---|
-| `message.created`, `message.updated` | `messages`, `principals` (author), `files`, `message_attachments`, `reactions_summary`, `message_components`, `my_mentions`, `search_index`; `loaded_ranges` for `created`; a tombstone clears content and search row | version |
+| `message.created`, `message.updated` | `messages`, `principals` (author), `files`, `message_attachments`, `reactions_summary`, `message_components`, `my_mentions`, `search_index`; `loaded_ranges` for `created`; for `created` the thread through `getThread` when it is not held; a tombstone clears content and search row | version |
 | `message.deleted` | `messages` (tombstone), `reactions_summary`, `my_mentions`, `message_components`, `message_attachments`, `search_index` | version |
 | `reaction.added`, `reaction.removed` | `reactions_summary` | seq |
 | `pin.added`, `pin.removed` | `messages.pinned` | seq |
 | `thread.created`, `thread.updated`, `thread.closed`, `thread.reopened`, `thread.moved` | `threads`, `thread_tags`, `search_index` (title) | version |
 | `thread.moved_out` | everything of the thread (`removeTargets`) when it is still in the source channel | seq |
 | `space.created`, `space.updated`, `space.archived` | `spaces` | version |
-| `channel.created`, `channel.updated`, `channel.archived` | `channels`, `channel_operators` | version |
+| `channel.created`, `channel.updated`, `channel.archived` | `channels` (`project_bound` included, R-DM-54), `channel_operators` | version |
 | `run.state_changed` | `runs` | version |
 | `user.updated` | `principals` | seq |
 | `agent.updated` | `agents`, `principals` | version |
@@ -646,7 +653,12 @@ above it (the app under test in the macOS app sandbox, M4-18), it uses the copy 
   with `anchors: true`; `world.resolveMentions` resolves `@handle` tokens like the server.
 - Snapshot: `unread_threads` and the read state's `mention_count` are computed (messages of
   others after the read position, not deleted); `sidebar` and the agent presence (`agents`) are
-  always empty.
+  always empty. `active_threads` holds per visible channel the open threads of kind `thread` with
+  an active run or unread, then the newest others up to 20 (`snapshotThreadsPerChannel`; no
+  activity window). Every channel carries `project_bound`; `setProjectBound` creates or deletes a
+  binding as the server does: the flag, a higher `version` and `channel.updated` (R-DM-54).
+  `requestsOf(operationId)` counts the REST requests, for example `listChannelThreads` and
+  `getThread`.
 
 ## Layout
 

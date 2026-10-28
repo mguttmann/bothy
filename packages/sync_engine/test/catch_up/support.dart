@@ -77,6 +77,7 @@ Map<String, Object?> channelJson(
   int spaceN = 1,
   int version = 1,
   bool readOnly = false,
+  bool projectBound = false,
 }) => {
   'id': channelId(n),
   'space_id': spaceId(spaceN),
@@ -86,7 +87,7 @@ Map<String, Object?> channelJson(
   'sort_key': 'a$n',
   'operator': {'mode': 'inherit'},
   'read_only': readOnly,
-  'project_bound': false,
+  'project_bound': projectBound,
   'version': version,
   'settings_version': 1,
   'created_at': at,
@@ -105,8 +106,14 @@ Map<String, Object?> channelView(
   int spaceN = 1,
   String level = 'write',
   int version = 1,
+  bool projectBound = false,
 }) => {
-  'channel': channelJson(n, spaceN: spaceN, version: version),
+  'channel': channelJson(
+    n,
+    spaceN: spaceN,
+    version: version,
+    projectBound: projectBound,
+  ),
   'level': level,
   'capabilities': <Object?>[],
 };
@@ -225,6 +232,7 @@ Map<String, Object?> snapshotJson({
   List<Map<String, Object?>> agents = const [],
   List<Map<String, Object?>> drafts = const [],
   List<Map<String, Object?>> settings = const [],
+  List<Map<String, Object?>> activeThreads = const [],
 }) => {
   'head_seq': headSeq,
   'permission_version': 3,
@@ -236,6 +244,7 @@ Map<String, Object?> snapshotJson({
   'sidebar': <Object?>[],
   'unread_threads': unread,
   'active_runs': <Object?>[],
+  'active_threads': activeThreads,
   'agents': agents,
   'settings': settings,
   'drafts': drafts,

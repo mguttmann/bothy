@@ -79,6 +79,7 @@ ChannelsCompanion channelToCompanion(Channel channel) =>
       archivedAt: Value(channel.archivedAt),
       version: channel.version.value,
       settingsVersion: channel.settingsVersion.value,
+      projectBound: Value(channel.projectBound),
     );
 
 /// The operator setting of [channel] for `channel_operators`.
@@ -114,6 +115,7 @@ Channel channelFromRow(ChannelRow row, ChannelOperatorRow? operator) => Channel(
   archivedAt: row.archivedAt,
   version: ResourceVersion(row.version),
   settingsVersion: ResourceVersion(row.settingsVersion),
+  projectBound: row.projectBound,
 );
 
 /// The insert companion of [tag].

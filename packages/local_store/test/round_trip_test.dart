@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Every mirror table gives back what was stored (15 6.1): instance, principals and agent cards,
-// commands and the personal tables, each through its DAO and mapper.
+// commands and the personal tables, each through its DAO and mapper; the derived
+// `project_bound` of a channel (M4-40, R-DM-54) too.
 
 import 'package:domain/domain.dart';
 import 'package:local_store/local_store.dart';
@@ -182,6 +183,29 @@ void main() {
       expect(await dao.quietHours(), [rule]);
       await dao.deleteQuietHours(rule.id);
       expect(await dao.quietHours(), isEmpty);
+    },
+  );
+
+  test(
+    'project_bound of a channel round-trips and follows a newer version',
+    () async {
+      final bound = channel(1).copyWith(projectBound: true);
+      expect(await db.structureDao.upsertChannelIfNewer(bound), isTrue);
+      expect(await db.structureDao.channelById(bound.id), bound);
+      expect(
+        (await db.structureDao.channelById(bound.id))!.projectBound,
+        isTrue,
+      );
+
+      // Deleting the binding raises channels.version (R-DM-54); the older value is ignored.
+      final unbound = channel(1, version: 2);
+      expect(await db.structureDao.upsertChannelIfNewer(unbound), isTrue);
+      expect(await db.structureDao.channelById(bound.id), unbound);
+      expect(await db.structureDao.upsertChannelIfNewer(bound), isFalse);
+      expect(
+        (await db.structureDao.channelById(bound.id))!.projectBound,
+        isFalse,
+      );
     },
   );
 }

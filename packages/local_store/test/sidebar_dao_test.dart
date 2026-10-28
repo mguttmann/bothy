@@ -2,7 +2,11 @@
 
 // The DAO methods M4-19 added for the sidebar and the post list (brief M4-19 Design notes 1, 2
 // and 4): the local write of a sidebar state, every read state and notification preference,
-// the active runs, and the Done collapse state per forum on this device (`forum_view_states`).
+// the active runs, and the Done collapse state per forum on this device (`forum_view_states`);
+// and those of M4-40 (01 6.8 item 7, D-SB-6): the collapsed thread groups per channel
+// (`channel_view_states`) and the pinned forum overview (`shell_view_state`).
+
+import 'dart:async';
 
 import 'package:domain/domain.dart';
 import 'package:local_store/local_store.dart';
@@ -128,4 +132,81 @@ void main() {
       for (final t in db.mirrorTables) t.actualTableName,
     ], isNot(contains('forum_view_states')));
   });
+
+  test(
+    'thread groups start expanded and keep their state per channel',
+    () async {
+      final dao = db.forumViewDao;
+      final forum = ChannelId.parse(uuid(0x201));
+      final text = ChannelId.parse(uuid(0x202));
+      final seen = <Set<ChannelId>>[];
+      final watching = dao.watchCollapsedGroups().listen(seen.add);
+      addTearDown(watching.cancel);
+
+      Future<void> until(Set<ChannelId> expected) async {
+        while (seen.isEmpty || !_sameSet(seen.last, expected)) {
+          await Future<void>.delayed(Duration.zero);
+        }
+      }
+
+      await until({});
+      await dao.setGroupCollapsed(forum, collapsed: true);
+      await until({forum});
+      await dao.setGroupCollapsed(text, collapsed: true);
+      await until({forum, text});
+      await dao.setGroupCollapsed(forum, collapsed: false);
+      await until({text});
+      expect(await dao.watchCollapsedGroups().first, {text});
+    },
+  );
+
+  test(
+    'the overview is not pinned until it is set, read once or watched',
+    () async {
+      final dao = db.forumViewDao;
+      expect(await dao.overviewPinned(), isFalse);
+      expect(await dao.watchOverviewPinned().first, isFalse);
+      final seen = <bool>[];
+      final watching = dao.watchOverviewPinned().listen(seen.add);
+      addTearDown(watching.cancel);
+      while (seen.isEmpty) {
+        await Future<void>.delayed(Duration.zero);
+      }
+
+      await dao.setOverviewPinned(pinned: true);
+      expect(await dao.overviewPinned(), isTrue);
+      while (seen.isEmpty || !seen.last) {
+        await Future<void>.delayed(Duration.zero);
+      }
+      await dao.setOverviewPinned(pinned: false);
+      expect(await dao.overviewPinned(), isFalse);
+      while (seen.last) {
+        await Future<void>.delayed(Duration.zero);
+      }
+      // drift may emit an unchanged value again; the changes come in order.
+      final changes = [
+        for (final (i, v) in seen.indexed)
+          if (i == 0 || seen[i - 1] != v) v,
+      ];
+      expect(changes, [false, true, false]);
+      // One row, like sync_state.
+      final rows = await db
+          .customSelect('SELECT count(*) AS n FROM shell_view_state')
+          .getSingle();
+      expect(rows.read<int>('n'), 1);
+    },
+  );
+
+  test('a resync keeps the group and overview state: they are no mirror '
+      'tables', () {
+    expect(
+      [for (final t in db.mirrorTables) t.actualTableName],
+      isNot(
+        anyOf(contains('channel_view_states'), contains('shell_view_state')),
+      ),
+    );
+  });
 }
+
+bool _sameSet(Set<ChannelId> a, Set<ChannelId> b) =>
+    a.length == b.length && a.containsAll(b);

@@ -92,6 +92,17 @@ void main() {
     c.copyWith(),
     c.copyWith(dmParticipantIds: [alex]),
   );
+  // R-DM-54: the derived project flag is part of the value; an older payload leaves it false.
+  _value(
+    'Channel.projectBound',
+    c.copyWith(projectBound: true),
+    mkChannel().copyWith(projectBound: true),
+    c.copyWith(projectBound: true).copyWith(),
+    c,
+  );
+  test('Channel.projectBound is false by default', () {
+    expect(c.projectBound, isFalse);
+  });
 
   ForumTag mkTag() => ForumTag(
     id: ForumTagId.parse(uuid(60)),

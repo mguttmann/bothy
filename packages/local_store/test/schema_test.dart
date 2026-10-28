@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// The current schema against 15 6.1: every table, `host_key_pins` (M4-36) included, the columns
-// a client may see with their 03 source, and none of the columns 15 6.1 excludes.
+// The current schema against 15 6.1: every table, `host_key_pins` (M4-36) and the sidebar view
+// state of M4-40 included, the columns a client may see with their 03 source, and none of the
+// columns 15 6.1 excludes.
 
 import 'package:local_store/local_store.dart';
 import 'package:test/test.dart';
@@ -23,8 +24,9 @@ const Map<String, List<String>> expected = {
     'updated_by_device_id',
   ],
   // 03 `channels` without `prompt` and the behaviour fields; `effective_operator_agent_id`:
-  // API `ChannelOperator.effective_agent_id`; `main_thread_id`, `dm_participant_ids`: API
-  // `Channel`; `level`, `capabilities`: API `ChannelView`.
+  // API `ChannelOperator.effective_agent_id`; `main_thread_id`, `dm_participant_ids`,
+  // `project_bound` (derived from 03 `project_bindings`, R-DM-54): API `Channel`; `level`,
+  // `capabilities`: API `ChannelView`.
   'channels': [
     'id', 'space_id', 'kind', 'name', 'topic', 'sort_key', //
     'effective_operator_agent_id',
@@ -35,7 +37,7 @@ const Map<String, List<String>> expected = {
     'dm_participant_ids',
     'created_at',
     'archived_at',
-    'version', 'settings_version', 'level', 'capabilities',
+    'version', 'settings_version', 'level', 'capabilities', 'project_bound',
   ],
   // API `ChannelOperator.mode` and 03 `channels.operator_agent_id`.
   'channel_operators': ['channel_id', 'operator_mode', 'operator_agent_id'],
@@ -280,6 +282,10 @@ const Map<String, List<String>> expected = {
     'key_fingerprint',
     'first_seen_at',
   ],
+  // Local only (M4-40): the collapsed thread group per channel on this device (01 6.8 item 7).
+  'channel_view_states': ['channel_id', 'group_collapsed'],
+  // Local only (M4-40): the pinned forum overview of this device, one row (01 D15).
+  'shell_view_state': ['id', 'overview_pinned'],
 };
 
 void main() {
@@ -292,8 +298,8 @@ void main() {
     return [for (final r in rows) r.read<String>('name')];
   }
 
-  test('schema version 5 has exactly the tables of 15 6.1', () async {
-    expect(db.schemaVersion, 5);
+  test('schema version 6 has exactly the tables of 15 6.1', () async {
+    expect(db.schemaVersion, 6);
     final rows = await db
         .customSelect(
           "SELECT name FROM sqlite_master WHERE type = 'table' "

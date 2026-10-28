@@ -315,6 +315,8 @@ Channel channelFromJson(Json j) {
       NotificationLevel.fromCode,
     ),
     readOnly: flag(j, 'read_only'),
+    // R-DM-54: derived by the server; absent in a payload of a server before it (false).
+    projectBound: flag(j, 'project_bound'),
     mainThreadId: _opt(optStr(j, 'main_thread_id'), ThreadId.parse),
     dmParticipantIds: [
       for (final p in strList(j, 'dm_participant_ids')) PrincipalId.parse(p),
@@ -657,6 +659,7 @@ final class SnapshotData {
     required this.sidebar,
     required this.unreadThreads,
     required this.activeRuns,
+    required this.activeThreads,
     required this.agents,
     required this.settings,
     required this.drafts,
@@ -693,6 +696,13 @@ final class SnapshotData {
   /// Active runs.
   final List<RunSummary> activeRuns;
 
+  /// The active threads of the visible channels (`active_threads`, 04 6.3 item 4, R-SY-28):
+  /// open threads with an active run or unread for the person, plus the newest active ones up to
+  /// `sync.snapshot_threads_per_channel` per channel, as `getThread` returns them. The sidebar
+  /// lists them without one request per channel (D-SB-11); empty in a snapshot of an older
+  /// server.
+  final List<Thread> activeThreads;
+
   /// Presence of the visible agents.
   final Map<PrincipalId, AgentPresence> agents;
 
@@ -728,6 +738,9 @@ SnapshotData snapshotFromJson(Json j) => SnapshotData(
       ),
   ],
   activeRuns: [for (final r in objList(j, 'active_runs')) runFromJson(r)],
+  activeThreads: [
+    for (final t in objList(j, 'active_threads')) threadFromJson(t),
+  ],
   agents: {
     for (final a in objList(j, 'agents'))
       PrincipalId.parse(str(a, 'agent_id')): presenceFromJson(a),

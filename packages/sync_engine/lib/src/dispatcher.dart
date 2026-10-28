@@ -145,6 +145,12 @@ final class SyncContext {
   /// M4-14). An `access.changed` with `added` and a snapshot that lists a target take it out.
   final Set<String> removedTargets = {};
 
+  /// The threads whose `getThread` load after a `message.created` is queued or running (04 6.3
+  /// item 4, R-SY-28; brief M4-40 Design note 5): a further message of such a thread queues no
+  /// second load. An ID enters after the commit of its event, so a page that rolls back leaves
+  /// none behind, and goes when its load ends, whether the load stored the thread or failed.
+  final Set<ThreadId> threadLoads = {};
+
   /// Whether a background read may store content of [threadId] in [channelId]: the channel is
   /// stored here and neither it nor the thread was removed. Call it inside the transaction of
   /// the write, so a removal cannot slip in between.

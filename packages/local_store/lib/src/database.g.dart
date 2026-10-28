@@ -1685,6 +1685,21 @@ class $ChannelsTable extends Channels
     type: DriftSqlType.int,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _projectBoundMeta = const VerificationMeta(
+    'projectBound',
+  );
+  @override
+  late final GeneratedColumn<bool> projectBound = GeneratedColumn<bool>(
+    'project_bound',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("project_bound" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   static const VerificationMeta _levelMeta = const VerificationMeta('level');
   @override
   late final GeneratedColumn<String> level = GeneratedColumn<String>(
@@ -1724,6 +1739,7 @@ class $ChannelsTable extends Channels
     archivedAt,
     version,
     settingsVersion,
+    projectBound,
     level,
     capabilities,
   ];
@@ -1870,6 +1886,15 @@ class $ChannelsTable extends Channels
     } else if (isInserting) {
       context.missing(_settingsVersionMeta);
     }
+    if (data.containsKey('project_bound')) {
+      context.handle(
+        _projectBoundMeta,
+        projectBound.isAcceptableOrUnknown(
+          data['project_bound']!,
+          _projectBoundMeta,
+        ),
+      );
+    }
     if (data.containsKey('level')) {
       context.handle(
         _levelMeta,
@@ -1958,6 +1983,10 @@ class $ChannelsTable extends Channels
         DriftSqlType.int,
         data['${effectivePrefix}settings_version'],
       )!,
+      projectBound: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}project_bound'],
+      )!,
       level: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}level'],
@@ -2024,6 +2053,11 @@ class ChannelRow extends DataClass implements Insertable<ChannelRow> {
   /// 03 `channels.settings_version`.
   final int settingsVersion;
 
+  /// API `Channel.project_bound` (03 `project_bindings`, R-DM-54): whether a project binding
+  /// exists, so the sidebar shows a project forum (01 6.8 item 11). False in a row of a version
+  /// before 6 until the snapshot that the migration asks for (M4-40).
+  final bool projectBound;
+
   /// API `ChannelView.level`; null until delivered.
   final String? level;
 
@@ -2046,6 +2080,7 @@ class ChannelRow extends DataClass implements Insertable<ChannelRow> {
     this.archivedAt,
     required this.version,
     required this.settingsVersion,
+    required this.projectBound,
     this.level,
     required this.capabilities,
   });
@@ -2084,6 +2119,7 @@ class ChannelRow extends DataClass implements Insertable<ChannelRow> {
     }
     map['version'] = Variable<int>(version);
     map['settings_version'] = Variable<int>(settingsVersion);
+    map['project_bound'] = Variable<bool>(projectBound);
     if (!nullToAbsent || level != null) {
       map['level'] = Variable<String>(level);
     }
@@ -2121,6 +2157,7 @@ class ChannelRow extends DataClass implements Insertable<ChannelRow> {
           : Value(archivedAt),
       version: Value(version),
       settingsVersion: Value(settingsVersion),
+      projectBound: Value(projectBound),
       level: level == null && nullToAbsent
           ? const Value.absent()
           : Value(level),
@@ -2154,6 +2191,7 @@ class ChannelRow extends DataClass implements Insertable<ChannelRow> {
       archivedAt: serializer.fromJson<DateTime?>(json['archivedAt']),
       version: serializer.fromJson<int>(json['version']),
       settingsVersion: serializer.fromJson<int>(json['settingsVersion']),
+      projectBound: serializer.fromJson<bool>(json['projectBound']),
       level: serializer.fromJson<String?>(json['level']),
       capabilities: serializer.fromJson<String>(json['capabilities']),
     );
@@ -2182,6 +2220,7 @@ class ChannelRow extends DataClass implements Insertable<ChannelRow> {
       'archivedAt': serializer.toJson<DateTime?>(archivedAt),
       'version': serializer.toJson<int>(version),
       'settingsVersion': serializer.toJson<int>(settingsVersion),
+      'projectBound': serializer.toJson<bool>(projectBound),
       'level': serializer.toJson<String?>(level),
       'capabilities': serializer.toJson<String>(capabilities),
     };
@@ -2204,6 +2243,7 @@ class ChannelRow extends DataClass implements Insertable<ChannelRow> {
     Value<DateTime?> archivedAt = const Value.absent(),
     int? version,
     int? settingsVersion,
+    bool? projectBound,
     Value<String?> level = const Value.absent(),
     String? capabilities,
   }) => ChannelRow(
@@ -2229,6 +2269,7 @@ class ChannelRow extends DataClass implements Insertable<ChannelRow> {
     archivedAt: archivedAt.present ? archivedAt.value : this.archivedAt,
     version: version ?? this.version,
     settingsVersion: settingsVersion ?? this.settingsVersion,
+    projectBound: projectBound ?? this.projectBound,
     level: level.present ? level.value : this.level,
     capabilities: capabilities ?? this.capabilities,
   );
@@ -2264,6 +2305,9 @@ class ChannelRow extends DataClass implements Insertable<ChannelRow> {
       settingsVersion: data.settingsVersion.present
           ? data.settingsVersion.value
           : this.settingsVersion,
+      projectBound: data.projectBound.present
+          ? data.projectBound.value
+          : this.projectBound,
       level: data.level.present ? data.level.value : this.level,
       capabilities: data.capabilities.present
           ? data.capabilities.value
@@ -2290,6 +2334,7 @@ class ChannelRow extends DataClass implements Insertable<ChannelRow> {
           ..write('archivedAt: $archivedAt, ')
           ..write('version: $version, ')
           ..write('settingsVersion: $settingsVersion, ')
+          ..write('projectBound: $projectBound, ')
           ..write('level: $level, ')
           ..write('capabilities: $capabilities')
           ..write(')'))
@@ -2314,6 +2359,7 @@ class ChannelRow extends DataClass implements Insertable<ChannelRow> {
     archivedAt,
     version,
     settingsVersion,
+    projectBound,
     level,
     capabilities,
   );
@@ -2337,6 +2383,7 @@ class ChannelRow extends DataClass implements Insertable<ChannelRow> {
           other.archivedAt == this.archivedAt &&
           other.version == this.version &&
           other.settingsVersion == this.settingsVersion &&
+          other.projectBound == this.projectBound &&
           other.level == this.level &&
           other.capabilities == this.capabilities);
 }
@@ -2358,6 +2405,7 @@ class ChannelsCompanion extends UpdateCompanion<ChannelRow> {
   final Value<DateTime?> archivedAt;
   final Value<int> version;
   final Value<int> settingsVersion;
+  final Value<bool> projectBound;
   final Value<String?> level;
   final Value<String> capabilities;
   final Value<int> rowid;
@@ -2378,6 +2426,7 @@ class ChannelsCompanion extends UpdateCompanion<ChannelRow> {
     this.archivedAt = const Value.absent(),
     this.version = const Value.absent(),
     this.settingsVersion = const Value.absent(),
+    this.projectBound = const Value.absent(),
     this.level = const Value.absent(),
     this.capabilities = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -2399,6 +2448,7 @@ class ChannelsCompanion extends UpdateCompanion<ChannelRow> {
     this.archivedAt = const Value.absent(),
     required int version,
     required int settingsVersion,
+    this.projectBound = const Value.absent(),
     this.level = const Value.absent(),
     this.capabilities = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -2429,6 +2479,7 @@ class ChannelsCompanion extends UpdateCompanion<ChannelRow> {
     Expression<DateTime>? archivedAt,
     Expression<int>? version,
     Expression<int>? settingsVersion,
+    Expression<bool>? projectBound,
     Expression<String>? level,
     Expression<String>? capabilities,
     Expression<int>? rowid,
@@ -2452,6 +2503,7 @@ class ChannelsCompanion extends UpdateCompanion<ChannelRow> {
       if (archivedAt != null) 'archived_at': archivedAt,
       if (version != null) 'version': version,
       if (settingsVersion != null) 'settings_version': settingsVersion,
+      if (projectBound != null) 'project_bound': projectBound,
       if (level != null) 'level': level,
       if (capabilities != null) 'capabilities': capabilities,
       if (rowid != null) 'rowid': rowid,
@@ -2475,6 +2527,7 @@ class ChannelsCompanion extends UpdateCompanion<ChannelRow> {
     Value<DateTime?>? archivedAt,
     Value<int>? version,
     Value<int>? settingsVersion,
+    Value<bool>? projectBound,
     Value<String?>? level,
     Value<String>? capabilities,
     Value<int>? rowid,
@@ -2498,6 +2551,7 @@ class ChannelsCompanion extends UpdateCompanion<ChannelRow> {
       archivedAt: archivedAt ?? this.archivedAt,
       version: version ?? this.version,
       settingsVersion: settingsVersion ?? this.settingsVersion,
+      projectBound: projectBound ?? this.projectBound,
       level: level ?? this.level,
       capabilities: capabilities ?? this.capabilities,
       rowid: rowid ?? this.rowid,
@@ -2559,6 +2613,9 @@ class ChannelsCompanion extends UpdateCompanion<ChannelRow> {
     if (settingsVersion.present) {
       map['settings_version'] = Variable<int>(settingsVersion.value);
     }
+    if (projectBound.present) {
+      map['project_bound'] = Variable<bool>(projectBound.value);
+    }
     if (level.present) {
       map['level'] = Variable<String>(level.value);
     }
@@ -2590,6 +2647,7 @@ class ChannelsCompanion extends UpdateCompanion<ChannelRow> {
           ..write('archivedAt: $archivedAt, ')
           ..write('version: $version, ')
           ..write('settingsVersion: $settingsVersion, ')
+          ..write('projectBound: $projectBound, ')
           ..write('level: $level, ')
           ..write('capabilities: $capabilities, ')
           ..write('rowid: $rowid')
@@ -18327,6 +18385,450 @@ class HostKeyPinsCompanion extends UpdateCompanion<HostKeyPinRow> {
   }
 }
 
+class $ChannelViewStatesTable extends ChannelViewStates
+    with TableInfo<$ChannelViewStatesTable, ChannelViewStateRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ChannelViewStatesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _channelIdMeta = const VerificationMeta(
+    'channelId',
+  );
+  @override
+  late final GeneratedColumn<String> channelId = GeneratedColumn<String>(
+    'channel_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _groupCollapsedMeta = const VerificationMeta(
+    'groupCollapsed',
+  );
+  @override
+  late final GeneratedColumn<bool> groupCollapsed = GeneratedColumn<bool>(
+    'group_collapsed',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("group_collapsed" IN (0, 1))',
+    ),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [channelId, groupCollapsed];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'channel_view_states';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ChannelViewStateRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('channel_id')) {
+      context.handle(
+        _channelIdMeta,
+        channelId.isAcceptableOrUnknown(data['channel_id']!, _channelIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_channelIdMeta);
+    }
+    if (data.containsKey('group_collapsed')) {
+      context.handle(
+        _groupCollapsedMeta,
+        groupCollapsed.isAcceptableOrUnknown(
+          data['group_collapsed']!,
+          _groupCollapsedMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_groupCollapsedMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {channelId};
+  @override
+  ChannelViewStateRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ChannelViewStateRow(
+      channelId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}channel_id'],
+      )!,
+      groupCollapsed: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}group_collapsed'],
+      )!,
+    );
+  }
+
+  @override
+  $ChannelViewStatesTable createAlias(String alias) {
+    return $ChannelViewStatesTable(attachedDatabase, alias);
+  }
+}
+
+class ChannelViewStateRow extends DataClass
+    implements Insertable<ChannelViewStateRow> {
+  /// The channel, canonical UUID text.
+  final String channelId;
+
+  /// Whether the thread group under the channel row is collapsed.
+  final bool groupCollapsed;
+  const ChannelViewStateRow({
+    required this.channelId,
+    required this.groupCollapsed,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['channel_id'] = Variable<String>(channelId);
+    map['group_collapsed'] = Variable<bool>(groupCollapsed);
+    return map;
+  }
+
+  ChannelViewStatesCompanion toCompanion(bool nullToAbsent) {
+    return ChannelViewStatesCompanion(
+      channelId: Value(channelId),
+      groupCollapsed: Value(groupCollapsed),
+    );
+  }
+
+  factory ChannelViewStateRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ChannelViewStateRow(
+      channelId: serializer.fromJson<String>(json['channelId']),
+      groupCollapsed: serializer.fromJson<bool>(json['groupCollapsed']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'channelId': serializer.toJson<String>(channelId),
+      'groupCollapsed': serializer.toJson<bool>(groupCollapsed),
+    };
+  }
+
+  ChannelViewStateRow copyWith({String? channelId, bool? groupCollapsed}) =>
+      ChannelViewStateRow(
+        channelId: channelId ?? this.channelId,
+        groupCollapsed: groupCollapsed ?? this.groupCollapsed,
+      );
+  ChannelViewStateRow copyWithCompanion(ChannelViewStatesCompanion data) {
+    return ChannelViewStateRow(
+      channelId: data.channelId.present ? data.channelId.value : this.channelId,
+      groupCollapsed: data.groupCollapsed.present
+          ? data.groupCollapsed.value
+          : this.groupCollapsed,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ChannelViewStateRow(')
+          ..write('channelId: $channelId, ')
+          ..write('groupCollapsed: $groupCollapsed')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(channelId, groupCollapsed);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ChannelViewStateRow &&
+          other.channelId == this.channelId &&
+          other.groupCollapsed == this.groupCollapsed);
+}
+
+class ChannelViewStatesCompanion extends UpdateCompanion<ChannelViewStateRow> {
+  final Value<String> channelId;
+  final Value<bool> groupCollapsed;
+  final Value<int> rowid;
+  const ChannelViewStatesCompanion({
+    this.channelId = const Value.absent(),
+    this.groupCollapsed = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ChannelViewStatesCompanion.insert({
+    required String channelId,
+    required bool groupCollapsed,
+    this.rowid = const Value.absent(),
+  }) : channelId = Value(channelId),
+       groupCollapsed = Value(groupCollapsed);
+  static Insertable<ChannelViewStateRow> custom({
+    Expression<String>? channelId,
+    Expression<bool>? groupCollapsed,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (channelId != null) 'channel_id': channelId,
+      if (groupCollapsed != null) 'group_collapsed': groupCollapsed,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ChannelViewStatesCompanion copyWith({
+    Value<String>? channelId,
+    Value<bool>? groupCollapsed,
+    Value<int>? rowid,
+  }) {
+    return ChannelViewStatesCompanion(
+      channelId: channelId ?? this.channelId,
+      groupCollapsed: groupCollapsed ?? this.groupCollapsed,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (channelId.present) {
+      map['channel_id'] = Variable<String>(channelId.value);
+    }
+    if (groupCollapsed.present) {
+      map['group_collapsed'] = Variable<bool>(groupCollapsed.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ChannelViewStatesCompanion(')
+          ..write('channelId: $channelId, ')
+          ..write('groupCollapsed: $groupCollapsed, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $ShellViewStatesTable extends ShellViewStates
+    with TableInfo<$ShellViewStatesTable, ShellViewStateRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ShellViewStatesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    check: () => id.equals(1),
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _overviewPinnedMeta = const VerificationMeta(
+    'overviewPinned',
+  );
+  @override
+  late final GeneratedColumn<bool> overviewPinned = GeneratedColumn<bool>(
+    'overview_pinned',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("overview_pinned" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, overviewPinned];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'shell_view_state';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ShellViewStateRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('overview_pinned')) {
+      context.handle(
+        _overviewPinnedMeta,
+        overviewPinned.isAcceptableOrUnknown(
+          data['overview_pinned']!,
+          _overviewPinnedMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  ShellViewStateRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ShellViewStateRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      overviewPinned: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}overview_pinned'],
+      )!,
+    );
+  }
+
+  @override
+  $ShellViewStatesTable createAlias(String alias) {
+    return $ShellViewStatesTable(attachedDatabase, alias);
+  }
+}
+
+class ShellViewStateRow extends DataClass
+    implements Insertable<ShellViewStateRow> {
+  /// Always 1: the table holds one row.
+  final int id;
+
+  /// Whether the forum overview D15 is pinned as a column next to the history.
+  final bool overviewPinned;
+  const ShellViewStateRow({required this.id, required this.overviewPinned});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['overview_pinned'] = Variable<bool>(overviewPinned);
+    return map;
+  }
+
+  ShellViewStatesCompanion toCompanion(bool nullToAbsent) {
+    return ShellViewStatesCompanion(
+      id: Value(id),
+      overviewPinned: Value(overviewPinned),
+    );
+  }
+
+  factory ShellViewStateRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ShellViewStateRow(
+      id: serializer.fromJson<int>(json['id']),
+      overviewPinned: serializer.fromJson<bool>(json['overviewPinned']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'overviewPinned': serializer.toJson<bool>(overviewPinned),
+    };
+  }
+
+  ShellViewStateRow copyWith({int? id, bool? overviewPinned}) =>
+      ShellViewStateRow(
+        id: id ?? this.id,
+        overviewPinned: overviewPinned ?? this.overviewPinned,
+      );
+  ShellViewStateRow copyWithCompanion(ShellViewStatesCompanion data) {
+    return ShellViewStateRow(
+      id: data.id.present ? data.id.value : this.id,
+      overviewPinned: data.overviewPinned.present
+          ? data.overviewPinned.value
+          : this.overviewPinned,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ShellViewStateRow(')
+          ..write('id: $id, ')
+          ..write('overviewPinned: $overviewPinned')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, overviewPinned);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ShellViewStateRow &&
+          other.id == this.id &&
+          other.overviewPinned == this.overviewPinned);
+}
+
+class ShellViewStatesCompanion extends UpdateCompanion<ShellViewStateRow> {
+  final Value<int> id;
+  final Value<bool> overviewPinned;
+  const ShellViewStatesCompanion({
+    this.id = const Value.absent(),
+    this.overviewPinned = const Value.absent(),
+  });
+  ShellViewStatesCompanion.insert({
+    this.id = const Value.absent(),
+    this.overviewPinned = const Value.absent(),
+  });
+  static Insertable<ShellViewStateRow> custom({
+    Expression<int>? id,
+    Expression<bool>? overviewPinned,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (overviewPinned != null) 'overview_pinned': overviewPinned,
+    });
+  }
+
+  ShellViewStatesCompanion copyWith({
+    Value<int>? id,
+    Value<bool>? overviewPinned,
+  }) {
+    return ShellViewStatesCompanion(
+      id: id ?? this.id,
+      overviewPinned: overviewPinned ?? this.overviewPinned,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (overviewPinned.present) {
+      map['overview_pinned'] = Variable<bool>(overviewPinned.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ShellViewStatesCompanion(')
+          ..write('id: $id, ')
+          ..write('overviewPinned: $overviewPinned')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$LocalDatabase extends GeneratedDatabase {
   _$LocalDatabase(QueryExecutor e) : super(e);
   late final SearchIndex searchIndex = SearchIndex(this);
@@ -18375,6 +18877,11 @@ abstract class _$LocalDatabase extends GeneratedDatabase {
   );
   late final $RecentTargetsTable recentTargets = $RecentTargetsTable(this);
   late final $HostKeyPinsTable hostKeyPins = $HostKeyPinsTable(this);
+  late final $ChannelViewStatesTable channelViewStates =
+      $ChannelViewStatesTable(this);
+  late final $ShellViewStatesTable shellViewStates = $ShellViewStatesTable(
+    this,
+  );
   late final Index channelsSpace = Index(
     'channels_space',
     'CREATE INDEX channels_space ON channels (space_id)',
@@ -18464,6 +18971,8 @@ abstract class _$LocalDatabase extends GeneratedDatabase {
     forumViewStates,
     recentTargets,
     hostKeyPins,
+    channelViewStates,
+    shellViewStates,
     channelsSpace,
     forumTagsChannel,
     threadsChannel,

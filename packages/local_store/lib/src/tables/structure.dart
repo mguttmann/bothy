@@ -2,7 +2,9 @@
 
 /// Mirror tables of the sidebar structure (15 6.1: `spaces`, `user_space_states`, `channels`,
 /// `forum_tags`, `channel_operators`). Columns carry the 03 names; nothing readable only with
-/// `manage` (channel prompt, skills, project binding) has a column (15 6.1).
+/// `manage` (channel prompt, skills, project binding) has a column (15 6.1); of the binding only
+/// the derived flag `project_bound` of the API `Channel` is kept, which every reader gets
+/// (R-DM-54).
 library;
 
 import 'package:drift/drift.dart';
@@ -76,8 +78,8 @@ class UserSpaceStates extends Table {
 }
 
 /// 03 `channels` without `prompt` and the behaviour fields (readable only with `manage`), with
-/// the effective operator of the API field `operator` and the caller's `level` and
-/// `capabilities` of the API `ChannelView`.
+/// the effective operator of the API field `operator`, the derived `project_bound` of the API
+/// `Channel` and the caller's `level` and `capabilities` of the API `ChannelView`.
 @DataClassName('ChannelRow')
 @TableIndex(name: 'channels_space', columns: {#spaceId})
 class Channels extends Table {
@@ -131,6 +133,11 @@ class Channels extends Table {
 
   /// 03 `channels.settings_version`.
   IntColumn get settingsVersion => integer()();
+
+  /// API `Channel.project_bound` (03 `project_bindings`, R-DM-54): whether a project binding
+  /// exists, so the sidebar shows a project forum (01 6.8 item 11). False in a row of a version
+  /// before 6 until the snapshot that the migration asks for (M4-40).
+  BoolColumn get projectBound => boolean().withDefault(const Constant(false))();
 
   /// API `ChannelView.level`; null until delivered.
   TextColumn get level => text().nullable()();
