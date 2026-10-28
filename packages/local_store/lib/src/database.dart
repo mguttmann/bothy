@@ -91,6 +91,23 @@ class LocalDatabase extends _$LocalDatabase {
   @override
   int get schemaVersion => 6;
 
+  /// Closes the database and releases its file, also while watched queries come and go.
+  ///
+  /// drift closes its stream store first: it awaits the close of each active stream while it
+  /// iterates them, and a paused listener (riverpod pauses providers nobody watches) holds that
+  /// close until it resumes. A stream that a cancelled listener removes meanwhile ends the loop
+  /// with a [ConcurrentModificationError] before drift closes the executor, so the file stayed
+  /// open and Windows refused to delete it after a 4012 or a logout (R-SY-14). The executor
+  /// closes in that case anyway; the streams are dead with it.
+  @override
+  Future<void> close() async {
+    try {
+      await super.close();
+    } on ConcurrentModificationError {
+      await executor.close();
+    }
+  }
+
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onCreate: (m) => m.createAll(),
