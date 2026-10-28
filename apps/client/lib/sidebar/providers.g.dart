@@ -749,16 +749,18 @@ abstract class _$ChannelThreads extends $Notifier<SidebarThreadGroup?> {
 
 /// The rows of the forum [channelId] above its thread rows (01 6.8 item 8, brief M4-41): the
 /// draft row while the person's draft of a new post has text (the unsent write of this device,
-/// else the stored draft) or the new chat view of the forum is open and writing, then the posts sent from this device that the server has not created
-/// yet, newest first. Empty for other channels.
+/// else the stored draft) or the new chat view of the forum is open and writing, then the posts
+/// sent from this device that the server has not created yet, newest first. Empty for other
+/// channels.
 
 @ProviderFor(newChatRows)
 final newChatRowsProvider = NewChatRowsFamily._();
 
 /// The rows of the forum [channelId] above its thread rows (01 6.8 item 8, brief M4-41): the
 /// draft row while the person's draft of a new post has text (the unsent write of this device,
-/// else the stored draft) or the new chat view of the forum is open and writing, then the posts sent from this device that the server has not created
-/// yet, newest first. Empty for other channels.
+/// else the stored draft) or the new chat view of the forum is open and writing, then the posts
+/// sent from this device that the server has not created yet, newest first. Empty for other
+/// channels.
 
 final class NewChatRowsProvider
     extends
@@ -770,8 +772,9 @@ final class NewChatRowsProvider
     with $Provider<List<SidebarNewChatRow>> {
   /// The rows of the forum [channelId] above its thread rows (01 6.8 item 8, brief M4-41): the
   /// draft row while the person's draft of a new post has text (the unsent write of this device,
-  /// else the stored draft) or the new chat view of the forum is open and writing, then the posts sent from this device that the server has not created
-  /// yet, newest first. Empty for other channels.
+  /// else the stored draft) or the new chat view of the forum is open and writing, then the posts
+  /// sent from this device that the server has not created yet, newest first. Empty for other
+  /// channels.
   NewChatRowsProvider._({
     required NewChatRowsFamily super.from,
     required String super.argument,
@@ -824,12 +827,13 @@ final class NewChatRowsProvider
   }
 }
 
-String _$newChatRowsHash() => r'7b1b30124e5a14b589035c2f9f31c0e53d70314d';
+String _$newChatRowsHash() => r'ac5330fbdab927b8020b6e42088e740bcb141ee9';
 
 /// The rows of the forum [channelId] above its thread rows (01 6.8 item 8, brief M4-41): the
 /// draft row while the person's draft of a new post has text (the unsent write of this device,
-/// else the stored draft) or the new chat view of the forum is open and writing, then the posts sent from this device that the server has not created
-/// yet, newest first. Empty for other channels.
+/// else the stored draft) or the new chat view of the forum is open and writing, then the posts
+/// sent from this device that the server has not created yet, newest first. Empty for other
+/// channels.
 
 final class NewChatRowsFamily extends $Family
     with $FunctionalFamilyOverride<List<SidebarNewChatRow>, String> {
@@ -844,8 +848,9 @@ final class NewChatRowsFamily extends $Family
 
   /// The rows of the forum [channelId] above its thread rows (01 6.8 item 8, brief M4-41): the
   /// draft row while the person's draft of a new post has text (the unsent write of this device,
-  /// else the stored draft) or the new chat view of the forum is open and writing, then the posts sent from this device that the server has not created
-  /// yet, newest first. Empty for other channels.
+  /// else the stored draft) or the new chat view of the forum is open and writing, then the posts
+  /// sent from this device that the server has not created yet, newest first. Empty for other
+  /// channels.
 
   NewChatRowsProvider call(String channelId) =>
       NewChatRowsProvider._(argument: channelId, from: this);

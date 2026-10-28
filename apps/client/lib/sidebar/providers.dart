@@ -185,8 +185,9 @@ class ChannelThreads extends _$ChannelThreads {
 
 /// The rows of the forum [channelId] above its thread rows (01 6.8 item 8, brief M4-41): the
 /// draft row while the person's draft of a new post has text (the unsent write of this device,
-/// else the stored draft) or the new chat view of the forum is open and writing, then the posts sent from this device that the server has not created
-/// yet, newest first. Empty for other channels.
+/// else the stored draft) or the new chat view of the forum is open and writing, then the posts
+/// sent from this device that the server has not created yet, newest first. Empty for other
+/// channels.
 @riverpod
 List<SidebarNewChatRow> newChatRows(Ref ref, String channelId) {
   final channel = ref.watch(storedChannelOfRouteProvider(channelId)).value;
