@@ -18,6 +18,7 @@ import 'package:client/phone/phone_shell.dart';
 import 'package:client/sidebar/sidebar_column.dart';
 import 'package:client/sidebar/sidebar_model.dart';
 import 'package:client/sidebar/sidebar_order.dart';
+import 'package:client/sidebar/sidebar_threads.dart';
 import 'package:client/thread/message_menu.dart';
 import 'package:client/thread/message_tile.dart';
 import 'package:client/thread/outbox_rows.dart';
@@ -141,6 +142,138 @@ Widget spacesScene() => phoneFrame(
         onToggle: (_, _) {},
         onMove: (_, _) {},
         onOpenChannel: (_) {},
+        onSettings: () {},
+        onLogout: () {},
+        showFooter: false,
+      ),
+    ),
+  ),
+);
+
+/// [c] with the thread group of [threads] as the selection of 01 6.8 chooses it (at [t0] plus
+/// an hour, the limits of 01 14), its counters, its collapse state and its new chat rows.
+SidebarChannel _grouped(
+  Channel c,
+  List<Thread> threads, {
+  Map<ThreadId, ThreadCounts> counts = const {},
+  List<RunSummary> runs = const [],
+  bool expanded = true,
+  List<SidebarNewChatRow> newChatRows = const [],
+}) {
+  final group = selectSidebarThreads(
+    channel: c,
+    threads: threads,
+    counts: counts,
+    runs: runs,
+    selected: null,
+    me: alex,
+    now: t0.add(const Duration(hours: 1)),
+    limits: const SidebarThreadLimits(
+      window: Duration(hours: 72),
+      perChannel: 8,
+    ),
+    expanded: expanded,
+  );
+  var total = ThreadCounts.zero;
+  for (final v in counts.values) {
+    total = ThreadCounts(
+      unread: total.unread + v.unread,
+      mentions: total.mentions + v.mentions,
+    );
+  }
+  return SidebarChannel(
+    channel: c,
+    counts: total,
+    runActive: runs.any((r) => r.channelId == c.id),
+    muted: false,
+    group: group,
+    expanded: expanded,
+    newChatRows: newChatRows,
+  );
+}
+
+/// The tree of M1 with thread groups (brief M5-15): a text channel with a thread row, a forum
+/// with the draft row "New chat", posts running, waiting for Alex, unread with a mention, an
+/// untitled one and "All posts", and a project forum whose group is collapsed.
+List<SidebarSpaceNode> threadNodes() {
+  final requests = channel(2, name: 'requests', kind: ChannelKind.forum);
+  Thread post(int n, String title, int created) => thread(
+    n,
+    channelN: 2,
+    title: title,
+    createdMinutes: created,
+    activeMinutes: 30,
+  );
+  return [
+    SidebarSpaceNode(
+      entry: SidebarSpace(space: space(1, name: 'Support')),
+      channels: [
+        _grouped(
+          channel(1, name: 'general'),
+          [thread(12, title: 'Export format', activeMinutes: 20)],
+          counts: {threadId(12): const ThreadCounts(unread: 1, mentions: 0)},
+        ),
+        _grouped(
+          requests,
+          [
+            post(1, 'Gateway: resume after network change', 60),
+            post(2, 'Check migration 0012', 50),
+            post(3, 'Review: grant wizard', 40),
+            post(4, '', 35),
+          ],
+          runs: [
+            run(1, RunState.running, threadN: 1, channelN: 2),
+            run(2, RunState.waitingInput, threadN: 2, channelN: 2),
+          ],
+          counts: {
+            threadId(3): const ThreadCounts(unread: 2, mentions: 1),
+            // A post not stored here: only "All posts" counts it.
+            threadId(40): const ThreadCounts(unread: 1, mentions: 0),
+          },
+          newChatRows: const [SidebarNewChatRow.draft()],
+        ),
+      ],
+    ),
+    SidebarSpaceNode(
+      entry: SidebarSpace(space: space(2, name: 'Engineering')),
+      channels: [
+        _grouped(
+          channel(
+            4,
+            spaceN: 2,
+            name: 'server',
+            kind: ChannelKind.forum,
+          ).copyWith(projectBound: true),
+          [thread(11, channelN: 4, title: 'Release 1.2', activeMinutes: 10)],
+          counts: {threadId(11): const ThreadCounts(unread: 3, mentions: 0)},
+          expanded: false,
+        ),
+      ],
+    ),
+  ];
+}
+
+/// M1 Spaces with the thread groups and "+" of 01 6.8 (brief M5-15), as the phone shows it:
+/// no pinned column, no selected row.
+Widget spacesThreadsScene() => phoneFrame(
+  tab: PhoneTab.spaces,
+  running: 1,
+  body: Builder(
+    builder: (context) => ColoredBox(
+      color: context.dsColors.surfaceSidebar,
+      child: SidebarView(
+        productName: 'Team Chat',
+        nodes: threadNodes(),
+        runningCount: 1,
+        onRunningNow: () {},
+        onJumpTo: () {},
+        onToggle: (_, _) {},
+        onMove: (_, _) {},
+        onOpenChannel: (_) {},
+        onOpenThread: (_) {},
+        onToggleGroup: (_, _) {},
+        onAdd: (_) {},
+        onOpenNewChat: (_, _) {},
         onSettings: () {},
         onLogout: () {},
         showFooter: false,

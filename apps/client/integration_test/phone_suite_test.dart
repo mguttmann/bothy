@@ -13,12 +13,14 @@ import 'phone/login_flow_test.dart' as login_flow;
 import 'phone/mobile_run_graph_test.dart' as mobile_run_graph;
 import 'phone/navigation_flow_test.dart' as navigation_flow;
 import 'phone/offline_test.dart' as offline;
+import 'phone/phone_threads_test.dart' as phone_threads;
 import 'phone/viz_test.dart' as viz;
 import 'phone/voice_test.dart' as voice;
 
 void main() {
   group('login flow', login_flow.main);
   group('navigation flow', navigation_flow.main);
+  group('threads and new chat', phone_threads.main);
   group('background', background.main);
   group('offline', offline.main);
   group('emergency', emergency.main);

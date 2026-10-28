@@ -71,8 +71,7 @@ final class SidebarChannel {
   /// whether shown below the channel or not.
   final ThreadCounts counts;
 
-  /// The thread group of the channel (01 6.8), or null where no group is built (the phone until
-  /// M5-15, tests).
+  /// The thread group of the channel (01 6.8), or null where no group is built (tests).
   final SidebarThreadGroup? group;
 
   /// Whether the thread group is expanded on this device (01 6.8 item 7; default expanded).

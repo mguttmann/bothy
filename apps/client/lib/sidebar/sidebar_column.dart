@@ -64,6 +64,7 @@ class SidebarView extends StatelessWidget {
     this.onToggleGroup,
     this.onAdd,
     this.onHold,
+    this.holdMode = SidebarHoldMode.pointer,
     this.selectedNewChat,
     this.onOpenNewChat,
   });
@@ -128,7 +129,7 @@ class SidebarView extends StatelessWidget {
   /// The thread the route shows, or null.
   final ThreadId? selectedThread;
 
-  /// Opens a thread row; null shows no thread groups (the phone until M5-15).
+  /// Opens a thread row; null shows no thread groups (tests of the tree without them).
   final ValueChanged<ThreadId>? onOpenThread;
 
   /// Collapses or expands the thread group of a channel (01 6.8 item 7).
@@ -143,15 +144,24 @@ class SidebarView extends StatelessWidget {
   /// The "+" action of a forum row (01 6.8 item 8), or null for none.
   final ValueChanged<ChannelId>? onAdd;
 
-  /// Called with true while the pointer is over the sidebar or the focus is in it, and with
-  /// false when both left (01 6.8 item 4: rows that no longer qualify stay until then).
+  /// Called with true while the person is in the sidebar ([holdMode]) and with false when the
+  /// person left it (01 6.8 item 4: rows that no longer qualify stay until then).
   final ValueChanged<bool>? onHold;
+
+  /// What counts as "in the sidebar" for [onHold]: the pointer and the keyboard focus on the
+  /// desktop, a finger, a scroll and the screen reader on a touch screen (brief M5-15 Design
+  /// note 1).
+  final SidebarHoldMode holdMode;
 
   @override
   Widget build(BuildContext context) {
     final column = _column(context);
     final hold = onHold;
-    return hold == null ? column : _HoldRegion(onHold: hold, child: column);
+    if (hold == null) return column;
+    return switch (holdMode) {
+      SidebarHoldMode.pointer => _HoldRegion(onHold: hold, child: column),
+      SidebarHoldMode.touch => _TouchHoldRegion(onHold: hold, child: column),
+    };
   }
 
   Widget _column(BuildContext context) => Column(
@@ -200,6 +210,20 @@ class SidebarView extends StatelessWidget {
   );
 }
 
+/// What holds the thread rows of the sidebar in place (01 6.8 item 4): a row that no longer
+/// qualifies leaves only once the person is no longer in the sidebar.
+enum SidebarHoldMode {
+  /// The desktop (brief M4-40 Design note 2): the pointer is over the sidebar or the keyboard
+  /// focus is in it.
+  pointer,
+
+  /// A touch screen, M1 of the phone (brief M5-15 Design note 1; D-M5-15-1): a finger is on the
+  /// list, the list scrolls, or a screen reader runs while the list is the page on screen,
+  /// because the app learns no position of the screen reader focus but on the focused node
+  /// itself, and on M1 that focus is in the list or one step from it.
+  touch,
+}
+
 /// Reports whether the pointer is over [child] or the keyboard focus is inside it (brief M4-40
 /// Design note 2): true when either starts, false when both have left.
 class _HoldRegion extends StatefulWidget {
@@ -246,6 +270,96 @@ class _HoldRegionState extends State<_HoldRegion> {
       skipTraversal: true,
       includeSemantics: false,
       onFocusChange: (focused) => _update(focus: focused),
+      child: widget.child,
+    ),
+  );
+}
+
+/// Reports whether a finger is on [child], [child] scrolls, or a screen reader runs while
+/// [child] is on the page on screen (brief M5-15 Design note 1): true when one starts, false
+/// when none holds any more.
+class _TouchHoldRegion extends StatefulWidget {
+  const _TouchHoldRegion({required this.onHold, required this.child});
+
+  final ValueChanged<bool> onHold;
+  final Widget child;
+
+  @override
+  State<_TouchHoldRegion> createState() => _TouchHoldRegionState();
+}
+
+class _TouchHoldRegionState extends State<_TouchHoldRegion> {
+  /// The pointers that are down on the list now.
+  final Set<int> _fingers = {};
+
+  /// The scrollables below that scroll now (the list, a nested one).
+  int _scrolls = 0;
+
+  bool _reader = false;
+  bool _held = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // A screen reader in the list holds while M1 is the page on screen; a page on top of it
+    // (M2, M3, the new chat page) ends the hold, so M1 is current when the person returns.
+    final reader =
+        MediaQuery.accessibleNavigationOf(context) &&
+        (ModalRoute.isCurrentOf(context) ?? true);
+    if (reader == _reader) return;
+    _reader = reader;
+    // Dependencies change during a build; the provider must not change in it.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _report();
+    });
+  }
+
+  void _report() {
+    final held = _fingers.isNotEmpty || _scrolls > 0 || _reader;
+    if (held == _held) return;
+    _held = held;
+    widget.onHold(held);
+  }
+
+  void _down(PointerDownEvent e) {
+    _fingers.add(e.pointer);
+    _report();
+  }
+
+  void _up(PointerEvent e) {
+    _fingers.remove(e.pointer);
+    _report();
+  }
+
+  bool _onScroll(ScrollNotification n) {
+    if (n is ScrollStartNotification) {
+      _scrolls++;
+      _report();
+    } else if (n is ScrollEndNotification && _scrolls > 0) {
+      _scrolls--;
+      _report();
+    }
+    return false;
+  }
+
+  @override
+  void dispose() {
+    // As [_HoldRegionState.dispose]: a list that leaves holds nothing any more.
+    if (_held) {
+      final report = widget.onHold;
+      scheduleMicrotask(() => report(false));
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Listener(
+    behavior: HitTestBehavior.translucent,
+    onPointerDown: _down,
+    onPointerUp: _up,
+    onPointerCancel: _up,
+    child: NotificationListener<ScrollNotification>(
+      onNotification: _onScroll,
       child: widget.child,
     ),
   );
@@ -310,9 +424,10 @@ class SidebarColumn extends ConsumerWidget {
         writer()?.move(moveSpace([for (final n in nodes) n.entry], space, to)),
       ),
       onOpenChannel: (channel) => context.go('/c/${channel.value}'),
-      // The phone shows the thread groups with M5-15; the desktop shows them here (01 6.8).
+      // The desktop and M1 of the phone show the thread groups (01 6.8, D-SB-13): a thread
+      // row opens the history, on the phone as M3 on top of M1.
       selectedThread: selectedThread,
-      onOpenThread: phone ? null : (thread) => context.go('/t/${thread.value}'),
+      onOpenThread: (thread) => context.go('/t/${thread.value}'),
       onToggleGroup: (channel, expanded) => unawaited(
         ref
             .read(localDatabaseProvider)
@@ -320,14 +435,16 @@ class SidebarColumn extends ConsumerWidget {
             .setGroupCollapsed(channel, collapsed: !expanded),
       ),
       // 01 6.8 item 8: "+" opens the new chat view of the forum, its draft when one exists; a
-      // collapsed group expands, so the draft row shows and is selected.
-      onAdd: phone ? null : (channel) => openNewChat(context, ref, channel),
+      // collapsed group expands, so the draft row shows and is selected. On the phone the view
+      // is a page on top of M1 (brief M5-15 Design note 2).
+      onAdd: (channel) => openNewChat(context, ref, channel),
       selectedNewChat: newChat,
-      onOpenNewChat: phone
-          ? null
-          : (forum, entry) =>
-                context.go(NewChatLocation.pathOf(forum, entry: entry)),
-      onHold: phone ? null : (held) => hold.set(held: held),
+      onOpenNewChat: (forum, entry) =>
+          context.go(NewChatLocation.pathOf(forum, entry: entry)),
+      onHold: (held) => hold.set(held: held),
+      // No pointer on touch (brief M5-15 Design note 1): a finger, a scroll or the screen
+      // reader holds the rows of M1.
+      holdMode: phone ? SidebarHoldMode.touch : SidebarHoldMode.pointer,
       onSettings: () => context.go('/settings'),
       onStatus: () => context.go('/status'),
       onJumpTo: phone

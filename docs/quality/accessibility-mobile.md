@@ -95,6 +95,7 @@ Every kind of page of the phone router (`PhonePageKind` in
 | `PhonePageKind.spaces` | `/` | M1 Spaces |
 | `PhonePageKind.channel` | `/c/<id>` | M2 Post list (forum); M3 History with the compact live box (text channel: its main history) |
 | `PhonePageKind.thread` | `/t/<id>` | M3 History with the compact live box |
+| `PhonePageKind.newChat` | `/c/<id>/new` (with `?entry=<outbox entry>` while a sent post waits) | M1 Spaces (the new chat page of "+" and the draft row, M5-15) |
 | `PhonePageKind.mentions` | `/mentions` | Pages of the tabs and Me |
 | `PhonePageKind.running` | `/running` | M11 Running now and M12 Run graph |
 | `PhonePageKind.runGraph` | `/running/<run>?t=<thread>` (with `from=thread` from a history) | M11 Running now and M12 Run graph |
@@ -115,7 +116,9 @@ of the history and the share sheet belongs to the share target. They have their 
 
 ## M1 Spaces
 
-01 5.3 M1 and 5.4: the tree of spaces and channels, Jump to, Running now and the tab bar.
+01 5.3 M1 and 5.4: the tree of spaces and channels, Jump to, Running now and the tab bar. With M5-15 the
+tree holds the thread groups of 01 6.8 (thread rows, the draft row, "All posts") and "+" on every
+forum row; the rows below the rule table cover them.
 
 | Rule of 01 section 8 | Where | Platform | Automated evidence | State | Manual pass |
 |---|---|---|---|---|---|
@@ -128,6 +131,8 @@ of the history and the share sheet belongs to the share target. They have their 
 | Motion | reduced motion of the system | iOS, Android | `apps/client/test/a11y/phone/m1_spaces_a11y_test.dart`: "M1 Spaces on the phone with reduced motion: no animation runs"; "M1 Spaces on Android on the phone with reduced motion: no animation runs" | automated; manual before release | by sight with Reduce Motion |
 | Color | states are words and icon shapes, never only a color | iOS, Android | `apps/client/test/a11y/phone/m1_spaces_a11y_test.dart`: "M1 Spaces on the phone: roles, labels and states for screen readers"; "M1 Spaces on Android on the phone: roles, labels and states for screen readers" | automated (states in the labels of the snapshot) | VoiceOver, TalkBack |
 | Language | the app's language in the semantics tree; agent text without a language tag keeps it | iOS, Android | `apps/client/test/a11y/phone/m1_spaces_a11y_test.dart`: "M1 Spaces on the phone: the semantics tree speaks the language of the app in de and en"; "M1 Spaces on Android on the phone: the semantics tree speaks the language of the app in de and en" | automated | VoiceOver, TalkBack |
+| Screen reader: role and name (thread groups, M5-15) | every thread row with title, state, unread and mentions in words, the draft row, "All posts" with the posts not shown, "+" as a button with "New chat in" or "New post in" the forum, the arrow of each group, and the levels space, channel, thread as nesting of the tree | iOS, Android | `apps/client/test/a11y/phone/m1_threads_a11y_test.dart`: "M1 with threads on the phone: roles, labels and states for screen readers"; "M1 with threads on Android on the phone: roles, labels and states for screen readers" | automated (labels, order and nesting); manual before release: whether VoiceOver and TalkBack announce a level | VoiceOver, TalkBack |
+| Targets and font size (thread groups, M5-15) | "+", the thread rows and "All posts" at `density.target-min`, reachable at text scale 2 in German and English | iOS, Android | `apps/client/test/a11y/phone/m1_threads_a11y_test.dart`: "M1 with threads on the phone: contrast, labelled targets and touch targets in light and dark"; "M1 with threads on the phone at text scale 2 in de and en: no overflow, every control reachable"; "M1 with threads on Android on the phone at text scale 2 in de and en: no overflow, every control reachable" | automated | by finger, by sight at the largest text |
 
 ## M2 Post list
 
