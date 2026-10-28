@@ -234,6 +234,7 @@ Agents, backend policy and tool class (configured), reported state, consumer cur
   `not_found`, D-M2-20-0), decode (one
   `validation_failed` with every field error), under the entry lock read `GetPresenceRow` on every
   heartbeat (a configured value changed in another process counts at once), project readiness
+  (with the optional `reason` of M4-43: a code of at most 64 characters, only with `ready` false)
   only when the list changed since this process applied it (`ApplyProjectReadiness` of `chat` in
   its own unit of work), then the change path, the entry update, the reassessment, the re-armed
   deadline and the event. The rate limit `rl.agent_runtime` runs before, in the chain or the

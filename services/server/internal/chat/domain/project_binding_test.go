@@ -261,3 +261,58 @@ func TestPlanBindingPut(t *testing.T) {
 		t.Fatal("an empty tools list became absent")
 	}
 }
+
+// TestValidateProjectBinding_Provision: provision and its rules on workspace_ref and
+// repository_url (03 project_bindings, 09 section 18.12, M4-43).
+func TestValidateProjectBinding_Provision(t *testing.T) {
+	t.Parallel()
+	with := func(p domain.Provision, ref string, url *string) func(*domain.ProjectBindingInput) {
+		return func(in *domain.ProjectBindingInput) { in.Provision, in.WorkspaceRef, in.RepositoryURL = p, ref, url }
+	}
+	https, http := str("https://git.example.com/team/website.git"), str("http://git.example.com/team/website")
+	refFormat := []string{"/workspace_ref:invalid_format"}
+	runBindingCases(t, []bindingCase{
+		{"absent is none, nested folder", with("", "team/website", nil), nil},
+		{"none, nested folder", with(domain.ProvisionNone, "team/website", nil), nil},
+		{"init, one segment", with(domain.ProvisionInit, "web-site_2.app", nil), nil},
+		{"init, nested", with(domain.ProvisionInit, "team/website", nil), refFormat},
+		{"init, hidden", with(domain.ProvisionInit, ".website", nil), refFormat},
+		{"init, inner space", with(domain.ProvisionInit, "web site", nil), refFormat},
+		{"init, leading underscore", with(domain.ProvisionInit, "_website", nil), refFormat},
+		{"init, non ASCII", with(domain.ProvisionInit, "wébsite", nil), refFormat},
+		{"init with a display URL", with(domain.ProvisionInit, "website", http), nil},
+		{"clone, https", with(domain.ProvisionClone, "website", https), nil},
+		{"clone without URL", with(domain.ProvisionClone, "website", nil), []string{"/repository_url:required"}},
+		{"clone over http", with(domain.ProvisionClone, "website", http), []string{"/repository_url:invalid_format"}},
+		{"clone with query", with(domain.ProvisionClone, "website", str("https://git.example.com/a?x=1")), []string{"/repository_url:invalid_format"}},
+		{"clone, nested", with(domain.ProvisionClone, "a/b", https), refFormat},
+		{"unknown provision", with("copy", "website", nil), []string{"/provision:invalid_format"}},
+	})
+}
+
+// TestPlanBindingPut_Provision: provision is part of the binding and a replace clears the
+// reported reason; a no-op keeps it (R-DM-55).
+func TestPlanBindingPut_Provision(t *testing.T) {
+	t.Parallel()
+	in := bindingInput()
+	in.Provision = domain.ProvisionInit
+	created := domain.PlanBindingPut(nil, in)
+	if created.Next.Provision != domain.ProvisionInit || created.Next.ReadyReason != "" {
+		t.Fatalf("create: %+v", created.Next)
+	}
+	absent := domain.PlanBindingPut(nil, bindingInput())
+	if absent.Next.Provision != domain.ProvisionNone {
+		t.Fatalf("an absent provision is %q, want none", absent.Next.Provision)
+	}
+	cur := created.Next
+	cur.Version, cur.ReadyReason = 3, "provisioning"
+	if same := domain.PlanBindingPut(&cur, in); same.Kind != domain.BindingUnchanged || same.Next.ReadyReason != "provisioning" {
+		t.Fatalf("no-op: %+v", same)
+	}
+	next := bindingInput()
+	next.Provision = domain.ProvisionClone
+	got := domain.PlanBindingPut(&cur, next)
+	if got.Kind != domain.BindingReplaced || got.Next.Provision != domain.ProvisionClone || got.Next.ReadyReason != "" || got.Next.Version != 4 {
+		t.Fatalf("replace: %+v", got)
+	}
+}

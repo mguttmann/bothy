@@ -12,7 +12,8 @@ import (
 
 // TestChatProjectBindingsMigration_Schema holds project_bindings against
 // docs/spec/03-data-model.md section 4.5 column by column, with the primary key, both foreign
-// keys and the unique index on lower(workspace_ref) (M2-03).
+// keys and the unique index on lower(workspace_ref) (M2-03), and the columns provision and
+// ready_reason with the check of provision (M4-43, R-DM-55).
 func TestChatProjectBindingsMigration_Schema(t *testing.T) {
 	t.Parallel()
 	conn := pgtest.New(t).SuperConn(t)
@@ -27,8 +28,11 @@ func TestChatProjectBindingsMigration_Schema(t *testing.T) {
 		{"created_by", "uuid", false, ""},
 		{"created_at", ts, false, "now()"},
 		{"version", "bigint", false, "1"},
+		{"provision", "text", false, "'none'::text"},
+		{"ready_reason", "text", true, ""},
 	}
 	constraints := []string{
+		"CHECK ((provision = ANY (ARRAY['none'::text, 'init'::text, 'clone'::text])))",
 		"FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE CASCADE",
 		"FOREIGN KEY (created_by) REFERENCES principals(id) ON DELETE RESTRICT",
 		"PRIMARY KEY (channel_id)",

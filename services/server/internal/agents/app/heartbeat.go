@@ -158,7 +158,7 @@ func (t *Tracker) applyReadiness(ctx context.Context, e *entry, r domain.Report)
 	}
 	reports := make([]chat.ProjectReadiness, 0, len(r.Readiness))
 	for _, rd := range r.Readiness {
-		reports = append(reports, chat.ProjectReadiness{ChannelID: rd.ChannelID, Ready: rd.Ready})
+		reports = append(reports, chat.ProjectReadiness{ChannelID: rd.ChannelID, Ready: rd.Ready, Reason: rd.Reason})
 	}
 	if err := port.ApplyProjectReadiness(ctx, e.id, reports); err != nil {
 		if errs.KindOf(err) == errs.KindBadRequest {

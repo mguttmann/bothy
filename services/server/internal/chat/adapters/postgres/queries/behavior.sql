@@ -13,7 +13,7 @@ SELECT c.id, c.space_id, c.require_mention, c.thread_require_mention, c.free_res
        c.allow_mentioned_agents, c.history_backfill_limit, c.prompt, c.settings_version,
        ARRAY(SELECT b.skill_ref FROM channel_skill_bindings b WHERE b.channel_id = c.id ORDER BY b.position)::text[] AS skills,
        (pb.channel_id IS NOT NULL)::boolean AS project_bound, pb.workspace_ref, pb.repository_url, pb.default_branch,
-       pb.runner_config, pb.ready, pb.version AS binding_version
+       pb.runner_config, pb.ready, pb.version AS binding_version, pb.provision, pb.ready_reason
 FROM channels c
 LEFT JOIN project_bindings pb ON pb.channel_id = c.id
 WHERE c.id = @id;
@@ -26,7 +26,7 @@ SELECT c.id, c.space_id, c.require_mention, c.thread_require_mention, c.free_res
        c.allow_mentioned_agents, c.history_backfill_limit, c.prompt, c.settings_version,
        ARRAY(SELECT b.skill_ref FROM channel_skill_bindings b WHERE b.channel_id = c.id ORDER BY b.position)::text[] AS skills,
        (pb.channel_id IS NOT NULL)::boolean AS project_bound, pb.workspace_ref, pb.repository_url, pb.default_branch,
-       pb.runner_config, pb.ready, pb.version AS binding_version
+       pb.runner_config, pb.ready, pb.version AS binding_version, pb.provision, pb.ready_reason
 FROM channels c
 LEFT JOIN project_bindings pb ON pb.channel_id = c.id
 WHERE c.id = ANY (@channel_ids::uuid[]) AND c.space_id = ANY (@space_ids::uuid[]) AND c.archived_at IS NULL

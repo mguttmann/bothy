@@ -125,6 +125,7 @@ func toBehavior(row sqlcgen.GetChannelBehaviorRow) (app.BehaviorRow, error) {
 		b := domain.ProjectBinding{
 			ChannelID: idOf(row.ID), WorkspaceRef: row.WorkspaceRef.String, RepositoryURL: row.RepositoryUrl.String,
 			DefaultBranch: row.DefaultBranch.String, Ready: row.Ready.Bool, Version: row.BindingVersion.Int64,
+			Provision: domain.Provision(row.Provision.String), ReadyReason: row.ReadyReason.String,
 		}
 		var err error
 		if b.RunnerConfig, err = decodeRunnerConfig(row.RunnerConfig); err != nil {

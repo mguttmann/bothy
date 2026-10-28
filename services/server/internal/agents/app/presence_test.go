@@ -516,6 +516,18 @@ func TestHeartbeat_ReadinessOnlyOnChange(t *testing.T) {
 	if w.rd.count() != 2 {
 		t.Fatalf("%d calls after a change, want 2", w.rd.count())
 	}
+	// A change of the reason alone is a change of the list (M4-43), and the port gets the reason.
+	w.beat(`{"state":"online","project_readiness":[{"channel_id":"` + ch + `","ready":false,"reason":"provisioning"}]}`)
+	w.beat(`{"state":"online","project_readiness":[{"channel_id":"` + ch + `","ready":false,"reason":"provisioning"}]}`)
+	if w.rd.count() != 3 {
+		t.Fatalf("%d calls after a reason change, want 3", w.rd.count())
+	}
+	w.rd.mu.Lock()
+	last := w.rd.calls[len(w.rd.calls)-1]
+	w.rd.mu.Unlock()
+	if len(last) != 1 || last[0].Reason != "provisioning" {
+		t.Fatalf("port got %+v", last)
+	}
 }
 
 // TestHeartbeat_ShutdownFlushPublishesNothing: the stop step writes every dirty entry and

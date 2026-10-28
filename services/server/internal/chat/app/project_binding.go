@@ -34,13 +34,22 @@ type BindingStore interface {
 	// DeleteBinding deletes the binding of channel.
 	DeleteBinding(ctx context.Context, channel ids.ID) error
 	// LockReportedBindings locks the bindings of channels in ascending channel id and returns
-	// their ready flags; a channel without a binding is absent.
-	LockReportedBindings(ctx context.Context, channels []ids.ID) (map[ids.ID]bool, error)
-	// SetProjectReady writes ready of the locked binding of channel and raises its version.
-	SetProjectReady(ctx context.Context, channel ids.ID, ready bool) error
-	// ResetProjectReadiness sets ready false and raises the version of every binding of channels
-	// that is ready (an effective operator change, design note 7 of M2-03).
+	// their ready flags and reasons; a channel without a binding is absent.
+	LockReportedBindings(ctx context.Context, channels []ids.ID) (map[ids.ID]Readiness, error)
+	// SetProjectReady writes ready and ready_reason ("" is NULL) of the locked binding of channel
+	// and raises its version.
+	SetProjectReady(ctx context.Context, channel ids.ID, r Readiness) error
+	// ResetProjectReadiness sets ready false, clears ready_reason and raises the version of every
+	// binding of channels that is ready or has a reason (an effective operator change, design
+	// note 7 of M2-03, R-DM-55).
 	ResetProjectReadiness(ctx context.Context, channels []ids.ID) error
+}
+
+// Readiness is the stored or reported readiness of one binding: ready and the reason of 09
+// section 18.12 ("" for none, always "" with Ready true).
+type Readiness struct {
+	Ready  bool
+	Reason string
 }
 
 // The audit details of channel.project.bind (design note 6 of M2-03): codes, IDs, the version and
@@ -143,6 +152,7 @@ func (s *Service) PutProjectBinding(ctx context.Context, cmd chat.PutProjectBind
 	in := domain.ProjectBindingInput{
 		WorkspaceRef: cmd.WorkspaceRef, RepositoryURL: cmd.RepositoryURL, DefaultBranch: cmd.DefaultBranch,
 		RunnerConfig: domain.RunnerConfig{Model: cmd.RunnerConfig.Model, AllowedTools: cmd.RunnerConfig.AllowedTools}, Reason: cmd.Reason,
+		Provision: domain.Provision(cmd.Provision),
 	}
 	if fs := domain.ValidateProjectBinding(in, s.bindingLimits()); len(fs) > 0 {
 		return chat.ProjectBinding{}, errs.New(errs.CodeValidationFailed, "the project binding is not valid").WithFields(fs...)
@@ -301,7 +311,9 @@ type bindingJSON struct {
 	RepositoryURL string           `json:"repository_url,omitempty"`
 	DefaultBranch string           `json:"default_branch,omitempty"`
 	RunnerConfig  runnerConfigJSON `json:"runner_config"`
+	Provision     string           `json:"provision"`
 	Ready         bool             `json:"ready"`
+	ReadyReason   string           `json:"ready_reason,omitempty"`
 	Version       int64            `json:"version"`
 }
 
@@ -317,7 +329,7 @@ func bindingBody(b domain.ProjectBinding) bindingJSON {
 	}
 	return bindingJSON{
 		WorkspaceRef: b.WorkspaceRef, RepositoryURL: b.RepositoryURL, DefaultBranch: b.DefaultBranch, RunnerConfig: rc,
-		Ready: b.Ready, Version: b.Version,
+		Provision: provisionOf(b.Provision), Ready: b.Ready, ReadyReason: b.ReadyReason, Version: b.Version,
 	}
 }
 
@@ -326,8 +338,17 @@ func bindingDTO(b domain.ProjectBinding) chat.ProjectBinding {
 	rc := b.RunnerConfig.Clone()
 	return chat.ProjectBinding{
 		ChannelID: b.ChannelID, WorkspaceRef: b.WorkspaceRef, RepositoryURL: b.RepositoryURL, DefaultBranch: b.DefaultBranch,
-		RunnerConfig: chat.RunnerConfig{Model: rc.Model, AllowedTools: rc.AllowedTools}, Ready: b.Ready, Version: b.Version,
+		RunnerConfig: chat.RunnerConfig{Model: rc.Model, AllowedTools: rc.AllowedTools}, Provision: provisionOf(b.Provision),
+		Ready: b.Ready, ReadyReason: b.ReadyReason, Version: b.Version,
 	}
+}
+
+// provisionOf returns the wire value of p; a row read before M4-43 has none.
+func provisionOf(p domain.Provision) string {
+	if p == "" {
+		return string(domain.ProvisionNone)
+	}
+	return string(p)
 }
 
 // ApplyProjectReadiness implements chat.ProjectBindings (design note 7 of M2-03): a channel
@@ -335,7 +356,8 @@ func bindingDTO(b domain.ProjectBinding) chat.ProjectBinding {
 // of work or an own one, the spaces of the reported channels that inherit their operator FOR
 // SHARE, the channels FOR SHARE and the bindings FOR UPDATE, each in ascending id, then every
 // report whose forum is bound, not archived and served by agentID as effective operator, and
-// whose ready differs, is written with a new binding version. No event, no audit entry and no
+// whose ready or reason differs, is written with a new binding version; a reason with ready true
+// is dropped (R-DM-55). No event, no audit entry and no
 // settings_version: readiness is runtime state of the runner (docs/DECISIONS.md D-M2-03-6).
 func (s *Service) ApplyProjectReadiness(ctx context.Context, agentID ids.ID, reports []chat.ProjectReadiness) error {
 	st, err := s.bindings()
@@ -351,7 +373,7 @@ func (s *Service) ApplyProjectReadiness(ctx context.Context, agentID ids.ID, rep
 
 // applyReports is ApplyProjectReadiness inside its unit of work: the locks, then every report
 // that differs from the stored value of a bound forum agentID serves.
-func (s *Service) applyReports(ctx context.Context, st BindingStore, agentID ids.ID, want map[ids.ID]bool, channels []ids.ID) error {
+func (s *Service) applyReports(ctx context.Context, st BindingStore, agentID ids.ID, want map[ids.ID]Readiness, channels []ids.ID) error {
 	rows, err := s.shareReported(ctx, channels)
 	if err != nil {
 		return err
@@ -375,15 +397,19 @@ func (s *Service) applyReports(ctx context.Context, st BindingStore, agentID ids
 
 // readinessReports returns the reported value per channel and the channels in ascending id.
 // Errors: validation_failed with code duplicate on /project_readiness for a channel reported twice.
-func readinessReports(reports []chat.ProjectReadiness) (map[ids.ID]bool, []ids.ID, error) {
-	want := make(map[ids.ID]bool, len(reports))
+func readinessReports(reports []chat.ProjectReadiness) (map[ids.ID]Readiness, []ids.ID, error) {
+	want := make(map[ids.ID]Readiness, len(reports))
 	channels := make([]ids.ID, 0, len(reports))
 	for _, r := range reports {
 		if _, dup := want[r.ChannelID]; dup {
 			return nil, nil, errs.New(errs.CodeValidationFailed, "a channel is reported twice").
 				WithFields(errs.FieldError{Pointer: pointerProjectReadiness, Code: domain.FieldDuplicate, Detail: "a channel is reported twice"})
 		}
-		want[r.ChannelID] = r.Ready
+		w := Readiness{Ready: r.Ready}
+		if !r.Ready {
+			w.Reason = r.Reason
+		}
+		want[r.ChannelID] = w
 		channels = append(channels, r.ChannelID)
 	}
 	slices.SortFunc(channels, compareIDs)
