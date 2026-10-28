@@ -356,19 +356,12 @@ func (s *SnapshotService) activeThreads(ctx context.Context, a actor.Actor, chan
 	return nil
 }
 
-// threadOf converts a thread of chat.
+// threadOf converts a thread of chat; the tags are never nil.
 func threadOf(th chat.Thread) sync.SnapshotThread {
-	tags := th.TagIDs
-	if tags == nil {
-		tags = []ids.ID{}
+	if th.TagIDs == nil {
+		th.TagIDs = []ids.ID{}
 	}
-	return sync.SnapshotThread{
-		ID: th.ID, ChannelID: th.ChannelID, Kind: th.Kind, State: th.State, ParentMessageID: th.ParentMessageID, Title: th.Title,
-		TitleSource: th.TitleSource, ClosedAt: th.ClosedAt, ClosedBy: th.ClosedBy, OperatorAgentID: th.OperatorAgentID,
-		BillingMode: th.BillingMode, LastMessageSeq: th.LastMessageSeq, UnreadFloorSeq: th.UnreadFloorSeq, MessageCount: th.MessageCount,
-		CreatedBy: th.CreatedBy, CreatedAt: th.CreatedAt, LastActivityAt: th.LastActivityAt, MovedAt: th.MovedAt, Version: th.Version,
-		TagIDs: tags,
-	}
+	return sync.SnapshotThread(th)
 }
 
 // agents fills the agents a may read (agent.read per item, the listing behind listAgents) with

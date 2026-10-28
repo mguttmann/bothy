@@ -169,16 +169,18 @@ type UnreadThread struct {
 }
 
 // SnapshotThread is an active thread of the snapshot (schema Thread, as getThread without
-// messages; 04 section 6.3 item 4, R-SY-28). Zero values are absent members.
+// messages; 04 section 6.3 item 4, R-SY-28). Zero values are absent members. Its layout equals
+// chat.Thread and rest.ThreadFields, so the conversions are plain type conversions.
 type SnapshotThread struct {
 	ID, ChannelID ids.ID
-	// Kind is thread (the snapshot holds no main thread); State is open.
-	Kind, State string
+	// Kind is thread (the snapshot holds no main thread).
+	Kind string
 	// ParentMessageID is the message the thread started from; zero for a forum post.
 	ParentMessageID ids.ID
 	// Title may be empty; TitleSource is auto or manual.
 	Title, TitleSource string
-	// ClosedAt and ClosedBy are zero while open.
+	// State is open; ClosedAt and ClosedBy are zero while open.
+	State    string
 	ClosedAt time.Time
 	ClosedBy ids.ID
 	// OperatorAgentID is the fixed operator, zero for none; BillingMode its policy, "" for none.

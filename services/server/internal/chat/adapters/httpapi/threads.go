@@ -4,7 +4,6 @@ package httpapi
 
 import (
 	"context"
-	"time"
 
 	"github.com/OWNER/bothy/services/server/api/rest"
 	"github.com/OWNER/bothy/services/server/internal/chat"
@@ -146,27 +145,4 @@ func (h *Threads) MoveThread(ctx context.Context, req rest.MoveThreadRequestObje
 
 // ThreadREST converts a thread (schema Thread, brief D7): empty values become absent members,
 // never null (ADR 0053); unread_floor_seq only when not 0; tag_ids always present.
-func ThreadREST(th chat.Thread) rest.Thread {
-	tags := make([]rest.Uuid, 0, len(th.TagIDs))
-	for _, t := range th.TagIDs {
-		tags = append(tags, rest.Uuid(t))
-	}
-	out := rest.Thread{
-		Id: rest.Uuid(th.ID), ChannelId: rest.Uuid(th.ChannelID), Kind: rest.ThreadKind(th.Kind),
-		ParentMessageId: optionalID(th.ParentMessageID), Title: th.Title, TitleSource: rest.ThreadTitleSource(th.TitleSource),
-		State: rest.ThreadState(th.State), ClosedAt: optionalTime(th.ClosedAt), ClosedBy: optionalID(th.ClosedBy),
-		OperatorAgentId: optionalID(th.OperatorAgentID), LastMessageSeq: th.LastMessageSeq,
-		LastActivityAt: th.LastActivityAt.UTC().Truncate(time.Millisecond), MessageCount: th.MessageCount,
-		CreatedBy: rest.Uuid(th.CreatedBy), CreatedAt: th.CreatedAt.UTC().Truncate(time.Millisecond), MovedAt: optionalTime(th.MovedAt),
-		Version: th.Version, TagIds: tags,
-	}
-	if th.UnreadFloorSeq != 0 {
-		v := th.UnreadFloorSeq
-		out.UnreadFloorSeq = &v
-	}
-	if th.BillingMode != "" && !th.OperatorAgentID.IsZero() {
-		m := rest.BillingMode(th.BillingMode)
-		out.BillingMode = &m
-	}
-	return out
-}
+func ThreadREST(th chat.Thread) rest.Thread { return rest.ThreadOf(rest.ThreadFields(th)) }
