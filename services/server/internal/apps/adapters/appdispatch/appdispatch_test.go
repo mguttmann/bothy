@@ -603,7 +603,7 @@ func TestLogLines(t *testing.T) {
 	if out, err := w.post(t, ids.New()); err != nil || !out.Deferred {
 		t.Fatalf("Post = %+v %v", out, err)
 	}
-	if out, err := w.d.Ask(context.Background(), runs.AppAsk{AppID: w.appID, Event: w.askEvent(), Deadline: time.Now().Add(100 * time.Millisecond)}); err != nil || out.Reason == "" {
+	if out, err := w.d.Ask(context.Background(), runs.AppAsk{AppID: w.appID, Event: w.askEvent(), Deadline: testkit.Deadline()}); err != nil || out.Reason != runs.AppReasonInvalidReply {
 		t.Fatalf("Ask = %+v %v", out, err)
 	}
 	text := w.logText()
