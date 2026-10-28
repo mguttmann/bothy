@@ -52,11 +52,19 @@ func errorType(err error) string {
 		return pgErr.Code
 	case errors.As(err, &refErr):
 		return secrets.ErrorCode(err)
-	case errors.Is(err, context.DeadlineExceeded):
+	case timedOut(err):
 		return "timeout"
 	default:
 		return "connect"
 	}
+}
+
+// timedOut reports whether err is the end of a deadline: of the context, or of the socket when
+// the dialer's own deadline fired first (an i/o timeout, os.ErrDeadlineExceeded, which is no
+// context.DeadlineExceeded).
+func timedOut(err error) bool {
+	var netErr net.Error
+	return errors.Is(err, context.DeadlineExceeded) || errors.As(err, &netErr) && netErr.Timeout()
 }
 
 // Pool is the connection pool of a process (one per process, docs/spec/02-architecture.md
@@ -297,7 +305,7 @@ func retryUntil(ctx context.Context, log *slog.Logger, cfg Config, maxWait time.
 		remaining := time.Until(deadline)
 		// An attempt cut short by the end of the wait says nothing about the database; the
 		// operator needs the cause before it (a wrong password, a missing database).
-		if last == nil || remaining > 0 || !errors.Is(err, context.DeadlineExceeded) {
+		if last == nil || remaining > 0 || !timedOut(err) {
 			last = err
 		}
 		if remaining <= 0 {
