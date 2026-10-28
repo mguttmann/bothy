@@ -195,6 +195,8 @@ class RecordingSource implements EventSource {
     readonly inner: EventSource,
     private readonly rewrite?: Rewrite,
     private readonly log?: Log,
+    /** Never acknowledge, so `FakeServer.redeliver` brings every event again. */
+    private readonly holdAcks = false,
   ) {}
 
   get closeReason(): EventSource["closeReason"] {
@@ -230,6 +232,7 @@ class RecordingSource implements EventSource {
   }
 
   async settle(seq: number): Promise<void> {
+    if (this.holdAcks) return;
     if (this.log !== undefined && this.inner instanceof GatewaySource) {
       // Route through this wrapper so the acknowledgement is visible in the log.
       const point = this.inner.window.settle(seq);
@@ -247,6 +250,7 @@ class RecordingSource implements EventSource {
   }
 
   ack(seq: number): Promise<void> {
+    if (this.holdAcks) return Promise.resolve();
     return this.inner.ack(seq);
   }
 
@@ -403,12 +407,13 @@ interface Running {
 async function running<T>(
   adapter: Adapter,
   body: (run: Running) => Promise<T>,
-  wrap: { rewrite?: Rewrite; log?: Log } = {},
+  wrap: { rewrite?: Rewrite; log?: Log; holdAcks?: boolean } = {},
 ): Promise<T> {
   const source = new RecordingSource(
     await adapter.makeSource(),
     wrap.rewrite,
     wrap.log,
+    wrap.holdAcks,
   );
   adapter.source = source;
   const done = adapter.run();
@@ -1051,6 +1056,88 @@ describe("renewal and superseded tokens", () => {
         }),
       );
       expect(late.count("execute")).toBe(0);
+      expect((await fake.runState(runId)).starts).toBe(1);
+    },
+    TEST_TIMEOUT,
+  );
+
+  it(
+    "starts with the newest token when a redelivery arrives during a renewal",
+    async () => {
+      // The server granted the renewal and then redelivered the event with a newer token,
+      // which the adapter stored before the grant arrived: the grant must not overwrite it
+      // (09 4.5.1).
+      await fake.stop();
+      fake = new FakeServer({ ackTimeoutMs: 100_000_000 });
+      await fake.start();
+      const runs = (
+        fake as unknown as {
+          world: {
+            runs: Map<
+              string,
+              { invocationJti: string; startedJti: string | undefined }
+            >;
+          };
+        }
+      ).world.runs;
+      const gate = new Gate();
+      const handler = new RecordingHandler({ blockPrepare: gate });
+      let hook: (() => Promise<void>) | undefined;
+      const afterRenewal = async (request: Request): Promise<Response> => {
+        const renewal =
+          request.method === "POST" &&
+          new URL(request.url).pathname.endsWith("/invocation-token");
+        const response = await globalThis.fetch(request);
+        if (renewal && response.ok && hook !== undefined) {
+          const run = hook;
+          hook = undefined;
+          const body = await response.text();
+          await run();
+          return new Response(body, {
+            status: response.status,
+            headers: response.headers,
+          });
+        }
+        return response;
+      };
+      const adapter = makeAdapter(
+        handler,
+        "renew-redelivery",
+        {},
+        { fetch: afterRenewal },
+      );
+      let runId = "";
+      const newest: string[] = [];
+      await running(
+        adapter,
+        async () => {
+          runId = (await fake.trigger()).runId;
+          await until(fake, () => handler.count("prepare") === 1);
+          const eventId = (await adapter.inbox.forRun(runId))[0]?.eventId;
+          expect(eventId).toBeDefined();
+          hook = async () => {
+            await fake.redeliver();
+            newest.push(runs.get(runId)?.invocationJti ?? "");
+            await until(
+              fake,
+              async () =>
+                (await adapter.inbox.get(eventId as string))?.tokenJti ===
+                newest[0],
+            );
+          };
+          await fake.passTime(
+            fake.timings["agent.invocation_token_ttl"] +
+              fake.timings["auth.clock_leeway"] +
+              1_000,
+          );
+          gate.open();
+          await until(fake, async () => (await stateOf(runId)) === "completed");
+        },
+        { holdAcks: true },
+      );
+      expect(newest).toHaveLength(1);
+      expect(runs.get(runId)?.startedJti).toBe(newest[0]);
+      expect(handler.count("execute")).toBe(1);
       expect((await fake.runState(runId)).starts).toBe(1);
     },
     TEST_TIMEOUT,

@@ -995,7 +995,13 @@ class Adapter:
             )
             renewed = Secret(grant.invocation_token)
             claims = stored_claims(renewed)
-            await self.inbox.replace_token(target, renewed, claims.iat, claims.jti)
+            stored = await self.inbox.replace_token(
+                target, renewed, claims.iat, claims.jti, replaces=token
+            )
+            if stored.token is not None and stored.token != renewed:
+                # A redelivery during the call replaced the run's token after the grant: start
+                # with the most recently received token (09 4.5.1).
+                renewed = stored.token
             self._run_tokens[state.run_id] = renewed
             return renewed
 

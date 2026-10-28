@@ -1104,9 +1104,19 @@ export class Adapter {
         }),
         "renewInvocationToken",
       );
-      const renewed = new Secret(grant.invocation_token);
+      let renewed = new Secret(grant.invocation_token);
       const claims = storedClaims(renewed);
-      await this.inbox.replaceToken(target, renewed, claims.iat, claims.jti);
+      const stored = await this.inbox.replaceToken(
+        target,
+        renewed,
+        claims.iat,
+        claims.jti,
+        token,
+      );
+      // A redelivery during the call replaced the run's token after the grant: start with
+      // the most recently received token (09 4.5.1).
+      if (stored.token !== undefined && !stored.token.equals(renewed))
+        renewed = stored.token;
       this.runTokens.set(state.runId, renewed);
       this.client.setRunToken(state.runId, renewed);
       return renewed;

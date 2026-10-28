@@ -199,6 +199,35 @@ describe.each(Object.entries(kinds))("%s inbox store", (_name, make) => {
     expect(got?.token?.equals(new Secret("token-grant"))).toBe(true);
   });
 
+  it("keeps a token a redelivery stored while the renewal was on its way", async () => {
+    const e = entry({ tok: "token-a", iat: 100 });
+    await store.add(e);
+    await store.redelivered(
+      e.eventId,
+      new Secret("token-redelivered"),
+      100,
+      "jti-redelivered",
+    );
+    const kept = await store.replaceToken(
+      e.eventId,
+      new Secret("token-grant"),
+      100,
+      "jti-grant",
+      new Secret("token-a"),
+    );
+    expect(kept.tokenJti).toBe("jti-redelivered");
+    expect(kept.token?.equals(new Secret("token-redelivered"))).toBe(true);
+    expect((await store.get(e.eventId))?.tokenJti).toBe("jti-redelivered");
+    const stored = await store.replaceToken(
+      e.eventId,
+      new Secret("token-grant"),
+      100,
+      "jti-grant",
+      new Secret("token-redelivered"),
+    );
+    expect(stored.tokenJti).toBe("jti-grant");
+  });
+
   it("refuses unknown and duplicate IDs and an envelope with a token", async () => {
     const e = entry();
     expect(await store.get(e.eventId)).toBeUndefined();

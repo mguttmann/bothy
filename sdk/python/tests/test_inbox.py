@@ -212,6 +212,27 @@ async def test_replace_token_unconditional(store: InboxStore) -> None:
 
 
 @pytest.mark.anyio
+async def test_replace_token_keeps_a_token_stored_since_the_renewal_began(
+    store: InboxStore,
+) -> None:
+    e = entry(tok="token-a", iat=100)
+    await store.add(e)
+    # A redelivery stores a newer token while the renewal of token-a is on its way.
+    await store.redelivered(e.event_id, Secret("token-redelivered"), 100, "jti-redelivered")
+    kept = await store.replace_token(
+        e.event_id, Secret("token-grant"), 100, "jti-grant", replaces=Secret("token-a")
+    )
+    assert (kept.token, kept.token_jti) == (Secret("token-redelivered"), "jti-redelivered")
+    got = await store.get(e.event_id)
+    assert got is not None
+    assert (got.token, got.token_jti) == (kept.token, kept.token_jti)
+    stored = await store.replace_token(
+        e.event_id, Secret("token-grant"), 100, "jti-grant", replaces=Secret("token-redelivered")
+    )
+    assert (stored.token, stored.token_jti) == (Secret("token-grant"), "jti-grant")
+
+
+@pytest.mark.anyio
 async def test_unknown_and_duplicate_ids(store: InboxStore) -> None:
     e = entry()
     assert await store.get(e.event_id) is None
