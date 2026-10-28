@@ -1135,7 +1135,7 @@ func lbStallWindows() []string {
 	interval := gwAccessTokenTTL / 96 // 15 minutes; with the miss limit 100 the deadline is 25h15m
 	ms := func(d time.Duration) string { return strconv.FormatInt(d.Milliseconds(), 10) + "ms" }
 	return []string{
-		"BOTHY_SYNC__HEARTBEAT_INTERVAL=" + ms(interval), "BOTHY_SYNC__HEARTBEAT_MISS_LIMIT=100",
+		"BOTHY_SYNC__HEARTBEAT_INTERVAL=" + ms(interval), "BOTHY_SYNC__HEARTBEAT_MISS_LIMIT=100", // nosemgrep: bothy-go-test-gateway-window -- every window lies beyond any run; Alex sends no heartbeat and stalls its reads
 		"BOTHY_AGENT__PRESENCE_TIMEOUT=" + ms(gwAccessTokenTTL), "BOTHY_GATEWAY__WRITE_TIMEOUT=" + ms(gwAccessTokenTTL),
 	}
 }
