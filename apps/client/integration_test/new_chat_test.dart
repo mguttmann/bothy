@@ -203,7 +203,8 @@ void main() {
       await s.app.waitFor(
         find.descendant(
           of: row,
-          matching: find.text('Gateway drops resumed streams'),
+          // The row isolates the title as every foreign name (dsIsolate).
+          matching: find.text(dsIsolate('Gateway drops resumed streams')),
         ),
       );
       expect(s.app.fake.server.violations, isEmpty);
