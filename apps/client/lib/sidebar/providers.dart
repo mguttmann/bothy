@@ -5,6 +5,8 @@
 /// docs/DECISIONS.md D-M4-19-1). Widgets never query the database themselves (R-CL-03).
 library;
 
+import 'dart:async';
+
 import 'package:domain/domain.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -324,8 +326,14 @@ class LastRouteSelection extends _$LastRouteSelection {
   @override
   RouteSelection build() => const RouteSelection();
 
-  /// Keeps [selection].
-  void keep(RouteSelection selection) => state = selection;
+  /// Keeps [selection], right after the current refresh of the providers. The desktop
+  /// shell calls this from its listener of the route selection, which runs inside such a
+  /// refresh, and a state set there would rebuild a provider that watches it and was already
+  /// rebuilt in that refresh a second time (`Tried to rebuild ... multiple times in the same
+  /// frame`, main run 40691988401; PL/59).
+  void keep(RouteSelection selection) => scheduleMicrotask(() {
+    if (ref.mounted) state = selection;
+  });
 }
 
 /// The selection of [path] (path and query of the router), read from the local database; the
