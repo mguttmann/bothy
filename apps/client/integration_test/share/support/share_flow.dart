@@ -19,6 +19,7 @@ import 'package:patrol/patrol.dart';
 
 import '../../../test/support/until.dart' show testPatience;
 import '../../phone/support/phone_flow.dart';
+import 'photos_walk.dart';
 
 export '../../phone/support/phone_flow.dart';
 
@@ -137,26 +138,30 @@ Future<void> _shareNewestPhoto(PatrolIntegrationTester $) async {
   // on screen), or in the library, maybe without photos on screen: a Library tab in some
   // versions; on iOS 18 one scrolling view (with the "Library" element all_photos_grid) that
   // opens scrolled down to the collections, below the grid, so the walk swipes it down towards
-  // the grid. The close button of a header (header.closeButton, a tip at the first start) is
-  // answered only before the walk did anything else.
+  // the grid.
   //
-  // Photos and the share button are tapped at the center of what is on screen (patrol taps an
-  // element it cannot hit at its top-left corner, and a tap that waits for a missing element
-  // ends the native automation), and a photo only when two rounds in a row saw it at the same
-  // place, so not while the grid still scrolls. A step repeats in every round in which its
-  // view still shows, because a tap during an animation can get lost. The rounds end at the
-  // share sheet or when nativeWait has passed; a failure names the steps.
+  // Each round tells PhotosWalk what it saw and carries out its steps (photos_walk.dart: when
+  // to tap a photo, and that a walk that sees none of its views acts by itself). Photos and the
+  // share button are tapped at the center of what is on screen (patrol taps an element it
+  // cannot hit at its top-left corner, and a tap that waits for a missing element ends the
+  // native automation). The rounds end at the share sheet or when nativeWait has passed; a
+  // failure names the steps.
   final end = DateTime.now().add(nativeWait);
-  final steps = <String, int>{};
-  void count(String name) => steps[name] = (steps[name] ?? 0) + 1;
-  Offset? seen;
-  while (true) {
-    await _optionalTap($, const IOSSelector(label: 'Continue'), photosApp);
-    await _optionalTap(
+  final walk = PhotosWalk();
+  var done = false;
+  while (!done) {
+    var answered = await _optionalTap(
+      $,
+      const IOSSelector(label: 'Continue'),
+      photosApp,
+    );
+    if (await _optionalTap(
       $,
       const IOSSelector(label: 'Don’t Allow'),
       'com.apple.springboard',
-    );
+    )) {
+      answered = true;
+    }
     final screen = await _screen(ios);
     if (screen != null) {
       final share = await _onScreen(
@@ -164,62 +169,68 @@ Future<void> _shareNewestPhoto(PatrolIntegrationTester $) async {
         const IOSSelector(label: 'Share'),
         screen,
       );
-      if (share != null) {
-        await ios.tapAt(share, appId: photosApp);
-        break;
-      }
-      final newest = await _newestPhoto(ios, screen);
-      final photo = newest.center;
-      if (photo != null) {
-        if (photo == seen) {
-          await ios.tapAt(photo, appId: photosApp);
-          count('photo');
-          seen = null;
-        } else {
-          seen = photo;
-        }
-      } else if (newest.exists) {
-        // The grid holds the newest photo below the screen: scroll towards it.
-        seen = null;
-        await ios.swipe(
-          from: const Offset(0.5, 0.7),
-          to: const Offset(0.5, 0.3),
-          appId: photosApp,
-        );
-        count('swipe up');
-      } else {
-        seen = null;
-        if (steps.isEmpty) {
-          await _optionalTap(
-            $,
-            const IOSSelector(identifier: 'header.closeButton'),
-            photosApp,
-          );
-        }
-        if (await _optionalTap(
-          $,
-          const IOSSelector(identifier: 'LibraryTab'),
-          photosApp,
-        )) {
-          count('LibraryTab');
-        }
-        final scrolled = await ios.getNativeViews(
-          const IOSSelector(identifier: 'all_photos_grid'),
-          appId: photosApp,
-        );
-        if (scrolled.roots.isNotEmpty) {
-          await ios.swipe(
-            from: const Offset(0.5, 0.3),
-            to: const Offset(0.5, 0.9),
-            appId: photosApp,
-          );
-          count('swipe down');
+      final newest = share == null
+          ? await _newestPhoto(ios, screen)
+          : (center: null, exists: false);
+      final others = share == null && newest.center == null && !newest.exists;
+      final view = PhotosView(
+        answeredPrompt: answered,
+        share: share,
+        newest: newest.center,
+        newestExists: newest.exists,
+        headerClose:
+            others &&
+            await _shown(
+              ios,
+              const IOSSelector(identifier: 'header.closeButton'),
+            ),
+        libraryTab:
+            others &&
+            await _shown(ios, const IOSSelector(identifier: 'LibraryTab')),
+        libraryAbove:
+            others &&
+            await _shown(ios, const IOSSelector(identifier: 'all_photos_grid')),
+      );
+      for (final step in walk.next(view)) {
+        switch (step) {
+          case PhotosStep.tapShare:
+            await ios.tapAt(share!, appId: photosApp);
+            done = true;
+          case PhotosStep.tapPhoto:
+            await ios.tapAt(newest.center!, appId: photosApp);
+          case PhotosStep.swipeUp:
+            await ios.swipe(
+              from: const Offset(0.5, 0.7),
+              to: const Offset(0.5, 0.3),
+              appId: photosApp,
+            );
+          case PhotosStep.closeHeader:
+            await _optionalTap(
+              $,
+              const IOSSelector(identifier: 'header.closeButton'),
+              photosApp,
+            );
+          case PhotosStep.libraryTab:
+            await _optionalTap(
+              $,
+              const IOSSelector(identifier: 'LibraryTab'),
+              photosApp,
+            );
+          case PhotosStep.swipeDown:
+            await ios.swipe(
+              from: const Offset(0.5, 0.3),
+              to: const Offset(0.5, 0.9),
+              appId: photosApp,
+            );
+          case PhotosStep.reopen:
+            await $.platform.mobile.pressHome();
+            await ios.openPlatformApp(iosAppId: AppleApp.photos);
         }
       }
     }
+    if (done) break;
     if (DateTime.now().isAfter(end)) {
-      final named = [for (final e in steps.entries) '${e.key} x${e.value}'];
-      fail('Photos shows no Share button (steps: ${named.join(', ')})');
+      fail('Photos shows no Share button (steps: ${walk.described})');
     }
     await Future<void>.delayed(const Duration(milliseconds: 200));
   }
@@ -230,6 +241,10 @@ Future<void> _shareNewestPhoto(PatrolIntegrationTester $) async {
     timeout: nativeWait,
   );
 }
+
+/// Whether Photos shows [selector] now, on screen or off.
+Future<bool> _shown(IOSAutomator ios, IOSSelector selector) async =>
+    (await ios.getNativeViews(selector, appId: photosApp)).roots.isNotEmpty;
 
 /// The identifiers and labels of [views], one line per view that has either, for a failure
 /// message.
