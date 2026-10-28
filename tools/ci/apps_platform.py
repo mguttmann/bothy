@@ -29,11 +29,13 @@ runs once more (PL/44); every `flutter test` on a device runs one test file, so 
 command ran. A command that printed nothing for `SILENCE_SECONDS` after its output began is
 stopped with its process tree; when its last line was the build or install of the app, it stalled
 before its test file started (flutter waits without a limit for the VM service of an app on the
-iOS simulator) and runs once more (PL/44). Before each attempt of an Android command the script
-restarts the adb server and waits up to ANDROID_READY_SECONDS until the one device is listed in
-state `device` and reports `sys.boot_completed` 1; otherwise that attempt fails with the reason
-and the command does not run (PL/51); the device log is cleared then, and a failed Android
-attempt prints its last ANDROID_LOG_LINES lines. A failed test never runs again.
+iOS simulator) and runs once more (PL/44). After such a line the shorter
+`APP_START_SILENCE_SECONDS` applies, so a stalled start and its second run fit in the job
+(PL/57). Before each attempt of an Android command the script restarts the adb server and
+waits up to ANDROID_READY_SECONDS until the one device is listed in state `device` and reports
+`sys.boot_completed` 1; otherwise that attempt fails with the reason and the command does not run
+(PL/51); the device log is cleared then, and a failed Android attempt prints its last
+ANDROID_LOG_LINES lines. A failed test never runs again.
 
 Usage: apps_platform.py [--root <repository>] [--system macos|windows|android|ios]
 Exit 0 when every command that was to run passed (or nothing was to run), 1 when one failed or
@@ -213,6 +215,10 @@ SILENCE_SECONDS = 15 * 60
 # iOS build, the end of a desktop or Android build, the Android install. A command that stalls
 # right after one of them stalled before its test file started (PL/44).
 APP_STARTING = re.compile(rb"^(?:Xcode build done\.|\xe2\x9c\x93 Built |Installing )")
+# The silence after a line of APP_STARTING that stops a command (PL/57). The passing starts of
+# the main runs 40574981313 to 40631541184 printed their next line after at most 212 s on iOS;
+# a start that stalls never prints again (five of seven iOS runs before stalled once).
+APP_START_SILENCE_SECONDS = 8 * 60
 # Where the hooks runner keeps the output of each hook run of the workspace.
 HOOK_LOGS = ".dart_tool/hooks_runner"
 # The lines of each hook log that are printed.
@@ -238,6 +244,8 @@ class Outcome:
     native_failed: bool = False
     load_failed: bool = False
     stalled: bool = False
+    # The silence that stopped a stalled command.
+    silence: float = 0.0
     # The last line printed before the end or the stall.
     last_line: bytes = b""
 
@@ -257,9 +265,10 @@ def _stop_tree(proc: subprocess.Popen[bytes]) -> None:
 def _execute(argv: list[str], folder: Path) -> Outcome:
     """Run argv in folder, echo its output, and report what it showed.
 
-    Once the command printed its first line, a silence of SILENCE_SECONDS stops it with its
-    process tree. A command whose own process ended while a process it started still holds the
-    output open is done, not stalled.
+    Once the command printed its first line, a silence of SILENCE_SECONDS (after a line of
+    APP_STARTING: APP_START_SILENCE_SECONDS) stops it with its process tree. A command whose
+    own process ended while a process it started still holds the output open is done, not
+    stalled.
     """
     group: dict[str, Any]
     if sys.platform == "win32":
@@ -286,8 +295,14 @@ def _execute(argv: list[str], folder: Path) -> Outcome:
         except queue.Empty:
             if proc.poll() is not None:
                 break
-            if last is not None and time.monotonic() - last >= SILENCE_SECONDS:
+            limit = (
+                APP_START_SILENCE_SECONDS
+                if APP_STARTING.match(outcome.last_line)
+                else SILENCE_SECONDS
+            )
+            if last is not None and time.monotonic() - last >= limit:
                 outcome.stalled = True
+                outcome.silence = limit
                 _stop_tree(proc)
                 break
             continue
@@ -331,7 +346,7 @@ def _attempt(name: str, system: str, command: list[str], program: str, folder: P
     if outcome.stalled:
         print(
             f"apps-platform {label}: {' '.join(command)} printed nothing for"
-            f" {SILENCE_SECONDS:g} s; stopped",
+            f" {outcome.silence:g} s; stopped",
             file=sys.stderr,
         )
     return outcome
