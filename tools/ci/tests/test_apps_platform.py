@@ -456,6 +456,7 @@ def test_a_command_that_stalls_while_the_app_starts_runs_once_more(
     _member(root, "apps/client", {"ios": [["flutter", "test", "first"]]})
     monkeypatch.setattr(apps_platform, "host_system", lambda: "macos")
     monkeypatch.setattr(apps_platform, "SILENCE_SECONDS", 0.2)
+    monkeypatch.setattr(apps_platform, "APP_START_SILENCE_SECONDS", 0.2)
     monkeypatch.setenv("FAKE_HANG_CALLS", "1")
     assert apps_platform.main(["--root", str(root), "--system", "ios"]) == 0
     assert [c["args"] for c in _calls(fake_flutter)] == [["test", "first"], ["test", "first"]]
@@ -467,6 +468,29 @@ def test_a_command_that_stalls_while_the_app_starts_runs_once_more(
     assert "apps-platform apps/client ios: 1 commands ok" in captured.out
 
 
+def test_a_stall_while_the_app_starts_ends_after_the_shorter_limit(
+    tmp_path: Path,
+    fake_flutter: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Main run 40624496344 (apps (iOS)): the first start of the app after "Xcode build done."
+    # stalled, the stop came only after SILENCE_SECONDS (15 minutes), and with the run once more
+    # the job passed its 75 minute limit. After a line of APP_STARTING the command is stopped
+    # after APP_START_SILENCE_SECONDS (PL/57).
+    root = tmp_path / "repo"
+    _member(root, "apps/client", {"ios": [["flutter", "test", "first"]]})
+    monkeypatch.setattr(apps_platform, "host_system", lambda: "macos")
+    monkeypatch.setattr(apps_platform, "SILENCE_SECONDS", 30)
+    monkeypatch.setattr(apps_platform, "APP_START_SILENCE_SECONDS", 0.2)
+    monkeypatch.setenv("FAKE_HANG_CALLS", "1")
+    assert apps_platform.main(["--root", str(root), "--system", "ios"]) == 0
+    assert [c["args"] for c in _calls(fake_flutter)] == [["test", "first"], ["test", "first"]]
+    captured = capsys.readouterr()
+    assert "printed nothing for 0.2 s; stopped" in captured.err
+    assert "apps-platform apps/client ios: 1 commands ok" in captured.out
+
+
 def test_a_command_that_stalls_after_a_failed_test_is_not_repeated(
     tmp_path: Path,
     fake_flutter: Path,
@@ -475,7 +499,9 @@ def test_a_command_that_stalls_after_a_failed_test_is_not_repeated(
 ) -> None:
     root = tmp_path / "repo"
     _member(root, "apps/client", {"macos": [["flutter", "test", "first"]]})
+    # The shorter limit of the app start does not apply after a test result.
     monkeypatch.setattr(apps_platform, "SILENCE_SECONDS", 0.2)
+    monkeypatch.setattr(apps_platform, "APP_START_SILENCE_SECONDS", 30)
     monkeypatch.setenv("FAKE_HANG_CALLS", "1")
     monkeypatch.setenv("FAKE_HANG_AFTER_RESULT", "1")
     assert apps_platform.main(["--root", str(root), "--system", "macos"]) == 1
@@ -494,6 +520,7 @@ def test_a_command_that_stalls_twice_fails(
     root = tmp_path / "repo"
     _member(root, "apps/client", {"macos": [["flutter", "test", "first"]]})
     monkeypatch.setattr(apps_platform, "SILENCE_SECONDS", 0.2)
+    monkeypatch.setattr(apps_platform, "APP_START_SILENCE_SECONDS", 0.2)
     monkeypatch.setenv("FAKE_HANG_CALLS", "2")
     assert apps_platform.main(["--root", str(root), "--system", "macos"]) == 1
     assert [c["args"] for c in _calls(fake_flutter)] == [["test", "first"], ["test", "first"]]
@@ -583,6 +610,9 @@ def test_the_silence_limit_is_the_documented_one() -> None:
     # PL/44 and the changelog name 15 minutes; the longest quiet step of a passing command (the
     # Xcode build of the iOS app) took more than 7 in main run 40213460068.
     assert apps_platform.SILENCE_SECONDS == 15 * 60
+    # PL/57: 8 minutes after the build or install of the app; the passing starts of the main runs
+    # 40574981313 to 40631541184 took at most 212 s on iOS, 14 s on Android, 2 s on macOS.
+    assert apps_platform.APP_START_SILENCE_SECONDS == 8 * 60
 
 
 class FakeClock:

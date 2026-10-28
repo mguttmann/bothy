@@ -1120,9 +1120,10 @@ jobs:
     runs-on: macos-15
     # The iOS simulator entries of platform-tests.json (--system ios, PL/44): one build and run of
     # the phone tests and the native simulator tests; a command that stalls is stopped by
-    # tools/ci/apps_platform.py (SILENCE_SECONDS) and runs once more. The accessibility audit of
-    # Xcode (M5-10) builds the app once more with its own entry, which needs the longer limit.
-    timeout-minutes: 75
+    # tools/ci/apps_platform.py (SILENCE_SECONDS, APP_START_SILENCE_SECONDS while the app starts)
+    # and runs once more. The accessibility audit of Xcode (M5-10) builds the app once more with
+    # its own entry. The limit holds a stalled start and its second run (PL/57).
+    timeout-minutes: 90
     permissions:
       contents: read
     steps:
