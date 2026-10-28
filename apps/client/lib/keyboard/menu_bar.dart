@@ -142,6 +142,7 @@ List<PlatformMenuItem> appMenus(
             item(ShortcutAction.stopRun),
             item(ShortcutAction.toggleLiveBox),
             item(ShortcutAction.toggleSessionColumn),
+            item(ShortcutAction.toggleChannelColumn),
           ],
         ),
       ],

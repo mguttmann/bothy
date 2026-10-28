@@ -34,6 +34,11 @@ import '../files/attachment_tile.dart';
 import '../files/providers.dart';
 import '../files/upload_executor.dart';
 import '../forum/forum_model.dart' show timeLabel;
+import '../forum/providers.dart'
+    show
+        channelColumnHiddenProvider,
+        overviewPinnedProvider,
+        toggleChannelColumn;
 import '../keyboard/app_shortcuts.dart';
 import '../keyboard/intents.dart';
 import '../menus/thread_menu.dart';
@@ -490,6 +495,16 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
     final main = thread.kind == ThreadKind.main;
     if (main) _loadStarters(thread.channelId);
     final textLayout = widget.besideMain;
+    // M4-42: a thread beside the main history of its text channel, or a forum post beside the
+    // pinned overview, offers to hide that channel column (01 D1, D2).
+    final channelColumn =
+        !main &&
+        (textLayout ||
+            (channel?.kind == ChannelKind.forum &&
+                (ref.watch(overviewPinnedProvider).value ?? false)));
+    final channelHidden =
+        channelColumn &&
+        (ref.watch(channelColumnHiddenProvider).value ?? false);
     final starters = main
         ? ref.watch(threadsOfChannelProvider(channelId)).value ?? const []
         : const <Thread>[];
@@ -701,6 +716,13 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
               onColumn: () => ref
                   .read(sessionColumnShownProvider.notifier)
                   .toggle(textThread: textLayout),
+              // M4-42 (01 D1, D2): the channel column beside the thread can be hidden.
+              onChannelColumn: channelColumn
+                  ? () => unawaited(
+                      toggleChannelColumn(ref.read(localDatabaseProvider)),
+                    )
+                  : null,
+              channelColumnHidden: channelHidden,
               // The level of the thread, or of the channel for its main history (M4-33).
               menu: channel == null
                   ? null

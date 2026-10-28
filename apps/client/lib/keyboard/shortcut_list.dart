@@ -39,6 +39,7 @@ String shortcutRowLabel(AppLocalizations l, ShortcutRow row) =>
       ShortcutAction.stopRun => l.shortcutStopRun,
       ShortcutAction.toggleLiveBox => l.shortcutLiveBox,
       ShortcutAction.toggleSessionColumn => l.shortcutSessionColumn,
+      ShortcutAction.toggleChannelColumn => l.shortcutChannelColumn,
       ShortcutAction.editLast => l.shortcutEditLast,
       ShortcutAction.send || ShortcutAction.newLine => l.shortcutSend,
       ShortcutAction.runningNow => l.shortcutRunningNow,

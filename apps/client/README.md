@@ -681,6 +681,20 @@ until the server created the post, then the post row takes its place and its his
 "Edit" of a refused post moves it back into the view. No git worktree, folder or runner request
 is involved (09 18.1). Rulings: docs/decisions.d/M4-41.md.
 
+### Thread layout on the desktop (M4-42)
+
+Every column border can be dragged (`ColumnDragHandle` of `lib/app/layout/column_layout.dart`):
+sidebar, pinned overview and session column as before, and the border between the main history of
+a text channel and the thread open beside it (`BesideMainHistory` in
+`lib/thread/history_area.dart`), whose width is `main_history` in `layout.column_widths`; the
+thread takes the rest, and no side becomes narrower than `DsLayout.columnMin`. When a thread or a
+forum post is open next to its channel column (the main history, or the pinned overview of a
+forum), "Hide channel" in the thread header, Cmd+Shift+H (Ctrl+Shift+H) and the Thread menu hide
+that column so the thread takes the whole content width; "Show channel" brings it back. The
+choice is kept per device in `shell_view_state` (`channelColumnHiddenProvider`) and stays when
+another thread opens from the sidebar; the pin of the overview does not change. Rulings:
+docs/decisions.d/M4-42.md.
+
 ### Threads and new chat on the phone (M5-15)
 
 M1 Spaces on the iPhone and on Android is the same `SidebarColumn` (`phone: true`) with the same
@@ -906,6 +920,7 @@ to `bindings.dart`:
 | Stop the run in the current thread | Cmd+. | Ctrl+. |
 | Expand and collapse the live box | Cmd+Shift+L | Ctrl+Shift+L |
 | Show and hide the session column | Cmd+Shift+I | Ctrl+Shift+I |
+| Show and hide the channel next to an open thread | Cmd+Shift+H | Ctrl+Shift+H |
 | Edit the last own message | Arrow up in the empty field | Arrow up in the empty field |
 | Send / new line | Enter / Shift+Enter (reversible) | Enter / Shift+Enter (reversible) |
 | Running now | Cmd+Shift+R | Ctrl+Shift+R |

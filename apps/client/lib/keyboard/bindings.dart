@@ -303,6 +303,13 @@ final List<ShortcutRow> shortcutRows = [
       shift: true,
     ),
   ]),
+  ShortcutRow('Show and hide the channel next to an open thread', [
+    _primary(
+      ShortcutAction.toggleChannelColumn,
+      LogicalKeyboardKey.keyH,
+      shift: true,
+    ),
+  ]),
   ShortcutRow('Edit the last own message', [
     _same(ShortcutAction.editLast, ShortcutKind.composer, const [
       KeyStroke(_up),

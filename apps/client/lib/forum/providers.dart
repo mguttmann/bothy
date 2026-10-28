@@ -78,6 +78,25 @@ Stream<bool> overviewPinned(Ref ref) {
       : db.forumViewDao.watchOverviewPinned();
 }
 
+/// Whether the channel column next to an open thread is hidden on this device (01 D1, D2;
+/// M4-42): the main history of a text channel or the pinned overview of a forum. Kept in the
+/// local view state, never synchronized, like the pin (D-SB-6). False until stored.
+@riverpod
+Stream<bool> channelColumnHidden(Ref ref) {
+  final db = ref.watch(localDatabaseProvider);
+  return db == null
+      ? Stream.value(false)
+      : db.forumViewDao.watchChannelColumnHidden();
+}
+
+/// Hides or shows the channel column next to an open thread on this device (M4-42); [db] is
+/// the local database of `localDatabaseProvider`.
+Future<void> toggleChannelColumn(LocalDatabase? db) async {
+  if (db == null) return;
+  final hidden = await db.forumViewDao.channelColumnHidden();
+  await db.forumViewDao.setChannelColumnHidden(hidden: !hidden);
+}
+
 /// The person's stored draft of a new post in [channelId] (03 `drafts` with `thread_id` NULL;
 /// 01 6.8 item 8, brief M4-41), or null.
 @riverpod

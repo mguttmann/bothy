@@ -22,8 +22,12 @@ abstract final class AppColumn {
   /// The session column.
   static const String session = 'session';
 
+  /// The main history of a text channel beside an open thread (D2, M4-42); the thread takes
+  /// the rest of the content column. Without a stored width the two share the room.
+  static const String mainHistory = 'main_history';
+
   /// The columns with a stored width, left to right.
-  static const List<String> sized = [sidebar, postList, session];
+  static const List<String> sized = [sidebar, postList, mainHistory, session];
 }
 
 /// The widths of the sized columns in logical pixels.
@@ -54,7 +58,7 @@ final class ColumnWidths {
     if (value is! Map) return defaults;
     return ColumnWidths._({
       for (final MapEntry(:key, :value) in value.entries)
-        if (_defaults.containsKey(key) && value is num && value >= 0)
+        if (AppColumn.sized.contains(key) && value is num && value >= 0)
           key as String: value.toDouble(),
     });
   }
@@ -62,6 +66,13 @@ final class ColumnWidths {
   /// The width of [column] (one of [AppColumn.sized]).
   double of(String column) {
     final width = _widths[column] ?? _defaults[column] ?? DsLayout.columnMin;
+    return width < DsLayout.columnMin ? DsLayout.columnMin : width;
+  }
+
+  /// The stored width of [column], at least `DsLayout.columnMin`, or null without one.
+  double? stored(String column) {
+    final width = _widths[column];
+    if (width == null) return null;
     return width < DsLayout.columnMin ? DsLayout.columnMin : width;
   }
 
@@ -80,10 +91,14 @@ final class ColumnWidths {
   @override
   bool operator ==(Object other) =>
       other is ColumnWidths &&
-      AppColumn.sized.every((c) => other.of(c) == of(c));
+      AppColumn.sized.every((c) => other.of(c) == of(c)) &&
+      other.stored(AppColumn.mainHistory) == stored(AppColumn.mainHistory);
 
   @override
-  int get hashCode => Object.hashAll(AppColumn.sized.map(of));
+  int get hashCode => Object.hash(
+    Object.hashAll(AppColumn.sized.map(of)),
+    stored(AppColumn.mainHistory),
+  );
 }
 
 /// Writes the column widths through the settings writer: the local `user_settings` row changes

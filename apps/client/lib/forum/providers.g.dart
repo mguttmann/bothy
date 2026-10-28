@@ -463,6 +463,51 @@ final class OverviewPinnedProvider
 
 String _$overviewPinnedHash() => r'307bd82dc92691c6e5ed00e8feccba092aa98bbf';
 
+/// Whether the channel column next to an open thread is hidden on this device (01 D1, D2;
+/// M4-42): the main history of a text channel or the pinned overview of a forum. Kept in the
+/// local view state, never synchronized, like the pin (D-SB-6). False until stored.
+
+@ProviderFor(channelColumnHidden)
+final channelColumnHiddenProvider = ChannelColumnHiddenProvider._();
+
+/// Whether the channel column next to an open thread is hidden on this device (01 D1, D2;
+/// M4-42): the main history of a text channel or the pinned overview of a forum. Kept in the
+/// local view state, never synchronized, like the pin (D-SB-6). False until stored.
+
+final class ChannelColumnHiddenProvider
+    extends $FunctionalProvider<AsyncValue<bool>, bool, Stream<bool>>
+    with $FutureModifier<bool>, $StreamProvider<bool> {
+  /// Whether the channel column next to an open thread is hidden on this device (01 D1, D2;
+  /// M4-42): the main history of a text channel or the pinned overview of a forum. Kept in the
+  /// local view state, never synchronized, like the pin (D-SB-6). False until stored.
+  ChannelColumnHiddenProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'channelColumnHiddenProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$channelColumnHiddenHash();
+
+  @$internal
+  @override
+  $StreamProviderElement<bool> $createElement($ProviderPointer pointer) =>
+      $StreamProviderElement(pointer);
+
+  @override
+  Stream<bool> create(Ref ref) {
+    return channelColumnHidden(ref);
+  }
+}
+
+String _$channelColumnHiddenHash() =>
+    r'c4131676e940051827f1dad72ff0c89b4f34b6e8';
+
 /// The person's stored draft of a new post in [channelId] (03 `drafts` with `thread_id` NULL;
 /// 01 6.8 item 8, brief M4-41), or null.
 

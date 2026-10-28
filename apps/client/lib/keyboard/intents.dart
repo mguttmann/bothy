@@ -66,6 +66,9 @@ enum ShortcutAction {
   /// Shows or hides the session column.
   toggleSessionColumn,
 
+  /// Hides or shows the channel column next to an open thread (01 D1, D2; M4-42).
+  toggleChannelColumn,
+
   /// Edits the last own message (arrow up in the empty input; the composer handles it).
   editLast,
 
@@ -263,6 +266,15 @@ final class ToggleSessionColumnIntent extends AppIntent {
   ShortcutAction get action => ShortcutAction.toggleSessionColumn;
 }
 
+/// Intent of [ShortcutAction.toggleChannelColumn].
+final class ToggleChannelColumnIntent extends AppIntent {
+  /// Creates the intent.
+  const ToggleChannelColumnIntent();
+
+  @override
+  ShortcutAction get action => ShortcutAction.toggleChannelColumn;
+}
+
 /// Intent of [ShortcutAction.editLast].
 final class EditLastIntent extends AppIntent {
   /// Creates the intent.
@@ -357,6 +369,7 @@ AppIntent intentOf(ShortcutAction action) => switch (action) {
   ShortcutAction.stopRun => const StopRunIntent(),
   ShortcutAction.toggleLiveBox => const ToggleLiveBoxIntent(),
   ShortcutAction.toggleSessionColumn => const ToggleSessionColumnIntent(),
+  ShortcutAction.toggleChannelColumn => const ToggleChannelColumnIntent(),
   ShortcutAction.editLast => const EditLastIntent(),
   ShortcutAction.send => const SendIntent(),
   ShortcutAction.newLine => const NewLineIntent(),
