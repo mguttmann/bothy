@@ -1257,7 +1257,7 @@ final class LastRouteSelectionProvider
 }
 
 String _$lastRouteSelectionHash() =>
-    r'ee92503c6f7bedd423e295bc0a923dfd2a04910a';
+    r'18e6db35eaf5092f8a572ab73bfa419e00df7c17';
 
 /// The last selection a route resolved to; the shell shows it while the selection of a new
 /// route loads, so the post list does not leave and come back for a frame.
