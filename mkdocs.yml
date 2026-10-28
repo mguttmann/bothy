@@ -444,6 +444,7 @@ nav:
           - "M4-39: Run graph and control room on the desktop": briefs/M4-39-run-graph-desktop.md
           - "M4-40: Threads in the sidebar and the forum overview on the desktop": briefs/M4-40-sidebar-threads.md
           - "M4-41: New chat from the sidebar on the desktop": briefs/M4-41-sidebar-new-chat.md
+          - "M4-42: Thread layout on the desktop": briefs/M4-42-thread-layout.md
       - Milestone M6:
           - "M6-01: Console session following the BFF pattern": briefs/M6-01-console-session.md
           - "M6-05: Statistics in the server": briefs/M6-05-stats-server.md
