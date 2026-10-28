@@ -6,7 +6,8 @@
 // local-only table `recent_targets`, version 4 (M4-36) the local-only table `host_key_pins`,
 // version 5 (M5-08) the nullable column `instance.app_lock` and version 6 (M4-40) the local-only
 // tables `channel_view_states` and `shell_view_state` with the column `channels.project_bound`
-// and a cleared cursor; each keeps every row of the mirror. The preserved tables are checked by
+// and a cleared cursor, and version 7 (M4-42) the column `shell_view_state.channel_column_hidden`;
+// each keeps every row of the mirror. The preserved tables are checked by
 // `survival_test.dart`.
 
 import 'package:drift/drift.dart';
@@ -21,6 +22,7 @@ import 'generated/schema_v3.dart' as v3;
 import 'generated/schema_v4.dart' as v4;
 import 'generated/schema_v5.dart' as v5;
 import 'generated/schema_v6.dart' as v6;
+import 'generated/schema_v7.dart' as v7;
 
 void main() {
   driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
@@ -226,6 +228,29 @@ void main() {
         ]);
         expect(await newDb.select(newDb.channelViewStates).get(), isEmpty);
         expect(await newDb.select(newDb.shellViewState).get(), isEmpty);
+      },
+    );
+  });
+
+  test('the migration 6 to 7 keeps the pinned overview and shows the channel '
+      'column', () async {
+    const row = v6.ShellViewStateData(id: 1, overviewPinned: 1);
+    await verifier.testWithDataIntegrity(
+      oldVersion: 6,
+      newVersion: 7,
+      createOld: v6.DatabaseAtV6.new,
+      createNew: v7.DatabaseAtV7.new,
+      openTestedDatabase: LocalDatabase.new,
+      createItems: (batch, oldDb) =>
+          batch.insertAll(oldDb.shellViewState, [row]),
+      validateItems: (newDb) async {
+        expect(await newDb.select(newDb.shellViewState).get(), [
+          const v7.ShellViewStateData(
+            id: 1,
+            overviewPinned: 1,
+            channelColumnHidden: 0,
+          ),
+        ]);
       },
     );
   });

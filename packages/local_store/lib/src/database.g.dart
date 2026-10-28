@@ -18649,8 +18649,26 @@ class $ShellViewStatesTable extends ShellViewStates
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _channelColumnHiddenMeta =
+      const VerificationMeta('channelColumnHidden');
   @override
-  List<GeneratedColumn> get $columns => [id, overviewPinned];
+  late final GeneratedColumn<bool> channelColumnHidden = GeneratedColumn<bool>(
+    'channel_column_hidden',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("channel_column_hidden" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    overviewPinned,
+    channelColumnHidden,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -18675,6 +18693,15 @@ class $ShellViewStatesTable extends ShellViewStates
         ),
       );
     }
+    if (data.containsKey('channel_column_hidden')) {
+      context.handle(
+        _channelColumnHiddenMeta,
+        channelColumnHidden.isAcceptableOrUnknown(
+          data['channel_column_hidden']!,
+          _channelColumnHiddenMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -18692,6 +18719,10 @@ class $ShellViewStatesTable extends ShellViewStates
         DriftSqlType.bool,
         data['${effectivePrefix}overview_pinned'],
       )!,
+      channelColumnHidden: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}channel_column_hidden'],
+      )!,
     );
   }
 
@@ -18708,12 +18739,22 @@ class ShellViewStateRow extends DataClass
 
   /// Whether the forum overview D15 is pinned as a column next to the history.
   final bool overviewPinned;
-  const ShellViewStateRow({required this.id, required this.overviewPinned});
+
+  /// Whether the channel column next to an open thread is hidden, so the thread takes the
+  /// whole content width (01 D1, D2; M4-42): the main history of a text channel, or the pinned
+  /// overview of a forum.
+  final bool channelColumnHidden;
+  const ShellViewStateRow({
+    required this.id,
+    required this.overviewPinned,
+    required this.channelColumnHidden,
+  });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<int>(id);
     map['overview_pinned'] = Variable<bool>(overviewPinned);
+    map['channel_column_hidden'] = Variable<bool>(channelColumnHidden);
     return map;
   }
 
@@ -18721,6 +18762,7 @@ class ShellViewStateRow extends DataClass
     return ShellViewStatesCompanion(
       id: Value(id),
       overviewPinned: Value(overviewPinned),
+      channelColumnHidden: Value(channelColumnHidden),
     );
   }
 
@@ -18732,6 +18774,9 @@ class ShellViewStateRow extends DataClass
     return ShellViewStateRow(
       id: serializer.fromJson<int>(json['id']),
       overviewPinned: serializer.fromJson<bool>(json['overviewPinned']),
+      channelColumnHidden: serializer.fromJson<bool>(
+        json['channelColumnHidden'],
+      ),
     );
   }
   @override
@@ -18740,20 +18785,28 @@ class ShellViewStateRow extends DataClass
     return <String, dynamic>{
       'id': serializer.toJson<int>(id),
       'overviewPinned': serializer.toJson<bool>(overviewPinned),
+      'channelColumnHidden': serializer.toJson<bool>(channelColumnHidden),
     };
   }
 
-  ShellViewStateRow copyWith({int? id, bool? overviewPinned}) =>
-      ShellViewStateRow(
-        id: id ?? this.id,
-        overviewPinned: overviewPinned ?? this.overviewPinned,
-      );
+  ShellViewStateRow copyWith({
+    int? id,
+    bool? overviewPinned,
+    bool? channelColumnHidden,
+  }) => ShellViewStateRow(
+    id: id ?? this.id,
+    overviewPinned: overviewPinned ?? this.overviewPinned,
+    channelColumnHidden: channelColumnHidden ?? this.channelColumnHidden,
+  );
   ShellViewStateRow copyWithCompanion(ShellViewStatesCompanion data) {
     return ShellViewStateRow(
       id: data.id.present ? data.id.value : this.id,
       overviewPinned: data.overviewPinned.present
           ? data.overviewPinned.value
           : this.overviewPinned,
+      channelColumnHidden: data.channelColumnHidden.present
+          ? data.channelColumnHidden.value
+          : this.channelColumnHidden,
     );
   }
 
@@ -18761,49 +18814,59 @@ class ShellViewStateRow extends DataClass
   String toString() {
     return (StringBuffer('ShellViewStateRow(')
           ..write('id: $id, ')
-          ..write('overviewPinned: $overviewPinned')
+          ..write('overviewPinned: $overviewPinned, ')
+          ..write('channelColumnHidden: $channelColumnHidden')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, overviewPinned);
+  int get hashCode => Object.hash(id, overviewPinned, channelColumnHidden);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is ShellViewStateRow &&
           other.id == this.id &&
-          other.overviewPinned == this.overviewPinned);
+          other.overviewPinned == this.overviewPinned &&
+          other.channelColumnHidden == this.channelColumnHidden);
 }
 
 class ShellViewStatesCompanion extends UpdateCompanion<ShellViewStateRow> {
   final Value<int> id;
   final Value<bool> overviewPinned;
+  final Value<bool> channelColumnHidden;
   const ShellViewStatesCompanion({
     this.id = const Value.absent(),
     this.overviewPinned = const Value.absent(),
+    this.channelColumnHidden = const Value.absent(),
   });
   ShellViewStatesCompanion.insert({
     this.id = const Value.absent(),
     this.overviewPinned = const Value.absent(),
+    this.channelColumnHidden = const Value.absent(),
   });
   static Insertable<ShellViewStateRow> custom({
     Expression<int>? id,
     Expression<bool>? overviewPinned,
+    Expression<bool>? channelColumnHidden,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (overviewPinned != null) 'overview_pinned': overviewPinned,
+      if (channelColumnHidden != null)
+        'channel_column_hidden': channelColumnHidden,
     });
   }
 
   ShellViewStatesCompanion copyWith({
     Value<int>? id,
     Value<bool>? overviewPinned,
+    Value<bool>? channelColumnHidden,
   }) {
     return ShellViewStatesCompanion(
       id: id ?? this.id,
       overviewPinned: overviewPinned ?? this.overviewPinned,
+      channelColumnHidden: channelColumnHidden ?? this.channelColumnHidden,
     );
   }
 
@@ -18816,6 +18879,9 @@ class ShellViewStatesCompanion extends UpdateCompanion<ShellViewStateRow> {
     if (overviewPinned.present) {
       map['overview_pinned'] = Variable<bool>(overviewPinned.value);
     }
+    if (channelColumnHidden.present) {
+      map['channel_column_hidden'] = Variable<bool>(channelColumnHidden.value);
+    }
     return map;
   }
 
@@ -18823,7 +18889,8 @@ class ShellViewStatesCompanion extends UpdateCompanion<ShellViewStateRow> {
   String toString() {
     return (StringBuffer('ShellViewStatesCompanion(')
           ..write('id: $id, ')
-          ..write('overviewPinned: $overviewPinned')
+          ..write('overviewPinned: $overviewPinned, ')
+          ..write('channelColumnHidden: $channelColumnHidden')
           ..write(')'))
         .toString();
   }

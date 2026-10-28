@@ -222,6 +222,12 @@ class ShellViewStates extends Table {
   BoolColumn get overviewPinned =>
       boolean().withDefault(const Constant(false))();
 
+  /// Whether the channel column next to an open thread is hidden, so the thread takes the
+  /// whole content width (01 D1, D2; M4-42): the main history of a text channel, or the pinned
+  /// overview of a forum.
+  BoolColumn get channelColumnHidden =>
+      boolean().withDefault(const Constant(false))();
+
   @override
   Set<Column<Object>> get primaryKey => {id};
 }

@@ -284,8 +284,9 @@ const Map<String, List<String>> expected = {
   ],
   // Local only (M4-40): the collapsed thread group per channel on this device (01 6.8 item 7).
   'channel_view_states': ['channel_id', 'group_collapsed'],
-  // Local only (M4-40): the pinned forum overview of this device, one row (01 D15).
-  'shell_view_state': ['id', 'overview_pinned'],
+  // Local only (M4-40, M4-42): the pinned forum overview and the hidden channel column next to
+  // an open thread on this device, one row (01 D1, D2, D15).
+  'shell_view_state': ['id', 'overview_pinned', 'channel_column_hidden'],
 };
 
 void main() {
@@ -298,8 +299,8 @@ void main() {
     return [for (final r in rows) r.read<String>('name')];
   }
 
-  test('schema version 6 has exactly the tables of 15 6.1', () async {
-    expect(db.schemaVersion, 6);
+  test('schema version 7 has exactly the tables of 15 6.1', () async {
+    expect(db.schemaVersion, 7);
     final rows = await db
         .customSelect(
           "SELECT name FROM sqlite_master WHERE type = 'table' "

@@ -4,7 +4,8 @@
 // and 4): the local write of a sidebar state, every read state and notification preference,
 // the active runs, and the Done collapse state per forum on this device (`forum_view_states`);
 // and those of M4-40 (01 6.8 item 7, D-SB-6): the collapsed thread groups per channel
-// (`channel_view_states`) and the pinned forum overview (`shell_view_state`).
+// (`channel_view_states`) and the pinned forum overview (`shell_view_state`); and that of M4-42
+// (01 D1, D2): the hidden channel column next to an open thread (`shell_view_state`).
 
 import 'dart:async';
 
@@ -196,6 +197,28 @@ void main() {
       expect(rows.read<int>('n'), 1);
     },
   );
+
+  test('the channel column is shown until it is hidden; hiding keeps the pin and back', () async {
+    final dao = db.forumViewDao;
+    expect(await dao.channelColumnHidden(), isFalse);
+    expect(await dao.watchChannelColumnHidden().first, isFalse);
+
+    await dao.setOverviewPinned(pinned: true);
+    await dao.setChannelColumnHidden(hidden: true);
+    expect(await dao.channelColumnHidden(), isTrue);
+    expect(await dao.watchChannelColumnHidden().first, isTrue);
+    expect(await dao.overviewPinned(), isTrue, reason: 'the pin stays');
+
+    await dao.setOverviewPinned(pinned: false);
+    expect(await dao.channelColumnHidden(), isTrue, reason: 'stays hidden');
+    await dao.setChannelColumnHidden(hidden: false);
+    expect(await dao.watchChannelColumnHidden().first, isFalse);
+    expect(await dao.overviewPinned(), isFalse);
+    final rows = await db
+        .customSelect('SELECT count(*) AS n FROM shell_view_state')
+        .getSingle();
+    expect(rows.read<int>('n'), 1);
+  });
 
   test('a resync keeps the group and overview state: they are no mirror '
       'tables', () {
