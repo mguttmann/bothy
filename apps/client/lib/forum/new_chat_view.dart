@@ -15,6 +15,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:l10n/l10n.dart';
+import 'package:local_store/local_store.dart' show OutboxState;
 import 'package:sync_engine/sync_engine.dart';
 
 import '../app/providers/ports.dart';
@@ -409,6 +410,7 @@ class _SentPane extends ConsumerStatefulWidget {
 class _SentPaneState extends ConsumerState<_SentPane> {
   StreamSubscription<String>? _created;
   bool _left = false;
+  bool _checking = false;
 
   @override
   void initState() {
@@ -429,6 +431,27 @@ class _SentPaneState extends ConsumerState<_SentPane> {
     context.go('/t/${thread.value}');
   }
 
+  /// The entry is missing from the forum's waiting posts. The outbox's stream follows a write
+  /// a moment later, so right after the send that list can predate the entry; the outbox
+  /// decides: a waiting or refused entry keeps the view, and an entry that was confirmed or is
+  /// gone without this run seeing its answer (another run sent it) leaves to the overview,
+  /// which shows the post.
+  Future<void> _checkLeft() async {
+    if (_checking || _left) return;
+    _checking = true;
+    final entry = await ref
+        .read(localDatabaseProvider)
+        ?.outboxDao
+        .byId(widget.entry);
+    _checking = false;
+    if (!mounted || _left) return;
+    final thread = ref.read(createdPostsProvider).threadOf(widget.entry);
+    if (thread != null) return _open(thread);
+    if (entry != null && entry.state != OutboxState.confirmed) return;
+    _left = true;
+    context.go('/c/${widget.forum.value}');
+  }
+
   @override
   void dispose() {
     unawaited(_created?.cancel());
@@ -446,16 +469,15 @@ class _SentPaneState extends ConsumerState<_SentPane> {
               const <FailedPost>[])
         if (f.entryId == widget.entry) f,
     ];
-    // The entry left the outbox without this run seeing its answer (another run sent it):
-    // the post is in the forum, so the overview shows it.
+    // The entry is not among the waiting posts: it may have left the outbox, or the list may
+    // still predate the send; the outbox decides (_checkLeft).
     if (pending != null &&
         !pending.any((p) => p.entryId == widget.entry) &&
         ref.read(createdPostsProvider).threadOf(widget.entry) == null &&
         !_left) {
-      _left = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) context.go('/c/$forum');
-      });
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => unawaited(_checkLeft()),
+      );
     }
     final engine = ref.read(syncEngineProvider);
     return Padding(
