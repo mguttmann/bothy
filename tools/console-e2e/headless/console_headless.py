@@ -48,9 +48,11 @@ from playwright.sync_api import (
     ConsoleMessage,
     Page,
     Playwright,
+    Request,
     WebSocket,
     sync_playwright,
 )
+from playwright.sync_api import TimeoutError as PlaywrightTimeout
 
 ORIGIN = os.environ.get("E2E_ORIGIN", "https://localhost:8443").rstrip("/")
 CONSOLE = ORIGIN + "/console/"
@@ -203,6 +205,8 @@ class Session:
         self.requests: list[str] = []
         self.websockets: list[str] = []
         self.console_errors: list[str] = []
+        # Errors of the page, its console and failed requests, printed after a failed step.
+        self.load_log: list[str] = []
         self.all_violations: list[dict[str, str]] = []
         self.all_policies: set[str] = set()
         self.context.expose_function("__e2eRecordViolation", self._record_violation)
@@ -213,6 +217,8 @@ class Session:
         self.page: Page = self.context.new_page()
         self.page.set_default_timeout(STEP_TIMEOUT_MS)
         self.page.on("console", self._console)
+        self.page.on("pageerror", lambda e: self._log(f"page error: {e}"))
+        self.page.on("requestfailed", self._request_failed)
         self.page.on("websocket", self._websocket)
 
     def _record_violation(self, violation: dict[str, str]) -> None:
@@ -221,8 +227,17 @@ class Session:
     def _record_policy(self, name: str) -> None:
         self.all_policies.add(name)
 
+    def _log(self, line: str) -> None:
+        if len(self.load_log) < 50:
+            self.load_log.append(line[:300])
+
+    def _request_failed(self, request: Request) -> None:
+        self._log(f"request failed: {request.url} {request.failure}")
+
     def _console(self, msg: ConsoleMessage) -> None:
         text = msg.text
+        if msg.type in ("error", "warning"):
+            self._log(f"console {msg.type}: {text}")
         if msg.type == "error" and (
             "Content Security Policy" in text or "TrustedType" in text or "Trusted Type" in text
         ):
@@ -256,8 +271,22 @@ class Session:
 
 
 def wait_for_console(page: Page) -> None:
-    """Waits until the Flutter view and its semantics tree are in the document."""
-    page.wait_for_selector("flutter-view", state="attached")
+    """Waits until the Flutter view and its semantics tree are in the document.
+
+    When the view never attaches, the app did not start in this load (seen in Firefox in the PR
+    runs of #401 and #445, with Chromium and WebKit fine in the same run): the page is loaded once
+    more, the start only, never a failed check. A second failed start fails the test.
+    """
+    try:
+        page.wait_for_selector("flutter-view", state="attached")
+    except PlaywrightTimeout:
+        print(
+            "console-headless: the console did not start (no flutter-view); loading it once more",
+            file=sys.stderr,
+            flush=True,
+        )
+        page.reload()
+        page.wait_for_selector("flutter-view", state="attached")
     page.wait_for_function(
         "document.querySelectorAll('flt-semantics').length > 2", timeout=STEP_TIMEOUT_MS
     )
@@ -559,6 +588,8 @@ def run_browser(pw: Playwright, name: str, login: Login, spki: str) -> dict[str,
             result["negative_inline_script"] = "blocked and reported"
     except Exception:
         dump_screen(page)
+        for line in session.load_log:
+            print(f"console-headless: {name}: {line}", file=sys.stderr, flush=True)
         raise
     finally:
         session.context.close()

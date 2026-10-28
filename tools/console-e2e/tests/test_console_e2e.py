@@ -2085,3 +2085,52 @@ def test_phase_one_b_creates_no_person_a_later_phase_creates() -> None:
         created |= set(re.findall(r"'createPerson\.handle', '([^']+)'", text))
     assert {"sam", "robin"} <= created  # the extraction still finds the people of phase 2
     assert handle.lower() not in {h.lower() for h in created}
+
+
+# ---- start of the console in headless/console_headless.py ---------------------------------
+import console_headless as headless  # noqa: E402
+from playwright.sync_api import TimeoutError as PlaywrightTimeout  # noqa: E402
+
+
+class _StartPage:
+    """A page whose Flutter view attaches only from load number ``attach_on`` on."""
+
+    def __init__(self, attach_on: int) -> None:
+        self.attach_on = attach_on
+        self.loads = 1
+        self.calls: list[str] = []
+
+    def wait_for_selector(self, selector: str, **_: object) -> None:
+        self.calls.append(f"selector {selector}")
+        if self.loads < self.attach_on:
+            raise PlaywrightTimeout('waiting for locator("flutter-view")')
+
+    def reload(self, **_: object) -> None:
+        self.calls.append("reload")
+        self.loads += 1
+
+    def wait_for_function(self, expression: str, **_: object) -> None:
+        self.calls.append("semantics")
+
+
+def test_console_start_waits_without_a_reload_when_the_view_attaches() -> None:
+    page = _StartPage(attach_on=1)
+    headless.wait_for_console(page)  # type: ignore[arg-type]
+    assert page.calls == ["selector flutter-view", "semantics"]
+
+
+def test_console_start_loads_the_page_once_more_when_the_view_never_attaches(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    # Firefox in console-e2e (PR runs of #401 and #445): the view never attached in 60 s.
+    page = _StartPage(attach_on=2)
+    headless.wait_for_console(page)  # type: ignore[arg-type]
+    assert page.calls == ["selector flutter-view", "reload", "selector flutter-view", "semantics"]
+    assert "loading it once more" in capsys.readouterr().err
+
+
+def test_console_start_fails_when_the_second_load_does_not_start_either() -> None:
+    page = _StartPage(attach_on=3)
+    with pytest.raises(PlaywrightTimeout):
+        headless.wait_for_console(page)  # type: ignore[arg-type]
+    assert page.calls.count("reload") == 1
