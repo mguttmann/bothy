@@ -1069,12 +1069,12 @@ func (w *lbWorld) runOfID(id string) runRow {
 // Alex reads again the frames form an unbroken chain to the newest version in which a snapshot
 // replaced the dropped patches. The size of the kernel buffers is not under the test's
 // control, so the stall is repeated with more patches until a snapshot replaced dropped frames.
+// The gateway windows are lbStallWindows.
 func TestLiveBoxQueueFullGivesSnapshot(t *testing.T) {
 	t.Parallel()
 	const excerpt = 50000
-	w := newLBWorld(t, append(patientWindows(2*time.Minute), "BOTHY_SYNC__OUTBOUND_QUEUE_MAX=8", "BOTHY_SYNC__CURSOR_ADVANCE_EVERY=1000",
-		"BOTHY_GATEWAY__WRITE_TIMEOUT=5m", "BOTHY_AGENT__PRESENCE_TIMEOUT=5m", "BOTHY_SYNC__RUN_PATCH_COALESCE_INTERVAL=20ms",
-		"BOTHY_RUN__EXCERPT_MAX_CHARS=60000")...)
+	w := newLBWorld(t, append(lbStallWindows(), "BOTHY_SYNC__OUTBOUND_QUEUE_MAX=8", "BOTHY_SYNC__CURSOR_ADVANCE_EVERY=1000",
+		"BOTHY_SYNC__RUN_PATCH_COALESCE_INTERVAL=20ms", "BOTHY_RUN__EXCERPT_MAX_CHARS=60000")...)
 	r := w.running(t, "queue")
 	alex, _ := w.ready(t, w.params(w.owner), wstest.WithoutHeartbeat())
 	focus(t, alex, r.thread)
@@ -1119,6 +1119,24 @@ func TestLiveBoxQueueFullGivesSnapshot(t *testing.T) {
 	f := mustRunUpdated(t, alex, r.id)
 	if f.snapshot() || f.ev.Payload.BaseVersion == nil || *f.ev.Payload.BaseVersion != last || f.ev.Payload.Version != v {
 		t.Fatalf("frame after the stall %s", f.raw)
+	}
+}
+
+// lbStallWindows are the gateway windows of TestLiveBoxQueueFullGivesSnapshot, each longer than
+// any run of the package (gwAccessTokenTTL): gateway.write_timeout, the heartbeat deadline
+// (sync.heartbeat_interval times sync.heartbeat_miss_limit plus one) and agent.presence_timeout
+// (above the interval). Alex stops reading for a whole round of patches, so the server's write
+// waits as long as the round takes, and Alex sends no heartbeat during the whole test. A round is
+// many patches, each bounded only by Patience, so no window of a few minutes outlasts it on a
+// loaded runner: a write_timeout of 5 minutes ended Alex's connection without a close frame in the
+// middle of round 2 (CI: "failed to read frame payload: unexpected EOF" after 541 s). The test
+// checks none of these deadlines.
+func lbStallWindows() []string {
+	interval := gwAccessTokenTTL / 96 // 15 minutes; with the miss limit 100 the deadline is 25h15m
+	ms := func(d time.Duration) string { return strconv.FormatInt(d.Milliseconds(), 10) + "ms" }
+	return []string{
+		"BOTHY_SYNC__HEARTBEAT_INTERVAL=" + ms(interval), "BOTHY_SYNC__HEARTBEAT_MISS_LIMIT=100", // nosemgrep: bothy-go-test-gateway-window -- every window lies beyond any run; Alex sends no heartbeat and stalls its reads
+		"BOTHY_AGENT__PRESENCE_TIMEOUT=" + ms(gwAccessTokenTTL), "BOTHY_GATEWAY__WRITE_TIMEOUT=" + ms(gwAccessTokenTTL),
 	}
 }
 
