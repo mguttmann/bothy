@@ -124,7 +124,7 @@ func TestDemoDeterministic(t *testing.T) {
 // TestDemoSecondRunRefused: a second run on the same instance ends with ErrNotEmpty and writes
 // nothing: the audit chain gains no entry of its own. The only entries it may gain meanwhile are
 // the aggregated denials of the first run (its step-up answers), which the server writes when
-// audit.deny_aggregate_window ends; such a row carries the time of its first denial.
+// audit.deny_aggregate_window ends; such a row names the time of its last denial.
 func TestDemoSecondRunRefused(t *testing.T) {
 	t.Parallel()
 	ds := loadDataSet(t)
@@ -154,12 +154,14 @@ func auditLastSeq(t *testing.T, s *harness.Server) int64 {
 }
 
 // auditWrittenSince returns the actions of the audit events of s after seq last, without the
-// aggregated denials whose first denial came before start: those belong to what ran before start
-// and reach the table only when their aggregation window ends.
+// aggregated denials whose last denial came before start: those belong to what ran before start
+// and reach the table only when their aggregation window ends. A bucket that a denial after start
+// joined counts.
 func auditWrittenSince(t *testing.T, s *harness.Server, last int64, start time.Time) []string {
 	t.Helper()
 	rows, err := s.AdminDB().Query(t.Context(), `SELECT action || ' ' || decision FROM audit_events
-		WHERE seq > $1 AND NOT (decision = 'deny' AND details ? 'aggregate' AND occurred_at < $2) ORDER BY seq`, last, start)
+		WHERE seq > $1 AND NOT (decision = 'deny' AND details ? 'aggregate'
+		AND (details->'aggregate'->>'last_at')::timestamptz < $2) ORDER BY seq`, last, start)
 	if err != nil {
 		t.Fatal(err)
 	}
