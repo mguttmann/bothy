@@ -148,14 +148,19 @@ void main() {
     );
     expect(
       find.bySemanticsLabel(
-        'general, ${en.threadRowUnread(3)}, ${en.threadRowMentions(1)}, '
-        '${en.channelRowRunActive}',
+        'general, ${en.channelKindNameText}, ${en.threadRowUnread(3)}, '
+        '${en.threadRowMentions(1)}, ${en.channelRowRunActive}',
       ),
       findsOneWidget,
     );
-    expect(find.bySemanticsLabel('ideas'), findsOneWidget);
     expect(
-      tester.getSemantics(find.bySemanticsLabel('ops')),
+      find.bySemanticsLabel('ideas, ${en.channelKindNameForum}'),
+      findsOneWidget,
+    );
+    expect(
+      tester.getSemantics(
+        find.bySemanticsLabel('ops, ${en.channelKindNameText}'),
+      ),
       isSemantics(isSelected: true),
     );
     await tester.tap(find.byKey(ValueKey('sidebar.space.${spaceId(2).value}')));

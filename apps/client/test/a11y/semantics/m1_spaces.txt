@@ -3,12 +3,12 @@ button, label "Jump to", action tap
 button, label "Running now, 2 active runs", action tap
 label "Space Support with its channels"
 expanded, label "Support", hint "Collapse Support", action tap
-label "general", action tap
-label "requests, 3 unread, run active", action tap
-label "alerts", action tap
+label "general, text channel", tooltip "Text channel: one shared conversation, threads start from its messages", action tap
+label "requests, forum, 3 unread, run active", tooltip "Forum: every post is its own conversation", action tap
+label "alerts, text channel", tooltip "Text channel: one shared conversation, threads start from its messages", action tap
 label "Space Engineering with its channels"
 expanded, label "Engineering", hint "Collapse Engineering", action tap
-label "server, 1 unread, 1 mention", action tap
+label "server, forum, 1 unread, 1 mention", tooltip "Forum: every post is its own conversation", action tap
 button, selected, label "Spaces\nTab 1 of 4", action tap
 button, label "Mentions\nTab 2 of 4", action tap
 button, label "2 active runs\nRunning\nTab 3 of 4", action tap

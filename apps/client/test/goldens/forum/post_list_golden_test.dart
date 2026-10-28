@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// The goldens of the post list (brief M4-19 Tests; components.md 6; 01 6.1): every row state
-// (active run with operator, waiting for me, mention, unread, tags, failure reason, read) and
-// the Done section expanded, light and dark, densities comfortable and compact, text scaling 1
-// and 2, German and English. One file per theme keeps each file below repo.max_file_kb.
+// The goldens of the forum overview D15 (briefs M4-19 and M4-40 Tests; components.md 6; 01 6.1,
+// D15): every row state (active run with operator, waiting for me, mention, unread, tags,
+// failure reason, read) and the Done section expanded with the head of the overview in the
+// content column (kind sentence, New post, search, Pin); and a project forum pinned as a column
+// with its empty state. Light and dark, densities comfortable and compact, text scaling 1 and 2,
+// German and English. One file per theme and form keeps each file below repo.max_file_kb.
 //
 // Every post was last active on an earlier day at 09:00 UTC, so the time labels are days and
 // read the same in every time zone of the test machines.
@@ -38,6 +40,16 @@ Widget cell(Widget child) => SizedBox(
 const int day = 24 * 60;
 
 final Channel forum = channel(1, name: 'ideas', kind: ChannelKind.forum);
+
+/// A forum with a project binding (01 6.8 item 11).
+final Channel project = channel(
+  2,
+  name: 'server',
+  kind: ChannelKind.forum,
+).copyWith(projectBound: true);
+
+/// The size of the pinned overview column in a cell.
+const Size pinnedColumn = Size(380, 860);
 
 final List<ForumTag> tags = [
   tag(1, 'bug', color: 'rowan'),
@@ -126,6 +138,44 @@ void main() {
               onSort: (_) {},
               onToggleDone: (_) {},
               onOpenPost: (_) {},
+              onPin: () {},
+              onSearch: () {},
+            ),
+          ),
+        ),
+      ),
+    );
+    goldenTest(
+      'the pinned overview of an empty project forum in ${theme.name}, '
+      'two densities, text scale 1 and 2, de and en',
+      fileName: 'overview_pinned_${theme.name}',
+      builder: () => dsGoldenMatrix(
+        name: 'pinned overview',
+        themes: [theme],
+        densities: DsDensityMode.values,
+        textScales: const [1.0, 2.0],
+        locales: const [Locale('de'), Locale('en')],
+        builder: () => cell(
+          SizedBox.fromSize(
+            size: pinnedColumn,
+            child: PostListView(
+              forum: project,
+              filter: const PostListFilter(),
+              model: const PostListModel(open: [], done: []),
+              tags: const [],
+              names: const {},
+              now: t0,
+              doneCollapsed: true,
+              morePages: false,
+              pinned: true,
+              onNewPost: () {},
+              onView: (_) {},
+              onTags: (_) {},
+              onSort: (_) {},
+              onToggleDone: (_) {},
+              onOpenPost: (_) {},
+              onPin: () {},
+              onSearch: () {},
             ),
           ),
         ),

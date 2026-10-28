@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The post list column of a forum (01 5.1 D1, 6.1; components.md 6; brief M4-19 Goal):
-/// head with filters, the virtualized list of open posts and the Done section.
+/// The forum overview D15 (01 5.1 D1 and D15, 6.1; components.md 6; briefs M4-19 Goal and
+/// M4-40): head with the kind sentence, "New chat" or "New post", the search in the forum,
+/// "Pin" and the filters, the virtualized list of open posts and the Done section. The same
+/// widget shows in the content column and, pinned, in its own column (Design note 4).
 library;
 
 import 'dart:async';
@@ -60,10 +62,22 @@ class PostListView extends StatefulWidget {
     this.onEditPost,
     this.initialOffset = 0,
     this.onOffset,
+    this.pinned = false,
+    this.onPin,
+    this.onSearch,
   });
 
   /// The forum.
   final Channel forum;
+
+  /// Whether the overview is pinned as a column on this device (01 D15).
+  final bool pinned;
+
+  /// Pins or unpins the overview; null hides "Pin".
+  final VoidCallback? onPin;
+
+  /// Opens the search in this forum; null hides it.
+  final VoidCallback? onSearch;
 
   /// The filters.
   final PostListFilter filter;
@@ -200,6 +214,10 @@ class _PostListViewState extends State<PostListView> {
       children: [
         PostListHeader(
           forumName: w.forum.name,
+          projectBound: w.forum.projectBound,
+          pinned: w.pinned,
+          onPin: w.onPin,
+          onSearch: w.onSearch,
           filter: w.filter,
           sort: w.filter.sortFor(w.forum),
           tags: w.tags,
@@ -248,10 +266,22 @@ class _PostListViewState extends State<PostListView> {
                     final i = at - failed.length;
                     if (i < (empty ? 1 : open.length)) {
                       if (empty) {
+                        // A forum without any post explains its kind (01 6.8 item 11); a
+                        // filter that hides every post says so.
+                        final bare =
+                            w.model.done.isEmpty &&
+                            failed.isEmpty &&
+                            w.filter == const PostListFilter();
                         return Padding(
                           padding: const EdgeInsets.all(DsSpace.s12),
                           child: Text(
-                            l.postListEmpty,
+                            bare
+                                ? dsChannelKindSentence(
+                                    l,
+                                    DsChannelKind.forum,
+                                    projectBound: w.forum.projectBound,
+                                  )
+                                : l.postListEmpty,
                             key: const ValueKey('postList.empty'),
                             style: dsTextStyle(
                               DsType.bodySm,
@@ -285,11 +315,13 @@ class _PostListViewState extends State<PostListView> {
   }
 }
 
-/// The post list of the forum [channelId] over the providers (R-CL-03).
+/// The forum overview of [channelId] over the providers (R-CL-03).
 ///
 /// It loads the first page of `listChannelThreads` when it opens and the next ones when
-/// scrolled near the end ([ForumPager]); "New post" puts `createThread` into the outbox; the
-/// Done state is kept on this device (`forum_view_states`); a post opens `/t/<id>`.
+/// scrolled near the end ([ForumPager]); "New post" (or "New chat") puts `createThread` into the
+/// outbox, also when the "+" of the sidebar asked for it ([NewPostRequest], until M4-41); the
+/// Done state and the pinned state are kept on this device; "Pin" and Cmd+Shift+O pin or unpin
+/// it; the search opens `/search` with `in:<forum>`; a post opens `/t/<id>`.
 class PostListColumn extends ConsumerWidget {
   /// Creates the column.
   const PostListColumn({
@@ -329,6 +361,17 @@ class PostListColumn extends ConsumerWidget {
       );
     }
 
+    // The "+" of the sidebar asked for a new post in this forum: open the dialog once the
+    // overview shows (brief M4-40 Scope; M4-41 replaces it with the new chat view).
+    if (ref.watch(newPostRequestProvider) == channelId) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!context.mounted) return;
+        if (ref.read(newPostRequestProvider.notifier).take(channelId)) {
+          unawaited(newPost());
+        }
+      });
+    }
+    final pinned = ref.watch(overviewPinnedProvider).value ?? false;
     // M4-24: Cmd+N or Ctrl+N opens "New post" of the forum on screen (01 7).
     return KeyboardActions(
       handlers: {
@@ -390,10 +433,28 @@ class PostListColumn extends ConsumerWidget {
               .setDoneCollapsed(channelId, collapsed: collapsed),
         ),
         onOpenPost: (thread) => context.go('/t/${thread.value}'),
+        pinned: pinned,
+        onPin: () => unawaited(
+          ref
+              .read(localDatabaseProvider)
+              ?.forumViewDao
+              .setOverviewPinned(pinned: !pinned),
+        ),
+        onSearch: () => context.go(
+          Uri(
+            path: '/search',
+            queryParameters: {'q': '${forumFilter(forum.name)} '},
+          ).toString(),
+        ),
       ),
     );
   }
 }
+
+/// The search notation that keeps the search to the forum [name] (`in:<name>`, quoted when it
+/// holds a space; brief M4-23, 14 4.1).
+String forumFilter(String name) =>
+    name.contains(' ') ? 'in:"$name"' : 'in:$name';
 
 /// The row of a page that failed to load, with "Try again".
 class _LoadFailedRow extends StatelessWidget {

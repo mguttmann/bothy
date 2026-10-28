@@ -510,14 +510,253 @@ final class ThreadCountsOfFamily extends $Family
   String toString() => r'threadCountsOfProvider';
 }
 
-/// The channel rows of [spaceId]: counters ([channelCounts]), active run and muted state;
-/// direct messages and archived channels are not part of the tree.
+/// The channels whose thread group the person collapsed on this device (01 6.8 item 7; kept in
+/// `channel_view_states`, never synchronized, D-SB-6).
+
+@ProviderFor(collapsedGroups)
+final collapsedGroupsProvider = CollapsedGroupsProvider._();
+
+/// The channels whose thread group the person collapsed on this device (01 6.8 item 7; kept in
+/// `channel_view_states`, never synchronized, D-SB-6).
+
+final class CollapsedGroupsProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<Set<ChannelId>>,
+          Set<ChannelId>,
+          Stream<Set<ChannelId>>
+        >
+    with $FutureModifier<Set<ChannelId>>, $StreamProvider<Set<ChannelId>> {
+  /// The channels whose thread group the person collapsed on this device (01 6.8 item 7; kept in
+  /// `channel_view_states`, never synchronized, D-SB-6).
+  CollapsedGroupsProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'collapsedGroupsProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$collapsedGroupsHash();
+
+  @$internal
+  @override
+  $StreamProviderElement<Set<ChannelId>> $createElement(
+    $ProviderPointer pointer,
+  ) => $StreamProviderElement(pointer);
+
+  @override
+  Stream<Set<ChannelId>> create(Ref ref) {
+    return collapsedGroups(ref);
+  }
+}
+
+String _$collapsedGroupsHash() => r'255ff66e0bbc04c5fcae3486af799c68a47d20ac';
+
+/// Whether the pointer is over the sidebar or the keyboard focus is in it: while it holds, a
+/// thread row that no longer qualifies stays in place (01 6.8 item 4; brief M4-40 Design note
+/// 2). The sidebar sets it ([SidebarHold.set]).
+
+@ProviderFor(SidebarHold)
+final sidebarHoldProvider = SidebarHoldProvider._();
+
+/// Whether the pointer is over the sidebar or the keyboard focus is in it: while it holds, a
+/// thread row that no longer qualifies stays in place (01 6.8 item 4; brief M4-40 Design note
+/// 2). The sidebar sets it ([SidebarHold.set]).
+final class SidebarHoldProvider extends $NotifierProvider<SidebarHold, bool> {
+  /// Whether the pointer is over the sidebar or the keyboard focus is in it: while it holds, a
+  /// thread row that no longer qualifies stays in place (01 6.8 item 4; brief M4-40 Design note
+  /// 2). The sidebar sets it ([SidebarHold.set]).
+  SidebarHoldProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'sidebarHoldProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$sidebarHoldHash();
+
+  @$internal
+  @override
+  SidebarHold create() => SidebarHold();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(bool value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<bool>(value),
+    );
+  }
+}
+
+String _$sidebarHoldHash() => r'264382c69ce6d1fbee5e8edc1e736a1304b5ac44';
+
+/// Whether the pointer is over the sidebar or the keyboard focus is in it: while it holds, a
+/// thread row that no longer qualifies stays in place (01 6.8 item 4; brief M4-40 Design note
+/// 2). The sidebar sets it ([SidebarHold.set]).
+
+abstract class _$SidebarHold extends $Notifier<bool> {
+  bool build();
+  @$mustCallSuper
+  @override
+  WhenComplete runBuild() {
+    final ref = this.ref as $Ref<bool, bool>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<bool, bool>,
+              bool,
+              Object?,
+              Object?
+            >;
+    return element.handleCreate(ref, build);
+  }
+}
+
+/// The thread group of [channelId] (01 6.8 items 2 to 6; `selectSidebarThreads`): its stored
+/// threads, the counters per thread, its runs, the selected thread of the route, the person,
+/// the clock and the limits of `AppConfig`. While [sidebarHoldProvider] holds, the rows shown
+/// last stay (01 6.8 item 4); additions and changes apply at once.
+
+@ProviderFor(ChannelThreads)
+final channelThreadsProvider = ChannelThreadsFamily._();
+
+/// The thread group of [channelId] (01 6.8 items 2 to 6; `selectSidebarThreads`): its stored
+/// threads, the counters per thread, its runs, the selected thread of the route, the person,
+/// the clock and the limits of `AppConfig`. While [sidebarHoldProvider] holds, the rows shown
+/// last stay (01 6.8 item 4); additions and changes apply at once.
+final class ChannelThreadsProvider
+    extends $NotifierProvider<ChannelThreads, SidebarThreadGroup?> {
+  /// The thread group of [channelId] (01 6.8 items 2 to 6; `selectSidebarThreads`): its stored
+  /// threads, the counters per thread, its runs, the selected thread of the route, the person,
+  /// the clock and the limits of `AppConfig`. While [sidebarHoldProvider] holds, the rows shown
+  /// last stay (01 6.8 item 4); additions and changes apply at once.
+  ChannelThreadsProvider._({
+    required ChannelThreadsFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'channelThreadsProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$channelThreadsHash();
+
+  @override
+  String toString() {
+    return r'channelThreadsProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  ChannelThreads create() => ChannelThreads();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(SidebarThreadGroup? value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<SidebarThreadGroup?>(value),
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is ChannelThreadsProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$channelThreadsHash() => r'94ac2c24601c0e5fa80a5c6b660648ccaf651249';
+
+/// The thread group of [channelId] (01 6.8 items 2 to 6; `selectSidebarThreads`): its stored
+/// threads, the counters per thread, its runs, the selected thread of the route, the person,
+/// the clock and the limits of `AppConfig`. While [sidebarHoldProvider] holds, the rows shown
+/// last stay (01 6.8 item 4); additions and changes apply at once.
+
+final class ChannelThreadsFamily extends $Family
+    with
+        $ClassFamilyOverride<
+          ChannelThreads,
+          SidebarThreadGroup?,
+          SidebarThreadGroup?,
+          SidebarThreadGroup?,
+          String
+        > {
+  ChannelThreadsFamily._()
+    : super(
+        retry: null,
+        name: r'channelThreadsProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// The thread group of [channelId] (01 6.8 items 2 to 6; `selectSidebarThreads`): its stored
+  /// threads, the counters per thread, its runs, the selected thread of the route, the person,
+  /// the clock and the limits of `AppConfig`. While [sidebarHoldProvider] holds, the rows shown
+  /// last stay (01 6.8 item 4); additions and changes apply at once.
+
+  ChannelThreadsProvider call(String channelId) =>
+      ChannelThreadsProvider._(argument: channelId, from: this);
+
+  @override
+  String toString() => r'channelThreadsProvider';
+}
+
+/// The thread group of [channelId] (01 6.8 items 2 to 6; `selectSidebarThreads`): its stored
+/// threads, the counters per thread, its runs, the selected thread of the route, the person,
+/// the clock and the limits of `AppConfig`. While [sidebarHoldProvider] holds, the rows shown
+/// last stay (01 6.8 item 4); additions and changes apply at once.
+
+abstract class _$ChannelThreads extends $Notifier<SidebarThreadGroup?> {
+  late final _$args = ref.$arg as String;
+  String get channelId => _$args;
+
+  SidebarThreadGroup? build(String channelId);
+  @$mustCallSuper
+  @override
+  WhenComplete runBuild() {
+    final ref = this.ref as $Ref<SidebarThreadGroup?, SidebarThreadGroup?>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<SidebarThreadGroup?, SidebarThreadGroup?>,
+              SidebarThreadGroup?,
+              Object?,
+              Object?
+            >;
+    return element.handleCreate(ref, () => build(_$args));
+  }
+}
+
+/// The channel rows of [spaceId]: counters ([channelCounts]), active run, muted state and the
+/// thread group with its collapse state on this device (01 6.8); direct messages and archived
+/// channels are not part of the tree.
 
 @ProviderFor(channelsOfSpace)
 final channelsOfSpaceProvider = ChannelsOfSpaceFamily._();
 
-/// The channel rows of [spaceId]: counters ([channelCounts]), active run and muted state;
-/// direct messages and archived channels are not part of the tree.
+/// The channel rows of [spaceId]: counters ([channelCounts]), active run, muted state and the
+/// thread group with its collapse state on this device (01 6.8); direct messages and archived
+/// channels are not part of the tree.
 
 final class ChannelsOfSpaceProvider
     extends
@@ -527,8 +766,9 @@ final class ChannelsOfSpaceProvider
           List<SidebarChannel>
         >
     with $Provider<List<SidebarChannel>> {
-  /// The channel rows of [spaceId]: counters ([channelCounts]), active run and muted state;
-  /// direct messages and archived channels are not part of the tree.
+  /// The channel rows of [spaceId]: counters ([channelCounts]), active run, muted state and the
+  /// thread group with its collapse state on this device (01 6.8); direct messages and archived
+  /// channels are not part of the tree.
   ChannelsOfSpaceProvider._({
     required ChannelsOfSpaceFamily super.from,
     required String super.argument,
@@ -581,10 +821,11 @@ final class ChannelsOfSpaceProvider
   }
 }
 
-String _$channelsOfSpaceHash() => r'4db24aae10524ea801a31749a4ca66adf5fa5bd4';
+String _$channelsOfSpaceHash() => r'b993f192e8ef260e2ba7711d53623f82cc7464ca';
 
-/// The channel rows of [spaceId]: counters ([channelCounts]), active run and muted state;
-/// direct messages and archived channels are not part of the tree.
+/// The channel rows of [spaceId]: counters ([channelCounts]), active run, muted state and the
+/// thread group with its collapse state on this device (01 6.8); direct messages and archived
+/// channels are not part of the tree.
 
 final class ChannelsOfSpaceFamily extends $Family
     with $FunctionalFamilyOverride<List<SidebarChannel>, String> {
@@ -597,8 +838,9 @@ final class ChannelsOfSpaceFamily extends $Family
         isAutoDispose: true,
       );
 
-  /// The channel rows of [spaceId]: counters ([channelCounts]), active run and muted state;
-  /// direct messages and archived channels are not part of the tree.
+  /// The channel rows of [spaceId]: counters ([channelCounts]), active run, muted state and the
+  /// thread group with its collapse state on this device (01 6.8); direct messages and archived
+  /// channels are not part of the tree.
 
   ChannelsOfSpaceProvider call(String spaceId) =>
       ChannelsOfSpaceProvider._(argument: spaceId, from: this);

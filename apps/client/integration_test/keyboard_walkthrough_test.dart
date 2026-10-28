@@ -108,10 +108,12 @@ void main() {
         () => focusIn(find.byKey(const ValueKey('column.sidebar'))),
       );
 
-      // Option or Alt plus arrow down walks the channels until the forum `deploys`.
-      for (var i = 0; i < 10 && route() != '/c/$forum'; i++) {
+      // Option or Alt plus arrow down walks the channels and thread rows (M4-40) until the
+      // forum `deploys`.
+      for (var i = 0; i < 20 && route() != '/c/$forum'; i++) {
+        final before = route();
         await press(ShortcutAction.nextChannel);
-        await until('a channel route', () => route().startsWith('/c/'));
+        await until('the next row', () => route() != before);
       }
       expect(route(), '/c/$forum');
       await press(ShortcutAction.previousChannel);
@@ -196,6 +198,10 @@ void main() {
         find.byKey(const ValueKey('switcher.field')),
         'release no',
       );
+      // The rows of the typed text are built in the next frame; before it the list still holds
+      // the recent targets, which include "Release notes" once the walk above visited its
+      // thread row (M4-40), and Enter would take the first of them.
+      await tester.pump();
       await shows(
         find.byKey(ValueKey('switcher.row.thread.${seed.releaseNotes}')),
       );

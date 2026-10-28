@@ -252,15 +252,18 @@ final List<ShortcutRow> shortcutRows = [
     ]),
     _primary(ShortcutAction.focusInput, LogicalKeyboardKey.keyL),
   ], orJoined: true),
-  ShortcutRow('Next or previous channel', [
+  ShortcutRow('Next or previous channel or thread row in the sidebar', [
     _option(ShortcutAction.nextChannel, _down),
     _option(ShortcutAction.previousChannel, _up),
   ]),
-  ShortcutRow('Next or previous unread channel', [
+  ShortcutRow('Next or previous unread channel or thread row', [
     _option(ShortcutAction.nextUnreadChannel, _down, shift: true),
     _option(ShortcutAction.previousUnreadChannel, _up, shift: true),
   ]),
-  ShortcutRow('Switch column (sidebar, list, history, session)', [
+  ShortcutRow('Pin or unpin the forum overview as a column', [
+    _primary(ShortcutAction.pinOverview, LogicalKeyboardKey.keyO, shift: true),
+  ]),
+  ShortcutRow('Switch column (sidebar, pinned overview, history, session)', [
     _same(ShortcutAction.nextColumn, ShortcutKind.app, const [
       KeyStroke(LogicalKeyboardKey.f6),
     ]),

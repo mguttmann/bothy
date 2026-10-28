@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The head of the post list (components.md 6): forum name, "New post" and the filter chips
+/// The head of the forum overview D15 (components.md 6; 01 D15): forum name with the kind
+/// sentence, "New chat" or "New post", the search in the forum, "Pin" and the filter chips
 /// Open, Waiting for me, Tags and Sort.
 library;
 
@@ -11,11 +12,15 @@ import 'package:l10n/l10n.dart';
 
 import 'forum_model.dart';
 
-/// The head of the post list of [forumName].
+/// The head of the overview of [forumName].
 ///
-/// "New post" is the primary button ([onNewPost]); the chips Open and Waiting for me choose
-/// the view ([onView]); Tags opens a multi-select of [tags] ([onTags]); Sort chooses last
-/// activity or creation ([onSort]), shown as [sort], the sort in effect.
+/// Below the name the kind sentence explains the forum (01 6.8 item 11, [projectBound] picks
+/// the project one and the icon `channel.project`). "New chat" in a project forum, else "New
+/// post", is the primary button ([onNewPost]); [onSearch] opens the search with the filter of
+/// this forum; [onPin] pins or unpins the overview as a column ([pinned]; null hides the
+/// button); the chips Open and Waiting for me choose the view ([onView]); Tags opens a
+/// multi-select of [tags] ([onTags]); Sort chooses last activity or creation ([onSort]), shown
+/// as [sort], the sort in effect.
 class PostListHeader extends StatelessWidget {
   /// Creates the head.
   const PostListHeader({
@@ -28,10 +33,26 @@ class PostListHeader extends StatelessWidget {
     required this.onView,
     required this.onTags,
     required this.onSort,
+    this.projectBound = false,
+    this.pinned = false,
+    this.onPin,
+    this.onSearch,
   });
 
   /// The forum's name (a foreign name).
   final String forumName;
+
+  /// Whether the forum has a project binding (`Channel.project_bound`).
+  final bool projectBound;
+
+  /// Whether the overview is pinned as a column on this device.
+  final bool pinned;
+
+  /// Pins or unpins the overview; null hides "Pin".
+  final VoidCallback? onPin;
+
+  /// Opens the search in this forum; null hides it.
+  final VoidCallback? onSearch;
 
   /// The filters.
   final PostListFilter filter;
@@ -58,6 +79,11 @@ class PostListHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final c = context.dsColors;
+    final sentence = dsChannelKindSentence(
+      l,
+      DsChannelKind.forum,
+      projectBound: projectBound,
+    );
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         DsSpace.s12,
@@ -83,7 +109,10 @@ class PostListHeader extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       DsIcon(
-                        DsIcons.channelForum,
+                        dsChannelGlyph(
+                          DsChannelKind.forum,
+                          projectBound: projectBound,
+                        ),
                         size: DsIconSizeRole.md,
                         color: c.textSecondary,
                         decorative: true,
@@ -106,15 +135,44 @@ class PostListHeader extends StatelessWidget {
                 ),
                 ConstrainedBox(
                   constraints: BoxConstraints(maxWidth: constraints.maxWidth),
-                  child: DsButton(
-                    key: const ValueKey('postList.newPost'),
-                    label: l.postListNewPost,
-                    style: DsButtonStyle.primary,
-                    onPressed: onNewPost,
+                  child: Wrap(
+                    spacing: DsSpace.s6,
+                    runSpacing: DsSpace.s6,
+                    children: [
+                      DsButton(
+                        key: const ValueKey('postList.newPost'),
+                        label: projectBound
+                            ? l.postListNewChat
+                            : l.postListNewPost,
+                        style: DsButtonStyle.primary,
+                        onPressed: onNewPost,
+                      ),
+                      if (onSearch case final search?)
+                        DsButton(
+                          key: const ValueKey('postList.search'),
+                          label: l.overviewSearch(dsIsolate(forumName)),
+                          style: DsButtonStyle.secondary,
+                          onPressed: search,
+                        ),
+                      if (onPin case final pin?)
+                        DsButton(
+                          key: const ValueKey('postList.pin'),
+                          label: pinned ? l.overviewUnpin : l.overviewPin,
+                          style: DsButtonStyle.secondary,
+                          onPressed: pin,
+                        ),
+                    ],
                   ),
                 ),
               ],
             ),
+          ),
+          const SizedBox(height: DsSpace.s4),
+          // The kind sentence as the subtitle (01 6.8 item 11).
+          Text(
+            sentence,
+            key: const ValueKey('postList.kind'),
+            style: dsTextStyle(DsType.bodySm).copyWith(color: c.textSecondary),
           ),
           const SizedBox(height: DsSpace.s8),
           Wrap(

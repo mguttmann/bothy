@@ -422,6 +422,113 @@ final class DoneCollapsedFamily extends $Family
   String toString() => r'doneCollapsedProvider';
 }
 
+/// Whether the forum overview is pinned as its own column on this device (01 D15, 6.8 item 7;
+/// kept in the local view state, never synchronized, D-SB-6). False until stored.
+
+@ProviderFor(overviewPinned)
+final overviewPinnedProvider = OverviewPinnedProvider._();
+
+/// Whether the forum overview is pinned as its own column on this device (01 D15, 6.8 item 7;
+/// kept in the local view state, never synchronized, D-SB-6). False until stored.
+
+final class OverviewPinnedProvider
+    extends $FunctionalProvider<AsyncValue<bool>, bool, Stream<bool>>
+    with $FutureModifier<bool>, $StreamProvider<bool> {
+  /// Whether the forum overview is pinned as its own column on this device (01 D15, 6.8 item 7;
+  /// kept in the local view state, never synchronized, D-SB-6). False until stored.
+  OverviewPinnedProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'overviewPinnedProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$overviewPinnedHash();
+
+  @$internal
+  @override
+  $StreamProviderElement<bool> $createElement($ProviderPointer pointer) =>
+      $StreamProviderElement(pointer);
+
+  @override
+  Stream<bool> create(Ref ref) {
+    return overviewPinned(ref);
+  }
+}
+
+String _$overviewPinnedHash() => r'307bd82dc92691c6e5ed00e8feccba092aa98bbf';
+
+/// A new post the "+" of a forum row asked for (01 6.8 item 8; until M4-41 it opens the
+/// overview with the "New post" dialog): the forum, or null. The overview of that forum takes it
+/// once it shows ([take]).
+
+@ProviderFor(NewPostRequest)
+final newPostRequestProvider = NewPostRequestProvider._();
+
+/// A new post the "+" of a forum row asked for (01 6.8 item 8; until M4-41 it opens the
+/// overview with the "New post" dialog): the forum, or null. The overview of that forum takes it
+/// once it shows ([take]).
+final class NewPostRequestProvider
+    extends $NotifierProvider<NewPostRequest, ChannelId?> {
+  /// A new post the "+" of a forum row asked for (01 6.8 item 8; until M4-41 it opens the
+  /// overview with the "New post" dialog): the forum, or null. The overview of that forum takes it
+  /// once it shows ([take]).
+  NewPostRequestProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'newPostRequestProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$newPostRequestHash();
+
+  @$internal
+  @override
+  NewPostRequest create() => NewPostRequest();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(ChannelId? value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<ChannelId?>(value),
+    );
+  }
+}
+
+String _$newPostRequestHash() => r'd2e0c2c779bb45d300fc6ee98772bfa9d0fa6f61';
+
+/// A new post the "+" of a forum row asked for (01 6.8 item 8; until M4-41 it opens the
+/// overview with the "New post" dialog): the forum, or null. The overview of that forum takes it
+/// once it shows ([take]).
+
+abstract class _$NewPostRequest extends $Notifier<ChannelId?> {
+  ChannelId? build();
+  @$mustCallSuper
+  @override
+  WhenComplete runBuild() {
+    final ref = this.ref as $Ref<ChannelId?, ChannelId?>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<ChannelId?, ChannelId?>,
+              ChannelId?,
+              Object?,
+              Object?
+            >;
+    return element.handleCreate(ref, build);
+  }
+}
+
 /// The new posts of [channelId] the server refused (`createThread` entries of the outbox in
 /// `failed`), oldest first (04 13.2 item 5).
 

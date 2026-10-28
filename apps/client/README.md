@@ -50,8 +50,8 @@ SHA-256 of uploads and downloads), and for files and voice (M4-22, docs/DECISION
 | `lib/app/discovery.dart`, `target_resolver.dart` | E1's discovery, "Not found or no access" |
 | `lib/app/providers/` | Riverpod providers (generated `*.g.dart`): ports, session, engine, settings, targets |
 | `lib/app/layout/` | the desktop shell, the four columns and their stored widths |
-| `lib/sidebar/` | the sidebar column (M4-19): head, space tree, channel rows, foot, personal order, `SidebarNavigation` for M4-24 |
-| `lib/forum/` | the post list of a forum (M4-19): head with filters, rows, Done section, "New post" dialog, paging |
+| `lib/sidebar/` | the sidebar column (M4-19): head, space tree, channel rows, foot, personal order, `SidebarNavigation` for M4-24; the thread groups with their selection, rows and "All posts" (M4-40) |
+| `lib/forum/` | the forum overview D15 (M4-19, M4-40): head with the kind sentence, "Pin" and filters, rows, Done section, "New post" dialog, paging |
 | `lib/thread/` | the history column (M4-20): header, message list with paging, gaps and jumps, message tiles and actions, outbox rows, dialogs (versions, conflict, delete, reactions, title, move), the D2 layout |
 | `lib/composer/` | the composer (M4-20): send path, draft sync, mention suggestions, templates |
 | `lib/session_column/` | the frame of the session column with the agent part (M4-21) and the sections "Pinned" (M4-20) and "Files" (M4-22) |
@@ -635,6 +635,33 @@ pages through `listChannelThreads`, writes new posts as `createThread` through t
 keeps the collapse state of its "Done (n)" section per device in `forum_view_states` (01 6.1;
 docs/DECISIONS.md D-M4-19-1 to D-M4-19-7).
 
+### Threads in the sidebar and the forum overview (M4-40)
+
+Under each forum and text channel the desktop sidebar shows its open threads as rows with a tree
+line (01 6.8, D-SB-1 to D-SB-10). `sidebar_threads.dart` holds the selection as one pure
+function, `selectSidebarThreads`: which threads qualify (selected, active run, waiting for the
+person, unread, activity within `ui.sidebar_thread_window`), the bound
+`ui.sidebar_threads_per_channel` with its priority, the order by creation, and the counters of
+the channel row and of "All posts" without a number twice on screen. The `ChannelThreads`
+provider feeds it from the local database; while the pointer is over the sidebar or the focus is
+in it (`SidebarHold`), rows that no longer qualify stay in place. The threads come from the
+snapshot's `active_threads` and the events the engine applies, never from a list request per
+channel. Each group collapses with its own arrow; the state is kept per device in
+`channel_view_states` of `local_store`. The arrow keys walk the tree (arrow right expands a group
+or enters its first row, arrow left goes back or collapses), and "next or previous channel" and
+"next unread" stop at thread rows too. Thread and channel rows cannot be dragged; only a space
+row starts a drag.
+
+A click on a forum (or "All posts") opens the forum overview D15 in the content column: the post
+list of `lib/forum/` with the kind sentence, "New chat" in a project forum or "New post", the
+search in the forum, "Pin", the filters and the Done section. "Pin" or Cmd+Shift+O (Ctrl+Shift+O)
+keeps it as its own column next to the history, with the width `post_list` of
+`layout.column_widths`; the choice is kept per device in `shell_view_state`, and below
+`ui.desktop_min_width_three_columns` a pinned overview returns to the content column. The channel
+icons tell a text channel, a forum and a project forum (`channel.project`) apart and explain the
+kind in their tooltip. Until M4-41 the "+" of a forum row opens the overview with the "New post"
+dialog. Rulings: docs/decisions.d/M4-40.md.
+
 ## Notification levels and channel export
 
 The menu of a space or channel (right click, the menu key or Shift+F10 on its sidebar row), of a
@@ -817,9 +844,9 @@ an active run, Done only in a thread, New post only in a forum). An action witho
 nothing and leaves the key alone. Components register no action, so no shortcut can approve
 anything (R-PR-04); Enter and Space on the focused button are the only keys that apply one. The
 composer keeps Enter, Shift+Enter and arrow up; the history handles Esc (mark read) and "Esc then
-Tab" (focus the input). F6 and Shift+F6 move between the visible columns (sidebar, list,
-history, session), Tab moves in reading order inside a column, and the focus ring is always
-drawn. `KeyboardScope.passThrough` marks the terminal region of M4-36, where only Cmd (macOS) or
+Tab" (focus the input). F6 and Shift+F6 move between the visible columns (sidebar, pinned
+overview, history, session), Tab moves in reading order inside a column, and the focus ring is
+always drawn. `KeyboardScope.passThrough` marks the terminal region of M4-36, where only Cmd (macOS) or
 Ctrl+Shift (Windows) shortcuts reach the app (R-PR-10). Cmd+/ or Ctrl+/ shows the list in the
 language of the app; on macOS the menu bar offers the same actions. "Open hosts and terminal"
 opens the first host the person sees, or the hint to choose one (M4-36). `test/keyboard/readme_table_test.dart` holds this table equal
@@ -832,9 +859,10 @@ to `bindings.dart`:
 | Search in thread | Cmd+F | Ctrl+F |
 | New post or new chat in the current forum | Cmd+N | Ctrl+N |
 | Focus the input | Esc then Tab, or Cmd+L | Esc then Tab, or Ctrl+L |
-| Next or previous channel | Option+Arrow down / up | Alt+Arrow down / up |
-| Next or previous unread channel | Option+Shift+Arrow down / up | Alt+Shift+Arrow down / up |
-| Switch column (sidebar, list, history, session) | F6 / Shift+F6 | F6 / Shift+F6 |
+| Next or previous channel or thread row in the sidebar | Option+Arrow down / up | Alt+Arrow down / up |
+| Next or previous unread channel or thread row | Option+Shift+Arrow down / up | Alt+Shift+Arrow down / up |
+| Pin or unpin the forum overview as a column | Cmd+Shift+O | Ctrl+Shift+O |
+| Switch column (sidebar, pinned overview, history, session) | F6 / Shift+F6 | F6 / Shift+F6 |
 | Mark thread as read | Esc | Esc |
 | Mark as unread (from a message) | Option+Click | Alt+Click |
 | Mark thread as done or reopen it | Cmd+Shift+E | Ctrl+Shift+E |

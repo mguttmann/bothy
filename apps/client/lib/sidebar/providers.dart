@@ -11,8 +11,10 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../app/providers/ports.dart';
 import '../app/providers/session.dart';
 import '../app/router.dart';
+import '../forum/providers.dart' show channelRunsProvider, forumThreadsProvider;
 import 'sidebar_model.dart';
 import 'sidebar_order.dart';
+import 'sidebar_threads.dart';
 
 part 'providers.g.dart';
 
@@ -107,8 +109,76 @@ Map<ThreadId, ThreadCounts> threadCountsOf(Ref ref, String channelId) {
   };
 }
 
-/// The channel rows of [spaceId]: counters ([channelCounts]), active run and muted state;
-/// direct messages and archived channels are not part of the tree.
+/// The channels whose thread group the person collapsed on this device (01 6.8 item 7; kept in
+/// `channel_view_states`, never synchronized, D-SB-6).
+@riverpod
+Stream<Set<ChannelId>> collapsedGroups(Ref ref) {
+  final db = ref.watch(localDatabaseProvider);
+  return db == null
+      ? Stream.value(const {})
+      : db.forumViewDao.watchCollapsedGroups();
+}
+
+/// Whether the pointer is over the sidebar or the keyboard focus is in it: while it holds, a
+/// thread row that no longer qualifies stays in place (01 6.8 item 4; brief M4-40 Design note
+/// 2). The sidebar sets it ([SidebarHold.set]).
+@Riverpod(keepAlive: true)
+class SidebarHold extends _$SidebarHold {
+  @override
+  bool build() => false;
+
+  /// Sets whether the sidebar holds its rows; does nothing once the provider is gone (a
+  /// sidebar that leaves with the whole app reports after it).
+  void set({required bool held}) {
+    if (!ref.mounted) return;
+    if (state != held) state = held;
+  }
+}
+
+/// The thread group of [channelId] (01 6.8 items 2 to 6; `selectSidebarThreads`): its stored
+/// threads, the counters per thread, its runs, the selected thread of the route, the person,
+/// the clock and the limits of `AppConfig`. While [sidebarHoldProvider] holds, the rows shown
+/// last stay (01 6.8 item 4); additions and changes apply at once.
+@riverpod
+class ChannelThreads extends _$ChannelThreads {
+  /// The rows of the last build; kept while the sidebar holds them.
+  Set<ThreadId> _shown = const {};
+
+  @override
+  SidebarThreadGroup? build(String channelId) {
+    final channel = ref.watch(storedChannelOfRouteProvider(channelId)).value;
+    if (channel == null) return null;
+    final held = ref.watch(sidebarHoldProvider);
+    final prefs = ref.watch(notificationPreferencesProvider).value ?? const [];
+    final now = ref.watch(appPortsProvider).clock.now();
+    final group = selectSidebarThreads(
+      channel: channel,
+      threads: ref.watch(forumThreadsProvider(channelId)).value ?? const [],
+      counts: ref.watch(threadCountsOfProvider(channelId)),
+      runs: ref.watch(channelRunsProvider(channelId)).value ?? const [],
+      selected: ref.watch(lastRouteSelectionProvider).thread,
+      me: ref.watch(ownPrincipalProvider).value?.id,
+      now: now,
+      limits: SidebarThreadLimits.of(ref.watch(appConfigProvider)),
+      expanded: !(ref.watch(collapsedGroupsProvider).value ?? const {})
+          .contains(channel.id),
+      keep: held ? _shown : const {},
+      mutedThreads: {
+        for (final p in prefs)
+          if (p.targetKind == NotificationTargetKind.thread &&
+              isMutedTarget(p, now: now))
+            ThreadId.parse(p.targetId),
+      },
+      channelMuted: isMuted(channel.id, prefs, now: now),
+    );
+    _shown = {for (final r in group.rows) r.thread.id};
+    return group;
+  }
+}
+
+/// The channel rows of [spaceId]: counters ([channelCounts]), active run, muted state and the
+/// thread group with its collapse state on this device (01 6.8); direct messages and archived
+/// channels are not part of the tree.
 @riverpod
 List<SidebarChannel> channelsOfSpace(Ref ref, String spaceId) {
   ref.watch(counterTicksProvider);
@@ -116,6 +186,7 @@ List<SidebarChannel> channelsOfSpace(Ref ref, String spaceId) {
   final reads = ref.watch(allReadStatesProvider).value ?? const [];
   final prefs = ref.watch(notificationPreferencesProvider).value ?? const [];
   final runs = ref.watch(activeRunsProvider).value ?? const [];
+  final collapsed = ref.watch(collapsedGroupsProvider).value ?? const {};
   final now = ref.watch(appPortsProvider).clock.now();
   return [
     for (final c
@@ -130,6 +201,8 @@ List<SidebarChannel> channelsOfSpace(Ref ref, String spaceId) {
           ),
           runActive: runs.any((r) => r.channelId == c.id),
           muted: isMuted(c.id, prefs, now: now),
+          group: ref.watch(channelThreadsProvider(c.id.value)),
+          expanded: !collapsed.contains(c.id),
         ),
   ];
 }

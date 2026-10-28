@@ -20,8 +20,10 @@ import 'sidebar_model.dart';
 /// requested expanded state); screen readers get the expanded or collapsed state and the
 /// actions "Move up" and "Move down" ([onMoveUp], [onMoveDown]; null when the space is at
 /// that end), the keyboard and screen reader way to change the personal order besides
-/// dragging. The channels follow when the space is expanded. A right click, the menu key or
-/// Shift+F10 opens the space's menu (M4-33).
+/// dragging. The channels follow when the space is expanded, each with its thread group when
+/// [onOpenThread] is given (01 6.8). A right click, the menu key or Shift+F10 opens the space's
+/// menu (M4-33). Only the space row can start a drag ([dragHandle]); channel and thread rows
+/// cannot be dragged (01 6.8 item 10).
 class SpaceNode extends StatelessWidget {
   /// Creates the node.
   const SpaceNode({
@@ -30,8 +32,13 @@ class SpaceNode extends StatelessWidget {
     required this.selectedChannel,
     required this.onToggle,
     required this.onOpenChannel,
+    this.selectedThread,
+    this.onOpenThread,
+    this.onToggleGroup,
+    this.onAdd,
     this.onMoveUp,
     this.onMoveDown,
+    this.dragHandle,
   });
 
   /// The space with its channels.
@@ -45,6 +52,21 @@ class SpaceNode extends StatelessWidget {
 
   /// Opens a channel.
   final ValueChanged<ChannelId> onOpenChannel;
+
+  /// The thread the route shows, or null.
+  final ThreadId? selectedThread;
+
+  /// Opens a thread row; null shows no thread groups (the phone until M5-15).
+  final ValueChanged<ThreadId>? onOpenThread;
+
+  /// Collapses or expands the thread group of a channel.
+  final void Function(ChannelId channel, bool expanded)? onToggleGroup;
+
+  /// The "+" action of a forum row (01 6.8 item 8), or null for none.
+  final ValueChanged<ChannelId>? onAdd;
+
+  /// Wraps the space row so it starts a drag of the space (the list's drag listener), or null.
+  final Widget Function(Widget row)? dragHandle;
 
   /// Moves the space one place up; null at the top.
   final VoidCallback? onMoveUp;
@@ -62,24 +84,26 @@ class SpaceNode extends StatelessWidget {
         // One node: the row with its name, state and the move actions; without the merge the
         // actions sat on an unnamed node of their own around the row, which VoiceOver stops at
         // without a name (brief M5-10).
-        MergeSemantics(
-          child: Semantics(
-            customSemanticsActions: {
-              CustomSemanticsAction(label: l.sidebarMoveUp): ?onMoveUp,
-              CustomSemanticsAction(label: l.sidebarMoveDown): ?onMoveDown,
-            },
-            child: Container(
-              constraints: BoxConstraints(
-                minHeight: context.dsDensity.rowChannel,
-              ),
-              alignment: Alignment.centerLeft,
-              padding: const EdgeInsets.only(top: DsSpace.s4),
-              child: SpaceMenu(
-                space: node.entry.space,
-                child: DsSpaceRow(
-                  node.rowData,
-                  key: ValueKey('sidebar.space.${node.entry.space.id.value}'),
-                  onToggle: onToggle,
+        (dragHandle ?? (row) => row)(
+          MergeSemantics(
+            child: Semantics(
+              customSemanticsActions: {
+                CustomSemanticsAction(label: l.sidebarMoveUp): ?onMoveUp,
+                CustomSemanticsAction(label: l.sidebarMoveDown): ?onMoveDown,
+              },
+              child: Container(
+                constraints: BoxConstraints(
+                  minHeight: context.dsDensity.rowChannel,
+                ),
+                alignment: Alignment.centerLeft,
+                padding: const EdgeInsets.only(top: DsSpace.s4),
+                child: SpaceMenu(
+                  space: node.entry.space,
+                  child: DsSpaceRow(
+                    node.rowData,
+                    key: ValueKey('sidebar.space.${node.entry.space.id.value}'),
+                    onToggle: onToggle,
+                  ),
                 ),
               ),
             ),
@@ -88,9 +112,16 @@ class SpaceNode extends StatelessWidget {
         if (node.expanded)
           for (final c in node.channels)
             ChannelEntry(
+              key: ValueKey('sidebar.entry.${c.channel.id.value}'),
               entry: c,
               selected: c.channel.id == selectedChannel,
+              selectedThread: selectedThread,
               onOpen: () => onOpenChannel(c.channel.id),
+              onOpenThread: onOpenThread,
+              onToggleGroup: onToggleGroup == null
+                  ? null
+                  : (expanded) => onToggleGroup!(c.channel.id, expanded),
+              onAdd: onAdd == null ? null : () => onAdd!(c.channel.id),
             ),
       ],
     );

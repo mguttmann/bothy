@@ -68,6 +68,35 @@ Stream<bool> doneCollapsed(Ref ref, String channelId) {
       : db.forumViewDao.watchDoneCollapsed(ChannelId.parse(channelId));
 }
 
+/// Whether the forum overview is pinned as its own column on this device (01 D15, 6.8 item 7;
+/// kept in the local view state, never synchronized, D-SB-6). False until stored.
+@riverpod
+Stream<bool> overviewPinned(Ref ref) {
+  final db = ref.watch(localDatabaseProvider);
+  return db == null
+      ? Stream.value(false)
+      : db.forumViewDao.watchOverviewPinned();
+}
+
+/// A new post the "+" of a forum row asked for (01 6.8 item 8; until M4-41 it opens the
+/// overview with the "New post" dialog): the forum, or null. The overview of that forum takes it
+/// once it shows ([take]).
+@Riverpod(keepAlive: true)
+class NewPostRequest extends _$NewPostRequest {
+  @override
+  ChannelId? build() => null;
+
+  /// Asks for a new post in [forum].
+  void request(ChannelId forum) => state = forum;
+
+  /// Takes the request when it is for [forum]: clears it and returns true, else false.
+  bool take(ChannelId forum) {
+    if (state != forum) return false;
+    state = null;
+    return true;
+  }
+}
+
 /// The new posts of [channelId] the server refused (`createThread` entries of the outbox in
 /// `failed`), oldest first (04 13.2 item 5).
 @riverpod
