@@ -37,10 +37,11 @@ no heartbeat or identify deadline closes a connection before `Patience`. The gat
 test of a deadline carries a `nosemgrep` with its reason (docs/DECISIONS.md PL/22).
 
 `testkit.PatientDatabase()` gives the database deadlines of a serve process of a test that does not
-check them (`database.acquire_timeout`, `database.statement_timeout`, `database.lock_timeout`
-and `http.request_timeout`, the deadline of a request that bounds its waits for the database,
-each `Patience`): on a loaded runner a start step that waited longer than the production
-deadlines failed the start and ended the process, and a request answered 503 or 500. `serveEnv`
+check them (`database.acquire_timeout`, `database.statement_timeout`, `database.lock_timeout`,
+`database.idle_in_tx_timeout` and `http.request_timeout`, the deadline of a request that bounds
+its waits for the database, each `Patience`): on a loaded runner a start step that waited longer
+than the production deadlines failed the start and ended the process, a request answered 503 or
+500, and a process that stalled inside a transaction lost its session (PL/56). `serveEnv`
 of `internal/wire` starts every serve process with them and `harness.Start` every harness server;
 a test of a deadline passes its own value (docs/DECISIONS.md PL/31, PL/37, PL/52).
 

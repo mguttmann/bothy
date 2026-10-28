@@ -153,10 +153,11 @@ func TestPatientGatewayPutsEveryWindowBeyondPatience(t *testing.T) {
 func TestPatientDatabasePutsEveryDeadlineAtPatience(t *testing.T) {
 	t.Parallel()
 	want := map[string]string{
-		"database.acquire_timeout":   testkit.PatienceSetting,
-		"database.statement_timeout": testkit.PatienceSetting,
-		"database.lock_timeout":      testkit.PatienceSetting,
-		"http.request_timeout":       testkit.PatienceSetting,
+		"database.acquire_timeout":    testkit.PatienceSetting,
+		"database.statement_timeout":  testkit.PatienceSetting,
+		"database.lock_timeout":       testkit.PatienceSetting,
+		"database.idle_in_tx_timeout": testkit.PatienceSetting,
+		"http.request_timeout":        testkit.PatienceSetting,
 	}
 	if got := testkit.PatientDatabase(); fmt.Sprint(got) != fmt.Sprint(want) {
 		t.Fatalf("PatientDatabase() = %v, want %v", got, want)

@@ -550,6 +550,10 @@ func TestServeEnvDatabaseDeadlinesArePatient(t *testing.T) {
 	if cfg.AcquireTimeout != testkit.Patience || cfg.StatementTimeout != testkit.Patience || cfg.LockTimeout != testkit.Patience {
 		t.Fatalf("acquire %s, statement %s, lock %s; want %s each", cfg.AcquireTimeout, cfg.StatementTimeout, cfg.LockTimeout, testkit.Patience)
 	}
+	// An open transaction of a stalled process outlives the idle deadline (PL/56).
+	if unit, err := wire.UnitConfig(loadEnv(t, serveEnv(t, db))); err != nil || unit.IdleInTxTimeout != testkit.Patience {
+		t.Fatalf("idle in transaction %s (%v), want %s", unit.IdleInTxTimeout, err, testkit.Patience)
+	}
 	// The request deadline bounds every wait of a request for the database (PL/52).
 	if got := loadEnv(t, serveEnv(t, db)).Duration("http.request_timeout"); got != testkit.Patience {
 		t.Fatalf("http.request_timeout %s, want %s", got, testkit.Patience)
