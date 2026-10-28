@@ -90,7 +90,6 @@ def test_flutter_covers_every_dart_package(job: str) -> None:
         (WORKFLOW, "sonar"),
         (WORKFLOW, "apps-macos"),
         (WORKFLOW, "apps-ios"),
-        (WORKFLOW, "apps-windows"),
         (DOCS_WORKFLOW, "build"),
     ],
 )
@@ -124,7 +123,7 @@ def test_apps_jobs_run_the_platform_tests(job: str, runner: str, system: str) ->
     assert spec["permissions"] == {"contents": "read"}
     assert isinstance(spec["timeout-minutes"], int)
     assert spec["if"] == f"contains(format(' {{0}} ', needs.plan.outputs.jobs), ' {job} ')"
-    [run] = [s for s in spec["steps"] if "run" in s]
+    [run] = [s for s in spec["steps"] if "run" in s and s.get("id") != FLUTTER_PIN_ID]
     assert run["run"] == (
         f"uv run --project tools --locked --quiet python tools/ci/apps_platform.py{system}"
     )
@@ -253,3 +252,80 @@ def test_sonar_reads_the_lcov_of_every_member() -> None:
     [exclusions] = [x for x in text.splitlines() if x.startswith("sonar.exclusions=")]
     for pattern in ("**/*.g.dart", "**/*.freezed.dart", "**/*.drift.dart", "**/generated/**"):
         assert pattern in exclusions.split("=", 1)[1].split(","), pattern
+
+
+# The Windows image has no yq, and flutter-action installs it from Chocolatey whenever it reads
+# `flutter-version-file`; that feed failed the Windows jobs again and again (HTTP 503, 504 and
+# 404 from community.chocolatey.org, then "yq not found"). Every job on a Windows runner reads
+# the root pin with this step and hands flutter-action the version, so no Chocolatey call is left.
+FLUTTER_PIN_ID = "flutter-pin"
+FLUTTER_PIN_VERSION = "${{ steps.flutter-pin.outputs.version }}"
+FLUTTER_PIN_RUN = (
+    "version=\"$(sed -n -E 's/^  flutter: ([0-9]+\\.[0-9]+\\.[0-9]+)$/\\1/p' pubspec.yaml)\"\n"
+    'test -n "$version"\n'
+    'echo "version=$version" >> "$GITHUB_OUTPUT"\n'
+)
+
+
+def _windows_flutter_jobs() -> list[tuple[str, str, list[dict[str, Any]]]]:
+    found = []
+    for workflow in sorted((REPO / ".github" / "workflows").glob("*.yml")):
+        for name, job in _jobs(workflow).items():
+            runner = f"{job.get('runs-on', '')} {job.get('strategy', '')}".lower()
+            steps = job.get("steps") or []
+            if "windows" in runner and any(_uses(s, "subosito/flutter-action") for s in steps):
+                found.append((workflow.name, name, steps))
+    return found
+
+
+def test_windows_jobs_exist() -> None:
+    names = {(w, j) for w, j, _ in _windows_flutter_jobs()}
+    assert ("ci.yml", "apps-windows") in names
+    assert ("release.yml", "build-windows") in names
+
+
+@pytest.mark.parametrize(
+    ("workflow", "job", "steps"),
+    _windows_flutter_jobs(),
+    ids=lambda v: v if isinstance(v, str) else "",
+)
+def test_windows_jobs_install_flutter_without_chocolatey(
+    workflow: str, job: str, steps: list[dict[str, Any]]
+) -> None:
+    flutter = next(i for i, s in enumerate(steps) if _uses(s, "subosito/flutter-action"))
+    pin = [i for i, s in enumerate(steps) if s.get("id") == FLUTTER_PIN_ID]
+    assert pin, f"{workflow} {job}: no {FLUTTER_PIN_ID} step"
+    assert pin[0] < flutter
+    assert steps[pin[0]]["run"] == FLUTTER_PIN_RUN
+    assert steps[pin[0]]["shell"] == "bash"
+    assert "flutter-version-file" not in steps[flutter]["with"]
+    assert steps[flutter]["with"]["flutter-version"] == FLUTTER_PIN_VERSION
+    assert steps[flutter]["with"]["channel"] == "stable"
+
+
+def _run_pin(tmp_path: Path, pubspec: str) -> subprocess.CompletedProcess[str]:
+    (tmp_path / "pubspec.yaml").write_text(pubspec, encoding="utf-8")
+    out = tmp_path / "out"
+    out.write_text("", encoding="utf-8")
+    return subprocess.run(
+        ["bash", "-e", "-c", FLUTTER_PIN_RUN],
+        cwd=tmp_path,
+        env={"GITHUB_OUTPUT": str(out), "PATH": "/usr/bin:/bin"},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+def test_flutter_pin_step_reads_the_root_pin(tmp_path: Path) -> None:
+    root = (REPO / "pubspec.yaml").read_text(encoding="utf-8")
+    result = _run_pin(tmp_path, root)
+    assert result.returncode == 0, result.stderr
+    pin = _pubspec("pubspec.yaml")["environment"]["flutter"]
+    assert (tmp_path / "out").read_text(encoding="utf-8") == f"version={pin}\n"
+
+
+def test_flutter_pin_step_fails_without_a_pin(tmp_path: Path) -> None:
+    result = _run_pin(tmp_path, "name: x\nenvironment:\n  sdk: ^3.13.5\n")
+    assert result.returncode != 0
+    assert (tmp_path / "out").read_text(encoding="utf-8") == ""
