@@ -305,87 +305,100 @@ class NewChatComposeState extends ConsumerState<NewChatCompose> {
         required &&
         chat.title.text.trim().isEmpty &&
         chat.composer.text.text.trim().isNotEmpty;
-    return Padding(
-      padding: const EdgeInsets.all(DsSpace.s12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          widget.header,
-          const SizedBox(height: DsSpace.s12),
-          TextField(
-            key: const ValueKey('newChat.title'),
-            controller: chat?.title,
-            enabled: chat != null,
-            textInputAction: TextInputAction.next,
-            decoration: InputDecoration(
-              labelText: required ? l.newPostTitle : l.newChatTitleOptional,
-              helperText: required ? null : l.newChatTitleAgentHint,
-              helperMaxLines: 2,
-            ),
-          ),
-          if (tags.isNotEmpty && chat != null) ...[
-            const SizedBox(height: DsSpace.s12),
-            Text(l.newPostTags, style: dsTextStyle(DsType.label)),
-            const SizedBox(height: DsSpace.s6),
-            Wrap(
-              spacing: DsSpace.s6,
-              runSpacing: DsSpace.s6,
+    // The composer sits at the bottom of the column; when header, title and tags need more
+    // than the window's height (text scale 2), the view scrolls instead of overflowing.
+    return CustomScrollView(
+      slivers: [
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child: Padding(
+            padding: const EdgeInsets.all(DsSpace.s12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                for (final t in tags)
-                  FilterChip(
-                    key: ValueKey('newChat.tag.${t.id.value}'),
-                    label: Text(dsIsolate(t.name)),
-                    selected: chat.tags.contains(t.id),
-                    // Whether the person may set a restricted tag is the server's decision
-                    // (15 1); a refusal shows as every outbox failure (01 6.6).
-                    onSelected: (_) => chat.toggleTag(
-                      t.id,
-                      order: [for (final x in tags) x.id],
+                widget.header,
+                const SizedBox(height: DsSpace.s12),
+                TextField(
+                  key: const ValueKey('newChat.title'),
+                  controller: chat?.title,
+                  enabled: chat != null,
+                  textInputAction: TextInputAction.next,
+                  decoration: InputDecoration(
+                    labelText: required
+                        ? l.newPostTitle
+                        : l.newChatTitleOptional,
+                    helperText: required ? null : l.newChatTitleAgentHint,
+                    helperMaxLines: 2,
+                  ),
+                ),
+                if (tags.isNotEmpty && chat != null) ...[
+                  const SizedBox(height: DsSpace.s12),
+                  Text(l.newPostTags, style: dsTextStyle(DsType.label)),
+                  const SizedBox(height: DsSpace.s6),
+                  Wrap(
+                    spacing: DsSpace.s6,
+                    runSpacing: DsSpace.s6,
+                    children: [
+                      for (final t in tags)
+                        FilterChip(
+                          key: ValueKey('newChat.tag.${t.id.value}'),
+                          label: Text(dsIsolate(t.name)),
+                          selected: chat.tags.contains(t.id),
+                          // Whether the person may set a restricted tag is the server's decision
+                          // (15 1); a refusal shows as every outbox failure (01 6.6).
+                          onSelected: (_) => chat.toggleTag(
+                            t.id,
+                            order: [for (final x in tags) x.id],
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+                const Spacer(),
+                if (_overwritten)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: DsSpace.s4),
+                    child: DsBanner(
+                      key: const ValueKey('newChat.draftNotice'),
+                      tone: DsTone.warning,
+                      text: l.composerDraftOverwritten,
+                      liveRegion: true,
+                      actionLabel: l.threadCancel,
+                      onAction: () => setState(() => _overwritten = false),
+                    ),
+                  ),
+                if (missingTitle)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: DsSpace.s6),
+                    child: Text(
+                      l.newChatTitleMissing,
+                      key: const ValueKey('newChat.titleMissing'),
+                      style: dsTextStyle(DsType.bodySm)
+                          .copyWith(color: c.textSecondary),
+                    ),
+                  ),
+                if (chat != null)
+                  Focus(
+                    focusNode: _fieldGroup,
+                    child: DsComposer(
+                      key: const ValueKey('newChat.composer'),
+                      targetName: channel?.name ?? '',
+                      maxLines: ref.watch(appConfigProvider).composerMaxLines,
+                      enterSends: ref
+                          .watch(personalSettingsProvider)
+                          .enterSends,
+                      controller: chat.composer.text,
+                      onChanged: chat.composer.onChanged,
+                      onSend: (text) => unawaited(_send(text)),
+                      offline: offline,
+                      sendEnabled: chat.canSend,
                     ),
                   ),
               ],
             ),
-          ],
-          const Spacer(),
-          if (_overwritten)
-            Padding(
-              padding: const EdgeInsets.only(bottom: DsSpace.s4),
-              child: DsBanner(
-                key: const ValueKey('newChat.draftNotice'),
-                tone: DsTone.warning,
-                text: l.composerDraftOverwritten,
-                liveRegion: true,
-                actionLabel: l.threadCancel,
-                onAction: () => setState(() => _overwritten = false),
-              ),
-            ),
-          if (missingTitle)
-            Padding(
-              padding: const EdgeInsets.only(bottom: DsSpace.s6),
-              child: Text(
-                l.newChatTitleMissing,
-                key: const ValueKey('newChat.titleMissing'),
-                style: dsTextStyle(DsType.bodySm)
-                    .copyWith(color: c.textSecondary),
-              ),
-            ),
-          if (chat != null)
-            Focus(
-              focusNode: _fieldGroup,
-              child: DsComposer(
-                key: const ValueKey('newChat.composer'),
-                targetName: channel?.name ?? '',
-                maxLines: ref.watch(appConfigProvider).composerMaxLines,
-                enterSends: ref.watch(personalSettingsProvider).enterSends,
-                controller: chat.composer.text,
-                onChanged: chat.composer.onChanged,
-                onSend: (text) => unawaited(_send(text)),
-                offline: offline,
-                sendEnabled: chat.canSend,
-              ),
-            ),
-        ],
-      ),
+          ),
+        ),
+      ],
     );
   }
 }
