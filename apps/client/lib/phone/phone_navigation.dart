@@ -44,6 +44,10 @@ enum PhonePageKind {
   /// The history of a thread (M3).
   thread,
 
+  /// The new chat view of a forum (01 6.8 item 8, M4-41) as a page of its own (brief M5-15
+  /// Design note 2), also while a sent post waits for the server.
+  newChat,
+
   /// Mentions.
   mentions,
 
@@ -166,7 +170,7 @@ typedef ThreadChannel = ({ChannelId channel, ThreadId? mainThread});
 /// of a card lies on Running now; one opened from a thread lies on that thread's stack.
 ///
 /// Example: in Spaces, `/t/<t>` of a forum `<c>` gives the pages Spaces (`/`), channel
-/// (`/c/<c>`) and thread (`/t/<t>`).
+/// (`/c/<c>`) and thread (`/t/<t>`); `/c/<c>/new` gives Spaces and the new chat view.
 List<PhonePage> phoneStack(
   PhoneTab tab,
   Uri location, {
@@ -188,6 +192,10 @@ List<PhonePage> phoneStack(
       return [root];
     case ChannelLocation():
       return [root, PhonePage(PhonePageKind.channel, path)];
+    // The new chat view of a forum lies on M1, where "+" and the draft row open it (brief
+    // M5-15 Design note 2); back goes to M1. On the send the post's history replaces it.
+    case NewChatLocation():
+      return [root, PhonePage(PhonePageKind.newChat, path)];
     case ThreadLocation(:final threadId):
       return _threadStack(root, tab, threadId, path, channelOf);
     case RunGraphLocation(fromThread: false):

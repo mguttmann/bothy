@@ -681,6 +681,24 @@ until the server created the post, then the post row takes its place and its his
 "Edit" of a refused post moves it back into the view. No git worktree, folder or runner request
 is involved (09 18.1). Rulings: docs/decisions.d/M4-41.md.
 
+### Threads and new chat on the phone (M5-15)
+
+M1 Spaces on the iPhone and on Android is the same `SidebarColumn` (`phone: true`) with the same
+thread groups, selection, bound, order, "All posts", markers, counters and kind icons as the
+desktop (01 6.8, D-SB-13), in the density `touch`, where "+" shows on every forum row at
+`density.target-min`. Navigation: a tap on a thread row goes to `/t/<id>` and the Spaces stack
+becomes M1, M2, M3; a tap on the forum name or "All posts" opens M2; "+" and the draft row open
+the new chat view of M4-41 (`NewChatView`, unchanged) as the page `PhonePageKind.newChat` at
+`/c/<forum>/new` on top of M1, with the input focused. Back (the back button and the edge swipe
+on iOS, the up arrow and system back on Android) pops that page to M1, which disposes the view, so
+an empty draft is deleted as on the desktop; sending goes through the outbox and, once the server
+created the post, its history replaces the page. Rows that no longer qualify stay while the
+person is in the list: `SidebarHoldMode.touch` holds while a finger is on the list, the list
+scrolls, or a screen reader runs while M1 is the page on screen (Design note 1). The group of a
+channel and its rows are nested nodes of the semantics tree, so screen readers get the levels
+space, channel, thread. There is no pinned column and no Cmd+Shift+O on the phone; the collapse
+state of a group is kept per device as on the desktop. Rulings: docs/decisions.d/M5-15.md.
+
 ## Notification levels and channel export
 
 The menu of a space or channel (right click, the menu key or Shift+F10 on its sidebar row), of a

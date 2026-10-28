@@ -58,7 +58,7 @@ class SpaceNode extends StatefulWidget {
   /// The thread the route shows, or null.
   final ThreadId? selectedThread;
 
-  /// Opens a thread row; null shows no thread groups (the phone until M5-15).
+  /// Opens a thread row; null shows no thread groups (tests of the tree without groups).
   final ValueChanged<ThreadId>? onOpenThread;
 
   /// Collapses or expands the thread group of a channel.

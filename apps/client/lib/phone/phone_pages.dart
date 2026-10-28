@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// The pages of the phone's stacks (docs/spec/01-product.md 5.3 M1 to M4 and M7; brief M5-02
-/// Design note 2): each composes the views and controllers of M4-19 to M4-25 unchanged; only
+/// Design note 2; the new chat view of 01 6.8 item 8, brief M5-15): each composes the views and controllers of M4-19 to M4-25 unchanged; only
 /// the layout around them is the phone's.
 library;
 
@@ -17,6 +17,7 @@ import 'package:l10n/l10n.dart';
 import '../app/providers/target.dart';
 import '../app/router.dart';
 import '../app/target_resolver.dart';
+import '../forum/new_chat_view.dart';
 import '../forum/post_list_column.dart';
 import '../mentions/mentions_view.dart';
 import '../onboarding/onboarding_controller.dart';
@@ -61,6 +62,12 @@ class PhonePageView extends StatelessWidget {
       ),
       PhonePageKind.thread when parsed is ThreadLocation => PhoneThreadPage(
         location: location,
+      ),
+      // The view and controller of M4-41 unchanged, as a page (brief M5-15 Design note 2).
+      PhonePageKind.newChat when parsed is NewChatLocation => NewChatView(
+        key: ValueKey('phone.newChat.${parsed.channelId.value}'),
+        forum: parsed.channelId,
+        sentEntry: parsed.sentEntry,
       ),
       PhonePageKind.search when parsed is ViewLocation => SearchView(
         key: ValueKey('searchView.${parsed.query}'),

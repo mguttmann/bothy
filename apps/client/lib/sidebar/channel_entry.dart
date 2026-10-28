@@ -64,7 +64,7 @@ class ChannelEntry extends StatefulWidget {
   /// Opens the channel.
   final VoidCallback onOpen;
 
-  /// Opens a thread of the group; null shows no group (the phone until M5-15).
+  /// Opens a thread of the group; null shows no group (tests of the tree without groups).
   final ValueChanged<ThreadId>? onOpenThread;
 
   /// Collapses or expands the group with the requested expanded state.
@@ -231,41 +231,63 @@ class _ChannelEntryState extends State<ChannelEntry> {
       ),
     );
     if (rows.isEmpty && newChats.isEmpty) return channelRow;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        channelRow,
-        // The draft row and the sent posts at the top of the group (01 6.8 item 8, M4-41).
-        for (final (i, r) in newChats.indexed)
-          NewChatEntry(
-            channel: e.channel.id,
-            row: r,
-            selected: newChat?.selects(e.channel.id, r) ?? false,
-            last: rest == null && rows.isEmpty && i == newChats.length - 1,
-            onOpen: () => w.onOpenNewChat!(r.entryId),
-            focusNode: _newChatNode(r),
-            onKeyEvent: _onRowKey,
+    // The channel with its rows is one node inside the space's group, and the rows one node
+    // below the channel row, so VoiceOver and TalkBack get the levels space, channel, thread as
+    // nesting of the semantics tree (components.md 7; brief M5-15 requirement 15): Flutter has
+    // no tree role or level to set.
+    return Semantics(
+      container: true,
+      explicitChildNodes: true,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          channelRow,
+          Semantics(
+            container: true,
+            explicitChildNodes: true,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // The draft row and the sent posts at the top of the group (01 6.8 item 8,
+                // M4-41).
+                for (final (i, r) in newChats.indexed)
+                  NewChatEntry(
+                    channel: e.channel.id,
+                    row: r,
+                    selected: newChat?.selects(e.channel.id, r) ?? false,
+                    last:
+                        rest == null &&
+                        rows.isEmpty &&
+                        i == newChats.length - 1,
+                    onOpen: () => w.onOpenNewChat!(r.entryId),
+                    focusNode: _newChatNode(r),
+                    onKeyEvent: _onRowKey,
+                  ),
+                for (final (i, r) in rows.indexed)
+                  ThreadEntry(
+                    entry: r,
+                    channel: e.channel,
+                    selected: r.thread.id == w.selectedThread,
+                    last: rest == null && i == rows.length - 1,
+                    onOpen: () => w.onOpenThread!(r.thread.id),
+                    focusNode: _threadNode(r.thread.id),
+                    onKeyEvent: _onRowKey,
+                  ),
+                if (rest != null)
+                  AllPostsEntry(
+                    channel: e.channel.id,
+                    counts: rest,
+                    onOpen: w.onOpen,
+                    focusNode: _allPosts,
+                    onKeyEvent: _onRowKey,
+                  ),
+              ],
+            ),
           ),
-        for (final (i, r) in rows.indexed)
-          ThreadEntry(
-            entry: r,
-            channel: e.channel,
-            selected: r.thread.id == w.selectedThread,
-            last: rest == null && i == rows.length - 1,
-            onOpen: () => w.onOpenThread!(r.thread.id),
-            focusNode: _threadNode(r.thread.id),
-            onKeyEvent: _onRowKey,
-          ),
-        if (rest != null)
-          AllPostsEntry(
-            channel: e.channel.id,
-            counts: rest,
-            onOpen: w.onOpen,
-            focusNode: _allPosts,
-            onKeyEvent: _onRowKey,
-          ),
-      ],
+        ],
+      ),
     );
   }
 }
