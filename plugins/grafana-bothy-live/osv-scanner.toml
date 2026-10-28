@@ -200,6 +200,6 @@ ignoreUntil = 2026-11-18
 reason = "react-router 6.30.6 via @grafana/ui 13.2.3; same reason as GHSA-337j-9hxr-rhxg: an external provided by Grafana, never bundled or imported by the plugin."
 
 [[IgnoredVulns]]
-id = "GHSA-hp3w-g68c-fv3c"
+id = "GHSA-gcqx-w48m-w2h4"
 ignoreUntil = 2026-11-18
-reason = "sprintf-js 1.0.3, a dev dependency of jest (argparse); it runs only in the unit tests on fixed input and never ships. No fixed release exists yet; Renovate proposes it when one does."
+reason = "deepmerge 4.3.1, a dev dependency of jest-config and fork-ts-checker-webpack-plugin; it merges only the plugin's own test and type-check configuration and never ships. No fixed release exists yet; Renovate proposes it when one does."
