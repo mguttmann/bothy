@@ -104,6 +104,11 @@ the certificate counts as valid (WebAuthn needs that). Firefox and WebKit, which
 authenticator in Playwright, accept the test certificate through the context option and do the
 step-up with password and one-time code.
 
+When the Flutter view of the console does not attach within the step limit after a load, the flow
+loads the page once more and waits again; a second failed start fails the browser (PL/61). A failed
+browser prints the page errors, console errors and warnings and failed requests of its session (at
+most 50 lines) after the screen dump.
+
 Phase 1 also checks VZ-T12 without the key in every browser: the console's CSP has no `frame-src`
 and the navigation has no "Operations (Grafana)".
 
