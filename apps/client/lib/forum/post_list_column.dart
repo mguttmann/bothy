@@ -315,10 +315,10 @@ class _PostListViewState extends State<PostListView> {
 /// The forum overview of [channelId] over the providers (R-CL-03).
 ///
 /// It loads the first page of `listChannelThreads` when it opens and the next ones when
-/// scrolled near the end ([ForumPager]); "New post" (or "New chat") puts `createThread` into the
-/// outbox, also when the "+" of the sidebar asked for it ([NewPostRequest], until M4-41); the
-/// Done state and the pinned state are kept on this device; "Pin" and Cmd+Shift+O pin or unpin
-/// it; the search opens `/search` with `in:<forum>`; a post opens `/t/<id>`.
+/// scrolled near the end ([ForumPager]); "New post" (or "New chat") opens the new chat view of
+/// the forum (M4-41); the Done state and the pinned state are kept on this device; "Pin" and
+/// Cmd+Shift+O pin or unpin it; the search opens `/search` with `in:<forum>`; a post opens
+/// `/t/<id>`.
 class PostListColumn extends ConsumerWidget {
   /// Creates the column.
   const PostListColumn({
