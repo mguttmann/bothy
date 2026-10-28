@@ -772,7 +772,7 @@ func (s *Server) listSpaceChannels(_ *http.Request, _ []byte, params []string) (
 	for _, ch := range sp.channels {
 		items = append(items, view("channel", map[string]any{
 			"id": ch.id, memberName: ch.name, memberKind: ch.kind, "space_id": sp.id, memberSortKey: ch.sortKey, "topic": ch.topic,
-			"read_only": ch.readOnly, "operator": map[string]any{memberMode: "inherit"}, "settings_version": 1, memberVersion: 1,
+			"read_only": ch.readOnly, "project_bound": false, "operator": map[string]any{memberMode: "inherit"}, "settings_version": 1, memberVersion: 1,
 			memberCreatedAt: stamp(ch.created)}))
 	}
 	return http.StatusOK, map[string]any{memberItems: items}, nil

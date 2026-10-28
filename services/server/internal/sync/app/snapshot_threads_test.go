@@ -208,3 +208,30 @@ func TestActiveThreads_Excludes(t *testing.T) {
 		t.Fatalf("the owner, who reads Finance, misses its post: %+v", o.ActiveThreads)
 	}
 }
+
+// TestSnapshot_ChannelProjectBound (M2-52, R-DM-54): the channels of the snapshot carry
+// project_bound, true for a bound forum and false for an unbound forum and a text channel; the
+// snapshot part of TestChannel_ProjectBoundInEveryRead.
+func TestSnapshot_ChannelProjectBound(t *testing.T) {
+	t.Parallel()
+	w := newATWorld(t)
+	unbound := w.Channel(w.space, "forum", "ideas")
+	text := w.Channel(w.space, "text", "general")
+	w.SQL(`INSERT INTO project_bindings (channel_id, workspace_ref, created_by) VALUES ($1, 'website', $2)`, w.forum.String(), w.OwnerID.String())
+	want := map[ids.ID]bool{w.forum: true, unbound: false, text: false}
+	v := w.snapshot(t, "alex")
+	seen := 0
+	for _, c := range v.Channels {
+		bound, known := want[c.ID]
+		if !known {
+			continue
+		}
+		seen++
+		if c.ProjectBound != bound {
+			t.Fatalf("channel %s: project_bound %v, want %v", c.ID, c.ProjectBound, bound)
+		}
+	}
+	if seen != len(want) {
+		t.Fatalf("snapshot lists %d of %d channels: %+v", seen, len(want), v.Channels)
+	}
+}
