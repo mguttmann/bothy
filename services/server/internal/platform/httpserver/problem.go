@@ -169,11 +169,11 @@ func toError(r *http.Request, err error) *errs.Error {
 		if e.Code == errs.CodeInternalError && requestDeadline(r, err) {
 			// Adapters wrap any database error as internal_error; the end of http.request_timeout
 			// is the server's overload, not a defect (PL/52).
-			logFailure(r, errs.CodeUnavailable, errs.CauseDeadlineExceeded, "")
+			logFailure(r, err, errs.CodeUnavailable, errs.CauseDeadlineExceeded, "")
 			return errs.Wrap(errs.CodeUnavailable, err, "").WithCause(errs.CauseDeadlineExceeded)
 		}
 		if e.Kind().Status() >= http.StatusInternalServerError {
-			logFailure(r, e.PublicCode(), e.Cause, "")
+			logFailure(r, err, e.PublicCode(), e.Cause, "")
 		}
 		return e
 	}
@@ -182,10 +182,10 @@ func toError(r *http.Request, err error) *errs.Error {
 		return payloadTooLarge(r.Context())
 	}
 	if errors.Is(err, os.ErrDeadlineExceeded) || requestDeadline(r, err) {
-		logFailure(r, errs.CodeUnavailable, errs.CauseDeadlineExceeded, "")
+		logFailure(r, err, errs.CodeUnavailable, errs.CauseDeadlineExceeded, "")
 		return errs.Wrap(errs.CodeUnavailable, err, "").WithCause(errs.CauseDeadlineExceeded)
 	}
-	logFailure(r, errs.CodeInternalError, "", fmt.Sprintf("%T", err))
+	logFailure(r, err, errs.CodeInternalError, "", fmt.Sprintf("%T", err))
 	return errs.Wrap(errs.CodeInternalError, err, "")
 }
 
@@ -218,7 +218,8 @@ func payloadTooLarge(ctx context.Context) *errs.Error {
 // logFailure writes "request failed" at level error with the public code as error.type, the
 // internal cause as bothy.reason and the route. goType names the Go type of an error without a
 // kind; texts never reach the log through the allowlist of platform/otel (signals.md "Logs").
-func logFailure(r *http.Request, code errs.Code, cause, goType string) {
+// The SQLSTATE of a database error in the chain of err is db.response.status_code (PL/56).
+func logFailure(r *http.Request, err error, code errs.Code, cause, goType string) {
 	ctx := r.Context()
 	attrs := []slog.Attr{slog.String(attr.ErrorType, string(code)), slog.String(attr.CorrelationID, reqmeta.CorrelationID(ctx))}
 	if op, ok := OperationFrom(ctx); ok {
@@ -229,6 +230,10 @@ func logFailure(r *http.Request, code errs.Code, cause, goType string) {
 	}
 	if goType != "" {
 		attrs = append(attrs, slog.String(attr.ExceptionType, goType))
+	}
+	var se interface{ SQLState() string }
+	if errors.As(err, &se) && se.SQLState() != "" {
+		attrs = append(attrs, slog.String(attr.DBResponseStatusCode, se.SQLState()))
 	}
 	loggerFrom(ctx).LogAttrs(ctx, slog.LevelError, LogRequestFailed, attrs...)
 }

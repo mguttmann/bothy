@@ -11,6 +11,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgconn"
+
+	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver/httpservertest"
 )
@@ -256,6 +259,32 @@ func TestDeadline_ExceededGives503(t *testing.T) {
 	rec, ok := h.Logs.Find(httpserver.LogRequestFailed)
 	if !ok || rec.Attrs["bothy.reason"] != "deadline_exceeded" {
 		t.Fatalf("log %+v", rec)
+	}
+}
+
+// TestInternalError_LogsTheSQLState: an internal_error over a database error logs its SQLSTATE
+// (db.response.status_code, a code without text), so a 500 names its database cause, for
+// example 25P03 for a session the database ended after database.idle_in_tx_timeout.
+func TestInternalError_LogsTheSQLState(t *testing.T) {
+	t.Parallel()
+	op := getThing()
+	h := httpservertest.New(t, httpservertest.Options{Routes: []httpservertest.Route{{Op: op,
+		Handler: httpservertest.Authorized(op.Action, func(w http.ResponseWriter, r *http.Request) {
+			cause := &pgconn.PgError{Severity: "FATAL", Code: "25P03", Message: "terminating connection due to idle-in-transaction timeout"}
+			httpserver.WriteProblem(w, r, errs.Wrap(errs.CodeInternalError, cause, "chat: create channel"))
+		})}}})
+	resp := h.Do(h.NewRequest(http.MethodGet, "/api/v1/things/"+thingID, "", "X-Mode", "fast"))
+	if resp.StatusCode != 500 || strings.Contains(string(resp.Body), "25P03") {
+		t.Fatalf("%d %s", resp.StatusCode, resp.Body)
+	}
+	rec, ok := h.Logs.Find(httpserver.LogRequestFailed)
+	if !ok || rec.Attrs["db.response.status_code"] != "25P03" || rec.Attrs["error.type"] != "internal_error" {
+		t.Fatalf("log %+v", rec)
+	}
+	for _, v := range rec.Attrs {
+		if strings.Contains(v, "idle-in-transaction") {
+			t.Fatalf("error text in the log: %+v", rec)
+		}
 	}
 }
 
