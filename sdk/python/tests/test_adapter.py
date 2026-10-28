@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
 from pathlib import Path
 from typing import Any
 from uuid import UUID
@@ -392,6 +392,75 @@ async def test_renewal_refused_closes_the_entry(fake: FakeServer) -> None:
         assert run_id not in a._runs
     assert late.count("execute") == 0
     assert fake.run_state(run_id).starts == 1
+
+
+class NoAckSource(RecordingSource):
+    """Never acknowledges, so `FakeServer.redeliver` brings every event again."""
+
+    async def settle(self, seq: int) -> None:
+        return None
+
+    async def ack(self, seq: int) -> None:
+        return None
+
+
+class AfterRenewal(httpx.AsyncBaseTransport):
+    """Runs ``hook`` once after the server granted a renewal, before the adapter sees the grant."""
+
+    def __init__(self) -> None:
+        self.inner = httpx.AsyncHTTPTransport()
+        self.hook: Callable[[], Awaitable[None]] | None = None
+
+    async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+        response = await self.inner.handle_async_request(request)
+        renewal = request.method == "POST" and request.url.path.endswith("/invocation-token")
+        if renewal and response.status_code == httpx.codes.OK and self.hook is not None:
+            hook, self.hook = self.hook, None
+            await response.aread()
+            await hook()
+        return response
+
+    async def aclose(self) -> None:
+        await self.inner.aclose()
+
+
+@pytest.mark.anyio
+async def test_redelivery_during_a_renewal_starts_with_the_newest_token() -> None:
+    # The server granted the renewal and then redelivered the event with a newer token, which
+    # the adapter stored before the grant arrived: the grant must not overwrite it (09 4.5.1).
+    async with FakeServer(timings={"agent.ack_timeout": 100_000}) as fake:
+        gate = asyncio.Event()
+        handler = RecordingHandler(block_prepare=gate)
+        transport = AfterRenewal()
+        adapter = make_adapter(fake, handler, "renew-redelivery", http_transport=transport)
+        async with running(adapter, NoAckSource, fake):
+            triggered = await fake.trigger()
+            run_id = triggered.run_id
+            await until(fake, lambda: handler.count("prepare") == 1)
+            event_id = adapter._runs[run_id].event_id
+            newest: list[str] = []
+
+            async def redeliver() -> None:
+                await fake.redeliver()
+                newest.append(fake.world.runs[run_id].invocation_jti)
+
+                async def stored() -> bool:
+                    entry = await adapter.inbox.get(event_id)
+                    return entry is not None and entry.token_jti == newest[0]
+
+                await until(fake, stored)
+
+            transport.hook = redeliver
+            ttl = fake.timings["agent.invocation_token_ttl"] + fake.timings["auth.clock_leeway"]
+            await fake.pass_time(ttl + 1)
+            gate.set()
+            await until(fake, lambda: fake.run_state(run_id).state == "completed")
+        assert newest
+        assert fake.world.runs[run_id].started_jti == newest[0]
+        assert handler.count("execute") == 1
+        assert fake.run_state(run_id).starts == 1
+        renewals = [r for r in fake.requests if r.operation_id == "renewInvocationToken"]
+        assert len(renewals) == 1
 
 
 class TwoAnswers(RecordingHandler):

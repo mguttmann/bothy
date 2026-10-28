@@ -152,14 +152,22 @@ class InboxStore(ReplayStore, Protocol):
         """
         ...
 
-    async def replace_token(self, event_id: UUID, token: Secret, iat: int, jti: str) -> None:
-        """Replace the token unconditionally (after a renewal grant).
+    async def replace_token(
+        self, event_id: UUID, token: Secret, iat: int, jti: str, *, replaces: Secret | None = None
+    ) -> InboxEntry:
+        """Replace the token (after a renewal grant).
 
         Args:
             event_id: The envelope ``id``.
             token: The granted token.
             iat: Its ``iat``.
             jti: Its ``jti``.
+            replaces: The renewed token; when given, the token is replaced only while the stored
+                token is still this one (a redelivery during the renewal stored a newer token,
+                which stays).
+
+        Returns:
+            The entry after the call.
 
         Raises:
             KeyError: The event is not stored.
@@ -227,6 +235,14 @@ def _after_redelivery(
             entry, token=token, token_iat=iat, token_jti=jti, deliveries=entry.deliveries + 1
         )
     return dataclasses.replace(entry, deliveries=entry.deliveries + 1)
+
+
+def _after_grant(
+    entry: InboxEntry, token: Secret, iat: int, jti: str, replaces: Secret | None
+) -> InboxEntry:
+    if replaces is not None and entry.token is not None and entry.token != replaces:
+        return entry  # a redelivery stored a newer token while the renewal was on its way
+    return dataclasses.replace(entry, token=token, token_iat=iat, token_jti=jti)
 
 
 def _order(entry: InboxEntry) -> tuple[bool, int]:
@@ -312,22 +328,28 @@ class MemoryInboxStore:
             self._entries[event_id] = updated
             return updated
 
-    async def replace_token(self, event_id: UUID, token: Secret, iat: int, jti: str) -> None:
-        """Replace the token unconditionally.
+    async def replace_token(
+        self, event_id: UUID, token: Secret, iat: int, jti: str, *, replaces: Secret | None = None
+    ) -> InboxEntry:
+        """Replace the token; see `InboxStore.replace_token`.
 
         Args:
             event_id: The envelope ``id``.
             token: The granted token.
             iat: Its ``iat``.
             jti: Its ``jti``.
+            replaces: The renewed token, if the replacement depends on it.
+
+        Returns:
+            The entry after the call.
 
         Raises:
             KeyError: The event is not stored.
         """
         async with self._lock:
-            self._entries[event_id] = dataclasses.replace(
-                self._entries[event_id], token=token, token_iat=iat, token_jti=jti
-            )
+            updated = _after_grant(self._entries[event_id], token, iat, jti, replaces)
+            self._entries[event_id] = updated
+            return updated
 
     async def set_state(self, event_id: UUID, state: EntryState) -> None:
         """Set the state of an entry.
@@ -554,26 +576,34 @@ class SqliteInboxStore:
         result: InboxEntry = await self._run(fn)
         return result
 
-    async def replace_token(self, event_id: UUID, token: Secret, iat: int, jti: str) -> None:
-        """Replace the token unconditionally; durable when this returns.
+    async def replace_token(
+        self, event_id: UUID, token: Secret, iat: int, jti: str, *, replaces: Secret | None = None
+    ) -> InboxEntry:
+        """Replace the token; durable when this returns; see `InboxStore.replace_token`.
 
         Args:
             event_id: The envelope ``id``.
             token: The granted token.
             iat: Its ``iat``.
             jti: Its ``jti``.
+            replaces: The renewed token, if the replacement depends on it.
+
+        Returns:
+            The entry after the call.
 
         Raises:
             KeyError: The event is not stored.
         """
 
-        def fn(conn: sqlite3.Connection) -> None:
+        def fn(conn: sqlite3.Connection) -> InboxEntry:
             current = _require(conn, event_id)
-            _write_token_and_count(
-                conn, dataclasses.replace(current, token=token, token_iat=iat, token_jti=jti)
-            )
+            updated = _after_grant(current, token, iat, jti, replaces)
+            if updated is not current:
+                _write_token_and_count(conn, updated)
+            return updated
 
-        await self._run(fn)
+        result: InboxEntry = await self._run(fn)
+        return result
 
     async def set_state(self, event_id: UUID, state: EntryState) -> None:
         """Set the state of an entry; durable when this returns.

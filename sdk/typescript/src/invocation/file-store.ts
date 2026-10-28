@@ -14,6 +14,7 @@ import { Secret } from "../auth/secret.js";
 import {
   EntryState,
   InboxEntry,
+  afterGrant,
   afterRedelivery,
   bySeq,
   checkNew,
@@ -242,23 +243,25 @@ export class FileInboxStore implements InboxStore {
   }
 
   /**
-   * Replaces the token unconditionally; durable when this resolves.
+   * Replaces the token; durable when this resolves; see {@link InboxStore.replaceToken}.
    *
    * @param eventId - The envelope `id`.
    * @param token - The granted token.
    * @param iat - Its `iat`.
    * @param jti - Its `jti`.
-   * @returns A promise that resolves when written.
+   * @param replaces - The renewed token, if the replacement depends on it.
+   * @returns The entry after the call.
    * @throws `RangeError` when the event is not stored; `Error` when the write fails.
    */
-  async replaceToken(
+  replaceToken(
     eventId: string,
     token: Secret,
     iat: number,
     jti: string,
-  ): Promise<void> {
-    await this.update(eventId, (e) =>
-      replaced(e, { token, tokenIat: iat, tokenJti: jti }),
+    replaces?: Secret,
+  ): Promise<InboxEntry> {
+    return this.update(eventId, (e) =>
+      afterGrant(e, token, iat, jti, replaces),
     );
   }
 

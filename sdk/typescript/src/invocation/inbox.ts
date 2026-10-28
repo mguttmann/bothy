@@ -187,12 +187,16 @@ export interface InboxStore extends ReplayStore {
     jti: string | undefined,
   ): Promise<InboxEntry>;
   /**
-   * Replaces the token unconditionally (after a renewal grant).
+   * Replaces the token (after a renewal grant).
    *
    * @param eventId - The envelope `id`.
    * @param token - The granted token.
    * @param iat - Its `iat`.
    * @param jti - Its `jti`.
+   * @param replaces - The renewed token; when given, the token is replaced only while the
+   *   stored token is still this one (a redelivery during the renewal stored a newer token,
+   *   which stays).
+   * @returns The entry after the call.
    * @throws `RangeError` when the event is not stored.
    */
   replaceToken(
@@ -200,7 +204,8 @@ export interface InboxStore extends ReplayStore {
     token: Secret,
     iat: number,
     jti: string,
-  ): Promise<void>;
+    replaces?: Secret,
+  ): Promise<InboxEntry>;
   /**
    * Sets the state of an entry.
    *
@@ -290,6 +295,33 @@ export function afterRedelivery(
         deliveries: entry.deliveries + 1,
       })
     : replaced(entry, { deliveries: entry.deliveries + 1 });
+}
+
+/**
+ * The entry after a renewal grant: the granted token, unless a redelivery stored a newer token
+ * than `replaces` while the renewal was on its way.
+ *
+ * @param entry - The stored entry.
+ * @param token - The granted token.
+ * @param iat - Its `iat`.
+ * @param jti - Its `jti`.
+ * @param replaces - The renewed token, if the replacement depends on it.
+ * @returns The updated entry, or `entry` itself when it keeps its token.
+ */
+export function afterGrant(
+  entry: InboxEntry,
+  token: Secret,
+  iat: number,
+  jti: string,
+  replaces: Secret | undefined,
+): InboxEntry {
+  if (
+    replaces !== undefined &&
+    entry.token !== undefined &&
+    !entry.token.equals(replaces)
+  )
+    return entry;
+  return replaced(entry, { token, tokenIat: iat, tokenJti: jti });
 }
 
 /**
@@ -387,6 +419,29 @@ export class MemoryInboxStore implements InboxStore {
   }
 
   /**
+   * Replaces the token; see {@link InboxStore.replaceToken}.
+   *
+   * @param eventId - The envelope `id`.
+   * @param token - The granted token.
+   * @param iat - Its `iat`.
+   * @param jti - Its `jti`.
+   * @param replaces - The renewed token, if the replacement depends on it.
+   * @returns The entry after the call.
+   * @throws `RangeError` when the event is not stored.
+   */
+  replaceToken(
+    eventId: string,
+    token: Secret,
+    iat: number,
+    jti: string,
+    replaces?: Secret,
+  ): Promise<InboxEntry> {
+    return this.update(eventId, (e) =>
+      afterGrant(e, token, iat, jti, replaces),
+    );
+  }
+
+  /**
    * Counts a redelivery; see {@link InboxStore.redelivered}.
    *
    * @param eventId - The envelope `id`.
@@ -403,27 +458,6 @@ export class MemoryInboxStore implements InboxStore {
     jti: string | undefined,
   ): Promise<InboxEntry> {
     return this.update(eventId, (e) => afterRedelivery(e, token, iat, jti));
-  }
-
-  /**
-   * Replaces the token unconditionally.
-   *
-   * @param eventId - The envelope `id`.
-   * @param token - The granted token.
-   * @param iat - Its `iat`.
-   * @param jti - Its `jti`.
-   * @returns A promise that resolves when stored.
-   * @throws `RangeError` when the event is not stored.
-   */
-  async replaceToken(
-    eventId: string,
-    token: Secret,
-    iat: number,
-    jti: string,
-  ): Promise<void> {
-    await this.update(eventId, (e) =>
-      replaced(e, { token, tokenIat: iat, tokenJti: jti }),
-    );
   }
 
   /**
