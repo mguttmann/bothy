@@ -151,7 +151,7 @@ void main() {
       expect(find.text('2'), findsOneWidget);
       expect(
         find.bySemanticsLabel(
-          '${'general'}, ${l.threadRowUnread(3)}, ${l.threadRowMentions(2)}, ${l.channelRowRunActive}',
+          '${'general'}, ${l.channelKindNameText}, ${l.threadRowUnread(3)}, ${l.threadRowMentions(2)}, ${l.channelRowRunActive}',
         ),
         findsOneWidget,
       );

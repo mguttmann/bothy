@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// Local-only tables (15 6.1): `outbox`, `sync_state`, `loaded_ranges`, `file_cache`,
-/// `share_inbox`, `forum_view_states`, `recent_targets` and `host_key_pins`. Times are
-/// milliseconds since the epoch in UTC, so ordering and the cleanup compare plain integers.
+/// `share_inbox`, `forum_view_states`, `recent_targets`, `host_key_pins`, `channel_view_states`
+/// and `shell_view_state`. Times are milliseconds since the epoch in UTC, so ordering and the
+/// cleanup compare plain integers.
 library;
 
 import 'package:drift/drift.dart';
@@ -182,6 +183,47 @@ class ForumViewStates extends Table {
 
   @override
   Set<Column<Object>> get primaryKey => {channelId};
+}
+
+/// How the thread group of a channel looks in the sidebar on this device (01 6.8 item 7, D-SB-6):
+/// whether it is collapsed. Kept per device and never synchronized, because 01 11 has no key
+/// for it (a new setting key would need a server change for a view preference); a channel
+/// without a row shows its group expanded. The removal of a channel deletes its row (04 8.3).
+@DataClassName('ChannelViewStateRow')
+class ChannelViewStates extends Table {
+  @override
+  String get tableName => 'channel_view_states';
+
+  /// The channel, canonical UUID text.
+  TextColumn get channelId => text()();
+
+  /// Whether the thread group under the channel row is collapsed.
+  BoolColumn get groupCollapsed => boolean()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {channelId};
+}
+
+/// How the desktop shell looks on this device (01 6.8 item 7, D-SB-6; 01 D1, D15): whether the
+/// forum overview is pinned as its own column. One row, like `sync_state`; kept per device and
+/// never synchronized, because 01 11 has no key for it; without the row the overview is not
+/// pinned.
+@DataClassName('ShellViewStateRow')
+class ShellViewStates extends Table {
+  @override
+  String get tableName => 'shell_view_state';
+
+  /// Always 1: the table holds one row.
+  // drift builds the CHECK from the column itself; the getter is not called recursively.
+  // ignore: recursive_getters
+  IntColumn get id => integer().check(id.equals(1))();
+
+  /// Whether the forum overview D15 is pinned as a column next to the history.
+  BoolColumn get overviewPinned =>
+      boolean().withDefault(const Constant(false))();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
 }
 
 /// The recently visited spaces, channels and threads of the quick switcher (brief M4-23 Design

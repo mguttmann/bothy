@@ -19,6 +19,8 @@
     ["flutter", "test", "integration_test/search_test.dart", "-d", "macos"],
     ["flutter", "test", "integration_test/settings_sync_test.dart", "-d", "macos"],
     ["flutter", "test", "integration_test/sidebar_sync_test.dart", "-d", "macos"],
+    ["flutter", "test", "integration_test/sidebar_threads_test.dart", "-d", "macos"],
+    ["flutter", "test", "integration_test/sidebar_keyboard_test.dart", "-d", "macos"],
     ["flutter", "test", "integration_test/switcher_mentions_running_test.dart", "-d", "macos"],
     ["flutter", "test", "integration_test/terminal_fake_test.dart", "-d", "macos"],
     ["flutter", "test", "integration_test/viz/live_test.dart", "-d", "macos"],
@@ -54,6 +56,8 @@
     ["flutter", "test", "integration_test/search_test.dart", "-d", "windows"],
     ["flutter", "test", "integration_test/settings_sync_test.dart", "-d", "windows"],
     ["flutter", "test", "integration_test/sidebar_sync_test.dart", "-d", "windows"],
+    ["flutter", "test", "integration_test/sidebar_threads_test.dart", "-d", "windows"],
+    ["flutter", "test", "integration_test/sidebar_keyboard_test.dart", "-d", "windows"],
     ["flutter", "test", "integration_test/switcher_mentions_running_test.dart", "-d", "windows"],
     ["flutter", "test", "integration_test/terminal_fake_test.dart", "-d", "windows"],
     ["flutter", "test", "integration_test/viz/live_test.dart", "-d", "windows"]

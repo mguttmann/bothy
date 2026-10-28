@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The drift database of the apps, schema version 5 (docs/spec/15-client-architecture.md 6, ADR
-/// 0029): the mirror tables of 15 6.1 and the local-only tables, `host_key_pins` (M4-36)
-/// included.
+/// The drift database of the apps, schema version 6 (docs/spec/15-client-architecture.md 6, ADR
+/// 0029): the mirror tables of 15 6.1 and the local-only tables, `host_key_pins` (M4-36) and
+/// the sidebar view state `channel_view_states` and `shell_view_state` (M4-40) included.
 library;
 
 import 'dart:io';
@@ -26,6 +26,7 @@ import 'daos/structure_dao.dart';
 import 'daos/sync_state_dao.dart';
 import 'daos/threads_dao.dart';
 import 'database.steps.dart';
+import 'migration_rules.dart';
 import 'tables/files.dart';
 import 'tables/instance.dart';
 import 'tables/local_only.dart';
@@ -70,6 +71,8 @@ part 'database.g.dart';
     ForumViewStates,
     RecentTargets,
     HostKeyPins,
+    ChannelViewStates,
+    ShellViewStates,
   ],
   include: {'search.drift'},
 )
@@ -86,7 +89,24 @@ class LocalDatabase extends _$LocalDatabase {
   final DateTime Function() clock;
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
+
+  /// Closes the database and releases its file, also while watched queries come and go.
+  ///
+  /// drift closes its stream store first: it awaits the close of each active stream while it
+  /// iterates them, and a paused listener (riverpod pauses providers nobody watches) holds that
+  /// close until it resumes. A stream that a cancelled listener removes meanwhile ends the loop
+  /// with a [ConcurrentModificationError] before drift closes the executor, so the file stayed
+  /// open and Windows refused to delete it after a 4012 or a logout (R-SY-14). The executor
+  /// closes in that case anyway; the streams are dead with it.
+  @override
+  Future<void> close() async {
+    try {
+      await super.close();
+    } on ConcurrentModificationError {
+      await executor.close();
+    }
+  }
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -106,6 +126,16 @@ class LocalDatabase extends _$LocalDatabase {
       // `getInstance` of the engine fills the policy.
       from4To5: (m, schema) =>
           m.addColumn(schema.instance, schema.instance.appLock),
+      // Version 6 (M4-40): the local-only tables `channel_view_states` and `shell_view_state`
+      // (01 6.8 item 7, D-SB-6) and the column `channels.project_bound` (R-DM-54), false in
+      // every kept row; no row moves. The cursor goes, so the next connection loads a whole
+      // snapshot that fills the flag of every channel (04 7.3).
+      from5To6: (m, schema) async {
+        await m.createTable(schema.channelViewStates);
+        await m.createTable(schema.shellViewState);
+        await m.addColumn(schema.channels, schema.channels.projectBound);
+        await MigrationRules.resetCursor(m);
+      },
     ),
   );
 
@@ -183,7 +213,8 @@ class LocalDatabase extends _$LocalDatabase {
   /// Share inbox.
   late final ShareInboxDao shareInboxDao = ShareInboxDao(this);
 
-  /// How forums look on this device (the Done section).
+  /// How forums and channel groups look on this device: the Done section, the collapsed
+  /// thread groups and the pinned forum overview.
   late final ForumViewDao forumViewDao = ForumViewDao(this);
 
   /// The recently visited targets of the quick switcher on this device.

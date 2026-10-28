@@ -2590,7 +2590,7 @@ abstract class AppLocalizations {
   /// Semantics label of the post list column frame (01 section 5.1).
   ///
   /// In en, this message translates to:
-  /// **'Post list'**
+  /// **'Forum overview'**
   String get shellColumnPostList;
 
   /// Semantics label of the history column frame (01 section 5.1).
@@ -12885,19 +12885,19 @@ abstract class AppLocalizations {
   /// Row of the list of shortcuts (01 7).
   ///
   /// In en, this message translates to:
-  /// **'Next or previous channel'**
+  /// **'Next or previous channel or thread row in the sidebar'**
   String get shortcutChannel;
 
   /// Row of the list of shortcuts (01 7).
   ///
   /// In en, this message translates to:
-  /// **'Next or previous unread channel'**
+  /// **'Next or previous unread channel or thread row'**
   String get shortcutUnreadChannel;
 
   /// Row of the list of shortcuts (01 7).
   ///
   /// In en, this message translates to:
-  /// **'Switch column (sidebar, list, history, session)'**
+  /// **'Switch column (sidebar, pinned overview, history, session)'**
   String get shortcutColumn;
 
   /// Row of the list of shortcuts (01 7).
@@ -14705,6 +14705,108 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'error {status}'**
   String shareReasonStatus(String status);
+
+  /// The kind sentence of a text channel: tooltip and screen reader text of its icon, subtitle of its header (01 section 4 and 6.8 item 11).
+  ///
+  /// In en, this message translates to:
+  /// **'Text channel: one shared conversation, threads start from its messages'**
+  String get channelKindSentenceText;
+
+  /// The kind sentence of a forum without a project binding: tooltip of its icon, subtitle of its header and overview, empty state of the forum (01 section 4 and 6.8 item 11).
+  ///
+  /// In en, this message translates to:
+  /// **'Forum: every post is its own conversation'**
+  String get channelKindSentenceForum;
+
+  /// The kind sentence of a forum with a project binding: tooltip of its icon, subtitle of its header and overview, empty state of the forum (01 section 4 and 6.8 item 11).
+  ///
+  /// In en, this message translates to:
+  /// **'Project: every post is one agent session in this project'**
+  String get channelKindSentenceProject;
+
+  /// The kind of a channel inside the screen reader label of its sidebar row: a text channel (components.md section 7).
+  ///
+  /// In en, this message translates to:
+  /// **'text channel'**
+  String get channelKindNameText;
+
+  /// The kind of a channel inside the screen reader label of its sidebar row: a forum (components.md section 7).
+  ///
+  /// In en, this message translates to:
+  /// **'forum'**
+  String get channelKindNameForum;
+
+  /// The kind of a channel inside the screen reader label of its sidebar row: a forum with a project binding (components.md section 7).
+  ///
+  /// In en, this message translates to:
+  /// **'project forum'**
+  String get channelKindNameProject;
+
+  /// Last row of an expanded forum group in the sidebar; opens the forum overview (01 section 6.8 item 5).
+  ///
+  /// In en, this message translates to:
+  /// **'All posts'**
+  String get sidebarAllPosts;
+
+  /// Sidebar thread row whose title is still empty (01 section 6.8 item 6).
+  ///
+  /// In en, this message translates to:
+  /// **'New chat'**
+  String get sidebarNewChat;
+
+  /// Label of the + action of a forum row with a project binding (01 section 6.8 item 8).
+  ///
+  /// In en, this message translates to:
+  /// **'New chat in {forum}'**
+  String sidebarNewChatIn(String forum);
+
+  /// Label of the + action of a forum row without a project binding (01 section 6.8 item 8).
+  ///
+  /// In en, this message translates to:
+  /// **'New post in {forum}'**
+  String sidebarNewPostIn(String forum);
+
+  /// Tooltip of the arrow of a collapsed thread group of a channel in the sidebar (01 section 6.8 item 7).
+  ///
+  /// In en, this message translates to:
+  /// **'Show threads'**
+  String get sidebarShowThreads;
+
+  /// Tooltip of the arrow of an expanded thread group of a channel in the sidebar (01 section 6.8 item 7).
+  ///
+  /// In en, this message translates to:
+  /// **'Hide threads'**
+  String get sidebarHideThreads;
+
+  /// Primary button in the header of the overview of a forum with a project binding (components.md section 6).
+  ///
+  /// In en, this message translates to:
+  /// **'New chat'**
+  String get postListNewChat;
+
+  /// Button in the header of the forum overview that keeps it as its own column (01 D15).
+  ///
+  /// In en, this message translates to:
+  /// **'Pin'**
+  String get overviewPin;
+
+  /// Button in the header of the pinned forum overview column that returns it to the content column (01 D15).
+  ///
+  /// In en, this message translates to:
+  /// **'Unpin'**
+  String get overviewUnpin;
+
+  /// Button in the header of the forum overview that opens the search with the filter of this forum (01 D15).
+  ///
+  /// In en, this message translates to:
+  /// **'Search in {forum}'**
+  String overviewSearch(String forum);
+
+  /// Row of the list of shortcuts (01 7).
+  ///
+  /// In en, this message translates to:
+  /// **'Pin or unpin the forum overview as a column'**
+  String get shortcutPinOverview;
 }
 
 class _AppLocalizationsDelegate

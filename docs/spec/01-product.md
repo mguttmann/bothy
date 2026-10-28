@@ -1560,9 +1560,10 @@ Windows key). There is no shortcut that triggers an approval.
 | Search in thread | Cmd+F | Ctrl+F |
 | New post or new chat in the current forum | Cmd+N | Ctrl+N |
 | Focus the input | Esc then Tab, or Cmd+L | Esc then Tab, or Ctrl+L |
-| Next or previous channel | Option+Arrow down / up | Alt+Arrow down / up |
-| Next or previous unread channel | Option+Shift+Arrow down / up | Alt+Shift+Arrow down / up |
-| Switch column (sidebar, list, history, session) | F6 / Shift+F6 | F6 / Shift+F6 |
+| Next or previous channel or thread row in the sidebar | Option+Arrow down / up | Alt+Arrow down / up |
+| Next or previous unread channel or thread row | Option+Shift+Arrow down / up | Alt+Shift+Arrow down / up |
+| Pin or unpin the forum overview as a column | Cmd+Shift+O | Ctrl+Shift+O |
+| Switch column (sidebar, pinned overview, history, session) | F6 / Shift+F6 | F6 / Shift+F6 |
 | Mark thread as read | Esc | Esc |
 | Mark as unread (from a message) | Option+Click | Alt+Click |
 | Mark thread as done or reopen it | Cmd+Shift+E | Ctrl+Shift+E |
@@ -1578,16 +1579,9 @@ Windows key). There is no shortcut that triggers an approval.
 | Open hosts and terminal | Cmd+Shift+T | Ctrl+Shift+T |
 
 Planned with the threads in the sidebar (addendum of 2026-10-27, 6.8, R-PR-17). The table above
-is the shipped state and the app checks it row by row; M4-40 and M4-41 change these rows in the
-same change as the bindings:
+is the shipped state and the app checks it row by row; M4-41 changes this row in the same change
+as the bindings:
 
-- "Next or previous channel" becomes "Next or previous channel or thread row in the sidebar", and
-  "Next or previous unread channel" becomes "Next or previous unread channel or thread row" (same
-  keys; M4-40).
-- New row after them: "Pin or unpin the forum overview as a column", Cmd+Shift+O, Ctrl+Shift+O
-  (M4-40).
-- "Switch column (sidebar, list, history, session)" becomes "Switch column (sidebar, pinned
-  overview, history, session)" (M4-40).
 - "New post or new chat in the current forum" gets the addition "(the forum of the focused or
   selected row, 6.8)" (M4-41).
 

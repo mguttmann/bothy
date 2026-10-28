@@ -1737,6 +1737,7 @@ abstract final class DsIcons {
   static const DsGlyph billingPersonal = DsGlyph('user-circle', DsIconWeight.fill);
   static const DsGlyph channelDm = DsGlyph('chat-teardrop', DsIconWeight.regular);
   static const DsGlyph channelForum = DsGlyph('chats-circle', DsIconWeight.regular);
+  static const DsGlyph channelProject = DsGlyph('brackets-angle', DsIconWeight.regular);
   static const DsGlyph channelText = DsGlyph('hash', DsIconWeight.bold);
   static const DsGlyph context = DsGlyph('gauge', DsIconWeight.regular);
   static const DsGlyph cost = DsGlyph('coins', DsIconWeight.regular);

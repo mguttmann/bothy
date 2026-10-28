@@ -2,6 +2,7 @@ button, label "Back to Spaces", action tap
 header, label "⁨requests⁩"
 header, label "⁨requests⁩"
 button, label "New post", action tap
+label "Forum: every post is its own conversation"
 button, selected, label "Open", action tap
 button, label "Waiting for me", action tap
 button, disabled, label "Tags"

@@ -15,6 +15,7 @@ import 'package:go_router/go_router.dart';
 
 import '../admin/admin_route.dart' show adminPathOf;
 import '../app/providers/session.dart';
+import '../forum/providers.dart' show newPostRequestProvider;
 import '../onboarding/onboarding_controller.dart';
 import '../running/providers.dart' show activeRunCountProvider;
 import '../switcher/quick_switcher.dart' show showQuickSwitcher;
@@ -57,6 +58,11 @@ class SidebarView extends StatelessWidget {
     this.showFooter = true,
     this.hosts,
     this.onStatus,
+    this.selectedThread,
+    this.onOpenThread,
+    this.onToggleGroup,
+    this.onAdd,
+    this.onHold,
   });
 
   /// `branding.product_name` of the instance.
@@ -116,8 +122,30 @@ class SidebarView extends StatelessWidget {
   /// Opens the status page from the foot (M7-21), or null for no entry.
   final VoidCallback? onStatus;
 
+  /// The thread the route shows, or null.
+  final ThreadId? selectedThread;
+
+  /// Opens a thread row; null shows no thread groups (the phone until M5-15).
+  final ValueChanged<ThreadId>? onOpenThread;
+
+  /// Collapses or expands the thread group of a channel (01 6.8 item 7).
+  final void Function(ChannelId channel, bool expanded)? onToggleGroup;
+
+  /// The "+" action of a forum row (01 6.8 item 8), or null for none.
+  final ValueChanged<ChannelId>? onAdd;
+
+  /// Called with true while the pointer is over the sidebar or the focus is in it, and with
+  /// false when both left (01 6.8 item 4: rows that no longer qualify stay until then).
+  final ValueChanged<bool>? onHold;
+
   @override
-  Widget build(BuildContext context) => Column(
+  Widget build(BuildContext context) {
+    final column = _column(context);
+    final hold = onHold;
+    return hold == null ? column : _HoldRegion(onHold: hold, child: column);
+  }
+
+  Widget _column(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
       SidebarHeader(
@@ -133,9 +161,13 @@ class SidebarView extends StatelessWidget {
         child: SpaceTree(
           nodes: nodes,
           selectedChannel: selectedChannel,
+          selectedThread: selectedThread,
           onToggle: onToggle,
           onMove: onMove,
           onOpenChannel: onOpenChannel,
+          onOpenThread: onOpenThread,
+          onToggleGroup: onToggleGroup,
+          onAdd: onAdd,
         ),
       ),
       // The group scrolls within a share of the column, so the spaces keep their room.
@@ -157,6 +189,57 @@ class SidebarView extends StatelessWidget {
   );
 }
 
+/// Reports whether the pointer is over [child] or the keyboard focus is inside it (brief M4-40
+/// Design note 2): true when either starts, false when both have left.
+class _HoldRegion extends StatefulWidget {
+  const _HoldRegion({required this.onHold, required this.child});
+
+  final ValueChanged<bool> onHold;
+  final Widget child;
+
+  @override
+  State<_HoldRegion> createState() => _HoldRegionState();
+}
+
+class _HoldRegionState extends State<_HoldRegion> {
+  bool _pointer = false;
+  bool _focus = false;
+  bool _held = false;
+
+  void _update({bool? pointer, bool? focus}) {
+    _pointer = pointer ?? _pointer;
+    _focus = focus ?? _focus;
+    final held = _pointer || _focus;
+    if (held == _held) return;
+    _held = held;
+    widget.onHold(held);
+  }
+
+  @override
+  void dispose() {
+    // A sidebar that leaves the screen holds nothing any more; reported after the frame that
+    // removes it, because a provider must not change while widgets unmount.
+    if (_held) {
+      final report = widget.onHold;
+      scheduleMicrotask(() => report(false));
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => MouseRegion(
+    onEnter: (_) => _update(pointer: true),
+    onExit: (_) => _update(pointer: false),
+    child: Focus(
+      canRequestFocus: false,
+      skipTraversal: true,
+      includeSemantics: false,
+      onFocusChange: (focused) => _update(focus: focused),
+      child: widget.child,
+    ),
+  );
+}
+
 /// The sidebar of the signed-in instance over the providers (R-CL-03).
 ///
 /// The desktop shows the group "Live and statistics" (D12) below the head. A click or Enter on
@@ -169,12 +252,16 @@ class SidebarColumn extends ConsumerWidget {
   const SidebarColumn({
     super.key,
     this.selectedChannel,
+    this.selectedThread,
     this.selectedHost,
     this.phone = false,
   });
 
   /// The channel of the route, or null.
   final ChannelId? selectedChannel;
+
+  /// The thread of the route, or null.
+  final ThreadId? selectedThread;
 
   /// The host of the route (`/hosts/<id>`), or null.
   final String? selectedHost;
@@ -186,6 +273,7 @@ class SidebarColumn extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final instance = ref.watch(currentInstanceProvider);
     final nodes = ref.watch(sidebarTreeProvider);
+    final hold = ref.read(sidebarHoldProvider.notifier);
     // `client.cold_start.duration` ends with the first sidebar that shows spaces from the
     // local database (15 19, brief M4-31); later calls do nothing.
     if (nodes.isNotEmpty) ref.read(appMeasurementsProvider).sidebarShown();
@@ -207,6 +295,23 @@ class SidebarColumn extends ConsumerWidget {
         writer()?.move(moveSpace([for (final n in nodes) n.entry], space, to)),
       ),
       onOpenChannel: (channel) => context.go('/c/${channel.value}'),
+      // The phone shows the thread groups with M5-15; the desktop shows them here (01 6.8).
+      selectedThread: selectedThread,
+      onOpenThread: phone ? null : (thread) => context.go('/t/${thread.value}'),
+      onToggleGroup: (channel, expanded) => unawaited(
+        ref
+            .read(localDatabaseProvider)
+            ?.forumViewDao
+            .setGroupCollapsed(channel, collapsed: !expanded),
+      ),
+      // Until M4-41 fills it, "+" opens the forum overview with "New post" (brief M4-40 Scope).
+      onAdd: phone
+          ? null
+          : (channel) {
+              ref.read(newPostRequestProvider.notifier).request(channel);
+              context.go('/c/${channel.value}');
+            },
+      onHold: phone ? null : (held) => hold.set(held: held),
       onSettings: () => context.go('/settings'),
       onStatus: () => context.go('/status'),
       onJumpTo: phone

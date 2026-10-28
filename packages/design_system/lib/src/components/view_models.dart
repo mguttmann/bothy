@@ -993,6 +993,7 @@ final class DsChannelRowData {
     this.mentionCount = 0,
     this.runActive = false,
     this.muted = false,
+    this.projectBound = false,
   });
 
   /// The channel ID.
@@ -1003,6 +1004,11 @@ final class DsChannelRowData {
 
   /// The kind; selects the icon.
   final DsChannelKind kind;
+
+  /// Whether the forum has a project binding (`Channel.project_bound`): its posts are agent
+  /// sessions in one project, so the row shows `channel.project` and the project kind
+  /// sentence (01 6.8 item 11). Ignored for every kind but [DsChannelKind.forum].
+  final bool projectBound;
 
   /// Unread messages; more than 0 is the state "unread".
   final int unreadCount;
@@ -1015,6 +1021,47 @@ final class DsChannelRowData {
 
   /// Whether the reader muted the channel.
   final bool muted;
+}
+
+/// A thread row of the sidebar, nested below its channel (components.md section 7, 01 6.8).
+///
+/// A forum post or a thread from a message of a text channel; the sidebar shows only open
+/// threads, and a done one only while it is selected (01 6.8 item 2), so [done] is rare.
+@immutable
+final class DsSidebarThreadRowData {
+  /// Creates the row.
+  const DsSidebarThreadRowData({
+    required this.id,
+    required this.title,
+    this.runState,
+    this.unreadCount = 0,
+    this.mentionCount = 0,
+    this.muted = false,
+    this.done = false,
+  });
+
+  /// The thread ID.
+  final String id;
+
+  /// The title (a foreign name); empty while the server has not named the thread yet, which
+  /// the row shows as "New chat" with the "automatic" mark (01 6.8 item 6).
+  final String title;
+
+  /// The state of the thread's latest run, or null without a run. Only `queued`, `running`,
+  /// `waiting_input` and `failed` show an icon and a state word (01 6.8 item 6).
+  final DsRunState? runState;
+
+  /// Unread messages; more than 0 is the state "unread" (a mark, never a number).
+  final int unreadCount;
+
+  /// Unread mentions; more than 0 shows the counter.
+  final int mentionCount;
+
+  /// Whether the reader muted the thread or its channel.
+  final bool muted;
+
+  /// Whether the thread is done (`state = closed`).
+  final bool done;
 }
 
 /// A space row of the sidebar (components.md section 7).

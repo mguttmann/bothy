@@ -30,6 +30,7 @@ String shortcutRowLabel(AppLocalizations l, ShortcutRow row) =>
       ShortcutAction.previousChannel => l.shortcutChannel,
       ShortcutAction.nextUnreadChannel ||
       ShortcutAction.previousUnreadChannel => l.shortcutUnreadChannel,
+      ShortcutAction.pinOverview => l.shortcutPinOverview,
       ShortcutAction.nextColumn ||
       ShortcutAction.previousColumn => l.shortcutColumn,
       ShortcutAction.markRead => l.shortcutMarkRead,

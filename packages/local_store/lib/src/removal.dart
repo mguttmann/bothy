@@ -19,10 +19,11 @@ extension LocalStoreRemoval on LocalDatabase {
   /// channels, a channel with its threads, a thread with its messages, attachments, reaction
   /// summaries, mentions, components, runs, drafts, read states, loaded ranges, search rows and
   /// file cache rows, plus the sidebar state, operator setting, forum tags, commands,
-  /// notification preferences and recently visited rows (`recent_targets`, M4-23) of the
-  /// targets. Outbox entries stay: they fail with `404` and
-  /// keep their text (04 8.3 item 4). Host targets are ignored, and the pinned host keys
-  /// (`host_key_pins`, M4-36) stay: a pin is a trust anchor that only the [wipe] deletes (15 6.1).
+  /// notification preferences, recently visited rows (`recent_targets`, M4-23) and the
+  /// collapsed thread groups (`channel_view_states`, M4-40) of the targets. Outbox entries
+  /// stay: they fail with `404` and keep their text (04 8.3 item 4). Host targets are ignored,
+  /// and the pinned host keys (`host_key_pins`, M4-36) stay: a pin is a trust anchor that only
+  /// the [wipe] deletes (15 6.1).
   ///
   /// Returns the paths of the deleted file cache rows; the caller deletes the bytes (M4-22).
   Future<List<String>> removeTargets(
@@ -81,6 +82,10 @@ extension LocalStoreRemoval on LocalDatabase {
     });
     await _deleteWhereIn(channels, 'search_index', 'channel_id', {searchIndex});
     await _deleteWhereIn(channels, 'channels', 'id', {this.channels});
+    // A removed channel leaves no view state behind (04 8.3; 01 6.8 item 7).
+    await _deleteWhereIn(channels, 'channel_view_states', 'channel_id', {
+      channelViewStates,
+    });
     await _deleteWhereIn(spaceIds, 'user_space_states', 'space_id', {
       userSpaceStates,
     });

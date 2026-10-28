@@ -1555,7 +1555,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get shellColumnSidebar => 'Spaces and channels';
 
   @override
-  String get shellColumnPostList => 'Post list';
+  String get shellColumnPostList => 'Forum overview';
 
   @override
   String get shellColumnHistory => 'History';
@@ -8004,14 +8004,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get shortcutFocusInput => 'Focus the input';
 
   @override
-  String get shortcutChannel => 'Next or previous channel';
+  String get shortcutChannel =>
+      'Next or previous channel or thread row in the sidebar';
 
   @override
-  String get shortcutUnreadChannel => 'Next or previous unread channel';
+  String get shortcutUnreadChannel =>
+      'Next or previous unread channel or thread row';
 
   @override
   String get shortcutColumn =>
-      'Switch column (sidebar, list, history, session)';
+      'Switch column (sidebar, pinned overview, history, session)';
 
   @override
   String get shortcutMarkRead => 'Mark thread as read';
@@ -9107,4 +9109,65 @@ class AppLocalizationsEn extends AppLocalizations {
   String shareReasonStatus(String status) {
     return 'error $status';
   }
+
+  @override
+  String get channelKindSentenceText =>
+      'Text channel: one shared conversation, threads start from its messages';
+
+  @override
+  String get channelKindSentenceForum =>
+      'Forum: every post is its own conversation';
+
+  @override
+  String get channelKindSentenceProject =>
+      'Project: every post is one agent session in this project';
+
+  @override
+  String get channelKindNameText => 'text channel';
+
+  @override
+  String get channelKindNameForum => 'forum';
+
+  @override
+  String get channelKindNameProject => 'project forum';
+
+  @override
+  String get sidebarAllPosts => 'All posts';
+
+  @override
+  String get sidebarNewChat => 'New chat';
+
+  @override
+  String sidebarNewChatIn(String forum) {
+    return 'New chat in $forum';
+  }
+
+  @override
+  String sidebarNewPostIn(String forum) {
+    return 'New post in $forum';
+  }
+
+  @override
+  String get sidebarShowThreads => 'Show threads';
+
+  @override
+  String get sidebarHideThreads => 'Hide threads';
+
+  @override
+  String get postListNewChat => 'New chat';
+
+  @override
+  String get overviewPin => 'Pin';
+
+  @override
+  String get overviewUnpin => 'Unpin';
+
+  @override
+  String overviewSearch(String forum) {
+    return 'Search in $forum';
+  }
+
+  @override
+  String get shortcutPinOverview =>
+      'Pin or unpin the forum overview as a column';
 }

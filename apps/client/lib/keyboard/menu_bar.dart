@@ -120,6 +120,7 @@ List<PlatformMenuItem> appMenus(
             item(ShortcutAction.nextChannel, l.shortcutChannel),
             item(ShortcutAction.nextUnreadChannel, l.shortcutUnreadChannel),
             item(ShortcutAction.nextColumn, l.shortcutColumn),
+            item(ShortcutAction.pinOverview),
           ],
         ),
       ],

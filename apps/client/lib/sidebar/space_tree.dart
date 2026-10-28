@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The tree of spaces and channels (components.md 7): spaces in the person's order, dragged
-/// into a new order with the mouse (brief M4-19 Design note 2).
+/// The tree of spaces, channels and thread rows (components.md 7; 01 6.8): spaces in the
+/// person's order, dragged into a new order with the mouse by their row (brief M4-19 Design
+/// note 2; channel and thread rows cannot be dragged, 01 6.8 item 10).
 library;
 
 import 'package:design_system/design_system.dart';
@@ -15,7 +16,8 @@ import 'space_node.dart';
 /// The tree of [nodes].
 ///
 /// Dragging a space row moves the space; [onMove] gets the space and its index in the list
-/// without it (the input of `moveSpace`). The list scrolls and builds its spaces lazily.
+/// without it (the input of `moveSpace`). The list scrolls and builds its spaces lazily. With
+/// [onOpenThread] every channel shows its thread group (01 6.8).
 class SpaceTree extends StatelessWidget {
   /// Creates the tree.
   const SpaceTree({
@@ -25,6 +27,10 @@ class SpaceTree extends StatelessWidget {
     required this.onToggle,
     required this.onMove,
     required this.onOpenChannel,
+    this.selectedThread,
+    this.onOpenThread,
+    this.onToggleGroup,
+    this.onAdd,
   });
 
   /// The spaces in order with their channels.
@@ -41,6 +47,18 @@ class SpaceTree extends StatelessWidget {
 
   /// Opens a channel.
   final ValueChanged<ChannelId> onOpenChannel;
+
+  /// The thread the route shows, or null.
+  final ThreadId? selectedThread;
+
+  /// Opens a thread row; null shows no thread groups.
+  final ValueChanged<ThreadId>? onOpenThread;
+
+  /// Collapses or expands the thread group of a channel.
+  final void Function(ChannelId channel, bool expanded)? onToggleGroup;
+
+  /// The "+" action of a forum row, or null for none.
+  final ValueChanged<ChannelId>? onAdd;
 
   @override
   Widget build(BuildContext context) {
@@ -68,9 +86,8 @@ class SpaceTree extends StatelessWidget {
       itemBuilder: (context, i) {
         final node = nodes[i];
         final id = node.entry.space.id;
-        return ReorderableDragStartListener(
+        return KeyedSubtree(
           key: ValueKey('sidebar.node.${id.value}'),
-          index: i,
           // The list gives every item the actions to move it on a node of its own; the space's
           // name makes that node say which space it moves (brief M5-10).
           child: Semantics(
@@ -79,10 +96,18 @@ class SpaceTree extends StatelessWidget {
             child: SpaceNode(
               node: node,
               selectedChannel: selectedChannel,
+              selectedThread: selectedThread,
               onToggle: (expanded) => onToggle(node, expanded),
               onOpenChannel: onOpenChannel,
+              onOpenThread: onOpenThread,
+              onToggleGroup: onToggleGroup,
+              onAdd: onAdd,
               onMoveUp: i > 0 ? () => onMove(id, i - 1) : null,
               onMoveDown: i < nodes.length - 1 ? () => onMove(id, i + 1) : null,
+              // Only the space row starts a drag: a channel or thread row must never move
+              // anything (01 6.8 item 10, D-SB-7).
+              dragHandle: (row) =>
+                  ReorderableDragStartListener(index: i, child: row),
             ),
           ),
         );

@@ -2,13 +2,15 @@
 
 /// The view model of the sidebar and its pure rules (brief M4-19 Design notes 1 and 5;
 /// components.md 7; 04 14): the counters of a channel, the muted state, the mapping to the
-/// row data of M4-07 and the navigation between channels for M4-24.
+/// row data of M4-07, the thread group of a channel (01 6.8, M4-40) and the navigation between
+/// channels and thread rows for M4-24 and M4-40.
 library;
 
 import 'package:design_system/design_system.dart';
 import 'package:domain/domain.dart';
 
 import 'sidebar_order.dart';
+import 'sidebar_threads.dart';
 
 /// A channel row of the sidebar with what it shows.
 final class SidebarChannel {
@@ -18,13 +20,38 @@ final class SidebarChannel {
     required this.counts,
     required this.runActive,
     required this.muted,
+    this.group,
+    this.expanded = true,
   });
 
   /// The channel.
   final Channel channel;
 
-  /// Unread messages and unread mentions of the person in the channel (04 14).
+  /// Unread messages and unread mentions of the person in the channel (04 14): every thread,
+  /// whether shown below the channel or not.
   final ThreadCounts counts;
+
+  /// The thread group of the channel (01 6.8), or null where no group is built (the phone until
+  /// M5-15, tests).
+  final SidebarThreadGroup? group;
+
+  /// Whether the thread group is expanded on this device (01 6.8 item 7; default expanded).
+  final bool expanded;
+
+  /// Whether the channel shows thread rows (and so its own arrow, 01 6.8 item 7).
+  bool get hasGroup => group?.hasRows ?? false;
+
+  /// The thread rows on screen: those of an expanded group, else none.
+  List<SidebarThread> get visibleThreads =>
+      hasGroup && expanded ? group!.rows : const [];
+
+  /// The counters the channel row shows: with a group those of D-SB-5 (an expanded group
+  /// counts only what no row below it shows), else [counts].
+  ThreadCounts get rowCounts => hasGroup ? group!.channelCounts : counts;
+
+  /// The counters of "All posts" of an expanded forum group, or null when it has none.
+  ThreadCounts? get allPostsCounts =>
+      hasGroup && expanded ? group!.allPostsCounts : null;
 
   /// Whether a run of the channel has not ended (`runs`).
   final bool runActive;
@@ -35,14 +62,21 @@ final class SidebarChannel {
   /// Whether the channel has something unread (the unread state, or a mention).
   bool get hasUnread => counts.unread > 0 || counts.mentions > 0;
 
-  /// The row data of `DsChannelRow` (M4-07); the row builds the label
-  /// `<Name>, <n> unread, <m> mentions, run active` from it.
-  DsChannelRowData get rowData => DsChannelRowData(
+  /// The row data of `DsChannelRow` (M4-07) with every thread counted (no group shown); the
+  /// row builds the label `<Name>, <kind>, <n> unread, <m> mentions, run active` from it.
+  DsChannelRowData get rowData => _row(counts);
+
+  /// The row data of `DsChannelRow` above its thread group: the counters of [rowCounts]
+  /// (01 6.8 item 6); the run dot stays an aggregate of every thread.
+  DsChannelRowData get treeRowData => _row(rowCounts);
+
+  DsChannelRowData _row(ThreadCounts shown) => DsChannelRowData(
     id: channel.id.value,
     name: channel.name,
     kind: DsChannelKind.fromCode(channel.kind.code),
-    unreadCount: counts.unread,
-    mentionCount: counts.mentions,
+    projectBound: channel.projectBound,
+    unreadCount: shown.unread,
+    mentionCount: shown.mentions,
     runActive: runActive,
     muted: muted,
   );
@@ -118,48 +152,103 @@ bool isMuted(
   (p) =>
       p.targetKind == NotificationTargetKind.channel &&
       p.targetId == channel.value &&
-      (p.level == NotificationLevel.mute ||
-          (p.mutedUntil != null && p.mutedUntil!.isAfter(now))),
+      isMutedTarget(p, now: now),
 );
 
-/// The channel after (or, with [forward] false, before) [current] in [tree], wrapping at the
+/// Whether the row [preference] mutes its own target at [now]: its level is `mute`, or its
+/// `muted_until` lies after [now] (13 3.1; D-M3-18-3, D-M4-33-2). The thread rows of the sidebar
+/// use it for the thread's own row (01 6.8 item 6).
+bool isMutedTarget(
+  NotificationPreference preference, {
+  required DateTime now,
+}) =>
+    preference.level == NotificationLevel.mute ||
+    (preference.mutedUntil != null && preference.mutedUntil!.isAfter(now));
+
+/// A place the sidebar navigation can open: a channel, or a thread row below it (01 7, 6.8).
+final class SidebarTarget {
+  /// Creates the target; [thread] is null for the channel row itself.
+  const SidebarTarget(this.channel, [this.thread]);
+
+  /// The channel of the row.
+  final ChannelId channel;
+
+  /// The thread of a thread row, or null for a channel row.
+  final ThreadId? thread;
+
+  /// The router path: `/t/<id>` for a thread row, `/c/<id>` for a channel row.
+  String get path =>
+      thread == null ? '/c/${channel.value}' : '/t/${thread!.value}';
+
+  @override
+  bool operator ==(Object other) =>
+      other is SidebarTarget &&
+      other.channel == channel &&
+      other.thread == thread;
+
+  @override
+  int get hashCode => Object.hash(channel, thread);
+
+  @override
+  String toString() => path;
+}
+
+/// The row after (or, with [forward] false, before) [current] in [tree], wrapping at the
 /// ends; null when there is none.
 ///
-/// Without [unreadOnly] only channels of expanded spaces count (the ones on screen); with it
-/// every channel with unread items, also in collapsed spaces (01 7: next or previous unread
-/// channel). A [current] that is not in the list starts from the beginning (or the end).
-ChannelId? neighbourChannel(
+/// Rows are the channels and the thread rows of their expanded groups, in the order of the
+/// sidebar (01 7: "Next or previous channel or thread row in the sidebar"; D-SB-8); "All posts"
+/// is no target. Without [unreadOnly] only rows of expanded spaces count (the ones on screen);
+/// with it every channel whose row or "All posts" shows unread items, also in collapsed spaces,
+/// and every unread thread row (01 7: next or previous unread channel or thread row). A
+/// [current] that is not in the list starts from the beginning (or the end); a thread that is
+/// not a row stands for its channel.
+SidebarTarget? neighbourTarget(
   List<SidebarSpaceNode> tree,
-  ChannelId? current, {
+  SidebarTarget? current, {
   required bool forward,
   bool unreadOnly = false,
 }) {
-  final all = [
-    for (final node in tree)
-      if (unreadOnly || node.expanded)
-        for (final c in node.channels) c,
-  ];
+  final rows = <(SidebarTarget, bool)>[];
+  for (final node in tree) {
+    if (!unreadOnly && !node.expanded) continue;
+    for (final c in node.channels) {
+      final shown = node.expanded ? c.visibleThreads : const <SidebarThread>[];
+      // In a collapsed space every count of the channel is out of view.
+      final rowCounts = node.expanded ? c.rowCounts : c.counts;
+      final rest = node.expanded ? c.allPostsCounts : null;
+      final channelUnread =
+          _unread(rowCounts) || (rest != null && _unread(rest));
+      rows.add((SidebarTarget(c.channel.id), channelUnread));
+      for (final t in shown) {
+        rows.add((SidebarTarget(c.channel.id, t.thread.id), _unread(t.counts)));
+      }
+    }
+  }
+  var at = current;
+  if (at != null && at.thread != null && !rows.any((r) => r.$1 == at)) {
+    at = SidebarTarget(at.channel);
+  }
   final candidates = [
-    for (final c in all)
-      if (!unreadOnly || c.hasUnread || c.channel.id == current) c,
+    for (final r in rows)
+      if (!unreadOnly || r.$2 || r.$1 == at) r.$1,
   ];
-  final index = candidates.indexWhere((c) => c.channel.id == current);
+  final index = at == null ? -1 : candidates.indexOf(at);
   final pool = [
     for (final c in candidates)
-      if (c.channel.id != current) c,
+      if (c != at) c,
   ];
   if (pool.isEmpty) return null;
-  if (index < 0) {
-    return (forward ? pool.first : pool.last).channel.id;
-  }
+  if (index < 0) return forward ? pool.first : pool.last;
   final n = candidates.length;
-  final next = (index + (forward ? 1 : -1) + n) % n;
-  return candidates[next].channel.id;
+  return candidates[(index + (forward ? 1 : -1) + n) % n];
 }
 
-/// The navigation between channels the sidebar offers M4-24 (01 7: next or previous channel,
-/// next or previous unread channel): it reads the current tree and selection and calls
-/// [open] with the channel to show.
+bool _unread(ThreadCounts c) => c.unread > 0 || c.mentions > 0;
+
+/// The navigation between the rows of the sidebar that M4-24 binds (01 7: next or previous
+/// channel or thread row, next or previous unread channel or thread row; M4-40): it reads the
+/// current tree and selection and calls [open] with the row to show.
 ///
 /// Example:
 /// ```dart
@@ -177,26 +266,26 @@ final class SidebarNavigation {
   /// The tree as the sidebar shows it.
   final List<SidebarSpaceNode> Function() tree;
 
-  /// The selected channel, or null.
-  final ChannelId? Function() selected;
+  /// The selected row (the channel and the thread of the route), or null.
+  final SidebarTarget? Function() selected;
 
-  /// Opens a channel (the router path `/c/<id>`).
-  final void Function(ChannelId channel) open;
+  /// Opens a row (its [SidebarTarget.path]).
+  final void Function(SidebarTarget target) open;
 
-  /// Opens the next channel; returns whether one was found.
+  /// Opens the next row; returns whether one was found.
   bool next() => _go(forward: true, unreadOnly: false);
 
-  /// Opens the previous channel.
+  /// Opens the previous row.
   bool previous() => _go(forward: false, unreadOnly: false);
 
-  /// Opens the next channel with unread items.
+  /// Opens the next row with unread items.
   bool nextUnread() => _go(forward: true, unreadOnly: true);
 
-  /// Opens the previous channel with unread items.
+  /// Opens the previous row with unread items.
   bool previousUnread() => _go(forward: false, unreadOnly: true);
 
   bool _go({required bool forward, required bool unreadOnly}) {
-    final target = neighbourChannel(
+    final target = neighbourTarget(
       tree(),
       selected(),
       forward: forward,

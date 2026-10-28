@@ -1,6 +1,6 @@
 # local_store
 
-The encrypted local database of the apps: drift on SQLite3MultipleCiphers, schema version 5
+The encrypted local database of the apps: drift on SQLite3MultipleCiphers, schema version 6
 with the mirror tables and the local-only tables, data access objects that hand out the domain
 types of `packages/domain`, removal and wipe, the cache cleanup and offline search
 (docs/spec/15-client-architecture.md 6, ADR 0029, R-CL-08). The interface reads only from this
@@ -41,17 +41,17 @@ hooks:
       source: sqlite3mc
 ```
 
-## Tables (schema version 5)
+## Tables (schema version 6)
 
 | Group | File | Tables |
 |---|---|---|
-| Structure | `lib/src/tables/structure.dart` | `spaces`, `user_space_states`, `channels` (effective operator, caller's `level` and `capabilities`, no `prompt`), `channel_operators`, `forum_tags` |
+| Structure | `lib/src/tables/structure.dart` | `spaces`, `user_space_states`, `channels` (effective operator, caller's `level` and `capabilities`, the derived `project_bound` of the API `Channel` since version 6, M4-40, R-DM-54; no `prompt`), `channel_operators`, `forum_tags` |
 | Threads and messages | `lib/src/tables/threads_messages.dart` | `threads` (local `last_accessed_at`), `thread_tags`, `messages` (`trigger_state`, `thread_seq`, tombstone fields, no `client_payload_sha256`), `reactions_summary`, `my_mentions`, `message_components` |
 | Files | `lib/src/tables/files.dart` | `files`, `message_attachments` |
 | Runs and agents | `lib/src/tables/runs_agents.dart` | `runs` (summary of `run.state_changed`), `agents`, `principals` |
 | Personal | `lib/src/tables/personal.dart` | `read_states`, `drafts`, `user_settings`, `notification_preferences`, `quiet_hours` |
 | Instance | `lib/src/tables/instance.dart` | `instance` (with the app lock policy of `getInstance` in `app_lock` since version 5, M5-08; null in a row of an earlier version until the next `getInstance`), `commands` |
-| Local only | `lib/src/tables/local_only.dart` | `outbox`, `sync_state`, `loaded_ranges`, `file_cache`, `share_inbox`, `forum_view_states` (version 2, M4-19: the Done section per forum), `recent_targets` (version 3, M4-23: the recently visited spaces, channels and threads of the quick switcher, per device, never synchronized), `host_key_pins` (version 4, M4-36: the pinned Noise keys of the hosts, per device, a trust anchor) |
+| Local only | `lib/src/tables/local_only.dart` | `outbox`, `sync_state`, `loaded_ranges`, `file_cache`, `share_inbox`, `forum_view_states` (version 2, M4-19: the Done section per forum), `recent_targets` (version 3, M4-23: the recently visited spaces, channels and threads of the quick switcher, per device, never synchronized), `host_key_pins` (version 4, M4-36: the pinned Noise keys of the hosts, per device, a trust anchor), `channel_view_states` and `shell_view_state` (version 6, M4-40: the collapsed thread group per channel and the one row with the pinned forum overview, per device, never synchronized; 01 6.8 item 7, D-SB-6) |
 | Search | `lib/src/search.drift` | `search_index` (FTS5) |
 
 `host_key_pins` of 15 6.1 came with version 4 (M4-36); from there on it is a preserved table of
@@ -75,13 +75,14 @@ whether it applied (04 9); reactions and pins carry absolute values and leave
 | `OutboxDao` | FIFO per thread by `created_at`, then `id`; `depends_on`; failures with the `current` revision of a `412` |
 | `FileCacheDao`, `ShareInboxDao`, `SearchDao` | file cache metadata, share inbox, offline search; `SearchDao.watchTranscriptsToIndex` lists the done transcripts of attached voice files without an index row (the app fetches the text), `pruneTranscripts` drops the rows of files no stored message attaches any more |
 | `HostKeyPinsDao` | the pin of a host (`read`, `write` replaces, `all`); nothing here deletes a pin (M4-36) |
-| `ForumViewDao`, `RecentTargetsDao` | local view state per device: the Done section of a forum; the recently visited targets (`visit` keeps the newest `keep` rows, `watchRecent` newest first) |
+| `ForumViewDao`, `RecentTargetsDao` | local view state per device: the Done section of a forum, the collapsed thread groups (`watchCollapsedGroups`, `setGroupCollapsed`; expanded without a row) and the pinned forum overview (`watchOverviewPinned`, `overviewPinned`, `setOverviewPinned`; not pinned without the row); the recently visited targets (`visit` keeps the newest `keep` rows, `watchRecent` newest first) |
 
 ## Removal, wipe and cleanup
 
 - `removeTargets(List<TargetRef>)` deletes spaces, channels and threads with everything below
   them (messages, attachments, reactions, mentions, components, runs, drafts, read states, loaded
-  ranges, search rows, file cache rows, recently visited rows) in one transaction and returns the file cache paths, so
+  ranges, search rows, file cache rows, recently visited rows, the collapsed thread group of a
+  channel) in one transaction and returns the file cache paths, so
   the caller deletes the bytes (04 8.3). Outbox entries stay; they fail with `404`. Host targets
   are ignored and the pins of `host_key_pins` stay.
 - `wipe()` closes the database and deletes the file with its `-wal` and `-shm` files (`4012`,
@@ -103,7 +104,9 @@ the end-of-file hook excludes `drift_schemas/`.
 
 Rules for every later version (15 6.2): `onUpgrade` uses `stepByStep` with the steps from
 `MigrationRules`. A mirror table may be discarded (`MigrationRules.discardCache` drops and
-recreates it and resets the cursor, so the next connection loads a snapshot); `outbox`, `drafts`
+recreates it and resets the cursor, so the next connection loads a snapshot; a step that adds a
+mirror column only the snapshot fills calls `MigrationRules.resetCursor` alone, as version 6 does
+for `channels.project_bound`); `outbox`, `drafts`
 and `share_inbox` are migrated row by row (`MigrationRules.keepRows`). `test/drift/survival_test.dart`
 migrates every pair of stored versions with fixture rows in those tables and compares them; a new
 version adds its fixture rows there.

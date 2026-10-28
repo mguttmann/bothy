@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// The snapshot of `ready` and `GET /api/v1/sync/snapshot` (04 6.3 item 4, 04 7.3; brief
-/// M4-14 Design note 1): the whole snapshot on the first connection and after a resync, only
-/// the parts that are not events (counters, presence, feature flags, active run summaries) on a
-/// connection that continues from a cursor.
+/// M4-14 Design note 1): the whole snapshot on the first connection and after a resync, the
+/// active threads of the sidebar included (R-SY-28, brief M4-40 Design note 5), only the parts
+/// that are not events (counters, presence, feature flags, active run summaries) on a connection
+/// that continues from a cursor.
 library;
 
 import 'package:domain/domain.dart';
@@ -11,6 +12,7 @@ import 'package:local_store/local_store.dart';
 
 import 'appliers/principal_appliers.dart';
 import 'appliers/structure_appliers.dart';
+import 'appliers/thread_appliers.dart';
 import 'dispatcher.dart';
 import 'wire.dart';
 
@@ -31,8 +33,9 @@ final class SnapshotApplier {
   final SyncContext sync;
 
   /// Applies the whole snapshot inside [txn] (the caller empties the mirror first and stores
-  /// cursor and epoch in the same transaction): spaces and channels with access, sidebar,
-  /// the person, settings and active runs; after the commit the counters, presence and flags,
+  /// cursor and epoch in the same transaction): spaces and channels with access, the active
+  /// threads of the held channels, sidebar, the person, settings and active runs; after the
+  /// commit the counters, presence and flags,
   /// and in the background the drafts newer than the local ones, the read states and the
   /// instance information, which the snapshot names only by version or not at all.
   Future<void> applyFull(
@@ -45,12 +48,23 @@ final class SnapshotApplier {
     sync.removedTargets.removeAll([
       for (final v in s.spaces) v.space.id.value,
       for (final v in s.channels) v.channel.id.value,
+      for (final t in s.activeThreads) t.id.value,
     ]);
     for (final v in s.spaces) {
       await storeSpaceView(db, v);
     }
     for (final v in s.channels) {
       await storeChannelView(db, v);
+    }
+    // R-SY-28, D-SB-11: the sidebar lists the open threads of every channel without one list
+    // request per channel. Only here, on the first connection and a resync: a connection that
+    // continues from a cursor replays the `thread.*` events after it, which keep the threads
+    // current, and the snapshot's state (as of `head_seq`) stored before those older events
+    // could be undone by one of them, for example a replayed `thread.moved_out`.
+    for (final thread in s.activeThreads) {
+      if (await sync.holdsChannel(db, thread.channelId)) {
+        await storeThread(db, thread);
+      }
     }
     for (final state in s.sidebar) {
       await db.structureDao.upsertUserSpaceStateIfNewer(state);

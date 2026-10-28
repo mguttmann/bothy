@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The four columns of the desktop main view (docs/spec/01-product.md 5.1 D1 and D2, R-PR-01;
-/// brief M4-18 Design note 5).
+/// The columns of the desktop main view (docs/spec/01-product.md 5.1 D1, D2 and D15,
+/// R-PR-17; briefs M4-18 Design note 5 and M4-40 Design note 4): three by default, the pinned
+/// forum overview as the optional fourth.
 library;
 
 import 'package:design_system/design_system.dart';
@@ -12,12 +13,15 @@ import '../../keyboard/app_shortcuts.dart';
 import '../../keyboard/column_focus.dart';
 import 'column_widths.dart';
 
-/// Sidebar, post list, history and session side by side, with drag handles between them.
+/// Sidebar, history and session side by side, with drag handles between them; the forum
+/// overview ([postList]) is its own column between sidebar and history only while
+/// [listPinned] (01 D15).
 ///
 /// Below [minWidthFourColumns] (`ui.desktop_min_width_four_columns`) the session column
-/// collapses; below [minWidthThreeColumns] (`ui.desktop_min_width_three_columns`) the post
-/// list and the history share one place like the navigation stack of the phone, and
-/// [stackShowsHistory] decides which one is on top. A drag changes the width at once and calls
+/// collapses. Without the pin, and below [minWidthThreeColumns]
+/// (`ui.desktop_min_width_three_columns`) also with it, the overview and the history share the
+/// content column like the navigation stack of the phone, and [stackShowsHistory] (a thread is
+/// open) decides which one shows. A drag changes the width at once and calls
 /// [onWidthsChanged] when the drag ends, so one drag is one write; the dragged widths stay
 /// until [widths] changes.
 class ColumnLayout extends StatefulWidget {
@@ -34,6 +38,7 @@ class ColumnLayout extends StatefulWidget {
     required this.session,
     this.stackShowsHistory = false,
     this.showPostList = true,
+    this.listPinned = true,
     this.showSession = true,
   });
 
@@ -64,9 +69,12 @@ class ColumnLayout extends StatefulWidget {
   /// In the stacked form: whether the history (a thread is open) or the post list shows.
   final bool stackShowsHistory;
 
-  /// Whether the post list column shows; only a forum has one (01 5.1: D2, a text channel,
-  /// shows no post list; brief M4-19 Design note 5).
+  /// Whether the route has a forum overview; only a forum has one (01 5.1: D2, a text
+  /// channel, shows none; brief M4-19 Design note 5).
   final bool showPostList;
+
+  /// Whether the overview is pinned as its own column (01 D15; kept on this device).
+  final bool listPinned;
 
   /// Whether the session column shows when the window is wide enough; the header button
   /// "Column" hides it, and a thread of a text channel collapses it (01 5.1 D1, D2; M4-20).
@@ -117,20 +125,14 @@ class _ColumnLayoutState extends State<ColumnLayout> {
       final four = total >= widget.minWidthFourColumns && widget.showSession;
       final stacked = total < widget.minWidthThreeColumns;
       final list = widget.showPostList;
-      final widths = fitColumns(
-        _widths,
-        sized: [
-          AppColumn.sidebar,
-          if (!stacked && list) AppColumn.postList,
-          if (four) AppColumn.session,
-        ],
-        total: total,
-      );
+      // The overview has a column of its own only pinned and with room for it (01 D1, D15).
+      final column = list && widget.listPinned && !stacked;
       final sized = <String>[
         AppColumn.sidebar,
-        if (!stacked && list) AppColumn.postList,
+        if (column) AppColumn.postList,
         if (four) AppColumn.session,
       ];
+      final widths = fitColumns(_widths, sized: sized, total: total);
       _total = total;
       _sized = sized;
       Widget fixed(String column, Widget child) => SizedBox(
@@ -142,7 +144,7 @@ class _ColumnLayoutState extends State<ColumnLayout> {
         onDrag: (dx) => _drag(column, growsLeft ? -dx : dx),
         onEnd: _end,
       );
-      final middle = stacked && list
+      final middle = list && !column
           ? (widget.stackShowsHistory
                 ? _ColumnFrame(column: AppColumn.history, child: widget.history)
                 : _ColumnFrame(
@@ -155,7 +157,7 @@ class _ColumnLayoutState extends State<ColumnLayout> {
         children: [
           fixed(AppColumn.sidebar, widget.sidebar),
           handle(AppColumn.sidebar),
-          if (!stacked && list) ...[
+          if (column) ...[
             fixed(AppColumn.postList, widget.postList),
             handle(AppColumn.postList),
           ],

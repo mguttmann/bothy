@@ -6,6 +6,7 @@
 
 import 'package:client/sidebar/sidebar_model.dart';
 import 'package:client/sidebar/sidebar_order.dart';
+import 'package:client/sidebar/sidebar_threads.dart';
 import 'package:design_system/design_system.dart';
 import 'package:domain/domain.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -203,40 +204,112 @@ void main() {
       ),
     ];
 
+    SidebarTarget at(int n, [int? t]) =>
+        SidebarTarget(channelId(n), t == null ? null : threadId(t));
+
     test('next and previous channel skip collapsed spaces and wrap', () {
-      expect(neighbourChannel(tree, channelId(2), forward: true), channelId(4));
-      expect(neighbourChannel(tree, channelId(4), forward: true), channelId(1));
-      expect(
-        neighbourChannel(tree, channelId(1), forward: false),
-        channelId(4),
-      );
-      expect(neighbourChannel(tree, null, forward: true), channelId(1));
+      expect(neighbourTarget(tree, at(2), forward: true), at(4));
+      expect(neighbourTarget(tree, at(4), forward: true), at(1));
+      expect(neighbourTarget(tree, at(1), forward: false), at(4));
+      expect(neighbourTarget(tree, null, forward: true), at(1));
     });
 
     test('next and previous unread channel include collapsed spaces', () {
       expect(
-        neighbourChannel(tree, channelId(1), forward: true, unreadOnly: true),
-        channelId(2),
+        neighbourTarget(tree, at(1), forward: true, unreadOnly: true),
+        at(2),
       );
       expect(
-        neighbourChannel(tree, channelId(2), forward: true, unreadOnly: true),
-        channelId(3),
+        neighbourTarget(tree, at(2), forward: true, unreadOnly: true),
+        at(3),
       );
       expect(
-        neighbourChannel(tree, channelId(2), forward: false, unreadOnly: true),
-        channelId(3),
+        neighbourTarget(tree, at(2), forward: false, unreadOnly: true),
+        at(3),
       );
       expect(
-        neighbourChannel(
+        neighbourTarget(
           [
             tree.first.copyWithChannels([ch(1)]),
           ],
-          channelId(1),
+          at(1),
           forward: true,
           unreadOnly: true,
         ),
         isNull,
       );
+    });
+
+    // M4-40: thread rows of expanded groups are rows of the tree (01 7, 6.8; D-SB-8).
+    SidebarChannel grouped(
+      int n,
+      List<(int, int)> threads, {
+      bool expanded = true,
+    }) {
+      final rows = [
+        for (final (t, unread) in threads)
+          SidebarThread(
+            thread: thread(t, channelN: n, createdMinutes: -t),
+            counts: ThreadCounts(unread: unread, mentions: 0),
+          ),
+      ];
+      return SidebarChannel(
+        channel: channel(n, kind: ChannelKind.forum),
+        counts: ThreadCounts(
+          unread: threads.fold(0, (a, t) => a + t.$2),
+          mentions: 0,
+        ),
+        runActive: false,
+        muted: false,
+        expanded: expanded,
+        group: SidebarThreadGroup(
+          rows: rows,
+          candidates: rows,
+          channelCounts: expanded
+              ? ThreadCounts.zero
+              : ThreadCounts(
+                  unread: threads.fold(0, (a, t) => a + t.$2),
+                  mentions: 0,
+                ),
+          allPostsCounts: expanded ? ThreadCounts.zero : null,
+        ),
+      );
+    }
+
+    final threaded = [
+      SidebarSpaceNode(
+        entry: SidebarSpace(space: space(1)),
+        channels: [
+          grouped(1, [(1, 0), (2, 3)]),
+          grouped(2, [(3, 1)], expanded: false),
+          ch(5),
+        ],
+      ),
+    ];
+
+    test('the channel navigation stops at thread rows', () {
+      expect(neighbourTarget(threaded, at(1), forward: true), at(1, 1));
+      expect(neighbourTarget(threaded, at(1, 1), forward: true), at(1, 2));
+      expect(neighbourTarget(threaded, at(1, 2), forward: true), at(2));
+      // A collapsed group shows no rows.
+      expect(neighbourTarget(threaded, at(2), forward: true), at(5));
+      expect(neighbourTarget(threaded, at(2), forward: false), at(1, 2));
+    });
+
+    test('next unread stops at an unread thread row and a collapsed group', () {
+      expect(
+        neighbourTarget(threaded, at(1), forward: true, unreadOnly: true),
+        at(1, 2),
+      );
+      expect(
+        neighbourTarget(threaded, at(1, 2), forward: true, unreadOnly: true),
+        at(2),
+        reason: 'the collapsed group counts its thread on the channel row',
+      );
+    });
+
+    test('a selected thread that is no row stands for its channel', () {
+      expect(neighbourTarget(threaded, at(5, 9), forward: true), at(1));
     });
   });
 }

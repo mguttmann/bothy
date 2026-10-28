@@ -388,6 +388,193 @@ Widget rowsSheet() => Sheet([
   ),
 ]);
 
+/// Rows on the sidebar surface, as the space tree of the app draws them (components.md 7).
+Widget _sidebar(List<Widget> rows) => Builder(
+  builder: (context) => ColoredBox(
+    color: context.dsColors.surfaceSidebar,
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: rows,
+    ),
+  ),
+);
+
+/// A forum row with its group arrow and the "+" action labeled from packages/l10n.
+Widget _forum(DsChannelRowData data, {bool? expanded, bool selected = false}) =>
+    Builder(
+      builder: (context) {
+        final l = dsL10n(context);
+        return DsChannelRow(
+          data,
+          selected: selected,
+          groupExpanded: expanded,
+          onToggleGroup: (_) {},
+          addLabel: data.projectBound
+              ? l.sidebarNewChatIn(data.name)
+              : l.sidebarNewPostIn(data.name),
+          onAdd: () {},
+          onOpen: () {},
+        );
+      },
+    );
+
+/// The channel rows of M4-40 (components.md 7, 01 6.8 items 7, 8 and 11): the three kinds,
+/// a group expanded and collapsed with its arrow, a channel without a group, and the "+"
+/// action of the selected forum (always visible in `touch`).
+Widget sidebarChannelsSheet() => Sheet([
+  _sidebar([
+    _forum(
+      const DsChannelRowData(
+        id: 'c1',
+        name: 'server',
+        kind: DsChannelKind.forum,
+        projectBound: true,
+      ),
+      expanded: true,
+      selected: true,
+    ),
+    _forum(
+      const DsChannelRowData(
+        id: 'c2',
+        name: 'apps',
+        kind: DsChannelKind.forum,
+        projectBound: true,
+        unreadCount: 2,
+        mentionCount: 1,
+        runActive: true,
+      ),
+      expanded: false,
+    ),
+    _forum(
+      const DsChannelRowData(
+        id: 'c3',
+        name: 'requests',
+        kind: DsChannelKind.forum,
+        unreadCount: 3,
+      ),
+      expanded: true,
+    ),
+    DsChannelRow(
+      const DsChannelRowData(id: 'c4', name: 'general'),
+      groupExpanded: false,
+      onToggleGroup: (_) {},
+      onOpen: () {},
+    ),
+    DsChannelRow(
+      const DsChannelRowData(id: 'c5', name: 'releases'),
+      onOpen: () {},
+    ),
+    DsChannelRow(
+      const DsChannelRowData(id: 'c6', name: 'alerts', muted: true),
+      groupExpanded: true,
+      onToggleGroup: (_) {},
+      onOpen: () {},
+    ),
+  ]),
+]);
+
+/// The thread rows and "All posts" of M4-40 below their channels (components.md 7, 01 6.8
+/// items 1, 5 and 6): every state of the table, the run state icons, an empty title, the tree
+/// line ending at the last row; text channels have no "All posts".
+Widget sidebarThreadsSheet() => Sheet([
+  _sidebar([
+    _forum(
+      const DsChannelRowData(
+        id: 'c1',
+        name: 'server',
+        kind: DsChannelKind.forum,
+        projectBound: true,
+      ),
+      expanded: true,
+    ),
+    DsSidebarThreadRow(
+      const DsSidebarThreadRowData(
+        id: 't1',
+        title: '',
+        runState: DsRunState.queued,
+      ),
+      onOpen: () {},
+    ),
+    DsSidebarThreadRow(
+      const DsSidebarThreadRowData(
+        id: 't2',
+        title: 'Gateway: resume after network change',
+        runState: DsRunState.running,
+      ),
+      selected: true,
+      onOpen: () {},
+    ),
+    DsSidebarThreadRow(
+      const DsSidebarThreadRowData(
+        id: 't3',
+        title: 'Review: grant the deploy key',
+        runState: DsRunState.waitingInput,
+        unreadCount: 2,
+        mentionCount: 1,
+      ),
+      onOpen: () {},
+    ),
+    DsSidebarThreadRow(
+      const DsSidebarThreadRowData(
+        id: 't4',
+        title: 'Check migration 0042',
+        runState: DsRunState.failed,
+      ),
+      onOpen: () {},
+    ),
+    DsSidebarThreadRow(
+      const DsSidebarThreadRowData(
+        id: 't5',
+        title: 'Search: hits in transcripts',
+        unreadCount: 3,
+      ),
+      onOpen: () {},
+    ),
+    DsSidebarThreadRow(
+      const DsSidebarThreadRowData(
+        id: 't6',
+        title: 'Nightly build',
+        muted: true,
+      ),
+      onOpen: () {},
+    ),
+    DsSidebarAllPostsRow(unreadCount: 4, mentionCount: 2, onOpen: () {}),
+    _forum(
+      const DsChannelRowData(
+        id: 'c2',
+        name: 'requests',
+        kind: DsChannelKind.forum,
+      ),
+      expanded: true,
+    ),
+    DsSidebarThreadRow(
+      const DsSidebarThreadRowData(id: 't7', title: 'Export format'),
+      onOpen: () {},
+    ),
+    DsSidebarAllPostsRow(selected: true, onOpen: () {}),
+    DsChannelRow(
+      const DsChannelRowData(id: 'c3', name: 'general'),
+      groupExpanded: true,
+      onToggleGroup: (_) {},
+      onOpen: () {},
+    ),
+    DsSidebarThreadRow(
+      const DsSidebarThreadRowData(id: 't8', title: 'Export format'),
+      onOpen: () {},
+    ),
+    DsSidebarThreadRow(
+      const DsSidebarThreadRowData(
+        id: 't9',
+        title: 'Request summary 4711',
+        done: true,
+      ),
+      selected: true,
+      last: true,
+      onOpen: () {},
+    ),
+  ]),
+]);
+
 const _header = DsComponentHeader(
   agentName: 'Robin',
   runLabel: 'R-12',
@@ -607,6 +794,8 @@ final Map<String, Widget Function()> sheets = {
   'live_box_final': liveBoxFinalSheet,
   'indicators': indicatorSheet,
   'rows': rowsSheet,
+  'sidebar_channels': sidebarChannelsSheet,
+  'sidebar_threads': sidebarThreadsSheet,
   'message_components_active': componentsActiveSheet,
   'message_components_final': componentsFinalSheet,
   'composer': composerSheet,

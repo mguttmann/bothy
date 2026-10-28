@@ -2229,7 +2229,7 @@
   "@shellColumnSidebar": {
     "description": "Semantics label of the sidebar column frame (01 section 5.1)."
   },
-  "shellColumnPostList": "Post list",
+  "shellColumnPostList": "Forum overview",
   "@shellColumnPostList": {
     "description": "Semantics label of the post list column frame (01 section 5.1)."
   },
@@ -12205,15 +12205,15 @@
   "@shortcutFocusInput": {
     "description": "Row of the list of shortcuts (01 7)."
   },
-  "shortcutChannel": "Next or previous channel",
+  "shortcutChannel": "Next or previous channel or thread row in the sidebar",
   "@shortcutChannel": {
     "description": "Row of the list of shortcuts (01 7)."
   },
-  "shortcutUnreadChannel": "Next or previous unread channel",
+  "shortcutUnreadChannel": "Next or previous unread channel or thread row",
   "@shortcutUnreadChannel": {
     "description": "Row of the list of shortcuts (01 7)."
   },
-  "shortcutColumn": "Switch column (sidebar, list, history, session)",
+  "shortcutColumn": "Switch column (sidebar, pinned overview, history, session)",
   "@shortcutColumn": {
     "description": "Row of the list of shortcuts (01 7)."
   },
@@ -13736,5 +13736,88 @@
         "example": "422"
       }
     }
+  },
+  "channelKindSentenceText": "Text channel: one shared conversation, threads start from its messages",
+  "@channelKindSentenceText": {
+    "description": "The kind sentence of a text channel: tooltip and screen reader text of its icon, subtitle of its header (01 section 4 and 6.8 item 11)."
+  },
+  "channelKindSentenceForum": "Forum: every post is its own conversation",
+  "@channelKindSentenceForum": {
+    "description": "The kind sentence of a forum without a project binding: tooltip of its icon, subtitle of its header and overview, empty state of the forum (01 section 4 and 6.8 item 11)."
+  },
+  "channelKindSentenceProject": "Project: every post is one agent session in this project",
+  "@channelKindSentenceProject": {
+    "description": "The kind sentence of a forum with a project binding: tooltip of its icon, subtitle of its header and overview, empty state of the forum (01 section 4 and 6.8 item 11)."
+  },
+  "channelKindNameText": "text channel",
+  "@channelKindNameText": {
+    "description": "The kind of a channel inside the screen reader label of its sidebar row: a text channel (components.md section 7)."
+  },
+  "channelKindNameForum": "forum",
+  "@channelKindNameForum": {
+    "description": "The kind of a channel inside the screen reader label of its sidebar row: a forum (components.md section 7)."
+  },
+  "channelKindNameProject": "project forum",
+  "@channelKindNameProject": {
+    "description": "The kind of a channel inside the screen reader label of its sidebar row: a forum with a project binding (components.md section 7)."
+  },
+  "sidebarAllPosts": "All posts",
+  "@sidebarAllPosts": {
+    "description": "Last row of an expanded forum group in the sidebar; opens the forum overview (01 section 6.8 item 5)."
+  },
+  "sidebarNewChat": "New chat",
+  "@sidebarNewChat": {
+    "description": "Sidebar thread row whose title is still empty (01 section 6.8 item 6)."
+  },
+  "sidebarNewChatIn": "New chat in {forum}",
+  "@sidebarNewChatIn": {
+    "description": "Label of the + action of a forum row with a project binding (01 section 6.8 item 8).",
+    "placeholders": {
+      "forum": {
+        "type": "String"
+      }
+    }
+  },
+  "sidebarNewPostIn": "New post in {forum}",
+  "@sidebarNewPostIn": {
+    "description": "Label of the + action of a forum row without a project binding (01 section 6.8 item 8).",
+    "placeholders": {
+      "forum": {
+        "type": "String"
+      }
+    }
+  },
+  "sidebarShowThreads": "Show threads",
+  "@sidebarShowThreads": {
+    "description": "Tooltip of the arrow of a collapsed thread group of a channel in the sidebar (01 section 6.8 item 7)."
+  },
+  "sidebarHideThreads": "Hide threads",
+  "@sidebarHideThreads": {
+    "description": "Tooltip of the arrow of an expanded thread group of a channel in the sidebar (01 section 6.8 item 7)."
+  },
+  "postListNewChat": "New chat",
+  "@postListNewChat": {
+    "description": "Primary button in the header of the overview of a forum with a project binding (components.md section 6)."
+  },
+  "overviewPin": "Pin",
+  "@overviewPin": {
+    "description": "Button in the header of the forum overview that keeps it as its own column (01 D15)."
+  },
+  "overviewUnpin": "Unpin",
+  "@overviewUnpin": {
+    "description": "Button in the header of the pinned forum overview column that returns it to the content column (01 D15)."
+  },
+  "overviewSearch": "Search in {forum}",
+  "@overviewSearch": {
+    "description": "Button in the header of the forum overview that opens the search with the filter of this forum (01 D15).",
+    "placeholders": {
+      "forum": {
+        "type": "String"
+      }
+    }
+  },
+  "shortcutPinOverview": "Pin or unpin the forum overview as a column",
+  "@shortcutPinOverview": {
+    "description": "Row of the list of shortcuts (01 7)."
   }
 }

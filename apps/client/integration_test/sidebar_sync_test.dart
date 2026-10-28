@@ -2,7 +2,8 @@
 
 // The personal sidebar across two devices of Alex and the counters of a channel (brief M4-19
 // Tests; 04 14): collapsing in the app reaches the other device, a new order from the other
-// device reaches the app through `sidebar.updated`, and the counters follow messages from Sam.
+// device reaches the app through `sidebar.updated`, and the counters follow messages from Sam
+// (on the thread row of the thread, M4-40).
 
 import 'package:api_client/api_client.dart';
 import 'package:domain/domain.dart';
@@ -59,8 +60,16 @@ void main() {
       await app.waitFor(general);
       final semantics = tester.ensureSemantics();
       seed.post(seed.sam, seed.releaseNotes, 'Build is green');
+      // The thread is unread now, so it is a row below `general` with its own counters, and
+      // the channel row does not count it a second time (01 6.8 item 6, M4-40).
       await app.waitFor(
-        find.bySemanticsLabel('general, ${en.threadRowUnread(1)}'),
+        find.bySemanticsLabel(
+          'Release notes, ${en.threadRowStateOpen}, ${en.threadRowUnread(1)}',
+        ),
+      );
+      expect(
+        find.bySemanticsLabel('general, ${en.channelKindNameText}'),
+        findsOneWidget,
       );
       world.createMessage(seed.sam.id, seed.releaseNotes, {
         'client_msg_id': world.nextId(),
@@ -69,7 +78,8 @@ void main() {
       });
       await app.waitFor(
         find.bySemanticsLabel(
-          'general, ${en.threadRowUnread(2)}, ${en.threadRowMentions(1)}',
+          'Release notes, ${en.threadRowStateOpen}, ${en.threadRowUnread(2)}, '
+          '${en.threadRowMentions(1)}',
         ),
       );
       semantics.dispose();

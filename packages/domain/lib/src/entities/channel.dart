@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// Channels and forum tags as the client sees them (03 `channels`, `forum_tags`; 15 6.1): without prompt, skills and project binding, which need `manage`.
+/// Channels and forum tags as the client sees them (03 `channels`, `forum_tags`; 15 6.1): without prompt, skills and project binding, which need `manage`; only the derived flag `project_bound` tells every reader that a binding exists (R-DM-54).
 library;
 
 import '../coded.dart';
@@ -136,6 +136,7 @@ final class Channel {
     this.defaultNotificationLevel,
     this.mainThreadId,
     this.archivedAt,
+    this.projectBound = false,
   });
 
   /// ID.
@@ -186,6 +187,12 @@ final class Channel {
   /// Version of behavior, prompt, skills and project; events name only this number (04 2.2 rule 1).
   final ResourceVersion settingsVersion;
 
+  /// API `Channel.project_bound`: true exactly when a project binding exists for the channel
+  /// (03 `project_bindings`, R-DM-54). The server derives it, so a reader without `manage` knows
+  /// that a forum is a project (01 6.8 item 11); creating or deleting the binding raises
+  /// [version] and comes as `channel.updated`. False in a payload of an older server.
+  final bool projectBound;
+
   /// Returns a copy with the given fields replaced; a nullable field cannot be cleared
   /// through it (build a new object for that).
   Channel copyWith({
@@ -204,6 +211,7 @@ final class Channel {
     DateTime? archivedAt,
     ResourceVersion? version,
     ResourceVersion? settingsVersion,
+    bool? projectBound,
   }) => Channel(
     id: id,
     spaceId: spaceId ?? this.spaceId,
@@ -222,6 +230,7 @@ final class Channel {
     archivedAt: archivedAt ?? this.archivedAt,
     version: version ?? this.version,
     settingsVersion: settingsVersion ?? this.settingsVersion,
+    projectBound: projectBound ?? this.projectBound,
   );
 
   @override
@@ -242,7 +251,8 @@ final class Channel {
       other.createdAt == createdAt &&
       other.archivedAt == archivedAt &&
       other.version == version &&
-      other.settingsVersion == settingsVersion;
+      other.settingsVersion == settingsVersion &&
+      other.projectBound == projectBound;
 
   @override
   int get hashCode => Object.hash(
@@ -262,6 +272,7 @@ final class Channel {
     archivedAt,
     version,
     settingsVersion,
+    projectBound,
   );
 }
 

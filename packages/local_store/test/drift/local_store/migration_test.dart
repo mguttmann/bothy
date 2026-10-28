@@ -3,8 +3,11 @@
 // The migration steps of the local database (docs/DECISIONS.md D-M4-12-6): every stored schema
 // version migrates to every later one and then equals the stored schema of that version;
 // version 2 (M4-19) adds the local-only table `forum_view_states`, version 3 (M4-23) the
-// local-only table `recent_targets`, version 4 (M4-36) the local-only table `host_key_pins` and
-// version 5 (M5-08) the nullable column `instance.app_lock`; each keeps every row of the mirror. The preserved tables are checked by `survival_test.dart`.
+// local-only table `recent_targets`, version 4 (M4-36) the local-only table `host_key_pins`,
+// version 5 (M5-08) the nullable column `instance.app_lock` and version 6 (M4-40) the local-only
+// tables `channel_view_states` and `shell_view_state` with the column `channels.project_bound`
+// and a cleared cursor; each keeps every row of the mirror. The preserved tables are checked by
+// `survival_test.dart`.
 
 import 'package:drift/drift.dart';
 import 'package:drift_dev/api/migrations_native.dart';
@@ -17,6 +20,7 @@ import 'generated/schema_v2.dart' as v2;
 import 'generated/schema_v3.dart' as v3;
 import 'generated/schema_v4.dart' as v4;
 import 'generated/schema_v5.dart' as v5;
+import 'generated/schema_v6.dart' as v6;
 
 void main() {
   driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
@@ -155,4 +159,74 @@ void main() {
       );
     },
   );
+
+  test('the migration 5 to 6 keeps the channels unbound, adds the view state '
+      'tables and clears cursor and epoch', () async {
+    final channel = v5.ChannelsData(
+      id: '0192f4a0-7b1c-7000-8000-000000000201',
+      spaceId: '0192f4a0-7b1c-7000-8000-000000000101',
+      kind: 'forum',
+      name: 'dev',
+      topic: '',
+      sortKey: 'a0',
+      readOnly: 0,
+      dmParticipantIds: '[]',
+      createdAt: '2026-10-01T09:00:00.000Z',
+      version: 4,
+      settingsVersion: 2,
+      level: 'write',
+      capabilities: '[]',
+    );
+    final state = v5.SyncStateData(
+      id: 1,
+      cursor: 812,
+      syncEpoch: 'epoch-3',
+      headSeq: 812,
+      permissionVersion: 7,
+      lastSnapshotAt: 40,
+    );
+    await verifier.testWithDataIntegrity(
+      oldVersion: 5,
+      newVersion: 6,
+      createOld: v5.DatabaseAtV5.new,
+      createNew: v6.DatabaseAtV6.new,
+      openTestedDatabase: LocalDatabase.new,
+      createItems: (batch, oldDb) {
+        batch
+          ..insertAll(oldDb.channels, [channel])
+          ..insertAll(oldDb.syncState, [state]);
+      },
+      validateItems: (newDb) async {
+        expect(await newDb.select(newDb.channels).get(), [
+          v6.ChannelsData(
+            id: channel.id,
+            spaceId: channel.spaceId,
+            kind: 'forum',
+            name: 'dev',
+            topic: '',
+            sortKey: 'a0',
+            readOnly: 0,
+            dmParticipantIds: '[]',
+            createdAt: '2026-10-01T09:00:00.000Z',
+            version: 4,
+            settingsVersion: 2,
+            projectBound: 0,
+            level: 'write',
+            capabilities: '[]',
+          ),
+        ]);
+        // The next connection loads a whole snapshot that fills project_bound (04 7.3).
+        expect(await newDb.select(newDb.syncState).get(), [
+          const v6.SyncStateData(
+            id: 1,
+            headSeq: 812,
+            permissionVersion: 7,
+            lastSnapshotAt: 40,
+          ),
+        ]);
+        expect(await newDb.select(newDb.channelViewStates).get(), isEmpty);
+        expect(await newDb.select(newDb.shellViewState).get(), isEmpty);
+      },
+    );
+  });
 }

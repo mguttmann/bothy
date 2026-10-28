@@ -74,6 +74,7 @@ var iconNames = []string{
 	"billing.personal",
 	"channel.dm",
 	"channel.forum",
+	"channel.project",
 	"channel.text",
 	"context",
 	"cost",

@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The main view of the desktop after the login: the connection banner and the four column
-/// frames that M4-19 to M4-25 fill (docs/spec/01-product.md 5.1, 6.6, 6.7); M4-19 fills the
-/// sidebar and the post list of a forum, M4-20 the history and the frame of the session
-/// column.
+/// The main view of the desktop after the login: the connection banner and the column frames
+/// that M4-19 to M4-25 fill (docs/spec/01-product.md 5.1, 6.6, 6.7); M4-19 fills the sidebar
+/// and the post list of a forum, M4-20 the history and the frame of the session column, M4-40
+/// the thread groups of the sidebar and the forum overview D15 in the content column or pinned
+/// as its own column.
 library;
 
 import 'dart:async';
@@ -17,13 +18,14 @@ import 'package:l10n/l10n.dart';
 import 'package:sync_engine/sync_engine.dart';
 
 import '../../forum/post_list_column.dart';
+import '../../forum/providers.dart' show overviewPinnedProvider;
 import '../../keyboard/app_shortcuts.dart';
 import '../../keyboard/intents.dart';
 import '../../session_column/session_column.dart';
 import '../../settings/settings_providers.dart';
 import '../../sidebar/providers.dart';
 import '../../sidebar/sidebar_column.dart';
-import '../../sidebar/sidebar_model.dart' show SidebarNavigation;
+import '../../sidebar/sidebar_model.dart' show SidebarNavigation, SidebarTarget;
 import '../../switcher/providers.dart';
 import '../../switcher/quick_switcher.dart' show showQuickSwitcher;
 import '../../terminal/host_terminal_page.dart';
@@ -103,11 +105,15 @@ class DesktopShell extends ConsumerWidget {
       ),
       _ => null,
     };
+    // M4-40: the navigation stops at thread rows too (01 7, D-SB-8).
     final nav = SidebarNavigation(
       tree: () => ref.read(sidebarTreeProvider),
-      selected: () => selection.channel,
-      open: (channel) => context.go('/c/${channel.value}'),
+      selected: () => selection.channel == null
+          ? null
+          : SidebarTarget(selection.channel!, selection.thread),
+      open: (target) => context.go(target.path),
     );
+    final pinned = ref.watch(overviewPinnedProvider).value ?? false;
     // The cross-cutting views, the run graph and the terminal of a host have no session
     // column.
     final host = parsed is HostLocation ? parsed : null;
@@ -130,6 +136,16 @@ class DesktopShell extends ConsumerWidget {
           final first = ref.read(hostsListProvider).value?.hosts.firstOrNull;
           context.go(first == null ? '/hosts' : '/hosts/${first.id}');
         }),
+        // 01 7: Cmd+Shift+O or Ctrl+Shift+O pins or unpins the forum overview (D15); the choice
+        // is kept on this device (D-SB-6).
+        ShortcutAction.pinOverview: KeyboardHandler(
+          () => unawaited(
+            ref
+                .read(localDatabaseProvider)
+                ?.forumViewDao
+                .setOverviewPinned(pinned: !pinned),
+          ),
+        ),
         ShortcutAction.nextChannel: KeyboardHandler(nav.next),
         ShortcutAction.previousChannel: KeyboardHandler(nav.previous),
         ShortcutAction.nextUnreadChannel: KeyboardHandler(nav.nextUnread),
@@ -161,6 +177,7 @@ class DesktopShell extends ConsumerWidget {
                     .toDouble(),
                 stackShowsHistory: parsed is ThreadLocation || host != null,
                 showPostList: forum != null && host == null,
+                listPinned: pinned,
                 // The cross-cutting views (search, mentions, Running now) have no session.
                 showSession:
                     !isView && (textChannel ? shown.textThread : shown.forum),
@@ -170,6 +187,7 @@ class DesktopShell extends ConsumerWidget {
                 },
                 sidebar: SidebarColumn(
                   selectedChannel: host == null ? selection.channel : null,
+                  selectedThread: host == null ? selection.thread : null,
                   selectedHost: host?.hostId?.value,
                 ),
                 postList: forum == null

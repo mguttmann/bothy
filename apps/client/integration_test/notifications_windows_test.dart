@@ -136,8 +136,11 @@ void main() {
         await app.waitFor(find.byKey(const ValueKey('column.sidebar')));
         await app.waitLive();
         final semantics = tester.ensureSemantics();
+        // The thread row of "Release notes" carries them (01 6.8 item 6, M4-40).
         await app.waitFor(
-          find.bySemanticsLabel('general, ${en.threadRowUnread(2)}'),
+          find.bySemanticsLabel(
+            'Release notes, ${en.threadRowStateOpen}, ${en.threadRowUnread(2)}',
+          ),
         );
         semantics.dispose();
       } finally {

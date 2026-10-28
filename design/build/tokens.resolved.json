@@ -2857,6 +2857,10 @@
         "name": "chat-teardrop",
         "weight": "regular"
       },
+      "channel.project": {
+        "name": "brackets-angle",
+        "weight": "regular"
+      },
       "thread": {
         "name": "chat-text",
         "weight": "regular"

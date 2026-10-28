@@ -35,6 +35,7 @@
           "channel.text": {"name": "hash", "weight": "bold"},
           "channel.forum": {"name": "chats-circle", "weight": "regular"},
           "channel.dm": {"name": "chat-teardrop", "weight": "regular"},
+          "channel.project": {"name": "brackets-angle", "weight": "regular"},
           "thread": {"name": "chat-text", "weight": "regular"},
           "agent": {"name": "robot", "weight": "regular"},
           "person": {"name": "user", "weight": "regular"},

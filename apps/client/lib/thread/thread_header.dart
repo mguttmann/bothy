@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// The header of a thread or of the main history of a channel (brief M4-20 Design note 5;
-/// 01 5.1 D1 and D2, 6.1, 6.7): the title with its "automatic" mark, the operator or "No agent
+/// 01 5.1 D1 and D2, 6.1, 6.7): the title with its "automatic" mark, below the title of a main
+/// history the kind sentence of a text channel (01 6.8 item 11, M4-40), the operator or "No agent
 /// answers here", Done or Reopen, Move, Pin, Column and the menu of M4-33. On the phone
 /// ([ThreadHeader.compact], 01 5.3 M3) the actions sit in one overflow menu next to the title.
 library;
@@ -19,6 +20,7 @@ final class ThreadHeaderData {
     required this.operatorName,
     required this.mainHistory,
     required this.done,
+    this.textChannel = false,
     this.canEditTitle = false,
     this.canSetDone = false,
     this.canMove = false,
@@ -38,6 +40,10 @@ final class ThreadHeaderData {
 
   /// Whether the thread is done (`state = closed`).
   final bool done;
+
+  /// Whether this is the main history of a text channel, whose header explains the kind
+  /// (01 6.8 item 11); false for a direct message and every thread.
+  final bool textChannel;
 
   /// Whether the title may be edited (05 `thread.title.update`).
   final bool canEditTitle;
@@ -178,6 +184,15 @@ class ThreadHeader extends StatelessWidget {
                 ),
             ],
           ),
+          // The channel header explains the kind (01 6.8 item 11, M4-40); a forum's header is
+          // its overview.
+          if (d.textChannel)
+            Text(
+              dsChannelKindSentence(l, DsChannelKind.text),
+              key: const ValueKey('thread.kind'),
+              style: dsTextStyle(DsType.caption)
+                  .copyWith(color: colors.textSecondary),
+            ),
           const SizedBox(height: DsSpace.s4),
           Wrap(
             spacing: DsSpace.s8,

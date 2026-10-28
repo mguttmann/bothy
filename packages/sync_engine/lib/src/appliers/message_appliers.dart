@@ -2,7 +2,8 @@
 
 /// Appliers of `message.*`, `reaction.*` and `pin.*` (04 9 item 3, 15 5): messages by version,
 /// reactions and pins with absolute values in `seq` order; every message change feeds the
-/// search index and the unread counter (brief M4-14 Design note 2f).
+/// search index and the unread counter (brief M4-14 Design note 2f); a new message of a thread
+/// this database does not hold loads that thread (R-SY-28, brief M4-40 Design note 5).
 library;
 
 import 'package:domain/domain.dart';
@@ -10,6 +11,7 @@ import 'package:local_store/local_store.dart';
 
 import '../dispatcher.dart';
 import '../wire.dart';
+import 'thread_appliers.dart';
 
 /// The appliers of this group by event type.
 final Map<String, Applier> messageAppliers = {
@@ -144,6 +146,7 @@ Future<void> _applyMessage(
       final id = MessageId.parse(clientMsgId);
       after.steps.add(() => sync.onEcho(id, m));
     }
+    await _queueUnknownThread(sync, db, after, m);
   }
   if (!applied) return;
   await _count(
@@ -153,6 +156,61 @@ Future<void> _applyMessage(
     created ? MessageCreated(m) : MessageUpdated(m, previous: previous),
     seq: seq,
   );
+}
+
+/// R-SY-28 (04 6.3 item 4): the client fills the sidebar from the snapshot's `active_threads`
+/// and keeps it current from `thread.*` and `message.created`, so a message of a thread this
+/// database does not hold (not in the snapshot, created before the cursor and dropped by the
+/// cache cleanup, or the main thread of a text channel) queues one `getThread` and the row
+/// appears when it arrives (brief M4-40 Design note 5). [SyncContext.threadLoads] keeps it to
+/// one load per thread.
+Future<void> _queueUnknownThread(
+  SyncContext sync,
+  LocalDatabase db,
+  AfterCommit after,
+  Message m,
+) async {
+  final id = m.threadId;
+  if (sync.threadLoads.contains(id) || await db.threadsDao.byId(id) != null) {
+    return;
+  }
+  // After the commit, so a page that rolls back leaves no entry in threadLoads; the reads of a
+  // commit start after all its steps, so the read queued here runs with them, and a second
+  // message of the thread in the same page finds the entry and queues nothing.
+  after.steps.add(() {
+    if (sync.threadLoads.add(id)) {
+      after.reads.add(() => _loadThread(sync, id, m.channelId));
+    }
+  });
+}
+
+/// Loads the thread [id] of [channelId] (`getThread`) and stores it by the version rule; a
+/// failure is logged without content and the next message of the thread tries again.
+Future<void> _loadThread(
+  SyncContext sync,
+  ThreadId id,
+  ChannelId channelId,
+) async {
+  final db = sync.db;
+  try {
+    // Checked when the read runs: an earlier read or event may have stored the thread, or
+    // loaded or removed its channel, since the message arrived.
+    if (await db.threadsDao.byId(id) != null ||
+        !await sync.holdsContent(db, channelId, id)) {
+      return;
+    }
+    final thread = await sync.fetcher.thread(id);
+    await db.transaction(() async {
+      // Inside the write's transaction, so a removal during the read wins (04 8.3).
+      if (await sync.holdsContent(db, thread.channelId, thread.id)) {
+        await storeThread(db, thread);
+      }
+    });
+  } on Object catch (e) {
+    sync.log('unknown thread not loaded: ${e.runtimeType}');
+  } finally {
+    sync.threadLoads.remove(id);
+  }
 }
 
 Future<void> _deleted(ApplyContext c) async {

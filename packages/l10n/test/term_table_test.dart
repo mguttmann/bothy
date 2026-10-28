@@ -28,6 +28,8 @@ const Map<String, String> exceptions = {
   'shellColumnSidebar': 'German plural of the term Channel',
   // The German plural of the term Post changes its vowel (M4-19, INT-W40/5).
   'postListLoadFailed': 'German plural of the term Post',
+  // "All posts" of the sidebar: the same plural (M4-40).
+  'sidebarAllPosts': 'German plural of the term Post',
   // {space} and {channel} are placeholders that carry the names, not the terms (INT-W27/4).
   'vizLaneLabel': 'placeholders {space} and {channel}, not the terms',
   // {channel} is a placeholder that carries the channel's name, not the term (M4-27).

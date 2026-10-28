@@ -188,6 +188,32 @@ void main() {
     },
   );
 
+  test(
+    'removing a channel or its space deletes the state of its thread group',
+    () async {
+      await fill(1, s: 1);
+      await fill(2, s: 2);
+      await fill(3, s: 1);
+      for (final c in [1, 2, 3]) {
+        await db.forumViewDao.setGroupCollapsed(channel(c).id, collapsed: true);
+      }
+      await db.forumViewDao.setOverviewPinned(pinned: true);
+
+      await db.removeTargets([TargetRef.channel(channel(1).id)]);
+      expect(await db.forumViewDao.watchCollapsedGroups().first, {
+        channel(2).id,
+        channel(3).id,
+      });
+
+      await db.removeTargets([TargetRef.space(space(2).id)]);
+      expect(await db.forumViewDao.watchCollapsedGroups().first, {
+        channel(3).id,
+      });
+      // The pinned overview belongs to the device, not to a target.
+      expect(await db.forumViewDao.overviewPinned(), isTrue);
+    },
+  );
+
   test('a removal that fails midway changes nothing', () async {
     await fill(1);
     await db.customStatement(

@@ -27,17 +27,20 @@ enum ShortcutAction {
   /// Puts the focus into the input of the open history.
   focusInput,
 
-  /// Opens the next channel of the sidebar.
+  /// Opens the next channel or thread row of the sidebar.
   nextChannel,
 
-  /// Opens the previous channel of the sidebar.
+  /// Opens the previous channel or thread row of the sidebar.
   previousChannel,
 
-  /// Opens the next channel with unread items.
+  /// Opens the next channel or thread row with unread items.
   nextUnreadChannel,
 
-  /// Opens the previous channel with unread items.
+  /// Opens the previous channel or thread row with unread items.
   previousUnreadChannel,
+
+  /// Pins or unpins the forum overview as a column (01 D15, M4-40).
+  pinOverview,
 
   /// Moves the focus to the next column (F6).
   nextColumn,
@@ -177,6 +180,15 @@ final class PreviousUnreadChannelIntent extends AppIntent {
 
   @override
   ShortcutAction get action => ShortcutAction.previousUnreadChannel;
+}
+
+/// Intent of [ShortcutAction.pinOverview].
+final class PinOverviewIntent extends AppIntent {
+  /// Creates the intent.
+  const PinOverviewIntent();
+
+  @override
+  ShortcutAction get action => ShortcutAction.pinOverview;
 }
 
 /// Intent of [ShortcutAction.nextColumn].
@@ -336,6 +348,7 @@ AppIntent intentOf(ShortcutAction action) => switch (action) {
   ShortcutAction.previousChannel => const PreviousChannelIntent(),
   ShortcutAction.nextUnreadChannel => const NextUnreadChannelIntent(),
   ShortcutAction.previousUnreadChannel => const PreviousUnreadChannelIntent(),
+  ShortcutAction.pinOverview => const PinOverviewIntent(),
   ShortcutAction.nextColumn => const NextColumnIntent(),
   ShortcutAction.previousColumn => const PreviousColumnIntent(),
   ShortcutAction.markRead => const MarkReadIntent(),

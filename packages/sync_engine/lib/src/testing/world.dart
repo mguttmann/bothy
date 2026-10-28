@@ -1065,6 +1065,29 @@ final class FakeWorld {
     return id;
   }
 
+  /// Creates ([bound] true) or deletes the project binding of [channelId] as the server does
+  /// (03 `project_bindings`, R-DM-54): `project_bound` follows, `channels.version` rises and
+  /// `channel.updated` with the channel goes to everyone who sees it. The fake keeps no binding
+  /// row, only the derived flag; as on the server, a call that leaves the flag as it is writes
+  /// nothing (an identical binding raises no version).
+  void setProjectBound(String channelId, {required bool bound}) {
+    final channel = channels[channelId]!;
+    if (channel.json['project_bound'] == bound) return;
+    final json = channel.json
+      ..['project_bound'] = bound
+      ..['version'] = (channel.json['version']! as int) + 1;
+    append(
+      'channel.updated',
+      resource: {
+        'kind': 'channel',
+        'id': channelId,
+        'version': json['version'],
+      },
+      scope: {'space_id': ?channel.spaceId, 'channel_id': channelId},
+      payload: {'channel': json},
+    );
+  }
+
   /// Adds the tag [name] to forum [channelId] with the category [color]; returns its ID.
   String addForumTag(
     String channelId,
