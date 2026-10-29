@@ -18,6 +18,7 @@ from claude_code_runner.commandline import (
     choose_model,
     choose_session,
     class_flags,
+    reported_model,
     scoped_tools,
 )
 
@@ -152,6 +153,50 @@ def test_add_dir_only_scoped_and_host_with_files() -> None:
 def test_model_precedence() -> None:
     assert choose_model("model-small", "model-large") == "model-small"
     assert choose_model(None, "model-large") == "model-large"
+
+
+def _model_pattern() -> re.Pattern[str]:
+    """The pattern of `default_model` that 09 2.2 names (the server's model name check)."""
+    lines = SPEC.read_text("utf-8").splitlines()
+    row = next(line for line in lines if line.startswith("| `default_model`"))
+    found = re.search(r"pattern `([^`]+)`", row)
+    assert found is not None
+    return re.compile(found.group(1))
+
+
+@pytest.mark.parametrize(
+    ("cli_model", "reported"),
+    [
+        ("model-large", "model-large"),
+        # The CLI notation with a context window: the server gets the model name (09 2.2).
+        ("claude-opus-5-5[1m]", "claude-opus-5-5"),
+        ("claude-sonnet-5[200k]", "claude-sonnet-5"),
+        ("opus", "opus"),
+        # Nothing left that the server could take: the member is left out, the run goes on.
+        ("[1m]", None),
+        ("model large[1m]", None),
+        ("a]b", None),
+    ],
+)
+def test_reported_model_is_a_server_model_name(cli_model: str, reported: str | None) -> None:
+    assert reported_model(cli_model) == reported
+    if reported is not None:
+        assert _model_pattern().fullmatch(reported)
+
+
+def test_cli_notation_reaches_the_cli_unchanged() -> None:
+    model = choose_model("claude-opus-5-5[1m]", "model-large")
+    assert model == "claude-opus-5-5[1m]"
+    line = build_argv(
+        claude_bin="/usr/bin/claude",
+        model=model,
+        session=SESSION,
+        tool_class="chat",
+        tools=[],
+        add_dir=None,
+        system_prompt_file=PROMPT,
+    )
+    assert line[line.index("--model") + 1] == "claude-opus-5-5[1m]"
 
 
 @pytest.mark.parametrize("value", ["-p", "--x", "", "a\nb", "a\u202eb"])

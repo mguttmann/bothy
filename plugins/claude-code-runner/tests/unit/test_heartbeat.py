@@ -20,6 +20,7 @@ from claude_code_runner.heartbeat import (
     billing_modes_supported,
     parse_version,
     probe_version,
+    raised_minimum,
     runtime_status,
 )
 
@@ -45,7 +46,9 @@ def test_parse_version() -> None:
 def test_body_per_configuration(key: bool, personal: bool, modes: tuple[str, ...] | None) -> None:
     assert billing_modes_supported(has_key_ref=key, allow_personal=personal) == modes
     status = runtime_status(
-        Probe("2.1.259", ()), [ProjectReadiness(channel_id=CHANNEL, ready=True)], modes
+        Probe(PINNED_CLAUDE_CODE_VERSION, ()),
+        [ProjectReadiness(channel_id=CHANNEL, ready=True)],
+        modes,
     )
     beat = build_heartbeat(
         status.state,
@@ -101,8 +104,46 @@ async def test_probe_unreachable(tmp_path: Path) -> None:
     assert MIN_CLAUDE_CODE_VERSION <= PINNED_CLAUDE_CODE_VERSION
 
 
+def test_pin_is_a_version_that_serves_current_models() -> None:
+    # 2.1.259 was refused by the API for current models ("version 2.1.280 or newer is
+    # required", 2026-10-29); the pin moved to 2.1.288 (RUNNER-CLI-PIN).
+    assert PINNED_CLAUDE_CODE_VERSION == "2.1.288"
+    assert parse_version(PINNED_CLAUDE_CODE_VERSION) >= (2, 1, 280)  # type: ignore[operator]
+
+
+@pytest.mark.anyio
+async def test_probe_below_a_raised_minimum_is_unsupported(tmp_path: Path) -> None:
+    """A minimum the API named for the model makes an older CLI unsupported (blocking)."""
+    prog = script(tmp_path, f"print('{PINNED_CLAUDE_CODE_VERSION} (Claude Code)')")
+    probe = await probe_version(prog, {}, tmp_path, PATIENCE, minimum="2.1.300")
+    assert probe.version == PINNED_CLAUDE_CODE_VERSION
+    assert probe.reasons == ("runtime_version_unsupported",)
+    assert probe.blocking
+    same = await probe_version(prog, {}, tmp_path, PATIENCE, minimum=PINNED_CLAUDE_CODE_VERSION)
+    assert same.reasons == ()
+
+
+@pytest.mark.parametrize(
+    ("current", "minimum", "required", "expected"),
+    [
+        # The API named the version: it becomes the minimum.
+        ("2.1.259", "2.1.259", "2.1.280", "2.1.280"),
+        # Never lowered by a smaller or unreadable requirement.
+        ("2.1.288", "2.1.300", "2.1.280", "2.1.300"),
+        # No version named (an organization's policy): anything after the probed one.
+        ("2.1.288", "2.1.259", None, "2.1.289"),
+        # Nothing probed and nothing named: unchanged.
+        (None, "2.1.259", None, "2.1.259"),
+    ],
+)
+def test_raised_minimum(
+    current: str | None, minimum: str, required: str | None, expected: str
+) -> None:
+    assert raised_minimum(minimum, current=current, required=required) == expected
+
+
 def test_runtime_status_carries_the_project_folders() -> None:
     """The folder names of 09 18.13 enter the heartbeat; ``None`` leaves the member out."""
-    status = runtime_status(Probe("2.1.259", ()), [], None, ["api", "website"])
+    status = runtime_status(Probe(PINNED_CLAUDE_CODE_VERSION, ()), [], None, ["api", "website"])
     assert status.project_folders == ("api", "website")
-    assert runtime_status(Probe("2.1.259", ()), [], None).project_folders is None
+    assert runtime_status(Probe(PINNED_CLAUDE_CODE_VERSION, ()), [], None).project_folders is None

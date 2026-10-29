@@ -67,6 +67,7 @@ from claude_code_runner.commandline import (
     SessionChoice,
     choose_model,
     choose_session,
+    reported_model,
     scoped_tools,
 )
 from claude_code_runner.config import RunnerConfig
@@ -78,9 +79,12 @@ from claude_code_runner.environment import (
 )
 from claude_code_runner.heartbeat import (
     CAPABILITIES,
+    MIN_CLAUDE_CODE_VERSION,
     Probe,
     billing_modes_supported,
+    parse_version,
     probe_version,
+    raised_minimum,
     runtime_status,
 )
 from claude_code_runner.locks import LockTimeout, acquire, release
@@ -149,6 +153,8 @@ class RunnerHandler(AgentHandler):
             on_done=self.on_provisioned,
         )
         self.probe = Probe()
+        self.minimum = MIN_CLAUDE_CODE_VERSION
+        """The lowest supported CLI version; raised when the API refuses the model (18.9)."""
         self._probing: asyncio.Task[Probe] | None = None
         self._runs: dict[UUID, RunState] = {}
         self.adopted: dict[UUID, RunTurn] = {}
@@ -419,9 +425,14 @@ class RunnerHandler(AgentHandler):
         Returns:
             The probe.
         """
-        self.probe = await probe_version(
-            self.claude_bin, self._probe_env(), self.config.state_dir, self.config.cli_probe_timeout
+        probe = await probe_version(
+            self.claude_bin,
+            self._probe_env(),
+            self.config.state_dir,
+            self.config.cli_probe_timeout,
+            minimum=self.minimum,
         )
+        self.probe = self._held(probe)  # a minimum raised while the probe ran still holds
         if self.probe.reasons:
             warn("runtime_degraded", reasons=",".join(self.probe.reasons))
         return self.probe
@@ -441,6 +452,34 @@ class RunnerHandler(AgentHandler):
             task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await task
+
+    def _held(self, probe: Probe) -> Probe:
+        """``probe`` with ``runtime_version_unsupported`` when its version is below `minimum`."""
+        parsed = parse_version(probe.version or "")
+        minimum = parse_version(self.minimum)
+        if probe.blocking or parsed is None or minimum is None or parsed >= minimum:
+            return probe
+        return Probe(probe.version, ("runtime_version_unsupported",))
+
+    async def runtime_too_old(self, required: str | None) -> None:
+        """The API refused a turn's model to the CLI as too old (09 18.9, D-RUNNER-CLI-PIN-2).
+
+        The minimum rises to the version the API named (without one: past the probed version),
+        so the runner reports ``degraded`` with ``runtime_version_unsupported`` and prepare
+        refuses runs until a probe finds a CLI at that version; the heartbeat goes out at once.
+
+        Args:
+            required: The version the API named, if any.
+        """
+        self.minimum = raised_minimum(self.minimum, current=self.probe.version, required=required)
+        self.probe = self._held(self.probe)
+        warn(
+            "runtime_version_unsupported",
+            version=self.probe.version or "unknown",
+            minimum=self.minimum,
+        )
+        if self.adapter is not None:
+            await self.adapter.send_heartbeat()
 
     def _probe_soon(self) -> None:
         if self._probing is not None and not self._probing.done():
@@ -513,7 +552,7 @@ class RunnerHandler(AgentHandler):
         await self.precheck(state, inv.claims.billing_mode, ids)
         log("run_prepared", **ids)
         return StartOptions(
-            model=state.model,
+            model=reported_model(state.model),
             external_session_ref=state.session.ref,
             billing_evidence=state.evidence,
         )

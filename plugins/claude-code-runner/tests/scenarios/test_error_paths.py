@@ -244,3 +244,46 @@ async def test_quoted_error_text_is_not_an_error_path(world: World) -> None:
     assert world.calls("compact") == []
     [note] = status_steps(world, run.run_id)
     assert note["detail"]["errors"] == ["Reached the maximum number of turns"]
+
+
+async def test_cli_too_old_for_the_model_degrades_until_updated(world: World) -> None:
+    """The API refuses the model to an outdated CLI: a clear end and a blocking degraded state.
+
+    Live on 2026-10-29: "API Error: 400 Claude Code 2.1.259 does not support this model; version
+    2.1.280 or newer is required" ended a run as a bare ``runtime_error`` while the heartbeat
+    stayed ``online`` (RUNNER-CLI-PIN).
+    """
+    world.scenario(fixture="plain", api_error="cli_too_old")
+    await world.start()
+    run = await world.fake.trigger("Fix it", channel_id=world.forum_a)
+    assert await world.ended(run.run_id) == "failed"
+    assert world.fake.run_state(run.run_id).state_reason == "runtime_error"
+    [note] = status_steps(world, run.run_id)
+    assert note["detail"]["errors"] == [
+        "Claude Code on the runner host is too old for the model: version 2.1.300 or newer "
+        "is required. Update Claude Code (the runner reports runtime_version_unsupported "
+        "until it is updated)."
+    ]
+    assert len(world.turns()) == 1
+
+    def degraded() -> bool:
+        beat = world.fake.heartbeats[-1]
+        return beat["details"]["degraded_reasons"] == ["runtime_version_unsupported"]
+
+    await world.until(degraded)
+    assert world.fake.heartbeats[-1]["state"] == "degraded"
+    assert world.fake.heartbeats[-1]["runtime_version"] == "2.1.288"
+    # No turn for a model the CLI cannot serve: prepare refuses at once.
+    refused = await world.fake.trigger("Again", channel_id=world.forum_a)
+    assert await world.ended(refused.run_id) == "failed"
+    assert world.fake.run_state(refused.run_id).state_reason == "runtime_error"
+    assert len(world.turns()) == 1
+    # The operator updates the CLI: the next probe clears the state, runs work again.
+    world.scenario(fixture="plain", version="2.1.300")
+    await world.until(
+        lambda: (
+            world.fake.heartbeats[-1]["details"]["degraded_reasons"] == ["runtime_version_untested"]
+        )
+    )
+    late = await world.fake.trigger("Once more", channel_id=world.forum_a)
+    assert await world.ended(late.run_id) == "completed"

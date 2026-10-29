@@ -3,9 +3,10 @@
 
 `probe_version` runs ``claude --version`` within ``runner.cli_probe_timeout``; its outcome gives
 the degraded reasons ``runtime_unreachable`` (no answer), ``runtime_version_unsupported``
-(below `MIN_CLAUDE_CODE_VERSION` or unreadable) and ``runtime_version_untested`` (another
-version than `PINNED_CLAUDE_CODE_VERSION`). `runtime_status` turns the last probe, the project
-readiness and the provable billing modes into the SDK's `RuntimeStatus`; the SDK adds
+(below `MIN_CLAUDE_CODE_VERSION`, below a minimum the API named for the model, or unreadable)
+and ``runtime_version_untested`` (another version than `PINNED_CLAUDE_CODE_VERSION`).
+`runtime_status` turns the last probe, the project readiness and the provable billing modes
+into the SDK's `RuntimeStatus`; the SDK adds
 ``details`` (capabilities, active runs, adapter and runtime names, protocol version).
 
 Examples:
@@ -34,14 +35,18 @@ __all__ = [
     "billing_modes_supported",
     "parse_version",
     "probe_version",
+    "raised_minimum",
     "runtime_status",
 ]
 
 MIN_CLAUDE_CODE_VERSION = "2.1.259"
 """The version 09 18.2 names for ``--permission-prompts none``."""
 
-PINNED_CLAUDE_CODE_VERSION = "2.1.259"
-"""The version the fixtures and the stream field table were written for (RK-14)."""
+PINNED_CLAUDE_CODE_VERSION = "2.1.288"
+"""The version the fixtures and the stream field table were written for (RK-14).
+
+2.1.259 until 2026-10-29, when the API refused current models to it ("version 2.1.280 or newer
+is required"); docs/DECISIONS.md D-RUNNER-CLI-PIN-1."""
 
 CAPABILITIES: Mapping[str, bool | str] = {
     "followups": "steer",
@@ -99,8 +104,42 @@ class Probe:
         return bool(BLOCKING & set(self.reasons))
 
 
+def raised_minimum(minimum: str, *, current: str | None, required: str | None) -> str:
+    """Return the minimum after the API refused the model to the CLI as too old (18.9).
+
+    Args:
+        minimum: The minimum so far.
+        current: The probed version when the refusal came, if known.
+        required: The version the API named (``version <v> or newer is required``); ``None``
+            when it named none (an organization's policy floor).
+
+    Returns:
+        The higher of ``minimum`` and ``required``; without ``required``, the version after
+        ``current`` (patch plus one), so the probed version counts as too old; without both,
+        ``minimum`` unchanged.
+
+    Examples:
+        >>> raised_minimum("2.1.259", current="2.1.259", required="2.1.280")
+        '2.1.280'
+    """
+    if required is not None and parse_version(required) is not None:
+        wanted = _as_tuple(required)
+    elif current is not None and (parsed := parse_version(current)) is not None:
+        wanted = (parsed[0], parsed[1], parsed[2] + 1)
+    else:
+        return minimum
+    if wanted <= _as_tuple(minimum):
+        return minimum
+    return ".".join(str(p) for p in wanted)
+
+
 async def probe_version(  # noqa: PLR0911 - one return per outcome
-    claude_bin: str | None, env: Mapping[str, str], cwd: Path, timeout: float
+    claude_bin: str | None,
+    env: Mapping[str, str],
+    cwd: Path,
+    timeout: float,
+    *,
+    minimum: str = MIN_CLAUDE_CODE_VERSION,
 ) -> Probe:
     """Run ``<claude_bin> --version`` and classify the answer.
 
@@ -109,6 +148,8 @@ async def probe_version(  # noqa: PLR0911 - one return per outcome
         env: An environment without credentials.
         cwd: The working directory (``runner.state_dir``).
         timeout: ``runner.cli_probe_timeout``.
+        minimum: The lowest supported version: `MIN_CLAUDE_CODE_VERSION`, or the higher one
+            the API named for the model (`raised_minimum`).
 
     Returns:
         The probe.
@@ -142,7 +183,7 @@ async def probe_version(  # noqa: PLR0911 - one return per outcome
     if parsed is None:
         return Probe(None, ("runtime_version_unsupported",))
     version = ".".join(str(p) for p in parsed)
-    if parsed < _as_tuple(MIN_CLAUDE_CODE_VERSION):
+    if parsed < max(_as_tuple(MIN_CLAUDE_CODE_VERSION), _as_tuple(minimum)):
         return Probe(version, ("runtime_version_unsupported",))
     if parsed != _as_tuple(PINNED_CLAUDE_CODE_VERSION):
         return Probe(version, ("runtime_version_untested",))

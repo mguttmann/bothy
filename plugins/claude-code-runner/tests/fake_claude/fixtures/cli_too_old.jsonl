@@ -1,0 +1,1 @@
+{"type":"fixture_meta","origin":"constructed","cli_version":"2.1.288","source":"tests/real_cli/captured/api_errors_2.1.288.jsonl: the API's answer to a CLI below the model's minimum (live text of 2026-10-29 with the versions of the capture)","channel":"assistant","error_text":"API Error: 400 Claude Code 2.1.288 does not support this model; version 2.1.300 or newer is required"}
