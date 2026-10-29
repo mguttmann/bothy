@@ -155,7 +155,7 @@ void main() {
       () {
         const body =
             '\tif (a) {\n'
-            '\t\treturn "ü \u{1F600} אב é  x";  \n'
+            '\t\treturn "ñ \u{1F600} אב é  x";  \n'
             '    }\n'
             '​\u{10FFFF}';
         expect(_code('```js\n$body\n```'), body);

@@ -68,7 +68,7 @@ void main() {
   test(
     'a copy without HTML is plain text through the system clipboard',
     () async {
-      const text = '\tif x:\n\t\treturn "\u00fc \u{1F600}"';
+      const text = '\tif x:\n\t\treturn "\u00f1 \u{1F600}"';
       await const PlatformRichClipboard().write(const DsCopyData(text));
       expect(channel, isEmpty);
       expect(plain, [text]);

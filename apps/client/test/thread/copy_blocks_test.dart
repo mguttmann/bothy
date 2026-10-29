@@ -21,11 +21,11 @@ import '../support/widgets.dart';
 
 const _content =
     'Run this:\n\n'
-    '```sh\n\tmake check  \n\techo "ü \u{1F600}"\n```\n\n'
+    '```sh\n\tmake check  \n\techo "ñ \u{1F600}"\n```\n\n'
     '> Quoted **line**\n'
     '> second line';
 
-const _code = '\tmake check  \n\techo "ü \u{1F600}"';
+const _code = '\tmake check  \n\techo "ñ \u{1F600}"';
 const _quote = 'Quoted line\nsecond line';
 
 /// The clipboard writes and the haptics of the platform channel.

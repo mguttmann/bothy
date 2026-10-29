@@ -104,7 +104,7 @@ String dsCodeBlockText(md.Element pre) {
 /// The plain text keeps the line breaks of the source; inline Markdown becomes its text
 /// (emphasis, inline code and links as their text, an image as its alt text); blocks are
 /// separated by an empty line; a list item starts with "- " or its number, a task with
-/// "[x] " or "[ ] "; a code block keeps its raw content ([dsCodeBlockText]); a table row is
+/// `[x] ` or `[ ] `; a code block keeps its raw content ([dsCodeBlockText]); a table row is
 /// its cells separated by a tab. A nested quote is part of its parent's copy as text.
 ///
 /// The HTML form carries the same content with its formatting: emphasis, inline code, code

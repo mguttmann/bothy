@@ -17,14 +17,14 @@ import 'package:l10n/l10n.dart';
 final String _longLine = List.filled(400, 'wide\tline').join(' ');
 final String _code =
     '\tif (x) {\n'
-    '\t\treturn "ü \u{1F600} אב é";  \n'
+    '\t\treturn "ñ \u{1F600} אב é";  \n'
     '\t}\n'
     '$_longLine\n';
 
 String get _source =>
     '```dart\n$_code\n```\n\n'
     '> Quoted **bold** line\n'
-    '> second ü line\n';
+    '> second ñ line\n';
 
 Finder _button(Type block) => find
     .descendant(of: find.byType(block), matching: find.byType(DsTappable))
@@ -69,11 +69,11 @@ void main() {
     await tester.tap(_button(DsMarkdownQuoteBlock));
     await tester.pumpAndSettle();
     final quote = await Clipboard.getData(Clipboard.kTextPlain);
-    expect(quote?.text, 'Quoted bold line\nsecond ü line');
+    expect(quote?.text, 'Quoted bold line\nsecond ñ line');
     final html = await PlatformRichClipboard.channel.invokeMethod<String>(
       'readHtml',
     );
     expect(html, contains('<strong>bold</strong>'));
-    expect(html, contains('second ü line'));
+    expect(html, contains('second ñ line'));
   });
 }
