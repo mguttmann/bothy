@@ -52,6 +52,7 @@ from bothy_sdk.uploads import upload_part
 __all__ = [
     "FileRefused",
     "LocalFile",
+    "audio_cache_ext",
     "audio_to_transcribe",
     "read_local_file",
     "upload",
@@ -62,6 +63,25 @@ _LOG = logging.getLogger("bothy_hermes_adapter")
 
 _READ_CHUNK: Final = 1024 * 1024
 _SERVED: Final = frozenset({"clean", "skipped"})
+#: Audio suffixes a voice attachment keeps in Hermes's audio cache; Hermes's speech to text
+#: picks its handling from the suffix, and the person names the file.
+_AUDIO_SUFFIXES: Final = frozenset(
+    {".aac", ".amr", ".flac", ".m4a", ".mp3", ".mp4", ".oga", ".ogg", ".opus", ".wav", ".webm"}
+)
+_DEFAULT_AUDIO_SUFFIX: Final = ".ogg"
+
+
+def audio_cache_ext(name: str, mime_type: str) -> str:
+    """The suffix of an audio attachment in Hermes's audio cache (09 17.6).
+
+    The name's suffix when it is a known audio format, else the MIME type's when that is one,
+    else ``.ogg``; a suffix such as ``.45`` of ``Voice 10.45`` never reaches Hermes.
+    """
+    suffix = Path(name).suffix.lower()
+    if suffix in _AUDIO_SUFFIXES:
+        return suffix
+    guessed = (mimetypes.guess_extension(mime_type.partition(";")[0].strip()) or "").lower()
+    return guessed if guessed in _AUDIO_SUFFIXES else _DEFAULT_AUDIO_SUFFIX
 
 
 class FileRefused(Exception):  # noqa: N818 - names the outcome, like PrepareRefused

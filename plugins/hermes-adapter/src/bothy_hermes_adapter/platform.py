@@ -36,7 +36,6 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
-import mimetypes
 import uuid
 from collections.abc import Mapping
 from pathlib import Path
@@ -75,6 +74,7 @@ from bothy_hermes_adapter.config import (
 from bothy_hermes_adapter.handler import HermesHandler
 from bothy_hermes_adapter.heartbeat import ADAPTER_NAME, RUNTIME_NAME, HermesAdapterLoop
 from bothy_hermes_adapter.installer import CONTROL_SENDER
+from bothy_hermes_adapter.media import audio_cache_ext
 from bothy_hermes_adapter.runtime import (
     CardKind,
     CardRequest,
@@ -100,7 +100,6 @@ _OUTCOMES: Final = {
     ProcessingOutcome.CANCELLED: TurnOutcome.CANCELLED,
 }
 _NO_RUN: Final = "no active run in this thread"
-_AUDIO_EXT: Final = ".ogg"
 # How often the adapter looks at the gateway's startup restore before it connects; a poll of a
 # flag, not a deadline (the wait ends when Hermes is ready).
 _READY_POLL_S: Final = 0.1
@@ -480,7 +479,7 @@ class ServerPlatform(BasePlatformAdapter):
         runner = getattr(self, "gateway_runner", None)
         if runner is None:
             return Transcription(None)
-        ext = Path(name).suffix.lower() or mimetypes.guess_extension(mime_type) or _AUDIO_EXT
+        ext = audio_cache_ext(name, mime_type)
         path = await cache_audio_from_bytes_async(data, ext)
         text, transcripts = await runner._enrich_message_with_transcription("", [path])
         if transcripts:

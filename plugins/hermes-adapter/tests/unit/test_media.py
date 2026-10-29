@@ -17,6 +17,7 @@ from bothy_sdk.ids import uuid7
 from bothy_sdk.testing.fakeserver import ContextFile
 from bothy_sdk.testing.faults import Fault
 
+from bothy_hermes_adapter.media import audio_cache_ext
 from bothy_hermes_adapter.runtime import FileSent, MediaKind, TurnOutcome, TurnRequest
 
 pytestmark = pytest.mark.anyio
@@ -294,3 +295,21 @@ async def test_only_served_audio_without_a_transcript_is_transcribed(
         assert "submitTranscript" not in _ops(r)
         if voice.transcript:
             assert voice.transcript in runtime.turns[0].user_text
+
+
+@pytest.mark.parametrize(
+    ("name", "mime_type", "ext"),
+    [
+        ("voice.M4A", "audio/mp4", ".m4a"),
+        ("note.opus", "audio/ogg", ".opus"),
+        # A person names the file; a suffix that is no audio format never reaches Hermes.
+        ("Voice 10.45", "audio/mpeg", ".mp3"),
+        ("Voice 10.45", "application/x-unknown", ".ogg"),
+        ("voice", "audio/mpeg", ".mp3"),
+        ("x.sh", "video/mp4", ".mp4"),
+    ],
+)
+def test_audio_cache_ext_takes_only_known_audio_suffixes(
+    name: str, mime_type: str, ext: str
+) -> None:
+    assert audio_cache_ext(name, mime_type) == ext
