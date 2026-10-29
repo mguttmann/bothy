@@ -33,7 +33,7 @@ the title once per new session and reports the cost of the run.
 | `ledger.py` | The recovery invariants of a turn (stored offset, answers, inputs, kind, decided end), part of the turn record |
 | `failures.py`, `recovery.py` | Recognised CLI texts (`ERROR_TEXTS`) and the classification of a process end; the next action and the box notes |
 | `followups.py`, `stop.py`, `adoption.py` | Follow-up check, line and stdin rule; the stop schedule; identity check and adoption decision |
-| `channels.py`, `workspace.py` | Cache of the served forums and their bindings; resolution of `workspace_ref` and readiness |
+| `channels.py`, `workspace.py` | Cache of the served forums and their bindings; resolution of `workspace_ref`, readiness and the project folder report (09 18.13, M4-44) |
 | `provision.py` | Folder creation of a binding with `provision` `init` or `clone`, its creation record and the readiness reasons (09 18.12, M4-43) |
 | `toolclass.py`, `commandline.py`, `environment.py` | Tool class order, the argument list of a turn, the allow-list environment |
 | `authcheck.py`, `heartbeat.py` | Pre-check `claude auth status`; version probe and the run-time heartbeat members |
@@ -186,6 +186,18 @@ create its folder under `runner.projects_root` (docs/spec/09-agents.md 18.12). T
 
 A private repository needs a credential helper of the runner user (`HOME` is kept); `ssh` clones
 are not supported.
+
+## Project folder report (M4-44)
+
+Every heartbeat carries `project_folders`: the names of the Git work trees directly under
+`runner.projects_root` (docs/spec/09-agents.md 18.13). An entry counts when its name is one
+segment of letters, digits, `.`, `_` and `-` that starts with a letter or digit (so hidden folders
+and the `.provision-<uuid>` folders never show), it resolves like a `workspace_ref` to a folder
+under the root and it holds `.git`. The names go out in code point order, at most
+`runner.project_folders_max`; more are cut and logged as `project_folders_truncated` with the
+count, and a root that cannot be read sends the empty list and logs `project_folders_unreadable`.
+Only names leave the runner. The app lists those without a forum under "Add forums for existing
+folders" and binds the chosen ones with `provision` `none`.
 
 ## Answer attachments (M3-12)
 

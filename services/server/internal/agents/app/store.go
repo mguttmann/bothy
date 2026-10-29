@@ -102,6 +102,12 @@ type PresenceStore interface {
 	// PersistHeartbeat stores state, version, details and last heartbeat of w unless the row
 	// holds a fresher heartbeat; updated is false then.
 	PersistHeartbeat(ctx context.Context, w PresenceWrite) (updated bool, err error)
+	// WriteProjectFolders stores names as reported_project_folders of id (M4-44); an empty list
+	// is stored as an empty array, never NULL. It changes no other column and not the version.
+	WriteProjectFolders(ctx context.Context, id ids.ID, names []string) error
+	// GetProjectFolders returns reported_project_folders of id; reported is false while the
+	// column is NULL, found is false for an unknown id.
+	GetProjectFolders(ctx context.Context, id ids.ID) (names []string, reported, found bool, err error)
 }
 
 // PresenceWrite is one write of the reported state of an agent.

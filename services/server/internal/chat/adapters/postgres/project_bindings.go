@@ -172,6 +172,15 @@ func (r *Repository) LockReportedBindings(ctx context.Context, channels []ids.ID
 	return out, nil
 }
 
+// BoundProjectFolders implements app.BindingStore (M4-44).
+func (r *Repository) BoundProjectFolders(ctx context.Context, names []string) ([]string, error) {
+	out, err := r.read(ctx).BoundProjectFolders(ctx, names)
+	if err != nil {
+		return nil, mapError(err, "reading bound project folders")
+	}
+	return out, nil
+}
+
 // SetProjectReady implements app.BindingStore.
 func (r *Repository) SetProjectReady(ctx context.Context, channel ids.ID, rd app.Readiness) error {
 	q, err := r.write(ctx)

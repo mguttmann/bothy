@@ -27,6 +27,7 @@ type Agent struct {
 	ReportedDetails        []byte
 	LastHeartbeatAt        pgtype.Timestamptz
 	Version                int64
+	ReportedProjectFolders []string
 }
 
 type AgentConsumerCursor struct {

@@ -15119,6 +15119,132 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Create the project {name}'**
   String stepUpPurposeNewProject(String name);
+
+  /// Space menu entry that opens the dialog adding a forum for every folder of a runner without one (01 section 6.10).
+  ///
+  /// In en, this message translates to:
+  /// **'Add forums for existing folders'**
+  String get spaceMenuAddFolderForums;
+
+  /// Title of the dialog that adds forums for existing folders (01 section 6.10).
+  ///
+  /// In en, this message translates to:
+  /// **'Add forums for existing folders in {name}'**
+  String projectSyncTitle(String name);
+
+  /// Text above the folder list of the dialog that adds forums for existing folders.
+  ///
+  /// In en, this message translates to:
+  /// **'These folders of the runner have no forum yet. Each checked folder gets a forum with its name, bound to the folder; the folders stay as they are.'**
+  String get projectSyncIntro;
+
+  /// Shown while the folder list of the runner loads.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading the runner\'s folders.'**
+  String get projectSyncLoading;
+
+  /// Shown while no runner is chosen in the dialog that adds forums for existing folders.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a runner to see its folders.'**
+  String get projectSyncChooseRunner;
+
+  /// Shown when the runner reported no folder without a forum.
+  ///
+  /// In en, this message translates to:
+  /// **'Every folder of this runner already has a forum.'**
+  String get projectSyncEmpty;
+
+  /// Shown when the runner never reported its folders (ProjectFolderList.reported false).
+  ///
+  /// In en, this message translates to:
+  /// **'This runner has not reported its folders yet. It may be an older version or not connected.'**
+  String get projectSyncNotReported;
+
+  /// Button that creates a forum and a binding for every checked folder.
+  ///
+  /// In en, this message translates to:
+  /// **'Add forums'**
+  String get projectSyncAdd;
+
+  /// Status of a folder that is bound while the runner has not reported it ready.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for the runner'**
+  String get projectSyncWaitingRunner;
+
+  /// Status of a folder whose forum is a ready project.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready'**
+  String get projectSyncReady;
+
+  /// Status of a folder that is not ready within ui.new_project_wait.
+  ///
+  /// In en, this message translates to:
+  /// **'The runner has not finished yet; the forum becomes ready by itself.'**
+  String get projectSyncNotFinished;
+
+  /// Screen reader text of a folder row of the dialog that adds forums for existing folders.
+  ///
+  /// In en, this message translates to:
+  /// **'{folder}: {state, select, waiting{will be added} skipped{not added} running{running} runner{waiting for the runner} ready{ready} failed{failed} other{not finished}}'**
+  String projectSyncRowState(String folder, String state);
+
+  /// Reason of the audit entries of the binding and the runner assignment of the dialog that adds forums for existing folders.
+  ///
+  /// In en, this message translates to:
+  /// **'Forum for an existing folder'**
+  String get projectSyncAuditReason;
+
+  /// Purpose shown by the step-up prompt of the dialog that adds forums for existing folders.
+  ///
+  /// In en, this message translates to:
+  /// **'Add forums for existing folders'**
+  String get stepUpPurposeProjectSync;
+
+  /// Menu entry of a forum with a project binding that renames the forum (01 section 6.11).
+  ///
+  /// In en, this message translates to:
+  /// **'Rename project'**
+  String get channelMenuRenameProject;
+
+  /// Title of the dialog that renames a project forum.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename project'**
+  String get renameProjectTitle;
+
+  /// Label of the name field of the dialog that renames a project forum.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get renameProjectName;
+
+  /// Helper text below the name field of the dialog that renames a project forum.
+  ///
+  /// In en, this message translates to:
+  /// **'Only the forum is renamed; the folder on the runner stays as it is.'**
+  String get renameProjectHint;
+
+  /// Button of the dialog that renames a project forum.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename'**
+  String get renameProjectSubmit;
+
+  /// Button that closes the dialog that renames a project forum without a change.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get renameProjectCancel;
+
+  /// Shown after a version conflict while renaming a project forum.
+  ///
+  /// In en, this message translates to:
+  /// **'The forum was changed meanwhile. Check the name and press Rename again.'**
+  String get renameProjectChanged;
 }
 
 class _AppLocalizationsDelegate

@@ -52,7 +52,7 @@ SHA-256 of uploads and downloads), and for files and voice (M4-22, docs/DECISION
 | `lib/app/layout/` | the desktop shell, the four columns and their stored widths |
 | `lib/sidebar/` | the sidebar column (M4-19): head, space tree, channel rows, foot, personal order, `SidebarNavigation` for M4-24; the thread groups with their selection, rows and "All posts" (M4-40) |
 | `lib/forum/` | the forum overview D15 (M4-19, M4-40): head with the kind sentence, "Pin" and filters, rows, Done section, paging, and the new chat view (M4-41) |
-| `lib/new_project/` | the new project dialog (M4-43): name suggestion and field checks, the steps of `NewProjectFlow`, the port over the API and the outbox, the dialog |
+| `lib/new_project/` | the new project dialog (M4-43): name suggestion and field checks, the steps of `NewProjectFlow`, the port over the API and the outbox, the dialog; forums for existing folders (`ProjectSyncFlow`, its dialog) and the rename of a project forum (M4-44) |
 | `lib/thread/` | the history column (M4-20): header, message list with paging, gaps and jumps, message tiles and actions, outbox rows, dialogs (versions, conflict, delete, reactions, title, move), the D2 layout |
 | `lib/composer/` | the composer (M4-20): send path, draft sync, mention suggestions, templates |
 | `lib/session_column/` | the frame of the session column with the agent part (M4-21) and the sections "Pinned" (M4-20) and "Files" (M4-22) |
@@ -733,6 +733,29 @@ cancelled step-up, no answer, or the runner's reason of 09 18.12), and "Try agai
 with the fields of the steps not done; after `ui.new_project_wait` without readiness it says that
 the runner has not finished. When every step is done it opens the forum, for an idea the new
 chat. The phone has no entry (D-M4-43-12). Rulings: docs/decisions.d/M4-43.md.
+
+### Forums for existing folders and renaming a project (M4-44)
+
+For an owner on the desktop the space menu has "Add forums for existing folders" below "New
+project in" (01 6.10). It opens `lib/new_project/project_sync_dialog.dart`: the runner field of
+the new project dialog and the folders that runner reported under its projects folder without a
+forum (`listAgentProjectFolders`), each with a checked box; the list is the preview and nothing is
+created before "Add forums". `ProjectSyncFlow` then runs, one checked folder after the other, the
+steps of a new project in mode "Existing folder" with the folder name as forum name
+(`createChannel` with one `Idempotency-Key` per folder, `setChannelOperator` only for another
+runner, `putProjectBinding` with `provision` `none`), so the first step-up covers the rest and a
+failed folder does not stop the others, and then reads the readiness of all bound forums every
+`ui.new_project_poll_interval` until each is ready, names a reason or `ui.new_project_wait`
+passed. Each row shows its state and the failure sentence of the new project dialog; "Try again"
+resumes the failed and unfinished folders with the forum each already has, so no folder gets a
+second forum. An empty list says that every folder has a forum, and a runner that never reported
+its folders is named so.
+
+The menu of a forum with a project binding has "Rename project" for a person with `manage` on it
+(01 6.11). `lib/new_project/rename_project_dialog.dart` renames the forum with `updateChannel`
+and the version of `getChannel` as `If-Match`; the folder and the binding stay. A
+`version_conflict` reads the version again and asks for one more press. Rulings:
+docs/decisions.d/M4-44.md.
 
 ## Notification levels and channel export
 

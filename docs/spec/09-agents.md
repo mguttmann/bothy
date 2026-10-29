@@ -636,6 +636,7 @@ Top-level members (openapi `Heartbeat`, closed; an unknown member is `400 valida
 | `rate_limit` | state of the provider's rate limits: `state` `ok`, `near_limit`, `limited` or `unknown`, and `resets_at` when known; never quotas, keys or subscription names. Stored as exactly these two members in `agents.reported_details.rate_limit`; a heartbeat without it clears the stored one (full state). Display in the backend view of [25-visualization.md](25-visualization.md), section 6.2 |
 | `details` | closed object, keys below |
 | `project_readiness` | runners only: list of `{channel_id, ready, reason}`, one entry per bound forum, distinct `channel_id` values (sets `project_bindings.ready`, M2-03); `reason` is optional, a code of 18.12 in the reason form below, sent only with `ready` false and stored as `project_bindings.ready_reason` (M4-43) |
+| `project_folders` | runners only: the distinct folder names directly under the projects root that are Git work trees, sorted, at most `runner.project_folders_max` (18.13); each one segment of `^[A-Za-z0-9][A-Za-z0-9._-]*$` with the length limit of `ProjectFolderName` in the OpenAPI; stored as `agents.reported_project_folders` (M4-44) |
 
 Keys of `details` (closed; any other key, also inside `capabilities`, `adapter` and `runtime`, is
 an unknown member):
@@ -668,7 +669,10 @@ out of `reported_details`. Exception: `project_readiness` is applied only when p
 different from the last list this server process applied for the agent, or when that
 application is at least `agent.heartbeat_persist_interval` old (a binding change resets the stored
 readiness, and an unchanged list must restore it), in its own transaction before the rest of the
-heartbeat; absent means "unchanged". `reported_details` holds exactly
+heartbeat; absent means "unchanged". `project_folders` too is applied only when present and
+different from the last list this server process wrote for the agent, in its own transaction
+before the rest of the heartbeat; absent means "unchanged" (M4-44). A folder name listed twice
+or breaking its form is one field error at `/project_folders/<i>`. `reported_details` holds exactly
 `capabilities`, `billing_modes_supported`, `billing_evidence`, `active_runs` (run ids as strings),
 `degraded_reasons`, `adapter`, `runtime` and `protocol_version`, never `null`.
 
@@ -3007,6 +3011,32 @@ Reasons of a not ready forum (`ProjectReadiness.reason`, `project_bindings.ready
 | `provision_timeout` | the creation exceeded `runner.provision_timeout` |
 | `provision_refused` | a check of item 2 refused the binding |
 
+### 18.13 Reporting the project folders
+
+Addendum of 2026-10-29 (M4-44, [design note](../design/new-project.md) section 6, D-M4-44-1 to
+D-M4-44-4). The app adds a forum for every folder of the projects root that has none yet
+([01-product.md](01-product.md) 6.10); only the runner can see those folders, so it reports their
+names.
+
+1. **Which folders.** Every entry directly under the real path of `runner.projects_root` whose
+   name is one segment of `^[A-Za-z0-9][A-Za-z0-9._-]*$` (so no hidden folder and no
+   `.provision-<uuid>` folder of 18.12) of at most 255 characters, that resolves by 18.1 to a
+   folder (a symbolic link counts only when its target is a strict descendant of the root) and
+   holds `.git` (a folder or a file). Other entries are left out without a log line per entry.
+   Reason: these are exactly the folders that a binding with `provision` `none` makes ready.
+2. **When.** The runner reads the root whenever it computes readiness (18.1) and sends the
+   names, sorted by code point, in the heartbeat member `project_folders` (4.8), at most
+   `runner.project_folders_max`; when there are more, it sends the first ones and logs
+   `project_folders_truncated` with the count. A root it cannot read gives the empty list and the
+   log code `project_folders_unreadable`. Only names leave the runner, never a path, a content
+   or a file type.
+3. **On the server.** The server stores the list in `agents.reported_project_folders` (03,
+   R-DM-56). `listAgentProjectFolders` (action `agent.project_folders.read`, owner) answers the
+   stored names without those equal to the `workspace_ref` of any binding, compared without case
+   (the unique index of 03 `project_bindings`), and `reported` false while the runner never sent
+   the member. The binding itself keeps its checks: a folder bound meanwhile is refused by
+   `putProjectBinding` with `conflict`.
+
 ## 19. Decisions of this chapter
 
 | No. | Decision | Reason |
@@ -3040,6 +3070,7 @@ Reasons of a not ready forum (`ProjectReadiness.reason`, `project_bindings.ready
 | R-AG-27 | The run graph is derived from the run document by one shared function in `bothy_viz`; a node other than the root shows only a cost the adapter reported for it, only for `organization` and as "Estimate" (5.6, addendum of 2026-10-24). | All apps draw the same tree from the same data; a split of the run cost over subagents would be wrong when they use different models. |
 | R-AG-28 | The Claude Code runner runs every session of a project in the project folder and creates no worktree per thread; parallel sessions of a project are separate posts (18.1, addendum of 2026-10-27). | The owner starts several chats per project and opens a worktree through the agent when he wants one; a worktree per post would change readiness, cleanup and the working folder contract without need. |
 | R-AG-29 | The Claude Code runner creates the folder of a binding with `provision` `init` or `clone` under `runner.projects_root` itself, with `git` from an argument list, only for a one-segment name, only for an `https` URL, never into an existing folder it did not create, and reports the outcome as a readiness reason (18.12, addendum of 2026-10-28). | The owner creates projects from the app; the runner owns the projects root and works in the folder as its user, the server never touches host files or fetches the URL (D-M4-43-2 to D-M4-43-6). |
+| R-AG-30 | The Claude Code runner reports the names of the Git work trees directly under `runner.projects_root` in the heartbeat member `project_folders`; the server shows the owner those without a binding (18.13, addendum of 2026-10-29). | The app adds forums for existing folders as the owner's former setup did; only the runner sees the folders, and names carry no path or content (D-M4-44-1 to D-M4-44-4). |
 
 ## 20. Alignment with the core contract
 
@@ -3122,6 +3153,7 @@ configuration of the respective program outside the server.
 | `runner.git_bin` | Runner | `git` | program for the folder creation of 18.12, searched in the cleaned `PATH` |
 | `runner.provision_timeout` | Runner | `10m` | time limit of one folder creation (`git init` or `git clone`, 18.12) |
 | `runner.provision_retry_after` | Runner | `5m` | a failed folder creation is not tried again for the same binding content before this time (18.12) |
+| `runner.project_folders_max` | Runner | `500` | most folder names the runner reports in `project_folders` (18.13) |
 | `runner.projects_root` | Runner | no default, required | root of all project folders |
 | `runner.state_dir` | Runner | no default, required | state, recordings, incoming files |
 | `runner.followup_grace` | Runner | `30s` | stdin stays open for follow-ups after `result` |

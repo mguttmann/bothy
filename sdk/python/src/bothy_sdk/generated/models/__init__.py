@@ -541,6 +541,8 @@ from .problem_type import ProblemType
 from .profile_update import ProfileUpdate
 from .project_binding import ProjectBinding
 from .project_binding_put import ProjectBindingPut
+from .project_folder import ProjectFolder
+from .project_folder_list import ProjectFolderList
 from .project_provision import ProjectProvision
 from .project_readiness import ProjectReadiness
 from .project_runner_config import ProjectRunnerConfig
@@ -1328,6 +1330,8 @@ __all__ = (
     "ProfileUpdate",
     "ProjectBinding",
     "ProjectBindingPut",
+    "ProjectFolder",
+    "ProjectFolderList",
     "ProjectProvision",
     "ProjectReadiness",
     "ProjectRunnerConfig",

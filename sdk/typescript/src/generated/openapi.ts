@@ -3334,6 +3334,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/agents/{agent_id}/project-folders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the project folders of a runner that have no binding
+         * @description The folders directly under the projects root of the runner `agent_id` that its last heartbeat reported (`Heartbeat.project_folders`, 09 18.13) and that no forum is bound to: a name equal to the `workspace_ref` of any binding, compared without case, is left out (03 `runner_project_folders`, M4-44). `reported` is false while the runner has never reported its folders. The app offers these folders to add a forum for each (01 6.10); the server never reads a host's files.
+         */
+        get: operations["listAgentProjectFolders"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/agents/{agent_id}/webhooks": {
         parameters: {
             query?: never;
@@ -7935,6 +7955,22 @@ export interface components {
             details?: components["schemas"]["JsonObject"];
             /** @description Readiness per bound forum of a runner (M2-03); the channels must be distinct. Applied only when present and different from the last list this server process applied; absent means "unchanged". */
             project_readiness?: components["schemas"]["ProjectReadiness"][];
+            /** @description Runners only, the folder names directly under the projects root that are Git work trees, sorted, at most `runner.project_folders_max` (09 18.13, M4-44). Applied only when present and different from the last list this server process applied; absent means "unchanged". Names only, never a path. */
+            project_folders?: components["schemas"]["ProjectFolderName"][];
+        };
+        /**
+         * @description One folder name directly under a runner's projects root, the one-segment form of `workspace_ref` (09 18.12 item 2).
+         * @example website
+         */
+        ProjectFolderName: string;
+        ProjectFolder: {
+            name: components["schemas"]["ProjectFolderName"];
+        };
+        ProjectFolderList: {
+            /** @description The reported folders without a binding, in name order. */
+            items: components["schemas"]["ProjectFolder"][];
+            /** @description Whether the runner has reported its folders at least once; false for a runner that never did (an older runner or not yet connected). */
+            reported: boolean;
         };
         ProjectReadiness: {
             channel_id: components["schemas"]["Uuid"];
@@ -19325,6 +19361,37 @@ export interface operations {
             409: components["responses"]["Conflict"];
             412: components["responses"]["PreconditionFailed"];
             428: components["responses"]["PreconditionRequired"];
+            429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
+    listAgentProjectFolders: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                agent_id: components["parameters"]["AgentIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK. */
+            200: {
+                headers: {
+                    "Correlation-Id": components["headers"]["Correlation-Id"];
+                    RateLimit: components["headers"]["RateLimit"];
+                    "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectFolderList"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
             429: components["responses"]["TooManyRequests"];
             default: components["responses"]["Error"];
         };

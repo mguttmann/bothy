@@ -781,6 +781,7 @@ Module: `agents`.
 | `reported_runtime_version` | `text` | yes | | |
 | `reported_details` | `jsonb` | no | `'{}'` | schema `agent_heartbeat.v1` ([09-agents.md](09-agents.md), section 4.8): `capabilities`, `billing_modes_supported`, `billing_evidence` (`provider`, `key_type`, `method`, never a value), `active_runs`, `degraded_reasons`, `rate_limit`; without secrets and without content |
 | `last_heartbeat_at` | `timestamptz` | yes | | |
+| `reported_project_folders` | `text[]` | yes | | runners only: the folder names of the heartbeat member `project_folders` ([09-agents.md](09-agents.md), section 18.13), sorted and distinct, each one segment of `^[A-Za-z0-9][A-Za-z0-9._-]*$`; NULL until the first report; names only, never a path (addendum of 2026-10-29, R-DM-56) |
 | `version` | `bigint` | no | `1` | |
 
 PK: `principal_id`. FK: `principal_id` -> `principals(id)` ON DELETE RESTRICT;
@@ -795,6 +796,9 @@ Heartbeat fields are written at most once per `agent.heartbeat_persist_interval`
 in between, the server keeps the state in memory. Exception: a change of
 `reported_billing_mode` or `reported_tool_class` is stored and audited at once
 (`agent.heartbeat`, [05-actions.md](05-actions.md)), because the reported mode is the evidence for I3.
+`reported_project_folders` is written in its own transaction when a heartbeat carries a list
+that differs from the last one this server process wrote for the agent, never by the delayed
+write of the other fields, and never changes `version` (addendum of 2026-10-29, R-DM-56).
 
 #### `agent_consumer_cursors`
 
@@ -2808,6 +2812,7 @@ section 4 applies, and the gate fails.
 | R-DM-53 | `runs.last_progress_at` holds the server time of the last start or stored patch, and the server keeps one summary step per parent in `run_steps` (addendum of 2026-10-24, run visualization). | The stall notice needs a server fact instead of a client clock; merging old steps at the root would flatten the run graph ([09-agents.md](09-agents.md), sections 5.3, 5.5 and 5.6). |
 | R-DM-54 | `Channel.project_bound` is derived from `project_bindings`; creating or deleting a binding raises `channels.version` and writes `channel.updated` (addendum of 2026-10-27). | Readers of a forum see that it is a project without the binding, which needs `manage`; clients learn the change through the event they already follow. |
 | R-DM-55 | `project_bindings.provision` asks the serving runner to create the folder (`init`, `clone`) or nothing (`none`); `ready_reason` is the code the runner reported with `ready` false and is cleared with every effective binding change and every report of `ready` true (addendum of 2026-10-28). | A project created from the app needs its folder made where the runner works, and the person must see why a project is not ready (D-M4-43-2, D-M4-43-5). |
+| R-DM-56 | `agents.reported_project_folders` holds the folder names a runner reports under its projects root; `listAgentProjectFolders` shows the owner those that no binding names (`lower(workspace_ref)`), so the app offers a forum only for a folder without one (addendum of 2026-10-29). | The owner adds forums for the folders that already exist; the server never reads host files, and a folder already bound must never get a second forum (D-M4-44-1, D-M4-44-4). |
 
 ## 9. Configuration values of this chapter
 

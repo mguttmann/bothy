@@ -51,3 +51,14 @@ SET reported_runtime_state = @reported_runtime_state,
     reported_details = @reported_details,
     last_heartbeat_at = @last_heartbeat_at
 WHERE principal_id = @principal_id AND (last_heartbeat_at IS NULL OR last_heartbeat_at <= @last_heartbeat_at);
+
+-- name: WriteProjectFolders :exec
+-- The folder names of the heartbeat member project_folders (M4-44, R-DM-56), written only when
+-- the list changed; no other column, no version, no event.
+UPDATE agents SET reported_project_folders = @reported_project_folders::text[] WHERE principal_id = @principal_id;
+
+-- name: GetProjectFolders :one
+-- The stored folder names of one agent for listAgentProjectFolders, read after authorize allowed
+-- agent.project_folders.read; NULL while the runner never reported them.
+SELECT (reported_project_folders IS NOT NULL)::boolean AS reported, coalesce(reported_project_folders, '{}')::text[] AS names
+FROM agents WHERE principal_id = @principal_id;

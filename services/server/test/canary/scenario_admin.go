@@ -101,6 +101,7 @@ func (sc *Scenario) agents() {
 	agent := id(a)
 	sc.get(o, "/agents/"+agent, ok...)
 	sc.get(o, "/agents", ok...)
+	sc.get(o, "/agents/"+agent+"/project-folders", ok...)
 	sc.matched(o, "/agents/"+agent, req{method: http.MethodPatch, path: "/agents/" + agent, body: map[string]any{
 		"display_name": sc.Reg.New(ClassContent, "", "agent display name (update)"), "description": sc.Reg.New(ClassContent, "", "agent description (update)"),
 	}}, ok...)

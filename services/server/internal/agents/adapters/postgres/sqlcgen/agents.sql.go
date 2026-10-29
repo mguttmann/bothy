@@ -13,7 +13,7 @@ import (
 
 const getAgent = `-- name: GetAgent :one
 
-SELECT principal_id, adapter_kind, description, operator_config, billing_mode, credential_holder_id, billing_mode_changed_at, billing_mode_changed_by, tool_class, reported_tool_class, reported_runtime_state, reported_billing_mode, reported_runtime_version, reported_details, last_heartbeat_at, version FROM agents WHERE principal_id = $1
+SELECT principal_id, adapter_kind, description, operator_config, billing_mode, credential_holder_id, billing_mode_changed_at, billing_mode_changed_by, tool_class, reported_tool_class, reported_runtime_state, reported_billing_mode, reported_runtime_version, reported_details, last_heartbeat_at, version, reported_project_folders FROM agents WHERE principal_id = $1
 `
 
 // SPDX-License-Identifier: Apache-2.0
@@ -39,12 +39,13 @@ func (q *Queries) GetAgent(ctx context.Context, principalID pgtype.UUID) (Agent,
 		&i.ReportedDetails,
 		&i.LastHeartbeatAt,
 		&i.Version,
+		&i.ReportedProjectFolders,
 	)
 	return i, err
 }
 
 const getAgents = `-- name: GetAgents :many
-SELECT principal_id, adapter_kind, description, operator_config, billing_mode, credential_holder_id, billing_mode_changed_at, billing_mode_changed_by, tool_class, reported_tool_class, reported_runtime_state, reported_billing_mode, reported_runtime_version, reported_details, last_heartbeat_at, version FROM agents WHERE principal_id = ANY ($1::uuid[]) ORDER BY principal_id
+SELECT principal_id, adapter_kind, description, operator_config, billing_mode, credential_holder_id, billing_mode_changed_at, billing_mode_changed_by, tool_class, reported_tool_class, reported_runtime_state, reported_billing_mode, reported_runtime_version, reported_details, last_heartbeat_at, version, reported_project_folders FROM agents WHERE principal_id = ANY ($1::uuid[]) ORDER BY principal_id
 `
 
 // The records of a list without a lock, ascending by id: the run facts of runs (M2-05).
@@ -74,6 +75,7 @@ func (q *Queries) GetAgents(ctx context.Context, ids []pgtype.UUID) ([]Agent, er
 			&i.ReportedDetails,
 			&i.LastHeartbeatAt,
 			&i.Version,
+			&i.ReportedProjectFolders,
 		); err != nil {
 			return nil, err
 		}
@@ -116,7 +118,7 @@ func (q *Queries) InsertAgent(ctx context.Context, arg InsertAgentParams) error 
 }
 
 const listAgents = `-- name: ListAgents :many
-SELECT principal_id, adapter_kind, description, operator_config, billing_mode, credential_holder_id, billing_mode_changed_at, billing_mode_changed_by, tool_class, reported_tool_class, reported_runtime_state, reported_billing_mode, reported_runtime_version, reported_details, last_heartbeat_at, version FROM agents
+SELECT principal_id, adapter_kind, description, operator_config, billing_mode, credential_holder_id, billing_mode_changed_at, billing_mode_changed_by, tool_class, reported_tool_class, reported_runtime_state, reported_billing_mode, reported_runtime_version, reported_details, last_heartbeat_at, version, reported_project_folders FROM agents
 WHERE ($1::uuid IS NULL OR principal_id > $1::uuid)
 ORDER BY principal_id
 LIMIT $2
@@ -154,6 +156,7 @@ func (q *Queries) ListAgents(ctx context.Context, arg ListAgentsParams) ([]Agent
 			&i.ReportedDetails,
 			&i.LastHeartbeatAt,
 			&i.Version,
+			&i.ReportedProjectFolders,
 		); err != nil {
 			return nil, err
 		}
@@ -166,7 +169,7 @@ func (q *Queries) ListAgents(ctx context.Context, arg ListAgentsParams) ([]Agent
 }
 
 const listPersonalAgents = `-- name: ListPersonalAgents :many
-SELECT principal_id, adapter_kind, description, operator_config, billing_mode, credential_holder_id, billing_mode_changed_at, billing_mode_changed_by, tool_class, reported_tool_class, reported_runtime_state, reported_billing_mode, reported_runtime_version, reported_details, last_heartbeat_at, version FROM agents WHERE billing_mode = 'personal' ORDER BY principal_id
+SELECT principal_id, adapter_kind, description, operator_config, billing_mode, credential_holder_id, billing_mode_changed_at, billing_mode_changed_by, tool_class, reported_tool_class, reported_runtime_state, reported_billing_mode, reported_runtime_version, reported_details, last_heartbeat_at, version, reported_project_folders FROM agents WHERE billing_mode = 'personal' ORDER BY principal_id
 `
 
 // The personal records for the I1 list of the policy source; the status filter runs through
@@ -197,6 +200,7 @@ func (q *Queries) ListPersonalAgents(ctx context.Context) ([]Agent, error) {
 			&i.ReportedDetails,
 			&i.LastHeartbeatAt,
 			&i.Version,
+			&i.ReportedProjectFolders,
 		); err != nil {
 			return nil, err
 		}
@@ -209,7 +213,7 @@ func (q *Queries) ListPersonalAgents(ctx context.Context) ([]Agent, error) {
 }
 
 const lockAgent = `-- name: LockAgent :one
-SELECT principal_id, adapter_kind, description, operator_config, billing_mode, credential_holder_id, billing_mode_changed_at, billing_mode_changed_by, tool_class, reported_tool_class, reported_runtime_state, reported_billing_mode, reported_runtime_version, reported_details, last_heartbeat_at, version FROM agents WHERE principal_id = $1 FOR UPDATE
+SELECT principal_id, adapter_kind, description, operator_config, billing_mode, credential_holder_id, billing_mode_changed_at, billing_mode_changed_by, tool_class, reported_tool_class, reported_runtime_state, reported_billing_mode, reported_runtime_version, reported_details, last_heartbeat_at, version, reported_project_folders FROM agents WHERE principal_id = $1 FOR UPDATE
 `
 
 // The record locked for a change (03 section 6.3: domain rows after permission_version).
@@ -233,12 +237,13 @@ func (q *Queries) LockAgent(ctx context.Context, principalID pgtype.UUID) (Agent
 		&i.ReportedDetails,
 		&i.LastHeartbeatAt,
 		&i.Version,
+		&i.ReportedProjectFolders,
 	)
 	return i, err
 }
 
 const lockAgents = `-- name: LockAgents :many
-SELECT principal_id, adapter_kind, description, operator_config, billing_mode, credential_holder_id, billing_mode_changed_at, billing_mode_changed_by, tool_class, reported_tool_class, reported_runtime_state, reported_billing_mode, reported_runtime_version, reported_details, last_heartbeat_at, version FROM agents WHERE principal_id = ANY ($1::uuid[]) ORDER BY principal_id FOR UPDATE
+SELECT principal_id, adapter_kind, description, operator_config, billing_mode, credential_holder_id, billing_mode_changed_at, billing_mode_changed_by, tool_class, reported_tool_class, reported_runtime_state, reported_billing_mode, reported_runtime_version, reported_details, last_heartbeat_at, version, reported_project_folders FROM agents WHERE principal_id = ANY ($1::uuid[]) ORDER BY principal_id FOR UPDATE
 `
 
 // The records of a list locked in ascending id (BR-08, docs/DECISIONS.md M1-51).
@@ -268,6 +273,7 @@ func (q *Queries) LockAgents(ctx context.Context, ids []pgtype.UUID) ([]Agent, e
 			&i.ReportedDetails,
 			&i.LastHeartbeatAt,
 			&i.Version,
+			&i.ReportedProjectFolders,
 		); err != nil {
 			return nil, err
 		}
@@ -280,7 +286,7 @@ func (q *Queries) LockAgents(ctx context.Context, ids []pgtype.UUID) ([]Agent, e
 }
 
 const lockPersonalAgents = `-- name: LockPersonalAgents :many
-SELECT principal_id, adapter_kind, description, operator_config, billing_mode, credential_holder_id, billing_mode_changed_at, billing_mode_changed_by, tool_class, reported_tool_class, reported_runtime_state, reported_billing_mode, reported_runtime_version, reported_details, last_heartbeat_at, version FROM agents WHERE billing_mode = 'personal' ORDER BY principal_id FOR UPDATE
+SELECT principal_id, adapter_kind, description, operator_config, billing_mode, credential_holder_id, billing_mode_changed_at, billing_mode_changed_by, tool_class, reported_tool_class, reported_runtime_state, reported_billing_mode, reported_runtime_version, reported_details, last_heartbeat_at, version, reported_project_folders FROM agents WHERE billing_mode = 'personal' ORDER BY principal_id FOR UPDATE
 `
 
 // Every personal record locked in ascending id, disabled agents included (10 section 9.1).
@@ -310,6 +316,7 @@ func (q *Queries) LockPersonalAgents(ctx context.Context) ([]Agent, error) {
 			&i.ReportedDetails,
 			&i.LastHeartbeatAt,
 			&i.Version,
+			&i.ReportedProjectFolders,
 		); err != nil {
 			return nil, err
 		}

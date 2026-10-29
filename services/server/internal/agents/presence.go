@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 )
 
@@ -97,4 +98,25 @@ type Presence interface {
 	// others from their stored row; unknown ids are left out. It does not authorize: callers pass
 	// only agents the caller may read. Errors: a database error.
 	Statuses(ctx context.Context, agentIDs []ids.ID) ([]PresenceStatus, error)
+	// ProjectFolders returns the folders the runner agentID reported under its projects root
+	// (heartbeat member project_folders, 09 section 18.13) without the names a project binding
+	// names, compared without case (listAgentProjectFolders, M4-44). It authorizes
+	// agent.project_folders.read for a (owner).
+	//
+	// Errors: forbidden or not_found from authorize, not_found for an unknown agent,
+	// internal_error for a database or chat failure.
+	//
+	// Example:
+	//
+	//	f, err := presence.ProjectFolders(ctx, owner, runnerID)
+	//	// f.Names == []string{"docs-site", "website"}, f.Reported == true
+	ProjectFolders(ctx context.Context, a actor.Actor, agentID ids.ID) (ProjectFolders, error)
+}
+
+// ProjectFolders is the answer of Presence.ProjectFolders (schema ProjectFolderList).
+type ProjectFolders struct {
+	// Names are the reported folder names without a binding, in the reported order; never nil.
+	Names []string
+	// Reported is false while the runner never sent project_folders.
+	Reported bool
 }

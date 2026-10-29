@@ -99,3 +99,10 @@ async def test_probe_unreachable(tmp_path: Path) -> None:
         "runtime_unreachable",
     )
     assert MIN_CLAUDE_CODE_VERSION <= PINNED_CLAUDE_CODE_VERSION
+
+
+def test_runtime_status_carries_the_project_folders() -> None:
+    """The folder names of 09 18.13 enter the heartbeat; ``None`` leaves the member out."""
+    status = runtime_status(Probe("2.1.259", ()), [], None, ["api", "website"])
+    assert status.project_folders == ("api", "website")
+    assert runtime_status(Probe("2.1.259", ()), [], None).project_folders is None

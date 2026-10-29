@@ -172,7 +172,10 @@ def billing_modes_supported(*, has_key_ref: bool, allow_personal: bool) -> tuple
 
 
 def runtime_status(
-    probe: Probe, readiness: Sequence[ProjectReadiness], modes: tuple[str, ...] | None
+    probe: Probe,
+    readiness: Sequence[ProjectReadiness],
+    modes: tuple[str, ...] | None,
+    folders: Sequence[str] | None = None,
 ) -> RuntimeStatus:
     """Build the heartbeat members that change at run time.
 
@@ -183,6 +186,7 @@ def runtime_status(
         probe: The last version probe.
         readiness: One entry per bound forum in the channel cache.
         modes: `billing_modes_supported`.
+        folders: The project folder names of 09 18.13; ``None`` leaves the member out.
 
     Returns:
         The status.
@@ -193,4 +197,5 @@ def runtime_status(
         runtime_version=probe.version,
         billing_modes_supported=modes,
         project_readiness=tuple(readiness),
+        project_folders=None if folders is None else tuple(folders),
     )

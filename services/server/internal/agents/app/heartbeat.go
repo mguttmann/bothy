@@ -76,6 +76,9 @@ func (t *Tracker) Heartbeat(ctx context.Context, body json.RawMessage) (agents.P
 	if err := t.applyReadiness(ctx, e, report, now); err != nil {
 		return agents.PresenceStatus{}, err
 	}
+	if err := t.applyFolders(ctx, e, report); err != nil {
+		return agents.PresenceStatus{}, err
+	}
 	wrote, err := t.store(ctx, a.ID, row, report, now, takeover)
 	if err != nil {
 		return agents.PresenceStatus{}, err
@@ -169,6 +172,28 @@ func (t *Tracker) applyReadiness(ctx context.Context, e *entry, r domain.Report,
 		return internal(err, "agents: applying project readiness")
 	}
 	e.readiness, e.readinessSet, e.readinessAt = slices.Clone(r.Readiness), true, now
+	return nil
+}
+
+// applyFolders writes project_folders of r as agents.reported_project_folders when the member is
+// present and the list differs from the last one this process wrote for the agent (09 section
+// 4.8, M4-44), in its own unit of work; the caller holds e.beat, which guards the written list.
+// Any error fails the heartbeat with internal_error.
+func (t *Tracker) applyFolders(ctx context.Context, e *entry, r domain.Report) error {
+	if !r.FoldersGiven || (e.foldersSet && slices.Equal(e.folders, r.Folders)) {
+		return nil
+	}
+	names := slices.Clone(r.Folders)
+	if names == nil {
+		names = []string{}
+	}
+	err := t.d.UoW.Do(ctx, func(ctx context.Context) error {
+		return t.d.Store.WriteProjectFolders(ctx, e.id, names)
+	})
+	if err != nil {
+		return internal(err, "agents: storing the project folders")
+	}
+	e.folders, e.foldersSet = names, true
 	return nil
 }
 

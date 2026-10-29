@@ -64,6 +64,7 @@ export const HEARTBEAT_MEMBERS = Object.freeze([
   "rate_limit",
   "details",
   "project_readiness",
+  "project_folders",
 ] as const);
 
 /** The options of {@link buildHeartbeat}; each maps to the member of the same name. */
@@ -100,6 +101,12 @@ export interface BuildHeartbeatOptions {
   readonly details?: Readonly<Record<string, unknown>> | undefined;
   /** `project_readiness`: runners only, one entry per bound forum, distinct channels. */
   readonly projectReadiness?: readonly ProjectReadiness[] | undefined;
+  /**
+   * `project_folders`: runners only, the distinct folder names under the projects root, each one
+   * segment of letters, digits, `.`, `_` and `-` that starts with a letter or digit, at most 255
+   * characters (09 18.13, M4-44).
+   */
+  readonly projectFolders?: readonly string[] | undefined;
 }
 
 const OPTION_KEYS: ReadonlySet<string> = new Set([
@@ -111,6 +118,7 @@ const OPTION_KEYS: ReadonlySet<string> = new Set([
   "rateLimit",
   "details",
   "projectReadiness",
+  "projectFolders",
 ]);
 // The records make tsc hold each vocabulary equal to the generated type.
 const STATES: Readonly<Record<Heartbeat["state"], true>> = {
@@ -163,7 +171,7 @@ const CODE = new RegExp(CODE_FORM);
  * Builds a heartbeat of schema `agent_heartbeat.v1`.
  *
  * Every heartbeat is the whole reported state: an option left out is "not reported" (09 4.8
- * "Full state"), except `projectReadiness`, where absent means "unchanged". The adapter fills
+ * "Full state"), except `projectReadiness` and `projectFolders`, where absent means "unchanged". The adapter fills
  * `details.active_runs` and sends the result as member `agent` of every gateway heartbeat, or
  * through `sendHeartbeat` with the polling source ({@link HeartbeatSender}).
  *
@@ -224,6 +232,8 @@ export function buildHeartbeat(
   if (o.details !== undefined) beat.details = details(o.details);
   if (o.projectReadiness !== undefined)
     beat.project_readiness = readiness(o.projectReadiness);
+  if (o.projectFolders !== undefined)
+    beat.project_folders = folders(o.projectFolders);
   return beat;
 }
 
@@ -411,6 +421,26 @@ function protocolVersion(value: unknown): number {
   if (value < 1 || value > PROTOCOL_VERSION_MAX)
     throw new RangeError("details.protocol_version: out of range");
   return value;
+}
+
+/** `ProjectFolderName`: one segment, at most 255 characters (09 18.13). */
+const FOLDER_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+const FOLDER_NAME_MAX = 255;
+
+/** `project_folders`: distinct names of the form `ProjectFolderName`. */
+function folders(value: unknown): string[] {
+  const field = "project_folders";
+  const out = list(value, field).map((name) => {
+    if (
+      typeof name !== "string" ||
+      name.length > FOLDER_NAME_MAX ||
+      !FOLDER_NAME.test(name)
+    )
+      throw new RangeError(`${field}: not a folder name`);
+    return name;
+  });
+  distinct(out, field);
+  return out;
 }
 
 /** `project_readiness`: closed entries with distinct channels. */

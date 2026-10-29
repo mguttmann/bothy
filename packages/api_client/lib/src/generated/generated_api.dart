@@ -438,6 +438,8 @@ export 'package:api_client/src/generated/model/problem_type.dart';
 export 'package:api_client/src/generated/model/profile_update.dart';
 export 'package:api_client/src/generated/model/project_binding.dart';
 export 'package:api_client/src/generated/model/project_binding_put.dart';
+export 'package:api_client/src/generated/model/project_folder.dart';
+export 'package:api_client/src/generated/model/project_folder_list.dart';
 export 'package:api_client/src/generated/model/project_provision.dart';
 export 'package:api_client/src/generated/model/project_readiness.dart';
 export 'package:api_client/src/generated/model/project_runner_config.dart';

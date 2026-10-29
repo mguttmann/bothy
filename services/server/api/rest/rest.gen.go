@@ -66,6 +66,9 @@ type ServerInterface interface {
 	// EnableAgent Enable an agent
 	// (POST /agents/{agent_id}/enable)
 	EnableAgent(w http.ResponseWriter, r *http.Request, agentId AgentIdPath, params EnableAgentParams)
+	// ListAgentProjectFolders List the project folders of a runner that have no binding
+	// (GET /agents/{agent_id}/project-folders)
+	ListAgentProjectFolders(w http.ResponseWriter, r *http.Request, agentId AgentIdPath)
 	// SetAgentToolClass Set the tool class of an agent
 	// (PUT /agents/{agent_id}/tool-class)
 	SetAgentToolClass(w http.ResponseWriter, r *http.Request, agentId AgentIdPath, params SetAgentToolClassParams)
@@ -1626,6 +1629,32 @@ func (siw *ServerInterfaceWrapper) EnableAgent(w http.ResponseWriter, r *http.Re
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.EnableAgent(w, r, agentId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAgentProjectFolders operation middleware
+func (siw *ServerInterfaceWrapper) ListAgentProjectFolders(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "agent_id" -------------
+	var agentId AgentIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "agent_id", r.PathValue("agent_id"), &agentId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "agent_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAgentProjectFolders(w, r, agentId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -13835,6 +13864,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/agents/{agent_id}/billing-mode", wrapper.SetAgentBillingMode)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/agents/{agent_id}/credential-holder", wrapper.SetCredentialHolder)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/agents/{agent_id}/tool-class", wrapper.SetAgentToolClass)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents/{agent_id}/project-folders", wrapper.ListAgentProjectFolders)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/agents/me/heartbeat", wrapper.SendHeartbeat)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents/me/consumers/{consumer}", wrapper.GetConsumerState)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents/me/consumers/{consumer}/events", wrapper.PollAgentEvents)
@@ -14160,6 +14190,9 @@ type StrictServerInterface interface {
 	// EnableAgent Enable an agent
 	// (POST /agents/{agent_id}/enable)
 	EnableAgent(ctx context.Context, request EnableAgentRequestObject) (EnableAgentResponseObject, error)
+	// ListAgentProjectFolders List the project folders of a runner that have no binding
+	// (GET /agents/{agent_id}/project-folders)
+	ListAgentProjectFolders(ctx context.Context, request ListAgentProjectFoldersRequestObject) (ListAgentProjectFoldersResponseObject, error)
 	// SetAgentToolClass Set the tool class of an agent
 	// (PUT /agents/{agent_id}/tool-class)
 	SetAgentToolClass(ctx context.Context, request SetAgentToolClassRequestObject) (SetAgentToolClassResponseObject, error)
@@ -15553,6 +15586,32 @@ func (sh *strictHandler) EnableAgent(w http.ResponseWriter, r *http.Request, age
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(EnableAgentResponseObject); ok {
 		if err := validResponse.VisitEnableAgentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListAgentProjectFolders operation middleware
+func (sh *strictHandler) ListAgentProjectFolders(w http.ResponseWriter, r *http.Request, agentId AgentIdPath) {
+	var request ListAgentProjectFoldersRequestObject
+
+	request.AgentId = agentId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListAgentProjectFolders(ctx, request.(ListAgentProjectFoldersRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListAgentProjectFolders")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListAgentProjectFoldersResponseObject); ok {
+		if err := validResponse.VisitListAgentProjectFoldersResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

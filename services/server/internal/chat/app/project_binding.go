@@ -43,6 +43,9 @@ type BindingStore interface {
 	// binding of channels that is ready or has a reason (an effective operator change, design
 	// note 7 of M2-03, R-DM-55).
 	ResetProjectReadiness(ctx context.Context, channels []ids.ID) error
+	// BoundProjectFolders returns the entries of names that a binding's workspace_ref names,
+	// compared without case (M4-44).
+	BoundProjectFolders(ctx context.Context, names []string) ([]string, error)
 }
 
 // Readiness is the stored or reported readiness of one binding: ready and the reason of 09
@@ -393,6 +396,19 @@ func (s *Service) applyReports(ctx context.Context, st BindingStore, agentID ids
 		}
 	}
 	return nil
+}
+
+// BoundProjectFolders implements chat.ProjectBindings (M4-44): the store answers which of names a
+// binding names; an empty list reads nothing.
+func (s *Service) BoundProjectFolders(ctx context.Context, names []string) ([]string, error) {
+	if len(names) == 0 {
+		return nil, nil
+	}
+	st, err := s.bindings()
+	if err != nil {
+		return nil, err
+	}
+	return st.BoundProjectFolders(ctx, names)
 }
 
 // readinessReports returns the reported value per channel and the channels in ascending id.

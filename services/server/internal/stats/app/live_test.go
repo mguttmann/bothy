@@ -98,6 +98,10 @@ func (s *liveSources) Statuses(_ context.Context, list []ids.ID) ([]agents.Prese
 	return out, nil
 }
 
+func (s *liveSources) ProjectFolders(context.Context, actor.Actor, ids.ID) (agents.ProjectFolders, error) {
+	return agents.ProjectFolders{}, nil
+}
+
 func (s *liveSources) LiveRates(context.Context, time.Time, time.Time) ([]app.LiveRateRow, error) {
 	return s.rates, nil
 }

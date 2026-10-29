@@ -27,6 +27,7 @@ part 'heartbeat.g.dart';
 /// * [rateLimit] - Stored in `agents.reported_details.rate_limit` as exactly `state` and `resets_at`; absent clears a stored one, because every heartbeat is the full reported state. Shown by `getStatsBackends`.
 /// * [details] - Further fields of schema `agent_heartbeat.v1`, a closed object; any other key, also inside `capabilities`, `adapter` and `runtime`, is refused. Keys: `capabilities` (object: `followups` `steer` or `queue`; `components`, `voice_input`, `title`, `files_out` booleans), `active_runs` (distinct run ids), `degraded_reasons` (distinct codes), `adapter` (`name` required, `version` optional), `runtime` (`name` required), `protocol_version` (integer, at least 1). Names match `^[a-z0-9][a-z0-9._-]*$`, versions `^[0-9A-Za-z][0-9A-Za-z.+_-]*$`, codes `^[a-z0-9][a-z0-9_.:-]*$`. No secrets, no content, no paths.
 /// * [projectReadiness] - Readiness per bound forum of a runner (M2-03); the channels must be distinct. Applied only when present and different from the last list this server process applied; absent means \"unchanged\".
+/// * [projectFolders] - Runners only, the folder names directly under the projects root that are Git work trees, sorted, at most `runner.project_folders_max` (09 18.13, M4-44). Applied only when present and different from the last list this server process applied; absent means \"unchanged\". Names only, never a path.
 @BuiltValue()
 abstract class Heartbeat implements Built<Heartbeat, HeartbeatBuilder> {
   @BuiltValueField(wireName: r'state')
@@ -63,6 +64,10 @@ abstract class Heartbeat implements Built<Heartbeat, HeartbeatBuilder> {
   /// Readiness per bound forum of a runner (M2-03); the channels must be distinct. Applied only when present and different from the last list this server process applied; absent means \"unchanged\".
   @BuiltValueField(wireName: r'project_readiness')
   BuiltList<ProjectReadiness>? get projectReadiness;
+
+  /// Runners only, the folder names directly under the projects root that are Git work trees, sorted, at most `runner.project_folders_max` (09 18.13, M4-44). Applied only when present and different from the last list this server process applied; absent means \"unchanged\". Names only, never a path.
+  @BuiltValueField(wireName: r'project_folders')
+  BuiltSet<String>? get projectFolders;
 
   Heartbeat._();
 
@@ -149,6 +154,13 @@ class _$HeartbeatSerializer implements PrimitiveSerializer<Heartbeat> {
       yield serializers.serialize(
         object.projectReadiness,
         specifiedType: const FullType(BuiltList, [FullType(ProjectReadiness)]),
+      );
+    }
+    if (object.projectFolders != null) {
+      yield r'project_folders';
+      yield serializers.serialize(
+        object.projectFolders,
+        specifiedType: const FullType(BuiltSet, [FullType(String)]),
       );
     }
   }
@@ -255,6 +267,16 @@ class _$HeartbeatSerializer implements PrimitiveSerializer<Heartbeat> {
           ) as BuiltList<ProjectReadiness>?;
           if (valueDes == null) continue;
           result.projectReadiness.replace(valueDes);
+          break;
+        case r'project_folders':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(BuiltSet, [
+              FullType(String),
+            ]),
+          ) as BuiltSet<String>?;
+          if (valueDes == null) continue;
+          result.projectFolders.replace(valueDes);
           break;
         default:
           unhandled.add(key);

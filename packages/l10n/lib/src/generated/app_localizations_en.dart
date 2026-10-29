@@ -9362,4 +9362,86 @@ class AppLocalizationsEn extends AppLocalizations {
   String stepUpPurposeNewProject(String name) {
     return 'Create the project $name';
   }
+
+  @override
+  String get spaceMenuAddFolderForums => 'Add forums for existing folders';
+
+  @override
+  String projectSyncTitle(String name) {
+    return 'Add forums for existing folders in $name';
+  }
+
+  @override
+  String get projectSyncIntro =>
+      'These folders of the runner have no forum yet. Each checked folder gets a forum with its name, bound to the folder; the folders stay as they are.';
+
+  @override
+  String get projectSyncLoading => 'Loading the runner\'s folders.';
+
+  @override
+  String get projectSyncChooseRunner => 'Choose a runner to see its folders.';
+
+  @override
+  String get projectSyncEmpty =>
+      'Every folder of this runner already has a forum.';
+
+  @override
+  String get projectSyncNotReported =>
+      'This runner has not reported its folders yet. It may be an older version or not connected.';
+
+  @override
+  String get projectSyncAdd => 'Add forums';
+
+  @override
+  String get projectSyncWaitingRunner => 'Waiting for the runner';
+
+  @override
+  String get projectSyncReady => 'Ready';
+
+  @override
+  String get projectSyncNotFinished =>
+      'The runner has not finished yet; the forum becomes ready by itself.';
+
+  @override
+  String projectSyncRowState(String folder, String state) {
+    String _temp0 = intl.Intl.selectLogic(state, {
+      'waiting': 'will be added',
+      'skipped': 'not added',
+      'running': 'running',
+      'runner': 'waiting for the runner',
+      'ready': 'ready',
+      'failed': 'failed',
+      'other': 'not finished',
+    });
+    return '$folder: $_temp0';
+  }
+
+  @override
+  String get projectSyncAuditReason => 'Forum for an existing folder';
+
+  @override
+  String get stepUpPurposeProjectSync => 'Add forums for existing folders';
+
+  @override
+  String get channelMenuRenameProject => 'Rename project';
+
+  @override
+  String get renameProjectTitle => 'Rename project';
+
+  @override
+  String get renameProjectName => 'Name';
+
+  @override
+  String get renameProjectHint =>
+      'Only the forum is renamed; the folder on the runner stays as it is.';
+
+  @override
+  String get renameProjectSubmit => 'Rename';
+
+  @override
+  String get renameProjectCancel => 'Cancel';
+
+  @override
+  String get renameProjectChanged =>
+      'The forum was changed meanwhile. Check the name and press Rename again.';
 }

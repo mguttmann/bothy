@@ -43,6 +43,8 @@ const (
 	ActionAgentHeartbeat Action = "agent.heartbeat"
 	// ActionAgentInvoke is the action agent.invoke.
 	ActionAgentInvoke Action = "agent.invoke"
+	// ActionAgentProjectFoldersRead is the action agent.project_folders.read.
+	ActionAgentProjectFoldersRead Action = "agent.project_folders.read"
 	// ActionAgentRead is the action agent.read.
 	ActionAgentRead Action = "agent.read"
 	// ActionAgentToolClassSet is the action agent.tool_class.set.
@@ -448,6 +450,7 @@ var actionByID = map[string]Action{
 	"agent.events.consume":         ActionAgentEventsConsume,
 	"agent.heartbeat":              ActionAgentHeartbeat,
 	"agent.invoke":                 ActionAgentInvoke,
+	"agent.project_folders.read":   ActionAgentProjectFoldersRead,
 	"agent.read":                   ActionAgentRead,
 	"agent.tool_class.set":         ActionAgentToolClassSet,
 	"agent.triggerers.read":        ActionAgentTriggerersRead,
@@ -660,6 +663,7 @@ var actionList = []Action{
 	ActionAgentEventsConsume,
 	ActionAgentHeartbeat,
 	ActionAgentInvoke,
+	ActionAgentProjectFoldersRead,
 	ActionAgentRead,
 	ActionAgentToolClassSet,
 	ActionAgentTriggerersRead,

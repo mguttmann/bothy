@@ -493,6 +493,7 @@ make sure that clients clear their cache and runs end (R-AZ-15).
 | `agent.heartbeat` | report state, reported mode, supported modes, tool class and active runs | agent | agent-self | no | no | yes on a change of the reported mode or the tool class | no | `rl.agent_runtime` |
 | `agent.events.consume` | receive and acknowledge events as a consumer (`ack`) | agent | agent-self | no | no | no | no | `rl.agent_runtime` |
 | `agent.config.read` | read prompt, skills, project binding of the channels that the agent operates | channel | agent-self and effective operator | no | no | no | no | `rl.read` |
+| `agent.project_folders.read` | read the project folders a runner reported that have no binding (09 18.13, M4-44) | agent | owner | yes | no | no | no | `rl.read` |
 | `agent.triggerers.read` | set of the people who may trigger this agent, with `permission_version` (allow list in the adapter) | agent | agent-self | no | no | no | no | `rl.agent_runtime` |
 | `command.read` | see the command list and options (built-in commands, those of the operator, of allowed guests and of apps with `write`) | channel | read | no | no | no | no | `rl.read` |
 | `command.register` | register or change a command; it may apply only to targets that its owner operates or on which the owner has `write` | command | agent-self or app-self with scope | no | no | yes | no | `rl.admin` |

@@ -303,3 +303,17 @@ def test_rate_limit() -> None:
         "rate_limit.resets_at",
         lambda: build_heartbeat(rate_limit={"state": "ok", "resets_at": "2026-10-10T09:30:00Z"}),
     )
+
+
+def test_project_folders() -> None:
+    """``project_folders`` carries distinct one-segment folder names (09 18.13, M4-44)."""
+    beat = build_heartbeat(project_folders=["docs-site", "website"])
+    assert beat.to_dict() == {"state": "online", "project_folders": ["docs-site", "website"]}
+    assert build_heartbeat(project_folders=[]).to_dict() == {
+        "state": "online",
+        "project_folders": [],
+    }
+    assert "project_folders" not in build_heartbeat().to_dict()
+    raises_naming("project_folders", lambda: build_heartbeat(project_folders=["a", "a"]))
+    for bad in (".git", "a/b", "-x", "", "my project", "x" * 256):
+        raises_naming("project_folders", lambda bad=bad: build_heartbeat(project_folders=[bad]))

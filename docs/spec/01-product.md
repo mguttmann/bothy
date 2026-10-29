@@ -1601,6 +1601,45 @@ result like any forum.
 7. **Done.** The dialog closes and opens the new forum, for an idea the new chat; the forum shows
    as a project in the sidebar (6.8 item 11).
 
+### 6.10 Forums for existing folders
+
+Addendum of 2026-10-29 (R-PR-21, rulings D-M4-44-1 to D-M4-44-7,
+[design note](../design/new-project.md) section 6). Applies to the desktop sidebar (D1), owners
+only, like 6.9.
+
+1. **Entry.** The space menu has the entry "Add forums for existing folders" below "New project
+   in".
+2. **List.** The dialog has the runner field of 6.9 (the active agents, default the space's
+   default operator) and lists the folders that this runner reported under its projects folder
+   and that no forum is bound to (`listAgentProjectFolders`, [09-agents.md](09-agents.md) 18.13),
+   in name order, each with a checkbox, all checked. A changed runner loads its list again. An
+   empty list says that every folder already has a forum; a runner that never reported its
+   folders is named so (an older runner or one not connected yet). Nothing is created before the
+   person presses "Add forums"; the list is the preview of what will be created.
+3. **Steps.** For each checked folder in list order: create a forum named like the folder
+   (`channel.create`), assign the runner when it is not the space's default operator
+   (`channel.operator.set`), bind the folder (`channel.project.bind` with `provision` `none` and
+   the folder name as `workspace_ref`). Then the dialog reads the readiness of all bound forums
+   every `ui.new_project_poll_interval` until each is ready or names a reason. Every row shows its
+   state (waiting, running, done, failed) and, on a failure, the sentence of 6.9 item 5; the other
+   folders go on. A step-up prompt appears once, where the first action needs it.
+4. **Resume.** "Try again" runs the failed rows again from their failed step with the forum they
+   already have, so no folder gets a second forum; "Close" keeps what exists. A folder that got a
+   forum since the list was loaded fails with "already bound" and its new forum stays a plain
+   forum, as in 6.9.
+5. **Waiting.** Rows not ready after `ui.new_project_wait` say that the runner has not finished;
+   the person may close the dialog and the forums become ready by themselves.
+
+### 6.11 Rename project
+
+Addendum of 2026-10-29 (R-PR-21, D-M4-44-6, D-M4-44-7). The menu of a forum with a project binding
+(`Channel.project_bound`) has "Rename project" for a person with `manage` on the forum
+(`channel.update`). It opens a short dialog with the current name; "Rename" changes the forum's
+name (`updateChannel` with the forum's version as `If-Match`). The folder, the binding and the
+sessions stay as they are. The name is trimmed and not empty; the server checks its length
+(`channel.name_max_chars`, 03) and a refusal shows its sentence in the dialog, and a changed version
+(`version_conflict`) reads the forum again and asks the person to confirm the new name once more.
+
 ## 7. Keyboard shortcuts
 
 Shortcuts apply on desktop. They avoid system assignments (Cmd+H, Cmd+M, Cmd+Q, Alt+F4,
@@ -1846,6 +1885,7 @@ Rules:
 | R-PR-18 | A new chat starts from the forum row ("+") or Cmd+N without a dialog; the title is optional where an operator agent names the chat; no git worktree per post (addendum of 2026-10-27). | Starting a session is the most frequent action in a dev forum; the owner opens worktrees through the agent when he wants them. |
 | R-PR-19 | On desktop the channel column next to an open thread (the main history of a text channel or the pinned forum overview) can be hidden from the thread header and with Cmd+Shift+H, kept per device; every column border, also the one between main history and thread, can be dragged (addendum of 2026-10-28). | Owner feedback on the Mac app (2026-10-28): the thread where the person writes stayed small next to the channel history, which could neither be hidden nor resized. |
 | R-PR-20 | A new project starts from the space row or the space menu ("New project", owners only) in a dialog with four modes: empty, clone, existing folder, idea; it shows every step and resumes after a failure; for an idea the first post starts when the folder is ready (6.9, addendum of 2026-10-28). | Owner feedback 2026-10-28: a space had no way to add a project; his earlier setup created one per request (D-M4-43-1 to D-M4-43-12). |
+| R-PR-21 | The space menu adds forums for the folders of a runner's projects folder that have none, as a checked list the owner confirms, one forum and binding per folder; a project forum's menu renames the forum, never the folder (6.10, 6.11, addendum of 2026-10-29). | Owner feedback 2026-10-29: his former setup synced a forum for every project folder and renamed project forums; the list is the preview, and a folder with a forum never gets a second one (D-M4-44-1 to D-M4-44-7). |
 
 ## 14. Configuration values of this chapter
 

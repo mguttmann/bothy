@@ -5,6 +5,8 @@
 /// `getChannelBehavior` through the client of the signed-in session (DPoP, refresh and the
 /// step-up interceptor apply, so the step-up prompt appears where the server demands it), and
 /// the idea through the outbox as the forum's new post draft and its first post (01 6.8 item 8).
+/// The folders of a runner without a binding come from `listAgentProjectFolders` (01 6.10), the
+/// rename of a project forum goes through `updateChannel` (01 6.11, M4-44).
 library;
 
 import 'package:api_client/api_client.dart';
@@ -17,6 +19,7 @@ import 'package:sync_engine/sync_engine.dart' show Outbox;
 import '../composer/draft_sync.dart';
 import '../sync/thread_ops.dart';
 import 'new_project_flow.dart';
+import 'project_sync_flow.dart';
 
 /// A runner the dialog offers: an active agent.
 final class ProjectRunner {
@@ -37,7 +40,7 @@ final class ProjectRunner {
 /// final port = ApiNewProjectPort(api: services.auth.api, outbox: engine.outbox,
 ///     dao: db.outboxDao, purpose: l.stepUpPurposeNewProject, reason: l.newProjectAuditReason);
 /// ```
-final class ApiNewProjectPort implements NewProjectPort {
+final class ApiNewProjectPort implements NewProjectPort, ProjectFolderSource {
   /// Creates the port; [purpose] gives the text of the step-up prompt for the project's name
   /// and [reason] is the audit reason of the binding and the runner assignment (D-M4-43-7).
   ApiNewProjectPort({
@@ -75,6 +78,17 @@ final class ApiNewProjectPort implements NewProjectPort {
       cursor = page.nextCursor;
     } while (cursor != null);
     return out;
+  });
+
+  @override
+  Future<RunnerFolders> folders(d.PrincipalId runner) => _guard(() async {
+    final list = (await _api.getAgentsApi().listAgentProjectFolders(
+      agentId: runner.value,
+    )).data!;
+    return RunnerFolders(
+      names: [for (final f in list.items) f.name],
+      reported: list.reported,
+    );
   });
 
   @override
@@ -179,4 +193,51 @@ final class ApiNewProjectPort implements NewProjectPort {
       throw const NewProjectFailure.stepUpCancelled();
     }
   }
+}
+
+/// The server side of "Rename project" (01 6.11; D-M4-44-6); every method throws
+/// [NewProjectFailure].
+abstract interface class RenameProjectPort {
+  /// The current version of [forum], the `If-Match` of the rename.
+  Future<int> version(d.ChannelId forum);
+
+  /// Renames [forum] to [name] at [version] with [idempotencyKey]; the folder and the binding
+  /// stay.
+  Future<void> rename(
+    d.ChannelId forum,
+    String name, {
+    required int version,
+    required String idempotencyKey,
+  });
+}
+
+/// [RenameProjectPort] over `getChannel` and `updateChannel`.
+final class ApiRenameProjectPort implements RenameProjectPort {
+  /// Creates the port over the client of the signed-in session.
+  ApiRenameProjectPort(this._api);
+
+  final ApiClient _api;
+
+  @override
+  Future<int> version(d.ChannelId forum) => ApiNewProjectPort._guard(() async {
+    final view = (await _api.getChannelsApi().getChannel(
+      channelId: forum.value,
+    )).data!;
+    return view.channel.version;
+  });
+
+  @override
+  Future<void> rename(
+    d.ChannelId forum,
+    String name, {
+    required int version,
+    required String idempotencyKey,
+  }) => ApiNewProjectPort._guard(() async {
+    await _api.getChannelsApi().updateChannel(
+      channelId: forum.value,
+      ifMatch: '"$version"',
+      idempotencyKey: idempotencyKey,
+      channelUpdate: ChannelUpdate((b) => b..name = name),
+    );
+  });
 }

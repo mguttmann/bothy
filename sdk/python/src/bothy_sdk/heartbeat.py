@@ -89,8 +89,13 @@ HEARTBEAT_MEMBERS = (
     "rate_limit",
     "details",
     "project_readiness",
+    "project_folders",
 )
 """The top-level members `build_heartbeat` sets."""
+
+_FOLDER_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
+_FOLDER_NAME_MAX = 255
+"""``ProjectFolderName``: one segment, at most 255 characters (09 18.13)."""
 
 _FOLLOWUP_MODES = ("steer", "queue")
 _EVIDENCE_KEYS = ("provider", "key_type", "method")
@@ -118,12 +123,13 @@ def build_heartbeat(  # noqa: PLR0913 - keywords mirror the members of Heartbeat
     rate_limit: AgentRateLimitState | Mapping[str, Any] | None = None,
     details: Mapping[str, Any] | None = None,
     project_readiness: Iterable[ProjectReadiness] | None = None,
+    project_folders: Iterable[str] | None = None,
 ) -> Heartbeat:
     """Build a heartbeat of schema ``agent_heartbeat.v1``.
 
     Every heartbeat is the whole reported state: an argument left at ``None`` is "not
-    reported" (09 4.8 "Full state"), except ``project_readiness``, where absent means
-    "unchanged".
+    reported" (09 4.8 "Full state"), except ``project_readiness`` and ``project_folders``,
+    where absent means "unchanged".
 
     Args:
         state: ``online`` or ``degraded``.
@@ -144,6 +150,9 @@ def build_heartbeat(  # noqa: PLR0913 - keywords mirror the members of Heartbeat
             (distinct codes), ``adapter`` (``name`` required, ``version`` optional),
             ``runtime`` (``name`` required) and ``protocol_version`` (integer, at least 1).
         project_readiness: Runners only: one entry per bound forum, distinct channels.
+        project_folders: Runners only: the distinct folder names under the projects root,
+            each one segment of letters, digits, ``.``, ``_`` and ``-`` that starts with a
+            letter or digit, at most 255 characters (09 18.13, M4-44).
 
     Returns:
         The generated `Heartbeat`.
@@ -181,7 +190,23 @@ def build_heartbeat(  # noqa: PLR0913 - keywords mirror the members of Heartbeat
                 raise ValueError("project_readiness: entries must be ProjectReadiness")
         _distinct([r.channel_id for r in readiness], "project_readiness")
         beat.project_readiness = readiness
+    if project_folders is not None:
+        beat.project_folders = _folders(project_folders)
     return beat
+
+
+def _folders(names: Iterable[str]) -> list[str]:
+    """``project_folders``: distinct names of the form ``ProjectFolderName``."""
+    folders = list(names)
+    for name in folders:
+        if (
+            not isinstance(name, str)
+            or len(name) > _FOLDER_NAME_MAX
+            or not _FOLDER_NAME.fullmatch(name)
+        ):
+            raise ValueError("project_folders: not a folder name")
+    _distinct(folders, "project_folders")
+    return folders
 
 
 def _member(kind: type[E], value: object, field: str) -> E:

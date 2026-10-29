@@ -21,6 +21,8 @@ claude_bin = "claude"
 git_bin = "git"
 provision_timeout = "10m"
 provision_retry_after = "5m"
+# Most folder names the heartbeat reports for "Add forums for existing folders" (09 18.13).
+project_folders_max = 500
 projects_root = "/srv/projects"
 state_dir = "/var/lib/claude-code-runner"
 followup_grace = "30s"

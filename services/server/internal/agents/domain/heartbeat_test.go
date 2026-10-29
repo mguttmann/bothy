@@ -353,3 +353,35 @@ func TestDecodeHeartbeatReadinessReason(t *testing.T) {
 		}
 	}
 }
+
+// TestDecodeHeartbeatProjectFolders: project_folders is a list of distinct one-segment folder
+// names of at most 255 characters; absent is "unchanged", an empty list is a report (09 section
+// 18.13, M4-44).
+func TestDecodeHeartbeatProjectFolders(t *testing.T) {
+	t.Parallel()
+	r, fes := domain.DecodeHeartbeat([]byte(`{"state":"online","project_folders":["docs-site","website","v2.1_api"]}`))
+	if len(fes) > 0 || !r.FoldersGiven || !slices.Equal(r.Folders, []string{"docs-site", "website", "v2.1_api"}) {
+		t.Fatalf("report %+v errors %+v", r, fes)
+	}
+	if r, _ := domain.DecodeHeartbeat([]byte(`{"state":"online"}`)); r.FoldersGiven || r.Folders != nil {
+		t.Fatalf("absent member %+v", r)
+	}
+	if r, _ := domain.DecodeHeartbeat([]byte(`{"state":"online","project_folders":[]}`)); !r.FoldersGiven || len(r.Folders) != 0 {
+		t.Fatalf("empty list %+v", r)
+	}
+	for name, c := range map[string]struct{ list, pointer, code string }{
+		"hidden":       {`[".git"]`, "/project_folders/0", "pattern_mismatch"},
+		"path":         {`["a/b"]`, "/project_folders/0", "pattern_mismatch"},
+		"leading dash": {`["-x"]`, "/project_folders/0", "pattern_mismatch"},
+		"space":        {`["my project"]`, "/project_folders/0", "pattern_mismatch"},
+		"empty":        {`[""]`, "/project_folders/0", "pattern_mismatch"},
+		"too long":     {`["` + strings.Repeat("a", 256) + `"]`, "/project_folders/0", "too_long"},
+		"not a string": {`[1]`, "/project_folders/0", "invalid_type"},
+		"twice":        {`["website","docs","website"]`, "/project_folders/2", "duplicate"},
+		"not a list":   {`"website"`, "/project_folders", "invalid_type"},
+	} {
+		if _, fes := domain.DecodeHeartbeat([]byte(`{"state":"online","project_folders":` + c.list + `}`)); !hasError(fes, c.pointer, c.code) {
+			t.Errorf("%s: errors %+v, want %s at %s", name, fes, c.code, c.pointer)
+		}
+	}
+}

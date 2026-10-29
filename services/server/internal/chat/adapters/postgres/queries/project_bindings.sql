@@ -51,3 +51,11 @@ UPDATE project_bindings SET ready = @ready, ready_reason = sqlc.narg(ready_reaso
 -- of M2-03, R-DM-55).
 UPDATE project_bindings SET ready = false, ready_reason = NULL, version = version + 1
 WHERE channel_id = ANY (@channel_ids::uuid[]) AND (ready OR ready_reason IS NOT NULL);
+
+-- name: BoundProjectFolders :many
+-- The entries of names that the workspace_ref of a binding names, compared without case as the
+-- unique index does; only these names leave, no channel and no row (listAgentProjectFolders,
+-- M4-44).
+SELECT n::text AS name
+FROM unnest(@names::text[]) AS n
+WHERE EXISTS (SELECT 1 FROM project_bindings WHERE lower(workspace_ref) = lower(n));

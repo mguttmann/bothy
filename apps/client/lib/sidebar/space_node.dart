@@ -37,6 +37,7 @@ class SpaceNode extends StatefulWidget {
     this.onToggleGroup,
     this.onAdd,
     this.onNewProject,
+    this.onAddFolderForums,
     this.selectedNewChat,
     this.onOpenNewChat,
     this.onMoveUp,
@@ -77,6 +78,9 @@ class SpaceNode extends StatefulWidget {
   /// The action "New project" of the space row and its menu (01 6.9 item 1), or null for none.
   final ValueChanged<Space>? onNewProject;
 
+  /// The space menu entry "Add forums for existing folders" (01 6.10 item 1), or null for none.
+  final ValueChanged<Space>? onAddFolderForums;
+
   /// Wraps the space row so it starts a drag of the space (the list's drag listener), or null.
   final Widget Function(Widget row)? dragHandle;
 
@@ -113,6 +117,7 @@ class _SpaceNodeState extends State<SpaceNode> {
       :onToggleGroup,
       :onAdd,
       :onNewProject,
+      :onAddFolderForums,
       :selectedNewChat,
       :onOpenNewChat,
       :onMoveUp,
@@ -148,6 +153,9 @@ class _SpaceNodeState extends State<SpaceNode> {
                   space: node.entry.space,
                   newProjectLabel: newProjectLabel,
                   onNewProject: newProject,
+                  onAddFolderForums: onAddFolderForums == null
+                      ? null
+                      : () => onAddFolderForums(space),
                   child: DsSpaceRow(
                     node.rowData,
                     key: ValueKey('sidebar.space.${node.entry.space.id.value}'),

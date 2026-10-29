@@ -272,6 +272,8 @@ class RuntimeStatus:
         runtime_version: The runtime's version, replacing ``AdapterConfig.runtime_version``.
         billing_modes_supported: Modes the adapter can prove; ``None`` leaves the member out.
         project_readiness: Runners only: one entry per bound forum; ``None`` leaves it out.
+        project_folders: Runners only: the folder names under the projects root (09 18.13,
+            M4-44); ``None`` leaves it out.
         active_runs: Runs the handler runs outside the adapter's own run loop, for example
             turns a runner adopted after a restart (M2-35); added to ``active_runs``.
         rate_limit: The rate-limit state of the runtime at its provider (M6-14): ``state`` and
@@ -287,6 +289,7 @@ class RuntimeStatus:
     runtime_version: str | None = None
     billing_modes_supported: Sequence[str] | None = None
     project_readiness: Sequence[ProjectReadiness] | None = None
+    project_folders: Sequence[str] | None = None
     active_runs: Sequence[UUID] = ()
     rate_limit: AgentRateLimitState | Mapping[str, Any] | None = None
     reported_billing_mode: str | None = None
@@ -734,6 +737,7 @@ class Adapter:
             rate_limit=None if status is None else status.rate_limit,
             details=details,
             project_readiness=None if status is None else status.project_readiness,
+            project_folders=None if status is None else status.project_folders,
         )
 
     async def send_heartbeat(self) -> None:

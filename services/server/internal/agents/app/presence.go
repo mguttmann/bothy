@@ -58,6 +58,9 @@ func (RealTimers) AfterFunc(d time.Duration, f func()) func() bool { return time
 // (M2-03 note 7).
 type Readiness interface {
 	ApplyProjectReadiness(ctx context.Context, agentID ids.ID, reports []chat.ProjectReadiness) error
+	// BoundProjectFolders returns the entries of names that the workspace_ref of a binding
+	// names, compared without case (M4-44).
+	BoundProjectFolders(ctx context.Context, names []string) ([]string, error)
 }
 
 // Principals is the part of identity.Directory the tracker reads handle and status with.
@@ -184,6 +187,10 @@ type entry struct {
 	readiness    []domain.Readiness
 	readinessSet bool
 	readinessAt  time.Time
+	// folders is the last project folder list this process wrote; foldersSet tells a written
+	// empty list from none (M4-44). Guarded by beat like readiness.
+	folders    []string
+	foldersSet bool
 
 	// fed is true once this process applied a heartbeat of the agent since the entry was filled
 	// or last adopted another node's row; elsewhere is true while the newest stored heartbeat came

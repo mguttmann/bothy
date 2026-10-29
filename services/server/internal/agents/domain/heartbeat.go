@@ -36,6 +36,12 @@ var readinessReasonPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_]*$`)
 
 const readinessReasonMax = 64
 
+// folderNamePattern and folderNameMax are the form of ProjectFolderName: one segment as the
+// workspace_ref of provision init or clone (09 section 18.12 item 2, M4-44).
+var folderNamePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
+
+const folderNameMax = 255
+
 // The forms of agent_heartbeat.v1 (docs/DECISIONS.md D-M2-20-2): names, versions and codes. None
 // of them can carry a path separator, whitespace, a control or bidi character or "=", so most key
 // formats and every path are unrepresentable (09 section 4.8, I5). Go's regexp runs in linear
@@ -151,6 +157,10 @@ type Report struct {
 	// Readiness is project_readiness; ReadinessGiven tells an absent member from an empty list.
 	Readiness      []Readiness
 	ReadinessGiven bool
+	// Folders is project_folders, the folder names under the runner's projects root (09 section
+	// 18.13, M4-44); FoldersGiven tells an absent member from an empty list.
+	Folders      []string
+	FoldersGiven bool
 }
 
 // Reported returns the columns and details of r as the stored form Reported; LastHeartbeatAt is
@@ -429,7 +439,7 @@ func (d *decoder) form(pointer string, raw json.RawMessage, re *regexp.Regexp) (
 
 // The top-level members of the schema Heartbeat.
 var heartbeatMembers = []string{"state", "runtime_version", "reported_billing_mode", "billing_modes_supported", "billing_evidence",
-	"reported_tool_class", "rate_limit", "details", "project_readiness"}
+	"reported_tool_class", "rate_limit", "details", "project_readiness", "project_folders"}
 
 // billingModes and toolClasses are the enumerations of BillingMode and ToolClass.
 var (
@@ -490,6 +500,9 @@ func DecodeHeartbeat(raw []byte) (Report, []errs.FieldError) {
 	}
 	if v, has := m["project_readiness"]; has {
 		r.Readiness, r.ReadinessGiven = d.readiness(v), true
+	}
+	if v, has := m["project_folders"]; has {
+		r.Folders, r.FoldersGiven = d.folders(v), true
 	}
 	if len(d.errs) > 0 {
 		return Report{}, d.errs
@@ -738,6 +751,34 @@ func (d *decoder) readiness(raw json.RawMessage) []Readiness {
 	}
 	if dup {
 		d.fail(p, codeDuplicate)
+	}
+	return out
+}
+
+// folders reads project_folders: distinct names of the schema ProjectFolderName, each error at
+// the index of its entry (09 section 4.8, M4-44). The result is never nil, so an empty list is a
+// report.
+func (d *decoder) folders(raw json.RawMessage) []string {
+	const p = "/project_folders"
+	items, ok := d.array(p, raw)
+	if !ok {
+		return nil
+	}
+	out := make([]string, 0, len(items))
+	for i, it := range items {
+		ip := index(p, i)
+		s, ok := d.str(ip, it)
+		switch {
+		case !ok:
+		case len(s) > folderNameMax:
+			d.fail(ip, codeTooLong)
+		case !folderNamePattern.MatchString(s):
+			d.fail(ip, codePattern)
+		case slices.Contains(out, s):
+			d.fail(ip, codeDuplicate)
+		default:
+			out = append(out, s)
+		}
 	}
 	return out
 }

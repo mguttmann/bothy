@@ -498,6 +498,10 @@ canary class `manage_only` of `test/canary`.
   fragment. `ready_reason` holds the code the runner reported with `ready` false; a report that
   changes only the reason is written like a readiness change, and every effective binding change
   and every operator reset clears it (R-DM-55).
+- Forums for existing folders (M4-44): `BoundProjectFolders` answers which of a list of folder
+  names a binding's `workspace_ref` names, compared without case as the unique index compares;
+  the agents module calls it through its readiness port for `listAgentProjectFolders` after
+  `agent.project_folders.read` allowed the owner, and only the given names leave (R-DM-56).
 - Domain (`domain/project_binding.go`): `ValidateProjectBinding` (limits
   `project.binding_text_max_chars` and `audit.reason_max_chars` at request time) and
   `PlanBindingPut` (`created`, `replaced` with `ready = false`, `unchanged` without a write).

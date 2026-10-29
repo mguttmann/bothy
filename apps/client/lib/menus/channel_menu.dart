@@ -3,7 +3,9 @@
 /// The menu of a channel in the sidebar and the thread header of its main history (brief M4-33
 /// Scope): its notification level, "Mute until" and "Export history", which appears only where
 /// the server gives the capability `export` (07 2.4; fixed requirement 9); in the sidebar a
-/// forum's menu starts with "New chat in" or "New post in" (01 6.8 item 8, brief M4-41).
+/// forum's menu starts with "New chat in" or "New post in" (01 6.8 item 8, brief M4-41), and a
+/// forum with a project binding has "Rename project" for a person with `manage` (01 6.11,
+/// M4-44).
 library;
 
 import 'dart:async';
@@ -15,6 +17,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:l10n/l10n.dart';
 
 import '../export/channel_export.dart';
+import '../new_project/rename_project_dialog.dart';
 import '../notifications_settings/providers.dart';
 import '../thread/providers.dart';
 import 'level_menu.dart';
@@ -48,15 +51,26 @@ class ChannelMenu extends StatelessWidget {
     label: AppLocalizations.of(context).notifyMenuOf(channel.name),
     menuChildren: (context, ref) {
       // Watched, so the open menu follows a capability the server reports later.
-      ref.watch(channelAccessProvider(channel.id.value));
+      final access = ref.watch(channelAccessProvider(channel.id.value)).value;
       final label = newChatLabel;
       final start = onNewChat;
+      final rename =
+          channel.kind == ChannelKind.forum &&
+          channel.projectBound &&
+          (access?.capabilities.contains(Capability.manage) ?? false);
       return [
         if (label != null && start != null)
           DsMenuItem(
             key: const ValueKey('menu.newChat'),
             onPressed: start,
             child: Text(dsIsolate(label)),
+          ),
+        if (rename)
+          DsMenuItem(
+            key: const ValueKey('menu.renameProject'),
+            onPressed: () =>
+                unawaited(showRenameProjectDialog(context, ref, channel)),
+            child: Text(AppLocalizations.of(context).channelMenuRenameProject),
           ),
         ...channelMenuItems(context, ref, channel),
       ];

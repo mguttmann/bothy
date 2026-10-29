@@ -18,6 +18,7 @@ import '../app/providers/session.dart';
 import '../app/router.dart' show NewChatLocation;
 import '../forum/new_chat_view.dart' show openNewChat;
 import '../new_project/new_project_dialog.dart' show showNewProjectDialog;
+import '../new_project/project_sync_dialog.dart' show showProjectSyncDialog;
 import '../notifications_settings/providers.dart' show isOwnerProvider;
 import '../onboarding/onboarding_controller.dart';
 import '../running/providers.dart' show activeRunCountProvider;
@@ -66,6 +67,7 @@ class SidebarView extends StatelessWidget {
     this.onToggleGroup,
     this.onAdd,
     this.onNewProject,
+    this.onAddFolderForums,
     this.onHold,
     this.holdMode = SidebarHoldMode.pointer,
     this.selectedNewChat,
@@ -150,6 +152,9 @@ class SidebarView extends StatelessWidget {
   /// The action "New project" of a space row and its menu (01 6.9 item 1), or null for none.
   final ValueChanged<Space>? onNewProject;
 
+  /// The space menu entry "Add forums for existing folders" (01 6.10 item 1), or null for none.
+  final ValueChanged<Space>? onAddFolderForums;
+
   /// Called with true while the person is in the sidebar ([holdMode]) and with false when the
   /// person left it (01 6.8 item 4: rows that no longer qualify stay until then).
   final ValueChanged<bool>? onHold;
@@ -194,6 +199,7 @@ class SidebarView extends StatelessWidget {
           onToggleGroup: onToggleGroup,
           onAdd: onAdd,
           onNewProject: onNewProject,
+          onAddFolderForums: onAddFolderForums,
           selectedNewChat: selectedNewChat,
           onOpenNewChat: onOpenNewChat,
         ),
@@ -419,6 +425,7 @@ class SidebarColumn extends ConsumerWidget {
       return engine == null || db == null ? null : SidebarWriter(engine, db);
     }
 
+    final owner = !phone && (ref.watch(isOwnerProvider).value ?? false);
     return SidebarView(
       productName: instance?.productName ?? '',
       logo: instance?.logo,
@@ -447,8 +454,13 @@ class SidebarColumn extends ConsumerWidget {
       onAdd: (channel) => openNewChat(context, ref, channel),
       // 01 6.9 item 1: owners start a new project from a space row; the desktop only
       // (D-M4-43-12).
-      onNewProject: !phone && (ref.watch(isOwnerProvider).value ?? false)
+      onNewProject: owner
           ? (space) => unawaited(_newProject(context, ref, space))
+          : null,
+      // 01 6.10 item 1: owners add forums for the folders of a runner, the desktop only
+      // (D-M4-44-7).
+      onAddFolderForums: owner
+          ? (space) => unawaited(showProjectSyncDialog(context, ref, space))
           : null,
       selectedNewChat: newChat,
       onOpenNewChat: (forum, entry) =>

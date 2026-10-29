@@ -18,6 +18,7 @@ import 'package:api_client/src/generated/model/billing_mode_set_all.dart';
 import 'package:api_client/src/generated/model/billing_mode_set_all_result.dart';
 import 'package:api_client/src/generated/model/credential_holder_set.dart';
 import 'package:api_client/src/generated/model/problem.dart';
+import 'package:api_client/src/generated/model/project_folder_list.dart';
 import 'package:api_client/src/generated/model/reason_body.dart';
 import 'package:api_client/src/generated/model/tool_class_set.dart';
 
@@ -443,6 +444,98 @@ class AgentsApi {
     }
 
     return Response<Agent>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// List the project folders of a runner that have no binding
+  /// The folders directly under the projects root of the runner &#x60;agent_id&#x60; that its last heartbeat reported (&#x60;Heartbeat.project_folders&#x60;, 09 18.13) and that no forum is bound to: a name equal to the &#x60;workspace_ref&#x60; of any binding, compared without case, is left out (03 &#x60;runner_project_folders&#x60;, M4-44). &#x60;reported&#x60; is false while the runner has never reported its folders. The app offers these folders to add a forum for each (01 6.10); the server never reads a host&#39;s files.
+  ///
+  /// Parameters:
+  /// * [agentId]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [ProjectFolderList] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<ProjectFolderList>> listAgentProjectFolders({
+    required String agentId,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/agents/{agent_id}/project-folders'.replaceAll(
+      '{'
+      r'agent_id'
+      '}',
+      encodeQueryParameter(
+        _serializers,
+        agentId,
+        const FullType(String),
+      ).toString(),
+    );
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'apiKey',
+            'name': 'consoleSession',
+            'keyName': '__Host-console_session',
+            'where': '',
+          },
+          {'type': 'http', 'scheme': 'DPoP', 'name': 'dpopAuth'},
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearerAuth'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    ProjectFolderList? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(
+              rawResponse,
+              specifiedType: const FullType(ProjectFolderList),
+            ) as ProjectFolderList;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<ProjectFolderList>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,

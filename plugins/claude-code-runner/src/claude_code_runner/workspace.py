@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Resolution of ``workspace_ref`` under ``runner.projects_root`` and readiness (09 18.1).
+"""Resolution of ``workspace_ref``, readiness and the project folder report (09 18.1, 18.13).
 
 The reference is an opaque name; it resolves to a strict descendant of the real path of the
 root, also after symbolic links, and the resolved real path is the working directory of a
@@ -14,13 +14,18 @@ Examples:
 
 from __future__ import annotations
 
+import json
+import logging
 import os
 import re
 from pathlib import Path
 
-__all__ = ["WorkspaceError", "readiness", "resolve"]
+__all__ = ["WorkspaceError", "project_folders", "readiness", "resolve"]
 
 _DRIVE = re.compile(r"^[A-Za-z]:")
+_FOLDER_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
+_FOLDER_NAME_MAX = 255
+_LOG = logging.getLogger("claude_code_runner")
 
 
 class WorkspaceError(Exception):
@@ -92,3 +97,43 @@ def readiness(projects_root: Path, workspace_ref: str) -> tuple[bool, str | None
     if not os.access(path, os.R_OK | os.W_OK | os.X_OK):
         return False, "not_writable"
     return True, None
+
+
+def project_folders(projects_root: Path, limit: int) -> list[str]:
+    """Return the names of the Git work trees directly under the root (09 18.13).
+
+    An entry counts when its name is one segment of ``^[A-Za-z0-9][A-Za-z0-9._-]*$`` of at most
+    255 characters (so no hidden folder and no ``.provision-<uuid>`` folder of 18.12), it
+    resolves by `resolve` to a folder (a symbolic link only when its target stays under the
+    root) and it holds ``.git`` (a folder or a file). Only names leave the runner, never a path.
+
+    Args:
+        projects_root: ``runner.projects_root``.
+        limit: ``runner.project_folders_max``.
+
+    Returns:
+        The names in code point order, at most ``limit``; when there are more, the first ones,
+        and the log code ``project_folders_truncated`` names the count. A root that cannot be
+        read gives ``[]`` and the log code ``project_folders_unreadable``.
+    """
+    try:
+        entries = [e.name for e in Path(os.path.realpath(projects_root)).iterdir()]
+    except OSError:
+        _LOG.warning(json.dumps({"event": "project_folders_unreadable"}))
+        return []
+    names = sorted(n for n in entries if _is_project_folder(projects_root, n))
+    if len(names) > limit:
+        _LOG.info(json.dumps({"event": "project_folders_truncated", "count": len(names)}))
+        names = names[:limit]
+    return names
+
+
+def _is_project_folder(projects_root: Path, name: str) -> bool:
+    """Whether the entry ``name`` of the root is a reported project folder."""
+    if len(name) > _FOLDER_NAME_MAX or not _FOLDER_NAME.fullmatch(name):
+        return False
+    try:
+        path = resolve(projects_root, name)
+    except WorkspaceError:
+        return False
+    return path.is_dir() and (path / ".git").exists()

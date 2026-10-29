@@ -99,4 +99,10 @@ type ProjectBindings interface {
 	// the stored values; the reason is stored only with ready false (R-DM-55). Errors:
 	// validation_failed on /project_readiness for a channel reported twice, then nothing changes.
 	ApplyProjectReadiness(ctx context.Context, agentID ids.ID, reports []ProjectReadiness) error
+	// BoundProjectFolders returns the entries of names that the workspace_ref of a binding
+	// names, compared without case as the unique index compares, in the order of names
+	// (listAgentProjectFolders, M4-44). It does not authorize: the agents module calls it only
+	// after agent.project_folders.read allowed the owner, and only names leave, never a channel.
+	// Errors: a database error.
+	BoundProjectFolders(ctx context.Context, names []string) ([]string, error)
 }

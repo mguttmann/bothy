@@ -162,6 +162,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - invokeCommand
   - issueHostPairingCode
   - listActiveRuns
+  - listAgentProjectFolders
   - listAgentSessions
   - listAgents
   - listApps
