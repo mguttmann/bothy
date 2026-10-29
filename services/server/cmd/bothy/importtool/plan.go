@@ -178,7 +178,7 @@ func buildStructure(gs *guildState, m *Mapping, pl placement) (*plan, error) {
 	if err := p.addSpaces(gs, m, pl.lastSpace); err != nil {
 		return nil, err
 	}
-	if err := p.addChannels(gs, m, pl.lastChannel); err != nil {
+	if err := p.addChannels(gs, m, pl); err != nil {
 		return nil, err
 	}
 	return p, nil
@@ -202,19 +202,20 @@ func (p *plan) addSpaces(gs *guildState, m *Mapping, last string) error {
 	return nil
 }
 
-// addChannels decides every channel in Discord order; its key follows the last key of its target
-// category (lastChannel, or none for a space the run creates).
-func (p *plan) addChannels(gs *guildState, m *Mapping, lastChannel map[string]string) error {
+// addChannels decides every channel in Discord order; its key follows the last key of its block:
+// the live target space shared by all categories mapped to it, or the category for a space the
+// run creates (no last key).
+func (p *plan) addChannels(gs *guildState, m *Mapping, pl placement) error {
 	blocks := map[string]*keySeq{}
 	for _, c := range gs.channels {
 		if c.Type == typeCategory {
 			continue
 		}
-		category := categoryOf(gs, m, c.ID)
-		if blocks[category] == nil {
-			blocks[category] = &keySeq{last: lastChannel[category]}
+		b := pl.blockOf(categoryOf(gs, m, c.ID))
+		if blocks[b] == nil {
+			blocks[b] = &keySeq{last: pl.lastChannel[b]}
 		}
-		k, err := blocks[category].next()
+		k, err := blocks[b].next()
 		if err != nil {
 			return err
 		}

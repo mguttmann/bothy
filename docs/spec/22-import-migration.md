@@ -183,7 +183,9 @@ Rules:
    operator (section 13.3).
 4. Order: spaces and channels in Discord order (`position`), as `sort_key`. The new spaces follow
    the last `sort_key` of the spaces of the target instance as one block; the new channels of a
-   target space that already exists follow its last channel as one block. A key is the next
+   target space that already exists follow its last channel as one block, shared by all
+   categories mapped to that space. The order is the shared one; personal sidebar keys of a person
+   (which the import cannot set) can still place the new spaces elsewhere. A key is the next
    integer key of the fractional index after the previous one
    ([03-data-model.md](03-data-model.md), principle 5). An item that is already posted keeps its
    key, so a later run never reorders what an earlier run placed.

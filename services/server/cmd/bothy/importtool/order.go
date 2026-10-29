@@ -24,7 +24,17 @@ var errKeyRange = errors.New("no sort key after the last key of the server")
 // later run moves nothing an earlier run placed.
 type placement struct {
 	lastSpace   string            // "" on a server without spaces
-	lastChannel map[string]string // by Discord category whose target space is live
+	block       map[string]string // channel block by Discord category whose target space is live
+	lastChannel map[string]string // last channel key by block: one block per live space, so the
+	// categories that share an existing space fill it as one block in Discord order
+}
+
+// blockOf returns the channel block of a category: its live target space, else the category.
+func (pl placement) blockOf(category string) string {
+	if b, ok := pl.block[category]; ok {
+		return b
+	}
+	return category
 }
 
 // placementOf reads the last keys of placement from the spaces of the server and the channels of
@@ -35,7 +45,7 @@ func (c *collisions) placementOf(ctx context.Context) (placement, error) {
 	for _, sp := range c.spaces {
 		keys = append(keys, sp.SortKey)
 	}
-	pl := placement{lastSpace: lastKey(keys), lastChannel: map[string]string{}}
+	pl := placement{lastSpace: lastKey(keys), block: map[string]string{}, lastChannel: map[string]string{}}
 	for _, s := range c.m.Spaces {
 		if s.Target.Skip {
 			continue
@@ -52,7 +62,8 @@ func (c *collisions) placementOf(ctx context.Context) (placement, error) {
 		for _, ch := range chans {
 			keys = append(keys, ch.SortKey)
 		}
-		pl.lastChannel[s.Category] = lastKey(keys)
+		pl.block[s.Category] = "space:" + space.String()
+		pl.lastChannel[pl.block[s.Category]] = lastKey(keys)
 	}
 	return pl, nil
 }

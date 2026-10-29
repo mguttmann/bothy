@@ -83,6 +83,33 @@ func TestNewChannelsFollowExistingChannels(t *testing.T) {
 	}
 }
 
+// TestCategoriesSharingExistingSpaceKeepDiscordOrder: two categories mapped to one existing space
+// draw their channels from one block after its last channel, in Discord order, instead of each
+// category starting its own block at the same key.
+func TestCategoriesSharingExistingSpaceKeepDiscordOrder(t *testing.T) {
+	e := newTestEnv(t, discordtest.BasicFixture(t))
+	existing := e.bothy.AddSpace("Existing")
+	e.bothy.AddChannel(existing, "one")
+	text := strings.Replace(fixtureMapping, `{create: {name: "Projects"}}`, `{existing: "`+existing+`"}`, 1)
+	text = strings.Replace(text, `{create: {name: "Community"}}`, `{existing: "`+existing+`"}`, 1)
+	e.startSource(text)
+	e.applyRun(text)
+	placed := e.bothy.Channels(existing)
+	keys := keysByName(placed)
+	seen := map[string]string{}
+	for name, k := range keys {
+		if other, dup := seen[k]; dup {
+			t.Errorf("%s and %s share the sort key %s", other, name, k)
+		}
+		seen[k] = name
+	}
+	// Discord order of the fixture: general (0), news (1), support (2), random (4).
+	want := []string{"one", "general", "news", "support", "random"}
+	if got := sidebarOrder(placed); !slices.Equal(got, want) {
+		t.Errorf("channel order = %v, want %v", got, want)
+	}
+}
+
 // TestRerunKeepsPlacedOrder: a second run after the server order changed moves nothing the first
 // run placed.
 func TestRerunKeepsPlacedOrder(t *testing.T) {

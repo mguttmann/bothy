@@ -102,8 +102,11 @@ working and temporary directories.
 
 Order (22 5.1 rule 4): the new spaces form one block after the last sort key of the spaces of the
 server, in Discord order; the new channels of a target space the server already holds form one
-block after its last channel, in Discord order, and the channels of a space the run creates keep
-Discord order among themselves. Nothing interleaves with what was there before. The server keeps
+block after its last channel, in Discord order (all categories mapped to the same existing space
+fill one block together), and the channels of a space the run creates keep Discord order among
+themselves. Nothing interleaves with what was there before in the shared order; a person who has
+reordered their own sidebar keeps personal keys the tool can neither read nor set, so the new
+spaces can still land between their spaces. The server keeps
 the key of an item it has posted, so a later run never moves a space or channel an earlier run
 placed; a category added to the mapping later lands after everything that exists then.
 
