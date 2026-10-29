@@ -35,6 +35,7 @@ class SpaceNode extends StatefulWidget {
     this.selectedThread,
     this.onOpenThread,
     this.onToggleGroup,
+    this.onShowAllPosts,
     this.onAdd,
     this.onNewProject,
     this.onAddFolderForums,
@@ -65,6 +66,10 @@ class SpaceNode extends StatefulWidget {
 
   /// Collapses or expands the thread group of a channel.
   final void Function(ChannelId channel, bool expanded)? onToggleGroup;
+
+  /// Lists every open post of a forum's group (true, "Show more") or the newest ones (false,
+  /// "Show less"); null shows no such row (01 6.8 item 3, M4-46).
+  final void Function(ChannelId forum, bool inFull)? onShowAllPosts;
 
   /// The new chat row the route selects, or null (brief M4-41).
   final SidebarNewChatSelection? selectedNewChat;
@@ -115,6 +120,7 @@ class _SpaceNodeState extends State<SpaceNode> {
       :selectedThread,
       :onOpenThread,
       :onToggleGroup,
+      :onShowAllPosts,
       :onAdd,
       :onNewProject,
       :onAddFolderForums,
@@ -181,6 +187,9 @@ class _SpaceNodeState extends State<SpaceNode> {
               onToggleGroup: onToggleGroup == null
                   ? null
                   : (expanded) => onToggleGroup(c.channel.id, expanded),
+              onShowAllPosts: onShowAllPosts == null
+                  ? null
+                  : (inFull) => onShowAllPosts(c.channel.id, inFull),
               onAdd: onAdd == null ? null : () => onAdd(c.channel.id),
               selectedNewChat: selectedNewChat,
               onOpenNewChat: onOpenNewChat == null

@@ -165,7 +165,7 @@ phone. Reason: the same mental model on every device; on the phone the post list
 |---|---|
 | Keep the post list column and only shrink it | still a column for a list the sidebar can hold; does not give the Discord view the owner asked for |
 | Order thread rows by last activity | rows move under the pointer while agents work (D-SB-3) |
-| Show every open post in the sidebar | a busy forum would push the rest of the sidebar away; the overview has them all |
+| Show every open post in the sidebar | a busy forum would push the rest of the sidebar away; the overview has them all (replaced for forums on 2026-10-29, section 6) |
 | Load each forum's list on connect instead of a snapshot member | one request per channel on every connect and resync; rate class `rl.read` and start time grow with the number of channels |
 | Synchronize collapse and pin state | needs a new personal setting key and a server change for a view preference (D-M4-19-4) |
 | A worktree per post in the runner | not wanted (owner, 2026-10-27); would change readiness, cleanup and the working folder contract |
@@ -182,3 +182,25 @@ Defined in the [plan](../PLAN.md); dependencies there and in the brief index.
 - M4-41 (desktop): "+ New chat" at the forum, new chat view without a dialog, draft row; after
   M4-40.
 - M5-15 (iPhone and Android): the same groups and "+" in M1; after M4-41 and M5-03.
+
+## 6. Addendum of 2026-10-29: every open post of a forum (M4-46)
+
+Owner decision of 2026-10-29: the sidebar shows every open forum post, as Discord does. After an
+import most open posts of a forum had no activity within `ui.sidebar_thread_window`, so a forum
+with 24 open posts showed none. The normative text is 01 6.8 items 2 to 4 and 7 (R-PR-23); the
+rulings are `D-M4-46-1` to `D-M4-46-5` in [decisions.d/M4-46.md](../decisions.d/M4-46.md). They
+replace D-SB-2 and D-SB-3 for forums; text channels keep both.
+
+- A forum group lists every open post the client holds, by last activity, newest first; done
+  posts only while selected. Unread, mentions and the run state icon stay on the rows.
+- Beyond `ui.sidebar_forum_posts_visible` (15) the row "Show more" above "All posts" lists the
+  rest in place and then reads "Show less"; the choice is kept per device next to the collapse
+  state (`channel_view_states`), not synchronized. This answers the concern of section 4: a busy
+  forum takes the room of 15 rows until the person asks for more.
+- While the pointer or the focus is in the sidebar the rows keep their order (D-SB-3 still
+  holds: no row moves under the pointer); a post new to the group appears at the top. "Show
+  more" and "Show less" apply at once.
+- The client lists what it holds: the snapshot's `active_threads` (04 6.3 item 4: unread, running
+  and up to `sync.snapshot_threads_per_channel` posts active within `sync.snapshot_thread_window`),
+  the posts that events brought, and the pages of the forum overview. The snapshot rule is not
+  changed here (D-M4-46-5).

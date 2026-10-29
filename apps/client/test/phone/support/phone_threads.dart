@@ -33,25 +33,27 @@ Thread serverPost(
   required int created,
   int ageHours = 500,
   String? title,
+  ThreadState state = ThreadState.open,
+  int version = 1,
 }) => Thread(
   id: threadId(n),
   channelId: server.id,
   kind: ThreadKind.thread,
   title: title ?? 'Post $n',
   titleSource: TitleSource.manual,
-  state: ThreadState.open,
+  state: state,
   lastMessageSeq: const ThreadSeq(4),
   unreadFloorSeq: const ThreadSeq(0),
   lastActivityAt: t0.subtract(Duration(hours: ageHours)),
   messageCount: 4,
   createdBy: sam,
   createdAt: t0.subtract(Duration(days: 30, minutes: -created)),
-  version: const ResourceVersion(1),
+  version: ResourceVersion(version),
   tagIds: const [],
 );
 
-/// The forums of [fillForums] and two posts of `server`: post 1 is old and qualifies only
-/// while it is unread (3 unread), post 2 is recent.
+/// The forums of [fillForums] and two open posts of `server`: post 1 is old and unread (3
+/// unread), post 2 is recent; a forum lists both (01 6.8 item 2, M4-46).
 Future<void> fillThreads(LocalDatabase db) async {
   await fillForums(db);
   await db.threadsDao.upsertIfNewer(serverPost(1, created: 1));
@@ -59,15 +61,9 @@ Future<void> fillThreads(LocalDatabase db) async {
   await db.personalDao.applyReadState(readState(1, lastRead: 1, unread: 3));
 }
 
-/// Post 1 read to its end: it no longer qualifies (01 6.8 item 2).
-ReadState post1Read() => ReadState(
-  threadId: threadId(1),
-  channelId: server.id,
-  lastReadSeq: const ThreadSeq(4),
-  mentionCount: 0,
-  unreadCount: 0,
-  version: const ResourceVersion(2),
-);
+/// Post 1 marked done: it no longer qualifies (01 6.8 item 2).
+Thread post1Done() =>
+    serverPost(1, created: 1, state: ThreadState.closed, version: 2);
 
 /// The thread row of post [n].
 Finder postRow(int n) =>

@@ -14,8 +14,8 @@
 /// `view_models.dart` and read every text from `package:l10n`: [DsMessage], [DsMarkdown],
 /// [DsLiveBox], [DsToolChip], [DsStatusLine], [DsTriggerStateIcon], [DsThreadRow],
 /// [DsSpaceRow], [DsChannelRow], [DsSidebarThreadRow], [DsSidebarDraftRow],
-/// [DsSidebarAllPostsRow], [DsMessageComponents], [DsComposer], [DsSuggestionList],
-/// [DsBillingBadge], [DsCostText], [DsBanner] and the [LiveAnnouncer].
+/// [DsSidebarAllPostsRow], [DsSidebarMoreRow], [DsMessageComponents], [DsComposer],
+/// [DsSuggestionList], [DsBillingBadge], [DsCostText], [DsBanner] and the [LiveAnnouncer].
 library;
 
 export 'src/components/ds_banner.dart';

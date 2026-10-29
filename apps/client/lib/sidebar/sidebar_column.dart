@@ -65,6 +65,7 @@ class SidebarView extends StatelessWidget {
     this.selectedThread,
     this.onOpenThread,
     this.onToggleGroup,
+    this.onShowAllPosts,
     this.onAdd,
     this.onNewProject,
     this.onAddFolderForums,
@@ -140,6 +141,10 @@ class SidebarView extends StatelessWidget {
   /// Collapses or expands the thread group of a channel (01 6.8 item 7).
   final void Function(ChannelId channel, bool expanded)? onToggleGroup;
 
+  /// Lists every open post of a forum's group (true, "Show more") or the newest ones (false,
+  /// "Show less"); null shows no such row (01 6.8 item 3, M4-46).
+  final void Function(ChannelId forum, bool inFull)? onShowAllPosts;
+
   /// The new chat row the route selects, or null (brief M4-41).
   final SidebarNewChatSelection? selectedNewChat;
 
@@ -197,6 +202,7 @@ class SidebarView extends StatelessWidget {
           onOpenChannel: onOpenChannel,
           onOpenThread: onOpenThread,
           onToggleGroup: onToggleGroup,
+          onShowAllPosts: onShowAllPosts,
           onAdd: onAdd,
           onNewProject: onNewProject,
           onAddFolderForums: onAddFolderForums,
@@ -447,6 +453,14 @@ class SidebarColumn extends ConsumerWidget {
             .read(localDatabaseProvider)
             ?.forumViewDao
             .setGroupCollapsed(channel, collapsed: !expanded),
+      ),
+      // 01 6.8 item 3 (M4-46): "Show more" and "Show less" of a forum group, kept on this
+      // device.
+      onShowAllPosts: (forum, inFull) => unawaited(
+        ref
+            .read(localDatabaseProvider)
+            ?.forumViewDao
+            .setPostListShownInFull(forum, inFull: inFull),
       ),
       // 01 6.8 item 8: "+" opens the new chat view of the forum, its draft when one exists; a
       // collapsed group expands, so the draft row shows and is selected. On the phone the view

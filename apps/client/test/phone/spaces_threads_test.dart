@@ -149,7 +149,7 @@ void main() {
       await settlePhone(tester, host);
       await host.run(
         tester,
-        () => host.db.personalDao.applyReadState(post1Read()),
+        () => host.db.threadsDao.upsertIfNewer(post1Done()),
       );
       await settlePhone(tester, host);
       expect(
@@ -177,10 +177,7 @@ void main() {
     // A scroll that the app drives (a fling's tail), without a finger on the list.
     scroll.position.didStartScroll();
     await settlePhone(tester, host);
-    await host.run(
-      tester,
-      () => host.db.personalDao.applyReadState(post1Read()),
-    );
+    await host.run(tester, () => host.db.threadsDao.upsertIfNewer(post1Done()));
     await settlePhone(tester, host);
     expect(postRow(1), findsOneWidget, reason: 'no row leaves while scrolling');
     scroll.position.didEndScroll();
@@ -200,7 +197,7 @@ void main() {
       final host = await open(tester);
       await host.run(
         tester,
-        () => host.db.personalDao.applyReadState(post1Read()),
+        () => host.db.threadsDao.upsertIfNewer(post1Done()),
       );
       await settlePhone(tester, host);
       expect(

@@ -24,7 +24,8 @@ import 'thread_entry.dart';
 /// click, the menu key or Shift+F10 opens the channel's menu (M4-33).
 ///
 /// With [onOpenThread] the channel shows its thread group (01 6.8): the thread rows of an
-/// expanded group, "All posts" at the end of a forum's group, its own arrow ([onToggleGroup])
+/// expanded group, "Show more" or "Show less" ([onShowAllPosts], M4-46) and "All posts" at the
+/// end of a forum's group, its own arrow ([onToggleGroup])
 /// and on a forum the "+" action ([onAdd]). The arrow keys walk the tree (D-SB-8): arrow right
 /// on the channel expands its group or enters its first row, arrow left collapses it; arrow left
 /// on a thread row goes back to the channel. Neither the channel nor its rows can be dragged
@@ -43,7 +44,12 @@ class ChannelEntry extends StatefulWidget {
     this.onParent,
     this.selectedNewChat,
     this.onOpenNewChat,
+    this.onShowAllPosts,
   });
+
+  /// Lists every open post of a forum group (true, "Show more") or the newest ones (false,
+  /// "Show less"); null shows no such row (01 6.8 item 3, M4-46).
+  final ValueChanged<bool>? onShowAllPosts;
 
   /// The new chat row the route selects, or null (brief M4-41).
   final SidebarNewChatSelection? selectedNewChat;
@@ -83,6 +89,7 @@ class ChannelEntry extends StatefulWidget {
 class _ChannelEntryState extends State<ChannelEntry> {
   final FocusNode _channel = FocusNode(debugLabel: 'sidebar.channel');
   final FocusNode _allPosts = FocusNode(debugLabel: 'sidebar.allPosts');
+  final FocusNode _more = FocusNode(debugLabel: 'sidebar.morePosts');
   final Map<ThreadId, FocusNode> _threads = {};
   final Map<String, FocusNode> _newChats = {};
 
@@ -90,6 +97,7 @@ class _ChannelEntryState extends State<ChannelEntry> {
   void dispose() {
     _channel.dispose();
     _allPosts.dispose();
+    _more.dispose();
     for (final n in [..._threads.values, ..._newChats.values]) {
       n.dispose();
     }
@@ -193,6 +201,7 @@ class _ChannelEntryState extends State<ChannelEntry> {
         (newChat != null && newChat.forum == e.channel.id);
     final forum = e.channel.kind == ChannelKind.forum;
     final rest = grouped ? e.allPostsCounts : null;
+    final more = grouped && w.onShowAllPosts != null ? e.morePosts : null;
     final addLabel = e.channel.projectBound
         ? l.sidebarNewChatIn(e.channel.name)
         : l.sidebarNewPostIn(e.channel.name);
@@ -270,9 +279,17 @@ class _ChannelEntryState extends State<ChannelEntry> {
                     entry: r,
                     channel: e.channel,
                     selected: r.thread.id == w.selectedThread,
-                    last: rest == null && i == rows.length - 1,
+                    last: rest == null && more == null && i == rows.length - 1,
                     onOpen: () => w.onOpenThread!(r.thread.id),
                     focusNode: _threadNode(r.thread.id),
+                    onKeyEvent: _onRowKey,
+                  ),
+                if (more != null)
+                  MorePostsEntry(
+                    channel: e.channel.id,
+                    more: more,
+                    onToggle: w.onShowAllPosts!,
+                    focusNode: _more,
                     onKeyEvent: _onRowKey,
                   ),
                 if (rest != null)

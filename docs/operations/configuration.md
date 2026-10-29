@@ -141,8 +141,9 @@ Source: [01-product.md](../spec/01-product.md), section 14.
 | `ui.quick_switch_max_results` |  | App |  | `20` | hits in the quick switcher |  |
 | `ui.desktop_min_width_four_columns` |  | App |  | `1280px` | below this width the session column collapses |  |
 | `ui.desktop_min_width_three_columns` |  | App |  | `960px` | below this width a pinned forum overview returns to the content column (navigation stack) |  |
-| `ui.sidebar_thread_window` |  | App |  | `72h` | an open thread with activity within this window shows in the sidebar (6.8) |  |
-| `ui.sidebar_threads_per_channel` |  | App |  | `8` | at most this many thread rows per channel in the sidebar (6.8) |  |
+| `ui.sidebar_thread_window` |  | App |  | `72h` | an open thread of a text channel with activity within this window shows in the sidebar (6.8) |  |
+| `ui.sidebar_threads_per_channel` |  | App |  | `8` | at most this many thread rows per text channel in the sidebar (6.8) |  |
+| `ui.sidebar_forum_posts_visible` |  | App |  | `15` | a forum group in the sidebar shows this many open posts before "Show more" (6.8) |  |
 | `ui.new_project_wait` |  | App |  | `2m` | after this time without readiness the new project dialog says that the runner has not finished (6.9) |  |
 | `ui.new_project_poll_interval` |  | App |  | `2s` | interval at which the new project dialog reads the readiness of the binding (6.9) |  |
 | `ui.new_project_name_max_chars` |  | App |  | `40` | longest suggested and accepted name of a new project (6.9) |  |

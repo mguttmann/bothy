@@ -128,6 +128,16 @@ Stream<Set<ChannelId>> collapsedGroups(Ref ref) {
       : db.forumViewDao.watchCollapsedGroups();
 }
 
+/// The forums whose group lists every open post on this device ("Show more", 01 6.8 item 3;
+/// kept in `channel_view_states`, never synchronized, D-M4-46-2).
+@riverpod
+Stream<Set<ChannelId>> postListsShownInFull(Ref ref) {
+  final db = ref.watch(localDatabaseProvider);
+  return db == null
+      ? Stream.value(const {})
+      : db.forumViewDao.watchPostListsShownInFull();
+}
+
 /// Whether the pointer is over the sidebar or the keyboard focus is in it: while it holds, a
 /// thread row that no longer qualifies stays in place (01 6.8 item 4; brief M4-40 Design note
 /// 2). The sidebar sets it ([SidebarHold.set]).
@@ -146,18 +156,27 @@ class SidebarHold extends _$SidebarHold {
 
 /// The thread group of [channelId] (01 6.8 items 2 to 6; `selectSidebarThreads`): its stored
 /// threads, the counters per thread, its runs, the selected thread of the route, the person,
-/// the clock and the limits of `AppConfig`. While [sidebarHoldProvider] holds, the rows shown
-/// last stay (01 6.8 item 4); additions and changes apply at once.
+/// the clock, the limits of `AppConfig` and the "Show more" state of this device. While
+/// [sidebarHoldProvider] holds, the rows shown last stay, and in a forum in their order (01 6.8
+/// item 4, D-M4-46-3); additions and changes apply at once. "Show more" and "Show less" apply at
+/// once too: the person asked for them.
 @riverpod
 class ChannelThreads extends _$ChannelThreads {
-  /// The rows of the last build; kept while the sidebar holds them.
-  Set<ThreadId> _shown = const {};
+  /// The rows of the last build in their order; kept while the sidebar holds them.
+  List<ThreadId> _shown = const [];
+
+  /// The "Show more" state of the last build.
+  bool? _inFull;
 
   @override
   SidebarThreadGroup? build(String channelId) {
     final channel = ref.watch(storedChannelOfRouteProvider(channelId)).value;
     if (channel == null) return null;
-    final held = ref.watch(sidebarHoldProvider);
+    final inFull = (ref.watch(postListsShownInFullProvider).value ?? const {})
+        .contains(channel.id);
+    final toggled = _inFull != null && _inFull != inFull;
+    _inFull = inFull;
+    final held = ref.watch(sidebarHoldProvider) && !toggled;
     final prefs = ref.watch(notificationPreferencesProvider).value ?? const [];
     final now = ref.watch(appPortsProvider).clock.now();
     final group = selectSidebarThreads(
@@ -171,7 +190,9 @@ class ChannelThreads extends _$ChannelThreads {
       limits: SidebarThreadLimits.of(ref.watch(appConfigProvider)),
       expanded: !(ref.watch(collapsedGroupsProvider).value ?? const {})
           .contains(channel.id),
-      keep: held ? _shown : const {},
+      keep: held ? _shown.toSet() : const {},
+      heldOrder: held ? _shown : const [],
+      showAllPosts: inFull,
       mutedThreads: {
         for (final p in prefs)
           if (p.targetKind == NotificationTargetKind.thread &&
@@ -180,7 +201,7 @@ class ChannelThreads extends _$ChannelThreads {
       },
       channelMuted: isMuted(channel.id, prefs, now: now),
     );
-    _shown = {for (final r in group.rows) r.thread.id};
+    _shown = [for (final r in group.rows) r.thread.id];
     return group;
   }
 }

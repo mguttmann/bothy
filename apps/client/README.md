@@ -640,12 +640,16 @@ docs/DECISIONS.md D-M4-19-1 to D-M4-19-7).
 
 Under each forum and text channel the desktop sidebar shows its open threads as rows with a tree
 line (01 6.8, D-SB-1 to D-SB-10). `sidebar_threads.dart` holds the selection as one pure
-function, `selectSidebarThreads`: which threads qualify (selected, active run, waiting for the
-person, unread, activity within `ui.sidebar_thread_window`), the bound
-`ui.sidebar_threads_per_channel` with its priority, the order by creation, and the counters of
-the channel row and of "All posts" without a number twice on screen. The `ChannelThreads`
-provider feeds it from the local database; while the pointer is over the sidebar or the focus is
-in it (`SidebarHold`), rows that no longer qualify stay in place. The threads come from the
+function, `selectSidebarThreads`. A forum lists every open post by last activity, newest first,
+the newest `ui.sidebar_forum_posts_visible` and the selected one, and above "All posts" the row
+"Show more" lists the rest in place ("Show less" goes back; M4-46, D-M4-46-1 to D-M4-46-4); the
+choice is kept per device in `channel_view_states.posts_shown_in_full`. A text channel keeps its
+rule: which threads qualify (selected, active run, waiting for the person, unread, activity
+within `ui.sidebar_thread_window`), the bound `ui.sidebar_threads_per_channel` with its priority
+and the order by creation. The counters of the channel row and of "All posts" never show a
+number twice on screen. The `ChannelThreads` provider feeds it from the local database; while
+the pointer is over the sidebar or the focus is in it (`SidebarHold`), rows that no longer
+qualify stay in place and the rows of a forum keep their order. The threads come from the
 snapshot's `active_threads` and the events the engine applies, never from a list request per
 channel. Each group collapses with its own arrow; the state is kept per device in
 `channel_view_states` of `local_store`. The arrow keys walk the tree (arrow right expands a group

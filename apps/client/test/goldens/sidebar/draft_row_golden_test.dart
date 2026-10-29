@@ -39,6 +39,7 @@ Widget cell(Widget child) => SizedBox(
 const SidebarThreadLimits limits = SidebarThreadLimits(
   window: Duration(hours: 72),
   perChannel: 8,
+  forumPostsVisible: 15,
 );
 
 /// The outbox entry of the sent post that waits.

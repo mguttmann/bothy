@@ -248,7 +248,11 @@ further than the channel row, a tree line on the left in `color.text.on-sidebar-
 `run.failed`) at `icon.size.sm`, otherwise nothing; title in `type.body-sm`, one line, cut with an
 ellipsis, full title in the tooltip; the states of the table below. The draft row "New chat" is in
 italics in `color.text.on-sidebar-secondary`. The last row of an expanded forum group is "All
-posts" in `color.text.on-sidebar-secondary` with the counters of the posts not shown.
+posts" in `color.text.on-sidebar-secondary` with the counters of the posts not shown. A forum with
+more open posts than `ui.sidebar_forum_posts_visible` has the row "Show more" ("Show less" while
+the group lists them all) above "All posts": same indent and tree line, text in
+`color.text.on-sidebar-secondary`, no counters, a button whose label names the posts it shows or
+hides (addendum of 2026-10-29, M4-46).
 
 | State | Rendering |
 |---|---|

@@ -1527,19 +1527,33 @@ Addendum of 2026-10-27 (R-PR-17, rulings D-SB-1 to D-SB-13,
 [design note](../design/sidebar-sessions.md)). Applies to the desktop sidebar (D1) and to the
 spaces screen on the phone (M1).
 
+Addendum of 2026-10-29 (R-PR-23, rulings D-M4-46-1 to D-M4-46-5): a forum lists every open post,
+like Discord, ordered by last activity, with "Show more" beyond a limit (items 2 to 4); text
+channels keep their rule. Reason: owner decision of 2026-10-29; after an import most open posts of
+a forum had no activity within `ui.sidebar_thread_window`, so a forum with 24 open posts showed
+none of them.
+
 1. **Group.** Under each forum and each text channel the sidebar shows a group of thread rows
    (forum posts, threads from messages of the main thread), indented with a tree line. The main
    thread of a text channel is the channel row itself.
-2. **Which threads.** A thread shows when it is open and at least one holds: it is selected; it
-   has an active run; it waits for the person ("Waiting for me": a run the person triggered in
-   `waiting_input`, or an unread mention of the person); it is unread; its `last_activity_at` lies
-   within `ui.sidebar_thread_window`. A done thread shows only while it is selected.
-3. **Bound.** At most `ui.sidebar_threads_per_channel` thread rows per channel. When more qualify,
-   they are chosen in this order: selected, waiting for the person, active run, unread mentions,
-   unread, newest activity.
-4. **Order.** By creation time, newest first, never by activity. A row that no longer qualifies
-   disappears only while the pointer is outside the sidebar and the keyboard focus is not in it;
-   until then it stays in place.
+2. **Which threads.** In a forum every open post shows (every post the client holds: the active
+   threads of the snapshot, 04 6.3 item 4, the posts that events brought and the pages of the
+   forum overview). In a text channel a thread shows when it is open and at least one holds: it
+   is selected; it has an active run; it waits for the person ("Waiting for me": a run the person
+   triggered in `waiting_input`, or an unread mention of the person); it is unread; its
+   `last_activity_at` lies within `ui.sidebar_thread_window`. A done thread shows only while it
+   is selected.
+3. **Bound.** A forum group shows the newest `ui.sidebar_forum_posts_visible` open posts and the
+   selected one; when the forum has more open posts, the row "Show more" above "All posts" lists
+   all of them in place and then reads "Show less". Whether a forum group shows all is kept per
+   device like the collapse state (item 7). A text channel has at most
+   `ui.sidebar_threads_per_channel` thread rows. When more qualify, they are chosen in this
+   order: selected, waiting for the person, active run, unread mentions, unread, newest activity.
+4. **Order.** In a forum by last activity (`last_activity_at`), newest first; in a text channel by
+   creation time, newest first. A row that no longer qualifies disappears, and the rows of a forum
+   change their order, only while the pointer is outside the sidebar and the keyboard focus is
+   not in it; until then the rows stay in place, and a post new to the group appears at the top.
+   "Show more" and "Show less" apply at once.
 5. **"All posts".** An expanded forum group ends with the row "All posts", which opens the forum
    overview D15; it carries the unread mark and the mention counter of the posts not shown in the
    group, never a total. Text channels have no such row.
@@ -1550,8 +1564,9 @@ spaces screen on the phone (M1).
    of its main thread; a collapsed group counts all; the run dot of a channel covers all its
    threads.
 7. **Collapse.** Each channel with thread rows has its own arrow; groups are expanded by default.
-   The collapse state of a group and whether the forum overview is pinned as a column are kept per
-   device in the local database and are not synchronized (like the Done section in 6.1).
+   The collapse state of a group, whether a forum group shows all its open posts (item 3) and
+   whether the forum overview is pinned as a column are kept per device in the local database and
+   are not synchronized (like the Done section in 6.1).
 8. **New chat.** Every forum row has the action "+" (visible on hover, on keyboard focus and on the
    selected forum; always on touch), labelled "New chat in <forum>" in a forum with a project
    binding and "New post in <forum>" otherwise; it is also in the context menu of the forum, and
@@ -1897,6 +1912,7 @@ Rules:
 | R-PR-20 | A new project starts from the space row or the space menu ("New project", owners only) in a dialog with four modes: empty, clone, existing folder, idea; it shows every step and resumes after a failure; for an idea the first post starts when the folder is ready (6.9, addendum of 2026-10-28). | Owner feedback 2026-10-28: a space had no way to add a project; his earlier setup created one per request (D-M4-43-1 to D-M4-43-12). |
 | R-PR-21 | The space menu adds forums for the folders of a runner's projects folder that have none, as a checked list the owner confirms, one forum and binding per folder; a project forum's menu renames the forum, never the folder (6.10, 6.11, addendum of 2026-10-29). | Owner feedback 2026-10-29: his former setup synced a forum for every project folder and renamed project forums; the list is the preview, and a folder with a forum never gets a second one (D-M4-44-1 to D-M4-44-7). |
 | R-PR-22 | On desktop the session column can be hidden and shown from the header of a thread or main history ("Hide session", "Show session"), with Cmd+Shift+I and from a slim rail at the right edge while it is hidden, kept per device and per layout (addendum of 2026-10-29). | Owner feedback on the Mac app (2026-10-29): the session column read as not collapsible, because the header button only said "Column" and the choice was lost on restart. |
+| R-PR-23 | A forum group in the sidebar lists every open post by last activity, newest first, the newest `ui.sidebar_forum_posts_visible` and then "Show more" in place (kept per device); text channels keep the rule of 6.8 item 2 (addendum of 2026-10-29). | Owner decision 2026-10-29 ("like Discord"): after an import most open posts had no recent activity and vanished from the sidebar; a forum with 24 open posts showed none. |
 
 ## 14. Configuration values of this chapter
 
@@ -1910,8 +1926,9 @@ Rules:
 | `ui.quick_switch_max_results` | `20` | hits in the quick switcher |
 | `ui.desktop_min_width_four_columns` | `1280px` | below this width the session column collapses |
 | `ui.desktop_min_width_three_columns` | `960px` | below this width a pinned forum overview returns to the content column (navigation stack) |
-| `ui.sidebar_thread_window` | `72h` | an open thread with activity within this window shows in the sidebar (6.8) |
-| `ui.sidebar_threads_per_channel` | `8` | at most this many thread rows per channel in the sidebar (6.8) |
+| `ui.sidebar_thread_window` | `72h` | an open thread of a text channel with activity within this window shows in the sidebar (6.8) |
+| `ui.sidebar_threads_per_channel` | `8` | at most this many thread rows per text channel in the sidebar (6.8) |
+| `ui.sidebar_forum_posts_visible` | `15` | a forum group in the sidebar shows this many open posts before "Show more" (6.8) |
 | `ui.new_project_wait` | `2m` | after this time without readiness the new project dialog says that the runner has not finished (6.9) |
 | `ui.new_project_poll_interval` | `2s` | interval at which the new project dialog reads the readiness of the binding (6.9) |
 | `ui.new_project_name_max_chars` | `40` | longest suggested and accepted name of a new project (6.9) |

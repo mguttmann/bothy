@@ -6,9 +6,11 @@
 // local-only table `recent_targets`, version 4 (M4-36) the local-only table `host_key_pins`,
 // version 5 (M5-08) the nullable column `instance.app_lock` and version 6 (M4-40) the local-only
 // tables `channel_view_states` and `shell_view_state` with the column `channels.project_bound`
-// and a cleared cursor, version 7 (M4-42) the column `shell_view_state.channel_column_hidden`
-// and version 8 (M4-45) the columns `shell_view_state.session_column_hidden` and
-// `text_thread_session_shown`; each keeps every row of the mirror. The preserved tables are checked by
+// and a cleared cursor, version 7 (M4-42) the column `shell_view_state.channel_column_hidden`,
+// version 8 (M4-45) the columns `shell_view_state.session_column_hidden` and
+// `text_thread_session_shown` and version 9 (M4-46) the column
+// `channel_view_states.posts_shown_in_full`; each keeps every row of the mirror. The preserved
+// tables are checked by
 // `survival_test.dart`.
 
 import 'package:drift/drift.dart';
@@ -25,6 +27,7 @@ import 'generated/schema_v5.dart' as v5;
 import 'generated/schema_v6.dart' as v6;
 import 'generated/schema_v7.dart' as v7;
 import 'generated/schema_v8.dart' as v8;
+import 'generated/schema_v9.dart' as v9;
 
 void main() {
   driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
@@ -280,6 +283,37 @@ void main() {
             channelColumnHidden: 1,
             sessionColumnHidden: 0,
             textThreadSessionShown: 0,
+          ),
+        ]);
+      },
+    );
+  });
+
+  test('the migration 8 to 9 keeps the collapsed groups and shows every forum '
+      'group with the limit', () async {
+    const rows = [
+      v8.ChannelViewStatesData(channelId: 'a', groupCollapsed: 1),
+      v8.ChannelViewStatesData(channelId: 'b', groupCollapsed: 0),
+    ];
+    await verifier.testWithDataIntegrity(
+      oldVersion: 8,
+      newVersion: 9,
+      createOld: v8.DatabaseAtV8.new,
+      createNew: v9.DatabaseAtV9.new,
+      openTestedDatabase: LocalDatabase.new,
+      createItems: (batch, oldDb) =>
+          batch.insertAll(oldDb.channelViewStates, rows),
+      validateItems: (newDb) async {
+        expect(await newDb.select(newDb.channelViewStates).get(), [
+          const v9.ChannelViewStatesData(
+            channelId: 'a',
+            groupCollapsed: 1,
+            postsShownInFull: 0,
+          ),
+          const v9.ChannelViewStatesData(
+            channelId: 'b',
+            groupCollapsed: 0,
+            postsShownInFull: 0,
           ),
         ]);
       },

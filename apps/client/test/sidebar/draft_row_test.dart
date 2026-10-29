@@ -3,7 +3,7 @@
 // The draft row "New chat" of a forum group in the desktop shell over the local database (brief
 // M4-41 Tests; 01 6.8 item 8; D-M4-41-4): it heads the forum's group while the new chat view is
 // open or a draft with text is stored, is selected while the view writes, and counts toward
-// neither the bound (`ui.sidebar_threads_per_channel`) nor the counters; a second "+" opens the
+// neither the limit (`ui.sidebar_forum_posts_visible`) nor the counters; a second "+" opens the
 // same draft; a sent post shows "Sending", a refused one "Not sent"; the row survives a
 // restart; a collapsed group shows none.
 
@@ -42,11 +42,11 @@ Finder threadRow(int n) =>
 Finder allPosts(Channel forum) =>
     find.byKey(ValueKey('sidebar.allPosts.${forum.id.value}'));
 
-/// The config of the tests with `ui.sidebar_threads_per_channel` [bound].
+/// The config of the tests with `ui.sidebar_forum_posts_visible` [bound].
 Override boundConfig(int bound) => appConfigProvider.overrideWithValue(
   AppConfig.defaults().withOverrides({
     ...fastConfig,
-    'ui.sidebar_threads_per_channel': '$bound',
+    'ui.sidebar_forum_posts_visible': '$bound',
   }),
 );
 
@@ -171,7 +171,7 @@ void main() {
     },
   );
 
-  testWidgets('the draft row counts toward neither the bound nor the counters', (
+  testWidgets('the draft row counts toward neither the limit nor the counters', (
     tester,
   ) async {
     final host = await pumpShell(
@@ -198,7 +198,7 @@ void main() {
       for (final n in [1, 2, 3, 4])
         if (threadRow(n).evaluate().isNotEmpty) n,
     ];
-    expect(shownBefore, hasLength(2), reason: 'the bound of 2');
+    expect(shownBefore, hasLength(2), reason: 'the limit of 2');
     final before = counters(tester, server);
     expect(before.allUnread + before.unread, greaterThan(0));
 
