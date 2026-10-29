@@ -12,6 +12,7 @@ import 'package:client/app/providers/target.dart';
 import 'package:client/app/target_resolver.dart';
 import 'package:client/keyboard/bindings.dart';
 import 'package:client/keyboard/intents.dart';
+import 'package:client/thread/providers.dart';
 import 'package:domain/domain.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -103,6 +104,19 @@ final Finder rail = find.byKey(const ValueKey('column.session.show'));
 String path(int n) => '/t/${threadId(n).value}';
 
 void main() {
+  test('two quick toggles of the session column restore it', () async {
+    final db = openInMemoryForTests(clock: () => t0);
+    addTearDown(db.close);
+    await Future.wait([
+      toggleSessionColumn(db, textThread: false),
+      toggleSessionColumn(db, textThread: false),
+    ]);
+    expect(
+      await db.forumViewDao.sessionColumnHidden(textThread: false),
+      isFalse,
+    );
+  });
+
   testWidgets('Hide session gives the thread the width, the rail brings the '
       'column back; the choice survives a restart', (tester) async {
     final db = await tester.runAsync(

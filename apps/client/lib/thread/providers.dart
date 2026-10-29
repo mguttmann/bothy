@@ -220,18 +220,21 @@ Stream<bool> sessionColumnHidden(Ref ref, {required bool textThread}) {
 
 /// Hides or shows the session column of the layout [textThread] names on this device (M4-45);
 /// [db] is the local database of `localDatabaseProvider`, and nothing happens without one.
+/// Read and write run in one transaction, so two quick presses cannot read the same value.
 Future<void> toggleSessionColumn(
   LocalDatabase? db, {
   required bool textThread,
 }) async {
   if (db == null) return;
-  final hidden = await db.forumViewDao.sessionColumnHidden(
-    textThread: textThread,
-  );
-  await db.forumViewDao.setSessionColumnHidden(
-    textThread: textThread,
-    hidden: !hidden,
-  );
+  await db.transaction(() async {
+    final hidden = await db.forumViewDao.sessionColumnHidden(
+      textThread: textThread,
+    );
+    await db.forumViewDao.setSessionColumnHidden(
+      textThread: textThread,
+      hidden: !hidden,
+    );
+  });
 }
 
 /// Shows the session column of the layout [textThread] names on this device ("Pin" and the
