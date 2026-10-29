@@ -105,8 +105,8 @@ people who could also be owners.
 | Services | `docker compose ps` | all `healthy` or `running`; `secrets-init`, `migrate` with exit 0 |
 | Readiness | `docker compose exec api bothy healthcheck --url http://127.0.0.1:8081/readyz` | exit 0 |
 | Secrets | output of `secrets-init` | fingerprints; escrow notice followed |
-| First backup | `docker compose exec backup bothy-backupd run --now full` | run `succeeded` in the admin console |
-| First restore test | `docker compose exec backup bothy-backupd run --now restore-test` | all checks green |
+| First backup | `docker compose exec backup bothy-backupd backup pg_full` (then `logical` and, with the driver `fs`, `objects`) | exit 0, `bothy-backupd: backup pg_full succeeded`; run `succeeded` in the admin console |
+| First restore test | `docker compose exec backup bothy-backupd restore-test` | exit 0, all checks green |
 | Status page | app, Status section | all components `operational` |
 
 ## 5. Edge

@@ -150,10 +150,11 @@ TS_ON := $(and $(TS_PROJECTS),$(or $(call want,sdk-typescript),$(call want,plugi
 TOOLS_ON := $(call area,tools)
 tools_skip = $(call skip,$(1),AREAS=$(AREAS) leaves the Python tools out (pre-push gate))
 # The tools tests that read source files of the components (the working name in every Go and
-# Dart file, the patience of the Go test helper, the Dart sources of bothy_noise): they run
-# also when AREAS leaves the Python tools out, because a component change alone can fail them.
+# Dart file, the patience of the Go test helper, the Dart sources of bothy_noise, the usage text
+# of bothy-backupd): they run also when AREAS leaves the Python tools out, because a component
+# change alone can fail them.
 TOOLS_SOURCE_TESTS := ci/tests/test_product_name_places.py docs/tests/test_config_values.py \
-  ci/tests/test_bothy_noise_package.py
+  ci/tests/test_bothy_noise_package.py docs/tests/test_backupd_commands.py
 
 .PHONY: help bootstrap bootstrap-ci check gates fmt fmt-check lint typecheck test coverage \
         sonar sonar-scan sonar-up sonar-down sonar-config sonar-config-check sonar-main-branch sonar-visibility sonar-new-code semgrep trivy osv gitleaks \

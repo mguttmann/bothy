@@ -175,8 +175,10 @@ restore of a production-sized database against `dr.rto_target`.
 2. `docker compose stop postgres`.
 3. Do not delete the old data directory but rename it (copy the volume) until the
    restore is verified.
-4. `docker compose run --rm backup bothy-backupd restore --target-time "<time>"` (calls
-   `pgbackrest restore` with `--delta` on the volume `pgdata`).
+4. `docker compose run --rm --no-deps postgres pgbackrest --stanza=bothy restore --delta
+   --type=time "--target=<time>" --target-action=promote` (the entry point of `bothy-postgres`
+   runs `pgbackrest ...` as the database host on the volume `pgdata`; `backup` keeps running as
+   the repository host). For the latest state use `--type=default` without `--target`.
 5. `docker compose start postgres`; PostgreSQL replays WAL up to the target and begins a new
    timeline.
 6. `docker compose run --rm restore` (the service of the profile `restore` runs
