@@ -203,3 +203,11 @@ def test_provision_keys(tmp_path: Path) -> None:
     )
     with pytest.raises(ConfigError, match="git_bin"):
         load_config(write(tmp_path, 'git_bin = "-x"\n'))
+
+
+def test_project_folders_max(tmp_path: Path) -> None:
+    """``runner.project_folders_max`` (09 18.13, M4-44): default 500, at least 1."""
+    assert load_config(write(tmp_path)).project_folders_max == 500
+    assert load_config(write(tmp_path, "project_folders_max = 3\n")).project_folders_max == 3
+    with pytest.raises(ConfigError, match="project_folders_max"):
+        load_config(write(tmp_path, "project_folders_max = 0\n"))

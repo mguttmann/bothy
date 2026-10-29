@@ -91,7 +91,7 @@ from claude_code_runner.secrets import SecretError, resolve
 from claude_code_runner.statedir import ensure_private_dir, sweep
 from claude_code_runner.stop import stop_group
 from claude_code_runner.turn import remove_turn_record
-from claude_code_runner.workspace import WorkspaceError, readiness
+from claude_code_runner.workspace import WorkspaceError, project_folders, readiness
 from claude_code_runner.workspace import resolve as resolve_workspace
 
 __all__ = ["Runner", "RunnerHandler", "StartError", "log", "warn"]
@@ -188,7 +188,10 @@ class RunnerHandler(AgentHandler):
         """The run-time heartbeat members; a new version probe starts in the background."""
         self._probe_soon()
         cache = self.channels
-        status = runtime_status(self.probe, cache.readiness() if cache else [], self._modes)
+        folders = project_folders(self.config.projects_root, self.config.project_folders_max)
+        status = runtime_status(
+            self.probe, cache.readiness() if cache else [], self._modes, folders
+        )
         return dataclasses.replace(status, active_runs=sorted(self.adopted, key=str))
 
     async def on_provisioned(self) -> None:

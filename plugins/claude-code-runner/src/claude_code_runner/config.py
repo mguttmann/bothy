@@ -136,6 +136,8 @@ class RunnerConfig:
         provision_timeout: ``runner.provision_timeout``: time limit of one folder creation.
         provision_retry_after: ``runner.provision_retry_after``: a failed creation is not tried
             again for the same binding content before this time.
+        project_folders_max: ``runner.project_folders_max``: most folder names the heartbeat
+            reports in ``project_folders`` (09 18.13, M4-44); at least 1.
     """
 
     source: Path
@@ -168,6 +170,7 @@ class RunnerConfig:
     git_bin: str = "git"
     provision_timeout: float = 600.0
     provision_retry_after: float = 300.0
+    project_folders_max: int = 500
 
 
 _Parse = Callable[[Any], Any]
@@ -296,6 +299,14 @@ def _sdk(file: Path, adapter: _Reader, agent: _Reader, sdk: _Reader) -> SdkSetti
         raise ConfigError("sdk", file, "invalid SDK value") from None
 
 
+def _at_least_one(r: _Reader, name: str, default: int) -> int:
+    """The integer key ``name`` of ``r``, refused below 1."""
+    value = r.get(name, int, default)
+    if value < 1:
+        raise r.fail(name, "must be at least 1")
+    return int(value)
+
+
 def load_config(path: Path) -> RunnerConfig:
     """Load and check the configuration file.
 
@@ -343,9 +354,8 @@ def load_config(path: Path) -> RunnerConfig:
     default_model = r.get("default_model", str, required=True)
     if not check_argument(default_model):
         raise r.fail("default_model", "empty, starts with - or has controls")
-    max_parallel = r.get("max_parallel_runs", int, 4)
-    if max_parallel < 1:
-        raise r.fail("max_parallel_runs", "must be at least 1")
+    folders_max = _at_least_one(r, "project_folders_max", 500)
+    max_parallel = _at_least_one(r, "max_parallel_runs", 4)
     claude_bin = r.get("claude_bin", str, "claude")
     if not claude_bin:
         raise r.fail("claude_bin", "must not be empty")
@@ -387,6 +397,7 @@ def load_config(path: Path) -> RunnerConfig:
         git_bin=git_bin,
         provision_timeout=r.duration("provision_timeout", "10m"),
         provision_retry_after=r.duration("provision_retry_after", "5m"),
+        project_folders_max=folders_max,
     )
     r.unknown()
     return config
