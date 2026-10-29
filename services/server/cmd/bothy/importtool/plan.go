@@ -170,42 +170,55 @@ type plan struct {
 	notes    []string
 }
 
-// sortKey returns the fractional index key of position i (0 based) in Discord order: an integer
-// part of the base-62 scheme of chat (head letter a with one digit, b with two, c with three), so
-// the byte order of the keys is the order of i.
-func sortKey(i int) string {
-	const digits = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
-	n := len(digits)
-	switch {
-	case i < n:
-		return "a" + string(digits[i])
-	case i < n*n:
-		return "b" + string(digits[i/n]) + string(digits[i%n])
-	default:
-		i = min(i, n*n*n-1)
-		return "c" + string(digits[i/(n*n)]) + string(digits[(i/n)%n]) + string(digits[i%n])
+// buildStructure decides every category and channel of the guild under the mapping (22 5.1) and
+// gives each its sort key after the last key of pl: the spaces one block in Discord order, the
+// channels one block per target category in Discord order.
+func buildStructure(gs *guildState, m *Mapping, pl placement) (*plan, error) {
+	p := &plan{byID: map[string]*channelPlan{}, threadOf: map[string]*channelPlan{}, skipped: map[string]int{}}
+	if err := p.addSpaces(gs, m, pl.lastSpace); err != nil {
+		return nil, err
 	}
+	if err := p.addChannels(gs, m, pl.lastChannel); err != nil {
+		return nil, err
+	}
+	return p, nil
 }
 
-// buildStructure decides every category and channel of the guild under the mapping (22 5.1).
-func buildStructure(gs *guildState, m *Mapping) *plan {
-	p := &plan{byID: map[string]*channelPlan{}, threadOf: map[string]*channelPlan{}, skipped: map[string]int{}}
-	si, ci := 0, 0
+// addSpaces plans the mapped categories in Discord order with keys after last.
+func (p *plan) addSpaces(gs *guildState, m *Mapping, last string) error {
+	keys := keySeq{last: last}
 	for _, c := range gs.channels {
 		if c.Type != typeCategory {
 			continue
 		}
 		if e := m.Space(c.ID); e != nil {
-			p.spaces = append(p.spaces, spacePlan{cat: c, entry: e, sortKey: sortKey(si)})
-			si++
+			k, err := keys.next()
+			if err != nil {
+				return err
+			}
+			p.spaces = append(p.spaces, spacePlan{cat: c, entry: e, sortKey: k})
 		}
 	}
+	return nil
+}
+
+// addChannels decides every channel in Discord order; its key follows the last key of its target
+// category (lastChannel, or none for a space the run creates).
+func (p *plan) addChannels(gs *guildState, m *Mapping, lastChannel map[string]string) error {
+	blocks := map[string]*keySeq{}
 	for _, c := range gs.channels {
 		if c.Type == typeCategory {
 			continue
 		}
-		cp := &channelPlan{ch: c, entry: m.Channel(c.ID), sortKey: sortKey(ci), rep: &channelReport{}}
-		ci++
+		category := categoryOf(gs, m, c.ID)
+		if blocks[category] == nil {
+			blocks[category] = &keySeq{last: lastChannel[category]}
+		}
+		k, err := blocks[category].next()
+		if err != nil {
+			return err
+		}
+		cp := &channelPlan{ch: c, entry: m.Channel(c.ID), sortKey: k, rep: &channelReport{}}
 		cp.decide(m)
 		p.channels = append(p.channels, cp)
 		p.byID[c.ID] = cp
@@ -216,7 +229,7 @@ func buildStructure(gs *guildState, m *Mapping) *plan {
 			cp.rep.notes = append(cp.rep.notes, notePermissions)
 		}
 	}
-	return p
+	return nil
 }
 
 // decide sets the kind, the space and the skip reason of a channel.

@@ -181,7 +181,12 @@ Rules:
    owner sets grants deliberately.
 3. New channels are read-only in the read mirror (section 12.1). Only the switch-over sets the
    operator (section 13.3).
-4. Order: spaces and channels in Discord order (`position`), as `sort_key`.
+4. Order: spaces and channels in Discord order (`position`), as `sort_key`. The new spaces follow
+   the last `sort_key` of the spaces of the target instance as one block; the new channels of a
+   target space that already exists follow its last channel as one block. A key is the next
+   integer key of the fractional index after the previous one
+   ([03-data-model.md](03-data-model.md), principle 5). An item that is already posted keeps its
+   key, so a later run never reorders what an earlier run placed.
 
 #### 5.1.1 Threads
 

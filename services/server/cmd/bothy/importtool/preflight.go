@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"slices"
 	"strings"
 
 	"github.com/OWNER/bothy/services/server/api/restclient"
@@ -37,6 +36,7 @@ type session struct {
 	agents map[string]person
 	limits restclient.InstanceLimits
 	source *restclient.ImportSource
+	place  placement // where the new spaces and channels of the run go (22 5.1 rule 4)
 }
 
 // preflightDiscord runs steps 1 to 3 of 22 4.4 against Discord: a bot token, the server and every
@@ -165,7 +165,7 @@ func countFilled(page []discord.Message, botID string, limit int) (int, bool) {
 // preflightBothy runs steps 4 to 6 of 22 4.4 against the server: an active owner, every mapped person,
 // agent and planned operator active, and no name of a new space or channel taken by an object
 // the import did not create. It also finds the source of the guild (none, or exactly one that is
-// not completed or failed).
+// not completed or failed) and reads the last sort keys the new spaces and channels follow.
 func preflightBothy(ctx context.Context, r bothyReads, m *Mapping, gs *guildState) (*session, error) {
 	me, err := meOf(ctx, r.api)
 	if err != nil {
@@ -190,7 +190,11 @@ func preflightBothy(ctx context.Context, r bothyReads, m *Mapping, gs *guildStat
 	if s.source, err = findSource(ctx, r, m.GuildID); err != nil {
 		return nil, err
 	}
-	if err := checkCollisions(ctx, r, m, gs, s.source); err != nil {
+	c, err := checkCollisions(ctx, r, m, gs, s.source)
+	if err != nil {
+		return nil, err
+	}
+	if s.place, err = c.placementOf(ctx); err != nil {
 		return nil, err
 	}
 	return s, nil
@@ -288,19 +292,22 @@ type collisions struct {
 	ours   map[restclient.Uuid]bool
 	posted map[string]restclient.Uuid
 	spaces []restclient.Space
+	chans  map[restclient.Uuid][]restclient.Channel
 	names  map[restclient.Uuid]map[string]bool
 }
 
 // checkCollisions is step 6 of 22 4.4 (22 5.1 rule 1): a create name equal (without regard to
 // case, like the unique indexes of spaces and channels) to the name of a live space, or of a live
 // channel in the target space, that is not the target of a posted item of this source ends the run
-// before the first write; so does a name the mapping creates twice in one place.
-func checkCollisions(ctx context.Context, r bothyReads, m *Mapping, gs *guildState, src *restclient.ImportSource) error {
-	c := &collisions{r: r, m: m, gs: gs, ours: map[restclient.Uuid]bool{}, posted: map[string]restclient.Uuid{}, names: map[restclient.Uuid]map[string]bool{}}
+// before the first write; so does a name the mapping creates twice in one place. It returns the
+// reads for placementOf.
+func checkCollisions(ctx context.Context, r bothyReads, m *Mapping, gs *guildState, src *restclient.ImportSource) (*collisions, error) {
+	c := &collisions{r: r, m: m, gs: gs, ours: map[restclient.Uuid]bool{}, posted: map[string]restclient.Uuid{},
+		chans: map[restclient.Uuid][]restclient.Channel{}, names: map[restclient.Uuid]map[string]bool{}}
 	if src != nil {
 		items, err := r.posted(ctx, src.Id)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		for key, it := range items {
 			if it.TargetId != nil {
@@ -311,12 +318,12 @@ func checkCollisions(ctx context.Context, r bothyReads, m *Mapping, gs *guildSta
 	}
 	var err error
 	if c.spaces, err = r.spaces(ctx); err != nil {
-		return err
+		return nil, err
 	}
 	if err := c.spaceNames(); err != nil {
-		return err
+		return nil, err
 	}
-	return c.channelNames(ctx)
+	return c, c.channelNames(ctx)
 }
 
 // spaceNames checks the create names of the spaces.
@@ -373,12 +380,12 @@ func (c *collisions) channelTaken(ctx context.Context, e ChannelEntry, category,
 	if _, done := c.posted[keyChannel+e.Channel]; done {
 		return false, nil
 	}
-	space, ok := targetSpace(c.m, category, c.posted)
-	if !ok || !slices.ContainsFunc(c.spaces, func(s restclient.Space) bool { return s.Id == space }) {
+	space, ok := c.liveTarget(category)
+	if !ok {
 		return false, nil
 	}
 	if c.names[space] == nil {
-		chans, err := c.r.channels(ctx, space)
+		chans, err := c.liveChannels(ctx, space)
 		if err != nil {
 			return false, err
 		}

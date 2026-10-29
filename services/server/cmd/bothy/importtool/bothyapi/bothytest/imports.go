@@ -302,6 +302,47 @@ func (s *Server) AddChannel(spaceID, name string) string {
 	return ch.id
 }
 
+// Placed is a space or channel of the fake with its global sort key.
+type Placed struct {
+	ID, Name, SortKey string
+}
+
+// SetSpaceSortKey sets the global sort key of a space, for a server whose order was changed.
+func (s *Server) SetSpaceSortKey(spaceID, key string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if sp := s.imp.space(spaceID); sp != nil {
+		sp.sortKey = key
+	}
+}
+
+// Spaces returns every space with its sort key in insertion order.
+func (s *Server) Spaces() []Placed {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]Placed, 0, len(s.imp.spaces))
+	for _, sp := range s.imp.spaces {
+		out = append(out, Placed{ID: sp.id, Name: sp.name, SortKey: sp.sortKey})
+	}
+	return out
+}
+
+// Channels returns the channels of a space with their sort keys in insertion order; nil for an
+// unknown space.
+func (s *Server) Channels(spaceID string) []Placed {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	sp := s.imp.space(spaceID)
+	if sp == nil {
+		return nil
+	}
+	out := make([]Placed, 0, len(sp.channels))
+	for _, ch := range sp.channels {
+		out = append(out, Placed{ID: ch.id, Name: ch.name, SortKey: ch.sortKey})
+	}
+	return out
+}
+
 // AddSource adds a source of kind discord named "Example import" in state (draft, running,
 // paused, completed or failed) with config as its stored mapping and returns its UUID. Pass the
 // normalized JSON form the server stores (domain.Mapping.JSON): the fake stores it as given.
