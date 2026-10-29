@@ -48,4 +48,7 @@ class MessageEvent:
         metadata: dict[str, Any] = ...,
         timestamp: Any = ...,
         allow_gateway_control: bool = ...,
+        reply_expected: bool | None = ...,
+        inherit_channel_pin: bool = ...,
+        edit_revision: str | None = ...,
     ) -> None: ...

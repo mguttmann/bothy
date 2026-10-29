@@ -11,6 +11,7 @@ from __future__ import annotations
 import pytest
 from hermes_harness.calls import RECORD_HINT, compare_patterns
 from hermes_harness.fixtures import OBSERVATIONS, RecordingRun, load_fixture
+from hermes_harness.gateway import unexpected_listeners
 from hermes_harness.pin import PIN_FILE, load_pin
 from hermes_harness.provision import REPO_ROOT
 from hermes_harness.scenarios import load_scenarios
@@ -42,7 +43,11 @@ def test_observations_match_the_fixture(recording: RecordingRun) -> None:
 
 
 def test_hermes_opened_no_listener(recording: RecordingRun) -> None:
-    listeners = {name: r.listeners for name, r in recording.results.items() if r.listeners}
+    listeners = {
+        name: unexpected_listeners(r.listeners)
+        for name, r in recording.results.items()
+        if unexpected_listeners(r.listeners)
+    }
     assert listeners == {}
     assert all(any(c["method"] == "connect" for c in r.calls) for r in recording.results.values())
 

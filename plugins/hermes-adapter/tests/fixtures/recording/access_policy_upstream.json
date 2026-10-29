@@ -1,0 +1,333 @@
+{
+  "calls": [
+    {
+      "args": {
+        "extra_keys": [
+          "authorization_is_upstream",
+          "command_poll_s",
+          "dm_policy",
+          "enforces_own_access_policy",
+          "group_sessions_per_user",
+          "supports_draft_streaming",
+          "supports_status_text",
+          "thread_sessions_per_user"
+        ],
+        "is_reconnect": false
+      },
+      "method": "connect"
+    },
+    {
+      "args": {
+        "event": {
+          "chat_id": "<id:2>",
+          "message_id": "<id:1>",
+          "text": "Please plan the trip to the lake.",
+          "thread_id": "<id:3>",
+          "type": "MessageEvent",
+          "user_id": "u-robin"
+        }
+      },
+      "method": "on_processing_start"
+    },
+    {
+      "args": {
+        "value": true
+      },
+      "method": "read:authorization_is_upstream"
+    },
+    {
+      "args": {
+        "value": true
+      },
+      "method": "read:authorization_is_upstream"
+    },
+    {
+      "args": {
+        "value": true
+      },
+      "method": "read:authorization_is_upstream"
+    },
+    {
+      "args": {
+        "value": true
+      },
+      "method": "read:authorization_is_upstream"
+    },
+    {
+      "args": {
+        "value": true
+      },
+      "method": "read:authorization_is_upstream"
+    },
+    {
+      "args": {
+        "value": true
+      },
+      "method": "read:authorization_is_upstream"
+    },
+    {
+      "args": {
+        "is_first_turn": null,
+        "kwargs": [
+          "model",
+          "platform",
+          "session_id",
+          "telemetry_schema_version"
+        ],
+        "session_id": "<id:4>",
+        "user_message": null
+      },
+      "method": "hook:on_session_start"
+    },
+    {
+      "args": {
+        "is_first_turn": true,
+        "kwargs": [
+          "conversation_history",
+          "is_first_turn",
+          "model",
+          "parent_session_id",
+          "platform",
+          "sender_id",
+          "session_id",
+          "task_id",
+          "telemetry_schema_version",
+          "turn_id",
+          "user_message"
+        ],
+        "session_id": "<id:4>",
+        "user_message": "sha256:62b2cc6fe9d5219715af63d3463df1c19f5e127b91d314562c91b2aa7bbd7d95:41"
+      },
+      "method": "hook:pre_llm_call"
+    },
+    {
+      "args": {
+        "chat_id": "<id:2>",
+        "content": "<partial>",
+        "draft_id": "<id:5>",
+        "metadata": {
+          "reply_to_message_id": "<id:1>",
+          "thread_id": "<id:3>"
+        }
+      },
+      "method": "send_draft"
+    },
+    {
+      "args": {
+        "chat_id": "<id:2>",
+        "content": "<partial>",
+        "draft_id": "<id:5>",
+        "metadata": {
+          "reply_to_message_id": "<id:1>",
+          "thread_id": "<id:3>"
+        }
+      },
+      "method": "send_draft"
+    },
+    {
+      "args": {
+        "chat_id": "<id:2>",
+        "content": "The trip to the lake is planned for Saturday morning.",
+        "draft_id": "<id:5>",
+        "metadata": {
+          "reply_to_message_id": "<id:1>",
+          "thread_id": "<id:3>"
+        }
+      },
+      "method": "send_draft"
+    },
+    {
+      "args": {
+        "is_first_turn": null,
+        "kwargs": [
+          "completed",
+          "failed",
+          "interrupted",
+          "model",
+          "platform",
+          "session_id",
+          "task_id",
+          "telemetry_schema_version",
+          "turn_exit_reason",
+          "turn_id"
+        ],
+        "session_id": "<id:4>",
+        "user_message": null
+      },
+      "method": "hook:on_session_end"
+    },
+    {
+      "args": {
+        "chat_id": "<id:2>",
+        "content": "The trip to the lake is planned for Saturday morning.",
+        "message_id": "<id:6>",
+        "metadata": {
+          "notify": true,
+          "reply_to_message_id": "<id:1>",
+          "thread_id": "<id:3>"
+        },
+        "reply_to": "<id:1>"
+      },
+      "method": "send"
+    },
+    {
+      "args": {
+        "event": {
+          "chat_id": "<id:2>",
+          "message_id": "<id:1>",
+          "text": "Please plan the trip to the lake.",
+          "thread_id": "<id:3>",
+          "type": "MessageEvent",
+          "user_id": "u-robin"
+        },
+        "outcome": {
+          "enum": "ProcessingOutcome",
+          "value": "success"
+        }
+      },
+      "method": "on_processing_complete"
+    }
+  ],
+  "inputs_sha256": "951e586ff37ce048d2812b708412ebeb1b44b674f09786131c2d01801b6f2bb2",
+  "model_requests": [
+    {
+      "credential": "none",
+      "route": "openai.models",
+      "scripted": false
+    },
+    {
+      "completed": true,
+      "credential": "none",
+      "model": "fake-model",
+      "other_texts": [
+        "sha256:56e1ceee2ca1be660b79faea2589cac26aebc134202a07b7fa2a025516c75e2f:5105",
+        "sha256:62b2cc6fe9d5219715af63d3463df1c19f5e127b91d314562c91b2aa7bbd7d95:41"
+      ],
+      "roles": [
+        "system",
+        "user"
+      ],
+      "route": "openai.chat",
+      "scenario_texts": [
+        "Please plan the trip to the lake."
+      ],
+      "scripted": true,
+      "stream": true,
+      "tool_call_ids": [],
+      "tools": [
+        "todo_list"
+      ],
+      "turn": 1
+    },
+    {
+      "credential": "none",
+      "route": "openai.models",
+      "scripted": false
+    },
+    {
+      "completed": true,
+      "credential": "none",
+      "model": "fake-model",
+      "other_texts": [
+        "sha256:3f1eef0616ddd2c13d45a3f8cef4ed648dadfdacdba7fbedceebf5a04d549998:942"
+      ],
+      "roles": [
+        "system",
+        "user"
+      ],
+      "route": "openai.chat",
+      "scenario_texts": [
+        "Please plan the trip to the lake."
+      ],
+      "scripted": false,
+      "stream": false,
+      "tool_call_ids": [],
+      "tools": [],
+      "turn": null
+    },
+    {
+      "credential": "none",
+      "route": "openai.models",
+      "scripted": false
+    }
+  ],
+  "pattern": [
+    {
+      "args": {
+        "extra_keys": [
+          "authorization_is_upstream",
+          "command_poll_s",
+          "dm_policy",
+          "enforces_own_access_policy",
+          "group_sessions_per_user",
+          "supports_draft_streaming",
+          "supports_status_text",
+          "thread_sessions_per_user"
+        ],
+        "is_reconnect": false
+      },
+      "method": "connect"
+    },
+    {
+      "args": {
+        "event": {
+          "chat_id": "<id:1>",
+          "message_id": "<id:2>",
+          "text": "Please plan the trip to the lake.",
+          "thread_id": "<id:3>",
+          "type": "MessageEvent",
+          "user_id": "u-robin"
+        }
+      },
+      "method": "on_processing_start"
+    },
+    {
+      "args": {
+        "chat_id": "<id:1>",
+        "content": "The trip to the lake is planned for Saturday morning.",
+        "draft_id": "<id:4>",
+        "metadata": {
+          "reply_to_message_id": "<id:2>",
+          "thread_id": "<id:3>"
+        }
+      },
+      "method": "send_draft"
+    },
+    {
+      "args": {
+        "chat_id": "<id:1>",
+        "content": "The trip to the lake is planned for Saturday morning.",
+        "message_id": "<id:5>",
+        "metadata": {
+          "notify": true,
+          "reply_to_message_id": "<id:2>",
+          "thread_id": "<id:3>"
+        },
+        "reply_to": "<id:2>"
+      },
+      "method": "send"
+    },
+    {
+      "args": {
+        "event": {
+          "chat_id": "<id:1>",
+          "message_id": "<id:2>",
+          "text": "Please plan the trip to the lake.",
+          "thread_id": "<id:3>",
+          "type": "MessageEvent",
+          "user_id": "u-robin"
+        },
+        "outcome": {
+          "enum": "ProcessingOutcome",
+          "value": "success"
+        }
+      },
+      "method": "on_processing_complete"
+    }
+  ],
+  "pin": {
+    "commit": "bf0203a794a07aac3ff764972ab9087baa4e4f4e",
+    "tag": "v0.22.5"
+  },
+  "scenario": "access_policy_upstream"
+}

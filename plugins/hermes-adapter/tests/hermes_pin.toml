@@ -2,12 +2,14 @@
 #
 # Pinned Hermes Agent version of the recording (docs/spec/09-agenten.md 17.1 and 17.10).
 # Rule (docs/DECISIONS.md D-M2-32): the newest release tag of the public repository that is
-# older than deps.min_release_age on the recording day, resolved with `git ls-remote`.
+# older than deps.min_release_age on the recording day, resolved with `git ls-remote`
+# (release tags are versions such as v0.22.5 since October 2026, D-HERMES-COMPAT-1). The
+# Python is one that Hermes' own lock installs; v0.22 locks only 3.14 (D-HERMES-COMPAT-2).
 # Renovate proposes newer tags; then record again with `make -C plugins/hermes-adapter record`.
 repository = "https://github.com/NousResearch/hermes-agent"
-tag = "v2026.9.24"
-commit = "f97608f178d1ffeca59860195ab7da295f7c8e5f"
-python = "3.13"
+tag = "v0.22.5"
+commit = "bf0203a794a07aac3ff764972ab9087baa4e4f4e"
+python = "3.14"
 install = "uv-lock"
 extras = ["anthropic"]
-recorded_on = 2026-10-12
+recorded_on = 2026-10-29

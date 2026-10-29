@@ -64,9 +64,13 @@ PLATFORM_KEY = "bothy"
 #: Distributions the adapter adds to the Hermes environment (11 11.3): nothing else may change.
 ADDED = ("attrs", "coverage")
 #: Gateway starts before a run gives up: Hermes' fixed wait for its plugin discovery can end
-#: before the adapter's platform is registered on a loaded machine (D-M2-33-14).
-_START_ATTEMPTS = 3
+#: before the adapter's platform is registered on a loaded machine, and Hermes v0.22 exits more
+#: often with an import error of its own modules at start (D-M2-33-14, D-HERMES-COMPAT-7).
+_START_ATTEMPTS = 5
 _NO_PLATFORM = "No messaging platforms enabled."
+#: The first number of a date tag of Hermes (``v2026.9.24``) is a year; a version tag's
+#: (``v0.22.5``) is a major version far below it.
+_FIRST_CALENDAR_YEAR = 2000
 _CREDENTIAL_NAMES = {"anthropic_api_key": "ANTHROPIC_API_KEY", "anthropic_oauth": "ANTHROPIC_TOKEN"}
 
 
@@ -110,6 +114,8 @@ def _freeze(python: Path) -> dict[str, str]:
 def newest_release(pin: HermesPin) -> HermesPin:
     """The newest release tag of the pinned repository (``--hermes-version=latest``, 09 17.1).
 
+    A release tag is ``v`` and dot-separated numbers only: release candidates
+    (``rc.1-v0.22.5``), canaries (``v0.22.5+canary.<stamp>``) and other refs never count.
     An unpinned download: a manual switch, never part of ``make check``.
     """
     git = shutil.which("git")
@@ -132,9 +138,14 @@ def newest_release(pin: HermesPin) -> HermesPin:
             commits.setdefault(tag, commit)
     tags = []
     for tag, commit in commits.items():
-        numbers = tag.lstrip("v").split(".")
+        numbers = tag.removeprefix("v").split(".")
         if all(n.isdigit() for n in numbers):
-            tags.append((tuple(int(n) for n in numbers), tag, commit))
+            version = tuple(int(n) for n in numbers)
+            # Hermes tagged its releases by date (v2026.9.24) until September 2026 and by
+            # version since then (v0.22.5, D-HERMES-COMPAT-1): every version tag is newer than
+            # every date tag, so the scheme ranks first and the numbers only within it.
+            scheme = 0 if version[0] >= _FIRST_CALENDAR_YEAR else 1
+            tags.append(((scheme, version), tag, commit))
     if not tags:
         raise AssertionError("no release tag found")
     _, tag, commit = max(tags)

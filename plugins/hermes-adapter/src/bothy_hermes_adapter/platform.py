@@ -114,6 +114,11 @@ class ServerPlatform(BasePlatformAdapter):
             self.config_error = str(exc)
         if self.settings is not None:
             self.MAX_MESSAGE_LENGTH = self.settings.max_message_bytes
+        # Hermes's own allow list of the platform (09 17.7 layer 3, the name entry.py registers):
+        # written only by `switch-mode personal`, which needs a gateway restart anyway.
+        self._hermes_allow_list = hermes_config.env_defines(
+            Path(get_hermes_home()), f"{platform_key.upper()}_ALLOWED_USERS"
+        )
         self._loop: asyncio.AbstractEventLoop | None = None
         self._serve_task: asyncio.Task[Any] | None = None
         self._sdk: HermesAdapterLoop | None = None
@@ -122,6 +127,9 @@ class ServerPlatform(BasePlatformAdapter):
         self._sources: dict[uuid.UUID, tuple[str, str, str]] = {}
         self._sessions: dict[uuid.UUID, str] = {}
         self._parents: dict[uuid.UUID, str] = {}
+        # Session ID to the thread whose turn ran on it in this process (09 17.4): Hermes v0.22
+        # keeps such a session live on that thread's route until the gateway restarts.
+        self._ran_here: dict[str, uuid.UUID] = {}
         self._control: dict[uuid.UUID, int] = {}
         self._confirms: set[asyncio.Task[Any]] = set()
         self._store: CallbackStore | None = None
@@ -132,6 +140,17 @@ class ServerPlatform(BasePlatformAdapter):
     def enforces_own_access_policy(self) -> bool:
         """The adapter enforces its own access policy (09 17.7 layer 2)."""
         return True
+
+    @property
+    def authorization_is_upstream(self) -> bool:
+        """The server authorized the person and the adapter checked its token (09 17.7).
+
+        Hermes v0.22 checks every message again at admission and trusts an own access policy
+        there only through this declaration. It holds only while Hermes has no allow list of
+        its own for the platform: with the list of ``personal`` (layer 3) Hermes keeps judging
+        each person by it.
+        """
+        return not self._hermes_allow_list
 
     async def connect(self, *, is_reconnect: bool = False) -> bool:
         """Connect as the agent and start the SDK loop (09 17.3).
@@ -336,6 +355,7 @@ class ServerPlatform(BasePlatformAdapter):
                 await self.handle_message(event)
                 return TurnOutcome.COMPLETED
             outcome = await self._dispatch(event)
+            await self._command_settled(event)
             while self._confirms:
                 await asyncio.gather(*list(self._confirms), return_exceptions=True)
             return outcome
@@ -343,6 +363,17 @@ class ServerPlatform(BasePlatformAdapter):
             self._control[thread_id] -= 1
             if self._control[thread_id] <= 0:
                 del self._control[thread_id]
+
+    async def _command_settled(self, event: MessageEvent) -> None:
+        """Wait until Hermes has finished processing a command, not only reported it.
+
+        Hermes v0.22 calls `on_processing_complete` of a command before its processing task
+        ends; a turn sent in that gap on the same session key runs but never completes
+        (measured after ``/resume``, 09 17.4).
+        """
+        task = self._session_tasks.get(self._event_session_key(event))
+        if task is not None and not task.done() and task is not asyncio.current_task():
+            await asyncio.wait({task})
 
     async def resolve_callback(
         self, card: OpenCard, custom_id: str, values: Mapping[str, Any], operator: uuid.UUID
@@ -379,6 +410,12 @@ class ServerPlatform(BasePlatformAdapter):
         if self._sessions.get(thread_id) is not None:
             await self._control_command(thread_id, "/new")
         if mode != "bind" or not external_session_ref:
+            return SessionSwitch.NEW
+        holder = self._ran_here.get(external_session_ref)
+        if holder is not None and holder != thread_id:
+            # Hermes does not move it off the other thread's live route, and the turn of this
+            # thread stalls on it (an admission conflict): fail open with the new session (9.5).
+            _LOG.info("bind refused: the session is live in another thread until a restart")
             return SessionSwitch.NEW
         await self._control_command(thread_id, f"/resume {external_session_ref} --all")
         return SessionSwitch.BOUND
@@ -662,6 +699,7 @@ class ServerPlatform(BasePlatformAdapter):
             session_id = kwargs.get("session_id")
             if session_id:
                 self._sessions[thread] = str(session_id)
+                self._ran_here[str(session_id)] = thread
                 parent = kwargs.get("parent_session_id")
                 if parent:
                     self._parents[thread] = str(parent)

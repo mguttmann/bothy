@@ -55,10 +55,11 @@
       ]
     },
     {
-      "description": "Hermes Agent version of the recording harness (plugins/hermes-adapter/tests/hermes_pin.toml): the recording test fails until the fixtures are recorded again, on purpose",
+      "description": "Hermes Agent version of the recording harness (plugins/hermes-adapter/tests/hermes_pin.toml): the recording test fails until the fixtures are recorded again, on purpose; the date tags before v0.22 (v2026.9.24) are older releases, never an update (D-HERMES-COMPAT-1)",
       "matchManagers": ["custom.regex"],
       "matchFileNames": ["plugins/hermes-adapter/tests/hermes_pin.toml"],
       "groupName": "Hermes Agent recording pin",
+      "allowedVersions": "<2000",
       "prBodyNotes": [
         "Record again before merging: `make -C plugins/hermes-adapter record` (it also regenerates `tests/hermes_requirements.txt` when the pinned commit has no `uv.lock`), review the fixture diff in `plugins/hermes-adapter/tests/fixtures/recording/`, set `recorded_on`, and update docs/spec/09-agents.md 17.10 (and every section an adapted point names)."
       ]

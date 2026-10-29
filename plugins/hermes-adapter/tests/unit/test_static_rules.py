@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import ast
+import tomllib
 from pathlib import Path
 
 from hermes_modules import HERMES_TOP_LEVEL
@@ -66,3 +67,14 @@ def test_every_module_carries_the_spdx_header() -> None:
     for path in [*_modules(), *sorted((COMPONENT / "typings").rglob("*.pyi"))]:
         first = path.read_text(encoding="utf-8").splitlines()[0]
         assert first == "# SPDX-License-Identifier: Apache-2.0", path.name
+
+
+def test_one_oldest_python_everywhere() -> None:
+    # The oldest Python the adapter admits is the one its checks target and the one its own
+    # tests run on (.python-version: the CI's uv picks it). The Fake-Hermes tests run the
+    # adapter in the Python of the pinned Hermes environment (hermes_pin.toml).
+    data = tomllib.loads((COMPONENT / "pyproject.toml").read_text(encoding="utf-8"))
+    oldest = data["project"]["requires-python"].removeprefix(">=")
+    assert data["tool"]["ruff"]["target-version"] == "py" + oldest.replace(".", "")
+    assert data["tool"]["mypy"]["python_version"] == oldest
+    assert (COMPONENT / ".python-version").read_text(encoding="utf-8").strip() == oldest

@@ -44,6 +44,9 @@ installation.
 
 ## Installation into a Hermes profile
 
+The adapter runs on Python 3.11 and newer, in the Python of the profile's gateway; it is tested
+against Hermes Agent `v0.22.5` (the pin, on Python 3.14, the only Python its lock installs).
+
 Neither this component nor the SDK is packaged before the release chain (M7). Until then make
 `sdk/python/src` and `plugins/hermes-adapter/src` importable in the Python that runs the
 profile's gateway (for example with a `.pth` file in its `site-packages`) and install `attrs`
@@ -113,8 +116,11 @@ connects only after Hermes finished its startup restore.
   the stub contract, the toolset table and the unchanged pin. They need the network for the
   pinned downloads and fail without it; they never skip.
 - Not proven: the newest Hermes release (`pytest --hermes-version=latest` is a manual switch with
-  an unpinned download, never part of `make check`), the adapter against the real server, other
-  credential resolutions than the tested ones, the effect of the markers on a real model.
+  an unpinned download, never part of `make check`; it takes the highest version tag and ranks
+  every version tag above the date tags Hermes used before `v0.22`), the adapter against the real
+  server, Hermes releases older than the pin (the adapter declares surfaces of `v0.22` that older
+  releases ignore, but no test runs them), other credential resolutions than the tested ones, the
+  effect of the markers on a real model.
 
 ## The pin and its update
 
@@ -131,8 +137,10 @@ cumulative drafts through `send_draft`; `steer` only through the global key and 
 public surface for the credential type; `/stop` via `handle_message` returns `CANCELLED`; `/new`
 with confirmation, `/resume` in the thread, foreign sessions only with `--all` for an admin
 sender, the session ID from the hook `pre_llm_call`; `enforces_own_access_policy` with
-`dm_policy = "allowlist"` works. The recording is part of the normal test run and needs the
-network for the pinned downloads.
+`dm_policy = "allowlist"` works. Recorded again against `v0.22.5` (09 17.10): the own access
+policy needs `authorization_is_upstream` next to it, `/resume --all` does not move a session that
+is live in another thread of the same gateway, and the global `queue` steers. The recording is
+part of the normal test run and needs the network for the pinned downloads.
 
 The harness guarantees: the checkout of the pinned commit lies read-only in a throwaway
 directory outside the repository; the installation is made from a `git archive` export into a

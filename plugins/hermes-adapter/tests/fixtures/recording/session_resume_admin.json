@@ -4,6 +4,7 @@
       "args": {
         "extra_keys": [
           "allow_admin_from",
+          "authorization_is_upstream",
           "command_poll_s",
           "enforces_own_access_policy",
           "group_allow_admin_from",
@@ -28,6 +29,30 @@
         }
       },
       "method": "on_processing_start"
+    },
+    {
+      "args": {
+        "value": false
+      },
+      "method": "read:authorization_is_upstream"
+    },
+    {
+      "args": {
+        "value": false
+      },
+      "method": "read:authorization_is_upstream"
+    },
+    {
+      "args": {
+        "value": false
+      },
+      "method": "read:authorization_is_upstream"
+    },
+    {
+      "args": {
+        "value": false
+      },
+      "method": "read:authorization_is_upstream"
     },
     {
       "args": {
@@ -166,6 +191,30 @@
     },
     {
       "args": {
+        "value": false
+      },
+      "method": "read:authorization_is_upstream"
+    },
+    {
+      "args": {
+        "value": false
+      },
+      "method": "read:authorization_is_upstream"
+    },
+    {
+      "args": {
+        "value": false
+      },
+      "method": "read:authorization_is_upstream"
+    },
+    {
+      "args": {
+        "value": false
+      },
+      "method": "read:authorization_is_upstream"
+    },
+    {
+      "args": {
         "is_first_turn": null,
         "kwargs": [
           "model",
@@ -289,6 +338,12 @@
     },
     {
       "args": {
+        "value": false
+      },
+      "method": "read:authorization_is_upstream"
+    },
+    {
+      "args": {
         "chat_id": "<id:2>",
         "content": "sha256:83970db40510ab2c687d318b1a8b51dbd68652b35678b5f0d325370cd54538e2:63",
         "message_id": "<id:13>",
@@ -332,77 +387,29 @@
     },
     {
       "args": {
-        "is_first_turn": false,
-        "kwargs": [
-          "conversation_history",
-          "is_first_turn",
-          "model",
-          "parent_session_id",
-          "platform",
-          "sender_id",
-          "session_id",
-          "task_id",
-          "telemetry_schema_version",
-          "turn_id",
-          "user_message"
-        ],
-        "session_id": "<id:4>",
-        "user_message": "sha256:42069384d477d67e018da6d80538e858956d30482b09488a9daf31219f3da392:46"
+        "value": false
       },
-      "method": "hook:pre_llm_call"
+      "method": "read:authorization_is_upstream"
+    },
+    {
+      "args": {
+        "value": false
+      },
+      "method": "read:authorization_is_upstream"
+    },
+    {
+      "args": {
+        "value": false
+      },
+      "method": "read:authorization_is_upstream"
     },
     {
       "args": {
         "chat_id": "<id:2>",
-        "content": "sha256:fa54a5932fd2eb9381262b628c819c24a8186538dd7bd92c170d14aa777864c9:11",
-        "draft_id": "<id:15>",
-        "metadata": {
-          "reply_to_message_id": "<id:14>",
-          "thread_id": "<id:8>"
-        }
-      },
-      "method": "send_draft"
-    },
-    {
-      "args": {
-        "chat_id": "<id:2>",
-        "content": "sha256:784f90cbe1d8c6ac08d6e3a89cb7a095c8fca9c0096a2bfc1408b962b15c9f1e:29",
-        "draft_id": "<id:15>",
-        "metadata": {
-          "reply_to_message_id": "<id:14>",
-          "thread_id": "<id:8>"
-        }
-      },
-      "method": "send_draft"
-    },
-    {
-      "args": {
-        "is_first_turn": null,
-        "kwargs": [
-          "completed",
-          "failed",
-          "interrupted",
-          "model",
-          "platform",
-          "session_id",
-          "task_id",
-          "telemetry_schema_version",
-          "turn_exit_reason",
-          "turn_id"
-        ],
-        "session_id": "<id:4>",
-        "user_message": null
-      },
-      "method": "hook:on_session_end"
-    },
-    {
-      "args": {
-        "chat_id": "<id:2>",
-        "content": "sha256:784f90cbe1d8c6ac08d6e3a89cb7a095c8fca9c0096a2bfc1408b962b15c9f1e:29",
-        "message_id": "<id:16>",
+        "content": "sha256:2006eda848df02b62d17d5fddff3855c4044ee3c884ab684b10d862ad03309be:233",
+        "message_id": "<id:15>",
         "metadata": {
           "notify": true,
-          "reply_to_message_id": "<id:14>",
           "thread_id": "<id:8>"
         },
         "reply_to": "<id:14>"
@@ -427,7 +434,7 @@
       "method": "on_processing_complete"
     }
   ],
-  "inputs_sha256": "9f5cf5c29784a5ea96af71632ce006561f43106a4d57b63dfe3384c357a38f0e",
+  "inputs_sha256": "951e586ff37ce048d2812b708412ebeb1b44b674f09786131c2d01801b6f2bb2",
   "model_requests": [
     {
       "credential": "none",
@@ -439,8 +446,8 @@
       "credential": "none",
       "model": "fake-model",
       "other_texts": [
-        "sha256:f9c63f6753f7dd5c1c9f7c3c97734386202709898d520d9b74ecbb51acf7e7fb:5264",
-        "sha256:7b0bc61905001e77c75d23fb47a192a7e162211222293fe70a5a87579f8f8f13:1034"
+        "sha256:03bd083edfa7a96306ebd852c4906e5ad789c633e261512707f4c4cc2d58044d:5105",
+        "sha256:354fffcff870d90b48e0469344c0dd645038ce983084ac81086eeb4f70266c04:37"
       ],
       "roles": [
         "system",
@@ -468,8 +475,7 @@
       "credential": "none",
       "model": "fake-model",
       "other_texts": [
-        "sha256:3f1eef0616ddd2c13d45a3f8cef4ed648dadfdacdba7fbedceebf5a04d549998:942",
-        "sha256:354fffcff870d90b48e0469344c0dd645038ce983084ac81086eeb4f70266c04:37"
+        "sha256:3f1eef0616ddd2c13d45a3f8cef4ed648dadfdacdba7fbedceebf5a04d549998:942"
       ],
       "roles": [
         "system",
@@ -495,7 +501,7 @@
       "credential": "none",
       "model": "fake-model",
       "other_texts": [
-        "sha256:ad1498be63a56bcb1d132cf3d894e1148bfb0068e9d697bc9a52544ba56a606b:5264",
+        "sha256:b96e4720abc6c426f5662875a0f1ad3393c3688df6e45ac6c7902ed389b18230:5105",
         "sha256:c41adaac7cd28913a340cf4fca202bbe0892719d798fdabd871e94bb3270ce3b:36"
       ],
       "roles": [
@@ -519,8 +525,7 @@
       "credential": "none",
       "model": "fake-model",
       "other_texts": [
-        "sha256:3f1eef0616ddd2c13d45a3f8cef4ed648dadfdacdba7fbedceebf5a04d549998:942",
-        "sha256:c41adaac7cd28913a340cf4fca202bbe0892719d798fdabd871e94bb3270ce3b:36"
+        "sha256:3f1eef0616ddd2c13d45a3f8cef4ed648dadfdacdba7fbedceebf5a04d549998:942"
       ],
       "roles": [
         "system",
@@ -535,35 +540,6 @@
       "tool_call_ids": [],
       "tools": [],
       "turn": null
-    },
-    {
-      "completed": true,
-      "credential": "none",
-      "model": "fake-model",
-      "other_texts": [
-        "sha256:ad1498be63a56bcb1d132cf3d894e1148bfb0068e9d697bc9a52544ba56a606b:5264",
-        "sha256:7b0bc61905001e77c75d23fb47a192a7e162211222293fe70a5a87579f8f8f13:1034",
-        "sha256:42069384d477d67e018da6d80538e858956d30482b09488a9daf31219f3da392:46"
-      ],
-      "roles": [
-        "system",
-        "user",
-        "assistant",
-        "user"
-      ],
-      "route": "openai.chat",
-      "scenario_texts": [
-        "Please remember the blue boat.",
-        "The trip to the lake is planned for Saturday morning.",
-        "Which things did I ask you to remember?"
-      ],
-      "scripted": true,
-      "stream": true,
-      "tool_call_ids": [],
-      "tools": [
-        "todo_list"
-      ],
-      "turn": 3
     }
   ],
   "pattern": [
@@ -571,6 +547,7 @@
       "args": {
         "extra_keys": [
           "allow_admin_from",
+          "authorization_is_upstream",
           "command_poll_s",
           "enforces_own_access_policy",
           "group_allow_admin_from",
@@ -754,23 +731,10 @@
     {
       "args": {
         "chat_id": "<id:1>",
-        "content": "sha256:784f90cbe1d8c6ac08d6e3a89cb7a095c8fca9c0096a2bfc1408b962b15c9f1e:29",
-        "draft_id": "<id:14>",
-        "metadata": {
-          "reply_to_message_id": "<id:13>",
-          "thread_id": "<id:7>"
-        }
-      },
-      "method": "send_draft"
-    },
-    {
-      "args": {
-        "chat_id": "<id:1>",
-        "content": "sha256:784f90cbe1d8c6ac08d6e3a89cb7a095c8fca9c0096a2bfc1408b962b15c9f1e:29",
-        "message_id": "<id:15>",
+        "content": "sha256:2006eda848df02b62d17d5fddff3855c4044ee3c884ab684b10d862ad03309be:233",
+        "message_id": "<id:14>",
         "metadata": {
           "notify": true,
-          "reply_to_message_id": "<id:13>",
           "thread_id": "<id:7>"
         },
         "reply_to": "<id:13>"
@@ -796,8 +760,8 @@
     }
   ],
   "pin": {
-    "commit": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
-    "tag": "v2026.9.24"
+    "commit": "bf0203a794a07aac3ff764972ab9087baa4e4f4e",
+    "tag": "v0.22.5"
   },
   "scenario": "session_resume_admin"
 }

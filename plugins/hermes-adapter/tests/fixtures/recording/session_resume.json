@@ -3,6 +3,7 @@
     {
       "args": {
         "extra_keys": [
+          "authorization_is_upstream",
           "command_poll_s",
           "enforces_own_access_policy",
           "group_sessions_per_user",
@@ -26,6 +27,30 @@
         }
       },
       "method": "on_processing_start"
+    },
+    {
+      "args": {
+        "value": false
+      },
+      "method": "read:authorization_is_upstream"
+    },
+    {
+      "args": {
+        "value": false
+      },
+      "method": "read:authorization_is_upstream"
+    },
+    {
+      "args": {
+        "value": false
+      },
+      "method": "read:authorization_is_upstream"
+    },
+    {
+      "args": {
+        "value": false
+      },
+      "method": "read:authorization_is_upstream"
     },
     {
       "args": {
@@ -164,6 +189,30 @@
     },
     {
       "args": {
+        "value": false
+      },
+      "method": "read:authorization_is_upstream"
+    },
+    {
+      "args": {
+        "value": false
+      },
+      "method": "read:authorization_is_upstream"
+    },
+    {
+      "args": {
+        "value": false
+      },
+      "method": "read:authorization_is_upstream"
+    },
+    {
+      "args": {
+        "value": false
+      },
+      "method": "read:authorization_is_upstream"
+    },
+    {
+      "args": {
         "is_first_turn": null,
         "kwargs": [
           "model",
@@ -287,6 +336,12 @@
     },
     {
       "args": {
+        "value": false
+      },
+      "method": "read:authorization_is_upstream"
+    },
+    {
+      "args": {
         "chat_id": "<id:2>",
         "content": "sha256:56a327fbb56730a7642749edda2a287e209cc1bb3cf876116b65f5591e162f35:114",
         "message_id": "<id:13>",
@@ -327,6 +382,30 @@
         }
       },
       "method": "on_processing_start"
+    },
+    {
+      "args": {
+        "value": false
+      },
+      "method": "read:authorization_is_upstream"
+    },
+    {
+      "args": {
+        "value": false
+      },
+      "method": "read:authorization_is_upstream"
+    },
+    {
+      "args": {
+        "value": false
+      },
+      "method": "read:authorization_is_upstream"
+    },
+    {
+      "args": {
+        "value": false
+      },
+      "method": "read:authorization_is_upstream"
     },
     {
       "args": {
@@ -425,7 +504,7 @@
       "method": "on_processing_complete"
     }
   ],
-  "inputs_sha256": "9f5cf5c29784a5ea96af71632ce006561f43106a4d57b63dfe3384c357a38f0e",
+  "inputs_sha256": "951e586ff37ce048d2812b708412ebeb1b44b674f09786131c2d01801b6f2bb2",
   "model_requests": [
     {
       "credential": "none",
@@ -437,8 +516,8 @@
       "credential": "none",
       "model": "fake-model",
       "other_texts": [
-        "sha256:24997aa2f99646c71fd8642c6088984ccccecf551335a7d81fbdd6e2dd191039:5264",
-        "sha256:7b0bc61905001e77c75d23fb47a192a7e162211222293fe70a5a87579f8f8f13:1034"
+        "sha256:451e6a23abf9f3fdc057b54f7f712ec130f14bb95f71b567c969196786fc5d2d:5105",
+        "sha256:354fffcff870d90b48e0469344c0dd645038ce983084ac81086eeb4f70266c04:37"
       ],
       "roles": [
         "system",
@@ -466,8 +545,7 @@
       "credential": "none",
       "model": "fake-model",
       "other_texts": [
-        "sha256:3f1eef0616ddd2c13d45a3f8cef4ed648dadfdacdba7fbedceebf5a04d549998:942",
-        "sha256:354fffcff870d90b48e0469344c0dd645038ce983084ac81086eeb4f70266c04:37"
+        "sha256:3f1eef0616ddd2c13d45a3f8cef4ed648dadfdacdba7fbedceebf5a04d549998:942"
       ],
       "roles": [
         "system",
@@ -493,7 +571,7 @@
       "credential": "none",
       "model": "fake-model",
       "other_texts": [
-        "sha256:6399df4929931887601699af261fda2495c9eaeda8e34316e93eeef0af547632:5264",
+        "sha256:b3af676795e2f78ec248711b0dcf784d66c007d62e67837942569aa3ba941f98:5105",
         "sha256:c41adaac7cd28913a340cf4fca202bbe0892719d798fdabd871e94bb3270ce3b:36"
       ],
       "roles": [
@@ -517,8 +595,7 @@
       "credential": "none",
       "model": "fake-model",
       "other_texts": [
-        "sha256:3f1eef0616ddd2c13d45a3f8cef4ed648dadfdacdba7fbedceebf5a04d549998:942",
-        "sha256:c41adaac7cd28913a340cf4fca202bbe0892719d798fdabd871e94bb3270ce3b:36"
+        "sha256:3f1eef0616ddd2c13d45a3f8cef4ed648dadfdacdba7fbedceebf5a04d549998:942"
       ],
       "roles": [
         "system",
@@ -539,7 +616,7 @@
       "credential": "none",
       "model": "fake-model",
       "other_texts": [
-        "sha256:6399df4929931887601699af261fda2495c9eaeda8e34316e93eeef0af547632:5264",
+        "sha256:b3af676795e2f78ec248711b0dcf784d66c007d62e67837942569aa3ba941f98:5105",
         "sha256:c41adaac7cd28913a340cf4fca202bbe0892719d798fdabd871e94bb3270ce3b:36",
         "sha256:8514384f2a2a9f057087ae41eeb9026b4ea7a2ba49aa10fbd8771c53f74b2e58:31",
         "sha256:42069384d477d67e018da6d80538e858956d30482b09488a9daf31219f3da392:46"
@@ -568,6 +645,7 @@
     {
       "args": {
         "extra_keys": [
+          "authorization_is_upstream",
           "command_poll_s",
           "enforces_own_access_policy",
           "group_sessions_per_user",
@@ -792,8 +870,8 @@
     }
   ],
   "pin": {
-    "commit": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
-    "tag": "v2026.9.24"
+    "commit": "bf0203a794a07aac3ff764972ab9087baa4e4f4e",
+    "tag": "v0.22.5"
   },
   "scenario": "session_resume"
 }

@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 from fake_hermes_kit import HermesWorld, gateway_log, hermes_rig
 from hermes_harness.fake_model import ScriptTurn
@@ -113,18 +115,46 @@ async def test_new_session_after_a_restart(world: HermesWorld) -> None:
 
 
 async def test_bind_takes_a_session_over_or_fails_open(world: HermesWorld) -> None:
-    script = [ScriptTurn(text=(f"Answer {n}.",), paced=True) for n in range(4)]
+    from fake_hermes_kit import _start_gateway
+
+    script = [ScriptTurn(text=(f"Answer {n}.",), paced=True) for n in range(5)]
     async with hermes_rig(world, script) as rig:
         fake = rig.fake
+
+        async def finish(triggered: Any, what: str) -> None:
+            try:
+                await rig.until(lambda: rig.finished(triggered.run_id), what)
+            except AssertionError:
+                raise AssertionError(gateway_log(rig)) from None
+            assert fake.run_state(triggered.run_id).state == "completed", gateway_log(rig)
+
         source = await fake.trigger("Remember the boat.", session_mode="new")
-        await rig.until(lambda: rig.finished(source.run_id), "the first run")
+        await finish(source, "the first run")
         taken = fake.session_reports(source.thread_id)[-1]["external_session_ref"]
-        # Another thread binds the first thread's session (an import or a rebinding).
+        # A session that ran in another thread of this gateway process: Hermes v0.22 keeps it
+        # live on that thread's route and pauses every turn of another route on it, so the
+        # adapter fails open instead of binding (09 17.4).
         other = await fake.trigger("Hello.", session_mode="new")
-        await rig.until(lambda: rig.finished(other.run_id), "the second run")
+        await finish(other, "the second run")
+        fake.start_session(other.thread_id, taken, started=True)
+        refused = await fake.trigger("Go on.", thread_id=other.thread_id, session_mode="bind")
+        await finish(refused, "the bind of a live session")
+        report = fake.session_reports(other.thread_id)[-1]
+        assert report["bind_failed"] == "session_missing", gateway_log(rig)
+        assert report["external_session_ref"] != taken
+        # After a restart the session is live nowhere: another thread takes it over (an import
+        # or a rebinding).
+        assert rig.gateway is not None
+        rig.gateway.stop()
+        identifies = sum(1 for f in fake.frames if f.get("op") == "identify")
+        await _start_gateway(rig)
+        await rig.until(
+            lambda: sum(1 for f in fake.frames if f.get("op") == "identify") > identifies,
+            "the new identify",
+        )
         fake.start_session(other.thread_id, taken, started=False)
         bound = await fake.trigger("Go on.", thread_id=other.thread_id, session_mode="bind")
-        await rig.until(lambda: rig.finished(bound.run_id), "the bound run")
+        await finish(bound, "the bound run")
         report = fake.session_reports(other.thread_id)[-1]
         assert report == {"external_session_ref": taken}, gateway_log(rig)
         # A session Hermes does not know: a new session, reported with bind_failed. The server
@@ -132,8 +162,7 @@ async def test_bind_takes_a_session_over_or_fails_open(world: HermesWorld) -> No
         # for an imported session that ran before.
         fake.start_session(other.thread_id, "20260101_000000_deadbeef", started=True)
         missing = await fake.trigger("Again.", thread_id=other.thread_id, session_mode="bind")
-        await rig.until(lambda: rig.finished(missing.run_id), "the run of a missing session")
+        await finish(missing, "the run of a missing session")
         report = fake.session_reports(other.thread_id)[-1]
         assert report["bind_failed"] == "session_missing", gateway_log(rig)
         assert report["external_session_ref"] not in (taken, "20260101_000000_deadbeef")
-        assert fake.run_state(missing.run_id).state == "completed"

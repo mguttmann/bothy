@@ -40,7 +40,7 @@ from hermes_harness.fake_model import (
     FakeModel,
     ScriptTurn,
 )
-from hermes_harness.gateway import GatewayError, HermesGateway
+from hermes_harness.gateway import GatewayError, HermesGateway, unexpected_listeners
 from hermes_harness.limits import (
     COMMAND_POLL_S,
     GATEWAY_START_DEADLINE_S,
@@ -73,12 +73,13 @@ PROVIDER_HOSTS = frozenset(
 )
 #: Calls that a timer repeats while a turn runs; they do not count as activity.
 TIMER_CALLS = frozenset({"send_typing", "stop_typing"})
-#: Unix socket paths must fit ``sun_path`` (104 bytes with the NUL on macOS, 108 on Linux);
-#: the longest one the pinned version binds below the Hermes home is its loop-tick socket,
-#: named after the PID (at most 5 digits on macOS, 7 on Linux).
+#: The longest Unix socket path the pinned version binds below the Hermes home is its loop-tick
+#: socket, named after the PID (at most 5 digits on macOS, 7 on Linux). Hermes v0.22 binds it
+#: only up to 100 bytes (its own margin below ``sun_path``) and listens on TCP loopback for a
+#: longer path, which a recording refuses as an opened listener.
 _PID_DIGITS = 5 if sys.platform == "darwin" else 7
 _SOCKET_SUFFIX = "/state/gateway.loop-tick." + "9" * _PID_DIGITS + ".sock"
-_SUN_PATH_MAX = 103 if sys.platform == "darwin" else 107
+_SUN_PATH_MAX = 100
 _CREDENTIAL_NAMES = {
     "anthropic_api_key": "ANTHROPIC_API_KEY",
     "anthropic_oauth": "ANTHROPIC_TOKEN",
@@ -141,6 +142,7 @@ SURFACES: Final = (
     "base.MAX_MESSAGE_LENGTH",
     "base.splits_long_messages",
     "base.enforces_own_access_policy",
+    "base.authorization_is_upstream",
     "base.cancel_session_processing",
     "base.interrupt_session_activity",
 )
@@ -342,6 +344,7 @@ class _Run:
             "supports_draft_streaming": bool(scenario.probe.get("supports_draft_streaming")),
             "supports_status_text": bool(scenario.probe.get("supports_status_text")),
             "enforces_own_access_policy": bool(scenario.probe.get("enforces_own_access_policy")),
+            "authorization_is_upstream": bool(scenario.probe.get("authorization_is_upstream")),
         }
         if scenario.probe.get("dm_policy"):
             extra["dm_policy"] = scenario.probe["dm_policy"]
@@ -538,8 +541,9 @@ class _Run:
             host = destination.rsplit(":", 1)[0]
             if host in PROVIDER_HOSTS:
                 self.result.failures.append(f"model provider contacted: {destination} ({phase})")
-        if self.result.listeners:
-            self.result.failures.append(f"Hermes opened listeners: {self.result.listeners}")
+        unexpected = unexpected_listeners(self.result.listeners)
+        if unexpected:
+            self.result.failures.append(f"Hermes opened listeners: {unexpected}")
 
     def close(self) -> None:
         for server in (self.model, self.control, self.egress):

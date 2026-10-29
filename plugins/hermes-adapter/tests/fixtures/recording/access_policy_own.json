@@ -3,6 +3,7 @@
     {
       "args": {
         "extra_keys": [
+          "authorization_is_upstream",
           "command_poll_s",
           "dm_policy",
           "enforces_own_access_policy",
@@ -30,114 +31,21 @@
     },
     {
       "args": {
+        "value": false
+      },
+      "method": "read:authorization_is_upstream"
+    },
+    {
+      "args": {
         "value": true
       },
       "method": "read:enforces_own_access_policy"
     },
     {
       "args": {
-        "is_first_turn": null,
-        "kwargs": [
-          "model",
-          "platform",
-          "session_id",
-          "telemetry_schema_version"
-        ],
-        "session_id": "<id:4>",
-        "user_message": null
+        "value": false
       },
-      "method": "hook:on_session_start"
-    },
-    {
-      "args": {
-        "is_first_turn": true,
-        "kwargs": [
-          "conversation_history",
-          "is_first_turn",
-          "model",
-          "parent_session_id",
-          "platform",
-          "sender_id",
-          "session_id",
-          "task_id",
-          "telemetry_schema_version",
-          "turn_id",
-          "user_message"
-        ],
-        "session_id": "<id:4>",
-        "user_message": "sha256:62b2cc6fe9d5219715af63d3463df1c19f5e127b91d314562c91b2aa7bbd7d95:41"
-      },
-      "method": "hook:pre_llm_call"
-    },
-    {
-      "args": {
-        "chat_id": "<id:2>",
-        "content": "<partial>",
-        "draft_id": "<id:5>",
-        "metadata": {
-          "reply_to_message_id": "<id:1>",
-          "thread_id": "<id:3>"
-        }
-      },
-      "method": "send_draft"
-    },
-    {
-      "args": {
-        "chat_id": "<id:2>",
-        "content": "<partial>",
-        "draft_id": "<id:5>",
-        "metadata": {
-          "reply_to_message_id": "<id:1>",
-          "thread_id": "<id:3>"
-        }
-      },
-      "method": "send_draft"
-    },
-    {
-      "args": {
-        "chat_id": "<id:2>",
-        "content": "The trip to the lake is planned for Saturday morning.",
-        "draft_id": "<id:5>",
-        "metadata": {
-          "reply_to_message_id": "<id:1>",
-          "thread_id": "<id:3>"
-        }
-      },
-      "method": "send_draft"
-    },
-    {
-      "args": {
-        "is_first_turn": null,
-        "kwargs": [
-          "completed",
-          "failed",
-          "interrupted",
-          "model",
-          "platform",
-          "session_id",
-          "task_id",
-          "telemetry_schema_version",
-          "turn_exit_reason",
-          "turn_id"
-        ],
-        "session_id": "<id:4>",
-        "user_message": null
-      },
-      "method": "hook:on_session_end"
-    },
-    {
-      "args": {
-        "chat_id": "<id:2>",
-        "content": "The trip to the lake is planned for Saturday morning.",
-        "message_id": "<id:6>",
-        "metadata": {
-          "notify": true,
-          "reply_to_message_id": "<id:1>",
-          "thread_id": "<id:3>"
-        },
-        "reply_to": "<id:1>"
-      },
-      "method": "send"
+      "method": "read:authorization_is_upstream"
     },
     {
       "args": {
@@ -151,70 +59,26 @@
         },
         "outcome": {
           "enum": "ProcessingOutcome",
-          "value": "success"
+          "value": "failure"
         }
       },
       "method": "on_processing_complete"
+    },
+    {
+      "args": {
+        "chat_id": "<id:2>",
+        "content": "sha256:742b304b9a521dae8063bda16e894b266169d990cfbdf087a200ff4033ae5237:118",
+        "message_id": "<id:4>",
+        "metadata": {
+          "thread_id": "<id:3>"
+        },
+        "reply_to": null
+      },
+      "method": "send"
     }
   ],
-  "inputs_sha256": "9f5cf5c29784a5ea96af71632ce006561f43106a4d57b63dfe3384c357a38f0e",
+  "inputs_sha256": "951e586ff37ce048d2812b708412ebeb1b44b674f09786131c2d01801b6f2bb2",
   "model_requests": [
-    {
-      "credential": "none",
-      "route": "openai.models",
-      "scripted": false
-    },
-    {
-      "completed": true,
-      "credential": "none",
-      "model": "fake-model",
-      "other_texts": [
-        "sha256:e38b80aa64527d5afe255d83b82c4f6b69688cb926be48b3553dd2a0a597b69f:5264",
-        "sha256:8b34a269fc65b6dcc3cc6ac4beea0f9c640bf6b46c70d3b8c0f7b2b0fe1562ec:1038"
-      ],
-      "roles": [
-        "system",
-        "user"
-      ],
-      "route": "openai.chat",
-      "scenario_texts": [
-        "Please plan the trip to the lake."
-      ],
-      "scripted": true,
-      "stream": true,
-      "tool_call_ids": [],
-      "tools": [
-        "todo_list"
-      ],
-      "turn": 1
-    },
-    {
-      "credential": "none",
-      "route": "openai.models",
-      "scripted": false
-    },
-    {
-      "completed": true,
-      "credential": "none",
-      "model": "fake-model",
-      "other_texts": [
-        "sha256:3f1eef0616ddd2c13d45a3f8cef4ed648dadfdacdba7fbedceebf5a04d549998:942",
-        "sha256:62b2cc6fe9d5219715af63d3463df1c19f5e127b91d314562c91b2aa7bbd7d95:41"
-      ],
-      "roles": [
-        "system",
-        "user"
-      ],
-      "route": "openai.chat",
-      "scenario_texts": [
-        "Please plan the trip to the lake."
-      ],
-      "scripted": false,
-      "stream": false,
-      "tool_call_ids": [],
-      "tools": [],
-      "turn": null
-    },
     {
       "credential": "none",
       "route": "openai.models",
@@ -225,6 +89,7 @@
     {
       "args": {
         "extra_keys": [
+          "authorization_is_upstream",
           "command_poll_s",
           "dm_policy",
           "enforces_own_access_policy",
@@ -252,32 +117,6 @@
     },
     {
       "args": {
-        "chat_id": "<id:1>",
-        "content": "The trip to the lake is planned for Saturday morning.",
-        "draft_id": "<id:4>",
-        "metadata": {
-          "reply_to_message_id": "<id:2>",
-          "thread_id": "<id:3>"
-        }
-      },
-      "method": "send_draft"
-    },
-    {
-      "args": {
-        "chat_id": "<id:1>",
-        "content": "The trip to the lake is planned for Saturday morning.",
-        "message_id": "<id:5>",
-        "metadata": {
-          "notify": true,
-          "reply_to_message_id": "<id:2>",
-          "thread_id": "<id:3>"
-        },
-        "reply_to": "<id:2>"
-      },
-      "method": "send"
-    },
-    {
-      "args": {
         "event": {
           "chat_id": "<id:1>",
           "message_id": "<id:2>",
@@ -288,15 +127,27 @@
         },
         "outcome": {
           "enum": "ProcessingOutcome",
-          "value": "success"
+          "value": "failure"
         }
       },
       "method": "on_processing_complete"
+    },
+    {
+      "args": {
+        "chat_id": "<id:1>",
+        "content": "sha256:742b304b9a521dae8063bda16e894b266169d990cfbdf087a200ff4033ae5237:118",
+        "message_id": "<id:4>",
+        "metadata": {
+          "thread_id": "<id:3>"
+        },
+        "reply_to": null
+      },
+      "method": "send"
     }
   ],
   "pin": {
-    "commit": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
-    "tag": "v2026.9.24"
+    "commit": "bf0203a794a07aac3ff764972ab9087baa4e4f4e",
+    "tag": "v0.22.5"
   },
   "scenario": "access_policy_own"
 }

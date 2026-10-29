@@ -3,6 +3,7 @@
     {
       "args": {
         "extra_keys": [
+          "authorization_is_upstream",
           "command_poll_s",
           "enforces_own_access_policy",
           "group_sessions_per_user",
@@ -26,6 +27,30 @@
         }
       },
       "method": "on_processing_start"
+    },
+    {
+      "args": {
+        "value": false
+      },
+      "method": "read:authorization_is_upstream"
+    },
+    {
+      "args": {
+        "value": false
+      },
+      "method": "read:authorization_is_upstream"
+    },
+    {
+      "args": {
+        "value": false
+      },
+      "method": "read:authorization_is_upstream"
+    },
+    {
+      "args": {
+        "value": false
+      },
+      "method": "read:authorization_is_upstream"
     },
     {
       "args": {
@@ -164,6 +189,12 @@
     },
     {
       "args": {
+        "value": false
+      },
+      "method": "read:authorization_is_upstream"
+    },
+    {
+      "args": {
         "chat_id": "<id:2>",
         "confirm_id": "<id:8>",
         "message": "sha256:bc80401ea230a24514c996154ac84cbc5b7ab9429720e0c10ab278d6b2453c26:317",
@@ -216,6 +247,30 @@
         }
       },
       "method": "on_processing_start"
+    },
+    {
+      "args": {
+        "value": false
+      },
+      "method": "read:authorization_is_upstream"
+    },
+    {
+      "args": {
+        "value": false
+      },
+      "method": "read:authorization_is_upstream"
+    },
+    {
+      "args": {
+        "value": false
+      },
+      "method": "read:authorization_is_upstream"
+    },
+    {
+      "args": {
+        "value": false
+      },
+      "method": "read:authorization_is_upstream"
     },
     {
       "args": {
@@ -342,6 +397,12 @@
     },
     {
       "args": {
+        "value": false
+      },
+      "method": "read:authorization_is_upstream"
+    },
+    {
+      "args": {
         "chat_id": "<id:2>",
         "content": "sha256:83970db40510ab2c687d318b1a8b51dbd68652b35678b5f0d325370cd54538e2:63",
         "message_id": "<id:14>",
@@ -382,6 +443,30 @@
         }
       },
       "method": "on_processing_start"
+    },
+    {
+      "args": {
+        "value": false
+      },
+      "method": "read:authorization_is_upstream"
+    },
+    {
+      "args": {
+        "value": false
+      },
+      "method": "read:authorization_is_upstream"
+    },
+    {
+      "args": {
+        "value": false
+      },
+      "method": "read:authorization_is_upstream"
+    },
+    {
+      "args": {
+        "value": false
+      },
+      "method": "read:authorization_is_upstream"
     },
     {
       "args": {
@@ -480,7 +565,7 @@
       "method": "on_processing_complete"
     }
   ],
-  "inputs_sha256": "9f5cf5c29784a5ea96af71632ce006561f43106a4d57b63dfe3384c357a38f0e",
+  "inputs_sha256": "951e586ff37ce048d2812b708412ebeb1b44b674f09786131c2d01801b6f2bb2",
   "model_requests": [
     {
       "credential": "none",
@@ -492,8 +577,8 @@
       "credential": "none",
       "model": "fake-model",
       "other_texts": [
-        "sha256:282044d30906cbbf504077f0ca4ed376396ad5fae18ab01960b668fdc280fc1c:5264",
-        "sha256:7b0bc61905001e77c75d23fb47a192a7e162211222293fe70a5a87579f8f8f13:1034"
+        "sha256:7251b35e9443d02503a27b02e0bbc8c6348f7e998429b9cec8020d3f7240a097:5105",
+        "sha256:354fffcff870d90b48e0469344c0dd645038ce983084ac81086eeb4f70266c04:37"
       ],
       "roles": [
         "system",
@@ -521,8 +606,7 @@
       "credential": "none",
       "model": "fake-model",
       "other_texts": [
-        "sha256:3f1eef0616ddd2c13d45a3f8cef4ed648dadfdacdba7fbedceebf5a04d549998:942",
-        "sha256:354fffcff870d90b48e0469344c0dd645038ce983084ac81086eeb4f70266c04:37"
+        "sha256:3f1eef0616ddd2c13d45a3f8cef4ed648dadfdacdba7fbedceebf5a04d549998:942"
       ],
       "roles": [
         "system",
@@ -548,7 +632,7 @@
       "credential": "none",
       "model": "fake-model",
       "other_texts": [
-        "sha256:282044d30906cbbf504077f0ca4ed376396ad5fae18ab01960b668fdc280fc1c:5264",
+        "sha256:7251b35e9443d02503a27b02e0bbc8c6348f7e998429b9cec8020d3f7240a097:5105",
         "sha256:c41adaac7cd28913a340cf4fca202bbe0892719d798fdabd871e94bb3270ce3b:36"
       ],
       "roles": [
@@ -572,8 +656,7 @@
       "credential": "none",
       "model": "fake-model",
       "other_texts": [
-        "sha256:3f1eef0616ddd2c13d45a3f8cef4ed648dadfdacdba7fbedceebf5a04d549998:942",
-        "sha256:c41adaac7cd28913a340cf4fca202bbe0892719d798fdabd871e94bb3270ce3b:36"
+        "sha256:3f1eef0616ddd2c13d45a3f8cef4ed648dadfdacdba7fbedceebf5a04d549998:942"
       ],
       "roles": [
         "system",
@@ -594,8 +677,8 @@
       "credential": "none",
       "model": "fake-model",
       "other_texts": [
-        "sha256:282044d30906cbbf504077f0ca4ed376396ad5fae18ab01960b668fdc280fc1c:5264",
-        "sha256:7b0bc61905001e77c75d23fb47a192a7e162211222293fe70a5a87579f8f8f13:1034",
+        "sha256:7251b35e9443d02503a27b02e0bbc8c6348f7e998429b9cec8020d3f7240a097:5105",
+        "sha256:354fffcff870d90b48e0469344c0dd645038ce983084ac81086eeb4f70266c04:37",
         "sha256:42069384d477d67e018da6d80538e858956d30482b09488a9daf31219f3da392:46"
       ],
       "roles": [
@@ -623,6 +706,7 @@
     {
       "args": {
         "extra_keys": [
+          "authorization_is_upstream",
           "command_poll_s",
           "enforces_own_access_policy",
           "group_sessions_per_user",
@@ -886,8 +970,8 @@
     }
   ],
   "pin": {
-    "commit": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
-    "tag": "v2026.9.24"
+    "commit": "bf0203a794a07aac3ff764972ab9087baa4e4f4e",
+    "tag": "v0.22.5"
   },
   "scenario": "session_resume_same_thread"
 }

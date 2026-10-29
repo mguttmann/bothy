@@ -297,3 +297,13 @@ def test_scenarios_do_not_depend_on_stream_timing() -> None:
     # stream, and its progress task polls on its own clock; both race an unpaced answer.
     problems = {name: timing_problems(s) for name, s in SCENARIOS.items()}
     assert {name: p for name, p in problems.items() if p} == {}
+
+
+def test_root_fits_the_unix_path_cap_of_hermes() -> None:
+    # Hermes v0.22 binds its loop-tick socket only below 100 bytes and otherwise listens on
+    # TCP loopback, which a recording refuses; the harness holds the same cap on every platform.
+    from hermes_harness.scenarios import _SOCKET_SUFFIX, root_fits
+
+    fixed = len("/00/hermes/h" + _SOCKET_SUFFIX)
+    assert root_fits(Path("/" + "r" * (100 - fixed - 1)))
+    assert not root_fits(Path("/" + "r" * (101 - fixed - 1)))
