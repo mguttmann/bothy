@@ -1632,7 +1632,7 @@ only, like 6.9.
 
 ### 6.11 Rename project
 
-Addendum of 2026-10-29 (R-PR-21, D-M4-44-6). The menu of a forum with a project binding
+Addendum of 2026-10-29 (R-PR-21, D-M4-44-6, D-M4-44-7). The menu of a forum with a project binding
 (`Channel.project_bound`) has "Rename project" for a person with `manage` on the forum
 (`channel.update`). It opens a short dialog with the current name; "Rename" changes the forum's
 name (`updateChannel` with the forum's version as `If-Match`). The folder, the binding and the

@@ -9406,4 +9406,89 @@ class AppLocalizationsDe extends AppLocalizations {
   String stepUpPurposeNewProject(String name) {
     return 'Das Projekt $name anlegen';
   }
+
+  @override
+  String get spaceMenuAddFolderForums =>
+      'Forum für jeden vorhandenen Ordner anlegen';
+
+  @override
+  String projectSyncTitle(String name) {
+    return 'Forum für jeden vorhandenen Ordner in $name anlegen';
+  }
+
+  @override
+  String get projectSyncIntro =>
+      'Diese Ordner des Runners haben noch kein Forum. Jeder angehakte Ordner bekommt ein Forum mit seinem Namen, das mit dem Ordner verbunden wird; die Ordner bleiben, wie sie sind.';
+
+  @override
+  String get projectSyncLoading => 'Die Ordner des Runners werden geladen.';
+
+  @override
+  String get projectSyncChooseRunner =>
+      'Wähle einen Runner, um seine Ordner zu sehen.';
+
+  @override
+  String get projectSyncEmpty =>
+      'Jeder Ordner dieses Runners hat schon ein Forum.';
+
+  @override
+  String get projectSyncNotReported =>
+      'Dieser Runner hat seine Ordner noch nicht gemeldet. Vielleicht ist er eine ältere Version oder nicht verbunden.';
+
+  @override
+  String get projectSyncAdd => 'Je ein Forum anlegen';
+
+  @override
+  String get projectSyncWaitingRunner => 'Wartet auf den Runner';
+
+  @override
+  String get projectSyncReady => 'Bereit';
+
+  @override
+  String get projectSyncNotFinished =>
+      'Der Runner ist noch nicht fertig; das Forum wird von selbst bereit.';
+
+  @override
+  String projectSyncRowState(String folder, String state) {
+    String _temp0 = intl.Intl.selectLogic(state, {
+      'waiting': 'wird angelegt',
+      'skipped': 'nicht angelegt',
+      'running': 'läuft',
+      'runner': 'wartet auf den Runner',
+      'ready': 'bereit',
+      'failed': 'fehlgeschlagen',
+      'other': 'nicht fertig',
+    });
+    return '$folder: $_temp0';
+  }
+
+  @override
+  String get projectSyncAuditReason => 'Forum für einen vorhandenen Ordner';
+
+  @override
+  String get stepUpPurposeProjectSync =>
+      'Forum für jeden vorhandenen Ordner anlegen';
+
+  @override
+  String get channelMenuRenameProject => 'Projekt umbenennen';
+
+  @override
+  String get renameProjectTitle => 'Projekt umbenennen';
+
+  @override
+  String get renameProjectName => 'Name';
+
+  @override
+  String get renameProjectHint =>
+      'Nur das Forum wird umbenannt; der Ordner auf dem Runner bleibt, wie er ist.';
+
+  @override
+  String get renameProjectSubmit => 'Umbenennen';
+
+  @override
+  String get renameProjectCancel => 'Abbrechen';
+
+  @override
+  String get renameProjectChanged =>
+      'Das Forum wurde inzwischen geändert. Prüfe den Namen und tippe erneut auf Umbenennen.';
 }

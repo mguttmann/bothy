@@ -67,7 +67,7 @@ Fragments: `docs/decisions.d/M4-44.md`; changelog fragments `services/server/cha
 - Conventional Commits with a DCO sign-off; no co-author trailers.
 - Tests bind only `127.0.0.1` with port 0 and make no network call; runner tests use temporary folders.
 - Never read or print secrets; never lower a threshold or disable a gate.
-- Where the merged code names a package, type, function, file or provider differently from this brief, follow the code and list each difference in the report.
+- This brief was written after M4-43 merged, in the manner of D-W-100: where the merged code names a package, type, function, file or provider differently from this brief, follow the code and list each difference in the report.
 
 ## Design notes
 

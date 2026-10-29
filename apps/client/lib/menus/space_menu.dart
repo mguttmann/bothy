@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// The menu of a space in the sidebar (brief M4-33 Scope): its notification level and "Mute
-/// until" (13 3.1), headed by "New project in" for an owner (01 6.9 item 1, M4-43).
+/// until" (13 3.1), headed by "New project in" and "Add forums for existing folders" for an
+/// owner (01 6.9 item 1, M4-43; 01 6.10 item 1, M4-44).
 library;
 
 import 'package:design_system/design_system.dart';
@@ -22,6 +23,7 @@ class SpaceMenu extends StatelessWidget {
     required this.child,
     this.newProjectLabel,
     this.onNewProject,
+    this.onAddFolderForums,
   });
 
   /// The space.
@@ -33,6 +35,9 @@ class SpaceMenu extends StatelessWidget {
   /// Opens the new project dialog of the space, or null for no entry.
   final VoidCallback? onNewProject;
 
+  /// Opens "Add forums for existing folders" of the space, or null for no entry.
+  final VoidCallback? onAddFolderForums;
+
   /// The row the menu belongs to.
   final Widget child;
 
@@ -42,12 +47,19 @@ class SpaceMenu extends StatelessWidget {
     menuChildren: (context, ref) {
       final label = newProjectLabel;
       final start = onNewProject;
+      final sync = onAddFolderForums;
       return [
         if (label != null && start != null)
           DsMenuItem(
             key: const ValueKey('menu.newProject'),
             onPressed: start,
             child: Text(dsIsolate(label)),
+          ),
+        if (sync != null)
+          DsMenuItem(
+            key: const ValueKey('menu.addFolderForums'),
+            onPressed: sync,
+            child: Text(AppLocalizations.of(context).spaceMenuAddFolderForums),
           ),
         ...levelMenuItems(context, ref, spaceMenuTarget(ref, space)),
       ];

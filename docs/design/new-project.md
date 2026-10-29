@@ -248,7 +248,9 @@ Reason: `workspace_ref` is the folder's name on the runner and running sessions 
 rename of the folder would need the runner to move a folder it did not create (forbidden by 18.12
 item 7). The owner's former rename also changed only the forum.
 
-**D-M4-44-7 Desktop only.** As D-M4-43-12; the phone shows the new forums and names.
+**D-M4-44-7 The folder list on the desktop only.** As D-M4-43-12, "Add forums for existing
+folders" is a desktop entry; the phone shows the new forums. "Rename project" sits in the menu
+of the forum wherever that menu shows, because a rename is one short text field.
 
 ### 6.4 Out of scope
 
