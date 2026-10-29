@@ -2,7 +2,8 @@
 
 /// Access to `forum_view_states`, `channel_view_states` and `shell_view_state`: how forums and
 /// channel groups look on this device (brief M4-19 Design note 4, docs/DECISIONS.md D-M4-19-4;
-/// 01 6.8 item 7, D-SB-6). Nothing of it is synchronized: 01 11 has no key for it.
+/// 01 6.8 item 7, D-SB-6), and whether the channel column next to an open thread is hidden (01
+/// D1, D2; M4-42). Nothing of it is synchronized: 01 11 has no key for it.
 library;
 
 import 'package:domain/domain.dart';
@@ -20,6 +21,8 @@ import '../database.dart';
 /// db.forumViewDao.watchCollapsedGroups().listen(print); // {forum}
 /// await db.forumViewDao.setOverviewPinned(pinned: true);
 /// print(await db.forumViewDao.overviewPinned()); // true
+/// await db.forumViewDao.setChannelColumnHidden(hidden: true);
+/// print(await db.forumViewDao.channelColumnHidden()); // true
 /// ```
 final class ForumViewDao {
   /// Creates the DAO on a database; use `LocalDatabase.forumViewDao`.
@@ -101,6 +104,36 @@ final class ForumViewDao {
           ShellViewStatesCompanion.insert(
             id: const Value(1),
             overviewPinned: Value(pinned),
+          ),
+        );
+  }
+
+  /// Whether the channel column next to an open thread is hidden on this device, emitted on
+  /// every change; false without the stored row (01 D1, D2: shown by default).
+  Stream<bool> watchChannelColumnHidden() => _db
+      .select(_db.shellViewStates)
+      .map((row) => row.channelColumnHidden)
+      .watchSingleOrNull()
+      .map((hidden) => hidden ?? false);
+
+  /// Whether the channel column next to an open thread is hidden, read once; false without the
+  /// stored row.
+  Future<bool> channelColumnHidden() async =>
+      await _db
+          .select(_db.shellViewStates)
+          .map((row) => row.channelColumnHidden)
+          .getSingleOrNull() ??
+      false;
+
+  /// Stores whether the channel column next to an open thread is [hidden] on this device; the
+  /// pinned state of the overview stays.
+  Future<void> setChannelColumnHidden({required bool hidden}) async {
+    await _db
+        .into(_db.shellViewStates)
+        .insertOnConflictUpdate(
+          ShellViewStatesCompanion.insert(
+            id: const Value(1),
+            channelColumnHidden: Value(hidden),
           ),
         );
   }

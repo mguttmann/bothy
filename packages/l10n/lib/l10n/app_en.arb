@@ -5473,6 +5473,14 @@
   "@threadColumn": {
     "description": "Header button that shows or hides the session column (01 section 5.1 D1)."
   },
+  "threadHideChannel": "Hide channel",
+  "@threadHideChannel": {
+    "description": "Header button of an open thread that hides the channel column beside it (the main history of a text channel or the pinned forum overview), so the thread takes the whole width (01 section 5.1 D1, D2)."
+  },
+  "threadShowChannel": "Show channel",
+  "@threadShowChannel": {
+    "description": "Header button of an open thread that shows the hidden channel column beside it again (01 section 5.1 D1, D2)."
+  },
   "threadEditTitle": "Edit title",
   "@threadEditTitle": {
     "description": "Header button and dialog title to change the thread title (01 section 6.7)."
@@ -12227,6 +12235,10 @@
   },
   "shortcutSessionColumn": "Show and hide the session column",
   "@shortcutSessionColumn": {
+    "description": "Row of the list of shortcuts (01 7)."
+  },
+  "shortcutChannelColumn": "Show and hide the channel next to an open thread",
+  "@shortcutChannelColumn": {
     "description": "Row of the list of shortcuts (01 7)."
   },
   "shortcutEditLast": "Edit the last own message",

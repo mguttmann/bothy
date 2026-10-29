@@ -139,11 +139,12 @@ class _ColumnLayoutState extends State<ColumnLayout> {
         width: widths.of(column),
         child: _ColumnFrame(column: column, child: child),
       );
-      Widget handle(String column, {bool growsLeft = false}) => _DragHandle(
-        key: ValueKey('column.handle.$column'),
-        onDrag: (dx) => _drag(column, growsLeft ? -dx : dx),
-        onEnd: _end,
-      );
+      Widget handle(String column, {bool growsLeft = false}) =>
+          ColumnDragHandle(
+            key: ValueKey('column.handle.$column'),
+            onDrag: (dx) => _drag(column, growsLeft ? -dx : dx),
+            onEnd: _end,
+          );
       final middle = list && !column
           ? (widget.stackShowsHistory
                 ? _ColumnFrame(column: AppColumn.history, child: widget.history)
@@ -210,11 +211,21 @@ class _ColumnFrame extends StatelessWidget {
   }
 }
 
-/// The draggable border between two columns.
-class _DragHandle extends StatelessWidget {
-  const _DragHandle({super.key, required this.onDrag, required this.onEnd});
+/// The draggable border between two columns: [onDrag] gets the horizontal movement of each
+/// update, [onEnd] is called once when the drag ends (01 5.1 D1: every column border can be
+/// dragged; M4-42 uses it between the main history and the thread too).
+class ColumnDragHandle extends StatelessWidget {
+  /// Creates the handle.
+  const ColumnDragHandle({
+    super.key,
+    required this.onDrag,
+    required this.onEnd,
+  });
 
+  /// Called with the horizontal movement of a drag update.
   final ValueChanged<double> onDrag;
+
+  /// Called when the drag ends.
   final VoidCallback onEnd;
 
   @override

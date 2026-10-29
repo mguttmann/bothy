@@ -111,6 +111,21 @@ void main() {
       );
     });
 
+    test('main_history has no default: the thread beside it shares the room '
+        'until a drag stores it (M4-42)', () {
+      expect(ColumnWidths.defaults.stored(AppColumn.mainHistory), isNull);
+      final w = ColumnWidths.fromSetting({'main_history': 420, 'sidebar': 300});
+      expect(w.stored(AppColumn.mainHistory), 420);
+      expect(w.toSetting(), {'sidebar': 300, 'main_history': 420});
+      expect(
+        ColumnWidths.defaults
+            .withWidth(AppColumn.mainHistory, 10)
+            .stored(AppColumn.mainHistory),
+        DsLayout.columnMin,
+      );
+      expect(w, isNot(ColumnWidths.fromSetting({'sidebar': 300})));
+    });
+
     test(
       'the writer puts and deletes layout.column_widths through the outbox',
       () async {

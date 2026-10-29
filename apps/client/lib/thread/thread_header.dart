@@ -66,6 +66,8 @@ class ThreadHeader extends StatelessWidget {
     required this.onMove,
     required this.onPin,
     required this.onColumn,
+    this.onChannelColumn,
+    this.channelColumnHidden = false,
     this.menu,
     this.compact = false,
   });
@@ -87,6 +89,13 @@ class ThreadHeader extends StatelessWidget {
 
   /// Shows or hides the session column.
   final VoidCallback onColumn;
+
+  /// Hides or shows the channel column beside the open thread (the main history of a text
+  /// channel or the pinned forum overview, 01 D1, D2; M4-42), or null when there is none.
+  final VoidCallback? onChannelColumn;
+
+  /// Whether that channel column is hidden: the button reads "Show channel".
+  final bool channelColumnHidden;
 
   /// The button that opens the menu of the thread or of the channel (M4-33), or null.
   final Widget? menu;
@@ -126,10 +135,16 @@ class ThreadHeader extends StatelessWidget {
                     decorative: true,
                   ),
                   const SizedBox(width: DsSpace.s4),
-                  Text(
-                    label,
-                    style: dsTextStyle(DsType.label)
-                        .copyWith(color: colors.textSecondary),
+                  // A column at its minimum width (M4-42) cuts a long label instead of
+                  // overflowing.
+                  Flexible(
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: dsTextStyle(DsType.label)
+                          .copyWith(color: colors.textSecondary),
+                    ),
                   ),
                 ],
               ),
@@ -241,6 +256,17 @@ class ThreadHeader extends StatelessWidget {
                 l.threadColumn,
                 onColumn,
               ),
+              if (onChannelColumn case final toggle?)
+                action(
+                  'thread.channelColumn',
+                  channelColumnHidden
+                      ? DsIcons.actionCollapse
+                      : DsIcons.actionBack,
+                  channelColumnHidden
+                      ? l.threadShowChannel
+                      : l.threadHideChannel,
+                  toggle,
+                ),
               ?menu,
             ],
           ),

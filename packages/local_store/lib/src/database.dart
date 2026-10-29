@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The drift database of the apps, schema version 6 (docs/spec/15-client-architecture.md 6, ADR
+/// The drift database of the apps, schema version 7 (docs/spec/15-client-architecture.md 6, ADR
 /// 0029): the mirror tables of 15 6.1 and the local-only tables, `host_key_pins` (M4-36) and
-/// the sidebar view state `channel_view_states` and `shell_view_state` (M4-40) included.
+/// the sidebar view state `channel_view_states` and `shell_view_state` (M4-40, M4-42) included.
 library;
 
 import 'dart:io';
@@ -89,7 +89,7 @@ class LocalDatabase extends _$LocalDatabase {
   final DateTime Function() clock;
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   /// Closes the database and releases its file, also while watched queries come and go.
   ///
@@ -136,6 +136,12 @@ class LocalDatabase extends _$LocalDatabase {
         await m.addColumn(schema.channels, schema.channels.projectBound);
         await MigrationRules.resetCursor(m);
       },
+      // Version 7 (M4-42): the column `shell_view_state.channel_column_hidden`, false in the
+      // kept row (01 D1, D2: the channel column shows until the person hides it); no row moves.
+      from6To7: (m, schema) => m.addColumn(
+        schema.shellViewState,
+        schema.shellViewState.channelColumnHidden,
+      ),
     ),
   );
 

@@ -19,7 +19,11 @@ import 'package:sync_engine/sync_engine.dart';
 
 import '../../forum/new_chat_view.dart';
 import '../../forum/post_list_column.dart';
-import '../../forum/providers.dart' show overviewPinnedProvider;
+import '../../forum/providers.dart'
+    show
+        channelColumnHiddenProvider,
+        overviewPinnedProvider,
+        toggleChannelColumn;
 import '../../keyboard/app_shortcuts.dart';
 import '../../keyboard/intents.dart';
 import '../../session_column/session_column.dart';
@@ -124,6 +128,12 @@ class DesktopShell extends ConsumerWidget {
     final isView =
         parsed is ViewLocation || parsed is RunGraphLocation || host != null;
     final hasSession = !isView && sessionThread != null;
+    // M4-42 (01 D1, D2): an open thread has a channel column beside it, the main history of a
+    // text channel or the pinned overview of a forum, which the person can hide.
+    final channelHidden = ref.watch(channelColumnHiddenProvider).value ?? false;
+    final thread = parsed is ThreadLocation;
+    final hasChannelColumn =
+        thread && (textChannel || (forum != null && host == null && pinned));
     return AppShortcuts(
       handlers: {
         ShortcutAction.quickSwitcher: KeyboardHandler(
@@ -173,6 +183,12 @@ class DesktopShell extends ConsumerWidget {
               .toggle(textThread: textChannel),
           enabled: hasSession,
         ),
+        // 01 7: Cmd+Shift+H or Ctrl+Shift+H hides or shows the channel next to an open thread;
+        // the choice is kept on this device (M4-42).
+        ShortcutAction.toggleChannelColumn: KeyboardHandler(
+          () => unawaited(toggleChannelColumn(ref.read(localDatabaseProvider))),
+          enabled: hasChannelColumn,
+        ),
       },
       child: Material(
         color: context.dsColors.surfaceCanvas,
@@ -191,7 +207,8 @@ class DesktopShell extends ConsumerWidget {
                 stackShowsHistory:
                     parsed is ThreadLocation || host != null || newChat != null,
                 showPostList: forum != null && host == null,
-                listPinned: pinned,
+                // A hidden channel column gives the open post the overview's room (M4-42).
+                listPinned: pinned && !(thread && channelHidden),
                 // The cross-cutting views (search, mentions, Running now) have no session.
                 showSession:
                     !isView && (textChannel ? shown.textThread : shown.forum),

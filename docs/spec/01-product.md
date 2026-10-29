@@ -248,11 +248,23 @@ binding every post is one agent session, so the sessions of a project are visibl
 click. Which rows show, their order, markers and the "+" action are in 6.8. A click on the forum
 name opens the forum overview D15 in the content column; pinned (Cmd+Shift+O, button "Pin" in the
 overview), the overview is its own column between sidebar and history, and D1 has four columns.
-Column borders can be dragged; widths are stored as the setting `layout.column_widths`. Below
-`ui.desktop_min_width_four_columns` the session column collapses, below
+Every column border can be dragged: between sidebar, pinned overview, history and session column,
+and between the main history of a text channel and a thread open beside it (D2); widths are
+stored as the setting `layout.column_widths` (names `sidebar`, `post_list`, `main_history`,
+`session`; the history, or the thread beside a main history, takes the rest). No column becomes
+narrower than `DsLayout.columnMin` by a drag; a stored width wider than the window shrinks to fit.
+Below `ui.desktop_min_width_four_columns` the session column collapses, below
 `ui.desktop_min_width_three_columns` a pinned overview column returns to the content column
 (navigation stack as on the phone). Addendum of 2026-10-27 (R-PR-17, replaces the four fixed
 columns of R-PR-01).
+
+When a thread or a forum post is open next to its channel column (the main history of a text
+channel, D2, or the pinned overview of a forum), the button "Hide channel" in the thread header
+and Cmd+Shift+H (Ctrl+Shift+H) hide that column, so the thread takes the whole content width;
+"Show channel" and the same keys show it again. The choice is kept on this device like the pin
+of the overview, never synchronized, and stays while the person opens other threads, from the
+sidebar or elsewhere; the pin itself does not change. The main history of a channel alone has
+nothing to hide. Addendum of 2026-10-28 (R-PR-19).
 
 ```text
 +----------------------------------+---------------------------------------+------------------------+
@@ -283,8 +295,11 @@ columns of R-PR-01).
 ```
 
 **D2 Text channel with an open thread.** No post list. A thread opens to the right of the
-main thread; the session column is then collapsed. The header names the operator. The open threads
-of the channel are nested under it in the sidebar (6.8); the selected one is marked there.
+main thread; the session column is then collapsed. The border between the two can be dragged
+(`main_history`; without a stored width they share the room), and "Hide channel" or
+Cmd+Shift+H leaves the thread alone in the content column (D1, R-PR-19). The header names the
+operator. The open threads of the channel are nested under it in the sidebar (6.8); the selected
+one is marked there.
 
 ```text
 +--------------------------+------------------------------------------------+------------------------------------------+
@@ -1570,6 +1585,7 @@ Windows key). There is no shortcut that triggers an approval.
 | Stop the run in the current thread | Cmd+. | Ctrl+. |
 | Expand and collapse the live box | Cmd+Shift+L | Ctrl+Shift+L |
 | Show and hide the session column | Cmd+Shift+I | Ctrl+Shift+I |
+| Show and hide the channel next to an open thread | Cmd+Shift+H | Ctrl+Shift+H |
 | Edit the last own message | Arrow up in the empty field | Arrow up in the empty field |
 | Send / new line | Enter / Shift+Enter (reversible) | Enter / Shift+Enter (reversible) |
 | Running now | Cmd+Shift+R | Ctrl+Shift+R |
@@ -1743,7 +1759,7 @@ unknown keys and values outside the list.
 | `composer.enter_sends` | `true`, `false` | without a stored value `true` on desktop and `false` on mobile; a stored value applies on all devices | Enter sends |
 | `privacy.crash_reports` | `true`, `false` | `true` if the instance has set up a crash service | Send crash reports |
 | `privacy.client_metrics` | `true`, `false` | `true` | Send performance data without content |
-| `layout.column_widths` | Object: names `^[a-z][a-z0-9_]*$` (column, for example `sidebar`, `post_list`, `session`), values non-negative integers in logical pixels | empty | Column widths on desktop; the client interprets the names |
+| `layout.column_widths` | Object: names `^[a-z][a-z0-9_]*$` (column, for example `sidebar`, `post_list`, `main_history`, `session`), values non-negative integers in logical pixels | empty | Column widths on desktop; the client interprets the names |
 
 ## 12. Branding per instance
 
@@ -1790,6 +1806,7 @@ Rules:
 | R-PR-16 | The control room is "Running now" with cards and stays in its place; cards visible on the screen are live through `focus`, the others show the summary (addendum of 2026-10-24). | One place and one permission for active runs; live data only where a person looks, within the existing focus limit. |
 | R-PR-17 | Desktop has three columns by default (sidebar, history, session column instead of members); open posts and threads are nested under their channel in the sidebar (6.8); the post list is the forum overview D15 in the content column and can be pinned as its own column (addendum of 2026-10-27, replaces R-PR-01). | Owner feedback 2026-10-27: the sessions of a project belong in the sidebar as in Discord; a fixed list column costs a quarter of a laptop screen. |
 | R-PR-18 | A new chat starts from the forum row ("+") or Cmd+N without a dialog; the title is optional where an operator agent names the chat; no git worktree per post (addendum of 2026-10-27). | Starting a session is the most frequent action in a dev forum; the owner opens worktrees through the agent when he wants them. |
+| R-PR-19 | On desktop the channel column next to an open thread (the main history of a text channel or the pinned forum overview) can be hidden from the thread header and with Cmd+Shift+H, kept per device; every column border, also the one between main history and thread, can be dragged (addendum of 2026-10-28). | Owner feedback on the Mac app (2026-10-28): the thread where the person writes stayed small next to the channel history, which could neither be hidden nor resized. |
 
 ## 14. Configuration values of this chapter
 
