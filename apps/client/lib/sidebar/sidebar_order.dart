@@ -6,26 +6,33 @@ library;
 
 import 'package:domain/domain.dart';
 
-/// A space with the person's sidebar state (03 `user_space_states`).
+/// A space with the person's sidebar state (03 `user_space_states`) and whether it is
+/// collapsed on this device.
 final class SidebarSpace {
-  /// Creates the entry of [space] with its [state] (null: never changed by the person).
-  const SidebarSpace({required this.space, this.state});
+  /// Creates the entry of [space] with its [state] (null: never changed by the person) and its
+  /// [collapsed] state on this device.
+  const SidebarSpace({required this.space, this.state, this.collapsed = false});
 
   /// The space.
   final Space space;
 
-  /// The personal state, or null.
+  /// The synchronized personal state, or null; the sidebar uses its order only.
   final UserSpaceState? state;
+
+  /// Whether the person collapsed the space on this device (`space_view_states`; 01 6.7,
+  /// R-PR-24): another device of the person never changes it.
+  final bool collapsed;
 
   /// The key the sidebar sorts by: the personal `sort_key`, else the global one (04 14).
   String get orderKey => state?.sortKey ?? space.sortKey;
 
-  /// Whether the person collapsed the space; a space without a state is expanded.
-  bool get collapsed => state?.collapsed ?? false;
+  /// The `collapsed` the server holds for the space; a write of the order sends it unchanged
+  /// (the API `SidebarStatePut` needs it), false without a state.
+  bool get storedCollapsed => state?.collapsed ?? false;
 }
 
-/// One write of the personal order: [sortKey] for [spaceId], keeping [collapsed] (the API
-/// `SidebarStatePut` needs both).
+/// One write of the personal order: [sortKey] for [spaceId], keeping the [collapsed] the server
+/// holds (the API `SidebarStatePut` needs both).
 final class SpaceOrderWrite {
   /// Creates the write.
   const SpaceOrderWrite({
@@ -40,7 +47,7 @@ final class SpaceOrderWrite {
   /// Its new personal key.
   final String sortKey;
 
-  /// Its collapse state.
+  /// The collapse state the server holds, unchanged by the write.
   final bool collapsed;
 
   @override
@@ -58,7 +65,8 @@ final class SpaceOrderWrite {
       'SpaceOrderWrite(${spaceId.value}, $sortKey, collapsed: $collapsed)';
 }
 
-/// The spaces the sidebar shows, in the person's order.
+/// The spaces the sidebar shows, in the person's order; a space in [collapsed] (the collapsed
+/// spaces of this device) is collapsed.
 ///
 /// Archived spaces are left out. The order is [SidebarSpace.orderKey] compared as bytes (the
 /// server's `COLLATE "C"`), then the global key, then the ID, so every device shows the same
@@ -67,12 +75,18 @@ final class SpaceOrderWrite {
 /// Example: `orderSpaces(spaces, states).first.space.name`.
 List<SidebarSpace> orderSpaces(
   Iterable<Space> spaces,
-  Iterable<UserSpaceState> states,
-) {
+  Iterable<UserSpaceState> states, {
+  Set<SpaceId> collapsed = const {},
+}) {
   final byId = {for (final s in states) s.spaceId: s};
   final list = [
     for (final s in spaces)
-      if (s.archivedAt == null) SidebarSpace(space: s, state: byId[s.id]),
+      if (s.archivedAt == null)
+        SidebarSpace(
+          space: s,
+          state: byId[s.id],
+          collapsed: collapsed.contains(s.id),
+        ),
   ];
   list.sort((a, b) {
     final byKey = a.orderKey.compareTo(b.orderKey);
@@ -111,7 +125,7 @@ List<SpaceOrderWrite> moveSpace(
       SpaceOrderWrite(
         spaceId: spaceId,
         sortKey: FractionalIndex.between(before, after),
-        collapsed: moving.collapsed,
+        collapsed: moving.storedCollapsed,
       ),
     ];
   } on ArgumentError {
@@ -125,7 +139,7 @@ List<SpaceOrderWrite> moveSpace(
           SpaceOrderWrite(
             spaceId: s.space.id,
             sortKey: key,
-            collapsed: s.collapsed,
+            collapsed: s.storedCollapsed,
           ),
         );
       }

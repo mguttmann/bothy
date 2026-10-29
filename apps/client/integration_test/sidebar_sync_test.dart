@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // The personal sidebar across two devices of Alex and the counters of a channel (brief M4-19
-// Tests; 04 14): collapsing in the app reaches the other device, a new order from the other
-// device reaches the app through `sidebar.updated`, and the counters follow messages from Sam
-// (on the thread row of the thread, M4-40).
+// Tests; 04 14): collapsing in the app stays on this device (01 6.7, R-PR-24), a new order from
+// the other device reaches the app through `sidebar.updated`, and the counters follow messages
+// from Sam (on the thread row of the thread, M4-40).
 
 import 'package:api_client/api_client.dart';
 import 'package:domain/domain.dart';
@@ -31,7 +31,7 @@ void main() {
     }
   }
 
-  testWidgets('order and collapse sync across devices; counters follow Sam', (
+  testWidgets('order syncs across devices, collapse stays; counters follow Sam', (
     tester,
   ) async {
     final app = await TestApp.start(tester);
@@ -84,7 +84,7 @@ void main() {
       );
       semantics.dispose();
 
-      // Collapse in the app: the other device reads it from the server.
+      // Collapse in the app: it stays on this device, the server keeps no collapse of Team.
       await tester.tap(team);
       await until(
         tester,
@@ -92,16 +92,12 @@ void main() {
         () => general.evaluate().isEmpty,
       );
       final prefs = other.auth.api.getPreferencesApi();
-      final end = DateTime.now().add(const Duration(seconds: 20));
-      while (true) {
-        final list = (await tester.runAsync(prefs.getMySidebar))!.data!;
-        final state = list.items.where((s) => s.spaceId == seed.space);
-        if (state.isNotEmpty && state.single.collapsed) break;
-        if (DateTime.now().isAfter(end)) {
-          fail('the other device sees no collapse');
-        }
-        await tester.pump(const Duration(milliseconds: 50));
-      }
+      final list = (await tester.runAsync(prefs.getMySidebar))!.data!;
+      expect(
+        list.items.where((s) => s.spaceId == seed.space && s.collapsed),
+        isEmpty,
+        reason: 'the other device sees no collapse',
+      );
 
       // A new order on the other device: Ops first, with a key the server accepts.
       await tester.runAsync(

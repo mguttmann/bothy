@@ -627,10 +627,12 @@ Docker engine with buildx) and hands its connection file to `tool/e2e_suite.sh t
 ## Sidebar and post list
 
 The sidebar (`lib/sidebar/`) and the post list (`lib/forum/`) read the local database through
-Riverpod providers and never query it from a widget (R-CL-03). The person's order and collapse
-state of the spaces is written locally at once and sent through the outbox as
-`putMySidebarSpace`; another device's change arrives as `sidebar.updated` and wins by version
-(04 14). Order keys come from `FractionalIndex` in `domain`, the rule the server validates.
+Riverpod providers and never query it from a widget (R-CL-03). The person's order of the spaces
+is written locally at once and sent through the outbox as `putMySidebarSpace`; another device's
+change arrives as `sidebar.updated` and wins by version (04 14). Whether a space is collapsed
+stays on the device in `space_view_states` and never reaches the server, so expanding a space on
+the phone to open a chat leaves the desktop sidebar as it was (01 6.7, R-PR-24;
+docs/decisions.d/FIX-device-mirroring-2.md). Order keys come from `FractionalIndex` in `domain`, the rule the server validates.
 Counters per channel come from the sync engine and the stored read states. A forum's post list
 pages through `listChannelThreads`, writes new posts as `createThread` through the outbox, and
 keeps the collapse state of its "Done (n)" section per device in `forum_view_states` (01 6.1;

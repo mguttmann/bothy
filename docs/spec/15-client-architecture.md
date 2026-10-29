@@ -281,6 +281,7 @@ Local only:
 | `share_inbox` | share entries taken over from extensions |
 | `recent_targets` | recently visited spaces, channels and threads of the quick switcher, per device, never synchronized ([01](01-product.md) D6) |
 | `host_key_pins` | pinned Noise keys of the hosts per device (section 23.3); never covered by the cleanup after `client.cache_max_age`, because a lost pin would prevent a warning on a key change |
+| `space_view_states` | whether a space is collapsed in the sidebar, per device, never synchronized ([01](01-product.md) 6.7, R-PR-24; [04](04-sync-protocol.md) section 14, R-SY-29); filled once from `user_space_states.collapsed` by schema version 10 |
 
 ### 6.2 Migrations
 

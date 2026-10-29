@@ -7,7 +7,9 @@
 // (`channel_view_states`) and the pinned forum overview (`shell_view_state`); and that of M4-42
 // (01 D1, D2): the hidden channel column next to an open thread (`shell_view_state`); and those
 // of M4-45 (01 D1, D2): the hidden session column per layout (`shell_view_state`); and that of
-// M4-46 (01 6.8 item 3): the forum groups expanded to every open post (`channel_view_states`).
+// M4-46 (01 6.8 item 3): the forum groups expanded to every open post (`channel_view_states`);
+// and those of FIX-device-mirroring-2 (01 6.7, R-PR-24): the collapsed spaces of this device
+// (`space_view_states`).
 
 import 'dart:async';
 
@@ -303,6 +305,31 @@ void main() {
       expect(rows.read<int>('n'), 1);
     },
   );
+
+  test('the collapse of a space is kept on this device and is independent of '
+      'the synchronized sidebar state', () async {
+    final spaceB = SpaceId.parse(uuid(0x102));
+    final dao = db.forumViewDao;
+    expect(await dao.watchCollapsedSpaces().first, isEmpty);
+    await dao.setSpaceCollapsed(spaceA, collapsed: true);
+    await dao.setSpaceCollapsed(spaceB, collapsed: true);
+    expect(await dao.watchCollapsedSpaces().first, {spaceA, spaceB});
+    await dao.setSpaceCollapsed(spaceB, collapsed: false);
+    expect(await dao.watchCollapsedSpaces().first, {spaceA});
+
+    // A `sidebar.updated` of another device writes `user_space_states` only.
+    await db.structureDao.upsertUserSpaceStateIfNewer(
+      UserSpaceState(
+        spaceId: spaceA,
+        collapsed: false,
+        version: const ResourceVersion(5),
+      ),
+    );
+    expect(await dao.watchCollapsedSpaces().first, {spaceA});
+    expect([
+      for (final t in db.mirrorTables) t.actualTableName,
+    ], isNot(contains('space_view_states')));
+  });
 
   test('a resync keeps the group and overview state: they are no mirror '
       'tables', () {

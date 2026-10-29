@@ -65,7 +65,7 @@ milestones from the [plan](../PLAN.md).
 
 | Feature | Milestone | Where | Action(s) | Remark |
 |---|---|---|---|---|
-| Spaces collapsible, personal order, across devices | core | D, M | `sidebar.update` | global order only through administration (`space.reorder`) |
+| Spaces collapsible per device, personal order across devices | core | D, M | `sidebar.update` | global order only through administration (`space.reorder`) |
 | Text channels with main thread and threads from messages | core | D, M | `thread.create`, `message.create` | |
 | Forum channels with a dense post list, tags, Done section | core | D, M | `thread.create`, `thread.tags.set` | list instead of cards (study B); on desktop in the forum overview D15, pinnable as a column (R-PR-17) |
 | Open posts and threads nested under their channel in the sidebar | core | D, M | `thread.read` | as in Discord; selection, order and markers in 6.8 (addendum of 2026-10-27) |
@@ -1522,10 +1522,13 @@ a second interaction.
 - **Move:** The dialog shows only channels with the same operator; the thread ID stays.
 - **Each device navigates on its own** (addendum of 2026-10-29, R-PR-24). What a device shows
   is its own: the route (open space, channel, thread or view), the selected sidebar row, the open
-  and hidden columns and the scroll position are never written to the server and never follow
-  another device of the person. Only data crosses devices (04 14): messages, read state and the
-  counters it gives, drafts, settings, the sidebar order and collapse of spaces and notification
-  preferences. Opening a thread on one device marks it read there; the other device updates its
+  and hidden columns, which spaces and thread groups of the sidebar are collapsed and the scroll
+  position are never written to the server and never follow another device of the person. Only
+  data crosses devices (04 14): messages, read state and the counters it gives, drafts, settings,
+  the personal order of the spaces and notification preferences. Expanding a space on the phone
+  to open a chat leaves the space as it was on the desktop; an upgraded app keeps the collapse
+  state it showed last, a new device starts with every space expanded. Opening a thread on one
+  device marks it read there; the other device updates its
   counters and stays where it is. Only an action of the person on that device changes its route:
   a click in the app, a clicked notification or push, a link.
 
@@ -1855,7 +1858,9 @@ time; a separate push only for cleanup is to be checked later.
 
 ## 11. Personal settings
 
-Synchronized via `user_settings` ([04](04-sync-protocol.md) section 14). This table is
+Synchronized via `user_settings` ([04](04-sync-protocol.md) section 14). The view state of a
+device is no setting and has no key here: which spaces, thread groups and Done sections are
+collapsed, which columns show and the route stay on the device (6.7, R-PR-24). This table is
 normative for all personal keys except `notify.*` ([03-data-model.md](03-data-model.md),
 `user_settings`); the keys `notify.*` are in
 [13-push-notifications.md](13-push-notifications.md), section 3.3. The server rejects
@@ -1921,7 +1926,7 @@ Rules:
 | R-PR-21 | The space menu adds forums for the folders of a runner's projects folder that have none, as a checked list the owner confirms, one forum and binding per folder; a project forum's menu renames the forum, never the folder (6.10, 6.11, addendum of 2026-10-29). | Owner feedback 2026-10-29: his former setup synced a forum for every project folder and renamed project forums; the list is the preview, and a folder with a forum never gets a second one (D-M4-44-1 to D-M4-44-7). |
 | R-PR-22 | On desktop the session column can be hidden and shown from the header of a thread or main history ("Hide session", "Show session"), with Cmd+Shift+I and from a slim rail at the right edge while it is hidden, kept per device and per layout (addendum of 2026-10-29). | Owner feedback on the Mac app (2026-10-29): the session column read as not collapsible, because the header button only said "Column" and the choice was lost on restart. |
 | R-PR-23 | A forum group in the sidebar lists every open post by last activity, newest first, the newest `ui.sidebar_forum_posts_visible` and then "Show more" in place (kept per device); text channels keep the rule of 6.8 item 2 (addendum of 2026-10-29). | Owner decision 2026-10-29 ("like Discord"): after an import most open posts had no recent activity and vanished from the sidebar; a forum with 24 open posts showed none. |
-| R-PR-24 | Each device navigates on its own: route, selected row, open columns and scroll position stay on the device and never follow another device of the person; only data (messages, read state, counters, drafts, settings, sidebar order, notification preferences) syncs (6.7, 04 14; addendum of 2026-10-29). | Owner report 2026-10-29 (iPhone and Mac app of one person): opening a chat on the phone appeared to open the same chat on the Mac. The owner wants to do different things on phone and desktop. A test with two app instances of one person over the fake server holds the rule (docs/decisions.d/FIX-device-mirroring.md). |
+| R-PR-24 | Each device navigates on its own: route, selected row, open columns, collapsed spaces and groups and scroll position stay on the device and never follow another device of the person; only data (messages, read state, counters, drafts, settings, sidebar order, notification preferences) syncs (6.7, 04 14; addendum of 2026-10-29). | Owner report 2026-10-29 (iPhone and Mac app of one person): opening a chat on the phone appeared to open the same chat on the Mac. The cause was the synchronized collapse of a space: the space a device expanded to open a chat expanded on the other device at the same moment, while the route never followed. The owner wants to do different things on phone and desktop. Two-device tests over the fake server hold the rule (docs/decisions.d/FIX-device-mirroring.md, docs/decisions.d/FIX-device-mirroring-2.md). |
 
 ## 14. Configuration values of this chapter
 

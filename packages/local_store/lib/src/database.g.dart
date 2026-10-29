@@ -19084,6 +19084,231 @@ class ShellViewStatesCompanion extends UpdateCompanion<ShellViewStateRow> {
   }
 }
 
+class $SpaceViewStatesTable extends SpaceViewStates
+    with TableInfo<$SpaceViewStatesTable, SpaceViewStateRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $SpaceViewStatesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _spaceIdMeta = const VerificationMeta(
+    'spaceId',
+  );
+  @override
+  late final GeneratedColumn<String> spaceId = GeneratedColumn<String>(
+    'space_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _collapsedMeta = const VerificationMeta(
+    'collapsed',
+  );
+  @override
+  late final GeneratedColumn<bool> collapsed = GeneratedColumn<bool>(
+    'collapsed',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("collapsed" IN (0, 1))',
+    ),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [spaceId, collapsed];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'space_view_states';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<SpaceViewStateRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('space_id')) {
+      context.handle(
+        _spaceIdMeta,
+        spaceId.isAcceptableOrUnknown(data['space_id']!, _spaceIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_spaceIdMeta);
+    }
+    if (data.containsKey('collapsed')) {
+      context.handle(
+        _collapsedMeta,
+        collapsed.isAcceptableOrUnknown(data['collapsed']!, _collapsedMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_collapsedMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {spaceId};
+  @override
+  SpaceViewStateRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return SpaceViewStateRow(
+      spaceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}space_id'],
+      )!,
+      collapsed: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}collapsed'],
+      )!,
+    );
+  }
+
+  @override
+  $SpaceViewStatesTable createAlias(String alias) {
+    return $SpaceViewStatesTable(attachedDatabase, alias);
+  }
+}
+
+class SpaceViewStateRow extends DataClass
+    implements Insertable<SpaceViewStateRow> {
+  /// The space, canonical UUID text.
+  final String spaceId;
+
+  /// Whether the space is collapsed.
+  final bool collapsed;
+  const SpaceViewStateRow({required this.spaceId, required this.collapsed});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['space_id'] = Variable<String>(spaceId);
+    map['collapsed'] = Variable<bool>(collapsed);
+    return map;
+  }
+
+  SpaceViewStatesCompanion toCompanion(bool nullToAbsent) {
+    return SpaceViewStatesCompanion(
+      spaceId: Value(spaceId),
+      collapsed: Value(collapsed),
+    );
+  }
+
+  factory SpaceViewStateRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return SpaceViewStateRow(
+      spaceId: serializer.fromJson<String>(json['spaceId']),
+      collapsed: serializer.fromJson<bool>(json['collapsed']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'spaceId': serializer.toJson<String>(spaceId),
+      'collapsed': serializer.toJson<bool>(collapsed),
+    };
+  }
+
+  SpaceViewStateRow copyWith({String? spaceId, bool? collapsed}) =>
+      SpaceViewStateRow(
+        spaceId: spaceId ?? this.spaceId,
+        collapsed: collapsed ?? this.collapsed,
+      );
+  SpaceViewStateRow copyWithCompanion(SpaceViewStatesCompanion data) {
+    return SpaceViewStateRow(
+      spaceId: data.spaceId.present ? data.spaceId.value : this.spaceId,
+      collapsed: data.collapsed.present ? data.collapsed.value : this.collapsed,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SpaceViewStateRow(')
+          ..write('spaceId: $spaceId, ')
+          ..write('collapsed: $collapsed')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(spaceId, collapsed);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is SpaceViewStateRow &&
+          other.spaceId == this.spaceId &&
+          other.collapsed == this.collapsed);
+}
+
+class SpaceViewStatesCompanion extends UpdateCompanion<SpaceViewStateRow> {
+  final Value<String> spaceId;
+  final Value<bool> collapsed;
+  final Value<int> rowid;
+  const SpaceViewStatesCompanion({
+    this.spaceId = const Value.absent(),
+    this.collapsed = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  SpaceViewStatesCompanion.insert({
+    required String spaceId,
+    required bool collapsed,
+    this.rowid = const Value.absent(),
+  }) : spaceId = Value(spaceId),
+       collapsed = Value(collapsed);
+  static Insertable<SpaceViewStateRow> custom({
+    Expression<String>? spaceId,
+    Expression<bool>? collapsed,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (spaceId != null) 'space_id': spaceId,
+      if (collapsed != null) 'collapsed': collapsed,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  SpaceViewStatesCompanion copyWith({
+    Value<String>? spaceId,
+    Value<bool>? collapsed,
+    Value<int>? rowid,
+  }) {
+    return SpaceViewStatesCompanion(
+      spaceId: spaceId ?? this.spaceId,
+      collapsed: collapsed ?? this.collapsed,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (spaceId.present) {
+      map['space_id'] = Variable<String>(spaceId.value);
+    }
+    if (collapsed.present) {
+      map['collapsed'] = Variable<bool>(collapsed.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SpaceViewStatesCompanion(')
+          ..write('spaceId: $spaceId, ')
+          ..write('collapsed: $collapsed, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$LocalDatabase extends GeneratedDatabase {
   _$LocalDatabase(QueryExecutor e) : super(e);
   late final SearchIndex searchIndex = SearchIndex(this);
@@ -19135,6 +19360,9 @@ abstract class _$LocalDatabase extends GeneratedDatabase {
   late final $ChannelViewStatesTable channelViewStates =
       $ChannelViewStatesTable(this);
   late final $ShellViewStatesTable shellViewStates = $ShellViewStatesTable(
+    this,
+  );
+  late final $SpaceViewStatesTable spaceViewStates = $SpaceViewStatesTable(
     this,
   );
   late final Index channelsSpace = Index(
@@ -19228,6 +19456,7 @@ abstract class _$LocalDatabase extends GeneratedDatabase {
     hostKeyPins,
     channelViewStates,
     shellViewStates,
+    spaceViewStates,
     channelsSpace,
     forumTagsChannel,
     threadsChannel,

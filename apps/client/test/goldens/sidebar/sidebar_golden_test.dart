@@ -37,12 +37,6 @@ Widget cell(Widget child) => SizedBox(
   ),
 );
 
-UserSpaceState state(int n, {bool collapsed = false}) => UserSpaceState(
-  spaceId: spaceId(n),
-  collapsed: collapsed,
-  version: const ResourceVersion(1),
-);
-
 SidebarChannel entry(
   Channel c, {
   int unread = 0,
@@ -177,7 +171,7 @@ List<SidebarSpaceNode> nodes() => [
   SidebarSpaceNode(
     entry: SidebarSpace(
       space: space(2, name: 'Operations', color: 'loch'),
-      state: state(2, collapsed: true),
+      collapsed: true,
     ),
     channels: [entry(channel(7, spaceN: 2, name: 'alerts'), unread: 3)],
   ),

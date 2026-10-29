@@ -26,7 +26,8 @@ void main() {
     test('the personal key wins, the global order is the fallback', () {
       final order = orderSpaces(
         [space(1, key: 'a1'), space(2, key: 'a2'), space(3, key: 'a3')],
-        [state(3, key: 'a0V'), state(2, collapsed: true)],
+        [state(3, key: 'a0V'), state(2)],
+        collapsed: {spaceId(2)},
       );
       expect(
         [for (final s in order) s.space.id],
@@ -34,6 +35,17 @@ void main() {
       );
       expect(order.last.collapsed, isTrue);
       expect(order.first.collapsed, isFalse);
+    });
+
+    test('the collapse comes from this device, not from the synchronized '
+        'state (01 6.7, R-PR-24)', () {
+      final order = orderSpaces(
+        [space(1), space(2)],
+        [state(1, collapsed: true)],
+        collapsed: {spaceId(2)},
+      );
+      expect(order.first.collapsed, isFalse);
+      expect(order.last.collapsed, isTrue);
     });
 
     test('archived spaces are not shown', () {
@@ -60,11 +72,13 @@ void main() {
       expect(moveSpace(order, spaceId(2), 1), isEmpty, reason: 'no change');
     });
 
-    test('neighbours without room get fresh keys, collapse states kept', () {
+    test('neighbours without room get fresh keys, the synchronized collapse '
+        'states kept', () {
       // Two spaces with the same global key, and one whose key is no valid key.
       final order = orderSpaces(
         [space(1, key: 'a1'), space(2, key: 'a1'), space(3, key: 'a10')],
         [state(1, collapsed: true)],
+        collapsed: {spaceId(3)},
       );
       final writes = moveSpace(order, spaceId(3), 1);
       final keys = {for (final w in writes) w.spaceId: w.sortKey};
@@ -75,9 +89,14 @@ void main() {
         final b = keys[after[i]] ?? order[1].orderKey;
         expect(a.compareTo(b), lessThan(0));
       }
+      // A write keeps the value the server holds, not the state of this device.
       expect(
         writes.firstWhere((w) => w.spaceId == spaceId(1)).collapsed,
         isTrue,
+      );
+      expect(
+        writes.firstWhere((w) => w.spaceId == spaceId(3)).collapsed,
+        isFalse,
       );
       for (final w in writes) {
         expect(FractionalIndex.isValid(w.sortKey), isTrue);
@@ -195,7 +214,7 @@ void main() {
         channels: [ch(1), ch(2, unread: 1)],
       ),
       SidebarSpaceNode(
-        entry: SidebarSpace(space: space(2), state: state(2, collapsed: true)),
+        entry: SidebarSpace(space: space(2), collapsed: true),
         channels: [ch(3, unread: 2)],
       ),
       SidebarSpaceNode(

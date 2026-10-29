@@ -188,6 +188,16 @@ void main() {
     },
   );
 
+  test('removing a space deletes its collapse state on this device', () async {
+    await fill(1, s: 1);
+    await fill(2, s: 2);
+    for (final n in [1, 2]) {
+      await db.forumViewDao.setSpaceCollapsed(space(n).id, collapsed: true);
+    }
+    await db.removeTargets([TargetRef.space(space(2).id)]);
+    expect(await db.forumViewDao.watchCollapsedSpaces().first, {space(1).id});
+  });
+
   test(
     'removing a channel or its space deletes the state of its thread group',
     () async {
