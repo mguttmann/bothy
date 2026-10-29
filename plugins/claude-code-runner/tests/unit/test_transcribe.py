@@ -117,12 +117,12 @@ async def test_missing_program_is_unreachable(tmp_path: Path) -> None:
 
 
 async def test_long_output_is_cut_at_a_character_boundary(tmp_path: Path) -> None:
-    cmd = script(tmp_path, f"sys.stdout.write('ä' * {TRANSCRIPT_MAX_BYTES})")
+    cmd = script(tmp_path, f"sys.stdout.write('\\u00e9' * {TRANSCRIPT_MAX_BYTES})")
     item = attachment()
     await transcribe_attachments([item], stored(tmp_path, item), transcriber((cmd,)))
     assert isinstance(item.transcript, str)
     assert len(item.transcript.encode("utf-8")) == TRANSCRIPT_MAX_BYTES
-    assert set(item.transcript) == {"ä"}
+    assert set(item.transcript) == {"\u00e9"}
 
 
 async def test_only_stored_audio_without_a_server_transcript_is_given(tmp_path: Path) -> None:
