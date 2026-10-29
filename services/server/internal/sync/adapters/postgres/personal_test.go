@@ -13,6 +13,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/pg/pgtest"
 	"github.com/OWNER/bothy/services/server/internal/sync"
 	"github.com/OWNER/bothy/services/server/internal/sync/adapters/postgres"
+	"github.com/OWNER/bothy/services/server/internal/sync/domain"
 	"github.com/OWNER/bothy/services/server/internal/wire"
 )
 
@@ -90,7 +91,7 @@ func TestPersonalRepositoryRoundTrip(t *testing.T) {
 	}
 
 	// Drafts.
-	if _, err := repo.UpsertDraft(ctx, alex, sync.Draft{ID: ids.New(), ThreadID: thread, ChannelID: ch}); err == nil {
+	if _, _, err := repo.UpsertDraft(ctx, alex, sync.Draft{ID: ids.New(), ThreadID: thread, ChannelID: ch}); err == nil {
 		t.Fatal("upsert outside a unit of work")
 	}
 	if _, _, err := repo.DeleteDraft(ctx, alex, thread, ch); err == nil {
@@ -99,18 +100,30 @@ func TestPersonalRepositoryRoundTrip(t *testing.T) {
 	var first sync.Draft
 	do(func(ctx context.Context) error {
 		var err error
-		first, err = repo.UpsertDraft(ctx, alex, sync.Draft{ID: ids.New(), ThreadID: thread, ChannelID: ch, ContentMD: "a", ReplyToID: msg,
-			FileIDs: []ids.ID{ids.New()}, UpdatedAt: at})
-		if err != nil || first.Version != 1 || first.ReplyToID != msg || len(first.FileIDs) != 1 {
-			t.Errorf("insert %+v %v", first, err)
+		var none domain.ReplacedDraft
+		file := ids.New()
+		first, none, err = repo.UpsertDraft(ctx, alex, sync.Draft{ID: ids.New(), ThreadID: thread, ChannelID: ch, ContentMD: "a", ReplyToID: msg,
+			FileIDs: []ids.ID{file}, UpdatedAt: at})
+		if err != nil || first.Version != 1 || first.ReplyToID != msg || len(first.FileIDs) != 1 || none.Found {
+			t.Errorf("insert %+v %+v %v", first, none, err)
 		}
-		again, err := repo.UpsertDraft(ctx, alex, sync.Draft{ID: ids.New(), ThreadID: thread, ChannelID: ch, ContentMD: "b", UpdatedAt: at})
+		// The update returns the row it replaced: text, files and (no) device of version 1; the
+		// devices are the HTTP tests' (TestDraftsOwnWritesNeverOverwrite).
+		again, replaced, err := repo.UpsertDraft(ctx, alex, sync.Draft{ID: ids.New(), ThreadID: thread, ChannelID: ch, ContentMD: "b", UpdatedAt: at})
 		if err != nil || again.ID != first.ID || again.Version != 2 || len(again.FileIDs) != 0 || !again.ReplyToID.IsZero() {
 			t.Errorf("update %+v %v", again, err)
 		}
-		post, err := repo.UpsertDraft(ctx, alex, sync.Draft{ID: ids.New(), ChannelID: ch, ContentMD: "post", UpdatedAt: at})
-		if err != nil || post.Version != 1 || !post.ThreadID.IsZero() {
+		if !replaced.Found || !replaced.Known || replaced.Version != 1 || replaced.ContentMD != "a" || !replaced.Device.IsZero() ||
+			len(replaced.FileIDs) != 1 || replaced.FileIDs[0] != file {
+			t.Errorf("replaced %+v", replaced)
+		}
+		post, none, err := repo.UpsertDraft(ctx, alex, sync.Draft{ID: ids.New(), ChannelID: ch, ContentMD: "post", UpdatedAt: at})
+		if err != nil || post.Version != 1 || !post.ThreadID.IsZero() || none.Found {
 			t.Errorf("channel draft %+v %v", post, err)
+		}
+		post2, replaced, err := repo.UpsertDraft(ctx, alex, sync.Draft{ID: ids.New(), ChannelID: ch, ContentMD: "post 2", UpdatedAt: at})
+		if err != nil || post2.Version != 2 || !replaced.Known || replaced.ContentMD != "post" || !replaced.Device.IsZero() {
+			t.Errorf("channel draft again %+v %+v %v", post2, replaced, err)
 		}
 		return nil
 	})

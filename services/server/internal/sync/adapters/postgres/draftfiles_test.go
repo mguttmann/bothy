@@ -52,15 +52,15 @@ func TestDraftFilesHeldByUploader(t *testing.T) {
 	inThread, inChannel, foreign, loose := ids.New(), ids.New(), ids.New(), ids.New()
 	at := time.Date(2026, 10, 15, 9, 0, 0, 0, time.UTC)
 	if err := uow.Do(ctx, func(ctx context.Context) error {
-		if _, err := repo.UpsertDraft(ctx, alex, sync.Draft{ID: ids.New(), ThreadID: thread, ChannelID: ch, ContentMD: "a",
+		if _, _, err := repo.UpsertDraft(ctx, alex, sync.Draft{ID: ids.New(), ThreadID: thread, ChannelID: ch, ContentMD: "a",
 			FileIDs: []ids.ID{inThread}, UpdatedAt: at}); err != nil {
 			return err
 		}
-		if _, err := repo.UpsertDraft(ctx, alex, sync.Draft{ID: ids.New(), ChannelID: ch, ContentMD: "b", FileIDs: []ids.ID{inChannel},
+		if _, _, err := repo.UpsertDraft(ctx, alex, sync.Draft{ID: ids.New(), ChannelID: ch, ContentMD: "b", FileIDs: []ids.ID{inChannel},
 			UpdatedAt: at}); err != nil {
 			return err
 		}
-		_, err := repo.UpsertDraft(ctx, sam, sync.Draft{ID: ids.New(), ThreadID: thread, ChannelID: ch, ContentMD: "c",
+		_, _, err := repo.UpsertDraft(ctx, sam, sync.Draft{ID: ids.New(), ThreadID: thread, ChannelID: ch, ContentMD: "c",
 			FileIDs: []ids.ID{foreign}, UpdatedAt: at})
 		return err
 	}); err != nil {

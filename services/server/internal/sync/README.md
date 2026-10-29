@@ -276,10 +276,14 @@ invisible thread or channel the same `404`.
   `file_ids` UUIDv7, without duplicates and at most `message.max_attachments`, a reply target of
   the same thread (`messaging.ReplyTargets`, `not_in_thread`), none on a channel draft. A write is
   one upsert on the partial unique index, so concurrent first writes do not fail; a returned
-  version 1 is new, a larger one replaced version - 1, and `overwrote_newer = existed AND
-  (base_version absent OR base_version < version - 1)`. An empty draft (whitespace only, no
-  files) is deleted like `DELETE` and answers the empty final state with the last version plus
-  one. `listMyDrafts` (`draft.read`): the drafts in the visible channels, each checked with
+  version 1 is new, a larger one replaced version - 1. The upsert also returns the replaced row
+  of its snapshot (text, files, device; known only when its version is version - 1, else a
+  concurrent write came in between), and `domain.OverwroteNewer` decides: `overwrote_newer =
+  replaced AND (base_version absent OR base_version < version - 1) AND NOT (replaced by this
+  device OR same text and files)`, with an unknown replaced row counting as foreign (04 14,
+  addendum of 2026-10-29). An empty draft (whitespace only, no files) is deleted like `DELETE`,
+  answers the empty final state with the last version plus one and never reports
+  `overwrote_newer`. `listMyDrafts` (`draft.read`): the drafts in the visible channels, each checked with
   `thread.read` or `channel.read` in filter mode; drafts of lost channels stay stored.
 - **clear_draft.** `Subscribers.OnMessagePosted` runs in the message transaction: with
   `ClearDraft` it deletes the author's draft of the thread, or for the first message of a new

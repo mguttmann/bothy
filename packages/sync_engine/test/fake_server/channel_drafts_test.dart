@@ -35,6 +35,48 @@ void main() {
   Map<String, Object?> scopeOf(FakeEvent e) =>
       e.envelope['scope']! as Map<String, Object?>;
 
+  // FIX-draft-conflict-banner: as the server, overwrote_newer only for different text of
+  // another device that this device had not seen; its own writes with a lagging base and an
+  // empty or identical draft never report it.
+  test(
+    'overwrote_newer only for another device\'s newer different text',
+    () async {
+      final phone = h.device();
+      await signedIn(h, phone);
+      final laptop = h.device(keySeed: 2);
+      await signedIn(h, laptop);
+      Future<bool> put(
+        TestDevice d,
+        String text, {
+        int? base,
+        String? thread,
+      }) async {
+        final draft = DraftPut(
+          (b) => b
+            ..contentMd = text
+            ..baseVersion = base,
+        );
+        final prefs = d.api.getPreferencesApi();
+        final result = thread == null
+            ? await prefs.putChannelDraft(channelId: forum, draftPut: draft)
+            : await prefs.putThreadDraft(threadId: thread, draftPut: draft);
+        return result.data!.overwroteNewer;
+      }
+
+      for (final thread in [null, h.seed.releaseNotes]) {
+        expect(await put(phone, 'H', thread: thread), isFalse);
+        expect(await put(phone, 'He', thread: thread), isFalse);
+        expect(await put(phone, 'Hel', base: 1, thread: thread), isFalse);
+        expect(await put(laptop, 'Hel', base: 1, thread: thread), isFalse);
+        expect(await put(laptop, 'Laptop', base: 4, thread: thread), isFalse);
+        expect(await put(phone, 'Hello', base: 4, thread: thread), isTrue);
+        expect(await put(laptop, 'Mine', thread: thread), isTrue);
+        expect(await put(phone, '', base: 1, thread: thread), isFalse);
+      }
+      expect(h.server.violations, isEmpty);
+    },
+  );
+
   test('put, overwrite and list the draft of a new forum post', () async {
     final alex = h.device();
     final session = await signedIn(h, alex);
@@ -74,7 +116,9 @@ void main() {
     expect(second.draft.version, 2);
 
     // Another device edited version 1 while this one already wrote version 2.
-    final stale = (await prefs.putChannelDraft(
+    final laptop = h.device(keySeed: 2);
+    await signedIn(h, laptop);
+    final stale = (await laptop.api.getPreferencesApi().putChannelDraft(
       channelId: forum,
       draftPut: DraftPut(
         (b) => b

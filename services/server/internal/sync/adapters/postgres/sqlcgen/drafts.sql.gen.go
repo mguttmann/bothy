@@ -218,6 +218,10 @@ func (q *Queries) ListDraftsOfUser(ctx context.Context, userID pgtype.UUID) ([]D
 }
 
 const upsertChannelDraft = `-- name: UpsertChannelDraft :one
+WITH prev AS (
+    SELECT o.content_md, o.file_ids, o.updated_by_device_id, o.version FROM drafts o
+    WHERE o.user_id = $2 AND o.channel_id = $3 AND o.thread_id IS NULL
+)
 INSERT INTO drafts (id, user_id, thread_id, channel_id, content_md, reply_to_message_id, file_ids, version,
                     updated_by_device_id, updated_at)
 VALUES ($1, $2, NULL, $3, $4, NULL, $5::uuid[], 1,
@@ -225,7 +229,10 @@ VALUES ($1, $2, NULL, $3, $4, NULL, $5::uuid[], 1,
 ON CONFLICT (user_id, channel_id) WHERE thread_id IS NULL DO UPDATE
 SET content_md = EXCLUDED.content_md, file_ids = EXCLUDED.file_ids, version = drafts.version + 1,
     updated_by_device_id = EXCLUDED.updated_by_device_id, updated_at = EXCLUDED.updated_at
-RETURNING id, user_id, thread_id, channel_id, content_md, reply_to_message_id, file_ids, version, updated_by_device_id, updated_at
+RETURNING drafts.id, drafts.user_id, drafts.thread_id, drafts.channel_id, drafts.content_md, drafts.reply_to_message_id, drafts.file_ids, drafts.version, drafts.updated_by_device_id, drafts.updated_at, COALESCE((SELECT prev.version FROM prev), 0)::bigint AS old_version,
+          COALESCE((SELECT prev.content_md FROM prev), '')::text AS old_content_md,
+          (SELECT prev.file_ids FROM prev)::uuid[] AS old_file_ids,
+          (SELECT prev.updated_by_device_id FROM prev)::uuid AS old_updated_by_device_id
 `
 
 type UpsertChannelDraftParams struct {
@@ -238,7 +245,24 @@ type UpsertChannelDraftParams struct {
 	UpdatedAt         pgtype.Timestamptz
 }
 
-func (q *Queries) UpsertChannelDraft(ctx context.Context, arg UpsertChannelDraftParams) (Draft, error) {
+type UpsertChannelDraftRow struct {
+	ID                   pgtype.UUID
+	UserID               pgtype.UUID
+	ThreadID             pgtype.UUID
+	ChannelID            pgtype.UUID
+	ContentMd            string
+	ReplyToMessageID     pgtype.UUID
+	FileIds              []pgtype.UUID
+	Version              int64
+	UpdatedByDeviceID    pgtype.UUID
+	UpdatedAt            pgtype.Timestamptz
+	OldVersion           int64
+	OldContentMd         string
+	OldFileIds           []pgtype.UUID
+	OldUpdatedByDeviceID pgtype.UUID
+}
+
+func (q *Queries) UpsertChannelDraft(ctx context.Context, arg UpsertChannelDraftParams) (UpsertChannelDraftRow, error) {
 	row := q.db.QueryRow(ctx, upsertChannelDraft,
 		arg.ID,
 		arg.UserID,
@@ -248,7 +272,7 @@ func (q *Queries) UpsertChannelDraft(ctx context.Context, arg UpsertChannelDraft
 		arg.UpdatedByDeviceID,
 		arg.UpdatedAt,
 	)
-	var i Draft
+	var i UpsertChannelDraftRow
 	err := row.Scan(
 		&i.ID,
 		&i.UserID,
@@ -260,12 +284,20 @@ func (q *Queries) UpsertChannelDraft(ctx context.Context, arg UpsertChannelDraft
 		&i.Version,
 		&i.UpdatedByDeviceID,
 		&i.UpdatedAt,
+		&i.OldVersion,
+		&i.OldContentMd,
+		&i.OldFileIds,
+		&i.OldUpdatedByDeviceID,
 	)
 	return i, err
 }
 
 const upsertThreadDraft = `-- name: UpsertThreadDraft :one
 
+WITH prev AS (
+    SELECT o.content_md, o.file_ids, o.updated_by_device_id, o.version FROM drafts o
+    WHERE o.user_id = $2 AND o.thread_id = $3
+)
 INSERT INTO drafts (id, user_id, thread_id, channel_id, content_md, reply_to_message_id, file_ids, version,
                     updated_by_device_id, updated_at)
 VALUES ($1, $2, $3, $4, $5,
@@ -274,7 +306,10 @@ ON CONFLICT (user_id, thread_id) WHERE thread_id IS NOT NULL DO UPDATE
 SET channel_id = EXCLUDED.channel_id, content_md = EXCLUDED.content_md, reply_to_message_id = EXCLUDED.reply_to_message_id,
     file_ids = EXCLUDED.file_ids, version = drafts.version + 1, updated_by_device_id = EXCLUDED.updated_by_device_id,
     updated_at = EXCLUDED.updated_at
-RETURNING id, user_id, thread_id, channel_id, content_md, reply_to_message_id, file_ids, version, updated_by_device_id, updated_at
+RETURNING drafts.id, drafts.user_id, drafts.thread_id, drafts.channel_id, drafts.content_md, drafts.reply_to_message_id, drafts.file_ids, drafts.version, drafts.updated_by_device_id, drafts.updated_at, COALESCE((SELECT prev.version FROM prev), 0)::bigint AS old_version,
+          COALESCE((SELECT prev.content_md FROM prev), '')::text AS old_content_md,
+          (SELECT prev.file_ids FROM prev)::uuid[] AS old_file_ids,
+          (SELECT prev.updated_by_device_id FROM prev)::uuid AS old_updated_by_device_id
 `
 
 type UpsertThreadDraftParams struct {
@@ -289,12 +324,32 @@ type UpsertThreadDraftParams struct {
 	UpdatedAt         pgtype.Timestamptz
 }
 
+type UpsertThreadDraftRow struct {
+	ID                   pgtype.UUID
+	UserID               pgtype.UUID
+	ThreadID             pgtype.UUID
+	ChannelID            pgtype.UUID
+	ContentMd            string
+	ReplyToMessageID     pgtype.UUID
+	FileIds              []pgtype.UUID
+	Version              int64
+	UpdatedByDeviceID    pgtype.UUID
+	UpdatedAt            pgtype.Timestamptz
+	OldVersion           int64
+	OldContentMd         string
+	OldFileIds           []pgtype.UUID
+	OldUpdatedByDeviceID pgtype.UUID
+}
+
 // SPDX-License-Identifier: Apache-2.0
 // Drafts (M1-61; 03 drafts, 04 section 14). Every statement names the person (user_id). The
 // writes upsert on the partial unique indexes, so two concurrent first writes do not fail: the
 // second updates the row the first inserted. A returned version 1 is a new row; a larger one is
-// the version after the update (the row had version - 1 under its lock).
-func (q *Queries) UpsertThreadDraft(ctx context.Context, arg UpsertThreadDraftParams) (Draft, error) {
+// the version after the update (the row had version - 1 under its lock). The upserts also return
+// the version, text, files and device of the row in the statement's snapshot (old_version 0 for
+// none; FIX-draft-conflict-banner): it is the replaced row only when old_version is the returned
+// version - 1, otherwise a concurrent write came in between and the replaced row is unknown.
+func (q *Queries) UpsertThreadDraft(ctx context.Context, arg UpsertThreadDraftParams) (UpsertThreadDraftRow, error) {
 	row := q.db.QueryRow(ctx, upsertThreadDraft,
 		arg.ID,
 		arg.UserID,
@@ -306,7 +361,7 @@ func (q *Queries) UpsertThreadDraft(ctx context.Context, arg UpsertThreadDraftPa
 		arg.UpdatedByDeviceID,
 		arg.UpdatedAt,
 	)
-	var i Draft
+	var i UpsertThreadDraftRow
 	err := row.Scan(
 		&i.ID,
 		&i.UserID,
@@ -318,6 +373,10 @@ func (q *Queries) UpsertThreadDraft(ctx context.Context, arg UpsertThreadDraftPa
 		&i.Version,
 		&i.UpdatedByDeviceID,
 		&i.UpdatedAt,
+		&i.OldVersion,
+		&i.OldContentMd,
+		&i.OldFileIds,
+		&i.OldUpdatedByDeviceID,
 	)
 	return i, err
 }

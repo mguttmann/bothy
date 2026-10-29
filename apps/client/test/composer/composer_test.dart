@@ -257,6 +257,36 @@ void main() {
     },
   );
 
+  // FIX-draft-conflict-banner: a draft of another device arriving, and the restore of an
+  // unconfirmed write, only fill the field; the route of this device stays.
+  testWidgets('a synced or restored draft does not navigate', (tester) async {
+    final host = await open(tester);
+    final before = [...host.visited];
+    await host.run(
+      tester,
+      () => host.db.personalDao.upsertDraftIfNewer(
+        Draft(
+          id: DraftId.parse(uuid(0xd3)),
+          threadId: threadId(1),
+          channelId: channelId(1),
+          contentMd: 'From the laptop',
+          fileIds: const [],
+          version: const ResourceVersion(1),
+        ),
+      ),
+    );
+    await host.settle(tester);
+    expect(
+      tester.widget<TextField>(composerField).controller!.text,
+      'From the laptop',
+    );
+    await pumpThreadWith(tester, host, const {}, show: false);
+    await pumpThreadWith(tester, host, const {});
+    await host.settle(tester);
+    expect(host.visited.toSet(), before.toSet());
+    await host.dispose(tester);
+  });
+
   testWidgets('overwrote_newer shows a notice', (tester) async {
     final host = await open(tester);
     await host.run(

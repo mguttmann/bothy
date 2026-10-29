@@ -17,6 +17,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/sync"
 	"github.com/OWNER/bothy/services/server/internal/sync/adapters/postgres/sqlcgen"
 	"github.com/OWNER/bothy/services/server/internal/sync/app"
+	"github.com/OWNER/bothy/services/server/internal/sync/domain"
 )
 
 // PersonalRepository implements app.PersonalStore over the sqlc queries of read_states, drafts
@@ -146,29 +147,68 @@ func readStateOf(row sqlcgen.ReadState) sync.ReadState {
 }
 
 // UpsertDraft implements app.PersonalStore on the partial unique index of the thread or of the
-// channel draft.
-func (r *PersonalRepository) UpsertDraft(ctx context.Context, user ids.ID, d sync.Draft) (sync.Draft, error) {
+// channel draft. The replaced row comes from the statement's snapshot; it is known only when its
+// version is the one the upsert raised (no concurrent write came in between).
+func (r *PersonalRepository) UpsertDraft(ctx context.Context, user ids.ID, d sync.Draft) (sync.Draft, domain.ReplacedDraft, error) {
 	q, err := r.write(ctx)
 	if err != nil {
-		return sync.Draft{}, err
+		return sync.Draft{}, domain.ReplacedDraft{}, err
 	}
 	var row sqlcgen.Draft
+	var old replacedRow
 	if d.ThreadID.IsZero() {
-		row, err = q.UpsertChannelDraft(ctx, sqlcgen.UpsertChannelDraftParams{
+		var up sqlcgen.UpsertChannelDraftRow
+		up, err = q.UpsertChannelDraft(ctx, sqlcgen.UpsertChannelDraftParams{
 			ID: uuid(d.ID), UserID: uuid(user), ChannelID: uuid(d.ChannelID), ContentMd: d.ContentMD, FileIds: uuids(d.FileIDs),
 			UpdatedByDeviceID: uuid(d.UpdatedByDeviceID), UpdatedAt: timestamptz(d.UpdatedAt),
 		})
+		row = sqlcgen.Draft{ID: up.ID, UserID: up.UserID, ThreadID: up.ThreadID, ChannelID: up.ChannelID, ContentMd: up.ContentMd,
+			ReplyToMessageID: up.ReplyToMessageID, FileIds: up.FileIds, Version: up.Version, UpdatedByDeviceID: up.UpdatedByDeviceID,
+			UpdatedAt: up.UpdatedAt}
+		old = replacedRow{up.OldVersion, up.OldContentMd, up.OldFileIds, up.OldUpdatedByDeviceID}
 	} else {
-		row, err = q.UpsertThreadDraft(ctx, sqlcgen.UpsertThreadDraftParams{
+		var up sqlcgen.UpsertThreadDraftRow
+		up, err = q.UpsertThreadDraft(ctx, sqlcgen.UpsertThreadDraftParams{
 			ID: uuid(d.ID), UserID: uuid(user), ThreadID: uuid(d.ThreadID), ChannelID: uuid(d.ChannelID), ContentMd: d.ContentMD,
 			ReplyToMessageID: uuid(d.ReplyToID), FileIds: uuids(d.FileIDs), UpdatedByDeviceID: uuid(d.UpdatedByDeviceID),
 			UpdatedAt: timestamptz(d.UpdatedAt),
 		})
+		row = sqlcgen.Draft{ID: up.ID, UserID: up.UserID, ThreadID: up.ThreadID, ChannelID: up.ChannelID, ContentMd: up.ContentMd,
+			ReplyToMessageID: up.ReplyToMessageID, FileIds: up.FileIds, Version: up.Version, UpdatedByDeviceID: up.UpdatedByDeviceID,
+			UpdatedAt: up.UpdatedAt}
+		old = replacedRow{up.OldVersion, up.OldContentMd, up.OldFileIds, up.OldUpdatedByDeviceID}
 	}
 	if err != nil {
-		return sync.Draft{}, failed(err, "writing a draft")
+		return sync.Draft{}, domain.ReplacedDraft{}, failed(err, "writing a draft")
 	}
-	return draftOf(row), nil
+	return draftOf(row), old.of(row.Version), nil
+}
+
+// replacedRow is the snapshot of the draft row before an upsert (old_version 0 for none).
+type replacedRow struct {
+	version int64
+	content string
+	files   []pgtype.UUID
+	device  pgtype.UUID
+}
+
+// of returns the replaced row of an upsert that stored version: none for version 1; the row of
+// the snapshot when its version is version - 1; otherwise a concurrent write came in between and
+// only the version of the replaced row is known.
+func (o replacedRow) of(version int64) domain.ReplacedDraft {
+	if version <= 1 {
+		return domain.ReplacedDraft{}
+	}
+	out := domain.ReplacedDraft{Found: true, Version: version - 1}
+	if o.version != version-1 {
+		return out
+	}
+	files := make([]ids.ID, 0, len(o.files))
+	for _, f := range o.files {
+		files = append(files, idOf(f))
+	}
+	out.Known, out.Device, out.ContentMD, out.FileIDs = true, idOf(o.device), o.content, files
+	return out
 }
 
 // DeleteDraft implements app.PersonalStore and app.DraftRows.
