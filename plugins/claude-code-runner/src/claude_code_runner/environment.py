@@ -25,7 +25,13 @@ from pathlib import Path
 
 from bothy_sdk.auth import Secret
 
-__all__ = ["RunEnvironmentError", "build_environment", "clean_path", "find_program"]
+__all__ = [
+    "RunEnvironmentError",
+    "build_environment",
+    "clean_path",
+    "find_program",
+    "kept_environment",
+]
 
 _KEPT = ("HOME", "USER", "LOGNAME", "SHELL", "LANG", "TERM", "TMPDIR")
 _WIDE = stat.S_IWGRP | stat.S_IWOTH
@@ -87,6 +93,24 @@ def find_program(name: str, entries: Sequence[str]) -> str | None:
     return None
 
 
+def kept_environment(parent: Mapping[str, str]) -> dict[str, str]:
+    """Return the allow list of 18.2 from the runner's own environment, without any mode part.
+
+    Kept: ``HOME``, ``USER``, ``LOGNAME``, ``SHELL``, ``LANG``, ``TERM``, ``TMPDIR``, every
+    ``LC_*`` and the cleaned ``PATH``; the folder creation of 18.12 runs ``git`` with it.
+
+    Args:
+        parent: The runner's own environment.
+
+    Returns:
+        The environment.
+    """
+    env = {name: parent[name] for name in _KEPT if name in parent}
+    env.update({k: v for k, v in parent.items() if k.startswith("LC_")})
+    env["PATH"] = os.pathsep.join(clean_path(parent.get("PATH", "")))
+    return env
+
+
 def build_environment(  # noqa: PLR0913 - the parts of a run environment are explicit
     parent: Mapping[str, str],
     *,
@@ -115,9 +139,7 @@ def build_environment(  # noqa: PLR0913 - the parts of a run environment are exp
     """
     if not parent.get("HOME"):
         raise RunEnvironmentError("home_missing")
-    env = {name: parent[name] for name in _KEPT if name in parent}
-    env.update({k: v for k, v in parent.items() if k.startswith("LC_")})
-    env["PATH"] = os.pathsep.join(clean_path(parent.get("PATH", "")))
+    env = kept_environment(parent)
     if tmpdir is not None:
         env["TMPDIR"] = str(tmpdir)
     if forward_ssh_agent and parent.get("SSH_AUTH_SOCK"):

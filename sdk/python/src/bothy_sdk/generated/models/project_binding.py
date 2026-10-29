@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, Self, TypeVar
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
+from ..models.project_provision import ProjectProvision
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
@@ -25,6 +26,12 @@ class ProjectBinding:
         version (int):
         repository_url (str | Unset): Display only; the server never fetches this URL.
         default_branch (str | Unset):
+        provision (ProjectProvision | Unset): Whether the serving runner creates the folder of the binding (09 18.12).
+            `none` creates nothing and the folder must exist; `init` creates an empty folder with `git init`; `clone` clones
+            `repository_url`, which must be `https`. With `init` or `clone` the `workspace_ref` is one segment of
+            `^[A-Za-z0-9][A-Za-z0-9._-]*$`. Absent means `none`; the server always sends it.
+        ready_reason (str | Unset): The code the serving runner reported with `ready` false (09 18.12, for example
+            `provisioning` or `clone_failed`); absent while `ready` is true and before the first report.
     """
 
     workspace_ref: str
@@ -33,6 +40,8 @@ class ProjectBinding:
     version: int
     repository_url: str | Unset = UNSET
     default_branch: str | Unset = UNSET
+    provision: ProjectProvision | Unset = UNSET
+    ready_reason: str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -48,6 +57,12 @@ class ProjectBinding:
 
         default_branch = self.default_branch
 
+        provision: str | Unset = UNSET
+        if not isinstance(self.provision, Unset):
+            provision = self.provision.value
+
+        ready_reason = self.ready_reason
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -62,6 +77,10 @@ class ProjectBinding:
             field_dict["repository_url"] = repository_url
         if default_branch is not UNSET:
             field_dict["default_branch"] = default_branch
+        if provision is not UNSET:
+            field_dict["provision"] = provision
+        if ready_reason is not UNSET:
+            field_dict["ready_reason"] = ready_reason
 
         return field_dict
 
@@ -82,6 +101,15 @@ class ProjectBinding:
 
         default_branch = d.pop("default_branch", UNSET)
 
+        _provision = d.pop("provision", UNSET)
+        provision: ProjectProvision | Unset
+        if isinstance(_provision, Unset):
+            provision = UNSET
+        else:
+            provision = ProjectProvision(_provision)
+
+        ready_reason = d.pop("ready_reason", UNSET)
+
         project_binding = cls(
             workspace_ref=workspace_ref,
             runner_config=runner_config,
@@ -89,6 +117,8 @@ class ProjectBinding:
             version=version,
             repository_url=repository_url,
             default_branch=default_branch,
+            provision=provision,
+            ready_reason=ready_reason,
         )
 
         project_binding.additional_properties = d

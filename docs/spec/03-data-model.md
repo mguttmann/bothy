@@ -1034,7 +1034,9 @@ Module: `chat`.
 | `repository_url` | `text` | yes | | for display; the server never loads this URL |
 | `default_branch` | `text` | yes | | |
 | `runner_config` | `jsonb` | no | `'{}'` | schema `project_runner_config.v1`: model, allowed tools of the runtime within `agents.tool_class`; no secrets |
+| `provision` | `text` | no | `'none'` | CHECK `IN ('none', 'init', 'clone')`: whether the serving runner creates the folder (`init`: empty folder with `git init`; `clone`: clone of `repository_url`, which must then be `https`); with `init` or `clone` `workspace_ref` is one segment of `^[A-Za-z0-9][A-Za-z0-9._-]*$` (09 18.12, addendum of 2026-10-28) |
 | `ready` | `boolean` | no | `false` | reported by the runner via heartbeat: work environment ready |
+| `ready_reason` | `text` | yes | | code the runner reported with `ready` false (09 18.12, for example `provisioning`, `clone_failed`); NULL while `ready` is true, after an effective binding change and before the first report (addendum of 2026-10-28) |
 | `created_by` | `uuid` | no | | |
 | `created_at` | `timestamptz` | no | `now()` | |
 | `version` | `bigint` | no | `1` | |
@@ -1046,7 +1048,9 @@ Retention: `config`.
 The API document `Channel` carries `project_bound`, true exactly when a row of this table exists
 for the channel; it is derived, not stored. Creating or deleting a binding raises
 `channels.version` and writes `channel.updated` in the same transaction; changing an existing
-binding and a readiness report do not (addendum of 2026-10-27, R-DM-54). Reason: every reader of
+binding and a readiness report do not (addendum of 2026-10-27, R-DM-54). `provision` is part of the binding: a
+change is an effective change, which sets `ready` false and clears `ready_reason`; a readiness
+report writes `ready` and `ready_reason` together (addendum of 2026-10-28, R-DM-55). Reason: every reader of
 the forum sees that it is a project (01 6.8 item 11) without reading the binding, which needs
 `manage`.
 
@@ -2803,6 +2807,7 @@ section 4 applies, and the gate fails.
 | R-DM-52 | The deletion journal numbers its objects densely in `deletion_journal_state` (module `privacy`): the consumer `privacy.journal` writes object `next_number` and moves the number with its cursor, the retention removes objects from `low_number` upward, and `bothy restore finalize` continues from the restored `next_number` to the first missing number. | The object storage port has no listing and no conditional write (core S3, [ADR 0010](../adr/0010-object-storage-behind-an-s3-interface-local-driver-as-default.md)); dense numbers make the journal readable and deletable without either. |
 | R-DM-53 | `runs.last_progress_at` holds the server time of the last start or stored patch, and the server keeps one summary step per parent in `run_steps` (addendum of 2026-10-24, run visualization). | The stall notice needs a server fact instead of a client clock; merging old steps at the root would flatten the run graph ([09-agents.md](09-agents.md), sections 5.3, 5.5 and 5.6). |
 | R-DM-54 | `Channel.project_bound` is derived from `project_bindings`; creating or deleting a binding raises `channels.version` and writes `channel.updated` (addendum of 2026-10-27). | Readers of a forum see that it is a project without the binding, which needs `manage`; clients learn the change through the event they already follow. |
+| R-DM-55 | `project_bindings.provision` asks the serving runner to create the folder (`init`, `clone`) or nothing (`none`); `ready_reason` is the code the runner reported with `ready` false and is cleared with every effective binding change and every report of `ready` true (addendum of 2026-10-28). | A project created from the app needs its folder made where the runner works, and the person must see why a project is not ready (D-M4-43-2, D-M4-43-5). |
 
 ## 9. Configuration values of this chapter
 

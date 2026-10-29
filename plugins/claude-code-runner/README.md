@@ -1,7 +1,7 @@
 # claude-code-runner
 
 Status: core (M2-34), follow-ups, stop, error paths and adoption after a crash (M2-35), answer
-attachments (M3-12).
+attachments (M3-12), folder creation of new projects (M4-43).
 
 ## Purpose
 
@@ -34,6 +34,7 @@ the title once per new session and reports the cost of the run.
 | `failures.py`, `recovery.py` | Recognised CLI texts (`ERROR_TEXTS`) and the classification of a process end; the next action and the box notes |
 | `followups.py`, `stop.py`, `adoption.py` | Follow-up check, line and stdin rule; the stop schedule; identity check and adoption decision |
 | `channels.py`, `workspace.py` | Cache of the served forums and their bindings; resolution of `workspace_ref` and readiness |
+| `provision.py` | Folder creation of a binding with `provision` `init` or `clone`, its creation record and the readiness reasons (09 18.12, M4-43) |
 | `toolclass.py`, `commandline.py`, `environment.py` | Tool class order, the argument list of a turn, the allow-list environment |
 | `authcheck.py`, `heartbeat.py` | Pre-check `claude auth status`; version probe and the run-time heartbeat members |
 | `prompt.py`, `prompts/runner_prompt.md`, `attachments.py` | System prompt file and first stdin line; attachments as local files |
@@ -162,6 +163,29 @@ uv run --locked claude-code-runner run --config /etc/claude-code-runner.toml
 `check-config` contacts no server; it prints one code per check (`ok`, `unset` or the problem).
 `run` logs JSON lines on stderr (event codes and IDs, never content, tokens or keys) and stops on
 SIGINT or SIGTERM; running turns are ended with SIGINT, SIGTERM and SIGKILL to their group.
+
+## Folder creation (M4-43)
+
+A binding with `provision` `init` or `clone` (a project created from the app) asks the runner to
+create its folder under `runner.projects_root` (docs/spec/09-agents.md 18.12). The runner:
+
+- creates only a one-segment name (`^[A-Za-z0-9][A-Za-z0-9._-]*$`) directly under the root, and
+  clones only an `https` URL without user information, query or fragment; anything else is
+  `provision_refused` before any process starts;
+- never writes into a folder it did not create: a name that exists (also a link) without an entry
+  in `<runner.state_dir>/provisioned.json` is `workspace_exists`; bind such a folder with
+  `provision` `none`;
+- runs `runner.git_bin` from the cleaned `PATH` with an argument list (`git init --quiet
+  [--initial-branch <branch>]` in the new folder, `git clone --quiet --no-recurse-submodules --
+  <url> <root>/.provision-<uuid>` and a rename), the allow-list environment plus
+  `GIT_TERMINAL_PROMPT=0` and `GIT_ALLOW_PROTOCOL=https`, stdin closed, output discarded, and the
+  time limit `runner.provision_timeout`;
+- reports `provisioning` meanwhile, then sends a heartbeat at once with `ready` or one of
+  `init_failed`, `clone_failed`, `provision_timeout`; a failure removes only what the attempt
+  created and is not tried again for the same binding before `runner.provision_retry_after`.
+
+A private repository needs a credential helper of the runner user (`HOME` is kept); `ssh` clones
+are not supported.
 
 ## Answer attachments (M3-12)
 

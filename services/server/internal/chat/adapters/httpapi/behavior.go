@@ -36,6 +36,9 @@ func (h *Behavior) PutProjectBinding(ctx context.Context, req rest.PutProjectBin
 	}
 	if b := req.Body; b != nil {
 		cmd.WorkspaceRef, cmd.RepositoryURL, cmd.DefaultBranch, cmd.Reason = b.WorkspaceRef, b.RepositoryUrl, b.DefaultBranch, b.Reason
+		if b.Provision != nil {
+			cmd.Provision = string(*b.Provision)
+		}
 		if rc := b.RunnerConfig; rc != nil {
 			cmd.RunnerConfig.Model = rc.Model
 			if rc.AllowedTools != nil {
@@ -60,9 +63,19 @@ func (h *Behavior) DeleteProjectBinding(ctx context.Context, req rest.DeleteProj
 }
 
 // bindingREST converts a binding (schema ProjectBinding): absent members stay absent, never null
-// (ADR 0053), and an empty tool list stays an empty list.
+// (ADR 0053), an empty tool list stays an empty list, provision is always sent and ready_reason
+// only while the runner reported one (M4-43).
 func bindingREST(b chat.ProjectBinding) rest.ProjectBinding {
-	out := rest.ProjectBinding{WorkspaceRef: b.WorkspaceRef, Ready: b.Ready, Version: b.Version, RunnerConfig: rest.ProjectRunnerConfig{Model: b.RunnerConfig.Model}}
+	provision := rest.ProjectProvision(b.Provision)
+	if provision == "" {
+		provision = rest.ProjectProvisionNone
+	}
+	out := rest.ProjectBinding{WorkspaceRef: b.WorkspaceRef, Ready: b.Ready, Version: b.Version, RunnerConfig: rest.ProjectRunnerConfig{Model: b.RunnerConfig.Model},
+		Provision: &provision}
+	if b.ReadyReason != "" && !b.Ready {
+		r := b.ReadyReason
+		out.ReadyReason = &r
+	}
 	if b.RepositoryURL != "" {
 		u := b.RepositoryURL
 		out.RepositoryUrl = &u

@@ -101,7 +101,8 @@ func (r *Repository) LockBinding(ctx context.Context, channel ids.ID) (domain.Pr
 	return domain.ProjectBinding{
 		ChannelID: idOf(row.ChannelID), WorkspaceRef: row.WorkspaceRef, RepositoryURL: row.RepositoryUrl.String,
 		DefaultBranch: row.DefaultBranch.String, RunnerConfig: rc, Ready: row.Ready, CreatedBy: idOf(row.CreatedBy),
-		CreatedAt: timeOf(row.CreatedAt), Version: row.Version,
+		CreatedAt: timeOf(row.CreatedAt), Version: row.Version, Provision: domain.Provision(row.Provision),
+		ReadyReason: row.ReadyReason.String,
 	}, true, nil
 }
 
@@ -117,7 +118,7 @@ func (r *Repository) InsertBinding(ctx context.Context, b domain.ProjectBinding)
 	}
 	at, err := q.InsertProjectBinding(ctx, sqlcgen.InsertProjectBindingParams{
 		ChannelID: uuid(b.ChannelID), WorkspaceRef: b.WorkspaceRef, RepositoryUrl: optionalText(b.RepositoryURL),
-		DefaultBranch: optionalText(b.DefaultBranch), RunnerConfig: rc, CreatedBy: uuid(b.CreatedBy),
+		DefaultBranch: optionalText(b.DefaultBranch), RunnerConfig: rc, Provision: storedProvision(b.Provision), CreatedBy: uuid(b.CreatedBy),
 	})
 	if err != nil {
 		return time.Time{}, bindingWriteError(err, "inserting a project binding")
@@ -137,7 +138,7 @@ func (r *Repository) ReplaceBinding(ctx context.Context, b domain.ProjectBinding
 	}
 	err = q.ReplaceProjectBinding(ctx, sqlcgen.ReplaceProjectBindingParams{
 		ChannelID: uuid(b.ChannelID), WorkspaceRef: b.WorkspaceRef, RepositoryUrl: optionalText(b.RepositoryURL),
-		DefaultBranch: optionalText(b.DefaultBranch), RunnerConfig: rc, Version: b.Version,
+		DefaultBranch: optionalText(b.DefaultBranch), RunnerConfig: rc, Provision: storedProvision(b.Provision), Version: b.Version,
 	})
 	if err != nil {
 		return bindingWriteError(err, "replacing a project binding")
@@ -155,7 +156,7 @@ func (r *Repository) DeleteBinding(ctx context.Context, channel ids.ID) error {
 }
 
 // LockReportedBindings implements app.BindingStore.
-func (r *Repository) LockReportedBindings(ctx context.Context, channels []ids.ID) (map[ids.ID]bool, error) {
+func (r *Repository) LockReportedBindings(ctx context.Context, channels []ids.ID) (map[ids.ID]app.Readiness, error) {
 	q, err := r.write(ctx)
 	if err != nil {
 		return nil, err
@@ -164,20 +165,29 @@ func (r *Repository) LockReportedBindings(ctx context.Context, channels []ids.ID
 	if err != nil {
 		return nil, mapError(err, "locking reported project bindings")
 	}
-	out := make(map[ids.ID]bool, len(rows))
+	out := make(map[ids.ID]app.Readiness, len(rows))
 	for _, row := range rows {
-		out[idOf(row.ChannelID)] = row.Ready
+		out[idOf(row.ChannelID)] = app.Readiness{Ready: row.Ready, Reason: row.ReadyReason.String}
 	}
 	return out, nil
 }
 
 // SetProjectReady implements app.BindingStore.
-func (r *Repository) SetProjectReady(ctx context.Context, channel ids.ID, ready bool) error {
+func (r *Repository) SetProjectReady(ctx context.Context, channel ids.ID, rd app.Readiness) error {
 	q, err := r.write(ctx)
 	if err != nil {
 		return err
 	}
-	return mapError(q.SetProjectReady(ctx, sqlcgen.SetProjectReadyParams{ChannelID: uuid(channel), Ready: ready}), "writing project readiness")
+	return mapError(q.SetProjectReady(ctx, sqlcgen.SetProjectReadyParams{ChannelID: uuid(channel), Ready: rd.Ready,
+		ReadyReason: optionalText(rd.Reason)}), "writing project readiness")
+}
+
+// storedProvision is the column value of p; "" (a binding built before M4-43) is none.
+func storedProvision(p domain.Provision) string {
+	if p == "" {
+		return string(domain.ProvisionNone)
+	}
+	return string(p)
 }
 
 // ResetProjectReadiness implements app.BindingStore.

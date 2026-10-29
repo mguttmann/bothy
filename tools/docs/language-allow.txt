@@ -34,6 +34,10 @@ path: services/server/internal/authz/domain/previewtext/catalog_de.go
 path: services/server/internal/authz/domain/previewtext/testdata/example_07_de.golden
 path: services/server/internal/authz/domain/previewtext/testdata/example_host_de.golden
 path: services/server/internal/authz/domain/previewtext/testdata/example_switch_de.golden
+# The name suggestion of the new project dialog folds German umlauts and sharp s (M4-43,
+# D-M4-43-3): the fold table and its test sample name the letters.
+path: apps/client/lib/new_project/project_name.dart
+path: apps/client/test/new_project/project_name_test.dart
 # Third-party files, kept byte for byte as published.
 path: tools/design-tokens/vendor/fonts/*
 path: tools/design-tokens/vendor/phosphor/*

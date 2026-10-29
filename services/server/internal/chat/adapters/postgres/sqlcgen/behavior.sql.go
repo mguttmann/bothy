@@ -26,7 +26,7 @@ SELECT c.id, c.space_id, c.require_mention, c.thread_require_mention, c.free_res
        c.allow_mentioned_agents, c.history_backfill_limit, c.prompt, c.settings_version,
        ARRAY(SELECT b.skill_ref FROM channel_skill_bindings b WHERE b.channel_id = c.id ORDER BY b.position)::text[] AS skills,
        (pb.channel_id IS NOT NULL)::boolean AS project_bound, pb.workspace_ref, pb.repository_url, pb.default_branch,
-       pb.runner_config, pb.ready, pb.version AS binding_version
+       pb.runner_config, pb.ready, pb.version AS binding_version, pb.provision, pb.ready_reason
 FROM channels c
 LEFT JOIN project_bindings pb ON pb.channel_id = c.id
 WHERE c.id = $1
@@ -51,6 +51,8 @@ type GetChannelBehaviorRow struct {
 	RunnerConfig         []byte
 	Ready                pgtype.Bool
 	BindingVersion       pgtype.Int8
+	Provision            pgtype.Text
+	ReadyReason          pgtype.Text
 }
 
 // SPDX-License-Identifier: Apache-2.0
@@ -84,6 +86,8 @@ func (q *Queries) GetChannelBehavior(ctx context.Context, id pgtype.UUID) (GetCh
 		&i.RunnerConfig,
 		&i.Ready,
 		&i.BindingVersion,
+		&i.Provision,
+		&i.ReadyReason,
 	)
 	return i, err
 }
@@ -110,7 +114,7 @@ SELECT c.id, c.space_id, c.require_mention, c.thread_require_mention, c.free_res
        c.allow_mentioned_agents, c.history_backfill_limit, c.prompt, c.settings_version,
        ARRAY(SELECT b.skill_ref FROM channel_skill_bindings b WHERE b.channel_id = c.id ORDER BY b.position)::text[] AS skills,
        (pb.channel_id IS NOT NULL)::boolean AS project_bound, pb.workspace_ref, pb.repository_url, pb.default_branch,
-       pb.runner_config, pb.ready, pb.version AS binding_version
+       pb.runner_config, pb.ready, pb.version AS binding_version, pb.provision, pb.ready_reason
 FROM channels c
 LEFT JOIN project_bindings pb ON pb.channel_id = c.id
 WHERE c.id = ANY ($1::uuid[]) AND c.space_id = ANY ($2::uuid[]) AND c.archived_at IS NULL
@@ -141,6 +145,8 @@ type ListServedBehaviorsRow struct {
 	RunnerConfig         []byte
 	Ready                pgtype.Bool
 	BindingVersion       pgtype.Int8
+	Provision            pgtype.Text
+	ReadyReason          pgtype.Text
 }
 
 // listServedChannels with the predicate of 07 section 7.4 rule 1: the channels and spaces of
@@ -174,6 +180,8 @@ func (q *Queries) ListServedBehaviors(ctx context.Context, arg ListServedBehavio
 			&i.RunnerConfig,
 			&i.Ready,
 			&i.BindingVersion,
+			&i.Provision,
+			&i.ReadyReason,
 		); err != nil {
 			return nil, err
 		}

@@ -13,6 +13,7 @@ part 'project_readiness.g.dart';
 /// Properties:
 /// * [channelId] - UUIDv7 (RFC 9562), lowercase canonical form.
 /// * [ready]
+/// * [reason] - Why the forum is not ready, a code of 09 18.12 (for example `provisioning`, `workspace_exists`, `clone_failed`); only with `ready` false. Stored as `project_bindings.ready_reason`.
 @BuiltValue()
 abstract class ProjectReadiness
     implements Built<ProjectReadiness, ProjectReadinessBuilder> {
@@ -22,6 +23,10 @@ abstract class ProjectReadiness
 
   @BuiltValueField(wireName: r'ready')
   bool get ready;
+
+  /// Why the forum is not ready, a code of 09 18.12 (for example `provisioning`, `workspace_exists`, `clone_failed`); only with `ready` false. Stored as `project_bindings.ready_reason`.
+  @BuiltValueField(wireName: r'reason')
+  String? get reason;
 
   ProjectReadiness._();
 
@@ -59,6 +64,13 @@ class _$ProjectReadinessSerializer
       object.ready,
       specifiedType: const FullType(bool),
     );
+    if (object.reason != null) {
+      yield r'reason';
+      yield serializers.serialize(
+        object.reason,
+        specifiedType: const FullType(String),
+      );
+    }
   }
 
   @override
@@ -99,6 +111,14 @@ class _$ProjectReadinessSerializer
             specifiedType: const FullType(bool),
           ) as bool;
           result.ready = valueDes;
+          break;
+        case r'reason':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(String),
+          ) as String?;
+          if (valueDes == null) continue;
+          result.reason = valueDes;
           break;
         default:
           unhandled.add(key);

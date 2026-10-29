@@ -9188,4 +9188,178 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get newChatTitleMissing => 'Enter a title to send.';
+
+  @override
+  String newProjectIn(String name) {
+    return 'New project in $name';
+  }
+
+  @override
+  String get newProjectModeLabel => 'Start with';
+
+  @override
+  String get newProjectModeEmpty => 'Empty project';
+
+  @override
+  String get newProjectModeClone => 'Clone repository';
+
+  @override
+  String get newProjectModeExisting => 'Existing folder';
+
+  @override
+  String get newProjectModeIdea => 'Start from an idea';
+
+  @override
+  String get newProjectName => 'Name';
+
+  @override
+  String get newProjectNameHint => 'Used for the forum and the folder.';
+
+  @override
+  String newProjectNameInvalid(int max) {
+    return 'Use letters, digits, dots, underscores or hyphens, starting with a letter or digit, at most $max characters.';
+  }
+
+  @override
+  String get newProjectUrl => 'Repository URL (https)';
+
+  @override
+  String get newProjectUrlInvalid =>
+      'Enter an https URL with a server name, without user name, query or fragment.';
+
+  @override
+  String get newProjectFolder => 'Folder in the runner\'s projects folder';
+
+  @override
+  String get newProjectFolderInvalid =>
+      'Enter a folder inside the projects folder, for example team/website.';
+
+  @override
+  String get newProjectIdea => 'Your idea';
+
+  @override
+  String get newProjectIdeaRequired => 'Describe the idea.';
+
+  @override
+  String get newProjectRunner => 'Runner';
+
+  @override
+  String newProjectRunnerSpace(String name) {
+    return '$name (default of the space)';
+  }
+
+  @override
+  String get newProjectRunnerMissing =>
+      'Choose the agent that works on the project.';
+
+  @override
+  String get newProjectCreate => 'Create';
+
+  @override
+  String get newProjectRetry => 'Try again';
+
+  @override
+  String get newProjectClose => 'Close';
+
+  @override
+  String get newProjectCancel => 'Cancel';
+
+  @override
+  String get newProjectStepForum => 'Create forum';
+
+  @override
+  String get newProjectStepRunner => 'Assign runner';
+
+  @override
+  String get newProjectStepBind => 'Bind project';
+
+  @override
+  String get newProjectStepFolder => 'Prepare folder';
+
+  @override
+  String get newProjectStepCreating => 'Creating folder';
+
+  @override
+  String get newProjectStepCloning => 'Cloning';
+
+  @override
+  String get newProjectStepIdea => 'Send the idea';
+
+  @override
+  String newProjectStepState(String step, String state) {
+    String _temp0 = intl.Intl.selectLogic(state, {
+      'waiting': 'waiting',
+      'running': 'running',
+      'finished': 'finished',
+      'other': 'failed',
+    });
+    return '$step: $_temp0';
+  }
+
+  @override
+  String get newProjectSlow =>
+      'The runner has not finished yet. You can close this dialog; the forum becomes ready by itself.';
+
+  @override
+  String get newProjectErrNameTaken =>
+      'This space already has a channel with this name. Choose another name.';
+
+  @override
+  String get newProjectErrFolderBound =>
+      'This folder is already bound to another forum.';
+
+  @override
+  String get newProjectErrStepUp =>
+      'The confirmation was cancelled. Try again to continue.';
+
+  @override
+  String get newProjectErrOffline =>
+      'The server cannot be reached. Try again when you are online.';
+
+  @override
+  String get newProjectErrWorkspaceExists =>
+      'A folder with this name already exists on the runner. Change the folder name and try again.';
+
+  @override
+  String get newProjectErrCloneFailed =>
+      'The repository could not be cloned. Check the URL and the runner\'s access to it.';
+
+  @override
+  String get newProjectErrInitFailed =>
+      'The runner could not create the folder.';
+
+  @override
+  String get newProjectErrTimeout =>
+      'Creating the folder took too long, so the runner stopped it.';
+
+  @override
+  String get newProjectErrRefused => 'The runner refused the name or the URL.';
+
+  @override
+  String get newProjectErrMissing =>
+      'The folder does not exist in the runner\'s projects folder.';
+
+  @override
+  String get newProjectErrNotGit => 'The folder is not a Git repository.';
+
+  @override
+  String get newProjectErrNotWritable =>
+      'The runner may not write to the folder.';
+
+  @override
+  String get newProjectErrOutsideRoot =>
+      'The folder is outside the runner\'s projects folder.';
+
+  @override
+  String newProjectErrNotReady(String code) {
+    return 'The runner reports that the project is not ready ($code).';
+  }
+
+  @override
+  String get newProjectAuditReason => 'New project from the app';
+
+  @override
+  String stepUpPurposeNewProject(String name) {
+    return 'Create the project $name';
+  }
 }

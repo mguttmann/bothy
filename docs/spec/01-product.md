@@ -1563,6 +1563,44 @@ spaces screen on the phone (M1).
     channel header shows the same sentence as its subtitle, and an empty forum shows it as its
     empty state.
 
+### 6.9 New project
+
+Addendum of 2026-10-28 (R-PR-20, rulings D-M4-43-1 to D-M4-43-12,
+[design note](../design/new-project.md)). Applies to the desktop sidebar (D1); the phone shows the
+result like any forum.
+
+1. **Entry.** A space row has the action "New project" (visible on hover, on keyboard focus and on
+   the selected space), and the space menu has the same entry. Both show only for an owner, because
+   binding a project is an owner action with step-up (05 `channel.project.bind`).
+2. **Dialog.** A short dialog with four modes: "Empty project" (a new folder with `git init`),
+   "Clone repository" (an `https` URL), "Existing folder" (a folder name under the runner's
+   projects folder) and "Start from an idea" (a multi-line text; the project is created empty and
+   the idea becomes its first chat). Fields: the name (suggested from the URL or the idea, at most
+   `ui.new_project_name_max_chars` characters, editable; used for the forum and the folder), the
+   runner (the active agents, default the space's default operator) and the mode's own field. The
+   dialog checks the name (letters, digits, `.`, `_`, `-`, starting with a letter or digit) and the
+   URL (`https` with a host) before it sends.
+3. **Steps.** "Create" runs, in order: create the forum (`channel.create`), assign the runner when
+   it is not the space's default operator (`channel.operator.set`), bind the project
+   (`channel.project.bind` with `provision` `init`, `clone` or `none`), wait until the runner
+   reports the project ready (`getChannelBehavior`, every `ui.new_project_poll_interval`), and for
+   an idea post it (`thread.create`). The dialog lists the steps with the states waiting, running,
+   done and failed; while the runner works the folder step reads "Creating folder" or "Cloning".
+   A step-up prompt appears where an action needs one.
+4. **Idea.** The idea is first stored as the person's draft of a new post in the new forum (6.8
+   item 8) and sent with an empty title once the project is ready, so the agent answers in the new
+   chat and names it. If the dialog closes before, the idea stays as that draft.
+5. **Failure.** A failed step shows its name and one sentence for its cause: a taken name, a
+   folder already bound to another forum, a refused step-up, a folder that already exists, a
+   failed clone, a missing folder, a folder that is not a Git repository, a runner that has not
+   answered. The fields of the steps not done yet stay editable (for example the URL after a
+   failed clone, the folder name after a taken folder); "Try again" resumes at the failed step with
+   them and creates nothing twice; "Close" keeps what exists.
+6. **Waiting.** When the project is not ready after `ui.new_project_wait`, the dialog says that the
+   runner has not finished and that the forum becomes ready by itself; the person may close it.
+7. **Done.** The dialog closes and opens the new forum, for an idea the new chat; the forum shows
+   as a project in the sidebar (6.8 item 11).
+
 ## 7. Keyboard shortcuts
 
 Shortcuts apply on desktop. They avoid system assignments (Cmd+H, Cmd+M, Cmd+Q, Alt+F4,
@@ -1807,6 +1845,7 @@ Rules:
 | R-PR-17 | Desktop has three columns by default (sidebar, history, session column instead of members); open posts and threads are nested under their channel in the sidebar (6.8); the post list is the forum overview D15 in the content column and can be pinned as its own column (addendum of 2026-10-27, replaces R-PR-01). | Owner feedback 2026-10-27: the sessions of a project belong in the sidebar as in Discord; a fixed list column costs a quarter of a laptop screen. |
 | R-PR-18 | A new chat starts from the forum row ("+") or Cmd+N without a dialog; the title is optional where an operator agent names the chat; no git worktree per post (addendum of 2026-10-27). | Starting a session is the most frequent action in a dev forum; the owner opens worktrees through the agent when he wants them. |
 | R-PR-19 | On desktop the channel column next to an open thread (the main history of a text channel or the pinned forum overview) can be hidden from the thread header and with Cmd+Shift+H, kept per device; every column border, also the one between main history and thread, can be dragged (addendum of 2026-10-28). | Owner feedback on the Mac app (2026-10-28): the thread where the person writes stayed small next to the channel history, which could neither be hidden nor resized. |
+| R-PR-20 | A new project starts from the space row or the space menu ("New project", owners only) in a dialog with four modes: empty, clone, existing folder, idea; it shows every step and resumes after a failure; for an idea the first post starts when the folder is ready (6.9, addendum of 2026-10-28). | Owner feedback 2026-10-28: a space had no way to add a project; his earlier setup created one per request (D-M4-43-1 to D-M4-43-12). |
 
 ## 14. Configuration values of this chapter
 
@@ -1822,5 +1861,8 @@ Rules:
 | `ui.desktop_min_width_three_columns` | `960px` | below this width a pinned forum overview returns to the content column (navigation stack) |
 | `ui.sidebar_thread_window` | `72h` | an open thread with activity within this window shows in the sidebar (6.8) |
 | `ui.sidebar_threads_per_channel` | `8` | at most this many thread rows per channel in the sidebar (6.8) |
+| `ui.new_project_wait` | `2m` | after this time without readiness the new project dialog says that the runner has not finished (6.9) |
+| `ui.new_project_poll_interval` | `2s` | interval at which the new project dialog reads the readiness of the binding (6.9) |
+| `ui.new_project_name_max_chars` | `40` | longest suggested and accepted name of a new project (6.9) |
 | `a11y.live_announce_min_interval` | `10s` | the live box announces a change at most this often |
 | `client.share.recent_targets` | `8` | recently used targets in the share sheet |

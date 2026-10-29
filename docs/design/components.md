@@ -229,7 +229,9 @@ person (`user_space_states`).
 Space row: arrow (`action.expand` or `action.collapse`), icon of the space from
 `space-icons` in the category color (`category.<name>.on-sidebar`, on a lightly tinted
 tile of the same color), name in `type.section`, `color.text.on-sidebar`. Collapsed with unread
-items: dot on the right.
+items: dot on the right. For an owner on the desktop the row has the action "+" (`action.new`,
+label "New project in <space>", 01 6.9 item 1), shown on hover and on focus, always in the context
+`touch`, like the "+" of a forum row; the space menu starts with the same entry.
 
 Channel row (height `density.row-channel`): icon by kind (`channel.text`, `channel.forum`,
 `channel.project` for a forum with a project binding), name in `type.body-sm`. The icon has a

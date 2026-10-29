@@ -513,6 +513,7 @@ Serializers _$serializers =
           ..add(ProfileUpdate.serializer)
           ..add(ProjectBinding.serializer)
           ..add(ProjectBindingPut.serializer)
+          ..add(ProjectProvision.serializer)
           ..add(ProjectReadiness.serializer)
           ..add(ProjectRunnerConfig.serializer)
           ..add(PublicBranding.serializer)

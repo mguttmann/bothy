@@ -84,6 +84,7 @@ from claude_code_runner.heartbeat import (
     runtime_status,
 )
 from claude_code_runner.locks import LockTimeout, acquire, release
+from claude_code_runner.provision import Provisioner
 from claude_code_runner.reply_upload import remove_run_files, run_temp_dir
 from claude_code_runner.runturn import RunState, RunTurn
 from claude_code_runner.secrets import SecretError, resolve
@@ -138,6 +139,15 @@ class RunnerHandler(AgentHandler):
         self.claude_bin = find_program(config.claude_bin, self.path_entries)
         self.adapter: Adapter | None = None
         self.channels: ChannelCache | None = None
+        self.provisioner = Provisioner(
+            projects_root=config.projects_root,
+            state_dir=config.state_dir,
+            git_bin=find_program(config.git_bin, self.path_entries),
+            environ=self.environ,
+            timeout=config.provision_timeout,
+            retry_after=config.provision_retry_after,
+            on_done=self.on_provisioned,
+        )
         self.probe = Probe()
         self._probing: asyncio.Task[Probe] | None = None
         self._runs: dict[UUID, RunState] = {}
@@ -180,6 +190,11 @@ class RunnerHandler(AgentHandler):
         cache = self.channels
         status = runtime_status(self.probe, cache.readiness() if cache else [], self._modes)
         return dataclasses.replace(status, active_runs=sorted(self.adopted, key=str))
+
+    async def on_provisioned(self) -> None:
+        """A folder creation of 09 18.12 ended: report the new readiness at once."""
+        if self.adapter is not None:
+            await self.adapter.send_heartbeat()
 
     async def on_ready(self) -> None:
         """Send the first heartbeat as soon as the connection is ready (note 3)."""
@@ -409,7 +424,11 @@ class RunnerHandler(AgentHandler):
         return self.probe
 
     async def close(self) -> None:
-        """Cancel a running version probe and the follow of adopted turns (they keep running)."""
+        """Cancel the version probe, the follows and a running folder creation.
+
+        Adopted turns keep running; what a cancelled folder creation made is removed (09 18.12).
+        """
+        await self.provisioner.close()
         for follow in list(self._adopting):
             follow.cancel()
             with contextlib.suppress(asyncio.CancelledError, Exception):
@@ -710,7 +729,9 @@ class Runner:
             adapter_config, self.handler, clock=self.clock, http_transport=self.http_transport
         )
         self.handler.adapter = self.adapter
-        cache = ChannelCache(self.adapter.client, self.config.projects_root)
+        cache = ChannelCache(
+            self.adapter.client, self.config.projects_root, self.handler.provisioner
+        )
         try:
             await cache.load()
         except (ProblemError, httpx.TransportError) as err:

@@ -1136,30 +1136,44 @@ class World:
         channel_id = uuid7()
         binding = None
         if workspace_ref is not None:
-            binding = self._binding(workspace_ref, model, allowed_tools, version=1)
+            binding = self._binding(
+                workspace_ref, model, allowed_tools, version=1, provision=None, url=None
+            )
         self.channels[channel_id] = self._channel(prompt, binding)
         return channel_id
 
     @staticmethod
-    def _binding(
-        workspace_ref: str, model: str | None, allowed_tools: list[str] | None, *, version: int
+    def _binding(  # noqa: PLR0913 - the members of a binding
+        workspace_ref: str,
+        model: str | None,
+        allowed_tools: list[str] | None,
+        *,
+        version: int,
+        provision: str | None,
+        url: str | None,
     ) -> dict[str, Any]:
         config: dict[str, Any] = {}
         if model is not None:
             config["model"] = model
         if allowed_tools is not None:
             config["allowed_tools"] = list(allowed_tools)
-        return {
+        binding: dict[str, Any] = {
             "workspace_ref": workspace_ref,
             "runner_config": config,
             "ready": False,
             "version": version,
         }
+        if provision is not None:
+            binding["provision"] = provision
+        if url is not None:
+            binding["repository_url"] = url
+        return binding
 
     def update_forum(self, channel_id: UUID, **changes: Any) -> None:
-        """Change a forum (``workspace_ref``, ``model``, ``allowed_tools``, ``prompt``).
+        """Change a forum and append ``agent.config_changed``.
 
-        ``settings_version`` grows by one and ``agent.config_changed`` is appended.
+        Changes: ``workspace_ref``, ``model``, ``allowed_tools``, ``provision``,
+        ``repository_url``, ``prompt``; ``settings_version`` grows by one.
         """
         behavior = self.channels[channel_id]["behavior"]
         if "prompt" in changes:
@@ -1173,6 +1187,8 @@ class World:
                 changes.get("model", config.get("model")),
                 changes.get("allowed_tools", config.get("allowed_tools")),
                 version=(old["version"] + 1) if old else 1,
+                provision=changes.get("provision", old.get("provision") if old else None),
+                url=changes.get("repository_url", old.get("repository_url") if old else None),
             )
         behavior["settings_version"] += 1
         self._config_changed(channel_id, behavior["settings_version"])

@@ -179,10 +179,11 @@ type entry struct {
 	// anySince is the start of a difference of any kind, modeSince of kind (a) (note 8).
 	anySince, modeSince time.Time
 
-	// readiness is the last project readiness list this process applied; readinessSet tells an
-	// applied empty list from none.
+	// readiness is the last project readiness list this process applied at readinessAt;
+	// readinessSet tells an applied empty list from none.
 	readiness    []domain.Readiness
 	readinessSet bool
+	readinessAt  time.Time
 
 	// fed is true once this process applied a heartbeat of the agent since the entry was filled
 	// or last adopted another node's row; elsewhere is true while the newest stored heartbeat came

@@ -30,6 +30,12 @@ const (
 	codeDuplicate     = "duplicate"
 )
 
+// readinessReasonPattern and readinessReasonMax are the form of ProjectReadiness.reason, a code of
+// 09 section 18.12 (M4-43): lower case letters, digits and underscores.
+var readinessReasonPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_]*$`)
+
+const readinessReasonMax = 64
+
 // The forms of agent_heartbeat.v1 (docs/DECISIONS.md D-M2-20-2): names, versions and codes. None
 // of them can carry a path separator, whitespace, a control or bidi character or "=", so most key
 // formats and every path are unrepresentable (09 section 4.8, I5). Go's regexp runs in linear
@@ -119,6 +125,8 @@ type RateLimit struct {
 type Readiness struct {
 	ChannelID ids.ID
 	Ready     bool
+	// Reason is the code of 09 section 18.12 sent with Ready false; "" when absent (M4-43).
+	Reason string
 }
 
 // Report is one decoded heartbeat (agent_heartbeat.v1). Every heartbeat is the whole reported
@@ -305,6 +313,10 @@ func fieldDetail(code string) string {
 		return "The value does not match the required pattern."
 	case codeDuplicate:
 		return "The value is repeated."
+	case codeTooLong:
+		return "The value is too long."
+	case codeInvalid:
+		return "The value is not allowed here."
 	}
 	return "The value is invalid."
 }
@@ -733,7 +745,7 @@ func (d *decoder) readiness(raw json.RawMessage) []Readiness {
 // readinessItem reads one entry of project_readiness (schema ProjectReadiness); ok is false when
 // it is no object.
 func (d *decoder) readinessItem(ip string, raw json.RawMessage) (Readiness, bool) {
-	m, ok := d.object(ip, raw, "channel_id", "ready")
+	m, ok := d.object(ip, raw, "channel_id", "ready", "reason")
 	if !ok {
 		return Readiness{}, false
 	}
@@ -754,7 +766,29 @@ func (d *decoder) readinessItem(ip string, raw json.RawMessage) (Readiness, bool
 	} else {
 		d.fail(ip+"/ready", codeRequired)
 	}
+	if v, has := m["reason"]; has {
+		r.Reason = d.readinessReason(ip+"/reason", v, r.Ready)
+	}
 	return r, true
+}
+
+// readinessReason reads the reason of one readiness entry: a code of at most readinessReasonMax
+// characters in readinessReasonPattern, allowed only with ready false (09 section 4.8, M4-43).
+func (d *decoder) readinessReason(pointer string, raw json.RawMessage, ready bool) string {
+	s, ok := d.str(pointer, raw)
+	switch {
+	case !ok:
+		return ""
+	case len(s) > readinessReasonMax:
+		d.fail(pointer, codeTooLong)
+	case !readinessReasonPattern.MatchString(s):
+		d.fail(pointer, codePattern)
+	case ready:
+		d.fail(pointer, codeInvalid)
+	default:
+		return s
+	}
+	return ""
 }
 
 // AuditDetails are the details of the audit entry agent.heartbeat of a change of the reported

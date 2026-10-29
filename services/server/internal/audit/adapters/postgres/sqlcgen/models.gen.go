@@ -871,6 +871,8 @@ type ProjectBinding struct {
 	CreatedBy     pgtype.UUID
 	CreatedAt     pgtype.Timestamptz
 	Version       int64
+	Provision     string
+	ReadyReason   pgtype.Text
 }
 
 type PushRegistration struct {

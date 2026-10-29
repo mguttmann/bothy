@@ -3,6 +3,7 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:api_client/src/generated/model/project_provision.dart';
 import 'package:api_client/src/generated/model/project_runner_config.dart';
 import 'package:built_value/built_value.dart';
 import 'package:built_value/serializer.dart';
@@ -16,7 +17,9 @@ part 'project_binding.g.dart';
 /// * [repositoryUrl] - Display only; the server never fetches this URL.
 /// * [defaultBranch]
 /// * [runnerConfig]
+/// * [provision]
 /// * [ready]
+/// * [readyReason] - The code the serving runner reported with `ready` false (09 18.12, for example `provisioning` or `clone_failed`); absent while `ready` is true and before the first report.
 /// * [version]
 @BuiltValue()
 abstract class ProjectBinding
@@ -35,8 +38,16 @@ abstract class ProjectBinding
   @BuiltValueField(wireName: r'runner_config')
   ProjectRunnerConfig get runnerConfig;
 
+  @BuiltValueField(wireName: r'provision')
+  ProjectProvision? get provision;
+  // enum provisionEnum {  none,  init,  clone,  };
+
   @BuiltValueField(wireName: r'ready')
   bool get ready;
+
+  /// The code the serving runner reported with `ready` false (09 18.12, for example `provisioning` or `clone_failed`); absent while `ready` is true and before the first report.
+  @BuiltValueField(wireName: r'ready_reason')
+  String? get readyReason;
 
   @BuiltValueField(wireName: r'version')
   int get version;
@@ -91,11 +102,25 @@ class _$ProjectBindingSerializer
       object.runnerConfig,
       specifiedType: const FullType(ProjectRunnerConfig),
     );
+    if (object.provision != null) {
+      yield r'provision';
+      yield serializers.serialize(
+        object.provision,
+        specifiedType: const FullType(ProjectProvision),
+      );
+    }
     yield r'ready';
     yield serializers.serialize(
       object.ready,
       specifiedType: const FullType(bool),
     );
+    if (object.readyReason != null) {
+      yield r'ready_reason';
+      yield serializers.serialize(
+        object.readyReason,
+        specifiedType: const FullType(String),
+      );
+    }
     yield r'version';
     yield serializers.serialize(
       object.version,
@@ -158,12 +183,28 @@ class _$ProjectBindingSerializer
           ) as ProjectRunnerConfig;
           result.runnerConfig.replace(valueDes);
           break;
+        case r'provision':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(ProjectProvision),
+          ) as ProjectProvision?;
+          if (valueDes == null) continue;
+          result.provision = valueDes;
+          break;
         case r'ready':
           final valueDes = serializers.deserialize(
             value,
             specifiedType: const FullType(bool),
           ) as bool;
           result.ready = valueDes;
+          break;
+        case r'ready_reason':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(String),
+          ) as String?;
+          if (valueDes == null) continue;
+          result.readyReason = valueDes;
           break;
         case r'version':
           final valueDes = serializers.deserialize(

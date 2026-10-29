@@ -20,10 +20,12 @@ REPO = Path(__file__).resolve().parents[3]
 NAME = "bothy"
 
 # Files that are no code or configuration: the documentation (it names the product freely),
-# binary assets, lock files, code generated from docs/ (it mirrors the documentation) and this
-# test, whose fixtures name the forms it checks.
+# binary assets, lock files, code generated from docs/ (it mirrors the documentation; the
+# contract documents embed docs/api and docs/spec as gzip base64, whose random letters can spell
+# the name) and this test, whose fixtures name the forms it checks.
 SKIP = re.compile(
-    r"^docs/|^tools/ci/tests/test_product_name_places\.py$|\.(md|png|jpe?g|svg|ico|woff2?|ttf|otf|pdf|lock|sum)$|(^|/)package-lock\.json$|\.gen\.(go|ya?ml)$|/generated/",
+    r"^docs/|^tools/ci/tests/test_product_name_places\.py$|\.(md|png|jpe?g|svg|ico|woff2?|ttf|otf|pdf|lock|sum)$|(^|/)package-lock\.json$|\.gen\.(go|ya?ml)$|/generated/"
+    r"|^packages/sync_engine/lib/src/testing/contract_documents\.g\.dart$",
 )
 
 # Characters of a token around a hit.
@@ -272,6 +274,14 @@ def test_forms_of_the_kinds() -> None:
         "rules.yaml", "BothyVolumeFull", 0, "BothyVolumeFull", frozenset({"bothyvolumefull"})
     )
     assert allowed("x.go", "bothyvolumefull", 0, "bothyvolumefull", frozenset({"bothyvolumefull"}))
+
+
+def test_generated_contract_documents_are_skipped(tmp_path: Path) -> None:
+    rel = "packages/sync_engine/lib/src/testing/contract_documents.g.dart"
+    (tmp_path / rel).parent.mkdir(parents=True)
+    (tmp_path / rel).write_text("  'nbO8oZtbOtHY69p57',\n", encoding="utf-8")
+    (tmp_path / "other.g.dart").write_text("  'nbO8oZtbOtHY69p57',\n", encoding="utf-8")
+    assert offenders([rel, "other.g.dart"], tmp_path) == ["other.g.dart:1: nbO8oZtbOtHY69p57"]
 
 
 def test_red_team_cases_are_offenders(tmp_path: Path) -> None:

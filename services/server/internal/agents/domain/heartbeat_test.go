@@ -325,3 +325,31 @@ func TestReportedVoiceInput(t *testing.T) {
 		}
 	}
 }
+
+// TestDecodeHeartbeatReadinessReason: project_readiness entries carry an optional reason in the
+// code form, only with ready false (09 section 4.8, M4-43).
+func TestDecodeHeartbeatReadinessReason(t *testing.T) {
+	t.Parallel()
+	entry := func(rest string) []byte {
+		return []byte(`{"state":"online","project_readiness":[{"channel_id":"` + runA + `",` + rest + `}]}`)
+	}
+	r, fes := domain.DecodeHeartbeat(entry(`"ready":false,"reason":"clone_failed"`))
+	if len(fes) > 0 || len(r.Readiness) != 1 || r.Readiness[0].Reason != "clone_failed" || r.Readiness[0].Ready {
+		t.Fatalf("report %+v errors %+v", r, fes)
+	}
+	if r, _ := domain.DecodeHeartbeat(entry(`"ready":false`)); r.Readiness[0].Reason != "" {
+		t.Fatalf("absent reason %+v", r.Readiness)
+	}
+	for name, c := range map[string]struct{ rest, code string }{
+		"upper case":      {`"ready":false,"reason":"Clone_failed"`, "pattern_mismatch"},
+		"path":            {`"ready":false,"reason":"a/b"`, "pattern_mismatch"},
+		"dot":             {`"ready":false,"reason":"a.b"`, "pattern_mismatch"},
+		"too long":        {`"ready":false,"reason":"` + strings.Repeat("a", 65) + `"`, "too_long"},
+		"not a string":    {`"ready":false,"reason":1`, "invalid_type"},
+		"with ready true": {`"ready":true,"reason":"provisioning"`, "invalid"},
+	} {
+		if _, fes := domain.DecodeHeartbeat(entry(c.rest)); !hasError(fes, "/project_readiness/0/reason", c.code) {
+			t.Errorf("%s: errors %+v, want %s", name, fes, c.code)
+		}
+	}
+}

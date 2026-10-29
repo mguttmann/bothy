@@ -202,6 +202,7 @@ nav:
       - Name: design/naming.md
       - Run visualization: design/run-visualization.md
       - Sessions in the sidebar: design/sidebar-sessions.md
+      - New project from the app: design/new-project.md
   - Operations:
       - Configuration: operations/configuration.md
       - Installation with Compose: operations/install-compose.md
@@ -445,6 +446,7 @@ nav:
           - "M4-40: Threads in the sidebar and the forum overview on the desktop": briefs/M4-40-sidebar-threads.md
           - "M4-41: New chat from the sidebar on the desktop": briefs/M4-41-sidebar-new-chat.md
           - "M4-42: Thread layout on the desktop": briefs/M4-42-thread-layout.md
+          - "M4-43: New project from the app": briefs/M4-43-new-project.md
       - Milestone M6:
           - "M6-01: Console session following the BFF pattern": briefs/M6-01-console-session.md
           - "M6-05: Statistics in the server": briefs/M6-05-stats-server.md

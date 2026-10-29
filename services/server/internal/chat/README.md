@@ -491,6 +491,13 @@ canary class `manage_only` of `test/canary`.
 - Table `project_bindings` (migration `00048`): PK `channel_id`, unique `lower(workspace_ref)`,
   `runner_config` of schema `project_runner_config.v1`, `ready`, `version`. Only forums get a row;
   the use case enforces it (`400 validation_failed` with `not_a_forum` on `#path/channel_id`).
+- New project from the app (M4-43, migrations `00082` and `00083`): `provision` (`none`, `init`,
+  `clone`; the serving runner creates the folder, 09 18.12) is part of the binding and of the
+  equality of a PUT; with `init` or `clone` the `workspace_ref` must be one segment of
+  `^[A-Za-z0-9][A-Za-z0-9._-]*$`, and `clone` needs an `https` `repository_url` without query or
+  fragment. `ready_reason` holds the code the runner reported with `ready` false; a report that
+  changes only the reason is written like a readiness change, and every effective binding change
+  and every operator reset clears it (R-DM-55).
 - Domain (`domain/project_binding.go`): `ValidateProjectBinding` (limits
   `project.binding_text_max_chars` and `audit.reason_max_chars` at request time) and
   `PlanBindingPut` (`created`, `replaced` with `ready = false`, `unchanged` without a write).

@@ -122,7 +122,7 @@ the waves before it are merged; many can start earlier, as soon as their own dep
 | 38 | M4-24, M4-39, M5-02, M6-06, M6-14, M7-05, M8-05, M8-06 |
 | 39 | M4-32, M4-34, M4-36, M4-40, M5-03, M5-04, M7-06, M7-09, M8-07 |
 | 40 | M4-38, M4-41, M4-42, M5-05, M5-06, M5-07, M5-08, M5-09, M5-14, M6-16, M7-07, M7-08, M7-12, M7-14, M8-09 |
-| 41 | M5-10, M5-11, M5-15, M6-17, M7-18, M7-21, M7-23, M7-26, M7-27 |
+| 41 | M4-43, M5-10, M5-11, M5-15, M6-17, M7-18, M7-21, M7-23, M7-26, M7-27 |
 | 42 | M5-12, M7-13 |
 | 43 | M5-13 |
 | 44 | M7-28 |
@@ -328,6 +328,7 @@ names listed here.
 | 39 | M4-40 | Threads in the sidebar and the forum overview on the desktop | `M4-40-sidebar-threads.md` | M2-52, M4-24 |
 | 40 | M4-41 | New chat from the sidebar on the desktop | `M4-41-sidebar-new-chat.md` | M4-40 |
 | 40 | M4-42 | Thread layout on the desktop | `M4-42-thread-layout.md` | M4-40 |
+| 41 | M4-43 | New project from the app | `M4-43-new-project.md` | M2-34, M4-41 |
 | 23 | M6-01 | Console session following the BFF pattern | `M6-01-console-session.md` | M1-39, M1-40, M1-41, M1-43, M1-45, M1-49, M1-64 |
 | 37 | M6-05 | Statistics in the server | `M6-05-stats-server.md` | M2-22, M2-26, M3-22 |
 | 2 | M6-10 | Design tokens for charts: check for color vision deficiency | `M6-10-viz-cvd-check.md` | M4-03 |
@@ -922,6 +923,7 @@ flowchart TB
   M1_73["M1-73"]
   M2_21["M2-21"]
   M2_31["M2-31"]
+  M2_34["M2-34"]
   M2_41["M2-41"]
   M2_44["M2-44"]
   M2_48["M2-48"]
@@ -973,6 +975,7 @@ flowchart TB
   M4_40["M4-40"]
   M4_41["M4-41"]
   M4_42["M4-42"]
+  M4_43["M4-43"]
   M6_11["M6-11"]
   M1_01 --> M4_01
   M1_17 --> M4_02
@@ -1052,6 +1055,8 @@ flowchart TB
   M4_24 --> M4_40
   M4_40 --> M4_41
   M4_40 --> M4_42
+  M2_34 --> M4_43
+  M4_41 --> M4_43
 ```
 
 Tickets of M5:

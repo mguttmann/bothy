@@ -6790,6 +6790,7 @@ paths:
                     repository_url: https://git.example.com/team/website
                     default_branch: main
                     runner_config: {}
+                    provision: none
                     ready: false
                     version: 3
         '400': {$ref: '#/components/responses/BadRequest'}
@@ -24474,8 +24475,19 @@ components:
         repository_url: {type: string, description: Display only; the server never fetches this URL., examples: ['https://git.example.com/team/website']}
         default_branch: {type: string, examples: [main]}
         runner_config: {$ref: '#/components/schemas/ProjectRunnerConfig'}
+        provision: {$ref: '#/components/schemas/ProjectProvision'}
         ready: {type: boolean}
+        ready_reason:
+          type: string
+          description: The code the serving runner reported with `ready` false (09 18.12, for example `provisioning` or `clone_failed`); absent while `ready` is true and before the first report.
+          pattern: '^[a-z0-9][a-z0-9_]*$'
+          maxLength: 64
+          examples: [provisioning]
         version: {type: integer, format: int64}
+    ProjectProvision:
+      type: string
+      enum: [none, init, clone]
+      description: Whether the serving runner creates the folder of the binding (09 18.12). `none` creates nothing and the folder must exist; `init` creates an empty folder with `git init`; `clone` clones `repository_url`, which must be `https`. With `init` or `clone` the `workspace_ref` is one segment of `^[A-Za-z0-9][A-Za-z0-9._-]*$`. Absent means `none`; the server always sends it.
     ProjectBindingPut:
       type: object
       additionalProperties: false
@@ -24485,6 +24497,7 @@ components:
         repository_url: {type: string, examples: ['https://git.example.com/team/website']}
         default_branch: {type: string, examples: [main]}
         runner_config: {$ref: '#/components/schemas/ProjectRunnerConfig'}
+        provision: {$ref: '#/components/schemas/ProjectProvision'}
         reason: {type: string, minLength: 1, examples: [Website project moves to this forum]}
     ProjectRunnerConfig:
       type: object
@@ -26034,6 +26047,11 @@ components:
           $ref: '#/components/schemas/Uuid'
         ready:
           type: boolean
+        reason:
+          type: string
+          description: Why the forum is not ready, a code of 09 18.12 (for example `provisioning`, `workspace_exists`, `clone_failed`); only with `ready` false. Stored as `project_bindings.ready_reason`.
+          pattern: '^[a-z0-9][a-z0-9_]*$'
+          maxLength: 64
     HeartbeatAck:
       type: object
       required: [presence, interval_ms]

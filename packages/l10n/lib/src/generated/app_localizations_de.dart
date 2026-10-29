@@ -9230,4 +9230,180 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get newChatTitleMissing => 'Gib einen Titel ein, um zu senden.';
+
+  @override
+  String newProjectIn(String name) {
+    return 'Neues Projekt in $name';
+  }
+
+  @override
+  String get newProjectModeLabel => 'Start mit';
+
+  @override
+  String get newProjectModeEmpty => 'Leeres Projekt';
+
+  @override
+  String get newProjectModeClone => 'Repository klonen';
+
+  @override
+  String get newProjectModeExisting => 'Vorhandener Ordner';
+
+  @override
+  String get newProjectModeIdea => 'Mit einer Idee starten';
+
+  @override
+  String get newProjectName => 'Name';
+
+  @override
+  String get newProjectNameHint =>
+      'Wird für das Forum und den Ordner verwendet.';
+
+  @override
+  String newProjectNameInvalid(int max) {
+    return 'Verwende Buchstaben, Ziffern, Punkte, Unterstriche oder Bindestriche, beginnend mit einem Buchstaben oder einer Ziffer, höchstens $max Zeichen.';
+  }
+
+  @override
+  String get newProjectUrl => 'Repository-URL (https)';
+
+  @override
+  String get newProjectUrlInvalid =>
+      'Gib eine https-URL mit Servernamen ein, ohne Benutzername, Abfrage oder Fragment.';
+
+  @override
+  String get newProjectFolder => 'Ordner im Projektordner des Runners';
+
+  @override
+  String get newProjectFolderInvalid =>
+      'Gib einen Ordner im Projektordner ein, zum Beispiel team/website.';
+
+  @override
+  String get newProjectIdea => 'Deine Idee';
+
+  @override
+  String get newProjectIdeaRequired => 'Beschreibe die Idee.';
+
+  @override
+  String get newProjectRunner => 'Runner';
+
+  @override
+  String newProjectRunnerSpace(String name) {
+    return '$name (Standard des Bereichs)';
+  }
+
+  @override
+  String get newProjectRunnerMissing =>
+      'Wähle den Agenten, der am Projekt arbeitet.';
+
+  @override
+  String get newProjectCreate => 'Anlegen';
+
+  @override
+  String get newProjectRetry => 'Erneut versuchen';
+
+  @override
+  String get newProjectClose => 'Schließen';
+
+  @override
+  String get newProjectCancel => 'Abbrechen';
+
+  @override
+  String get newProjectStepForum => 'Forum anlegen';
+
+  @override
+  String get newProjectStepRunner => 'Runner zuweisen';
+
+  @override
+  String get newProjectStepBind => 'Projekt verbinden';
+
+  @override
+  String get newProjectStepFolder => 'Ordner vorbereiten';
+
+  @override
+  String get newProjectStepCreating => 'Ordner wird angelegt';
+
+  @override
+  String get newProjectStepCloning => 'Wird geklont';
+
+  @override
+  String get newProjectStepIdea => 'Idee senden';
+
+  @override
+  String newProjectStepState(String step, String state) {
+    String _temp0 = intl.Intl.selectLogic(state, {
+      'waiting': 'wartet',
+      'running': 'läuft',
+      'finished': 'fertig',
+      'other': 'fehlgeschlagen',
+    });
+    return '$step: $_temp0';
+  }
+
+  @override
+  String get newProjectSlow =>
+      'Der Runner ist noch nicht fertig. Du kannst diesen Dialog schließen; das Forum wird von selbst bereit.';
+
+  @override
+  String get newProjectErrNameTaken =>
+      'In diesem Bereich gibt es schon einen Kanal mit diesem Namen. Wähle einen anderen Namen.';
+
+  @override
+  String get newProjectErrFolderBound =>
+      'Dieser Ordner ist schon mit einem anderen Forum verbunden.';
+
+  @override
+  String get newProjectErrStepUp =>
+      'Die Bestätigung wurde abgebrochen. Versuche es erneut, um fortzufahren.';
+
+  @override
+  String get newProjectErrOffline =>
+      'Der Server ist nicht erreichbar. Versuche es erneut, sobald du online bist.';
+
+  @override
+  String get newProjectErrWorkspaceExists =>
+      'Auf dem Runner gibt es schon einen Ordner mit diesem Namen. Ändere den Ordnernamen und versuche es erneut.';
+
+  @override
+  String get newProjectErrCloneFailed =>
+      'Das Repository konnte nicht geklont werden. Prüfe die URL und den Zugriff des Runners darauf.';
+
+  @override
+  String get newProjectErrInitFailed =>
+      'Der Runner konnte den Ordner nicht anlegen.';
+
+  @override
+  String get newProjectErrTimeout =>
+      'Das Anlegen des Ordners hat zu lange gedauert, deshalb hat der Runner es abgebrochen.';
+
+  @override
+  String get newProjectErrRefused =>
+      'Der Runner hat den Namen oder die URL abgelehnt.';
+
+  @override
+  String get newProjectErrMissing =>
+      'Der Ordner existiert nicht im Projektordner des Runners.';
+
+  @override
+  String get newProjectErrNotGit => 'Der Ordner ist kein Git-Repository.';
+
+  @override
+  String get newProjectErrNotWritable =>
+      'Der Runner darf nicht in den Ordner schreiben.';
+
+  @override
+  String get newProjectErrOutsideRoot =>
+      'Der Ordner liegt außerhalb des Projektordners des Runners.';
+
+  @override
+  String newProjectErrNotReady(String code) {
+    return 'Der Runner meldet, dass das Projekt nicht bereit ist ($code).';
+  }
+
+  @override
+  String get newProjectAuditReason => 'Neues Projekt aus der App';
+
+  @override
+  String stepUpPurposeNewProject(String name) {
+    return 'Das Projekt $name anlegen';
+  }
 }

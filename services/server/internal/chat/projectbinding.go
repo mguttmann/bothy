@@ -28,8 +28,13 @@ type ProjectBinding struct {
 	RepositoryURL string
 	DefaultBranch string
 	RunnerConfig  RunnerConfig
+	// Provision is none, init or clone (schema ProjectProvision, M4-43).
+	Provision string
 	// Ready is the readiness the serving runner reported in its heartbeat.
 	Ready bool
+	// ReadyReason is the code the runner reported with Ready false (09 section 18.12); "" for
+	// none.
+	ReadyReason string
 	// Version is the ETag of the binding.
 	Version int64
 }
@@ -44,6 +49,8 @@ type PutProjectBindingCmd struct {
 	DefaultBranch *string
 	// RunnerConfig is the empty config for an absent member.
 	RunnerConfig RunnerConfig
+	// Provision is none, init or clone; "" for an absent member, which means none (M4-43).
+	Provision string
 	// Reason is the mandatory reason of the audit entry.
 	Reason string
 	// IfMatch is the optional precondition on the binding version (last write wins without it).
@@ -55,6 +62,9 @@ type PutProjectBindingCmd struct {
 type ProjectReadiness struct {
 	ChannelID ids.ID
 	Ready     bool
+	// Reason is the code of 09 section 18.12 the runner sent with Ready false; "" for none. It is
+	// ignored with Ready true (M4-43).
+	Reason string
 }
 
 // ProjectBindings binds forums to development projects (05 channel.project.bind) and takes the
@@ -85,7 +95,8 @@ type ProjectBindings interface {
 	// from the heartbeat). A report changes ready only for a bound forum that is not archived and
 	// whose effective operator is agentID; every other report is ignored without error, so the
 	// result tells the agent nothing about forums it does not serve. It writes no event, no audit
-	// entry and no settings_version. Errors: validation_failed on /project_readiness for a channel
-	// reported twice, then nothing changes.
+	// entry and no settings_version. A report is written when ready or the reason differs from
+	// the stored values; the reason is stored only with ready false (R-DM-55). Errors:
+	// validation_failed on /project_readiness for a channel reported twice, then nothing changes.
 	ApplyProjectReadiness(ctx context.Context, agentID ids.ID, reports []ProjectReadiness) error
 }

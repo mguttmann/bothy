@@ -16,6 +16,8 @@ class _$ProjectBindingPut extends ProjectBindingPut {
   @override
   final ProjectRunnerConfig? runnerConfig;
   @override
+  final ProjectProvision? provision;
+  @override
   final String reason;
 
   factory _$ProjectBindingPut([
@@ -27,6 +29,7 @@ class _$ProjectBindingPut extends ProjectBindingPut {
     this.repositoryUrl,
     this.defaultBranch,
     this.runnerConfig,
+    this.provision,
     required this.reason,
   }) : super._();
   @override
@@ -45,6 +48,7 @@ class _$ProjectBindingPut extends ProjectBindingPut {
         repositoryUrl == other.repositoryUrl &&
         defaultBranch == other.defaultBranch &&
         runnerConfig == other.runnerConfig &&
+        provision == other.provision &&
         reason == other.reason;
   }
 
@@ -55,6 +59,7 @@ class _$ProjectBindingPut extends ProjectBindingPut {
     _$hash = $jc(_$hash, repositoryUrl.hashCode);
     _$hash = $jc(_$hash, defaultBranch.hashCode);
     _$hash = $jc(_$hash, runnerConfig.hashCode);
+    _$hash = $jc(_$hash, provision.hashCode);
     _$hash = $jc(_$hash, reason.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
@@ -67,6 +72,7 @@ class _$ProjectBindingPut extends ProjectBindingPut {
           ..add('repositoryUrl', repositoryUrl)
           ..add('defaultBranch', defaultBranch)
           ..add('runnerConfig', runnerConfig)
+          ..add('provision', provision)
           ..add('reason', reason))
         .toString();
   }
@@ -96,6 +102,10 @@ class ProjectBindingPutBuilder
   set runnerConfig(ProjectRunnerConfigBuilder? runnerConfig) =>
       _$this._runnerConfig = runnerConfig;
 
+  ProjectProvision? _provision;
+  ProjectProvision? get provision => _$this._provision;
+  set provision(ProjectProvision? provision) => _$this._provision = provision;
+
   String? _reason;
   String? get reason => _$this._reason;
   set reason(String? reason) => _$this._reason = reason;
@@ -111,6 +121,7 @@ class ProjectBindingPutBuilder
       _repositoryUrl = $v.repositoryUrl;
       _defaultBranch = $v.defaultBranch;
       _runnerConfig = $v.runnerConfig?.toBuilder();
+      _provision = $v.provision;
       _reason = $v.reason;
       _$v = null;
     }
@@ -144,6 +155,7 @@ class ProjectBindingPutBuilder
             repositoryUrl: repositoryUrl,
             defaultBranch: defaultBranch,
             runnerConfig: _runnerConfig?.build(),
+            provision: provision,
             reason: BuiltValueNullFieldError.checkNotNull(
               reason,
               r'ProjectBindingPut',

@@ -21,8 +21,8 @@ func (q *Queries) DeleteProjectBinding(ctx context.Context, channelID pgtype.UUI
 }
 
 const insertProjectBinding = `-- name: InsertProjectBinding :one
-INSERT INTO project_bindings (channel_id, workspace_ref, repository_url, default_branch, runner_config, created_by)
-VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO project_bindings (channel_id, workspace_ref, repository_url, default_branch, runner_config, provision, created_by)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
 RETURNING created_at
 `
 
@@ -32,10 +32,11 @@ type InsertProjectBindingParams struct {
 	RepositoryUrl pgtype.Text
 	DefaultBranch pgtype.Text
 	RunnerConfig  []byte
+	Provision     string
 	CreatedBy     pgtype.UUID
 }
 
-// A new binding with ready false and version 1; created_at comes from the column default.
+// A new binding with ready false, no reason and version 1; created_at comes from the column default.
 func (q *Queries) InsertProjectBinding(ctx context.Context, arg InsertProjectBindingParams) (pgtype.Timestamptz, error) {
 	row := q.db.QueryRow(ctx, insertProjectBinding,
 		arg.ChannelID,
@@ -43,6 +44,7 @@ func (q *Queries) InsertProjectBinding(ctx context.Context, arg InsertProjectBin
 		arg.RepositoryUrl,
 		arg.DefaultBranch,
 		arg.RunnerConfig,
+		arg.Provision,
 		arg.CreatedBy,
 	)
 	var created_at pgtype.Timestamptz
@@ -52,7 +54,8 @@ func (q *Queries) InsertProjectBinding(ctx context.Context, arg InsertProjectBin
 
 const lockProjectBinding = `-- name: LockProjectBinding :one
 
-SELECT channel_id, workspace_ref, repository_url, default_branch, runner_config, ready, created_by, created_at, version
+SELECT channel_id, workspace_ref, repository_url, default_branch, runner_config, ready, created_by, created_at, version,
+       provision, ready_reason
 FROM project_bindings
 WHERE channel_id = $1
 FOR UPDATE
@@ -80,12 +83,14 @@ func (q *Queries) LockProjectBinding(ctx context.Context, channelID pgtype.UUID)
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.Version,
+		&i.Provision,
+		&i.ReadyReason,
 	)
 	return i, err
 }
 
 const lockReportedBindings = `-- name: LockReportedBindings :many
-SELECT channel_id, ready
+SELECT channel_id, ready, ready_reason
 FROM project_bindings
 WHERE channel_id = ANY ($1::uuid[])
 ORDER BY channel_id
@@ -93,8 +98,9 @@ FOR UPDATE
 `
 
 type LockReportedBindingsRow struct {
-	ChannelID pgtype.UUID
-	Ready     bool
+	ChannelID   pgtype.UUID
+	Ready       bool
+	ReadyReason pgtype.Text
 }
 
 // The bindings of the channels of a readiness report, locked in ascending channel id.
@@ -107,7 +113,7 @@ func (q *Queries) LockReportedBindings(ctx context.Context, channelIds []pgtype.
 	var items []LockReportedBindingsRow
 	for rows.Next() {
 		var i LockReportedBindingsRow
-		if err := rows.Scan(&i.ChannelID, &i.Ready); err != nil {
+		if err := rows.Scan(&i.ChannelID, &i.Ready, &i.ReadyReason); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -121,8 +127,8 @@ func (q *Queries) LockReportedBindings(ctx context.Context, channelIds []pgtype.
 const replaceProjectBinding = `-- name: ReplaceProjectBinding :exec
 UPDATE project_bindings
 SET workspace_ref = $1, repository_url = $2, default_branch = $3,
-    runner_config = $4, ready = false, version = $5
-WHERE channel_id = $6
+    runner_config = $4, provision = $5, ready = false, ready_reason = NULL, version = $6
+WHERE channel_id = $7
 `
 
 type ReplaceProjectBindingParams struct {
@@ -130,18 +136,20 @@ type ReplaceProjectBindingParams struct {
 	RepositoryUrl pgtype.Text
 	DefaultBranch pgtype.Text
 	RunnerConfig  []byte
+	Provision     string
 	Version       int64
 	ChannelID     pgtype.UUID
 }
 
-// Replaces the whole binding of the locked row (HTTP PUT) with ready false and the new version;
-// created_by and created_at stay.
+// Replaces the whole binding of the locked row (HTTP PUT) with ready false, no reason and the new
+// version; created_by and created_at stay.
 func (q *Queries) ReplaceProjectBinding(ctx context.Context, arg ReplaceProjectBindingParams) error {
 	_, err := q.db.Exec(ctx, replaceProjectBinding,
 		arg.WorkspaceRef,
 		arg.RepositoryUrl,
 		arg.DefaultBranch,
 		arg.RunnerConfig,
+		arg.Provision,
 		arg.Version,
 		arg.ChannelID,
 	)
@@ -149,27 +157,31 @@ func (q *Queries) ReplaceProjectBinding(ctx context.Context, arg ReplaceProjectB
 }
 
 const resetProjectReadiness = `-- name: ResetProjectReadiness :exec
-UPDATE project_bindings SET ready = false, version = version + 1 WHERE channel_id = ANY ($1::uuid[]) AND ready
+UPDATE project_bindings SET ready = false, ready_reason = NULL, version = version + 1
+WHERE channel_id = ANY ($1::uuid[]) AND (ready OR ready_reason IS NOT NULL)
 `
 
-// Sets ready false with a new version for the bound forums among channel_ids that are ready: the
-// effective operator of these channels changed (design note 7 of M2-03).
+// Sets ready false and clears the reason with a new version for the bound forums among channel_ids
+// that are ready or have a reason: the effective operator of these channels changed (design note 7
+// of M2-03, R-DM-55).
 func (q *Queries) ResetProjectReadiness(ctx context.Context, channelIds []pgtype.UUID) error {
 	_, err := q.db.Exec(ctx, resetProjectReadiness, channelIds)
 	return err
 }
 
 const setProjectReady = `-- name: SetProjectReady :exec
-UPDATE project_bindings SET ready = $1, version = version + 1 WHERE channel_id = $2
+UPDATE project_bindings SET ready = $1, ready_reason = $2, version = version + 1 WHERE channel_id = $3
 `
 
 type SetProjectReadyParams struct {
-	Ready     bool
-	ChannelID pgtype.UUID
+	Ready       bool
+	ReadyReason pgtype.Text
+	ChannelID   pgtype.UUID
 }
 
-// Applies one readiness report of the serving runner to the locked row.
+// Applies one readiness report of the serving runner to the locked row; the reason is NULL with
+// ready true (R-DM-55).
 func (q *Queries) SetProjectReady(ctx context.Context, arg SetProjectReadyParams) error {
-	_, err := q.db.Exec(ctx, setProjectReady, arg.Ready, arg.ChannelID)
+	_, err := q.db.Exec(ctx, setProjectReady, arg.Ready, arg.ReadyReason, arg.ChannelID)
 	return err
 }

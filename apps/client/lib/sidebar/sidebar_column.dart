@@ -17,6 +17,8 @@ import '../admin/admin_route.dart' show adminPathOf;
 import '../app/providers/session.dart';
 import '../app/router.dart' show NewChatLocation;
 import '../forum/new_chat_view.dart' show openNewChat;
+import '../new_project/new_project_dialog.dart' show showNewProjectDialog;
+import '../notifications_settings/providers.dart' show isOwnerProvider;
 import '../onboarding/onboarding_controller.dart';
 import '../running/providers.dart' show activeRunCountProvider;
 import '../switcher/quick_switcher.dart' show showQuickSwitcher;
@@ -63,6 +65,7 @@ class SidebarView extends StatelessWidget {
     this.onOpenThread,
     this.onToggleGroup,
     this.onAdd,
+    this.onNewProject,
     this.onHold,
     this.holdMode = SidebarHoldMode.pointer,
     this.selectedNewChat,
@@ -144,6 +147,9 @@ class SidebarView extends StatelessWidget {
   /// The "+" action of a forum row (01 6.8 item 8), or null for none.
   final ValueChanged<ChannelId>? onAdd;
 
+  /// The action "New project" of a space row and its menu (01 6.9 item 1), or null for none.
+  final ValueChanged<Space>? onNewProject;
+
   /// Called with true while the person is in the sidebar ([holdMode]) and with false when the
   /// person left it (01 6.8 item 4: rows that no longer qualify stay until then).
   final ValueChanged<bool>? onHold;
@@ -187,6 +193,7 @@ class SidebarView extends StatelessWidget {
           onOpenThread: onOpenThread,
           onToggleGroup: onToggleGroup,
           onAdd: onAdd,
+          onNewProject: onNewProject,
           selectedNewChat: selectedNewChat,
           onOpenNewChat: onOpenNewChat,
         ),
@@ -438,6 +445,11 @@ class SidebarColumn extends ConsumerWidget {
       // collapsed group expands, so the draft row shows and is selected. On the phone the view
       // is a page on top of M1 (brief M5-15 Design note 2).
       onAdd: (channel) => openNewChat(context, ref, channel),
+      // 01 6.9 item 1: owners start a new project from a space row; the desktop only
+      // (D-M4-43-12).
+      onNewProject: !phone && (ref.watch(isOwnerProvider).value ?? false)
+          ? (space) => unawaited(_newProject(context, ref, space))
+          : null,
       selectedNewChat: newChat,
       onOpenNewChat: (forum, entry) =>
           context.go(NewChatLocation.pathOf(forum, entry: entry)),
@@ -465,4 +477,21 @@ class SidebarColumn extends ConsumerWidget {
           unawaited(ref.read(onboardingControllerProvider.notifier).logout()),
     );
   }
+}
+
+/// Opens the new project dialog of [space] and, when every step is done, the new forum or,
+/// for an idea, its new chat (01 6.9 item 7).
+Future<void> _newProject(
+  BuildContext context,
+  WidgetRef ref,
+  Space space,
+) async {
+  final result = await showNewProjectDialog(context, ref, space);
+  if (result == null || !context.mounted) return;
+  final entry = result.sentEntry;
+  context.go(
+    entry == null
+        ? '/c/${result.forum.value}'
+        : NewChatLocation.pathOf(result.forum, entry: entry),
+  );
 }

@@ -183,3 +183,23 @@ def test_example_lists_every_runner_key() -> None:
     )
     fields = {f.name for f in dataclasses.fields(RunnerConfig)} - {"source", "sdk"}
     assert set(example["runner"]) == fields
+
+
+def test_provision_keys(tmp_path: Path) -> None:
+    cfg = load_config(write(tmp_path))
+    assert cfg.git_bin == "git"
+    assert cfg.provision_timeout == 600.0
+    assert cfg.provision_retry_after == 300.0
+    cfg = load_config(
+        write(
+            tmp_path,
+            'git_bin = "/usr/bin/git"\nprovision_timeout = "30s"\nprovision_retry_after = "1m"\n',
+        )
+    )
+    assert (cfg.git_bin, cfg.provision_timeout, cfg.provision_retry_after) == (
+        "/usr/bin/git",
+        30.0,
+        60.0,
+    )
+    with pytest.raises(ConfigError, match="git_bin"):
+        load_config(write(tmp_path, 'git_bin = "-x"\n'))

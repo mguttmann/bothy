@@ -143,6 +143,9 @@ Source: [01-product.md](../spec/01-product.md), section 14.
 | `ui.desktop_min_width_three_columns` |  | App |  | `960px` | below this width a pinned forum overview returns to the content column (navigation stack) |  |
 | `ui.sidebar_thread_window` |  | App |  | `72h` | an open thread with activity within this window shows in the sidebar (6.8) |  |
 | `ui.sidebar_threads_per_channel` |  | App |  | `8` | at most this many thread rows per channel in the sidebar (6.8) |  |
+| `ui.new_project_wait` |  | App |  | `2m` | after this time without readiness the new project dialog says that the runner has not finished (6.9) |  |
+| `ui.new_project_poll_interval` |  | App |  | `2s` | interval at which the new project dialog reads the readiness of the binding (6.9) |  |
+| `ui.new_project_name_max_chars` |  | App |  | `40` | longest suggested and accepted name of a new project (6.9) |  |
 | `a11y.live_announce_min_interval` |  | App |  | `10s` | the live box announces a change at most this often |  |
 | `client.share.recent_targets` |  | App |  | `8` | recently used targets in the share sheet |  |
 
@@ -466,6 +469,9 @@ Source: [09-agents.md](../spec/09-agents.md), section 21.
 | `hermes_adapter.max_message_bytes` |  | Hermes adapter |  | `262144` | longest answer (`MAX_MESSAGE_LENGTH`); the default equals `message.max_content_bytes`, both change together |  |
 | `hermes_adapter.attachment_text_max_bytes` |  | Hermes adapter |  | `32768` | longest attachment text the adapter inlines as a data block; the default equals `agent.context_message_max_bytes` |  |
 | `runner.claude_bin` |  | Runner |  | `claude` | program, searched in the cleaned `PATH` |  |
+| `runner.git_bin` |  | Runner |  | `git` | program for the folder creation of 18.12, searched in the cleaned `PATH` |  |
+| `runner.provision_timeout` |  | Runner |  | `10m` | time limit of one folder creation (`git init` or `git clone`, 18.12) |  |
+| `runner.provision_retry_after` |  | Runner |  | `5m` | a failed folder creation is not tried again for the same binding content before this time (18.12) |  |
 | `runner.projects_root` |  | Runner |  | no default, required | root of all project folders |  |
 | `runner.state_dir` |  | Runner |  | no default, required | state, recordings, incoming files |  |
 | `runner.followup_grace` |  | Runner |  | `30s` | stdin stays open for follow-ups after `result` |  |

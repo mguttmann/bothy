@@ -13839,5 +13839,233 @@
   "newChatTitleMissing": "Enter a title to send.",
   "@newChatTitleMissing": {
     "description": "Hint of the new chat view in a forum without an operator agent while the title is empty (01 section 6.8 item 8)."
+  },
+  "newProjectIn": "New project in {name}",
+  "@newProjectIn": {
+    "description": "Label of the action at a space row and of the space menu entry that opens the new project dialog, and the title of that dialog (01 section 6.9).",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Engineering"
+      }
+    }
+  },
+  "newProjectModeLabel": "Start with",
+  "@newProjectModeLabel": {
+    "description": "Label of the mode choice of the new project dialog."
+  },
+  "newProjectModeEmpty": "Empty project",
+  "@newProjectModeEmpty": {
+    "description": "Mode of the new project dialog: a new empty folder with Git."
+  },
+  "newProjectModeClone": "Clone repository",
+  "@newProjectModeClone": {
+    "description": "Mode of the new project dialog: clone an https repository."
+  },
+  "newProjectModeExisting": "Existing folder",
+  "@newProjectModeExisting": {
+    "description": "Mode of the new project dialog: bind a folder that exists under the runner's projects folder."
+  },
+  "newProjectModeIdea": "Start from an idea",
+  "@newProjectModeIdea": {
+    "description": "Mode of the new project dialog: an empty project whose first chat is the idea."
+  },
+  "newProjectName": "Name",
+  "@newProjectName": {
+    "description": "Label of the name field of the new project dialog."
+  },
+  "newProjectNameHint": "Used for the forum and the folder.",
+  "@newProjectNameHint": {
+    "description": "Hint below the name field of the new project dialog."
+  },
+  "newProjectNameInvalid": "Use letters, digits, dots, underscores or hyphens, starting with a letter or digit, at most {max} characters.",
+  "@newProjectNameInvalid": {
+    "description": "Error of the name field of the new project dialog; max is ui.new_project_name_max_chars.",
+    "placeholders": {
+      "max": {
+        "type": "int",
+        "example": "40"
+      }
+    }
+  },
+  "newProjectUrl": "Repository URL (https)",
+  "@newProjectUrl": {
+    "description": "Label of the URL field of the new project dialog in the clone mode."
+  },
+  "newProjectUrlInvalid": "Enter an https URL with a server name, without user name, query or fragment.",
+  "@newProjectUrlInvalid": {
+    "description": "Error of the URL field of the new project dialog."
+  },
+  "newProjectFolder": "Folder in the runner's projects folder",
+  "@newProjectFolder": {
+    "description": "Label of the folder field of the new project dialog in the existing folder mode."
+  },
+  "newProjectFolderInvalid": "Enter a folder inside the projects folder, for example team/website.",
+  "@newProjectFolderInvalid": {
+    "description": "Error of the folder field of the new project dialog."
+  },
+  "newProjectIdea": "Your idea",
+  "@newProjectIdea": {
+    "description": "Label of the idea field of the new project dialog."
+  },
+  "newProjectIdeaRequired": "Describe the idea.",
+  "@newProjectIdeaRequired": {
+    "description": "Error of the empty idea field of the new project dialog."
+  },
+  "newProjectRunner": "Runner",
+  "@newProjectRunner": {
+    "description": "Label of the runner choice of the new project dialog."
+  },
+  "newProjectRunnerSpace": "{name} (default of the space)",
+  "@newProjectRunnerSpace": {
+    "description": "Entry of the runner choice for the space's default operator.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Code Runner"
+      }
+    }
+  },
+  "newProjectRunnerMissing": "Choose the agent that works on the project.",
+  "@newProjectRunnerMissing": {
+    "description": "Error of the runner choice of the new project dialog without a runner."
+  },
+  "newProjectCreate": "Create",
+  "@newProjectCreate": {
+    "description": "Button of the new project dialog that starts the steps."
+  },
+  "newProjectRetry": "Try again",
+  "@newProjectRetry": {
+    "description": "Button of the new project dialog after a failed step."
+  },
+  "newProjectClose": "Close",
+  "@newProjectClose": {
+    "description": "Button of the new project dialog that closes it and keeps what exists."
+  },
+  "newProjectCancel": "Cancel",
+  "@newProjectCancel": {
+    "description": "Button of the new project dialog before the start."
+  },
+  "newProjectStepForum": "Create forum",
+  "@newProjectStepForum": {
+    "description": "Step of the new project dialog: create the forum."
+  },
+  "newProjectStepRunner": "Assign runner",
+  "@newProjectStepRunner": {
+    "description": "Step of the new project dialog: set the runner as the forum's operator."
+  },
+  "newProjectStepBind": "Bind project",
+  "@newProjectStepBind": {
+    "description": "Step of the new project dialog: create the project binding."
+  },
+  "newProjectStepFolder": "Prepare folder",
+  "@newProjectStepFolder": {
+    "description": "Step of the new project dialog: the runner checks the folder."
+  },
+  "newProjectStepCreating": "Creating folder",
+  "@newProjectStepCreating": {
+    "description": "Step of the new project dialog: the runner creates the folder."
+  },
+  "newProjectStepCloning": "Cloning",
+  "@newProjectStepCloning": {
+    "description": "Step of the new project dialog: the runner clones the repository."
+  },
+  "newProjectStepIdea": "Send the idea",
+  "@newProjectStepIdea": {
+    "description": "Step of the new project dialog: the idea becomes the first chat."
+  },
+  "newProjectStepState": "{step}: {state, select, waiting{waiting} running{running} finished{finished} other{failed}}",
+  "@newProjectStepState": {
+    "description": "Screen reader text of a step of the new project dialog with its state.",
+    "placeholders": {
+      "step": {
+        "type": "String",
+        "example": "Create forum"
+      },
+      "state": {
+        "type": "String",
+        "example": "finished"
+      }
+    }
+  },
+  "newProjectSlow": "The runner has not finished yet. You can close this dialog; the forum becomes ready by itself.",
+  "@newProjectSlow": {
+    "description": "Notice of the new project dialog after ui.new_project_wait without readiness (01 section 6.9 item 6)."
+  },
+  "newProjectErrNameTaken": "This space already has a channel with this name. Choose another name.",
+  "@newProjectErrNameTaken": {
+    "description": "Failure of the step create forum: the name is taken."
+  },
+  "newProjectErrFolderBound": "This folder is already bound to another forum.",
+  "@newProjectErrFolderBound": {
+    "description": "Failure of the step bind project: workspace_ref taken."
+  },
+  "newProjectErrStepUp": "The confirmation was cancelled. Try again to continue.",
+  "@newProjectErrStepUp": {
+    "description": "Failure of a step of the new project dialog: the step-up was cancelled."
+  },
+  "newProjectErrOffline": "The server cannot be reached. Try again when you are online.",
+  "@newProjectErrOffline": {
+    "description": "Failure of a step of the new project dialog without an answer of the server."
+  },
+  "newProjectErrWorkspaceExists": "A folder with this name already exists on the runner. Change the folder name and try again.",
+  "@newProjectErrWorkspaceExists": {
+    "description": "Failure of the step prepare folder: reason workspace_exists (09 section 18.12)."
+  },
+  "newProjectErrCloneFailed": "The repository could not be cloned. Check the URL and the runner's access to it.",
+  "@newProjectErrCloneFailed": {
+    "description": "Failure of the step prepare folder: reason clone_failed."
+  },
+  "newProjectErrInitFailed": "The runner could not create the folder.",
+  "@newProjectErrInitFailed": {
+    "description": "Failure of the step prepare folder: reason init_failed."
+  },
+  "newProjectErrTimeout": "Creating the folder took too long, so the runner stopped it.",
+  "@newProjectErrTimeout": {
+    "description": "Failure of the step prepare folder: reason provision_timeout."
+  },
+  "newProjectErrRefused": "The runner refused the name or the URL.",
+  "@newProjectErrRefused": {
+    "description": "Failure of the step prepare folder: reason provision_refused."
+  },
+  "newProjectErrMissing": "The folder does not exist in the runner's projects folder.",
+  "@newProjectErrMissing": {
+    "description": "Failure of the step prepare folder: reason workspace_missing."
+  },
+  "newProjectErrNotGit": "The folder is not a Git repository.",
+  "@newProjectErrNotGit": {
+    "description": "Failure of the step prepare folder: reason not_a_git_worktree."
+  },
+  "newProjectErrNotWritable": "The runner may not write to the folder.",
+  "@newProjectErrNotWritable": {
+    "description": "Failure of the step prepare folder: reason not_writable."
+  },
+  "newProjectErrOutsideRoot": "The folder is outside the runner's projects folder.",
+  "@newProjectErrOutsideRoot": {
+    "description": "Failure of the step prepare folder: reason outside_root."
+  },
+  "newProjectErrNotReady": "The runner reports that the project is not ready ({code}).",
+  "@newProjectErrNotReady": {
+    "description": "Failure of the step prepare folder with a reason the app does not know; code is the reason code.",
+    "placeholders": {
+      "code": {
+        "type": "String",
+        "example": "workspace_missing"
+      }
+    }
+  },
+  "newProjectAuditReason": "New project from the app",
+  "@newProjectAuditReason": {
+    "description": "Reason of the audit entries of the project binding and the runner assignment of the new project dialog."
+  },
+  "stepUpPurposeNewProject": "Create the project {name}",
+  "@stepUpPurposeNewProject": {
+    "description": "Purpose shown by the step-up prompt of the new project dialog.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "website"
+      }
+    }
   }
 }
