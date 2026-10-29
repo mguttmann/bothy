@@ -1526,8 +1526,9 @@ a second interaction.
   position are never written to the server and never follow another device of the person. Only
   data crosses devices (04 14): messages, read state and the counters it gives, drafts, settings,
   the personal order of the spaces and notification preferences. Expanding a space on the phone
-  to open a chat leaves the space as it was on the desktop; a new device and an upgraded app
-  start with the collapse state the app showed last. Opening a thread on one device marks it read there; the other device updates its
+  to open a chat leaves the space as it was on the desktop; an upgraded app keeps the collapse
+  state it showed last, a new device starts with every space expanded. Opening a thread on one
+  device marks it read there; the other device updates its
   counters and stays where it is. Only an action of the person on that device changes its route:
   a click in the app, a clicked notification or push, a link.
 
