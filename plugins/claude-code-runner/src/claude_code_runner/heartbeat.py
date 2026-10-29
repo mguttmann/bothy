@@ -137,7 +137,7 @@ async def probe_version(  # noqa: PLR0911 - one return per outcome
     claude_bin: str | None,
     env: Mapping[str, str],
     cwd: Path,
-    timeout: float,
+    timeout: float,  # NOSONAR - a timeout is a classified outcome, D-RUNNER-CLI-PIN-4
     *,
     minimum: str = MIN_CLAUDE_CODE_VERSION,
 ) -> Probe:
