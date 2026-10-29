@@ -230,6 +230,44 @@ void main() {
     await host.dispose(tester);
   });
 
+  testWidgets('a main history opened as a thread route stands alone: the '
+      'session column shows and the toggle keeps the text-thread choice', (
+    tester,
+  ) async {
+    final host = await ColumnHost.open(tester);
+    await tester.runAsync(() => fill(host.db));
+    // A mention, a search hit or a push opens the main history as `/t/<mainThreadId>`.
+    await host.pump(
+      tester,
+      shell,
+      location: '/t/${mainHistory.id.value}',
+      overrides: overrides(host.db),
+    );
+    // 01 D2, D-M4-45-2: a main history alone shows the session column.
+    expect(session, findsOneWidget);
+    expect(rail, findsNothing);
+    expect(find.text(en.threadHideSession), findsOneWidget);
+    expect(find.byKey(const ValueKey('thread.channelColumn')), findsNothing);
+    await tester.tap(button);
+    await host.settle(tester);
+    expect(session, findsNothing);
+    expect(find.text(en.threadShowSession), findsOneWidget);
+    expect(
+      await tester.runAsync(
+        () => host.db.forumViewDao.sessionColumnHidden(textThread: false),
+      ),
+      isTrue,
+    );
+    expect(
+      await tester.runAsync(
+        () => host.db.forumViewDao.sessionColumnHidden(textThread: true),
+      ),
+      isTrue,
+      reason: 'the text-thread layout keeps its default',
+    );
+    await host.dispose(tester);
+  });
+
   testWidgets('a post opened from the sidebar keeps the session hidden', (
     tester,
   ) async {

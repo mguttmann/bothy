@@ -89,9 +89,12 @@ class DesktopShell extends ConsumerWidget {
             : const RouteSelection());
     final forum = selection.forum;
     // D2: with a thread of a text channel open the session column is collapsed until the
-    // person shows it.
+    // person shows it. A main history opened as a thread route stands alone, like the
+    // history area shows it.
     final textChannel =
-        selection.kind == ChannelKind.text && selection.thread != null;
+        selection.kind == ChannelKind.text &&
+        selection.thread != null &&
+        !selection.mainHistory;
     // M4-45: whether the person hid (or, beside a text channel's thread, showed) the session
     // column on this device; the default of the layout until the database answers.
     final sessionHidden =

@@ -206,9 +206,9 @@ class ChannelViewStates extends Table {
 
 /// How the desktop shell looks on this device (01 6.8 item 7, D-SB-6; 01 D1, D15): whether the
 /// forum overview is pinned as its own column, whether the channel column next to an open thread
-/// is hidden (M4-42) and whether the session column shows in either layout (M4-45). One row, like `sync_state`; kept per device and
-/// never synchronized, because 01 11 has no key for it; without the row the overview is not
-/// pinned.
+/// is hidden (M4-42) and whether the session column shows in either layout (M4-45). One row,
+/// like `sync_state`; kept per device and never synchronized, because 01 11 has no key for it;
+/// without the row the overview is not pinned.
 @DataClassName('ShellViewStateRow')
 class ShellViewStates extends Table {
   @override

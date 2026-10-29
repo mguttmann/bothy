@@ -279,7 +279,7 @@ text channel, D2). Addendum of 2026-10-29 (R-PR-22).
 +----------------------------------+---------------------------------------+------------------------+
 | [^] Bothy                        | Gateway: resume after network change  | Session            [x] |
 | [Jump to ...  Cmd+K]             | {} server  [Organization]  1,84 USD   |                        |
-| (o) Running now           (2)    | estimate        [Done] [Pin] [Column] | [A] dev-runner         |
+| (o) Running now           (2)    | estimate  [Done] [Pin] [Hide session] | [A] dev-runner         |
 |                                  | +- (o) Running 4:12  62 % 0,62 USD -+ |     online             |
 | v [H] Support                    | | Checking if resume restores ...   | | Backend [Organization] |
 |     # general                    | | [ok Read] internal/sync/gw.go     | | Model      model-large |
@@ -305,9 +305,9 @@ text channel, D2). Addendum of 2026-10-29 (R-PR-22).
 
 **D2 Text channel with an open thread.** No post list. A thread opens to the right of the
 main thread; the session column is then collapsed until the person shows it ("Show session",
-Cmd+Shift+I or the rail, D1), and that choice is kept on this device. The border between the two can be dragged
-(`main_history`; without a stored width they share the room), and "Hide channel" or
-Cmd+Shift+H leaves the thread alone in the content column (D1, R-PR-19). The header names the
+Cmd+Shift+I or the rail, D1), and that choice is kept on this device. The border between the
+two can be dragged (`main_history`; without a stored width they share the room), and "Hide
+channel" or Cmd+Shift+H leaves the thread alone in the content column (D1, R-PR-19). The header names the
 operator. The open threads of the channel are nested under it in the sidebar (6.8); the selected
 one is marked there.
 
