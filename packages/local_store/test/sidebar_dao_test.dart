@@ -163,41 +163,34 @@ void main() {
     },
   );
 
-  test(
-    'forum groups show the limit until Show more is stored per channel, and '
-    'the collapse state and Show more keep each other',
-    () async {
-      final dao = db.forumViewDao;
-      final forum = ChannelId.parse(uuid(0x201));
-      final other = ChannelId.parse(uuid(0x202));
-      expect(await dao.watchPostListsShownInFull().first, <ChannelId>{});
+  test('forum groups show the limit until Show more is stored per channel, and '
+      'the collapse state and Show more keep each other', () async {
+    final dao = db.forumViewDao;
+    final forum = ChannelId.parse(uuid(0x201));
+    final other = ChannelId.parse(uuid(0x202));
+    expect(await dao.watchPostListsShownInFull().first, <ChannelId>{});
 
-      await dao.setPostListShownInFull(forum, inFull: true);
-      expect(await dao.watchPostListsShownInFull().first, {forum});
-      expect(
-        await dao.watchCollapsedGroups().first,
-        <ChannelId>{},
-        reason: 'a new row keeps the group expanded',
-      );
+    await dao.setPostListShownInFull(forum, inFull: true);
+    expect(await dao.watchPostListsShownInFull().first, {forum});
+    expect(
+      await dao.watchCollapsedGroups().first,
+      <ChannelId>{},
+      reason: 'a new row keeps the group expanded',
+    );
 
-      await dao.setGroupCollapsed(forum, collapsed: true);
-      expect(await dao.watchCollapsedGroups().first, {forum});
-      expect(
-        await dao.watchPostListsShownInFull().first,
-        {forum},
-        reason: 'collapsing the group keeps Show more',
-      );
+    await dao.setGroupCollapsed(forum, collapsed: true);
+    expect(await dao.watchCollapsedGroups().first, {forum});
+    expect(await dao.watchPostListsShownInFull().first, {
+      forum,
+    }, reason: 'collapsing the group keeps Show more');
 
-      await dao.setPostListShownInFull(other, inFull: true);
-      await dao.setPostListShownInFull(forum, inFull: false);
-      expect(await dao.watchPostListsShownInFull().first, {other});
-      expect(
-        await dao.watchCollapsedGroups().first,
-        {forum},
-        reason: 'Show less keeps the collapse state',
-      );
-    },
-  );
+    await dao.setPostListShownInFull(other, inFull: true);
+    await dao.setPostListShownInFull(forum, inFull: false);
+    expect(await dao.watchPostListsShownInFull().first, {other});
+    expect(await dao.watchCollapsedGroups().first, {
+      forum,
+    }, reason: 'Show less keeps the collapse state');
+  });
 
   test(
     'the overview is not pinned until it is set, read once or watched',
