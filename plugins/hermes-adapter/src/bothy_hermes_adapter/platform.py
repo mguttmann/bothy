@@ -42,6 +42,7 @@ from bothy_sdk.errors import ProblemError
 from bothy_sdk.generated.api.me import get_me
 from bothy_sdk.generated.models import Me
 from gateway.config import Platform, PlatformConfig
+from gateway.platforms._shared import platform_gate_env
 from gateway.platforms.base import BasePlatformAdapter, ExecApprovalPrompt, SendResult
 from gateway.platforms.event import MessageEvent, MessageType, ProcessingOutcome
 from gateway.session_context import get_session_env
@@ -114,11 +115,8 @@ class ServerPlatform(BasePlatformAdapter):
             self.config_error = str(exc)
         if self.settings is not None:
             self.MAX_MESSAGE_LENGTH = self.settings.max_message_bytes
-        # Hermes's own allow list of the platform (09 17.7 layer 3, the name entry.py registers):
-        # written only by `switch-mode personal`, which needs a gateway restart anyway.
-        self._hermes_allow_list = hermes_config.env_defines(
-            Path(get_hermes_home()), f"{platform_key.upper()}_ALLOWED_USERS"
-        )
+        # Hermes's own allow list of the platform (09 17.7 layer 3, the name entry.py registers).
+        self._allow_list_variable = f"{platform_key.upper()}_ALLOWED_USERS"
         self._loop: asyncio.AbstractEventLoop | None = None
         self._serve_task: asyncio.Task[Any] | None = None
         self._sdk: HermesAdapterLoop | None = None
@@ -148,9 +146,10 @@ class ServerPlatform(BasePlatformAdapter):
         Hermes v0.22 checks every message again at admission and trusts an own access policy
         there only through this declaration. It holds only while Hermes has no allow list of
         its own for the platform: with the list of ``personal`` (layer 3) Hermes keeps judging
-        each person by it.
+        each person by it. The list is read on every call with the reader Hermes's admission
+        check uses, so it covers the process environment and a list written without a restart.
         """
-        return not self._hermes_allow_list
+        return not platform_gate_env(self._allow_list_variable)
 
     async def connect(self, *, is_reconnect: bool = False) -> bool:
         """Connect as the agent and start the SDK loop (09 17.3).

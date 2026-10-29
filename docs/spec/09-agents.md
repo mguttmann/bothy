@@ -2342,7 +2342,8 @@ Three layers, each sufficient on its own for "no stranger triggers":
    there only together with `authorization_is_upstream = True` (measured in `v0.22.5`:
    `access_policy_own.json` does not reach the turn, `access_policy_upstream.json` does). The
    adapter declares it while Hermes keeps no allow list of its own for the platform (layer 3
-   below, read from the profile's `.env` at the start of the gateway); with that list the
+   below, read on every admission with the reader Hermes's own check uses, so the process
+   environment counts and a list written without a restart holds at once); with that list the
    declaration is off, so Hermes keeps judging every person by it (D-HERMES-COMPAT-4). The list is the set of the
    principals that may trigger this agent, read from the server (`agent.triggerers.read`,
    agent-self, `GET /api/v1/agents/me/triggerers`, returns IDs and `permission_version`). It is

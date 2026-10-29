@@ -271,6 +271,29 @@ async def test_installer_busy_mode_and_switch(world: HermesWorld) -> None:
         assert rig.gateway.pid == pid
 
 
+async def test_allow_list_of_the_process_environment_holds(world: HermesWorld) -> None:
+    # Layer 3 (09 17.7) from the gateway's environment instead of the profile's .env: Hermes
+    # judges each person by it, so the adapter declares no upstream authorization next to it.
+    script = [ScriptTurn(text=("Fine.",), paced=False)]
+    async with hermes_rig(world, script, start=False) as rig:
+        rig.env["BOTHY_ALLOWED_USERS"] = str(rig.fake.robin_id)
+        await _start_gateway(rig)
+        allowed = await rig.fake.trigger("hello", author="robin")
+        try:
+            await rig.until(lambda: rig.finished(allowed.run_id), "the end of the run")
+        except AssertionError:
+            raise AssertionError(gateway_log(rig)) from None
+        assert rig.fake.run_state(allowed.run_id).state == "completed", gateway_log(rig)
+        before = len(rig.model_requests(scripted=True))
+        stranger = await rig.fake.trigger("hello", author="sam")
+        try:
+            await rig.until(lambda: rig.finished(stranger.run_id), "the end of the refusal")
+        except AssertionError:
+            raise AssertionError(gateway_log(rig)) from None
+        assert f"Unauthorized user: {rig.fake.sam_id}" in gateway_log(rig)
+        assert len(rig.model_requests(scripted=True)) == before
+
+
 async def test_installer_refuses_a_login_file_for_organization(world: HermesWorld) -> None:
     profile = Profile(login_file=True)
     async with hermes_rig(world, [], profile=profile, start=False) as rig:
