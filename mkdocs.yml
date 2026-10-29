@@ -448,6 +448,7 @@ nav:
           - "M4-42: Thread layout on the desktop": briefs/M4-42-thread-layout.md
           - "M4-43: New project from the app": briefs/M4-43-new-project.md
           - "M4-44: Forums for existing folders and renaming a project": briefs/M4-44-project-sync-rename.md
+          - "M4-45: Session column toggle on the desktop": briefs/M4-45-session-column-toggle.md
       - Milestone M6:
           - "M6-01: Console session following the BFF pattern": briefs/M6-01-console-session.md
           - "M6-05: Statistics in the server": briefs/M6-05-stats-server.md

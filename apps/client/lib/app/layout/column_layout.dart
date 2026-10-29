@@ -40,6 +40,7 @@ class ColumnLayout extends StatefulWidget {
     this.showPostList = true,
     this.listPinned = true,
     this.showSession = true,
+    this.onShowSession,
   });
 
   /// The stored widths.
@@ -77,8 +78,14 @@ class ColumnLayout extends StatefulWidget {
   final bool listPinned;
 
   /// Whether the session column shows when the window is wide enough; the header button
-  /// "Column" hides it, and a thread of a text channel collapses it (01 5.1 D1, D2; M4-20).
+  /// "Hide session" hides it, and a thread of a text channel collapses it (01 5.1 D1, D2; M4-20,
+  /// M4-45).
   final bool showSession;
+
+  /// Shows the hidden session column again; while the window has room for it and it is hidden
+  /// ([showSession] false), a slim rail at the right edge offers it (01 D1; M4-45). Null where
+  /// the route has no session (the cross-cutting views), so no rail shows.
+  final VoidCallback? onShowSession;
 
   @override
   State<ColumnLayout> createState() => _ColumnLayoutState();
@@ -121,8 +128,12 @@ class _ColumnLayoutState extends State<ColumnLayout> {
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
-      final total = constraints.maxWidth;
-      final four = total >= widget.minWidthFourColumns && widget.showSession;
+      final room = constraints.maxWidth >= widget.minWidthFourColumns;
+      final four = room && widget.showSession;
+      // M4-45: a hidden session column that has room leaves a rail to bring it back.
+      final show = widget.onShowSession;
+      final railed = room && !widget.showSession && show != null;
+      final total = constraints.maxWidth - (railed ? _SessionRail.width : 0);
       final stacked = total < widget.minWidthThreeColumns;
       final list = widget.showPostList;
       // The overview has a column of its own only pinned and with room for it (01 D1, D15).
@@ -167,6 +178,7 @@ class _ColumnLayoutState extends State<ColumnLayout> {
             handle(AppColumn.session, growsLeft: true),
             fixed(AppColumn.session, widget.session),
           ],
+          if (railed) _SessionRail(onShow: show),
         ],
       );
     },
@@ -205,6 +217,62 @@ class _ColumnFrame extends StatelessWidget {
           column: column,
           registry: KeyboardScope.maybeOf(context)?.columns,
           child: child,
+        ),
+      ),
+    );
+  }
+}
+
+/// The slim rail at the right edge while the session column is hidden (01 D1; M4-45): one
+/// button "Show session" that brings the column back, as the header button and Cmd+Shift+I do.
+class _SessionRail extends StatelessWidget {
+  const _SessionRail({required this.onShow});
+
+  /// The width the rail takes from the content column.
+  static const double width = DsSpace.s32;
+
+  final VoidCallback onShow;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.dsColors;
+    final label = AppLocalizations.of(context).threadShowSession;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colors.surfaceCanvas,
+        border: Border(
+          left: BorderSide(
+            color: colors.borderSubtle,
+            width: DsBorderWidth.hairline,
+          ),
+        ),
+      ),
+      child: SizedBox(
+        width: width,
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: Padding(
+            padding: const EdgeInsets.only(top: DsSpace.s8),
+            child: Tooltip(
+              message: label,
+              excludeFromSemantics: true,
+              child: DsTappable(
+                key: const ValueKey('column.session.show'),
+                onTap: onShow,
+                label: label,
+                excludeChildSemantics: true,
+                child: Padding(
+                  padding: const EdgeInsets.all(DsSpace.s6),
+                  child: DsIcon(
+                    DsIcons.actionTogglePanel,
+                    size: DsIconSizeRole.sm,
+                    color: colors.textSecondary,
+                    decorative: true,
+                  ),
+                ),
+              ),
+            ),
+          ),
         ),
       ),
     );

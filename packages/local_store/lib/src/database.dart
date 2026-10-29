@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The drift database of the apps, schema version 7 (docs/spec/15-client-architecture.md 6, ADR
+/// The drift database of the apps, schema version 8 (docs/spec/15-client-architecture.md 6, ADR
 /// 0029): the mirror tables of 15 6.1 and the local-only tables, `host_key_pins` (M4-36) and
 /// the sidebar view state `channel_view_states` and `shell_view_state` (M4-40, M4-42) included.
 library;
@@ -89,7 +89,7 @@ class LocalDatabase extends _$LocalDatabase {
   final DateTime Function() clock;
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   /// Closes the database and releases its file, also while watched queries come and go.
   ///
@@ -142,6 +142,20 @@ class LocalDatabase extends _$LocalDatabase {
         schema.shellViewState,
         schema.shellViewState.channelColumnHidden,
       ),
+      // Version 8 (M4-45): the columns `shell_view_state.session_column_hidden` and
+      // `text_thread_session_shown`, false in the kept row (01 D1, D2: the session column shows
+      // beside a forum post and is collapsed beside a thread of a text channel until the person
+      // changes it); no row moves.
+      from7To8: (m, schema) async {
+        await m.addColumn(
+          schema.shellViewState,
+          schema.shellViewState.sessionColumnHidden,
+        );
+        await m.addColumn(
+          schema.shellViewState,
+          schema.shellViewState.textThreadSessionShown,
+        );
+      },
     ),
   );
 

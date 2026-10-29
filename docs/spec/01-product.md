@@ -266,11 +266,20 @@ of the overview, never synchronized, and stays while the person opens other thre
 sidebar or elsewhere; the pin itself does not change. The main history of a channel alone has
 nothing to hide. Addendum of 2026-10-28 (R-PR-19).
 
+The right session column is collapsible the same way: the button "Hide session" in the header of
+a thread or main history and Cmd+Shift+I (Ctrl+Shift+I) hide it, so the history takes its width;
+"Show session", the same keys, "Pin" and a slim rail with a "Show session" button at the right
+edge of the window show it again. The rail is there only while the column is hidden and the
+window is wide enough for it. The choice is kept on this device like the channel column, never
+synchronized, and stays while other threads open; it is kept apart for the two layouts (shown by
+default beside a forum post or a main history alone, collapsed by default beside a thread of a
+text channel, D2). Addendum of 2026-10-29 (R-PR-22).
+
 ```text
 +----------------------------------+---------------------------------------+------------------------+
 | [^] Bothy                        | Gateway: resume after network change  | Session            [x] |
 | [Jump to ...  Cmd+K]             | {} server  [Organization]  1,84 USD   |                        |
-| (o) Running now           (2)    | estimate        [Done] [Pin] [Column] | [A] dev-runner         |
+| (o) Running now           (2)    | estimate  [Done] [Pin] [Hide session] | [A] dev-runner         |
 |                                  | +- (o) Running 4:12  62 % 0,62 USD -+ |     online             |
 | v [H] Support                    | | Checking if resume restores ...   | | Backend [Organization] |
 |     # general                    | | [ok Read] internal/sync/gw.go     | | Model      model-large |
@@ -295,9 +304,10 @@ nothing to hide. Addendum of 2026-10-28 (R-PR-19).
 ```
 
 **D2 Text channel with an open thread.** No post list. A thread opens to the right of the
-main thread; the session column is then collapsed. The border between the two can be dragged
-(`main_history`; without a stored width they share the room), and "Hide channel" or
-Cmd+Shift+H leaves the thread alone in the content column (D1, R-PR-19). The header names the
+main thread; the session column is then collapsed until the person shows it ("Show session",
+Cmd+Shift+I or the rail, D1), and that choice is kept on this device. The border between the
+two can be dragged (`main_history`; without a stored width they share the room), and "Hide
+channel" or Cmd+Shift+H leaves the thread alone in the content column (D1, R-PR-19). The header names the
 operator. The open threads of the channel are nested under it in the sidebar (6.8); the selected
 one is marked there.
 
@@ -1886,6 +1896,7 @@ Rules:
 | R-PR-19 | On desktop the channel column next to an open thread (the main history of a text channel or the pinned forum overview) can be hidden from the thread header and with Cmd+Shift+H, kept per device; every column border, also the one between main history and thread, can be dragged (addendum of 2026-10-28). | Owner feedback on the Mac app (2026-10-28): the thread where the person writes stayed small next to the channel history, which could neither be hidden nor resized. |
 | R-PR-20 | A new project starts from the space row or the space menu ("New project", owners only) in a dialog with four modes: empty, clone, existing folder, idea; it shows every step and resumes after a failure; for an idea the first post starts when the folder is ready (6.9, addendum of 2026-10-28). | Owner feedback 2026-10-28: a space had no way to add a project; his earlier setup created one per request (D-M4-43-1 to D-M4-43-12). |
 | R-PR-21 | The space menu adds forums for the folders of a runner's projects folder that have none, as a checked list the owner confirms, one forum and binding per folder; a project forum's menu renames the forum, never the folder (6.10, 6.11, addendum of 2026-10-29). | Owner feedback 2026-10-29: his former setup synced a forum for every project folder and renamed project forums; the list is the preview, and a folder with a forum never gets a second one (D-M4-44-1 to D-M4-44-7). |
+| R-PR-22 | On desktop the session column can be hidden and shown from the header of a thread or main history ("Hide session", "Show session"), with Cmd+Shift+I and from a slim rail at the right edge while it is hidden, kept per device and per layout (addendum of 2026-10-29). | Owner feedback on the Mac app (2026-10-29): the session column read as not collapsible, because the header button only said "Column" and the choice was lost on restart. |
 
 ## 14. Configuration values of this chapter
 

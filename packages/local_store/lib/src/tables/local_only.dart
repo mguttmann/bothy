@@ -205,9 +205,10 @@ class ChannelViewStates extends Table {
 }
 
 /// How the desktop shell looks on this device (01 6.8 item 7, D-SB-6; 01 D1, D15): whether the
-/// forum overview is pinned as its own column. One row, like `sync_state`; kept per device and
-/// never synchronized, because 01 11 has no key for it; without the row the overview is not
-/// pinned.
+/// forum overview is pinned as its own column, whether the channel column next to an open thread
+/// is hidden (M4-42) and whether the session column shows in either layout (M4-45). One row,
+/// like `sync_state`; kept per device and never synchronized, because 01 11 has no key for it;
+/// without the row the overview is not pinned.
 @DataClassName('ShellViewStateRow')
 class ShellViewStates extends Table {
   @override
@@ -226,6 +227,16 @@ class ShellViewStates extends Table {
   /// whole content width (01 D1, D2; M4-42): the main history of a text channel, or the pinned
   /// overview of a forum.
   BoolColumn get channelColumnHidden =>
+      boolean().withDefault(const Constant(false))();
+
+  /// Whether the person hid the session column where it shows by default (01 D1, D2; M4-45):
+  /// next to a forum post and next to a main history alone.
+  BoolColumn get sessionColumnHidden =>
+      boolean().withDefault(const Constant(false))();
+
+  /// Whether the person showed the session column next to a thread of a text channel, where it
+  /// is collapsed by default (01 D2; M4-45).
+  BoolColumn get textThreadSessionShown =>
       boolean().withDefault(const Constant(false))();
 
   @override

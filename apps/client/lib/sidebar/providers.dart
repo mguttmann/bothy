@@ -297,6 +297,7 @@ final class RouteSelection {
     this.thread,
     this.newChat = false,
     this.sentEntry,
+    this.mainHistory = false,
   });
 
   /// The selected channel, or null.
@@ -307,6 +308,11 @@ final class RouteSelection {
 
   /// The selected thread, or null.
   final ThreadId? thread;
+
+  /// Whether [thread] is the main history of its channel (a `/t/` route a mention, a search
+  /// hit or a push opens): the layout is the main history alone, not a thread beside it
+  /// (01 D2, D-M4-45-2).
+  final bool mainHistory;
 
   /// Whether the route is the new chat view of [channel] (01 6.8 item 8, M4-41): its draft
   /// row, or the row of [sentEntry], is the selected one.
@@ -377,5 +383,6 @@ Future<RouteSelection> routeSelection(Ref ref, String path) async {
     channel: channelId,
     kind: channel?.kind,
     thread: thread,
+    mainHistory: channel?.mainThreadId == thread.value,
   );
 }

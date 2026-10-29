@@ -5469,9 +5469,13 @@
   "@threadPin": {
     "description": "Header button that shows the pinned messages of the thread in the session column (01 section 5.1 D1)."
   },
-  "threadColumn": "Column",
-  "@threadColumn": {
-    "description": "Header button that shows or hides the session column (01 section 5.1 D1)."
+  "threadHideSession": "Hide session",
+  "@threadHideSession": {
+    "description": "Header button of a thread or main history that hides the right session column (agent, costs, runs, pinned messages, files), so the history takes its width (01 section 5.1 D1)."
+  },
+  "threadShowSession": "Show session",
+  "@threadShowSession": {
+    "description": "Header button of a thread or main history, and the slim rail at the right edge of the window, that show the hidden session column again (01 section 5.1 D1, D2)."
   },
   "threadHideChannel": "Hide channel",
   "@threadHideChannel": {

@@ -3597,7 +3597,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get threadPin => 'Pin';
 
   @override
-  String get threadColumn => 'Column';
+  String get threadHideSession => 'Hide session';
+
+  @override
+  String get threadShowSession => 'Show session';
 
   @override
   String get threadHideChannel => 'Hide channel';

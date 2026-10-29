@@ -204,23 +204,49 @@ Future<TemplateLists> templateLists(Ref ref, String channelId) =>
 DraftEditingRegistry draftEditing(Ref ref) =>
     ref.watch(signedInServicesProvider)?.draftEditing ?? DraftEditingRegistry();
 
-/// Whether the session column shows (the header buttons "Column" and "Pin", 01 5.1 D1): next to
-/// a forum thread it shows unless the person hid it; next to a thread of a text channel it is
-/// collapsed until the person shows it (D2). It lasts while the app runs.
-@Riverpod(keepAlive: true)
-class SessionColumnShown extends _$SessionColumnShown {
-  @override
-  ({bool forum, bool textThread}) build() => (forum: true, textThread: false);
+/// Whether the session column is hidden on this device (the header buttons "Hide session",
+/// "Show session" and "Pin", Cmd+Shift+I, the rail at the right edge; 01 5.1 D1, D2, M4-45):
+/// [textThread] names the layout of a thread beside the main history of its text channel, where
+/// the column is collapsed until the person shows it (D2); in every other layout it shows until
+/// the person hides it (D1). Kept in the local view state, never synchronized, like the channel
+/// column of M4-42 (D-M4-42-2). The default of the layout until the database answers.
+@riverpod
+Stream<bool> sessionColumnHidden(Ref ref, {required bool textThread}) {
+  final db = ref.watch(localDatabaseProvider);
+  return db == null
+      ? Stream.value(textThread)
+      : db.forumViewDao.watchSessionColumnHidden(textThread: textThread);
+}
 
-  /// Shows or hides the column of the layout ([textThread]: a thread of a text channel).
-  void toggle({required bool textThread}) => state = textThread
-      ? (forum: state.forum, textThread: !state.textThread)
-      : (forum: !state.forum, textThread: state.textThread);
+/// Hides or shows the session column of the layout [textThread] names on this device (M4-45);
+/// [db] is the local database of `localDatabaseProvider`, and nothing happens without one.
+/// Read and write run in one transaction, so two quick presses cannot read the same value.
+Future<void> toggleSessionColumn(
+  LocalDatabase? db, {
+  required bool textThread,
+}) async {
+  if (db == null) return;
+  await db.transaction(() async {
+    final hidden = await db.forumViewDao.sessionColumnHidden(
+      textThread: textThread,
+    );
+    await db.forumViewDao.setSessionColumnHidden(
+      textThread: textThread,
+      hidden: !hidden,
+    );
+  });
+}
 
-  /// Shows the column of the layout.
-  void show({required bool textThread}) => state = textThread
-      ? (forum: state.forum, textThread: true)
-      : (forum: true, textThread: state.textThread);
+/// Shows the session column of the layout [textThread] names on this device ("Pin" and the
+/// rail, M4-45); [db] as in [toggleSessionColumn].
+Future<void> showSessionColumn(
+  LocalDatabase? db, {
+  required bool textThread,
+}) async {
+  await db?.forumViewDao.setSessionColumnHidden(
+    textThread: textThread,
+    hidden: false,
+  );
 }
 
 /// What the server lets the person do in a channel, from its level, capabilities and the

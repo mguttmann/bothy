@@ -5869,11 +5869,17 @@ abstract class AppLocalizations {
   /// **'Pin'**
   String get threadPin;
 
-  /// Header button that shows or hides the session column (01 section 5.1 D1).
+  /// Header button of a thread or main history that hides the right session column (agent, costs, runs, pinned messages, files), so the history takes its width (01 section 5.1 D1).
   ///
   /// In en, this message translates to:
-  /// **'Column'**
-  String get threadColumn;
+  /// **'Hide session'**
+  String get threadHideSession;
+
+  /// Header button of a thread or main history, and the slim rail at the right edge of the window, that show the hidden session column again (01 section 5.1 D1, D2).
+  ///
+  /// In en, this message translates to:
+  /// **'Show session'**
+  String get threadShowSession;
 
   /// Header button of an open thread that hides the channel column beside it (the main history of a text channel or the pinned forum overview), so the thread takes the whole width (01 section 5.1 D1, D2).
   ///

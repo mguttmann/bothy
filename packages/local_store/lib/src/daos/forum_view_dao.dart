@@ -3,7 +3,8 @@
 /// Access to `forum_view_states`, `channel_view_states` and `shell_view_state`: how forums and
 /// channel groups look on this device (brief M4-19 Design note 4, docs/DECISIONS.md D-M4-19-4;
 /// 01 6.8 item 7, D-SB-6), and whether the channel column next to an open thread is hidden (01
-/// D1, D2; M4-42). Nothing of it is synchronized: 01 11 has no key for it.
+/// D1, D2; M4-42) and whether the session column shows (01 D1, D2; M4-45). Nothing of it is
+/// synchronized: 01 11 has no key for it.
 library;
 
 import 'package:domain/domain.dart';
@@ -23,6 +24,8 @@ import '../database.dart';
 /// print(await db.forumViewDao.overviewPinned()); // true
 /// await db.forumViewDao.setChannelColumnHidden(hidden: true);
 /// print(await db.forumViewDao.channelColumnHidden()); // true
+/// await db.forumViewDao.setSessionColumnHidden(textThread: false, hidden: true);
+/// print(await db.forumViewDao.sessionColumnHidden(textThread: false)); // true
 /// ```
 final class ForumViewDao {
   /// Creates the DAO on a database; use `LocalDatabase.forumViewDao`.
@@ -137,4 +140,51 @@ final class ForumViewDao {
           ),
         );
   }
+
+  /// Whether the session column is hidden on this device in the layout of a thread of a text
+  /// channel ([textThread]) or in every other layout (a forum post, a main history alone),
+  /// emitted on every change. Without the stored row it shows in the forum layout and is
+  /// collapsed beside a thread of a text channel (01 D1, D2).
+  Stream<bool> watchSessionColumnHidden({required bool textThread}) => _db
+      .select(_db.shellViewStates)
+      .map((row) => _sessionHidden(row, textThread: textThread))
+      .watchSingleOrNull()
+      .map((hidden) => hidden ?? textThread);
+
+  /// Whether the session column is hidden in the layout [textThread] names, read once; the
+  /// default of [watchSessionColumnHidden] without the stored row.
+  Future<bool> sessionColumnHidden({required bool textThread}) async =>
+      await _db
+          .select(_db.shellViewStates)
+          .map((row) => _sessionHidden(row, textThread: textThread))
+          .getSingleOrNull() ??
+      textThread;
+
+  /// Stores whether the session column is [hidden] in the layout [textThread] names on this
+  /// device; the other layout, the pin and the channel column stay.
+  Future<void> setSessionColumnHidden({
+    required bool textThread,
+    required bool hidden,
+  }) async {
+    await _db
+        .into(_db.shellViewStates)
+        .insertOnConflictUpdate(
+          textThread
+              ? ShellViewStatesCompanion.insert(
+                  id: const Value(1),
+                  textThreadSessionShown: Value(!hidden),
+                )
+              : ShellViewStatesCompanion.insert(
+                  id: const Value(1),
+                  sessionColumnHidden: Value(hidden),
+                ),
+        );
+  }
+
+  // Beside a thread of a text channel the column is stored as shown (collapsed by default,
+  // D2); elsewhere as hidden (shown by default, D1).
+  static bool _sessionHidden(
+    ShellViewStateRow row, {
+    required bool textThread,
+  }) => textThread ? !row.textThreadSessionShown : row.sessionColumnHidden;
 }

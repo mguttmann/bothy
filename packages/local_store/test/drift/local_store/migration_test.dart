@@ -6,8 +6,9 @@
 // local-only table `recent_targets`, version 4 (M4-36) the local-only table `host_key_pins`,
 // version 5 (M5-08) the nullable column `instance.app_lock` and version 6 (M4-40) the local-only
 // tables `channel_view_states` and `shell_view_state` with the column `channels.project_bound`
-// and a cleared cursor, and version 7 (M4-42) the column `shell_view_state.channel_column_hidden`;
-// each keeps every row of the mirror. The preserved tables are checked by
+// and a cleared cursor, version 7 (M4-42) the column `shell_view_state.channel_column_hidden`
+// and version 8 (M4-45) the columns `shell_view_state.session_column_hidden` and
+// `text_thread_session_shown`; each keeps every row of the mirror. The preserved tables are checked by
 // `survival_test.dart`.
 
 import 'package:drift/drift.dart';
@@ -23,6 +24,7 @@ import 'generated/schema_v4.dart' as v4;
 import 'generated/schema_v5.dart' as v5;
 import 'generated/schema_v6.dart' as v6;
 import 'generated/schema_v7.dart' as v7;
+import 'generated/schema_v8.dart' as v8;
 
 void main() {
   driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
@@ -249,6 +251,35 @@ void main() {
             id: 1,
             overviewPinned: 1,
             channelColumnHidden: 0,
+          ),
+        ]);
+      },
+    );
+  });
+
+  test('the migration 7 to 8 keeps the pin and the hidden channel column and '
+      'keeps the default session column of both layouts', () async {
+    const row = v7.ShellViewStateData(
+      id: 1,
+      overviewPinned: 1,
+      channelColumnHidden: 1,
+    );
+    await verifier.testWithDataIntegrity(
+      oldVersion: 7,
+      newVersion: 8,
+      createOld: v7.DatabaseAtV7.new,
+      createNew: v8.DatabaseAtV8.new,
+      openTestedDatabase: LocalDatabase.new,
+      createItems: (batch, oldDb) =>
+          batch.insertAll(oldDb.shellViewState, [row]),
+      validateItems: (newDb) async {
+        expect(await newDb.select(newDb.shellViewState).get(), [
+          const v8.ShellViewStateData(
+            id: 1,
+            overviewPinned: 1,
+            channelColumnHidden: 1,
+            sessionColumnHidden: 0,
+            textThreadSessionShown: 0,
           ),
         ]);
       },
