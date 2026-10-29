@@ -2141,7 +2141,8 @@ plugin surfaces. Verified basis, retrieved 2026-10-10:
   `send_slash_confirm`, `on_processing_start`, `on_processing_complete`, `build_source`,
   `get_chat_info`, `supports_status_text` with `set_status_text`, `supports_draft_streaming` with
   `send_draft`, `format_tool_event` (returning `None` swallows the tool display),
-  `render_message_event`, `enforces_own_access_policy`:
+  `render_message_event`, `enforces_own_access_policy`, `authorization_is_upstream` (since
+  `v0.22`):
   https://github.com/NousResearch/hermes-agent/blob/main/gateway/platforms/base.py [verified]
 - `display.busy_input_mode` with `interrupt` (default), `queue` and `steer`; `steer` is also
   named in the command reference (`/steer`): https://hermes-agent.nousresearch.com/docs/user-guide/cli
@@ -2149,7 +2150,12 @@ plugin surfaces. Verified basis, retrieved 2026-10-10:
   per-platform key is not read, 17.5 and 17.10 row `steer`]
 - Pinned version for tests: `plugins/hermes-adapter/tests/hermes_pin.toml` (release tag and full
   commit). The recording of M2-32 proves the mapping of this section against exactly this
-  version (17.10).
+  version (17.10). Hermes tagged its releases by date up to `v2026.9.24` and by version since
+  October 2026 (`v0.22.x`); a version tag is always the newer release (D-HERMES-COMPAT-1).
+- Python: the adapter runs on Python 3.11 and newer, the oldest Python Hermes admits
+  (`requires-python` of `v0.22.5`: `>=3.11,<3.15`); the lock of `v0.22` installs only 3.14, so
+  the Fake-Hermes tests and the recording run on 3.14 and the adapter's own tests on 3.11
+  (D-HERMES-COMPAT-2).
 
 Hermes is not part of the product. The adapter pins a version range of Hermes; a
 compatibility test runs against the pinned and the newest version (16.1, fake Hermes).
@@ -2192,14 +2198,14 @@ compatibility test runs against the pinned and the newest version (16.1, fake He
 | `edit_message(..., finalize)` | own reply message: buffer the content, a `message.update` only on `finalize=True` or at the end of the run; reason: every edit would be a durable event and a revision. Measured: without draft streaming Hermes first sends the reply as `send` with a typing cursor, edits it with `finalize=False` and closes it with exactly one `edit_message(finalize=True)` carrying the finished text; with draft streaming there is no `finalize=True`. If `send_draft` is off, the buffered content is the source of `/last_text_excerpt` |
 | `supports_draft_streaming()` = true, `send_draft(...)` | draft text of a running turn as `run.update` on `/last_text_excerpt`; the finished reply comes via `send`. Measured: the text is cumulative (each draft contains the previous one), the last draft equals the reply except for leading spaces; after a tool it starts with a paragraph |
 | `supports_status_text` = true, `set_status_text(chat_id, text)` | `run.update` on `/status_line`. Measured: Hermes sets a status sentence when a tool starts and `None` when it ends; that is the only signal about tool steps. The adapter creates the step `tool_call` at the status sentence, takes the text verbatim as the step title (never parsed, D-L7) and completes it at `None`, at the next status sentence, at the next draft or the reply, or at `on_processing_complete`, whichever comes first |
-| `format_tool_event(event)` | not called in `v2026.9.24` (the base class offers the method, no caller in the gateway). The adapter still overrides it with the return value `None` and, on a later call, creates the step as with `set_status_text`: `kind: tool_call`, title the preview, `detail` exactly `{"preview": <the preview Hermes would have shown>}` (never a tool result), paired by Hermes' call ID or first in, first out. Hermes sends progress bubbles via `send` and edits them with `edit_message`; that is why the installer sets `display.platforms.<platform_key>.tool_progress: off` (measured: then no progress message) |
-| `render_message_event(event, sink)` | not called in `v2026.9.24`; the default behavior stays, text parts also as `last_text_excerpt` |
+| `format_tool_event(event)` | not called in `v2026.9.24` and `v0.22.5` (the base class offers the method, no caller in the gateway). The adapter still overrides it with the return value `None` and, on a later call, creates the step as with `set_status_text`: `kind: tool_call`, title the preview, `detail` exactly `{"preview": <the preview Hermes would have shown>}` (never a tool result), paired by Hermes' call ID or first in, first out. Hermes sends progress bubbles via `send` and edits them with `edit_message`; that is why the installer sets `display.platforms.<platform_key>.tool_progress: off` (measured: then no progress message) |
+| `render_message_event(event, sink)` | not called in `v2026.9.24` and `v0.22.5`; the default behavior stays, text parts also as `last_text_excerpt` |
 | `send_typing`, `stop_typing` | no operation (4.7, typing) |
 | `send_image`, `send_document`, `send_voice`, `send_video` | `file.upload`, then `message.create` with an attachment (`+upload` needed). Not built yet (follow-up ticket): the adapter answers with Hermes' failure result "not supported by this server adapter yet", sends nothing and reports no `files_out` |
 | `send_clarify(...)` | card with buttons or a selection, `custom_id` = callback ID `cl:<id>:<idx>`; run `waiting_input` |
 | `_send_exec_approval_prompt(prompt)` | approval card per 11.5, `custom_id` = `appr:<id>:<choice>` |
 | `send_slash_confirm(...)` | card "Once", "Always", "Cancel", `custom_id` = `sc:<choice>:<id>` |
-| `send_model_picker`, `send_choice_picker` | selection component; missing from the base class in `v2026.9.24` (Hermes then falls back to text, which arrives as `send`) |
+| `send_model_picker`, `send_choice_picker` | selection component; missing from the base class in `v2026.9.24` and `v0.22.5` (Hermes then falls back to text, which arrives as `send`) |
 | Interaction (`interaction.created`) | the SDK resumes the run with the interaction's token; the adapter passes the callback ID to the Hermes resolver exactly once per prompt (a stored record of resolved IDs, so a redelivery resolves nothing) and answers with `interaction.respond` (`acknowledged`, the chosen label as `response.text`). No `component.update` after an interaction: the server disables the other single-use components of the card in the same transaction (11.3). Every card is a message `kind = card` of the run with `single_use` components, followed by `run.await_input` with the question's first line as status line |
 | `on_processing_start(event)` | no operation (the start is already `run.start`) |
 | `on_processing_complete(event, outcome)` | `run.finish` with `completed`, `failed` or `cancelled`, `costs`. Measured: after `/stop` comes `ProcessingOutcome.CANCELLED` |
@@ -2209,8 +2215,8 @@ compatibility test runs against the pinned and the newest version (16.1, fake He
 
 `MAX_MESSAGE_LENGTH` corresponds to `message.max_content_bytes`; the adapter does not split
 (`splits_long_messages = False`). Reason: long replies stay one message (Baseline
-section 4). In `v2026.9.24` `MAX_MESSAGE_LENGTH` is missing from the base class (Hermes takes a
-default of its own); the adapter sets the limit as a class attribute and also through
+section 4). In `v2026.9.24` and `v0.22.5` `MAX_MESSAGE_LENGTH` is missing from the base class
+(Hermes takes a default of its own); the adapter sets the limit as a class attribute and also through
 `max_message_length` in `ctx.register_platform`.
 
 The recording test of M2-32 holds the call patterns of this table against the pinned version
@@ -2242,6 +2248,15 @@ this sender after the server has checked the permission (10.4). It sees whether 
 worked from the session ID of the next `pre_llm_call`; for a missing ID Hermes keeps the current
 session and answers with a notice (9.5 item 4).
 
+Since `v0.22` (measured in the recording and the Fake-Hermes tests of `v0.22.5`): Hermes reports
+`on_processing_complete` of a command before its processing has ended, and a turn sent in that gap
+on the same session key never completes; the adapter therefore waits after every command it sends
+until Hermes' processing of it has ended. A session stays live on the route of the thread whose
+turn ran on it until the gateway restarts: `/resume <ID> --all` from another thread does not move
+it (`session_resume_admin.json`), and the turn of the other thread does not run on it. For a bind of a
+session whose turn ran in another thread of the same gateway process the adapter therefore sends
+no `/resume` and fails open with the new session (9.5 item 4); after a restart the takeover works.
+
 ### 17.5 Follow-ups: `busy_input_mode`
 
 The installer explicitly sets the global key `display.busy_input_mode` of the Hermes profile to
@@ -2250,8 +2265,10 @@ Hermes' own YAML reader before and after. The per-platform key
 (`display.platforms.<platform_key>.busy_input_mode`) is not read in `v2026.9.24` (measured: every
 value there acts like `interrupt`); the global one applies, because a Hermes profile is exactly
 one agent principal (17.2) and the profile serves no other platforms. Measured with the global
-key: `steer` puts the follow-up behind the next tool in the same turn, `queue` starts a new turn
-after the current one. A steer that arrives after the last tool batch becomes Hermes'
+key: `steer` puts the follow-up behind the next tool in the same turn; `queue` started a new turn
+after the current one in `v2026.9.24` and steers like `steer` in `v0.22.5`. With
+`followups = queue` the adapter passes no follow-up into a turn at all (the follow-on run of
+section 7 takes it), so this difference does not reach the server. A steer that arrives after the last tool batch becomes Hermes'
 next user turn inside the same processing, before `on_processing_complete`, so the run still
 covers it (measured in M2-33). After a model reply without tool calls (the answer, reported
 by `post_api_request` before Hermes drains its last steer) the adapter passes no further text
@@ -2321,7 +2338,13 @@ Three layers, each sufficient on its own for "no stranger triggers":
    "allowlist" in `PlatformConfig.extra.dm_policy`; for `chat_type = "thread"` Hermes reads the
    DM scope, because a thread is not a group type in `v2026.9.24` (measured in M2-32: with the
    declaration the message of a person without a Hermes list reaches the turn, without it it does
-   not). The list is the set of the
+   not). Since `v0.22` Hermes checks every message again at admission and trusts the own policy
+   there only together with `authorization_is_upstream = True` (measured in `v0.22.5`:
+   `access_policy_own.json` does not reach the turn, `access_policy_upstream.json` does). The
+   adapter declares it while Hermes keeps no allow list of its own for the platform (layer 3
+   below, read on every admission with the reader Hermes's own check uses, so the process
+   environment counts and a list written without a restart holds at once); with that list the
+   declaration is off, so Hermes keeps judging every person by it (D-HERMES-COMPAT-4). The list is the set of the
    principals that may trigger this agent, read from the server (`agent.triggerers.read`,
    agent-self, `GET /api/v1/agents/me/triggerers`, returns IDs and `permission_version`). It is
    reloaded when a token carries a higher `permission_version` (4.5 item 9).
@@ -2354,7 +2377,7 @@ heartbeat determination differs from the run's `billing_mode_used`) interrupts t
 the run `failed` with `billing_mode_mismatch` (10, BR-05).
 
 Detection uses only the key type; the value is never stored, sent or logged. There is no
-public surface for it in `v2026.9.24`. The compatibility layer uses the internal function with
+public surface for it in `v2026.9.24` and `v0.22.5`. The compatibility layer uses the internal function with
 which Hermes itself chooses the login: `hermes_cli.runtime_provider.resolve_runtime_provider()`
 and `agent.anthropic_credentials.anthropic_route_is_oauth(base_url, credential, *, provider)`; the
 value stays in this call and never leaves it. In M2-32 its answer matched in every profile what
@@ -2374,7 +2397,7 @@ installer shows this beforehand.
 
 ### 17.9 Reports from cron jobs
 
-`cron_deliver_env_var` and `standalone_sender_fn` (both present in `v2026.9.24`) are registered so that Hermes cron jobs can send
+`cron_deliver_env_var` and `standalone_sender_fn` (both present in `v2026.9.24` and `v0.22.5`) are registered so that Hermes cron jobs can send
 without a live adapter. The target is the report channel from the platform configuration
 (section 14). Not built yet (follow-up ticket, needs the reports of section 14): cron delivery is
 not registered; until then the installer writes a placeholder home channel (`chat_id`
@@ -2382,19 +2405,20 @@ not registered; until then the installer writes a placeholder home channel (`cha
 
 ### 17.10 To check before building
 
-Measured in M2-32 against Hermes Agent `v2026.9.24`, commit `f97608f178d1`, recorded on
-2026-10-12, with a fake model (no costs). Evidence in
+Measured in M2-32 against Hermes Agent `v2026.9.24` (recorded on 2026-10-12) and recorded again
+against `v0.22.5`, commit `bf0203a794a0`, on 2026-10-29 (D-HERMES-COMPAT-3), with a fake model
+(no costs). The table states the `v0.22.5` results and names what changed. Evidence in
 `plugins/hermes-adapter/tests/fixtures/recording/`; `observations.json` computes the verdict of
 every row from the facts, and a test keeps table and evidence equal.
 
 | Item | Result | Evidence | Consequence |
 |---|---|---|---|
 | `progress_hooks` | adapted: `format_tool_event` and `render_message_event` are not called, progress comes as a bubble via `send` and `edit_message`; `set_status_text` reports the start and end of a tool, `send_draft` is cumulative and ends with the reply, without drafts exactly one `edit_message(finalize=True)` closes the reply. | `tool_and_text.json`, `tool_without_progress.json`, `text_without_draft.json`, `observations.json` | 17.3 |
-| `steer` | adapted: the per-platform key is not read (every value acts like `interrupt`); the global `display.busy_input_mode` with `steer` puts the follow-up into the running turn, with `queue` into a new one, and `/steer <text>` also works without configuration. | `busy_steer.json`, `busy_queue.json`, `busy_interrupt.json`, `busy_steer_global.json`, `busy_queue_global.json`, `busy_steer_command.json`, `observations.json` | 17.1, 17.3, 17.5 |
+| `steer` | adapted: the per-platform key is not read (every value acts like `interrupt`); the global `display.busy_input_mode` with `steer` puts the follow-up into the running turn, with `queue` in `v0.22.5` also into the running turn (in `v2026.9.24` into a new one), and `/steer <text>` also works without configuration. | `busy_steer.json`, `busy_queue.json`, `busy_interrupt.json`, `busy_steer_global.json`, `busy_queue_global.json`, `busy_steer_command.json`, `observations.json` | 17.1, 17.3, 17.5 |
 | `credential_type` | adapted: no public surface; Hermes' internal resolution matches the endpoint in every profile, OAuth takes precedence, the choice applies per turn, a login file of Claude Code is used, and `auth.adopt_external_logins: false` switches that off. | `credential_api_key_only.json`, `credential_oauth_only.json`, `credential_both.json`, `credential_none.json`, `credential_login_file_only.json`, `credential_login_file_optout.json`, `credential_other_provider.json`, `credential_per_turn.json`, `observations.json` | 17.8, 10 10.1 |
-| `interrupt_outcome` | confirmed: `/stop` via `handle_message` ends the turn, `on_processing_complete` reports `CANCELLED`, and the model is not called further; `cancel_session_processing` also reports `CANCELLED`, but lets the agent run on. | `interrupt.json`, `interrupt_command.json`, `observations.json` | 8, 17.3 |
-| `session_switch` | confirmed: `/new` with the confirmation through `tools.slash_confirm.resolve` starts a new session, `/resume` binds a session of the same thread, a foreign one only with `--all` for an admin sender; the hook `pre_llm_call` delivers the ID, and a missing ID leaves the current session in place. | `session_new.json`, `session_resume.json`, `session_resume_admin.json`, `session_resume_same_thread.json`, `session_resume_missing.json`, `observations.json` | 9.5, 17.3, 17.4 |
-| `own_access_policy` | confirmed: with `enforces_own_access_policy = True` and `dm_policy = "allowlist"` in `PlatformConfig.extra` the message of a person without a Hermes list reaches the turn; without the declaration Hermes holds it back. | `access_policy_own.json`, `access_policy_default.json`, `observations.json` | 17.7 |
+| `interrupt_outcome` | confirmed: `/stop` via `handle_message` ends the turn, `on_processing_complete` reports `CANCELLED`, and the model is not called further; `cancel_session_processing` also reports `CANCELLED`, but lets the agent run on (in `v0.22.5` it also sends an answer). | `interrupt.json`, `interrupt_command.json`, `observations.json` | 8, 17.3 |
+| `session_switch` | adapted: `/new` with the confirmation through `tools.slash_confirm.resolve` starts a new session, `/resume` binds a session of the same thread, and the hook `pre_llm_call` delivers the ID; a missing ID leaves the current session in place. In `v0.22.5` `/resume --all` for an admin sender no longer moves a session that is live in another thread of the same gateway process (in `v2026.9.24` it did). | `session_new.json`, `session_resume.json`, `session_resume_admin.json`, `session_resume_same_thread.json`, `session_resume_missing.json`, `observations.json` | 9.5, 17.3, 17.4 |
+| `own_access_policy` | adapted: in `v0.22.5` `enforces_own_access_policy = True` with `dm_policy = "allowlist"` in `PlatformConfig.extra` no longer lets the message of a person without a Hermes list reach the turn (in `v2026.9.24` it did); together with `authorization_is_upstream = True` it does; without any declaration Hermes holds it back. | `access_policy_own.json`, `access_policy_default.json`, `access_policy_upstream.json`, `observations.json` | 17.7 |
 
 ### 17.11 Tool class
 

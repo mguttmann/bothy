@@ -94,12 +94,6 @@
       "method": "on_processing_complete"
     },
     {
-      "do": "wait_for",
-      "from_start": true,
-      "message": "m-2",
-      "method": "on_processing_complete"
-    },
-    {
       "do": "wait_quiet"
     }
   ],

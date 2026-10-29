@@ -10,7 +10,9 @@ from __future__ import annotations
 
 import ast
 import json
+import re
 import subprocess
+import tomllib
 from typing import Any
 
 import pytest
@@ -154,6 +156,21 @@ def test_sdk_dependencies_fit_pinned_hermes(world: HermesWorld) -> None:
         assert version >= minimum, name
 
 
+def _lowest_python(requires: str) -> tuple[int, int]:
+    found = re.search(r">=\s*3\.([0-9]+)", requires)
+    assert found is not None, requires
+    return (3, int(found.group(1)))
+
+
+def test_adapter_admits_every_python_of_pinned_hermes(world: HermesWorld) -> None:
+    # Hermes admits older Pythons than its lock installs (v0.22: >=3.11 for installs that still
+    # update on an old Python, the lock only 3.14); the adapter must load in every one of them.
+    hermes = tomllib.loads((world.install.export / "pyproject.toml").read_text(encoding="utf-8"))
+    adapter = tomllib.loads((COMPONENT / "pyproject.toml").read_text(encoding="utf-8"))
+    oldest = _lowest_python(hermes["project"]["requires-python"])
+    assert _lowest_python(adapter["project"]["requires-python"]) <= oldest
+
+
 async def test_installer_busy_mode_and_switch(world: HermesWorld) -> None:
     script = [ScriptTurn(text=("Fine.",), paced=False)]
     profile = Profile(dotenv={"anthropic_api_key": "api_key", "anthropic_oauth": "oauth"})
@@ -222,6 +239,17 @@ async def test_installer_busy_mode_and_switch(world: HermesWorld) -> None:
         ]
         assert used
         assert set(used) == {"oauth"}
+        # Layer 3 (09 17.7): Hermes's allow list still refuses every other person, even with a
+        # valid token (the adapter declares no upstream authorization next to the list); the
+        # model never sees the turn.
+        before = len(rig.model_requests(scripted=True))
+        stranger = await rig.fake.trigger("hello", author="sam")
+        try:
+            await rig.until(lambda: rig.finished(stranger.run_id), "the end of the run")
+        except AssertionError:
+            raise AssertionError(gateway_log(rig)) from None
+        assert f"Unauthorized user: {rig.fake.sam_id}" in gateway_log(rig)
+        assert len(rig.model_requests(scripted=True)) == before
         # organization needs the API key; the switch empties the OAuth variables and the list.
         no_key = rig.installer("switch-mode", "organization", "--profile-home", str(rig.home))
         assert no_key.returncode == 2
@@ -241,6 +269,29 @@ async def test_installer_busy_mode_and_switch(world: HermesWorld) -> None:
         assert rig.gateway is not None
         assert rig.gateway.running()
         assert rig.gateway.pid == pid
+
+
+async def test_allow_list_of_the_process_environment_holds(world: HermesWorld) -> None:
+    # Layer 3 (09 17.7) from the gateway's environment instead of the profile's .env: Hermes
+    # judges each person by it, so the adapter declares no upstream authorization next to it.
+    script = [ScriptTurn(text=("Fine.",), paced=False)]
+    async with hermes_rig(world, script, start=False) as rig:
+        rig.env["BOTHY_ALLOWED_USERS"] = str(rig.fake.robin_id)
+        await _start_gateway(rig)
+        allowed = await rig.fake.trigger("hello", author="robin")
+        try:
+            await rig.until(lambda: rig.finished(allowed.run_id), "the end of the run")
+        except AssertionError:
+            raise AssertionError(gateway_log(rig)) from None
+        assert rig.fake.run_state(allowed.run_id).state == "completed", gateway_log(rig)
+        before = len(rig.model_requests(scripted=True))
+        stranger = await rig.fake.trigger("hello", author="sam")
+        try:
+            await rig.until(lambda: rig.finished(stranger.run_id), "the end of the refusal")
+        except AssertionError:
+            raise AssertionError(gateway_log(rig)) from None
+        assert f"Unauthorized user: {rig.fake.sam_id}" in gateway_log(rig)
+        assert len(rig.model_requests(scripted=True)) == before
 
 
 async def test_installer_refuses_a_login_file_for_organization(world: HermesWorld) -> None:

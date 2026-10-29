@@ -152,6 +152,15 @@ def holding() -> dict[str, ScenarioResult]:
         "access_policy_default": _r(
             "access_policy_default", [_c("read:enforces_own_access_policy", value=False)]
         ),
+        "access_policy_upstream": _r(
+            "access_policy_upstream",
+            [
+                _c("read:enforces_own_access_policy", value=True),
+                _c("read:authorization_is_upstream", value=True),
+                _c("send"),
+            ],
+            [_req(1)],
+        ),
     }
     busy = {
         "busy_steer": "steered",
@@ -296,6 +305,21 @@ def test_facts_name_the_details() -> None:
     )
     assert points["session_switch"]["facts"]["new"]["confirmation_resolved_with"] == "resolver"
     assert points["own_access_policy"]["facts"]["own"]["declaration_value"] is True
+    upstream = points["own_access_policy"]["facts"]["upstream"]
+    assert upstream["message_reached_turn"] is True
+    assert upstream["upstream_read"] == "BasePlatformAdapter.authorization_is_upstream (property)"
+    assert upstream["upstream_value"] is True
+    assert points["own_access_policy"]["facts"]["own"]["upstream_read"] is None
+
+
+def test_the_own_policy_point_stays_judged_by_the_own_policy_alone() -> None:
+    # Hermes v0.22 needs authorization_is_upstream next to the own policy (09 17.7): the
+    # upstream scenario is evidence for the adaptation, never a verdict of its own.
+    results = holding()
+    results["access_policy_own"].model_requests = []
+    points = observe(results, SCENARIOS)
+    assert points["own_access_policy"]["holds"] is False
+    assert points["own_access_policy"]["facts"]["upstream"]["message_reached_turn"] is True
 
 
 def test_run_wide_facts() -> None:

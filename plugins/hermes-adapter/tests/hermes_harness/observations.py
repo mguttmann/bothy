@@ -62,7 +62,11 @@ POINT_SCENARIOS: Final[Mapping[str, tuple[str, ...]]] = {
         "session_resume_same_thread",
         "session_resume_missing",
     ),
-    "own_access_policy": ("access_policy_own", "access_policy_default"),
+    "own_access_policy": (
+        "access_policy_own",
+        "access_policy_default",
+        "access_policy_upstream",
+    ),
 }
 SESSION_ID_SURFACE: Final = "ctx.register_hook('pre_llm_call') keyword session_id"
 PER_PLATFORM_BUSY_KEY: Final = "display.platforms.<platform>.busy_input_mode"
@@ -377,6 +381,9 @@ def _access(results: Results, scenarios: Scenarios) -> dict[str, Any]:
     def entry(name: str) -> dict[str, Any]:
         result = results[name]
         reads = [c["args"].get("value") for c in _calls(result, "read:enforces_own_access_policy")]
+        upstream = [
+            c["args"].get("value") for c in _calls(result, "read:authorization_is_upstream")
+        ]
         return {
             "message_reached_turn": bool(_scripted(result)),
             "hermes_replied": bool(_calls(result, "send")),
@@ -384,14 +391,21 @@ def _access(results: Results, scenarios: Scenarios) -> dict[str, Any]:
             if reads
             else None,
             "declaration_value": reads[0] if reads else None,
+            "upstream_read": "BasePlatformAdapter.authorization_is_upstream (property)"
+            if upstream
+            else None,
+            "upstream_value": upstream[0] if upstream else None,
             "policy_value": scenarios[name].probe.get("dm_policy"),
         }
 
     own = entry("access_policy_own")
     default = entry("access_policy_default")
+    # Evidence only (Hermes v0.22 checks again at admission and trusts an own policy there only
+    # with authorization_is_upstream, 09 17.7); the verdict stays the own policy's.
     facts = {
         "own": own,
         "default": default,
+        "upstream": entry("access_policy_upstream"),
         "policy_key": "PlatformConfig.extra.dm_policy",
         "chat_type": "thread",
     }

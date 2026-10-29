@@ -13,7 +13,7 @@ name = "bothy-hermes-adapter"
 version = "0.0.0"
 description = "Reference adapter for Hermes Agent: the platform plugin and its recording harness."
 license = "Apache-2.0"
-requires-python = ">=3.12"
+requires-python = ">=3.11"
 classifiers = ["Private :: Do Not Upload"]
 # The runtime dependencies of bothy-sdk (sdk/python/pyproject.toml), nothing more; the ranges
 # include the versions the pinned Hermes environment ships (11 11.3, held by the Fake-Hermes
@@ -65,7 +65,7 @@ skip_covered = true
 fail_under = 80
 
 [tool.ruff]
-target-version = "py312"
+target-version = "py311"
 line-length = 100
 
 [tool.ruff.lint]
@@ -93,7 +93,7 @@ max-args = 7
 "typings/**" = ["D", "N", "PLR0913", "E501", "PYI"]
 
 [tool.mypy]
-python_version = "3.12"
+python_version = "3.11"
 strict = true
 warn_unreachable = true
 # The adapter with the stubs of the Hermes symbols it uses (typings/, Design note 2), the SDK

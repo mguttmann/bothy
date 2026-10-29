@@ -18,7 +18,7 @@ PYPROJECT = """\
 [project]
 name = "mini"
 version = "0.0.0"
-requires-python = ">=3.12"
+requires-python = ">=3.11"
 dependencies = []
 
 [tool.uv]

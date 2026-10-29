@@ -12,7 +12,7 @@ Example:
     >>> gateway = HermesGateway(cmd, env=env, cwd=homes.work, log=root / "gateway.log")
     >>> gateway.start()
     >>> gateway.wait_connected(control)
-    >>> assert gateway.listening_sockets() == []
+    >>> assert unexpected_listeners(gateway.listening_sockets()) == []
     >>> gateway.stop()
 """
 
@@ -181,6 +181,25 @@ class HermesGateway:
         survivors = self.members()
         if survivors or process.poll() is None:
             raise GatewayError(f"process group {self.pgid} survived SIGKILL: {survivors}")
+
+
+def unexpected_listeners(listeners: Sequence[str]) -> list[str]:
+    """The listeners of :meth:`HermesGateway.listening_sockets` that fail a run.
+
+    Hermes v0.22 always serves its local runtime API on one TCP port of ``127.0.0.1`` (clients
+    attach with a ticket of its control socket; no setting turns it off). Exactly one such
+    listener is Hermes's own; any other listener, and every loopback one when there are more
+    than one, is unexpected.
+
+    Args:
+        listeners: Entries ``"tcp <address>"`` or ``"udp <address>"``.
+
+    Returns:
+        The unexpected entries, in the given order.
+    """
+    loopback = [s for s in listeners if s.startswith("tcp 127.0.0.1:")]
+    allowed = set(loopback) if len(loopback) == 1 else set()
+    return [s for s in listeners if s not in allowed]
 
 
 def _lsof_listeners(pids: list[int]) -> list[str]:

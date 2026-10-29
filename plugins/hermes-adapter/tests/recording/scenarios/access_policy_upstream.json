@@ -1,0 +1,44 @@
+{
+  "allowlist": [],
+  "model_script": [
+    {
+      "paced": true,
+      "text": [
+        "The trip to the lake ",
+        "is planned for ",
+        "Saturday morning."
+      ]
+    }
+  ],
+  "point": "own_access_policy",
+  "probe": {
+    "authorization_is_upstream": true,
+    "dm_policy": "allowlist",
+    "enforces_own_access_policy": true,
+    "supports_draft_streaming": true,
+    "supports_status_text": true
+  },
+  "provider": "openai",
+  "scenario": "access_policy_upstream",
+  "steps": [
+    {
+      "do": "inject",
+      "message": "m-1",
+      "text": "ask",
+      "thread": "t-1",
+      "user": "robin"
+    },
+    {
+      "do": "wait_for",
+      "message": "m-1",
+      "method": "on_processing_complete"
+    },
+    {
+      "do": "wait_quiet"
+    }
+  ],
+  "texts": {
+    "answer": "The trip to the lake is planned for Saturday morning.",
+    "ask": "Please plan the trip to the lake."
+  }
+}

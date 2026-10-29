@@ -149,6 +149,7 @@ class RecordingProbe(BasePlatformAdapter):
         self._draft = bool(extra.get("supports_draft_streaming", False))
         self.supports_status_text = bool(extra.get("supports_status_text", False))
         self._own_policy = bool(extra.get("enforces_own_access_policy", False))
+        self._upstream = bool(extra.get("authorization_is_upstream", False))
         self._sent = 0
         self._loop_task: asyncio.Task[None] | None = None
         self._events: dict[str, MessageEvent] = {}
@@ -167,6 +168,12 @@ class RecordingProbe(BasePlatformAdapter):
         """Declared own access policy (recorded on every read by the gateway)."""
         self._record("read:enforces_own_access_policy", value=self._own_policy)
         return self._own_policy
+
+    @property
+    def authorization_is_upstream(self) -> bool:  # type: ignore[override]
+        """Declared upstream authorization (Hermes v0.22; recorded on every read)."""
+        self._record("read:authorization_is_upstream", value=self._upstream)
+        return self._upstream
 
     # ---- lifecycle -------------------------------------------------------------------
     async def connect(self, *, is_reconnect: bool = False) -> bool:

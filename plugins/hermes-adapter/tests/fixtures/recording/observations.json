@@ -17,10 +17,10 @@
     ]
   },
   "egress": [],
-  "inputs_sha256": "9f5cf5c29784a5ea96af71632ce006561f43106a4d57b63dfe3384c357a38f0e",
+  "inputs_sha256": "951e586ff37ce048d2812b708412ebeb1b44b674f09786131c2d01801b6f2bb2",
   "pin": {
-    "commit": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
-    "tag": "v2026.9.24"
+    "commit": "bf0203a794a07aac3ff764972ab9087baa4e4f4e",
+    "tag": "v0.22.5"
   },
   "plugin_discovery": {
     "enabled_through": "plugins.enabled",
@@ -195,7 +195,7 @@
           "BasePlatformAdapter.cancel_session_processing(session_key)": {
             "acknowledgement_sent": false,
             "agent_continued": true,
-            "answer_sent": false,
+            "answer_sent": true,
             "held_answer_used": true,
             "interrupt_session_activity_called": false,
             "outcome": "cancelled",
@@ -213,18 +213,31 @@
           "declaration_value": false,
           "hermes_replied": false,
           "message_reached_turn": false,
-          "policy_value": null
+          "policy_value": null,
+          "upstream_read": "BasePlatformAdapter.authorization_is_upstream (property)",
+          "upstream_value": false
         },
         "own": {
           "declaration_read": "BasePlatformAdapter.enforces_own_access_policy (property)",
           "declaration_value": true,
           "hermes_replied": true,
-          "message_reached_turn": true,
-          "policy_value": "allowlist"
+          "message_reached_turn": false,
+          "policy_value": "allowlist",
+          "upstream_read": "BasePlatformAdapter.authorization_is_upstream (property)",
+          "upstream_value": false
         },
-        "policy_key": "PlatformConfig.extra.dm_policy"
+        "policy_key": "PlatformConfig.extra.dm_policy",
+        "upstream": {
+          "declaration_read": null,
+          "declaration_value": null,
+          "hermes_replied": true,
+          "message_reached_turn": true,
+          "policy_value": "allowlist",
+          "upstream_read": "BasePlatformAdapter.authorization_is_upstream (property)",
+          "upstream_value": true
+        }
       },
-      "holds": true
+      "holds": false
     },
     "progress_hooks": {
       "facts": {
@@ -281,8 +294,8 @@
           "switched": false
         },
         "resume_other_thread_as_admin": {
-          "earlier_text_in_next_request": true,
-          "switched": true
+          "earlier_text_in_next_request": false,
+          "switched": false
         },
         "resume_same_thread": {
           "earlier_text_in_next_request": true,
@@ -291,12 +304,12 @@
         "session_id_public": true,
         "session_id_read_through": "ctx.register_hook('pre_llm_call') keyword session_id"
       },
-      "holds": true
+      "holds": false
     },
     "steer": {
       "facts": {
         "global_behaviour": {
-          "queue": "new_turn",
+          "queue": "steered",
           "steer": "steered"
         },
         "global_key": "display.busy_input_mode",
@@ -312,7 +325,7 @@
       "holds": false
     }
   },
-  "recorded_on": "2026-10-12",
+  "recorded_on": "2026-10-29",
   "surface": {
     "base.MAX_MESSAGE_LENGTH": {
       "present": false
@@ -322,6 +335,11 @@
       "params": [
         "prompt"
       ],
+      "present": true
+    },
+    "base.authorization_is_upstream": {
+      "kind": "property",
+      "params": [],
       "present": true
     },
     "base.build_source": {

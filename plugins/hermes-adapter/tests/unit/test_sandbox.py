@@ -68,7 +68,11 @@ def _sandbox_denies_outbound_except_loopback(homes: ThrowawayHomes) -> None:
     )
     command = wrap_command([sys.executable, "-c", _PROBE, str(port), str(other_port)], profile)
     assert command[0] == "/usr/bin/sandbox-exec"
-    result = subprocess.run(command, capture_output=True, text=True, timeout=30, check=False)
+    # In the throwaway work directory like the gateway: Python 3.11 reads the working
+    # directory for the import path of `-c`, and the sandbox denies the real home.
+    result = subprocess.run(
+        command, cwd=homes.work, capture_output=True, text=True, timeout=30, check=False
+    )
     listener.close()
     other.close()
     assert result.stdout.splitlines() == [

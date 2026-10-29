@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 from hermes_harness.control import ControlServer
-from hermes_harness.gateway import GatewayError, HermesGateway
+from hermes_harness.gateway import GatewayError, HermesGateway, unexpected_listeners
 
 PARENT = """
 import subprocess, sys, time
@@ -159,3 +159,17 @@ def test_gateway_must_be_started_before_use(tmp_path: Path) -> None:
     with pytest.raises(GatewayError, match="not started"):
         gateway.members()
     gateway.stop()
+
+
+def test_only_the_runtime_api_of_hermes_may_listen() -> None:
+    # Hermes v0.22 always serves its local runtime API on one loopback port (no setting turns
+    # it off); every other listener, and a second loopback one, still fails a run.
+    assert unexpected_listeners([]) == []
+    assert unexpected_listeners(["tcp 127.0.0.1:52307"]) == []
+    assert unexpected_listeners(["tcp 0.0.0.0:8080"]) == ["tcp 0.0.0.0:8080"]
+    assert unexpected_listeners(["tcp [::1]:52307"]) == ["tcp [::1]:52307"]
+    assert unexpected_listeners(["udp 127.0.0.1:5353"]) == ["udp 127.0.0.1:5353"]
+    both = ["tcp 127.0.0.1:52307", "tcp 127.0.0.1:52308"]
+    assert unexpected_listeners(both) == both
+    mixed = ["tcp 127.0.0.1:52307", "tcp *:9000"]
+    assert unexpected_listeners(mixed) == ["tcp *:9000"]
