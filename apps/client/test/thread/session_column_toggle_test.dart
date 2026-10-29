@@ -338,7 +338,9 @@ void main() {
     expect(de.threadHideSession, 'Sitzung ausblenden');
     expect(de.threadShowSession, 'Sitzung einblenden');
     expect(de.threadHideChannel, 'Kanal ausblenden');
+    // language-check: off
     expect(de.shellResizeColumn, 'Spaltenbreite ändern');
+    // language-check: on
     expect(find.text(de.threadShowSession), findsNWidgets(2));
     expect(find.text(de.threadHideChannel), findsOneWidget);
     expect(find.bySemanticsLabel(de.threadShowSession), findsWidgets);

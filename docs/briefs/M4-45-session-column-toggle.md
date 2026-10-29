@@ -83,7 +83,7 @@ Fragments: `docs/decisions.d/M4-45.md` (`D-M4-45-<n>`), changelog fragment `chan
 
 Widget tests (`flutter test`, in-memory `local_store`, fake clock):
 
-- `test/thread/session_column_toggle_test.dart`: "Hide session" gives the history the width and the rail brings the column back, the choice survives a restart on the same database; Cmd+Shift+I hides and shows; "Pin" shows; beside a thread of a text channel the column is collapsed until shown and that choice is kept apart; a post opened from the sidebar keeps the column hidden; a window too narrow for the column has no rail; the German interface names "Sitzung ausblenden", "Sitzung einblenden", "Kanal ausblenden", "Kanal einblenden" and the drag handles "Spaltenbreite ändern".
+- `test/thread/session_column_toggle_test.dart`: "Hide session" gives the history the width and the rail brings the column back, the choice survives a restart on the same database; Cmd+Shift+I hides and shows; "Pin" shows; beside a thread of a text channel the column is collapsed until shown and that choice is kept apart; a post opened from the sidebar keeps the column hidden; a window too narrow for the column has no rail; the German interface names "Sitzung ausblenden", "Sitzung einblenden", "Kanal ausblenden", "Kanal einblenden" and the German label of the drag handles (`shellResizeColumn`).
 - `packages/local_store`: the DAO test of the new state (defaults, layouts apart, pin and channel column stay), the column list of `shell_view_state`, the migration test of the new version with a kept row.
 - The thread goldens show the new label.
 
