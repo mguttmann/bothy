@@ -513,6 +513,8 @@ Serializers _$serializers =
           ..add(ProfileUpdate.serializer)
           ..add(ProjectBinding.serializer)
           ..add(ProjectBindingPut.serializer)
+          ..add(ProjectFolder.serializer)
+          ..add(ProjectFolderList.serializer)
           ..add(ProjectProvision.serializer)
           ..add(ProjectReadiness.serializer)
           ..add(ProjectRunnerConfig.serializer)
@@ -921,6 +923,10 @@ Serializers _$serializers =
             () => ListBuilder<ProjectReadiness>(),
           )
           ..addBuilderFactory(
+            const FullType(BuiltSet, const [const FullType(String)]),
+            () => SetBuilder<String>(),
+          )
+          ..addBuilderFactory(
             const FullType(BuiltList, const [
               const FullType(BuiltMap, const [
                 const FullType(String),
@@ -1321,6 +1327,10 @@ Serializers _$serializers =
           ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(ChannelLabel)]),
             () => ListBuilder<ChannelLabel>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(ProjectFolder)]),
+            () => ListBuilder<ProjectFolder>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(PushRegistration)]),

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, Self, TypeVar
+from typing import TYPE_CHECKING, Any, Self, TypeVar, cast
 
 from attrs import define as _attrs_define
 
@@ -40,6 +40,9 @@ class Heartbeat:
         project_readiness (list[ProjectReadiness] | Unset): Readiness per bound forum of a runner (M2-03); the channels
             must be distinct. Applied only when present and different from the last list this server process applied; absent
             means "unchanged".
+        project_folders (list[str] | Unset): Runners only, the folder names directly under the projects root that are
+            Git work trees, sorted, at most `runner.project_folders_max` (09 18.13, M4-44). Applied only when present and
+            different from the last list this server process applied; absent means "unchanged". Names only, never a path.
     """
 
     state: HeartbeatState
@@ -51,6 +54,7 @@ class Heartbeat:
     rate_limit: AgentRateLimitState | Unset = UNSET
     details: JsonObject | Unset = UNSET
     project_readiness: list[ProjectReadiness] | Unset = UNSET
+    project_folders: list[str] | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         state = self.state.value
@@ -91,6 +95,10 @@ class Heartbeat:
                 project_readiness_item = project_readiness_item_data.to_dict()
                 project_readiness.append(project_readiness_item)
 
+        project_folders: list[str] | Unset = UNSET
+        if not isinstance(self.project_folders, Unset):
+            project_folders = self.project_folders
+
         field_dict: dict[str, Any] = {}
 
         field_dict.update(
@@ -114,6 +122,8 @@ class Heartbeat:
             field_dict["details"] = details
         if project_readiness is not UNSET:
             field_dict["project_readiness"] = project_readiness
+        if project_folders is not UNSET:
+            field_dict["project_folders"] = project_folders
 
         return field_dict
 
@@ -186,6 +196,8 @@ class Heartbeat:
 
                 project_readiness.append(project_readiness_item)
 
+        project_folders = cast(list[str], d.pop("project_folders", UNSET))
+
         heartbeat = cls(
             state=state,
             runtime_version=runtime_version,
@@ -196,6 +208,7 @@ class Heartbeat:
             rate_limit=rate_limit,
             details=details,
             project_readiness=project_readiness,
+            project_folders=project_folders,
         )
 
         return heartbeat

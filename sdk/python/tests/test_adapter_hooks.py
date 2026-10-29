@@ -224,11 +224,24 @@ async def test_runtime_status_sends_the_rate_limit(fake: FakeServer) -> None:
 
 
 @pytest.mark.anyio
+async def test_runtime_status_sends_the_project_folders(fake: FakeServer) -> None:
+    """``RuntimeStatus.project_folders`` reaches the fake server (M4-44)."""
+    handler = Reporting(RuntimeStatus(project_folders=("api", "website")))
+    adapter = make_adapter(fake, handler, "folders")
+    async with running(adapter, fake):
+        await until(fake, lambda: handler.ready == 1)
+        before = len(fake.heartbeats)
+        await adapter.send_heartbeat()
+    assert fake.heartbeats[before]["project_folders"] == ["api", "website"]
+
+
+@pytest.mark.anyio
 async def test_without_runtime_status_the_heartbeat_is_unchanged(fake: FakeServer) -> None:
     adapter = make_adapter(fake, RecordingHandler(), "plain")
     beat = adapter.heartbeat().to_dict()
     assert beat["state"] == "online"
     assert "project_readiness" not in beat
+    assert "project_folders" not in beat
     assert "billing_modes_supported" not in beat
 
 

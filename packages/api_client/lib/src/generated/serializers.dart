@@ -410,6 +410,8 @@ import 'package:api_client/src/generated/model/problem_type.dart';
 import 'package:api_client/src/generated/model/profile_update.dart';
 import 'package:api_client/src/generated/model/project_binding.dart';
 import 'package:api_client/src/generated/model/project_binding_put.dart';
+import 'package:api_client/src/generated/model/project_folder.dart';
+import 'package:api_client/src/generated/model/project_folder_list.dart';
 import 'package:api_client/src/generated/model/project_provision.dart';
 import 'package:api_client/src/generated/model/project_readiness.dart';
 import 'package:api_client/src/generated/model/project_runner_config.dart';
@@ -1017,6 +1019,8 @@ part 'serializers.g.dart';
   ProfileUpdate,
   ProjectBinding,
   ProjectBindingPut,
+  ProjectFolder,
+  ProjectFolderList,
   ProjectProvision,
   ProjectReadiness,
   ProjectRunnerConfig,
@@ -1593,6 +1597,10 @@ Serializers serializers =
           ..addBuilderFactory(
             const FullType(BuiltSet, [FullType(String)]),
             () => SetBuilder<String>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(ProjectFolder)]),
+            () => ListBuilder<ProjectFolder>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, [FullType(AccessTarget)]),
