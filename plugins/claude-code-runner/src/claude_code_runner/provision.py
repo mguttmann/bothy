@@ -218,7 +218,15 @@ class Provisioner:
         self._jobs.pop(channel_id, None)
         if code is None:
             self._record[str(channel_id)] = want.workspace_ref
-            self._save_record()
+            try:
+                self._save_record()
+            except OSError:
+                # An unrecorded folder would read as workspace_exists forever (D-M4-43-4): undo
+                # the creation, so the next attempt starts clean.
+                self._record.pop(str(channel_id), None)
+                _remove_tree(target)
+                code = failed
+        if code is None:
             _LOG.info(json.dumps({"event": "workspace_created", "channel_id": str(channel_id)}))
         else:
             self._fail(channel_id, want, code)

@@ -306,6 +306,26 @@ async def test_init_failure_removes_the_new_folder(root: Path, state: Path, git:
 
 
 @pytest.mark.anyio
+async def test_failed_record_save_undoes_the_creation(
+    root: Path, state: Path, git: FakeGit, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    done: list[UUID] = []
+    p = make(root, state, str(git.path), done=done)
+
+    def refuse() -> None:
+        raise OSError("disk full")
+
+    monkeypatch.setattr(p, "_save_record", refuse)
+    channel = uuid4()
+    want = Want("website", "init", None, None)
+    p.readiness(channel, want)
+    await p.wait_idle()
+    assert p.readiness(channel, want) == (False, "init_failed")
+    assert list(root.iterdir()) == []
+    assert len(done) == 1
+
+
+@pytest.mark.anyio
 async def test_missing_git(root: Path, state: Path) -> None:
     p = make(root, state, None)
     channel = uuid4()
