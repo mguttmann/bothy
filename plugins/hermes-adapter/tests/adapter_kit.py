@@ -33,6 +33,7 @@ from bothy_hermes_adapter.runtime import (
     OpenCard,
     ResolvedCredential,
     SessionSwitch,
+    Transcription,
     TurnOutcome,
     TurnRequest,
     Usage,
@@ -76,6 +77,9 @@ class FakeRuntime:
     stopped: dict[UUID, asyncio.Event] = field(default_factory=dict)
     started: asyncio.Event = field(default_factory=asyncio.Event)
     late: Any = None
+    stt: bool = True
+    transcripts: Mapping[bytes, str] = field(default_factory=dict)
+    heard: list[tuple[bytes, str, str]] = field(default_factory=list)
     _events: HermesHandler | None = None
     _scripts: set[asyncio.Task[TurnOutcome]] = field(default_factory=set)
 
@@ -150,6 +154,16 @@ class FakeRuntime:
 
     def loaded_toolsets(self) -> frozenset[str]:
         return self.toolsets
+
+    def voice_input(self) -> bool:
+        return self.stt
+
+    async def transcribe(self, data: bytes, name: str, mime_type: str) -> Transcription:
+        self.heard.append((data, name, mime_type))
+        text = self.transcripts.get(data)
+        if text is None:
+            return Transcription(None, "[voice message could not be transcribed automatically]")
+        return Transcription(text)
 
 
 @dataclass

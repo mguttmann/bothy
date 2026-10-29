@@ -2137,7 +2137,7 @@ plugin surfaces. Verified basis, retrieved 2026-10-10:
   https://github.com/NousResearch/hermes-agent/blob/main/gateway/platforms/ADDING_A_PLATFORM.md
   [verified]
 - Base class `BasePlatformAdapter` with `send`, `edit_message(..., finalize)`, `send_typing`,
-  `send_image`, `send_voice`, `send_document`, `send_clarify`, `_send_exec_approval_prompt`,
+  `send_image`, `send_image_file`, `send_voice`, `send_video`, `send_document`, `send_clarify`, `_send_exec_approval_prompt`,
   `send_slash_confirm`, `on_processing_start`, `on_processing_complete`, `build_source`,
   `get_chat_info`, `supports_status_text` with `set_status_text`, `supports_draft_streaming` with
   `send_draft`, `format_tool_event` (returning `None` swallows the tool display),
@@ -2201,7 +2201,8 @@ compatibility test runs against the pinned and the newest version (16.1, fake He
 | `format_tool_event(event)` | not called in `v2026.9.24` and `v0.22.5` (the base class offers the method, no caller in the gateway). The adapter still overrides it with the return value `None` and, on a later call, creates the step as with `set_status_text`: `kind: tool_call`, title the preview, `detail` exactly `{"preview": <the preview Hermes would have shown>}` (never a tool result), paired by Hermes' call ID or first in, first out. Hermes sends progress bubbles via `send` and edits them with `edit_message`; that is why the installer sets `display.platforms.<platform_key>.tool_progress: off` (measured: then no progress message) |
 | `render_message_event(event, sink)` | not called in `v2026.9.24` and `v0.22.5`; the default behavior stays, text parts also as `last_text_excerpt` |
 | `send_typing`, `stop_typing` | no operation (4.7, typing) |
-| `send_image`, `send_document`, `send_voice`, `send_video` | `file.upload`, then `message.create` with an attachment (`+upload` needed). Not built yet (follow-up ticket): the adapter answers with Hermes' failure result "not supported by this server adapter yet", sends nothing and reports no `files_out` |
+| `send_document`, `send_image_file`, `send_voice`, `send_video` | Built (HERMES-MEDIA). Hermes calls them after the text of its answer, before `on_processing_complete`, for the files its answer names (`MEDIA:` tags; images through `send_multiple_images`, which calls `send_image_file` per local image). The adapter checks the path again with Hermes' own media delivery policy (`validate_media_delivery_path`), opens the file without following a symbolic link, refuses anything but a non-empty regular file within `InstanceLimits.file_max_upload_bytes` (read once per run with `getInstance`), uploads it through an upload session of the run's channel in mode `direct` (`createUpload`, `uploadPart`, `completeUpload`, each bound to the run, 07 SR9; any failure aborts the session) and sends one `message.create` of the run with the caption as text and the file in `attachment_file_ids`, always `kind = text`, audio through `send_voice` too: the server accepts `kind = voice` only for a final file (12 8.1, `409 file_not_ready`), and the scan that makes it final runs after `completeUpload` (12 3.4). The server scans the file (12). The adapter reports `files_out` always; the owner switch `supports_files_out` decides on the server (`403 feature_disabled`). Every refusal returns Hermes' failure result with a code and sends nothing, so Hermes posts its own failure notice through `send`. Needs `+upload` |
+| `send_image` | an image by web address (a Markdown image of the answer): sent as the address in a message of its own; the adapter downloads nothing from the web |
 | `send_clarify(...)` | card with buttons or a selection, `custom_id` = callback ID `cl:<id>:<idx>`; run `waiting_input` |
 | `_send_exec_approval_prompt(prompt)` | approval card per 11.5, `custom_id` = `appr:<id>:<choice>` |
 | `send_slash_confirm(...)` | card "Once", "Always", "Cancel", `custom_id` = `sc:<choice>:<id>` |
@@ -2320,6 +2321,20 @@ attachments:
    mark; contents with `trust = unverified`, every file text and the transcripts of unverified
    messages only inside data blocks after a fixed notice line, opened and closed by markers with
    a random boundary of this turn, so no content can close a block or pose as a header line.
+
+Voice input (HERMES-MEDIA, 13): after `run.start` and before the turn, every attachment of the
+triggering message with an `audio/*` type, no `transcript` (a transcript of the server, mode
+`service`, is used as it is) and `scan_status` `clean` or `skipped` is loaded whole
+(`file.read`), placed in Hermes' audio cache of the profile and transcribed with Hermes' own
+speech to text (`_enrich_message_with_transcription` of the gateway, the function Hermes'
+other platforms use: the configured provider with its local fallback). A transcript becomes the
+attachment's `transcript`, so it stands in the person's text with the trust of the message, and
+is delivered with `file.transcript.submit` (`If-Match` from `file.get`; a refusal is logged and
+changes nothing else). Without a transcript Hermes' own note (the voice message could not be
+transcribed, or speech to text is off, with the cached audio path) goes before the person's
+text, as on its other platforms. Attachments of context messages and of follow-ups are not
+transcribed. The adapter reports `voice_input` while Hermes' speech to text is on and finds a
+provider (`stt.enabled`, `stt.provider`, read at connect and at every heartbeat).
 
 Elements with `already_delivered` are left out (the continued session holds them). Attachments
 with `scan_status` `clean` or `skipped` and a `text/*` or `application/json` type are loaded
@@ -3144,6 +3159,7 @@ attachment without a transcript would reach the turn only as a file path.
 | R-AG-30 | The Claude Code runner reports the names of the Git work trees directly under `runner.projects_root` in the heartbeat member `project_folders`; the server shows the owner those without a binding (18.13, addendum of 2026-10-29). | The app adds forums for existing folders as the owner's former setup did; only the runner sees the folders, and names carry no path or content (D-M4-44-1 to D-M4-44-4). |
 | R-AG-31 | The Claude Code runner reloads its served channels on `access.changed` and the channel and space structure events, and on a timer as a fallback, not only at start (18.1, addendum of 2026-10-29). | An operator change sends no `agent.config_changed`, so a forum that got the runner as operator stayed not ready until a restart (docs/decisions.d/RUNNER-LIVE-RELOAD.md). |
 | R-AG-32 | The Claude Code runner transcribes audio attachments without a transcript with an optional local program and reports `voice_input` only when one is configured; without it the person gets a note in the thread (18.14, addendum of 2026-10-29). | Claude Code cannot hear audio; a local program keeps the audio on the host, and a note replaces a silent loss (R-AG-16). |
+| R-AG-33 | The Hermes adapter sends the files of Hermes' answer as attachments through the public upload sessions, each within the server's upload limit and after Hermes' own delivery policy, and transcribes voice input with Hermes' own speech to text, delivering the transcript to the server (17.3, 17.6, HERMES-MEDIA). | Hermes behaves in a thread as on its other platforms; the server keeps scanning, limits and the owner switch `supports_files_out`, and other people see the transcript (13). |
 
 ## 20. Alignment with the core contract
 

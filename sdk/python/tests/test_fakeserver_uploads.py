@@ -218,6 +218,23 @@ async def test_create_message_attaches_completed_uploads(fake: FakeServer, clien
     assert too_many.problem.code == "validation_failed"
 
 
+async def test_voice_message_refuses_an_upload_not_yet_scanned(
+    fake: FakeServer, client: Client
+) -> None:
+    # The FakeServer never scans an upload, so it stays not final: like the server, a voice
+    # message with it answers 409 file_not_ready and attaches nothing (12 8.1); text attaches.
+    thread, channel = await _thread(fake)
+    file = await _upload(client, await _create(client, channel))
+    outbox = Outbox(client)
+    voice = await outbox.send_message(thread, "", kind="voice", attachment_file_ids=[file.id])
+    assert voice.state is OutboxState.FAILED
+    assert voice.problem is not None
+    assert voice.problem.code == "file_not_ready"
+    assert fake.uploads.sessions[file.id].attached is None
+    text = await outbox.send_message(thread, "", attachment_file_ids=[file.id])
+    assert text.state is OutboxState.SENT
+
+
 async def test_outbox_attachments_refused_with_403_fail_at_once(
     fake: FakeServer, client: Client
 ) -> None:

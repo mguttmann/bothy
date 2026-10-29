@@ -17,6 +17,12 @@ of 17.3 to `bothy_hermes_adapter.handler.HermesHandler` on the adapter's event l
   a follow-up as busy input (``display.busy_input_mode``), ``/stop``, ``/new`` with its
   confirmation answered through ``tools.slash_confirm.resolve``, and ``/resume <id> --all`` from
   the adapter's control sender.
+* Files Hermes sends with an answer (``send_document``, ``send_image_file``, ``send_voice``,
+  ``send_video``) pass Hermes's own media delivery policy again and go to the handler, which
+  uploads each one and sends it attached; an image Hermes names by a web address is sent as the
+  address (the adapter downloads nothing from the web). Voice input is transcribed with Hermes's
+  own speech to text (``_enrich_message_with_transcription`` of the gateway, the function its
+  other platforms use).
 * Session IDs and usage come from the plugin hooks ``pre_llm_call``, ``on_session_reset`` and
   ``post_api_request``; the thread of a hook or of ``set_status_text`` is the session's thread
   variable of the turn (``gateway.session_context``).
@@ -30,6 +36,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import mimetypes
 import uuid
 from collections.abc import Mapping
 from pathlib import Path
@@ -43,7 +50,12 @@ from bothy_sdk.generated.api.me import get_me
 from bothy_sdk.generated.models import Me
 from gateway.config import Platform, PlatformConfig
 from gateway.platforms._shared import platform_gate_env
-from gateway.platforms.base import BasePlatformAdapter, ExecApprovalPrompt, SendResult
+from gateway.platforms.base import (
+    BasePlatformAdapter,
+    ExecApprovalPrompt,
+    SendResult,
+    cache_audio_from_bytes_async,
+)
 from gateway.platforms.event import MessageEvent, MessageType, ProcessingOutcome
 from gateway.session_context import get_session_env
 from hermes_cli import __version__ as hermes_version
@@ -51,6 +63,7 @@ from hermes_constants import get_hermes_home
 from tools import slash_confirm
 from tools.approval import resolve_gateway_approval
 from tools.clarify_gateway import resolve_gateway_clarify
+from tools.transcription_tools import _get_provider, _load_stt_config, is_stt_enabled
 
 from bothy_hermes_adapter import __version__, cards, hermes_config
 from bothy_hermes_adapter.config import (
@@ -65,9 +78,11 @@ from bothy_hermes_adapter.installer import CONTROL_SENDER
 from bothy_hermes_adapter.runtime import (
     CardKind,
     CardRequest,
+    MediaKind,
     OpenCard,
     ResolvedCredential,
     SessionSwitch,
+    Transcription,
     TurnOutcome,
     TurnRequest,
     Usage,
@@ -84,7 +99,8 @@ _OUTCOMES: Final = {
     ProcessingOutcome.FAILURE: TurnOutcome.FAILED,
     ProcessingOutcome.CANCELLED: TurnOutcome.CANCELLED,
 }
-_NOT_BUILT: Final = "not supported by this server adapter yet"
+_NO_RUN: Final = "no active run in this thread"
+_AUDIO_EXT: Final = ".ogg"
 # How often the adapter looks at the gateway's startup restore before it connects; a poll of a
 # flag, not a deadline (the wait ends when Hermes is ready).
 _READY_POLL_S: Final = 0.1
@@ -449,6 +465,28 @@ class ServerPlatform(BasePlatformAdapter):
         """The toolsets Hermes enables for this platform."""
         return hermes_config.enabled_toolsets(self.platform_key)
 
+    def voice_input(self) -> bool:
+        """Whether Hermes's speech to text is on and finds a provider (09 2.2, 13)."""
+        config = _load_stt_config()
+        return is_stt_enabled(config) and _get_provider(config) != "none"
+
+    async def transcribe(self, data: bytes, name: str, mime_type: str) -> Transcription:
+        """Transcribe audio as Hermes does on its other platforms (09 13, 17.6).
+
+        The audio goes into Hermes's audio cache of the profile and through the gateway's own
+        ``_enrich_message_with_transcription``: the configured provider with the local fallback,
+        and without a transcript the note Hermes writes on every platform.
+        """
+        runner = getattr(self, "gateway_runner", None)
+        if runner is None:
+            return Transcription(None)
+        ext = Path(name).suffix.lower() or mimetypes.guess_extension(mime_type) or _AUDIO_EXT
+        path = await cache_audio_from_bytes_async(data, ext)
+        text, transcripts = await runner._enrich_message_with_transcription("", [path])
+        if transcripts:
+            return Transcription(str(transcripts[0]))
+        return Transcription(None, str(text or ""))
+
     # ---- Hermes callbacks (17.3) --------------------------------------------------------------
 
     def _thread(self, chat_id: Any, metadata: Mapping[str, Any] | None = None) -> uuid.UUID | None:
@@ -486,10 +524,10 @@ class ServerPlatform(BasePlatformAdapter):
         if thread is not None and thread in self._control:
             return SendResult(success=True, message_id=f"ctl-{uuid.uuid4().hex}")
         if thread is None or self.handler is None:
-            return SendResult(success=False, error="no active run in this thread")
+            return SendResult(success=False, error=_NO_RUN)
         message_id = await self.handler.on_answer(thread, content, reply_to)
         if message_id is None:
-            return SendResult(success=False, error="no active run in this thread")
+            return SendResult(success=False, error=_NO_RUN)
         return SendResult(success=True, message_id=message_id)
 
     async def edit_message(
@@ -577,8 +615,44 @@ class ServerPlatform(BasePlatformAdapter):
         reply_to: str | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> SendResult:
-        """Not built yet (Design note 21)."""
-        return SendResult(success=False, error=_NOT_BUILT)
+        """An image by web address: sent as the address (the adapter downloads nothing)."""
+        text = f"{caption}\n{image_url}" if caption else image_url
+        return await self.send(chat_id, text, reply_to=reply_to, metadata=metadata)
+
+    async def _send_file(
+        self,
+        chat_id: str,
+        path: str,
+        kind: MediaKind,
+        caption: str | None,
+        file_name: str | None,
+        metadata: Mapping[str, Any] | None,
+    ) -> SendResult:
+        """A local file of the answer: Hermes's delivery policy, then upload and send (17.3)."""
+        thread = self._thread(chat_id, metadata)
+        if thread is None or self.handler is None:
+            return SendResult(success=False, error=_NO_RUN)
+        # Hermes checks a MEDIA path before it calls here; other callers do not, so the policy
+        # (a regular file outside the credential and system paths) applies again.
+        safe = self.validate_media_delivery_path(str(path))
+        if safe is None:
+            return SendResult(success=False, error="refused by the media delivery policy")
+        sent = await self.handler.on_file(thread, safe, kind, caption, file_name)
+        if sent.message_id is None:
+            return SendResult(success=False, error=f"file not sent: {sent.error}")
+        return SendResult(success=True, message_id=sent.message_id)
+
+    async def send_image_file(
+        self,
+        chat_id: str,
+        image_path: str,
+        caption: str | None = None,
+        reply_to: str | None = None,
+        metadata: dict[str, Any] | None = None,
+        **kwargs: Any,
+    ) -> SendResult:
+        """A local image as an attachment of the answer."""
+        return await self._send_file(chat_id, image_path, MediaKind.IMAGE, caption, None, metadata)
 
     async def send_document(
         self,
@@ -590,8 +664,10 @@ class ServerPlatform(BasePlatformAdapter):
         metadata: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> SendResult:
-        """Not built yet (Design note 21)."""
-        return SendResult(success=False, error=_NOT_BUILT)
+        """A file as an attachment of the answer."""
+        return await self._send_file(
+            chat_id, file_path, MediaKind.DOCUMENT, caption, file_name, metadata
+        )
 
     async def send_voice(
         self,
@@ -602,8 +678,8 @@ class ServerPlatform(BasePlatformAdapter):
         metadata: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> SendResult:
-        """Not built yet (Design note 21)."""
-        return SendResult(success=False, error=_NOT_BUILT)
+        """Audio as an attachment of the answer (a text message, 09 17.3)."""
+        return await self._send_file(chat_id, audio_path, MediaKind.VOICE, caption, None, metadata)
 
     async def send_video(
         self,
@@ -614,15 +690,15 @@ class ServerPlatform(BasePlatformAdapter):
         metadata: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> SendResult:
-        """Not built yet (Design note 21)."""
-        return SendResult(success=False, error=_NOT_BUILT)
+        """A video as an attachment of the answer."""
+        return await self._send_file(chat_id, video_path, MediaKind.VIDEO, caption, None, metadata)
 
     async def _card(
         self, chat_id: str, metadata: Mapping[str, Any] | None, request: CardRequest
     ) -> SendResult:
         thread = self._thread(chat_id, metadata)
         if thread is None or self.handler is None:
-            return SendResult(success=False, error="no active run in this thread")
+            return SendResult(success=False, error=_NO_RUN)
         shown = await self.handler.on_card(thread, request)
         if not shown:
             return SendResult(success=False, error="card not shown")

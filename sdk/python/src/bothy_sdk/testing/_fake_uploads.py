@@ -9,7 +9,8 @@ digest ``409 conflict`` with ``reason`` ``part_conflict``, a completed session c
 aborted (``409 invalid_state_transition``). The received bytes are kept per file, so a test
 compares them with the files it announced. ``createMessage`` attaches only completed own
 uploads of the message's channel that are not attached yet (``409 conflict`` with ``reason``
-``file_not_attachable`` otherwise, M3-07).
+``file_not_attachable`` otherwise, M3-07). An upload is never scanned (``scan_status``
+``pending``), so a voice message with one answers ``409 file_not_ready`` (12 8.1).
 """
 
 from __future__ import annotations

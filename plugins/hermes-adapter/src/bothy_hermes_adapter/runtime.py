@@ -31,11 +31,14 @@ from uuid import UUID
 __all__ = [
     "CardKind",
     "CardRequest",
+    "FileSent",
+    "MediaKind",
     "OpenCard",
     "ResolvedCredential",
     "Runtime",
     "RuntimeEvents",
     "SessionSwitch",
+    "Transcription",
     "TurnOutcome",
     "TurnRequest",
     "Usage",
@@ -67,6 +70,42 @@ class CardKind(StrEnum):
     CLARIFY = "clarify"
     APPROVAL = "approval"
     SLASH_CONFIRM = "slash_confirm"
+
+
+class MediaKind(StrEnum):
+    """The kind of file Hermes sends with an answer (09 17.3 ``send_document`` and siblings)."""
+
+    DOCUMENT = "document"
+    IMAGE = "image"
+    VOICE = "voice"
+    VIDEO = "video"
+
+
+@dataclass(frozen=True)
+class FileSent:
+    """What became of a file Hermes sent (``send_document`` and siblings).
+
+    Attributes:
+        message_id: The message that carries the file, ``None`` when nothing was sent.
+        error: Why nothing was sent (a code, never a path or a content), ``None`` on success.
+    """
+
+    message_id: str | None
+    error: str | None = None
+
+
+@dataclass(frozen=True)
+class Transcription:
+    """Hermes's transcription of one audio attachment (09 13, 17.6).
+
+    Attributes:
+        transcript: The text, ``None`` when Hermes could not transcribe the audio.
+        note: The line Hermes puts into the person's text when there is no transcript (the
+            same note it writes on its other platforms); empty with a transcript.
+    """
+
+    transcript: str | None = field(repr=False)
+    note: str = field(default="", repr=False)
 
 
 @dataclass(frozen=True)
@@ -299,6 +338,27 @@ class Runtime(Protocol):
         """
         ...
 
+    def voice_input(self) -> bool:
+        """Return whether Hermes can transcribe audio now (speech to text on, a provider found).
+
+        Returns:
+            Whether the adapter may report ``voice_input`` (09 2.2, 13).
+        """
+        ...
+
+    async def transcribe(self, data: bytes, name: str, mime_type: str) -> Transcription:
+        """Transcribe one audio attachment with Hermes's own speech to text (09 13, 17.6).
+
+        Args:
+            data: The audio bytes.
+            name: The attachment's original name (for the file extension).
+            mime_type: The attachment's MIME type.
+
+        Returns:
+            The transcript, or Hermes's note when there is none.
+        """
+        ...
+
 
 class RuntimeEvents(Protocol):
     """What Hermes reports during a turn; ``platform.py`` calls it on the adapter's loop."""
@@ -325,6 +385,12 @@ class RuntimeEvents(Protocol):
 
     async def on_card(self, thread_id: UUID, request: CardRequest) -> bool:
         """A Hermes prompt to show as a card; returns whether it was shown."""
+        ...
+
+    async def on_file(
+        self, thread_id: UUID, path: str, kind: MediaKind, caption: str | None, name: str | None
+    ) -> FileSent:
+        """A file Hermes sends with its answer: upload it and send it as an attachment."""
         ...
 
     def on_usage(self, thread_id: UUID, usage: Usage) -> None:

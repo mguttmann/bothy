@@ -1,7 +1,8 @@
 # hermes-adapter
 
-Status: built (M2-33) on the recording of M2-32. Not built yet: sending files, images, voice and
-video, voice input, Hermes commands and the reports of Hermes cron jobs (09 17.3, 17.9).
+Status: built (M2-33) on the recording of M2-32; files, images, voice and video from Hermes and
+voice input to Hermes since HERMES-MEDIA. Not built yet: Hermes commands and the reports of
+Hermes cron jobs (09 17.3, 17.9).
 
 ## Purpose
 
@@ -33,6 +34,7 @@ installation.
 | `src/bothy_hermes_adapter/runtime.py` | the protocol between the logic and Hermes (`Runtime`, `RuntimeEvents`) |
 | `src/bothy_hermes_adapter/handler.py` | the runtime side of the SDK loop: start, turn, end, follow-ups, interactions |
 | `src/bothy_hermes_adapter/actual_mode.py`, `tool_class.py` | the actual billing mode (17.8) and the tool class (17.11) |
+| `src/bothy_hermes_adapter/media.py` | files of the answer (check, upload session, message kind) and the audio attachments to transcribe (17.3, 17.6) |
 | `src/bothy_hermes_adapter/context_format.py` | the run context as the fixed system part (17.6) |
 | `src/bothy_hermes_adapter/live_box.py`, `cards.py`, `store.py`, `heartbeat.py` | live box, cards, resolved callbacks and open cards, heartbeat |
 | `src/bothy_hermes_adapter/config.py`, `defaults.py` | the configuration from `PlatformConfig.extra` and its defaults |
@@ -93,6 +95,27 @@ The adapter determines the actual mode from the kind of credential Hermes resolv
 start and in every heartbeat; an undeterminable mode fails every run with `billing_mode_mismatch`
 and the heartbeat reports `degraded`.
 
+## Files and voice
+
+Files Hermes names in its answer (`MEDIA:` tags, local images, voice replies, videos) reach the
+thread as attachments: each one passes Hermes' own media delivery policy again (keep
+`HERMES_MEDIA_DELIVERY_STRICT` and `HERMES_MEDIA_ALLOW_DIRS` as for Hermes' other platforms),
+must be a regular file within the server's `file_max_upload_bytes`, goes through an upload
+session of the thread's channel and then as one message of the run with the file attached; the
+server scans it. Audio from `send_voice` is attached to a text message too: the server accepts a
+voice message only once its scan has made the file final, which happens after the upload. The
+agent needs the right `upload`, and the owner switch `supports_files_out` must stay on; a refused
+file sends nothing and Hermes posts its own failure notice. An image by web address is sent as
+the address.
+
+Voice messages (and other audio attachments) of the triggering message without a transcript of
+the server are transcribed with the profile's own speech to text (`stt` in Hermes'
+configuration, the same provider its other platforms use); the transcript is the person's text
+and is stored on the server as the agent's transcript. Without a transcript Hermes' own note
+reaches the turn. The adapter reports `voice_input` only while speech to text is on and finds a
+provider, so in the server's mode `agent` a voice message reaches it only then (09 13). An
+external speech to text provider receives the audio; choose it as for Hermes' other platforms.
+
 ## Inbox, state and restart
 
 The state directory `<home>/<platform key>` (mode `0700`) holds the SDK's inbox and outbox and the
@@ -113,8 +136,16 @@ connects only after Hermes finished its startup restore.
   the reported mode equals the credential the model endpoint receives, AG-13 (steer, queue,
   stop), AG-15 (concurrent clicks resolve once), AG-20 (trust marks reach the model as data
   blocks), BR-13 (no key value in any request, frame, log, output or state file), the installer,
-  the stub contract, the toolset table and the unchanged pin. They need the network for the
+  the stub contract, the toolset table and the unchanged pin; files of the answer
+  (`MEDIA:` tags for a document, an MP3 voice, a video and an image) arrive as attachments with
+  the uploaded bytes, the profile's `.env` stays out, and a voice message reaches Hermes' speech
+  to text (a command provider of the profile) and its transcript the model and the server, or
+  Hermes' note when speech to text is off. They need the network for the
   pinned downloads and fail without it; they never skip.
+- `tests/unit/test_media.py`: upload in parts, voice kind, size and file type refusals, an
+  aborted upload, a refused attachment, the capabilities, transcripts and their submission.
+- The recording of M2-32 has no scenario for files and voice: Hermes' calls are proven by the
+  Fake-Hermes tests against the same pin (D-HERMES-MEDIA-5).
 - Not proven: the newest Hermes release (`pytest --hermes-version=latest` is a manual switch with
   an unpinned download, never part of `make check`; it takes the highest version tag and ranks
   every version tag above the date tags Hermes used before `v0.22`), the adapter against the real

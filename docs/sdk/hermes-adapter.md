@@ -4,7 +4,7 @@ Reference of the Hermes adapter `bothy_hermes_adapter` (docs/spec/09-agents.md s
 `make docs` renders it from the google docstrings of the source with mkdocstrings. Installation,
 configuration, the billing-mode switch and how to run the tests are in
 [plugins/hermes-adapter/README.md](../../plugins/hermes-adapter/README.md); the rulings are
-`D-M2-33-*` in the decision log.
+`D-M2-33-*`, `D-HERMES-COMPAT-*` and `D-HERMES-MEDIA-*` in the decision log.
 
 ## Layers
 
@@ -20,6 +20,7 @@ the runtime, and the Fake-Hermes tests run the pinned Hermes in a subprocess.
 | `actual_mode` | The actual billing mode from the kind of credential Hermes resolves. |
 | `tool_class` | The actual tool class from the enabled toolsets. |
 | `context_format` | The run context as the fixed system part with data blocks. |
+| `media` | Files of the answer and the audio attachments to transcribe. |
 | `live_box` | Steps, status line and draft of a running turn. |
 | `cards` | Cards for clarify, approval and slash confirmations. |
 | `store` | Resolved callbacks and open cards. |
@@ -38,6 +39,8 @@ the runtime, and the Fake-Hermes tests run the pinned Hermes in a subprocess.
 ::: bothy_hermes_adapter.tool_class
 
 ::: bothy_hermes_adapter.context_format
+
+::: bothy_hermes_adapter.media
 
 ::: bothy_hermes_adapter.live_box
 
