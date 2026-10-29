@@ -1343,7 +1343,7 @@ final class RouteSelectionProvider
   }
 }
 
-String _$routeSelectionHash() => r'6a84685cb9b1aabe894d5a37c000f029d0d1fe28';
+String _$routeSelectionHash() => r'26babfa6b918152606bb5299d1cb167beb103cba';
 
 /// The selection of [path] (path and query of the router), read from the local database; the
 /// selected sidebar row and the post list follow it (brief M4-19 Design note 5).
