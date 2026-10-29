@@ -134,6 +134,7 @@ modules:
     actions: [agent.read, agent.create, agent.update, agent.disable, agent.enable,
               agent.billing_mode.set, agent.billing_mode.set_all, agent.credential_holder.set,
               agent.tool_class.set, agent.heartbeat, agent.events.consume, agent.triggerers.read,
+              agent.project_folders.read,
               agent_session.read, agent_session.reset, agent_session.bind, agent_session.report,
               command.read, command.register, command.remove, dev_environment.read,
               dev_environment.manage, dev_environment.report]

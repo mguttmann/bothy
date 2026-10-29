@@ -103,6 +103,25 @@ func (q *Queries) GetPresenceRows(ctx context.Context, ids []pgtype.UUID) ([]Get
 	return items, nil
 }
 
+const getProjectFolders = `-- name: GetProjectFolders :one
+SELECT (reported_project_folders IS NOT NULL)::boolean AS reported, coalesce(reported_project_folders, '{}')::text[] AS names
+FROM agents WHERE principal_id = $1
+`
+
+type GetProjectFoldersRow struct {
+	Reported bool
+	Names    []string
+}
+
+// The stored folder names of one agent for listAgentProjectFolders, read after authorize allowed
+// agent.project_folders.read; NULL while the runner never reported them.
+func (q *Queries) GetProjectFolders(ctx context.Context, principalID pgtype.UUID) (GetProjectFoldersRow, error) {
+	row := q.db.QueryRow(ctx, getProjectFolders, principalID)
+	var i GetProjectFoldersRow
+	err := row.Scan(&i.Reported, &i.Names)
+	return i, err
+}
+
 const listLivePresence = `-- name: ListLivePresence :many
 SELECT principal_id, billing_mode, tool_class, reported_runtime_state, reported_billing_mode, reported_tool_class,
        reported_runtime_version, reported_details, last_heartbeat_at
@@ -219,6 +238,22 @@ func (q *Queries) PersistHeartbeat(ctx context.Context, arg PersistHeartbeatPara
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const writeProjectFolders = `-- name: WriteProjectFolders :exec
+UPDATE agents SET reported_project_folders = $1::text[] WHERE principal_id = $2
+`
+
+type WriteProjectFoldersParams struct {
+	ReportedProjectFolders []string
+	PrincipalID            pgtype.UUID
+}
+
+// The folder names of the heartbeat member project_folders (M4-44, R-DM-56), written only when
+// the list changed; no other column, no version, no event.
+func (q *Queries) WriteProjectFolders(ctx context.Context, arg WriteProjectFoldersParams) error {
+	_, err := q.db.Exec(ctx, writeProjectFolders, arg.ReportedProjectFolders, arg.PrincipalID)
+	return err
 }
 
 const writeReportedChange = `-- name: WriteReportedChange :exec

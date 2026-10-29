@@ -81,6 +81,9 @@ exceptions:
   - query: chat.GetChannelBehavior
     category: after_authorize
     reason: "the behaviour of the one channel whose channel.behavior.read, channel.behavior.update or agent.config.read authorize allowed (M2-02)"
+  - query: chat.BoundProjectFolders
+    category: after_authorize
+    reason: "answers which of the given folder names a binding names, after authorize allowed agent.project_folders.read for the owner; only the given names leave, never a channel or a row (M4-44)"
   - query: chat.LockProjectBinding
     category: after_authorize
     reason: "locks the binding of the one forum whose channel.project.bind authorize allowed (M2-03)"

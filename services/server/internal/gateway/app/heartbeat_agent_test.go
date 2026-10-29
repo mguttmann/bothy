@@ -35,6 +35,10 @@ func (p *fakePresence) Statuses(context.Context, []ids.ID) ([]agents.PresenceSta
 	return nil, nil
 }
 
+func (p *fakePresence) ProjectFolders(context.Context, actor.Actor, ids.ID) (agents.ProjectFolders, error) {
+	return agents.ProjectFolders{}, nil
+}
+
 // calls returns the recorded heartbeats.
 func (p *fakePresence) calls() ([]string, []ids.ID) {
 	p.mu.Lock()

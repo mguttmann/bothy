@@ -64,6 +64,11 @@ func (r readinessInMaintenance) ApplyProjectReadiness(ctx context.Context, agent
 	return r.chat.ApplyProjectReadiness(txn.WithWriteInMaintenance(ctx), agentID, reports)
 }
 
+// BoundProjectFolders implements agentsapp.Readiness; a read, so it needs no mark (M4-44).
+func (r readinessInMaintenance) BoundProjectFolders(ctx context.Context, names []string) ([]string, error) {
+	return r.chat.BoundProjectFolders(ctx, names)
+}
+
 // startAgents is start step 6e (M1-51): the agents module over the pool, the unit of work, the
 // recorder and the rights hook of the audit step, the appender of the sync step, the Authorizer
 // and the identity module; it binds the switch of the module into the guided flow of authz

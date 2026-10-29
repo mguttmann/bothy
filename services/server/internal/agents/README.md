@@ -236,8 +236,15 @@ Agents, backend policy and tool class (configured), reported state, consumer cur
   heartbeat (a configured value changed in another process counts at once), project readiness
   (with the optional `reason` of M4-43: a code of at most 64 characters, only with `ready` false)
   only when the list changed since this process applied it (`ApplyProjectReadiness` of `chat` in
-  its own unit of work), then the change path, the entry update, the reassessment, the re-armed
-  deadline and the event. The rate limit `rl.agent_runtime` runs before, in the chain or the
+  its own unit of work), the project folders of M4-44 (`project_folders`, written to
+  `agents.reported_project_folders` with `WriteProjectFolders` in its own unit of work only when
+  the list differs from the last one this process wrote; absent means unchanged), then the change
+  path, the entry update, the reassessment, the re-armed deadline and the event.
+- `app/project_folders.go` (M4-44, migration `00084`): `ProjectFolders`, the use case of
+  `listAgentProjectFolders`: `authorize` `agent.project_folders.read` (owner) on the agent,
+  `GetProjectFolders` (`reported` false while the column is NULL, `not_found` for an unknown
+  agent), and the names the readiness port of `chat` answers as bound (`BoundProjectFolders`,
+  compared without case) left out, so this module never reads `project_bindings` (R-DM-56). The rate limit `rl.agent_runtime` runs before, in the chain or the
   gateway.
 - State rules: `unknown` before the first heartbeat, `online` or `degraded` from the latest one,
   `offline` once the deadline (last heartbeat plus `agent.presence_timeout`, inclusive) fires
@@ -490,7 +497,7 @@ Only this module writes and reads these tables by SQL (03-data-model.md, princip
 
 ## Actions (05-actions.md)
 
-`agent.read`, `agent.create`, `agent.update`, `agent.disable`, `agent.enable`, `agent.billing_mode.set`, `agent.billing_mode.set_all`, `agent.credential_holder.set`, `agent.tool_class.set`, `agent.heartbeat`, `agent.events.consume`, `agent.triggerers.read`, `agent_session.read`, `agent_session.reset`, `agent_session.bind`, `agent_session.report`, `command.read`, `command.register`, `command.remove`, `dev_environment.read`, `dev_environment.manage`, `dev_environment.report`.
+`agent.read`, `agent.create`, `agent.update`, `agent.disable`, `agent.enable`, `agent.billing_mode.set`, `agent.billing_mode.set_all`, `agent.credential_holder.set`, `agent.tool_class.set`, `agent.heartbeat`, `agent.events.consume`, `agent.triggerers.read`, `agent.project_folders.read`, `agent_session.read`, `agent_session.reset`, `agent_session.bind`, `agent_session.report`, `command.read`, `command.register`, `command.remove`, `dev_environment.read`, `dev_environment.manage`, `dev_environment.report`.
 
 ## Events and WebSocket ops
 

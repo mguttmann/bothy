@@ -833,6 +833,10 @@ func (stubServer) ListActiveRuns(context.Context, rest.ListActiveRunsRequestObje
 	return nil, nil
 }
 
+func (stubServer) ListAgentProjectFolders(context.Context, rest.ListAgentProjectFoldersRequestObject) (rest.ListAgentProjectFoldersResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) ListAgentSessions(context.Context, rest.ListAgentSessionsRequestObject) (rest.ListAgentSessionsResponseObject, error) {
 	return nil, nil
 }
@@ -1337,6 +1341,8 @@ func TestRealTable_Enabled(t *testing.T) {
 		"setAllAgentsBillingMode": {"PUT /api/v1/instance/agent-billing-mode", "agent.billing_mode.set_all", "rl.admin"},
 		"setCredentialHolder":     {"PUT /api/v1/agents/{agent_id}/credential-holder", "agent.credential_holder.set", "rl.admin"},
 		"setAgentToolClass":       {"PUT /api/v1/agents/{agent_id}/tool-class", "agent.tool_class.set", "rl.admin"},
+		// M4-44
+		"listAgentProjectFolders": {"GET /api/v1/agents/{agent_id}/project-folders", "agent.project_folders.read", "rl.read"},
 		// M2-07
 		"getConsumerState": {"GET /api/v1/agents/me/consumers/{consumer}", "agent.events.consume", "rl.agent_runtime"},
 		"pollAgentEvents":  {"GET /api/v1/agents/me/consumers/{consumer}/events", "agent.events.consume", "rl.agent_runtime"},

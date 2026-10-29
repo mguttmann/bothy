@@ -11,6 +11,35 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const boundProjectFolders = `-- name: BoundProjectFolders :many
+SELECT n::text AS name
+FROM unnest($1::text[]) AS n
+WHERE EXISTS (SELECT 1 FROM project_bindings WHERE lower(workspace_ref) = lower(n))
+`
+
+// The entries of names that the workspace_ref of a binding names, compared without case as the
+// unique index does; only these names leave, no channel and no row (listAgentProjectFolders,
+// M4-44).
+func (q *Queries) BoundProjectFolders(ctx context.Context, names []string) ([]string, error) {
+	rows, err := q.db.Query(ctx, boundProjectFolders, names)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, err
+		}
+		items = append(items, name)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const deleteProjectBinding = `-- name: DeleteProjectBinding :exec
 DELETE FROM project_bindings WHERE channel_id = $1
 `

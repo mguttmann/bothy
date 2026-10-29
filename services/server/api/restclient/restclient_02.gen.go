@@ -199,6 +199,13 @@ type ClientInterface interface {
 	// Corresponds with POST /agents/{agent_id}/enable (the `EnableAgent` operationId).
 	EnableAgent(ctx context.Context, agentId AgentIdPath, params *EnableAgentParams, body EnableAgentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListAgentProjectFolders List the project folders of a runner that have no binding
+	//
+	// The folders directly under the projects root of the runner `agent_id` that its last heartbeat reported (`Heartbeat.project_folders`, 09 18.13) and that no forum is bound to: a name equal to the `workspace_ref` of any binding, compared without case, is left out (03 `runner_project_folders`, M4-44). `reported` is false while the runner has never reported its folders. The app offers these folders to add a forum for each (01 6.10); the server never reads a host's files.
+	//
+	// Corresponds with GET /agents/{agent_id}/project-folders (the `ListAgentProjectFolders` operationId).
+	ListAgentProjectFolders(ctx context.Context, agentId AgentIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// SetAgentToolClassWithBody Set the tool class of an agent
 	//
 	// Target tool class (`chat` < `scoped` < `host`, 07 2.11). `authorize` uses the higher of target and reported class; a guest run needs a matching tool class (SR2).
@@ -4191,6 +4198,23 @@ func (c *Client) EnableAgentWithBody(ctx context.Context, agentId AgentIdPath, p
 // Corresponds with POST /agents/{agent_id}/enable (the `EnableAgent` operationId).
 func (c *Client) EnableAgent(ctx context.Context, agentId AgentIdPath, params *EnableAgentParams, body EnableAgentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewEnableAgentRequest(c.Server, agentId, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListAgentProjectFolders List the project folders of a runner that have no binding
+//
+// The folders directly under the projects root of the runner `agent_id` that its last heartbeat reported (`Heartbeat.project_folders`, 09 18.13) and that no forum is bound to: a name equal to the `workspace_ref` of any binding, compared without case, is left out (03 `runner_project_folders`, M4-44). `reported` is false while the runner has never reported its folders. The app offers these folders to add a forum for each (01 6.10); the server never reads a host's files.
+//
+// Corresponds with GET /agents/{agent_id}/project-folders (the `ListAgentProjectFolders` operationId).
+func (c *Client) ListAgentProjectFolders(ctx context.Context, agentId AgentIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListAgentProjectFoldersRequest(c.Server, agentId)
 	if err != nil {
 		return nil, err
 	}
@@ -13115,6 +13139,40 @@ func NewEnableAgentRequestWithBody(server string, agentId AgentIdPath, params *E
 			req.Header.Set("Idempotency-Key", headerParam0)
 		}
 
+	}
+
+	return req, nil
+}
+
+// NewListAgentProjectFoldersRequest constructs an http.Request for the ListAgentProjectFolders method
+func NewListAgentProjectFoldersRequest(server string, agentId AgentIdPath) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "agent_id", agentId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/agents/%s/project-folders", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
 	}
 
 	return req, nil
@@ -24677,93 +24735,4 @@ func NewCreateSpaceRequest(server string, params *CreateSpaceParams, body Create
 	}
 	bodyReader = bytes.NewReader(buf)
 	return NewCreateSpaceRequestWithBody(server, params, "application/json", bodyReader)
-}
-
-// NewCreateSpaceRequestWithBody constructs an http.Request for the CreateSpace method, with any body, and a specified content type
-func NewCreateSpaceRequestWithBody(server string, params *CreateSpaceParams, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/spaces")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
-	}
-
-	return req, nil
-}
-
-// NewGetSpaceRequest constructs an http.Request for the GetSpace method
-func NewGetSpaceRequest(server string, spaceId SpaceIdPath) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "space_id", spaceId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/spaces/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewUpdateSpaceRequest calls the generic UpdateSpace builder with application/json body
-func NewUpdateSpaceRequest(server string, spaceId SpaceIdPath, params *UpdateSpaceParams, body UpdateSpaceJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewUpdateSpaceRequestWithBody(server, spaceId, params, "application/json", bodyReader)
 }

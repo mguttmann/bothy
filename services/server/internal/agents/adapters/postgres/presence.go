@@ -109,6 +109,31 @@ func (r *Repository) PersistHeartbeat(ctx context.Context, w app.PresenceWrite) 
 	return n > 0, nil
 }
 
+// WriteProjectFolders implements app.PresenceStore (M4-44).
+func (r *Repository) WriteProjectFolders(ctx context.Context, id ids.ID, names []string) error {
+	q, err := r.write(ctx)
+	if err != nil {
+		return err
+	}
+	if names == nil {
+		names = []string{}
+	}
+	return mapError(q.WriteProjectFolders(ctx, sqlcgen.WriteProjectFoldersParams{ReportedProjectFolders: names, PrincipalID: uuid(id)}),
+		"storing the project folders")
+}
+
+// GetProjectFolders implements app.PresenceStore (M4-44).
+func (r *Repository) GetProjectFolders(ctx context.Context, id ids.ID) ([]string, bool, bool, error) {
+	row, err := r.read(ctx).GetProjectFolders(ctx, uuid(id))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, false, false, nil
+	}
+	if err != nil {
+		return nil, false, false, mapError(err, "reading the project folders")
+	}
+	return row.Names, row.Reported, true, nil
+}
+
 // onePresence converts the result of a single-row presence query; no rows is found false.
 func onePresence(row sqlcgen.ListLivePresenceRow, err error, what string) (domain.PresenceRow, bool, error) {
 	if errors.Is(err, pgx.ErrNoRows) {

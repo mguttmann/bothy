@@ -20,6 +20,7 @@ var catalogEntries = []CatalogEntry{
 	{ID: "agent.events.consume", Right: "agent-self", RateLimitClass: "rl.agent_runtime"},
 	{ID: "agent.heartbeat", Right: "agent-self", RateLimitClass: "rl.agent_runtime"},
 	{ID: "agent.invoke", Right: "trigger and rules from 5", RateLimitClass: "rl.trigger"},
+	{ID: "agent.project_folders.read", Right: "owner", RateLimitClass: "rl.read"},
 	{ID: "agent.read", Right: "owner or agent-self or read on a channel that the agent operates", RateLimitClass: "rl.read"},
 	{ID: "agent.tool_class.set", Right: "owner", RateLimitClass: "rl.admin"},
 	{ID: "agent.triggerers.read", Right: "agent-self", RateLimitClass: "rl.agent_runtime"},

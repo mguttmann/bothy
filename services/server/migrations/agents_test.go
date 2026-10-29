@@ -17,7 +17,8 @@ import (
 )
 
 // TestAgentsMigration_Schema holds agents against docs/spec/03-data-model.md section 4.4 column
-// by column, with the checks, the foreign keys and the two indexes (M1-51).
+// by column, with the checks, the foreign keys and the two indexes (M1-51), and the column
+// reported_project_folders (M4-44, R-DM-56).
 func TestAgentsMigration_Schema(t *testing.T) {
 	t.Parallel()
 	conn := pgtest.New(t).SuperConn(t)
@@ -39,6 +40,7 @@ func TestAgentsMigration_Schema(t *testing.T) {
 		{"reported_details", "jsonb", false, "'{}'::jsonb"},
 		{"last_heartbeat_at", ts, true, ""},
 		{"version", "bigint", false, "1"},
+		{"reported_project_folders", "ARRAY", true, ""},
 	}
 	constraints := []string{
 		"CHECK (((billing_mode = 'personal'::text) = (credential_holder_id IS NOT NULL)))",

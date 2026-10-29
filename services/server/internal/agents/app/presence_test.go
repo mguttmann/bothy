@@ -95,6 +95,10 @@ type fakeStore struct {
 	gate     *gate                         // parks a heartbeat in one of its database calls
 	changes  []app.PresenceWrite
 	persists []app.PresenceWrite
+	// folders are the stored reported_project_folders (nil: never reported) and folderWrites
+	// the lists written (M4-44).
+	folders      map[ids.ID][]string
+	folderWrites [][]string
 }
 
 // gate parks the first call that reaches the armed point until release is closed, as a row lock
@@ -308,6 +312,8 @@ type fakeReadiness struct {
 	gate  *gate
 	mu    gosync.Mutex
 	calls [][]chat.ProjectReadiness
+	// bound are the workspace_ref values of the bindings, for BoundProjectFolders (M4-44).
+	bound []string
 }
 
 func (r *fakeReadiness) ApplyProjectReadiness(_ context.Context, _ ids.ID, reports []chat.ProjectReadiness) error {

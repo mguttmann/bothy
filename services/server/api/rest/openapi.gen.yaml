@@ -12720,6 +12720,52 @@ paths:
         default:
           $ref: '#/components/responses/Error'
 
+  /agents/{agent_id}/project-folders:
+    get:
+      operationId: listAgentProjectFolders
+      summary: List the project folders of a runner that have no binding
+      tags: [Agents]
+      description: |-
+        The folders directly under the projects root of the runner `agent_id` that its last heartbeat reported (`Heartbeat.project_folders`, 09 18.13) and that no forum is bound to: a name equal to the `workspace_ref` of any binding, compared without case, is left out (03 `runner_project_folders`, M4-44). `reported` is false while the runner has never reported its folders. The app offers these folders to add a forum for each (01 6.10); the server never reads a host's files.
+      x-authz-action: agent.project_folders.read
+      x-rate-limit-class: rl.read
+      parameters:
+      - $ref: '#/components/parameters/AgentIdPath'
+      responses:
+        '200':
+          description: OK.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectFolderList'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    reported: true
+                    items:
+                    - name: website
+                    - name: docs-site
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
   /agents/{agent_id}/webhooks:
     get:
       operationId: listAgentWebhookSubscriptions
@@ -26038,6 +26084,36 @@ components:
           description: Readiness per bound forum of a runner (M2-03); the channels must be distinct. Applied only when present and different from the last list this server process applied; absent means "unchanged".
           items:
             $ref: '#/components/schemas/ProjectReadiness'
+        project_folders:
+          type: array
+          uniqueItems: true
+          description: Runners only, the folder names directly under the projects root that are Git work trees, sorted, at most `runner.project_folders_max` (09 18.13, M4-44). Applied only when present and different from the last list this server process applied; absent means "unchanged". Names only, never a path.
+          items:
+            $ref: '#/components/schemas/ProjectFolderName'
+    ProjectFolderName:
+      type: string
+      description: One folder name directly under a runner's projects root, the one-segment form of `workspace_ref` (09 18.12 item 2).
+      pattern: '^[A-Za-z0-9][A-Za-z0-9._-]*$'
+      maxLength: 255
+      examples: [website]
+    ProjectFolder:
+      type: object
+      required: [name]
+      properties:
+        name:
+          $ref: '#/components/schemas/ProjectFolderName'
+    ProjectFolderList:
+      type: object
+      required: [items, reported]
+      properties:
+        items:
+          type: array
+          description: The reported folders without a binding, in name order.
+          items:
+            $ref: '#/components/schemas/ProjectFolder'
+        reported:
+          type: boolean
+          description: Whether the runner has reported its folders at least once; false for a runner that never did (an older runner or not yet connected).
     ProjectReadiness:
       type: object
       additionalProperties: false

@@ -21,7 +21,7 @@ var requirementGroups = []struct {
 	{"permission of the target action", Preview, []string{"access.preview"}},
 	{"owner", Owner, []string{
 		"access.view_as", "agent.billing_mode.set", "agent.billing_mode.set_all", "agent.create",
-		"agent.credential_holder.set", "agent.disable", "agent.enable", "agent.tool_class.set",
+		"agent.credential_holder.set", "agent.disable", "agent.enable", "agent.project_folders.read", "agent.tool_class.set",
 		"agent.update", "app.install", "app.read", "app.resume", "app.scopes.update", "app.suspend",
 		"app.uninstall", "audit.read", "audit.verify", "channel.operator.set", "channel.project.bind",
 		"cost.reconcile", "dev_environment.manage", "feature_flag.read", "feature_flag.update",
