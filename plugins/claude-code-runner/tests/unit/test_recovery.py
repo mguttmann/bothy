@@ -96,6 +96,14 @@ CASES: list[tuple[str, TurnEnd, RecoveryState, str, dict[str, object], Action]] 
         Fail("runtime_not_authenticated"),
     ),
     ("runtime error", ERR, FRESH, "new", {}, Fail("runtime_error", ("boom",))),
+    (
+        "cli too old for the model: no recovery, the actionable text in the box",
+        TurnEnd("runtime_version_unsupported", ("update",), "1", "2.1.280"),
+        FRESH,
+        "resume",
+        {},
+        Fail("runtime_error", ("update",)),
+    ),
     ("completed", TurnEnd("completed"), FRESH, "new", {}, Finish()),
     (
         "stopped",

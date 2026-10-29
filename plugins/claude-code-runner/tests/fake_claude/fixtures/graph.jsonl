@@ -1,4 +1,4 @@
-{"type":"fixture_meta","origin":"constructed","cli_version":"2.1.259","source":"tests/fixtures/recording/stream_fields_2.1.259.json"}
+{"type":"fixture_meta","origin":"constructed","cli_version":"2.1.288","source":"tests/fixtures/recording/stream_fields_2.1.288.json"}
 {"type":"assistant","session_id":"{{session_id}}","parent_tool_use_id":null,"message":{"id":"msg_1","model":"{{model}}","role":"assistant","content":[{"type":"text","text":"Splitting the review."},{"type":"tool_use","id":"toolu_agent","name":"Agent","input":{"description":"Review the module","prompt":"Read src"}}]}}
 {"type":"system","subtype":"task_started","session_id":"{{session_id}}","task_id":"task_agent","tool_use_id":"toolu_agent","description":"Review the module","task_type":"local_agent","subagent_type":"general-purpose"}
 {"type":"assistant","session_id":"{{session_id}}","parent_tool_use_id":"toolu_agent","message":{"id":"msg_2","model":"{{model}}","role":"assistant","content":[{"type":"tool_use","id":"toolu_read","name":"Read","input":{"file_path":"src/app.py"}}]}}

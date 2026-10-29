@@ -272,3 +272,21 @@ def _blocks(text: str) -> str:
     """The content of every marked data block of a rendered part, joined."""
     found = re.findall(r"<<<DATA (\w+) [^>]*>>>\n(.*?)\n<<<END DATA \1>>>", text, re.DOTALL)
     return "\n".join(content for _, content in found)
+
+
+async def test_cli_model_notation_reported_as_model_name(world: World) -> None:
+    """``runner.default_model`` in the CLI's notation with a context window (RUNNER-CLI-PIN).
+
+    The CLI gets the value as it is; the server gets the model name of 09 2.2, which has no
+    ``[`` (live on 2026-10-29 ``startRun`` answered ``400 validation_failed`` for it).
+    """
+    await world.start(world.config(default_model="claude-opus-5-5[1m]"))
+    run = await world.fake.trigger("Fix it", channel_id=world.forum_a)
+    assert await world.ended(run.run_id) == "completed"
+    argv = world.turns()[0]["argv"]
+    assert argv[argv.index("--model") + 1] == "claude-opus-5-5[1m]"
+    [start] = world.requests("startRun")
+    assert _body(start)["model"] == "claude-opus-5-5"
+    reports = [_body(r) for r in world.requests("reportAgentSession")]
+    assert reports
+    assert all(r.get("model") == "claude-opus-5-5" for r in reports)

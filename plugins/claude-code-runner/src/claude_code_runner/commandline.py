@@ -12,6 +12,7 @@ Examples:
 
 from __future__ import annotations
 
+import re
 import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -29,6 +30,7 @@ __all__ = [
     "choose_model",
     "choose_session",
     "class_flags",
+    "reported_model",
     "scoped_tools",
 ]
 
@@ -120,6 +122,34 @@ def choose_model(binding_model: str | None, default_model: str) -> str:
     if not check_argument(model):
         raise ArgumentError("invalid_argument")
     return model
+
+
+_MODEL_NAME = re.compile(r"^[A-Za-z0-9._:/@-]+$")
+"""The pattern of a model name the server takes (09 2.2 ``default_model``, ``run.start``)."""
+_CLI_SUFFIX = re.compile(r"\[[^\[\]]*\]$")
+"""A trailing selector of the CLI notation, such as the context window in ``<model>[1m]``."""
+
+
+def reported_model(model: str) -> str | None:
+    """Return the model name the runner reports for a CLI model value (D-RUNNER-CLI-PIN-3).
+
+    The CLI takes ``<model>[<selector>]`` (for example a context window, ``[1m]``) and sends
+    the model without it; the server's model name (09 2.2) has no ``[``. The suffix is cut; a
+    value that still is no model name is left out of ``startRun`` and ``agent_session.report``,
+    so the run goes on without it.
+
+    Args:
+        model: The value of `choose_model` (passed to ``--model`` unchanged).
+
+    Returns:
+        The model name, or ``None``.
+
+    Examples:
+        >>> reported_model("claude-opus-5-5[1m]")
+        'claude-opus-5-5'
+    """
+    name = _CLI_SUFFIX.sub("", model)
+    return name if _MODEL_NAME.fullmatch(name) else None
 
 
 def choose_session(agent_session: Any) -> SessionChoice:

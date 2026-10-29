@@ -1,1 +1,1 @@
-{"type":"fixture_meta","origin":"constructed","cli_version":"2.1.259","source":"pinned CLI file claude 2.1.259: the API error text of a request above the context window","channel":"assistant","error_text":"Prompt is too long"}
+{"type":"fixture_meta","origin":"constructed","cli_version":"2.1.288","source":"pinned CLI file claude 2.1.288: the API error text of a request above the context window","channel":"assistant","error_text":"Prompt is too long"}

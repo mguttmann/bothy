@@ -11,7 +11,7 @@ from claude_code_runner.livebox import WORKFLOW_TASK_TYPE, LiveBox
 
 from .test_livebox import OWN, Patch
 
-RECORDING = Path(__file__).parent.parent / "fixtures" / "recording" / "stream_fields_2.1.259.json"
+RECORDING = Path(__file__).parent.parent / "fixtures" / "recording" / "stream_fields_2.1.288.json"
 T0 = datetime(2026, 10, 21, 9, 0, tzinfo=UTC)
 INTERVAL = 120.0
 
@@ -41,7 +41,7 @@ def _box(clock: Clock) -> tuple[LiveBox, Patch]:
 
 def test_mapping_uses_only_recorded_fields() -> None:
     recording = json.loads(RECORDING.read_text())
-    assert recording["cli_version"] == "2.1.259"
+    assert recording["cli_version"] == "2.1.288"
     assert recording["workflow_task_type"] == WORKFLOW_TASK_TYPE
     assert WORKFLOW_TASK_TYPE in recording["task_types"]
     for subtype in ("system/task_started", "system/task_notification"):

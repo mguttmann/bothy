@@ -10,6 +10,8 @@ from pathlib import Path
 
 import pytest
 
+from claude_code_runner.heartbeat import PINNED_CLAUDE_CODE_VERSION
+
 from .conftest import API_KEY, LogLines, World
 
 pytestmark = pytest.mark.anyio
@@ -23,7 +25,7 @@ async def test_project_readiness_in_heartbeat(world: World) -> None:
     assert readiness == {str(world.forum_a): True, str(world.forum_b): False}
     assert beat["state"] == "online"
     assert beat["reported_tool_class"] == "scoped"
-    assert beat["runtime_version"] == "2.1.259"
+    assert beat["runtime_version"] == PINNED_CLAUDE_CODE_VERSION
     assert beat["billing_modes_supported"] == ["organization"]
     assert "reported_billing_mode" not in beat
     assert "billing_evidence" not in beat

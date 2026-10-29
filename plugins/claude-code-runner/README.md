@@ -68,8 +68,19 @@ docs/operations/configuration.md (generated from 09 21). Operator rules:
   of `organization` live in the runner's own configuration folder and those of `personal` under
   `HOME`; M2-35 handles a missing session (fail open).
 - Install exactly the pinned Claude Code version (`PINNED_CLAUDE_CODE_VERSION` in
-  `heartbeat.py`, 2.1.259) and keep automatic updates of the CLI off; another version reports
+  `heartbeat.py`, 2.1.288) and keep automatic updates of the CLI off; another version reports
   `runtime_version_untested`, an older one `runtime_version_unsupported` and refuses runs.
+- The API refuses a model to a CLI below the model's minimum version ("Claude Code <v> does not
+  support this model; version <v> or newer is required", or the minimum of an organization's
+  policy). The run then ends `runtime_error` with a box note that names the required version and
+  says to update Claude Code; the runner raises its minimum to that version, reports `degraded`
+  with `runtime_version_unsupported` at once and refuses runs until a version probe (before
+  every heartbeat) finds a CLI at that version. The raised minimum lives in memory: a restart
+  of the runner forgets it, and the next refused turn raises it again.
+- `runner.default_model` and the binding's `runner_config.model` may use the CLI's notation with
+  a selector in square brackets, such as a context window (`<model>[1m]`): the CLI gets the
+  value as it is, `startRun` and `agent_session.report` get the model name without the suffix,
+  because the server's model name (09 2.2) has no `[`.
 - `runner.forward_ssh_agent` gives every turn the runner user's SSH keys; keep it off unless the
   projects need it.
 - Keep `runner.progress_patch_interval` below `run.stall_after` of the server, else a run whose
@@ -96,9 +107,9 @@ throttles them to `agent.run_update_min_interval`.
 | `system/api_retry` | `/metrics/api_retries`, `/metrics/last_api_retry` |
 
 The run graph fields (`tool_use_id`, `task_type`, `usage`, the workflow type `local_workflow`)
-were read from the files of the pinned CLI 2.1.259 without a session
-(`tests/fixtures/recording/stream_fields_2.1.259.json`, ruling D-M2-51-1); the level-one switch
-test holds them against the installed CLI.
+were read from the files of the pinned CLI 2.1.259 without a session (ruling D-M2-51-1) and read
+again in 2.1.288 (`tests/fixtures/recording/stream_fields_2.1.288.json`, D-RUNNER-CLI-PIN-1); the
+level-one switch test holds them against the installed CLI.
 
 ## Follow-ups, stop and error paths (M2-35)
 
@@ -119,8 +130,9 @@ test holds them against the installed CLI.
   of a process with `--resume`) and the same prompt runs again, with a retry hint in the runner
   prompt when the turn had worked; a missing session is replaced by a new one and reported (with
   `bind_failed` in mode `bind`), fail open; a session that exists at the first turn is resumed; a
-  missing login ends `runtime_not_authenticated`; an error `result` ends `runtime_error` with its
-  texts in the last step. Box notes are run steps of kind `status` with the codes
+  missing login ends `runtime_not_authenticated`; a CLI too old for the model ends
+  `runtime_error` with the required version in the last step and degrades the runner (see the
+  operator rules); an error `result` ends `runtime_error` with its texts in the last step. Box notes are run steps of kind `status` with the codes
   `context_compacted`, `session_missing` and `runtime_error`.
 - **Crash of the runner**: turns keep running in their own process group with stdout and stderr in
   files. At start, before the first inbox event and heartbeat, the runner reads the turn records
@@ -262,6 +274,11 @@ no login of the developer is touched. The real CLI runs only behind switches:
 - Level two, additionally `CLAUDE_CODE_RUNNER_REAL_TURN=1` and `CLAUDE_CODE_RUNNER_REAL_KEY_FILE`:
   `auth status` per mode and two short real turns (one `--resume`). It uses the operator's key or
   login and costs money; running it is the owner's decision.
+- `tests/real_cli/captured/api_errors_<pinned version>.jsonl` holds the `assistant` and `result`
+  lines the pinned CLI wrote against a local stand-in for the API (`ANTHROPIC_BASE_URL` on
+  `127.0.0.1`, a fake key, an empty `HOME`; no model call): a prompt above the context window
+  (400), a refused key (401) and a CLI below the model's minimum (400). `test_failures.py`
+  classifies them. A change of the pin captures them again with the new version.
 
 ## To check before the build
 
@@ -270,7 +287,7 @@ no login of the developer is touched. The real CLI runs only behind switches:
   `system/init` interrupts the turn with SIGINT.
 - Is `/compact` available in print mode of the pinned version? Yes: the command `compact` of
   Claude Code 2.1.259 has `supportsNonInteractive: true` in the files of the pinned CLI
-  (retrieved 2026-10-24), and the Agent SDK page on slash commands sends `/compact` as a prompt
+  (retrieved 2026-10-24, again in 2.1.288 on 2026-10-29), and the Agent SDK page on slash commands sends `/compact` as a prompt
   and reports it with a `system` message `compact_boundary`
   (https://code.claude.com/docs/en/agent-sdk/slash-commands, retrieved 2026-10-24). That the CLI
   takes it as the content of a stream-json `user` line is not run with a real session yet (level

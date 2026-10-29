@@ -1,3 +1,3 @@
-{"type":"fixture_meta","origin":"constructed","cli_version":"2.1.259","source":"https://code.claude.com/docs/en/agent-sdk/typescript (result with errors, retrieved 2026-10-24)"}
+{"type":"fixture_meta","origin":"constructed","cli_version":"2.1.288","source":"https://code.claude.com/docs/en/agent-sdk/typescript (result with errors, retrieved 2026-10-24)"}
 {"type":"assistant","session_id":"{{session_id}}","parent_tool_use_id":null,"message":{"id":"msg_1","model":"{{model}}","role":"assistant","content":[{"type":"text","text":"Trying."}]}}
 {"type":"result","subtype":"error_during_execution","is_error":true,"session_id":"{{session_id}}","errors":["Upstream connection reset","Tool runner stopped"],"num_turns":1,"total_cost_usd":0.0020,"modelUsage":{"{{model}}":{"inputTokens":200,"outputTokens":10,"cacheReadInputTokens":0,"cacheCreationInputTokens":0,"costUSD":0.0020,"contextWindow":200000}}}

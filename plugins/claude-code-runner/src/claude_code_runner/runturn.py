@@ -70,8 +70,9 @@ from bothy_sdk.outbox import OutboxState
 from bothy_sdk.runs import RunHandle, is_run_ended
 
 from claude_code_runner.adoption import read_identity
-from claude_code_runner.commandline import SessionChoice, build_argv
+from claude_code_runner.commandline import SessionChoice, build_argv, reported_model
 from claude_code_runner.failures import (
+    ErrorKind,
     TurnEnd,
     TurnEvidence,
     api_error_text,
@@ -144,7 +145,8 @@ _RUNTIME_CURRENCY = "USD"
 COMPACT_IN_PRINT_MODE = True
 """``/compact`` is taken as an input line in print mode by the pinned CLI (design note 8 a):
 the command ``compact`` of Claude Code 2.1.259 has ``supportsNonInteractive: true`` (file of the
-installed pinned CLI) and the Agent SDK page on slash commands sends ``/compact`` as a prompt
+installed pinned CLI; again in 2.1.288, read 2026-10-29) and the Agent SDK page on slash
+commands sends ``/compact`` as a prompt
 (https://code.claude.com/docs/en/agent-sdk/slash-commands, retrieved 2026-10-24)."""
 
 
@@ -377,6 +379,8 @@ class RunTurn:
                 ):
                     # The pinned CLI ends a failed compaction with a success result too.
                     end = TurnEnd("runtime_error", exit_label=end.exit_label)
+                if end.outcome == ErrorKind.VERSION_UNSUPPORTED.value:
+                    await self.h.runtime_too_old(end.required_version)
                 worked = worked_before if attempt.kind == "compaction" else outcome.worked
                 action = next_action(
                     end,
@@ -1015,9 +1019,10 @@ class RunTurn:
         if not attempt.new_reference and not self.report_due:
             return
         self.report_due = False
-        body = AgentSessionReport(
-            external_session_ref=self.session.ref, model=self.state.model, started=True
-        )
+        body = AgentSessionReport(external_session_ref=self.session.ref, started=True)
+        model = reported_model(self.state.model)
+        if model is not None:
+            body.model = model
         if attempt.bind_failed:
             body.bind_failed = AgentSessionReportBindFailed.SESSION_MISSING
         version = self.session_version
@@ -1303,6 +1308,8 @@ class RunTurn:
                     exit_label="unknown",
                 )
             )
+            if end.outcome == ErrorKind.VERSION_UNSUPPORTED.value:
+                await self.h.runtime_too_old(end.required_version)
             await self._end_adopted(end.outcome, end.errors)
             done = True
         finally:
