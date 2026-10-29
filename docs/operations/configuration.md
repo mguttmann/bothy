@@ -472,6 +472,7 @@ Source: [09-agents.md](../spec/09-agents.md), section 21.
 | `runner.git_bin` |  | Runner |  | `git` | program for the folder creation of 18.12, searched in the cleaned `PATH` |  |
 | `runner.provision_timeout` |  | Runner |  | `10m` | time limit of one folder creation (`git init` or `git clone`, 18.12) |  |
 | `runner.provision_retry_after` |  | Runner |  | `5m` | a failed folder creation is not tried again for the same binding content before this time (18.12) |  |
+| `runner.project_folders_max` |  | Runner |  | `500` | most folder names the runner reports in `project_folders` (18.13) |  |
 | `runner.projects_root` |  | Runner |  | no default, required | root of all project folders |  |
 | `runner.state_dir` |  | Runner |  | no default, required | state, recordings, incoming files |  |
 | `runner.followup_grace` |  | Runner |  | `30s` | stdin stays open for follow-ups after `result` |  |

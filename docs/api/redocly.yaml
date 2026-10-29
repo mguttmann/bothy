@@ -87,6 +87,7 @@ rules:
         - agent.events.consume
         - agent.heartbeat
         - agent.invoke
+        - agent.project_folders.read
         - agent.read
         - agent.tool_class.set
         - agent.triggerers.read
@@ -346,6 +347,7 @@ rules:
         - agent.events.consume
         - agent.heartbeat
         - agent.invoke
+        - agent.project_folders.read
         - agent.read
         - agent.tool_class.set
         - agent.triggerers.read

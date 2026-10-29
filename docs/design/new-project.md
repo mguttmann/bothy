@@ -1,7 +1,8 @@
 # New project from the app
 
 Status: design of 2026-10-28 after owner feedback on the desktop app; a short design with the
-decisions, then one build ticket (M4-43 in the [plan](../PLAN.md)). This note explains and
+decisions, then one build ticket (M4-43 in the [plan](../PLAN.md)). Section 6 adds the follow-up
+of 2026-10-29: forums for existing folders and renaming a project (M4-44). This note explains and
 justifies; the normative text is in the chapters it changes
 ([01-product.md](../spec/01-product.md) 6.9, 13 R-PR-20, 14;
 [03-data-model.md](../spec/03-data-model.md) `project_bindings`, R-DM-55;
@@ -169,3 +170,89 @@ sequenceDiagram
 - Cloning over `ssh` or with credentials in the URL; a private repository needs a credential helper
   of the runner user (the runner's environment allow list keeps `HOME`).
 - Deleting a project's folder; removing a binding keeps the folder (as today).
+
+## 6. Follow-up: forums for existing folders and renaming (M4-44)
+
+Status: design of 2026-10-29, built by M4-44. Normative text: [01-product.md](../spec/01-product.md)
+6.10, 6.11, R-PR-21; [03-data-model.md](../spec/03-data-model.md) `agents.reported_project_folders`,
+R-DM-56; [05-actions.md](../spec/05-actions.md) `agent.project_folders.read`;
+[09-agents.md](../spec/09-agents.md) 4.8, 18.13, 21, R-AG-30; [openapi.yaml](../api/openapi.yaml)
+`listAgentProjectFolders`, `Heartbeat.project_folders`. Rulings:
+[decisions.d/M4-44.md](../decisions.d/M4-44.md) (`D-M4-44-1` to `D-M4-44-7`).
+
+### 6.1 Goal
+
+The owner's former Discord setup had three more project functions besides "new project":
+
+1. a sync that created a project forum for every folder under the projects root that had none,
+   shown first as a dry-run list to confirm when there were more than a few;
+2. renaming a project forum;
+3. never a second forum for a folder that already has one.
+
+Done means: the space menu offers "Add forums for existing folders", which lists the folders of
+the chosen runner without a binding as checkboxes and creates a forum and a binding per checked
+folder; a project forum's menu offers "Rename project", which renames the forum and not the
+folder; no folder that has a binding is ever offered or bound a second time.
+
+### 6.2 What M4-43 already covers
+
+| Function | Before M4-44 | Gap |
+|---|---|---|
+| Never a second forum for a bound folder | the unique index on `lower(workspace_ref)` (03, M2-03) refuses a second binding with `conflict`; the new project dialog keeps its forum on "Try again" and binds a changed folder to it (D-M4-43-8, D-M4-43-10) | none for binding; a list of folders must leave bound ones out |
+| Sync of existing folders | mode "Existing folder" binds one typed folder name | the app cannot see the folders: only the runner can |
+| Rename a project forum | `updateChannel` (`channel.update`, `manage`) changes a channel's name; no client entry | an entry and a dialog |
+
+### 6.3 Decisions
+
+**D-M4-44-1 The runner reports its folders in the heartbeat.** The heartbeat member
+`project_folders` carries the names of the folders directly under `runner.projects_root` (09
+18.13). Reason: the server never reads a host's files (D-M4-43-2), and the runner reaches the
+server only through its own requests; the heartbeat already carries the runner's view of its
+projects (`project_readiness`), so the list rides the same path, with the same rule "absent
+means unchanged" and a write only on a change.
+
+**D-M4-44-2 Only Git work trees with a one-segment name, capped.** The runner reports an entry only
+when its name matches `^[A-Za-z0-9][A-Za-z0-9._-]*$` (at most 255 characters), it resolves by
+18.1 to a folder under the root and it holds `.git`; at most `runner.project_folders_max` names in
+code point order. Reason: exactly these folders become ready with `provision` `none`; hidden
+folders and the temporary clone folders of 18.12 never show; names are the form `workspace_ref`
+already has, so no path and no content leave the runner; the cap bounds the heartbeat.
+
+**D-M4-44-3 A read action for the owner.** `listAgentProjectFolders`
+(`GET /agents/{agent_id}/project-folders`) needs the new action `agent.project_folders.read`
+(owner, no step-up, no audit, `rl.read`). The server stores the list in
+`agents.reported_project_folders` and answers the names that no binding names. Reason: unlike
+the writes of D-M4-43-1 no existing action reads a runner's folders; folder names of a host are
+owner information, so `agent.read` (any reader of an operated channel) is too wide; reads of the
+owner carry no step-up and no audit, as `app.read`. The agents module owns the column; it asks
+chat for the bound names through the readiness port, so chat keeps `project_bindings` to itself.
+
+**D-M4-44-4 Never a second forum.** The list leaves out every folder whose name equals a
+`workspace_ref` without case, as the unique index compares; the binding still refuses a folder
+bound meanwhile with `conflict`; "Try again" keeps the forum it created. Reason: the owner's rule
+3; the unique index is the guarantee, the list only keeps the person from meeting it.
+
+**D-M4-44-5 The list is the preview.** The dialog shows every folder without a binding with a
+checked box; nothing is created before "Add forums". Each checked folder runs the steps of 6.9
+with mode "Existing folder" and the folder name as forum name, one folder after the other (so
+one step-up covers the rest), then the readiness of all forums is read until each is ready or
+names a reason. Each row shows its state and failure; "Try again" resumes the failed rows. Reason:
+the owner's dry run asked for confirmation only above a few folders because his tool acted
+without a preview; a list with boxes always previews and lets him leave folders out. Sequential
+steps keep one step-up prompt and the order of the forums equal to the list.
+
+**D-M4-44-6 Renaming changes the forum only.** "Rename project" in the menu of a bound forum calls
+`updateChannel` with the new name and the forum's version; the folder, the binding and the
+sessions stay. It shows for a person with `manage` on the forum, the right of `channel.update`.
+Reason: `workspace_ref` is the folder's name on the runner and running sessions work in it; a
+rename of the folder would need the runner to move a folder it did not create (forbidden by 18.12
+item 7). The owner's former rename also changed only the forum.
+
+**D-M4-44-7 Desktop only.** As D-M4-43-12; the phone shows the new forums and names.
+
+### 6.4 Out of scope
+
+- Folders deeper than one level, folders without `.git` (bind them with "New project", mode
+  "Existing folder", after `git init`).
+- Removing forums whose folder disappeared; the forum shows `workspace_missing` as before.
+- Renaming the folder of a project.

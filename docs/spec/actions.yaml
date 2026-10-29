@@ -1729,6 +1729,17 @@ actions:
   rights_change: false
   rl_class: rl.read
   effect: read
+- id: agent.project_folders.read
+  section: agents
+  description: read the project folders a runner reported that have no binding (09 18.13, M4-44)
+  resource: agent
+  right: owner
+  owner: true
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.read
+  effect: read
 - id: agent.triggerers.read
   section: agents
   description: set of the people who may trigger this agent, with `permission_version` (allow list in
