@@ -114,6 +114,13 @@ describe("buildHeartbeat", () => {
     expect(JSON.parse(JSON.stringify(beat))).toEqual(beat);
     expect(buildHeartbeat()).toEqual({ state: "online" });
     expect(
+      buildHeartbeat("online", { projectFolders: ["docs-site", "website"] }),
+    ).toEqual({ state: "online", project_folders: ["docs-site", "website"] });
+    expect(buildHeartbeat("online", { projectFolders: [] })).toEqual({
+      state: "online",
+      project_folders: [],
+    });
+    expect(
       buildHeartbeat("online", { billingEvidence: { key_type: "unknown" } }),
     ).toEqual({ state: "online", billing_evidence: { key_type: "unknown" } });
 
@@ -221,6 +228,13 @@ describe("buildHeartbeat", () => {
         ],
       }),
     );
+    raisesNaming("project_folders", () =>
+      buildHeartbeat("online", { projectFolders: ["a", "a"] }),
+    );
+    for (const bad of [".git", "a/b", "-x", "", "my project", "x".repeat(256)])
+      raisesNaming("project_folders", () =>
+        buildHeartbeat("online", { projectFolders: [bad] }),
+      );
     raisesNaming("state", () => buildHeartbeat("offline" as "online"));
     raisesNaming("reported_billing_mode", () =>
       buildHeartbeat("online", {
