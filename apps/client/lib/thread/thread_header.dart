@@ -56,6 +56,9 @@ final class ThreadHeaderData {
   final bool canMove;
 }
 
+/// An action of the phone header's overflow menu: its key, its label and what a tap does.
+typedef ThreadHeaderAction = ({String key, String label, VoidCallback onTap});
+
 /// The header bar.
 class ThreadHeader extends StatelessWidget {
   /// Creates the header.
@@ -71,6 +74,7 @@ class ThreadHeader extends StatelessWidget {
     this.onChannelColumn,
     this.channelColumnHidden = false,
     this.menu,
+    this.compactMenu,
     this.compact = false,
   });
 
@@ -109,6 +113,11 @@ class ThreadHeader extends StatelessWidget {
   /// The phone form: Edit title, Done or Reopen, Move and the session ([onPin], a sheet on
   /// the phone) in one overflow menu `thread.more`; there is no session column to toggle.
   final bool compact;
+
+  /// The one overflow menu of the phone form with these actions and the entries of [menu]
+  /// (FIX-draft-conflict-banner: never a second button beside it), or null for a menu of the
+  /// actions alone. [menu] is not shown in the phone form.
+  final Widget Function(List<ThreadHeaderAction> actions)? compactMenu;
 
   @override
   Widget build(BuildContext context) {
@@ -286,15 +295,16 @@ class ThreadHeader extends StatelessWidget {
     final colors = context.dsColors;
     final d = data;
     final operator = d.operatorName;
-    final items = <(String, String, VoidCallback)>[
+    final items = <ThreadHeaderAction>[
       if (d.canEditTitle && !d.mainHistory)
-        ('thread.editTitle', l.threadEditTitle, onEditTitle),
+        (key: 'thread.editTitle', label: l.threadEditTitle, onTap: onEditTitle),
       if (!d.mainHistory && d.canSetDone)
         d.done
-            ? ('thread.reopen', l.threadReopen, onDone)
-            : ('thread.done', l.threadDone, onDone),
-      if (!d.mainHistory && d.canMove) ('thread.move', l.threadMove, onMove),
-      ('thread.session', l.shellColumnSession, onPin),
+            ? (key: 'thread.reopen', label: l.threadReopen, onTap: onDone)
+            : (key: 'thread.done', label: l.threadDone, onTap: onDone),
+      if (!d.mainHistory && d.canMove)
+        (key: 'thread.move', label: l.threadMove, onTap: onMove),
+      (key: 'thread.session', label: l.shellColumnSession, onTap: onPin),
     ];
     return Container(
       key: const ValueKey('thread.header'),
@@ -341,26 +351,26 @@ class ThreadHeader extends StatelessWidget {
               ],
             ),
           ),
-          ?menu,
-          PopupMenuButton<VoidCallback>(
-            key: const ValueKey('thread.more'),
-            tooltip: l.phoneMoreActions,
-            icon: DsIcon(
-              DsIcons.actionMore,
-              size: DsIconSizeRole.md,
-              color: colors.textSecondary,
-              decorative: true,
-            ),
-            onSelected: (action) => action(),
-            itemBuilder: (context) => [
-              for (final (key, label, action) in items)
-                PopupMenuItem<VoidCallback>(
-                  key: ValueKey(key),
-                  value: action,
-                  child: Text(label),
+          compactMenu?.call(items) ??
+              PopupMenuButton<VoidCallback>(
+                key: const ValueKey('thread.more'),
+                tooltip: l.phoneMoreActions,
+                icon: DsIcon(
+                  DsIcons.actionMore,
+                  size: DsIconSizeRole.md,
+                  color: colors.textSecondary,
+                  decorative: true,
                 ),
-            ],
-          ),
+                onSelected: (action) => action(),
+                itemBuilder: (context) => [
+                  for (final a in items)
+                    PopupMenuItem<VoidCallback>(
+                      key: ValueKey(a.key),
+                      value: a.onTap,
+                      child: Text(a.label),
+                    ),
+                ],
+              ),
         ],
       ),
     );

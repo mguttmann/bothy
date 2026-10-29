@@ -112,7 +112,7 @@ milestones from the [plan](../PLAN.md).
 | @everyone, @here, role mention | never | | | noise; notification per channel is enough |
 | Pin (moderation) | core | D, M | `pin.create` | needs `manage` |
 | Templates (personal and per channel) | core | D, M | `template.read`, `template.manage` | |
-| Drafts across devices | core | D, M | `draft.write` | notice when a newer version was overwritten |
+| Drafts across devices | core | D, M | `draft.write` | notice when a newer, different draft of another device was overwritten (04 14) |
 | Read receipts of other people | never | | | performance monitoring; the read state stays personal (ruling R-PR-03) |
 | Polls, widgets, to-do lists in text | never | | | agents deliver forms through components |
 | Stickers, GIF search, profile decorations, banners | never | | | distraction, license questions (Baseline 4) |

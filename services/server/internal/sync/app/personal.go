@@ -18,6 +18,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	"github.com/OWNER/bothy/services/server/internal/messaging"
 	"github.com/OWNER/bothy/services/server/internal/sync"
+	"github.com/OWNER/bothy/services/server/internal/sync/domain"
 )
 
 // PersonalConfig holds the limits of the personal data use cases (M1-61), bound in internal/wire
@@ -60,8 +61,10 @@ type PersonalStore interface {
 	ReadStatesOfChannel(ctx context.Context, user, channel ids.ID) ([]sync.ReadState, error)
 	// UpsertDraft inserts d for user with version 1 or replaces the stored draft of the same
 	// thread (d.ThreadID) or, with a zero thread, the channel draft of d.ChannelID with version
-	// + 1, and returns the stored row. Concurrent first writes do not fail: the second updates.
-	UpsertDraft(ctx context.Context, user ids.ID, d sync.Draft) (sync.Draft, error)
+	// + 1, and returns the stored row and the row it replaced (Found false for an insert).
+	// Concurrent first writes do not fail: the second updates, and its replaced row may be
+	// known by version only (domain.ReplacedDraft.Known false).
+	UpsertDraft(ctx context.Context, user ids.ID, d sync.Draft) (sync.Draft, domain.ReplacedDraft, error)
 	// DraftsInChannels returns the drafts of user in channels, ascending by id.
 	DraftsInChannels(ctx context.Context, user ids.ID, channels []ids.ID) ([]sync.Draft, error)
 	// PutSetting inserts key with version 1 or replaces a different stored value with version +

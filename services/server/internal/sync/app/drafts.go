@@ -39,7 +39,7 @@ func (s Drafts) PutThreadDraft(ctx context.Context, cmd sync.PutDraft) (sync.Dra
 				return domain.NotInThread()
 			}
 		}
-		out, err = s.putDraft(ctx, a, info.SpaceID, draftOf(in, cmd.ThreadID, info.ChannelID), in.Empty(), cmd.BaseVersion)
+		out, err = s.putDraft(ctx, a, info.SpaceID, draftOf(in, cmd.ThreadID, info.ChannelID), in, cmd.BaseVersion)
 		return err
 	})
 	return out, err
@@ -62,7 +62,7 @@ func (s Drafts) PutChannelDraft(ctx context.Context, cmd sync.PutDraft) (sync.Dr
 		if err := domain.ValidateDraft(in, s.limits()); err != nil {
 			return err
 		}
-		out, err = s.putDraft(ctx, a, space, draftOf(in, ids.ID{}, cmd.ChannelID), in.Empty(), cmd.BaseVersion)
+		out, err = s.putDraft(ctx, a, space, draftOf(in, ids.ID{}, cmd.ChannelID), in, cmd.BaseVersion)
 		return err
 	})
 	return out, err
@@ -166,11 +166,12 @@ func draftOf(in domain.DraftInput, thread, channel ids.ID) sync.Draft {
 
 // putDraft writes d for the caller (brief M1-61 notes 9 and 10). A non-empty draft is upserted:
 // a returned version 1 is a new row, a larger one replaced the version before it under the row
-// lock, from which overwrote_newer follows. An empty draft deletes the row like DELETE and
-// answers the empty final state with the last version plus one (1 without a row).
-func (s *Personal) putDraft(ctx context.Context, a actor.Actor, space ids.ID, d sync.Draft, empty bool, base *int64) (sync.DraftPutResult, error) {
+// lock. An empty draft deletes the row like DELETE and answers the empty final state with the
+// last version plus one (1 without a row). overwrote_newer follows from the replaced row
+// (domain.OverwroteNewer): only another device's different text the client had not seen.
+func (s *Personal) putDraft(ctx context.Context, a actor.Actor, space ids.ID, d sync.Draft, in domain.DraftInput, base *int64) (sync.DraftPutResult, error) {
 	now := s.now()
-	if empty {
+	if in.Empty() {
 		old, found, err := s.d.Store.DeleteDraft(ctx, a.ID, d.ThreadID, channelKey(d))
 		if err != nil {
 			return sync.DraftPutResult{}, err
@@ -183,15 +184,15 @@ func (s *Personal) putDraft(ctx context.Context, a actor.Actor, space ids.ID, d 
 				return sync.DraftPutResult{}, err
 			}
 		}
-		return sync.DraftPutResult{Draft: final, OverwroteNewer: domain.OverwroteNewer(found, base, old.Version)}, nil
+		// An empty write never reports overwrote_newer (domain.OverwroteNewer).
+		return sync.DraftPutResult{Draft: final}, nil
 	}
 	d.ID, d.UpdatedByDeviceID, d.UpdatedAt = ids.New(), a.DeviceID, now
-	row, err := s.d.Store.UpsertDraft(ctx, a.ID, d)
+	row, replaced, err := s.d.Store.UpsertDraft(ctx, a.ID, d)
 	if err != nil {
 		return sync.DraftPutResult{}, err
 	}
-	existed := row.Version > 1
-	res := sync.DraftPutResult{Draft: row, OverwroteNewer: domain.OverwroteNewer(existed, base, row.Version-1)}
+	res := sync.DraftPutResult{Draft: row, OverwroteNewer: domain.OverwroteNewer(replaced, base, a.DeviceID, in)}
 	return res, s.appendDraftUpdated(ctx, a, space, row)
 }
 

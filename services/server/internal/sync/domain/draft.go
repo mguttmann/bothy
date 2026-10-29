@@ -3,6 +3,7 @@
 package domain
 
 import (
+	"slices"
 	"strconv"
 	"strings"
 	"unicode"
@@ -79,12 +80,39 @@ func NotAForum() error {
 	return errs.New(errs.CodeValidationFailed, "only a forum channel has drafts of new posts; a text channel drafts on its main thread")
 }
 
-// OverwroteNewer is the hint of a draft write (04 section 14, brief M1-61 note 10): the write
-// replaced a version the client had not seen. exists reports a row before the write, base the
-// base_version of the request (nil when absent) and version the version of the row seen under
-// its lock.
-func OverwroteNewer(exists bool, base *int64, version int64) bool {
-	return exists && (base == nil || *base < version)
+// ReplacedDraft is the stored draft that a write replaces or deletes, as overwrote_newer needs it.
+type ReplacedDraft struct {
+	// Found reports a stored row before the write.
+	Found bool
+	// Version is the version of that row.
+	Version int64
+	// Known reports that Device, ContentMD and FileIDs are those of the replaced row; a write that
+	// raced a concurrent write of the same draft knows only Found and Version.
+	Known bool
+	// Device is the device of the last write of the row; zero for none.
+	Device ids.ID
+	// ContentMD and FileIDs are the text and the files of the row.
+	ContentMD string
+	FileIDs   []ids.ID
+}
+
+// OverwroteNewer is the hint of a draft write (04 section 14, brief M1-61 note 10, addendum of
+// 2026-10-29): the write replaced a draft that another device saved after the version the client
+// last saw. It needs a stored row (old.Found) whose version the client has not seen (base absent
+// or older than old.Version); a write of this device (old.Device is device), a row with the same
+// text and files as the write (in), and an empty write, which deletes the draft, never report it.
+// A replaced row whose device and text are not known (a race of two writes) reports it.
+func OverwroteNewer(old ReplacedDraft, base *int64, device ids.ID, in DraftInput) bool {
+	if !old.Found || in.Empty() || (base != nil && *base >= old.Version) {
+		return false
+	}
+	if !old.Known {
+		return true
+	}
+	if !device.IsZero() && old.Device == device {
+		return false
+	}
+	return old.ContentMD != in.ContentMD || !slices.Equal(old.FileIDs, in.FileIDs)
 }
 
 // TruncateContent returns content cut to the longest prefix at a character boundary for which

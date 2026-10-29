@@ -741,6 +741,15 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
                       channel: channel,
                       thread: main ? null : thread.id,
                     ),
+              // FIX-draft-conflict-banner: on the phone the menu of M4-33 joins the header's
+              // one overflow menu instead of a second button beside it.
+              compactMenu: channel == null
+                  ? null
+                  : (actions) => TargetMenuButton(
+                      channel: channel,
+                      thread: main ? null : thread.id,
+                      actions: actions,
+                    ),
             ),
             // M4-21: the live box of the active run, pinned over the history (01 6.2).
             LiveBoxSlot(

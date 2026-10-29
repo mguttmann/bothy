@@ -87,7 +87,9 @@ func TestPersonal_UseCases(t *testing.T) {
 	if err != nil || res.Draft.Version != 1 || res.OverwroteNewer {
 		t.Fatalf("put %+v %v", res, err)
 	}
-	if res, err = d.PutThreadDraft(ctx, syncmod.PutDraft{ThreadID: main, ContentMD: "y"}); err != nil || !res.OverwroteNewer || res.Draft.Version != 2 {
+	// The same device again without a base: its own write is never overwrote_newer
+	// (FIX-draft-conflict-banner).
+	if res, err = d.PutThreadDraft(ctx, syncmod.PutDraft{ThreadID: main, ContentMD: "y"}); err != nil || res.OverwroteNewer || res.Draft.Version != 2 {
 		t.Fatalf("put without base %+v %v", res, err)
 	}
 	bad := ids.New()

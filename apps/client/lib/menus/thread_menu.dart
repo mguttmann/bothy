@@ -12,6 +12,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:l10n/l10n.dart';
 
 import '../notifications_settings/providers.dart';
+import '../thread/thread_header.dart' show ThreadHeaderAction;
 import 'channel_menu.dart';
 import 'level_menu.dart';
 
@@ -68,9 +69,18 @@ class ThreadMenu extends StatelessWidget {
 
 /// The button "More" of the thread header: opens the menu of [thread] in [channel], or the
 /// channel's menu for the main history ([thread] null).
+///
+/// With [actions] (the phone header, FIX-draft-conflict-banner) it is the header's one overflow
+/// button `thread.more`: an icon whose menu lists the actions first and then the entries of the
+/// thread or channel menu.
 class TargetMenuButton extends ConsumerWidget {
   /// Creates the button.
-  const TargetMenuButton({super.key, required this.channel, this.thread});
+  const TargetMenuButton({
+    super.key,
+    required this.channel,
+    this.thread,
+    this.actions,
+  });
 
   /// The channel of the history.
   final Channel channel;
@@ -78,16 +88,46 @@ class TargetMenuButton extends ConsumerWidget {
   /// The thread, or null for the main history of a text channel.
   final ThreadId? thread;
 
+  /// The actions of the phone header, or null for the labelled button of the wide header.
+  final List<ThreadHeaderAction>? actions;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l = AppLocalizations.of(context);
     final colors = context.dsColors;
     ref.watch(levelContextProvider);
     final id = thread;
+    final entries = id == null
+        ? channelMenuItems(context, ref, channel)
+        : levelMenuItems(context, ref, threadMenuTarget(ref, id, channel));
+    final compact = actions;
+    if (compact != null) {
+      return MenuAnchor(
+        menuChildren: [
+          for (final a in compact)
+            DsMenuItem(
+              key: ValueKey(a.key),
+              onPressed: a.onTap,
+              child: Text(a.label),
+            ),
+          if (compact.isNotEmpty && entries.isNotEmpty) const Divider(),
+          ...entries,
+        ],
+        builder: (context, menu, _) => IconButton(
+          key: const ValueKey('thread.more'),
+          tooltip: l.phoneMoreActions,
+          onPressed: () => menu.isOpen ? menu.close() : menu.open(),
+          icon: DsIcon(
+            DsIcons.actionMore,
+            size: DsIconSizeRole.md,
+            color: colors.textSecondary,
+            decorative: true,
+          ),
+        ),
+      );
+    }
     return MenuAnchor(
-      menuChildren: id == null
-          ? channelMenuItems(context, ref, channel)
-          : levelMenuItems(context, ref, threadMenuTarget(ref, id, channel)),
+      menuChildren: entries,
       builder: (context, menu, _) => Tooltip(
         message: l.notifyMenuOpen,
         excludeFromSemantics: true,

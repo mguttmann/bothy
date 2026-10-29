@@ -780,3 +780,64 @@ func TestPersonalOperationsRejectAgentToken(t *testing.T) {
 		}
 	}
 }
+
+// TestDraftsOwnWritesNeverOverwrite reproduces the live report of FIX-draft-conflict-banner:
+// the phone writes a draft keystroke by keystroke while the laptop of the same person writes
+// nothing. The phone's next write leaves before the answer of its previous one is applied, so it
+// carries no base or the base before its own last write; that is never overwrote_newer. Only a
+// different text that another device saved after the phone's base is.
+func TestDraftsOwnWritesNeverOverwrite(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t)
+	e.Device("alex-phone", e.alex)
+	e.Device("alex-laptop", e.alex)
+	path := threadDraftPath(e.main)
+	for i, c := range []struct {
+		tok, body string
+		overwrote bool
+	}{
+		// The phone types; its answers arrive late, so bases lag behind its own writes.
+		{"alex-phone", `{"content_md":"H"}`, false},
+		{"alex-phone", `{"content_md":"He"}`, false},
+		{"alex-phone", `{"content_md":"Hel","base_version":1}`, false},
+		// The laptop saves the same text: nothing different was replaced.
+		{"alex-laptop", `{"content_md":"Hel","base_version":1}`, false},
+		{"alex-phone", `{"content_md":"Hel","base_version":3}`, false},
+		// The laptop saves different text after the phone's base: a real conflict.
+		{"alex-laptop", `{"content_md":"Hello from the laptop","base_version":5}`, false},
+		{"alex-phone", `{"content_md":"Hello","base_version":5}`, true},
+		// The laptop clears the field: an empty draft never reports.
+		{"alex-laptop", `{"content_md":"","base_version":2}`, false},
+		// After the deletion the phone starts again: no row, nothing replaced.
+		{"alex-phone", `{"content_md":"Again","base_version":7}`, false},
+	} {
+		m := e.putDraft(c.tok, path, c.body)
+		if m["overwrote_newer"] != c.overwrote {
+			t.Fatalf("step %d (%s %s): %v", i, c.tok, c.body, m)
+		}
+	}
+}
+
+// TestChannelDraftsOwnWritesNeverOverwrite: the draft of a new post follows the same rule.
+func TestChannelDraftsOwnWritesNeverOverwrite(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t)
+	e.Device("alex-phone", e.alex)
+	e.Device("alex-laptop", e.alex)
+	path := channelDraftPath(e.forum)
+	for i, c := range []struct {
+		tok, body string
+		overwrote bool
+	}{
+		{"alex-phone", `{"content_md":"I"}`, false},
+		{"alex-phone", `{"content_md":"Id"}`, false},
+		{"alex-phone", `{"content_md":"Ide","base_version":1}`, false},
+		{"alex-laptop", `{"content_md":"Other idea","base_version":3}`, false},
+		{"alex-phone", `{"content_md":"Idea","base_version":3}`, true},
+	} {
+		m := e.putDraft(c.tok, path, c.body)
+		if m["overwrote_newer"] != c.overwrote {
+			t.Fatalf("step %d (%s %s): %v", i, c.tok, c.body, m)
+		}
+	}
+}

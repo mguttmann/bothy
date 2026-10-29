@@ -1799,7 +1799,7 @@ final class FakeWorld {
   }
 
   /// Stores the draft of [principalId] in [threadId] from a `DraftPut` [body]; returns the
-  /// `DraftPutResult` (`overwrote_newer` when `base_version` was older, 04 14).
+  /// `DraftPutResult` (`overwrote_newer` as [_overwroteNewer], 04 14).
   JsonMap putDraft(
     String principalId,
     String threadId,
@@ -1837,9 +1837,33 @@ final class FakeWorld {
     );
     return {
       'draft': draft,
-      'overwrote_newer':
-          base != null && previous != null && base < previousVersion,
+      'overwrote_newer': _overwroteNewer(previous, base, deviceId, body),
     };
+  }
+
+  /// `overwrote_newer` of a draft write as the server decides it (04 14, addendum of
+  /// 2026-10-29): a stored draft [previous] whose version the writer has not seen ([base]
+  /// absent or older), written by another device than [deviceId], with other text or files
+  /// than the write [body]; an empty write never reports it.
+  static bool _overwroteNewer(
+    JsonMap? previous,
+    int? base,
+    String? deviceId,
+    JsonMap body,
+  ) {
+    if (previous == null) return false;
+    final content = body['content_md'] as String? ?? '';
+    final files = (body['file_ids'] as List<Object?>?) ?? const <Object?>[];
+    if (content.trim().isEmpty && files.isEmpty) return false;
+    if (base != null && base >= (previous['version']! as int)) return false;
+    final device = previous['updated_by_device_id'];
+    if (deviceId != null && device == deviceId) return false;
+    final previousFiles =
+        (previous['file_ids'] as List<Object?>?) ?? const <Object?>[];
+    return previous['content_md'] != content ||
+        previousFiles.length != files.length ||
+        [for (var i = 0; i < files.length; i++) previousFiles[i] == files[i]]
+            .contains(false);
   }
 
   /// Deletes the draft of [principalId] in [threadId]; nothing happens without one.
@@ -1922,8 +1946,7 @@ final class FakeWorld {
     }
     return {
       'draft': draft,
-      'overwrote_newer':
-          base != null && previous != null && base < previousVersion,
+      'overwrote_newer': _overwroteNewer(previous, base, deviceId, body),
     };
   }
 

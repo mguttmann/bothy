@@ -11,25 +11,45 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/sync/domain"
 )
 
-// TestOverwroteNewer: overwrote_newer = row exists AND (base absent OR base < row version).
+// TestOverwroteNewer: overwrote_newer only when a stored row the client has not seen (base
+// absent or older) came from another device with different text or files, and the write is not
+// empty; a row of unknown origin (a race) reports it (FIX-draft-conflict-banner).
 func TestOverwroteNewer(t *testing.T) {
 	t.Parallel()
 	v := func(n int64) *int64 { return &n }
+	me, other := ids.New(), ids.New()
+	file := ids.New()
+	foreign := domain.ReplacedDraft{Found: true, Version: 2, Known: true, Device: other, ContentMD: "theirs"}
+	with := func(f func(*domain.ReplacedDraft)) domain.ReplacedDraft {
+		r := foreign
+		f(&r)
+		return r
+	}
+	text := func(s string) domain.DraftInput { return domain.DraftInput{ContentMD: s} }
 	for _, c := range []struct {
-		name    string
-		exists  bool
-		base    *int64
-		version int64
-		want    bool
+		name   string
+		old    domain.ReplacedDraft
+		base   *int64
+		device ids.ID
+		in     domain.DraftInput
+		want   bool
 	}{
-		{"no row", false, nil, 0, false},
-		{"no row with base", false, v(3), 0, false},
-		{"row and base absent", true, nil, 2, true},
-		{"base equal", true, v(2), 2, false},
-		{"base older", true, v(1), 2, true},
-		{"base newer", true, v(5), 2, false},
+		{"no row", domain.ReplacedDraft{}, nil, me, text("mine"), false},
+		{"no row with base", domain.ReplacedDraft{}, v(3), me, text("mine"), false},
+		{"foreign row and base absent", foreign, nil, me, text("mine"), true},
+		{"foreign row and base older", foreign, v(1), me, text("mine"), true},
+		{"base equal", foreign, v(2), me, text("mine"), false},
+		{"base newer", foreign, v(5), me, text("mine"), false},
+		{"own row and base absent", with(func(r *domain.ReplacedDraft) { r.Device = me }), nil, me, text("mine"), false},
+		{"own row and base older", with(func(r *domain.ReplacedDraft) { r.Device = me }), v(1), me, text("mine"), false},
+		{"same text from another device", foreign, v(1), me, text("theirs"), false},
+		{"same text, other files", foreign, v(1), me, domain.DraftInput{ContentMD: "theirs", FileIDs: []ids.ID{file}}, true},
+		{"empty write", foreign, v(1), me, text("  "), false},
+		{"unknown origin", domain.ReplacedDraft{Found: true, Version: 2}, v(1), me, text("mine"), true},
+		{"unknown origin, base seen", domain.ReplacedDraft{Found: true, Version: 2}, v(2), me, text("mine"), false},
+		{"no device on either side", with(func(r *domain.ReplacedDraft) { r.Device = ids.ID{} }), nil, ids.ID{}, text("mine"), true},
 	} {
-		if got := domain.OverwroteNewer(c.exists, c.base, c.version); got != c.want {
+		if got := domain.OverwroteNewer(c.old, c.base, c.device, c.in); got != c.want {
 			t.Errorf("%s: %v, want %v", c.name, got, c.want)
 		}
 	}
