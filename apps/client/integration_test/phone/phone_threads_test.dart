@@ -52,12 +52,19 @@ void main() {
       try {
         await signIn(app);
 
-        // From the snapshot, without one list request per channel.
+        // From the snapshot, without one list request per channel: after the full snapshot
+        // only the open posts of the forum are listed (D-M4-46-5), no text channel.
         await app.waitFor(threadRow(first));
         await app.waitFor(threadRow(second));
         expect(
-          app.fake.server.requestsOf('listChannelThreads'),
-          isEmpty,
+          [
+            for (final r in app.fake.server.requestsOf('listChannelThreads'))
+              r.path,
+          ],
+          allOf(
+            hasLength(lessThanOrEqualTo(1)),
+            everyElement(endsWith('/channels/$forum/threads')),
+          ),
           reason: 'M1 fills from active_threads',
         );
         expect(top(threadRow(second)), lessThan(top(threadRow(first))));

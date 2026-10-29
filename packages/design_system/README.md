@@ -47,7 +47,7 @@ the apps pass them from the app configuration (M4-08), this package holds no num
 | `DsTriggerStateIcon` | `DsTriggerState` and reason code | none | 5 |
 | `DsThreadRow` | `DsThreadRowData`, `DsTagData` | none | 6 |
 | `DsSpaceRow`, `DsChannelRow` | `DsSpaceRowData`, `DsChannelRowData` | none | 7 |
-| `DsSidebarThreadRow`, `DsSidebarAllPostsRow` | `DsSidebarThreadRowData`, counters | none | 7 |
+| `DsSidebarThreadRow`, `DsSidebarAllPostsRow`, `DsSidebarMoreRow` | `DsSidebarThreadRowData`, counters, hidden count | none | 7 |
 | `DsSidebarDraftRow` | the draft title, `DsDraftRowState` | none | 7 (01 6.8 item 8) |
 | `dsChannelGlyph`, `dsChannelKindSentence`, `dsChannelKindName` | `DsChannelKind` and `projectBound` | none | 7 (01 6.8 item 11) |
 | `DsMessageComponents`, `DsButton` | `DsComponentData`, `DsComponentItem`, `DsComponentHeader` | none | 8 |

@@ -95,6 +95,11 @@ final class SidebarChannel {
   /// counts only what no row below it shows), else [counts]; new chat rows count nothing.
   ThreadCounts get rowCounts => _hasThreadRows ? group!.channelCounts : counts;
 
+  /// The "Show more" row of an expanded forum group with more open posts than it shows (01 6.8
+  /// item 3, M4-46), or null.
+  SidebarMorePosts? get morePosts =>
+      _hasThreadRows && expanded ? group!.more : null;
+
   /// The counters of "All posts" of an expanded forum group, or null when it has none.
   ThreadCounts? get allPostsCounts =>
       _hasThreadRows && expanded ? group!.allPostsCounts : null;

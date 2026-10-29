@@ -59,6 +59,7 @@ SidebarChannel entry(
 const SidebarThreadLimits limits = SidebarThreadLimits(
   window: Duration(hours: 72),
   perChannel: 8,
+  forumPostsVisible: 15,
 );
 
 /// [c] with the thread group [threads] (selected by the rules of 01 6.8), its counters and its

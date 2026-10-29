@@ -6,7 +6,8 @@
 // and those of M4-40 (01 6.8 item 7, D-SB-6): the collapsed thread groups per channel
 // (`channel_view_states`) and the pinned forum overview (`shell_view_state`); and that of M4-42
 // (01 D1, D2): the hidden channel column next to an open thread (`shell_view_state`); and those
-// of M4-45 (01 D1, D2): the hidden session column per layout (`shell_view_state`).
+// of M4-45 (01 D1, D2): the hidden session column per layout (`shell_view_state`); and that of
+// M4-46 (01 6.8 item 3): the forum groups expanded to every open post (`channel_view_states`).
 
 import 'dart:async';
 
@@ -161,6 +162,35 @@ void main() {
       expect(await dao.watchCollapsedGroups().first, {text});
     },
   );
+
+  test('forum groups show the limit until Show more is stored per channel, and '
+      'the collapse state and Show more keep each other', () async {
+    final dao = db.forumViewDao;
+    final forum = ChannelId.parse(uuid(0x201));
+    final other = ChannelId.parse(uuid(0x202));
+    expect(await dao.watchPostListsShownInFull().first, <ChannelId>{});
+
+    await dao.setPostListShownInFull(forum, inFull: true);
+    expect(await dao.watchPostListsShownInFull().first, {forum});
+    expect(
+      await dao.watchCollapsedGroups().first,
+      <ChannelId>{},
+      reason: 'a new row keeps the group expanded',
+    );
+
+    await dao.setGroupCollapsed(forum, collapsed: true);
+    expect(await dao.watchCollapsedGroups().first, {forum});
+    expect(await dao.watchPostListsShownInFull().first, {
+      forum,
+    }, reason: 'collapsing the group keeps Show more');
+
+    await dao.setPostListShownInFull(other, inFull: true);
+    await dao.setPostListShownInFull(forum, inFull: false);
+    expect(await dao.watchPostListsShownInFull().first, {other});
+    expect(await dao.watchCollapsedGroups().first, {
+      forum,
+    }, reason: 'Show less keeps the collapse state');
+  });
 
   test(
     'the overview is not pinned until it is set, read once or watched',

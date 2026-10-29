@@ -9140,6 +9140,23 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sidebarAllPosts => 'All posts';
 
   @override
+  String get sidebarShowMore => 'Show more';
+
+  @override
+  String get sidebarShowLess => 'Show less';
+
+  @override
+  String sidebarMorePosts(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count more posts',
+      one: '1 more post',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get sidebarNewChat => 'New chat';
 
   @override

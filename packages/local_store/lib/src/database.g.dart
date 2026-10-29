@@ -18416,8 +18416,27 @@ class $ChannelViewStatesTable extends ChannelViewStates
       'CHECK ("group_collapsed" IN (0, 1))',
     ),
   );
+  static const VerificationMeta _postsShownInFullMeta = const VerificationMeta(
+    'postsShownInFull',
+  );
   @override
-  List<GeneratedColumn> get $columns => [channelId, groupCollapsed];
+  late final GeneratedColumn<bool> postsShownInFull = GeneratedColumn<bool>(
+    'posts_shown_in_full',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("posts_shown_in_full" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    channelId,
+    groupCollapsed,
+    postsShownInFull,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -18449,6 +18468,15 @@ class $ChannelViewStatesTable extends ChannelViewStates
     } else if (isInserting) {
       context.missing(_groupCollapsedMeta);
     }
+    if (data.containsKey('posts_shown_in_full')) {
+      context.handle(
+        _postsShownInFullMeta,
+        postsShownInFull.isAcceptableOrUnknown(
+          data['posts_shown_in_full']!,
+          _postsShownInFullMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -18466,6 +18494,10 @@ class $ChannelViewStatesTable extends ChannelViewStates
         DriftSqlType.bool,
         data['${effectivePrefix}group_collapsed'],
       )!,
+      postsShownInFull: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}posts_shown_in_full'],
+      )!,
     );
   }
 
@@ -18482,15 +18514,21 @@ class ChannelViewStateRow extends DataClass
 
   /// Whether the thread group under the channel row is collapsed.
   final bool groupCollapsed;
+
+  /// Whether the forum group shows every open post instead of the newest
+  /// `ui.sidebar_forum_posts_visible` ("Show more", M4-46).
+  final bool postsShownInFull;
   const ChannelViewStateRow({
     required this.channelId,
     required this.groupCollapsed,
+    required this.postsShownInFull,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['channel_id'] = Variable<String>(channelId);
     map['group_collapsed'] = Variable<bool>(groupCollapsed);
+    map['posts_shown_in_full'] = Variable<bool>(postsShownInFull);
     return map;
   }
 
@@ -18498,6 +18536,7 @@ class ChannelViewStateRow extends DataClass
     return ChannelViewStatesCompanion(
       channelId: Value(channelId),
       groupCollapsed: Value(groupCollapsed),
+      postsShownInFull: Value(postsShownInFull),
     );
   }
 
@@ -18509,6 +18548,7 @@ class ChannelViewStateRow extends DataClass
     return ChannelViewStateRow(
       channelId: serializer.fromJson<String>(json['channelId']),
       groupCollapsed: serializer.fromJson<bool>(json['groupCollapsed']),
+      postsShownInFull: serializer.fromJson<bool>(json['postsShownInFull']),
     );
   }
   @override
@@ -18517,20 +18557,28 @@ class ChannelViewStateRow extends DataClass
     return <String, dynamic>{
       'channelId': serializer.toJson<String>(channelId),
       'groupCollapsed': serializer.toJson<bool>(groupCollapsed),
+      'postsShownInFull': serializer.toJson<bool>(postsShownInFull),
     };
   }
 
-  ChannelViewStateRow copyWith({String? channelId, bool? groupCollapsed}) =>
-      ChannelViewStateRow(
-        channelId: channelId ?? this.channelId,
-        groupCollapsed: groupCollapsed ?? this.groupCollapsed,
-      );
+  ChannelViewStateRow copyWith({
+    String? channelId,
+    bool? groupCollapsed,
+    bool? postsShownInFull,
+  }) => ChannelViewStateRow(
+    channelId: channelId ?? this.channelId,
+    groupCollapsed: groupCollapsed ?? this.groupCollapsed,
+    postsShownInFull: postsShownInFull ?? this.postsShownInFull,
+  );
   ChannelViewStateRow copyWithCompanion(ChannelViewStatesCompanion data) {
     return ChannelViewStateRow(
       channelId: data.channelId.present ? data.channelId.value : this.channelId,
       groupCollapsed: data.groupCollapsed.present
           ? data.groupCollapsed.value
           : this.groupCollapsed,
+      postsShownInFull: data.postsShownInFull.present
+          ? data.postsShownInFull.value
+          : this.postsShownInFull,
     );
   }
 
@@ -18538,44 +18586,51 @@ class ChannelViewStateRow extends DataClass
   String toString() {
     return (StringBuffer('ChannelViewStateRow(')
           ..write('channelId: $channelId, ')
-          ..write('groupCollapsed: $groupCollapsed')
+          ..write('groupCollapsed: $groupCollapsed, ')
+          ..write('postsShownInFull: $postsShownInFull')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(channelId, groupCollapsed);
+  int get hashCode => Object.hash(channelId, groupCollapsed, postsShownInFull);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is ChannelViewStateRow &&
           other.channelId == this.channelId &&
-          other.groupCollapsed == this.groupCollapsed);
+          other.groupCollapsed == this.groupCollapsed &&
+          other.postsShownInFull == this.postsShownInFull);
 }
 
 class ChannelViewStatesCompanion extends UpdateCompanion<ChannelViewStateRow> {
   final Value<String> channelId;
   final Value<bool> groupCollapsed;
+  final Value<bool> postsShownInFull;
   final Value<int> rowid;
   const ChannelViewStatesCompanion({
     this.channelId = const Value.absent(),
     this.groupCollapsed = const Value.absent(),
+    this.postsShownInFull = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ChannelViewStatesCompanion.insert({
     required String channelId,
     required bool groupCollapsed,
+    this.postsShownInFull = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : channelId = Value(channelId),
        groupCollapsed = Value(groupCollapsed);
   static Insertable<ChannelViewStateRow> custom({
     Expression<String>? channelId,
     Expression<bool>? groupCollapsed,
+    Expression<bool>? postsShownInFull,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
       if (channelId != null) 'channel_id': channelId,
       if (groupCollapsed != null) 'group_collapsed': groupCollapsed,
+      if (postsShownInFull != null) 'posts_shown_in_full': postsShownInFull,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -18583,11 +18638,13 @@ class ChannelViewStatesCompanion extends UpdateCompanion<ChannelViewStateRow> {
   ChannelViewStatesCompanion copyWith({
     Value<String>? channelId,
     Value<bool>? groupCollapsed,
+    Value<bool>? postsShownInFull,
     Value<int>? rowid,
   }) {
     return ChannelViewStatesCompanion(
       channelId: channelId ?? this.channelId,
       groupCollapsed: groupCollapsed ?? this.groupCollapsed,
+      postsShownInFull: postsShownInFull ?? this.postsShownInFull,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -18601,6 +18658,9 @@ class ChannelViewStatesCompanion extends UpdateCompanion<ChannelViewStateRow> {
     if (groupCollapsed.present) {
       map['group_collapsed'] = Variable<bool>(groupCollapsed.value);
     }
+    if (postsShownInFull.present) {
+      map['posts_shown_in_full'] = Variable<bool>(postsShownInFull.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -18612,6 +18672,7 @@ class ChannelViewStatesCompanion extends UpdateCompanion<ChannelViewStateRow> {
     return (StringBuffer('ChannelViewStatesCompanion(')
           ..write('channelId: $channelId, ')
           ..write('groupCollapsed: $groupCollapsed, ')
+          ..write('postsShownInFull: $postsShownInFull, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();

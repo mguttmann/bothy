@@ -129,6 +129,56 @@ class AllPostsEntry extends StatelessWidget {
   );
 }
 
+/// "Show more" or "Show less" above "All posts" of a forum group with more open posts than the
+/// limit (01 6.8 item 3, M4-46): lists every open post in place or goes back to the newest.
+class MorePostsEntry extends StatelessWidget {
+  /// Creates the entry.
+  const MorePostsEntry({
+    super.key,
+    required this.channel,
+    required this.more,
+    required this.onToggle,
+    this.focusNode,
+    this.onKeyEvent,
+  });
+
+  /// The forum.
+  final ChannelId channel;
+
+  /// The row state: the posts it shows or hides and whether the list is in full.
+  final SidebarMorePosts more;
+
+  /// Called with the requested state: true lists every open post.
+  final ValueChanged<bool> onToggle;
+
+  /// The focus node of the row, for the arrow keys of the tree (D-SB-8).
+  final FocusNode? focusNode;
+
+  /// Handles a key while the row has the focus (the arrow keys of the tree), or null.
+  final FocusOnKeyEventCallback? onKeyEvent;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsetsDirectional.only(
+      start: DsSpace.s16,
+      end: DsSpace.s4,
+    ),
+    child: Focus(
+      canRequestFocus: false,
+      skipTraversal: true,
+      includeSemantics: false,
+      onKeyEvent: onKeyEvent,
+      child: DsSidebarMoreRow(
+        key: ValueKey('sidebar.morePosts.${channel.value}'),
+        hiddenCount: more.hidden,
+        expanded: more.expanded,
+        onToggle: () => onToggle(!more.expanded),
+        focusNode: focusNode,
+      ),
+    ),
+  );
+}
+
 /// A new chat row at the top of a forum group (01 6.8 item 8, brief M4-41): the draft row "New
 /// chat" or a sent post that the server has not created yet.
 ///

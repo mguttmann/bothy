@@ -282,8 +282,13 @@ const Map<String, List<String>> expected = {
     'key_fingerprint',
     'first_seen_at',
   ],
-  // Local only (M4-40): the collapsed thread group per channel on this device (01 6.8 item 7).
-  'channel_view_states': ['channel_id', 'group_collapsed'],
+  // Local only (M4-40, M4-46): the collapsed thread group per channel and whether a forum group
+  // shows every open post ("Show more") on this device (01 6.8 items 3 and 7).
+  'channel_view_states': [
+    'channel_id',
+    'group_collapsed',
+    'posts_shown_in_full',
+  ],
   // Local only (M4-40, M4-42, M4-45): the pinned forum overview, the hidden channel column next
   // to an open thread and the session column of both layouts on this device, one row (01 D1,
   // D2, D15).
@@ -306,8 +311,8 @@ void main() {
     return [for (final r in rows) r.read<String>('name')];
   }
 
-  test('schema version 8 has exactly the tables of 15 6.1', () async {
-    expect(db.schemaVersion, 8);
+  test('schema version 9 has exactly the tables of 15 6.1', () async {
+    expect(db.schemaVersion, 9);
     final rows = await db
         .customSelect(
           "SELECT name FROM sqlite_master WHERE type = 'table' "

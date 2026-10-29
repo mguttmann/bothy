@@ -1,6 +1,6 @@
 # local_store
 
-The encrypted local database of the apps: drift on SQLite3MultipleCiphers, schema version 8
+The encrypted local database of the apps: drift on SQLite3MultipleCiphers, schema version 9
 with the mirror tables and the local-only tables, data access objects that hand out the domain
 types of `packages/domain`, removal and wipe, the cache cleanup and offline search
 (docs/spec/15-client-architecture.md 6, ADR 0029, R-CL-08). The interface reads only from this
@@ -41,7 +41,7 @@ hooks:
       source: sqlite3mc
 ```
 
-## Tables (schema version 8)
+## Tables (schema version 9)
 
 | Group | File | Tables |
 |---|---|---|
@@ -51,7 +51,7 @@ hooks:
 | Runs and agents | `lib/src/tables/runs_agents.dart` | `runs` (summary of `run.state_changed`), `agents`, `principals` |
 | Personal | `lib/src/tables/personal.dart` | `read_states`, `drafts`, `user_settings`, `notification_preferences`, `quiet_hours` |
 | Instance | `lib/src/tables/instance.dart` | `instance` (with the app lock policy of `getInstance` in `app_lock` since version 5, M5-08; null in a row of an earlier version until the next `getInstance`), `commands` |
-| Local only | `lib/src/tables/local_only.dart` | `outbox`, `sync_state`, `loaded_ranges`, `file_cache`, `share_inbox`, `forum_view_states` (version 2, M4-19: the Done section per forum), `recent_targets` (version 3, M4-23: the recently visited spaces, channels and threads of the quick switcher, per device, never synchronized), `host_key_pins` (version 4, M4-36: the pinned Noise keys of the hosts, per device, a trust anchor), `channel_view_states` and `shell_view_state` (version 6, M4-40: the collapsed thread group per channel and the one row with the pinned forum overview, per device, never synchronized; 01 6.8 item 7, D-SB-6; version 7, M4-42: `shell_view_state.channel_column_hidden`, whether the channel column next to an open thread is hidden, 01 D1, D2; version 8, M4-45: `shell_view_state.session_column_hidden` and `text_thread_session_shown`, whether the session column is hidden beside a forum post or main history and shown beside a thread of a text channel, 01 D1, D2) |
+| Local only | `lib/src/tables/local_only.dart` | `outbox`, `sync_state`, `loaded_ranges`, `file_cache`, `share_inbox`, `forum_view_states` (version 2, M4-19: the Done section per forum), `recent_targets` (version 3, M4-23: the recently visited spaces, channels and threads of the quick switcher, per device, never synchronized), `host_key_pins` (version 4, M4-36: the pinned Noise keys of the hosts, per device, a trust anchor), `channel_view_states` and `shell_view_state` (version 6, M4-40: the collapsed thread group per channel and the one row with the pinned forum overview, per device, never synchronized; 01 6.8 item 7, D-SB-6; version 7, M4-42: `shell_view_state.channel_column_hidden`, whether the channel column next to an open thread is hidden, 01 D1, D2; version 8, M4-45: `shell_view_state.session_column_hidden` and `text_thread_session_shown`, whether the session column is hidden beside a forum post or main history and shown beside a thread of a text channel, 01 D1, D2; version 9, M4-46: `channel_view_states.posts_shown_in_full`, whether a forum group lists every open post after "Show more", 01 6.8 item 3) |
 | Search | `lib/src/search.drift` | `search_index` (FTS5) |
 
 `host_key_pins` of 15 6.1 came with version 4 (M4-36); from there on it is a preserved table of

@@ -40,6 +40,7 @@ SidebarChannel entry({required bool expanded}) {
       limits: const SidebarThreadLimits(
         window: Duration(hours: 72),
         perChannel: 8,
+        forumPostsVisible: 15,
       ),
       expanded: expanded,
     ),

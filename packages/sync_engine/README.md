@@ -104,7 +104,10 @@ same limit after the visible ones) and
 - `ready` without a stored cursor (the first connection, or a cursor dropped by a failed
   resync) empties the mirror and applies the whole snapshot in one transaction with
   `cursor = head_seq` and the epoch, the `active_threads` of the held channels included, so the
-  sidebar lists the open threads without a list request per channel (R-SY-28, M4-40), then goes
+  sidebar lists the open threads without a list request per channel (R-SY-28, M4-40); after the
+  commit each forum of the snapshot loads every page of its open posts in the background
+  (`listChannelThreads` with `state=open`, D-M4-46-5), since the sidebar lists every open post of
+  a forum and `active_threads` carries only the unread, running and recently active ones; then goes
   `live` at once (no catch-up follows an `identify` without a cursor); with a cursor only what is
   not an event (counters, agent presence, feature flags, active run summaries) and the catch-up
   delivers the rest, the threads included: the snapshot's state stored before the replayed older
@@ -121,7 +124,8 @@ same limit after the visible ones) and
   inside a catch-up page run after the commit of the page.
 - `resync_required` (any reason) keeps the connection: `getSnapshot`, then in one transaction
   `clearMirror` (outbox, drafts and share inbox stay) and the snapshot with its cursor and epoch;
-  the threads in focus load their newest page; phase `live`, notice `Resynced`. Frames that
+  the threads in focus load their newest page and each forum its open posts, as on the first
+  connection; phase `live`, notice `Resynced`. Frames that
   arrive meanwhile wait and pass the duplicate rule afterwards. When the snapshot cannot be
   loaded, mirror and cursor stay and the snapshot is retried after the reconnect backoff on the
   same connection. The retry runs outside the frame queue and checks its session after its
@@ -302,7 +306,8 @@ interactions and commands, M4-22 the uploads. An app registers its own writes wi
 The sidebar counters (M4-19, 04 14): `CatchUpListener.countsOfChannel` returns the counts of
 every thread of a channel the engine counts (the snapshot's `unread_threads`, read states and
 message events name the channel), and `loadThreadPage` stores one page of
-`listChannelThreads` and returns the next cursor (the paging of the post list).
+`listChannelThreads` (`openOnly`: only open threads) and returns the next cursor (the paging of
+the post list).
 
 ## Run documents (M4-16)
 

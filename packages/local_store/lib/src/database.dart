@@ -89,7 +89,7 @@ class LocalDatabase extends _$LocalDatabase {
   final DateTime Function() clock;
 
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 9;
 
   /// Closes the database and releases its file, also while watched queries come and go.
   ///
@@ -156,6 +156,13 @@ class LocalDatabase extends _$LocalDatabase {
           schema.shellViewState.textThreadSessionShown,
         );
       },
+      // Version 9 (M4-46): the column `channel_view_states.posts_shown_in_full`, false in every
+      // kept row (01 6.8 item 3: a forum group shows the limit until the person picks "Show
+      // more"); no row moves.
+      from8To9: (m, schema) => m.addColumn(
+        schema.channelViewStates,
+        schema.channelViewStates.postsShownInFull,
+      ),
     ),
   );
 

@@ -1052,6 +1052,66 @@ void main() {
     });
   });
 
+  group('show more row (01 6.8 item 3, M4-46)', () {
+    testWidgets(
+      'reads Show more or Show less with the count, toggles on tap and is no drag source',
+      (tester) async {
+        final handle = tester.ensureSemantics();
+        final l = await en();
+        final c = DsColors.light;
+        var toggled = 0;
+        Future<void> show({required bool expanded}) => pumpDs(
+          tester,
+          _onSidebar(
+            DsSidebarMoreRow(
+              hiddenCount: 9,
+              expanded: expanded,
+              onToggle: () => toggled++,
+            ),
+          ),
+        );
+
+        await show(expanded: false);
+        expect(find.text(l.sidebarShowMore), findsOneWidget);
+        final text = tester.widget<Text>(find.text(l.sidebarShowMore));
+        expect(text.style?.color, c.textOnSidebarSecondary);
+        final label = '${l.sidebarShowMore}, ${l.sidebarMorePosts(9)}';
+        expect(
+          tester.getSemantics(find.bySemanticsLabel(label)),
+          isSemantics(label: label, hasTapAction: true, isButton: true),
+        );
+        expect(dsSemanticsProblems(tester), isEmpty);
+        await tester.tap(find.byType(DsSidebarMoreRow));
+        expect(toggled, 1);
+
+        await show(expanded: true);
+        expect(find.text(l.sidebarShowLess), findsOneWidget);
+        expect(
+          find.bySemanticsLabel(
+            '${l.sidebarShowLess}, ${l.sidebarMorePosts(9)}',
+          ),
+          findsOneWidget,
+        );
+        expect(_draggable(), findsNothing);
+        handle.dispose();
+      },
+    );
+
+    testWidgets('reads German', (tester) async {
+      final l = await de();
+      await pumpDs(
+        tester,
+        _onSidebar(
+          DsSidebarMoreRow(hiddenCount: 1, expanded: false, onToggle: () {}),
+        ),
+        locale: const Locale('de'),
+      );
+      expect(l.sidebarShowMore, 'Mehr anzeigen');
+      expect(l.sidebarShowLess, 'Weniger anzeigen');
+      expect(find.text('Mehr anzeigen'), findsOneWidget);
+    });
+  });
+
   testWidgets('a whole group reads cleanly in German', (tester) async {
     final handle = tester.ensureSemantics();
     final l = await de();

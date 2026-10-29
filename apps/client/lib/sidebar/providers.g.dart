@@ -557,6 +557,54 @@ final class CollapsedGroupsProvider
 
 String _$collapsedGroupsHash() => r'255ff66e0bbc04c5fcae3486af799c68a47d20ac';
 
+/// The forums whose group lists every open post on this device ("Show more", 01 6.8 item 3;
+/// kept in `channel_view_states`, never synchronized, D-M4-46-2).
+
+@ProviderFor(postListsShownInFull)
+final postListsShownInFullProvider = PostListsShownInFullProvider._();
+
+/// The forums whose group lists every open post on this device ("Show more", 01 6.8 item 3;
+/// kept in `channel_view_states`, never synchronized, D-M4-46-2).
+
+final class PostListsShownInFullProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<Set<ChannelId>>,
+          Set<ChannelId>,
+          Stream<Set<ChannelId>>
+        >
+    with $FutureModifier<Set<ChannelId>>, $StreamProvider<Set<ChannelId>> {
+  /// The forums whose group lists every open post on this device ("Show more", 01 6.8 item 3;
+  /// kept in `channel_view_states`, never synchronized, D-M4-46-2).
+  PostListsShownInFullProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'postListsShownInFullProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$postListsShownInFullHash();
+
+  @$internal
+  @override
+  $StreamProviderElement<Set<ChannelId>> $createElement(
+    $ProviderPointer pointer,
+  ) => $StreamProviderElement(pointer);
+
+  @override
+  Stream<Set<ChannelId>> create(Ref ref) {
+    return postListsShownInFull(ref);
+  }
+}
+
+String _$postListsShownInFullHash() =>
+    r'e1dd49cc9929430ff66a7f47b28dfa6663c5a6cb';
+
 /// Whether the pointer is over the sidebar or the keyboard focus is in it: while it holds, a
 /// thread row that no longer qualifies stays in place (01 6.8 item 4; brief M4-40 Design note
 /// 2). The sidebar sets it ([SidebarHold.set]).
@@ -624,22 +672,28 @@ abstract class _$SidebarHold extends $Notifier<bool> {
 
 /// The thread group of [channelId] (01 6.8 items 2 to 6; `selectSidebarThreads`): its stored
 /// threads, the counters per thread, its runs, the selected thread of the route, the person,
-/// the clock and the limits of `AppConfig`. While [sidebarHoldProvider] holds, the rows shown
-/// last stay (01 6.8 item 4); additions and changes apply at once.
+/// the clock, the limits of `AppConfig` and the "Show more" state of this device. While
+/// [sidebarHoldProvider] holds, the rows shown last stay, and in a forum in their order (01 6.8
+/// item 4, D-M4-46-3); additions and changes apply at once. "Show more" and "Show less" apply at
+/// once too: the person asked for them.
 
 @ProviderFor(ChannelThreads)
 final channelThreadsProvider = ChannelThreadsFamily._();
 
 /// The thread group of [channelId] (01 6.8 items 2 to 6; `selectSidebarThreads`): its stored
 /// threads, the counters per thread, its runs, the selected thread of the route, the person,
-/// the clock and the limits of `AppConfig`. While [sidebarHoldProvider] holds, the rows shown
-/// last stay (01 6.8 item 4); additions and changes apply at once.
+/// the clock, the limits of `AppConfig` and the "Show more" state of this device. While
+/// [sidebarHoldProvider] holds, the rows shown last stay, and in a forum in their order (01 6.8
+/// item 4, D-M4-46-3); additions and changes apply at once. "Show more" and "Show less" apply at
+/// once too: the person asked for them.
 final class ChannelThreadsProvider
     extends $NotifierProvider<ChannelThreads, SidebarThreadGroup?> {
   /// The thread group of [channelId] (01 6.8 items 2 to 6; `selectSidebarThreads`): its stored
   /// threads, the counters per thread, its runs, the selected thread of the route, the person,
-  /// the clock and the limits of `AppConfig`. While [sidebarHoldProvider] holds, the rows shown
-  /// last stay (01 6.8 item 4); additions and changes apply at once.
+  /// the clock, the limits of `AppConfig` and the "Show more" state of this device. While
+  /// [sidebarHoldProvider] holds, the rows shown last stay, and in a forum in their order (01 6.8
+  /// item 4, D-M4-46-3); additions and changes apply at once. "Show more" and "Show less" apply at
+  /// once too: the person asked for them.
   ChannelThreadsProvider._({
     required ChannelThreadsFamily super.from,
     required String super.argument,
@@ -684,12 +738,14 @@ final class ChannelThreadsProvider
   }
 }
 
-String _$channelThreadsHash() => r'94ac2c24601c0e5fa80a5c6b660648ccaf651249';
+String _$channelThreadsHash() => r'ed41ac68bf2cabf2f063d8a96f1278fce2422578';
 
 /// The thread group of [channelId] (01 6.8 items 2 to 6; `selectSidebarThreads`): its stored
 /// threads, the counters per thread, its runs, the selected thread of the route, the person,
-/// the clock and the limits of `AppConfig`. While [sidebarHoldProvider] holds, the rows shown
-/// last stay (01 6.8 item 4); additions and changes apply at once.
+/// the clock, the limits of `AppConfig` and the "Show more" state of this device. While
+/// [sidebarHoldProvider] holds, the rows shown last stay, and in a forum in their order (01 6.8
+/// item 4, D-M4-46-3); additions and changes apply at once. "Show more" and "Show less" apply at
+/// once too: the person asked for them.
 
 final class ChannelThreadsFamily extends $Family
     with
@@ -711,8 +767,10 @@ final class ChannelThreadsFamily extends $Family
 
   /// The thread group of [channelId] (01 6.8 items 2 to 6; `selectSidebarThreads`): its stored
   /// threads, the counters per thread, its runs, the selected thread of the route, the person,
-  /// the clock and the limits of `AppConfig`. While [sidebarHoldProvider] holds, the rows shown
-  /// last stay (01 6.8 item 4); additions and changes apply at once.
+  /// the clock, the limits of `AppConfig` and the "Show more" state of this device. While
+  /// [sidebarHoldProvider] holds, the rows shown last stay, and in a forum in their order (01 6.8
+  /// item 4, D-M4-46-3); additions and changes apply at once. "Show more" and "Show less" apply at
+  /// once too: the person asked for them.
 
   ChannelThreadsProvider call(String channelId) =>
       ChannelThreadsProvider._(argument: channelId, from: this);
@@ -723,8 +781,10 @@ final class ChannelThreadsFamily extends $Family
 
 /// The thread group of [channelId] (01 6.8 items 2 to 6; `selectSidebarThreads`): its stored
 /// threads, the counters per thread, its runs, the selected thread of the route, the person,
-/// the clock and the limits of `AppConfig`. While [sidebarHoldProvider] holds, the rows shown
-/// last stay (01 6.8 item 4); additions and changes apply at once.
+/// the clock, the limits of `AppConfig` and the "Show more" state of this device. While
+/// [sidebarHoldProvider] holds, the rows shown last stay, and in a forum in their order (01 6.8
+/// item 4, D-M4-46-3); additions and changes apply at once. "Show more" and "Show less" apply at
+/// once too: the person asked for them.
 
 abstract class _$ChannelThreads extends $Notifier<SidebarThreadGroup?> {
   late final _$args = ref.$arg as String;

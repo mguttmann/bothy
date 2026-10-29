@@ -50,6 +50,7 @@ const List<AppConfigKey> appConfigKeys = <AppConfigKey>[
   AppConfigKey('ui.new_project_poll_interval', 'App', AppConfigKind.duration, '2s'),
   AppConfigKey('ui.new_project_wait', 'App', AppConfigKind.duration, '2m'),
   AppConfigKey('ui.quick_switch_max_results', 'App', AppConfigKind.integer, '20'),
+  AppConfigKey('ui.sidebar_forum_posts_visible', 'App', AppConfigKind.integer, '15'),
   AppConfigKey('ui.sidebar_thread_window', 'App', AppConfigKind.duration, '72h'),
   AppConfigKey('ui.sidebar_threads_per_channel', 'App', AppConfigKind.integer, '8'),
   AppConfigKey('viz.live_poll_interval', 'App', AppConfigKind.duration, '2s'),
@@ -165,6 +166,8 @@ extension AppConfigValues on AppConfig {
   Duration get newProjectWait => value<Duration>('ui.new_project_wait');
   /// `ui.quick_switch_max_results` (integer, default `20`).
   int get quickSwitchMaxResults => value<int>('ui.quick_switch_max_results');
+  /// `ui.sidebar_forum_posts_visible` (integer, default `15`).
+  int get sidebarForumPostsVisible => value<int>('ui.sidebar_forum_posts_visible');
   /// `ui.sidebar_thread_window` (duration, default `72h`).
   Duration get sidebarThreadWindow => value<Duration>('ui.sidebar_thread_window');
   /// `ui.sidebar_threads_per_channel` (integer, default `8`).

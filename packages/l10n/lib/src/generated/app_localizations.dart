@@ -14754,6 +14754,24 @@ abstract class AppLocalizations {
   /// **'All posts'**
   String get sidebarAllPosts;
 
+  /// Row of a forum group in the sidebar above All posts while the forum has more open posts than the group shows; lists them all in place (01 section 6.8 item 3, M4-46).
+  ///
+  /// In en, this message translates to:
+  /// **'Show more'**
+  String get sidebarShowMore;
+
+  /// The same row while the forum group lists every open post; goes back to the newest ones (01 section 6.8 item 3, M4-46).
+  ///
+  /// In en, this message translates to:
+  /// **'Show less'**
+  String get sidebarShowLess;
+
+  /// Screen reader text after Show more or Show less: the open posts the row shows or hides (01 section 6.8 item 3, M4-46).
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 more post} other{{count} more posts}}'**
+  String sidebarMorePosts(int count);
+
   /// Sidebar thread row whose title is still empty (01 section 6.8 item 6).
   ///
   /// In en, this message translates to:

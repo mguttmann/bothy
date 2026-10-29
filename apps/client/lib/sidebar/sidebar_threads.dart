@@ -2,8 +2,8 @@
 
 /// The selection of the thread rows under a channel of the sidebar and the counters around
 /// them (docs/spec/01-product.md 6.8 items 2 to 6; brief M4-40 Design notes 1 and 3; rulings
-/// D-SB-2 to D-SB-5): a pure function the desktop sidebar uses and the phone layout of M5-15
-/// can reuse.
+/// D-SB-2 to D-SB-5; brief M4-46, D-M4-46-1 to D-M4-46-4): a pure function the desktop sidebar
+/// uses and the phone layout of M5-15 can reuse.
 library;
 
 import 'package:design_system/design_system.dart';
@@ -12,19 +12,57 @@ import 'package:domain/domain.dart';
 /// The limits of the selection, from `AppConfig`: never a literal in code (brief M4-40 rule 9).
 final class SidebarThreadLimits {
   /// Creates the limits.
-  const SidebarThreadLimits({required this.window, required this.perChannel});
+  const SidebarThreadLimits({
+    required this.window,
+    required this.perChannel,
+    required this.forumPostsVisible,
+  });
 
-  /// The limits of [config]: `ui.sidebar_thread_window` and `ui.sidebar_threads_per_channel`.
+  /// The limits of [config]: `ui.sidebar_thread_window`, `ui.sidebar_threads_per_channel` and
+  /// `ui.sidebar_forum_posts_visible`.
   factory SidebarThreadLimits.of(AppConfig config) => SidebarThreadLimits(
     window: config.sidebarThreadWindow,
     perChannel: config.sidebarThreadsPerChannel,
+    forumPostsVisible: config.sidebarForumPostsVisible,
   );
 
-  /// `ui.sidebar_thread_window`: an open thread with activity within it qualifies.
+  /// `ui.sidebar_thread_window`: an open thread of a text channel with activity within it
+  /// qualifies.
   final Duration window;
 
-  /// `ui.sidebar_threads_per_channel`: at most this many rows per channel.
+  /// `ui.sidebar_threads_per_channel`: at most this many rows per text channel.
   final int perChannel;
+
+  /// `ui.sidebar_forum_posts_visible`: a forum group shows this many open posts before "Show
+  /// more" (01 6.8 item 3, brief M4-46).
+  final int forumPostsVisible;
+}
+
+/// The "Show more" row of a forum group (01 6.8 item 3, brief M4-46): the forum has more open
+/// posts than `ui.sidebar_forum_posts_visible`.
+final class SidebarMorePosts {
+  /// Creates the row state.
+  const SidebarMorePosts({required this.hidden, required this.expanded});
+
+  /// While collapsed, the open posts the group does not show; while expanded, the open posts
+  /// beyond the limit that "Show less" hides again.
+  final int hidden;
+
+  /// Whether the person expanded the group to every open post on this device (the row reads
+  /// "Show less").
+  final bool expanded;
+
+  @override
+  bool operator ==(Object other) =>
+      other is SidebarMorePosts &&
+      other.hidden == hidden &&
+      other.expanded == expanded;
+
+  @override
+  int get hashCode => Object.hash(hidden, expanded);
+
+  @override
+  String toString() => 'SidebarMorePosts(hidden: $hidden, expanded: $expanded)';
 }
 
 /// A thread of a sidebar group with what its row shows.
@@ -87,14 +125,21 @@ final class SidebarThreadGroup {
     required this.candidates,
     required this.channelCounts,
     required this.allPostsCounts,
+    this.more,
   });
 
-  /// The rows in their order: by creation time, newest first (01 6.8 item 4).
+  /// The rows in their order (01 6.8 item 4): in a text channel by creation time, in a forum by
+  /// last activity, newest first.
   final List<SidebarThread> rows;
 
-  /// Every thread that qualifies (01 6.8 item 2), in the order of the priority of item 3, before
-  /// the bound; the rows are taken from its start.
+  /// Every thread that qualifies (01 6.8 item 2), before the bound: in a text channel in the
+  /// order of the priority of item 3, in a forum by last activity; the rows are taken from its
+  /// start.
   final List<SidebarThread> candidates;
+
+  /// The "Show more" row of a forum with more open posts than the limit, or null (text
+  /// channels, and forums within the limit).
+  final SidebarMorePosts? more;
 
   /// The counters of the channel row (D-SB-5): every thread of the channel when the group is
   /// collapsed or has no rows; when expanded, a text channel counts its main thread and the
@@ -121,14 +166,26 @@ const Set<RunState> _activeStates = {
 /// [threads] are the stored threads (others than [channel]'s are ignored), [counts] the person's
 /// counters per thread of the channel (the engine's values, else the stored read states; threads
 /// that are not stored count too), [runs] the stored runs of the channel, [selected] the thread
-/// the route shows, [me] the person, [now] the clock, [limits] from `AppConfig`. A thread
-/// qualifies when it is of kind `thread`, open (or selected) and selected, has an active run,
-/// waits for [me], is unread or was active within [SidebarThreadLimits.window]. When more qualify
-/// than [SidebarThreadLimits.perChannel], the priority selected, waiting, active run, unread
-/// mentions, unread, newest activity decides. [keep] holds rows that stay although they no longer
-/// qualify (the pointer or the focus is in the sidebar, 01 6.8 item 4); they stay while stored.
-/// [expanded] is the state of the group, [mutedThreads] the threads the person muted (a muted
-/// channel mutes its threads). Rows are ordered by creation time, newest first. Never throws.
+/// the route shows, [me] the person, [now] the clock, [limits] from `AppConfig`.
+///
+/// In a text channel a thread qualifies when it is of kind `thread`, open (or selected) and
+/// selected, has an active run, waits for [me], is unread or was active within
+/// [SidebarThreadLimits.window]. When more qualify than [SidebarThreadLimits.perChannel], the
+/// priority selected, waiting, active run, unread mentions, unread, newest activity decides; rows
+/// are ordered by creation time, newest first.
+///
+/// In a forum every open post qualifies, and the selected one also when done (brief M4-46).
+/// Rows are ordered by last activity, newest first; with more open posts than
+/// [SidebarThreadLimits.forumPostsVisible] only the newest that many and the selected post show
+/// until [showAllPosts] (the "Show more" state of this device) lists them all, and
+/// [SidebarThreadGroup.more] describes the row.
+///
+/// [keep] holds rows that stay although they no longer qualify (the pointer or the focus is in
+/// the sidebar, 01 6.8 item 4); they stay while stored. In a forum [heldOrder] is the order of
+/// the rows shown last while the sidebar holds them: those rows keep it, and rows new to the
+/// group come first, so no row moves under the pointer. [expanded] is the state of the group,
+/// [mutedThreads] the threads the person muted (a muted channel mutes its threads). Never
+/// throws.
 ///
 /// Example:
 /// ```dart
@@ -149,6 +206,8 @@ SidebarThreadGroup selectSidebarThreads({
   Set<ThreadId> keep = const {},
   Set<ThreadId> mutedThreads = const {},
   bool channelMuted = false,
+  bool showAllPosts = false,
+  List<ThreadId> heldOrder = const [],
 }) {
   final active = <ThreadId, RunSummary>{};
   final last = <ThreadId, RunSummary>{};
@@ -181,12 +240,15 @@ SidebarThreadGroup selectSidebarThreads({
     );
   }
 
+  final forum = channel.kind == ChannelKind.forum;
   final since = now.subtract(limits.window);
   bool qualifies(SidebarThread e) {
     final t = e.thread;
     if (t.id == selected) return true;
     // A done thread shows only while it is selected (01 6.8 item 2).
     if (t.state == ThreadState.closed) return false;
+    // Every open post of a forum shows (brief M4-46, D-M4-46-1).
+    if (forum) return true;
     return e.activeRun != null ||
         e.waitingForMe ||
         e.counts.unread > 0 ||
@@ -201,13 +263,37 @@ SidebarThreadGroup selectSidebarThreads({
   final candidates = [
     for (final e in own)
       if (qualifies(e)) e,
-  ]..sort((a, b) => _byPriority(a, b, selected));
-  final bound = limits.perChannel < 0 ? 0 : limits.perChannel;
-  final chosen = {for (final e in candidates.take(bound)) e.thread.id};
+  ]..sort(forum ? _byActivity : (a, b) => _byPriority(a, b, selected));
+  final Set<ThreadId> chosen;
+  SidebarMorePosts? more;
+  if (forum) {
+    final visible = limits.forumPostsVisible < 0 ? 0 : limits.forumPostsVisible;
+    final open = [
+      for (final e in candidates)
+        if (e.thread.state == ThreadState.open) e,
+    ];
+    chosen = {
+      for (final e in showAllPosts ? open : open.take(visible)) e.thread.id,
+      ?selected,
+    };
+    if (open.length > visible) {
+      more = SidebarMorePosts(
+        hidden: showAllPosts
+            ? open.length - visible
+            : open.where((e) => !_shownIn(e, chosen, keep)).length,
+        expanded: showAllPosts,
+      );
+      // Kept rows can cover every post beyond the limit for a moment; then no row is hidden.
+      if (!showAllPosts && more.hidden == 0) more = null;
+    }
+  } else {
+    final bound = limits.perChannel < 0 ? 0 : limits.perChannel;
+    chosen = {for (final e in candidates.take(bound)) e.thread.id};
+  }
   final rows = [
     for (final e in own)
-      if (chosen.contains(e.thread.id) || keep.contains(e.thread.id)) e,
-  ]..sort(_byCreation);
+      if (_shownIn(e, chosen, keep)) e,
+  ]..sort(forum ? _heldThenActivity(heldOrder) : _byCreation);
 
   var total = ThreadCounts.zero;
   for (final c in counts.values) {
@@ -218,14 +304,41 @@ SidebarThreadGroup selectSidebarThreads({
     shown = _plus(shown, r.counts);
   }
   final grouped = expanded && rows.isNotEmpty;
-  final forum = channel.kind == ChannelKind.forum;
   final rest = _minus(total, shown);
   return SidebarThreadGroup(
     rows: rows,
     candidates: candidates,
     channelCounts: !grouped ? total : (forum ? ThreadCounts.zero : rest),
     allPostsCounts: grouped && forum ? rest : null,
+    more: more,
   );
+}
+
+bool _shownIn(SidebarThread e, Set<ThreadId> chosen, Set<ThreadId> keep) =>
+    chosen.contains(e.thread.id) || keep.contains(e.thread.id);
+
+/// Last activity, newest first; the creation time, newest first, then the ID break ties, so the
+/// result never depends on the input order (brief M4-46).
+int _byActivity(SidebarThread a, SidebarThread b) {
+  final byActivity = b.thread.lastActivityAt.compareTo(a.thread.lastActivityAt);
+  if (byActivity != 0) return byActivity;
+  return _byCreation(a, b);
+}
+
+/// The order of forum rows while the sidebar holds them (01 6.8 item 4, D-M4-46-3): rows not in
+/// [held] first by [_byActivity], then the held rows in their held order. Without [held] it is
+/// [_byActivity].
+Comparator<SidebarThread> _heldThenActivity(List<ThreadId> held) {
+  if (held.isEmpty) return _byActivity;
+  final place = {for (final (i, id) in held.indexed) id: i};
+  return (a, b) {
+    final pa = place[a.thread.id];
+    final pb = place[b.thread.id];
+    if (pa == null && pb == null) return _byActivity(a, b);
+    if (pa == null) return -1;
+    if (pb == null) return 1;
+    return pa.compareTo(pb);
+  };
 }
 
 /// The priority of 01 6.8 item 3: selected, waiting for the person, active run, unread

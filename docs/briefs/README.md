@@ -123,7 +123,7 @@ the waves before it are merged; many can start earlier, as soon as their own dep
 | 39 | M4-32, M4-34, M4-36, M4-40, M5-03, M5-04, M7-06, M7-09, M8-07 |
 | 40 | M4-38, M4-41, M4-42, M5-05, M5-06, M5-07, M5-08, M5-09, M5-14, M6-16, M7-07, M7-08, M7-12, M7-14, M8-09 |
 | 41 | M4-43, M4-45, M5-10, M5-11, M5-15, M6-17, M7-18, M7-21, M7-23, M7-26, M7-27 |
-| 42 | M4-44, M5-12, M7-13 |
+| 42 | M4-44, M4-46, M5-12, M7-13 |
 | 43 | M5-13 |
 | 44 | M7-28 |
 
@@ -331,6 +331,7 @@ names listed here.
 | 41 | M4-43 | New project from the app | `M4-43-new-project.md` | M2-34, M4-41 |
 | 42 | M4-44 | Forums for existing folders and renaming a project | `M4-44-project-sync-rename.md` | M4-43 |
 | 41 | M4-45 | Session column toggle on the desktop | `M4-45-session-column-toggle.md` | M4-42 |
+| 42 | M4-46 | Sidebar shows all open forum posts | `M4-46-sidebar-all-open-posts.md` | M4-45 |
 | 23 | M6-01 | Console session following the BFF pattern | `M6-01-console-session.md` | M1-39, M1-40, M1-41, M1-43, M1-45, M1-49, M1-64 |
 | 37 | M6-05 | Statistics in the server | `M6-05-stats-server.md` | M2-22, M2-26, M3-22 |
 | 2 | M6-10 | Design tokens for charts: check for color vision deficiency | `M6-10-viz-cvd-check.md` | M4-03 |
@@ -980,6 +981,7 @@ flowchart TB
   M4_43["M4-43"]
   M4_44["M4-44"]
   M4_45["M4-45"]
+  M4_46["M4-46"]
   M6_11["M6-11"]
   M1_01 --> M4_01
   M1_17 --> M4_02
@@ -1063,6 +1065,7 @@ flowchart TB
   M4_41 --> M4_43
   M4_43 --> M4_44
   M4_42 --> M4_45
+  M4_45 --> M4_46
 ```
 
 Tickets of M5:

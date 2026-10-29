@@ -185,10 +185,11 @@ class ForumViewStates extends Table {
   Set<Column<Object>> get primaryKey => {channelId};
 }
 
-/// How the thread group of a channel looks in the sidebar on this device (01 6.8 item 7, D-SB-6):
-/// whether it is collapsed. Kept per device and never synchronized, because 01 11 has no key
-/// for it (a new setting key would need a server change for a view preference); a channel
-/// without a row shows its group expanded. The removal of a channel deletes its row (04 8.3).
+/// How the thread group of a channel looks in the sidebar on this device (01 6.8 items 3 and 7,
+/// D-SB-6, D-M4-46-2): whether it is collapsed and whether a forum group shows every open post
+/// ("Show more"). Kept per device and never synchronized, because 01 11 has no key for it (a new
+/// setting key would need a server change for a view preference); a channel without a row shows
+/// its group expanded with the limit. The removal of a channel deletes its row (04 8.3).
 @DataClassName('ChannelViewStateRow')
 class ChannelViewStates extends Table {
   @override
@@ -199,6 +200,11 @@ class ChannelViewStates extends Table {
 
   /// Whether the thread group under the channel row is collapsed.
   BoolColumn get groupCollapsed => boolean()();
+
+  /// Whether the forum group shows every open post instead of the newest
+  /// `ui.sidebar_forum_posts_visible` ("Show more", M4-46).
+  BoolColumn get postsShownInFull =>
+      boolean().withDefault(const Constant(false))();
 
   @override
   Set<Column<Object>> get primaryKey => {channelId};

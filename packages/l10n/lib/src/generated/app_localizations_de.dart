@@ -9182,6 +9182,23 @@ class AppLocalizationsDe extends AppLocalizations {
   String get sidebarAllPosts => 'Alle Beiträge';
 
   @override
+  String get sidebarShowMore => 'Mehr anzeigen';
+
+  @override
+  String get sidebarShowLess => 'Weniger anzeigen';
+
+  @override
+  String sidebarMorePosts(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count weitere Beiträge',
+      one: '1 weiterer Beitrag',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get sidebarNewChat => 'Neuer Chat';
 
   @override

@@ -3,8 +3,9 @@
 /// Access to `forum_view_states`, `channel_view_states` and `shell_view_state`: how forums and
 /// channel groups look on this device (brief M4-19 Design note 4, docs/DECISIONS.md D-M4-19-4;
 /// 01 6.8 item 7, D-SB-6), and whether the channel column next to an open thread is hidden (01
-/// D1, D2; M4-42) and whether the session column shows (01 D1, D2; M4-45). Nothing of it is
-/// synchronized: 01 11 has no key for it.
+/// D1, D2; M4-42), whether the session column shows (01 D1, D2; M4-45) and whether a forum group
+/// shows every open post (01 6.8 item 3; M4-46). Nothing of it is synchronized: 01 11 has no key
+/// for it.
 library;
 
 import 'package:domain/domain.dart';
@@ -20,6 +21,8 @@ import '../database.dart';
 /// db.forumViewDao.watchDoneCollapsed(forum).listen(print); // false
 /// await db.forumViewDao.setGroupCollapsed(forum, collapsed: true);
 /// db.forumViewDao.watchCollapsedGroups().listen(print); // {forum}
+/// await db.forumViewDao.setPostListShownInFull(forum, inFull: true);
+/// db.forumViewDao.watchPostListsShownInFull().listen(print); // {forum}
 /// await db.forumViewDao.setOverviewPinned(pinned: true);
 /// print(await db.forumViewDao.overviewPinned()); // true
 /// await db.forumViewDao.setChannelColumnHidden(hidden: true);
@@ -78,6 +81,36 @@ final class ForumViewDao {
           ChannelViewStatesCompanion.insert(
             channelId: channel.value,
             groupCollapsed: collapsed,
+          ),
+        );
+  }
+
+  /// The forums whose sidebar group shows every open post on this device ("Show more", 01 6.8
+  /// item 3), emitted on every change; a channel without a stored row shows the newest
+  /// `ui.sidebar_forum_posts_visible`.
+  Stream<Set<ChannelId>> watchPostListsShownInFull() =>
+      (_db.select(_db.channelViewStates)
+            ..where((t) => t.postsShownInFull.equals(true)))
+          .map((row) => ChannelId.parse(row.channelId))
+          .watch()
+          .map((channels) => channels.toSet());
+
+  /// Stores whether the sidebar group of [forum] shows every open post ([inFull]) on this
+  /// device; its collapse state stays (a new row is expanded).
+  Future<void> setPostListShownInFull(
+    ChannelId forum, {
+    required bool inFull,
+  }) async {
+    await _db
+        .into(_db.channelViewStates)
+        .insert(
+          ChannelViewStatesCompanion.insert(
+            channelId: forum.value,
+            groupCollapsed: false,
+            postsShownInFull: Value(inFull),
+          ),
+          onConflict: DoUpdate(
+            (_) => ChannelViewStatesCompanion(postsShownInFull: Value(inFull)),
           ),
         );
   }

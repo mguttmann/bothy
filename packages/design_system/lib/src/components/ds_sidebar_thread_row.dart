@@ -481,6 +481,69 @@ class DsSidebarAllPostsRowState extends State<DsSidebarAllPostsRow> {
   }
 }
 
+/// The row "Show more" of a forum group with more open posts than it shows, above "All posts"
+/// (01 6.8 item 3, M4-46); "Show less" while the group lists them all.
+///
+/// Same indent and tree line as [DsSidebarThreadRow], never the last row ("All posts" follows).
+/// The text in `color.text.on-sidebar-secondary`, no counters: the unread marks of the posts
+/// not shown stay on "All posts". The label reads "Show more, {n} more posts" ([hiddenCount]);
+/// Enter or a tap calls [onToggle], which expands or collapses the list in place. A button, not
+/// draggable.
+///
+/// ```dart
+/// DsSidebarMoreRow(hiddenCount: 9, expanded: false, onToggle: () => showAll(forum.id))
+/// ```
+class DsSidebarMoreRow extends StatelessWidget {
+  /// Creates the row.
+  const DsSidebarMoreRow({
+    super.key,
+    required this.hiddenCount,
+    required this.expanded,
+    required this.onToggle,
+    this.focusNode,
+  });
+
+  /// The open posts the row shows ("Show more") or hides again ("Show less").
+  final int hiddenCount;
+
+  /// Whether the group lists every open post; the row then reads "Show less".
+  final bool expanded;
+
+  /// Expands or collapses the list.
+  final VoidCallback onToggle;
+
+  /// The focus node of the row, so the caller's tree navigation can move the keyboard focus
+  /// to it (D-SB-8); null for one of its own.
+  final FocusNode? focusNode;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = dsL10n(context);
+    final text = expanded ? l.sidebarShowLess : l.sidebarShowMore;
+    return _SidebarTreeRow(
+      label: '$text, ${l.sidebarMorePosts(hiddenCount)}',
+      selected: false,
+      last: false,
+      unreadBar: false,
+      background: null,
+      onOpen: onToggle,
+      focusNode: focusNode,
+      button: true,
+      children: [
+        Expanded(
+          child: Text(
+            text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: dsTextStyle(DsType.bodySm)
+                .copyWith(color: context.dsColors.textOnSidebarSecondary),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 /// The frame of a row below a channel: the tree line in the indent, then one tappable line
 /// with the states of the channel row (components.md 7).
 class _SidebarTreeRow extends StatelessWidget {
@@ -493,9 +556,11 @@ class _SidebarTreeRow extends StatelessWidget {
     required this.onOpen,
     required this.focusNode,
     required this.children,
+    this.button = false,
   });
 
   final String label;
+  final bool button;
   final bool selected;
   final bool last;
   final bool unreadBar;
@@ -531,7 +596,7 @@ class _SidebarTreeRow extends StatelessWidget {
             focusNode: focusNode,
             label: label,
             selected: selected,
-            button: false,
+            button: button,
             onSidebar: true,
             hoverColor: c.surfaceSidebarHover,
             excludeChildSemantics: true,
