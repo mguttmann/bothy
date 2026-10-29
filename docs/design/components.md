@@ -268,8 +268,8 @@ hides (addendum of 2026-10-29, M4-46).
 Top: mark and product name (`branding.product_name`), quick switcher field ("Jump to" with a
 shortcut), entry "Running now" with a counter. Bottom: own avatar, settings.
 
-Behavior: collapse by click, Enter or arrow left/right; the state of a space is synchronized via
-`sidebar.update`, the state of a channel's thread group is kept on the device (01 6.8 item 7).
+Behavior: collapse by click, Enter or arrow left/right; the collapse state of a space and of a
+channel's thread group is kept on the device (01 6.7 R-PR-24, 01 6.8 item 7).
 Dragging a space changes the personal order (`user_space_states.sort_key`); the global order is
 changed only by `space.reorder` in the administration. Channel rows and thread rows cannot be
 dragged (01 6.8 item 10).

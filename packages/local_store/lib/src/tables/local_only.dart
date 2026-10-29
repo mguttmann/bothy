@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// Local-only tables (15 6.1): `outbox`, `sync_state`, `loaded_ranges`, `file_cache`,
-/// `share_inbox`, `forum_view_states`, `recent_targets`, `host_key_pins`, `channel_view_states`
-/// and `shell_view_state`. Times are milliseconds since the epoch in UTC, so ordering and the
+/// `share_inbox`, `forum_view_states`, `recent_targets`, `host_key_pins`, `channel_view_states`,
+/// `space_view_states` and `shell_view_state`. Times are milliseconds since the epoch in UTC, so ordering and the
 /// cleanup compare plain integers.
 library;
 
@@ -208,6 +208,26 @@ class ChannelViewStates extends Table {
 
   @override
   Set<Column<Object>> get primaryKey => {channelId};
+}
+
+/// Whether a space is collapsed in the sidebar on this device (01 6.7, R-PR-24; 04 14,
+/// R-SY-29; FIX-device-mirroring-2). Kept per device and never synchronized: a person expands a
+/// space on one device to open a chat there, and the other device must not follow. A space
+/// without a row is expanded. Version 10 fills the table once from `user_space_states.collapsed`,
+/// so an upgrade changes nothing on screen. The removal of a space deletes its row (04 8.3).
+@DataClassName('SpaceViewStateRow')
+class SpaceViewStates extends Table {
+  @override
+  String get tableName => 'space_view_states';
+
+  /// The space, canonical UUID text.
+  TextColumn get spaceId => text()();
+
+  /// Whether the space is collapsed.
+  BoolColumn get collapsed => boolean()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {spaceId};
 }
 
 /// How the desktop shell looks on this device (01 6.8 item 7, D-SB-6; 01 D1, D15): whether the

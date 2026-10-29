@@ -20,7 +20,8 @@ extension LocalStoreRemoval on LocalDatabase {
   /// summaries, mentions, components, runs, drafts, read states, loaded ranges, search rows and
   /// file cache rows, plus the sidebar state, operator setting, forum tags, commands,
   /// notification preferences, recently visited rows (`recent_targets`, M4-23) and the
-  /// collapsed thread groups (`channel_view_states`, M4-40) of the targets. Outbox entries
+  /// collapsed thread groups (`channel_view_states`, M4-40) and spaces (`space_view_states`,
+  /// FIX-device-mirroring-2) of the targets. Outbox entries
   /// stay: they fail with `404` and keep their text (04 8.3 item 4). Host targets are ignored,
   /// and the pinned host keys (`host_key_pins`, M4-36) stay: a pin is a trust anchor that only
   /// the [wipe] deletes (15 6.1).
@@ -88,6 +89,10 @@ extension LocalStoreRemoval on LocalDatabase {
     });
     await _deleteWhereIn(spaceIds, 'user_space_states', 'space_id', {
       userSpaceStates,
+    });
+    // A removed space leaves no collapse state of this device behind (04 8.3; 01 6.7).
+    await _deleteWhereIn(spaceIds, 'space_view_states', 'space_id', {
+      spaceViewStates,
     });
     await _deleteWhereIn(spaceIds, 'search_index', 'space_id', {searchIndex});
     await _deleteWhereIn(spaceIds, 'spaces', 'id', {spaces});

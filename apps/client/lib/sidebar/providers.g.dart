@@ -98,14 +98,61 @@ final class UserSpaceStatesProvider
 
 String _$userSpaceStatesHash() => r'a7cdcbaadafb3be305edf77bb68511f845078a19';
 
+/// The spaces collapsed in the sidebar on this device (01 6.7, R-PR-24; kept in
+/// `space_view_states`, never synchronized).
+
+@ProviderFor(collapsedSpaces)
+final collapsedSpacesProvider = CollapsedSpacesProvider._();
+
+/// The spaces collapsed in the sidebar on this device (01 6.7, R-PR-24; kept in
+/// `space_view_states`, never synchronized).
+
+final class CollapsedSpacesProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<Set<SpaceId>>,
+          Set<SpaceId>,
+          Stream<Set<SpaceId>>
+        >
+    with $FutureModifier<Set<SpaceId>>, $StreamProvider<Set<SpaceId>> {
+  /// The spaces collapsed in the sidebar on this device (01 6.7, R-PR-24; kept in
+  /// `space_view_states`, never synchronized).
+  CollapsedSpacesProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'collapsedSpacesProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$collapsedSpacesHash();
+
+  @$internal
+  @override
+  $StreamProviderElement<Set<SpaceId>> $createElement(
+    $ProviderPointer pointer,
+  ) => $StreamProviderElement(pointer);
+
+  @override
+  Stream<Set<SpaceId>> create(Ref ref) {
+    return collapsedSpaces(ref);
+  }
+}
+
+String _$collapsedSpacesHash() => r'23495b56aa2aba7da077c5770e1a6d918df9fc5c';
+
 /// The spaces with the person's state, in the personal order with the global order as the
-/// fallback (`orderSpaces`); empty while either source loads.
+/// fallback (`orderSpaces`), collapsed as on this device; empty while either source loads.
 
 @ProviderFor(spacesWithState)
 final spacesWithStateProvider = SpacesWithStateProvider._();
 
 /// The spaces with the person's state, in the personal order with the global order as the
-/// fallback (`orderSpaces`); empty while either source loads.
+/// fallback (`orderSpaces`), collapsed as on this device; empty while either source loads.
 
 final class SpacesWithStateProvider
     extends
@@ -116,7 +163,7 @@ final class SpacesWithStateProvider
         >
     with $Provider<List<SidebarSpace>> {
   /// The spaces with the person's state, in the personal order with the global order as the
-  /// fallback (`orderSpaces`); empty while either source loads.
+  /// fallback (`orderSpaces`), collapsed as on this device; empty while either source loads.
   SpacesWithStateProvider._()
     : super(
         from: null,
@@ -151,7 +198,7 @@ final class SpacesWithStateProvider
   }
 }
 
-String _$spacesWithStateHash() => r'74a16bfa966b0826709b7365223854eba5b4433b';
+String _$spacesWithStateHash() => r'ff6f5ea0782cccc4668c529efe793e93753909f8';
 
 /// The stored channels of [spaceId] in their order.
 

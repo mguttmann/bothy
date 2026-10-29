@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // The sidebar over the local database (brief M4-19 Tests; components.md 7; 04 14): the
-// personal order with the global fallback, collapse through the outbox with the row updated at
-// once, the tree semantics and the channel labels.
+// personal order with the global fallback, collapse kept on this device with the row updated at
+// once (01 6.7, R-PR-24), the tree semantics and the channel labels.
 
 import 'dart:convert';
 
 import 'package:client/sidebar/sidebar_column.dart';
-import 'package:client/sync/sidebar_ops.dart';
 import 'package:domain/domain.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
@@ -70,9 +69,8 @@ void main() {
     await host.dispose(tester);
   });
 
-  testWidgets('collapse writes one outbox entry and updates the row at once', (
-    tester,
-  ) async {
+  testWidgets('collapse stays on this device: no outbox entry, the row updates '
+      'at once', (tester) async {
     final host = await ColumnHost.open(tester);
     await tester.runAsync(() => fill(host));
     await host.pump(tester, const SidebarColumn());
@@ -83,19 +81,38 @@ void main() {
     await tester.tap(find.byKey(ValueKey('sidebar.space.${spaceId(1).value}')));
     await host.settle(tester);
     expect(general, findsNothing, reason: 'the space is collapsed at once');
+    // 01 6.7, R-PR-24: no `putMySidebarSpace`, so no other device of the person follows.
     final entries = await tester.runAsync(host.db.outboxDao.allEntries);
-    expect(entries!.map((e) => e.kind), [SidebarOps.putMySidebarSpace]);
-    expect(jsonDecode(entries.single.payload), {
-      'space_id': spaceId(1).value,
-      'collapsed': true,
-    });
+    expect(entries, isEmpty);
+    final collapsed = await tester.runAsync(
+      () => host.db.forumViewDao.watchCollapsedSpaces().first,
+    );
+    expect(collapsed, {spaceId(1)});
     final states = await tester.runAsync(
       () => host.db.structureDao.watchUserSpaceStates().first,
     );
     expect(
-      states!.singleWhere((s) => s.spaceId == spaceId(1)).collapsed,
-      isTrue,
+      states!.where((s) => s.spaceId == spaceId(1)),
+      isEmpty,
+      reason: 'the synchronized sidebar state is not written',
     );
+
+    // A `sidebar.updated` of another device (an older app) changes nothing on screen.
+    await tester.runAsync(
+      () => host.db.structureDao.upsertUserSpaceStateIfNewer(
+        UserSpaceState(
+          spaceId: spaceId(1),
+          collapsed: false,
+          version: const ResourceVersion(2),
+        ),
+      ),
+    );
+    await host.settle(tester);
+    expect(general, findsNothing);
+    await tester.tap(find.byKey(ValueKey('sidebar.space.${spaceId(1).value}')));
+    await host.settle(tester);
+    expect(general, findsOneWidget);
+    expect(await tester.runAsync(host.db.outboxDao.allEntries), isEmpty);
     await host.dispose(tester);
   });
 

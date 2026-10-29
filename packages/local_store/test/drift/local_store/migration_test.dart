@@ -8,8 +8,10 @@
 // tables `channel_view_states` and `shell_view_state` with the column `channels.project_bound`
 // and a cleared cursor, version 7 (M4-42) the column `shell_view_state.channel_column_hidden`,
 // version 8 (M4-45) the columns `shell_view_state.session_column_hidden` and
-// `text_thread_session_shown` and version 9 (M4-46) the column
-// `channel_view_states.posts_shown_in_full`; each keeps every row of the mirror. The preserved
+// `text_thread_session_shown`, version 9 (M4-46) the column
+// `channel_view_states.posts_shown_in_full` and version 10 (FIX-device-mirroring-2) the
+// local-only table `space_view_states`, filled from `user_space_states.collapsed`; each keeps
+// every row of the mirror. The preserved
 // tables are checked by
 // `survival_test.dart`.
 
@@ -20,6 +22,7 @@ import 'package:test/test.dart';
 
 import 'generated/schema.dart';
 import 'generated/schema_v1.dart' as v1;
+import 'generated/schema_v10.dart' as v10;
 import 'generated/schema_v2.dart' as v2;
 import 'generated/schema_v3.dart' as v3;
 import 'generated/schema_v4.dart' as v4;
@@ -315,6 +318,35 @@ void main() {
             groupCollapsed: 0,
             postsShownInFull: 0,
           ),
+        ]);
+      },
+    );
+  });
+
+  test('the migration 9 to 10 keeps the collapse state of every space on this '
+      'device', () async {
+    const rows = [
+      v9.UserSpaceStatesData(spaceId: 'a', collapsed: 1, version: 3),
+      v9.UserSpaceStatesData(
+        spaceId: 'b',
+        collapsed: 0,
+        sortKey: 'a0V',
+        version: 1,
+      ),
+    ];
+    await verifier.testWithDataIntegrity(
+      oldVersion: 9,
+      newVersion: 10,
+      createOld: v9.DatabaseAtV9.new,
+      createNew: v10.DatabaseAtV10.new,
+      openTestedDatabase: LocalDatabase.new,
+      createItems: (batch, oldDb) =>
+          batch.insertAll(oldDb.userSpaceStates, rows),
+      validateItems: (newDb) async {
+        expect(await newDb.select(newDb.userSpaceStates).get(), hasLength(2));
+        expect(await newDb.select(newDb.spaceViewStates).get(), [
+          const v10.SpaceViewStatesData(spaceId: 'a', collapsed: 1),
+          const v10.SpaceViewStatesData(spaceId: 'b', collapsed: 0),
         ]);
       },
     );

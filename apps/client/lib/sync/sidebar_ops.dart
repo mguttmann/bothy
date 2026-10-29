@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The write of the personal sidebar: collapse and order of a space through the outbox
-/// (`putMySidebarSpace`; components.md 7; 04 14; brief M4-19 Design note 2).
+/// The write of the personal sidebar: the order of a space through the outbox
+/// (`putMySidebarSpace`; components.md 7; 04 14; brief M4-19 Design note 2). The collapse of a
+/// space stays on its device (01 6.7, R-PR-24) and is never written here.
 library;
 
 import 'package:api_client/api_client.dart';
@@ -88,13 +89,13 @@ abstract final class SidebarOps {
   }
 }
 
-/// Writes the person's sidebar: the local row changes at once, the write goes through the
-/// outbox (brief M4-19 Design note 2).
+/// Writes the person's sidebar order: the local row changes at once, the write goes through the
+/// outbox (brief M4-19 Design note 2). Each write sends the `collapsed` the server holds, so an
+/// order write never changes the collapse of another device (01 6.7, R-PR-24).
 ///
 /// Example:
 /// ```dart
 /// final writer = SidebarWriter(engine, db);
-/// await writer.setCollapsed(entry, collapsed: true);
 /// await writer.move(moveSpace(order, entry.space.id, 0));
 /// ```
 final class SidebarWriter {
@@ -103,10 +104,6 @@ final class SidebarWriter {
 
   final SyncEngine _engine;
   final LocalDatabase _db;
-
-  /// Collapses or expands [entry]; its personal order stays.
-  Future<void> setCollapsed(SidebarSpace entry, {required bool collapsed}) =>
-      _write(entry.space.id, collapsed: collapsed);
 
   /// Stores the personal keys of [writes] (from `moveSpace`).
   Future<void> move(List<SpaceOrderWrite> writes) async {

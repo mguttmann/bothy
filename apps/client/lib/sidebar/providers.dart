@@ -43,12 +43,23 @@ Stream<List<UserSpaceState>> userSpaceStates(Ref ref) {
       : db.structureDao.watchUserSpaceStates();
 }
 
+/// The spaces collapsed in the sidebar on this device (01 6.7, R-PR-24; kept in
+/// `space_view_states`, never synchronized).
+@riverpod
+Stream<Set<SpaceId>> collapsedSpaces(Ref ref) {
+  final db = ref.watch(localDatabaseProvider);
+  return db == null
+      ? Stream.value(const {})
+      : db.forumViewDao.watchCollapsedSpaces();
+}
+
 /// The spaces with the person's state, in the personal order with the global order as the
-/// fallback (`orderSpaces`); empty while either source loads.
+/// fallback (`orderSpaces`), collapsed as on this device; empty while either source loads.
 @riverpod
 List<SidebarSpace> spacesWithState(Ref ref) => orderSpaces(
   ref.watch(storedSpacesProvider).value ?? const [],
   ref.watch(userSpaceStatesProvider).value ?? const [],
+  collapsed: ref.watch(collapsedSpacesProvider).value ?? const {},
 );
 
 /// The stored channels of [spaceId] in their order.

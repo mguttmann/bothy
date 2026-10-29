@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// Access to `forum_view_states`, `channel_view_states` and `shell_view_state`: how forums and
-/// channel groups look on this device (brief M4-19 Design note 4, docs/DECISIONS.md D-M4-19-4;
+/// Access to `forum_view_states`, `channel_view_states`, `space_view_states` and
+/// `shell_view_state`: how forums, channel groups and spaces look on this device (brief M4-19 Design note 4, docs/DECISIONS.md D-M4-19-4;
 /// 01 6.8 item 7, D-SB-6), and whether the channel column next to an open thread is hidden (01
 /// D1, D2; M4-42), whether the session column shows (01 D1, D2; M4-45) and whether a forum group
-/// shows every open post (01 6.8 item 3; M4-46). Nothing of it is synchronized: 01 11 has no key
-/// for it.
+/// shows every open post (01 6.8 item 3; M4-46) and whether a space is collapsed (01 6.7,
+/// R-PR-24; FIX-device-mirroring-2). Nothing of it is synchronized: 01 11 has no key for it.
 library;
 
 import 'package:domain/domain.dart';
@@ -21,6 +21,8 @@ import '../database.dart';
 /// db.forumViewDao.watchDoneCollapsed(forum).listen(print); // false
 /// await db.forumViewDao.setGroupCollapsed(forum, collapsed: true);
 /// db.forumViewDao.watchCollapsedGroups().listen(print); // {forum}
+/// await db.forumViewDao.setSpaceCollapsed(space, collapsed: true);
+/// db.forumViewDao.watchCollapsedSpaces().listen(print); // {space}
 /// await db.forumViewDao.setPostListShownInFull(forum, inFull: true);
 /// db.forumViewDao.watchPostListsShownInFull().listen(print); // {forum}
 /// await db.forumViewDao.setOverviewPinned(pinned: true);
@@ -81,6 +83,30 @@ final class ForumViewDao {
           ChannelViewStatesCompanion.insert(
             channelId: channel.value,
             groupCollapsed: collapsed,
+          ),
+        );
+  }
+
+  /// The spaces that are collapsed in the sidebar on this device, emitted on every change; a
+  /// space without a stored row is expanded (01 6.7, R-PR-24: another device of the person
+  /// never changes it).
+  Stream<Set<SpaceId>> watchCollapsedSpaces() =>
+      (_db.select(_db.spaceViewStates)..where((t) => t.collapsed.equals(true)))
+          .map((row) => SpaceId.parse(row.spaceId))
+          .watch()
+          .map((spaces) => spaces.toSet());
+
+  /// Stores whether [space] is [collapsed] in the sidebar on this device.
+  Future<void> setSpaceCollapsed(
+    SpaceId space, {
+    required bool collapsed,
+  }) async {
+    await _db
+        .into(_db.spaceViewStates)
+        .insertOnConflictUpdate(
+          SpaceViewStatesCompanion.insert(
+            spaceId: space.value,
+            collapsed: collapsed,
           ),
         );
   }

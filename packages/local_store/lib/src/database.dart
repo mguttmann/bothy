@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The drift database of the apps, schema version 8 (docs/spec/15-client-architecture.md 6, ADR
+/// The drift database of the apps, schema version 10 (docs/spec/15-client-architecture.md 6, ADR
 /// 0029): the mirror tables of 15 6.1 and the local-only tables, `host_key_pins` (M4-36) and
-/// the sidebar view state `channel_view_states` and `shell_view_state` (M4-40, M4-42) included.
+/// the sidebar view state `channel_view_states`, `shell_view_state` (M4-40, M4-42) and
+/// `space_view_states` (FIX-device-mirroring-2) included.
 library;
 
 import 'dart:io';
@@ -73,6 +74,7 @@ part 'database.g.dart';
     HostKeyPins,
     ChannelViewStates,
     ShellViewStates,
+    SpaceViewStates,
   ],
   include: {'search.drift'},
 )
@@ -89,7 +91,7 @@ class LocalDatabase extends _$LocalDatabase {
   final DateTime Function() clock;
 
   @override
-  int get schemaVersion => 9;
+  int get schemaVersion => 10;
 
   /// Closes the database and releases its file, also while watched queries come and go.
   ///
@@ -163,6 +165,16 @@ class LocalDatabase extends _$LocalDatabase {
         schema.channelViewStates,
         schema.channelViewStates.postsShownInFull,
       ),
+      // Version 10 (FIX-device-mirroring-2): the local-only table `space_view_states`, filled
+      // from the stored `user_space_states.collapsed`, so every space keeps the state it showed
+      // (01 6.7, R-PR-24: the collapse of a space stays on its device); no row moves.
+      from9To10: (m, schema) async {
+        await m.createTable(schema.spaceViewStates);
+        await m.database.customStatement(
+          'INSERT INTO space_view_states (space_id, collapsed) '
+          'SELECT space_id, collapsed FROM user_space_states',
+        );
+      },
     ),
   );
 

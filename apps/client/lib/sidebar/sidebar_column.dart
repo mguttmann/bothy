@@ -387,8 +387,9 @@ class _TouchHoldRegionState extends State<_TouchHoldRegion> {
 /// The sidebar of the signed-in instance over the providers (R-CL-03).
 ///
 /// The desktop shows the group "Live and statistics" (D12) below the head. A click or Enter on
-/// a channel goes to `/c/<id>`; collapse and drag write the personal
-/// sidebar state through the outbox ([SidebarWriter]); [selectedChannel] follows the route.
+/// a channel goes to `/c/<id>`; collapse is kept on this device (`space_view_states`; 01 6.7,
+/// R-PR-24), a drag writes the personal order through the outbox ([SidebarWriter]);
+/// [selectedChannel] follows the route.
 /// As M1 of the phone ([phone], 01 5.3) it has no foot (the Me tab has it) and the search
 /// field opens Search instead of the quick switcher.
 class SidebarColumn extends ConsumerWidget {
@@ -438,8 +439,14 @@ class SidebarColumn extends ConsumerWidget {
       nodes: nodes,
       ownName: ref.watch(ownPrincipalProvider).value?.displayName,
       selectedChannel: selectedChannel,
-      onToggle: (node, expanded) =>
-          unawaited(writer()?.setCollapsed(node.entry, collapsed: !expanded)),
+      // 01 6.7, R-PR-24: the collapse of a space stays on this device; no outbox entry, so no
+      // other device of the person follows.
+      onToggle: (node, expanded) => unawaited(
+        ref
+            .read(localDatabaseProvider)
+            ?.forumViewDao
+            .setSpaceCollapsed(node.entry.space.id, collapsed: !expanded),
+      ),
       onMove: (space, to) => unawaited(
         writer()?.move(moveSpace([for (final n in nodes) n.entry], space, to)),
       ),
