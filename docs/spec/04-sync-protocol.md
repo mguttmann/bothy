@@ -745,6 +745,13 @@ the commit order in the server, expressed by the version.
 
 A device recognizes its own echo by `updated_by_device_id` and ignores it.
 
+Not synchronized (addendum of 2026-10-29, R-SY-29): the navigation state of a device. Its route
+(the open space, channel, thread or view), its selected sidebar row, its open and hidden columns
+and its scroll positions have no event, no setting key and no REST operation, and no event of
+this table changes them on another device (01 6.7). `focus` (section 6.2) reports what a
+connection shows so the server can deliver to it; it is per connection and never reaches another
+device.
+
 Lists of personal data (`listMyReadStates`, `listMyDrafts`, snapshot) name only threads
 and channels that the person may still read ([07-permissions.md](07-permissions.md), section 7.4, rule 1).
 The rows stay stored until their retention ends; if the person gets the read permission
@@ -1114,6 +1121,7 @@ sequenceDiagram
 | R-SY-26 | Live statistics as a subscription op with an ephemeral frame per interval on the gateway, not as a durable event and not as a separate WebSocket channel. | A frame is worthless after one interval; the gateway already brings login, permission checks and close codes ([25-visualization.md](25-visualization.md), R-VZ-05). |
 | R-SY-27 | Live details of the control room come through the optional `focus` member `background_thread_ids` within `sync.max_focused_threads`: run document and `run.updated` only, never "Active in the thread"; no overview op and no overview event (addendum of 2026-10-24). | The focus already delivers the whole document and its patches under `run.read`; `idle` is one flag per connection and follows the window state (15 section 10), so card threads need their own list to stay out of the notification rules (13 4.4); a card that nobody sees needs no live data, and a second fan-out path would need its own receive rule. |
 | R-SY-28 | The snapshot carries the active threads of every visible channel (open threads with an active run, open threads unread for the caller, plus open threads active within `sync.snapshot_thread_window`, up to `sync.snapshot_threads_per_channel` per channel); no new event, the client keeps them current from `thread.*` and `message.created` (addendum of 2026-10-27). | The sidebar shows the open sessions of every channel (01 6.8); without titles in the snapshot the client would list the threads of every channel on every connect; unread threads are always included because the sidebar ranks them above newer activity, and a thread the client does not hold gets no row. |
+| R-SY-29 | The navigation state of a device (route, selected row, open columns, scroll position) is not personal data of section 14: no event, no setting key, no REST operation (addendum of 2026-10-29). | Owner report 2026-10-29: each device of a person navigates on its own; only data syncs (01 6.7, R-PR-24). |
 
 ## 18. Configuration values of this chapter
 

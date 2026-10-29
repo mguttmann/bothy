@@ -104,11 +104,13 @@ class FakeInstance {
   }
 
   /// A second app of Alex on the same fake: its own data folder, keys and secrets (a second
-  /// simulated device, brief M4-25 Tests). The caller stops it with [stopSibling].
+  /// simulated device, brief M4-25 Tests); [platform] is its build (`ios` for a phone). The
+  /// caller stops it with [stopSibling].
   Future<FakeInstance> sibling({
     Map<String, String> config = fastConfig,
     StepUpPrompt? stepUpPrompt,
-  }) => _on(server, seed, config, null, stepUpPrompt, null);
+    String platform = 'macos',
+  }) => _on(server, seed, config, null, stepUpPrompt, null, platform: platform);
 
   static Future<FakeInstance> _on(
     FakeServer server,

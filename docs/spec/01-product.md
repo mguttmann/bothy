@@ -1520,6 +1520,14 @@ a second interaction.
 - **Destructive actions** (delete a message, revoke a grant, revoke a device) ask for confirmation
   once; administration actions with step-up ask for the confirmation of the device.
 - **Move:** The dialog shows only channels with the same operator; the thread ID stays.
+- **Each device navigates on its own** (addendum of 2026-10-29, R-PR-24). What a device shows
+  is its own: the route (open space, channel, thread or view), the selected sidebar row, the open
+  and hidden columns and the scroll position are never written to the server and never follow
+  another device of the person. Only data crosses devices (04 14): messages, read state and the
+  counters it gives, drafts, settings, the sidebar order and collapse of spaces and notification
+  preferences. Opening a thread on one device marks it read there; the other device updates its
+  counters and stays where it is. Only an action of the person on that device changes its route:
+  a click in the app, a clicked notification or push, a link.
 
 ### 6.8 Threads in the sidebar
 
@@ -1913,6 +1921,7 @@ Rules:
 | R-PR-21 | The space menu adds forums for the folders of a runner's projects folder that have none, as a checked list the owner confirms, one forum and binding per folder; a project forum's menu renames the forum, never the folder (6.10, 6.11, addendum of 2026-10-29). | Owner feedback 2026-10-29: his former setup synced a forum for every project folder and renamed project forums; the list is the preview, and a folder with a forum never gets a second one (D-M4-44-1 to D-M4-44-7). |
 | R-PR-22 | On desktop the session column can be hidden and shown from the header of a thread or main history ("Hide session", "Show session"), with Cmd+Shift+I and from a slim rail at the right edge while it is hidden, kept per device and per layout (addendum of 2026-10-29). | Owner feedback on the Mac app (2026-10-29): the session column read as not collapsible, because the header button only said "Column" and the choice was lost on restart. |
 | R-PR-23 | A forum group in the sidebar lists every open post by last activity, newest first, the newest `ui.sidebar_forum_posts_visible` and then "Show more" in place (kept per device); text channels keep the rule of 6.8 item 2 (addendum of 2026-10-29). | Owner decision 2026-10-29 ("like Discord"): after an import most open posts had no recent activity and vanished from the sidebar; a forum with 24 open posts showed none. |
+| R-PR-24 | Each device navigates on its own: route, selected row, open columns and scroll position stay on the device and never follow another device of the person; only data (messages, read state, counters, drafts, settings, sidebar order, notification preferences) syncs (6.7, 04 14; addendum of 2026-10-29). | Owner report 2026-10-29 (iPhone and Mac app of one person): opening a chat on the phone appeared to open the same chat on the Mac. The owner wants to do different things on phone and desktop. A test with two app instances of one person over the fake server holds the rule (docs/decisions.d/FIX-device-mirroring.md). |
 
 ## 14. Configuration values of this chapter
 
