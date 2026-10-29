@@ -19,7 +19,7 @@ final class FakePort implements NewProjectPort {
   final List<BindingReadiness?> answers = [];
   NewProjectFailure? failCreate;
   NewProjectFailure? failBind;
-  NewProjectFailure? failAssign;
+  Object? failAssign;
 
   @override
   Future<ChannelId> createForum(
@@ -194,6 +194,51 @@ void main() {
     expect(h.flow.sentEntry, 'entry-1');
     expect(h.flow.finished, isTrue);
   });
+
+  test('the idea is the draft before the runner is assigned, so a failure keeps it', () async {
+    final h = Harness();
+    h.port
+      ..failAssign = const NewProjectFailure.offline()
+      ..answers.add(_ready);
+    h.flow
+      ..mode = NewProjectMode.idea
+      ..idea = 'A shopping list app'
+      ..runner = _otherRunner;
+    await h.flow.run();
+    expect(h.flow.failedStep, NewProjectStep.assignRunner);
+    expect(h.port.calls, [
+      'createForum a-shopping-list-app',
+      'saveIdea A shopping list app',
+      'assignRunner ${_otherRunner.value}',
+    ]);
+    await h.flow.run();
+    expect(h.flow.finished, isTrue);
+    expect(h.port.calls.where((c) => c.startsWith('saveIdea')), hasLength(1));
+  });
+
+  test(
+    'an error other than a step failure fails the step and resumes there',
+    () async {
+      final h = Harness();
+      h.port
+        ..failAssign = StateError('outbox closed')
+        ..answers.add(_ready);
+      h.flow
+        ..mode = NewProjectMode.empty
+        ..name = 'website'
+        ..runner = _otherRunner;
+      await h.flow.run();
+      expect(h.flow.failedStep, NewProjectStep.assignRunner);
+      expect(h.flow.failure?.kind, NewProjectFailureKind.problem);
+      expect(h.flow.failure?.code, 'internal_error');
+      expect(
+        h.flow.stateOf(NewProjectStep.assignRunner),
+        NewProjectStepState.failed,
+      );
+      await h.flow.run();
+      expect(h.flow.finished, isTrue);
+    },
+  );
 
   test('a failed step stops, keeps what exists and resumes; a new name is a new key', () async {
     final h = Harness();

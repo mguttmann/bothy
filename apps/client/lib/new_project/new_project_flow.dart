@@ -436,10 +436,14 @@ final class NewProjectFlow extends ChangeNotifier {
         _set(step, NewProjectStepState.running);
         try {
           await _do(step);
-        } on NewProjectFailure catch (f) {
+        } on Object catch (e) {
           if (_closed) return;
           _failedStep = step;
-          _failure = f;
+          // Any other error (local draft or outbox, a malformed answer) fails the step too,
+          // so the person keeps "Try again" instead of a step that runs forever.
+          _failure = e is NewProjectFailure
+              ? e
+              : const NewProjectFailure.problem('internal_error');
           _set(step, NewProjectStepState.failed);
           return;
         }
@@ -465,13 +469,11 @@ final class NewProjectFlow extends ChangeNotifier {
           _keyName = _name;
         }
         _forum = await _port.createForum(space, _name, idempotencyKey: _key!);
+        await _saveIdea();
       case NewProjectStep.assignRunner:
         await _port.assignRunner(_forum!, _runner!);
       case NewProjectStep.bindProject:
-        if (_mode == NewProjectMode.idea && !_ideaSaved) {
-          await _port.saveIdea(_forum!, _idea);
-          _ideaSaved = true;
-        }
+        await _saveIdea();
         await _port.bind(
           _forum!,
           workspaceRef: _workspaceRef,
@@ -483,6 +485,14 @@ final class NewProjectFlow extends ChangeNotifier {
       case NewProjectStep.postIdea:
         _sentEntry = await _port.postIdea(_forum!, _idea);
     }
+  }
+
+  /// Stores the idea as the forum's post draft once, right after the forum exists, so a
+  /// failed later step or an early close keeps it (D-M4-43-9).
+  Future<void> _saveIdea() async {
+    if (_mode != NewProjectMode.idea || _ideaSaved) return;
+    await _port.saveIdea(_forum!, _idea);
+    _ideaSaved = true;
   }
 
   /// Reads the readiness until ready, a failure reason or the end of the flow (09 18.12): no
