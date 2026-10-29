@@ -54,6 +54,7 @@ versions run as in CI. Setup once per clone: `make bootstrap`.
 | `api-checks/` | check the copies of the API contracts against their sources (chapter 06, G2), generate the generated tables of 06 and `docs/api/webhooks.md` and check them against a fresh generation (G3) ([README](api-checks/README.md)) | `api-checks` (G2 and G3), `api-tables` | `api-checks/tests/` |
 | `contract/` | G7 against a live server: Schemathesis run, DPoP proofs, credential broker client, project checks, `curl` reproduction ([README](contract/README.md)); runs with Schemathesis and `cryptography`, the exception to the rule below | `contract-test` (from the Go test of `services/server/test/contract`) | `contract/tests/` |
 | `docs/tests/test_config_values.py`, `docs/tests/test_toolchain_doc.py` | number and version guards for the docs | `test` | |
+| `docs/tests/test_backupd_commands.py` | every `bothy-backupd` command line in the code of the current Markdown documents (briefs, decision and change logs left out) is a command, option or backup kind of the usage text in `services/server/cmd/bothy-backupd/main.go` | `test` | |
 | `sonarqube/` | local SonarQube and syncing of profile and gate ([README](sonarqube/README.md)) | `sonar-up`, `sonar-config`, `sonar-config-check`, `sonar-main-branch`, `sonar-visibility`, `sonar-new-code` | `sonarqube/tests/` |
 | `design-tokens/` | translate design tokens into CSS, Dart, contrast table and preview (chapter 15, design system) | `tokens` (`design-tokens/Makefile`, target `check`) | `design-tokens/tests/` (unittest, via `make tokens`) |
 

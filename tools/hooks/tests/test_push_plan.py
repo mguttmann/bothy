@@ -266,6 +266,6 @@ def test_the_tools_tests_of_component_sources_exist() -> None:
     start = text.index("TOOLS_SOURCE_TESTS := ")
     end = text.index("\n", text.index("\\\n", start) + 2)
     names = text[start:end].removeprefix("TOOLS_SOURCE_TESTS := ").replace("\\\n", " ").split()
-    assert len(names) == 3
+    assert len(names) == 4
     for name in names:
         assert (repo / "tools" / name).is_file(), name
