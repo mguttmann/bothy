@@ -1397,7 +1397,10 @@ class FakeServer:
         return self._answer_autocomplete(p["request_id"], body)
 
     def _create_message(self, thread_id: str, body: Any) -> _Answer:
-        """``createMessage``; ``attachment_file_ids`` attach completed own uploads (M3-07)."""
+        """``createMessage``; ``attachment_file_ids`` attach completed own uploads (M3-07).
+
+        A voice message with an upload answers ``409 file_not_ready``: uploads are never scanned.
+        """
         world = self.world
         uploads = []
         ids = body.get("attachment_file_ids") if isinstance(body, dict) else None
@@ -1407,6 +1410,10 @@ class FakeServer:
             if meta is None:
                 raise FakeProblem("not_found")
             uploads = self.uploads.check_attachable(ids, UUID(str(meta["channel_id"])))
+            if uploads and body.get("kind") == "voice":
+                # The FakeServer never scans an upload: it is not final, and a voice message
+                # needs a final file (12 8.1).
+                raise FakeProblem("file_not_ready")
         message, created = world.create_message(thread_id, body)
         if created and uploads:
             self.uploads.attach(uploads, message)

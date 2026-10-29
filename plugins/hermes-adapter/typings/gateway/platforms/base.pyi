@@ -7,6 +7,8 @@ from typing import Any
 from gateway.config import Platform, PlatformConfig
 from gateway.platforms.event import MessageEvent, ProcessingOutcome
 
+async def cache_audio_from_bytes_async(data: bytes, ext: str = ...) -> str: ...
+
 class SendResult:
     success: bool
     message_id: str | None
@@ -120,6 +122,17 @@ class BasePlatformAdapter:
         reply_to: str | None = ...,
         metadata: dict[str, Any] | None = ...,
     ) -> SendResult: ...
+    async def send_image_file(
+        self,
+        chat_id: str,
+        image_path: str,
+        caption: str | None = ...,
+        reply_to: str | None = ...,
+        metadata: dict[str, Any] | None = ...,
+        **kwargs: Any,
+    ) -> SendResult: ...
+    @staticmethod
+    def validate_media_delivery_path(path: str, session_key: str = ...) -> str | None: ...
     async def send_document(
         self,
         chat_id: str,

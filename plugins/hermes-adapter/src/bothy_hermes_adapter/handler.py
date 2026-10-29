@@ -17,7 +17,11 @@ SDK's (M2-29); this module decides what Hermes does:
 * `on_followup` steers a running turn or answers a waiting card; `on_interaction` resolves a
   card's Hermes callback exactly once and answers the interaction.
 * The `bothy_hermes_adapter.runtime.RuntimeEvents` methods take what Hermes reports during a
-  turn: live box, answer, edits, cards and usage.
+  turn: live box, answer, edits, cards, usage and the files it sends with its answer (each one
+  uploaded and sent as a message with that file attached, 09 17.3).
+* Before the turn, the audio attachments of the triggering message without a transcript are
+  transcribed with Hermes's own speech to text and the transcripts delivered to the server (09
+  13, 17.6).
 
 Logs (logger ``bothy_hermes_adapter``) carry run, thread and event IDs, reasons and codes only.
 
@@ -37,14 +41,17 @@ from datetime import datetime
 from typing import Any, Final
 from uuid import UUID
 
+import httpx
 from bothy_sdk.adapter import ActualBilling, AgentHandler, Invocation, StartOptions
 from bothy_sdk.errors import ProblemError
+from bothy_sdk.generated.api.admin import get_instance
 from bothy_sdk.generated.api.agent_runtime import (
     get_served_channel_config,
     report_agent_session,
     respond_to_interaction,
+    submit_transcript,
 )
-from bothy_sdk.generated.api.files import download_file
+from bothy_sdk.generated.api.files import download_file, get_file
 from bothy_sdk.generated.api.interactions import update_component
 from bothy_sdk.generated.api.messages import update_message
 from bothy_sdk.generated.api.threads import get_thread, set_thread_title
@@ -57,14 +64,17 @@ from bothy_sdk.generated.models import (
     ComponentUpdate,
     ComponentUpdateState,
     CostReport,
+    InstanceInfo,
     InteractionRespond,
     InteractionRespondState,
     InteractionResponse,
     MessageUpdate,
+    RunContext,
     RunMetrics,
     Thread,
     ThreadTitlePut,
     ToolClass,
+    TranscriptSubmit,
 )
 from bothy_sdk.generated.types import File, Unset
 from bothy_sdk.runs import RunHandle
@@ -76,9 +86,18 @@ from bothy_hermes_adapter.config import AdapterSettings
 from bothy_hermes_adapter.context_format import BuiltContext, build_context, cut_utf8
 from bothy_hermes_adapter.context_format import find_message_text as _find_text
 from bothy_hermes_adapter.live_box import LiveBox
+from bothy_hermes_adapter.media import (
+    FileRefused,
+    audio_to_transcribe,
+    read_local_file,
+    upload,
+    with_transcripts,
+)
 from bothy_hermes_adapter.runtime import (
     CardKind,
     CardRequest,
+    FileSent,
+    MediaKind,
     OpenCard,
     Runtime,
     SessionSwitch,
@@ -118,6 +137,7 @@ class _Turn:
 
     run_id: UUID
     thread_id: UUID
+    channel_id: UUID
     handle: RunHandle
     built: BuiltContext
     session_mode: str | None
@@ -133,6 +153,7 @@ class _Turn:
     card_versions: dict[UUID, int] = field(default_factory=dict)
     abort_reason: str | None = None
     final_reply: bool = False
+    upload_limit: int | None = None
     dropped: bool = False
     interrupted: bool = False
     settled: asyncio.Event = field(default_factory=asyncio.Event)
@@ -168,8 +189,10 @@ class HermesHandler(AgentHandler):
         self._turns: dict[UUID, _Turn] = {}
         self._by_run: dict[UUID, _Turn] = {}
         self._prepared: dict[UUID, BuiltContext] = {}
+        self._voice: dict[UUID, tuple[RunContext, ChannelBehavior | None]] = {}
         self._channels: dict[UUID, tuple[int, ChannelBehavior]] = {}
         self._tool_class = self._read_tool_class()
+        self._voice_input = self._read_voice_input()
         self._tasks: set[asyncio.Task[Any]] = set()
 
     # ---- mode, class, heartbeat ------------------------------------------------------------
@@ -180,6 +203,13 @@ class HermesHandler(AgentHandler):
         except Exception as exc:  # an unreadable toolset list is the highest class
             _LOG.warning("toolsets not readable: %s", type(exc).__name__)
             return "host"
+
+    def _read_voice_input(self) -> bool:
+        try:
+            return bool(self.runtime.voice_input())
+        except Exception as exc:  # an unreadable speech to text setup transcribes nothing
+            _LOG.warning("speech to text not readable: %s", type(exc).__name__)
+            return False
 
     def actual_mode(self) -> ActualMode:
         """Determine the actual billing mode now (09 17.8).
@@ -213,12 +243,15 @@ class HermesHandler(AgentHandler):
         """``details.capabilities`` of the heartbeat (09 2.2, 17.5).
 
         Returns:
-            ``components``, ``title`` and ``followups`` unless ``busy_input_mode`` is
-            ``interrupt``; never ``files_out`` or ``voice_input`` (not built).
+            ``components``, ``title`` and ``files_out``, ``followups`` unless
+            ``busy_input_mode`` is ``interrupt``, and ``voice_input`` while Hermes's speech to
+            text is on and finds a provider.
         """
-        caps: dict[str, Any] = {"components": True, "title": True}
+        caps: dict[str, Any] = {"components": True, "title": True, "files_out": True}
         if self.busy_mode in (BusyMode.STEER, BusyMode.QUEUE):
             caps["followups"] = self.busy_mode
+        if self._voice_input:
+            caps["voice_input"] = True
         return caps
 
     def heartbeat_report(self) -> tuple[ActualMode, str, dict[str, Any]]:
@@ -229,6 +262,7 @@ class HermesHandler(AgentHandler):
         """
         actual = self.actual_mode()
         self._tool_class = self._read_tool_class()
+        self._voice_input = self._read_voice_input()
         for turn in list(self._by_run.values()):
             if not turn.ended and actual.sdk_mode != turn.mode_used and turn.abort_reason is None:
                 _LOG.warning("run %s: actual mode changed during the turn", turn.run_id)
@@ -265,6 +299,9 @@ class HermesHandler(AgentHandler):
             fetch=self._fetcher(run),
             attachment_limit=self.settings.attachment_text_max_bytes,
         )
+        if audio_to_transcribe(ctx):
+            # Transcribed after the start, before the turn (09 13): the run is running meanwhile.
+            self._voice[run.run_id] = (ctx, channel)
         actual = self.actual_mode()
         return StartOptions(billing_evidence=BillingEvidence.from_dict(actual.evidence))
 
@@ -304,9 +341,13 @@ class HermesHandler(AgentHandler):
         if built is None:  # prepare ran in a process that no longer exists
             raise PrepareRefused("context")
         session = getattr(payload, "agent_session", None)
+        voice = self._voice.pop(run.run_id, None)
+        if voice is not None:
+            built = await self._transcribed(run, *voice) or built
         turn = _Turn(
             run_id=run.run_id,
             thread_id=run.thread_id,
+            channel_id=payload.channel_id,
             handle=run,
             built=built,
             session_mode=_text_or_none(getattr(payload, "session_mode", None)),
@@ -324,6 +365,85 @@ class HermesHandler(AgentHandler):
             raise
         finally:
             self._forget(turn)
+
+    async def _transcribed(
+        self, run: RunHandle, ctx: RunContext, channel: ChannelBehavior | None
+    ) -> BuiltContext | None:
+        """The turn's texts with Hermes's transcripts of the trigger's audio (09 13, 17.6).
+
+        Each audio attachment without a transcript is loaded whole and transcribed with Hermes's
+        own speech to text; a transcript stands in the person's text with the trust of the
+        message and is delivered with ``submitTranscript``; without one Hermes's note (the same
+        as on its other platforms) goes before the person's text. A file the server refuses
+        (``409 file_not_ready``, ``409 file_blocked``) is left as the context lists it.
+
+        Returns:
+            The new texts, or ``None`` when nothing changed.
+        """
+        transcripts: dict[UUID, str] = {}
+        notes: list[str] = []
+        for item in audio_to_transcribe(ctx):
+            data = await self._download(run, item.file_id)
+            if data is None:
+                continue
+            try:
+                result = await self.runtime.transcribe(
+                    data, str(item.original_name), str(item.mime_type)
+                )
+            except Exception as exc:  # the turn goes on without the transcript
+                _LOG.warning("run %s: transcription failed: %s", run.run_id, type(exc).__name__)
+                continue
+            if result.transcript is not None:
+                transcripts[item.file_id] = result.transcript
+                await self._submit_transcript(run, item.file_id, result.transcript)
+            elif result.note:
+                notes.append(result.note)
+        if not transcripts and not notes:
+            return None
+        built = await build_context(
+            with_transcripts(ctx, transcripts),
+            channel=channel,
+            fetch=self._fetcher(run),
+            attachment_limit=self.settings.attachment_text_max_bytes,
+        )
+        if not notes:
+            return built
+        prefix = "\n\n".join(notes)
+        text = f"{prefix}\n\n{built.user_text}" if built.user_text.strip() else prefix
+        return BuiltContext(system_part=built.system_part, user_text=text)
+
+    async def _download(self, run: RunHandle, file_id: UUID) -> bytes | None:
+        try:
+            result = await run.client.call(download_file.asyncio_detailed, file_id=file_id)
+        except ProblemError as exc:
+            _LOG.info("run %s: audio not loaded code=%s", run.run_id, exc.code)
+            return None
+        except httpx.TransportError:
+            _LOG.info("run %s: audio not loaded code=transport_error", run.run_id)
+            return None
+        if not isinstance(result, File):
+            return None
+        return bytes(result.payload.read())
+
+    async def _submit_transcript(self, run: RunHandle, file_id: UUID, text: str) -> None:
+        """``submitTranscript`` with the transcript ``ETag`` of ``getFile``; a refusal is logged.
+
+        The server keeps it only for a voice message in mode ``agent`` (09 13); any other answer
+        leaves the turn as it is.
+        """
+        client = run.client
+        try:
+            current = await client.call_detailed(get_file.asyncio_detailed, file_id=file_id)
+            await client.call(
+                submit_transcript.asyncio_detailed,
+                file_id=file_id,
+                body=TranscriptSubmit(text=text),
+                if_match=current.headers.get("ETag", ""),
+            )
+        except ProblemError as exc:
+            _LOG.info("run %s: transcript not submitted code=%s", run.run_id, exc.code)
+        except httpx.TransportError:
+            _LOG.info("run %s: transcript not submitted code=transport_error", run.run_id)
 
     async def _run_turn(self, inv: Invocation, turn: _Turn) -> None:
         payload = inv.payload
@@ -504,6 +624,7 @@ class HermesHandler(AgentHandler):
             del self._turns[turn.thread_id]
         self._by_run.pop(turn.run_id, None)
         self._prepared.pop(turn.run_id, None)
+        self._voice.pop(turn.run_id, None)
         self._spawn(self.store.drop_card(turn.run_id))
 
     def _spawn(self, coro: Any) -> None:
@@ -754,6 +875,68 @@ class HermesHandler(AgentHandler):
         if was_cut:
             _LOG.info("run %s: answer cut to the message limit", turn.run_id)
         return cut
+
+    async def on_file(
+        self, thread_id: UUID, path: str, kind: MediaKind, caption: str | None, name: str | None
+    ) -> FileSent:
+        """A file Hermes sends with its answer: upload it and send it attached (09 17.3).
+
+        The file must be a regular file (a symbolic link is not followed) within the server's
+        ``file_max_upload_bytes``; it goes through an upload session of the run's channel and
+        then as one message ``kind = text`` of the run with the caption as its text, a voice
+        too: the server refuses ``kind = voice`` until its scan has made the file final (12
+        8.1, ``409 file_not_ready``), and the scan runs only after ``completeUpload`` (12 3.4).
+        Nothing is sent when a step fails; Hermes then tells the person itself.
+
+        Returns:
+            The message, or the code of why nothing was sent.
+        """
+        del kind  # every file goes as kind = text, a voice too (see above)
+        turn = self._active(thread_id)
+        if turn is None:
+            return FileSent(None, "no_active_run")
+        with self._bound(turn):
+            limit = await self._upload_limit(turn)
+            if limit is None:
+                return FileSent(None, "limits_unavailable")
+            try:
+                local = await asyncio.to_thread(read_local_file, path, name, limit)
+            except FileRefused as exc:
+                _LOG.info("run %s: file not sent code=%s", turn.run_id, exc.code)
+                return FileSent(None, exc.code)
+            try:
+                file_id = await upload(turn.handle.client, turn.channel_id, local)
+            except FileRefused as exc:
+                _LOG.info("run %s: file not sent code=%s", turn.run_id, exc.code)
+                return FileSent(None, exc.code)
+            finally:
+                local.close()
+            if turn.live is not None:
+                turn.live.answer()
+            entry = await turn.handle.send(
+                self._cut(turn, caption or ""),
+                kind="text",
+                attachment_file_ids=[file_id],
+            )
+        if entry.message_id is None:
+            code = entry.problem_code or "not_sent"
+            _LOG.info("run %s: file not sent code=%s", turn.run_id, code)
+            return FileSent(None, code)
+        return FileSent(str(entry.message_id))
+
+    async def _upload_limit(self, turn: _Turn) -> int | None:
+        """``InstanceLimits.file_max_upload_bytes``, read once per run."""
+        if turn.upload_limit is None:
+            try:
+                info = await turn.handle.client.call_as(InstanceInfo, get_instance.asyncio_detailed)
+            except ProblemError as exc:
+                _LOG.info("run %s: limits not read code=%s", turn.run_id, exc.code)
+                return None
+            except httpx.TransportError:
+                _LOG.info("run %s: limits not read code=transport_error", turn.run_id)
+                return None
+            turn.upload_limit = int(info.limits.file_max_upload_bytes)
+        return turn.upload_limit
 
     async def on_card(self, thread_id: UUID, request: CardRequest) -> bool:
         """A Hermes prompt: a card of the run, then ``awaitRunInput`` (09 11; Design note 12).
