@@ -158,6 +158,23 @@ final class AttachController extends ChangeNotifier {
   /// The attachments in their order.
   List<PendingAttachment> get attachments => List.unmodifiable(_items);
 
+  /// How many more files this message takes under `message_max_attachments`, or null while the
+  /// limits are unknown (the server checks then).
+  int? get freeSlots {
+    final maxCount = limits?.messageMaxAttachments;
+    if (maxCount == null) return null;
+    final free = maxCount - _items.length;
+    return free < 0 ? 0 : free;
+  }
+
+  /// Whether one more file fits; when none does, [refusal] becomes [TooManyFiles] as an [add]
+  /// over the limit would set it, so a picker need not open for files that would be refused.
+  bool hasRoom() {
+    final maxCount = limits?.messageMaxAttachments;
+    if (maxCount == null || _items.length < maxCount) return true;
+    return _refuse(TooManyFiles(maxCount));
+  }
+
   /// Attaches [files]: refuses all of them with [refusal] when one is over a limit or cannot
   /// be read, before any entry is written (15 14, 04 13.2); otherwise writes one upload entry
   /// per file and returns true.

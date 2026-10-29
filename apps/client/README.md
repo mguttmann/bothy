@@ -833,8 +833,10 @@ sends; `PhoneVoiceRecorder` (`voice_recorder.dart`) runs the states, shows the n
 limit, so the `mvhd` duration the server reads stays within it (D-M5-07-1). With an accessibility
 service on, the microphone is a button: tap to record, tap to stop, then Send or Discard. The
 background or a call stops a running recording and keeps it. The attachment button opens camera,
-photo library or file; `media_picker.dart` turns a photo into a JPEG before the composer attaches
-it. Recordings and photos lie in the app's temporary folder until the outbox moves them into
+photo library or file; the camera takes one photo, the photo library several at once, up to the
+free slots of `message_max_attachments` (with none free the picker does not open). `media_picker.dart`
+turns each photo into a JPEG, all of one pick or none, and the composer attaches them to one
+message in the picker's order (M5-16). Recordings and photos lie in the app's temporary folder until the outbox moves them into
 the outgoing folder.
 
 Media permissions: iOS asks for the microphone and the camera at their first use with

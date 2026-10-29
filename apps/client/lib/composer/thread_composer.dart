@@ -284,7 +284,10 @@ class ThreadComposerState extends ConsumerState<ThreadComposer> {
     );
     if (!mounted) return;
     setState(
-      () => _photo = outcome is PhotoPicked || outcome is PhotoCancelled
+      () => _photo =
+          outcome is PhotoPicked ||
+              outcome is PhotoCancelled ||
+              outcome is PhotoNoRoom
           ? null
           : outcome,
     );
@@ -293,7 +296,7 @@ class ThreadComposerState extends ConsumerState<ThreadComposer> {
   String? _photoText(AppLocalizations l, PhotoOutcome? outcome) {
     final android = ref.read(appPortsProvider).platform == 'android';
     return switch (outcome) {
-      null || PhotoPicked() || PhotoCancelled() => null,
+      null || PhotoPicked() || PhotoCancelled() || PhotoNoRoom() => null,
       PhotoDenied(source: MediaSource.camera) =>
         android ? l.photoCameraDeniedAndroid : l.photoCameraDeniedIos,
       PhotoDenied(source: MediaSource.library) => l.photoLibraryDenied,
@@ -315,44 +318,55 @@ class ThreadComposerState extends ConsumerState<ThreadComposer> {
       child: Semantics(
         container: true,
         label: l.composerAttachments(attach.attachments.length),
-        child: ListenableBuilder(
-          listenable: progress,
-          builder: (context, _) => Wrap(
-            spacing: DsSpace.s6,
-            runSpacing: DsSpace.s6,
-            children: [
-              for (final a in attach.attachments)
-                () {
-                  OutboxEntryView? view;
-                  for (final v in outbox) {
-                    if (v.id == a.entryId) view = v;
-                  }
-                  final code = view?.failureCode;
-                  return UploadChip(
-                    attachmentKey: a.key,
-                    name: a.name,
-                    sizeBytes: a.sizeBytes,
-                    // A confirmed upload left the outbox: the server checks the file now.
-                    state: view == null
-                        ? AttachmentState.checking
-                        : stateOfUpload(view),
-                    percent: ((progress.fractionOf(a.key) ?? 0) * 100).round(),
-                    reason: code == null
-                        ? null
-                        : uploadFailureText(
-                            l,
-                            code,
-                            reason: view?.failureReason,
-                          ),
-                    onRemove: () => unawaited(attach.remove(a.key)),
-                    onRetry: () => unawaited(attach.retry(a.key)),
-                    // The local preview of a photo before sending (15 14, M5-07).
-                    previewPath: a.mimeType.startsWith('image/')
-                        ? a.path
-                        : null,
-                  );
-                }(),
-            ],
+        // Up to `message_max_attachments` chips (several photos of the library at once,
+        // M5-16) scroll within a quarter of the screen, so the field and the send button stay
+        // on a phone.
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(context).height / 4,
+          ),
+          child: SingleChildScrollView(
+            child: ListenableBuilder(
+              listenable: progress,
+              builder: (context, _) => Wrap(
+                spacing: DsSpace.s6,
+                runSpacing: DsSpace.s6,
+                children: [
+                  for (final a in attach.attachments)
+                    () {
+                      OutboxEntryView? view;
+                      for (final v in outbox) {
+                        if (v.id == a.entryId) view = v;
+                      }
+                      final code = view?.failureCode;
+                      return UploadChip(
+                        attachmentKey: a.key,
+                        name: a.name,
+                        sizeBytes: a.sizeBytes,
+                        // A confirmed upload left the outbox: the server checks the file now.
+                        state: view == null
+                            ? AttachmentState.checking
+                            : stateOfUpload(view),
+                        percent: ((progress.fractionOf(a.key) ?? 0) * 100)
+                            .round(),
+                        reason: code == null
+                            ? null
+                            : uploadFailureText(
+                                l,
+                                code,
+                                reason: view?.failureReason,
+                              ),
+                        onRemove: () => unawaited(attach.remove(a.key)),
+                        onRetry: () => unawaited(attach.retry(a.key)),
+                        // The local preview of a photo before sending (15 14, M5-07).
+                        previewPath: a.mimeType.startsWith('image/')
+                            ? a.path
+                            : null,
+                      );
+                    }(),
+                ],
+              ),
+            ),
           ),
         ),
       ),

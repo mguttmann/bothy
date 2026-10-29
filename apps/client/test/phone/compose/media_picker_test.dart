@@ -5,7 +5,8 @@
 // cannot turn into JPEG is refused, the picker's own file never stays, a denied camera or
 // library says so, and in the phone composer a photo is attached as `image/jpeg` through the
 // outbox while one over `file_max_upload_bytes` is refused with the reason before the outbox
-// and deleted.
+// and deleted. The library picks several photos at once up to the free attachment slots (M5-16):
+// all of them become JPEG attachments of one message in the picker's order, or none of them.
 
 import 'dart:io';
 import 'dart:typed_data';
@@ -74,7 +75,7 @@ void main() {
       port.next = raw('IMG_0042.HEIC', bytes);
       final outcome = await picker.pick(MediaSource.library);
       expect(port.asked, [MediaSource.library]);
-      final file = (outcome as PhotoPicked).file;
+      final file = (outcome as PhotoPicked).files.single;
       expect(file.name, 'IMG_0042.jpg');
       expect(file.owned, isTrue);
       expect(File(file.path).readAsBytesSync(), bytes);
@@ -85,7 +86,7 @@ void main() {
     test('a PNG from the camera becomes a JPEG', () async {
       port.next = raw('capture.png', pngImage());
       final outcome = await picker.pick(MediaSource.camera);
-      final file = (outcome as PhotoPicked).file;
+      final file = (outcome as PhotoPicked).files.single;
       expect(file.name, 'capture.jpg');
       final bytes = File(file.path).readAsBytesSync();
       expect(isJpeg(bytes), isTrue);
@@ -96,8 +97,9 @@ void main() {
 
     test('a transparent image becomes a JPEG on white', () async {
       port.next = raw('sticker.png', pngImage(alpha: true));
-      final file =
-          ((await picker.pick(MediaSource.library)) as PhotoPicked).file;
+      final file = ((await picker.pick(
+        MediaSource.library,
+      )) as PhotoPicked).files.single;
       final decoded = img.decodeJpg(File(file.path).readAsBytesSync())!;
       expect(decoded.numChannels, 3);
       // Red at 100 of 255 alpha over white is a light red, not the dark red of black.
@@ -128,6 +130,88 @@ void main() {
       expect(await picker.pick(MediaSource.library), isA<PhotoCancelled>());
       port.error = StateError('no camera');
       expect(await picker.pick(MediaSource.camera), isA<PhotoFailed>());
+    });
+
+    test('three photos of the library become three JPEGs in order', () async {
+      port.many = [
+        raw('IMG_0001.HEIC', jpegPhoto()),
+        raw('screen.png', pngImage()),
+        raw('IMG_0003.jpg', jpegPhoto()),
+      ];
+      final outcome = await picker.pick(MediaSource.library, limit: 7);
+      expect(port.asked, [MediaSource.library]);
+      expect(port.limits, [7]);
+      final files = (outcome as PhotoPicked).files;
+      expect(
+        [for (final f in files) f.name],
+        ['IMG_0001.jpg', 'screen.jpg', 'IMG_0003.jpg'],
+      );
+      for (final f in files) {
+        expect(f.owned, isTrue);
+        expect(f.path, startsWith(scratch.path));
+        expect(isJpeg(File(f.path).readAsBytesSync()), isTrue);
+      }
+      expect({for (final f in files) f.path}, hasLength(3));
+      expect(picked.listSync(), isEmpty);
+    });
+
+    test(
+      'the library limit is passed to the port; null when unknown',
+      () async {
+        port.many = [raw('a.jpg', jpegPhoto())];
+        await picker.pick(MediaSource.library, limit: 1);
+        port.many = [raw('b.jpg', jpegPhoto())];
+        await picker.pick(MediaSource.library);
+        expect(port.limits, [1, null]);
+      },
+    );
+
+    test('one photo that cannot become a JPEG refuses the whole set', () async {
+      port.many = [
+        raw('IMG_0001.jpg', jpegPhoto()),
+        raw('IMG_0002.HEIC', heicStart),
+        raw('IMG_0003.png', pngImage()),
+      ];
+      final outcome = await picker.pick(MediaSource.library, limit: 10);
+      expect((outcome as PhotoUnsupported).name, 'IMG_0002.HEIC');
+      // Neither the picker's files nor the JPEG already written stay.
+      expect(picked.listSync(), isEmpty);
+      expect(
+        scratch.existsSync() ? scratch.listSync() : const <FileSystemEntity>[],
+        isEmpty,
+      );
+    });
+
+    test('an unreadable photo of the set fails it and deletes all', () async {
+      final ok = raw('IMG_0001.jpg', jpegPhoto());
+      port.many = [
+        ok,
+        RawMedia(path: '${picked.path}/gone.jpg', name: 'gone.jpg'),
+        raw('IMG_0003.jpg', jpegPhoto()),
+      ];
+      final outcome = await picker.pick(MediaSource.library, limit: 10);
+      expect(outcome, isA<PhotoFailed>());
+      expect(picked.listSync(), isEmpty);
+      expect(
+        scratch.existsSync() ? scratch.listSync() : const <FileSystemEntity>[],
+        isEmpty,
+      );
+    });
+
+    test('an empty library pick is a cancel', () async {
+      port.many = const [];
+      expect(
+        await picker.pick(MediaSource.library, limit: 4),
+        isA<PhotoCancelled>(),
+      );
+    });
+
+    test('the camera still takes one photo and ignores the limit', () async {
+      port.next = raw('capture.jpg', jpegPhoto());
+      final outcome = await picker.pick(MediaSource.camera, limit: 5);
+      expect(port.asked, [MediaSource.camera]);
+      expect(port.limits, isEmpty);
+      expect((outcome as PhotoPicked).files, hasLength(1));
     });
 
     test('jpegName replaces the extension', () {
@@ -251,6 +335,117 @@ void main() {
           find.text(en.composerFileTooLarge(dsIsolate('big.jpg'), '16 B')),
           findsOneWidget,
         );
+        expect(await uploads(tester, host), isEmpty);
+        expect(Directory('${temporary.path}/photos').listSync(), isEmpty);
+        await host.dispose(tester);
+      },
+    );
+
+    Future<List<OutboxEntry>> messages(WidgetTester tester, ColumnHost host) =>
+        host.run(tester, () async {
+          final all = await host.db.outboxDao.allEntries();
+          return [
+            for (final e in all)
+              if (e.kind == MessageOps.createMessage) e,
+          ];
+        });
+
+    Future<List<RawMedia>> photos(
+      WidgetTester tester,
+      ColumnHost host,
+      int count, {
+      String prefix = 'IMG_',
+    }) => host.run(tester, () async {
+      return [
+        for (var i = 0; i < count; i++)
+          write(host, '$prefix${1000 + i}.HEIC', jpegPhoto()),
+      ];
+    });
+
+    testWidgets('four photos of the library go into one message', (
+      tester,
+    ) async {
+      final (host, media, temporary) = await open(tester);
+      media.many = await photos(tester, host, 4);
+      await choose(tester, host, 'library');
+      await settleUntil(
+        tester,
+        host,
+        find.byKey(const ValueKey('upload.attach-3')),
+      );
+      // The instance allows 10 attachments, none is attached yet.
+      expect(media.limits, [10]);
+      for (var i = 0; i < 4; i++) {
+        expect(find.byKey(ValueKey('upload.attach-$i')), findsOneWidget);
+      }
+      final ups = await uploads(tester, host);
+      expect(
+        [for (final u in ups) decodePayload(u.payload)['name']],
+        ['IMG_1000.jpg', 'IMG_1001.jpg', 'IMG_1002.jpg', 'IMG_1003.jpg'],
+      );
+      expect(Directory('${temporary.path}/photos').listSync(), isEmpty);
+
+      await tester.tap(
+        find.byWidgetPredicate(
+          (w) => w is DsTappable && w.label == en.composerSend,
+        ),
+      );
+      await host.settle(tester);
+      final sent = (await messages(tester, host)).single;
+      expect(decodePayload(sent.payload)['attachment_keys'], [
+        'attach-0',
+        'attach-1',
+        'attach-2',
+        'attach-3',
+      ]);
+      await host.dispose(tester);
+    });
+
+    testWidgets('the library offers only the free attachment slots', (
+      tester,
+    ) async {
+      final (host, media, _) = await open(tester);
+      media.many = await photos(tester, host, 9);
+      await choose(tester, host, 'library');
+      await settleUntil(
+        tester,
+        host,
+        find.byKey(const ValueKey('upload.attach-8')),
+      );
+      media.many = await photos(tester, host, 1, prefix: 'LAST_');
+      await choose(tester, host, 'library');
+      await settleUntil(
+        tester,
+        host,
+        find.byKey(const ValueKey('upload.attach-9')),
+      );
+      expect(media.limits, [10, 1]);
+
+      // With all 10 slots taken the picker does not open; the refusal says why.
+      await choose(tester, host, 'library');
+      await settleUntil(
+        tester,
+        host,
+        find.byKey(const ValueKey('composer.attachError')),
+      );
+      expect(find.text(en.composerTooManyFiles(10)), findsOneWidget);
+      expect(media.asked, [MediaSource.library, MediaSource.library]);
+      expect(await uploads(tester, host), hasLength(10));
+      await host.dispose(tester);
+    });
+
+    testWidgets(
+      'a set over the limit from a picker that ignores it is refused',
+      (tester) async {
+        final (host, media, temporary) = await open(tester);
+        media.many = await photos(tester, host, 11);
+        await choose(tester, host, 'library');
+        await settleUntil(
+          tester,
+          host,
+          find.byKey(const ValueKey('composer.attachError')),
+        );
+        expect(find.text(en.composerTooManyFiles(10)), findsOneWidget);
         expect(await uploads(tester, host), isEmpty);
         expect(Directory('${temporary.path}/photos').listSync(), isEmpty);
         await host.dispose(tester);

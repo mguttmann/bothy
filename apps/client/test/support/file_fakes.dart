@@ -234,23 +234,40 @@ FilePorts fakeFilePorts({
       temporary ?? Directory.systemTemp.createTempSync('phone-temp'),
 );
 
-/// A camera and photo picker that return what the test sets (brief M5-07 Tests).
+/// A camera and photo picker that return what the test sets (brief M5-07 Tests, M5-16).
 class FakeMediaPort implements MediaPickerPort {
-  /// The next result: a file the test wrote, or null for "cancelled".
+  /// The next photo of the camera, and of the library while [many] is null: a file the test
+  /// wrote, or null for "cancelled".
   RawMedia? next;
 
-  /// When set, [pick] throws it (for example [MediaAccessDenied]).
+  /// The next photos of the library, in the picker's order; an empty list is "cancelled".
+  List<RawMedia>? many;
+
+  /// When set, the picker throws it (for example [MediaAccessDenied]).
   Object? error;
 
   /// The sources asked for, in order.
   final List<MediaSource> asked = [];
 
+  /// The limit of every library call, in order.
+  final List<int?> limits = [];
+
   @override
-  Future<RawMedia?> pick(MediaSource source) async {
-    asked.add(source);
+  Future<RawMedia?> camera() async {
+    asked.add(MediaSource.camera);
     final e = error;
     if (e != null) throw e;
     return next;
+  }
+
+  @override
+  Future<List<RawMedia>> library({int? limit}) async {
+    asked.add(MediaSource.library);
+    limits.add(limit);
+    final e = error;
+    if (e != null) throw e;
+    final one = next;
+    return many ?? [?one];
   }
 }
 
