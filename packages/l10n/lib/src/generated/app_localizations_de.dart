@@ -3614,7 +3614,10 @@ class AppLocalizationsDe extends AppLocalizations {
   String get threadPin => 'Anheften';
 
   @override
-  String get threadColumn => 'Spalte';
+  String get threadHideSession => 'Sitzung ausblenden';
+
+  @override
+  String get threadShowSession => 'Sitzung einblenden';
 
   @override
   String get threadHideChannel => 'Kanal ausblenden';

@@ -92,7 +92,11 @@ class DesktopShell extends ConsumerWidget {
     // person shows it.
     final textChannel =
         selection.kind == ChannelKind.text && selection.thread != null;
-    final shown = ref.watch(sessionColumnShownProvider);
+    // M4-45: whether the person hid (or, beside a text channel's thread, showed) the session
+    // column on this device; the default of the layout until the database answers.
+    final sessionHidden =
+        ref.watch(sessionColumnHiddenProvider(textThread: textChannel)).value ??
+        textChannel;
     final channelOfRoute = selection.channel == null
         ? null
         : ref
@@ -178,9 +182,12 @@ class DesktopShell extends ConsumerWidget {
         // D1, D2: the session column of the open thread or main history; the views have
         // none (the same rule as `showSession` below).
         ShortcutAction.toggleSessionColumn: KeyboardHandler(
-          () => ref
-              .read(sessionColumnShownProvider.notifier)
-              .toggle(textThread: textChannel),
+          () => unawaited(
+            toggleSessionColumn(
+              ref.read(localDatabaseProvider),
+              textThread: textChannel,
+            ),
+          ),
           enabled: hasSession,
         ),
         // 01 7: Cmd+Shift+H or Ctrl+Shift+H hides or shows the channel next to an open thread;
@@ -210,8 +217,16 @@ class DesktopShell extends ConsumerWidget {
                 // A hidden channel column gives the open post the overview's room (M4-42).
                 listPinned: pinned && !(thread && channelHidden),
                 // The cross-cutting views (search, mentions, Running now) have no session.
-                showSession:
-                    !isView && (textChannel ? shown.textThread : shown.forum),
+                showSession: !isView && !sessionHidden,
+                // M4-45: the slim rail that brings a hidden session column back.
+                onShowSession: hasSession
+                    ? () => unawaited(
+                        showSessionColumn(
+                          ref.read(localDatabaseProvider),
+                          textThread: textChannel,
+                        ),
+                      )
+                    : null,
                 onWidthsChanged: (next) {
                   final settings = ref.read(settingsRepositoryProvider);
                   if (settings != null) ColumnWidthsWriter(settings).save(next);

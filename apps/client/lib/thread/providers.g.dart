@@ -1123,83 +1123,108 @@ final class DraftEditingProvider
 
 String _$draftEditingHash() => r'2b5ecf8e8bd0399c4574add5ad6bea7e392e0aad';
 
-/// Whether the session column shows (the header buttons "Column" and "Pin", 01 5.1 D1): next to
-/// a forum thread it shows unless the person hid it; next to a thread of a text channel it is
-/// collapsed until the person shows it (D2). It lasts while the app runs.
+/// Whether the session column is hidden on this device (the header buttons "Hide session",
+/// "Show session" and "Pin", Cmd+Shift+I, the rail at the right edge; 01 5.1 D1, D2, M4-45):
+/// [textThread] names the layout of a thread beside the main history of its text channel, where
+/// the column is collapsed until the person shows it (D2); in every other layout it shows until
+/// the person hides it (D1). Kept in the local view state, never synchronized, like the channel
+/// column of M4-42 (D-M4-42-2). The default of the layout until the database answers.
 
-@ProviderFor(SessionColumnShown)
-final sessionColumnShownProvider = SessionColumnShownProvider._();
+@ProviderFor(sessionColumnHidden)
+final sessionColumnHiddenProvider = SessionColumnHiddenFamily._();
 
-/// Whether the session column shows (the header buttons "Column" and "Pin", 01 5.1 D1): next to
-/// a forum thread it shows unless the person hid it; next to a thread of a text channel it is
-/// collapsed until the person shows it (D2). It lasts while the app runs.
-final class SessionColumnShownProvider
-    extends
-        $NotifierProvider<SessionColumnShown, ({bool forum, bool textThread})> {
-  /// Whether the session column shows (the header buttons "Column" and "Pin", 01 5.1 D1): next to
-  /// a forum thread it shows unless the person hid it; next to a thread of a text channel it is
-  /// collapsed until the person shows it (D2). It lasts while the app runs.
-  SessionColumnShownProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'sessionColumnShownProvider',
-        isAutoDispose: false,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
+/// Whether the session column is hidden on this device (the header buttons "Hide session",
+/// "Show session" and "Pin", Cmd+Shift+I, the rail at the right edge; 01 5.1 D1, D2, M4-45):
+/// [textThread] names the layout of a thread beside the main history of its text channel, where
+/// the column is collapsed until the person shows it (D2); in every other layout it shows until
+/// the person hides it (D1). Kept in the local view state, never synchronized, like the channel
+/// column of M4-42 (D-M4-42-2). The default of the layout until the database answers.
+
+final class SessionColumnHiddenProvider
+    extends $FunctionalProvider<AsyncValue<bool>, bool, Stream<bool>>
+    with $FutureModifier<bool>, $StreamProvider<bool> {
+  /// Whether the session column is hidden on this device (the header buttons "Hide session",
+  /// "Show session" and "Pin", Cmd+Shift+I, the rail at the right edge; 01 5.1 D1, D2, M4-45):
+  /// [textThread] names the layout of a thread beside the main history of its text channel, where
+  /// the column is collapsed until the person shows it (D2); in every other layout it shows until
+  /// the person hides it (D1). Kept in the local view state, never synchronized, like the channel
+  /// column of M4-42 (D-M4-42-2). The default of the layout until the database answers.
+  SessionColumnHiddenProvider._({
+    required SessionColumnHiddenFamily super.from,
+    required bool super.argument,
+  }) : super(
+         retry: null,
+         name: r'sessionColumnHiddenProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
 
   @override
-  String debugGetCreateSourceHash() => _$sessionColumnShownHash();
+  String debugGetCreateSourceHash() => _$sessionColumnHiddenHash();
+
+  @override
+  String toString() {
+    return r'sessionColumnHiddenProvider'
+        ''
+        '($argument)';
+  }
 
   @$internal
   @override
-  SessionColumnShown create() => SessionColumnShown();
+  $StreamProviderElement<bool> $createElement($ProviderPointer pointer) =>
+      $StreamProviderElement(pointer);
 
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(({bool forum, bool textThread}) value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<({bool forum, bool textThread})>(
-        value,
-      ),
-    );
+  @override
+  Stream<bool> create(Ref ref) {
+    final argument = this.argument as bool;
+    return sessionColumnHidden(ref, textThread: argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is SessionColumnHiddenProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
   }
 }
 
-String _$sessionColumnShownHash() =>
-    r'170a57de08078cf0c7a7975dbe3aba47c715dfc0';
+String _$sessionColumnHiddenHash() =>
+    r'5a742566174862f6e321eb55eefd68bae1fec758';
 
-/// Whether the session column shows (the header buttons "Column" and "Pin", 01 5.1 D1): next to
-/// a forum thread it shows unless the person hid it; next to a thread of a text channel it is
-/// collapsed until the person shows it (D2). It lasts while the app runs.
+/// Whether the session column is hidden on this device (the header buttons "Hide session",
+/// "Show session" and "Pin", Cmd+Shift+I, the rail at the right edge; 01 5.1 D1, D2, M4-45):
+/// [textThread] names the layout of a thread beside the main history of its text channel, where
+/// the column is collapsed until the person shows it (D2); in every other layout it shows until
+/// the person hides it (D1). Kept in the local view state, never synchronized, like the channel
+/// column of M4-42 (D-M4-42-2). The default of the layout until the database answers.
 
-abstract class _$SessionColumnShown
-    extends $Notifier<({bool forum, bool textThread})> {
-  ({bool forum, bool textThread}) build();
-  @$mustCallSuper
+final class SessionColumnHiddenFamily extends $Family
+    with $FunctionalFamilyOverride<Stream<bool>, bool> {
+  SessionColumnHiddenFamily._()
+    : super(
+        retry: null,
+        name: r'sessionColumnHiddenProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// Whether the session column is hidden on this device (the header buttons "Hide session",
+  /// "Show session" and "Pin", Cmd+Shift+I, the rail at the right edge; 01 5.1 D1, D2, M4-45):
+  /// [textThread] names the layout of a thread beside the main history of its text channel, where
+  /// the column is collapsed until the person shows it (D2); in every other layout it shows until
+  /// the person hides it (D1). Kept in the local view state, never synchronized, like the channel
+  /// column of M4-42 (D-M4-42-2). The default of the layout until the database answers.
+
+  SessionColumnHiddenProvider call({required bool textThread}) =>
+      SessionColumnHiddenProvider._(argument: textThread, from: this);
+
   @override
-  WhenComplete runBuild() {
-    final ref =
-        this.ref
-            as $Ref<
-              ({bool forum, bool textThread}),
-              ({bool forum, bool textThread})
-            >;
-    final element =
-        ref.element
-            as $ClassProviderElement<
-              AnyNotifier<
-                ({bool forum, bool textThread}),
-                ({bool forum, bool textThread})
-              >,
-              ({bool forum, bool textThread}),
-              Object?,
-              Object?
-            >;
-    return element.handleCreate(ref, build);
-  }
+  String toString() => r'sessionColumnHiddenProvider';
 }
 
 /// The [ThreadPermissions] of [channelId].

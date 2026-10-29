@@ -696,6 +696,18 @@ choice is kept per device in `shell_view_state` (`channelColumnHiddenProvider`) 
 another thread opens from the sidebar; the pin of the overview does not change. Rulings:
 docs/decisions.d/M4-42.md.
 
+### Session column toggle on the desktop (M4-45)
+
+The right session column hides and shows like the channel column: "Hide session" in the header
+of a thread or main history (the former "Column"), Cmd+Shift+I (Ctrl+Shift+I) and the Thread
+menu hide it so the history takes its width; "Show session", the same keys, "Pin" and the slim
+rail at the right edge of `ColumnLayout` (`onShowSession`, only while the column is hidden and
+the window has room for it) show it again. The choice is kept per device and per layout in
+`shell_view_state` (`sessionColumnHiddenProvider`, `toggleSessionColumn`, `showSessionColumn` in
+`lib/thread/providers.dart`): shown by default beside a forum post or a main history alone,
+collapsed by default beside a thread of a text channel (01 D2). Rulings:
+docs/decisions.d/M4-45.md.
+
 ### Threads and new chat on the phone (M5-15)
 
 M1 Spaces on the iPhone and on Android is the same `SidebarColumn` (`phone: true`) with the same

@@ -80,8 +80,9 @@ final Map<String, List<Map<String, Object?>>> _rowsV1 = {
 
 /// The pins of version 4 (M4-36, `host_key_pins`): the table is new there, the other preserved
 /// tables keep the rows of version 1; version 5 (M5-08, `instance.app_lock`), version 6
-/// (M4-40, the sidebar view state and `channels.project_bound`) and version 7 (M4-42,
-/// `shell_view_state.channel_column_hidden`) left the preserved tables as they were.
+/// (M4-40, the sidebar view state and `channels.project_bound`), version 7 (M4-42,
+/// `shell_view_state.channel_column_hidden`) and version 8 (M4-45, the session column state of
+/// `shell_view_state`) left the preserved tables as they were.
 final Map<String, List<Map<String, Object?>>> _rowsV4 = {
   ..._rowsV1,
   'host_key_pins': [
@@ -126,6 +127,7 @@ final Map<int, Map<String, List<Map<String, Object?>>>> _fixtureRows = {
   5: _rowsV4,
   6: _rowsV4,
   7: _rowsV4,
+  8: _rowsV4,
 };
 
 void _insert(Database raw, Map<String, List<Map<String, Object?>>> rows) {

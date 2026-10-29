@@ -3,7 +3,8 @@
 /// The header of a thread or of the main history of a channel (brief M4-20 Design note 5;
 /// 01 5.1 D1 and D2, 6.1, 6.7): the title with its "automatic" mark, below the title of a main
 /// history the kind sentence of a text channel (01 6.8 item 11, M4-40), the operator or "No agent
-/// answers here", Done or Reopen, Move, Pin, Column and the menu of M4-33. On the phone
+/// answers here", Done or Reopen, Move, Pin, Hide or Show session (M4-45), Hide or Show channel
+/// (M4-42) and the menu of M4-33. On the phone
 /// ([ThreadHeader.compact], 01 5.3 M3) the actions sit in one overflow menu next to the title.
 library;
 
@@ -66,6 +67,7 @@ class ThreadHeader extends StatelessWidget {
     required this.onMove,
     required this.onPin,
     required this.onColumn,
+    this.sessionColumnHidden = false,
     this.onChannelColumn,
     this.channelColumnHidden = false,
     this.menu,
@@ -87,8 +89,12 @@ class ThreadHeader extends StatelessWidget {
   /// Shows the pinned messages in the session column.
   final VoidCallback onPin;
 
-  /// Shows or hides the session column.
+  /// Hides or shows the session column (01 D1; M4-45).
   final VoidCallback onColumn;
+
+  /// Whether the session column is hidden: the button reads "Show session", else "Hide
+  /// session".
+  final bool sessionColumnHidden;
 
   /// Hides or shows the channel column beside the open thread (the main history of a text
   /// channel or the pinned forum overview, 01 D1, D2; M4-42), or null when there is none.
@@ -250,10 +256,11 @@ class ThreadHeader extends StatelessWidget {
                   onMove,
                 ),
               action('thread.pin', DsIcons.actionPin, l.threadPin, onPin),
+              // M4-45 (01 D1): the label says which column and what a tap does.
               action(
                 'thread.column',
                 DsIcons.actionTogglePanel,
-                l.threadColumn,
+                sessionColumnHidden ? l.threadShowSession : l.threadHideSession,
                 onColumn,
               ),
               if (onChannelColumn case final toggle?)

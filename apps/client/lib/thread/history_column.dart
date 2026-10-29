@@ -505,6 +505,9 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
     final channelHidden =
         channelColumn &&
         (ref.watch(channelColumnHiddenProvider).value ?? false);
+    final sessionHidden =
+        ref.watch(sessionColumnHiddenProvider(textThread: textLayout)).value ??
+        textLayout;
     final starters = main
         ? ref.watch(threadsOfChannelProvider(channelId)).value ?? const []
         : const <Thread>[];
@@ -710,12 +713,20 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
               onMove: () => unawaited(_move(thread, channel)),
               onPin: phone
                   ? () => unawaited(_openSession())
-                  : () => ref
-                        .read(sessionColumnShownProvider.notifier)
-                        .show(textThread: textLayout),
-              onColumn: () => ref
-                  .read(sessionColumnShownProvider.notifier)
-                  .toggle(textThread: textLayout),
+                  : () => unawaited(
+                      showSessionColumn(
+                        ref.read(localDatabaseProvider),
+                        textThread: textLayout,
+                      ),
+                    ),
+              // M4-45 (01 D1, D2): kept on this device per layout.
+              onColumn: () => unawaited(
+                toggleSessionColumn(
+                  ref.read(localDatabaseProvider),
+                  textThread: textLayout,
+                ),
+              ),
+              sessionColumnHidden: sessionHidden,
               // M4-42 (01 D1, D2): the channel column beside the thread can be hidden.
               onChannelColumn: channelColumn
                   ? () => unawaited(

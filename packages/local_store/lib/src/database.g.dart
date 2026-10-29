@@ -18663,11 +18663,42 @@ class $ShellViewStatesTable extends ShellViewStates
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _sessionColumnHiddenMeta =
+      const VerificationMeta('sessionColumnHidden');
+  @override
+  late final GeneratedColumn<bool> sessionColumnHidden = GeneratedColumn<bool>(
+    'session_column_hidden',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("session_column_hidden" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _textThreadSessionShownMeta =
+      const VerificationMeta('textThreadSessionShown');
+  @override
+  late final GeneratedColumn<bool> textThreadSessionShown =
+      GeneratedColumn<bool>(
+        'text_thread_session_shown',
+        aliasedName,
+        false,
+        type: DriftSqlType.bool,
+        requiredDuringInsert: false,
+        defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("text_thread_session_shown" IN (0, 1))',
+        ),
+        defaultValue: const Constant(false),
+      );
   @override
   List<GeneratedColumn> get $columns => [
     id,
     overviewPinned,
     channelColumnHidden,
+    sessionColumnHidden,
+    textThreadSessionShown,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -18702,6 +18733,24 @@ class $ShellViewStatesTable extends ShellViewStates
         ),
       );
     }
+    if (data.containsKey('session_column_hidden')) {
+      context.handle(
+        _sessionColumnHiddenMeta,
+        sessionColumnHidden.isAcceptableOrUnknown(
+          data['session_column_hidden']!,
+          _sessionColumnHiddenMeta,
+        ),
+      );
+    }
+    if (data.containsKey('text_thread_session_shown')) {
+      context.handle(
+        _textThreadSessionShownMeta,
+        textThreadSessionShown.isAcceptableOrUnknown(
+          data['text_thread_session_shown']!,
+          _textThreadSessionShownMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -18722,6 +18771,14 @@ class $ShellViewStatesTable extends ShellViewStates
       channelColumnHidden: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}channel_column_hidden'],
+      )!,
+      sessionColumnHidden: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}session_column_hidden'],
+      )!,
+      textThreadSessionShown: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}text_thread_session_shown'],
       )!,
     );
   }
@@ -18744,10 +18801,20 @@ class ShellViewStateRow extends DataClass
   /// whole content width (01 D1, D2; M4-42): the main history of a text channel, or the pinned
   /// overview of a forum.
   final bool channelColumnHidden;
+
+  /// Whether the person hid the session column where it shows by default (01 D1, D2; M4-45):
+  /// next to a forum post and next to a main history alone.
+  final bool sessionColumnHidden;
+
+  /// Whether the person showed the session column next to a thread of a text channel, where it
+  /// is collapsed by default (01 D2; M4-45).
+  final bool textThreadSessionShown;
   const ShellViewStateRow({
     required this.id,
     required this.overviewPinned,
     required this.channelColumnHidden,
+    required this.sessionColumnHidden,
+    required this.textThreadSessionShown,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -18755,6 +18822,8 @@ class ShellViewStateRow extends DataClass
     map['id'] = Variable<int>(id);
     map['overview_pinned'] = Variable<bool>(overviewPinned);
     map['channel_column_hidden'] = Variable<bool>(channelColumnHidden);
+    map['session_column_hidden'] = Variable<bool>(sessionColumnHidden);
+    map['text_thread_session_shown'] = Variable<bool>(textThreadSessionShown);
     return map;
   }
 
@@ -18763,6 +18832,8 @@ class ShellViewStateRow extends DataClass
       id: Value(id),
       overviewPinned: Value(overviewPinned),
       channelColumnHidden: Value(channelColumnHidden),
+      sessionColumnHidden: Value(sessionColumnHidden),
+      textThreadSessionShown: Value(textThreadSessionShown),
     );
   }
 
@@ -18777,6 +18848,12 @@ class ShellViewStateRow extends DataClass
       channelColumnHidden: serializer.fromJson<bool>(
         json['channelColumnHidden'],
       ),
+      sessionColumnHidden: serializer.fromJson<bool>(
+        json['sessionColumnHidden'],
+      ),
+      textThreadSessionShown: serializer.fromJson<bool>(
+        json['textThreadSessionShown'],
+      ),
     );
   }
   @override
@@ -18786,6 +18863,8 @@ class ShellViewStateRow extends DataClass
       'id': serializer.toJson<int>(id),
       'overviewPinned': serializer.toJson<bool>(overviewPinned),
       'channelColumnHidden': serializer.toJson<bool>(channelColumnHidden),
+      'sessionColumnHidden': serializer.toJson<bool>(sessionColumnHidden),
+      'textThreadSessionShown': serializer.toJson<bool>(textThreadSessionShown),
     };
   }
 
@@ -18793,10 +18872,15 @@ class ShellViewStateRow extends DataClass
     int? id,
     bool? overviewPinned,
     bool? channelColumnHidden,
+    bool? sessionColumnHidden,
+    bool? textThreadSessionShown,
   }) => ShellViewStateRow(
     id: id ?? this.id,
     overviewPinned: overviewPinned ?? this.overviewPinned,
     channelColumnHidden: channelColumnHidden ?? this.channelColumnHidden,
+    sessionColumnHidden: sessionColumnHidden ?? this.sessionColumnHidden,
+    textThreadSessionShown:
+        textThreadSessionShown ?? this.textThreadSessionShown,
   );
   ShellViewStateRow copyWithCompanion(ShellViewStatesCompanion data) {
     return ShellViewStateRow(
@@ -18807,6 +18891,12 @@ class ShellViewStateRow extends DataClass
       channelColumnHidden: data.channelColumnHidden.present
           ? data.channelColumnHidden.value
           : this.channelColumnHidden,
+      sessionColumnHidden: data.sessionColumnHidden.present
+          ? data.sessionColumnHidden.value
+          : this.sessionColumnHidden,
+      textThreadSessionShown: data.textThreadSessionShown.present
+          ? data.textThreadSessionShown.value
+          : this.textThreadSessionShown,
     );
   }
 
@@ -18815,46 +18905,68 @@ class ShellViewStateRow extends DataClass
     return (StringBuffer('ShellViewStateRow(')
           ..write('id: $id, ')
           ..write('overviewPinned: $overviewPinned, ')
-          ..write('channelColumnHidden: $channelColumnHidden')
+          ..write('channelColumnHidden: $channelColumnHidden, ')
+          ..write('sessionColumnHidden: $sessionColumnHidden, ')
+          ..write('textThreadSessionShown: $textThreadSessionShown')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, overviewPinned, channelColumnHidden);
+  int get hashCode => Object.hash(
+    id,
+    overviewPinned,
+    channelColumnHidden,
+    sessionColumnHidden,
+    textThreadSessionShown,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is ShellViewStateRow &&
           other.id == this.id &&
           other.overviewPinned == this.overviewPinned &&
-          other.channelColumnHidden == this.channelColumnHidden);
+          other.channelColumnHidden == this.channelColumnHidden &&
+          other.sessionColumnHidden == this.sessionColumnHidden &&
+          other.textThreadSessionShown == this.textThreadSessionShown);
 }
 
 class ShellViewStatesCompanion extends UpdateCompanion<ShellViewStateRow> {
   final Value<int> id;
   final Value<bool> overviewPinned;
   final Value<bool> channelColumnHidden;
+  final Value<bool> sessionColumnHidden;
+  final Value<bool> textThreadSessionShown;
   const ShellViewStatesCompanion({
     this.id = const Value.absent(),
     this.overviewPinned = const Value.absent(),
     this.channelColumnHidden = const Value.absent(),
+    this.sessionColumnHidden = const Value.absent(),
+    this.textThreadSessionShown = const Value.absent(),
   });
   ShellViewStatesCompanion.insert({
     this.id = const Value.absent(),
     this.overviewPinned = const Value.absent(),
     this.channelColumnHidden = const Value.absent(),
+    this.sessionColumnHidden = const Value.absent(),
+    this.textThreadSessionShown = const Value.absent(),
   });
   static Insertable<ShellViewStateRow> custom({
     Expression<int>? id,
     Expression<bool>? overviewPinned,
     Expression<bool>? channelColumnHidden,
+    Expression<bool>? sessionColumnHidden,
+    Expression<bool>? textThreadSessionShown,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (overviewPinned != null) 'overview_pinned': overviewPinned,
       if (channelColumnHidden != null)
         'channel_column_hidden': channelColumnHidden,
+      if (sessionColumnHidden != null)
+        'session_column_hidden': sessionColumnHidden,
+      if (textThreadSessionShown != null)
+        'text_thread_session_shown': textThreadSessionShown,
     });
   }
 
@@ -18862,11 +18974,16 @@ class ShellViewStatesCompanion extends UpdateCompanion<ShellViewStateRow> {
     Value<int>? id,
     Value<bool>? overviewPinned,
     Value<bool>? channelColumnHidden,
+    Value<bool>? sessionColumnHidden,
+    Value<bool>? textThreadSessionShown,
   }) {
     return ShellViewStatesCompanion(
       id: id ?? this.id,
       overviewPinned: overviewPinned ?? this.overviewPinned,
       channelColumnHidden: channelColumnHidden ?? this.channelColumnHidden,
+      sessionColumnHidden: sessionColumnHidden ?? this.sessionColumnHidden,
+      textThreadSessionShown:
+          textThreadSessionShown ?? this.textThreadSessionShown,
     );
   }
 
@@ -18882,6 +18999,14 @@ class ShellViewStatesCompanion extends UpdateCompanion<ShellViewStateRow> {
     if (channelColumnHidden.present) {
       map['channel_column_hidden'] = Variable<bool>(channelColumnHidden.value);
     }
+    if (sessionColumnHidden.present) {
+      map['session_column_hidden'] = Variable<bool>(sessionColumnHidden.value);
+    }
+    if (textThreadSessionShown.present) {
+      map['text_thread_session_shown'] = Variable<bool>(
+        textThreadSessionShown.value,
+      );
+    }
     return map;
   }
 
@@ -18890,7 +19015,9 @@ class ShellViewStatesCompanion extends UpdateCompanion<ShellViewStateRow> {
     return (StringBuffer('ShellViewStatesCompanion(')
           ..write('id: $id, ')
           ..write('overviewPinned: $overviewPinned, ')
-          ..write('channelColumnHidden: $channelColumnHidden')
+          ..write('channelColumnHidden: $channelColumnHidden, ')
+          ..write('sessionColumnHidden: $sessionColumnHidden, ')
+          ..write('textThreadSessionShown: $textThreadSessionShown')
           ..write(')'))
         .toString();
   }
