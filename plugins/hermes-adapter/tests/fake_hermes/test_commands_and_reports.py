@@ -12,12 +12,20 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import subprocess
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
-from fake_hermes_kit import PLATFORM_KEY, HermesRig, HermesWorld, gateway_log, hermes_rig
+from fake_hermes_kit import (
+    PLATFORM_KEY,
+    HermesRig,
+    HermesWorld,
+    _bare_env,
+    gateway_log,
+    hermes_rig,
+)
 from hermes_harness.fake_model import ScriptTurn
 
 pytestmark = pytest.mark.anyio
@@ -262,3 +270,97 @@ def _post_texts(fake: Any, index: int, forum: Any) -> list[str]:
 def _agents(rig: HermesRig) -> list[str]:
     """The ``User-Agent`` of every ``createThread``, in order."""
     return [q.headers.get("user-agent", "") for q in rig.requests("createThread")]
+
+
+# `ServerPlatform.send` in the pinned Hermes, without a gateway: Hermes sends a turn's final
+# answer after its turn handler cleared the session variable, with the turn's message as
+# ``reply_to``. A stub handler stands for the run state (``active_run``).
+_LATE_SEND_PROBE = """
+import asyncio, json, uuid
+from gateway.config import PlatformConfig
+from bothy_hermes_adapter.platform import ServerPlatform
+from bothy_hermes_adapter.runtime import CommandRequest, TurnOutcome, TurnRequest
+
+C, T, U = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+R1, R2 = uuid.uuid4(), uuid.uuid4()
+M1 = uuid.uuid4()
+
+
+class Handler:
+    def __init__(self):
+        self.active = None
+        self.calls = []
+
+    def active_run(self, thread):
+        return self.active
+
+    async def on_answer(self, thread, text, reply_to):
+        self.calls.append(["answer", text])
+        return "a-1"
+
+    async def on_report(self, chat, thread, text):
+        self.calls.append(["report", text])
+        return "r-1"
+
+
+async def main():
+    p = ServerPlatform(PlatformConfig(), "webhook")
+    p._loop = asyncio.get_running_loop()
+    h = p.handler = Handler()
+    seen = []
+
+    async def dispatch(event):
+        seen.append(str(event.message_id))
+        return TurnOutcome.COMPLETED
+
+    p._dispatch = dispatch
+    turn = TurnRequest(
+        run_id=R1, thread_id=T, channel_id=C, user_id=U, user_name="p",
+        message_id=M1, user_text="hi", system_part="",
+    )
+    await p.start_turn(turn)
+    out = {}
+
+    async def send(name, text, reply_to):
+        r = await p.send(str(C), text, reply_to=reply_to, metadata={"thread_id": str(T)})
+        out[name] = [r.success, list(map(list, h.calls))]
+        h.calls.clear()
+
+    h.active = R1
+    await send("active", "answer", str(M1))
+    h.active = None
+    await send("cancelled", "late answer", str(M1))
+    h.active = R2
+    await send("next_run", "late answer", str(M1))
+    h.active = None
+    await send("report", "cron report", None)
+    await p.run_command(CommandRequest(
+        thread_id=T, channel_id=C, user_id=U, user_name="p", text="/version"))
+    await send("late_command", "late reply", seen[-1])
+    print(json.dumps(out))
+
+
+asyncio.run(main())
+"""
+
+
+def test_late_turn_answer_is_never_posted(world: HermesWorld) -> None:
+    """D-HERMES-CRON-COMMANDS-5: a cancelled or aborted turn's late answer is no report."""
+    out = subprocess.run(
+        [str(world.python), "-c", _LATE_SEND_PROBE],
+        capture_output=True,
+        text=True,
+        check=False,
+        env={**_bare_env(), "HOME": str(world.root / "probe-home")},
+    )
+    assert out.returncode == 0, out.stderr[-3000:]
+    sent = json.loads(out.stdout.strip().splitlines()[-1])
+    assert sent["active"] == [True, [["answer", "answer"]]]
+    # The run was cancelled or aborted (no active run): nothing is sent, Hermes gets a failure.
+    assert sent["cancelled"] == [False, []]
+    # A later run of the thread does not take the old turn's answer.
+    assert sent["next_run"] == [False, []]
+    # A late reply of an ended command is not a report either.
+    assert sent["late_command"] == [False, []]
+    # A send without a turn's message stays a report.
+    assert sent["report"] == [True, [["report", "cron report"]]]

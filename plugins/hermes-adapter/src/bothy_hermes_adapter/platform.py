@@ -161,6 +161,11 @@ class ServerPlatform(BasePlatformAdapter):
         # back to Hermes for them (an edit replaces the collected text).
         self._replies: dict[str, list[str]] = {}
         self._reply_ids: dict[str, tuple[list[str], int]] = {}
+        # Message IDs this process handed to Hermes, so a ``send`` that replies to one of them is
+        # known after Hermes cleared its session variable (09 14 versus 17.3): a turn's message to
+        # the run it started or steered, an adapter command's message to nothing.
+        self._turn_messages: dict[str, uuid.UUID | None] = {}
+        self._control_messages: dict[str, None] = {}
 
     # ---- lifecycle ---------------------------------------------------------------------------
 
@@ -318,6 +323,8 @@ class ServerPlatform(BasePlatformAdapter):
         if user is not None:
             user_id, user_name = user
         mid = message_id or f"ctl-{uuid.uuid4().hex}"
+        if control:
+            _remember(self._control_messages, mid, None)
         source = self.build_source(
             chat_id=channel,
             chat_type="thread",
@@ -354,6 +361,7 @@ class ServerPlatform(BasePlatformAdapter):
     async def start_turn(self, turn: TurnRequest) -> TurnOutcome:
         """Start a Hermes turn for a run and wait for ``on_processing_complete`` (17.6)."""
         self._remember_source(turn)
+        _remember(self._turn_messages, str(turn.message_id), turn.run_id)
         event = self._event(
             turn.thread_id, turn.user_text, message_id=str(turn.message_id), control=False
         )
@@ -366,6 +374,8 @@ class ServerPlatform(BasePlatformAdapter):
         """Pass a follow-up into the running turn as busy input (17.5)."""
         if thread_id not in self._sources:
             return
+        run = self.handler.active_run(thread_id) if self.handler is not None else None
+        _remember(self._turn_messages, str(message_id), run)
         await self.handle_message(
             self._event(thread_id, text, message_id=str(message_id), control=False)
         )
@@ -595,6 +605,10 @@ class ServerPlatform(BasePlatformAdapter):
 
         * ``reply_to`` names a running control command: the text is collected as its reply.
         * The thread is in one of the adapter's own commands (``/new``, ``/stop``): swallowed.
+        * ``reply_to`` names a message this process handed to Hermes: a late command reply
+          fails, and a turn's answer becomes a message of the run it belongs to, or fails when
+          that run is no longer active. Hermes sends the final answer after it cleared its
+          session variable, so a cancelled or aborted turn's answer never becomes a report.
         * The send belongs to a turn of its thread (`_turn_send`): one message of the run, or a
           failure when no run of the thread is active any more (a late answer is never posted).
         * Anything else is a report of the agent (09 14): a cron job, a background notice, a
@@ -613,6 +627,16 @@ class ServerPlatform(BasePlatformAdapter):
             return SendResult(success=True, message_id=f"ctl-{uuid.uuid4().hex}")
         if self.handler is None:
             return SendResult(success=False, error="the adapter is not connected")
+        if reply_to is not None and reply_to in self._control_messages:
+            return SendResult(success=False, error="the command has ended")
+        if reply_to is not None and reply_to in self._turn_messages:
+            run = self._turn_messages[reply_to]
+            if thread is None or run is None or self.handler.active_run(thread) != run:
+                return SendResult(success=False, error="no active run in this thread")
+            message_id = await self.handler.on_answer(thread, content, reply_to)
+            if message_id is None:
+                return SendResult(success=False, error="no active run in this thread")
+            return SendResult(success=True, message_id=message_id)
         if thread is not None and self._turn_send(str(chat_id), thread, env_thread):
             message_id = await self.handler.on_answer(thread, content, reply_to)
             if message_id is None:
@@ -922,6 +946,17 @@ class ServerPlatform(BasePlatformAdapter):
         )
         self._confirms.add(task)
         task.add_done_callback(self._confirms.discard)
+
+
+_KNOWN_MESSAGES = 4096
+
+
+def _remember(known: dict[str, Any], key: str, value: Any) -> None:
+    """Keep ``key`` in an insertion-ordered map of at most `_KNOWN_MESSAGES` entries."""
+    known.pop(key, None)
+    known[key] = value
+    while len(known) > _KNOWN_MESSAGES:
+        del known[next(iter(known))]
 
 
 def _uuid_of(raw: Any) -> uuid.UUID | None:
