@@ -497,7 +497,7 @@ func TestHeartbeat_ChangeEqualAfterLockWritesNothing(t *testing.T) {
 }
 
 // TestHeartbeat_ReadinessOnlyOnChange: the same list twice calls the port once, a changed list
-// again, an absent member never (D-M2-20-10).
+// again, an absent member never (D-M2-20-10), the same list after PersistInterval again.
 func TestHeartbeat_ReadinessOnlyOnChange(t *testing.T) {
 	t.Parallel()
 	w := newTracker(t)
@@ -527,6 +527,13 @@ func TestHeartbeat_ReadinessOnlyOnChange(t *testing.T) {
 	w.rd.mu.Unlock()
 	if len(last) != 1 || last[0].Reason != "provisioning" {
 		t.Fatalf("port got %+v", last)
+	}
+	// The same list again after PersistInterval is applied again: a binding change reset the
+	// stored readiness meanwhile, and the runner's unchanged list must restore it (M4-43).
+	w.tm.advance(tPersist)
+	w.beat(`{"state":"online","project_readiness":[{"channel_id":"` + ch + `","ready":false,"reason":"provisioning"}]}`)
+	if w.rd.count() != 4 {
+		t.Fatalf("%d calls after the persist interval, want 4", w.rd.count())
 	}
 }
 

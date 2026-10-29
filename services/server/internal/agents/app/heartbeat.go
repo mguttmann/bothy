@@ -73,7 +73,7 @@ func (t *Tracker) Heartbeat(ctx context.Context, body json.RawMessage) (agents.P
 	}
 	now := t.d.Clock.Now()
 	takeover := t.takeover(e, row, now)
-	if err := t.applyReadiness(ctx, e, report); err != nil {
+	if err := t.applyReadiness(ctx, e, report, now); err != nil {
 		return agents.PresenceStatus{}, err
 	}
 	wrote, err := t.store(ctx, a.ID, row, report, now, takeover)
@@ -144,12 +144,14 @@ func internal(err error, what string) error {
 }
 
 // applyReadiness applies project_readiness of r through chat when the member is present and the
-// list differs from the last one this process applied for the agent (the caller holds e.beat,
-// which guards the applied list). Any
+// list differs from the last one this process applied for the agent, or that application is at
+// least PersistInterval old: a binding change resets the stored readiness (09 section 4.8), and a
+// runner that keeps its list must still reach it, also through another node (the caller holds
+// e.beat, which guards the applied list). Any
 // error of the port fails the heartbeat with internal_error, except the validation error of a
 // duplicate channel, which domain.DecodeHeartbeat already refuses.
-func (t *Tracker) applyReadiness(ctx context.Context, e *entry, r domain.Report) error {
-	if !r.ReadinessGiven || (e.readinessSet && slices.Equal(e.readiness, r.Readiness)) {
+func (t *Tracker) applyReadiness(ctx context.Context, e *entry, r domain.Report, now time.Time) error {
+	if !r.ReadinessGiven || (e.readinessSet && slices.Equal(e.readiness, r.Readiness) && now.Sub(e.readinessAt) < t.cfg.PersistInterval) {
 		return nil
 	}
 	_, port := t.bound()
@@ -166,7 +168,7 @@ func (t *Tracker) applyReadiness(ctx context.Context, e *entry, r domain.Report)
 		}
 		return internal(err, "agents: applying project readiness")
 	}
-	e.readiness, e.readinessSet = slices.Clone(r.Readiness), true
+	e.readiness, e.readinessSet, e.readinessAt = slices.Clone(r.Readiness), true, now
 	return nil
 }
 

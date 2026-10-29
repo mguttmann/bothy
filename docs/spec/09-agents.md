@@ -635,7 +635,7 @@ Top-level members (openapi `Heartbeat`, closed; an unknown member is `400 valida
 | `reported_tool_class` | the tool class the runtime actually loaded, section 2.4 |
 | `rate_limit` | state of the provider's rate limits: `state` `ok`, `near_limit`, `limited` or `unknown`, and `resets_at` when known; never quotas, keys or subscription names. Stored as exactly these two members in `agents.reported_details.rate_limit`; a heartbeat without it clears the stored one (full state). Display in the backend view of [25-visualization.md](25-visualization.md), section 6.2 |
 | `details` | closed object, keys below |
-| `project_readiness` | runners only: list of `{channel_id, ready, reason}`, one entry per bound forum, distinct `channel_id` values (sets `project_bindings.ready`, M2-03); `reason` is optional, a code of 18.12 in the code form below, sent only with `ready` false and stored as `project_bindings.ready_reason` (M4-43) |
+| `project_readiness` | runners only: list of `{channel_id, ready, reason}`, one entry per bound forum, distinct `channel_id` values (sets `project_bindings.ready`, M2-03); `reason` is optional, a code of 18.12 in the reason form below, sent only with `ready` false and stored as `project_bindings.ready_reason` (M4-43) |
 
 Keys of `details` (closed; any other key, also inside `capabilities`, `adapter` and `runtime`, is
 an unknown member):
@@ -654,7 +654,8 @@ versions `^[0-9A-Za-z][0-9A-Za-z.+_-]*$`, codes (`billing_evidence.provider`,
 `billing_evidence.method`, each entry of `degraded_reasons`) `^[a-z0-9][a-z0-9_.:-]*$`, the code
 form of SEC-AUD-5, so `method` enters the audit details unchanged. Lists carry no duplicates; a
 channel listed twice in `project_readiness` is one field error at `/project_readiness`, and a
-`reason` that breaks the code form or comes with `ready` true is one at
+`reason` that breaks the reason form (`^[a-z0-9][a-z0-9_]*$` with the length limit of
+`ProjectReadiness.reason` in the OpenAPI, narrower than the code form) or comes with `ready` true is one at
 `/project_readiness/<i>/reason`. Lengths are
 bounded by `http.max_json_body_bytes`. Reason: the heartbeat carries no secrets, contents or paths,
 and these forms make path separators, whitespace, control and bidi characters and most key formats
@@ -664,8 +665,10 @@ pointer.
 Full state: every heartbeat replaces the whole reported state. An absent optional member means
 "not reported": `reported_billing_mode` and `reported_tool_class` become NULL, and the key is left
 out of `reported_details`. Exception: `project_readiness` is applied only when present and
-different from the last list this server process applied for the agent, in its own transaction
-before the rest of the heartbeat; absent means "unchanged". `reported_details` holds exactly
+different from the last list this server process applied for the agent, or when that
+application is at least `agent.heartbeat_persist_interval` old (a binding change resets the stored
+readiness, and an unchanged list must restore it), in its own transaction before the rest of the
+heartbeat; absent means "unchanged". `reported_details` holds exactly
 `capabilities`, `billing_modes_supported`, `billing_evidence`, `active_runs` (run ids as strings),
 `degraded_reasons`, `adapter`, `runtime` and `protocol_version`, never `null`.
 
