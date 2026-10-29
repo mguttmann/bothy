@@ -475,6 +475,7 @@ nav:
           - "M5-13: Terminal E2E on mobile": briefs/M5-13-mobile-terminal-e2e.md
           - "M5-14: Run graph and control room on iPhone and Android": briefs/M5-14-run-graph-mobile.md
           - "M5-15: Threads in the sidebar and new chat on iPhone and Android": briefs/M5-15-sidebar-threads-mobile.md
+          - "M5-16: Several photos from the library at once on the phone": briefs/M5-16-multi-photo-picker.md
           - "M6-02: Console app and serving by the server (ADR 0028)": briefs/M6-02-console-app.md
           - "M6-03: Content Security Policy with a headless test": briefs/M6-03-console-csp.md
           - "M6-04: Administration in the console": briefs/M6-04-console-admin.md

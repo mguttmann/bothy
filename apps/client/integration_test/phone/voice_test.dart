@@ -4,14 +4,15 @@
 // against the fake server: a recording held on the microphone and released arrives as an
 // `audio/mp4` upload with `kind = voice`; with the instance limit set very low the recording
 // stops by itself with the notice (PLAN row: a recording over the limit stops with a notice)
-// and its `mvhd` duration stays within the limit; a photo of the library arrives as JPEG.
+// and its `mvhd` duration stays within the limit; a photo of the library arrives as JPEG, and
+// three photos picked at once arrive as one message with three JPEG attachments (M5-16).
 //
 // When requested (CLIENT_VOICE_REAL_RECORDER) on an iOS simulator or Android emulator whose
 // microphone permission was granted before the run, the real recorder of package `record` records the simulator's or emulator's audio input,
 // so the `mvhd` duration of the upload is checked; elsewhere (the Flutter tester, a device
 // without the permission) the fake recorder stands in and the run prints a SKIP line for the
 // real recording. The system photo picker is a system screen the test cannot drive, so the
-// picker port is a fake that returns a PNG; the app turns it into the JPEG it uploads.
+// picker port is a fake that returns PNGs; the app turns them into the JPEGs it uploads.
 
 import 'dart:io';
 
@@ -310,6 +311,68 @@ void main() {
       final bytes = stored.bytes!;
       expect(isJpeg(bytes), isTrue);
       expect(media.asked, [MediaSource.library]);
+      expect(app.fake.server.violations, isEmpty);
+    } finally {
+      await app.stop();
+    }
+  });
+
+  testWidgets('three photos of the library arrive in one message', (
+    tester,
+  ) async {
+    final (app, thread, media, _) = await open(tester);
+    final world = app.fake.server.world;
+    try {
+      media.many = [
+        for (final (i, color) in [
+          img.ColorRgb8(200, 30, 30),
+          img.ColorRgb8(30, 160, 60),
+          img.ColorRgb8(30, 60, 200),
+        ].indexed)
+          () {
+            final png = File('${temporary.path}/IMG_000$i.png')
+              ..writeAsBytesSync(
+                img.encodePng(img.Image(width: 16, height: 12)..clear(color)),
+              );
+            return RawMedia(path: png.path, name: 'IMG_000$i.png');
+          }(),
+      ];
+      final attach = find.byWidgetPredicate(
+        (w) => w is DsTappable && w.label == en.composerAttach,
+      );
+      await untilStill(tester, attach);
+      await tester.tap(attach);
+      final library = find.byKey(const ValueKey('composer.attach.library'));
+      await app.waitFor(library);
+      await untilStill(tester, library);
+      await tester.tap(library);
+      await until(
+        tester,
+        'three chips',
+        () => find.byType(UploadChip).evaluate().length == 3,
+      );
+      await tester.tap(
+        find.byWidgetPredicate(
+          (w) => w is DsTappable && w.label == en.composerSend,
+        ),
+      );
+      bool withPhotos(Map<String, Object?> m) =>
+          ((m['attachments'] as List?)?.length ?? 0) == 3;
+      await until(
+        tester,
+        'message with three photos stored',
+        () => world.messagesOf(thread).any(withPhotos),
+      );
+      final message = world.messagesOf(thread).singleWhere(withPhotos);
+      final names = <Object?>[];
+      for (final a in message['attachments']! as List) {
+        final id = ((a as Map)['file']! as Map)['id'];
+        final stored = world.files['$id']!;
+        expect(isJpeg(stored.bytes!), isTrue);
+        names.add(stored.json['original_name']);
+      }
+      expect(names, ['IMG_0000.jpg', 'IMG_0001.jpg', 'IMG_0002.jpg']);
+      expect(media.limits, [10]);
       expect(app.fake.server.violations, isEmpty);
     } finally {
       await app.stop();

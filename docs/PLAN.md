@@ -954,6 +954,7 @@ Share Extension (solved through child sessions from M1-34; the NSE uses the prev
 | M5-13 | Terminal E2E on mobile | E2E on devices against the Compose stack with a host service container. | `apps/client/integration_test` | `patrol` on iOS and Android: opening with biometrics, Ctrl+C through the bar ends a running command, network loss and reattaching with scrollback, app switcher image without terminal content; checklist VoiceOver and TalkBack for M8 complete | M4-38, M5-11, M5-12 |
 | M5-14 | Run graph and control room on iPhone and Android | Screens M11 and M12 from 01 in density `touch` (09 5.6). | `apps/client/lib` (phone layouts), `packages/bothy_viz` (touch layout of the trace view) | goldens in density `touch`, portrait and landscape; integration tests on the iPhone and Android layouts against the fake server; live only in the foreground; VoiceOver and TalkBack check of the list forms | M4-39, M5-03 |
 | M5-15 | Threads in the sidebar and new chat on iPhone and Android | Screen M1 with the thread groups of 01 6.8 and the "+" action at forum rows in density `touch`; a thread row opens M3 (D-SB-13). | `apps/client/lib` (phone layouts) | goldens of M1 in density `touch`, text scaling 1 and 2, de and en; integration tests on the iPhone and Android layouts against the fake server: a tap on a thread row opens its history, "+" opens the new chat view and sending creates the post; VoiceOver and TalkBack labels of the tree | M4-41, M5-03 |
+| M5-16 | Several photos from the library at once on the phone | The library entry of the phone composer picks several photos in one go up to the free slots of `message_max_attachments`; they become the attachments of one message in picker order, all or none; the camera stays one photo (15 14). | `apps/client/lib` (phone compose, attachments) | unit tests of the conversion of a list (order, limit, all or nothing with deletion of every temporary file, cancel, camera one photo); widget tests: four photos in one message, limit 1 with nine attachments, no picker with ten; device test on the iOS simulator and the Android emulator in the CI: three photos arrive in one message | M5-07 |
 
 ## 12. M6 Admin console, statistics and visualization
 
@@ -1508,7 +1509,7 @@ holds the exclusion, the chapter names it.
 | | Drafts across devices | M1-61, M4-15, M4-20 |
 | | Link preview in the client with opt-in (later) | V3-02 |
 | Files and voice | Files and images with preview | M3-03 to M3-07, M4-22 |
-| | Photo, camera, file on the iPhone | M5-07 |
+| | Photo, camera, file on the iPhone | M5-07, M5-16 |
 | | Record a voice message, play it, transcript | M3-09, M4-22, M5-07 |
 | | Share from other apps | M5-06 |
 | | Share on Windows (later) | V3-03 |

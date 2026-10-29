@@ -903,6 +903,13 @@ unchanged; the server removes the metadata (baseline
 R-Objektspeicher). Preview before sending locally; after sending from `file_thumbnails` through the
 server.
 
+On the phone the photo library picker is multi-select: one opening picks several photos, limited
+to the free slots of `message_max_attachments` (the limit minus the attachments already in the
+composer; with no free slot the picker does not open and the composer shows the count refusal).
+The photos become the attachments of one message in the order the picker returns them, all or
+none: one photo that cannot be read or converted refuses the whole set, and no temporary file of
+it stays. The camera takes one photo per opening (M5-16).
+
 ## 15. Auto-update
 
 | Platform | Mechanism | Channels |
