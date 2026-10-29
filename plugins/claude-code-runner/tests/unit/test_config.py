@@ -211,3 +211,33 @@ def test_project_folders_max(tmp_path: Path) -> None:
     assert load_config(write(tmp_path, "project_folders_max = 3\n")).project_folders_max == 3
     with pytest.raises(ConfigError, match="project_folders_max"):
         load_config(write(tmp_path, "project_folders_max = 0\n"))
+
+
+def test_channels_resync_interval(tmp_path: Path) -> None:
+    """``runner.channels_resync_interval``: the fallback reload of the served channels."""
+    assert load_config(write(tmp_path)).channels_resync_interval == 300.0
+    cfg = load_config(write(tmp_path, 'channels_resync_interval = "30s"\n'))
+    assert cfg.channels_resync_interval == 30.0
+    with pytest.raises(ConfigError, match="channels_resync_interval"):
+        load_config(write(tmp_path, 'channels_resync_interval = "0s"\n'))
+
+
+def test_transcribe_keys(tmp_path: Path) -> None:
+    """``runner.transcribe_cmd`` (off by default) and ``runner.transcribe_timeout``."""
+    cfg = load_config(write(tmp_path))
+    assert cfg.transcribe_cmd == ()
+    assert cfg.transcribe_timeout == 300.0
+    cfg = load_config(
+        write(
+            tmp_path,
+            'transcribe_cmd = ["/opt/whisper/transcribe", "-l", "auto"]\n'
+            'transcribe_timeout = "90s"\n',
+        )
+    )
+    assert cfg.transcribe_cmd == ("/opt/whisper/transcribe", "-l", "auto")
+    assert cfg.transcribe_timeout == 90.0
+    for bad in ('["-x"]', '[""]', '["whisper", ""]', '["whisper", "a\\u0007"]', '"whisper"'):
+        with pytest.raises(ConfigError, match="transcribe_cmd"):
+            load_config(write(tmp_path, f"transcribe_cmd = {bad}\n"))
+    with pytest.raises(ConfigError, match="transcribe_timeout"):
+        load_config(write(tmp_path, 'transcribe_timeout = "0s"\n'))

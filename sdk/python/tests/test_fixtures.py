@@ -25,6 +25,8 @@ EVENT_FIXTURES = (
     "run.state_changed",
     # Constructed from AgentConfigChangedEvent for the runner scenarios (M2-34), not recorded.
     "agent.config_changed",
+    # Constructed from AccessChangedEvent for the runner's live channel reload, not recorded.
+    "access.changed",
 )
 # Gateway-only events are not in the Event union; their own generated model decodes them.
 EPHEMERAL_FIXTURES = {"command.autocomplete_requested": models.CommandAutocompleteRequestedEvent}

@@ -474,6 +474,9 @@ Source: [09-agents.md](../spec/09-agents.md), section 21.
 | `runner.provision_timeout` |  | Runner |  | `10m` | time limit of one folder creation (`git init` or `git clone`, 18.12) |  |
 | `runner.provision_retry_after` |  | Runner |  | `5m` | a failed folder creation is not tried again for the same binding content before this time (18.12) |  |
 | `runner.project_folders_max` |  | Runner |  | `500` | most folder names the runner reports in `project_folders` (18.13) |  |
+| `runner.channels_resync_interval` |  | Runner |  | `5m` | the served channels are loaded again at this interval, the fallback for an operator or binding change without an event (18.1); above zero |  |
+| `runner.transcribe_cmd` |  | Runner |  | empty | argument list of a local transcriber; the audio file path is appended and stdout is the transcript (18.14); empty means no transcription |  |
+| `runner.transcribe_timeout` |  | Runner |  | `5m` | time limit of one transcription (18.14); above zero |  |
 | `runner.projects_root` |  | Runner |  | no default, required | root of all project folders |  |
 | `runner.state_dir` |  | Runner |  | no default, required | state, recordings, incoming files |  |
 | `runner.followup_grace` |  | Runner |  | `30s` | stdin stays open for follow-ups after `result` |  |

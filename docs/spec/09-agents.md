@@ -2427,7 +2427,16 @@ name. Reason: fail closed; a too high report only blocks starts whose token carr
 as `reason` with the entry (M4-43). The runner
   computes readiness at start, after every change of its channel cache and before every
   heartbeat, and sends a heartbeat at once when `agent.config_changed` changed a readiness or a
-  folder creation of 18.12 ended. The server sets `project_bindings.ready` and
+  folder creation of 18.12 ended. The channel cache follows operator and binding changes while
+  the runner runs (addendum of 2026-10-29): `agent.config_changed` reloads the channel it names;
+  `access.changed`, `channel.updated`, `space.updated`, `channel.archived` and `space.archived`
+  reload the whole list (`listServedChannels`), because an operator change reaches the agent
+  only as `access.changed` (04 8.2) and a binding made before the agent became the operator was
+  announced to the earlier one; every `runner.channels_resync_interval` the list is loaded again
+  as the fallback for a change without an event (an operator change that does not change the
+  agent's visible targets writes no `access.changed`). A heartbeat goes out at once when such a
+  reload added or removed a bound forum or changed a readiness; a failed reload keeps the cache
+  and logs `channels_resync_failed`. The server sets `project_bindings.ready` and
   `project_bindings.ready_reason`; without `ready`, `agent.invoke` rejects with
   `project_not_ready`.
 - Schema `project_runner_config.v1` (`project_bindings.runner_config`, OpenAPI
@@ -2493,7 +2502,7 @@ character (D-M2-34-8).
 | Detachment | stdout and stderr go to the files `<run_id>.stream.jsonl` and `<run_id>.stderr.log` under `<runner.state_dir>/sessions/<session>/` (mode `0600`), not to pipes; the runner reads the stream file every `runner.poll_interval`; the turn record `<runner.state_dir>/turns/<run_id>.json` holds run, thread, channel, session, PID, group, start time and file paths, never a token; turns survive a restart of the runner, and the new runner finds running turns via the record and ends orphaned ones (M2-35) | a restart never silently kills a turn |
 | Locks | `flock` per thread and per session (`<runner.state_dir>/locks/`), taken in this order with attempts every `runner.poll_interval`; wait at most `runner.session_lock_wait`, then the run ends `failed` with `adapter_error`; the turn inherits the descriptors, so a lock lives as long as the turn, also when the runner dies | a session never runs twice at the same time |
 | Parallelism | at most `runner.max_parallel_runs` turns | host and rate limits |
-| Input | the system prompt file (`--append-system-prompt-file`, `<run_id>.system-prompt.md`) holds only the fixed runner instructions (the `TITLE:` request only for a new or unstarted session) and, in an own section, the channel prompt `behavior.prompt`; the first stdin line is one `user` message with two text items: first the context of 4.6 with trust marks, every `unverified` content and every file entry in marked data blocks, the attachments of the triggering message as local paths inside those blocks; second the text of the triggering message with the transcripts of its attachments; the line is stored as `<run_id>.input.jsonl` | the context becomes part of the session history, so a `--resume` turn still knows what `context_floor_seq` no longer sends; files are data, never instructions (ADR 0054); follow-ups through the same pipe (18.5) |
+| Input | the system prompt file (`--append-system-prompt-file`, `<run_id>.system-prompt.md`) holds only the fixed runner instructions (the `TITLE:` request only for a new or unstarted session) and, in an own section, the channel prompt `behavior.prompt`; the first stdin line is one `user` message with two text items: first the context of 4.6 with trust marks, every `unverified` content and every file entry in marked data blocks, the attachments of the triggering message as local paths inside those blocks; second the text of the triggering message with the transcripts of its attachments (of the server, or of the runner's transcriber for an audio attachment without one, 18.14); the line is stored as `<run_id>.input.jsonl` | the context becomes part of the session history, so a `--resume` turn still knows what `context_floor_seq` no longer sends; files are data, never instructions (ADR 0054); follow-ups through the same pipe (18.5) |
 | Recording | stream and stderr per session in `runner.state_dir`, prompt files and downloaded attachments too, kept for `runner.stream_log_retention` (swept at start and after every turn; the usage of a session, `usage.json`, is state and never swept) | troubleshooting, fixtures |
 | Permission prompts | `--permission-prompts none`: actions that are not allowed are rejected instead of waiting | an unattended turn never hangs on a question |
 | Version | `claude --version` is probed at start and before heartbeats within `runner.cli_probe_timeout`; the runner reports `degraded` with `runtime_unreachable` (no answer), `runtime_version_unsupported` (below the version named above for `--permission-prompts none`, or unreadable) or `runtime_version_untested` (another version than the pinned one, `PINNED_CLAUDE_CODE_VERSION` of the runner, equal to that version in M2-34); the first two end every run in prepare with `runtime_error`, the third only warns | the fixtures and the stream table of 18.4 hold for the pinned version (RK-14) |
@@ -3037,6 +3046,39 @@ names.
    the member. The binding itself keeps its checks: a folder bound meanwhile is refused by
    `putProjectBinding` with `conflict`.
 
+### 18.14 Transcribing voice messages and audio attachments
+
+Addendum of 2026-10-29. Claude Code cannot listen to audio, so a voice message or an audio
+attachment without a transcript would reach the turn only as a file path.
+
+1. **Which files.** Every attachment of the triggering message whose `mime_type` is `audio/*`,
+   that carries no `transcript` in the run context (4.6; a transcript of the server, mode
+   `service`, is used as it is) and that the runner stored as a local file (scan state `clean`
+   or `skipped`). Attachments of context messages and of follow-ups are not transcribed.
+2. **Transcriber.** `runner.transcribe_cmd` is the argument list of a local program (for
+   example a wrapper around a whisper.cpp binary); empty means no transcription, the default.
+   The runner appends the file path as the last argument and runs it without a shell, after
+   `startRun` and before the first input of the turn, with stdin closed, stderr discarded, the
+   allow-list environment of 18.2 without any mode part (no API key), its own process group and
+   the time limit `runner.transcribe_timeout`; a stop of the run ends it at once. Meanwhile the
+   live box shows the status line "Transcribing a voice message".
+3. **Transcript.** Exit status 0 and a stdout that is not empty after trimming: the text (UTF-8,
+   at most 32768 bytes, cut at a character boundary) becomes the attachment's `transcript`, so it
+   stands in the trigger part with the trust of the message like a transcript of the server
+   (13, ADR 0054). The runner then delivers it with `submitTranscript` (`If-Match` from
+   `getFile`); a refusal (for example `409` in mode `service` or for a file that is not a voice
+   format) is logged as `transcript_not_submitted` and changes nothing else.
+4. **No transcript.** Without a transcriber, or when it fails (`transcriber_unreachable`,
+   `transcriber_failed`, `transcriber_timeout`, `transcript_empty`), the file entry in the
+   context gets the line `not transcribed: <code>` (or `transcriber_not_configured`) and the
+   runner posts one message in the thread before the turn starts, which says that the voice
+   message was not transcribed and Claude Code received only the audio file. The run goes on.
+5. **Capability.** The runner reports `capabilities.voice_input` true exactly when
+   `runner.transcribe_cmd` is set, so in mode `agent` a voice message reaches it only when it
+   can transcribe (13); otherwise the server rejects it with `voice_unsupported`.
+6. **Privacy.** Neither the transcript nor the path is logged; the audio never leaves the host
+   except through the configured program, which the operator chooses.
+
 ## 19. Decisions of this chapter
 
 | No. | Decision | Reason |
@@ -3071,6 +3113,8 @@ names.
 | R-AG-28 | The Claude Code runner runs every session of a project in the project folder and creates no worktree per thread; parallel sessions of a project are separate posts (18.1, addendum of 2026-10-27). | The owner starts several chats per project and opens a worktree through the agent when he wants one; a worktree per post would change readiness, cleanup and the working folder contract without need. |
 | R-AG-29 | The Claude Code runner creates the folder of a binding with `provision` `init` or `clone` under `runner.projects_root` itself, with `git` from an argument list, only for a one-segment name, only for an `https` URL, never into an existing folder it did not create, and reports the outcome as a readiness reason (18.12, addendum of 2026-10-28). | The owner creates projects from the app; the runner owns the projects root and works in the folder as its user, the server never touches host files or fetches the URL (D-M4-43-2 to D-M4-43-6). |
 | R-AG-30 | The Claude Code runner reports the names of the Git work trees directly under `runner.projects_root` in the heartbeat member `project_folders`; the server shows the owner those without a binding (18.13, addendum of 2026-10-29). | The app adds forums for existing folders as the owner's former setup did; only the runner sees the folders, and names carry no path or content (D-M4-44-1 to D-M4-44-4). |
+| R-AG-31 | The Claude Code runner reloads its served channels on `access.changed` and the channel and space structure events, and on a timer as a fallback, not only at start (18.1, addendum of 2026-10-29). | An operator change sends no `agent.config_changed`, so a forum that got the runner as operator stayed not ready until a restart (docs/decisions.d/RUNNER-LIVE-RELOAD.md). |
+| R-AG-32 | The Claude Code runner transcribes audio attachments without a transcript with an optional local program and reports `voice_input` only when one is configured; without it the person gets a note in the thread (18.14, addendum of 2026-10-29). | Claude Code cannot hear audio; a local program keeps the audio on the host, and a note replaces a silent loss (R-AG-16). |
 
 ## 20. Alignment with the core contract
 
@@ -3154,6 +3198,9 @@ configuration of the respective program outside the server.
 | `runner.provision_timeout` | Runner | `10m` | time limit of one folder creation (`git init` or `git clone`, 18.12) |
 | `runner.provision_retry_after` | Runner | `5m` | a failed folder creation is not tried again for the same binding content before this time (18.12) |
 | `runner.project_folders_max` | Runner | `500` | most folder names the runner reports in `project_folders` (18.13) |
+| `runner.channels_resync_interval` | Runner | `5m` | the served channels are loaded again at this interval, the fallback for an operator or binding change without an event (18.1); above zero |
+| `runner.transcribe_cmd` | Runner | empty | argument list of a local transcriber; the audio file path is appended and stdout is the transcript (18.14); empty means no transcription |
+| `runner.transcribe_timeout` | Runner | `5m` | time limit of one transcription (18.14); above zero |
 | `runner.projects_root` | Runner | no default, required | root of all project folders |
 | `runner.state_dir` | Runner | no default, required | state, recordings, incoming files |
 | `runner.followup_grace` | Runner | `30s` | stdin stays open for follow-ups after `result` |

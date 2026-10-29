@@ -1,0 +1,30 @@
+{
+  "actor": {
+    "id": "01900000-0000-7000-8000-000000000202",
+    "kind": "user"
+  },
+  "audience": "self",
+  "id": "01900000-0000-7000-8000-000000000907",
+  "occurred_at": "2026-01-01T00:00:00.000Z",
+  "payload": {
+    "added": [
+      {
+        "id": "01900000-0000-7000-8000-000000000103",
+        "kind": "channel",
+        "level": "trigger"
+      }
+    ],
+    "changed": [],
+    "permission_version": 2,
+    "removed": []
+  },
+  "permission_version": 2,
+  "resource": {
+    "id": "01900000-0000-7000-8000-000000000201",
+    "kind": "principal"
+  },
+  "schema_version": 1,
+  "scope": {},
+  "seq": 7,
+  "type": "access.changed"
+}

@@ -452,7 +452,7 @@ class FakeServer:
         await _settle()
         return Triggered(run.id, run.thread_id, run.triggering_message_id)
 
-    def add_forum(
+    def add_forum(  # noqa: PLR0913 - the parts of a forum a scenario chooses
         self,
         name: str,
         workspace_ref: str | None,
@@ -460,6 +460,7 @@ class FakeServer:
         model: str | None = None,
         allowed_tools: list[str] | None = None,
         prompt: str = "",
+        served: bool = True,
     ) -> UUID:
         """A channel Lotse serves, with a project binding unless ``workspace_ref`` is ``None``.
 
@@ -469,13 +470,15 @@ class FakeServer:
             model: ``runner_config.model``.
             allowed_tools: ``runner_config.allowed_tools``.
             prompt: ``behavior.prompt``.
+            served: ``False`` makes another agent its operator: Lotse does not serve it until
+                `set_operator`.
 
         Returns:
             The channel ID.
         """
         del name
         return self.world.add_forum(
-            workspace_ref, model=model, allowed_tools=allowed_tools, prompt=prompt
+            workspace_ref, model=model, allowed_tools=allowed_tools, prompt=prompt, served=served
         )
 
     def update_forum(self, channel_id: UUID, **changes: Any) -> None:
@@ -487,6 +490,28 @@ class FakeServer:
                 ``repository_url`` (M4-43) or ``prompt``.
         """
         self.world.update_forum(channel_id, **changes)
+
+    def unbind_forum(self, channel_id: UUID) -> None:
+        """Delete the project binding of a served forum (``agent.config_changed``).
+
+        Args:
+            channel_id: The forum.
+        """
+        self.world.unbind_forum(channel_id)
+
+    def set_operator(self, channel_id: UUID, *, served: bool = True, announce: bool = True) -> None:
+        """Make Lotse the operator of a forum, or (``served=False``) another agent.
+
+        Delivers only ``access.changed`` with the channel under ``added`` or ``removed``, as the
+        server does for an operator change (04 8.2); no ``agent.config_changed``.
+
+        Args:
+            channel_id: A forum of `add_forum`.
+            served: Whether Lotse serves it afterwards.
+            announce: ``False`` writes no ``access.changed`` (the server writes none when the
+                visible targets of the agent do not change).
+        """
+        self.world.set_operator(channel_id, served=served, announce=announce)
 
     def remove_channel(self, channel_id: UUID) -> None:
         """Lotse stops serving the channel (``agent.config_changed``, then ``404``).

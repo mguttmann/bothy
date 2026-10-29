@@ -23,6 +23,14 @@ provision_timeout = "10m"
 provision_retry_after = "5m"
 # Most folder names the heartbeat reports for "Add forums for existing folders" (09 18.13).
 project_folders_max = 500
+# Fallback reload of the served channels and their bindings; operator and binding changes
+# normally arrive at once through access.changed and agent.config_changed (09 18.1).
+channels_resync_interval = "5m"
+# Local transcriber of voice messages and audio attachments (09 18.14): the program and its
+# arguments, the audio file path is appended, stdout is the text. Empty means off, for example
+# ["/usr/local/bin/transcribe-audio"] (a wrapper around a whisper.cpp binary, see the README).
+transcribe_cmd = []
+transcribe_timeout = "5m"
 projects_root = "/srv/projects"
 state_dir = "/var/lib/claude-code-runner"
 followup_grace = "30s"
