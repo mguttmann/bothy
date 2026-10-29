@@ -184,7 +184,7 @@ class _PlainWriter {
 
   String _item(md.Element item, String marker) {
     final (box, rest) = _taskBox(item);
-    final prefix = box == null ? marker : '$marker${box ? '[x]' : '[ ]'} ';
+    final prefix = '$marker${_taskMark(box)}';
     final body = _group(rest)
         .map(
           (g) => g.length == 1 && _isBlock(g.single)
@@ -294,7 +294,7 @@ class _HtmlWriter {
 
   String _item(md.Element item) {
     final (box, rest) = _taskBox(item);
-    final mark = box == null ? '' : (box ? '[x] ' : '[ ] ');
+    final mark = _taskMark(box);
     final body = _group(rest)
         .map(
           (g) => g.length == 1 && _isBlock(g.single)
@@ -352,3 +352,10 @@ class _HtmlWriter {
     return '<a href="${_escape(target.uri.toString())}">$inner</a>';
   }
 }
+
+/// The task marker of a list item: `[x] ` when checked, `[ ] ` when open, empty for no task.
+String _taskMark(bool? box) => switch (box) {
+  null => '',
+  true => '[x] ',
+  false => '[ ] ',
+};
