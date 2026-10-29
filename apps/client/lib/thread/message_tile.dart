@@ -79,7 +79,9 @@ String excerpt(String text) => text.trim().split('\n').first.trim();
 ///
 /// The hover bar offers Reply, React and More; More, a right click, the menu key and Shift+F10
 /// open the menu of [actions]. Option+Click (Alt+Click) calls [onAction] with "Mark as
-/// unread" (01 7). While [editing], an inline editor replaces the content.
+/// unread" (01 7). On the phone ([longPressMenu]) a long press opens the same menu, because a
+/// tap on a code or quote block copies that block and there is no hover (01 6.12 item 2). While
+/// [editing], an inline editor replaces the content.
 class MessageTile extends StatelessWidget {
   /// Creates the tile.
   const MessageTile({
@@ -96,6 +98,7 @@ class MessageTile extends StatelessWidget {
     this.attachments,
     this.resolver,
     this.components,
+    this.longPressMenu = false,
   });
 
   /// The message.
@@ -135,6 +138,9 @@ class MessageTile extends StatelessWidget {
   /// The body of a card (`kind = card`, M4-21): the components with their header from server
   /// fields and the agent's text below the divider (SEC-OUT-4).
   final Widget? components;
+
+  /// Whether a long press opens the menu of [actions] (the phone, 01 6.12 item 2).
+  final bool longPressMenu;
 
   Future<void> _menu(BuildContext context, Offset at) async {
     if (actions.isEmpty) return;
@@ -185,6 +191,15 @@ class MessageTile extends StatelessWidget {
           color: colors.attentionSubtle,
           borderRadius: BorderRadius.circular(DsRadius.sm),
         ),
+        child: body,
+      );
+    }
+    if (longPressMenu && editing == null && actions.isNotEmpty) {
+      // A tap stays with the content (links, the copy of a block); only the long press is
+      // the message's.
+      body = GestureDetector(
+        key: const ValueKey('message.longPress'),
+        onLongPressStart: (d) => _menu(context, d.globalPosition),
         child: body,
       );
     }

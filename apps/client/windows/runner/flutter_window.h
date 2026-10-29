@@ -14,8 +14,9 @@
 
 #include "win32_window.h"
 
-// A window that hosts a Flutter view and forwards deep links to Dart over the channel
-// `bothy/deep_links` (deep_link.h).
+// A window that hosts a Flutter view, forwards deep links to Dart over the channel
+// `bothy/deep_links` (deep_link.h) and serves the clipboard of block copies over the channel
+// `bothy/clipboard` (rich_clipboard.h).
 class FlutterWindow : public Win32Window {
  public:
   // Creates a new FlutterWindow hosting a Flutter view running |project|; |link| is the deep
@@ -41,6 +42,9 @@ class FlutterWindow : public Win32Window {
   // The channel of the deep links and the links Dart has not taken yet.
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> deep_links_;
   std::vector<std::string> pending_links_;
+
+  // The channel of the clipboard of block copies.
+  std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> clipboard_;
 };
 
 #endif  // RUNNER_FLUTTER_WINDOW_H_

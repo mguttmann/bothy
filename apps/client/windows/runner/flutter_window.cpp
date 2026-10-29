@@ -4,9 +4,12 @@
 #include <flutter/standard_method_codec.h>
 
 #include <optional>
+#include <string>
+#include <variant>
 
 #include "deep_link.h"
 #include "flutter/generated_plugin_registrant.h"
+#include "rich_clipboard.h"
 
 FlutterWindow::FlutterWindow(const flutter::DartProject& project,
                              std::optional<std::string> link)
@@ -51,6 +54,40 @@ bool FlutterWindow::OnCreate() {
         pending_links_.clear();
         result->Success(flutter::EncodableValue(links));
       });
+  clipboard_ = std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
+      flutter_controller_->engine()->messenger(), "bothy/clipboard",
+      &flutter::StandardMethodCodec::GetInstance());
+  clipboard_->SetMethodCallHandler(
+      [this](const flutter::MethodCall<flutter::EncodableValue>& call,
+             std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
+        if (call.method_name() == "readHtml") {
+          const std::optional<std::string> html = rich_clipboard::ReadHtml(GetHandle());
+          result->Success(html ? flutter::EncodableValue(*html) : flutter::EncodableValue());
+          return;
+        }
+        if (call.method_name() != "write") {
+          result->NotImplemented();
+          return;
+        }
+        const auto* args = std::get_if<flutter::EncodableMap>(call.arguments());
+        const std::string* text = nullptr;
+        const std::string* cf_html = nullptr;
+        if (args != nullptr) {
+          auto t = args->find(flutter::EncodableValue("text"));
+          auto h = args->find(flutter::EncodableValue("cf_html"));
+          if (t != args->end()) text = std::get_if<std::string>(&t->second);
+          if (h != args->end()) cf_html = std::get_if<std::string>(&h->second);
+        }
+        if (text == nullptr || cf_html == nullptr) {
+          result->Error("clipboard", "text and cf_html expected");
+          return;
+        }
+        if (!rich_clipboard::Write(GetHandle(), *text, *cf_html)) {
+          result->Error("clipboard", "the clipboard did not take the copy");
+          return;
+        }
+        result->Success();
+      });
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
@@ -67,6 +104,7 @@ bool FlutterWindow::OnCreate() {
 
 void FlutterWindow::OnDestroy() {
   deep_links_ = nullptr;
+  clipboard_ = nullptr;
   if (flutter_controller_) {
     flutter_controller_ = nullptr;
   }

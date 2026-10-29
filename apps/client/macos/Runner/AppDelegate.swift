@@ -107,6 +107,39 @@ enum LoginItemChannel {
   }
 }
 
+/// The clipboard of the block copies over the method channel `bothy/clipboard` (docs/spec/
+/// 01-product.md 6.12 item 4, brief M4-48; `PlatformRichClipboard` in
+/// lib/app/rich_clipboard.dart): `write` puts the plain text and the HTML form of a quote on the
+/// general pasteboard in one change, so a rich editor pastes the formatting and every other app
+/// the text. `readHtml` returns the HTML form on the pasteboard, for the platform test.
+enum RichClipboardChannel {
+  /// Connects the channel to the engine of the main window.
+  static func attach(messenger: FlutterBinaryMessenger) {
+    let channel = FlutterMethodChannel(name: "bothy/clipboard", binaryMessenger: messenger)
+    channel.setMethodCallHandler { call, result in
+      switch call.method {
+      case "write":
+        guard let args = call.arguments as? [String: Any],
+          let text = args["text"] as? String, let html = args["html"] as? String
+        else {
+          result(FlutterError(code: "clipboard", message: "text and html expected", details: nil))
+          return
+        }
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.declareTypes([.html, .string], owner: nil)
+        let stored = pasteboard.setString(html, forType: .html)
+          && pasteboard.setString(text, forType: .string)
+        result(stored ? nil : FlutterError(code: "clipboard", message: nil, details: nil))
+      case "readHtml":
+        result(NSPasteboard.general.string(forType: .html))
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
+  }
+}
+
 /// Automatic updates of the Developer ID edition with Sparkle 2 (docs/spec/18-release.md 8,
 /// docs/decisions.d/M7-12.md D-M7-12-3).
 ///

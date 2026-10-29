@@ -39,6 +39,7 @@ import 'layout/desktop_shell.dart';
 import 'providers/ports.dart';
 import 'providers/session.dart';
 import 'providers/settings.dart';
+import 'rich_clipboard.dart';
 import 'router.dart';
 
 /// The app on the desktop and on the phone.
@@ -375,24 +376,28 @@ class _ClientAppState extends ConsumerState<ClientApp> {
         final cover = _cover;
         return FormFactorScope(
           formFactor: _formFactor,
-          child: DsThemeScope(
-            dsContext: dsContext,
-            child: cover == null
-                ? content
-                : PrivacyCoverHost(
-                    cover: cover,
-                    productName: instance?.productName ?? branding.appName,
-                    logo: instance?.logo,
-                    hidden: lockHidesContent(_lock),
-                    // Every pointer event is activity of the person for the app lock.
-                    child: Listener(
-                      behavior: HitTestBehavior.translucent,
-                      onPointerDown: (_) => _lock?.recordActivity(),
-                      onPointerMove: (_) => _lock?.recordActivity(),
-                      onPointerSignal: (_) => _lock?.recordActivity(),
-                      child: content,
+          // M4-48: a quote block copies as plain text and HTML (01 6.12 item 4).
+          child: DsClipboardScope(
+            clipboard: const PlatformRichClipboard(),
+            child: DsThemeScope(
+              dsContext: dsContext,
+              child: cover == null
+                  ? content
+                  : PrivacyCoverHost(
+                      cover: cover,
+                      productName: instance?.productName ?? branding.appName,
+                      logo: instance?.logo,
+                      hidden: lockHidesContent(_lock),
+                      // Every pointer event is activity of the person for the app lock.
+                      child: Listener(
+                        behavior: HitTestBehavior.translucent,
+                        onPointerDown: (_) => _lock?.recordActivity(),
+                        onPointerMove: (_) => _lock?.recordActivity(),
+                        onPointerSignal: (_) => _lock?.recordActivity(),
+                        child: content,
+                      ),
                     ),
-                  ),
+            ),
           ),
         );
       },

@@ -28,10 +28,11 @@ Widget hostScreen(Widget child, {Locale locale = const Locale('en')}) {
 Widget hostRouter(
   RouterConfig<Object> router, {
   Locale locale = const Locale('en'),
+  DsDensityMode density = DsDensityMode.comfortable,
 }) {
-  const ds = DsContext(
+  final ds = DsContext(
     theme: DsThemeMode.light,
-    density: DsDensityMode.comfortable,
+    density: density,
     motion: DsMotionMode.reduced,
     accent: dsDefaultAccent,
   );

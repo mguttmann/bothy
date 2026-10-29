@@ -30,7 +30,8 @@ import kotlinx.coroutines.launch
  * permission for it and hands the taps of push notifications to the app ([PushTaps]).
  * It also takes the shares that [ShareActivity] forwards to the process's [ShareReceiver] and
  * connects that receiver to the Pigeon channels [ShareAndroidHostApi] and
- * [ShareAndroidFlutterApi] (brief M5-06 Design note 6).
+ * [ShareAndroidFlutterApi] (brief M5-06 Design note 6), and the clipboard of block copies
+ * [RichClipboardChannel] (brief M4-48).
  */
 class MainActivity : FlutterFragmentActivity(), PermissionAsker {
     private val login = CustomTabsLogin { this }
@@ -92,6 +93,7 @@ class MainActivity : FlutterFragmentActivity(), PermissionAsker {
         }
         shareNotify = notify
         share.attach(notify)
+        RichClipboardChannel(messenger, applicationContext)
         val links = DeepLinkChannel(messenger)
         deepLinks = links
         // A cold start by a link: LinkActivity started this activity with the link as data.

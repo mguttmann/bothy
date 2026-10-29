@@ -802,7 +802,11 @@ as one coalesced outbox entry, takes another device's draft only while the perso
 message actions (hover bar, right click, menu key or Shift+F10) and the header buttons are shown
 by the level and capabilities the server reported for the channel, never by grants; every write
 goes through the outbox (docs/DECISIONS.md D-M4-20-1 to D-M4-20-8). Rendering loads and runs
-nothing from a message (SEC-T13). The session column (`lib/session_column/`) has its frame with
+nothing from a message (SEC-T13). Every code block and quote block copies on its own (01 6.12,
+M4-48): the button at its top right on the desktop, a tap with "Copied" and a haptic on the
+phone, where a long press on the message opens the message menu; `lib/app/rich_clipboard.dart`
+writes a quote as plain text and HTML through the runners' channel `bothy/clipboard` (macOS,
+Windows, iOS, Android) and falls back to plain text (docs/decisions.d/M4-48.md). The session column (`lib/session_column/`) has its frame with
 the pinned messages and the files of the thread; the agent session follows (M4-21).
 
 ## Files and voice messages

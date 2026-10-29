@@ -867,6 +867,7 @@ class _MessageRow extends ConsumerWidget {
             ),
       resolver: files.isEmpty ? null : attachmentResolver(files),
       components: card,
+      longPressMenu: ref.watch(appPortsProvider).formFactor.isPhone,
       started: [
         for (final t in started)
           ThreadStarterLine(thread: t, onOpen: () => onOpenThread(t)),

@@ -7,6 +7,7 @@ import 'package:client/sidebar/providers.dart';
 import 'package:client/thread/history_column.dart';
 import 'package:client/thread/providers.dart';
 import 'package:client/thread/thread_reads.dart';
+import 'package:design_system/design_system.dart';
 import 'package:domain/domain.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
@@ -137,12 +138,16 @@ Future<void> pumpThread(
   int n = 1,
   MessageId? jumpTo,
   Locale locale = const Locale('en'),
+  String platform = 'macos',
+  DsDensityMode density = DsDensityMode.comfortable,
 }) => host.pump(
   tester,
   HistoryColumn(threadId: threadId(n), jumpTo: jumpTo),
   location: '/t/${threadId(n).value}',
   locale: locale,
   overrides: threadOverrides(reads),
+  platform: platform,
+  density: density,
 );
 
 /// The text field of the composer.

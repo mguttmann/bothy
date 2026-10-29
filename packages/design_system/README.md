@@ -40,6 +40,7 @@ the apps pass them from the app configuration (M4-08), this package holds no num
 |---|---|---|---|
 | `DsMessage` | `DsMessageData`, `DsMessageAction` | `collapseLines` (`ui.message_collapse_lines`); `isContinuation` computed by the caller from `ui.message_group_window` | 1 |
 | `DsMarkdown` | the Markdown source, `DsAttachmentResolver` | none | 1 |
+| `DsMarkdownCodeBlock`, `DsMarkdownQuoteBlock`, `DsClipboardScope` | `DsCopyData`, `DsClipboard`, `dsCodeBlockText`, `dsQuoteCopy` | none | 1 (01 6.12) |
 | `DsLiveBox`, `.collapsed`, `.mobile` | `DsRunData`, `DsStepData` | `visibleSteps` (`ui.livebox_visible_steps`), `announceMinInterval` (`a11y.live_announce_min_interval`) | 2 |
 | `LiveAnnouncer` | run state and question ID | `minInterval` (`a11y.live_announce_min_interval`) | 2.4 |
 | `DsToolChip` | `DsStepData` | none | 3 |

@@ -1506,7 +1506,11 @@
   },
   "markdownCopyCode": "Copy code",
   "@markdownCopyCode": {
-    "description": "Copy button of a code block in a message (components.md section 1)."
+    "description": "Copy button of a code block in a message (components.md section 1); on the phone the label of the tap action of the block (01 6.12)."
+  },
+  "markdownCopyQuote": "Copy quote",
+  "@markdownCopyQuote": {
+    "description": "Copy button of a quote block in a message; on the phone the label of the tap action of the block (01 6.12)."
   },
   "triggerReasonMultipleAgentsMentioned": "Please mention only one agent.",
   "@triggerReasonMultipleAgentsMentioned": {

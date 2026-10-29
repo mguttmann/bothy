@@ -1037,6 +1037,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get markdownCopyCode => 'Code kopieren';
 
   @override
+  String get markdownCopyQuote => 'Zitat kopieren';
+
+  @override
   String get triggerReasonMultipleAgentsMentioned =>
       'Bitte nur einen Agenten erwähnen.';
 

@@ -104,7 +104,7 @@ milestones from the [plan](../PLAN.md).
 
 | Feature | Milestone | Where | Action(s) | Remark |
 |---|---|---|---|---|
-| Markdown, code blocks, long answers without splitting, collapsed with "Show more" | core | D, M | `message.create` | limit `message.max_content_bytes` |
+| Markdown, code blocks, long answers without splitting, collapsed with "Show more" | core | D, M | `message.create` | limit `message.max_content_bytes`; a single code or quote block copies on its own (6.12) |
 | Edit and delete own messages, view versions | core | D, M | `message.update`, `message.delete`, `message.revisions.read` | no editing deadline |
 | Reply with quote | core | D, M | `message.create` | |
 | Reactions with a free Unicode character | core | D, M | `reaction.add` | status is not a reaction |
@@ -1676,6 +1676,47 @@ sessions stay as they are. The name is trimmed and not empty; the server checks 
 (`channel.name_max_chars`, 03) and a refusal shows its sentence in the dialog, and a changed version
 (`version_conflict`) reads the forum again and asks the person to confirm the new name once more.
 
+### 6.12 Copying blocks of a message
+
+Addendum of 2026-10-29 (R-PR-25, rulings D-M4-48-1 to D-M4-48-7). Reason: owner request of
+2026-10-29; in Discord a tap on a code block on the phone never copied it and "Copy text" always
+copied the whole message, so a command or a quoted passage had to be cut out of it by hand.
+Applies to every message the renderer draws, on the desktop (macOS, Windows) and on the phone
+(iOS, Android).
+
+1. **Desktop.** Every code block (fenced or indented) and every quote block has a small copy
+   button at its top right ("Copy code", "Copy quote"); it copies exactly that block and confirms
+   with "Copied". It is a button for the keyboard and the screen reader, and its label is never
+   part of a text selection. A click on the text of a block copies nothing.
+2. **Phone.** A tap on a code block or a quote block copies exactly that block, with a short
+   "Copied" and a light haptic; the block has no button. A long press on the message opens the
+   message menu (the menu of a right click on the desktop), where "Copy text" copies the whole
+   message. A tap on a link inside a
+   block opens the link, a horizontal drag scrolls a code block; neither copies. A screen reader
+   copies a block through its action "Copy code" or "Copy quote".
+3. **Code block.** The copy is the raw content between the fences, byte for byte: indentation,
+   tabs, trailing spaces, blank lines, every Unicode character and long lines stay as they are;
+   the fence lines and the language tag are not part of it, and nothing of the rendering (soft
+   wraps, horizontal scroll) is. Line breaks are LF. Trailing line break rule: only the line break
+   that ends the last content line is dropped, so a one-line block copies without a line break
+   and a block that ends in blank lines keeps them; an unclosed fence copies to the end of the
+   message. An indented fence removes only its own indentation (CommonMark).
+4. **Quote block.** The copy is the quote without its `>` markers. As plain text it keeps the
+   line breaks of the source and gives inline Markdown as its text (emphasis, inline code and
+   links as their text, an image as its alt text); blocks are separated by an empty line, a list
+   item starts with "- " or its number, a task with "[x] " or "[ ] ", a code block keeps its raw
+   content and a table row is its cells separated by a tab. Where the platform clipboard holds
+   rich text (all four apps: the HTML flavor of the pasteboard on macOS and iOS, "HTML Format"
+   on Windows, an HTML clip on Android) the same copy also carries an HTML form, so a paste into
+   a rich editor keeps emphasis, code, lists, tables and the `https`, `http` and `mailto` links;
+   any other link and every image are text only, so a paste loads nothing. If the rich form
+   cannot be written, the plain text still is.
+5. **Nesting.** A block inside another copies only itself: the code block or quote inside a
+   quote copies its own content, the outer quote copies all of its content as text.
+6. **Selection.** Selecting part of a message with the system selection, where a view offers it,
+   is not changed by the copy targets: a tap is the block's, a long press and a drag stay with
+   the selection and the message.
+
 ## 7. Keyboard shortcuts
 
 Shortcuts apply on desktop. They avoid system assignments (Cmd+H, Cmd+M, Cmd+Q, Alt+F4,
@@ -1927,6 +1968,7 @@ Rules:
 | R-PR-22 | On desktop the session column can be hidden and shown from the header of a thread or main history ("Hide session", "Show session"), with Cmd+Shift+I and from a slim rail at the right edge while it is hidden, kept per device and per layout (addendum of 2026-10-29). | Owner feedback on the Mac app (2026-10-29): the session column read as not collapsible, because the header button only said "Column" and the choice was lost on restart. |
 | R-PR-23 | A forum group in the sidebar lists every open post by last activity, newest first, the newest `ui.sidebar_forum_posts_visible` and then "Show more" in place (kept per device); text channels keep the rule of 6.8 item 2 (addendum of 2026-10-29). | Owner decision 2026-10-29 ("like Discord"): after an import most open posts had no recent activity and vanished from the sidebar; a forum with 24 open posts showed none. |
 | R-PR-24 | Each device navigates on its own: route, selected row, open columns, collapsed spaces and groups and scroll position stay on the device and never follow another device of the person; only data (messages, read state, counters, drafts, settings, sidebar order, notification preferences) syncs (6.7, 04 14; addendum of 2026-10-29). | Owner report 2026-10-29 (iPhone and Mac app of one person): opening a chat on the phone appeared to open the same chat on the Mac. The cause was the synchronized collapse of a space: the space a device expanded to open a chat expanded on the other device at the same moment, while the route never followed. The owner wants to do different things on phone and desktop. Two-device tests over the fake server hold the rule (docs/decisions.d/FIX-device-mirroring.md, docs/decisions.d/FIX-device-mirroring-2.md). |
+| R-PR-25 | Every code block and quote block of a message copies on its own: on the desktop through a copy button at its top right, on the phone through a tap with "Copied" and a haptic, while a long press keeps the message menu; a code block copies its raw content byte for byte, a quote its text without markers and, where the clipboard holds rich text, also as HTML (6.12, addendum of 2026-10-29). | Owner request 2026-10-29: in Discord a tap on a code block on the phone never copied it and "Copy text" always copied the whole message. |
 
 ## 14. Configuration values of this chapter
 
