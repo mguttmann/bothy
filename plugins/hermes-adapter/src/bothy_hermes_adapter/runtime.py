@@ -4,7 +4,8 @@
 Two directions, both without a Hermes import:
 
 * `Runtime` is what the logic asks of Hermes: start a turn, steer it, interrupt it, resolve a
-  card's callback, switch or read the session of a thread, and tell which credential and which
+  card's callback, switch or read the session of a thread, run a control command in a thread,
+  name the skill commands and build a skill's turn text, and tell which credential and which
   toolsets the next turn uses. ``platform.py`` implements it on the pinned Hermes version; unit
   tests fake it.
 * `RuntimeEvents` is what Hermes tells the logic during a turn (status sentences, drafts, the
@@ -31,6 +32,7 @@ from uuid import UUID
 __all__ = [
     "CardKind",
     "CardRequest",
+    "CommandRequest",
     "FileSent",
     "MediaKind",
     "OpenCard",
@@ -131,6 +133,25 @@ class TurnRequest:
     message_id: UUID
     user_text: str = field(repr=False)
     system_part: str = field(repr=False)
+
+
+@dataclass(frozen=True)
+class CommandRequest:
+    """A control command of a person, to run in a thread's Hermes session (09 10.4, 17.3).
+
+    Attributes:
+        thread_id: The thread.
+        channel_id: The channel.
+        user_id: The invoking person.
+        user_name: The person's display name.
+        text: The Hermes command line (``/<name>``).
+    """
+
+    thread_id: UUID
+    channel_id: UUID
+    user_id: UUID
+    user_name: str = field(repr=False)
+    text: str
 
 
 @dataclass(frozen=True)
@@ -319,6 +340,37 @@ class Runtime(Protocol):
 
         Returns:
             The title, or ``None``.
+        """
+        ...
+
+    async def run_command(self, command: CommandRequest) -> list[str]:
+        """Run a control command in the thread's Hermes session and collect Hermes' reply.
+
+        Args:
+            command: The command.
+
+        Returns:
+            The texts Hermes answered with, in order (empty when it answered nothing).
+        """
+        ...
+
+    def skill_commands(self) -> Mapping[str, str]:
+        """Return Hermes' skill commands for this platform: name (without ``/``) to description.
+
+        Returns:
+            The skill commands.
+        """
+        ...
+
+    def skill_text(self, name: str, text: str) -> str | None:
+        """Build Hermes' own turn text that invokes a skill with a person's text.
+
+        Args:
+            name: The skill command (without ``/``).
+            text: What the skill should work on (may be empty).
+
+        Returns:
+            The turn text, or ``None`` when Hermes has no such skill now.
         """
         ...
 

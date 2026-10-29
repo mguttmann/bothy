@@ -9,13 +9,19 @@ SDK's (M2-29); this module decides what Hermes does:
   again right before every ``startRun`` and ``resumeRun``; `actual_tool_class` reports the class
   of the enabled toolsets.
 * `prepare` reads the run context (and the channel configuration when ``settings_version`` is
-  newer) and builds the turn's texts; it refuses a ``command`` or ``interaction`` trigger, so
-  such a run ends ``failed`` ``adapter_error`` without a start.
+  newer) and builds the turn's texts; a model command (``trigger_kind = command``) of a Hermes
+  skill becomes Hermes' skill invocation with the command's ``input``. It refuses an
+  ``interaction`` trigger and every other command, so such a run ends ``failed``
+  ``adapter_error`` without a start.
 * `execute` handles the session of the thread (09 9.1, 9.5), runs the Hermes turn and ends the
   run: buffered edits first, then the session report, the title and ``finishRun`` with metrics
   and costs.
 * `on_followup` steers a running turn or answers a waiting card; `on_interaction` resolves a
   card's Hermes callback exactly once and answers the interaction.
+* `on_command` runs a control command (``command.invoked``) of
+  `bothy_hermes_adapter.hermes_commands` in the thread's Hermes session and posts Hermes' reply
+  as the agent's message without a run (09 10.4); `on_report` posts a message Hermes sends
+  without an invocation (a cron job's report) through `bothy_hermes_adapter.reports` (09 14).
 * The `bothy_hermes_adapter.runtime.RuntimeEvents` methods take what Hermes reports during a
   turn: live box, answer, edits, cards, usage and the files it sends with its answer (each one
   uploaded and sent as a message with that file attached, 09 17.3).
@@ -43,6 +49,7 @@ from uuid import UUID
 
 import httpx
 from bothy_sdk.adapter import ActualBilling, AgentHandler, Invocation, StartOptions
+from bothy_sdk.client import Client
 from bothy_sdk.errors import ProblemError
 from bothy_sdk.generated.api.admin import get_instance
 from bothy_sdk.generated.api.agent_runtime import (
@@ -85,6 +92,13 @@ from bothy_hermes_adapter.actual_mode import ActualMode, determine
 from bothy_hermes_adapter.config import AdapterSettings
 from bothy_hermes_adapter.context_format import BuiltContext, build_context, cut_utf8
 from bothy_hermes_adapter.context_format import find_message_text as _find_text
+from bothy_hermes_adapter.hermes_commands import (
+    BUILT_IN,
+    COMMAND_CLASSES,
+    INPUT_OPTION,
+    command_text,
+    option_values,
+)
 from bothy_hermes_adapter.live_box import LiveBox
 from bothy_hermes_adapter.media import (
     FileRefused,
@@ -93,9 +107,11 @@ from bothy_hermes_adapter.media import (
     upload,
     with_transcripts,
 )
+from bothy_hermes_adapter.reports import ReportError, direct_send, parse_target, post_report
 from bothy_hermes_adapter.runtime import (
     CardKind,
     CardRequest,
+    CommandRequest,
     FileSent,
     MediaKind,
     OpenCard,
@@ -154,6 +170,7 @@ class _Turn:
     abort_reason: str | None = None
     final_reply: bool = False
     upload_limit: int | None = None
+    anchored: bool = True
     dropped: bool = False
     interrupted: bool = False
     settled: asyncio.Event = field(default_factory=asyncio.Event)
@@ -194,6 +211,15 @@ class HermesHandler(AgentHandler):
         self._tool_class = self._read_tool_class()
         self._voice_input = self._read_voice_input()
         self._tasks: set[asyncio.Task[Any]] = set()
+        self._client: Client | None = None
+
+    def attach(self, client: Client) -> None:
+        """Take the adapter loop's client for the agent's own writes without a run.
+
+        Args:
+            client: The loop's client.
+        """
+        self._client = client
 
     # ---- mode, class, heartbeat ------------------------------------------------------------
 
@@ -283,12 +309,18 @@ class HermesHandler(AgentHandler):
             Start options with the billing evidence.
 
         Raises:
-            PrepareRefused: A ``command`` or ``interaction`` trigger, which this adapter does not
-                serve.
+            PrepareRefused: An ``interaction`` trigger, or a command that is no Hermes skill
+                command now, which this adapter does not serve.
         """
         payload = inv.payload
         kind = str(getattr(payload, "trigger_kind", "message"))
-        if kind != "message":
+        skill_text = None
+        if kind == "command":
+            skill_text = self._skill_text(payload)
+            if skill_text is None:
+                _LOG.warning("run %s refused: not a skill command", run.run_id)
+                raise PrepareRefused(kind)
+        elif kind != "message":
             _LOG.warning("run %s refused: trigger kind %s", run.run_id, kind)
             raise PrepareRefused(kind)
         ctx = await run.load_context()
@@ -299,11 +331,27 @@ class HermesHandler(AgentHandler):
             fetch=self._fetcher(run),
             attachment_limit=self.settings.attachment_text_max_bytes,
         )
-        if audio_to_transcribe(ctx):
+        if skill_text is not None:
+            # The turn is Hermes' own skill invocation; the context stays the system part.
+            built = self._prepared[run.run_id]
+            self._prepared[run.run_id] = BuiltContext(built.system_part, skill_text)
+        elif audio_to_transcribe(ctx):
             # Transcribed after the start, before the turn (09 13): the run is running meanwhile.
             self._voice[run.run_id] = (ctx, channel)
         actual = self.actual_mode()
         return StartOptions(billing_evidence=BillingEvidence.from_dict(actual.evidence))
+
+    def _skill_text(self, payload: Any) -> str | None:
+        """The turn text of a model command: Hermes' skill invocation, or ``None`` (09 17.3)."""
+        name = _text_or_none(getattr(payload, "command_name", None))
+        if name is None or name in BUILT_IN or name in COMMAND_CLASSES:
+            return None
+        values = option_values(getattr(payload, "options", None))
+        try:
+            return self.runtime.skill_text(name, values.get(INPUT_OPTION, ""))
+        except Exception as exc:  # an unreadable skill is no skill
+            _LOG.warning("skill not readable: %s", type(exc).__name__)
+            return None
 
     async def _channel(self, payload: Any, run: RunHandle) -> ChannelBehavior | None:
         channel_id = payload.channel_id
@@ -355,6 +403,7 @@ class HermesHandler(AgentHandler):
             session_version=_int_or_none(getattr(session, "version", None)),
             mode_used=inv.claims.billing_mode,
             live=LiveBox(run.patch, self._now),
+            anchored=str(getattr(payload, "trigger_kind", "message")) == "message",
         )
         self._turns[run.thread_id] = turn
         self._by_run[run.run_id] = turn
@@ -453,7 +502,8 @@ class HermesHandler(AgentHandler):
             channel_id=payload.channel_id,
             user_id=inv.claims.sub,
             user_name=str(payload.triggered_by.display_name),
-            message_id=payload.message_id,
+            # A command run has no triggering message; Hermes needs an ID for the turn's event.
+            message_id=payload.message_id if turn.anchored else turn.run_id,
             user_text=turn.built.user_text,
             system_part=turn.built.system_part,
         )
@@ -771,6 +821,97 @@ class HermesHandler(AgentHandler):
             await self._abandon(turn)
             raise
 
+    # ---- commands and reports without a run -------------------------------------------------
+
+    async def on_command(self, inv: Invocation, run: RunHandle | None) -> None:
+        """A control command (``command.invoked``): run it in Hermes, post the reply (09 10.4).
+
+        Only the control commands of `bothy_hermes_adapter.hermes_commands` run; Hermes gets the
+        bare command line from the adapter's control sender, never an option value. Each text
+        Hermes answers becomes a message of the agent in the thread, without a run.
+
+        Args:
+            inv: The ``command.invoked`` invocation (its token was checked by the SDK).
+            run: The adapter's run the command names, if any (not used: no run is changed).
+        """
+        del run
+        payload = inv.payload
+        name = str(getattr(payload, "command_name", ""))
+        thread_id = getattr(payload, "thread_id", None)
+        known = COMMAND_CLASSES.get(name, ("", ""))[0] == "control"
+        if not getattr(payload, "control", False) or not known or not isinstance(thread_id, UUID):
+            _LOG.info("command %s not run: no control command of this adapter", payload.command_id)
+            return
+        person = getattr(payload, "invoked_by", None)
+        request = CommandRequest(
+            thread_id=thread_id,
+            channel_id=payload.channel_id,
+            user_id=inv.claims.sub,
+            user_name=str(getattr(person, "display_name", "") or ""),
+            text=command_text(name, option_values(getattr(payload, "options", None))),
+        )
+        try:
+            texts = await self.runtime.run_command(request)
+        except Exception as exc:  # Hermes failed the command; the person sees no reply
+            _LOG.warning("command %s failed in Hermes: %s", payload.command_id, type(exc).__name__)
+            return
+        for text in texts:
+            if not text.strip():
+                continue
+            try:
+                await self._post_own(thread_id, text)
+            except Exception as exc:  # a refusal or an unreachable server: the reply is lost
+                _LOG.info(
+                    "command %s: reply not posted: %s", payload.command_id, type(exc).__name__
+                )
+
+    async def _post_own(self, thread_id: UUID, text: str) -> UUID | None:
+        """A message of the agent without a run (09 14): one ``createMessage``.
+
+        Not through the outbox: a refusal such as ``403`` must reach Hermes as a failure at
+        once, while the outbox keeps such an entry pending and sends it again at every
+        reconnect. The client repeats the same ``client_msg_id`` on a transient failure, so a
+        retry never posts twice.
+        """
+        client = self._client
+        if client is None:
+            raise ReportError("the adapter is not connected")
+        body, was_cut = cut_utf8(text.encode("utf-8"), self.settings.max_message_bytes)
+        if was_cut:
+            _LOG.info("thread %s: message cut to the message limit", thread_id)
+        try:
+            with client.unbound():
+                return await direct_send(client, thread_id, body)
+        except ProblemError as exc:
+            _LOG.info("thread %s: message refused code=%s", thread_id, exc.code)
+            raise ReportError(f"refused by the server: {exc.code}") from None
+
+    async def on_report(self, chat_id: str, thread_id: str | None, text: str) -> UUID | None:
+        """A message Hermes sends without an invocation: a report of the agent (09 14, 17.9).
+
+        Args:
+            chat_id: Hermes' ``chat_id`` (the channel).
+            thread_id: Hermes' ``thread_id`` (a fixed thread), if any.
+            text: The report.
+
+        Returns:
+            The message or the new forum post.
+
+        Raises:
+            ReportError: Nothing was posted; the reason names no content.
+        """
+        target = parse_target(chat_id, thread_id)
+        client = self._client
+        if client is None:
+            raise ReportError("the adapter is not connected")
+        return await post_report(
+            client,
+            target,
+            text,
+            max_bytes=self.settings.max_message_bytes,
+            send=self._post_own,
+        )
+
     async def on_event(self, envelope: Envelope) -> None:
         """``agent.config_changed``: forget the cached channel configuration.
 
@@ -829,7 +970,8 @@ class HermesHandler(AgentHandler):
         body = self._cut(turn, text)
         with self._bound(turn):
             turn.live.answer()
-            entry = await turn.handle.send(body, reply_to_message_id=_uuid_or_none(reply_to))
+            anchor = _uuid_or_none(reply_to) if turn.anchored else None
+            entry = await turn.handle.send(body, reply_to_message_id=anchor)
         if entry.message_id is None:
             return None
         key = str(entry.message_id)

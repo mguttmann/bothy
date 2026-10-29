@@ -9,9 +9,10 @@ module of the package starts a process; docs/DECISIONS.md D-M2-33-12):
   own access policy (``dm_policy: allowlist``), the adapter's control sender as slash-command
   admin, ``display.busy_input_mode`` (``steer`` or ``queue``; ``interrupt`` is refused) and
   ``busy_ack_enabled: false``, ``tool_progress: off`` and ``busy_steer_ack_enabled: false`` for
-  the platform and a placeholder home channel (Hermes would otherwise
-  ask for one in the first turn's thread; cron delivery is not built yet, 09 17.9); it
-  refuses to change an existing platform key
+  the platform, and the home channel: the report channel of ``--report-channel`` (with an
+  optional fixed ``--report-thread``), the target of ``deliver=<key>`` cron jobs (09 17.9), or
+  a placeholder that refuses every report (Hermes would otherwise ask for one in the first
+  turn's thread); it refuses to change an existing platform key
   (D-AG-19), because every thread would lose its Hermes session.
 * ``switch-mode``: ``organization`` requires the API-key variable of the profile environment to
   be set (judged by its name), empties the OAuth variables and Hermes's allow list of the
@@ -59,7 +60,8 @@ CONTROL_SENDER: Final = "bothy-adapter-control"
 _LOGIN_FILE: Final = Path(".claude") / ".credentials.json"
 
 HOME_CHANNEL_UNASSIGNED: Final = "unassigned"
-"""``chat_id`` of the platform's home channel until cron delivery is built (09 17.9)."""
+"""``chat_id`` of the platform's home channel without a report channel (09 17.9): Hermes stops
+asking for a home channel in the first turn's thread, and a report to it is refused."""
 
 
 class InstallError(ValueError):
@@ -120,6 +122,8 @@ class InstallRequest:
         platform_key: `hermes_adapter.platform_key`.
         consumer: `hermes_adapter.consumer`.
         dpop_key_file: `hermes_adapter.dpop_key_file`, if any.
+        report_channel: The report channel (Hermes' home channel, 09 14, 17.9), if any.
+        report_thread: A fixed thread of the report channel for every report, if any.
     """
 
     server_url: str = field(repr=False)
@@ -129,6 +133,8 @@ class InstallRequest:
     platform_key: str = "bothy"
     consumer: str = "default"
     dpop_key_file: Path | None = field(default=None, repr=False)
+    report_channel: UUID | None = None
+    report_thread: UUID | None = None
 
 
 def plugin_entry(platform_key: str) -> dict[str, str]:
@@ -198,6 +204,8 @@ def plan_install(config: Mapping[str, Any], request: InstallRequest) -> dict[str
     """
     if request.busy_input_mode not in ("steer", "queue"):
         raise InstallError("busy input mode must be steer or queue (interrupt is refused)")
+    if request.report_thread is not None and request.report_channel is None:
+        raise InstallError("--report-thread needs --report-channel")
     existing = _installed_key(config)
     if existing is not None and existing != request.platform_key:
         raise InstallError("the platform key is fixed after commissioning (D-AG-19)")
@@ -217,9 +225,20 @@ def plan_install(config: Mapping[str, Any], request: InstallRequest) -> dict[str
     new = copy.deepcopy(dict(config))
     section = _nested(new, "gateway", "platforms", request.platform_key)
     section["enabled"] = True
-    if not isinstance(section.get("home_channel"), dict):
+    if request.report_channel is not None:
+        # Hermes' home channel is the target of `deliver=<key>` cron jobs and `hermes send
+        # --to <key>` (09 14, 17.9); a thread makes every report go into that one thread.
+        home: dict[str, Any] = {
+            "platform": request.platform_key,
+            "chat_id": str(request.report_channel),
+            "name": "Reports",
+        }
+        if request.report_thread is not None:
+            home["thread_id"] = str(request.report_thread)
+        section["home_channel"] = home
+    elif not isinstance(section.get("home_channel"), dict):
         # Hermes asks every platform without a home channel to set one, in the first turn's
-        # thread; cron delivery is not built yet (09 17.9), so the channel only stops the notice.
+        # thread; without a report channel the placeholder only stops the notice.
         section["home_channel"] = {
             "platform": request.platform_key,
             "chat_id": HOME_CHANNEL_UNASSIGNED,

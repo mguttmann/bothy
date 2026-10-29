@@ -2194,7 +2194,7 @@ compatibility test runs against the pinned and the newest version (16.1, fake He
 | `connect()` | Gateway `identify` (token, `consumer` = `hermes_adapter.consumer`), load JWKS, reconcile commands, start heartbeat, load allowlist (17.7) |
 | `disconnect()` | close the connection with `1000`; the next heartbeat no longer reports open runs |
 | Inbound (`agent.invocation`, `agent.followup`) | check the token (4.5), `run.start`, then `MessageEvent` via `build_source` and `handle_message` (17.6) |
-| `send(chat_id, content, reply_to, metadata)` | `message.create` (`origin = agent`) in the thread from `chat_id`/`thread_id`; `client_msg_id` from the adapter outbox |
+| `send(chat_id, content, reply_to, metadata)` | Three cases (as built in HERMES-CRON-COMMANDS). A send whose `reply_to` names a running control command is that command's reply (row "Hermes commands"). A send that belongs to a turn of its thread is the turn's answer: `message.create` (`origin = agent`, `run_id` of the run) in the thread from `chat_id`/`thread_id`, `client_msg_id` from the adapter outbox; inside a turn (Hermes' session variable names a thread) only that thread's own sends count, outside any turn only a thread whose run is active; a late send of a thread whose run has ended fails and is never posted. Every other send is a report without a run (17.9): a cron job of the gateway's scheduler, a notice of a background task, a send into another channel or thread |
 | `edit_message(..., finalize)` | own reply message: buffer the content, a `message.update` only on `finalize=True` or at the end of the run; reason: every edit would be a durable event and a revision. Measured: without draft streaming Hermes first sends the reply as `send` with a typing cursor, edits it with `finalize=False` and closes it with exactly one `edit_message(finalize=True)` carrying the finished text; with draft streaming there is no `finalize=True`. If `send_draft` is off, the buffered content is the source of `/last_text_excerpt` |
 | `supports_draft_streaming()` = true, `send_draft(...)` | draft text of a running turn as `run.update` on `/last_text_excerpt`; the finished reply comes via `send`. Measured: the text is cumulative (each draft contains the previous one), the last draft equals the reply except for leading spaces; after a tool it starts with a paragraph |
 | `supports_status_text` = true, `set_status_text(chat_id, text)` | `run.update` on `/status_line`. Measured: Hermes sets a status sentence when a tool starts and `None` when it ends; that is the only signal about tool steps. The adapter creates the step `tool_call` at the status sentence, takes the text verbatim as the step title (never parsed, D-L7) and completes it at `None`, at the next status sentence, at the next draft or the reply, or at `on_processing_complete`, whichever comes first |
@@ -2211,7 +2211,7 @@ compatibility test runs against the pinned and the newest version (16.1, fake He
 | `on_processing_start(event)` | no operation (the start is already `run.start`) |
 | `on_processing_complete(event, outcome)` | `run.finish` with `completed`, `failed` or `cancelled`, `costs`. Measured: after `/stop` comes `ProcessingOutcome.CANCELLED` |
 | `get_chat_info(chat_id)` | read thread and channel (`thread.read`) |
-| Hermes commands | Not built yet (follow-up ticket, needs the reconciliation of M2-16): the adapter registers no commands and refuses a run with `trigger_kind` `command` (`failed`, `adapter_error`). The rest of this row describes the target. Register as control commands (`control = true`), skill commands as model commands. Measured: a new session (`session.mode = new` after a reset) with `/new` via `handle_message`; Hermes asks via `send_slash_confirm`, and the adapter answers the question, because the server has already checked the reset, through the resolver `tools.slash_confirm.resolve(session_key, confirm_id, "once")`. Rebinding (`bind`) with `/resume <session ID>` via `handle_message` (17.4, 9.5). Stop with `/stop` via `handle_message` (8 item 3). A follow-up without configuration also with `/steer <text>` (17.5) |
+| Hermes commands | Built (HERMES-CRON-COMMANDS). At connect the adapter declares its complete command list and the SDK reconciles it (10.2, D-M2-29-12). The Hermes commands that the server has as built-in commands (10.1) stay the server's and are never registered: `/stop` is the stop of section 8 (`/stop` via `handle_message`, item 3), `/new` a new session (`session.mode = new` after a reset, `/new` via `handle_message`; Hermes asks via `send_slash_confirm`, and the adapter answers through `tools.slash_confirm.resolve(session_key, confirm_id, "once")`, because the server has already checked the reset), `/resume` the rebinding (`bind`, `/resume <session ID> --all`, 17.4, 9.5), `/title` and `/status` the server's. A follow-up without configuration also works with `/steer <text>` (17.5), which the adapter does not use. The adapter's command table (`hermes_commands.COMMAND_CLASSES`) names every gateway command of the pinned version with its class and reason; a test fails when a pin update brings a command the table does not name, and commands of other Hermes plugins are never offered. Control commands (`control = true`, instance-wide, no options): `/context` and `/version`, which read the thread's Hermes session or Hermes itself and call no model. On `command.invoked` the adapter sends the bare `/<name>` (never an option value) via `handle_message` from its control sender (17.4) in the thread's session; Hermes answers an idle session through its normal processing and a busy one inline, both with `reply_to` = the command's message, and each text Hermes answers becomes a message of the agent in the thread without a run (`message.create` without `run_id` and without an invocation token, 10.4), also during a run of the thread. Every other gateway command is refused: it calls the model outside a run, changes the thread's session outside the server's session record, bypasses the server's follow-up, approval or card rules, reaches the host, or acts on the whole profile. Skill commands: every skill Hermes offers for the platform (its skill scan without the skills `skills.platform_disabled` turns off for the platform key) becomes a model command (`control = false`, instance-wide) with the optional `string` option `input`; a name that is no valid command name or that a built-in, a table row or a control command uses is left out, and the list never exceeds `command.max_per_principal`. A run with `trigger_kind = command` of such a skill is a turn whose text is Hermes' own skill invocation message for the skill and the `input` (`build_skill_invocation_message`, as Hermes' gateway builds it for `/<skill>`), with the run context as the system part and no reply anchor; any other command run is refused before the start (`failed`, `adapter_error`). Skills installed after the gateway start are declared at the next start. Evidence: the Fake-Hermes tests `test_commands_and_reports.py` and `test_command_table_covers_pinned_commands` against the pinned version |
 | Title | after the first completed run of a new session, the Hermes session title as a suggestion (section 12) |
 
 `MAX_MESSAGE_LENGTH` corresponds to `message.max_content_bytes`; the adapter does not split
@@ -2412,11 +2412,34 @@ installer shows this beforehand.
 
 ### 17.9 Reports from cron jobs
 
-`cron_deliver_env_var` and `standalone_sender_fn` (both present in `v2026.9.24` and `v0.22.5`) are registered so that Hermes cron jobs can send
-without a live adapter. The target is the report channel from the platform configuration
-(section 14). Not built yet (follow-up ticket, needs the reports of section 14): cron delivery is
-not registered; until then the installer writes a placeholder home channel (`chat_id`
-`unassigned`), because Hermes otherwise asks for one in the thread of the first turn.
+Built (HERMES-CRON-COMMANDS). The plugin registers `cron_deliver_env_var` (`<KEY>_HOME_CHANNEL`),
+`parse_target_ref_fn` and `standalone_sender_fn` (all present in `v2026.9.24` and `v0.22.5`), so
+Hermes cron jobs and `hermes send` deliver to the platform with or without a live adapter. Targets
+(Hermes' `deliver` and `--to` syntax): `<key>` is the platform's home channel, which the installer
+sets to the report channel (`--report-channel <channel ID>`, optionally `--report-thread
+<thread ID>`); `<key>:<channel ID>` names a channel and `<key>:<channel ID>:<thread ID>` a fixed
+thread. Without a report channel the installer keeps the placeholder home channel (`chat_id`
+`unassigned`), because Hermes otherwise asks for one in the thread of the first turn; a report to
+it is refused.
+
+A report is a write of the agent without a run (section 14), checked with the agent's own rights
+(`write` on the channel, `rl.message`). Without a fixed thread the channel's kind decides: a forum
+gets a new post per report (`thread.create` with the title from the report's first line, without
+Markdown heading marks, at most `thread.title_max_chars`, and the report as its first message), so
+a support job opens one post per ticket; a text channel gets the report in its main thread. In
+the gateway process the report is a `send` outside a turn of its thread (17.3) and goes out with
+the adapter's client; in a process without the gateway (`hermes cron run`, `hermes send`)
+`standalone_sender_fn` opens a client of its own from the platform section Hermes hands over
+(`PlatformConfig.extra`, the token file and the DPoP key; never the environment) with the
+`User-Agent` adapter name `hermes-adapter-standalone`. Each report is one request with a fresh
+`client_msg_id` (a new post: a fresh `Idempotency-Key`) that the client repeats on a transient
+failure, not an outbox entry: a refusal (for example `403 forbidden`) comes back to Hermes at once
+as a failure result with the problem code, and nothing is stored. A report with attachments
+(standalone) is refused, because a report carries text only; files go with a turn's answer
+(17.3). Hermes' continuable cron threads (`create_handoff_thread`) are not offered; a person's reply in a report's thread triggers
+by the normal rules (section 14 item 5). Evidence: the Fake-Hermes test
+`test_reports_from_hermes_send_and_cron` (home forum, text channel, fixed thread, a refused target,
+a cron job in a process without the gateway and one fired by the gateway's own scheduler).
 
 ### 17.10 To check before building
 
@@ -3160,6 +3183,7 @@ attachment without a transcript would reach the turn only as a file path.
 | R-AG-31 | The Claude Code runner reloads its served channels on `access.changed` and the channel and space structure events, and on a timer as a fallback, not only at start (18.1, addendum of 2026-10-29). | An operator change sends no `agent.config_changed`, so a forum that got the runner as operator stayed not ready until a restart (docs/decisions.d/RUNNER-LIVE-RELOAD.md). |
 | R-AG-32 | The Claude Code runner transcribes audio attachments without a transcript with an optional local program and reports `voice_input` only when one is configured; without it the person gets a note in the thread (18.14, addendum of 2026-10-29). | Claude Code cannot hear audio; a local program keeps the audio on the host, and a note replaces a silent loss (R-AG-16). |
 | R-AG-33 | The Hermes adapter sends the files of Hermes' answer as attachments through the public upload sessions, each within the server's upload limit and after Hermes' own delivery policy, and transcribes voice input with Hermes' own speech to text, delivering the transcript to the server (17.3, 17.6, HERMES-MEDIA). | Hermes behaves in a thread as on its other platforms; the server keeps scanning, limits and the owner switch `supports_files_out`, and other people see the transcript (13). |
+| R-AG-34 | Hermes: its built-in-like commands stay the server's built-ins, a closed table offers only control commands without a model call, skills become model commands, and reports without a run go to the report channel, a forum getting one post per report (17.3, 17.9, addendum of 2026-10-29). | A command sent as the adapter's admin sender must never widen what a person may do, and an unknown command of a later Hermes version is refused until the table names it (docs/decisions.d/HERMES-CRON-COMMANDS.md). |
 
 ## 20. Alignment with the core contract
 

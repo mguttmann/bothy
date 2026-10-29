@@ -89,6 +89,7 @@ _IDEMPOTENT_KEY_OPS = frozenset(
         "reportAgentSession",
         "createUpload",
         "completeUpload",
+        "createThread",
     }
 )
 _ROUTES: tuple[tuple[str, str, str], ...] = (
@@ -123,6 +124,8 @@ _ROUTES: tuple[tuple[str, str, str], ...] = (
     ("GET", "/files/{file_id}", "getFile"),
     ("PUT", "/files/{file_id}/transcript", "submitTranscript"),
     ("GET", "/threads/{thread_id}", "getThread"),
+    ("GET", "/channels/{channel_id}", "getChannel"),
+    ("POST", "/channels/{channel_id}/threads", "createThread"),
     ("PUT", "/threads/{thread_id}/title", "setThreadTitle"),
     ("POST", "/threads/{thread_id}/agent-sessions/report", "reportAgentSession"),
     ("PATCH", "/messages/{message_id}", "updateMessage"),
@@ -401,6 +404,8 @@ class FakeServer:
         files: tuple[ContextFile, ...] = (),
         session_mode: str | object | None = AUTO_SESSION,
         forged: str | None = None,
+        command: str | None = None,
+        options: Mapping[str, str] | None = None,
     ) -> Triggered:
         """A person posts ``text``: a queued run and its ``agent.invocation``.
 
@@ -425,6 +430,9 @@ class FakeServer:
                 kind instead of a fresh one, and nothing is recorded on the run (AG-08 and
                 AZ-P6 against an adapter in another process): ``missing`` (no token), a forge
                 variant of `forge_token`, or ``expired`` (well formed, ``exp`` in the past).
+            command: The name of a registered command of Lotse: a model command run
+                (``trigger_kind = command``) whose payload names it with ``options``.
+            options: The option values of ``command`` by name.
 
         Returns:
             The run, thread and message.
@@ -434,11 +442,19 @@ class FakeServer:
         """
         if forged is not None and forged not in ("missing", "expired", *FORGE_VARIANTS):
             raise ValueError(f"unknown token kind: {forged}")
+        definition = None
+        if command is not None:
+            found = [c for c in self.world.commands.values() if c["name"] == command]
+            if not found:
+                raise ValueError(f"no such command: {command}")
+            definition = (found[0], dict(options or {}))
+            trigger_kind = "command"
         run = self.world.trigger(
             text,
             channel_id=channel_id,
             author=author,
             trigger_kind=trigger_kind,
+            command=definition,
             attachments=tuple(attachments),
             thread_id=thread_id,
             context=context,
@@ -565,6 +581,22 @@ class FakeServer:
             doc: A ``RunContext`` document.
         """
         self.world.runs[run_id].context = dict(doc)
+
+    @property
+    def created_threads(self) -> list[UUID]:
+        """Threads Lotse opened itself with ``createThread`` (forum posts of reports)."""
+        return list(self.world.created_threads)
+
+    def main_thread(self, channel_id: UUID | None = None) -> UUID:
+        """The main thread of a text channel (Allgemein when omitted).
+
+        Args:
+            channel_id: The channel.
+
+        Returns:
+            The thread ID.
+        """
+        return self.world.main_thread(channel_id or self.world.channel_id)
 
     def thread(self, thread_id: UUID) -> dict[str, Any]:
         """The ``getThread`` body of a thread.
@@ -839,7 +871,12 @@ class FakeServer:
         return UUID(command["id"])
 
     async def invoke_command(
-        self, name: str, *, run_id: UUID | None = None, thread_id: UUID | None = None
+        self,
+        name: str,
+        *,
+        run_id: UUID | None = None,
+        thread_id: UUID | None = None,
+        options: Mapping[str, str] | None = None,
     ) -> UUID:
         """Alex runs Lotse's command ``name`` (registered first if missing): ``command.invoked``.
 
@@ -847,6 +884,7 @@ class FakeServer:
             name: The command name.
             run_id: The run of the thread, if any (its thread is used).
             thread_id: The thread without a run, if any.
+            options: The option values by name.
 
         Returns:
             The invocation ID of the payload.
@@ -854,7 +892,7 @@ class FakeServer:
         command = next((c for c in self.world.commands.values() if c["name"] == name), None)
         if command is None:
             command = self.world.commands[await self.register_command(name)]
-        invocation_id = self.world.command_invoked(command, run_id, thread_id)
+        invocation_id = self.world.command_invoked(command, run_id, thread_id, options)
         await _settle()
         return invocation_id
 
@@ -1333,6 +1371,11 @@ class FakeServer:
         if op == "getThread":
             doc = world.thread_doc(p["thread_id"])
             return 200, doc, {"ETag": f'"{doc["version"]}"'}
+        if op == "getChannel":
+            return 200, world.channel_doc(p["channel_id"]), {"ETag": '"1"'}
+        if op == "createThread":
+            doc = world.create_thread(p["channel_id"], body)
+            return 201, doc, {"ETag": f'"{doc["thread"]["version"]}"'}
         if op == "setThreadTitle":
             doc = world.set_title(p["thread_id"], body, request.headers.get("If-Match"))
             return 200, doc, {"ETag": f'"{doc["version"]}"'}

@@ -30,6 +30,7 @@ from bothy_hermes_adapter.handler import HermesHandler
 from bothy_hermes_adapter.heartbeat import HermesAdapterLoop
 from bothy_hermes_adapter.runtime import (
     CardRequest,
+    CommandRequest,
     OpenCard,
     ResolvedCredential,
     SessionSwitch,
@@ -80,6 +81,10 @@ class FakeRuntime:
     stt: bool = True
     transcripts: Mapping[bytes, str] = field(default_factory=dict)
     heard: list[tuple[bytes, str, str]] = field(default_factory=list)
+    skills: dict[str, str] = field(default_factory=dict)
+    commands: list[CommandRequest] = field(default_factory=list)
+    replies: list[str] = field(default_factory=lambda: ["Hermes Agent v0.0.0"])
+    command_error: Exception | None = None
     _events: HermesHandler | None = None
     _scripts: set[asyncio.Task[TurnOutcome]] = field(default_factory=set)
 
@@ -137,6 +142,20 @@ class FakeRuntime:
             return SessionSwitch.BOUND
         self.sessions[thread_id] = f"sess-new-{len(self.switches)}"
         return SessionSwitch.NEW if mode == "new" else SessionSwitch.BOUND
+
+    async def run_command(self, command: CommandRequest) -> list[str]:
+        self.commands.append(command)
+        if self.command_error is not None:
+            raise self.command_error
+        return list(self.replies)
+
+    def skill_commands(self) -> Mapping[str, str]:
+        return dict(self.skills)
+
+    def skill_text(self, name: str, text: str) -> str | None:
+        if name not in self.skills:
+            return None
+        return f"[skill {name}] {text}".rstrip()
 
     def current_session(self, thread_id: UUID) -> str | None:
         return self.sessions.get(thread_id)
@@ -214,6 +233,7 @@ async def rig(
     billing_mode: str = "organization",
     tool_class: str = "scoped",
     tamper: Rewrite | None = None,
+    commands: Any = None,
     **settings: Any,
 ) -> AsyncIterator[Rig]:
     """Start everything; stop and close on exit.
@@ -246,6 +266,7 @@ async def rig(
         runtime_version="0.21.5",
         capabilities=handler.capabilities(),
         settings=server.sdk_settings,
+        commands=commands,
     )
     loop = HermesAdapterLoop(config, handler, clock=server.clock)
     inner = await loop.make_source()

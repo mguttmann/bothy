@@ -12,7 +12,7 @@ it.
 
 | Folder | Kind | Purpose | State |
 |---|---|---|---|
-| `hermes-adapter/` | agent adapter | platform plugin for the open-source framework Hermes Agent | built (M2-33) on the recording of M2-32 ([README](hermes-adapter/README.md)); files, voice, Hermes commands and cron reports not built yet |
+| `hermes-adapter/` | agent adapter | platform plugin for the open-source framework Hermes Agent | built (M2-33) on the recording of M2-32, files and voice (HERMES-MEDIA), Hermes commands and cron reports (HERMES-CRON-COMMANDS) ([README](hermes-adapter/README.md)) |
 | `claude-code-runner/` | agent adapter | starts Claude Code sessions per thread in dev forums | core (M2-34); follow-ups, stop and error paths M2-35, answer attachments M3-12 ([README](claude-code-runner/README.md)) |
 | `grafana-bothy-live/` | Grafana panel plugin | views of the live statistics for operations from OTel metrics (ID `bothy-live-panel`, [25-visualization.md](../docs/spec/25-visualization.md), section 8) | built (M7-25), unsigned; provisioning and release ZIP M7-26 ([README](grafana-bothy-live/README.md)) |
 | `cost-reconciler/` | app | cost reconciliation of docs/spec/10-backend-policy.md section 12.4, admin key only in the app | built (M2-28) ([README](cost-reconciler/README.md)) |
