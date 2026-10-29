@@ -494,7 +494,10 @@ func prepare(ctx context.Context, o options, env Env, cfg Config, m *Mapping, sf
 	if err := sf.checkAgents(s.agents); err != nil {
 		return nil, nil, err
 	}
-	p := buildStructure(gs, m)
+	p, err := buildStructure(gs, m, s.place)
+	if err != nil {
+		return nil, nil, err
+	}
 	if err := p.readThreads(ctx, cl.dc, gs, cfg.DiscordClosedTags); err != nil {
 		if errors.Is(err, discord.ErrForbidden) {
 			return nil, nil, finding("preflight: a mapped channel is not readable by the bot (403 on its thread list)")
