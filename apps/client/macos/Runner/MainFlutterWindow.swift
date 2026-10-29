@@ -4,7 +4,8 @@ import Cocoa
 import FlutterMacOS
 
 /// The main window: the Flutter view, the plugins, the deep link channel, the channel of
-/// "Start at login" (`LoginItemChannel`), the push channel (`PushApple`), the sharing channel
+/// "Start at login" (`LoginItemChannel`), the clipboard of block copies
+/// (`RichClipboardChannel`), the push channel (`PushApple`), the sharing channel
 /// (`ShareApple`) and the updater of the Developer ID edition (`AppUpdater`, only when the
 /// build carries Sparkle; its channel `bothy/updater` answers in every build).
 class MainFlutterWindow: NSWindow {
@@ -17,6 +18,7 @@ class MainFlutterWindow: NSWindow {
     RegisterGeneratedPlugins(registry: flutterViewController)
     DeepLinkChannel.shared.attach(messenger: flutterViewController.engine.binaryMessenger)
     LoginItemChannel.attach(messenger: flutterViewController.engine.binaryMessenger)
+    RichClipboardChannel.attach(messenger: flutterViewController.engine.binaryMessenger)
     // Push (M5-04): the notification center's delegate before launch finishes, so a tap that
     // started the app reaches Dart through `takePendingTaps`. It keeps the delegate that
     // flutter_local_notifications set while registering and forwards it every local

@@ -3,6 +3,7 @@
     ["sh", "ios/ClientKit/run_tests.sh"],
     ["flutter", "test", "integration_test/a11y_platform_tree_test.dart", "-d", "macos"],
     ["flutter", "test", "integration_test/admin_step_up_test.dart", "-d", "macos"],
+    ["flutter", "test", "integration_test/copy_blocks_test.dart", "-d", "macos"],
     ["flutter", "test", "integration_test/devices_test.dart", "-d", "macos"],
     ["flutter", "test", "integration_test/export_test.dart", "-d", "macos"],
     ["flutter", "test", "integration_test/forum_test.dart", "-d", "macos"],
@@ -42,6 +43,7 @@
   "windows": [
     ["flutter", "test", "integration_test/a11y_platform_tree_test.dart", "-d", "windows"],
     ["flutter", "test", "integration_test/admin_step_up_test.dart", "-d", "windows"],
+    ["flutter", "test", "integration_test/copy_blocks_test.dart", "-d", "windows"],
     ["flutter", "test", "integration_test/devices_test.dart", "-d", "windows"],
     ["flutter", "test", "integration_test/export_test.dart", "-d", "windows"],
     ["flutter", "test", "integration_test/forum_test.dart", "-d", "windows"],

@@ -11,8 +11,10 @@ import '../../generated/design_tokens.g.dart';
 import '../../theme/ds_theme.dart';
 import '../ds_common.dart';
 import '../ds_focus_ring.dart';
+import 'block_copy.dart';
 import 'link_policy.dart';
 
+export 'block_copy.dart';
 export 'link_policy.dart';
 
 /// Resolves an image reference of a message to a widget, or returns null for the text form.
@@ -27,7 +29,7 @@ typedef DsAttachmentResolver = Widget? Function(Uri reference);
 ///
 /// The source is parsed with package `markdown` (GitHub flavored, without the HTML block and
 /// inline HTML syntaxes) and the subset paragraph, emphasis, strong, strikethrough, inline
-/// code, fenced code (language label, horizontal scroll, copy button), block quote, ordered
+/// code, fenced code (language label, horizontal scroll, copy), block quote (copy), ordered
 /// and unordered lists, read-only task boxes, headings (at most `type.heading`), horizontal
 /// rule, tables (horizontal scroll) and links is built from the AST:
 ///
@@ -37,6 +39,11 @@ typedef DsAttachmentResolver = Widget? Function(Uri reference);
 /// * a link is active only for `https`, `http`, `mailto` and the internal paths `/t/...` and
 ///   `/c/...` ([dsClassifyLink]); its target shows in a tooltip on hover and focus, and
 ///   [onOpenLink] is called only on a tap, Enter or Space. Any other link is plain text.
+///
+/// Every code block and every quote block copies exactly itself (01 6.12, R-PR-25): on the
+/// desktop through a copy button at its top right, on the phone (density `touch`) through a
+/// tap on the block, with "Copied" and a haptic. The copy goes to the [DsClipboardScope]'s
+/// clipboard ([dsCodeBlockText], [dsQuoteCopy]); a long press is left to the message around.
 ///
 /// [style] is the body style, by default `type.body` in `color.text.primary`.
 ///
@@ -249,16 +256,8 @@ class _Builder {
       case 'pre':
         return _code(e);
       case 'blockquote':
-        return Container(
-          padding: const EdgeInsets.only(left: DsSpace.s12),
-          decoration: BoxDecoration(
-            border: Border(
-              left: BorderSide(
-                color: colors.borderDefault,
-                width: DsBorderWidth.spine,
-              ),
-            ),
-          ),
+        return DsMarkdownQuoteBlock(
+          content: () => dsQuoteCopy(e),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             mainAxisSize: MainAxisSize.min,
@@ -282,8 +281,7 @@ class _Builder {
 
   Widget _code(md.Element pre) {
     final code = pre.children?.whereType<md.Element>().firstOrNull;
-    var text = (code ?? pre).textContent;
-    if (text.endsWith('\n')) text = text.substring(0, text.length - 1);
+    final text = dsCodeBlockText(pre);
     final cls = code?.attributes['class'];
     final language = cls != null && cls.startsWith('language-')
         ? cls.substring('language-'.length)
@@ -652,13 +650,153 @@ class _DsMarkdownLinkState extends State<DsMarkdownLink> {
   }
 }
 
+/// Whether the ambient density is `touch` (the phone, 01 11): the only density whose
+/// `density.target-min` is the touch target. Compared by value, because an animated density
+/// switch leaves a lerped `DsDensity` in the theme.
+bool _touch(BuildContext context) =>
+    context.dsDensity.targetMin >= DsDensity.touch.targetMin;
+
+/// Writes [data] to the clipboard of [context] and confirms it with "Copied"; on the phone
+/// ([touch]) with a light haptic too (01 6.12 items 1 and 2).
+Future<void> _copyBlock(
+  BuildContext context,
+  DsCopyData data, {
+  required bool touch,
+}) async {
+  final copied = dsL10n(context).messageCopied;
+  // The snack bar needs a scaffold; a renderer outside one (a test, a bare dialog) copies
+  // without it.
+  final messenger = Scaffold.maybeOf(context) == null
+      ? null
+      : ScaffoldMessenger.maybeOf(context);
+  await DsClipboardScope.of(context).write(data);
+  if (touch) await HapticFeedback.lightImpact();
+  messenger
+    ?..hideCurrentSnackBar()
+    ..showSnackBar(SnackBar(content: Text(copied)));
+}
+
+/// The small text button at the top right of a block on the desktop.
+///
+/// Kept out of the system selection, so a selection across the block never copies its label.
+class _CopyButton extends StatelessWidget {
+  const _CopyButton({required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return SelectionContainer.disabled(
+      child: DsTappable(
+        label: label,
+        excludeChildSemantics: true,
+        onTap: onTap,
+        child: Center(
+          widthFactor: 1,
+          heightFactor: 1,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: DsSpace.s8),
+            child: Text(
+              label,
+              style: dsTextStyle(DsType.label)
+                  .copyWith(color: context.dsAccent.textLink),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// On the phone: [child] as one tap target that copies the block, with [label] as the
+/// screen reader's name of that action. A long press and drags pass to the widgets around
+/// and inside (the message menu, the horizontal scroll of code); a deeper target (a link, a
+/// nested block) wins its own tap.
+class _TapToCopy extends StatelessWidget {
+  const _TapToCopy({
+    required this.label,
+    required this.onTap,
+    required this.child,
+  });
+
+  final String label;
+  final VoidCallback onTap;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      container: true,
+      label: label,
+      onTap: onTap,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        excludeFromSemantics: true,
+        onTap: onTap,
+        child: child,
+      ),
+    );
+  }
+}
+
+/// A block quote of [DsMarkdown]: [child] behind a spine in `color.border.default`, which
+/// copies [content] (the quote without its `>` markers, as plain text and HTML, [dsQuoteCopy]):
+/// through the button "Copy quote" at its top right on the desktop, through a tap on the
+/// phone (01 6.12).
+class DsMarkdownQuoteBlock extends StatelessWidget {
+  /// Creates the block.
+  const DsMarkdownQuoteBlock({
+    super.key,
+    required this.content,
+    required this.child,
+  });
+
+  /// Builds the copy when the person copies; the parse tree is not converted on every build.
+  final DsCopyData Function() content;
+
+  /// The rendered blocks of the quote.
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = dsL10n(context);
+    final touch = _touch(context);
+    void copy() => _copyBlock(context, content(), touch: touch);
+    final quote = Container(
+      padding: const EdgeInsets.only(left: DsSpace.s12),
+      decoration: BoxDecoration(
+        border: Border(
+          left: BorderSide(
+            color: context.dsColors.borderDefault,
+            width: DsBorderWidth.spine,
+          ),
+        ),
+      ),
+      child: touch
+          ? child
+          : Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: child),
+                _CopyButton(label: l.markdownCopyQuote, onTap: copy),
+              ],
+            ),
+    );
+    return touch
+        ? _TapToCopy(label: l.markdownCopyQuote, onTap: copy, child: quote)
+        : quote;
+  }
+}
+
 /// A code block of [DsMarkdown]: `type.code` on `color.code.bg`, horizontal scroll, language
-/// label and a copy button that puts exactly [code] into the clipboard.
+/// label, and the copy of exactly [code]: the button "Copy code" at its top right on the
+/// desktop, a tap on the block on the phone (01 6.12).
 class DsMarkdownCodeBlock extends StatelessWidget {
   /// Creates the block.
   const DsMarkdownCodeBlock({super.key, required this.code, this.language});
 
-  /// The code text without the fence and the last line break.
+  /// The raw code, as [dsCodeBlockText] gives it.
   final String code;
 
   /// The language of the fence, or null.
@@ -668,7 +806,13 @@ class DsMarkdownCodeBlock extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.dsColors;
     final l = dsL10n(context);
-    return Container(
+    final touch = _touch(context);
+    void copy() => _copyBlock(context, DsCopyData(code), touch: touch);
+    final label = Text(
+      language ?? '',
+      style: dsTextStyle(DsType.codeSm).copyWith(color: colors.textSecondary),
+    );
+    final block = Container(
       decoration: BoxDecoration(
         color: colors.codeBg,
         borderRadius: BorderRadius.circular(DsRadius.md),
@@ -681,35 +825,24 @@ class DsMarkdownCodeBlock extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Row(
-            children: [
-              const SizedBox(width: DsSpace.s8),
-              Expanded(
-                child: Text(
-                  language ?? '',
-                  style: dsTextStyle(DsType.codeSm)
-                      .copyWith(color: colors.textSecondary),
-                ),
+          if (touch)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                DsSpace.s8,
+                DsSpace.s4,
+                DsSpace.s8,
+                0,
               ),
-              DsTappable(
-                label: l.markdownCopyCode,
-                excludeChildSemantics: true,
-                onTap: () => Clipboard.setData(ClipboardData(text: code)),
-                child: Center(
-                  widthFactor: 1,
-                  heightFactor: 1,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: DsSpace.s8),
-                    child: Text(
-                      l.markdownCopyCode,
-                      style: dsTextStyle(DsType.label)
-                          .copyWith(color: context.dsAccent.textLink),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
+              child: label,
+            )
+          else
+            Row(
+              children: [
+                const SizedBox(width: DsSpace.s8),
+                Expanded(child: label),
+                _CopyButton(label: l.markdownCopyCode, onTap: copy),
+              ],
+            ),
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.fromLTRB(
@@ -727,5 +860,8 @@ class DsMarkdownCodeBlock extends StatelessWidget {
         ],
       ),
     );
+    return touch
+        ? _TapToCopy(label: l.markdownCopyCode, onTap: copy, child: block)
+        : block;
   }
 }

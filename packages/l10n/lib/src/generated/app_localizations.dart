@@ -1687,11 +1687,17 @@ abstract class AppLocalizations {
   /// **'Image: {alt}'**
   String markdownImageNoDomain(String alt);
 
-  /// Copy button of a code block in a message (components.md section 1).
+  /// Copy button of a code block in a message (components.md section 1); on the phone the label of the tap action of the block (01 6.12).
   ///
   /// In en, this message translates to:
   /// **'Copy code'**
   String get markdownCopyCode;
+
+  /// Copy button of a quote block in a message; on the phone the label of the tap action of the block (01 6.12).
+  ///
+  /// In en, this message translates to:
+  /// **'Copy quote'**
+  String get markdownCopyQuote;
 
   /// Notice for the rejection reason `multiple_agents_mentioned` at acceptance of a triggering message (docs/spec/09 section 3.5; components.md section 5).
   ///

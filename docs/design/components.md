@@ -63,7 +63,10 @@ Pin, More).
 
 Long replies: content over `ui.message_collapse_lines` lines is collapsed; a text button
 "Show more" (`color.text.link`) expands it. Code blocks in `type.code` on `color.code.bg`,
-horizontally scrollable, with a copy button.
+horizontally scrollable. Every code block and quote block copies on its own (01 6.12, M4-48): on
+the desktop a text button "Copy code" or "Copy quote" in `type.label`, `color.text.link`, at the
+top right of the block; on the phone (density `touch`) the whole block is the tap target, with a
+snack bar "Copied" and a light haptic, and a long press on the message opens the message menu.
 
 Sizes: avatar `size.avatar-md`; gap from avatar to content `space.12`; group gap
 `density.message-gap`; row padding `density.message-pad-y`; reading width at most

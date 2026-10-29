@@ -8,6 +8,7 @@ import 'dart:io';
 
 import 'package:client/app/providers/ports.dart';
 import 'package:client/app/providers/session.dart';
+import 'package:design_system/design_system.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
@@ -60,8 +61,9 @@ final class ColumnHost {
   }
 
   /// Pumps [child] at [location] with the provider [overrides]; every path the child goes to
-  /// is recorded in [visited]. [platform] `ios` gives the ports of a phone build in a phone
-  /// window (brief M5-02); [lifecycle] replaces the foreground of the test ports.
+  /// is recorded in [visited]. [platform] `ios` or `android` gives the ports of a phone build
+  /// in a phone window (brief M5-02); [density] is the density of the theme (`touch` is the
+  /// phone's, 01 11); [lifecycle] replaces the foreground of the test ports.
   Future<void> pump(
     WidgetTester tester,
     Widget child, {
@@ -69,9 +71,11 @@ final class ColumnHost {
     Locale locale = const Locale('en'),
     List<Override> overrides = const [],
     String platform = 'macos',
+    DsDensityMode density = DsDensityMode.comfortable,
     AppLifecycle? lifecycle,
   }) async {
-    if (platform == 'ios') {
+    final phone = platform == 'ios' || platform == 'android';
+    if (phone) {
       tester.view
         ..physicalSize = const Size(390, 844) * 3
         ..devicePixelRatio = 3;
@@ -106,7 +110,7 @@ final class ColumnHost {
           syncEngineProvider.overrideWithValue(engine),
           ...overrides,
         ],
-        child: hostRouter(router, locale: locale),
+        child: hostRouter(router, locale: locale, density: density),
       ),
     );
     await settle(tester);

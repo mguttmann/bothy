@@ -11,8 +11,10 @@ import 'package:client/app/discovery.dart';
 import 'package:client/app/providers/ports.dart';
 import 'package:client/app/providers/session.dart';
 import 'package:client/app/providers/target.dart';
+import 'package:client/app/rich_clipboard.dart';
 import 'package:client/app/target_resolver.dart';
 import 'package:client/onboarding/onboarding_controller.dart';
+import 'package:design_system/design_system.dart';
 import 'package:flutter/material.dart' hide ConnectionState;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
@@ -82,6 +84,16 @@ void main() {
       tester.widget<MaterialApp>(find.byType(MaterialApp)).title,
       testBranding.appName,
     );
+  });
+
+  testWidgets('block copies go to the rich clipboard of the runner (M4-48)', (
+    tester,
+  ) async {
+    await pumpApp(tester);
+    final scope = tester.widget<DsClipboardScope>(
+      find.byType(DsClipboardScope),
+    );
+    expect(scope.clipboard, isA<PlatformRichClipboard>());
   });
 
   testWidgets('each step of the controller has its screen', (tester) async {

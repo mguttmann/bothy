@@ -265,6 +265,7 @@
   "markdownImage": "Bild: {alt} ({domain})",
   "markdownImageNoDomain": "Bild: {alt}",
   "markdownCopyCode": "Code kopieren",
+  "markdownCopyQuote": "Zitat kopieren",
   "triggerReasonMultipleAgentsMentioned": "Bitte nur einen Agenten erwähnen.",
   "triggerReasonAgentNotAllowedHere": "Dieser Agent antwortet hier nicht.",
   "triggerReasonNoTriggerRight": "Du darfst hier keine Agenten auslösen.",
