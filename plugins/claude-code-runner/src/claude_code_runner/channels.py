@@ -3,7 +3,10 @@
 
 Loaded at start with ``listServedChannels``; a channel is reloaded with
 ``getServedChannelConfig`` after ``agent.config_changed`` and when an invocation names a newer
-``settings_version``. A ``404`` removes the channel. Content (prompts, bindings) is never logged.
+``settings_version``. A ``404`` removes the channel. `resync` loads the whole list again while
+the runner runs: an operator change reaches the runner only as ``access.changed`` (04 8.2),
+never as ``agent.config_changed``, and a binding made before the runner became the operator
+was announced to another agent (09 18.1). Content (prompts, bindings) is never logged.
 
 Examples:
     >>> ChannelCache.__name__
@@ -63,6 +66,24 @@ class ChannelCache:
             )
         self._configs = {c.channel_id: c for c in listed.items}
         _LOG.info(json.dumps({"event": "channels_loaded", "count": len(self._configs)}))
+
+    async def resync(self) -> bool:
+        """Load the served channels again while running (`load`), keeping the cache on a failure.
+
+        Returns:
+            True when a forum joined or left the served set or its readiness or reason changed,
+            so the caller reports the readiness at once.
+
+        Raises:
+            ProblemError: ``listServedChannels`` failed; the cache is unchanged.
+            httpx.TransportError: The server was not reachable; the cache is unchanged.
+        """
+        before = self._states()
+        await self.load()
+        return before != self._states()
+
+    def _states(self) -> dict[UUID, tuple[bool, str | None] | None]:
+        return {channel_id: self._ready(channel_id) for channel_id in self._configs}
 
     async def reload(self, channel_id: UUID) -> bool:
         """Reload one channel; a ``404`` removes it.

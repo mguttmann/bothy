@@ -138,6 +138,13 @@ class RunnerConfig:
             again for the same binding content before this time.
         project_folders_max: ``runner.project_folders_max``: most folder names the heartbeat
             reports in ``project_folders`` (09 18.13, M4-44); at least 1.
+        channels_resync_interval: ``runner.channels_resync_interval``: the served channels are
+            loaded again at this interval, the fallback for an operator or binding change whose
+            event did not reach the runner (09 18.1); above zero.
+        transcribe_cmd: ``runner.transcribe_cmd``: the argument list of a local transcriber; the
+            path of an audio file is appended and the text on stdout is the transcript (09
+            18.14). Empty: no transcription.
+        transcribe_timeout: ``runner.transcribe_timeout``: time limit of one transcription.
     """
 
     source: Path
@@ -171,6 +178,9 @@ class RunnerConfig:
     provision_timeout: float = 600.0
     provision_retry_after: float = 300.0
     project_folders_max: int = 500
+    channels_resync_interval: float = 300.0
+    transcribe_cmd: tuple[str, ...] = ()
+    transcribe_timeout: float = 300.0
 
 
 _Parse = Callable[[Any], Any]
@@ -307,6 +317,29 @@ def _at_least_one(r: _Reader, name: str, default: int) -> int:
     return int(value)
 
 
+def _positive(r: _Reader, name: str, default: str) -> float:
+    """The duration key ``name`` of ``r``, refused at zero."""
+    value = r.duration(name, default)
+    if value <= 0:
+        raise r.fail(name, "must be above zero")
+    return value
+
+
+def _transcribe_cmd(r: _Reader) -> tuple[str, ...]:
+    """``runner.transcribe_cmd``: a program and its arguments, no shell (09 18.14)."""
+    cmd = r.strings("transcribe_cmd")
+    if cmd and cmd[0].startswith("-"):
+        raise r.fail("transcribe_cmd", "the program starts with -")
+    if not all(_plain(part) for part in cmd):
+        raise r.fail("transcribe_cmd", "an entry is empty or has controls")
+    return cmd
+
+
+def _plain(value: str) -> bool:
+    """Not empty and without a control or bidi character (an argument may start with -)."""
+    return check_argument("x" + value) and bool(value)
+
+
 def load_config(path: Path) -> RunnerConfig:
     """Load and check the configuration file.
 
@@ -398,6 +431,9 @@ def load_config(path: Path) -> RunnerConfig:
         provision_timeout=r.duration("provision_timeout", "10m"),
         provision_retry_after=r.duration("provision_retry_after", "5m"),
         project_folders_max=folders_max,
+        channels_resync_interval=_positive(r, "channels_resync_interval", "5m"),
+        transcribe_cmd=_transcribe_cmd(r),
+        transcribe_timeout=_positive(r, "transcribe_timeout", "5m"),
     )
     r.unknown()
     return config

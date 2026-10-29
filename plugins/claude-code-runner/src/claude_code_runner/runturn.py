@@ -49,7 +49,12 @@ from bothy_sdk.errors import (
     ValidationFailed,
     VersionConflict,
 )
-from bothy_sdk.generated.api.agent_runtime import finish_run, report_agent_session
+from bothy_sdk.generated.api.agent_runtime import (
+    finish_run,
+    report_agent_session,
+    submit_transcript,
+)
+from bothy_sdk.generated.api.files import get_file
 from bothy_sdk.generated.api.messages import get_message
 from bothy_sdk.generated.models import (
     AgentSession,
@@ -64,6 +69,7 @@ from bothy_sdk.generated.models import (
     RunFinish,
     RunFinishState,
     RunMetrics,
+    TranscriptSubmit,
 )
 from bothy_sdk.generated.types import Unset
 from bothy_sdk.outbox import OutboxState
@@ -114,6 +120,7 @@ from claude_code_runner.statedir import ensure_private_dir, write_private
 from claude_code_runner.stop import StoppableGroup
 from claude_code_runner.streamreader import StreamReader
 from claude_code_runner.title import propose_title, split_title
+from claude_code_runner.transcribe import LOCAL_FILE, notice, transcribe_attachments
 from claude_code_runner.turn import (
     Turn,
     TurnPaths,
@@ -338,6 +345,7 @@ class RunTurn:
         context = self.state.context
         if context is None:  # pragma: no cover - prepare always loads it
             raise RuntimeError("no context")
+        await self._transcribe(context)
         rendered = render_context(context, file_texts=self.state.file_texts)
         self.prompt_line, self.own_uuid = user_line(context_items(rendered))
         write_private(paths.input, self.prompt_line + "\n")
@@ -422,6 +430,65 @@ class RunTurn:
     def _stop_requested(self) -> bool:
         """Whether a stop came (it can arrive at every ``await`` of the run)."""
         return self.stop_reason is not None
+
+    async def _transcribe(self, context: RunContext) -> None:
+        """Transcripts of the trigger's audio attachments before the first input (09 18.14).
+
+        A transcript is set on its attachment and delivered to the server (09 13); an audio file
+        without one gets a note in the thread. A stop ends the transcriber at once.
+        """
+        if not any(text.startswith(LOCAL_FILE) for text in self.state.file_texts.values()):
+            return  # no stored attachment, nothing to transcribe
+        status: list[bool] = []
+
+        async def on_start() -> None:
+            status.append(True)
+            await self._status_line("Transcribing a voice message")
+
+        task = asyncio.ensure_future(
+            transcribe_attachments(
+                context.trigger_message.attachments,
+                self.state.file_texts,
+                self.h.transcriber,
+                on_start,
+            )
+        )
+        while not task.done():
+            await asyncio.wait({task}, timeout=self.cfg.poll_interval)
+            if self._stop_requested() and not task.done():
+                task.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await task
+                return
+        done, missing = task.result()
+        if status:
+            await self._status_line(None)
+        for item in done:
+            await self._submit_transcript(item.file_id, str(item.transcript))
+        if missing and not self._stop_requested():
+            problem = await self._deliver(notice(missing), uuid4())
+            if problem is not None:
+                _log("transcript_notice_refused", code=problem, **self.ids)
+
+    async def _submit_transcript(self, file_id: UUID, text: str) -> None:
+        """``submitTranscript`` with the transcript ``ETag`` of ``getFile``; a refusal is logged.
+
+        The server keeps it only for a voice message in mode ``agent`` (09 13); any other answer
+        leaves the turn as it is.
+        """
+        client = self.handle.client
+        try:
+            current = await client.call_detailed(get_file.asyncio_detailed, file_id=file_id)
+            await client.call(
+                submit_transcript.asyncio_detailed,
+                file_id=file_id,
+                body=TranscriptSubmit(text=text),
+                if_match=current.headers.get("ETag", ""),
+            )
+        except ProblemError as err:
+            _log("transcript_not_submitted", code=err.code, file_id=file_id, **self.ids)
+        except httpx.TransportError:
+            _log("transcript_not_submitted", code="transport_error", file_id=file_id, **self.ids)
 
     async def _recover(self, action: Any, outcome: _Outcome) -> _Attempt | None:
         """The next process of a recovery (design notes 8 and 9)."""

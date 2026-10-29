@@ -195,6 +195,8 @@ class World:
         self.heartbeats: list[dict[str, Any]] = []
         # Channels Lotse serves: Allgemein first; forums with a project binding join (M2-34).
         self.channels: dict[UUID, dict[str, Any]] = {self.channel_id: self._channel("")}
+        # Forums another agent operates: Lotse does not serve them and gets no event about them.
+        self.unserved: dict[UUID, dict[str, Any]] = {}
         self.thread_meta: dict[UUID, dict[str, Any]] = {}
         self.files: dict[UUID, dict[str, Any]] = {}
         self.context_attachments: dict[UUID, list[UUID]] = {}
@@ -1131,6 +1133,7 @@ class World:
         model: str | None = None,
         allowed_tools: list[str] | None = None,
         prompt: str = "",
+        served: bool = True,
     ) -> UUID:
         """A forum Lotse serves, with a project binding unless ``workspace_ref`` is ``None``."""
         channel_id = uuid7()
@@ -1139,7 +1142,7 @@ class World:
             binding = self._binding(
                 workspace_ref, model, allowed_tools, version=1, provision=None, url=None
             )
-        self.channels[channel_id] = self._channel(prompt, binding)
+        (self.channels if served else self.unserved)[channel_id] = self._channel(prompt, binding)
         return channel_id
 
     @staticmethod
@@ -1170,12 +1173,15 @@ class World:
         return binding
 
     def update_forum(self, channel_id: UUID, **changes: Any) -> None:
-        """Change a forum and append ``agent.config_changed``.
+        """Change a forum and append ``agent.config_changed`` when Lotse serves it.
 
         Changes: ``workspace_ref``, ``model``, ``allowed_tools``, ``provision``,
-        ``repository_url``, ``prompt``; ``settings_version`` grows by one.
+        ``repository_url``, ``prompt``; ``settings_version`` grows by one. A forum of another
+        operator changes without an event to Lotse, as on the server (the event goes to the
+        effective operator only).
         """
-        behavior = self.channels[channel_id]["behavior"]
+        served = channel_id in self.channels
+        behavior = (self.channels if served else self.unserved)[channel_id]["behavior"]
         if "prompt" in changes:
             behavior["prompt"] = changes.pop("prompt")
         old = behavior.get("project_binding")
@@ -1191,7 +1197,46 @@ class World:
                 url=changes.get("repository_url", old.get("repository_url") if old else None),
             )
         behavior["settings_version"] += 1
+        if served:
+            self._config_changed(channel_id, behavior["settings_version"])
+
+    def unbind_forum(self, channel_id: UUID) -> None:
+        """Delete the project binding of a served forum and append ``agent.config_changed``."""
+        behavior = self.channels[channel_id]["behavior"]
+        behavior.pop("project_binding", None)
+        behavior["settings_version"] += 1
         self._config_changed(channel_id, behavior["settings_version"])
+
+    def set_operator(self, channel_id: UUID, *, served: bool, announce: bool = True) -> None:
+        """Make Lotse the operator of a forum (``served``) or another agent; ``access.changed``.
+
+        As on the server an operator change writes no ``agent.config_changed``, only the
+        personal ``access.changed`` with the channel under ``added`` or ``removed`` (04 8.2),
+        and none at all without ``announce`` (no change of Lotse's visible targets).
+        """
+        source, target = (
+            (self.unserved, self.channels) if served else (self.channels, self.unserved)
+        )
+        target[channel_id] = source.pop(channel_id)
+        if not announce:
+            return
+        self.permission_version += 1
+        entry = {"kind": "channel", "id": str(channel_id)}
+        payload: dict[str, Any] = {
+            "permission_version": self.permission_version,
+            "added": [{**entry, "level": "trigger"}] if served else [],
+            "removed": [] if served else [entry],
+            "changed": [],
+        }
+        envelope = self.envelope(
+            "access.changed",
+            payload,
+            resource={"kind": "principal", "id": str(self.lotse.id)},
+            thread_id=None,
+            actor=self.robin,
+        )
+        envelope["scope"] = {}
+        self.append("access.changed", envelope)
 
     def remove_channel(self, channel_id: UUID) -> None:
         """Lotse stops serving the channel: ``agent.config_changed``, then ``404``."""

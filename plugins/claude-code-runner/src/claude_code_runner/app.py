@@ -76,6 +76,7 @@ from claude_code_runner.environment import (
     build_environment,
     clean_path,
     find_program,
+    kept_environment,
 )
 from claude_code_runner.heartbeat import (
     CAPABILITIES,
@@ -94,13 +95,21 @@ from claude_code_runner.runturn import RunState, RunTurn
 from claude_code_runner.secrets import SecretError, resolve
 from claude_code_runner.statedir import ensure_private_dir, sweep
 from claude_code_runner.stop import stop_group
+from claude_code_runner.transcribe import Transcriber
 from claude_code_runner.turn import remove_turn_record
 from claude_code_runner.workspace import WorkspaceError, project_folders, readiness
 from claude_code_runner.workspace import resolve as resolve_workspace
 
-__all__ = ["Runner", "RunnerHandler", "StartError", "log", "warn"]
+__all__ = ["RESYNC_EVENTS", "Runner", "RunnerHandler", "StartError", "log", "warn"]
 
 _LOG = logging.getLogger("claude_code_runner")
+
+RESYNC_EVENTS = frozenset(
+    {"access.changed", "channel.updated", "space.updated", "channel.archived", "space.archived"}
+)
+"""Events after which the served channels are loaded again (09 18.1): an operator change
+reaches the old and the new operator as ``access.changed`` (04 8.2) and an agent that reads the
+channel also as ``channel.updated`` or ``space.updated``; none is ``agent.config_changed``."""
 
 
 def log(event: str, **ids: object) -> None:
@@ -152,6 +161,7 @@ class RunnerHandler(AgentHandler):
             retry_after=config.provision_retry_after,
             on_done=self.on_provisioned,
         )
+        self.transcriber = _transcriber(config, self.environ, self.path_entries)
         self.probe = Probe()
         self.minimum = MIN_CLAUDE_CODE_VERSION
         """The lowest supported CLI version; raised when the API refuses the model (18.9)."""
@@ -159,6 +169,8 @@ class RunnerHandler(AgentHandler):
         self._runs: dict[UUID, RunState] = {}
         self.adopted: dict[UUID, RunTurn] = {}
         self._adopting: set[asyncio.Task[None]] = set()
+        self._resync_lock = asyncio.Lock()
+        self._resyncing: asyncio.Task[None] | None = None
         self._slots = asyncio.Semaphore(config.max_parallel_runs)
         self._modes = billing_modes_supported(
             has_key_ref=config.anthropic_api_key_ref is not None,
@@ -211,13 +223,18 @@ class RunnerHandler(AgentHandler):
             await self.adapter.send_heartbeat()
 
     async def on_event(self, envelope: Envelope) -> None:
-        """``agent.config_changed`` reloads the forum and reports a changed readiness at once.
+        """``agent.config_changed`` reloads the forum, an operator change every served channel.
+
+        A changed readiness is reported at once (09 18.1).
 
         Args:
             envelope: The event.
         """
         if envelope.type == "run.cancel_requested":
             await self._cancel_adopted(envelope)
+            return
+        if envelope.type in RESYNC_EVENTS:
+            await self.resync_channels(envelope.type)
             return
         if envelope.type != "agent.config_changed" or self.channels is None:
             return
@@ -226,6 +243,39 @@ class RunnerHandler(AgentHandler):
             return
         if await self.channels.reload(channel_id) and self.adapter is not None:
             await self.adapter.send_heartbeat()
+
+    async def resync_channels(self, cause: str) -> None:
+        """Load the served channels again and send a heartbeat when a readiness changed.
+
+        A failure keeps the cache and is logged (``channels_resync_failed``); the next event or
+        the timer tries again.
+
+        Args:
+            cause: The event type or ``timer``, for the log line.
+        """
+        cache = self.channels
+        if cache is None:
+            return
+        async with self._resync_lock:
+            try:
+                changed = await cache.resync()
+            except (ProblemError, httpx.TransportError) as err:
+                warn("channels_resync_failed", cause=cause, code=getattr(err, "code", "transport"))
+                return
+        log("channels_resynced", cause=cause, changed=changed)
+        if changed and self.adapter is not None:
+            await self.adapter.send_heartbeat()
+
+    async def resync_periodically(self) -> None:
+        """The fallback of `resync_channels` every ``runner.channels_resync_interval``."""
+        while True:
+            await asyncio.sleep(self.config.channels_resync_interval)
+            await self.resync_channels("timer")
+
+    def start_resync(self) -> None:
+        """Start the timer of `resync_periodically` (once); `close` cancels it."""
+        if self._resyncing is None or self._resyncing.done():
+            self._resyncing = asyncio.get_running_loop().create_task(self.resync_periodically())
 
     async def on_followup(self, inv: Invocation, run: RunHandle) -> None:
         """A follow-up of a run of this runner: held until its turn starts, or offered (18.5).
@@ -438,11 +488,16 @@ class RunnerHandler(AgentHandler):
         return self.probe
 
     async def close(self) -> None:
-        """Cancel the version probe, the follows and a running folder creation.
+        """Cancel the version probe, the follows, the channel timer and a running folder creation.
 
         Adopted turns keep running; what a cancelled folder creation made is removed (09 18.12).
         """
         await self.provisioner.close()
+        resyncing = self._resyncing
+        if resyncing is not None and not resyncing.done():
+            resyncing.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await resyncing
         for follow in list(self._adopting):
             follow.cancel()
             with contextlib.suppress(asyncio.CancelledError, Exception):
@@ -764,7 +819,7 @@ class Runner:
             adapter_name=ADAPTER_NAME,
             adapter_version=__version__,
             runtime_name=RUNTIME_NAME,
-            capabilities=dict(CAPABILITIES),
+            capabilities={**CAPABILITIES, "voice_input": bool(self.config.transcribe_cmd)},
             settings=self.config.sdk,
         )
         self.adapter = Adapter(
@@ -795,6 +850,7 @@ class Runner:
         try:
             # Before the first event of the inbox and the first heartbeat (design note 12 d).
             await self.handler.adopt_turns(adapter)
+            self.handler.start_resync()
             return await adapter.run()
         finally:
             await self.handler.close()
@@ -803,6 +859,20 @@ class Runner:
         """Stop the adapter; running turns are cancelled by the SDK's shutdown."""
         if self.adapter is not None:
             await self.adapter.stop()
+
+
+def _transcriber(
+    config: RunnerConfig, environ: Mapping[str, str], path_entries: list[str]
+) -> Transcriber:
+    """The transcriber of 09 18.14.
+
+    The program is looked up in the cleaned ``PATH`` (a name that is not found stays and fails
+    as ``transcriber_unreachable``); the environment is the allow list without a mode part.
+    """
+    argv = config.transcribe_cmd
+    if argv:
+        argv = (find_program(argv[0], path_entries) or argv[0], *argv[1:])
+    return Transcriber(argv=argv, env=kept_environment(environ), timeout=config.transcribe_timeout)
 
 
 async def _newest_token(adapter: Adapter, run_id: UUID) -> Secret | None:

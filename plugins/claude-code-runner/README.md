@@ -1,7 +1,8 @@
 # claude-code-runner
 
 Status: core (M2-34), follow-ups, stop, error paths and adoption after a crash (M2-35), answer
-attachments (M3-12), folder creation of new projects (M4-43).
+attachments (M3-12), folder creation of new projects (M4-43), live reload of channels and
+optional transcription of voice messages (RUNNER-LIVE-RELOAD).
 
 ## Purpose
 
@@ -33,7 +34,8 @@ the title once per new session and reports the cost of the run.
 | `ledger.py` | The recovery invariants of a turn (stored offset, answers, inputs, kind, decided end), part of the turn record |
 | `failures.py`, `recovery.py` | Recognised CLI texts (`ERROR_TEXTS`) and the classification of a process end; the next action and the box notes |
 | `followups.py`, `stop.py`, `adoption.py` | Follow-up check, line and stdin rule; the stop schedule; identity check and adoption decision |
-| `channels.py`, `workspace.py` | Cache of the served forums and their bindings; resolution of `workspace_ref`, readiness and the project folder report (09 18.13, M4-44) |
+| `channels.py`, `workspace.py` | Cache of the served forums and their bindings, reloaded while running (09 18.1); resolution of `workspace_ref`, readiness and the project folder report (09 18.13, M4-44) |
+| `transcribe.py` | The local transcriber of audio attachments and the note without a transcript (09 18.14) |
 | `provision.py` | Folder creation of a binding with `provision` `init` or `clone`, its creation record and the readiness reasons (09 18.12, M4-43) |
 | `toolclass.py`, `commandline.py`, `environment.py` | Tool class order, the argument list of a turn, the allow-list environment |
 | `authcheck.py`, `heartbeat.py` | Pre-check `claude auth status`; version probe and the run-time heartbeat members |
@@ -89,6 +91,54 @@ docs/operations/configuration.md (generated from 09 21). Operator rules:
 - Keep `runner.stop_grace` plus `runner.kill_grace` below `agent.cancel_grace` of the server,
   else the server ends a stopped run with `cancel_timeout` before the runner reports
   `cancelled`; the runner cannot read the server value.
+- `runner.transcribe_cmd` is off by default; see "Voice messages" below. The transcriber runs as
+  the runner user with the allow-list environment and gets the audio file of a person's message,
+  so install only a program you trust there.
+
+## Channel and binding changes while running
+
+The runner loads its served channels at start and follows changes without a restart (09 18.1):
+`agent.config_changed` reloads the named channel; `access.changed` (the only event of an
+operator change, 04 8.2), `channel.updated`, `space.updated`, `channel.archived` and
+`space.archived` reload the whole list; and every `runner.channels_resync_interval` (default
+`5m`) the list is loaded again as a fallback. When a bound forum joined or left the list or a
+readiness changed, a heartbeat goes out at once, so a forum that just got the runner as operator
+is reported ready right after the change. Log codes: `channels_resynced` (cause and whether anything changed) and
+`channels_resync_failed` (the cache stays as it was).
+
+## Voice messages (09 18.14)
+
+Claude Code cannot hear audio. With `runner.transcribe_cmd` set, every audio attachment
+(`audio/*`) of the triggering message that has no transcript of the server is given to that
+program before the turn starts: the runner appends the local file path as the last argument, runs
+it without a shell, with stdin closed, stderr discarded, the allow-list environment (no API key)
+and the time limit `runner.transcribe_timeout`, and takes its stdout as the transcript. The text
+stands in the trigger part like a server transcript and is also stored on the server with
+`submitTranscript` (only accepted for a voice message in mode `agent`; any refusal is only
+logged). The heartbeat reports `capabilities.voice_input` true exactly when a transcriber is set.
+
+Without a transcriber, or when it fails (`transcriber_unreachable`, `transcriber_failed`,
+`transcriber_timeout`, `transcript_empty`), the runner posts a note in the thread that the voice
+message was not transcribed and Claude Code received only the audio file, and the turn runs
+with the file entry marked `not transcribed: <code>`.
+
+Example with whisper.cpp: its `whisper-cli` reads WAV, so a small wrapper converts first.
+
+```sh
+#!/bin/sh
+# /usr/local/bin/transcribe-audio <audio file>: prints the transcript on stdout.
+set -eu
+wav=$(mktemp "${TMPDIR:-/tmp}/voice.XXXXXX")
+trap 'rm -f "$wav"' EXIT
+ffmpeg -loglevel error -y -i "$1" -ar 16000 -ac 1 -f wav "$wav"
+whisper-cli -m /opt/whisper/models/ggml-base.bin -l auto -nt -np -f "$wav"
+```
+
+```toml
+[runner]
+transcribe_cmd = ["/usr/local/bin/transcribe-audio"]
+transcribe_timeout = "5m"
+```
 
 ## Stream mapping (09 18.4)
 
