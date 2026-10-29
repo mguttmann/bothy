@@ -1040,6 +1040,7 @@ Generated from openapi.yaml.
 | PUT | `/api/v1/agents/{agent_id}/billing-mode` | `setAgentBillingMode` | `agent.billing_mode.set` | Switch the backend policy of an agent |
 | PUT | `/api/v1/agents/{agent_id}/credential-holder` | `setCredentialHolder` | `agent.credential_holder.set` | Change the credential holder |
 | PUT | `/api/v1/agents/{agent_id}/tool-class` | `setAgentToolClass` | `agent.tool_class.set` | Set the tool class of an agent |
+| GET | `/api/v1/agents/{agent_id}/project-folders` | `listAgentProjectFolders` | `agent.project_folders.read` | List the project folders of a runner that have no binding |
 
 #### Agent runtime
 
