@@ -5,7 +5,7 @@
 /// after a truncated event, the structure of new targets and the personal lists.
 library;
 
-import 'package:api_client/api_client.dart' as api show ForumSort;
+import 'package:api_client/api_client.dart' as api show ForumSort, ThreadState;
 import 'package:api_client/api_client.dart' show ApiClient, standardSerializers;
 import 'package:built_value/serializer.dart';
 import 'package:domain/domain.dart';
@@ -99,12 +99,13 @@ abstract interface class Fetcher {
 
   /// One page of `listChannelThreads` of [channelId] sorted by [sort] (null: the server's
   /// default), from [cursor] (null: the first page), at most [limit] threads (null: the
-  /// server's page size).
+  /// server's page size); [openOnly] lists only open threads (`state=open`).
   Future<ThreadListPage> channelThreads(
     ChannelId channelId, {
     String? cursor,
     ForumSort? sort,
     int? limit,
+    bool openOnly = false,
   });
 
   /// `listMyDrafts`.
@@ -264,12 +265,14 @@ final class ApiFetcher implements Fetcher {
     String? cursor,
     ForumSort? sort,
     int? limit,
+    bool openOnly = false,
   }) async {
     final page = _json(
       (await _client.getThreadsApi().listChannelThreads(
         channelId: channelId.value,
         cursor: cursor,
         limit: limit,
+        state: openOnly ? api.ThreadState.open : null,
         sort: sort == null || sort == ForumSort.unknown
             ? null
             : sort == ForumSort.created

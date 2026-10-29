@@ -57,12 +57,13 @@ Product requirements implemented here:
 - `packages/local_store`: the column of `channel_view_states` with a new schema version and its migration step, the DAO methods to watch and set it; the stored schema and the generated schema helpers of `make-migrations`.
 - `packages/domain`: the regenerated `AppConfig` key table.
 - ARB keys in `packages/l10n` for every new text.
+- `packages/sync_engine`: the open posts of each forum after a full snapshot (`CatchUpListener`, `Fetcher.channelThreads` with `openOnly`) and their tests.
 
-Fragments: `docs/decisions.d/M4-46.md` (`D-M4-46-<n>`), changelog fragment `changelog.d/M4-46.md`; README of `apps/client`, `packages/design_system` and `packages/local_store`; `docs/spec/01-product.md` 6.8, 13 (R-PR-23) and 14; `docs/operations/configuration.md` (generated); `docs/design/sidebar-sessions.md` and `docs/design/components.md` 7.
+Fragments: `docs/decisions.d/M4-46.md` (`D-M4-46-<n>`), changelog fragment `changelog.d/M4-46.md`; README of `apps/client`, `packages/design_system`, `packages/local_store` and `packages/sync_engine`; `docs/spec/01-product.md` 6.8, 13 (R-PR-23) and 14; `docs/operations/configuration.md` (generated); `docs/design/sidebar-sessions.md` and `docs/design/components.md` 7.
 
 ## Out of scope
 
-- The snapshot rule of 04 6.3 item 4: the sidebar lists the open posts the client holds (the snapshot's `active_threads`, the posts that events brought and the pages of the forum overview). Sending every open post of every forum in each snapshot is a change of the sync contract and of the snapshot size and needs a decision of its own (D-M4-46-5).
+- The snapshot rule of 04 6.3 item 4: sending every open post of every forum in each snapshot is a change of the sync contract and of the snapshot size; instead the client loads the open posts of each forum after a full snapshot (Design note 6, D-M4-46-5).
 - The forum overview D15 and its post list.
 - Phone specific layout work beyond what the shared sidebar tree gives M1.
 
@@ -83,12 +84,14 @@ Fragments: `docs/decisions.d/M4-46.md` (`D-M4-46-<n>`), changelog fragment `chan
 3. **Local view state.** The "Show more" state is a column of `channel_view_states` next to the collapse state; setting one never changes the other.
 4. **Keys.** App keys are compiled defaults of `AppConfig` with no stored copy, so redefining `ui.sidebar_thread_window` and `ui.sidebar_threads_per_channel` as text channel keys needs no migration.
 5. **Rulings for `docs/decisions.d/M4-46.md`**: the forum rule and its order; the limit key, the row and where its state lives; the held order; the counters; the snapshot rule.
+6. **Open posts after a full snapshot.** `active_threads` carries per channel only the unread, running and up to `sync.snapshot_threads_per_channel` posts active within `sync.snapshot_thread_window`. After a full snapshot (first connection, resync) `CatchUpListener` therefore loads every page of `listChannelThreads` with `state=open` of each forum of the snapshot in the background and stores them by the version rule, as the post list does; a connection with a cursor lists nothing.
 
 ## Tests (write them first)
 
 - `apps/client/test/sidebar/sidebar_threads_test.dart`: every open post of a forum shows however old, read and idle, a done one only while selected; order by activity with the creation tie break; markers stay; above the limit the newest show and the rest is counted in `more`; "Show more" lists all and offers "Show less"; at most the limit has no row; the selected post beyond the limit; a forum with 24 idle posts shows 15 and 9 behind "Show more"; a kept post; the held order; text channels have no such row; the text channel rule unchanged; property tests over random forums.
 - `apps/client/test/sidebar/thread_group_test.dart`: in the sidebar over the local database a forum with 24 open idle posts shows 15 by activity, "Show more" between the last post and "All posts", lists all in place, the choice survives a restart, "Show less" goes back; "Show less" applies while the pointer is in the sidebar; a post that gets activity does not move under the pointer and moves after it leaves; an old read thread of a text channel stays hidden.
 - `packages/design_system/test/components/sidebar_rows_test.dart`: the row reads "Show more" or "Show less" with the count, is a button, toggles on tap, is no drag source, reads German.
+- `packages/sync_engine/test/snapshot_active_threads_test.dart`: a forum with 24 open, read posts that the snapshot does not carry has all 24 stored after the first `ready` and after a resync, listed only with `state=open` and only for the forum; a connection with a cursor lists no forum; against the fake server the oldest of 21 open posts, beyond the snapshot's bound, arrives through one list of the forum.
 - `packages/local_store`: the DAO test of the new state (default, per channel, collapse state kept both ways), the column list of `channel_view_states`, the migration test of the new version with kept rows.
 
 Commands that must pass, from the repository root:

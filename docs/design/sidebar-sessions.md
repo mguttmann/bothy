@@ -202,5 +202,6 @@ replace D-SB-2 and D-SB-3 for forums; text channels keep both.
   more" and "Show less" apply at once.
 - The client lists what it holds: the snapshot's `active_threads` (04 6.3 item 4: unread, running
   and up to `sync.snapshot_threads_per_channel` posts active within `sync.snapshot_thread_window`),
-  the posts that events brought, and the pages of the forum overview. The snapshot rule is not
-  changed here (D-M4-46-5).
+  the open posts the client lists for each forum after a full snapshot (first connection,
+  resync; `listChannelThreads` with `state=open`), the posts that events brought, and the pages
+  of the forum overview. The snapshot rule is not changed here (D-M4-46-5).

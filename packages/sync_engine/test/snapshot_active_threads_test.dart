@@ -234,31 +234,134 @@ void main() {
     });
   });
 
+  group('open forum posts after a full snapshot (M4-46)', () {
+    late World w;
+    setUp(() => w = World());
+    tearDown(() => w.dispose());
+
+    /// Forum 3 with [count] open, read posts (threads 100 and up) that no snapshot carries,
+    /// listed ten per page and only with `state=open`.
+    void forumWithOpenPosts(int count) {
+      w.rest.routes['GET /channels/${channelId(3)}/threads'] = (r) {
+        expect(r.query['state'], 'open');
+        final all = [
+          for (var n = 0; n < count; n++)
+            threadJson(100 + n, channelN: 3, title: 'Post $n'),
+        ];
+        final start = int.tryParse(r.query['cursor'] ?? '') ?? 0;
+        final end = start + 10 < all.length ? start + 10 : all.length;
+        return FakeReply(200, {
+          'items': all.sublist(start, end),
+          if (end < all.length) 'next_cursor': '$end',
+        });
+      };
+    }
+
+    Map<String, Object?> forumView(int n) => {
+      ...channelView(n),
+      'channel': {...channelJson(n), 'kind': 'forum'},
+    };
+
+    Future<int> heldPosts() async => [
+      for (var n = 0; n < 24; n++)
+        if (await w.db.threadsDao.byId(t(100 + n)) != null) n,
+    ].length;
+
+    test('the first ready loads every open post of a forum', () async {
+      forumWithOpenPosts(24);
+      await w.connect(
+        snapshot: snapshotJson(
+          channels: [channelView(1), forumView(3)],
+          activeThreads: [threadJson(1)],
+        ),
+      );
+
+      expect(await heldPosts(), 24);
+      expect(
+        threadReads(w),
+        everyElement('/channels/${channelId(3)}/threads'),
+        reason: 'only the forum is listed, a text channel is not',
+      );
+      expect(threadReads(w), hasLength(3));
+    });
+
+    test('a resync loads every open post of a forum again', () async {
+      await w.connect(cursor: 30);
+      await w.push('catchup.complete', {'head_seq': 30});
+      forumWithOpenPosts(24);
+      w.rest.routes['GET /sync/snapshot'] = (_) => FakeReply(
+        200,
+        snapshotJson(
+          headSeq: 90,
+          epoch: 'epoch-2',
+          channels: [channelView(1), forumView(3)],
+        ),
+      );
+
+      await w.push('resync_required', {
+        'reason': 'epoch_changed',
+        'head_seq': 90,
+        'sync_epoch': 'epoch-2',
+      });
+
+      expect(w.notices.whereType<Resynced>(), hasLength(1));
+      expect(await heldPosts(), 24);
+    });
+
+    test('a connection that continues from a cursor lists no forum', () async {
+      forumWithOpenPosts(24);
+      await w.connect(
+        cursor: 30,
+        snapshot: snapshotJson(channels: [channelView(1), forumView(3)]),
+      );
+      await w.push('catchup.complete', {'head_seq': 30});
+
+      expect(threadReads(w), isEmpty);
+    });
+  });
+
   group('engine against the fake server', () {
-    test('after connect the threads come from the snapshot; new ones and '
-        'project_bound follow', () async {
+    test('after connect the threads come from the snapshot and the open '
+        'posts of a forum from its list; new ones and project_bound '
+        'follow', () async {
       await scenario.withScenario((server, seed, client) async {
         final world = server.world;
         final forum = world.addForum(seed.space, 'dev', {
           seed.alex.id: 'write',
           seed.sam.id: 'write',
         });
+        // M4-46: the oldest of 21 open posts is beyond the snapshot's bound of 20 per channel.
         final older = world.addThread(
           forum,
           'Login loop',
           createdBy: seed.sam.id,
         );
+        world.threads[older]!['last_activity_at'] = world.stamp(
+          DateTime.utc(2020),
+        );
+        for (var i = 0; i < fake.FakeWorld.snapshotThreadsPerChannel; i++) {
+          world.addThread(forum, 'Post $i', createdBy: seed.sam.id);
+        }
+        expect([
+          for (final t
+              in world.snapshot(seed.alex.id)['active_threads']! as List)
+            (t as Map)['id'],
+        ], isNot(contains(older)));
         await client.start();
         Future<Thread?> stored(String id) =>
             client.db.threadsDao.byId(ThreadId.parse(id));
 
-        await fake.waitFor('active threads', () async {
+        await fake.waitFor('active threads and open posts', () async {
           return await stored(older) != null &&
               await stored(seed.printer) != null &&
               await stored(seed.releaseNotes) != null;
         });
         expect(await stored(seed.budget), isNull, reason: 'Alex lacks private');
-        expect(server.requestsOf('listChannelThreads'), isEmpty);
+        expect(
+          [for (final r in server.requestsOf('listChannelThreads')) r.path],
+          [contains(forum)],
+          reason: 'one list of the forum, none of a text channel',
+        );
         expect(server.requestsOf('getThread'), isEmpty);
 
         // A post Sam creates arrives with its thread.created.
@@ -300,7 +403,7 @@ void main() {
                   ?.projectBound ??
               false,
         );
-        expect(server.requestsOf('listChannelThreads'), isEmpty);
+        expect(server.requestsOf('listChannelThreads'), hasLength(1));
         expect(server.violations, isEmpty);
       });
     });

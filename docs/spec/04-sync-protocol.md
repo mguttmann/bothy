@@ -306,7 +306,9 @@ the problem code from [06-api.md](06-api.md) (for example `rate_limited`, `forbi
    `sync.snapshot_threads_per_channel` entries; threads with an active run and unread threads count
    toward this bound but are never left out, so every thread the sidebar must rank first (01 6.8
    items 2 and 3) is held by the client without a further request. The client keeps them current through `thread.*` and `message.created`
-   and fills the sidebar from them (01 6.8) without one list request per channel.
+   and fills the sidebar from them (01 6.8) without one list request per channel; only after
+   a full snapshot does it list the open posts of each forum (`listChannelThreads` with
+   `state=open`), because a forum lists every open post (01 6.8 item 2, D-M4-46-5).
    Thread contents are not included; the client loads them via REST.
    The server registers the connection for delivery before it reads `head_seq`; every
    later event is buffered or sent, every earlier one is in the snapshot or in the

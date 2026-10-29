@@ -197,12 +197,14 @@ final class CatchUpListener implements SessionListener {
   /// [sort]) from [cursor] and stores them by the version rule; returns the cursor of the next
   /// page, null on the last one (brief M4-19 Design note 3: the post list loads further pages
   /// when scrolled near the end). Nothing is stored for a channel this device does not hold
-  /// or that was removed meanwhile, nor after a wipe. Throws what the read throws.
+  /// or that was removed meanwhile, nor after a wipe; [openOnly] lists only open threads.
+  /// Throws what the read throws.
   Future<String?> loadThreadPage(
     ChannelId channelId, {
     String? cursor,
     ForumSort? sort,
     int? limit,
+    bool openOnly = false,
   }) async {
     if (_wiped) return null;
     final page = await _sync.fetcher.channelThreads(
@@ -210,6 +212,7 @@ final class CatchUpListener implements SessionListener {
       cursor: cursor,
       sort: sort,
       limit: limit,
+      openOnly: openOnly,
     );
     await _db.transaction(() async {
       if (_wiped || !await _sync.holdsChannel(_db, channelId)) return;
@@ -289,6 +292,33 @@ final class CatchUpListener implements SessionListener {
     if (erased.isNotEmpty) await _sync.eraser.erase(erased);
   }
 
+  /// Schedules, after the commit of the full [snapshot], the open posts of each of its forums
+  /// (brief M4-46 Design note 6, D-M4-46-5): `active_threads` carries only the unread, running
+  /// and recently active ones, while the sidebar lists every open post of a forum, so a new
+  /// device or a resync would otherwise show a forum's older open posts only after its post
+  /// list was opened.
+  void _loadOpenPostsAfter(SnapshotData snapshot, AfterCommit after) {
+    for (final v in snapshot.channels) {
+      if (v.channel.kind != ChannelKind.forum) continue;
+      after.reads.add(() => _loadOpenPosts(v.channel.id));
+    }
+  }
+
+  /// Loads every page of the open posts of [forum], newest activity first; stops after a wipe
+  /// or when the forum is no longer held.
+  Future<void> _loadOpenPosts(ChannelId forum) async {
+    String? cursor;
+    do {
+      if (_wiped || !await _sync.holdsChannel(_db, forum)) return;
+      cursor = await loadThreadPage(
+        forum,
+        cursor: cursor,
+        sort: ForumSort.lastActivity,
+        openOnly: true,
+      );
+    } while (cursor != null);
+  }
+
   /// Whether the database was wiped after a revocation; nothing is applied any more.
   bool get wiped => _wiped;
 
@@ -332,6 +362,7 @@ final class CatchUpListener implements SessionListener {
       gaps.clear();
       await _db.syncStateDao.markSnapshot(_clock.now());
       control.lastProcessedSeq = head;
+      _loadOpenPostsAfter(snapshot, after);
       await _afterCommit(after);
       // Without a cursor in identify the server sends no catch-up and no catchup.complete:
       // the session is live right after ready (04 6.3 item 4).
@@ -557,6 +588,7 @@ final class CatchUpListener implements SessionListener {
     for (final threadId in _openThreads()) {
       after.reads.add(() => _loadNewestPage(threadId));
     }
+    _loadOpenPostsAfter(snapshot, after);
     await _afterCommit(after);
     if (_wiped || session != _session) return;
     control.lastProcessedSeq = snapshot.headSeq;

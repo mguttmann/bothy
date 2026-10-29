@@ -1537,8 +1537,8 @@ none of them.
    (forum posts, threads from messages of the main thread), indented with a tree line. The main
    thread of a text channel is the channel row itself.
 2. **Which threads.** In a forum every open post shows (every post the client holds: the active
-   threads of the snapshot, 04 6.3 item 4, the posts that events brought and the pages of the
-   forum overview). In a text channel a thread shows when it is open and at least one holds: it
+   threads of the snapshot, 04 6.3 item 4, the open posts the client lists for each forum after a
+   full snapshot, the posts that events brought and the pages of the forum overview). In a text channel a thread shows when it is open and at least one holds: it
    is selected; it has an active run; it waits for the person ("Waiting for me": a run the person
    triggered in `waiting_input`, or an unread mention of the person); it is unread; its
    `last_activity_at` lies within `ui.sidebar_thread_window`. A done thread shows only while it
