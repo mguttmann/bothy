@@ -4804,6 +4804,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get fileStateWaiting => 'Waiting to upload';
 
   @override
+  String get fileStateRetrying => 'Paused, trying again shortly';
+
+  @override
   String get fileStateChecking => 'Being checked';
 
   @override

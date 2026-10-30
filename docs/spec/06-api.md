@@ -501,8 +501,9 @@ all texts of the YAML files (R-API-15); every response component names its statu
    `RateLimit-Policy: "<class>";q=<per_minute>;w=60` and `RateLimit: "<class>";r=<whole
    tokens>;t=<seconds until full>`. The mapping of a token bucket onto `q`, `w`, `r`, `t` is
    our own ruling [derived].
-3. Exhausted: `429 rate_limited` with `Retry-After` (RFC 9110). Clients wait at least that long;
-   the outbox then uses its backoff (04, 13.2). At the gateway only `rl.gateway_connect` closes
+3. Exhausted: `429 rate_limited` with `Retry-After` (RFC 9110). Clients wait at least that long
+   and add the jitter of their backoff, so clients refused together do not return together
+   (04, 13.2; addendum of 2026-10-30). At the gateway only `rl.gateway_connect` closes
    with `4008`, on `identify` and `resume`; every other op answers `error` with `rate_limited`,
    and the connection stays open (04, 6.2 and 6.4).
 4. If the headers change when the draft becomes an RFC, the server also sends the new names

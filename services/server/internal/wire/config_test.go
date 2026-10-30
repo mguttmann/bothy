@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -512,7 +513,7 @@ func TestConfigSchemaBuilds(t *testing.T) {
 	for class, def := range map[string][2]string{
 		"rl.public_auth": {"30", "10"}, "rl.gateway_connect": {"12", "4"}, "rl.read": {"600", "100"},
 		"rl.write": {"120", "30"}, "rl.message": {"60", "20"}, "rl.trigger": {"30", "10"},
-		"rl.interaction": {"60", "20"}, "rl.upload": {"30", "10"}, "rl.search": {"60", "20"},
+		"rl.interaction": {"60", "20"}, "rl.upload": {"300", "60"}, "rl.search": {"60", "20"},
 		"rl.typing": {"30", "5"}, "rl.admin": {"60", "20"}, "rl.export": {"2", "2"},
 		"rl.agent_runtime": {"1200", "200"}, "rl.webhook_in": {"60", "20"}, "rl.import": {"120", "30"},
 		"rl.terminal": {"20", "5"}, "rl.host": {"120", "30"},
@@ -1524,5 +1525,33 @@ func TestConfig_HeartbeatPersistBelowOrphanTimeout(t *testing.T) {
 			strings.Contains(msg, " "+c.persist) {
 			t.Errorf("problem %q", msg)
 		}
+	}
+}
+
+// TestUploadBurstHoldsTwoAttachmentBatches holds the sizing of the rl.upload defaults (05
+// section 10, addendum of 2026-10-30; FIX-upload-retry-storm): the burst holds the requests of
+// two messages with message.max_attachments files of one part each (announce, part, complete),
+// and a minute refills at least that much, so one person's batch never waits for the bucket.
+func TestUploadBurstHoldsTwoAttachmentBatches(t *testing.T) {
+	t.Parallel()
+	defaults := map[string]string{}
+	for _, k := range schema(t).Keys() {
+		defaults[k.Name] = k.Default
+	}
+	number := func(name string) int {
+		t.Helper()
+		v, err := strconv.Atoi(defaults[name])
+		if err != nil {
+			t.Fatalf("%s: default %q: %v", name, defaults[name], err)
+		}
+		return v
+	}
+	const requestsPerFile = 3
+	batch := number("message.max_attachments") * requestsPerFile
+	if burst := number("ratelimit.rl.upload.burst"); burst < 2*batch {
+		t.Errorf("ratelimit.rl.upload.burst = %d, want at least %d (two batches)", burst, 2*batch)
+	}
+	if perMinute := number("ratelimit.rl.upload.per_minute"); perMinute < number("ratelimit.rl.upload.burst") {
+		t.Errorf("ratelimit.rl.upload.per_minute = %d below its burst", perMinute)
 	}
 }

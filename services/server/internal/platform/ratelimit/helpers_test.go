@@ -82,7 +82,7 @@ var defaultLimits = map[ratelimit.Class]ratelimit.Limits{
 	"rl.public_auth": {PerMinute: 30, Burst: 10}, "rl.gateway_connect": {PerMinute: 12, Burst: 4},
 	"rl.read": {PerMinute: 600, Burst: 100}, "rl.write": {PerMinute: 120, Burst: 30},
 	"rl.message": {PerMinute: 60, Burst: 20}, "rl.trigger": {PerMinute: 30, Burst: 10},
-	"rl.interaction": {PerMinute: 60, Burst: 20}, "rl.upload": {PerMinute: 30, Burst: 10},
+	"rl.interaction": {PerMinute: 60, Burst: 20}, "rl.upload": {PerMinute: 300, Burst: 60},
 	"rl.search": {PerMinute: 60, Burst: 20}, "rl.typing": {PerMinute: 30, Burst: 5},
 	"rl.admin": {PerMinute: 60, Burst: 20}, "rl.export": {PerMinute: 2, Burst: 2},
 	"rl.agent_runtime": {PerMinute: 1200, Burst: 200}, "rl.webhook_in": {PerMinute: 60, Burst: 20},

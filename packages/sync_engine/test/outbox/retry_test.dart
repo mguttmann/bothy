@@ -23,6 +23,7 @@ void main() {
   final base = const Duration(seconds: 2); // client.outbox_retry_base default
   final cap = const Duration(minutes: 5); // client.outbox_retry_cap default
 
+  /// [wait] is the server's Retry-After, if the error names one.
   Future<void> expectRetried(Object error, {Duration? wait}) async {
     final exec = h.fake('createMessage')..then([error]);
     final e = await h.add('hello', thread: threadA);
@@ -33,7 +34,10 @@ void main() {
     expect(waiting.attempts, 1);
     final delay = waiting.nextAttemptAt!.difference(h.time.now);
     if (wait != null) {
-      expect(delay, wait);
+      // Retry-After is the floor; the full jitter of the first retry comes on top
+      // (addendum of 2026-10-30).
+      expect(delay >= wait, isTrue, reason: '$delay');
+      expect(delay <= wait + base, isTrue, reason: '$delay');
     } else {
       // Full jitter for the first retry: uniform in [0, min(cap, base)].
       expect(delay.isNegative, isFalse);

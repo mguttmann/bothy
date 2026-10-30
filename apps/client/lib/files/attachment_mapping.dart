@@ -18,6 +18,10 @@ enum AttachmentState {
   /// Parts are being sent ("Upload running").
   uploading,
 
+  /// The server refused an attempt for the moment (`429`, `5xx`, no network) and the entry
+  /// waits for its next one: "Paused, trying again shortly" (FIX-upload-retry-storm).
+  retrying,
+
   /// The client is done, the server checks: "being checked".
   checking,
 
@@ -59,7 +63,8 @@ bool isTombstone(FileMeta file) =>
     file.originalName.isEmpty && file.sizeBytes == 0 && file.thumbnails.isEmpty;
 
 /// The view of an upload entry of the outbox: [OutboxStateLabel.failed] is "Upload failed"
-/// (or canceled after `410 gone`), a request in flight is uploading, the rest waits.
+/// (or canceled after `410 gone`), a request in flight is uploading, an entry backing off
+/// after a refused attempt is paused, and one whose turn has not come waits.
 AttachmentState stateOfUpload(OutboxEntryView view) =>
     switch (view.stateLabel) {
       OutboxStateLabel.failed =>
@@ -67,7 +72,9 @@ AttachmentState stateOfUpload(OutboxEntryView view) =>
             ? AttachmentState.canceled
             : AttachmentState.failed,
       OutboxStateLabel.sending => AttachmentState.uploading,
-      _ => AttachmentState.waiting,
+      OutboxStateLabel.waiting ||
+      OutboxStateLabel.delayed => AttachmentState.retrying,
+      OutboxStateLabel.pending => AttachmentState.waiting,
     };
 
 /// The label of [state]; [percent] is the share of confirmed bytes while uploading.
@@ -78,6 +85,7 @@ String attachmentStateLabel(
 }) => switch (state) {
   AttachmentState.waiting => l.fileStateWaiting,
   AttachmentState.uploading => l.fileStateUploading(percent),
+  AttachmentState.retrying => l.fileStateRetrying,
   AttachmentState.checking => l.fileStateChecking,
   AttachmentState.failed => l.fileStateUploadFailed,
   AttachmentState.canceled => l.fileStateCanceled,

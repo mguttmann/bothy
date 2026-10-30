@@ -521,8 +521,8 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"ratelimit.rl.trigger.per_minute = 30  # default\n" +
 		"ratelimit.rl.typing.burst = 5  # default\n" +
 		"ratelimit.rl.typing.per_minute = 30  # default\n" +
-		"ratelimit.rl.upload.burst = 10  # default\n" +
-		"ratelimit.rl.upload.per_minute = 30  # default\n" +
+		"ratelimit.rl.upload.burst = 60  # default\n" +
+		"ratelimit.rl.upload.per_minute = 300  # default\n" +
 		"ratelimit.rl.webhook_in.burst = 20  # default\n" +
 		"ratelimit.rl.webhook_in.per_minute = 60  # default\n" +
 		"ratelimit.rl.write.burst = 30  # default\n" +

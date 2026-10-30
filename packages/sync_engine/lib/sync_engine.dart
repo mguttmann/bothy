@@ -49,7 +49,7 @@ export 'src/heartbeat.dart';
 export 'src/host_events.dart';
 export 'src/isolate_decode.dart';
 export 'src/notifications.dart';
-export 'src/outbox/backoff.dart' show fullJitterBackoff;
+export 'src/outbox/backoff.dart' show fullJitterBackoff, retryWait;
 export 'src/outbox/classify.dart' show Classification, OutcomeClass, classify;
 export 'src/outbox/entry.dart' show OutboxEntryView, OutboxStateLabel;
 export 'src/outbox/executors.dart'

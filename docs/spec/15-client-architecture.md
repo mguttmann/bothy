@@ -447,8 +447,9 @@ are in docs/DECISIONS.md D-M4-15-1.
 ## 8. Network and login
 
 - **REST:** `api_client` (openapi-generator `dart-dio`, baseline R-Clients) with interceptors for
-  DPoP, `Idempotency-Key`, correlation ID, retry only for reads; the outbox retries
-  writes.
+  DPoP, `Idempotency-Key`, correlation ID, retry only for reads (`Retry-After` plus jitter); the
+  outbox retries writes. An outbox executor that reads within an attempt opts out of the read
+  retry, so a refused read is retried once, with its entry ([12](12-files.md) 3.8).
 - **DPoP:** proof per request (RFC 9449) with the device key, ES256 (section 9); the server nonce
   is taken over. Gateway proof in `identify` ([04](04-sync-protocol.md) R-SY-01).
 - **Refresh:** exactly one refresh per refresh family at a time (single flight); the new token is
@@ -891,8 +892,11 @@ or public location.
 
 Check the size against `file.max_upload_bytes` before sending (the server checks again). The upload protocol
 (parts, resumption, pre-signed URLs) is set by [12-files.md](12-files.md); the client
-implements it as an outbox entry with progress, resumes after an abort with the parts that
-`getUpload` did not confirm, and attaches the file as soon as its upload session is completed
+implements it as an outbox entry with progress, keeps the session of the file in the entry and
+resumes it after an abort with the parts that `getUpload` did not confirm, never announcing the
+file again; the uploads of a channel go one at a time, and an upload that waits after a refused
+attempt shows "Paused, trying again shortly" ([12](12-files.md) 3.8, addendum of 2026-10-30), and
+attaches the file as soon as its upload session is completed
 (`completeUpload` with `200`, [12](12-files.md) 3.4), not only at `upload_state = complete`: until
 the result of the check the message shows the file as "being checked" ([12](12-files.md) 2), and
 the server holds the agent invocation, at most `file.invocation_hold_max` ([12](12-files.md) 10; ruling D-M4-22-1). The app uploads photos from the

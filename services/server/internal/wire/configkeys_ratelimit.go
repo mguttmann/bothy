@@ -21,7 +21,7 @@ var rateLimitDefaults = map[ratelimit.Class]ratelimit.Limits{
 	"rl.message":         {PerMinute: 60, Burst: 20},
 	"rl.trigger":         {PerMinute: 30, Burst: 10},
 	"rl.interaction":     {PerMinute: 60, Burst: 20},
-	"rl.upload":          {PerMinute: 30, Burst: 10},
+	"rl.upload":          {PerMinute: 300, Burst: 60},
 	"rl.search":          {PerMinute: 60, Burst: 20},
 	"rl.typing":          {PerMinute: 30, Burst: 5},
 	"rl.admin":           {PerMinute: 60, Burst: 20},

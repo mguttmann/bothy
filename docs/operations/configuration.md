@@ -327,8 +327,8 @@ Source: [05-actions.md](../spec/05-actions.md), section 10.
 | `ratelimit.rl.trigger.burst` | `BOTHY_RATELIMIT__RL__TRIGGER__BURST` | Server | int | `10` | per principal | active |
 | `ratelimit.rl.interaction.per_minute` | `BOTHY_RATELIMIT__RL__INTERACTION__PER_MINUTE` | Server | int | `60` | per principal | active |
 | `ratelimit.rl.interaction.burst` | `BOTHY_RATELIMIT__RL__INTERACTION__BURST` | Server | int | `20` | per principal | active |
-| `ratelimit.rl.upload.per_minute` | `BOTHY_RATELIMIT__RL__UPLOAD__PER_MINUTE` | Server | int | `30` | per principal | active |
-| `ratelimit.rl.upload.burst` | `BOTHY_RATELIMIT__RL__UPLOAD__BURST` | Server | int | `10` | per principal | active |
+| `ratelimit.rl.upload.per_minute` | `BOTHY_RATELIMIT__RL__UPLOAD__PER_MINUTE` | Server | int | `300` | per principal; the burst holds the requests of two batches of `message.max_attachments` files (announce, one part, complete: three per file of one part) (addendum of 2026-10-30) | active |
+| `ratelimit.rl.upload.burst` | `BOTHY_RATELIMIT__RL__UPLOAD__BURST` | Server | int | `60` | per principal; the burst holds the requests of two batches of `message.max_attachments` files (announce, one part, complete: three per file of one part) (addendum of 2026-10-30) | active |
 | `ratelimit.rl.search.per_minute` | `BOTHY_RATELIMIT__RL__SEARCH__PER_MINUTE` | Server | int | `60` | per principal | active |
 | `ratelimit.rl.search.burst` | `BOTHY_RATELIMIT__RL__SEARCH__BURST` | Server | int | `20` | per principal | active |
 | `ratelimit.rl.typing.per_minute` | `BOTHY_RATELIMIT__RL__TYPING__PER_MINUTE` | Server | int | `30` | per connection | active |

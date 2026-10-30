@@ -1277,6 +1277,7 @@
   "terminalLinkHost": "Rechner: {name}",
   "fileStateUploading": "Wird hochgeladen, {percent} %",
   "fileStateWaiting": "Wartet auf das Hochladen",
+  "fileStateRetrying": "Pausiert, gleich neuer Versuch",
   "fileStateChecking": "Wird geprüft",
   "fileStateUploadFailed": "Hochladen fehlgeschlagen",
   "fileStateBlocked": "Blockiert",
