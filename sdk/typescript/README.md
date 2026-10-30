@@ -53,7 +53,7 @@ ESM only; `engines.node = ">=24"` (on 2026-10-12 Node.js 24 is the only line in 
 | `runs` | `Adapter` (09 4.9: acknowledgement after the inbox, start only after `200`), `RunHandle`, `RunPatcher`, `renderContext`. |
 | `components` | Builders, `approvalCard`, `questionCard`, `respond`, `update`. |
 | `commands` | `reconcileCommands`, `guardedAutocomplete`; an autocomplete handler never calls a model. |
-| `outbox` | `Outbox` with `MemoryOutboxStore` and `FileOutboxStore`. |
+| `outbox` | `Outbox` with `MemoryOutboxStore` and `FileOutboxStore`; `sendMessage` takes `attachmentFileIds`. `sendLongMessage` keeps a long answer one message: the head as its text and the rest above `message_max_content_bytes` as one attachment `answer.txt` (`splitForLimit`, `uploadText`; M4-47). |
 | `heartbeat` | `buildHeartbeat` and `HeartbeatSender`; `buildHeartbeat(state, { rateLimit: { state, resets_at } })` reports the provider's rate-limit state (M6-14; `resets_at` RFC 3339 with a time zone, never a quota, key or subscription name; a heartbeat without it clears it). |
 | `webhooks` | `verifyWebhook`, `verifyWebhookRequest`, `WebhookKeyCache`, `parseWebhookPublicKey`, `parseWebhookSecret`. |
 | `testing` | `FakeServer`, `signWebhook`, the scenario functions and doubles. |

@@ -275,8 +275,9 @@ final class Outbox {
 
   /// The entries of [threadId] that are not confirmed, in FIFO order, for the display after
   /// the last confirmed `thread_seq` (04 13.2 item 3); a new list on every change and when an
-  /// entry becomes `delayed`.
-  Stream<List<OutboxEntryView>> watchThread(ThreadId threadId) {
+  /// entry becomes `delayed`. A null [threadId] watches the entries without a thread, such as
+  /// the uploads of a new post (M4-47).
+  Stream<List<OutboxEntryView>> watchThread(ThreadId? threadId) {
     late StreamController<List<OutboxEntryView>> controller;
     StreamSubscription<List<OutboxEntry>>? sub;
     Timer? delayTimer;

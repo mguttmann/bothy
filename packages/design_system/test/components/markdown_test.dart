@@ -206,6 +206,30 @@ void main() {
     },
   );
 
+  testWidgets(
+    'one long fenced block stays one block with all its lines (M4-47, 01 6.4)',
+    (tester) async {
+      // Blank lines, indented lines and lines that look like Markdown inside the fence must not
+      // end the block or start a second one.
+      final lines = [
+        for (var i = 0; i < 400; i++)
+          i % 50 == 0
+              ? ''
+              : i % 7 == 0
+              ? '    # not a heading $i'
+              : 'value_$i = compute($i)  # ${'x' * (i % 30)}',
+      ];
+      final code = lines.join('\n');
+      await pumpDs(tester, md('Before\n\n```python\n$code\n```\n\nAfter'));
+      final blocks = tester.widgetList<DsMarkdownCodeBlock>(
+        find.byType(DsMarkdownCodeBlock),
+      );
+      expect(blocks, hasLength(1));
+      expect(blocks.single.code, code);
+      expect(blocks.single.language, 'python');
+    },
+  );
+
   testWidgets('lists, quotes, tables, tasks, rules and emphasis render', (
     tester,
   ) async {

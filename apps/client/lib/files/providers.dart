@@ -178,3 +178,21 @@ AttachController? composerAttachments(
   ref.onDispose(attach.dispose);
   return attach;
 }
+
+/// The attachments of the first message of a new post in the forum [forumId] (the new chat
+/// view, M4-47), or null without an engine; kept while the app runs, as a thread's.
+@Riverpod(keepAlive: true)
+AttachController? newPostAttachments(Ref ref, String forumId) {
+  final engine = ref.watch(syncEngineProvider);
+  if (engine == null) return null;
+  final attach = AttachController(
+    thread: null,
+    channel: ChannelId.parse(forumId),
+    outbox: engine.outbox,
+    progress: ref.watch(uploadProgressProvider),
+    newKey: ref.watch(attachmentKeysProvider),
+    outgoing: () async => ref.read(outgoingFolderProvider),
+  );
+  ref.onDispose(attach.dispose);
+  return attach;
+}

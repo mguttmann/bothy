@@ -137,6 +137,8 @@ Source: [01-product.md](../spec/01-product.md), section 14.
 | `ui.message_collapse_lines` |  | App |  | `24` | from this many lines on, a message is collapsed |  |
 | `ui.livebox_visible_steps` |  | App |  | `6` | visible steps in the running live box |  |
 | `ui.composer_max_lines` |  | App |  | `12` | the input grows up to this many lines |  |
+| `ui.composer_paste_file_chars` |  | App |  | `4000` | a paste of more characters becomes a text file attachment in the composer (6.13) |  |
+| `ui.composer_paste_file_lines` |  | App |  | `100` | a paste of more lines becomes a text file attachment in the composer (6.13) |  |
 | `ui.autocomplete_debounce` |  | App |  | `150ms` | waiting time before `command.autocomplete` |  |
 | `ui.quick_switch_max_results` |  | App |  | `20` | hits in the quick switcher |  |
 | `ui.desktop_min_width_four_columns` |  | App |  | `1280px` | below this width the session column collapses |  |
@@ -467,7 +469,7 @@ Source: [09-agents.md](../spec/09-agents.md), section 21.
 | `hermes_adapter.instance_id` |  | Hermes adapter |  | no default, required | instance ID of the server and the expected `iss` of every token (4.5 point 4) |  |
 | `hermes_adapter.token_file` |  | Hermes adapter |  | no default, required | file with the agent's API token, readable only by the profile's user |  |
 | `hermes_adapter.dpop_key_file` |  | Hermes adapter |  | no default | private key of the DPoP proofs; without it no DPoP |  |
-| `hermes_adapter.max_message_bytes` |  | Hermes adapter |  | `262144` | longest answer (`MAX_MESSAGE_LENGTH`); the default equals `message.max_content_bytes`, both change together |  |
+| `hermes_adapter.max_message_bytes` |  | Hermes adapter |  | `262144` | longest answer text; the rest of a longer answer goes as one attachment of the same message (17.3, 01 6.13); the default equals `message.max_content_bytes`, both change together |  |
 | `hermes_adapter.attachment_text_max_bytes` |  | Hermes adapter |  | `32768` | longest attachment text the adapter inlines as a data block; the default equals `agent.context_message_max_bytes` |  |
 | `runner.claude_bin` |  | Runner |  | `claude` | program, searched in the cleaned `PATH` |  |
 | `runner.git_bin` |  | Runner |  | `git` | program for the folder creation of 18.12, searched in the cleaned `PATH` |  |

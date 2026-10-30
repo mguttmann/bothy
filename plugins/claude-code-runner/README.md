@@ -261,6 +261,15 @@ count, and a root that cannot be read sends the empty list and logs `project_fol
 Only names leave the runner. The app lists those without a forum under "Add forums for existing
 folders" and binds the chosen ones with `provision` `none`.
 
+## Long answers (M4-47)
+
+An answer is never split into several messages (docs/spec/01-product.md 6.13, 09 18.10). An answer
+text longer than `LIMIT_READ_FLOOR_BYTES` bytes reads `message_max_content_bytes` with
+`getInstance`; above it the message keeps the head (at a line break, never inside a character or a
+fenced code block) and the rest goes as the last attachment `answer.txt` of the answer's set,
+staged and uploaded like an `ATTACH:` file. When the set fails, a shorter head goes out with the
+notice naming `answer.txt`, so both fit the limit together.
+
 ## Answer attachments (M3-12)
 
 Claude announces a file with a line `ATTACH: <path>` at column 0, outside fenced code blocks (the

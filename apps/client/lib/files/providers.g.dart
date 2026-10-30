@@ -1018,3 +1018,101 @@ final class ComposerAttachmentsFamily extends $Family
   @override
   String toString() => r'composerAttachmentsProvider';
 }
+
+/// The attachments of the first message of a new post in the forum [forumId] (the new chat
+/// view, M4-47), or null without an engine; kept while the app runs, as a thread's.
+
+@ProviderFor(newPostAttachments)
+final newPostAttachmentsProvider = NewPostAttachmentsFamily._();
+
+/// The attachments of the first message of a new post in the forum [forumId] (the new chat
+/// view, M4-47), or null without an engine; kept while the app runs, as a thread's.
+
+final class NewPostAttachmentsProvider
+    extends
+        $FunctionalProvider<
+          AttachController?,
+          AttachController?,
+          AttachController?
+        >
+    with $Provider<AttachController?> {
+  /// The attachments of the first message of a new post in the forum [forumId] (the new chat
+  /// view, M4-47), or null without an engine; kept while the app runs, as a thread's.
+  NewPostAttachmentsProvider._({
+    required NewPostAttachmentsFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'newPostAttachmentsProvider',
+         isAutoDispose: false,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$newPostAttachmentsHash();
+
+  @override
+  String toString() {
+    return r'newPostAttachmentsProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $ProviderElement<AttachController?> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  AttachController? create(Ref ref) {
+    final argument = this.argument as String;
+    return newPostAttachments(ref, argument);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(AttachController? value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<AttachController?>(value),
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is NewPostAttachmentsProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$newPostAttachmentsHash() =>
+    r'ba204a681eb288656aa7ec79a56da49dea2e8b48';
+
+/// The attachments of the first message of a new post in the forum [forumId] (the new chat
+/// view, M4-47), or null without an engine; kept while the app runs, as a thread's.
+
+final class NewPostAttachmentsFamily extends $Family
+    with $FunctionalFamilyOverride<AttachController?, String> {
+  NewPostAttachmentsFamily._()
+    : super(
+        retry: null,
+        name: r'newPostAttachmentsProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: false,
+      );
+
+  /// The attachments of the first message of a new post in the forum [forumId] (the new chat
+  /// view, M4-47), or null without an engine; kept while the app runs, as a thread's.
+
+  NewPostAttachmentsProvider call(String forumId) =>
+      NewPostAttachmentsProvider._(argument: forumId, from: this);
+
+  @override
+  String toString() => r'newPostAttachmentsProvider';
+}

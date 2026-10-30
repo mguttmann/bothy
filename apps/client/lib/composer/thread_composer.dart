@@ -28,8 +28,6 @@ import '../agents/providers.dart';
 import '../app/providers/ports.dart';
 import '../app/providers/session.dart';
 import '../files/attach_controller.dart';
-import '../files/attachment_mapping.dart';
-import '../files/attachment_tile.dart';
 import '../files/providers.dart';
 import '../phone/compose/media_picker.dart';
 import '../phone/compose/voice_button.dart';
@@ -42,8 +40,10 @@ import '../thread/thread_actions.dart';
 import '../thread/typing_line.dart';
 import '../voice/recorder.dart';
 import '../voice/voice_button.dart';
+import 'attachment_chips.dart';
 import 'composer_controller.dart';
 import 'draft_sync.dart';
+import 'long_text.dart';
 import 'templates_menu.dart';
 
 /// The composer of [threadId] in [channelId], named [targetName] in the placeholder.
@@ -305,73 +305,20 @@ class ThreadComposerState extends ConsumerState<ThreadComposer> {
     };
   }
 
-  /// The chips of the attached files with the state of their upload entries (12 2).
-  Widget _chips(AttachController attach) {
-    final outbox =
-        ref.watch(threadOutboxProvider(widget.threadId.value)).value ??
-        const <OutboxEntryView>[];
-    final progress = ref.watch(uploadProgressProvider);
-    final l = AppLocalizations.of(context);
-    return Padding(
-      key: const ValueKey('composer.attachments'),
-      padding: const EdgeInsets.only(bottom: DsSpace.s4),
-      child: Semantics(
-        container: true,
-        label: l.composerAttachments(attach.attachments.length),
-        // Up to `message_max_attachments` chips (several photos of the library at once,
-        // M5-16) scroll within a quarter of the screen, so the field and the send button stay
-        // on a phone.
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.sizeOf(context).height / 4,
-          ),
-          child: SingleChildScrollView(
-            child: ListenableBuilder(
-              listenable: progress,
-              builder: (context, _) => Wrap(
-                spacing: DsSpace.s6,
-                runSpacing: DsSpace.s6,
-                children: [
-                  for (final a in attach.attachments)
-                    () {
-                      OutboxEntryView? view;
-                      for (final v in outbox) {
-                        if (v.id == a.entryId) view = v;
-                      }
-                      final code = view?.failureCode;
-                      return UploadChip(
-                        attachmentKey: a.key,
-                        name: a.name,
-                        sizeBytes: a.sizeBytes,
-                        // A confirmed upload left the outbox: the server checks the file now.
-                        state: view == null
-                            ? AttachmentState.checking
-                            : stateOfUpload(view),
-                        percent: ((progress.fractionOf(a.key) ?? 0) * 100)
-                            .round(),
-                        reason: code == null
-                            ? null
-                            : uploadFailureText(
-                                l,
-                                code,
-                                reason: view?.failureReason,
-                              ),
-                        onRemove: () => unawaited(attach.remove(a.key)),
-                        onRetry: () => unawaited(attach.retry(a.key)),
-                        // The local preview of a photo before sending (15 14, M5-07).
-                        previewPath: a.mimeType.startsWith('image/')
-                            ? a.path
-                            : null,
-                      );
-                    }(),
-                ],
-              ),
-            ),
-          ),
+  /// The chips of the attached files with the state of their upload entries (12 2) and
+  /// "Insert as text" on a long paste (M4-47).
+  Widget _chips(ComposerController composer, AttachController attach) =>
+      Padding(
+        key: const ValueKey('composer.attachments'),
+        padding: const EdgeInsets.only(bottom: DsSpace.s4),
+        child: ComposerAttachmentChips(
+          attach: attach,
+          views:
+              ref.watch(threadOutboxProvider(widget.threadId.value)).value ??
+              const <OutboxEntryView>[],
+          onInsertAsText: (key) => unawaited(composer.insertPasteAsText(key)),
         ),
-      ),
-    );
-  }
+      );
 
   /// [child] with the drop area and the paste key of [attach] (brief M4-22 Scope).
   Widget _withFiles(AttachController? attach, Widget child) {
@@ -387,18 +334,12 @@ class ThreadComposerState extends ConsumerState<ThreadComposer> {
     );
   }
 
-  String? _refusalText(AppLocalizations l, AttachRefusal? refusal) {
-    final locale = Localizations.localeOf(context).languageCode;
-    return switch (refusal) {
-      null => null,
-      FileTooLarge(:final name, :final limitBytes) => l.composerFileTooLarge(
-        dsIsolate(name),
-        fileSizeLabel(l, limitBytes, locale: locale),
-      ),
-      TooManyFiles(:final limit) => l.composerTooManyFiles(limit),
-      FileUnreadable(:final name) => l.composerFileUnreadable(dsIsolate(name)),
-    };
-  }
+  String? _refusalText(AppLocalizations l, AttachRefusal? refusal) =>
+      attachRefusalText(
+        l,
+        refusal,
+        locale: Localizations.localeOf(context).languageCode,
+      );
 
   /// Prepares a reply to [message] of [authorName] and puts the focus into the field.
   void startReply(Message message, String authorName) {
@@ -602,7 +543,11 @@ class ThreadComposerState extends ConsumerState<ThreadComposer> {
     final limits = ref.watch(instanceLimitsProvider).value;
     composer
       ..principals = principals
-      ..limits = limits;
+      ..limits = limits
+      ..pasteRule = PasteRule(
+        maxChars: config.composerPasteFileChars,
+        maxLines: config.composerPasteFileLines,
+      );
     final attach = _attach;
     final voice = _voice;
     final phoneVoice = _phoneVoice;
@@ -701,6 +646,13 @@ class ThreadComposerState extends ConsumerState<ThreadComposer> {
               DsTone.danger,
               l.composerTooLong(limit),
             ),
+          // M4-47: the draft is larger than one message; the rest goes as an attachment.
+          if (composer.overflows)
+            note(
+              const ValueKey('composer.overflow'),
+              DsTone.info,
+              l.composerOverflowNote(overflowFileName),
+            ),
           if (_refusalText(l, attach?.refusal) case final refused?)
             note(
               const ValueKey('composer.attachError'),
@@ -720,7 +672,8 @@ class ThreadComposerState extends ConsumerState<ThreadComposer> {
               photo,
               onClose: () => setState(() => _photo = null),
             ),
-          if (attach != null && attach.attachments.isNotEmpty) _chips(attach),
+          if (attach != null && attach.attachments.isNotEmpty)
+            _chips(composer, attach),
           if (voice != null) VoiceRecordingBar(controller: voice),
           if (phoneVoice != null)
             PhoneVoicePanel(

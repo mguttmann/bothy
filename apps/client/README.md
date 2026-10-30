@@ -54,7 +54,7 @@ SHA-256 of uploads and downloads), and for files and voice (M4-22, docs/DECISION
 | `lib/forum/` | the forum overview D15 (M4-19, M4-40): head with the kind sentence, "Pin" and filters, rows, Done section, paging, and the new chat view (M4-41) |
 | `lib/new_project/` | the new project dialog (M4-43): name suggestion and field checks, the steps of `NewProjectFlow`, the port over the API and the outbox, the dialog; forums for existing folders (`ProjectSyncFlow`, its dialog) and the rename of a project forum (M4-44) |
 | `lib/thread/` | the history column (M4-20): header, message list with paging, gaps and jumps, message tiles and actions, outbox rows, dialogs (versions, conflict, delete, reactions, title, move), the D2 layout |
-| `lib/composer/` | the composer (M4-20): send path, draft sync, mention suggestions, templates |
+| `lib/composer/` | the composer (M4-20): send path, draft sync, mention suggestions, templates; long pastes as files and long texts as one message with the rest attached (M4-47, `long_text.dart`, `attachment_chips.dart`) |
 | `lib/session_column/` | the frame of the session column with the agent part (M4-21) and the sections "Pinned" (M4-20) and "Files" (M4-22) |
 | `lib/files/` | files (M4-22): the upload executor and the attaching of its files, the part plan and hashing, the composer's attachments (button, drag and drop, paste), attachment tiles and their states, image previews, downloads with `Repr-Digest`, the file cache, ticket players, the file ports and providers |
 | `lib/voice/` | voice messages (M4-22): the recorder port over `record`, the recording bar, the player with speeds and the transcript |
@@ -798,7 +798,11 @@ loading row until the engine filled it (04 4), scrolling to the top loads older 
 threads form the gateway focus, and the newest message in view marks the thread read through
 the outbox. The composer (`lib/composer/`) sends with the limit of the instance, writes the draft
 as one coalesced outbox entry, takes another device's draft only while the person does not type
-(04 14) and offers mention suggestions from the stored people and agents and the templates. The
+(04 14) and offers mention suggestions from the stored people and agents and the templates. A
+paste over `ui.composer_paste_file_chars` characters or `ui.composer_paste_file_lines` lines
+becomes the file `paste.txt` (or a code file for one fenced block) with "Insert as text", and a
+text over `message_max_content_bytes` goes out as one message whose rest is the attachment
+`message.txt`, in a thread and in the new chat view of a forum (M4-47, 01 6.13). The
 message actions (hover bar, right click, menu key or Shift+F10) and the header buttons are shown
 by the level and capabilities the server reported for the channel, never by grants; every write
 goes through the outbox (docs/DECISIONS.md D-M4-20-1 to D-M4-20-8). Rendering loads and runs

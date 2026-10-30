@@ -1005,6 +1005,8 @@
   "outboxCompare": "Vergleichen",
   "outboxCopy": "Kopieren",
   "composerTooLong": "Die Nachricht ist zu lang: höchstens {limit} Byte",
+  "composerOverflowNote": "Länger als eine Nachricht: der Rest geht als {name} mit dieser Nachricht mit",
+  "composerPasteAsText": "Als Text einfügen",
   "composerDraftOverwritten": "Dieser Entwurf hat eine neuere Fassung eines anderen Geräts ersetzt",
   "composerReplyTo": "Antwort an {name}",
   "composerCancelReply": "Antwort abbrechen",

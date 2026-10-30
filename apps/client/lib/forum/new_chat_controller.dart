@@ -12,6 +12,8 @@ import 'package:sync_engine/sync_engine.dart';
 
 import '../composer/composer_controller.dart';
 import '../composer/draft_sync.dart';
+import '../files/attach_controller.dart';
+import '../files/upload_executor.dart' show MessageAttachments;
 import '../sync/thread_ops.dart';
 
 /// The new chat of one forum.
@@ -47,6 +49,7 @@ final class NewChatController extends ChangeNotifier {
     required DraftEditingRegistry editing,
     required this._dropStoredDraft,
     DeviceId? deviceId,
+    AttachController? attach,
   }) : _drafts = DraftWriter.forum(outbox: _outbox, dao: dao, forum: forum) {
     composer = ComposerController(
       thread: null,
@@ -56,7 +59,9 @@ final class NewChatController extends ChangeNotifier {
       editing: editing,
       deviceId: deviceId,
       sendNew: _sendNew,
-    )..addListener(notifyListeners);
+    )..attach = attach;
+    composer.addListener(notifyListeners);
+    attach?.addListener(notifyListeners);
     title.addListener(notifyListeners);
   }
 
@@ -120,7 +125,7 @@ final class NewChatController extends ChangeNotifier {
     return sent ? _sentEntry : null;
   }
 
-  Future<void> _sendNew(String body) async {
+  Future<void> _sendNew(String body, MessageAttachments? attachments) async {
     final ordered = [
       for (final t in _order)
         if (_tags.contains(t)) t,
@@ -134,6 +139,8 @@ final class NewChatController extends ChangeNotifier {
         title: title.text.trim(),
         contentMd: body,
         tagIds: ordered,
+        // A long paste or the rest of a long text (M4-47): the post waits for its uploads.
+        attachments: attachments,
         clearDraft: true,
       ),
     );
@@ -155,6 +162,8 @@ final class NewChatController extends ChangeNotifier {
 
   @override
   void dispose() {
+    // The attachments outlive the view (newPostAttachmentsProvider).
+    composer.attach?.removeListener(notifyListeners);
     composer
       ..removeListener(notifyListeners)
       ..dispose();

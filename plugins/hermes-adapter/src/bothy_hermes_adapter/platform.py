@@ -79,6 +79,7 @@ from bothy_hermes_adapter.config import (
     load_settings,
     load_token,
 )
+from bothy_hermes_adapter.defaults import NO_SPLIT_LENGTH
 from bothy_hermes_adapter.handler import HermesHandler
 from bothy_hermes_adapter.heartbeat import ADAPTER_NAME, RUNTIME_NAME, HermesAdapterLoop
 from bothy_hermes_adapter.hermes_commands import declared_commands
@@ -125,7 +126,10 @@ class ServerPlatform(BasePlatformAdapter):
         platform_key: `hermes_adapter.platform_key`, fixed by the plugin entry.
     """
 
-    splits_long_messages = False
+    # M4-47: Hermes hands every answer whole to `send` (no split, no cut of cron output); the
+    # handler keeps it one message and attaches the rest above hermes_adapter.max_message_bytes.
+    splits_long_messages = True
+    MAX_MESSAGE_LENGTH = NO_SPLIT_LENGTH
     supports_status_text = True
 
     def __init__(self, config: PlatformConfig, platform_key: str) -> None:
@@ -139,8 +143,6 @@ class ServerPlatform(BasePlatformAdapter):
             self.settings = load_settings(extra)
         except ConfigError as exc:
             self.config_error = str(exc)
-        if self.settings is not None:
-            self.MAX_MESSAGE_LENGTH = self.settings.max_message_bytes
         # Hermes's own allow list of the platform (09 17.7 layer 3, the name entry.py registers).
         self._allow_list_variable = f"{platform_key.upper()}_ALLOWED_USERS"
         self._loop: asyncio.AbstractEventLoop | None = None

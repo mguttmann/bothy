@@ -9,6 +9,11 @@
 the answer without attachments and with the notice: all or none (09 18.10 point 4). Every
 request goes through the SDK client inside the run's binding (07 SR9).
 
+An answer above ``message_max_content_bytes`` (brief M4-47) goes the same way with its text cut
+by `bothy_sdk.long_answers.split_for_limit`: the rest becomes one more staged file
+``answer.txt`` after the ``ATTACH:`` files (`read_content_limit` reads the limit once the text is
+longer than `LIMIT_READ_FLOOR_BYTES`), so a long answer stays one message (01 6.4).
+
 `AttachmentSetRecord` keeps the progress of one answer's set in
 ``<runner.state_dir>/sessions/<session ref>/<run_id>.attach-<answer>.json`` (mode ``0600``,
 written atomically): every ``Idempotency-Key`` before its request, every ``file_id`` right
@@ -67,6 +72,7 @@ from bothy_sdk.generated.models import (
     UploadState,
 )
 from bothy_sdk.ids import uuid7
+from bothy_sdk.long_answers import OVERFLOW_NAME, split_for_limit
 from bothy_sdk.uploads import upload_part
 
 from claude_code_runner.config import RunnerConfig
@@ -86,6 +92,7 @@ from claude_code_runner.reply_attachments import (
 from claude_code_runner.statedir import ensure_private_dir, write_private
 
 __all__ = [
+    "LIMIT_READ_FLOOR_BYTES",
     "STATUS_LINE",
     "AttachmentSetRecord",
     "ReplyContext",
@@ -93,6 +100,7 @@ __all__ = [
     "SendResult",
     "StagedFile",
     "outgoing_dir",
+    "read_content_limit",
     "remove_run_files",
     "run_temp_dir",
     "send_answer_with_attachments",
@@ -104,6 +112,11 @@ _LOG = logging.getLogger("claude_code_runner")
 
 STATUS_LINE = "uploading_attachments"
 """``/status_line`` of the run while a set uploads (09 5.3, note 7)."""
+
+LIMIT_READ_FLOOR_BYTES = 4096
+"""An answer text up to this many UTF-8 bytes is sent without reading ``getInstance`` first
+(D-M4-47-6): far below the default ``message.max_content_bytes``, so a short answer costs no
+request; a longer one reads the limit before it is sent."""
 
 _COPY_CHUNK = 1024 * 1024
 _FORBIDDEN = 403
@@ -488,6 +501,32 @@ async def _limits(ctx: ReplyContext) -> Limits | None:
     return Limits(info.limits.message_max_attachments, info.limits.file_max_upload_bytes)
 
 
+async def read_content_limit(client: Client, ids: Mapping[str, Any]) -> int | None:
+    """``message_max_content_bytes`` of ``getInstance`` (M4-47); ``None`` when the read failed.
+
+    Args:
+        client: The SDK client inside the run's binding.
+        ids: Run, thread and channel IDs for log lines.
+
+    Returns:
+        The limit in UTF-8 bytes, or ``None`` (the answer then goes out as it is).
+
+    Raises:
+        RunEnded: The server ended the run (note 7 f).
+    """
+    try:
+        info = await client.call_as(InstanceInfo, get_instance.asyncio_detailed)
+    except ProblemError as err:
+        if _ended(err):
+            raise RunEnded from None
+        _log("content_limit_unavailable", code=err.code, **ids)
+        return None
+    except (httpx.TransportError, TypeError):
+        _log("content_limit_unavailable", code="transport_error", **ids)
+        return None
+    return int(info.limits.message_max_content_bytes)
+
+
 def _check(ctx: ReplyContext, paths: Sequence[str], limits: Limits | None) -> SetVerdict:
     cfg = ctx.config
     roots = allowed_roots(
@@ -503,14 +542,52 @@ def _check(ctx: ReplyContext, paths: Sequence[str], limits: Limits | None) -> Se
     return check_set(checked, limits)
 
 
+def _with_overflow(
+    outcomes: Sequence[Outcome], overflow: str | None, code: str = "set_not_sent"
+) -> list[Outcome]:
+    """The outcomes of a set that is not sent, with the rest of a long answer last (M4-47)."""
+    rest = [Outcome(OVERFLOW_NAME, Rejection(code))] if overflow is not None else []
+    return [*outcomes, *rest]
+
+
+def _stage_overflow(
+    overflow: str, directory: Path, position: int, limits: Limits
+) -> _FileState | None:
+    """Write the rest of a long answer as the staged file ``position`` (M4-47).
+
+    Returns:
+        Its state, or ``None`` above ``file_max_upload_bytes``.
+    """
+    data = overflow.encode("utf-8")
+    if not data or len(data) > limits.max_upload_bytes:
+        return None
+    target = directory / str(position)
+    with contextlib.suppress(FileNotFoundError):
+        target.unlink()  # a copy of an earlier attempt of the same answer
+    write_private(target, data)
+    digest = hashlib.sha256(data).hexdigest()
+    return _FileState(OVERFLOW_NAME, OVERFLOW_NAME, str(target), len(data), digest)
+
+
 async def _prepare(
-    ctx: ReplyContext, paths: Sequence[str], answer: int, client_msg_id: UUID
+    ctx: ReplyContext,
+    paths: Sequence[str],
+    answer: int,
+    client_msg_id: UUID,
+    overflow: str | None = None,
 ) -> AttachmentSetRecord:
-    """Read the limits, check the set and stage it (notes 5 and 6); the record is stored."""
+    """Read the limits, check the set and stage it (notes 5 and 6); the record is stored.
+
+    The rest of a long answer (``overflow``, M4-47) takes the last place of the set, so the
+    ``ATTACH:`` files may use one place less.
+    """
     cfg = ctx.config
     path = AttachmentSetRecord.path_for(cfg.state_dir, ctx.session_ref, ctx.run_id, answer)
     limits = await _limits(ctx)
-    verdict = _check(ctx, paths, limits)
+    room = limits
+    if limits is not None and overflow is not None:
+        room = Limits(limits.max_attachments - 1, limits.max_upload_bytes)
+    verdict = _check(ctx, paths, room)
     record = AttachmentSetRecord(
         path=path,
         answer=answer,
@@ -519,18 +596,33 @@ async def _prepare(
         client_msg_id=str(client_msg_id),
     )
     if not verdict.ok or limits is None:
-        record.set_outcomes(verdict.outcomes)
+        code = "limits_unavailable" if limits is None else "set_not_sent"
+        record.set_outcomes(_with_overflow(verdict.outcomes, overflow, code))
         _log("attachments_rejected", count=len(verdict.outcomes), **ctx.ids)
     else:
         directory = outgoing_dir(cfg.state_dir, ctx.run_id) / str(answer)
         staged = stage_files(verdict.accepted, limits.max_upload_bytes, directory)
         if isinstance(staged, tuple):
-            record.set_outcomes(staged)
+            record.set_outcomes(_with_overflow(staged, overflow))
             _log("attachments_changed_during_check", **ctx.ids)
         else:
-            record.files = [
-                _FileState(s.announced, s.name, str(s.path), s.size, s.sha256) for s in staged
-            ]
+            files = [_FileState(s.announced, s.name, str(s.path), s.size, s.sha256) for s in staged]
+            rest = (
+                _stage_overflow(overflow, directory, len(files) + 1, limits)
+                if overflow is not None
+                else None
+            )
+            if overflow is not None and rest is None:
+                shutil.rmtree(directory, ignore_errors=True)
+                record.set_outcomes(
+                    [
+                        *(Outcome(f.announced, Rejection("set_not_sent")) for f in files),
+                        Outcome(OVERFLOW_NAME, Rejection("too_large")),
+                    ]
+                )
+                _log("answer_rest_too_large", **ctx.ids)
+            else:
+                record.files = [*files, *([rest] if rest is not None else [])]
     record.save()
     return record
 
@@ -764,8 +856,15 @@ async def _upload_tracked(ctx: ReplyContext, record: AttachmentSetRecord) -> lis
             await ctx.set_status(None)
 
 
-async def send_answer_with_attachments(
-    ctx: ReplyContext, text: str, paths: Sequence[str], answer: int, client_msg_id: UUID
+async def send_answer_with_attachments(  # noqa: PLR0913 - the answer and its rest
+    ctx: ReplyContext,
+    text: str,
+    paths: Sequence[str],
+    answer: int,
+    client_msg_id: UUID,
+    *,
+    overflow: str | None = None,
+    limit: int | None = None,
 ) -> SendResult:
     """Check, stage, upload and send one answer with ``ATTACH:`` lines (note 9).
 
@@ -783,6 +882,10 @@ async def send_answer_with_attachments(
         paths: The paths of the ``ATTACH:`` lines in line order.
         answer: The index of the answer in the run, from 1.
         client_msg_id: The answer's ``client_msg_id`` of the turn record.
+        overflow: The rest of an answer above ``message_max_content_bytes`` (M4-47), sent as
+            the last file ``answer.txt`` of the set; ``text`` is then the head.
+        limit: ``message_max_content_bytes`` when the answer was cut to it; the answer without
+            its files then shortens its head so head and notice fit the limit together.
 
     Returns:
         What became of the answer.
@@ -797,7 +900,7 @@ async def send_answer_with_attachments(
     try:
         _no_stop(ctx)
         if record is None:
-            record = await _prepare(ctx, paths, answer, client_msg_id)
+            record = await _prepare(ctx, paths, answer, client_msg_id, overflow)
         if record.state == "staged":
             ids = await _upload_tracked(ctx, record)
             _no_stop(ctx)
@@ -810,7 +913,7 @@ async def send_answer_with_attachments(
             sent = await _send_attached(ctx, record, text)
             if sent is not None:
                 return sent
-        return await _send_fallback(ctx, record, text)
+        return await _send_fallback(ctx, record, text, limit)
     except _Stopped:
         return SendResult(None, stopped=True)
     except asyncio.CancelledError:
@@ -855,15 +958,24 @@ async def _send_attached(
     return None
 
 
-async def _send_fallback(ctx: ReplyContext, record: AttachmentSetRecord, text: str) -> SendResult:
-    """Send the answer without attachments and with the notice (note 9 c and d)."""
+async def _send_fallback(
+    ctx: ReplyContext, record: AttachmentSetRecord, text: str, limit: int | None = None
+) -> SendResult:
+    """Send the answer without attachments and with the notice (note 9 c and d).
+
+    A head cut to ``limit`` (M4-47) is shortened further, so head and notice fit together.
+    """
     if record.fallback_msg_id is None:
         record.fallback_msg_id = str(uuid7())
         record.save()  # a new id before the send: the old id with another body is 422
     _no_stop(ctx)
-    problem, refusal = await ctx.deliver(
-        with_notice(text, record.notice()), UUID(record.fallback_msg_id), ()
-    )
+    notice = record.notice()
+    body = with_notice(text, notice)
+    if limit is not None and len(body.encode("utf-8")) > limit:
+        room = len(with_notice("x", notice).encode("utf-8")) - 1
+        head, _ = split_for_limit(text, max(1, limit - room))
+        body = with_notice(head, notice)
+    problem, refusal = await ctx.deliver(body, UUID(record.fallback_msg_id), ())
     if refusal is not None and _ended(refusal):
         raise RunEnded
     return SendResult(problem)
