@@ -157,6 +157,14 @@ For a new message M of a principal P in the thread T of the channel C, the follo
    `no_trigger_right`, otherwise no trigger. Reason: someone who may only write should not see
    an error message for every message in free-response channels, but a targeted mention
    needs an answer.
+4a. The candidate is the fixed operator of the thread T (`threads.operator_agent_id`, not a guest)
+   and that operator is no longer allowed in C: it is not the effective operator of C, has no
+   `write` of its own on C (a grant; the operator rule of the thread does not count, 07 2.9), has
+   no active run in T and never completed a run in T. Then rejection `operator_not_in_channel`, no
+   run (addendum of 2026-10-30, R-AG-36). Reason: such a thread (typically an imported one whose
+   `planned_operator` the channel never got after the switch-over, [22](22-import-migration.md)
+   13.3) would start a run for every message that fails at once in the runtime. A thread
+   operator that has worked in T keeps triggering after an operator change of C (R-DM-12).
 5. Target thread: if T is the main thread and `auto_thread` is set, the server creates in the same
    transaction a thread T' with `parent_message_id = M`; the target is T'. Otherwise the target is T.
 6. If the target has an active run R: if R belongs to the candidate, M becomes a follow-up (section 7).
@@ -235,6 +243,7 @@ flowchart TD
 | `project_not_ready` | project binding not ready | "Project environment is not ready." |
 | `voice_unsupported` | voice message without a transcription path (13) | "Voice messages are not understood here." |
 | `run_active` | model command during an active run (10.4) | "The agent is currently working; send the command again after the run." |
+| `operator_not_in_channel` | the fixed operator of the thread is no longer allowed in the channel (3.4 step 4a) | "The agent of this thread no longer works in this channel. An owner can make it the channel's operator again." |
 
 The texts are keys in the language catalogue of the apps ([01-product.md](01-product.md)); the table
 names only the meaning.
@@ -1097,6 +1106,34 @@ and it becomes live as soon as the card gets a focus slot. Stop as before only w
 
 Permissions: no new action. The graph needs exactly `run.read`, the control room
 `run.overview.read`, Stop `run.cancel` (05 4.10).
+
+### 5.7 Retry of a failed or cancelled run
+
+Addendum of 2026-10-30 (R-AG-37). A run that ended `failed` or `cancelled` (for example
+`adapter_error` because the forum had no project folder yet) can be started again for the same
+triggering message, so the person does not have to write the message again: `retryRun`
+(`POST /runs/{run_id}/retry`, [06](06-api.md)).
+
+1. Only the newest run of its thread (`queued_at`, then `id`), only `trigger_kind = message`, only
+   `failed` or `cancelled`; otherwise `409 invalid_state_transition`. An unknown run, or one the
+   caller may not read (`run.read`), is `404`.
+2. Rights: those of triggering. `agent.invoke` for the caller on the run's thread with the run's
+   agent, the mention of the triggering message (`MentionsAgent`) and, for a run in the auto thread
+   of a main-thread message, the main-thread mention rule (`NewThread`); a denial is
+   `403 agent_invocation_denied` with `reason` and is audited like every denial of
+   `agent.invoke`. A run of the thread's fixed operator that is no longer allowed in the channel
+   (3.4 step 4a) is refused with `reason = operator_not_in_channel` before that check.
+3. The new run is opened like an acceptance (3.4 step 7): same thread, same agent,
+   `triggering_message_id` of the old run, `triggered_by` = the caller, a new live box anchor,
+   `run.state_changed`, `trigger_state = received` on the message, and `agent.invocation` (held
+   while an attachment of the message is not final, 12 section 10). The old run stays as it is.
+4. Idempotent: when the newest run of the thread is already a run of the same agent for the same
+   message (an earlier retry), the answer is that run and nothing is written; a repeated request
+   with the same `Idempotency-Key` gets the stored answer (06 7).
+5. The apps show "Retry" on the line of a `failed` or `cancelled` run that is the newest run of
+   its thread ([01](01-product.md) 6.2); after `interrupted` and `stale` they keep "Send again"
+   for the person who triggered (5.5), because the runtime may have caused side effects. Retry is
+   no automatic retry: the person decides each time.
 
 ## 6. Trigger state (`trigger_state`)
 
@@ -3237,6 +3274,8 @@ attachment without a transcript would reach the turn only as a file path.
 | R-AG-33 | The Hermes adapter sends the files of Hermes' answer as attachments through the public upload sessions, each within the server's upload limit and after Hermes' own delivery policy, and transcribes voice input with Hermes' own speech to text, delivering the transcript to the server (17.3, 17.6, HERMES-MEDIA). | Hermes behaves in a thread as on its other platforms; the server keeps scanning, limits and the owner switch `supports_files_out`, and other people see the transcript (13). |
 | R-AG-34 | Hermes: its built-in-like commands stay the server's built-ins, a closed table offers only control commands without a model call, skills become model commands, and reports without a run go to the report channel, a forum getting one post per report (17.3, 17.9, addendum of 2026-10-29). | A command sent as the adapter's admin sender must never widen what a person may do, and an unknown command of a later Hermes version is refused until the table names it (docs/decisions.d/HERMES-CRON-COMMANDS.md). |
 | R-AG-35 | The Claude Code runner treats Git as optional: a bound folder without `.git` is ready, a forum without a binding works in `runner.default_workspace` when it is set (default off), and every run the runner ends without a turn or with `adapter_error` names its cause in the `summary` of `finishRun`, which the app shows next to the reason (18.1, 18.9, addendum of 2026-10-30). | Owner expectation 2026-10-30: every development forum is a Claude Code chat; forums bound to folders without Git stayed "not ready" and a forum without a binding failed at once with a bare "Error in the adapter" (docs/decisions.d/RUNNER-NO-GIT.md). |
+| R-AG-36 | A fixed thread operator triggers only while it is allowed in the channel: it is the channel's effective operator, has `write` of its own on the channel, has the active run of the thread, or completed a run in the thread; otherwise a message that would trigger it gets `operator_not_in_channel` and no run (3.4 step 4a, addendum of 2026-10-30). | Live use 2026-10-30: imported threads carry `planned_operator` (R-IM-08), and a switch-over that left the channel without that operator made every message start a run that failed at once; a thread its operator has worked in keeps its session after an operator change (R-DM-12). |
+| R-AG-37 | A failed or cancelled run of the newest trigger of a thread can be retried for the same message with the rights of triggering, idempotently (`retryRun`, 5.7, addendum of 2026-10-30). | Live use 2026-10-30: after `adapter_error` the person had to write the message again; the API and the apps had no way to start it again. |
 
 ## 20. Alignment with the core contract
 

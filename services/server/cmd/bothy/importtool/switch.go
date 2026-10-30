@@ -7,7 +7,9 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"maps"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/OWNER/bothy/services/server/api/restclient"
@@ -26,13 +28,14 @@ a second agent answer.`
 func switchMain(ctx context.Context, args []string, env Env) int {
 	var o options
 	var channel string
-	var locked bool
+	var locked, force bool
 	fs := flag.NewFlagSet("bothy import discord switch", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	fs.StringVar(&o.guild, "guild", "", "")
 	fs.StringVar(&o.mapFile, "map", "", "")
 	fs.StringVar(&channel, "channel", "", "")
 	fs.BoolVar(&locked, "discord-locked", false, "")
+	fs.BoolVar(&force, "force", false, "")
 	fs.BoolVar(&o.takeover, "takeover", false, "")
 	fs.StringVar(&o.report, "report", "text", "")
 	fs.StringVar(&o.tokenFile, "discord-token-file", "", "")
@@ -60,12 +63,13 @@ func switchMain(ctx context.Context, args []string, env Env) int {
 	}
 	// The round is the --apply --once round of the read mirror, narrowed to the channel.
 	o.apply, o.once, o.channels = true, true, stringList{channel}
-	return exitCode(env.Stderr, switchOver(ctx, o, env))
+	return exitCode(env.Stderr, switchOver(ctx, o, force, env))
 }
 
 // switchOver runs the flow of brief design notes 1 and 2: the inputs and clients of a run, the
-// preflight, the preconditions of the channel, one mirror round, the settle check and the steps.
-func switchOver(ctx context.Context, o options, env Env) error {
+// preflight, the preconditions of the channel (with the operators of its imported threads, which
+// force turns from a refusal into a warning), one mirror round, the settle check and the steps.
+func switchOver(ctx context.Context, o options, force bool, env Env) error {
 	cfg, tok, err := loadInputs(o.configFile, o.tokenFile, env)
 	if err != nil {
 		return err
@@ -87,8 +91,16 @@ func switchOver(ctx context.Context, o options, env Env) error {
 		return err
 	}
 	id := o.channels[0]
+	planned := ""
+	if e := m.Channel(id); e != nil {
+		planned = e.PlannedOperator
+	}
 	ready := func(ctx context.Context, s *session) error {
-		return switchReady(ctx, bothyReads{api: api}, s.source, id)
+		r := bothyReads{api: api}
+		if err := switchReady(ctx, r, s.source, id); err != nil {
+			return err
+		}
+		return threadOperators(ctx, r, s.source, id, planned, force, env.Stderr)
 	}
 	wk, s, err := prepare(ctx, o, env, cfg, m, nil, clients{dc: dc, api: api}, ready)
 	if err != nil {
@@ -103,10 +115,6 @@ func switchOver(ctx context.Context, o options, env Env) error {
 	}
 	if err := res.verdict(); err != nil {
 		return err
-	}
-	planned := ""
-	if e := m.Channel(id); e != nil {
-		planned = e.PlannedOperator
 	}
 	_, err = io.WriteString(env.Stderr, switchSteps(id, planned))
 	return err
@@ -134,6 +142,82 @@ func switchReady(ctx context.Context, r bothyReads, src *restclient.ImportSource
 		return finding("the import source is %s: switch needs a running source; start it in the web console", src.State)
 	}
 	return nil
+}
+
+// threadOperators is the operator check of the switch-over (22 13.3, addendum of 2026-10-30): the
+// imported threads of the Discord channel id carry their fixed operator (22 5.1.1), and after step
+// 3 the channel has the planned operator of the mapping (planned, a handle; "" for none). A thread
+// whose operator is another agent would answer every message with a notice instead of a run (09
+// 3.4 step 4a), so switch refuses with exit 2 before any write; with force it prints the same
+// text as a warning and goes on. The message names agent IDs and counts, never a name.
+func threadOperators(ctx context.Context, r bothyReads, src *restclient.ImportSource, id, planned string, force bool, w io.Writer) error {
+	foreign, total, err := foreignOperators(ctx, r, src, id, planned)
+	if err != nil || total == 0 {
+		return err
+	}
+	msg := foreignOperatorText(id, planned, total, foreign)
+	if !force {
+		return finding("%s", msg)
+	}
+	_, err = fmt.Fprintln(w, "bothy import discord switch: warning: "+msg)
+	return err
+}
+
+// foreignOperators counts the threads of the server channel of the Discord channel id whose fixed
+// operator is not the agent of the planned handle ("" for none), per agent ID, and in total.
+func foreignOperators(ctx context.Context, r bothyReads, src *restclient.ImportSource, id, planned string) (map[string]int, int, error) {
+	posted, err := r.posted(ctx, src.Id)
+	if err != nil {
+		return nil, 0, err
+	}
+	item, ok := posted[keyChannel+id]
+	if !ok || item.TargetId == nil {
+		return nil, 0, nil
+	}
+	threads, err := r.threads(ctx, *item.TargetId)
+	if err != nil {
+		return nil, 0, err
+	}
+	var want *restclient.Uuid
+	if planned != "" {
+		agents, err := r.agents(ctx)
+		if err != nil {
+			return nil, 0, err
+		}
+		if a, ok := agents[planned]; ok {
+			want = &a.id
+		}
+	}
+	foreign := map[string]int{}
+	total := 0
+	for _, t := range threads {
+		if t.OperatorAgentId == nil || (want != nil && *t.OperatorAgentId == *want) {
+			continue
+		}
+		foreign[t.OperatorAgentId.String()]++
+		total++
+	}
+	return foreign, total, nil
+}
+
+// foreignOperatorText is the refusal of threadOperators: the count, the agents by ID with their
+// counts, the operator the channel will have and the two ways on.
+func foreignOperatorText(id, planned string, total int, foreign map[string]int) string {
+	parts := make([]string, 0, len(foreign))
+	for _, agent := range slices.Sorted(maps.Keys(foreign)) {
+		parts = append(parts, fmt.Sprintf("agent %s: %d", agent, foreign[agent]))
+	}
+	will := "the mapping plans no operator for this channel"
+	if planned != "" {
+		will = "the channel will get agent:" + planned + ", the planned operator of the mapping"
+	}
+	noun := "imported threads name"
+	if total == 1 {
+		noun = "imported thread names"
+	}
+	return fmt.Sprintf("%d %s an operator the channel will not have (%s); %s. A message in such a thread would get "+
+		"a notice instead of an agent run. Set planned_operator of channel %s to the agent of those threads and that agent "+
+		"as the channel's operator in step 3, or run switch with --force to switch anyway", total, noun, strings.Join(parts, ", "), will, id)
 }
 
 // switchResult counts what the settle check found after the last round: the messages held back

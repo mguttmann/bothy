@@ -120,6 +120,17 @@ func (h *Runs) CancelRun(ctx context.Context, req rest.CancelRunRequestObject) (
 	return rest.CancelRun202JSONResponse{Body: SummaryREST(s)}, nil
 }
 
+// RetryRun implements rest.StrictServerInterface (POST /runs/{run_id}/retry, retryRun, addendum of
+// 2026-10-30): 202 with the summary of the new run, or of the earlier retry of the same run; the
+// Idempotency-Key is handled by the middleware of the chain.
+func (h *Runs) RetryRun(ctx context.Context, req rest.RetryRunRequestObject) (rest.RetryRunResponseObject, error) {
+	s, err := h.runs.Retry(ctx, runs.RetryRun{RunID: ids.ID(req.RunId)})
+	if err != nil {
+		return nil, err
+	}
+	return rest.RetryRun202JSONResponse{Body: SummaryREST(s)}, nil
+}
+
 // startCmd converts the body RunStart of startRun and resumeRun.
 func startCmd(runID rest.RunIdPath, b *rest.RunStart) (runs.StartRun, error) {
 	if b == nil {

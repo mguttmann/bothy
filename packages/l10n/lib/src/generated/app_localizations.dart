@@ -1747,6 +1747,12 @@ abstract class AppLocalizations {
   /// **'The agent is currently working; send the command again after the run.'**
   String get triggerReasonRunActive;
 
+  /// Notice for the rejection reason `operator_not_in_channel` at acceptance of a triggering message: the fixed operator of the thread is no longer allowed in the channel (docs/spec/09 sections 3.4 step 4a and 3.5).
+  ///
+  /// In en, this message translates to:
+  /// **'The agent of this thread no longer works in this channel. An owner can make it the channel\'s operator again.'**
+  String get triggerReasonOperatorNotInChannel;
+
   /// Translated state reason `user_cancelled` of a run when the name of the person is not known (components.md section 2.1).
   ///
   /// In en, this message translates to:
@@ -12731,6 +12737,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Send again'**
   String get liveBoxSendAgain;
+
+  /// Button on the line of a failed or cancelled run that starts a new run of the same agent for the same message (retryRun, docs/spec/09 section 5.7, 01 section 6.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get liveBoxRetry;
+
+  /// Screen reader label of the button Retry on the line of a failed or cancelled run (docs/spec/09 section 5.7).
+  ///
+  /// In en, this message translates to:
+  /// **'Retry the run of {agent}'**
+  String liveBoxRetryRun(String agent);
+
+  /// Line under a failed or cancelled run when the server refused its retry; reason is the translated reason or problem text (docs/spec/09 section 5.7).
+  ///
+  /// In en, this message translates to:
+  /// **'Could not retry: {reason}'**
+  String liveBoxRetryRefused(String reason);
 
   /// Typing line of an agent while its run is running (D-L9).
   ///

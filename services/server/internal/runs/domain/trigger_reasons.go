@@ -30,6 +30,10 @@ const (
 	ReasonVoiceUnsupported Reason = "voice_unsupported"
 	// ReasonRunActive: a model command during an active run of the thread (09 10.4).
 	ReasonRunActive Reason = "run_active"
+	// ReasonOperatorNotInChannel: the fixed operator of the thread is no longer allowed in the
+	// channel (09 3.4 step 4a, addendum of 2026-10-30): not the channel's effective operator, no
+	// write of its own on the channel, no active and no completed run in the thread.
+	ReasonOperatorNotInChannel Reason = "operator_not_in_channel"
 )
 
 // Outcome is the result kind of a Decision. The zero value is OutcomeNone, so a zero Decision
@@ -82,6 +86,9 @@ const (
 	StepMentions Step = "mentions"
 	// StepTriggerRight: 09 3.4 step 4, the author's trigger permission.
 	StepTriggerRight Step = "trigger_right"
+	// StepThreadOperator: 09 3.4 step 4a, a fixed thread operator no longer allowed in the
+	// channel (addendum of 2026-10-30).
+	StepThreadOperator Step = "thread_operator"
 	// StepVoice: 09 13, the transcription path of a voice message.
 	StepVoice Step = "voice"
 	// StepActiveRun: 09 3.4 step 6, an active run in the target.

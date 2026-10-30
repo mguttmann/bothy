@@ -174,6 +174,28 @@ func (q *Queries) ActiveRuns(ctx context.Context, arg ActiveRunsParams) ([]Run, 
 	return items, nil
 }
 
+const completedRunOfAgent = `-- name: CompletedRunOfAgent :one
+SELECT EXISTS (
+    SELECT 1 FROM runs
+    WHERE thread_id = $1 AND agent_id = $2 AND state = 'completed'
+)
+`
+
+type CompletedRunOfAgentParams struct {
+	ThreadID pgtype.UUID
+	AgentID  pgtype.UUID
+}
+
+// Whether the agent completed a run in the thread: a fixed thread operator that is no longer the
+// channel's operator keeps triggering only then (09 3.4 step 4a, addendum of 2026-10-30). The
+// thread prefix of runs_thread_queued_idx serves the lookup; only the boolean leaves.
+func (q *Queries) CompletedRunOfAgent(ctx context.Context, arg CompletedRunOfAgentParams) (bool, error) {
+	row := q.db.QueryRow(ctx, completedRunOfAgent, arg.ThreadID, arg.AgentID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const getRun = `-- name: GetRun :one
 SELECT id, thread_id, agent_id, agent_session_id, trigger_kind, triggering_message_id, triggering_command_id, triggering_interaction_id, triggered_by, state, state_reason, version, billing_mode_expected, billing_mode_used, billing_evidence, invocation_jti, started_jti, renewed_from_jti, dev_environment_id, model, status_line, last_text_excerpt, plan, metrics, cost_micros, currency, cost_is_estimate, summary, stall_warned_at, queued_at, invocation_held_until, started_at, finished_at, duration_ms, last_progress_at FROM runs WHERE id = $1
 `

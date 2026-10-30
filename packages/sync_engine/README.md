@@ -454,7 +454,7 @@ the connections that may see them. Test controls: `addPerson`, `addSpace`, `addC
 `412 version_conflict` with `current`, `410 message_deleted`), `deleteMessage` (idempotent
 `204`), `addReaction`, `removeReaction`, `putReadState`, `putThreadDraft`,
 `deleteThreadDraft`, `listMyReadStates`, `listMyDrafts`, `listMySettings`, `putMySetting`,
-`deleteMySetting`, `getRun`, `cancelRun`; since M4-19 also `getMySidebar`,
+`deleteMySetting`, `getRun`, `cancelRun`, `retryRun` (09 5.7); since M4-19 also `getMySidebar`,
 `putMySidebarSpace` (the `fracindex` check of the server: a `sort_key` outside the fractional
 index is `400 validation_failed` at `/sort_key`), `listForumTags`, `createThread` (forum posts
 only; without `first_message` `400 validation_failed` at `/first_message` with the reason
@@ -625,6 +625,8 @@ above it (the app under test in the macOS app sandbox, M4-18), it uses the copy 
 - Events: `agent.invocation` and the agent consumer side are not modelled; `device.pending` is
   not written (it is not in the API documents of this base); `typing.stop` has no effect.
 - `cancelRun` ends the run at once with `cancelled`.
+- `retryRun` knows no thread operator rule (09 3.4 step 4a); `operator_not_in_channel` is scripted
+  with `faults.onRequest`.
 - Terminal (M4-36, `rest/terminal_handlers.dart`, `terminal_stream_fake.dart`,
   `world_terminal.dart`): `listTerminalSessions`, `getTerminalSession`, `openTerminalSession`
   (a grant `terminal`, the assignee, an own session user the host reports, a known profile and

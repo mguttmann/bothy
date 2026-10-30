@@ -655,4 +655,101 @@ class RunsApi {
       extra: _response.extra,
     );
   }
+
+  /// Retry a failed or cancelled run
+  /// Starts a new run of the same agent for the triggering message of a &#x60;failed&#x60; or &#x60;cancelled&#x60; run, so the person does not have to write the message again (09 5.7, addendum of 2026-10-30). Only the newest run of its thread can be retried, and only a run with &#x60;trigger_kind &#x3D; message&#x60;; otherwise &#x60;409 invalid_state_transition&#x60;. The rights are those of triggering: &#x60;agent.invoke&#x60; for the caller on the run&#39;s thread with the run&#39;s agent, the mention of the triggering message and the rules of 05 section 5; a denial answers &#x60;403 agent_invocation_denied&#x60; with &#x60;reason&#x60;, also &#x60;operator_not_in_channel&#x60; when the agent is the thread&#39;s operator and no longer allowed in the channel (09 3.4 step 4a). The new run has &#x60;triggered_by&#x60; &#x3D; the caller and the triggering message&#39;s &#x60;trigger_state&#x60; follows it. Idempotent: when the newest run of the thread is already a retry of the same message, the answer is that run and nothing is written.
+  ///
+  /// Parameters:
+  /// * [runId]
+  /// * [idempotencyKey] - UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [RunSummary] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<RunSummary>> retryRun({
+    required String runId,
+    String? idempotencyKey,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/runs/{run_id}/retry'.replaceAll(
+      '{'
+      r'run_id'
+      '}',
+      encodeQueryParameter(
+        _serializers,
+        runId,
+        const FullType(String),
+      ).toString(),
+    );
+    final _options = Options(
+      method: r'POST',
+      headers: <String, dynamic>{
+        if (idempotencyKey != null) r'Idempotency-Key': idempotencyKey,
+        ...?headers,
+      },
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'apiKey',
+            'name': 'consoleSession',
+            'keyName': '__Host-console_session',
+            'where': '',
+          },
+          {'type': 'http', 'scheme': 'DPoP', 'name': 'dpopAuth'},
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearerAuth'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    RunSummary? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(
+              rawResponse,
+              specifiedType: const FullType(RunSummary),
+            ) as RunSummary;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<RunSummary>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
 }

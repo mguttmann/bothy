@@ -2967,6 +2967,23 @@ type ClientInterface interface {
 	// Corresponds with POST /runs/{run_id}/resume (the `ResumeRun` operationId).
 	ResumeRun(ctx context.Context, runId RunIdPath, body ResumeRunJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// RetryRun Retry a failed or cancelled run
+	//
+	// Starts a new run of the same agent for the triggering message of a `failed` or `cancelled`
+	// run, so the person does not have to write the message again (09 5.7, addendum of
+	// 2026-10-30). Only the newest run of its thread can be retried, and only a run with
+	// `trigger_kind = message`; otherwise `409 invalid_state_transition`. The rights are those of
+	// triggering: `agent.invoke` for the caller on the run's thread with the run's agent, the
+	// mention of the triggering message and the rules of 05 section 5; a denial answers
+	// `403 agent_invocation_denied` with `reason`, also `operator_not_in_channel` when the agent
+	// is the thread's operator and no longer allowed in the channel (09 3.4 step 4a). The new run
+	// has `triggered_by` = the caller and the triggering message's `trigger_state` follows it.
+	// Idempotent: when the newest run of the thread is already a retry of the same message, the
+	// answer is that run and nothing is written.
+	//
+	// Corresponds with POST /runs/{run_id}/retry (the `RetryRun` operationId).
+	RetryRun(ctx context.Context, runId RunIdPath, params *RetryRunParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// StartRunWithBody Start a queued run
 	//
 	// Compare-and-swap `queued -> running` after checking the invocation token. Repeating the call
@@ -10316,6 +10333,33 @@ func (c *Client) ResumeRunWithBody(ctx context.Context, runId RunIdPath, content
 // Corresponds with POST /runs/{run_id}/resume (the `ResumeRun` operationId).
 func (c *Client) ResumeRun(ctx context.Context, runId RunIdPath, body ResumeRunJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewResumeRunRequest(c.Server, runId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RetryRun Retry a failed or cancelled run
+//
+// Starts a new run of the same agent for the triggering message of a `failed` or `cancelled`
+// run, so the person does not have to write the message again (09 5.7, addendum of
+// 2026-10-30). Only the newest run of its thread can be retried, and only a run with
+// `trigger_kind = message`; otherwise `409 invalid_state_transition`. The rights are those of
+// triggering: `agent.invoke` for the caller on the run's thread with the run's agent, the
+// mention of the triggering message and the rules of 05 section 5; a denial answers
+// `403 agent_invocation_denied` with `reason`, also `operator_not_in_channel` when the agent
+// is the thread's operator and no longer allowed in the channel (09 3.4 step 4a). The new run
+// has `triggered_by` = the caller and the triggering message's `trigger_state` follows it.
+// Idempotent: when the newest run of the thread is already a retry of the same message, the
+// answer is that run and nothing is written.
+//
+// Corresponds with POST /runs/{run_id}/retry (the `RetryRun` operationId).
+func (c *Client) RetryRun(ctx context.Context, runId RunIdPath, params *RetryRunParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRetryRunRequest(c.Server, runId, params)
 	if err != nil {
 		return nil, err
 	}
@@ -24195,6 +24239,55 @@ func NewResumeRunRequestWithBody(server string, runId RunIdPath, contentType str
 	return req, nil
 }
 
+// NewRetryRunRequest constructs an http.Request for the RetryRun method
+func NewRetryRunRequest(server string, runId RunIdPath, params *RetryRunParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "run_id", runId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/runs/%s/retry", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
 // NewStartRunRequest calls the generic StartRun builder with application/json body
 func NewStartRunRequest(server string, runId RunIdPath, body StartRunJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -24593,146 +24686,4 @@ func NewSearchThreadTitlesRequest(server string, params *SearchThreadTitlesParam
 	}
 
 	return req, nil
-}
-
-// NewRevokeSessionRequest constructs an http.Request for the RevokeSession method
-func NewRevokeSessionRequest(server string, sessionId SessionIdPath, params *RevokeSessionParams) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "session_id", sessionId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/sessions/%s/revoke", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
-	}
-
-	return req, nil
-}
-
-// NewRotateSigningKeyRequest calls the generic RotateSigningKey builder with application/json body
-func NewRotateSigningKeyRequest(server string, params *RotateSigningKeyParams, body RotateSigningKeyJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewRotateSigningKeyRequestWithBody(server, params, "application/json", bodyReader)
-}
-
-// NewRotateSigningKeyRequestWithBody constructs an http.Request for the RotateSigningKey method, with any body, and a specified content type
-func NewRotateSigningKeyRequestWithBody(server string, params *RotateSigningKeyParams, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/signing-keys/rotate")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
-	}
-
-	return req, nil
-}
-
-// NewListSpacesRequest constructs an http.Request for the ListSpaces method
-func NewListSpacesRequest(server string) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/spaces")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewCreateSpaceRequest calls the generic CreateSpace builder with application/json body
-func NewCreateSpaceRequest(server string, params *CreateSpaceParams, body CreateSpaceJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewCreateSpaceRequestWithBody(server, params, "application/json", bodyReader)
 }

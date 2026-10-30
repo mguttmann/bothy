@@ -4,7 +4,8 @@
 /// M4-21 Design note 1): nothing while the run is active (its box is pinned over the history),
 /// then the collapsed line built from the summary of `run.state_changed` and the optional
 /// `summary`, never from a server sentence. Expanding loads the document once (`getRun`).
-/// After `interrupted` or `stale` the line offers "Send again" (09 5.5).
+/// After `interrupted` or `stale` the line offers "Send again" (09 5.5); the newest run of the
+/// thread that ended `failed` or `cancelled` otherwise offers "Retry" (`retryRun`, 09 5.7).
 library;
 
 import 'dart:async';
@@ -14,9 +15,11 @@ import 'package:domain/domain.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:l10n/l10n.dart';
+import 'package:sync_engine/sync_engine.dart';
 
 import '../app/providers/ports.dart';
 import '../app/providers/session.dart';
+import '../sync/message_ops_app.dart';
 import '../thread/providers.dart';
 import '../thread/thread_actions.dart';
 import 'providers.dart';
@@ -72,6 +75,21 @@ class RunLine extends ConsumerWidget {
         onExpand: () => toggle(true),
       );
     }
+    if (offersRetry(ended, runs)) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          box,
+          const SizedBox(height: DsSpace.s4),
+          _RetryButton(
+            key: ValueKey('runline.retry.${runId.value}'),
+            run: ended,
+            agentName: agentName,
+          ),
+        ],
+      );
+    }
     // Only the person who triggered the run decides whether to send again (09 5.5).
     final me = ref.watch(myPrincipalIdProvider);
     if (!offersSendAgain(ended) || ended.triggeredBy != me) return box;
@@ -96,6 +114,121 @@ class RunLine extends ConsumerWidget {
               run: ended,
             ),
           ],
+        ),
+      ],
+    );
+  }
+}
+
+/// Whether the line of [run] offers "Retry" (09 5.7): it ended `failed` or `cancelled`, it is the
+/// newest of the [runs] of its thread (`queued_at`, then the ID, as the server orders them), and
+/// it is no `interrupted` or `stale` run, which keeps "Send again" (09 5.5).
+bool offersRetry(RunSummary run, List<RunSummary> runs) {
+  if (run.state != RunState.failed && run.state != RunState.cancelled) {
+    return false;
+  }
+  if (offersSendAgain(run)) return false;
+  for (final other in runs) {
+    if (other.threadId != run.threadId || other.id == run.id) continue;
+    final order = other.queuedAt.compareTo(run.queuedAt);
+    if (order > 0 ||
+        (order == 0 && other.id.value.compareTo(run.id.value) > 0)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/// The button "Retry" with the reason of a refusal: one activation puts one `retryRun` into the
+/// outbox (lane of the run, no thread); it stays disabled while the entry waits and after the
+/// server accepted it (the new run then replaces this line as the newest). A refused entry is
+/// discarded, its reason shown, and the button offered again.
+class _RetryButton extends ConsumerStatefulWidget {
+  const _RetryButton({super.key, required this.run, required this.agentName});
+
+  final RunSummary run;
+  final String agentName;
+
+  @override
+  ConsumerState<_RetryButton> createState() => _RetryButtonState();
+}
+
+class _RetryButtonState extends ConsumerState<_RetryButton> {
+  bool _busy = false;
+  String? _entryId;
+  String? _refusalCode;
+  String? _refusalReason;
+  StreamSubscription<List<OutboxEntryView>>? _watch;
+
+  @override
+  void dispose() {
+    unawaited(_watch?.cancel());
+    super.dispose();
+  }
+
+  Future<void> _retry() async {
+    if (_busy) return;
+    final engine = ref.read(syncEngineProvider);
+    if (engine == null) return;
+    setState(() {
+      _busy = true;
+      _refusalCode = _refusalReason = null;
+    });
+    final entry = await engine.outbox.enqueue(
+      OutboxRequest(
+        kind: AppMessageOps.retryRun,
+        payload: {'run_id': widget.run.id.value},
+      ),
+    );
+    if (!mounted) return;
+    _entryId = entry.id;
+    await _watch?.cancel();
+    _watch = engine.outbox.watchThread(null).listen((views) {
+      for (final v in views) {
+        if (v.id != _entryId || v.stateLabel != OutboxStateLabel.failed) {
+          continue;
+        }
+        _entryId = null;
+        unawaited(engine.outbox.discard(v.id));
+        if (!mounted) return;
+        setState(() {
+          _busy = false;
+          _refusalCode = v.failureCode ?? 'unknown';
+          _refusalReason = v.failureReason;
+        });
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final code = _refusalCode;
+    final reason = _refusalReason;
+    final refusal = code == null
+        ? null
+        : l.liveBoxRetryRefused(
+            (reason == null ? null : dsReasonText(l, reason)) ??
+                problemText(l, code, reason: reason),
+          );
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            refusal ?? '',
+            style: dsTextStyle(DsType.bodySm)
+                .copyWith(color: context.dsColors.textSecondary),
+          ),
+        ),
+        Semantics(
+          label: l.liveBoxRetryRun(widget.agentName),
+          excludeSemantics: true,
+          button: true,
+          child: DsButton(
+            label: l.liveBoxRetry,
+            loading: _busy,
+            onPressed: _busy ? null : () => unawaited(_retry()),
+          ),
         ),
       ],
     );

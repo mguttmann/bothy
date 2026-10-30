@@ -125,6 +125,17 @@ func (r *repo) ActiveRunOfThread(_ context.Context, thread ids.ID) (app.RunRow, 
 	return app.RunRow{}, false, nil
 }
 
+func (r *repo) CompletedRunOfAgent(_ context.Context, thread, agent ids.ID) (bool, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, x := range r.runs {
+		if x.ThreadID == thread && x.AgentID == agent && x.State == domain.StateCompleted {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func (r *repo) LockActiveRunOfThread(ctx context.Context, thread ids.ID) (app.RunRow, bool, error) {
 	return r.ActiveRunOfThread(ctx, thread)
 }

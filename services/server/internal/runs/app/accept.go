@@ -213,15 +213,52 @@ func (s *Service) trigger(ctx context.Context, ev messaging.MessagePosted, info 
 			in.Mentioned = append(in.Mentioned, *agentFacts(facts, id))
 		}
 	}
-	active, found, err := s.d.Repo.LockActiveRunOfThread(ctx, ev.ThreadID)
+	locked, err := s.activeFacts(ctx, &in, info, ch.EffectiveOperatorID)
 	if err != nil {
 		return domain.MessageTrigger{}, nil, err
 	}
-	if !found {
-		return in, nil, nil
+	return in, locked, nil
+}
+
+// activeFacts adds the facts that depend on the runs of the thread to in: the active run, read
+// with its row lock (returned, nil for none), and whether the fixed thread operator is outside
+// the channel whose effective operator is channelOp (09 3.4 step 4a).
+func (s *Service) activeFacts(ctx context.Context, in *domain.MessageTrigger, info chat.ThreadInfo, channelOp ids.ID) (*RunRow, error) {
+	active, found, err := s.d.Repo.LockActiveRunOfThread(ctx, info.ID)
+	if err != nil {
+		return nil, err
 	}
-	in.ActiveRun = &domain.ActiveRun{RunID: active.ID, AgentID: active.AgentID}
-	return in, &active, nil
+	var locked *RunRow
+	if found {
+		in.ActiveRun = &domain.ActiveRun{RunID: active.ID, AgentID: active.AgentID}
+		locked = &active
+	}
+	if in.ThreadOperator != nil {
+		if in.ThreadOperatorOutside, err = s.operatorOutside(ctx, info, channelOp, locked); err != nil {
+			return nil, err
+		}
+	}
+	return locked, nil
+}
+
+// operatorOutside reports whether the fixed operator of the thread info is no longer allowed in
+// its channel (09 3.4 step 4a, addendum of 2026-10-30): it is not the channel's effective operator
+// channelOp, the thread's active run (nil: none) is not its run, it has no write of its own on the
+// channel (a grant: thread.create on the channel decided for the agent in filter mode, which the
+// operator rule of the thread does not reach, 07 2.9), and it never completed a run in the
+// thread. The check and the read run only when the first two do not decide.
+func (s *Service) operatorOutside(ctx context.Context, info chat.ThreadInfo, channelOp ids.ID, active *RunRow) (bool, error) {
+	op := info.OperatorAgentID
+	if op.IsZero() || op == channelOp || (active != nil && active.AgentID == op) {
+		return false, nil
+	}
+	v, err := s.d.Authorizer.Authorize(authorize.Filter(ctx), actor.Actor{ID: op, Kind: actor.KindAgent}, authorize.ActionThreadCreate,
+		authorize.Resource{Kind: authorize.ResourceChannel, ID: info.ChannelID})
+	if err != nil || v.Allowed() {
+		return false, err
+	}
+	worked, err := s.d.Repo.CompletedRunOfAgent(ctx, info.ID, op)
+	return !worked, err
 }
 
 // voiceMode returns the transcription mode of the author of the voice message ev (12 8.2): the
@@ -271,6 +308,10 @@ func candidateOf(in domain.MessageTrigger, d domain.Decision) (candidate, bool, 
 	if d.Reason == domain.ReasonAgentNotAllowedHere && len(in.Mentioned) > 0 {
 		return candidate{facts: in.Mentioned[0], mentioned: true}, true, nil
 	}
+	if d.Reason == domain.ReasonOperatorNotInChannel && in.ThreadOperator != nil {
+		// The fixed operator of the thread (09 3.4 step 4a), mentioned or by the mention rule.
+		return candidate{facts: *in.ThreadOperator, mentioned: mentions(in, in.ThreadOperator.ID)}, true, nil
+	}
 	// run_active_other_agent and voice_unsupported: the candidate as if the thread had no active
 	// run and the message were text (the voice rule rejects before the target, 09 3.4).
 	free := in
@@ -280,6 +321,16 @@ func candidateOf(in domain.MessageTrigger, d domain.Decision) (candidate, bool, 
 		return candidate{}, false, err
 	}
 	return candidate{facts: *fd.Agent, mentioned: fd.Mentioned}, true, nil
+}
+
+// mentions reports whether the message of in mentions the agent id.
+func mentions(in domain.MessageTrigger, id ids.ID) bool {
+	for _, m := range in.Mentioned {
+		if m.ID == id {
+			return true
+		}
+	}
+	return false
 }
 
 // settle runs the decision and step 7 for in (brief note 6 steps 3 to 7) with active, the locked
@@ -309,10 +360,10 @@ func (s *Service) settle(ctx context.Context, ev messaging.MessagePosted, info c
 	if silent, err := s.withoutTriggerRight(ctx, p, res, cand); err != nil || silent {
 		return nil, err
 	}
-	if d.Outcome == domain.OutcomeReject && d.Reason == domain.ReasonVoiceUnsupported {
-		// A rejection of the decision function (09 3.5, M3-09 design note 12 c): trigger_state
-		// failed without agent.invoke in request mode, so no audit entry; a person without trigger
-		// who did not mention the agent stays unanswered above (R-AG-05).
+	if d.Outcome == domain.OutcomeReject && (d.Reason == domain.ReasonVoiceUnsupported || d.Reason == domain.ReasonOperatorNotInChannel) {
+		// A rejection of the decision function (09 3.5, M3-09 design note 12 c, and 3.4 step 4a):
+		// trigger_state failed without agent.invoke in request mode, so no audit entry; a person
+		// without trigger who did not mention the agent stays unanswered above (R-AG-05).
 		return nil, s.fail(ctx, ev.MessageID, string(d.Reason))
 	}
 	v, err := s.d.Authorizer.Authorize(ctx, p, authorize.ActionAgentInvoke, res)

@@ -817,6 +817,10 @@ func (stubServer) CancelRun(context.Context, rest.CancelRunRequestObject) (rest.
 	return nil, nil
 }
 
+func (stubServer) RetryRun(context.Context, rest.RetryRunRequestObject) (rest.RetryRunResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) CreateInteraction(context.Context, rest.CreateInteractionRequestObject) (rest.CreateInteractionResponseObject, error) {
 	return nil, nil
 }
@@ -1629,6 +1633,8 @@ func TestRealTable_Enabled(t *testing.T) {
 		"getGdprRequest":     {"GET /api/v1/gdpr-requests/{request_id}", "gdpr.request.read", "rl.read"},
 		"decideGdprRequest":  {"POST /api/v1/gdpr-requests/{request_id}/decide", "gdpr.request.decide", "rl.admin"},
 		"downloadGdprExport": {"GET /api/v1/gdpr-requests/{request_id}/export", "gdpr.export.download", "rl.export"},
+		// FIX-run-retry-and-orphan-operator
+		"retryRun": {"POST /api/v1/runs/{run_id}/retry", "agent.invoke", "rl.trigger"},
 	}
 	ops := routes.Enabled()
 	if len(ops) != len(want) {

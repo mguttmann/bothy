@@ -258,6 +258,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - respondToInteraction
   - resumeApp
   - resumeRun
+  - retryRun
   - revokeDevice
   - revokeGrant
   - revokeIncomingWebhook

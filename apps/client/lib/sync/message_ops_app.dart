@@ -67,6 +67,7 @@ final class AppOpsStore {
 /// | `moveThread` | `target_channel_id`, `reason` | yes | thread |
 /// | `createPersonalTemplate` | `name`, `content_md` | no | `templates` |
 /// | `cancelRun` | `run_id`, optional `reason` | no | `run:<id>` |
+/// | `retryRun` | `run_id` | no | `run:<id>` |
 /// | `putThreadDraft` | `DraftPut` (replaces the executor of M4-15) | yes | thread |
 /// | `putReadState` | `ReadStatePut` (replaces the executor of M4-15) | yes | thread |
 ///
@@ -98,6 +99,9 @@ abstract final class AppMessageOps {
 
   /// `POST /runs/{run_id}/cancel` (Running now of M4-23 and the live box of M4-21).
   static const String cancelRun = 'cancelRun';
+
+  /// `POST /runs/{run_id}/retry` (Retry on the line of a failed or cancelled run, 09 5.7).
+  static const String retryRun = 'retryRun';
 
   /// Registers the executors on [registry]; they call [api] and hand what the server returned
   /// to [store].
@@ -198,6 +202,13 @@ abstract final class AppMessageOps {
         final response = await api.getRunsApi().cancelRun(
           runId: _required<String>(body, 'run_id'),
           runCancel: RunCancel((b) => b..reason = body['reason'] as String?),
+          extra: ctx.extra,
+        );
+        return OutboxResponse(status: response.statusCode, body: response.data);
+      }, lane: (e) => 'run:${decodePayload(e.payload)['run_id']}')
+      ..register(retryRun, (e, ctx) async {
+        final response = await api.getRunsApi().retryRun(
+          runId: _required<String>(decodePayload(e.payload), 'run_id'),
           extra: ctx.extra,
         );
         return OutboxResponse(status: response.statusCode, body: response.data);

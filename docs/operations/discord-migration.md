@@ -258,13 +258,22 @@ without it the command ends with exit `2` before any call:
 bothy import discord switch --guild <guild_id> --map mapping.yaml --channel <channel_id> --discord-locked
 ```
 
+Exit `2` naming "an operator the channel will not have" means imported threads of the channel carry
+another agent than the planned operator of your mapping (for example after the mapping changed
+since the import): after step 3 the channel would not have their agent, and a message there would
+only get the notice "The agent of this thread no longer works in this channel" instead of an
+answer. Set `planned_operator` to that agent and use it in step 3, or add `--force` to switch
+anyway with a warning.
+
 Exit `1` with counts per reason (busy, unsettled, lookback) means messages are still held back:
 repeat after `import.follow.settle_after`. Exit `1` with "run switch again" means messages arrived
 after the round: the Discord lock of step 1 is not in place yet. Exit `0` prints steps 3 and 4.
 
 Step 3, web console, owner (step-up): in the channel's row "Lead here", which makes the channel
 writable in the same step; then "Set operator" with the planned operator of the mapping. Another
-operator would leave the imported threads without their agent (R-IM-08).
+operator, or none, would leave the imported threads without their agent (R-IM-08): a message
+there then gets the notice "The agent of this thread no longer works in this channel" and no
+answer, until the planned operator is the channel's operator.
 
 Step 4, probe: write a test message in an imported thread of the channel. Exactly one answer of the
 operator follows, in Bothy only; a thread with an imported session reference continues that

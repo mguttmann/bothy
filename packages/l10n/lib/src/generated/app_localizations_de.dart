@@ -1071,6 +1071,10 @@ class AppLocalizationsDe extends AppLocalizations {
       'Der Agent arbeitet gerade; Befehl nach dem Lauf erneut senden.';
 
   @override
+  String get triggerReasonOperatorNotInChannel =>
+      'Der Agent dieses Threads arbeitet nicht mehr in diesem Kanal. Ein Owner kann ihn wieder zum Operator des Kanals machen.';
+
+  @override
   String get liveBoxReasonUserCancelledNoName => 'Von einer Person abgebrochen';
 
   @override
@@ -7956,6 +7960,19 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get liveBoxSendAgain => 'Erneut senden';
+
+  @override
+  String get liveBoxRetry => 'Erneut versuchen';
+
+  @override
+  String liveBoxRetryRun(String agent) {
+    return 'Lauf von $agent erneut versuchen';
+  }
+
+  @override
+  String liveBoxRetryRefused(String reason) {
+    return 'Erneuter Versuch nicht möglich: $reason';
+  }
 
   @override
   String agentWorking(String agent) {

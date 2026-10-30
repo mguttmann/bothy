@@ -14,7 +14,9 @@ import (
 // chatThread is a thread of a channel with its messages in thread_seq order.
 type chatThread struct {
 	id, channelID, kind string
-	messages            []chatMessage
+	// operator is threads.operator_agent_id ("" for none), set by SetThreadOperator.
+	operator string
+	messages []chatMessage
 }
 
 // chatMessage is one message of a chatThread.
@@ -119,6 +121,16 @@ func (s *Server) SetChannelOperator(channelID, agentID string) {
 	}
 }
 
+// SetThreadOperator sets the fixed operator of the thread (threads.operator_agent_id): an agent
+// UUID, "" for none. An imported thread carries the planned operator of its channel (22 5.1.1).
+func (s *Server) SetThreadOperator(threadID, agentID string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if t := s.imp.threadByID(threadID); t != nil {
+		t.operator = agentID
+	}
+}
+
 // SetChannelReadOnly sets the read-only flag of the channel, as setImportLead does with the lead.
 func (s *Server) SetChannelReadOnly(channelID string, readOnly bool) {
 	s.mu.Lock()
@@ -166,8 +178,12 @@ func (s *Server) getChannel(_ *http.Request, _ []byte, params []string) (int, an
 
 // threadJSON is the schema Thread of t.
 func threadJSON(t *chatThread) map[string]any {
-	return map[string]any{"id": t.id, "channel_id": t.channelID, memberKind: t.kind, "message_count": len(t.messages),
+	out := map[string]any{"id": t.id, "channel_id": t.channelID, memberKind: t.kind, "message_count": len(t.messages),
 		"last_message_seq": len(t.messages), memberState: "open"}
+	if t.operator != "" {
+		out["operator_agent_id"] = t.operator
+	}
+	return out
 }
 
 // listChannelThreads answers listChannelThreads: the threads of kind thread (never the main

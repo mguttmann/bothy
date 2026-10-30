@@ -408,6 +408,9 @@ exceptions:
   - query: runs.ActiveRunOfThread
     category: after_authorize
     reason: "the active run of the one thread whose message the acceptance handles (09 3.4) or whose run Open found taken; runs has no channel_id, the thread was checked first (D-M2-05-9)"
+  - query: runs.CompletedRunOfAgent
+    category: after_authorize
+    reason: "asks whether the fixed operator of the one thread whose message the acceptance handles (09 3.4 step 4a) completed a run there; only the boolean leaves, never a row; runs has no channel_id, the thread was checked first (D-M2-05-9)"
   - query: runs.ThreadRuns
     category: after_authorize
     reason: "the runs of the one thread listThreadRuns found visible through Scope(run.read); runs has no channel_id, and each row is authorized with run.read (D-M2-05-9)"
