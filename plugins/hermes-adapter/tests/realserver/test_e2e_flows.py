@@ -401,6 +401,9 @@ async def test_cancel_stops_the_turn(real: RealServer, tmp_path: Path) -> None:
             return (await real.run_state(first.run_id)).state == "running"
 
         await until("the running run", running)
+        # "running" is set by startRun, before the SDK enters the handler: a cancel in between
+        # stops the run without any Hermes turn to interrupt. Cancel once the turn runs in Hermes.
+        await until("the turn in Hermes", _async(runtime.started.is_set))
         ok(
             await real.call("cancelRun", path={"run_id": first.run_id}, body={"reason": "test"}),
             202,
