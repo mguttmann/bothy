@@ -93,6 +93,14 @@ def client_sources(root: Path) -> list[Path]:
 def _imports(tree: ast.AST, rel: str) -> Iterator[Call]:
     """The generated operation modules a source imports, with the line of each import."""
     for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            # import bothy_sdk.generated.api.<tag>.<op> (an `import` of a tag module alone names
+            # no operation; its attribute uses are not followed).
+            for alias in node.names:
+                parts = alias.name.split(".")
+                if alias.name.startswith(GENERATED_PACKAGE + ".") and len(parts) > 4:
+                    yield Call(parts[3], ".".join(parts[4:]), f"{rel}:{node.lineno}")
+            continue
         if not isinstance(node, ast.ImportFrom) or node.module is None:
             continue
         module = node.module

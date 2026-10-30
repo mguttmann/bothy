@@ -102,3 +102,16 @@ def test_an_import_without_a_generated_module_is_found(tree: Path) -> None:
     assert found == [
         f"client-routes: module: {CLIENT}:2: runs.no_such_op is no generated operation"
     ]
+
+
+def test_a_plain_import_of_an_operation_is_found(tree: Path) -> None:
+    """`import bothy_sdk.generated.api.<tag>.<op>` is checked like a from-import."""
+    (tree / CLIENT).write_text(
+        "import bothy_sdk.generated.api.agent_runtime.get_agent_triggerers\n"
+    )
+    assert client_routes.check(tree) == []
+    _edit(tree / client_routes.ENABLE_LIST, "  - getAgentTriggerers\n", "")
+    assert client_routes.check(tree) == [
+        f"client-routes: enabled: {CLIENT}:1: getAgentTriggerers is not enabled in "
+        f"{client_routes.ENABLE_LIST}"
+    ]

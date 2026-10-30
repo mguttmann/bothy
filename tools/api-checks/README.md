@@ -161,7 +161,7 @@ and line schema is in the table of the README (`readme`), and 06-api.md links th
 `client_routes.py` holds the HTTP calls of the Python clients to the server: every generated
 operation module (`bothy_sdk.generated.api.<tag>.<operation>`) that the hand-written code of the
 Python SDK (`sdk/python/src/bothy_sdk` without `generated/`) or the code of a Python plugin under
-`plugins/` (without its tests) imports must be generated (`module`), have its method and path as
+`plugins/` (without its tests) imports, by `from ... import` or a plain `import`, must be generated (`module`), have its method and path as
 an operation of `openapi.yaml` whose `operationId` fits the module name (`openapi`), stand under
 `enabled` in `services/server/api/operations.yaml` (`enabled`) and be registered with that method
 and path in `services/server/api/routes/routes.gen.go` (`router`). A documented operation that the

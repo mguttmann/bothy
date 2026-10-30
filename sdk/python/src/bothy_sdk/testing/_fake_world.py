@@ -1061,8 +1061,8 @@ class World:
         A run whose trigger is no message (a command run) has no context: ``500 internal_error``
         as on the real server.
 
-        ``thread_context`` holds every other message of the thread, also the follow-ups after the
-        trigger, so an adapter finds a follow-up's content by its ``message_id``.
+        ``thread_context`` holds only the messages before the trigger, as on the real server
+        (09 4.6). A follow-up comes after the trigger, so an adapter reads it with ``getMessage``.
         """
         run = self.run_or_404(run_id)
         if run.trigger_kind != "message":
