@@ -331,8 +331,18 @@ final class RestFake {
         proofJkt: jkt,
         bytes: binary ? rawBytes : null,
       );
-      final fault = faults.take(op);
-      if (fault is AnswerFault) {
+      final wait = faults.limit(op);
+      final fault = wait == null ? faults.take(op) : null;
+      if (wait != null) {
+        // As the server: the seconds until one token is back, rounded up, at least 1.
+        response = _problem(
+          429,
+          'rate_limited',
+          retryAfter: wait < const Duration(seconds: 1)
+              ? const Duration(seconds: 1)
+              : wait,
+        );
+      } else if (fault is AnswerFault) {
         response = _problem(
           fault.status,
           fault.code,
@@ -502,7 +512,10 @@ final class RestFake {
       if (oneTimeSecrets.contains(r.operationId) && stored.status < 300) {
         throw const FakeProblem(409, 'conflict', reason: 'one_time_secret');
       }
-      return FakeResponse(stored.status, stored.body);
+      // As the server: a replay says so (06 7).
+      return FakeResponse(stored.status, stored.body, const {
+        'Idempotent-Replay': 'true',
+      });
     }
     FakeResponse response;
     try {

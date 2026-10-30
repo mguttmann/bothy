@@ -8,6 +8,12 @@ import 'package:dio/dio.dart';
 const _readMethods = {'GET', 'HEAD'};
 const _attemptExtra = 'api_client.read_attempt';
 
+/// The request option that keeps [ReadRetryInterceptor] out of one read: pass
+/// `{noReadRetryExtra: true}` as `extra` of a generated operation whose caller retries by
+/// itself, for example an outbox executor, so a refused read is not retried in two layers
+/// (FIX-upload-retry-storm: the status read of an upload is retried with its entry).
+const String noReadRetryExtra = 'api_client.no_read_retry';
+
 /// How reads are retried: a full-jitter backoff from the caller's configuration keys.
 ///
 /// The apps pass `client.outbox_retry_base` and `client.outbox_retry_cap` (docs/DECISIONS.md
@@ -96,7 +102,9 @@ class ReadRetryPolicy {
 }
 
 /// Retries `GET` and `HEAD` after a network error, a timeout, `429` or `503` (except
-/// `503 setup_required`, which is final), waiting `Retry-After` when the response has it.
+/// `503 setup_required`, which is final), waiting `Retry-After` plus the full-jitter backoff
+/// when the response has it, so reads refused together do not come back together, and the
+/// backoff alone otherwise. A request with [noReadRetryExtra] is never retried here.
 ///
 /// It sits last in the chain, so it sees the mapped [ApiProblem], and a retry runs through
 /// every interceptor again (a new span ID, a new DPoP proof from M4-09).
@@ -121,10 +129,14 @@ class ReadRetryInterceptor extends Interceptor {
       handler.next(err);
       return;
     }
-    final wait =
+    final retryAfter =
         ApiProblem.of(err)?.retryAfter ??
-        parseRetryAfter(err.response?.headers.value('retry-after')) ??
-        policy.backoff(attempt - 1);
+        parseRetryAfter(err.response?.headers.value('retry-after'));
+    final jitter = policy.backoff(attempt - 1);
+    // Retry-After is the floor (06 9 item 3); a date in the past counts as no wait.
+    final wait = retryAfter == null || retryAfter.isNegative
+        ? jitter
+        : retryAfter + jitter;
     await policy.sleep(wait);
     options.extra[_attemptExtra] = attempt + 1;
     try {
@@ -135,7 +147,8 @@ class ReadRetryInterceptor extends Interceptor {
   }
 
   static bool _retryable(DioException err) {
-    if (!_readMethods.contains(err.requestOptions.method.toUpperCase())) {
+    if (!_readMethods.contains(err.requestOptions.method.toUpperCase()) ||
+        err.requestOptions.extra[noReadRetryExtra] == true) {
       return false;
     }
     switch (err.type) {

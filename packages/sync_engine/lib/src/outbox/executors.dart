@@ -12,8 +12,12 @@ import 'package:local_store/local_store.dart';
 
 /// What the outbox hands an executor besides the entry.
 final class ApiCallContext {
-  /// Creates the context of one attempt.
-  const ApiCallContext({required this.idempotencyKey});
+  /// Creates the context of one attempt; [checkpoint] keeps values in the entry (the outbox
+  /// passes its own, the default keeps nothing).
+  const ApiCallContext({
+    required this.idempotencyKey,
+    this._checkpoint = _keepNothing,
+  });
 
   /// The entry's ID: the `client_msg_id` of a message, the `client_interaction_id` of an
   /// interaction and the `Idempotency-Key` of every other write (04 5). It never changes on
@@ -23,7 +27,21 @@ final class ApiCallContext {
   /// The request option of `api_client` that writes [idempotencyKey] as the header
   /// `Idempotency-Key` (06 7); pass it as `extra` to a generated operation.
   Map<String, dynamic> get extra => {idempotencyKeyExtra: idempotencyKey};
+
+  final OutboxCheckpoint _checkpoint;
+
+  /// Writes [values] into the payload of the entry being sent, member by member, so the next
+  /// attempt of the same entry reads them (FIX-upload-retry-storm: an upload keeps its
+  /// session, so a retry resumes it instead of announcing it again). A value of null removes
+  /// the member. An entry that left the outbox meanwhile (discarded, confirmed by its echo)
+  /// changes nothing.
+  Future<void> checkpoint(Map<String, Object?> values) => _checkpoint(values);
+
+  static Future<void> _keepNothing(Map<String, Object?> values) async {}
 }
+
+/// Keeps [values] in the payload of the entry of an attempt (see [ApiCallContext.checkpoint]).
+typedef OutboxCheckpoint = Future<void> Function(Map<String, Object?> values);
 
 /// What an executor returns for a `2xx`.
 final class OutboxResponse {
@@ -138,7 +156,8 @@ final class OutboxOperation {
 /// final executors = OutboxExecutors();
 /// MessageOps.register(executors, api);
 /// PersonalOps.register(executors, api);
-/// executors.register('upload', uploadExecutor, lane: (e) => 'upload:${e.id}');
+/// executors.register('setting', settingExecutor,
+///     lane: (e) => 'setting:${decodePayload(e.payload)['key']}');
 /// ```
 final class OutboxExecutors {
   final Map<String, OutboxOperation> _ops = {};

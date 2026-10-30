@@ -383,6 +383,35 @@ and one without that variant give the same `404`. Avatars of agents have no oper
 `openapi.yaml` yet, although the table names `agent.update` (spec gap). Rulings D-M3-10-1 to
 D-M3-10-23 in [docs/decisions.d/M3-10.md](../decisions.d/M3-10.md).
 
+### 3.8 One session per file and pacing on the client (addendum of 2026-10-30)
+
+All operations of 3.1 to 3.4 share the bucket `rl.upload` of the principal (section 13). A
+message with several files must finish within it, also when the server answers `429` for a
+while, so the client follows these rules (R-FI-12; docs/decisions.d/FIX-upload-retry-storm.md):
+
+1. **One session per file for its whole life.** The client announces a file once
+   (`createUpload` with the `Idempotency-Key` of its upload entry) and keeps the `file_id` of the
+   session with the entry. Every later attempt resumes that session: it reads the confirmed parts
+   (3.2 item 5), sends the missing ones and completes it; it never announces the file again. A
+   session announced in the same attempt has no confirmed part and needs no status read. Only a
+   final failure (for example `410 gone`, `part_conflict`) ends the session; "Upload again"
+   then starts a new entry with a new key and a new session.
+2. **One retry layer.** A refused request of an upload ends the attempt; the outbox retries the
+   entry ([04](04-sync-protocol.md) 13.2 item 4). The status read (`getUpload`) and the read of a
+   completed file (`getFile`) are not retried inside the attempt as well.
+3. **`Retry-After` is a floor.** The client waits at least `Retry-After` and adds the full-jitter
+   backoff of the attempt, so uploads refused together do not come back together.
+4. **One upload at a time per conversation.** The uploads of a channel go one after another, in
+   the order the files were attached (the parts of that upload may still go in parallel, 3.2
+   item 4); uploads of different channels run in parallel.
+5. **No status polling.** After `completeUpload` the client follows `file.updated` (section 2);
+   it never polls `getUpload` or `getFile` in a loop.
+6. **A visible state.** An upload that waits for its next attempt after a refusal shows "Paused,
+   trying again shortly", not a frozen percentage (15 14).
+
+The defaults of `ratelimit.rl.upload.*` (05 section 10) hold the requests of two batches of
+`message.max_attachments` files of one part each (announce, part, complete) in the burst.
+
 ## 4. Object storage
 
 ### 4.1 Port
@@ -1296,6 +1325,7 @@ signature names only in the audit log.
 | R-FI-09 | Agent invocation with attachments only after a final state, with a time limit. | Agents never see unchecked bytes; no blocking of the event stream. |
 | R-FI-10 | Transcript by the agent by default; a service only by owner configuration. | No additional processor without a decision by the owner. |
 | R-FI-11 | No deduplication (R-DM-13 confirmed). | No existence side channel, reliable deletion. |
+| R-FI-12 | One upload session per file for its whole life; a retry resumes it, waits at least `Retry-After` plus jitter, and the uploads of a conversation go one at a time (3.8, addendum of 2026-10-30). | Live report of 2026-10-30: four attachments hung for minutes because every retry announced the file again, the status read was retried in two layers, every upload woke at the exact `Retry-After` and all uploads ran at once against one bucket. |
 
 ## 17. Alignment with the core contract
 

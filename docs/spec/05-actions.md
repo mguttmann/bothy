@@ -888,7 +888,7 @@ Terminal channels ([24-terminal.md](24-terminal.md); [asyncapi.yaml](../api/asyn
 | `ratelimit.rl.message.per_minute` / `.burst` | `60` / `20` | per principal |
 | `ratelimit.rl.trigger.per_minute` / `.burst` | `30` / `10` | per principal |
 | `ratelimit.rl.interaction.per_minute` / `.burst` | `60` / `20` | per principal |
-| `ratelimit.rl.upload.per_minute` / `.burst` | `30` / `10` | per principal |
+| `ratelimit.rl.upload.per_minute` / `.burst` | `300` / `60` | per principal; the burst holds the requests of two batches of `message.max_attachments` files (announce, one part, complete: three per file of one part) (addendum of 2026-10-30) |
 | `ratelimit.rl.search.per_minute` / `.burst` | `60` / `20` | per principal |
 | `ratelimit.rl.typing.per_minute` / `.burst` | `30` / `5` | per connection |
 | `ratelimit.rl.admin.per_minute` / `.burst` | `60` / `20` | per principal |

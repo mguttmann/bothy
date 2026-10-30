@@ -60,9 +60,11 @@ able to mount them (Colima mounts only the home folder by default, so set `TMPDI
   per request; `Idempotency-Key` on `POST`, `PATCH`, `PUT` and `DELETE` from the request option
   `idempotencyKeyExtra`, never invented; `ResponseMeta.of` exposes `Correlation-Id`.
 - Read retry: only `GET` and `HEAD`, only after a network error, a timeout, `429` or `503`
-  (not `503 setup_required`), waiting `Retry-After` or a full-jitter backoff from
-  `ReadRetryPolicy.fromBackoff(base, cap)`, which the apps fill from `client.outbox_retry_base`
-  and `client.outbox_retry_cap`. Writes are retried by the outbox, never here.
+  (not `503 setup_required`), waiting `Retry-After` plus a full-jitter backoff, or the backoff
+  alone without the header, from `ReadRetryPolicy.fromBackoff(base, cap)`, which the apps fill
+  from `client.outbox_retry_base` and `client.outbox_retry_cap`. A read with the request option
+  `noReadRetryExtra` is never retried here (an outbox executor retries it with its entry). Writes
+  are retried by the outbox, never here.
 - Problems: every response error reaches the caller as a `DioException` carrying an
   `ApiProblem` (`ApiProblem.of(e)`) with `status`, `code` (or `http_<status>` without a problem
   body), `reason`, `hint`, `errors`, `current`, `correlationId` and `retryAfter`.

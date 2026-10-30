@@ -37,3 +37,30 @@ Duration fullJitterBackoff({
   if (bound <= 0) return Duration.zero;
   return Duration(microseconds: (random.nextDouble() * bound).floor());
 }
+
+/// The wait before retry number [retry] after a refusal that named [retryAfter]: the server's
+/// wait plus [fullJitterBackoff], or the backoff alone without one (04 13.2 item 4, addendum of
+/// 2026-10-30).
+///
+/// `Retry-After` is a floor, never the exact time: the server names the seconds until one
+/// token of the bucket is back (06 9 item 5), so every lane refused at once would come back
+/// at once and use up the bucket again. The jitter spreads them; its bound doubles with
+/// [retry], so a lane that keeps hitting the limit backs off further.
+///
+/// Example: `retryWait(retryAfter: Duration(seconds: 1), base: base, cap: cap, retry: 0,
+/// random: random)` lies in `[1 s, 1 s + base]`.
+Duration retryWait({
+  Duration? retryAfter,
+  required Duration base,
+  required Duration cap,
+  required int retry,
+  required Random random,
+}) {
+  final jitter = fullJitterBackoff(
+    base: base,
+    cap: cap,
+    retry: retry,
+    random: random,
+  );
+  return retryAfter == null ? jitter : retryAfter + jitter;
+}

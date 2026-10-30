@@ -284,12 +284,16 @@ class UploadHarness {
     this.folder,
   );
 
-  /// Starts the fake (parts of [partBytes]) and the outbox (started).
-  static Future<UploadHarness> start({int partBytes = 4}) async {
+  /// Starts the fake (parts of [partBytes]) and the outbox (started); [readRetry] is the read
+  /// retry of Alex's REST client (none by default).
+  static Future<UploadHarness> start({
+    int partBytes = 4,
+    ReadRetryPolicy? readRetry,
+  }) async {
     final server = await FakeServer.start();
     final seed = WorldSeed.standard(server.world);
     server.world.fileSettings.partBytes = partBytes;
-    final alex = OtherDevice(server);
+    final alex = OtherDevice(server, readRetry: readRetry);
     await alex.signIn();
     final db = openInMemoryForTests();
     final progress = UploadProgress();

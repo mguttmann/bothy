@@ -7258,6 +7258,10 @@
   "@fileStateWaiting": {
     "description": "State of an attachment whose upload has not started yet (offline, 15 7.5)."
   },
+  "fileStateRetrying": "Paused, trying again shortly",
+  "@fileStateRetrying": {
+    "description": "State of an attachment whose upload the server refused for the moment (rate limit, unavailable, no network) and that waits for its next attempt; it resumes by itself (FIX-upload-retry-storm)."
+  },
   "fileStateChecking": "Being checked",
   "@fileStateChecking": {
     "description": "State of a file after the upload while the server checks it (12 2)."

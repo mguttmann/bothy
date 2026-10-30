@@ -102,8 +102,11 @@ void main() {
       // Every part reached the server exactly once; the confirmed ones were not sent again.
       expect(stored.toSet(), {'1', '2', '3', '4', '5'});
       expect(stored, hasLength(5));
-      expect(h.server.requestsOf('getUpload'), hasLength(2));
-      expect(h.server.requestsOf('createUpload'), hasLength(2));
+      // The first attempt announced the session and needed no status read; the retry
+      // resumed the kept session with one status read and no new announcement
+      // (FIX-upload-retry-storm).
+      expect(h.server.requestsOf('getUpload'), hasLength(1));
+      expect(h.server.requestsOf('createUpload'), hasLength(1));
       expect(h.server.world.files, hasLength(1), reason: 'the same session');
       expect(
         h.server.world.files.values.single.json['upload_state'],

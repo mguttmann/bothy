@@ -288,7 +288,10 @@ final class OutboxSender {
       try {
         response = await op.send(
           entry,
-          ApiCallContext(idempotencyKey: entry.id),
+          ApiCallContext(
+            idempotencyKey: entry.id,
+            checkpoint: (values) => _checkpoint(entry.id, values),
+          ),
         );
         outcome = const Classification(OutcomeClass.confirmed);
       } on Object catch (error) {
@@ -325,14 +328,15 @@ final class OutboxSender {
         }
         await dependencies.removeEntry(stored.id, into: const []);
       case OutcomeClass.retry:
-        final wait =
-            outcome.retryAfter ??
-            fullJitterBackoff(
-              base: config.outboxRetryBase,
-              cap: config.outboxRetryCap,
-              retry: stored.attempts - 1,
-              random: random,
-            );
+        // Retry-After is the floor; the jitter on top keeps lanes refused together from
+        // returning together (addendum of 2026-10-30).
+        final wait = retryWait(
+          retryAfter: outcome.retryAfter,
+          base: config.outboxRetryBase,
+          cap: config.outboxRetryCap,
+          retry: stored.attempts - 1,
+          random: random,
+        );
         await dao.markState(
           stored.id,
           OutboxState.waiting,
@@ -355,6 +359,25 @@ final class OutboxSender {
         );
     }
   }
+
+  /// Writes [values] into the payload of the entry [id] while it is being sent (see
+  /// `ApiCallContext.checkpoint`); a null value removes the member. An entry that is gone or
+  /// final keeps what it has.
+  Future<void> _checkpoint(String id, Map<String, Object?> values) =>
+      lock.run(() async {
+        if (_closed) return;
+        final stored = await dao.byId(id);
+        if (stored == null || stored.state.isFinal) return;
+        final payload = decodePayload(stored.payload);
+        for (final MapEntry(:key, :value) in values.entries) {
+          if (value == null) {
+            payload.remove(key);
+          } else {
+            payload[key] = value;
+          }
+        }
+        await dao.updatePayload(id, jsonEncode(payload));
+      });
 
   /// Fills [result] into the members the dependents of [entry] hold as null (D-M4-15-6), for
   /// example the server's `message_id` of a follow-up edit. Runs inside the lock.

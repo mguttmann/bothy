@@ -4828,6 +4828,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get fileStateWaiting => 'Wartet auf das Hochladen';
 
   @override
+  String get fileStateRetrying => 'Pausiert, gleich neuer Versuch';
+
+  @override
   String get fileStateChecking => 'Wird geprüft';
 
   @override

@@ -235,7 +235,7 @@ Life cycle of an entry:
 
 - One worker per FIFO lane sends the oldest entry and the next only after the response (04 13.2
   item 2). The lane is the thread, or the lane the executor names for writes outside a thread
-  (`setting:<key>`, `message:<id>`, `upload:<id>`); lanes run in parallel, bounded only by the
+  (`setting:<key>`, `message:<id>`, the client's `upload:<channel id>`); lanes run in parallel, bounded only by the
   HTTP client's connection limit. An entry goes no later than the oldest entry that waits for
   it, also through other lanes, so a replacement at the end of a lane never waits behind its
   own dependent.
@@ -274,7 +274,7 @@ Error classes (`classify`, docs/DECISIONS.md D-M4-15-1):
 | Response | Class |
 |---|---|
 | `2xx`, `200` with `Idempotent-Replay: true`, `204` | confirmed |
-| network error (also a TLS error), timeout, `5xx` except `503 setup_required`, `429`, `409 request_in_progress` | retry with full jitter between `client.outbox_retry_base` and `client.outbox_retry_cap`; `429` and `503` wait `Retry-After` |
+| network error (also a TLS error), timeout, `5xx` except `503 setup_required`, `429`, `409 request_in_progress` | retry with full jitter between `client.outbox_retry_base` and `client.outbox_retry_cap`; `429` and `503` wait `Retry-After` plus that jitter (`retryWait`) |
 | `412 version_conflict` | conflict: `failed` with the `current` revision |
 | `400`, `401`, `403`, `404`, any other `409`, `410`, `413`, `415`, `422`, `428`, `503 setup_required` | final: `failed` with code and reason |
 | an error that is no transport error and no response (a bug in an executor) | final: `executor_error` |
@@ -282,7 +282,9 @@ Error classes (`classify`, docs/DECISIONS.md D-M4-15-1):
 
 How a feature registers a write: an executor sends one entry through the generated client and
 returns an `OutboxResponse` on `2xx`; it passes `ctx.extra` so `api_client` writes the
-`Idempotency-Key`.
+`Idempotency-Key`. `ctx.checkpoint(values)` keeps members in the entry's payload for its next
+attempt (the upload keeps its session, so a retry resumes it); a null value removes a member,
+and an entry that left the outbox meanwhile is not touched.
 
 ```dart
 executors.register(
@@ -292,7 +294,7 @@ executors.register(
     // ... call the generated API with extra: ctx.extra ...
     return const OutboxResponse();
   },
-  lane: (entry) => 'upload:${entry.id}', // null: the entry's thread
+  lane: (entry) => 'upload:${decodePayload(entry.payload)['channel_id']}', // null: the thread
 );
 ```
 
@@ -495,7 +497,7 @@ stays "being checked" and answers `409 file_not_ready` until `world.finishScan(i
 `createMessage` attaches `attachment_file_ids` by the rules of 12 10 (`409 conflict` with
 `file_not_attachable`). Other
 writes with `Idempotency-Key` repeat their
-stored answer (04 5.2). Later tickets add operations with `server.handle(operationId,
+stored answer with `Idempotent-Replay: true` (04 5.2, 06 7). Later tickets add operations with `server.handle(operationId,
 handler)` in their own `rest/` file (D-M4-17-2). Gateway: `hello`, `identify`, `resume`,
 `ready` with the snapshot, catch-up in pages with `cursor` frames, `catchup.complete`,
 `resync_required` for `epoch_changed`, `retention`, `too_far_behind` and `cursor_ahead`, live
@@ -568,6 +570,7 @@ answer the body stored in `world.stats` under their operation ID, else an empty 
 | Fault | Effect |
 |---|---|
 | `onRequest(op, status:, code:, retryAfter:, times:)` | answers `409`, `410`, `412`, `429` (with `Retry-After`), `5xx` or any problem instead of the handler |
+| `rateLimit(ops, burst:, refill:, now:)` | one token bucket over the operations `ops`, as one rate-limit class of one principal: without a token `429 rate_limited` with `Retry-After` in whole seconds, at least 1; `limited` counts the refusals |
 | `dropResponseAfterCommit(op)` | stores the write and appends its events, then closes the connection before the response (04 16.2) |
 | `delay(duration, operationId:)` | holds the response after the handler ran |
 | `closeGateway(code, reason:, after:)` | closes every gateway connection with any code |

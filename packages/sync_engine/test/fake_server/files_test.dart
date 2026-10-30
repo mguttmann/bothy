@@ -331,6 +331,32 @@ void main() {
       expect(h.server.objectStorePuts, hasLength(1));
     },
   );
+
+  test('the rate limit of a class answers 429 with Retry-After after its '
+      'burst, nothing stored (FIX-upload-retry-storm)', () async {
+    var now = DateTime.utc(2026, 10, 30, 2, 47);
+    h.server.faults.rateLimit(
+      {'createUpload', 'getUpload'},
+      burst: 2,
+      refill: const Duration(milliseconds: 2500),
+      now: () => now,
+    );
+    final bytes = utf8.encode('abcd');
+    final s = await session(bytes);
+    await files.getUpload(fileId: s.fileId);
+    final refused = await files
+        .getUpload(fileId: s.fileId)
+        .then<Object?>((_) => null, onError: (Object e) => e);
+    final p = ApiProblem.of(refused! as DioException)!;
+    expect(p.status, 429);
+    expect(p.code, 'rate_limited');
+    expect(p.retryAfter, const Duration(seconds: 3), reason: 'rounded up');
+    expect(h.server.faults.limited, {'getUpload': 1});
+    expect(world.files, hasLength(1));
+    now = now.add(const Duration(milliseconds: 2500));
+    await files.getUpload(fileId: s.fileId);
+    expect(h.server.violations, isEmpty);
+  });
 }
 
 /// A 1 by 1 PNG.

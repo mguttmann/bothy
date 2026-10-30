@@ -16,8 +16,9 @@ import 'software_keys.dart';
 
 /// Alex's other device.
 class OtherDevice {
-  /// Creates the device for [server].
-  OtherDevice(this.server) {
+  /// Creates the device for [server]; [readRetry] replaces the policy that never retries a
+  /// read.
+  OtherDevice(this.server, {ReadRetryPolicy? readRetry}) {
     final random = Random(3);
     auth = AuthSession(
       serverUrl: server.baseUri,
@@ -37,11 +38,13 @@ class OtherDevice {
       buildClient: (interceptors) => createApiClient(
         baseUrl: server.baseUri,
         traceContext: () => TraceContext(traceId: '2' * 32, sampled: false),
-        readRetry: ReadRetryPolicy(
-          base: Duration.zero,
-          cap: Duration.zero,
-          maxAttempts: 1,
-        ),
+        readRetry:
+            readRetry ??
+            ReadRetryPolicy(
+              base: Duration.zero,
+              cap: Duration.zero,
+              maxAttempts: 1,
+            ),
         authInterceptors: interceptors,
       ),
     );

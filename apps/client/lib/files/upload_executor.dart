@@ -4,11 +4,15 @@
 /// the attaching of its file to the message that waits for it.
 ///
 /// An upload entry carries the local path, name, size, SHA-256 and declared type. Its
-/// executor creates the session with `Idempotency-Key` = entry ID (a retry gets the same
-/// session), reads the parts `getUpload` confirmed, sends the others, at most two at a time,
-/// each with `Content-Digest` and read alone from disk, and completes the session. The entry
-/// is confirmed when `completeUpload` answered `200` (12 3.4), which releases the message;
-/// the file's states then follow `file.updated`.
+/// executor creates the session with `Idempotency-Key` = entry ID and keeps its file ID in the
+/// entry ([UploadOps.sessionMember]), so every later attempt resumes that session: it reads
+/// the parts `getUpload` confirmed (once, without the read retry of the client; the outbox
+/// retries the entry), sends the others, at most two at a time, each with `Content-Digest` and
+/// read alone from disk, and completes the session. A session announced in the same attempt
+/// needs no status read. The entry is confirmed when `completeUpload` answered `200` (12 3.4),
+/// which releases the message; the file's states then follow `file.updated`. The uploads of a
+/// channel share one lane ([UploadOps.laneOf]), so they go one at a time
+/// (FIX-upload-retry-storm, 12 3.8).
 library;
 
 import 'dart:async';
@@ -60,7 +64,8 @@ final class UploadProgress extends ChangeNotifier {
 
   void _begin(String key, int total) {
     _total[key] = total;
-    _confirmed[key] = 0;
+    // A retry keeps the bytes the last attempt confirmed until the server's state is read.
+    _confirmed.putIfAbsent(key, () => 0);
     notifyListeners();
   }
 
@@ -86,7 +91,7 @@ final class UploadProgress extends ChangeNotifier {
 ///
 /// | Kind | Payload | Lane |
 /// |---|---|---|
-/// | `upload` | `channel_id`, `path`, `name`, `size_bytes`, `sha256`, `declared_mime_type`, `attachment_key` | `upload:<entry id>` |
+/// | `upload` | `channel_id`, `path`, `name`, `size_bytes`, `sha256`, `declared_mime_type`, `attachment_key`; after the announcement `upload_session` | `upload:<channel id>` |
 ///
 /// A message with attachments names its uploads in `depends_on` and holds
 /// `attachment_keys` (the keys in their order), `attachment_preview` (name and size for the
@@ -98,6 +103,10 @@ final class UploadProgress extends ChangeNotifier {
 abstract final class UploadOps {
   /// The kind of an upload entry.
   static const String upload = 'upload';
+
+  /// The payload member of an upload entry that keeps its session for the next attempt:
+  /// `{"entry": <entry id>, "file_id": ..., "mode": ...}` (FIX-upload-retry-storm).
+  static const String sessionMember = 'upload_session';
 
   /// Parts in flight at the same time (12 3.2 item 4: the client chooses; D-M4-22-1).
   static const int parallelParts = 2;
@@ -135,6 +144,14 @@ abstract final class UploadOps {
     },
   );
 
+  /// The lane of the upload entry [e]: one per channel, so the files of a message (and of the
+  /// other messages of that conversation) upload one after another, in the order they were
+  /// attached, never in parallel against one bucket of `rl.upload` (FIX-upload-retry-storm).
+  /// The lane is not a thread's lane, so a long upload never holds the other writes of the
+  /// thread.
+  static String laneOf(OutboxEntry e) =>
+      'upload:${decodePayload(e.payload)['channel_id']}';
+
   /// Registers `upload` on [registry] with the REST client [api]; [progress] receives the
   /// confirmed bytes. Parts of a `presigned` session go to their URLs (resolved against
   /// [baseUrl]) through [objectStore], a client without the authentication of [api], because
@@ -150,7 +167,7 @@ abstract final class UploadOps {
     registry.register(
       upload,
       (e, ctx) => _send(api, store, baseUrl, progress, e, ctx),
-      lane: (e) => 'upload:${e.id}',
+      lane: laneOf,
     );
   }
 
@@ -169,7 +186,11 @@ abstract final class UploadOps {
     final local = File(path);
     final files = api.getFilesApi();
     progress._begin(key, size);
-    final session = (await files.createUpload(
+    // The status reads of an attempt are retried by the outbox with the entry, never inside
+    // the attempt as well (FIX-upload-retry-storm).
+    const once = {noReadRetryExtra: true};
+
+    Future<Response<UploadSession>> announce() => files.createUpload(
       channelId: p['channel_id']! as String,
       idempotencyKey: ctx.idempotencyKey,
       uploadCreate: UploadCreate(
@@ -179,14 +200,52 @@ abstract final class UploadOps {
           ..sha256 = p['sha256']! as String
           ..declaredMimeType = p['declared_mime_type'] as String?,
       ),
-    )).data!;
-    final fileId = session.fileId;
-    // 12 3.2 item 5: resume from what the server confirmed after an interruption.
-    final state = (await files.getUpload(fileId: fileId)).data!;
-    final etags = <int, String>{
-      for (final c in state.completedParts) c.partNumber: c.etag,
-    };
-    final plan = planParts(size, session.partSizeBytes);
+    );
+
+    // The session an earlier attempt of this entry kept: the retry resumes it and never
+    // announces the file again. It counts only for this entry, so "Upload again", which
+    // copies the payload into a new entry, starts a new session.
+    final kept = p[sessionMember];
+    UploadSession? session;
+    final String fileId;
+    final bool presigned;
+    final bool fresh;
+    if (kept is Map && kept['entry'] == e.id && kept['file_id'] is String) {
+      fileId = kept['file_id']! as String;
+      presigned = kept['mode'] == UploadSessionModeEnum.presigned.name;
+      fresh = false;
+    } else {
+      final created = await announce();
+      session = created.data!;
+      fileId = session.fileId;
+      presigned = session.mode == UploadSessionModeEnum.presigned;
+      // A replay of the key returns a session that may have parts already.
+      fresh = created.headers.value('idempotent-replay') != 'true';
+      await ctx.checkpoint({
+        sessionMember: {
+          'entry': e.id,
+          'file_id': fileId,
+          'mode': session.mode.name,
+        },
+      });
+    }
+    // 12 3.2 item 5: resume from what the server confirmed after an interruption. A session
+    // announced in this attempt has no part yet, so it needs no status read.
+    final int partSize;
+    final etags = <int, String>{};
+    final bool completed;
+    if (fresh) {
+      partSize = session!.partSizeBytes;
+      completed = false;
+    } else {
+      final state = (await files.getUpload(fileId: fileId, extra: once)).data!;
+      partSize = state.partSizeBytes;
+      for (final c in state.completedParts) {
+        etags[c.partNumber] = c.etag;
+      }
+      completed = state.uploadState == UploadStateUploadStateEnum.complete;
+    }
+    final plan = planParts(size, partSize);
     progress._session(
       key,
       fileId,
@@ -195,7 +254,7 @@ abstract final class UploadOps {
           if (etags.containsKey(part.number)) part.length,
       ].fold(0, (a, b) => a + b),
     );
-    if (state.uploadState != UploadStateUploadStateEnum.complete) {
+    if (!completed) {
       final todo = [
         for (final part in plan)
           if (!etags.containsKey(part.number)) part,
@@ -212,7 +271,12 @@ abstract final class UploadOps {
         // IOException, which the outbox would retry).
         throw _unreadable;
       }
-      final targets = {for (final t in session.parts) t.partNumber: t};
+      // The part URLs of a presigned session come only with the announcement; a resumed one
+      // reads them from the replay of the same key (12 3.3).
+      if (presigned && todo.isNotEmpty) session ??= (await announce()).data!;
+      final targets = {
+        for (final t in session?.parts ?? const <UploadPart>[]) t.partNumber: t,
+      };
       var next = 0;
       var stopped = false;
       Future<void> worker() async {
@@ -225,7 +289,7 @@ abstract final class UploadOps {
             throw _unreadable;
           }
           final digest = contentDigestOf(bytes);
-          etags[part.number] = session.mode == UploadSessionModeEnum.presigned
+          etags[part.number] = presigned
               ? await _putPresigned(
                   store,
                   baseUrl,
@@ -257,10 +321,10 @@ abstract final class UploadOps {
       ]);
     }
     final Response<wire.File> done;
-    if (state.uploadState == UploadStateUploadStateEnum.complete) {
+    if (completed) {
       // Completed already (an earlier attempt's answer was lost): the file as it is now. A
       // second completion would send other parts under the same key (422).
-      done = await files.getFile(fileId: fileId);
+      done = await files.getFile(fileId: fileId, extra: once);
     } else {
       final numbers = etags.keys.toList()..sort();
       done = await files.completeUpload(

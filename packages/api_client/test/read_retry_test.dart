@@ -56,7 +56,9 @@ void main() {
     ).dio.get<Object>('/instance');
 
     expect(response.statusCode, 200);
-    expect(clock.sleeps, [const Duration(seconds: 1)]);
+    // Retry-After is the floor; the full jitter of the first retry comes on top
+    // (FIX-upload-retry-storm).
+    expect(clock.sleeps.single.inMilliseconds, inInclusiveRange(1000, 1100));
     // Each attempt is a new request with its own span.
     expect(
       adapter.requests[0].options.headers['traceparent'],
@@ -77,8 +79,11 @@ void main() {
     await fakeClient(adapter, clock: clock).dio.get<Object>('/instance');
 
     expect(adapter.requests, hasLength(2));
-    // A date in the past means: no wait.
-    expect(clock.sleeps, [Duration.zero]);
+    // A date in the past means: no wait beyond the jitter.
+    expect(
+      clock.sleeps.single,
+      lessThanOrEqualTo(const Duration(milliseconds: 100)),
+    );
   });
 
   test('GET is not retried after 404', () async {
@@ -195,5 +200,52 @@ void main() {
         inInclusiveRange(0, min(100 * 1000 << n, 300 * 1000)),
       );
     }
+  });
+
+  test('a read that opts out is not retried, also after 429 '
+      '(FIX-upload-retry-storm)', () async {
+    final clock = FakeClock();
+    final adapter = FakeAdapter()
+      ..problem(
+        429,
+        problem(429, 'rate_limited'),
+        headers: {'Retry-After': '1'},
+      )
+      ..json(200, _instance);
+
+    await expectLater(
+      fakeClient(adapter, clock: clock).dio.get<Object>(
+        '/instance',
+        options: Options(extra: {noReadRetryExtra: true}),
+      ),
+      throwsA(
+        isA<DioException>().having(
+          (e) => e.response?.statusCode,
+          'status',
+          429,
+        ),
+      ),
+    );
+
+    expect(adapter.requests, hasLength(1));
+    expect(clock.sleeps, isEmpty);
+  });
+
+  test('reads refused together with the same Retry-After wait different '
+      'times (FIX-upload-retry-storm)', () async {
+    final waits = <Duration>{};
+    for (var i = 0; i < 5; i++) {
+      final clock = FakeClock();
+      final adapter = FakeAdapter()
+        ..problem(
+          429,
+          problem(429, 'rate_limited'),
+          headers: {'Retry-After': '1'},
+        )
+        ..json(200, _instance);
+      await fakeClient(adapter, clock: clock).dio.get<Object>('/instance');
+      waits.add(clock.sleeps.single);
+    }
+    expect(waits.length, greaterThan(1));
   });
 }

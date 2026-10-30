@@ -6,6 +6,7 @@
 library;
 
 import 'dart:async';
+import 'dart:math';
 
 /// What a REST fault does to one request.
 sealed class RequestFault {
@@ -80,6 +81,38 @@ abstract interface class GatewayFaultTarget {
   void releaseDispatches();
 }
 
+/// A token bucket over a set of operations, as the server's rate limiter keeps one per class
+/// and principal (02, 06 9): [burst] tokens at most, one more every [refill].
+final class _Bucket {
+  _Bucket(this.operationIds, this.burst, this.refill, this._now)
+    : _tokens = burst.toDouble(),
+      _at = _now();
+
+  final Set<String> operationIds;
+  final int burst;
+  final Duration refill;
+  final DateTime Function() _now;
+  double _tokens;
+  DateTime _at;
+
+  /// Takes a token, or returns the wait until one is there.
+  Duration? take() {
+    final now = _now();
+    _tokens = min(
+      burst.toDouble(),
+      _tokens + now.difference(_at).inMicroseconds / refill.inMicroseconds,
+    );
+    _at = now;
+    if (_tokens >= 1) {
+      _tokens -= 1;
+      return null;
+    }
+    return Duration(
+      microseconds: ((1 - _tokens) * refill.inMicroseconds).ceil(),
+    );
+  }
+}
+
 class _Rule {
   _Rule(this.fault, this.times);
 
@@ -108,6 +141,36 @@ final class FaultPlan {
   final GatewayFaultTarget _gateway;
   final List<_Rule> _rules = [];
   final List<Timer> _timers = [];
+  final List<_Bucket> _buckets = [];
+
+  /// Requests refused by [rateLimit], by operation.
+  final Map<String, int> limited = {};
+
+  /// Limits the requests of [operationIds] together with one token bucket of [burst] tokens
+  /// that gains one token every [refill], as one rate-limit class of the server does for one
+  /// principal (06 9). A request without a token is answered `429 rate_limited` with
+  /// `Retry-After` in whole seconds until the next token, at least `1`, like the server
+  /// (06 9 item 5); nothing is handled or stored. [now] replaces the clock.
+  void rateLimit(
+    Set<String> operationIds, {
+    required int burst,
+    required Duration refill,
+    DateTime Function()? now,
+  }) => _buckets.add(_Bucket(operationIds, burst, refill, now ?? DateTime.now));
+
+  /// The wait of a request of [operationId] that a [rateLimit] bucket refuses, or null when it
+  /// may pass (it took a token). The fake server calls this once per request, before [take].
+  Duration? limit(String operationId) {
+    for (final b in _buckets) {
+      if (!b.operationIds.contains(operationId)) continue;
+      final wait = b.take();
+      if (wait != null) {
+        limited.update(operationId, (n) => n + 1, ifAbsent: () => 1);
+        return wait;
+      }
+    }
+    return null;
+  }
 
   /// The REST rules that have not been used up, in order.
   List<RequestFault> get pending => [for (final r in _rules) r.fault];

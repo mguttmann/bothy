@@ -7765,6 +7765,12 @@ abstract class AppLocalizations {
   /// **'Waiting to upload'**
   String get fileStateWaiting;
 
+  /// State of an attachment whose upload the server refused for the moment (rate limit, unavailable, no network) and that waits for its next attempt; it resumes by itself (FIX-upload-retry-storm).
+  ///
+  /// In en, this message translates to:
+  /// **'Paused, trying again shortly'**
+  String get fileStateRetrying;
+
   /// State of a file after the upload while the server checks it (12 2).
   ///
   /// In en, this message translates to:

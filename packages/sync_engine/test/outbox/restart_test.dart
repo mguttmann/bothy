@@ -71,7 +71,8 @@ void main() {
       pending.id,
     ], reason: 'FIFO in thread A, stored IDs');
     expect(after.calls.first.idempotencyKey, sending.id);
-    await h.time.advance(const Duration(minutes: 1));
+    // Retry-After plus at most the first backoff bound (client.outbox_retry_base, 2 s).
+    await h.time.advance(const Duration(minutes: 1, seconds: 2));
     expect(after.ids, [
       sending.id,
       pending.id,
