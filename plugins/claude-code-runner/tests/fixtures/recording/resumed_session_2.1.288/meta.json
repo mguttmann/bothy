@@ -1,0 +1,9 @@
+{
+  "cli_version": "2.1.288",
+  "origin": "recorded 2026-10-30 (RUNNER-RESUME-COST): the pinned CLI against a local stand-in of the Messages API on loopback (fixed answer, 1200 input, 40 output, 500 cache read and 300 cache write tokens per request), its own CLAUDE_CONFIG_DIR, no credential and no model call; turn 1 with --session-id, turn 2 with --resume of the same session",
+  "files": {
+    "transcript.jsonl": "the session transcript after turn 1 (projects/<folder>/<session>.jsonl), reduced to its user, assistant, last-prompt and cost-state lines; the cost-state line is what turn 2 restored",
+    "stream_resumed.jsonl": "the stream-json output of turn 2 (--resume); the init message reduced to the fields the runner reads"
+  },
+  "note": "Paths replaced by /work; the session reference is invented. The result of the resumed turn counts modelUsage and total_cost_usd for the whole session (turn 1 plus turn 2), while its usage counts turn 2 only."
+}

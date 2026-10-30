@@ -236,18 +236,27 @@ level-one switch test holds them against the installed CLI.
 The runtime reports cumulative values per session (`result.modelUsage`), also across
 `--resume`. The runner keeps the last values of each session in
 `<runner.state_dir>/sessions/<ref>/usage.json` and reports per run only the difference
-(docs/spec/09-agents.md 18.7). A session bound with a cost baseline (an imported session or a
+(docs/spec/09-agents.md 18.7). On `--resume` the CLI restores the session's totals from the
+last `cost-state` line of its transcript (`<config dir>/projects/<folder>/<ref>.jsonl`, the config
+dir being `CLAUDE_CONFIG_DIR` of the turn or `$HOME/.claude`) and counts on from there. Before
+the first process of a run that resumes, the runner reads the same line and makes it the stored values
+(log event `session_totals_taken`), so a run books only its own turns, in amounts and in tokens:
+also the first run of a session taken over from an import or started outside the runner, and a
+run after the session was continued outside the runner. Without such a line the stored values
+stay as they are. A difference below zero is never booked (the counter-reset rule below). A
+session bound with a cost baseline (an imported session or a
 rebind, `AgentSession.cost_baseline_micros` with `currency`, docs/spec/22-import-migration.md 9
 step 7) already holds amounts the old environment booked. When the runner has no stored values
-for such a session, it keeps a remaining baseline in `usage.json` and subtracts it from the
+for such a session and the transcript has no `cost-state` line (the transcript's totals take
+precedence, they hold the same old amounts per model), it keeps a remaining baseline in `usage.json` and subtracts it from the
 amounts of the next runs, shared across the models in proportion to their amounts and never below
 zero per model, until it is used up; a reset of the runtime's counters (any value goes down)
 clears it. The rule applies in every session mode, not only `bind`: a first run after a binding
 that ended before its values were stored would otherwise book the old amount on the next
 `resume` (docs/decisions.d/M8-06.md). A baseline in another currency than US dollars is ignored
 with the warning `cost_baseline_currency_ignored` (no conversion). Tokens have no baseline in the
-data model, so the token counts of the first run after a binding can include the old session's
-tokens.
+data model, so only in that case the token counts of the first run after a binding can include
+the old session's tokens.
 
 ## Running
 

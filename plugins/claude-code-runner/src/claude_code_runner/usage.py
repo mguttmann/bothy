@@ -13,6 +13,13 @@ A session bound with a cost baseline (an import or a rebind, ``AgentSession.cost
 amounts of the next runs are reduced by it until it is used up, and a reset of the runtime's
 counters clears it. Tokens have no baseline (09 18.7).
 
+A resumed session restores its totals from the last ``cost-state`` line of its transcript
+(``<config dir>/projects/<folder>/<ref>.jsonl``, pinned CLI 2.1.288). Before the first process
+of a run that resumes, the runner reads the same line (`transcript_totals`) and makes it the stored
+values (`UsageStore.rebase`), so the run books only what its own turns added, in amounts and in
+tokens, also for a session started outside the runner or continued outside it since its last run
+(RUNNER-RESUME-COST).
+
 Examples:
     >>> to_micros(Decimal("0.0000025"))
     2
@@ -35,18 +42,22 @@ __all__ = [
     "ModelUsage",
     "SessionUsage",
     "UsageStore",
+    "claude_config_dir",
     "context_windows",
     "cost_reports",
     "counters_reset",
     "difference",
+    "find_transcript",
     "metrics_totals",
     "parse_model_usage",
     "subtract_baseline",
     "to_micros",
+    "transcript_totals",
 ]
 
 _FIELDS = ("inputTokens", "outputTokens", "cacheReadInputTokens", "cacheCreationInputTokens")
 _MICROS = Decimal(1_000_000)
+_COST_STATE = b'"cost-state"'
 
 
 @dataclass(frozen=True)
@@ -111,6 +122,82 @@ def parse_model_usage(result: Mapping[str, Any]) -> dict[str, ModelUsage]:
     if not isinstance(usage, Mapping):
         return {}
     return {str(m): _from_json(v) for m, v in usage.items() if isinstance(v, Mapping)}
+
+
+def claude_config_dir(env: Mapping[str, str]) -> Path | None:
+    """Return the CLI's configuration folder for a turn environment.
+
+    Args:
+        env: The environment of the turn (``CLAUDE_CONFIG_DIR`` of ``organization``, else
+            ``HOME``).
+
+    Returns:
+        ``CLAUDE_CONFIG_DIR``, else ``$HOME/.claude``; ``None`` without either.
+    """
+    if env.get("CLAUDE_CONFIG_DIR"):
+        return Path(env["CLAUDE_CONFIG_DIR"])
+    if env.get("HOME"):
+        return Path(env["HOME"]) / ".claude"
+    return None
+
+
+def find_transcript(config_dir: Path, ref: str) -> Path | None:
+    """Return the transcript of session ``ref`` under ``<config_dir>/projects``.
+
+    The CLI names the folder after the working directory; any folder counts, so a session moved
+    or started in another folder is found too. With several, the newest file wins.
+
+    Args:
+        config_dir: The CLI's configuration folder.
+        ref: The session reference.
+
+    Returns:
+        The path, or ``None`` when there is none (or ``ref`` is no plain file name).
+    """
+    if not ref or ref != Path(ref).name or ref.startswith("."):
+        return None
+    try:
+        folders = list((config_dir / "projects").iterdir())
+        found = [f / f"{ref}.jsonl" for f in folders if (f / f"{ref}.jsonl").is_file()]
+    except OSError:
+        return None
+    newest: tuple[int, Path] | None = None
+    for path in found:
+        try:
+            mtime = path.stat().st_mtime_ns
+        except OSError:  # removed after the listing
+            continue
+        if newest is None or mtime > newest[0]:
+            newest = (mtime, path)
+    return newest[1] if newest is not None else None
+
+
+def transcript_totals(path: Path) -> dict[str, ModelUsage] | None:
+    """Read the session totals a resume restores: the last valid ``cost-state`` line.
+
+    Args:
+        path: The session transcript (JSON lines).
+
+    Returns:
+        Its ``modelUsage`` per model, or ``None`` without a readable ``cost-state`` line.
+    """
+    totals: dict[str, ModelUsage] | None = None
+    try:
+        with path.open("rb") as fh:
+            for raw in fh:
+                if _COST_STATE not in raw:
+                    continue
+                try:
+                    line = json.loads(raw)
+                except ValueError:
+                    continue
+                if not isinstance(line, dict) or line.get("type") != "cost-state":
+                    continue
+                if isinstance(line.get("modelUsage"), Mapping):
+                    totals = parse_model_usage(line)
+    except OSError:
+        return None
+    return totals
 
 
 def context_windows(result: Mapping[str, Any]) -> dict[str, int]:
@@ -383,6 +470,26 @@ class UsageStore:
         }
         if baseline_remaining is not None:
             doc["baseline_remaining_micros"] = baseline_remaining
+        ensure_private_dir(self.path.parent)
+        write_private(self.path, json.dumps(doc, sort_keys=True), atomic=True)
+
+    def rebase(self, totals: Mapping[str, ModelUsage]) -> None:
+        """Make ``totals`` the stored values: the session's sums before a resumed turn.
+
+        The remaining baseline ends (the old amounts are in ``totals``); the context windows and
+        a pending record stay.
+
+        Args:
+            totals: The values per model the runtime restores (`transcript_totals`).
+        """
+        state = self.load()
+        doc: dict[str, Any] = {
+            "values": {m: u.to_json() for m, u in sorted(totals.items())},
+            "context_windows": dict(sorted(state.context_windows.items())),
+            "baseline_remaining_micros": 0,
+        }
+        if state.pending_run is not None:
+            doc["pending"] = {"run_id": state.pending_run, "reports": state.pending}
         ensure_private_dir(self.path.parent)
         write_private(self.path, json.dumps(doc, sort_keys=True), atomic=True)
 
