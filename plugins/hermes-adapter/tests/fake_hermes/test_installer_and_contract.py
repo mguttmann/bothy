@@ -12,6 +12,7 @@ from __future__ import annotations
 import ast
 import json
 import re
+import shutil
 import subprocess
 import tomllib
 from typing import Any
@@ -27,12 +28,18 @@ from fake_hermes_kit import (
     _start_gateway,
     gateway_log,
     hermes_rig,
+    new_environment,
+    source_path,
 )
 from hermes_harness.fake_model import ScriptTurn
 from hermes_modules import HERMES_TOP_LEVEL
 
 from bothy_hermes_adapter.hermes_commands import COMMAND_CLASSES
-from bothy_hermes_adapter.installer import CONTROL_SENDER
+from bothy_hermes_adapter.installer import (
+    ADAPTER_LOADABLE,
+    ADAPTER_NOT_LOADABLE,
+    CONTROL_SENDER,
+)
 from bothy_hermes_adapter.tool_class import TOOLSET_CLASSES
 
 pytestmark = pytest.mark.anyio
@@ -314,3 +321,48 @@ async def test_installer_refuses_a_login_file_for_organization(world: HermesWorl
         result = rig.installer("switch-mode", "organization", "--profile-home", str(rig.home))
         assert result.returncode == 2
         assert "login file" in result.stderr
+
+
+async def test_install_survives_a_new_hermes_environment(world: HermesWorld) -> None:
+    """HERMES-INSTALL-DURABLE: install, Hermes replaces the environment, the gateway starts.
+
+    The install runs in an environment with the adapter's ``.pth`` file and ``attrs`` (as an
+    operator's did); then the environment loses both, as a new one of Hermes would. The gateway
+    still loads the adapter from the plugin directory and serves a turn, and ``check`` tells a
+    loadable adapter from one whose package is gone.
+    """
+    ask, answer = "Is the adapter still there?", "Still here."
+    script = [ScriptTurn(text=(answer,), paced=False)]
+    async with hermes_rig(world, script, texts=[ask, answer], start=False) as rig:
+        plugin = rig.home / "plugins" / "bothy"
+        manifest = json.loads((plugin / "packages.json").read_text(encoding="utf-8"))
+        assert manifest["last"] == {"attr": "vendor/attr", "attrs": "vendor/attrs"}
+        # The installing Python found attrs and the source trees through its environment.
+        attrs_dir = rig.homes.root / "attrs-for-check"
+        for name in ("attr", "attrs"):
+            shutil.copytree(plugin / "vendor" / name, attrs_dir / name)
+        with new_environment(world):
+            # The operator's commands now need the source trees and attrs on PYTHONPATH.
+            rig.env["PYTHONPATH"] = source_path(attrs_dir)
+            try:
+                checked = rig.installer("check", "--profile-home", str(rig.home))
+            finally:
+                del rig.env["PYTHONPATH"]
+            assert checked.returncode == 0, checked.stdout + checked.stderr
+            assert ADAPTER_LOADABLE in checked.stdout.splitlines()
+            await _start_gateway(rig)
+            triggered = await rig.fake.trigger(ask, session_mode="new")
+            await rig.until(lambda: rig.finished(triggered.run_id), "the end of the run")
+            assert rig.fake.run_state(triggered.run_id).state == "completed", gateway_log(rig)
+            assert [m["content_md"] for m in rig.fake.messages] == [answer]
+            # A package of the plugin directory is gone: check names it and exits with 1.
+            shutil.rmtree(plugin / "vendor" / "attrs")
+            rig.env["PYTHONPATH"] = source_path(attrs_dir)
+            try:
+                broken = rig.installer("check", "--profile-home", str(rig.home))
+            finally:
+                del rig.env["PYTHONPATH"]
+            assert broken.returncode == 1, broken.stdout + broken.stderr
+            line = next(x for x in broken.stdout.splitlines() if x.startswith(ADAPTER_NOT_LOADABLE))
+            assert "package attrs is missing" in line
+            assert str(rig.home) not in broken.stdout

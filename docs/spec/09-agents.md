@@ -2209,6 +2209,20 @@ compatibility test runs against the pinned and the newest version (16.1, fake He
   credential resolution of 17.8). Every other module depends on a runtime protocol that the
   platform module implements and unit tests fake. Reason: testable without Hermes, small coupling
   surface.
+- Durable install: Hermes replaces the Python environment of a profile on many of its commands
+  (from `v0.22` a new environment per command, the old one is collected), so the installer puts
+  nothing into an environment. The plugin folder `<profile home>/plugins/<platform key>`, which
+  Hermes' own discovery of directory plugins reads at every start, is self-contained:
+  `packages.json` names the directory of each package the plugin needs, a package that lay inside
+  the installing environment and the SDK's dependency `attrs` (the only one Hermes does not ship)
+  are copied into the folder, and the plugin entry serves exactly those import names, the
+  adapter's own before the environment and `attrs` only when the environment lacks it. A missing
+  package stops the plugin at the gateway's start with an error in the gateway log that names the
+  package and the fix (run `install` again); the installer's `check` reports the same state
+  (`adapter: loadable` or `adapter: not loadable: <reasons>`, exit status `1`). Hermes' entry
+  points and its plugin dependency builds (`python_dependencies`) are not used: an entry point
+  lives in the environment, and a dependency build needs Hermes' own admission and an index for
+  packages that are not published before M7.
 - Configuration through the platform configuration (`PlatformConfig.extra`, `env_enablement_fn`,
   `apply_yaml_config_fn`), never through `os.getenv`. The installer writes the adapter's keys
   (section 21, place "Hermes adapter") flat with their full names into `PlatformConfig.extra` of

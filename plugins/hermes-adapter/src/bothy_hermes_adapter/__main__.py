@@ -13,15 +13,25 @@ Examples:
 from __future__ import annotations
 
 import argparse
+import importlib.util
+import shutil
 import sys
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 from uuid import UUID
 
-from bothy_hermes_adapter.installer import InstallError, InstallRequest, check, install, switch_mode
+from bothy_hermes_adapter.installer import (
+    InstallError,
+    InstallRequest,
+    check,
+    install,
+    loadable,
+    locate_packages,
+    switch_mode,
+)
 
-__all__ = ["build_parser", "main"]
+__all__ = ["build_parser", "copy_package", "locate", "main", "place_file"]
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -94,9 +104,26 @@ class _Bridge:
         return tuple(self._hc.OAUTH_VARIABLES)
 
 
-def _place(path: Path, text: str) -> None:
+def place_file(path: Path, text: str) -> None:
+    """Write one file of the plugin entry, creating its directory."""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
+
+
+def copy_package(source: Path, target: Path) -> None:
+    """Replace ``target`` with a copy of the package directory ``source`` (no byte code)."""
+    if target.exists():
+        shutil.rmtree(target)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(source, target, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+
+
+def locate(name: str) -> Path | None:
+    """The directory of an import package in this Python, or ``None``."""
+    spec = importlib.util.find_spec(name)
+    if spec is None or not spec.submodule_search_locations:
+        return None
+    return Path(next(iter(spec.submodule_search_locations)))
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -106,7 +133,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         argv: The arguments (default ``sys.argv[1:]``).
 
     Returns:
-        ``0`` on success, ``2`` on a refusal.
+        ``0`` on success, ``1`` when ``check`` finds an adapter the gateway cannot load,
+        ``2`` on a refusal.
     """
     args = build_parser().parse_args(argv)
     home = args.profile_home.resolve()
@@ -131,7 +159,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 report_channel=args.report_channel,
                 report_thread=args.report_thread,
             )
-            lines = install(bridge, request, _place)
+            packages = locate_packages(locate, Path(sys.prefix))
+            lines = install(bridge, request, place_file, packages, copy_package)
         elif args.command == "switch-mode":
             lines = switch_mode(bridge, args.mode, args.credential_holder)
         else:
@@ -140,7 +169,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         sys.stderr.write(f"refused: {exc}\n")
         return 2
     sys.stdout.write("\n".join(lines) + "\n")
-    return 0
+    return 0 if loadable(lines) else 1
 
 
 if __name__ == "__main__":

@@ -284,6 +284,40 @@ def _add_adapter(install: HermesInstall, root: Path) -> tuple[Path, Path]:
     return rc, coverage_dir
 
 
+#: What the harness added to the Hermes environment for the adapter, besides coverage: the
+#: source trees' ``.pth`` file and ``attrs`` (the way an operator installed before
+#: HERMES-INSTALL-DURABLE).
+_ADAPTER_ADDITIONS = ("bothy_sources.pth", "attr", "attrs", "attrs-*.dist-info")
+
+
+@contextlib.contextmanager
+def new_environment(world: HermesWorld) -> Iterator[None]:
+    """Hermes replaced the profile's environment: the adapter's additions are gone until exit.
+
+    Hermes creates a new environment on many of its commands; the new one has nothing the
+    operator put into the old one. The additions move to a holding directory and back, so the
+    integrity snapshot of the environment holds after the test.
+    """
+    site = _site_packages(world.install.venv)
+    held = world.root / "held-additions"
+    held.mkdir()
+    moved = [path for pattern in _ADAPTER_ADDITIONS for path in sorted(site.glob(pattern))]
+    try:
+        for path in moved:
+            shutil.move(str(path), str(held / path.name))
+        yield
+    finally:
+        for path in moved:
+            if (held / path.name).exists():
+                shutil.move(str(held / path.name), str(path))
+        shutil.rmtree(held, ignore_errors=True)
+
+
+def source_path(*extra: Path) -> str:
+    """``PYTHONPATH`` with the two source trees (and ``extra``) for a Python without the .pth."""
+    return ":".join(str(p) for p in (SDK_SRC, ADAPTER_SRC, *extra))
+
+
 def provision_world(request: pytest.FixtureRequest) -> Iterator[HermesWorld]:
     """Provision the pinned version once and add the adapter (fails without network)."""
     version = request.config.getoption("--hermes-version")

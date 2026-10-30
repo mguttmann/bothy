@@ -4,7 +4,8 @@ Reference of the Hermes adapter `bothy_hermes_adapter` (docs/spec/09-agents.md s
 `make docs` renders it from the google docstrings of the source with mkdocstrings. Installation,
 configuration, the billing-mode switch and how to run the tests are in
 [plugins/hermes-adapter/README.md](../../plugins/hermes-adapter/README.md); the rulings are
-`D-M2-33-*`, `D-HERMES-COMPAT-*` and `D-HERMES-MEDIA-*` in the decision log.
+`D-M2-33-*`, `D-HERMES-COMPAT-*`, `D-HERMES-MEDIA-*` and `D-HERMES-INSTALL-DURABLE-*` in the
+decision log.
 
 ## Layers
 
@@ -26,7 +27,7 @@ the runtime, and the Fake-Hermes tests run the pinned Hermes in a subprocess.
 | `store` | Resolved callbacks and open cards. |
 | `heartbeat` | The heartbeat with the Hermes report. |
 | `handler` | The runtime side of the SDK loop. |
-| `installer` | Install into a profile and switch the billing mode. |
+| `installer` | Install into a profile as a self-contained plugin directory, check that the gateway can load it, switch the billing mode. |
 | `entry` | The plugin's `register(ctx)`; imports neither Hermes nor the SDK when Hermes loads it. |
 | `defaults` | Defaults of the configuration keys. |
 
