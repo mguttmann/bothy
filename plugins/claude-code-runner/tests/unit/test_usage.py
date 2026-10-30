@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import json
+import os
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
@@ -12,15 +14,24 @@ from bothy_sdk.generated.models import CostReport
 from claude_code_runner.usage import (
     ModelUsage,
     UsageStore,
+    claude_config_dir,
     context_windows,
     cost_reports,
     counters_reset,
     difference,
+    find_transcript,
     metrics_totals,
     parse_model_usage,
     subtract_baseline,
     to_micros,
+    transcript_totals,
 )
+
+# The pinned CLI's transcript of a session and the stream of its resumed turn (RUNNER-RESUME-COST).
+RECORDED = (
+    Path(__file__).resolve().parents[1] / "fixtures" / "recording" / "resumed_session_2.1.288"
+)
+RECORDED_REF = "0192d3a0-0000-4000-8000-0000000000b2"
 
 
 def result(models: dict[str, tuple[int, int, int, int, float]]) -> dict[str, Any]:
@@ -155,3 +166,94 @@ def test_store_keeps_the_remaining_baseline(tmp_path: Path) -> None:
     assert store.load().baseline_remaining == 1234
     store.record("run-2", current, [], {})
     assert store.load().baseline_remaining is None
+
+
+# ---- RUNNER-RESUME-COST: the session totals before a resumed turn (09 18.7) -------------------
+
+
+def _recorded_result() -> dict[str, Any]:
+    lines = (RECORDED / "stream_resumed.jsonl").read_text().splitlines()
+    return next(m for m in map(json.loads, lines) if m.get("type") == "result")
+
+
+def test_recorded_transcript_totals_are_what_the_resumed_turn_restored() -> None:
+    before = transcript_totals(RECORDED / "transcript.jsonl")
+    assert before == {"claude-sonnet-4-5": ModelUsage(1200, 40, 500, 300, Decimal("0.005475"))}
+    # The resumed turn's result counts the whole session; the delta is its own turn only.
+    current = parse_model_usage(_recorded_result())
+    assert current["claude-sonnet-4-5"].cost_usd == Decimal("0.01095")
+    diff = difference(before, current)
+    assert diff == {"claude-sonnet-4-5": ModelUsage(1200, 40, 500, 300, Decimal("0.005475"))}
+    assert metrics_totals(diff)["tokens_in"] == _recorded_result()["usage"]["input_tokens"]
+
+
+def test_transcript_totals_last_cost_state_wins_and_bad_lines_are_skipped(tmp_path: Path) -> None:
+    def state(cost: float, tokens: int) -> str:
+        usage = {
+            "m": {
+                "inputTokens": tokens,
+                "outputTokens": 1,
+                "cacheReadInputTokens": 0,
+                "cacheCreationInputTokens": 0,
+                "costUSD": cost,
+            }
+        }
+        return json.dumps({"type": "cost-state", "sessionId": "s", "modelUsage": usage})
+
+    path = tmp_path / "s.jsonl"
+    path.write_text(
+        "\n".join(
+            [
+                state(0.5, 10),
+                '{"type":"user","message":{"content":"x"}}',
+                state(1.25, 20),
+                '{"type":"cost-state","modelUsage":"not a mapping"}',
+                '{"type":"cost-state", torn',
+                "",
+            ]
+        )
+    )
+    assert transcript_totals(path) == {"m": ModelUsage(20, 1, 0, 0, Decimal("1.25"))}
+
+
+def test_transcript_totals_none_without_cost_state_or_file(tmp_path: Path) -> None:
+    plain = tmp_path / "plain.jsonl"
+    plain.write_text('{"type":"user","message":{"content":"x"}}\n')
+    assert transcript_totals(plain) is None
+    assert transcript_totals(tmp_path / "missing.jsonl") is None
+
+
+def test_claude_config_dir_follows_the_turn_environment(tmp_path: Path) -> None:
+    assert claude_config_dir({"CLAUDE_CONFIG_DIR": str(tmp_path / "c"), "HOME": "/h"}) == (
+        tmp_path / "c"
+    )
+    assert claude_config_dir({"HOME": str(tmp_path)}) == tmp_path / ".claude"
+    assert claude_config_dir({}) is None
+
+
+def test_find_transcript_in_any_project_folder(tmp_path: Path) -> None:
+    ref = RECORDED_REF
+    assert find_transcript(tmp_path, ref) is None
+    older = tmp_path / "projects" / "-old-folder" / f"{ref}.jsonl"
+    newer = tmp_path / "projects" / "-work" / f"{ref}.jsonl"
+    for path in (older, newer):
+        path.parent.mkdir(parents=True)
+        path.write_text("")
+    os.utime(older, (1, 1))
+    assert find_transcript(tmp_path, ref) == newer
+    assert find_transcript(tmp_path, "../x") is None
+    assert find_transcript(tmp_path, "*") is None  # a name, never a pattern
+
+
+def test_store_rebase_replaces_values_and_ends_the_baseline(tmp_path: Path) -> None:
+    store = UsageStore(tmp_path)
+    old = parse_model_usage(result({"m": (10, 1, 0, 0, 0.01), "gone": (5, 1, 0, 0, 0.002)}))
+    report = CostReport(provider="anthropic", model="m", currency="USD", amount_micros=1)
+    store.record("run-1", old, [report], {"m": 1000}, baseline_remaining=7000)
+    totals = {"m": ModelUsage(50, 2, 0, 0, Decimal("0.05"))}
+    store.rebase(totals)
+    state = store.load()
+    assert state.values == totals
+    assert state.baseline_remaining == 0
+    assert state.context_windows == {"m": 1000}
+    assert store.pending_for("run-1") == [report]

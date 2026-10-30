@@ -797,7 +797,9 @@ since its last report (18.7). The session object of `agent.invocation` and every
 carry `cost_baseline_micros` and `currency` when the baseline is above 0 (an imported session,
 [22-import-migration.md](22-import-migration.md) section 9 step 7, or a rebind, 9.4): such an adapter
 books per run only the part above the last known state, which after a binding starts at the
-baseline, so the first run never books the old session's amount again (RK-75, M8-06). Only `run.finish` books:
+baseline, or at the session totals the runtime itself keeps where it can read them (the Claude
+Code runner, 18.7), so the first run never books the old session's amount again (RK-75, M8-06,
+RUNNER-RESUME-COST). Only `run.finish` books:
 a run the server ends gets no entry, and a repeated `run.finish` with the same end state books
 nothing (10 section 12.1).
 
@@ -2794,8 +2796,22 @@ repeated `run.finish` of the same run sends the stored reports and a delta is re
 once (D-M2-34-11). The amounts are estimates of the CLI ("client-side estimates", [verified]); the
 server marks them as an estimate.
 
-Baseline (4.10, M8-06): when the session of a run carries `cost_baseline_micros` above 0 and the
-runner has no stored values for it (an imported session or a rebind that the runner never ran),
+Session totals before a resume (RUNNER-RESUME-COST): the pinned CLI restores the cumulative values
+of a resumed session from the last `cost-state` line of the session's transcript
+(`<config dir>/projects/<folder>/<session>.jsonl`; the config dir is `CLAUDE_CONFIG_DIR` of the
+turn, else `$HOME/.claude`; any folder counts, the newest file wins) and counts on from them
+([verified] against 2.1.288: recording `tests/fixtures/recording/resumed_session_2.1.288` of the
+runner). Before the first process of a run that resumes, the runner reads that line and stores
+its values per model as the session's values in `usage.json` (written atomically, the remaining
+baseline set to zero). The run then books only what its own processes added, in amounts and in
+tokens, also for a session the runner never saw (a takeover of an import, a session started
+outside the runner) and for one continued outside the runner since its last run. Without such a
+line the stored values and the baseline below stay as they are. No difference is ever booked
+below zero (the reset rule above).
+
+Baseline (4.10, M8-06): when the session of a run carries `cost_baseline_micros` above 0, the
+runner has no stored values for it (an imported session or a rebind that the runner never ran)
+and the transcript gave no session totals,
 the stored values per model start at zero as for a new session, and the runner additionally keeps
 a remaining baseline equal to `cost_baseline_micros` in `usage.json`. After computing a run's
 amount differences per model, it subtracts the remaining baseline from their sum, shared across the
@@ -2808,9 +2824,9 @@ sums. A baseline in another currency than `USD` is ignored with a warning line i
 (`session_missing`, 18.9) starts without one (the runner marks it in its `usage.json` before the
 new reference is reported, since the server keeps the row's baseline when the reference changes),
 and the turn record carries the baseline, so an
-adopted run (18.9 crash) applies it like its own runner would. Limitation: 03 stores no token baseline, so the token counts of the first runs
-after a binding can include the old session's tokens; only the amounts, which RK-75 is about,
-start at the baseline.
+adopted run (18.9 crash) applies it like its own runner would. Limitation: 03 stores no token baseline, so without session totals from the
+transcript the token counts of the first runs after a binding can include the old session's
+tokens; only the amounts, which RK-75 is about, start at the baseline.
 
 ### 18.8 Done
 

@@ -553,7 +553,10 @@ without blocking in the error case.
    required when the baseline is above 0). The bound session carries both to the adapter in the
    session object of `agent.invocation` (`AgentSession`, present when the baseline is above 0), and
    an adapter that reports differences of session sums starts from it
-   ([09-agents.md](09-agents.md) 4.10 and 18.7).
+   ([09-agents.md](09-agents.md) 4.10 and 18.7). The Claude Code runner reads the session's
+   totals from the session transcript before the first resumed turn and starts from those, per
+   model and also for tokens; for it the baseline in the file is a fallback for a transcript
+   without them and may be left out (RUNNER-RESUME-COST).
 
 Who may bind is governed by `agent.invoke`: the binding arises only from a permitted trigger
 (level `trigger`, I2).

@@ -49,6 +49,9 @@ READ_TOKENS = (
     "total_tokens",
     "tool_uses",
     "duration_ms",
+    # RUNNER-RESUME-COST: the transcript line a resume restores the session totals from.
+    "cost-state",
+    "totalCostUSD",
 )
 _WRAPPER_MAX_BYTES = 1 << 20  # a launcher script, not the program; read its package instead
 
