@@ -128,6 +128,7 @@ DsRunData runFromDocument(
     billingHolderName: mode == BillingMode.personal ? holderName : null,
     statusLine: doc.statusLine,
     lastTextExcerpt: doc.lastTextExcerpt,
+    reasonDetail: _ended(state) ? doc.summary : null,
     steps: steps,
     toolCount: steps.where((s) => s.kind == DsStepKind.toolCall).length,
     subagentCount: steps.where((s) => s.kind == DsStepKind.subagent).length,
@@ -154,10 +155,13 @@ DsRunData runFromSummary(
   String? cancelledByName,
 }) {
   final mode = run.billingModeUsed ?? run.billingModeExpected;
+  final state = DsRunState.fromCode(run.state.code);
+  // RUNNER-NO-GIT: the summary of a failed or cancelled run is the cause of its reason.
+  final cause = _ended(state) ? run.summary : null;
   return DsRunData(
     id: run.id.value,
     agentName: agentName,
-    state: DsRunState.fromCode(run.state.code),
+    state: state,
     stateReason: run.stateReason,
     cancelledByName: cancelledByName,
     elapsed: runElapsed(
@@ -170,7 +174,8 @@ DsRunData runFromSummary(
     cost: costOf(run.cost, mode),
     billingMode: DsBillingMode.fromCode(mode.code),
     statusLine: run.statusLine,
-    lastTextExcerpt: run.summary,
+    lastTextExcerpt: cause == null ? run.summary : null,
+    reasonDetail: cause,
     toolCount: steps?.tools ?? run.stepCount,
     subagentCount: steps?.subagents ?? 0,
   );
@@ -189,3 +194,7 @@ DsRunData runFromSummary(
   doc.stepsInOrder.forEach(walk);
   return (tools: tools, subagents: subagents);
 }
+
+/// Whether [state] ended with a reason whose cause the adapter may name in its summary.
+bool _ended(DsRunState state) =>
+    state == DsRunState.failed || state == DsRunState.cancelled;

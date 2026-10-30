@@ -66,6 +66,8 @@ async def test_session_lock_wait_exceeded(world: World) -> None:
     second = await world.fake.trigger("Two", thread_id=first.thread_id)
     assert await world.ended(second.run_id) == "failed"
     assert world.fake.run_state(second.run_id).state_reason == "adapter_error"
+    (finish,) = [r.json for r in world.requests("finishRun") if str(second.run_id) in r.path]
+    assert "`session_busy`" in finish["summary"]
     world.release(gate)
     assert await world.ended(first.run_id) == "completed"
     assert len(world.turns()) == 1

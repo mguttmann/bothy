@@ -978,6 +978,7 @@ Rules of `patchRun` and the gateway op `run.update` (both call the same use case
 | Follow-ups | `followups` with state | yes | no |
 | Stall | `stall_warned_at` set | notice "no movement since ..." | no |
 | Summary | `summary` of the adapter (optional) | no | yes |
+| Cause | `summary` of a `failed` or `cancelled` run, under the reason (addendum of 2026-10-30, R-AG-35) | no | yes, after the reason |
 
 The box has a button "Graph" that opens the run graph of 5.6 (01 D14, M12); addendum of
 2026-10-24 (run visualization).
@@ -2487,9 +2488,12 @@ name. Reason: fail closed; a too high report only blocks starts whose token carr
   folder of every turn (D-M2-34-5).
 - Readiness: the runner reports `ready` per bound forum in the heartbeat member
   `project_readiness` (`channel_id`, `ready`; section 4.8): the reference resolves, the target is
-  a folder, `.git` exists in it (a folder or a file, so linked work trees count) and the runner
-  user may read, write and search it. A forum that is not ready carries a log code of the runner:
-  `outside_root`, `workspace_missing`, `not_a_git_worktree` or `not_writable`, or one of the creation codes of 18.12; it sends that code
+  a folder and the runner user may read, write and search it. Git is optional (addendum of
+  2026-10-30, R-AG-35): a folder without `.git` is as ready as a Git work tree, because the
+  runner itself uses no Git feature in a turn (no worktree per post, no branch name, no diff or
+  commit report, R-AG-28); what Claude Code does with Git inside the folder is its own. A forum
+  that is not ready carries a log code of the runner: `outside_root`, `workspace_missing` or
+  `not_writable`, or one of the creation codes of 18.12; it sends that code
 as `reason` with the entry (M4-43). The runner
   computes readiness at start, after every change of its channel cache and before every
   heartbeat, and sends a heartbeat at once when `agent.config_changed` changed a readiness or a
@@ -2505,6 +2509,13 @@ as `reason` with the entry (M4-43). The runner
   and logs `channels_resync_failed`. The server sets `project_bindings.ready` and
   `project_bindings.ready_reason`; without `ready`, `agent.invoke` rejects with
   `project_not_ready`.
+- Forum without a binding (addendum of 2026-10-30, R-AG-35): the runner may operate a forum
+  that has no project binding. With `runner.default_workspace` set, a run there works in that
+  folder (`.` is `runner.projects_root` itself, any other value a reference resolved as above,
+  checked when the configuration loads), with the runner's own model and tools, and logs
+  `default_workspace_used`; such a forum has no `project_readiness` entry, because there is no
+  binding to make ready, and a bound forum never falls back to it. Without the key (the default)
+  the run ends `failed` with `adapter_error` and the cause `project_not_bound` (18.9).
 - Schema `project_runner_config.v1` (`project_bindings.runner_config`, OpenAPI
   `ProjectRunnerConfig`, M2-03): a closed JSON object (unknown members are rejected) with the
   optional members `model` (string, not empty, not starting with `-`; the runner passes it as
@@ -2812,6 +2823,7 @@ and continues the session.
 | Claude Code too old for the model (the API's answer "Claude Code <version> does not support this model; version <version> or newer is required", or the minimum of an organization's policy) | `failed`, `runtime_error`, the last step names the required version and says to update Claude Code (never the API's text itself); the runner reports `degraded` with `runtime_version_unsupported` at once (18.2 "Version"), so further runs end in prepare without a turn (D-RUNNER-CLI-PIN-2) |
 | `result` with an error subtype | `failed`, `runtime_error`, error texts in the last step |
 | Crash of the runner | the turn keeps running; a new runner takes it over or ends it; no new turn |
+| Run that ends without a turn, or with `adapter_error` (addendum of 2026-10-30, R-AG-35) | the `summary` of `finishRun` names the cause in one or two sentences with the log code in backticks at the end (for example `project_not_bound`: "This forum has no project folder ... Bind a folder to the forum in its settings, or set runner.default_workspace"); it carries only codes and key names, never a path, a user or a value of the host; an adopted turn repeats it (12 f 2). The SDK gives an unexpected handler error the summary that names only the error's kind |
 
 The recognized error texts of the CLI are in a table in the runner (`ERROR_TEXTS`: kind, stable
 fragment, channel `result`, `assistant` or `stderr`, and the evidence). A test against the
@@ -3094,7 +3106,7 @@ Reasons of a not ready forum (`ProjectReadiness.reason`, `project_bindings.ready
 |---|---|
 | `outside_root` | the reference does not resolve to a strict descendant of the root (18.1) |
 | `workspace_missing` | the folder does not exist and the binding asks for no creation |
-| `not_a_git_worktree` | the folder has no `.git` |
+| `not_a_git_worktree` | no longer sent (addendum of 2026-10-30, R-AG-35: Git is optional); a runner before that change sent it for a folder without `.git` |
 | `not_writable` | the runner user may not read, write or search the folder |
 | `provisioning` | the runner is creating the folder |
 | `workspace_exists` | `init` or `clone` found a folder it did not create |
@@ -3115,7 +3127,10 @@ names.
    `.provision-<uuid>` folder of 18.12) of at most 255 characters, that resolves by 18.1 to a
    folder (a symbolic link counts only when its target is a strict descendant of the root) and
    holds `.git` (a folder or a file). Other entries are left out without a log line per entry.
-   Reason: these are exactly the folders that a binding with `provision` `none` makes ready.
+   Reason: the dialog of 01 6.10 offers each reported folder as a new forum and checks all of
+   them; a projects root also holds folders that are no projects. Since Git is optional
+   (addendum of 2026-10-30, R-AG-35), a folder without `.git` is still ready when it is bound by
+   name ("Existing folder" of 01 6.9); it is only not offered in this list.
 2. **When.** The runner reads the root whenever it computes readiness (18.1) and sends the
    names, sorted by code point, in the heartbeat member `project_folders` (4.8), at most
    `runner.project_folders_max`; when there are more, it sends the first ones and logs
@@ -3200,6 +3215,7 @@ attachment without a transcript would reach the turn only as a file path.
 | R-AG-32 | The Claude Code runner transcribes audio attachments without a transcript with an optional local program and reports `voice_input` only when one is configured; without it the person gets a note in the thread (18.14, addendum of 2026-10-29). | Claude Code cannot hear audio; a local program keeps the audio on the host, and a note replaces a silent loss (R-AG-16). |
 | R-AG-33 | The Hermes adapter sends the files of Hermes' answer as attachments through the public upload sessions, each within the server's upload limit and after Hermes' own delivery policy, and transcribes voice input with Hermes' own speech to text, delivering the transcript to the server (17.3, 17.6, HERMES-MEDIA). | Hermes behaves in a thread as on its other platforms; the server keeps scanning, limits and the owner switch `supports_files_out`, and other people see the transcript (13). |
 | R-AG-34 | Hermes: its built-in-like commands stay the server's built-ins, a closed table offers only control commands without a model call, skills become model commands, and reports without a run go to the report channel, a forum getting one post per report (17.3, 17.9, addendum of 2026-10-29). | A command sent as the adapter's admin sender must never widen what a person may do, and an unknown command of a later Hermes version is refused until the table names it (docs/decisions.d/HERMES-CRON-COMMANDS.md). |
+| R-AG-35 | The Claude Code runner treats Git as optional: a bound folder without `.git` is ready, a forum without a binding works in `runner.default_workspace` when it is set (default off), and every run the runner ends without a turn or with `adapter_error` names its cause in the `summary` of `finishRun`, which the app shows next to the reason (18.1, 18.9, addendum of 2026-10-30). | Owner expectation 2026-10-30: every development forum is a Claude Code chat; forums bound to folders without Git stayed "not ready" and a forum without a binding failed at once with a bare "Error in the adapter" (docs/decisions.d/RUNNER-NO-GIT.md). |
 
 ## 20. Alignment with the core contract
 
@@ -3287,6 +3303,7 @@ configuration of the respective program outside the server.
 | `runner.transcribe_cmd` | Runner | empty | argument list of a local transcriber; the audio file path is appended and stdout is the transcript (18.14); empty means no transcription |
 | `runner.transcribe_timeout` | Runner | `5m` | time limit of one transcription (18.14); above zero |
 | `runner.projects_root` | Runner | no default, required | root of all project folders |
+| `runner.default_workspace` | Runner | empty | folder of a forum without a project binding (18.1): `.` for `runner.projects_root`, else a folder name under it; empty means off, and a run in such a forum ends with the cause `project_not_bound` |
 | `runner.state_dir` | Runner | no default, required | state, recordings, incoming files |
 | `runner.followup_grace` | Runner | `30s` | stdin stays open for follow-ups after `result` |
 | `runner.stop_grace` | Runner | `10s` | after SIGINT until SIGTERM |

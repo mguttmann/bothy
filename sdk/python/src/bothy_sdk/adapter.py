@@ -118,6 +118,7 @@ __all__ = [
     "RuntimeFailure",
     "RuntimeStatus",
     "StartOptions",
+    "unexpected_error_summary",
 ]
 
 _LOG = logging.getLogger("bothy_sdk")
@@ -246,16 +247,42 @@ class RunRefused(Exception):  # noqa: N818 - a refusal, not an error of the SDK
 
     Args:
         reason: The reason code of ``finishRun``, or ``None`` for no ``finishRun``.
+        summary: One or two sentences for the person that name the cause and what to do; sent
+            as the ``summary`` of ``finishRun`` and shown with the reason in the thread.
 
     Examples:
         >>> RunRefused("runtime_not_authenticated").reason
         'runtime_not_authenticated'
+        >>> RunRefused("adapter_error", summary="This forum has no project folder.").summary
+        'This forum has no project folder.'
     """
 
-    def __init__(self, reason: str | None) -> None:
+    def __init__(self, reason: str | None, *, summary: str | None = None) -> None:
         """Create the refusal; see the class docstring."""
         super().__init__(reason or "run no longer active")
         self.reason = reason
+        self.summary = summary
+
+
+def unexpected_error_summary(exc: BaseException) -> str:
+    """The summary of a run that an unexpected handler error ended with ``adapter_error``.
+
+    It names only the kind of the error, never its message, which may hold a path or a value.
+
+    Args:
+        exc: The error.
+
+    Returns:
+        One sentence for the thread.
+
+    Examples:
+        >>> unexpected_error_summary(KeyError("x"))
+        'The adapter failed with an unexpected error (KeyError); its log has the details.'
+    """
+    return (
+        f"The adapter failed with an unexpected error ({type(exc).__name__}); "
+        "its log has the details."
+    )
 
 
 @dataclass(frozen=True)
@@ -1056,15 +1083,16 @@ class Adapter:
         except RunRefused as refusal:
             if refusal.reason is not None:
                 with self.client.bind_run(state.run_id, entry.token):
-                    await self._finish_refused(state, refusal.reason)
+                    await self._finish_refused(state, refusal.reason, refusal.summary)
             else:
                 await self.inbox.set_state(state.event_id, EntryState.CLOSED)
                 self._runs.pop(state.run_id, None)
             _LOG.info("run %s refused in prepare: %s", state.run_id, refusal.reason or "inactive")
             return None
-        except Exception:
+        except Exception as exc:
             _LOG.exception("prepare failed for run %s", state.run_id)
-            await self._finish_refused(state, "adapter_error")
+            with self.client.bind_run(state.run_id, entry.token):
+                await self._finish_refused(state, "adapter_error", unexpected_error_summary(exc))
             return None
 
     async def _start(self, state: _RunState) -> None:
@@ -1172,10 +1200,12 @@ class Adapter:
         except RuntimeFailure:
             with self.client.bind_run(state.run_id, token), contextlib.suppress(ProblemError):
                 await handle.finish("failed", reason="runtime_error")
-        except Exception:
+        except Exception as exc:
             _LOG.exception("handler failed for run %s", state.run_id)
             with self.client.bind_run(state.run_id, token), contextlib.suppress(ProblemError):
-                await handle.finish("failed", reason="adapter_error")
+                await handle.finish(
+                    "failed", reason="adapter_error", summary=unexpected_error_summary(exc)
+                )
         finally:
             if handle.finished or handle.cancelled.is_set():
                 with contextlib.suppress(Exception):
@@ -1183,13 +1213,14 @@ class Adapter:
                 self._runs.pop(state.run_id, None)
                 self.client.release_run(state.run_id)
 
-    async def _finish_refused(self, state: _RunState, reason: str) -> None:
+    async def _finish_refused(
+        self, state: _RunState, reason: str, summary: str | None = None
+    ) -> None:
+        body = RunFinish(state=RunFinishState.FAILED, reason=reason)
+        if summary:
+            body.summary = summary
         with contextlib.suppress(ProblemError, httpx.TransportError):
-            await self.client.call(
-                finish_run.asyncio_detailed,
-                run_id=state.run_id,
-                body=RunFinish(state=RunFinishState.FAILED, reason=reason),
-            )
+            await self.client.call(finish_run.asyncio_detailed, run_id=state.run_id, body=body)
         await self.inbox.set_state(state.event_id, EntryState.CLOSED)
         self._runs.pop(state.run_id, None)
 

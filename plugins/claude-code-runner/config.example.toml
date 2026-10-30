@@ -32,6 +32,9 @@ channels_resync_interval = "5m"
 transcribe_cmd = []
 transcribe_timeout = "5m"
 projects_root = "/srv/projects"
+# Folder of a forum without a project binding (Git optional): "." is projects_root itself, a
+# name is a folder under it. Empty means off: such a forum gets a message to bind a folder.
+default_workspace = ""
 state_dir = "/var/lib/claude-code-runner"
 followup_grace = "30s"
 stop_grace = "10s"

@@ -37,6 +37,7 @@ from claude_code_runner.reply_attachments import (
 from claude_code_runner.secrets import SecretError, SecretRef, parse_secret_ref
 from claude_code_runner.statedir import StateDirError, ensure_private_dir
 from claude_code_runner.toolclass import ORDER
+from claude_code_runner.workspace import WorkspaceError, resolve_default
 
 __all__ = ["ConfigError", "RunnerConfig", "check_argument", "load_config", "parse_duration"]
 
@@ -145,6 +146,9 @@ class RunnerConfig:
             path of an audio file is appended and the text on stdout is the transcript (09
             18.14). Empty: no transcription.
         transcribe_timeout: ``runner.transcribe_timeout``: time limit of one transcription.
+        default_workspace: ``runner.default_workspace``: the folder of a forum without a binding
+            (RUNNER-NO-GIT), ``.`` for the projects root or a reference under it; ``None`` (the
+            default, empty in the file) leaves such a forum without a folder.
     """
 
     source: Path
@@ -181,6 +185,7 @@ class RunnerConfig:
     channels_resync_interval: float = 300.0
     transcribe_cmd: tuple[str, ...] = ()
     transcribe_timeout: float = 300.0
+    default_workspace: str | None = None
 
 
 _Parse = Callable[[Any], Any]
@@ -335,6 +340,20 @@ def _transcribe_cmd(r: _Reader) -> tuple[str, ...]:
     return cmd
 
 
+def _default_workspace(r: _Reader, projects_root: Path) -> str | None:
+    """``runner.default_workspace``: empty is off, ``.`` the root, else a folder under it."""
+    value = r.get("default_workspace", str, "")
+    if not value:
+        return None
+    try:
+        resolve_default(projects_root, value)
+    except WorkspaceError:
+        raise r.fail(
+            "default_workspace", "not . or a folder name under the projects root"
+        ) from None
+    return str(value)
+
+
 def _plain(value: str) -> bool:
     """Not empty and without a control or bidi character (an argument may start with -)."""
     return check_argument("x" + value) and bool(value)
@@ -395,6 +414,7 @@ def load_config(path: Path) -> RunnerConfig:
     git_bin = r.get("git_bin", str, "git")
     if not check_argument(git_bin):
         raise r.fail("git_bin", "empty, starts with - or has controls")
+    projects_root = _root(r, "projects_root")
     config = RunnerConfig(
         source=path,
         server_url=server_url,
@@ -411,7 +431,7 @@ def load_config(path: Path) -> RunnerConfig:
         cli_probe_timeout=r.duration("cli_probe_timeout", "30s"),
         poll_interval=r.duration("poll_interval", "200ms"),
         claude_bin=claude_bin,
-        projects_root=_root(r, "projects_root"),
+        projects_root=projects_root,
         state_dir=_state_dir(r),
         followup_grace=r.duration("followup_grace", "30s"),
         stop_grace=r.duration("stop_grace", "10s"),
@@ -434,6 +454,7 @@ def load_config(path: Path) -> RunnerConfig:
         channels_resync_interval=_positive(r, "channels_resync_interval", "5m"),
         transcribe_cmd=_transcribe_cmd(r),
         transcribe_timeout=_positive(r, "transcribe_timeout", "5m"),
+        default_workspace=_default_workspace(r, projects_root),
     )
     r.unknown()
     return config
