@@ -10,6 +10,7 @@ refused answer ends its run with the error), so such a send must not become a se
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 from uuid import UUID
 
 import pytest
@@ -101,3 +102,62 @@ async def test_a_refused_answer_is_recorded_too(tmp_path: Path) -> None:
         await r.until(lambda: r.finished(t.run_id), "the end of the run")
         # Hermes' ledger sends the refused answer again later: the adapter does not post it.
         assert await r.handler.recovered_duplicate(t.thread_id, RECONNECTED + "Done so far.")
+
+
+# ---- what the adapter reads with getMessage (answer anchor, follow-ups) ---------------------
+
+
+def _answers(r: Any) -> list[dict[str, Any]]:
+    return [q.json for q in r.requests("createMessage")]
+
+
+async def test_an_answer_quotes_its_trigger_in_the_same_thread(tmp_path: Path) -> None:
+    async with rig(tmp_path) as r:
+        t = await r.fake.trigger("Hello @Lotse")
+        await r.until(lambda: r.finished(t.run_id), "the end of the run")
+        assert [a.get("reply_to_message_id") for a in _answers(r)] == [str(t.message_id)]
+
+
+@pytest.mark.parametrize("fault", ["problem", "disconnect"])
+async def test_an_unreadable_trigger_is_quoted_by_no_answer(tmp_path: Path, fault: str) -> None:
+    from bothy_sdk.testing.faults import Fault
+
+    async with rig(tmp_path) as r:
+        if fault == "problem":
+            r.fake.inject("getMessage", Fault.problem("not_found"))
+        else:
+            r.fake.inject("getMessage", Fault.disconnect(), times=10)
+        t = await r.fake.trigger("Hello @Lotse")
+        await r.until(lambda: r.finished(t.run_id), "the end of the run")
+        assert r.fake.run_state(t.run_id).state == "completed"
+        answers = _answers(r)
+        assert [a["content_md"] for a in answers] == ["Done so far."]
+        assert "reply_to_message_id" not in answers[0]
+
+
+@pytest.mark.parametrize("fault", ["problem", "disconnect"])
+async def test_an_unreadable_followup_is_not_steered(tmp_path: Path, fault: str) -> None:
+    from adapter_kit import FakeRuntime
+    from bothy_sdk.testing.faults import Fault
+
+    from bothy_hermes_adapter.runtime import TurnOutcome, TurnRequest
+
+    async def script(turn: TurnRequest, rt: FakeRuntime) -> TurnOutcome:
+        await rt.stop_event(turn.thread_id).wait()
+        return TurnOutcome.COMPLETED
+
+    rt = FakeRuntime(script=script)
+    async with rig(tmp_path, runtime=rt, busy_mode="steer") as r:
+        t = await r.fake.trigger()
+        await r.until(lambda: rt.turns)
+        if fault == "problem":
+            r.fake.inject("getMessage", Fault.problem("not_found"))
+        else:
+            r.fake.inject("getMessage", Fault.disconnect(), times=10)
+        before = len(r.requests("getMessage"))
+        await r.fake.deliver_followup(t.run_id, "one more thing")
+        await r.until(lambda: len(r.requests("getMessage")) > before, "the read of the follow-up")
+        await r.fake.pass_time(0.5)
+        assert rt.steered == []
+        rt.stop_event(t.thread_id).set()
+        await r.until(lambda: r.finished(t.run_id))
