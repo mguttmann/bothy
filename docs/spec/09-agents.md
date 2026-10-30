@@ -2515,7 +2515,12 @@ as `reason` with the entry (M4-43). The runner
   checked when the configuration loads), with the runner's own model and tools, and logs
   `default_workspace_used`; such a forum has no `project_readiness` entry, because there is no
   binding to make ready, and a bound forum never falls back to it. Without the key (the default)
-  the run ends `failed` with `adapter_error` and the cause `project_not_bound` (18.9).
+  the run ends `failed` with `adapter_error` and the cause `project_not_bound` (18.9). Only a
+  channel in the runner's served cache (it is the operator) gets the default: a guest run (3.6)
+  in a channel another agent operates, bound or not, ends `failed` with `adapter_error` and the
+  cause `channel_not_served` and never runs in the default folder. A text channel the runner
+  operates without a binding is treated like such a forum. `.` gives every such channel the
+  whole projects root; a dedicated folder name keeps those chats out of the project folders.
 - Schema `project_runner_config.v1` (`project_bindings.runner_config`, OpenAPI
   `ProjectRunnerConfig`, M2-03): a closed JSON object (unknown members are rejected) with the
   optional members `model` (string, not empty, not starting with `-`; the runner passes it as

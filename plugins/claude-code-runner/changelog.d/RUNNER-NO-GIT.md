@@ -2,7 +2,8 @@
 
 - Configuration key `runner.default_workspace` (default empty, off): the folder of a forum the
   runner operates without a project binding, `"."` for `runner.projects_root` or a folder name
-  under it. Such a forum is then a normal Claude Code chat (09 18.1).
+  under it. Such a forum is then a normal Claude Code chat (09 18.1). A guest run in a channel
+  the runner does not operate never uses it and ends with the cause `channel_not_served`.
 
 ### Changed
 

@@ -21,6 +21,10 @@ CAUSES: dict[str, str] = {
         "to the forum in its settings, or set runner.default_workspace on the runner host "
         "for forums without a folder"
     ),
+    "channel_not_served": (
+        "This runner does not operate this channel, so it has no project folder here. Make "
+        "the runner the operator of a forum to chat with Claude Code there"
+    ),
     "trigger_kind_unsupported": (
         "Claude Code runs on messages only; this kind of trigger is not supported"
     ),

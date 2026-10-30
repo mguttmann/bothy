@@ -107,3 +107,24 @@ async def test_every_refusal_of_prepare_names_its_cause(world: World) -> None:
     missing = await fake.trigger("Hello", channel_id=world.forum_b)
     assert await world.ended(missing.run_id) == "failed"
     assert "`workspace_missing`" in summary_of(world, missing.run_id)
+
+
+@pytest.mark.parametrize("workspace_ref", [None, "website"])
+async def test_guest_run_in_a_channel_the_runner_does_not_operate_never_uses_the_default(
+    world: World, workspace_ref: str | None
+) -> None:
+    """A guest mention (09 3.6) in a forum another agent operates: no default folder.
+
+    The default is only for forums the runner operates without a binding (D-RUNNER-NO-GIT-3);
+    a bound one of another agent would else run a project's chat in the wrong folder.
+    """
+    fake = world.fake
+    forum = fake.add_forum("Elsewhere", workspace_ref, served=False)
+    await world.start(world.config(default_workspace="."))
+    run = await fake.trigger("Hello", channel_id=forum)
+    assert await world.ended(run.run_id) == "failed"
+    assert fake.run_state(run.run_id).state_reason == "adapter_error"
+    text = summary_of(world, run.run_id)
+    assert "`channel_not_served`" in text
+    assert "runner.default_workspace" not in text
+    assert world.turns() == []

@@ -589,6 +589,10 @@ class RunnerHandler(AgentHandler):
             refuse("trigger_kind_unsupported", "adapter_error", ids)
         binding = await self._binding(payload)
         default = self.config.default_workspace
+        if binding is None and not self._serves(payload.channel_id):
+            # A guest run (09 3.6) in a channel another agent operates: never the default
+            # folder, whether that channel is bound or not (D-RUNNER-NO-GIT-3).
+            refuse("channel_not_served", "adapter_error", ids)
         if binding is None and default is None:
             refuse("project_not_bound", "adapter_error", ids)
         if self.probe.blocking:
@@ -653,6 +657,10 @@ class RunnerHandler(AgentHandler):
             refuse(code or "workspace_missing", "adapter_error", ids, default_workspace=True)
         log("default_workspace_used", **ids)
         return path
+
+    def _serves(self, channel_id: UUID) -> bool:
+        """True when the channel is in the served cache, i.e. the runner operates it."""
+        return self.channels is not None and self.channels.get(channel_id) is not None
 
     async def _binding(self, payload: Any) -> Any:
         cache = self.channels

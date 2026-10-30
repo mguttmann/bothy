@@ -112,7 +112,11 @@ Every forum the runner operates is a Claude Code chat (09 18.1, R-AG-35):
   itself, a name such as `"scratch"` a folder under it (checked like a `workspace_ref` when the
   configuration loads; it must exist and be writable when a run starts). Such a run uses
   `runner.default_model` and `runner.scoped_allowed_tools` and logs `default_workspace_used`. A
-  bound forum never falls back to it. The default is empty (off).
+  bound forum never falls back to it, and neither does a channel the runner does not operate:
+  a guest run there (09 3.6) ends with the cause `channel_not_served`, bound or not. A text
+  channel the runner operates without a binding is treated like such a forum. The default is
+  empty (off). Note that `"."` gives every such chat the whole projects root, with write access
+  to every project folder; a dedicated folder such as `"scratch"` keeps them apart.
 - **The cause in the thread.** A run the runner ends without a turn, or with `adapter_error`,
   carries the cause as the `summary` of `finishRun`, one or two sentences with the log code in
   backticks, for example "This forum has no project folder, so Claude Code has nowhere to work.
