@@ -1083,6 +1083,20 @@ source error is returned and never means "has trigger". `adapters/fake.TriggerHo
 for the tests of other modules. Tests: `app/triggerholders_test.go`. Rulings:
 docs/decisions.d/M2-13.md (D-M2-13-1 and D-M2-13-2).
 
+## Trigger set of an agent (getAgentTriggerers)
+
+`app/agenttriggerers.go`: the `Authorizer` implements `authorize.AgentTriggerers`. `Triggerers(ctx,
+agent)` reads the rights version first, then T(A) with `domain.Triggerers` over `triggerWorld`
+(the trigger world of the I1 check and of `access.explain`): the active owners and the active people
+with effective `trigger` on a served target, without those SR2 blocks for the agent's effective
+tool class. An agent with billing mode `organization` adds its guest channels (05 section 5 point
+3: `allow_mentioned_agents`, not archived, not read-only, the agent's own snapshot reaches `write`)
+to its served targets; an agent with billing mode `personal` keeps only its credential holder (05
+section 5 point 4). An unknown, inactive or policy-less agent has the empty set. Every read is
+fresh, never from the snapshot cache; no audit entry, no check-log entry; a source error is
+returned without a set. The agents module serves it as `getAgentTriggerers`. Tests:
+`app/agenttriggerers_test.go`. Rulings: docs/decisions.d/SERVER-AGENT-TRIGGERERS.md.
+
 ## Personal data (M7-06)
 
 `app/personaldata.go`: `PersonalData` is the participant of authz in the privacy requests

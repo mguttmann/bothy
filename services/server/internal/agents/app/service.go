@@ -67,6 +67,9 @@ type Deps struct {
 	// Measure is the own measurement (kernel/measure, M6-13): billing_mode_switches after the
 	// commit; nil records nothing.
 	Measure measure.Recorder
+	// Triggerers answers the allow list of getAgentTriggerers (the Authorizer of authz); nil
+	// answers that operation with internal_error.
+	Triggerers authorize.AgentTriggerers
 }
 
 // Service implements agents.Agents. It is safe for concurrent use.

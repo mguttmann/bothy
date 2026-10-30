@@ -6,9 +6,10 @@
 against both). Every scenario connects with its own consumer names, so a run one scenario leaves
 ``queued`` never reaches another: a new consumer starts at ``head_seq`` (04 15.1 point 2).
 
-Scenarios (docs/spec/09-agents.md 16.2, 07 AZ-P6): `ag08_invalid_tokens`, `ag09_double_delivery`,
-`ag12_patch_rules`, `ag28_slow_start_and_restart`, `azp6_adapter_never_starts`. A failed check
-raises `ScenarioFailed`; its message never contains a token.
+Scenarios (docs/spec/09-agents.md 16.2, 07 AZ-P6, 09 R-AG-19): `ag08_invalid_tokens`,
+`ag09_double_delivery`, `ag12_patch_rules`, `ag28_slow_start_and_restart`,
+`azp6_adapter_never_starts`, `rag19_allowlist_from_server`. A failed check raises
+`ScenarioFailed`; its message never contains a token.
 """
 
 from __future__ import annotations
@@ -39,6 +40,7 @@ from bothy_sdk.errors import (
 )
 from bothy_sdk.gateway import Gateway, gateway_url
 from bothy_sdk.generated.api.agent_runtime import (
+    get_agent_triggerers,
     get_consumer_state,
     patch_run,
     renew_invocation_token,
@@ -46,6 +48,7 @@ from bothy_sdk.generated.api.agent_runtime import (
 )
 from bothy_sdk.generated.api.runs import get_run
 from bothy_sdk.generated.models import (
+    AgentTriggerers,
     BillingMode,
     ConsumerState,
     Heartbeat,
@@ -81,6 +84,7 @@ __all__ = [
     "ag12_patch_rules",
     "ag28_slow_start_and_restart",
     "azp6_adapter_never_starts",
+    "rag19_allowlist_from_server",
 ]
 
 _LOG = logging.getLogger("bothy_sdk")
@@ -204,6 +208,7 @@ def _adapter(
     consumer: str,
     *,
     http_transport: httpx.AsyncBaseTransport | None = None,
+    allowlist: bool = False,
 ) -> Adapter:
     config = AdapterConfig(
         base_url=server.base_url,
@@ -211,6 +216,7 @@ def _adapter(
         agent_id=server.agent_id,
         credentials=server.credentials,
         consumer=consumer,
+        allowlist=allowlist,
         adapter_name="scenario-adapter",
         adapter_version="1.0.0",
         runtime_name="scenario-runtime",
@@ -775,3 +781,50 @@ async def ag28_slow_start_and_restart(server: ScenarioServer) -> None:
             _check(handler.count("execute") == 1, "execute ran more than once")
     finally:
         await client.aclose()
+
+
+# ---- R-AG-19 ----------------------------------------------------------------------------------
+
+
+async def rag19_allowlist_from_server(server: ScenarioServer) -> None:
+    """R-AG-19 (09 17.7): the adapter's allow list comes from the server and admits the trigger.
+
+    The agent reads ``getAgentTriggerers`` with its own credentials; then an adapter with the
+    allow list on runs Alex's trigger, so the server's list holds the person the server let
+    trigger, in the form the SDK decodes.
+
+    Raises:
+        ScenarioFailed: A check failed.
+    """
+    client = _client(server)
+    try:
+        allow = await client.call_as(AgentTriggerers, get_agent_triggerers.asyncio_detailed)
+    except ProblemError as exc:
+        raise ScenarioFailed(f"getAgentTriggerers: {exc.status} {exc.code}") from None
+    finally:
+        await client.aclose()
+    _check(len(allow.principal_ids) > 0, "the allow list is empty")
+    _check(
+        len(set(allow.principal_ids)) == len(allow.principal_ids), "the allow list repeats a person"
+    )
+    _check(
+        not {server.agent_id, server.other_agent_id} & set(allow.principal_ids),
+        "an agent is on the allow list",
+    )
+    _check(allow.permission_version >= 1, f"permission_version {allow.permission_version}")
+    handler = RecordingHandler()
+    counting = _Counting()
+    adapter = _adapter(server, handler, "rag19-allow", http_transport=counting, allowlist=True)
+    try:
+        async with _running(adapter) as (rec, _):
+            await _until(server, _ready(rec), "the adapter to connect")
+            triggered = await _aw(server.trigger("R-AG-19 @Lotse"))
+            await _until(server, lambda: handler.count("execute") == 1, "execute")
+            _check(
+                counting.count("GET", "/agents/me/triggerers") >= 1,
+                "the adapter did not load the allow list",
+            )
+            view = await _aw(server.run_state(triggered.run_id))
+            _check(view.starts == 1, f"starts {view.starts}")
+    finally:
+        await counting.aclose()

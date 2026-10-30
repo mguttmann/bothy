@@ -48,6 +48,9 @@ type ServerInterface interface {
 	// SendHeartbeat Report state and actual billing mode
 	// (POST /agents/me/heartbeat)
 	SendHeartbeat(w http.ResponseWriter, r *http.Request)
+	// GetAgentTriggerers List who may trigger this agent
+	// (GET /agents/me/triggerers)
+	GetAgentTriggerers(w http.ResponseWriter, r *http.Request)
 	// GetAgent Read an agent with reported state
 	// (GET /agents/{agent_id})
 	GetAgent(w http.ResponseWriter, r *http.Request, agentId AgentIdPath)
@@ -1325,6 +1328,20 @@ func (siw *ServerInterfaceWrapper) SendHeartbeat(w http.ResponseWriter, r *http.
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.SendHeartbeat(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAgentTriggerers operation middleware
+func (siw *ServerInterfaceWrapper) GetAgentTriggerers(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAgentTriggerers(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -13924,6 +13941,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/agents/me/consumers/{consumer}/ack", wrapper.AckAgentEvents)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents/me/channels", wrapper.ListServedChannels)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents/me/channels/{channel_id}/config", wrapper.GetServedChannelConfig)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents/me/triggerers", wrapper.GetAgentTriggerers)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/runs", wrapper.ListActiveRuns)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/runs/{run_id}", wrapper.GetRun)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/runs/{run_id}", wrapper.PatchRun)
@@ -14226,6 +14244,9 @@ type StrictServerInterface interface {
 	// SendHeartbeat Report state and actual billing mode
 	// (POST /agents/me/heartbeat)
 	SendHeartbeat(ctx context.Context, request SendHeartbeatRequestObject) (SendHeartbeatResponseObject, error)
+	// GetAgentTriggerers List who may trigger this agent
+	// (GET /agents/me/triggerers)
+	GetAgentTriggerers(ctx context.Context, request GetAgentTriggerersRequestObject) (GetAgentTriggerersResponseObject, error)
 	// GetAgent Read an agent with reported state
 	// (GET /agents/{agent_id})
 	GetAgent(ctx context.Context, request GetAgentRequestObject) (GetAgentResponseObject, error)
@@ -15447,6 +15468,30 @@ func (sh *strictHandler) SendHeartbeat(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(SendHeartbeatResponseObject); ok {
 		if err := validResponse.VisitSendHeartbeatResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetAgentTriggerers operation middleware
+func (sh *strictHandler) GetAgentTriggerers(w http.ResponseWriter, r *http.Request) {
+	var request GetAgentTriggerersRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetAgentTriggerers(ctx, request.(GetAgentTriggerersRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetAgentTriggerers")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetAgentTriggerersResponseObject); ok {
+		if err := validResponse.VisitGetAgentTriggerersResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

@@ -109,6 +109,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - exportChannel
   - finishRun
   - getAgent
+  - getAgentTriggerers
   - getApp
   - getBrandingLogo
   - getChannel
@@ -327,8 +328,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: createDm
     milestone: V3
     ticket: V3-01
-  - operation_id: getAgentTriggerers
-    milestone: M2
   - operation_id: leaveDm
     milestone: V3
     ticket: V3-01

@@ -1,6 +1,6 @@
 # Module `agents`
 
-Status: agent records, backend policy, credential holder and tool class built (M1-51); consumer cursors with fencing, the op `ack` and the REST consumer operations built (M2-07); presence and heartbeat built (M2-20); the read of persisted heartbeats for the stall check built (M2-09); the slash command register built (M2-16) and extended for apps (M2-25: the port `OwnedCommands`, app commands listed and resolved through the app-owner guard of `authz`); agent sessions per thread built (M2-12); the session sum of a booking built (M2-22); dev environments follow with the tickets of the milestone.
+Status: agent records, backend policy, credential holder and tool class built (M1-51); consumer cursors with fencing, the op `ack` and the REST consumer operations built (M2-07); presence and heartbeat built (M2-20); the read of persisted heartbeats for the stall check built (M2-09); the slash command register built (M2-16) and extended for apps (M2-25: the port `OwnedCommands`, app commands listed and resolved through the app-owner guard of `authz`); agent sessions per thread built (M2-12); the session sum of a booking built (M2-22); the allow list of the adapter (`getAgentTriggerers`) built; dev environments follow with the tickets of the milestone.
 The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
 ## Purpose
@@ -297,6 +297,18 @@ Agents, backend policy and tool class (configured), reported state, consumer cur
   fakes and the fake timers), `adapters/otelmetrics/presence_test.go` (the gauges with an
   in-process reader).
 - Rulings: docs/DECISIONS.md M2-20.
+
+## Allow list of the adapter (getAgentTriggerers)
+
+`triggerers.go` holds the port `Triggerers`; `app/triggerers.go` implements it on `Service`:
+`authorize` `agent.triggerers.read` (agent-self, no audit entry for an allow) on the calling agent,
+then the set of `authorize.AgentTriggerers`, which the `Authorizer` of `authz` implements
+(`Deps.Triggerers`, bound by `wire.NewAgents`, which refuses an `Authorizer` without the port).
+This module never derives a level. `adapters/httpapi/triggerers.go` serves `GET
+/api/v1/agents/me/triggerers` as `AgentTriggerers` (`principal_ids` ascending, `permission_version`
+of the request). The adapters keep it as allow list (09 17.7). Tests:
+`adapters/httpapi/triggerers_test.go`; the set itself is tested in `authz`
+(`app/agenttriggerers_test.go`). Rulings: docs/decisions.d/SERVER-AGENT-TRIGGERERS.md.
 
 ## Run facts (M2-05)
 

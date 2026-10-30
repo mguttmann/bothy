@@ -65,7 +65,8 @@ type Handlers struct {
 	*authzhttp.Access
 	// Agents implements listAgents, createAgent, getAgent, updateAgent, disableAgent, enableAgent,
 	// setAgentBillingMode, setAllAgentsBillingMode, setCredentialHolder and setAgentToolClass
-	// (agents, M1-51).
+	// (agents, M1-51), the consumer operations (M2-07), sendHeartbeat (M2-20) and
+	// getAgentTriggerers.
 	*agentshttp.Agents
 	// Commands implements registerCommand, updateCommand, removeCommand, getCommand and
 	// listChannelCommands (agents, M2-16).

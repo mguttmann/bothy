@@ -36,6 +36,7 @@ func (sc *Scenario) behavior() {
 
 	sc.get(lotse, "/agents/me/channels", ok...)
 	sc.get(lotse, "/agents/me/channels/"+allgemein+"/config", ok...)
+	sc.get(lotse, "/agents/me/triggerers", ok...)
 
 	sc.get(alex, path, http.StatusForbidden)
 	sc.call(alex, req{method: http.MethodPut, path: path, header: ifMatch(1),

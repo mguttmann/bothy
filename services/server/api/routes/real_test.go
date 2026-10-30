@@ -1061,6 +1061,10 @@ func (stubServer) GetAgent(context.Context, rest.GetAgentRequestObject) (rest.Ge
 	return nil, nil
 }
 
+func (stubServer) GetAgentTriggerers(context.Context, rest.GetAgentTriggerersRequestObject) (rest.GetAgentTriggerersResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) GetConsumerState(context.Context, rest.GetConsumerStateRequestObject) (rest.GetConsumerStateResponseObject, error) {
 	return nil, nil
 }
@@ -1635,6 +1639,8 @@ func TestRealTable_Enabled(t *testing.T) {
 		"downloadGdprExport": {"GET /api/v1/gdpr-requests/{request_id}/export", "gdpr.export.download", "rl.export"},
 		// FIX-run-retry-and-orphan-operator
 		"retryRun": {"POST /api/v1/runs/{run_id}/retry", "agent.invoke", "rl.trigger"},
+		// SERVER-AGENT-TRIGGERERS
+		"getAgentTriggerers": {"GET /api/v1/agents/me/triggerers", "agent.triggerers.read", "rl.agent_runtime"},
 	}
 	ops := routes.Enabled()
 	if len(ops) != len(want) {
