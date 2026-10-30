@@ -61,6 +61,7 @@ String? dsReasonText(AppLocalizations l, String? code, {String? name}) {
       l.triggerReasonBillingModePersonalNotHolder,
     'voice_unsupported' => l.triggerReasonVoiceUnsupported,
     'run_active' => l.triggerReasonRunActive,
+    'operator_not_in_channel' => l.triggerReasonOperatorNotInChannel,
     'adapter_error' => l.liveBoxReasonAdapterError,
     'cancel_timeout' => l.liveBoxReasonCancelTimeout,
     'project_not_ready' => l.liveBoxReasonProjectNotReady,

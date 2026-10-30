@@ -206,6 +206,9 @@ type Repository interface {
 	Run(ctx context.Context, id ids.ID) (row RunRow, found bool, err error)
 	// ActiveRunOfThread reads the run in queued, running or waiting_input of the thread.
 	ActiveRunOfThread(ctx context.Context, threadID ids.ID) (row RunRow, found bool, err error)
+	// CompletedRunOfAgent reports whether the agent has a completed run in the thread: the
+	// thread operator rule of 09 3.4 step 4a (addendum of 2026-10-30).
+	CompletedRunOfAgent(ctx context.Context, threadID, agentID ids.ID) (bool, error)
 	// LockRun reads the run id with its row lock for the rest of the unit of work (SELECT ... FOR
 	// UPDATE, M2-08); found is false for an unknown id. It needs a unit of work.
 	LockRun(ctx context.Context, id ids.ID) (row RunRow, found bool, err error)

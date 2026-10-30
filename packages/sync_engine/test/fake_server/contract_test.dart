@@ -273,6 +273,14 @@ void main() {
       runId: run['id']! as String,
       runCancel: RunCancel(),
     );
+    // The cancelled run started again for the same message (09 5.7), once.
+    final retried = await api.getRunsApi().retryRun(
+      runId: run['id']! as String,
+    );
+    expect(retried.statusCode, 202);
+    expect(retried.data!.id, isNot(run['id']));
+    final again = await api.getRunsApi().retryRun(runId: run['id']! as String);
+    expect(again.data!.id, retried.data!.id);
 
     // A second device of Alex through a pairing.
     final tablet = h.device(keySeed: 2);

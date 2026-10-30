@@ -87,6 +87,7 @@ milestones from the [plan](../PLAN.md).
 | Operator per channel visible in the channel header | core | D, M | `channel.read` | without an operator it says "No agent answers here" |
 | Live box running, pinned, with stop | core | D, M | `run.read`, `run.cancel` | section 6.2 |
 | Live box collapsed after the end, expandable | core | D, M | `run.read` | |
+| Retry a failed or cancelled run on its line | core | D, M | `agent.invoke` (`retryRun`) | section 6.2, addendum of 2026-10-30 |
 | Trigger state as icons on the message | core | D, M | | replaces status emoji (section 6.3) |
 | Follow-ups during a run | core | D, M | `run.followup.create` | |
 | Buttons, selects, forms on messages | core | D, M | `interaction.create` | once, only for those authorized |
@@ -1476,6 +1477,14 @@ sentence "The data of this device has been deleted" (04, section 8.5, R-SY-14) a
 - A stall after `run.stall_after` shows a notice in the live box, no push.
 - Follow-ups: during an active run, the input is labeled "Follow-up to <agent>". The trigger state
   of the message changes to "Follow-up delivered" as soon as the adapter has handed it over.
+- Retry (addendum of 2026-10-30, [09](09-agents.md) 5.7): the line of a `failed` or `cancelled` run
+  that is the newest run of its thread has a button "Retry" (German "Erneut versuchen") on the
+  desktop apps (macOS, Windows) and the mobile apps (iOS, Android). It starts a new run of the
+  same agent for the same message through the outbox (`retryRun`), without writing the message
+  again; one activation sends once, and the button stays disabled while the request runs and
+  after it was accepted. A refusal shows its reason (for example "The agent of this thread no
+  longer works in this channel"). After `interrupted` and `stale` the line keeps "Send again"
+  for the person who triggered (09 5.5) instead.
 
 ### 6.3 Trigger state as icons
 

@@ -3737,6 +3737,36 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/runs/{run_id}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Retry a failed or cancelled run
+         * @description Starts a new run of the same agent for the triggering message of a `failed` or `cancelled`
+         *     run, so the person does not have to write the message again (09 5.7, addendum of
+         *     2026-10-30). Only the newest run of its thread can be retried, and only a run with
+         *     `trigger_kind = message`; otherwise `409 invalid_state_transition`. The rights are those of
+         *     triggering: `agent.invoke` for the caller on the run's thread with the run's agent, the
+         *     mention of the triggering message and the rules of 05 section 5; a denial answers
+         *     `403 agent_invocation_denied` with `reason`, also `operator_not_in_channel` when the agent
+         *     is the thread's operator and no longer allowed in the channel (09 3.4 step 4a). The new run
+         *     has `triggered_by` = the caller and the triggering message's `trigger_state` follows it.
+         *     Idempotent: when the newest run of the thread is already a retry of the same message, the
+         *     answer is that run and nothing is written.
+         */
+        post: operations["retryRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/channels/{channel_id}/commands": {
         parameters: {
             query?: never;
@@ -20069,6 +20099,41 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             422: components["responses"]["UnprocessableEntity"];
+            429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
+    retryRun: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`. */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                run_id: components["parameters"]["RunIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Accepted; the new run (or the earlier retry of the same message) is queued or further. */
+            202: {
+                headers: {
+                    "Correlation-Id": components["headers"]["Correlation-Id"];
+                    RateLimit: components["headers"]["RateLimit"];
+                    "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunSummary"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             429: components["responses"]["TooManyRequests"];
             default: components["responses"]["Error"];
         };

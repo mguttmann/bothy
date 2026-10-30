@@ -16,6 +16,148 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// NewRevokeSessionRequest constructs an http.Request for the RevokeSession method
+func NewRevokeSessionRequest(server string, sessionId SessionIdPath, params *RevokeSessionParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "session_id", sessionId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/sessions/%s/revoke", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewRotateSigningKeyRequest calls the generic RotateSigningKey builder with application/json body
+func NewRotateSigningKeyRequest(server string, params *RotateSigningKeyParams, body RotateSigningKeyJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewRotateSigningKeyRequestWithBody(server, params, "application/json", bodyReader)
+}
+
+// NewRotateSigningKeyRequestWithBody constructs an http.Request for the RotateSigningKey method, with any body, and a specified content type
+func NewRotateSigningKeyRequestWithBody(server string, params *RotateSigningKeyParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/signing-keys/rotate")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewListSpacesRequest constructs an http.Request for the ListSpaces method
+func NewListSpacesRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/spaces")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateSpaceRequest calls the generic CreateSpace builder with application/json body
+func NewCreateSpaceRequest(server string, params *CreateSpaceParams, body CreateSpaceJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateSpaceRequestWithBody(server, params, "application/json", bodyReader)
+}
+
 // NewCreateSpaceRequestWithBody constructs an http.Request for the CreateSpace method, with any body, and a specified content type
 func NewCreateSpaceRequestWithBody(server string, params *CreateSpaceParams, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
@@ -7264,6 +7406,25 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /runs/{run_id}/resume (the `ResumeRun` operationId).
 	ResumeRunWithResponse(ctx context.Context, runId RunIdPath, body ResumeRunJSONRequestBody, reqEditors ...RequestEditorFn) (*ResumeRunResponse, error)
+
+	// RetryRunWithResponse Retry a failed or cancelled run
+	//
+	// Starts a new run of the same agent for the triggering message of a `failed` or `cancelled`
+	// run, so the person does not have to write the message again (09 5.7, addendum of
+	// 2026-10-30). Only the newest run of its thread can be retried, and only a run with
+	// `trigger_kind = message`; otherwise `409 invalid_state_transition`. The rights are those of
+	// triggering: `agent.invoke` for the caller on the run's thread with the run's agent, the
+	// mention of the triggering message and the rules of 05 section 5; a denial answers
+	// `403 agent_invocation_denied` with `reason`, also `operator_not_in_channel` when the agent
+	// is the thread's operator and no longer allowed in the channel (09 3.4 step 4a). The new run
+	// has `triggered_by` = the caller and the triggering message's `trigger_state` follows it.
+	// Idempotent: when the newest run of the thread is already a retry of the same message, the
+	// answer is that run and nothing is written.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /runs/{run_id}/retry (the `RetryRun` operationId).
+	RetryRunWithResponse(ctx context.Context, runId RunIdPath, params *RetryRunParams, reqEditors ...RequestEditorFn) (*RetryRunResponse, error)
 
 	// StartRunWithBodyWithResponse Start a queued run
 	//
@@ -22816,146 +22977,6 @@ func (r CreateDmResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r CreateDmResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-// ListEventsResponse200Headers the declared response headers of an HTTP 200 response for ListEvents
-type ListEventsResponse200Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-}
-
-// ListEventsResponse400Headers the declared response headers of an HTTP 400 response for ListEvents
-type ListEventsResponse400Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// ListEventsResponse401Headers the declared response headers of an HTTP 401 response for ListEvents
-type ListEventsResponse401Headers struct {
-	CorrelationId   *CorrelationId
-	DPoPNonce       *string
-	SetCookie       *string
-	WWWAuthenticate *string
-}
-
-// ListEventsResponse403Headers the declared response headers of an HTTP 403 response for ListEvents
-type ListEventsResponse403Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// ListEventsResponse410Headers the declared response headers of an HTTP 410 response for ListEvents
-type ListEventsResponse410Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// ListEventsResponse429Headers the declared response headers of an HTTP 429 response for ListEvents
-type ListEventsResponse429Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      *int
-}
-
-// ListEventsResponseDefaultHeaders the declared response headers of an HTTP default response for ListEvents
-type ListEventsResponseDefaultHeaders struct {
-	CorrelationId *CorrelationId
-}
-
-type ListEventsResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *EventPage
-	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
-	ApplicationproblemJSON400 *BadRequest
-	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
-	ApplicationproblemJSON401 *Unauthorized
-	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
-	ApplicationproblemJSON403 *Forbidden
-	// ApplicationproblemJSON410 the response for an HTTP 410 `application/problem+json` response
-	ApplicationproblemJSON410 *Gone
-	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
-	ApplicationproblemJSON429 *TooManyRequests
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *Error
-	// Headers200 the parsed response headers for an HTTP 200 response
-	Headers200 *ListEventsResponse200Headers
-	// Headers400 the parsed response headers for an HTTP 400 response
-	Headers400 *ListEventsResponse400Headers
-	// Headers401 the parsed response headers for an HTTP 401 response
-	Headers401 *ListEventsResponse401Headers
-	// Headers403 the parsed response headers for an HTTP 403 response
-	Headers403 *ListEventsResponse403Headers
-	// Headers410 the parsed response headers for an HTTP 410 response
-	Headers410 *ListEventsResponse410Headers
-	// Headers429 the parsed response headers for an HTTP 429 response
-	Headers429 *ListEventsResponse429Headers
-	// HeadersDefault the parsed response headers for an HTTP default response
-	HeadersDefault *ListEventsResponseDefaultHeaders
-}
-
-// GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r ListEventsResponse) GetJSON200() *EventPage {
-	return r.JSON200
-}
-
-// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
-func (r ListEventsResponse) GetApplicationproblemJSON400() *BadRequest {
-	return r.ApplicationproblemJSON400
-}
-
-// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
-func (r ListEventsResponse) GetApplicationproblemJSON401() *Unauthorized {
-	return r.ApplicationproblemJSON401
-}
-
-// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
-func (r ListEventsResponse) GetApplicationproblemJSON403() *Forbidden {
-	return r.ApplicationproblemJSON403
-}
-
-// GetApplicationproblemJSON410 returns the response for an HTTP 410 `application/problem+json` response
-func (r ListEventsResponse) GetApplicationproblemJSON410() *Gone {
-	return r.ApplicationproblemJSON410
-}
-
-// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
-func (r ListEventsResponse) GetApplicationproblemJSON429() *TooManyRequests {
-	return r.ApplicationproblemJSON429
-}
-
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r ListEventsResponse) GetApplicationproblemJSONDefault() *Error {
-	return r.ApplicationproblemJSONDefault
-}
-
-// GetBody returns the raw response body bytes
-func (r ListEventsResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r ListEventsResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r ListEventsResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r ListEventsResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}

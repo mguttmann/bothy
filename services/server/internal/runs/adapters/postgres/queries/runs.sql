@@ -25,6 +25,15 @@ SELECT * FROM runs WHERE id = sqlc.arg(id);
 SELECT * FROM runs
 WHERE thread_id = sqlc.arg(thread_id) AND state IN ('queued', 'running', 'waiting_input');
 
+-- name: CompletedRunOfAgent :one
+-- Whether the agent completed a run in the thread: a fixed thread operator that is no longer the
+-- channel's operator keeps triggering only then (09 3.4 step 4a, addendum of 2026-10-30). The
+-- thread prefix of runs_thread_queued_idx serves the lookup; only the boolean leaves.
+SELECT EXISTS (
+    SELECT 1 FROM runs
+    WHERE thread_id = sqlc.arg(thread_id) AND agent_id = sqlc.arg(agent_id) AND state = 'completed'
+);
+
 -- name: TransitionRun :one
 -- The compare-and-swap of 03 runs: only the row with the expected state and version moves, and
 -- the UPDATE holds its row lock until the commit. started_at keeps its first value (waiting_input

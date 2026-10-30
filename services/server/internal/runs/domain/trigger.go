@@ -127,6 +127,11 @@ type MessageTrigger struct {
 	// ThreadOperator is the agent of threads.operator_agent_id; nil when NULL and always nil for
 	// a main thread (R-DM-21).
 	ThreadOperator *AgentFacts
+	// ThreadOperatorOutside reports that ThreadOperator is no longer allowed in the channel (09
+	// 3.4 step 4a, addendum of 2026-10-30): it is not the channel's effective operator, has no
+	// write of its own on the channel, no active run in the thread and never completed one there.
+	// Set only with ThreadOperator.
+	ThreadOperatorOutside bool
 	// ChannelOperator is the effective operator of the channel now; nil when none.
 	ChannelOperator *AgentFacts
 	// Switches are the channel switches.
@@ -247,6 +252,12 @@ func Decide(in MessageTrigger) (Decision, error) {
 		}
 		d.Step = StepTriggerRight
 		return d, nil
+	}
+
+	// Step 4a (addendum of 2026-10-30): a fixed thread operator that is no longer allowed in the
+	// channel gets no run; a run would fail at once in its runtime. The person sees why instead.
+	if !guest && in.ThreadKind == ThreadThread && in.ThreadOperatorOutside && cand.ID == in.ThreadOperator.ID {
+		return d.reject(StepThreadOperator, ReasonOperatorNotInChannel), nil
 	}
 
 	// Voice rule (09 13, D-M2-04-2): before the target, because the path depends on the candidate
@@ -399,6 +410,8 @@ func validateShape(in *MessageTrigger) error {
 	switch {
 	case in.ThreadKind == ThreadMain && in.ThreadOperator != nil:
 		return invalid("thread_operator") // R-DM-21
+	case in.ThreadOperatorOutside && in.ThreadOperator == nil:
+		return invalid("thread_operator_outside")
 	case in.ThreadKind == ThreadMain && in.ChannelKind == ChannelForum:
 		return invalid("thread_kind") // R-DM-11
 	case in.ChannelKind == ChannelDM && (in.ThreadOperator != nil || in.ChannelOperator != nil):

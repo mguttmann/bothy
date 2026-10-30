@@ -14102,6 +14102,75 @@ paths:
         default:
           $ref: '#/components/responses/Error'
 
+  /runs/{run_id}/retry:
+    post:
+      operationId: retryRun
+      summary: Retry a failed or cancelled run
+      tags: [Runs]
+      description: |-
+        Starts a new run of the same agent for the triggering message of a `failed` or `cancelled`
+        run, so the person does not have to write the message again (09 5.7, addendum of
+        2026-10-30). Only the newest run of its thread can be retried, and only a run with
+        `trigger_kind = message`; otherwise `409 invalid_state_transition`. The rights are those of
+        triggering: `agent.invoke` for the caller on the run's thread with the run's agent, the
+        mention of the triggering message and the rules of 05 section 5; a denial answers
+        `403 agent_invocation_denied` with `reason`, also `operator_not_in_channel` when the agent
+        is the thread's operator and no longer allowed in the channel (09 3.4 step 4a). The new run
+        has `triggered_by` = the caller and the triggering message's `trigger_state` follows it.
+        Idempotent: when the newest run of the thread is already a retry of the same message, the
+        answer is that run and nothing is written.
+      x-authz-action: agent.invoke
+      x-rate-limit-class: rl.trigger
+      parameters:
+      - $ref: '#/components/parameters/RunIdPath'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '202':
+          description: Accepted; the new run (or the earlier retry of the same message) is queued or further.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RunSummary'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    id: 0192f4a0-7b1c-767f-8292-c1b14d7d40e0
+                    thread_id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
+                    channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
+                    agent_id: 0192f4a0-7b1c-7d07-84b0-358556a08a99
+                    triggered_by: 0192f4a0-7b1c-7db7-8afc-99f48568ad99
+                    state: queued
+                    version: 1
+                    billing_mode_expected: organization
+                    cost:
+                      amount_micros: 0
+                      currency: USD
+                      is_estimate: true
+                    step_count: 0
+                    queued_at: '2026-10-30T09:30:00.000Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
   /channels/{channel_id}/commands:
     get:
       operationId: listChannelCommands

@@ -83,7 +83,7 @@ const usage = `Usage: bothy import discord --guild ID --map FILE [--apply] [--fo
                            [--config FILE] [--session-file PATH] [--sessions FILE]
        bothy import discord init-map --guild ID --out FILE [--discord-token-file PATH] [--config FILE]
        bothy import discord status --guild ID [--config FILE] [--session-file PATH]
-       bothy import discord switch --guild ID --map FILE --channel ID --discord-locked [--takeover]
+       bothy import discord switch --guild ID --map FILE --channel ID --discord-locked [--force] [--takeover]
                            [--report text|json] [--discord-token-file PATH] [--config FILE] [--session-file PATH]
        bothy import discord revert --guild ID --channel ID [--config FILE] [--session-file PATH]
 
@@ -100,7 +100,8 @@ agent of its line continues that agent session (a dry run only validates and cou
 switch moves one channel from Discord to this server (22 13.3): after the owner set the Discord channel
 read-only and removed the agent there (confirmed with --discord-locked), it runs the last mirror
 round for the channel and checks that nothing is held back; then it prints the owner's steps in
-the web console. revert only reads: it counts the messages written on the server per thread of the
+the web console. It refuses before the round when imported threads of the channel name an operator
+other than the planned operator of the mapping (--force switches anyway, with a warning). revert only reads: it counts the messages written on the server per thread of the
 channel and prints the owner's steps of reverting (22 13.4).
 
 Exit codes: 0 done; 1 aborted (network, rate limit above the limit, server error, source paused),

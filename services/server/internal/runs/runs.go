@@ -233,6 +233,11 @@ type CancelRun struct {
 	Reason string
 }
 
+// RetryRun is the input of Runs.Retry (retryRun, addendum of 2026-10-30).
+type RetryRun struct {
+	RunID ids.ID
+}
+
 // Runs is the read side of the runs module for handlers and other modules (M2-05). The caller is
 // the principal of ctx (kernel/actor). Errors are kernel/errs errors; an unknown and an invisible
 // run or thread give the same 404 not_found (02 section 9.2), and a foreign cursor 400
@@ -299,6 +304,13 @@ type Runs interface {
 	// one gets run.cancel_requested and the job runs.cancel_timeout. Errors: 404, 403, 400
 	// validation_failed for the reason, 409 invalid_state_transition for completed or failed.
 	Cancel(ctx context.Context, cmd CancelRun) (RunSummary, error)
+	// Retry starts a new run of the same agent for the triggering message of a failed or
+	// cancelled run (retryRun, rights of agent.invoke; 09 5.7, addendum of 2026-10-30). Only the
+	// newest run of its thread with trigger_kind message qualifies; a second retry of the same run
+	// answers the first retry and writes nothing. Errors: 404 for an unknown or invisible run,
+	// 409 invalid_state_transition, 403 agent_invocation_denied with the reason of agent.invoke or
+	// operator_not_in_channel.
+	Retry(ctx context.Context, cmd RetryRun) (RunSummary, error)
 	// Context returns run_context.v1 of an own active run for its agent (getRunContext,
 	// run.context.read; 09 section 4.6, M2-13): the triggering message whole, the earlier messages
 	// of the thread above the floor of the session and, on the first run of a session in a thread

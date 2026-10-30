@@ -2314,18 +2314,19 @@ final class FakeWorld {
     return null;
   }
 
-  /// Creates a queued run of [agentId] for [triggeringMessageId] and appends
-  /// `run.state_changed`; returns the run document.
+  /// Creates a queued run of [agentId] for [triggeringMessageId] in [threadId] (default: the
+  /// thread of the message) and appends `run.state_changed`; returns the run document.
   JsonMap createRun({
     required String agentId,
     required String triggeringMessageId,
     required String triggeredBy,
+    String? threadId,
   }) {
     final m = messages[triggeringMessageId]!;
     final id = nextId();
     final run = <String, Object?>{
       'id': id,
-      'thread_id': m['thread_id'],
+      'thread_id': threadId ?? m['thread_id'],
       'channel_id': m['channel_id'],
       'agent_id': agentId,
       'trigger_kind': 'message',

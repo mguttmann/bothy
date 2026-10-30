@@ -82,7 +82,8 @@ func (sc *Scenario) runContext(first string) {
 // runLifecycle drives the six lifecycle operations of M2-09 on the queued run of Lotse without
 // changing it: start, resume and renew present a forged invocation token (a secret canary, which
 // no output may carry) and are refused, waiting for input and finishing are no transitions of a
-// queued run, and Alex, who did not trigger the run, may not cancel it.
+// queued run, and Alex, who did not trigger the run, may not cancel it. A retry (retryRun) of the
+// queued run is refused, as only a failed or cancelled run can be retried.
 func (sc *Scenario) runLifecycle(run string) {
 	sc.T.Helper()
 	lotse, alex := sc.W.Agents["Lotse"], sc.W.People["Alex"]
@@ -96,6 +97,8 @@ func (sc *Scenario) runLifecycle(run string) {
 	sc.post(lotse, "/runs/"+run+"/finish", map[string]any{"state": "completed"}, http.StatusConflict)
 	sc.call(alex, req{method: http.MethodPost, path: "/runs/" + run + "/cancel", body: map[string]any{},
 		header: header("Idempotency-Key", newID())}, http.StatusForbidden, http.StatusNotFound)
+	sc.call(alex, req{method: http.MethodPost, path: "/runs/" + run + "/retry",
+		header: header("Idempotency-Key", newID())}, http.StatusForbidden, http.StatusNotFound, http.StatusConflict)
 }
 
 // agentSessions drives the four session operations of M2-12 on the thread of Support/Allgemein

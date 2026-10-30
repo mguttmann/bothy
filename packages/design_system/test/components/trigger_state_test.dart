@@ -174,6 +174,7 @@ void main() {
       'project_not_ready',
       'voice_unsupported',
       'run_active',
+      'operator_not_in_channel',
     ]) {
       expect(dsReasonText(l, code), isNotNull, reason: code);
     }

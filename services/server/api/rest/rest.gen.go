@@ -714,6 +714,9 @@ type ServerInterface interface {
 	// ResumeRun Resume a run that waited for input
 	// (POST /runs/{run_id}/resume)
 	ResumeRun(w http.ResponseWriter, r *http.Request, runId RunIdPath)
+	// RetryRun Retry a failed or cancelled run
+	// (POST /runs/{run_id}/retry)
+	RetryRun(w http.ResponseWriter, r *http.Request, runId RunIdPath, params RetryRunParams)
 	// StartRun Start a queued run
 	// (POST /runs/{run_id}/start)
 	StartRun(w http.ResponseWriter, r *http.Request, runId RunIdPath)
@@ -9766,6 +9769,56 @@ func (siw *ServerInterfaceWrapper) ResumeRun(w http.ResponseWriter, r *http.Requ
 	handler.ServeHTTP(w, r)
 }
 
+// RetryRun operation middleware
+func (siw *ServerInterfaceWrapper) RetryRun(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "run_id" -------------
+	var runId RunIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "run_id", r.PathValue("run_id"), &runId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "run_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params RetryRunParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RetryRun(w, r, runId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // StartRun operation middleware
 func (siw *ServerInterfaceWrapper) StartRun(w http.ResponseWriter, r *http.Request) {
 
@@ -13882,6 +13935,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/runs/{run_id}/await-input", wrapper.AwaitRunInput)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/runs/{run_id}/finish", wrapper.FinishRun)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/runs/{run_id}/cancel", wrapper.CancelRun)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/runs/{run_id}/retry", wrapper.RetryRun)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/channels/{channel_id}/commands", wrapper.ListChannelCommands)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/commands", wrapper.RegisterCommand)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/commands/{command_id}", wrapper.RemoveCommand)
@@ -14838,6 +14892,9 @@ type StrictServerInterface interface {
 	// ResumeRun Resume a run that waited for input
 	// (POST /runs/{run_id}/resume)
 	ResumeRun(ctx context.Context, request ResumeRunRequestObject) (ResumeRunResponseObject, error)
+	// RetryRun Retry a failed or cancelled run
+	// (POST /runs/{run_id}/retry)
+	RetryRun(ctx context.Context, request RetryRunRequestObject) (RetryRunResponseObject, error)
 	// StartRun Start a queued run
 	// (POST /runs/{run_id}/start)
 	StartRun(ctx context.Context, request StartRunRequestObject) (StartRunResponseObject, error)
@@ -22001,6 +22058,33 @@ func (sh *strictHandler) ResumeRun(w http.ResponseWriter, r *http.Request, runId
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ResumeRunResponseObject); ok {
 		if err := validResponse.VisitResumeRunResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RetryRun operation middleware
+func (sh *strictHandler) RetryRun(w http.ResponseWriter, r *http.Request, runId RunIdPath, params RetryRunParams) {
+	var request RetryRunRequestObject
+
+	request.RunId = runId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RetryRun(ctx, request.(RetryRunRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RetryRun")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RetryRunResponseObject); ok {
+		if err := validResponse.VisitRetryRunResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

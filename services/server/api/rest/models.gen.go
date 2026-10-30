@@ -17946,6 +17946,12 @@ type CancelRunParams struct {
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
+// RetryRunParams defines parameters for RetryRun.
+type RetryRunParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
 // ListRunStepsParams defines parameters for ListRunSteps.
 type ListRunStepsParams struct {
 	// Cursor Cursor from the previous page.

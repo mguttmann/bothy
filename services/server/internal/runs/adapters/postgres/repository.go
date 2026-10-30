@@ -107,6 +107,15 @@ func (r *Repository) ActiveRunOfThread(ctx context.Context, threadID ids.ID) (ap
 	return one(row, err, "reading the active run of a thread")
 }
 
+// CompletedRunOfAgent implements app.Repository: whether the agent completed a run in the thread.
+func (r *Repository) CompletedRunOfAgent(ctx context.Context, threadID, agentID ids.ID) (bool, error) {
+	ok, err := r.read(ctx).CompletedRunOfAgent(ctx, sqlcgen.CompletedRunOfAgentParams{ThreadID: uuid(threadID), AgentID: uuid(agentID)})
+	if err != nil {
+		return false, mapError(err, "reading the completed runs of an agent in a thread")
+	}
+	return ok, nil
+}
+
 // TransitionRun implements app.Repository: the compare-and-swap on state and version. No row
 // with the id, w.From and w.Version gives changed false and no error; the row is then unchanged.
 func (r *Repository) TransitionRun(ctx context.Context, w app.TransitionWrite) (app.RunRow, bool, error) {

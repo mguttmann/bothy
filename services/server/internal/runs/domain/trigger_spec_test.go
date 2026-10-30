@@ -153,7 +153,10 @@ func TestRejectionTableCoversSpec(t *testing.T) {
 		"run_active_other_agent": viaDecide(func(in *domain.MessageTrigger) {
 			in.ActiveRun = &domain.ActiveRun{RunID: runR, AgentID: texterID}
 		}),
-		"voice_unsupported":                viaDecide(func(in *domain.MessageTrigger) { in.Voice = true }),
+		"voice_unsupported": viaDecide(func(in *domain.MessageTrigger) { in.Voice = true }),
+		"operator_not_in_channel": viaDecide(func(in *domain.MessageTrigger) {
+			in.ChannelOperator, in.ThreadOperatorOutside = nil, true
+		}),
 		"agent_disabled":                   viaSettle("agent_not_reachable", false),
 		"billing_mode_personal_not_holder": viaSettle("billing_mode_personal_not_holder", true),
 		"project_not_ready":                viaSettle("project_not_ready", true),

@@ -16,7 +16,7 @@ and writes into Bothy only through the public import interface with the session 
 | `... --apply --once` | exactly one round of the read mirror, for scheduled calls; without `--apply` one dry round |
 | `bothy import discord init-map --guild ID --out FILE` | writes a skeleton of the mapping file (only this file; it never overwrites one) |
 | `bothy import discord status --guild ID` | prints the source, its state, per mapped channel the lead, the Bothy channel ID, its read-only state and its operator against the planned one (flagging a lead that disagrees with the read-only flag as `inconsistent`), and the counters; no names |
-| `bothy import discord switch --guild ID --map FILE --channel ID --discord-locked` | last mirror round and settle check of the switch-over of one channel; prints the owner's steps in the web console (section "Migration per channel") |
+| `bothy import discord switch --guild ID --map FILE --channel ID --discord-locked [--force]` | last mirror round and settle check of the switch-over of one channel; prints the owner's steps in the web console (section "Migration per channel") |
 | `bothy import discord revert --guild ID --channel ID` | only reads: the messages written in Bothy per thread of the channel and the owner's steps of reverting |
 
 Options of a run:
@@ -178,7 +178,12 @@ Switch-over (22 13.3):
 2. Tool: `bothy import discord switch --guild ID --map FILE --channel ID --discord-locked`. The
    flag `--discord-locked` confirms step 1; without it the command ends with exit `2` before any
    call. The channel must be imported (its channel item posted), led by Discord, and the source
-   running, else exit `2`. The command runs one mirror round for the channel (with the lease of a
+   running, else exit `2`. Imported threads of the channel whose fixed operator is not the planned
+   operator of the mapping (or that carry one while the mapping plans none) also end with exit `2`
+   before any write, with their count per agent ID: after step 3 the channel would not have their
+   operator, and every message there would get the notice `operator_not_in_channel` instead of a
+   run (09 3.4 step 4a). `--force` turns this into a warning on standard error (addendum of
+   2026-10-30). The command runs one mirror round for the channel (with the lease of a
    run, exit `3` and `--takeover` as for `--once`), then reads the channel once more and applies
    the settle rule with the current time: anything still held back ends with exit `1` and the
    counts per reason (busy, unsettled, lookback_busy); repeat after `import.follow.settle_after`.

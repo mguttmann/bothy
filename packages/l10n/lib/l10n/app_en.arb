@@ -1544,6 +1544,10 @@
   "@triggerReasonRunActive": {
     "description": "Notice for the rejection reason `run_active` at acceptance of a triggering message (docs/spec/09 section 3.5; components.md section 5)."
   },
+  "triggerReasonOperatorNotInChannel": "The agent of this thread no longer works in this channel. An owner can make it the channel's operator again.",
+  "@triggerReasonOperatorNotInChannel": {
+    "description": "Notice for the rejection reason `operator_not_in_channel` at acceptance of a triggering message: the fixed operator of the thread is no longer allowed in the channel (docs/spec/09 sections 3.4 step 4a and 3.5)."
+  },
   "liveBoxReasonUserCancelledNoName": "Canceled by a person",
   "@liveBoxReasonUserCancelledNoName": {
     "description": "Translated state reason `user_cancelled` of a run when the name of the person is not known (components.md section 2.1)."
@@ -12085,6 +12089,30 @@
   "liveBoxSendAgain": "Send again",
   "@liveBoxSendAgain": {
     "description": "Button after an interrupted or stale run that puts the triggering text into the outbox again (09 5.5)."
+  },
+  "liveBoxRetry": "Retry",
+  "@liveBoxRetry": {
+    "description": "Button on the line of a failed or cancelled run that starts a new run of the same agent for the same message (retryRun, docs/spec/09 section 5.7, 01 section 6.2)."
+  },
+  "liveBoxRetryRun": "Retry the run of {agent}",
+  "@liveBoxRetryRun": {
+    "description": "Screen reader label of the button Retry on the line of a failed or cancelled run (docs/spec/09 section 5.7).",
+    "placeholders": {
+      "agent": {
+        "type": "String",
+        "example": "Robin"
+      }
+    }
+  },
+  "liveBoxRetryRefused": "Could not retry: {reason}",
+  "@liveBoxRetryRefused": {
+    "description": "Line under a failed or cancelled run when the server refused its retry; reason is the translated reason or problem text (docs/spec/09 section 5.7).",
+    "placeholders": {
+      "reason": {
+        "type": "String",
+        "example": "You may not trigger agents here."
+      }
+    }
   },
   "agentWorking": "{agent} is working",
   "@agentWorking": {

@@ -1075,6 +1075,7 @@ Generated from openapi.yaml.
 | GET | `/api/v1/runs/{run_id}/steps` | `listRunSteps` | `run.read` | List steps in order |
 | GET | `/api/v1/runs/{run_id}/context` | `getRunContext` | `run.context.read` | Load the context of an own active run |
 | POST | `/api/v1/runs/{run_id}/cancel` | `cancelRun` | `run.cancel` | Cancel a run |
+| POST | `/api/v1/runs/{run_id}/retry` | `retryRun` | `agent.invoke` | Retry a failed or cancelled run |
 
 #### Commands
 

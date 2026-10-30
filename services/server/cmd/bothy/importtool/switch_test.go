@@ -390,3 +390,62 @@ func TestSwitchWithoutPlannedOperator(t *testing.T) {
 		t.Errorf("stderr lacks the note on the operator:\n%s", e.stderr.String())
 	}
 }
+
+// channelTarget returns the server channel of the Discord channel id of the source src.
+func channelTarget(e *testEnv, src, id string) string {
+	for _, it := range e.bothy.Items(src) {
+		if it.OriginKey == "channel:"+id {
+			return it.TargetID
+		}
+	}
+	return ""
+}
+
+// TestSwitchRefusesForeignThreadOperator (22 13.3, addendum of 2026-10-30): imported threads that
+// name an operator other than the planned operator of the mapping (the operator the channel will
+// get in step 3) stop switch with exit 2 before the round, naming the count and --force; with
+// --force switch warns and goes on. Threads of the planned operator pass.
+func TestSwitchRefusesForeignThreadOperator(t *testing.T) {
+	e, src, mapFile := switchEnv(t, "")
+	channel := channelTarget(e, src, fxGeneral)
+	pilot := e.bothy.AddAgent("pilot", "Pilot", true)
+	own := e.bothy.AddThread(channel)
+	e.bothy.SetThreadOperator(own, agentID(t, e, "lotse"))
+	foreign := e.bothy.AddThread(channel)
+	e.bothy.SetThreadOperator(foreign, pilot)
+	base := e.bothy.Writes()
+	if code := e.run(switchArgs(mapFile, "--discord-locked")...); code != ExitUsage {
+		t.Fatalf("exit %d, want 2: %s", code, e.stderr.String())
+	}
+	for _, want := range []string{"1 imported thread", pilot, "--force", "agent:lotse"} {
+		if !strings.Contains(e.stderr.String(), want) {
+			t.Errorf("stderr lacks %q:\n%s", want, e.stderr.String())
+		}
+	}
+	if w := e.bothy.Writes() - base; w != 0 {
+		t.Errorf("a refused switch wrote %d times", w)
+	}
+
+	if code := e.run(switchArgs(mapFile, "--discord-locked", "--force")...); code != ExitOK {
+		t.Fatalf("with --force: exit %d: %s", code, e.stderr.String())
+	}
+	for _, want := range []string{"warning", "1 imported thread", "Step 3"} {
+		if !strings.Contains(e.stderr.String(), want) {
+			t.Errorf("with --force stderr lacks %q:\n%s", want, e.stderr.String())
+		}
+	}
+}
+
+// TestSwitchRefusesThreadOperatorWithoutPlan: a mapping that plans no operator for a channel whose
+// imported threads carry one is refused the same way.
+func TestSwitchRefusesThreadOperatorWithoutPlan(t *testing.T) {
+	e, src, mapFile := switchEnv(t, "")
+	th := e.bothy.AddThread(channelTarget(e, src, fxRandom))
+	e.bothy.SetThreadOperator(th, agentID(t, e, "lotse"))
+	if code := e.run("switch", "--guild", fxGuild, "--map", mapFile, "--channel", fxRandom, "--discord-locked"); code != ExitUsage {
+		t.Fatalf("exit %d, want 2: %s", code, e.stderr.String())
+	}
+	if !strings.Contains(e.stderr.String(), "plans no operator") || !strings.Contains(e.stderr.String(), "--force") {
+		t.Errorf("stderr:\n%s", e.stderr.String())
+	}
+}

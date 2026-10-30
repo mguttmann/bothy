@@ -574,7 +574,7 @@ Who may bind is governed by `agent.invoke`: the binding arises only from a permi
 | `… --apply --follow` | read mirror as a loop (section 12); without `--apply` one reading round per interval with "would copy" |
 | `… --apply --once` | exactly one round of the read mirror; for scheduled calls |
 | `bothy import discord init-map --guild <id> --out <file>` | writes a skeleton of the mapping file (only this file) |
-| `bothy import discord switch --guild <id> --map <file> --channel <id> --discord-locked` | last mirror round and settle check of the switch-over (section 13.3, step 2); `--discord-locked` is the owner's statement that step 1 is done, without it exit `2` before any call; exit `1` with the counts per reason while the settle rule holds anything back or messages after the cursor were not copied; otherwise prints the owner's steps 3 and 4 for the web console |
+| `bothy import discord switch --guild <id> --map <file> --channel <id> --discord-locked` | last mirror round and settle check of the switch-over (section 13.3, step 2); `--discord-locked` is the owner's statement that step 1 is done, without it exit `2` before any call; exit `1` with the counts per reason while the settle rule holds anything back or messages after the cursor were not copied; otherwise prints the owner's steps 3 and 4 for the web console; before the round exit `2` when imported threads of the channel name an operator other than `planned_operator` (13.3, addendum of 2026-10-30), `--force` turns this into a warning |
 | `bothy import discord revert --guild <id> --channel <id>` | only reads Bothy (no lease, no Discord): prints per Bothy thread of the channel the number of messages written in Bothy (origin other than `import`, kind other than `system`, not deleted), the total and the owner's steps of reverting (section 13.4) |
 | `bothy import discord status --guild <id>` | source, state, ownership list (per mapped channel the Discord channel ID, the lead, the Bothy channel ID, its read-only state, and `operator ok`, `operator differs from planned` or `no operator`; a lead that disagrees with the read-only flag is flagged `inconsistent`), counters; no names of channels, spaces or people |
 
@@ -767,6 +767,30 @@ After the round `switch` reads the channel once more: messages after the cursor 
 rule does not hold but the round did not copy (written after it) also end with exit `1`, because
 the lock of step 1 is evidently not in place yet.
 
+#### 13.3.1 Operator of the imported threads (addendum of 2026-10-30)
+
+Imported threads carry their operator fixed (`threads.operator_agent_id` from `planned_operator`,
+5.1.1, R-IM-08), but step 3 is the owner's and can be left out or done with another agent. Then
+every message in such a thread used to start a run that failed at once in the runtime. Two rules
+close this (R-IM-13):
+
+1. `switch` reads the threads of the channel (`listChannelThreads`) after its preconditions and
+   before the round. When threads carry an operator other than the agent of `planned_operator`
+   (or any operator while the mapping plans none), it ends with exit `2` before any write and
+   names their count per agent ID, the operator the channel will get, and the two ways on: set
+   `planned_operator` to that agent and make it the channel's operator in step 3, or run
+   `switch --force`, which prints the same text as a warning and goes on. The text names IDs and
+   counts only (10.2 rule 4).
+2. The server starts no run for a fixed thread operator that is no longer allowed in the channel
+   (not the effective operator, no `write` of its own on the channel, no active run in the thread,
+   no completed run there); the message
+   gets `trigger_state = failed` with `operator_not_in_channel` and the app shows the notice
+   ([09-agents.md](09-agents.md) 3.4 step 4a, 3.5). Making the agent the channel's operator again
+   lets the threads trigger it at once; nothing has to be repaired.
+
+A failed run can be started again for the same message once the cause is fixed (`retryRun`,
+[09-agents.md](09-agents.md) 5.7).
+
 ### 13.4 Reverting a channel
 
 1. Bothy, owner in the web console: `lead = discord`, which sets read-only and cancels active
@@ -824,6 +848,7 @@ The import interface is source-neutral. A Zulip import would be a further comman
 | Rate limit | `X-RateLimit-Remaining: 0` waits; a wait time above the limit aborts with exit `1`, the state remains |
 | Intent probe | a channel with only empty messages by other authors aborts with exit `2` |
 | Invalid selection | an unknown ID in `--only-thread` aborts before any write |
+| Foreign thread operator | imported threads with an operator other than `planned_operator` stop `switch` with exit `2` before any write; `--force` warns and switches (13.3.1) |
 
 ## 17. Decisions of this chapter
 
@@ -841,6 +866,7 @@ The import interface is source-neutral. A Zulip import would be a further comman
 | R-IM-10 | Binding of earlier sessions on the first trigger, exactly once, fail open. | Matches `/resume`; a failure must never silence the person. |
 | R-IM-11 | Archived only with `archived = true` and not in the active list. | A thread wrongly left open does no harm, a thread wrongly closed hides work. |
 | R-IM-12 | Reverting copies nothing to Discord. | The tool never writes to Discord; the owner decides about the few messages. |
+| R-IM-13 | `switch` refuses, unless forced, when imported threads name an operator the channel will not have, and the server starts no run for a thread operator outside its channel (13.3.1, addendum of 2026-10-30). | Live use 2026-10-30: a switch-over without the planned operator left every imported thread starting runs that failed at once. |
 
 ## 18. Alignment with the core contract
 
