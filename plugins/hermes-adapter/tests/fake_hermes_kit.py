@@ -8,8 +8,9 @@ versions, and a ``.pth`` file with the source trees of the SDK and the adapter) 
 integrity snapshots after that. `HermesRig` gives one test a throwaway Hermes home configured
 by the adapter's own installer, the fake model of M2-32 with fake credentials, the egress
 recorder, the SDK's FakeServer on ``127.0.0.1`` with a wall clock, and the gateway process group
-under the macOS sandbox; it stops the group by its ID and moves the coverage data of the
-subprocess next to the main data file, so ``platform.py`` and ``hermes_config.py`` count.
+under the macOS sandbox, started through a launcher that runs Hermes' plugin discovery on the
+main thread (`write_gateway_launcher`); it stops the group by its ID and moves the coverage data
+of the subprocess next to the main data file, so ``platform.py`` and ``hermes_config.py`` count.
 
 Without the pinned Hermes the tests fail, they never skip (P-09 applied).
 """
@@ -63,9 +64,9 @@ ADAPTER_SRC = COMPONENT / "src"
 PLATFORM_KEY = "bothy"
 #: Distributions the adapter adds to the Hermes environment (11 11.3): nothing else may change.
 ADDED = ("attrs", "coverage")
-#: Gateway starts before a run gives up: Hermes' fixed wait for its plugin discovery can end
-#: before the adapter's platform is registered on a loaded machine, and Hermes v0.22 exits more
-#: often with an import error of its own modules at start (D-M2-33-14, D-HERMES-COMPAT-7).
+#: Gateway starts before a run gives up: Hermes can start without the adapter's platform or exit
+#: early on a loaded machine (D-M2-33-14, D-HERMES-COMPAT-7). The import race of Hermes' own
+#: modules at start is gone with the gateway launcher (FIX-FH22/1).
 _START_ATTEMPTS = 5
 _NO_PLATFORM = "No messaging platforms enabled."
 #: The first number of a date tag of Hermes (``v2026.9.24``) is a year; a version tag's
@@ -202,6 +203,38 @@ if _cov is not None:
 """
 
 
+#: Hermes' own CLI entry (``bin/hermes``) with its plugin discovery on the main thread. Hermes
+#: starts the discovery in a background thread while its main thread still imports the gateway,
+#: and every gateway consumer joins it (``discover_plugins``), so the thread only overlaps the
+#: two. On a loaded machine those overlapping first imports of Hermes' own modules end in a
+#: ``KeyError`` of the import system or an error of a partly imported module, and the gateway
+#: exits before any platform starts (docs/decisions.d/FIX-main-fake-hermes-v022.md). Without the
+#: thread the gateway runs the same discovery at its first ``discover_plugins`` call.
+_GATEWAY_LAUNCHER = """\
+# SPDX-License-Identifier: Apache-2.0
+\"\"\"Hermes' CLI entry, plugin discovery on the main thread (written by the test harness).\"\"\"
+import sys
+from pathlib import Path
+
+from hermes_cli.main import main
+from hermes_cli import plugins
+
+if not callable(getattr(plugins, "start_background_plugin_discovery", None)):
+    sys.exit("hermes_cli.plugins.start_background_plugin_discovery is gone: adapt the launcher")
+plugins.start_background_plugin_discovery = lambda: None
+sys.argv[0] = str(Path(__file__).with_name("hermes"))
+sys.exit(main())
+"""
+GATEWAY_LAUNCHER = "bothy-hermes-gateway"
+
+
+def write_gateway_launcher(bin_dir: Path) -> Path:
+    """Write the gateway launcher next to the ``hermes`` entry in ``bin_dir`` and return it."""
+    launcher = bin_dir / GATEWAY_LAUNCHER
+    launcher.write_text(_GATEWAY_LAUNCHER, encoding="utf-8")
+    return launcher
+
+
 def _site_packages(venv: Path) -> Path:
     found = sorted(venv.glob("lib/python*/site-packages"))
     if not found:
@@ -235,6 +268,7 @@ def _add_adapter(install: HermesInstall, root: Path) -> tuple[Path, Path]:
         env=_bare_env(),
         capture_output=True,
     )
+    write_gateway_launcher(install.venv / "bin")
     (site / "bothy_sources.pth").write_text(f"{SDK_SRC}\n{ADAPTER_SRC}\n", encoding="utf-8")
     (site / "bothy_coverage_startup.py").write_text(_COVERAGE_STARTUP, encoding="utf-8")
     (site / "bothy_coverage.pth").write_text("import bothy_coverage_startup\n", encoding="utf-8")
@@ -524,8 +558,9 @@ async def _start_gateway(rig: HermesRig) -> None:
     profile_file.write_text(
         sandbox_profile(rig.homes.root.parent, readable=readable, ports=ports), encoding="utf-8"
     )
+    launcher = world.install.venv / "bin" / GATEWAY_LAUNCHER
     command = wrap_command(
-        [str(world.install.executable), "gateway", "run", "--force"], profile_file
+        [str(world.python), str(launcher), "gateway", "run", "--force"], profile_file
     )
     log = rig.homes.root / "gateway.log"
 
@@ -553,9 +588,8 @@ async def _start_gateway(rig: HermesRig) -> None:
             raise AssertionError(f"{exc}\n{gateway_log(rig)}") from None
         if identifies() > before:
             break
-        # Hermes waits a fixed time for its own plugin discovery and starts without the plugin's
-        # platform when a loaded machine needs longer, and its start on a loaded machine once
-        # ended in an import error of its own modules; neither start connects, so start again.
+        # Hermes started without the plugin's platform or exited early; neither start connects,
+        # so start again.
         failed = gateway_log(rig)
         rig.gateway.stop()
         log.write_text("", encoding="utf-8")
