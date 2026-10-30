@@ -339,7 +339,7 @@ class RunTurn:
         self.upload: asyncio.Task[Any] | None = None
         """The upload of an answer's attachment set while it runs (a stop cancels it)."""
         self.rebased = False
-        """The session totals were taken before the run's first resumed process (09 18.7)."""
+        """The run's first process started; only it takes the session totals (09 18.7)."""
 
     # ---- the run ---------------------------------------------------------------------------
 
@@ -594,8 +594,12 @@ class RunTurn:
         stream_start = _size(paths.stream)
         stderr_start = _size(paths.stderr)
         cwd = self.state.cwd or self.cfg.projects_root
-        if attempt.resume and not self.rebased:
-            await asyncio.to_thread(self._rebase_usage)
+        if not self.rebased:
+            # Only the run's first process: a later one resumes the run's own session, whose
+            # stored values already hold what the run saw (D-RUNNER-RESUME-COST-2).
+            self.rebased = True
+            if attempt.resume:
+                await asyncio.to_thread(self._rebase_usage)
         try:
             process = Turn.start(
                 argv, cwd=cwd, env=self.state.env, paths=paths, pass_fds=self.state.locks
@@ -1239,14 +1243,13 @@ class RunTurn:
         return reports, metrics
 
     def _rebase_usage(self) -> None:
-        """Store the totals the resume restores, before the run's first resumed process.
+        """Store the totals the resume restores, before the run's first process if it resumes.
 
         The pinned CLI restores the session's sums from the last ``cost-state`` line of its
         transcript and counts on from there; with them as the stored values the run books only
         its own turns, also for a session the runner never saw (09 18.7, RUNNER-RESUME-COST).
         Without such a line the stored values and the cost baseline stay as they are.
         """
-        self.rebased = True
         config_dir = claude_config_dir(self.state.env)
         path = find_transcript(config_dir, self.session.ref) if config_dir else None
         totals = transcript_totals(path) if path is not None else None

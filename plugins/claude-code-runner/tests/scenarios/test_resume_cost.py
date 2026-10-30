@@ -4,9 +4,9 @@
 The pinned CLI counts ``modelUsage`` for the whole session on ``--resume``: it restores the totals
 of the transcript's last ``cost-state`` line. A session the runner never saw (a takeover from an
 import, or one started outside the runner) or one continued outside it since its last run must
-not book those old totals again. The runner reads the same line before the first resumed turn and
-books the difference. The values come from the pinned CLI's recording in
-``tests/fixtures/recording/resumed_session_2.1.288``.
+not book those old totals again. The runner reads the same line before the first process of a
+run that resumes and books the difference; a later process of the run takes nothing. The values
+come from the pinned CLI's recording in ``tests/fixtures/recording/resumed_session_2.1.288``.
 """
 
 from __future__ import annotations
@@ -151,3 +151,32 @@ async def test_without_a_cost_state_the_import_baseline_applies(world: World) ->
     thread = _thread(world, baseline=15000)
     finish = await _run(world, thread, _result({MODEL: (5000, 0.0200)}))
     assert _amounts(finish) == {MODEL: 20000 - 15000}
+
+
+async def test_new_session_with_compaction_books_both_processes(world: World) -> None:
+    # A run that starts a new session takes no totals when a later process resumes it.
+    await world.start()
+    # What the CLI wrote after process 0 (--session-id): the run's own first totals.
+    _transcript(world).write_text(_cost_state({MODEL: (1200, 0.005)}))
+    thread = _thread(world)
+    for row in world.fake.world.sessions[thread]:
+        row["started"] = False
+    world.scenario(
+        fixture="happy",
+        per_process={
+            "0": {
+                "api_error": "context_full",
+                "api_error_after": 1,
+                "result_override": _result({MODEL: (1200, 0.005)}),
+            },
+            "1": {"result_override": _result({MODEL: (1300, 0.006)})},
+            "2": {"result_override": _result({MODEL: (2400, 0.010)})},
+        },
+    )
+    run = await world.fake.trigger("Go", thread_id=thread, session_mode="bind")
+    assert await world.ended(run.run_id) == "completed"
+    flags = [[a for a in t["argv"] if a in ("--resume", "--session-id")] for t in world.turns()]
+    assert flags == [["--session-id"], ["--resume"], ["--resume"]]
+    finish = [r.json for r in world.requests("finishRun") if str(run.run_id) in r.path][-1]
+    assert _amounts(finish) == {MODEL: 10000}
+    assert finish["costs"][0]["tokens_in"] == 2400

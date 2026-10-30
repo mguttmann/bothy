@@ -554,7 +554,7 @@ without blocking in the error case.
    session object of `agent.invocation` (`AgentSession`, present when the baseline is above 0), and
    an adapter that reports differences of session sums starts from it
    ([09-agents.md](09-agents.md) 4.10 and 18.7). The Claude Code runner reads the session's
-   totals from the session transcript before the first resumed turn and starts from those, per
+   totals from the session transcript before the first process of a run that resumes and starts from those, per
    model and also for tokens; for it the baseline in the file is a fallback for a transcript
    without them and may be left out (RUNNER-RESUME-COST).
 

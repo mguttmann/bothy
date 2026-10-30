@@ -14,8 +14,8 @@ amounts of the next runs are reduced by it until it is used up, and a reset of t
 counters clears it. Tokens have no baseline (09 18.7).
 
 A resumed session restores its totals from the last ``cost-state`` line of its transcript
-(``<config dir>/projects/<folder>/<ref>.jsonl``, pinned CLI 2.1.288). Before the first resumed
-process of a run the runner reads the same line (`transcript_totals`) and makes it the stored
+(``<config dir>/projects/<folder>/<ref>.jsonl``, pinned CLI 2.1.288). Before the first process
+of a run that resumes, the runner reads the same line (`transcript_totals`) and makes it the stored
 values (`UsageStore.rebase`), so the run books only what its own turns added, in amounts and in
 tokens, also for a session started outside the runner or continued outside it since its last run
 (RUNNER-RESUME-COST).

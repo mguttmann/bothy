@@ -51,7 +51,7 @@ The file holds JSON lines, one object per line (blank lines are skipped):
   `agent.session_ref_max_bytes`), optionally `cost_baseline_micros` (an integer from 0, the amount
   the old session already booked) and `currency` (ISO 4217, required when the baseline is above 0).
   A Claude Code session needs no baseline: the runner reads the session's totals from the session
-  transcript before its first resumed turn (spec 09 18.7).
+  transcript before the first process of a run that resumes it (spec 09 18.7).
   An unknown member, a bad value, a `discord_thread` named twice or an unknown agent ends the run
   with exit `2` before any write; the message names the line, never the reference.
 - A line whose agent is not the `planned_operator` of the thread's channel is dropped and counted

@@ -239,7 +239,7 @@ The runtime reports cumulative values per session (`result.modelUsage`), also ac
 (docs/spec/09-agents.md 18.7). On `--resume` the CLI restores the session's totals from the
 last `cost-state` line of its transcript (`<config dir>/projects/<folder>/<ref>.jsonl`, the config
 dir being `CLAUDE_CONFIG_DIR` of the turn or `$HOME/.claude`) and counts on from there. Before
-the first resumed process of a run the runner reads the same line and makes it the stored values
+the first process of a run that resumes, the runner reads the same line and makes it the stored values
 (log event `session_totals_taken`), so a run books only its own turns, in amounts and in tokens:
 also the first run of a session taken over from an import or started outside the runner, and a
 run after the session was continued outside the runner. Without such a line the stored values

@@ -155,7 +155,7 @@ The sessions file `sessions.jsonl` holds one JSON line per thread whose agent se
 continue (22 9): `discord_thread`, `agent` (handle), `external_session_ref`, and for runtimes that
 report cumulative costs `cost_baseline_micros` and `currency`, so earlier costs are not booked
 twice. The Claude Code runner needs no baseline: it reads the session's totals from the session
-transcript before the first resumed turn (09 18.7); a baseline in the file only applies when the
+transcript before the first process of a run that resumes (09 18.7); a baseline in the file only applies when the
 transcript has none. The references stay opaque; no output carries one.
 
 <!-- rehearsal: pilot -->
