@@ -1,8 +1,8 @@
 # hermes-adapter
 
 Status: built (M2-33) on the recording of M2-32; files, images, voice and video from Hermes and
-voice input to Hermes since HERMES-MEDIA. Not built yet: Hermes commands and the reports of
-Hermes cron jobs (09 17.3, 17.9).
+voice input to Hermes since HERMES-MEDIA; Hermes commands and the reports of Hermes cron jobs
+since HERMES-CRON-COMMANDS (09 17.3, 17.9).
 
 ## Purpose
 
@@ -22,7 +22,8 @@ installation.
   `BasePlatformAdapter` methods, session per thread, `busy_input_mode`, flow of an invocation,
   access layers, reported mode, tool class).
 - Backend policy: docs/spec/10-backend-policy.md section 10.1.
-- Rulings: docs/decisions.d/M2-33.md (`D-M2-33-*`).
+- Rulings: docs/decisions.d/M2-33.md (`D-M2-33-*`), docs/decisions.d/HERMES-COMPAT.md and
+  docs/decisions.d/HERMES-CRON-COMMANDS.md.
 
 ## Layout
 
@@ -36,6 +37,8 @@ installation.
 | `src/bothy_hermes_adapter/actual_mode.py`, `tool_class.py` | the actual billing mode (17.8) and the tool class (17.11) |
 | `src/bothy_hermes_adapter/media.py` | files of the answer (check, upload session, message kind) and the audio attachments to transcribe (17.3, 17.6) |
 | `src/bothy_hermes_adapter/context_format.py` | the run context as the fixed system part (17.6) |
+| `src/bothy_hermes_adapter/hermes_commands.py` | the command table of the pinned version, the control and skill commands the adapter declares (17.3) |
+| `src/bothy_hermes_adapter/reports.py` | reports without a run: targets, a new forum post or the main thread, the standalone sender (17.9) |
 | `src/bothy_hermes_adapter/live_box.py`, `cards.py`, `store.py`, `heartbeat.py` | live box, cards, resolved callbacks and open cards, heartbeat |
 | `src/bothy_hermes_adapter/config.py`, `defaults.py` | the configuration from `PlatformConfig.extra` and its defaults |
 | `src/bothy_hermes_adapter/installer.py`, `__main__.py` | the installer |
@@ -65,10 +68,39 @@ python -m bothy_hermes_adapter install \
 ```
 
 `--dpop-key-file <file>` (with `--create-dpop-key` to create one) binds the token to a DPoP key.
+`--report-channel <channel ID>` (optionally with `--report-thread <thread ID>`) makes that channel
+the platform's home channel, the target of `deliver=<platform key>` cron jobs and of `hermes send
+--to <platform key>`.
 `install` places the plugin in `<home>/plugins/<platform key>`, writes the platform section,
-`display.busy_input_mode`, `tool_progress: off`, the own access policy and a placeholder home
-channel, and refuses to change an existing platform key: every thread would lose its Hermes
-session. Restart the gateway of the profile afterwards.
+`display.busy_input_mode`, `tool_progress: off`, the own access policy and the home channel (the
+report channel, or a placeholder that refuses every report), and refuses to change an existing
+platform key: every thread would lose its Hermes session. Restart the gateway of the profile
+afterwards.
+
+## Commands
+
+At every connect the adapter declares its commands and the SDK reconciles them with the server
+(09 10.2). `/stop`, `/new`, `/resume`, `/title` and `/status` are the server's built-in commands
+and are never registered; the adapter carries out the stop and the session changes they cause
+through its own paths (09 8, 9). The
+control commands `/context` and `/version` run in the thread's Hermes session from the adapter's
+control sender; Hermes' reply becomes a message of the agent in the thread, without a run, also
+during a run. Every other Hermes command is refused (the reasons are in
+`hermes_commands.COMMAND_CLASSES`). Each skill Hermes offers for the platform is a model command
+with an optional `input`: the server opens a run, and the turn is Hermes' own skill invocation. A
+skill installed later is declared after the next gateway start.
+
+## Reports without a run
+
+Cron jobs and `hermes send` deliver to the platform (09 14, 17.9): `<platform key>` (the home
+channel), `<platform key>:<channel ID>` or `<platform key>:<channel ID>:<thread ID>`. A forum gets
+a new post per report, titled by the report's first line; a text channel gets the report in its
+main thread; a thread target gets it in that thread. The server checks every report with the
+agent's own rights (`write` on the channel); a refusal reaches Hermes as a failure with the problem
+code. In the gateway process the report goes out with the adapter's client, in a process without
+the gateway with a client of its own from the platform section (`User-Agent`
+`hermes-adapter-standalone`). Reports with attachments are refused (a report carries text only;
+files go with a turn's answer).
 
 ## Configuration keys
 
@@ -129,19 +161,21 @@ connects only after Hermes finished its startup restore.
 
 - `tests/unit`: the logic against the SDK's FakeServer with a fake runtime: intake, start
   answers, restart, live box, answer, costs, title, follow-ups, cards, stop, sessions, heartbeat,
-  the `Invocation-Token` header, logs without content, configuration, the installer's plan.
+  the `Invocation-Token` header, logs without content, configuration, the installer's plan, the
+  command table, control and skill commands, reports and the standalone sender.
 - `tests/fake_hermes`: the pinned Hermes in a subprocess (throwaway home, fake model on
   `127.0.0.1`, the FakeServer, under the macOS sandbox, an empty managed scope): plugin discovery,
   a full turn, AG-08 and AZ-P6 (no turn without a matching token), AG-11 and the unknown mode,
   the reported mode equals the credential the model endpoint receives, AG-13 (steer, queue,
   stop), AG-15 (concurrent clicks resolve once), AG-20 (trust marks reach the model as data
   blocks), BR-13 (no key value in any request, frame, log, output or state file), the installer,
-  the stub contract, the toolset table and the unchanged pin; files of the answer
-  (`MEDIA:` tags for a document, an MP3 voice, a video and an image) arrive as attachments with
-  the uploaded bytes, the profile's `.env` stays out, and a voice message reaches Hermes' speech
-  to text (a command provider of the profile) and its transcript the model and the server, or
-  Hermes' note when speech to text is off. They need the network for the
-  pinned downloads and fail without it; they never skip.
+  the stub contract, the toolset table, the command table and the unchanged pin; files of the
+  answer (`MEDIA:` tags for a document, an MP3 voice, a video and an image) arrive as attachments
+  with the uploaded bytes, the profile's `.env` stays out, and a voice message reaches Hermes'
+  speech to text (a command provider of the profile) and its transcript the model and the server,
+  or Hermes' note when speech to text is off; a control command idle and during a turn, a skill
+  command, and reports through `hermes send`, a cron job in a process without the gateway and one
+  the gateway's own scheduler fires. They need the network for the pinned downloads and fail without it; they never skip.
 - `tests/unit/test_media.py`: upload in parts, voice kind, size and file type refusals, an
   aborted upload, a refused attachment, the capabilities, transcripts and their submission.
 - The recording of M2-32 has no scenario for files and voice: Hermes' calls are proven by the
@@ -149,9 +183,10 @@ connects only after Hermes finished its startup restore.
 - Not proven: the newest Hermes release (`pytest --hermes-version=latest` is a manual switch with
   an unpinned download, never part of `make check`; it takes the highest version tag and ranks
   every version tag above the date tags Hermes used before `v0.22`), the adapter against the real
-  server, Hermes releases older than the pin (the adapter declares surfaces of `v0.22` that older
-  releases ignore, but no test runs them), other credential resolutions than the tested ones, the
-  effect of the markers on a real model.
+  server, a send of a turn into another channel or thread (Hermes `v0.22` has no agent tool for
+  it; the routing is the same as a report's), Hermes releases older than the pin (the adapter
+  declares surfaces of `v0.22` that older releases ignore, but no test runs them), other
+  credential resolutions than the tested ones, the effect of the markers on a real model.
 
 ## The pin and its update
 

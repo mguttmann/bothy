@@ -198,6 +198,8 @@ class World:
         # Forums another agent operates: Lotse does not serve them and gets no event about them.
         self.unserved: dict[UUID, dict[str, Any]] = {}
         self.thread_meta: dict[UUID, dict[str, Any]] = {}
+        # Threads Lotse opened itself (``createThread``, a forum post of a report, 09 14).
+        self.created_threads: list[UUID] = []
         self.files: dict[UUID, dict[str, Any]] = {}
         self.context_attachments: dict[UUID, list[UUID]] = {}
         self.sessions: dict[UUID, list[dict[str, Any]]] = {}
@@ -421,6 +423,7 @@ class World:
         history: tuple[ContextMessage, ...] = (),
         files: tuple[ContextFile, ...] = (),
         session_mode: str | object | None = AUTO_SESSION,
+        command: tuple[dict[str, Any], Mapping[str, str]] | None = None,
     ) -> RunRecord:
         """A message (in a new thread or ``thread_id``), a queued run and its ``agent.invocation``.
 
@@ -450,6 +453,9 @@ class World:
             *(f.file_id for f in files),
         ]
         obj = message["id"] if trigger_kind == "message" else str(uuid7())
+        invocation = obj
+        if command is not None:
+            obj = str(command[0]["id"])  # the token names the command (09 10.4)
         run = RunRecord(
             id=uuid7(),
             thread_id=thread_id,
@@ -476,7 +482,12 @@ class World:
         }
         payload[
             TRIGGER_OBJECT[trigger_kind] if trigger_kind != "command" else "command_invocation_id"
-        ] = obj
+        ] = invocation
+        if command is not None:
+            definition, values = command
+            payload["command_id"] = definition["id"]
+            payload["command_name"] = definition["name"]
+            payload["options"] = [{"name": k, "value": v} for k, v in values.items()]
         session = self.current_session(thread_id)
         if session_mode is AUTO_SESSION:
             if session is not None:
@@ -605,20 +616,27 @@ class World:
         return UUID(interaction["id"])
 
     def command_invoked(
-        self, command: dict[str, Any], run_id: UUID | None, thread_id: UUID | None
+        self,
+        command: dict[str, Any],
+        run_id: UUID | None,
+        thread_id: UUID | None,
+        options: Mapping[str, str] | None = None,
     ) -> UUID:
         """Alex runs a command of Lotse: ``command.invoked``."""
         if run_id is not None:
             thread_id = self.runs[run_id].thread_id
         invocation_id = uuid7()
+        channel = self.channel_id
+        if thread_id is not None and thread_id in self.thread_meta:
+            channel = self.thread_meta[thread_id]["channel_id"]
         payload: dict[str, Any] = {
             "invocation_id": str(invocation_id),
             "command_id": command["id"],
             "command_name": command["name"],
             "control": command["control"],
-            "channel_id": str(self.channel_id),
+            "channel_id": str(channel),
             "invoked_by": self.alex.ref(),
-            "options": [],
+            "options": [{"name": k, "value": v} for k, v in (options or {}).items()],
         }
         if thread_id is not None:
             payload["thread_id"] = str(thread_id)
@@ -1105,7 +1123,7 @@ class World:
         }
         if binding is not None:
             behavior["project_binding"] = binding
-        return {"behavior": behavior}
+        return {"behavior": behavior, "kind": "text"}
 
     def channel_config(self, channel_id: UUID | None = None) -> dict[str, Any]:
         """The ``AgentChannelConfig`` of a served channel (Allgemein when omitted)."""
@@ -1142,7 +1160,9 @@ class World:
             binding = self._binding(
                 workspace_ref, model, allowed_tools, version=1, provision=None, url=None
             )
-        (self.channels if served else self.unserved)[channel_id] = self._channel(prompt, binding)
+        channel = self._channel(prompt, binding)
+        channel["kind"] = "forum"
+        (self.channels if served else self.unserved)[channel_id] = channel
         return channel_id
 
     @staticmethod
@@ -1280,6 +1300,62 @@ class World:
         """``getThread``: the ``Thread``, or ``404``."""
         meta = self._thread_or_404(thread_id)
         return {**meta, "channel_id": str(meta["channel_id"])}
+
+    def channel_doc(self, channel_id: str) -> dict[str, Any]:
+        """``getChannel`` of a served channel (a ``ChannelView`` with Lotse's level ``write``).
+
+        A text channel names its main thread; a channel of `add_forum` is a forum.
+        """
+        key = self.channel_or_404(channel_id)
+        channel = self.channels[key]
+        doc: dict[str, Any] = {
+            "id": str(key),
+            "kind": channel["kind"],
+            "name": "allgemein" if key == self.channel_id else "forum",
+            "topic": "",
+            "sort_key": "a",
+            "operator": {"mode": "agent", "agent_id": str(self.lotse.id)},
+            "read_only": False,
+            "project_bound": "project_binding" in channel["behavior"],
+            "version": 1,
+            "settings_version": channel["behavior"]["settings_version"],
+            "created_at": self.now_iso(),
+            "space_id": str(self.space_id),
+        }
+        if channel["kind"] == "text":
+            doc["main_thread_id"] = str(self.main_thread(key))
+        return {"channel": doc, "level": "write", "capabilities": []}
+
+    def main_thread(self, channel_id: UUID) -> UUID:
+        """The main thread of a text channel (created on first use)."""
+        channel = self.channels[channel_id]
+        if "main_thread_id" not in channel:
+            thread_id = uuid7()
+            meta = self._thread(thread_id, channel_id)
+            meta["kind"] = "main"
+            self.thread_meta[thread_id] = meta
+            self.threads[thread_id] = []
+            channel["main_thread_id"] = thread_id
+        main: UUID = channel["main_thread_id"]
+        return main
+
+    def create_thread(self, channel_id: str, body: Any) -> dict[str, Any]:
+        """``createThread`` by Lotse: a forum post with its first message (``ThreadCreated``)."""
+        key = self.channel_or_404(channel_id)
+        _closed(body, optional=("title", "parent_message_id", "tag_ids", "first_message"))
+        if self.channels[key]["kind"] != "forum":
+            raise field_error("/parent_message_id", "required")
+        first = body.get("first_message")
+        if not isinstance(first, dict):
+            raise field_error("/first_message", "required")
+        thread_id = uuid7()
+        meta = self._thread(thread_id, key, self.lotse)
+        meta["title"] = str(body.get("title", ""))
+        self.thread_meta[thread_id] = meta
+        self.threads[thread_id] = []
+        message, _ = self.create_message(str(thread_id), first)
+        self.created_threads.append(thread_id)
+        return {"thread": self.thread_doc(str(thread_id)), "first_message": message}
 
     def _thread_or_404(self, thread_id: str) -> dict[str, Any]:
         try:
@@ -1618,7 +1694,7 @@ class World:
             or (c["scope_kind"] == "space" and c.get("scope_id") == str(self.space_id))
         ]
         if channel_id != str(self.channel_id):
-            raise FakeProblem("not_found")
+            self.channel_or_404(channel_id)
         return {"items": visible}
 
     @staticmethod

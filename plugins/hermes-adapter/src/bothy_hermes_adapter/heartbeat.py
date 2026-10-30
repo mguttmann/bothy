@@ -106,7 +106,18 @@ def build_report(
 
 
 class HermesAdapterLoop(Adapter):
-    """The SDK adapter loop with the Hermes heartbeat; everything else is the SDK's."""
+    """The SDK adapter loop with the Hermes heartbeat; everything else is the SDK's.
+
+    A handler with ``attach(client)`` gets the loop's client for the agent's own writes without
+    a run (command replies and reports, 09 10.4, 14).
+    """
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Build the SDK loop, then attach the handler to its client."""
+        super().__init__(*args, **kwargs)
+        attach = getattr(self.handler, "attach", None)
+        if callable(attach):
+            attach(self.client)
 
     def heartbeat(self) -> Heartbeat:
         """Return the heartbeat with the Hermes report (09 4.8).

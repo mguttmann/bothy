@@ -23,6 +23,14 @@ of 17.3 to `bothy_hermes_adapter.handler.HermesHandler` on the adapter's event l
   address (the adapter downloads nothing from the web). Voice input is transcribed with Hermes's
   own speech to text (``_enrich_message_with_transcription`` of the gateway, the function its
   other platforms use).
+* A control command (09 10.4) is ``handle_message`` with ``/<name>`` from the control sender;
+  Hermes' reply (``send`` with the command's message as ``reply_to``) is collected for the
+  handler instead of being sent. A skill command is a turn whose text is Hermes' own skill
+  invocation message. At connect the adapter declares its commands
+  (`bothy_hermes_adapter.hermes_commands`), the SDK reconciles them.
+* A ``send`` outside a turn of its thread (a cron job of the gateway's scheduler, a notice of a
+  background task, a send into another channel) is a report without a run (09 14):
+  `bothy_hermes_adapter.handler.HermesHandler.on_report`.
 * Session IDs and usage come from the plugin hooks ``pre_llm_call``, ``on_session_reset`` and
   ``post_api_request``; the thread of a hook or of ``set_status_text`` is the session's thread
   variable of the turn (``gateway.session_context``).
@@ -73,11 +81,14 @@ from bothy_hermes_adapter.config import (
 )
 from bothy_hermes_adapter.handler import HermesHandler
 from bothy_hermes_adapter.heartbeat import ADAPTER_NAME, RUNTIME_NAME, HermesAdapterLoop
+from bothy_hermes_adapter.hermes_commands import declared_commands
 from bothy_hermes_adapter.installer import CONTROL_SENDER
 from bothy_hermes_adapter.media import audio_cache_ext
+from bothy_hermes_adapter.reports import ReportError
 from bothy_hermes_adapter.runtime import (
     CardKind,
     CardRequest,
+    CommandRequest,
     MediaKind,
     OpenCard,
     ResolvedCredential,
@@ -146,6 +157,15 @@ class ServerPlatform(BasePlatformAdapter):
         self._control: dict[uuid.UUID, int] = {}
         self._confirms: set[asyncio.Task[Any]] = set()
         self._store: CallbackStore | None = None
+        # Replies of a running control command by the command's message ID, and the IDs given
+        # back to Hermes for them (an edit replaces the collected text).
+        self._replies: dict[str, list[str]] = {}
+        self._reply_ids: dict[str, tuple[list[str], int]] = {}
+        # Message IDs this process handed to Hermes, so a ``send`` that replies to one of them is
+        # known after Hermes cleared its session variable (09 14 versus 17.3): a turn's message to
+        # the run it started or steered, an adapter command's message to nothing.
+        self._turn_messages: dict[str, uuid.UUID | None] = {}
+        self._control_messages: dict[str, None] = {}
 
     # ---- lifecycle ---------------------------------------------------------------------------
 
@@ -218,12 +238,21 @@ class ServerPlatform(BasePlatformAdapter):
             runtime_version=str(hermes_version),
             capabilities=self.handler.capabilities(),
             settings=settings.sdk,
+            commands=declared_commands(self._skills_or_none()),
         )
         self._sdk = HermesAdapterLoop(config, self.handler)
         self._serve_task = asyncio.ensure_future(self._serve(store))
         _PLATFORMS[self.platform_key] = self
         self._mark_connected()
         return True
+
+    def _skills_or_none(self) -> Mapping[str, str]:
+        """The skill commands to declare; an unreadable skill list declares none (logged)."""
+        try:
+            return self.skill_commands()
+        except Exception as exc:
+            _LOG.warning("skill commands not readable: %s", type(exc).__name__)
+            return {}
 
     async def _agent_id(
         self, settings: AdapterSettings, credentials: Credentials
@@ -294,6 +323,8 @@ class ServerPlatform(BasePlatformAdapter):
         if user is not None:
             user_id, user_name = user
         mid = message_id or f"ctl-{uuid.uuid4().hex}"
+        if control:
+            _remember(self._control_messages, mid, None)
         source = self.build_source(
             chat_id=channel,
             chat_type="thread",
@@ -330,6 +361,7 @@ class ServerPlatform(BasePlatformAdapter):
     async def start_turn(self, turn: TurnRequest) -> TurnOutcome:
         """Start a Hermes turn for a run and wait for ``on_processing_complete`` (17.6)."""
         self._remember_source(turn)
+        _remember(self._turn_messages, str(turn.message_id), turn.run_id)
         event = self._event(
             turn.thread_id, turn.user_text, message_id=str(turn.message_id), control=False
         )
@@ -342,6 +374,8 @@ class ServerPlatform(BasePlatformAdapter):
         """Pass a follow-up into the running turn as busy input (17.5)."""
         if thread_id not in self._sources:
             return
+        run = self.handler.active_run(thread_id) if self.handler is not None else None
+        _remember(self._turn_messages, str(message_id), run)
         await self.handle_message(
             self._event(thread_id, text, message_id=str(message_id), control=False)
         )
@@ -434,6 +468,55 @@ class ServerPlatform(BasePlatformAdapter):
         await self._control_command(thread_id, f"/resume {external_session_ref} --all")
         return SessionSwitch.BOUND
 
+    async def run_command(self, command: CommandRequest) -> list[str]:
+        """A control command in the thread's session; returns Hermes' reply texts (09 10.4).
+
+        It goes out from the control sender like ``/new`` (17.4). Hermes answers a command for
+        an idle session through its normal processing (the adapter waits for its end) and one
+        for a busy session inline, before ``handle_message`` returns; either way the reply comes
+        through ``send`` with the command's message as ``reply_to`` and is collected here.
+        """
+        thread_id = command.thread_id
+        self._sources.setdefault(
+            thread_id, (str(command.channel_id), str(command.user_id), command.user_name)
+        )
+        message_id = f"ctl-{uuid.uuid4().hex}"
+        replies: list[str] = []
+        self._replies[message_id] = replies
+        try:
+            event = self._event(
+                thread_id, command.text, user=(CONTROL_SENDER, "adapter"), message_id=message_id
+            )
+            await self._dispatch(event)
+            if getattr(event, "_gateway_accepted", True):
+                await self._command_settled(event)
+        finally:
+            self._replies.pop(message_id, None)
+            for key in [k for k in self._reply_ids if k.startswith(f"{message_id}-")]:
+                del self._reply_ids[key]
+        return list(replies)
+
+    def skill_commands(self) -> Mapping[str, str]:
+        """Hermes' skill commands for this platform, without the skills it disables here."""
+        from agent.skill_commands import get_skill_commands  # noqa: PLC0415 - Hermes' skill scan
+        from agent.skill_utils import get_disabled_skill_names  # noqa: PLC0415
+
+        disabled = get_disabled_skill_names(platform=self.platform_key)
+        found: dict[str, str] = {}
+        for key, info in get_skill_commands().items():
+            if str(info.get("name", "")) in disabled:
+                continue
+            found[str(key).lstrip("/")] = str(info.get("description") or "")
+        return found
+
+    def skill_text(self, name: str, text: str) -> str | None:
+        """Hermes' own turn text for a skill command, as its gateway builds it for ``/<skill>``."""
+        from agent.skill_commands import build_skill_invocation_message  # noqa: PLC0415
+
+        if name not in self.skill_commands():
+            return None
+        return build_skill_invocation_message(f"/{name}", text)
+
     def current_session(self, thread_id: uuid.UUID) -> str | None:
         """The session ID Hermes last reported for the thread (hooks)."""
         return self._sessions.get(thread_id)
@@ -518,21 +601,82 @@ class ServerPlatform(BasePlatformAdapter):
         reply_to: str | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> SendResult:
-        """The answer: one message of the run (or a failure without an active run)."""
-        thread = self._thread(chat_id, metadata)
+        """The answer of a turn, the reply to a control command, or a report without a run.
+
+        * ``reply_to`` names a running control command: the text is collected as its reply.
+        * The thread is in one of the adapter's own commands (``/new``, ``/stop``): swallowed.
+        * ``reply_to`` names a message this process handed to Hermes: a late command reply
+          fails, and a turn's answer becomes a message of the run it belongs to, or fails when
+          that run is no longer active. Hermes sends the final answer after it cleared its
+          session variable, so a cancelled or aborted turn's answer never becomes a report.
+        * The send belongs to a turn of its thread (`_turn_send`): one message of the run, or a
+          failure when no run of the thread is active any more (a late answer is never posted).
+        * Anything else is a report of the agent (09 14): a cron job, a background notice, a
+          send into another channel or thread.
+        """
+        if reply_to is not None and reply_to in self._replies:
+            replies = self._replies[reply_to]
+            replies.append(content)
+            key = f"{reply_to}-{len(replies)}"
+            self._reply_ids[key] = (replies, len(replies) - 1)
+            return SendResult(success=True, message_id=key)
+        meta_thread = _uuid_of((metadata or {}).get("thread_id"))
+        env_thread = _uuid_of(get_session_env(_THREAD_VAR, ""))
+        thread = meta_thread or env_thread
         if thread is not None and thread in self._control:
             return SendResult(success=True, message_id=f"ctl-{uuid.uuid4().hex}")
-        if thread is None or self.handler is None:
-            return SendResult(success=False, error=_NO_RUN)
-        message_id = await self.handler.on_answer(thread, content, reply_to)
-        if message_id is None:
-            return SendResult(success=False, error=_NO_RUN)
-        return SendResult(success=True, message_id=message_id)
+        if self.handler is None:
+            return SendResult(success=False, error="the adapter is not connected")
+        if reply_to is not None and reply_to in self._control_messages:
+            return SendResult(success=False, error="the command has ended")
+        if reply_to is not None and reply_to in self._turn_messages:
+            run = self._turn_messages[reply_to]
+            if thread is None or run is None or self.handler.active_run(thread) != run:
+                return SendResult(success=False, error="no active run in this thread")
+            message_id = await self.handler.on_answer(thread, content, reply_to)
+            if message_id is None:
+                return SendResult(success=False, error="no active run in this thread")
+            return SendResult(success=True, message_id=message_id)
+        if thread is not None and self._turn_send(str(chat_id), thread, env_thread):
+            message_id = await self.handler.on_answer(thread, content, reply_to)
+            if message_id is None:
+                return SendResult(success=False, error=_NO_RUN)
+            return SendResult(success=True, message_id=message_id)
+        raw_thread = (metadata or {}).get("thread_id")
+        try:
+            posted = await self.handler.on_report(
+                str(chat_id), str(raw_thread) if raw_thread else None, content
+            )
+        except ReportError as exc:
+            return SendResult(success=False, error=str(exc))
+        except Exception as exc:  # the server was not reachable after the client's retries
+            _LOG.warning("report not sent: %s", type(exc).__name__)
+            return SendResult(success=False, error="the server was not reachable")
+        return SendResult(success=True, message_id=str(posted) if posted else None)
+
+    def _turn_send(self, chat_id: str, thread: uuid.UUID, env_thread: uuid.UUID | None) -> bool:
+        """Whether a send into ``thread`` belongs to a turn of that thread (09 14 versus 17.3).
+
+        Only a thread a turn of this process ran in, in the same channel, qualifies. Inside a
+        turn (Hermes' session variable names a thread) only that turn's own thread does; outside
+        any turn only a thread whose run is active right now.
+        """
+        source = self._sources.get(thread)
+        if source is None or source[0] != chat_id:
+            return False
+        if env_thread is not None:
+            return env_thread == thread
+        return self.handler is not None and self.handler.active_run(thread) is not None
 
     async def edit_message(
         self, chat_id: str, message_id: str, content: str, *, finalize: bool = False
     ) -> SendResult:
         """An edit of an own answer: buffered until ``finalize`` or the end of the run."""
+        collected = self._reply_ids.get(message_id)
+        if collected is not None:
+            replies, index = collected
+            replies[index] = content
+            return SendResult(success=True, message_id=message_id)
         thread = self._thread(chat_id)
         if thread is not None and thread in self._control:
             return SendResult(success=True, message_id=message_id)
@@ -802,6 +946,26 @@ class ServerPlatform(BasePlatformAdapter):
         )
         self._confirms.add(task)
         task.add_done_callback(self._confirms.discard)
+
+
+_KNOWN_MESSAGES = 4096
+
+
+def _remember(known: dict[str, Any], key: str, value: Any) -> None:
+    """Keep ``key`` in an insertion-ordered map of at most `_KNOWN_MESSAGES` entries."""
+    known.pop(key, None)
+    known[key] = value
+    while len(known) > _KNOWN_MESSAGES:
+        del known[next(iter(known))]
+
+
+def _uuid_of(raw: Any) -> uuid.UUID | None:
+    if not raw:
+        return None
+    try:
+        return uuid.UUID(str(raw))
+    except ValueError:
+        return None
 
 
 def _usage(kwargs: Mapping[str, Any]) -> Usage | None:

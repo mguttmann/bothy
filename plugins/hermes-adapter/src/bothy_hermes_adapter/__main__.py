@@ -42,6 +42,8 @@ def build_parser() -> argparse.ArgumentParser:
     inst.add_argument("--busy-input-mode", required=True)
     inst.add_argument("--platform-key", default="bothy")
     inst.add_argument("--consumer", default="default")
+    inst.add_argument("--report-channel", type=UUID)
+    inst.add_argument("--report-thread", type=UUID)
     switch = sub.add_parser("switch-mode", help="switch the billing mode of the profile")
     switch.add_argument("mode", choices=("organization", "personal"))
     switch.add_argument("--profile-home", type=Path, required=True)
@@ -126,6 +128,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 platform_key=args.platform_key,
                 consumer=args.consumer,
                 dpop_key_file=args.dpop_key_file,
+                report_channel=args.report_channel,
+                report_thread=args.report_thread,
             )
             lines = install(bridge, request, _place)
         elif args.command == "switch-mode":

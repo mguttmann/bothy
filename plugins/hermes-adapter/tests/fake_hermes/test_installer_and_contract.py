@@ -2,8 +2,9 @@
 """The installer and the contract with the pinned Hermes (09 17.2, 17.5, 17.7; RK-12; 11 11.3).
 
 The stub contract compares every signature of ``typings/`` with the pinned version, the toolset
-table and the module list are held equal to it, the adapter's additions change no package of the
-Hermes environment, and the installer's commands are run with the profile's own Python.
+table, the command table and the module list are held equal to it, the adapter's additions
+change no package of the Hermes environment, and the installer's commands are run with the
+profile's own Python.
 """
 
 from __future__ import annotations
@@ -30,6 +31,7 @@ from fake_hermes_kit import (
 from hermes_harness.fake_model import ScriptTurn
 from hermes_modules import HERMES_TOP_LEVEL
 
+from bothy_hermes_adapter.hermes_commands import COMMAND_CLASSES
 from bothy_hermes_adapter.installer import CONTROL_SENDER
 from bothy_hermes_adapter.tool_class import TOOLSET_CLASSES
 
@@ -130,6 +132,18 @@ def test_hermes_stubs_match_pinned_version(world: HermesWorld) -> None:
 def test_tool_class_table_covers_pinned_toolsets(world: HermesWorld) -> None:
     names = _run(world, "import json, toolsets; print(json.dumps(sorted(toolsets.TOOLSETS)))")
     assert sorted(TOOLSET_CLASSES) == names
+
+
+def test_command_table_covers_pinned_commands(world: HermesWorld) -> None:
+    # Every command Hermes' gateway dispatches (not CLI-only, or CLI-only with a config gate).
+    names = _run(
+        world,
+        "import json\n"
+        "from hermes_cli.commands import COMMAND_REGISTRY\n"
+        "print(json.dumps(sorted(c.name for c in COMMAND_REGISTRY\n"
+        "                        if not c.cli_only or c.gateway_config_gate)))",
+    )
+    assert sorted(COMMAND_CLASSES) == names
 
 
 def test_hermes_top_level_matches_pinned_version(world: HermesWorld) -> None:
