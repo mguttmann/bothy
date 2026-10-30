@@ -46,6 +46,7 @@ installation.
 | `tests/unit/` | tests without Hermes: a fake runtime on the SDK's FakeServer, and the harness tests of M2-32 |
 | `tests/fake_hermes/` | the pinned Hermes in a subprocess with the adapter, the fake model and the FakeServer |
 | `tests/hermes_harness/`, `tests/recording/`, `tests/fixtures/recording/` | the recording of M2-32 |
+| `tests/realserver/` | the end-to-end suite: the adapter's own code with the fake runtime against the server of this tree (`make adapters-e2e`) |
 
 ## Installation into a Hermes profile
 
@@ -204,6 +205,16 @@ connects only after Hermes finished its startup restore.
   or Hermes' note when speech to text is off; a control command idle and during a turn, a skill
   command, and reports through `hermes send`, a cron job in a process without the gateway and one
   the gateway's own scheduler fires. They need the network for the pinned downloads and fail without it; they never skip.
+- `tests/realserver` (pytest marker `e2e`, left out of `uv run pytest`; `make adapters-e2e`): the
+  adapter's handler and SDK loop with the fake runtime against the server of this tree
+  (`services/server/test/sdkserver`, `bothy_sdk.testing.sdkserver`): a mention in the main
+  thread answered in the auto thread without a quote, a reply in a thread that quotes its
+  trigger, a forum post, reports into a text channel, a fixed thread and a forum (a new post),
+  files and an MP3 voice out, a voice message in with its transcript submitted, a control and a
+  skill command, a card answered by a click, a follow-up steered into the running turn (and
+  quoted by the answer), an edited answer and the thread title, cancel, retry of a failed run,
+  and a copy from Hermes' delivery ledger that is not posted again. A request the server refuses or does not serve fails a test there, which the
+  FakeServer cannot show. They need the Go tool chain and a container runtime and never skip.
 - `tests/unit/test_media.py`: upload in parts, voice kind, size and file type refusals, an
   aborted upload, a refused attachment, the capabilities, transcripts and their submission.
 - The recording of M2-32 has no scenario for files and voice: Hermes' calls are proven by the

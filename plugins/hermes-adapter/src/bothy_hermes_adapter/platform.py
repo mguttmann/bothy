@@ -629,6 +629,11 @@ class ServerPlatform(BasePlatformAdapter):
             return SendResult(success=True, message_id=f"ctl-{uuid.uuid4().hex}")
         if self.handler is None:
             return SendResult(success=False, error="the adapter is not connected")
+        if await self.handler.recovered_duplicate(thread, content):
+            # A copy from Hermes' delivery ledger of an answer the adapter took over: delivered
+            # by the outbox or ended with its run, never a second message (09 17.3).
+            _LOG.info("thread %s: recovered reply not posted again", thread)
+            return SendResult(success=True, message_id=None)
         if reply_to is not None and reply_to in self._control_messages:
             return SendResult(success=False, error="the command has ended")
         if reply_to is not None and reply_to in self._turn_messages:

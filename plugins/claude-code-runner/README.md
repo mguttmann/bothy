@@ -50,6 +50,7 @@ the title once per new session and reports the cost of the run.
 | `tests/unit/`, `tests/scenarios/` | Unit tests; scenarios with Fake-Claude and the SDK FakeServer |
 | `tests/fake_claude/` | Fake-Claude (plays `fixtures/*.jsonl`, constructed from the message shapes of 18.4 and the texts of the pinned CLI; see 09 16.1) |
 | `tests/real_cli/` | Tests against the installed CLI, only behind switches (see below) |
+| `tests/realserver/` | The end-to-end suite: the runner with Fake-Claude against the server of this tree (`make adapters-e2e`) |
 
 ## Configuration
 
@@ -366,6 +367,14 @@ true`, and the owner's switch `supports_files_out` is enforced by the server at 
 ```sh
 cd plugins/claude-code-runner && uv run --locked pytest
 ```
+
+The end-to-end suite `tests/realserver` (pytest marker `e2e`, left out of the command above) runs
+the runner with Fake-Claude against the server of this tree (`services/server/test/sdkserver`)
+as Lotse with tool class `chat` and the default workspace `website`: a forum post, a mention in
+the main thread answered in the auto thread, a reply that resumes the session, a follow-up
+into the running turn, an answer attachment, a voice message with a local transcriber, cancel
+and retry. It needs the Go tool chain and a container runtime (`make adapters-e2e` from the
+repository root).
 
 Every test uses Fake-Claude through `runner.claude_bin` and a fake `HOME`; no installed CLI and
 no login of the developer is touched. The real CLI runs only behind switches:

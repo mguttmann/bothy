@@ -57,7 +57,10 @@ bothy-sdk = { path = "../../sdk/python", editable = true }
 
 [tool.pytest.ini_options]
 minversion = "9.0"
-addopts = ["-ra", "--strict-markers", "--strict-config", "--import-mode=importlib"]
+# The end-to-end suite against the real server (tests/realserver, marker e2e) needs Go and a
+# container runtime; it runs with `make adapters-e2e` (CI job test-adapters-e2e), not here.
+addopts = ["-ra", "--strict-markers", "--strict-config", "--import-mode=importlib", "-m", "not e2e"]
+markers = ["e2e: end-to-end test against the real server of this tree (make adapters-e2e)"]
 testpaths = ["tests"]
 pythonpath = ["src", "tests"]
 filterwarnings = ["error"]

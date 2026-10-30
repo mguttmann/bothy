@@ -13,11 +13,13 @@ Two rules of docs/spec/06-api.md section 15, and the fixture check of chapter 25
   the YAML files and fails on any difference.
 - `viz-fixtures` (25 7.2, VZ-T11) validates every fixture of packages/bothy_viz/fixtures/
   against its schema in docs/api/openapi.yaml (module `viz_fixtures`).
+- `gdpr-export` checks the schemas of the export package (module `gdpr_export`).
+- `client-routes` holds every operation the Python SDK and the Python plugins call to
+  openapi.yaml, the server's enable list and its route table (module `client_routes`).
 
 Commands (run from anywhere; `--root` defaults to the repository of this file):
 
-    api_checks.py check [--rule api-catalogue-sync|api-tables|viz-fixtures]
-                                                                # exit 0 clean, 1 findings
+    api_checks.py check [--rule <rule>]                         # exit 0 clean, 1 findings
     api_checks.py generate                                      # rewrite the generated blocks
 
 Every finding is one line `<rule>: <sub-check>: <subject>: <detail>`; the sub-check `source`
@@ -47,6 +49,7 @@ import yaml
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "catalog"))
 
 import action_catalog
+import client_routes
 import gdpr_export
 import viz_fixtures
 from action_catalog import Catalog, CatalogError
@@ -64,7 +67,8 @@ RULE_SYNC = "api-catalogue-sync"
 RULE_TABLES = "api-tables"
 RULE_VIZ = viz_fixtures.RULE
 RULE_GDPR = gdpr_export.RULE
-RULES = (RULE_SYNC, RULE_TABLES, RULE_VIZ, RULE_GDPR)
+RULE_CLIENTS = client_routes.RULE
+RULES = (RULE_SYNC, RULE_TABLES, RULE_VIZ, RULE_GDPR, RULE_CLIENTS)
 SOURCE = "source"
 
 HTTP_METHODS = ("get", "put", "post", "delete", "options", "head", "patch", "trace")
@@ -2117,6 +2121,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         (RULE_TABLES, check_tables),
         (RULE_VIZ, viz_fixtures.check),
         (RULE_GDPR, gdpr_export.check),
+        (RULE_CLIENTS, client_routes.check),
     )
     for rule, run in checks:
         if args.rule not in (None, rule):

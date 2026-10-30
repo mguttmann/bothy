@@ -41,6 +41,7 @@ __all__ = [
     "SYSTEM_NOTE",
     "BuiltContext",
     "build_context",
+    "command_system_part",
     "cut_utf8",
     "find_message_text",
 ]
@@ -174,6 +175,21 @@ async def build_context(
     rendered = render_context(pruned, file_texts=texts, boundary=boundary)
     system = "\n".join([SYSTEM_NOTE, *_instructions(channel), rendered.system])
     return BuiltContext(system_part=system, user_text=rendered.trigger)
+
+
+def command_system_part(channel: ChannelBehavior | None) -> str:
+    """The system part of a command run: the fixed note and the channel instructions.
+
+    A command run has no run context (09 4.6 defines it for a triggering message only; the
+    server answers ``getRunContext`` of a command run with ``500``), so nothing else is added.
+
+    Args:
+        channel: The channel behaviour (operator runs), if any.
+
+    Returns:
+        The text.
+    """
+    return "\n".join([SYSTEM_NOTE, *_instructions(channel)])
 
 
 def find_message_text(ctx: RunContext, message_id: UUID) -> str | None:

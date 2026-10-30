@@ -73,6 +73,12 @@ func TestProtocolEndToEnd(t *testing.T) {
 			t.Fatalf("ready without %s: %v", k, ready)
 		}
 	}
+	world, _ := ready["world"].(map[string]any)
+	for _, k := range []string{"space_id", "channel_id", "main_thread_id", "alex_id", "owner_id"} {
+		if str(world[k]) == "" {
+			t.Fatalf("ready world without %s: %v", k, ready)
+		}
+	}
 	cfg, _ := ready["config"].(map[string]any)
 	for k, v := range realServerTimings {
 		if str(cfg[k]) != v {
@@ -87,6 +93,11 @@ func TestProtocolEndToEnd(t *testing.T) {
 	if str(trig["thread_id"]) == "" || str(trig["message_id"]) == "" {
 		t.Fatalf("trigger answer %v", trig)
 	}
+	if of := p.call(t, map[string]any{"op": "wait_run", "message_id": str(trig["message_id"])}, "wait_run", opWait); str(of["run_id"]) != run ||
+		str(of["thread_id"]) != str(trig["thread_id"]) {
+		t.Fatalf("wait_run answered %v, want run %s in thread %s", of, run, trig["thread_id"])
+	}
+	p.wantError(t, map[string]any{"op": "wait_run"})
 	first := a.waitInvocation(t, e2eConsumer, run)
 	p.wantRun(t, run, "queued", 0)
 

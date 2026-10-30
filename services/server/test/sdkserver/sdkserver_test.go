@@ -91,6 +91,8 @@ type request struct {
 	Variant  string            `json:"variant"`
 	Consumer string            `json:"consumer"`
 	AckedSeq *int64            `json:"acked_seq"`
+	// MessageID is the triggering message of wait_run.
+	MessageID string `json:"message_id"`
 	// The members of the app ops (brief M2-49 Design note 19): app_front of start, port of
 	// app_backend, name of create_forum, and as, operation_id, path_params, query and body of
 	// call.
@@ -102,6 +104,9 @@ type request struct {
 	PathParams  map[string]string `json:"path_params"`
 	Query       map[string]string `json:"query"`
 	Body        json.RawMessage   `json:"body"`
+	// RawBody (base64) is sent as it is instead of Body, with Header (call of uploadPart).
+	RawBody string            `json:"raw_body"`
+	Header  map[string]string `json:"header"`
 }
 
 // answer is one answer line: op and its members.
@@ -205,7 +210,7 @@ func (p *program) dispatch(req request) (answer, error) {
 		return p.start(req)
 	case "stop":
 		return answer{"op": "stop"}, nil
-	case "trigger", "forge_token", "run", "restart", "app_backend", "create_forum", "call":
+	case "trigger", "forge_token", "run", "wait_run", "restart", "app_backend", "create_forum", "call":
 	default:
 		return nil, fmt.Errorf("unknown op %q", req.Op)
 	}
@@ -219,6 +224,8 @@ func (p *program) dispatch(req request) (answer, error) {
 		return p.forgeToken(req)
 	case "run":
 		return p.run(req)
+	case "wait_run":
+		return p.waitRunOf(req)
 	case "app_backend":
 		return p.appBackend(req)
 	case "create_forum":
@@ -319,7 +326,8 @@ func (p *program) start(req request) (answer, error) {
 		cfg[k] = s.ConfigValue(k)
 	}
 	a := answer{"op": "ready", "origin": p.fwd.Origin(), "instance_id": p.instanceID, "agent_id": p.lotse, "other_agent_id": p.texter,
-		"token_file": tokenFile, "config": cfg}
+		"token_file": tokenFile, "config": cfg, "world": answer{"space_id": p.support, "channel_id": p.channel, "main_thread_id": p.mainThread,
+			"alex_id": p.alex.PrincipalID, "owner_id": p.owner.PrincipalID}}
 	if p.front != nil {
 		a["front_port"] = p.front.Port()
 	}
@@ -464,6 +472,32 @@ func (p *program) waitRun(ctx context.Context, thread string) (string, string, e
 			_ = p.db.QueryRow(ctx, `SELECT coalesce(string_agg(coalesce(trigger_state::text, '-') || '/' || coalesce(trigger_state_reason, '-'), ','), '')
 				FROM messages WHERE thread_id = $1`, thread).Scan(&states)
 			return "", "", fmt.Errorf("no run in the new thread within %s (trigger states %s)", testkit.Patience, states)
+		}
+		time.Sleep(pollEvery)
+	}
+}
+
+// waitRunOf waits for the run that the message message_id triggered, wherever the acceptance put
+// it: in the message's own thread, or in the thread it created on the message (auto_thread, 09
+// 3.4 point 5). It answers the run and its thread.
+func (p *program) waitRunOf(req request) (answer, error) {
+	if req.MessageID == "" {
+		return nil, errors.New("message_id is required")
+	}
+	ctx := p.gen.Context()
+	deadline := testkit.Deadline()
+	for {
+		var run, thread string
+		err := p.db.QueryRow(ctx, `SELECT id::text, thread_id::text FROM runs WHERE triggering_message_id = $1 ORDER BY id DESC LIMIT 1`,
+			req.MessageID).Scan(&run, &thread)
+		if err == nil {
+			return answer{"op": "wait_run", "run_id": run, "thread_id": thread}, nil
+		}
+		if time.Now().After(deadline) {
+			var state string
+			_ = p.db.QueryRow(ctx, `SELECT coalesce(trigger_state::text, '-') || '/' || coalesce(trigger_state_reason, '-') FROM messages WHERE id = $1`,
+				req.MessageID).Scan(&state)
+			return nil, fmt.Errorf("no run of message %s within %s (trigger state %s)", req.MessageID, testkit.Patience, state)
 		}
 		time.Sleep(pollEvery)
 	}

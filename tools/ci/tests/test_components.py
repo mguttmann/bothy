@@ -276,8 +276,9 @@ DESKTOP = {"apps-macos", "apps-ios", "apps-windows"}
 ANDROID = {"apps-android-26", "apps-android-36"}
 PLATFORM = DESKTOP | ANDROID
 CONSOLE = {"console-e2e"}
-# The real-server tests of the Python SDK build the server of this tree (M2-29).
-SDK = {"test-sdk-plugins"}
+# The real-server tests of the Python SDK build the server of this tree (M2-29), and so do the
+# end-to-end suites of the Python adapters (HERMES-E2E-REAL-SERVER).
+SDK = {"test-sdk-plugins", "test-adapters-e2e"}
 TRIALS = {"desktop-trial-macos", "desktop-trial-windows"}
 # The platform trials of the host packages follow the host service and its release steps (M7-23).
 HOST_TRIALS = {"host-trial-macos", "host-trial-windows"}
@@ -335,10 +336,11 @@ EVERY_JOB = set(components.CONDITIONAL_JOBS) - TRIALS - HOST_TRIALS - MOBILE
         ),
         (["tools/observability/sli_bounds.py"], {"test-apps", "test-server"}),
         # SDKs and plugins.
-        (["sdk/python/src/x.py"], {"test-sdk-plugins", "test-server"}),
-        (["sdk/typescript/src/x.ts"], {"test-sdk-plugins"}),
-        (["plugins/hermes-adapter/x.py"], {"test-sdk-plugins"}),
-        (["plugins/hermes-adapter/pyproject.toml"], {"test-sdk-plugins"}),
+        (["sdk/python/src/x.py"], SDK | {"test-server"}),
+        # sdk/typescript/ is an input of the component plugins too (the GitHub app).
+        (["sdk/typescript/src/x.ts"], SDK),
+        (["plugins/hermes-adapter/x.py"], SDK),
+        (["plugins/hermes-adapter/pyproject.toml"], SDK),
         # Documentation needs no conditional job; test (tools) runs on every change.
         (["docs/spec/07-permissions.md"], set()),
         # The terminal suite of the server starts the Compose stack and its collector (M2-48).
@@ -347,7 +349,7 @@ EVERY_JOB = set(components.CONDITIONAL_JOBS) - TRIALS - HOST_TRIALS - MOBILE
         # The Grafana pin of the Compose stack is an input of the panel plugin's tests (M7-25).
         (
             ["README.md", "infra/compose/compose.yaml"],
-            {"test-sdk-plugins"} | TESTS_SERVER | CONSOLE,
+            SDK | TESTS_SERVER | CONSOLE,
         ),
         (
             ["services/server/internal/x.go", "docs/DECISIONS.md"],
@@ -432,8 +434,8 @@ def test_ci_plan_leaves_android_out_while_the_repository_is_private() -> None:
         # The release gate of one component (release.yml): its jobs.
         ("server", TESTS_SERVER | POSTGRES | CONSOLE),
         ("apps", {"test-apps"} | PLATFORM | CONSOLE),
-        ("plugins", {"test-sdk-plugins"}),
-        ("sdk-python", {"test-sdk-plugins"}),
+        ("plugins", SDK),
+        ("sdk-python", SDK),
     ],
 )
 def test_ci_plan_without_a_diff_follows_the_components(selected: str, expected: set[str]) -> None:
@@ -500,8 +502,8 @@ def test_cli_ci_plan_from_a_diff(
     monkeypatch.chdir(tmp_path)
     assert components.main(["ci-plan", "--base", base, "--head", head, "--public", "true"]) == 0
     assert (
-        capsys.readouterr().out
-        == "components=plugins sdk-python server\njobs=test-sdk-plugins test-server\n"
+        capsys.readouterr().out == "components=plugins sdk-python server\n"
+        "jobs=test-adapters-e2e test-sdk-plugins test-server\n"
     )
 
 

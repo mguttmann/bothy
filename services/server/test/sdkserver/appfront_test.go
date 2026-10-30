@@ -17,6 +17,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -302,7 +303,8 @@ type callResult struct {
 }
 
 // call performs operation_id through the real HTTP chain as the owner (with a fresh step-up
-// first) or Alex and writes status and body into a new file of mode 0600 in the dir of start; the
+// first) or Alex and writes status and body into a new file of mode 0600 in the dir of start (a
+// raw_body, base64, is sent as it is with the header entries, for uploadPart); the
 // answer names status and file only, so no token is ever printed.
 func (p *program) call(req request) (answer, error) {
 	var c *harness.Client
@@ -335,8 +337,18 @@ func (p *program) call(req request) (answer, error) {
 			return nil, err
 		}
 	}
-	r := harness.Request{Method: op.Method, Path: path}
-	if len(req.Body) > 0 && string(req.Body) != "null" {
+	r := harness.Request{Method: op.Method, Path: path, Header: http.Header{}}
+	for k, v := range req.Header {
+		r.Header.Set(k, v)
+	}
+	switch {
+	case req.RawBody != "":
+		raw, err := base64.StdEncoding.DecodeString(req.RawBody)
+		if err != nil {
+			return nil, fmt.Errorf("raw_body: %w", err)
+		}
+		r.Body, r.ContentLength = raw, int64(len(raw))
+	case len(req.Body) > 0 && string(req.Body) != "null":
 		r.Body = []byte(req.Body)
 	}
 	resp, err := harness.DoWithStepUp(ctx, c, r)

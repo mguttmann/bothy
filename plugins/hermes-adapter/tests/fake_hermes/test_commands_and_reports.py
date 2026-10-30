@@ -278,7 +278,9 @@ def _agents(rig: HermesRig) -> list[str]:
 _LATE_SEND_PROBE = """
 import asyncio, json, uuid
 from gateway.config import PlatformConfig
+from gateway.delivery_ledger import FLOOD_MARKER, RECONNECTED_MARKER, RECOVERED_MARKER
 from bothy_hermes_adapter.platform import ServerPlatform
+from bothy_hermes_adapter.reports import recovered_reply
 from bothy_hermes_adapter.runtime import CommandRequest, TurnOutcome, TurnRequest
 
 C, T, U = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
@@ -301,6 +303,13 @@ class Handler:
     async def on_report(self, chat, thread, text):
         self.calls.append(["report", text])
         return "r-1"
+
+    async def recovered_duplicate(self, thread, content):
+        # The real notice parser over Hermes' real notices; "answer" was an answer of the thread.
+        reply = recovered_reply(content)
+        if reply is not None:
+            self.calls.append(["recovered", reply])
+        return reply == "answer" and thread == T
 
 
 async def main():
@@ -337,6 +346,10 @@ async def main():
     await p.run_command(CommandRequest(
         thread_id=T, channel_id=C, user_id=U, user_name="p", text="/version"))
     await send("late_command", "late reply", seen[-1])
+    for name, marker in (("restarted", RECOVERED_MARKER), ("reconnected", RECONNECTED_MARKER),
+                         ("flood", FLOOD_MARKER)):
+        await send(name, marker + "answer", None)
+    await send("recovered_report", RECONNECTED_MARKER + "cron report", None)
     print(json.dumps(out))
 
 
@@ -345,7 +358,10 @@ asyncio.run(main())
 
 
 def test_late_turn_answer_is_never_posted(world: HermesWorld) -> None:
-    """D-HERMES-CRON-COMMANDS-5: a cancelled or aborted turn's late answer is no report."""
+    """D-HERMES-CRON-COMMANDS-5: a cancelled or aborted turn's late answer is no report.
+
+    D-HERMES-E2E-3: a copy of an answer from Hermes' delivery ledger is not posted again.
+    """
     out = subprocess.run(
         [str(world.python), "-c", _LATE_SEND_PROBE],
         capture_output=True,
@@ -364,3 +380,10 @@ def test_late_turn_answer_is_never_posted(world: HermesWorld) -> None:
     assert sent["late_command"] == [False, []]
     # A send without a turn's message stays a report.
     assert sent["report"] == [True, [["report", "cron report"]]]
+    # A copy from Hermes' delivery ledger of an answer of the thread is acknowledged, not posted
+    # (HERMES-E2E-REAL-SERVER), for each notice of the pinned version; any other copy goes on.
+    for name in ("restarted", "reconnected", "flood"):
+        assert sent[name] == [True, [["recovered", "answer"]]], name
+    assert sent["recovered_report"][0] is True
+    assert sent["recovered_report"][1][0] == ["recovered", "cron report"]
+    assert sent["recovered_report"][1][1][0] == "report"

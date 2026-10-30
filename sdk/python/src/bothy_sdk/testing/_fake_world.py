@@ -1058,10 +1058,17 @@ class World:
     def context(self, run_id: str) -> dict[str, Any]:
         """``getRunContext``: the trigger and the other messages of the thread as marked items.
 
-        ``thread_context`` holds every other message of the thread, also the follow-ups after the
-        trigger, so an adapter finds a follow-up's content by its ``message_id``.
+        A run whose trigger is no message (a command run) has no context: ``500 internal_error``
+        as on the real server.
+
+        ``thread_context`` holds only the messages before the trigger, as on the real server
+        (09 4.6). A follow-up comes after the trigger, so an adapter reads it with ``getMessage``.
         """
         run = self.run_or_404(run_id)
+        if run.trigger_kind != "message":
+            # The real server defines the context for a triggering message only (09 4.6) and
+            # answers any other trigger kind with 500 (runs/app/runcontext.go).
+            raise FakeProblem("internal_error")
         items = [self._context_item(self.messages[m], run) for m in self.threads[run.thread_id]]
         if run.context is not None:
             doc = {**run.context, "run_id": str(run.id)}
@@ -1073,7 +1080,9 @@ class World:
         doc = {
             "run_id": str(run.id),
             "trigger_message": trigger,
-            "thread_context": [i for i in items if i is not trigger],
+            # The messages before the trigger only, as on the real server (09 4.6): a follow-up
+            # comes after it and is read with getMessage.
+            "thread_context": items[: items.index(trigger)],
             "channel_context": [],
             "context_floor_seq": 0,
         }
