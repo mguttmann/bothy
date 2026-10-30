@@ -221,3 +221,6 @@ async def test_undelivered_reply_fails_the_run(world: World) -> None:
     run = await world.fake.trigger("Fix it", channel_id=world.forum_a)
     assert await world.ended(run.run_id) == "failed"
     assert world.fake.run_state(run.run_id).state_reason == "adapter_error"
+    # RUNNER-NO-GIT: the thread names the cause, not a bare adapter_error.
+    (finish,) = [r.json for r in world.requests("finishRun") if str(run.run_id) in r.path]
+    assert "`reply_refused`" in finish["summary"]

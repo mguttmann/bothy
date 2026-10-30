@@ -436,7 +436,8 @@ class World:
         """
         person = self.by_handle[author] if isinstance(author, str) else (author or self.alex)
         channel = channel_id or self.channel_id
-        if channel not in self.channels:
+        # An unserved channel is a guest run's (09 3.6): Lotse is mentioned, not the operator.
+        if channel not in self.channels and channel not in self.unserved:
             raise KeyError("no such channel")
         if thread_id is None:
             thread_id = uuid7()
@@ -478,7 +479,9 @@ class World:
             "trigger_kind": trigger_kind,
             "triggered_by": person.ref(),
             "billing_mode": self.billing_mode,
-            "settings_version": self.channels[channel]["behavior"]["settings_version"],
+            "settings_version": (self.channels.get(channel) or self.unserved[channel])["behavior"][
+                "settings_version"
+            ],
         }
         payload[
             TRIGGER_OBJECT[trigger_kind] if trigger_kind != "command" else "command_invocation_id"

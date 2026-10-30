@@ -154,6 +154,56 @@ void main() {
     expect(code.style?.fontSize, DsType.codeSm.fontSize);
   });
 
+  testWidgets(
+    'a failed run names its cause next to the reason (RUNNER-NO-GIT)',
+    (tester) async {
+      final l = await en();
+      const cause = 'This forum has no project folder. Bind a folder.';
+      const run = DsRunData(
+        id: 'r1',
+        agentName: 'Robin',
+        state: DsRunState.failed,
+        stateReason: 'adapter_error',
+        reasonDetail: cause,
+      );
+      await pumpDs(
+        tester,
+        const DsLiveBox(run, visibleSteps: 6, announceMinInterval: _interval),
+      );
+      expect(find.text(l.liveBoxReasonAdapterError), findsOneWidget);
+      expect(find.text(cause), findsOneWidget);
+
+      await pumpDs(
+        tester,
+        DsLiveBox.collapsed(
+          run,
+          announceMinInterval: _interval,
+          onExpand: () {},
+        ),
+      );
+      final text = allText(tester);
+      expect(text, contains(l.liveBoxReasonAdapterError));
+      expect(text, contains(cause));
+    },
+  );
+
+  testWidgets('a completed run shows no reason detail line', (tester) async {
+    await pumpDs(
+      tester,
+      DsLiveBox.collapsed(
+        const DsRunData(
+          id: 'r1',
+          agentName: 'Robin',
+          state: DsRunState.completed,
+          reasonDetail: 'never shown',
+        ),
+        announceMinInterval: _interval,
+        onExpand: () {},
+      ),
+    );
+    expect(allText(tester), isNot(contains('never shown')));
+  });
+
   testWidgets('at most visibleSteps chips plus the earlier steps link', (
     tester,
   ) async {

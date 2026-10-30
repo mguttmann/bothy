@@ -2,12 +2,15 @@
 
 Status: core (M2-34), follow-ups, stop, error paths and adoption after a crash (M2-35), answer
 attachments (M3-12), folder creation of new projects (M4-43), live reload of channels and
-optional transcription of voice messages (RUNNER-LIVE-RELOAD).
+optional transcription of voice messages (RUNNER-LIVE-RELOAD), Git optional, a default folder for
+forums without a binding and the cause of every refusal in the thread (RUNNER-NO-GIT).
 
 ## Purpose
 
 Reference adapter for development forums: a forum with a project binding is a project, every
-thread in it is one Claude Code session. The runner is one process per agent token on the host
+thread in it is one Claude Code session. The project folder need not be a Git repository, and a
+forum without a binding works in `runner.default_workspace` when that is set (see "Forums
+without Git or without a folder"). The runner is one process per agent token on the host
 that holds the projects. For every run it starts exactly one `claude -p` turn with stream-json in
 the resolved project folder, fills the live box from the stream, answers in the thread, proposes
 the title once per new session and reports the cost of the run.
@@ -34,7 +37,8 @@ the title once per new session and reports the cost of the run.
 | `ledger.py` | The recovery invariants of a turn (stored offset, answers, inputs, kind, decided end), part of the turn record |
 | `failures.py`, `recovery.py` | Recognised CLI texts (`ERROR_TEXTS`) and the classification of a process end; the next action and the box notes |
 | `followups.py`, `stop.py`, `adoption.py` | Follow-up check, line and stdin rule; the stop schedule; identity check and adoption decision |
-| `channels.py`, `workspace.py` | Cache of the served forums and their bindings, reloaded while running (09 18.1); resolution of `workspace_ref`, readiness and the project folder report (09 18.13, M4-44) |
+| `channels.py`, `workspace.py` | Cache of the served forums and their bindings, reloaded while running (09 18.1); resolution of `workspace_ref` and `runner.default_workspace`, readiness and the project folder report (09 18.13, M4-44) |
+| `causes.py` | The sentence for the thread that names the cause of a refused run (09 18.9, RUNNER-NO-GIT) |
 | `transcribe.py` | The local transcriber of audio attachments and the note without a transcript (09 18.14) |
 | `provision.py` | Folder creation of a binding with `provision` `init` or `clone`, its creation record and the readiness reasons (09 18.12, M4-43) |
 | `toolclass.py`, `commandline.py`, `environment.py` | Tool class order, the argument list of a turn, the allow-list environment |
@@ -94,6 +98,37 @@ docs/operations/configuration.md (generated from 09 21). Operator rules:
 - `runner.transcribe_cmd` is off by default; see "Voice messages" below. The transcriber runs as
   the runner user with the allow-list environment and gets the audio file of a person's message,
   so install only a program you trust there.
+
+## Forums without Git or without a folder (RUNNER-NO-GIT)
+
+Every forum the runner operates is a Claude Code chat (09 18.1, R-AG-35):
+
+- **Git is optional.** A bound folder is ready when it exists under `runner.projects_root` and
+  the runner user may read, write and search it; `.git` is not needed. The runner uses no Git
+  feature itself (no worktree per post, no branch names, no diff or commit reports), so nothing
+  is skipped; Claude Code finds out on its own whether the folder is a repository.
+- **Forums without a binding.** With `runner.default_workspace` set, a run in a forum the runner
+  operates but that has no project binding works in that folder: `"."` is the projects root
+  itself, a name such as `"scratch"` a folder under it (checked like a `workspace_ref` when the
+  configuration loads; it must exist and be writable when a run starts). Such a run uses
+  `runner.default_model` and `runner.scoped_allowed_tools` and logs `default_workspace_used`. A
+  bound forum never falls back to it, and neither does a channel the runner does not operate:
+  a guest run there (09 3.6) ends with the cause `channel_not_served`, bound or not. A text
+  channel the runner operates without a binding is treated like such a forum. The default is
+  empty (off). Note that `"."` gives every such chat the whole projects root, with write access
+  to every project folder; a dedicated folder such as `"scratch"` keeps them apart.
+- **The cause in the thread.** A run the runner ends without a turn, or with `adapter_error`,
+  carries the cause as the `summary` of `finishRun`, one or two sentences with the log code in
+  backticks, for example "This forum has no project folder, so Claude Code has nowhere to work.
+  Bind a folder to the forum in its settings, or set runner.default_workspace on the runner host
+  for forums without a folder (`project_not_bound`)". The app shows it next to the reason. The
+  texts carry only codes and key names, never a path of the host.
+
+```toml
+[runner]
+projects_root = "/srv/projects"
+default_workspace = "."
+```
 
 ## Channel and binding changes while running
 
@@ -252,7 +287,9 @@ are not supported.
 ## Project folder report (M4-44)
 
 Every heartbeat carries `project_folders`: the names of the Git work trees directly under
-`runner.projects_root` (docs/spec/09-agents.md 18.13). An entry counts when its name is one
+`runner.projects_root` (docs/spec/09-agents.md 18.13). A folder without Git is still ready when
+it is bound by name; the list only offers Git work trees, because the app checks every listed
+folder for a new forum. An entry counts when its name is one
 segment of letters, digits, `.`, `_` and `-` that starts with a letter or digit (so hidden folders
 and the `.provision-<uuid>` folders never show), it resolves like a `workspace_ref` to a folder
 under the root and it holds `.git`. The names go out in code point order, at most

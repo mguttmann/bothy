@@ -241,3 +241,26 @@ def test_transcribe_keys(tmp_path: Path) -> None:
             load_config(write(tmp_path, f"transcribe_cmd = {bad}\n"))
     with pytest.raises(ConfigError, match="transcribe_timeout"):
         load_config(write(tmp_path, 'transcribe_timeout = "0s"\n'))
+
+
+def test_default_workspace_is_off_by_default(tmp_path: Path) -> None:
+    """RUNNER-NO-GIT: a forum without a binding gets no folder unless the operator names one."""
+    assert load_config(write(tmp_path)).default_workspace is None
+
+
+@pytest.mark.parametrize("value", [".", "scratch", "team/notes"])
+def test_default_workspace_accepted(tmp_path: Path, value: str) -> None:
+    cfg = load_config(write(tmp_path, runner=f'default_workspace = "{value}"'))
+    assert cfg.default_workspace == value
+
+
+def test_default_workspace_empty_is_off(tmp_path: Path) -> None:
+    cfg = load_config(write(tmp_path, runner='default_workspace = ""'))
+    assert cfg.default_workspace is None
+
+
+@pytest.mark.parametrize("value", ["/srv/projects", "../x", "-x", "~x", "a/../../b"])
+def test_default_workspace_outside_the_root_refused(tmp_path: Path, value: str) -> None:
+    with pytest.raises(ConfigError) as err:
+        load_config(write(tmp_path, runner=f'default_workspace = "{value}"'))
+    assert err.value.key == "runner.default_workspace"

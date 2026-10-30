@@ -7,7 +7,14 @@ from pathlib import Path
 
 import pytest
 
-from claude_code_runner.workspace import WorkspaceError, project_folders, readiness, resolve
+from claude_code_runner.workspace import (
+    WorkspaceError,
+    default_readiness,
+    project_folders,
+    readiness,
+    resolve,
+    resolve_default,
+)
 
 
 @pytest.fixture
@@ -49,7 +56,8 @@ def test_readiness_codes(root: Path) -> None:
     assert readiness(root, "website") == (True, None)
     assert readiness(root, "docs") == (False, "workspace_missing")
     (root / "plain").mkdir()
-    assert readiness(root, "plain") == (False, "not_a_git_worktree")
+    # RUNNER-NO-GIT: Git is optional; a plain folder is a ready project.
+    assert readiness(root, "plain") == (True, None)
     (root / "file").write_text("x")
     assert readiness(root, "file") == (False, "workspace_missing")
     (root / "linked").mkdir()
@@ -110,3 +118,44 @@ def test_project_folders_unreadable_root(tmp_path: Path, caplog: pytest.LogCaptu
 def test_project_folders_long_name_left_out(root: Path) -> None:
     _git_folder(root, "x" * 255)
     assert project_folders(root, 500) == ["website", "x" * 255]
+
+
+def test_plain_folder_without_rights_is_not_writable(root: Path) -> None:
+    ro = root / "plain-ro"
+    ro.mkdir()
+    ro.chmod(0o555)
+    try:
+        assert readiness(root, "plain-ro") == (False, "not_writable")
+    finally:
+        ro.chmod(0o755)
+
+
+def test_default_workspace_dot_is_the_root(root: Path) -> None:
+    """``runner.default_workspace = "."`` is the projects root itself (RUNNER-NO-GIT)."""
+    assert resolve_default(root, ".") == root.resolve()
+    assert default_readiness(root, ".") == (True, None)
+
+
+def test_default_workspace_names_a_folder_under_the_root(root: Path) -> None:
+    assert resolve_default(root, "team/website") == (root / "team" / "website").resolve()
+    assert default_readiness(root, "scratch") == (False, "workspace_missing")
+    (root / "scratch").mkdir()
+    assert default_readiness(root, "scratch") == (True, None)
+
+
+@pytest.mark.parametrize("ref", ["/etc", "~x", "-x", "a\\b", "C:x", "team/../x", "", "./x/.."])
+def test_default_workspace_refused_outside(root: Path, ref: str) -> None:
+    with pytest.raises(WorkspaceError) as err:
+        resolve_default(root, ref)
+    assert err.value.code == "outside_root"
+    assert default_readiness(root, ref) == (False, "outside_root")
+
+
+def test_default_workspace_root_without_rights(tmp_path: Path) -> None:
+    ro = tmp_path / "ro-root"
+    ro.mkdir()
+    ro.chmod(0o555)
+    try:
+        assert default_readiness(ro, ".") == (False, "not_writable")
+    finally:
+        ro.chmod(0o755)

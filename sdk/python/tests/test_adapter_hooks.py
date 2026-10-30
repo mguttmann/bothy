@@ -75,14 +75,15 @@ async def running(adapter: Adapter, fake: FakeServer) -> AsyncIterator[None]:
 
 
 class Refusing(RecordingHandler):
-    def __init__(self, reason: str | None) -> None:
+    def __init__(self, reason: str | None, summary: str | None = None) -> None:
         super().__init__()
         self.reason = reason
+        self.summary = summary
         self.not_started: list[UUID] = []
 
     async def prepare(self, inv: Invocation, run: RunHandle) -> StartOptions:
         await super().prepare(inv, run)
-        raise RunRefused(self.reason)
+        raise RunRefused(self.reason, summary=self.summary)
 
     async def on_not_started(self, inv: Invocation) -> None:
         self.not_started.append(inv.claims.run_id or UUID(int=0))
@@ -103,6 +104,68 @@ async def test_run_refused_in_prepare_finishes_with_its_reason(fake: FakeServer)
     assert fake.run_state(triggered.run_id).state_reason == "runtime_not_authenticated"
     assert ops(fake, "startRun") == []
     assert handler.count("execute") == 0
+
+
+def finish_bodies(fake: FakeServer, run_id: UUID) -> list[Any]:
+    return [
+        r.json for r in fake.requests if r.operation_id == "finishRun" and str(run_id) in r.path
+    ]
+
+
+@pytest.mark.anyio
+async def test_run_refused_with_a_summary_names_the_cause(fake: FakeServer) -> None:
+    """RUNNER-NO-GIT: the cause of a refusal reaches the thread as the run's summary."""
+    handler = Refusing("adapter_error", summary="This forum has no project folder.")
+    adapter = make_adapter(fake, handler, "cause")
+    async with running(adapter, fake):
+        triggered = await fake.trigger()
+        await until(fake, lambda: handler.not_started == [triggered.run_id])
+    assert fake.run_state(triggered.run_id).state_reason == "adapter_error"
+    (body,) = finish_bodies(fake, triggered.run_id)
+    assert body["summary"] == "This forum has no project folder."
+
+
+@pytest.mark.anyio
+async def test_run_refused_without_a_summary_sends_none(fake: FakeServer) -> None:
+    handler = Refusing("runtime_not_authenticated")
+    adapter = make_adapter(fake, handler, "nocause")
+    async with running(adapter, fake):
+        triggered = await fake.trigger()
+        await until(fake, lambda: handler.not_started == [triggered.run_id])
+    (body,) = finish_bodies(fake, triggered.run_id)
+    assert "summary" not in body
+
+
+class Crashing(RecordingHandler):
+    def __init__(self, where: str) -> None:
+        super().__init__()
+        self.where = where
+
+    async def prepare(self, inv: Invocation, run: RunHandle) -> StartOptions:
+        options = await super().prepare(inv, run)
+        if self.where == "prepare":
+            raise KeyError("/private/path/never/shown")
+        return options
+
+    async def execute(self, inv: Invocation, run: RunHandle) -> None:
+        if self.where == "execute":
+            raise KeyError("/private/path/never/shown")
+        await super().execute(inv, run)
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("where", ["prepare", "execute"])
+async def test_unexpected_handler_error_names_its_kind(fake: FakeServer, where: str) -> None:
+    """RUNNER-NO-GIT: an unexpected error is never a bare adapter_error; never its message."""
+    handler = Crashing(where)
+    adapter = make_adapter(fake, handler, f"crash-{where}")
+    async with running(adapter, fake):
+        triggered = await fake.trigger()
+        await until(fake, lambda: fake.run_state(triggered.run_id).state == "failed")
+    assert fake.run_state(triggered.run_id).state_reason == "adapter_error"
+    (body,) = finish_bodies(fake, triggered.run_id)
+    assert "KeyError" in body["summary"]
+    assert "private" not in body["summary"]
 
 
 @pytest.mark.anyio

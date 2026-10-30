@@ -154,3 +154,21 @@ def test_an_unknown_kind_reads_as_a_compaction_and_bad_entries_are_skipped() -> 
     )
     with pytest.raises(ValueError, match="other"):
         TurnLedger.begin("other", 0)
+
+
+def test_finishing_keeps_its_summary() -> None:
+    """RUNNER-NO-GIT: an adopted end repeats the summary that names the cause."""
+    from claude_code_runner.ledger import TurnLedger
+
+    record = {"finishing": {"state": "failed", "reason": "adapter_error", "summary": "Why"}}
+    assert TurnLedger.from_record(record).finishing == {
+        "state": "failed",
+        "reason": "adapter_error",
+        "summary": "Why",
+    }
+    old = {"finishing": {"state": "failed", "reason": "adapter_error"}}
+    assert TurnLedger.from_record(old).finishing == {
+        "state": "failed",
+        "reason": "adapter_error",
+        "summary": None,
+    }

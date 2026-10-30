@@ -102,3 +102,60 @@ async def test_periodic_resync_without_an_event(world: World) -> None:
     fake.set_operator(forum, announce=False)
     await world.until(lambda: _ready_since(world, count, forum))
     assert world.requests("listServedChannels")[1:]
+
+
+def _summary(world: World, run_id: UUID) -> str:
+    (body,) = [r.json for r in world.requests("finishRun") if str(run_id) in r.path]
+    return str(body.get("summary", ""))
+
+
+async def test_new_operator_of_a_forum_without_binding_uses_the_default(world: World) -> None:
+    """RUNNER-NO-GIT: a plain forum that gets the runner as operator is a Claude Code chat."""
+    fake = world.fake
+    forum = fake.add_forum("Ideas", None, served=False)
+    await world.start(world.config(default_workspace="."))
+    count = len(world.requests("listServedChannels"))
+    fake.set_operator(forum)
+    await world.until(lambda: len(world.requests("listServedChannels")) > count)
+    run = await fake.trigger("Hello", channel_id=forum)
+    assert await world.ended(run.run_id) == "completed"
+    (turn,) = world.turns()
+    assert turn["cwd"] == str(world.projects.resolve())
+
+
+async def test_new_operator_of_a_forum_without_binding_and_default(world: World) -> None:
+    fake = world.fake
+    forum = fake.add_forum("Ideas", None, served=False)
+    await world.start()
+    count = len(world.requests("listServedChannels"))
+    fake.set_operator(forum)
+    await world.until(lambda: len(world.requests("listServedChannels")) > count)
+    run = await fake.trigger("Hello", channel_id=forum)
+    assert await world.ended(run.run_id) == "failed"
+    assert "Bind a folder" in _summary(world, run.run_id)
+
+
+async def test_binding_to_a_folder_without_git_is_ready_at_once(world: World) -> None:
+    """RUNNER-NO-GIT through the live reload of #459: no restart, no Git."""
+    fake = world.fake
+    (world.projects / "plain").mkdir()
+    await world.start()
+    count = len(fake.heartbeats)
+    fake.update_forum(world.werkzeuge, workspace_ref="plain")
+    await world.until(lambda: _ready_since(world, count, world.werkzeuge))
+    run = await fake.trigger("Hello", channel_id=world.werkzeuge)
+    assert await world.ended(run.run_id) == "completed"
+    (turn,) = world.turns()
+    assert turn["cwd"] == str((world.projects / "plain").resolve())
+
+
+async def test_unbinding_falls_back_to_the_default_workspace(world: World) -> None:
+    fake = world.fake
+    await world.start(world.config(default_workspace="."))
+    count = len(fake.heartbeats)
+    fake.unbind_forum(world.forum_a)
+    await world.until(lambda: _gone_since(world, count, world.forum_a))
+    run = await fake.trigger("Hello", channel_id=world.forum_a)
+    assert await world.ended(run.run_id) == "completed"
+    (turn,) = world.turns()
+    assert turn["cwd"] == str(world.projects.resolve())

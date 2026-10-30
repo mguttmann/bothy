@@ -507,6 +507,7 @@ final class DsRunData {
     this.billingHolderName,
     this.statusLine,
     this.lastTextExcerpt,
+    this.reasonDetail,
     this.steps = const [],
     this.toolCount = 0,
     this.subagentCount = 0,
@@ -556,6 +557,10 @@ final class DsRunData {
 
   /// `last_text_excerpt`, or null.
   final String? lastTextExcerpt;
+
+  /// The adapter's `summary` of a failed or cancelled run: the cause of [stateReason] in its
+  /// own words (09 5.4, RUNNER-NO-GIT), shown next to the reason; null for none.
+  final String? reasonDetail;
 
   /// The steps in `ordinal` order.
   final List<DsStepData> steps;

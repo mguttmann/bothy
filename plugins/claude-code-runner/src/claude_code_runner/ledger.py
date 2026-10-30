@@ -182,9 +182,11 @@ class TurnLedger:
         finishing = record.get("finishing")
         if isinstance(finishing, Mapping) and finishing.get("state") in _END_STATES:
             reason = finishing.get("reason")
+            summary = finishing.get("summary")
             ledger.finishing = {
                 "state": str(finishing["state"]),
                 "reason": reason if isinstance(reason, str) else None,
+                "summary": summary if isinstance(summary, str) else None,
             }
         return ledger
 

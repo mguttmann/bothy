@@ -227,6 +227,14 @@ project, so a project has as many parallel chats as it has open posts. The app s
 tooltip of the channel icon, as the subtitle of the channel header and in the empty state of a
 forum (addendum of 2026-10-27, D-SB-10).
 
+Every forum whose operator is the Claude Code runner is a Claude Code chat (addendum of
+2026-10-30, R-PR-27, [09-agents.md](09-agents.md) 18.1). The project folder need not be a Git
+repository: the runner reports a bound folder without Git as ready. A forum without a project
+binding works in the runner's default folder (`runner.default_workspace`) when its operator set
+one; without it, a message there fails with a sentence that says the forum has no project folder
+and to bind one. Every failed run shows its cause in the thread next to the reason, never only
+"Error in the adapter".
+
 ## 5. Screens
 
 Symbols in the wireframes: `v`/`>` expanded/collapsed, `#` text channel, `=` forum, `{}` forum
@@ -1629,7 +1637,8 @@ result like any forum.
    chat and names it. If the dialog closes before, the idea stays as that draft.
 5. **Failure.** A failed step shows its name and one sentence for its cause: a taken name, a
    folder already bound to another forum, a refused step-up, a folder that already exists, a
-   failed clone, a missing folder, a folder that is not a Git repository, a runner that has not
+   failed clone, a missing folder, a folder that is not a Git repository (only from a runner
+   before the addendum of 2026-10-30, which treats Git as optional), a runner that has not
    answered. The fields of the steps not done yet stay editable (for example the URL after a
    failed clone, the folder name after a taken folder); "Try again" resumes at the failed step with
    them and creates nothing twice; "Close" keeps what exists.
@@ -2002,6 +2011,7 @@ Rules:
 | R-PR-24 | Each device navigates on its own: route, selected row, open columns, collapsed spaces and groups and scroll position stay on the device and never follow another device of the person; only data (messages, read state, counters, drafts, settings, sidebar order, notification preferences) syncs (6.7, 04 14; addendum of 2026-10-29). | Owner report 2026-10-29 (iPhone and Mac app of one person): opening a chat on the phone appeared to open the same chat on the Mac. The cause was the synchronized collapse of a space: the space a device expanded to open a chat expanded on the other device at the same moment, while the route never followed. The owner wants to do different things on phone and desktop. Two-device tests over the fake server hold the rule (docs/decisions.d/FIX-device-mirroring.md, docs/decisions.d/FIX-device-mirroring-2.md). |
 | R-PR-25 | Every code block and quote block of a message copies on its own: on the desktop through a copy button at its top right, on the phone through a tap with "Copied" and a haptic, while a long press keeps the message menu; a code block copies its raw content byte for byte, a quote its text without markers and, where the clipboard holds rich text, also as HTML (6.12, addendum of 2026-10-29). | Owner request 2026-10-29: in Discord a tap on a code block on the phone never copied it and "Copy text" always copied the whole message. |
 | R-PR-26 | A paste over `ui.composer_paste_file_chars` characters or `ui.composer_paste_file_lines` lines becomes a text file attachment with "Insert as text"; a text over `message.max_content_bytes` goes out as one message with its rest as one attachment, from people and agents alike; a message is never split (6.13, addendum of 2026-10-29). | Owner decision 2026-10-29: a person never hits a length limit, as in the former chat tool where 2000 characters forced splitting or a paid plan; one message keeps a reply readable and quotable as one. |
+| R-PR-27 | Every forum the Claude Code runner operates is a Claude Code chat: its folder need not be a Git repository, a forum without a project binding works in the runner's default folder when one is set, and a failed run shows its cause in the thread next to the reason (section 4, addendum of 2026-10-30). | Owner expectation 2026-10-30: three forums bound to folders without Git stayed "not ready", and a forum without a binding failed after 0 s with only "Error in the adapter" (docs/decisions.d/RUNNER-NO-GIT.md). |
 
 ## 14. Configuration values of this chapter
 

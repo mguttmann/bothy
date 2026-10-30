@@ -480,6 +480,7 @@ Source: [09-agents.md](../spec/09-agents.md), section 21.
 | `runner.transcribe_cmd` |  | Runner |  | empty | argument list of a local transcriber; the audio file path is appended and stdout is the transcript (18.14); empty means no transcription |  |
 | `runner.transcribe_timeout` |  | Runner |  | `5m` | time limit of one transcription (18.14); above zero |  |
 | `runner.projects_root` |  | Runner |  | no default, required | root of all project folders |  |
+| `runner.default_workspace` |  | Runner |  | empty | folder of a forum without a project binding (18.1): `.` for `runner.projects_root`, else a folder name under it; empty means off, and a run in such a forum ends with the cause `project_not_bound` |  |
 | `runner.state_dir` |  | Runner |  | no default, required | state, recordings, incoming files |  |
 | `runner.followup_grace` |  | Runner |  | `30s` | stdin stays open for follow-ups after `result` |  |
 | `runner.stop_grace` |  | Runner |  | `10s` | after SIGINT until SIGTERM |  |

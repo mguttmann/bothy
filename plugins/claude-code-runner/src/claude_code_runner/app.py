@@ -25,7 +25,7 @@ import os
 import sys
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
+from typing import Any, NoReturn
 from uuid import UUID
 
 import httpx
@@ -47,7 +47,6 @@ from bothy_sdk.gateway import CloseReason
 from bothy_sdk.generated.api.me import get_me
 from bothy_sdk.generated.api.runs import get_run
 from bothy_sdk.generated.models import AgentSession, Me, Run, RunContext, ToolClass
-from bothy_sdk.generated.types import Unset
 from bothy_sdk.invocation import stored_claims
 from bothy_sdk.runs import RunHandle
 from bothy_sdk.sources import Envelope
@@ -61,6 +60,7 @@ from claude_code_runner.adoption import (
 )
 from claude_code_runner.attachments import fetch_attachments
 from claude_code_runner.authcheck import auth_status, decide, evidence
+from claude_code_runner.causes import cause
 from claude_code_runner.channels import ChannelCache
 from claude_code_runner.commandline import (
     ArgumentError,
@@ -97,7 +97,13 @@ from claude_code_runner.statedir import ensure_private_dir, sweep
 from claude_code_runner.stop import stop_group
 from claude_code_runner.transcribe import Transcriber
 from claude_code_runner.turn import remove_turn_record
-from claude_code_runner.workspace import WorkspaceError, project_folders, readiness
+from claude_code_runner.workspace import (
+    WorkspaceError,
+    default_readiness,
+    project_folders,
+    readiness,
+    resolve_default,
+)
 from claude_code_runner.workspace import resolve as resolve_workspace
 
 __all__ = ["RESYNC_EVENTS", "Runner", "RunnerHandler", "StartError", "log", "warn"]
@@ -130,6 +136,24 @@ def warn(event: str, **ids: object) -> None:
         **ids: Run, thread and channel IDs or codes.
     """
     _LOG.warning(json.dumps({"event": event, **{k: str(v) for k, v in ids.items()}}))
+
+
+def refuse(
+    code: str, reason: str, ids: Mapping[str, Any], *, default_workspace: bool = False
+) -> NoReturn:
+    """Log ``code`` and end the run without a start, naming the cause in the thread.
+
+    Args:
+        code: The log code of the cause.
+        reason: The reason of ``finishRun``.
+        ids: IDs for the log line.
+        default_workspace: The cause is about ``runner.default_workspace``.
+
+    Raises:
+        RunRefused: Always, with ``reason`` and the text of `cause` as its summary.
+    """
+    log(code, **ids)
+    raise RunRefused(reason, summary=cause(code, default_workspace=default_workspace))
 
 
 class StartError(Exception):
@@ -562,40 +586,35 @@ class RunnerHandler(AgentHandler):
         self._runs[run.run_id] = state
         ids = {"run_id": run.run_id, "thread_id": state.thread_id, "channel_id": state.channel_id}
         if str(payload.trigger_kind) != "message":
-            log("trigger_kind_unsupported", **ids)
-            raise RunRefused("adapter_error")
+            refuse("trigger_kind_unsupported", "adapter_error", ids)
         binding = await self._binding(payload)
-        if binding is None:
-            log("project_not_bound", **ids)
-            raise RunRefused("adapter_error")
+        default = self.config.default_workspace
+        if binding is None and not self._serves(payload.channel_id):
+            # A guest run (09 3.6) in a channel another agent operates: never the default
+            # folder, whether that channel is bound or not (D-RUNNER-NO-GIT-3).
+            refuse("channel_not_served", "adapter_error", ids)
+        if binding is None and default is None:
+            refuse("project_not_bound", "adapter_error", ids)
         if self.probe.blocking:
-            log("runtime_unavailable", **ids)
-            raise RunRefused("runtime_error")
-        try:
-            state.cwd = resolve_workspace(self.config.projects_root, binding.workspace_ref)
-        except WorkspaceError as err:
-            log(err.code, **ids)
-            raise RunRefused("adapter_error") from None
-        ready, code = readiness(self.config.projects_root, binding.workspace_ref)
-        if not ready:
-            log(code or "workspace_missing", **ids)
-            raise RunRefused("adapter_error")
+            refuse("runtime_unavailable", "runtime_error", ids)
+        state.cwd = self._working_folder(binding, ids)
         session = payload.agent_session
         state.agent_session = session if isinstance(session, AgentSession) else None
         mode = getattr(payload.session_mode, "value", None)
         started = state.agent_session is not None and state.agent_session.started is True
         state.session_mode = str(mode) if mode else ("resume" if started else "new")
-        runner_config = binding.runner_config
+        # A forum without a binding has no runner settings: the runner's own defaults apply.
+        runner_config = binding.runner_config if binding is not None else None
+        model_value = getattr(runner_config, "model", None)
+        allowed = getattr(runner_config, "allowed_tools", None)
         try:
             state.session = choose_session(state.agent_session)
-            model = runner_config.model if isinstance(runner_config.model, str) else None
+            model = model_value if isinstance(model_value, str) else None
             state.model = choose_model(model, self.config.default_model)
-            allowed = runner_config.allowed_tools
-            binding_tools = list(allowed) if not isinstance(allowed, Unset) else None
+            binding_tools = list(allowed) if isinstance(allowed, list | tuple) else None
             state.tools = scoped_tools(self.config.scoped_allowed_tools, binding_tools)
         except ArgumentError as err:
-            log(err.code, **ids)
-            raise RunRefused("adapter_error") from None
+            refuse(err.code, "adapter_error", ids)
         config = self.channels.get(state.channel_id) if self.channels else None
         state.channel_prompt = config.behavior.prompt if config is not None else ""
         await self._take_locks(state, ids)
@@ -611,6 +630,37 @@ class RunnerHandler(AgentHandler):
             external_session_ref=state.session.ref,
             billing_evidence=state.evidence,
         )
+
+    def _working_folder(self, binding: Any, ids: Mapping[str, Any]) -> Path:
+        """The folder of the turn: the binding's, else ``runner.default_workspace``.
+
+        Git is optional (RUNNER-NO-GIT). A refusal names its cause for the thread.
+        """
+        root = self.config.projects_root
+        if binding is not None:
+            ref = binding.workspace_ref
+            try:
+                path = resolve_workspace(root, ref)
+            except WorkspaceError as err:
+                refuse(err.code, "adapter_error", ids)
+            ready, code = readiness(root, ref)
+            if not ready:
+                refuse(code or "workspace_missing", "adapter_error", ids)
+            return path
+        default = str(self.config.default_workspace)
+        try:
+            path = resolve_default(root, default)
+        except WorkspaceError as err:
+            refuse(err.code, "adapter_error", ids, default_workspace=True)
+        ready, code = default_readiness(root, default)
+        if not ready:
+            refuse(code or "workspace_missing", "adapter_error", ids, default_workspace=True)
+        log("default_workspace_used", **ids)
+        return path
+
+    def _serves(self, channel_id: UUID) -> bool:
+        """True when the channel is in the served cache, i.e. the runner operates it."""
+        return self.channels is not None and self.channels.get(channel_id) is not None
 
     async def _binding(self, payload: Any) -> Any:
         cache = self.channels
@@ -634,8 +684,7 @@ class RunnerHandler(AgentHandler):
                     )
                 )
         except LockTimeout:
-            log("session_busy", **ids)
-            raise RunRefused("adapter_error") from None
+            refuse("session_busy", "adapter_error", ids)
         await self._slots.acquire()
         state.slot = self._slots
 
@@ -674,13 +723,14 @@ class RunnerHandler(AgentHandler):
             except SecretError as err:
                 # No key: never a CLI call, never a fallback to a subscription (BR-12).
                 log("api_key_unavailable", code=err.code, **ids)
-                raise RunRefused("runtime_not_authenticated") from None
+                raise RunRefused(
+                    "runtime_not_authenticated", summary=cause("api_key_unavailable")
+                ) from None
             config_dir = ensure_private_dir(
                 self.config.state_dir / "claude-config" / "organization"
             )
         elif not (desired == "personal" and self.config.allow_personal):
-            log("billing_mode_not_allowed", **ids)
-            raise RunRefused("billing_mode_mismatch")
+            refuse("billing_mode_not_allowed", "billing_mode_mismatch", ids)
         try:
             state.env = build_environment(
                 self.environ,
@@ -692,17 +742,15 @@ class RunnerHandler(AgentHandler):
                 tmpdir=ensure_private_dir(run_temp_dir(self.config.state_dir, state.run_id)),
             )
         except RunEnvironmentError as err:
-            log(err.code, **ids)
-            raise RunRefused("adapter_error") from None
+            refuse(err.code, "adapter_error", ids)
         if self.claude_bin is None:
-            log("runtime_unreachable", **ids)
-            raise RunRefused("runtime_error")
+            refuse("runtime_unreachable", "runtime_error", ids)
         cwd = state.cwd or self.config.projects_root
         method = await auth_status(self.claude_bin, state.env, cwd, self.config.cli_probe_timeout)
         outcome = decide(desired, method)
         if outcome != "start":
             log("precheck_refused", reason=outcome, **ids)
-            raise RunRefused(outcome)
+            raise RunRefused(outcome, summary=cause(outcome))
         state.mode = desired
         state.evidence = evidence(method)
 

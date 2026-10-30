@@ -386,9 +386,16 @@ class DsLiveBoxState extends State<DsLiveBox> {
       }
     }
 
+    final detail = _reasonDetail(run);
     final children = <Widget>[
       header,
       ?reason,
+      if (detail != null)
+        Text(
+          detail,
+          style: dsTextStyle(DsType.bodySm)
+              .copyWith(color: colors.textSecondary),
+        ),
       if ((run.statusLine ?? '').trim().isNotEmpty)
         DsStatusLine(run.statusLine),
       if (hidden > 0)
@@ -491,11 +498,24 @@ class DsLiveBoxState extends State<DsLiveBox> {
     );
   }
 
+  /// The cause of a failed or cancelled [run] in the adapter's words, or null.
+  static String? _reasonDetail(DsRunData run) {
+    final ended =
+        run.state == DsRunState.failed || run.state == DsRunState.cancelled;
+    final detail = run.reasonDetail?.trim() ?? '';
+    return ended && detail.isNotEmpty ? detail : null;
+  }
+
   Widget _collapsed(BuildContext context) {
     final l = dsL10n(context);
     final f = dsFormat(context);
     final colors = context.dsColors;
     final run = widget.run;
+    final detail = _reasonDetail(run);
+    final code = run.stateReason;
+    final why = detail == null || code == null
+        ? null
+        : dsReasonText(l, code, name: run.cancelledByName) ?? code;
     final style = dsTextStyle(DsType.bodySm)
         .copyWith(color: colors.textSecondary);
     const dot = ' · ';
@@ -541,6 +561,9 @@ class DsLiveBoxState extends State<DsLiveBox> {
                       if (DsCostText.suffix(context, run.cost!) case final s?)
                         TextSpan(text: ' $s'),
                     ],
+                    // RUNNER-NO-GIT: a failed run names its cause on the line itself.
+                    if (why != null) TextSpan(text: '$dot$why'),
+                    if (detail != null) TextSpan(text: '$dot$detail'),
                   ],
                 ),
               ),

@@ -91,7 +91,8 @@ project; a silent takeover would point a new project at someone else's work.
 **D-M4-43-5 Readiness carries a reason.** The heartbeat entry `ProjectReadiness` gets the optional
 `reason` (a code), the server stores it as `project_bindings.ready_reason` while `ready` is false,
 and `ProjectBinding.ready_reason` shows it to readers of the binding. Codes: the existing
-`outside_root`, `workspace_missing`, `not_a_git_worktree`, `not_writable` and the new
+`outside_root`, `workspace_missing`, `not_a_git_worktree` (no longer sent since Git became
+optional, docs/decisions.d/RUNNER-NO-GIT.md), `not_writable` and the new
 `provisioning`, `workspace_exists`, `clone_failed`, `init_failed`, `provision_timeout`,
 `provision_refused` (09 18.12). A change of the reason alone is applied like a change of `ready`
 (no event, no audit, no `settings_version`). Reason: the person must see why a project does not

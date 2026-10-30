@@ -3,7 +3,9 @@
 
 The reference is an opaque name; it resolves to a strict descendant of the real path of the
 root, also after symbolic links, and the resolved real path is the working directory of a
-turn (design note 6).
+turn (design note 6). Git is optional (RUNNER-NO-GIT): any folder the runner user may read,
+write and search is ready. ``runner.default_workspace`` resolves the same way, and ``.`` names
+the root itself.
 
 Examples:
     >>> import tempfile, pathlib
@@ -20,7 +22,18 @@ import os
 import re
 from pathlib import Path
 
-__all__ = ["WorkspaceError", "project_folders", "readiness", "resolve"]
+__all__ = [
+    "ROOT",
+    "WorkspaceError",
+    "default_readiness",
+    "project_folders",
+    "readiness",
+    "resolve",
+    "resolve_default",
+]
+
+ROOT = "."
+"""The value of ``runner.default_workspace`` that names the projects root itself."""
 
 _DRIVE = re.compile(r"^[A-Za-z]:")
 _FOLDER_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
@@ -32,8 +45,7 @@ class WorkspaceError(Exception):
     """A workspace that is not ready or not allowed.
 
     Attributes:
-        code: ``outside_root``, ``workspace_missing``, ``not_a_git_worktree`` or
-            ``not_writable``.
+        code: ``outside_root``, ``workspace_missing`` or ``not_writable``.
     """
 
     def __init__(self, code: str) -> None:
@@ -74,10 +86,28 @@ def resolve(projects_root: Path, workspace_ref: str) -> Path:
     return Path(target)
 
 
-def readiness(projects_root: Path, workspace_ref: str) -> tuple[bool, str | None]:
-    """Tell whether a project is ready: resolved, a directory, a Git work tree, rights fit.
+def resolve_default(projects_root: Path, value: str) -> Path:
+    """Resolve ``runner.default_workspace``: ``.`` is the root, any other value as `resolve`.
 
-    ``.git`` may be a directory or a file, so linked work trees count.
+    Args:
+        projects_root: ``runner.projects_root``.
+        value: ``runner.default_workspace`` (not empty).
+
+    Returns:
+        The real path (it may not exist).
+
+    Raises:
+        WorkspaceError: ``outside_root`` as for `resolve`.
+    """
+    if value == ROOT:
+        return Path(os.path.realpath(projects_root))
+    return resolve(projects_root, value)
+
+
+def readiness(projects_root: Path, workspace_ref: str) -> tuple[bool, str | None]:
+    """Tell whether a project is ready: resolved, a directory, and the rights fit.
+
+    Git is optional (RUNNER-NO-GIT): a folder without ``.git`` is as ready as a work tree.
 
     Args:
         projects_root: ``runner.projects_root``.
@@ -90,10 +120,30 @@ def readiness(projects_root: Path, workspace_ref: str) -> tuple[bool, str | None
         path = resolve(projects_root, workspace_ref)
     except WorkspaceError as err:
         return False, err.code
+    return _usable(path)
+
+
+def default_readiness(projects_root: Path, value: str) -> tuple[bool, str | None]:
+    """The readiness of ``runner.default_workspace``, with the codes of `readiness`.
+
+    Args:
+        projects_root: ``runner.projects_root``.
+        value: ``runner.default_workspace`` (not empty).
+
+    Returns:
+        ``(True, None)`` or ``(False, code)``.
+    """
+    try:
+        path = resolve_default(projects_root, value)
+    except WorkspaceError as err:
+        return False, err.code
+    return _usable(path)
+
+
+def _usable(path: Path) -> tuple[bool, str | None]:
+    """A folder the runner user may read, write and search."""
     if not path.is_dir():
         return False, "workspace_missing"
-    if not (path / ".git").exists():
-        return False, "not_a_git_worktree"
     if not os.access(path, os.R_OK | os.W_OK | os.X_OK):
         return False, "not_writable"
     return True, None

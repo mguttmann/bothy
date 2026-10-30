@@ -77,6 +77,7 @@ from bothy_sdk.outbox import OutboxState
 from bothy_sdk.runs import RunHandle, is_run_ended
 
 from claude_code_runner.adoption import read_identity
+from claude_code_runner.causes import cause
 from claude_code_runner.commandline import SessionChoice, build_argv, reported_model
 from claude_code_runner.failures import (
     ErrorKind,
@@ -516,7 +517,9 @@ class RunTurn:
         if isinstance(action, NewSession):
             self.recovery = self.recovery.with_(session_replaced=True)
             if not await self._new_reference():
-                await self._fail("adapter_error", (), outcome.evidence.exit_label)
+                await self._fail(
+                    "adapter_error", (), outcome.evidence.exit_label, summary=cause("session_busy")
+                )
                 return None
             await self._box_note("session_missing", "completed", {"mode": self.state.session_mode})
             return _Attempt(resume=False, new_reference=True, bind_failed=action.bind_failed)
@@ -546,7 +549,9 @@ class RunTurn:
         try:
             await self.h.precheck(self.state, self.state.mode, self.ids)
         except RunRefused as refused:
-            await self._fail(refused.reason or "runtime_error", (), "not_started")
+            await self._fail(
+                refused.reason or "runtime_error", (), "not_started", summary=refused.summary
+            )
             return False
         return True
 
@@ -1161,19 +1166,29 @@ class RunTurn:
 
     async def _complete(self) -> None:
         if self.reply_problem is not None:
-            await self._finish("failed", reason="adapter_error")
+            await self._finish("failed", reason="adapter_error", summary=cause("reply_refused"))
             return
         if self.title_request and self.title:
             outcome = await propose_title(self.handle.client, self.state.thread_id, self.title)
             _log("title_proposed", outcome=outcome, **self.ids)
         await self._finish("completed")
 
-    async def _fail(self, reason: str, errors: tuple[str, ...], exit_label: str) -> None:
-        """``failed`` with ``reason``; for ``runtime_error`` the box note with the texts first."""
+    async def _fail(
+        self,
+        reason: str,
+        errors: tuple[str, ...],
+        exit_label: str,
+        *,
+        summary: str | None = None,
+    ) -> None:
+        """``failed`` with ``reason``; for ``runtime_error`` the box note with the texts first.
+
+        ``summary`` names the cause for the thread (RUNNER-NO-GIT).
+        """
         if reason == "runtime_error":
             detail = {"errors": list(errors), "exit": exit_label}
             await self._box_note("runtime_error", "failed", detail)
-        await self._finish("failed", reason=reason)
+        await self._finish("failed", reason=reason, summary=summary)
 
     async def _finish_cancelled(self) -> None:
         """``cancelled`` with the request's reason; no answer (note 6 b)."""
@@ -1232,19 +1247,23 @@ class RunTurn:
             return 0
         return int(baseline["micros"])
 
-    async def _finish(self, state: str, *, reason: str | None = None) -> None:
+    async def _finish(
+        self, state: str, *, reason: str | None = None, summary: str | None = None
+    ) -> None:
         """``finishRun`` once; a lost answer is sent again with the same body (D-M2-34-4).
 
         The decided end goes into the turn record first, then the costs into the session's
         usage file, then the call (design note 12 f 2): a runner that adopts a record with a
         decided end repeats exactly this, with the same costs (`UsageStore.pending_for`).
         """
-        self.ledger.finishing = {"state": state, "reason": reason}
+        self.ledger.finishing = {"state": state, "reason": reason, "summary": summary}
         self._persist()
         reports, metrics = self._usage()
         kwargs: dict[str, Any] = {"costs": reports}
         if reason is not None:
             kwargs["reason"] = reason
+        if summary is not None:
+            kwargs["summary"] = summary
         if metrics is not None:
             kwargs["metrics"] = metrics
         try:
@@ -1262,6 +1281,8 @@ class RunTurn:
         body = RunFinish(state=RunFinishState(state))
         if kwargs.get("reason") is not None:
             body.reason = kwargs["reason"]
+        if kwargs.get("summary") is not None:
+            body.summary = kwargs["summary"]
         if kwargs.get("metrics") is not None:
             body.metrics = kwargs["metrics"]
         if kwargs.get("costs"):
@@ -1379,7 +1400,11 @@ class RunTurn:
             if self.ledger.finishing is not None:
                 # The previous runner decided the end and may have stored its costs: repeat it.
                 decided = self.ledger.finishing
-                await self._finish(str(decided["state"]), reason=decided["reason"])
+                await self._finish(
+                    str(decided["state"]),
+                    reason=decided["reason"],
+                    summary=decided.get("summary"),
+                )
                 done = True
                 return
             reader = StreamReader(
