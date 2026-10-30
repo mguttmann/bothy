@@ -27,7 +27,7 @@ import hashlib
 import json
 import shutil
 import struct
-import subprocess
+import subprocess  # nosec B404 - the test driver builds and starts the sdkserver program
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -53,7 +53,7 @@ __all__ = [
 
 _ANSWER = "SDKSERVER "
 TIMINGS: Mapping[str, str] = {
-    "agent.invocation_token_ttl": "5s",
+    "agent.invocation_token_ttl": "5s",  # nosec B105 - a duration, not a secret
     "auth.clock_leeway": "1s",
     "agent.ack_timeout": "2s",
     "agent.ack_persist_interval": "100ms",
@@ -101,7 +101,7 @@ def build_sdkserver(work: Path) -> Path:
     if go is None:
         raise RuntimeError("the real-server tests need the Go tool chain (go not on PATH)")
     binary = work / "sdkserver.test"
-    subprocess.run(  # noqa: S603 - fixed arguments, no shell
+    subprocess.run(  # noqa: S603 - fixed arguments, no shell  # nosec B603
         [go, "test", "-c", "-tags", "sdkserver", "-o", str(binary), "./test/sdkserver"],
         cwd=repository_root() / "services" / "server",
         check=True,
@@ -170,12 +170,13 @@ class RealServer:
             RuntimeError: The program answered ``error`` or ended.
         """
         async with self._lock:
-            assert self._proc.stdin is not None  # noqa: S101 - set by create_subprocess_exec
-            assert self._proc.stdout is not None  # noqa: S101
-            self._proc.stdin.write((json.dumps(request) + "\n").encode())
-            await self._proc.stdin.drain()
+            stdin, stdout = self._proc.stdin, self._proc.stdout
+            if stdin is None or stdout is None:
+                raise RuntimeError("sdkserver was started without pipes")
+            stdin.write((json.dumps(request) + "\n").encode())
+            await stdin.drain()
             while True:
-                line = await asyncio.wait_for(self._proc.stdout.readline(), timeout)
+                line = await asyncio.wait_for(stdout.readline(), timeout)
                 if not line:
                     raise RuntimeError(f"sdkserver ended during {request['op']}")
                 text = line.decode(errors="replace").strip()
