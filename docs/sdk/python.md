@@ -108,6 +108,8 @@ would only repeat that.
 
 ::: bothy_sdk.testing.scenarios
 
+::: bothy_sdk.testing.sdkserver
+
 ::: bothy_sdk.testing.fake_agent
 
 ::: bothy_sdk.testing.demo_agent

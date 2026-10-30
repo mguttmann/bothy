@@ -159,7 +159,7 @@ TOOLS_SOURCE_TESTS := ci/tests/test_product_name_places.py docs/tests/test_confi
 .PHONY: help bootstrap bootstrap-ci check gates fmt fmt-check lint typecheck test coverage \
         sonar sonar-scan sonar-up sonar-down sonar-config sonar-config-check sonar-main-branch sonar-visibility sonar-new-code semgrep trivy osv gitleaks \
         gitleaks-staged denylist denylist-history licenses docs adr-index config-reference config-doc-check app-config event-catalog contract-documents apple-strings catalog catalog-check linkcheck \
-        trivy-image portability portability-trial load-capacity console-e2e alert-e2e linkcheck-external diagrams tokens api-lint api-checks api-breaking api-tables api-clients \
+        trivy-image portability portability-trial load-capacity console-e2e alert-e2e adapters-e2e linkcheck-external diagrams tokens api-lint api-checks api-breaking api-tables api-clients \
         runners-check release-pins install-options tofu-check tofu-vm-test commitlint fragments-check changelog-preview \
         review labels-check labels-sync tools-lock release-build release-prep release-trial scancode install-test clean \
         codegen-check arch register-check migrations-lint migrations-lock sql-visibility flag-check perf bench-search ops-check signal-check \
@@ -1039,6 +1039,15 @@ console-e2e: ## SEC-T05: the console under its CSP in Chromium, Firefox and WebK
 
 alert-e2e: ## M7-20: the alert path end to end (Prometheus, Alertmanager, the channel Operations, external and heartbeat stubs) against the Compose smoke stack (E2E_SERVER_IMAGE, default the tag of make image; docs/observability/alerting.md 5)
 	$(UVRUN) python tools/observability/alert_e2e.py
+
+# The end-to-end suites of the Python adapters (HERMES-E2E-REAL-SERVER): each runs the adapter's
+# own code (the Hermes adapter with its fake Hermes runtime, the Claude Code runner with
+# Fake-Claude) against the server of this tree through services/server/test/sdkserver, so they
+# need the Go tool chain and a Docker-compatible runtime. `make test` leaves them out (marker e2e);
+# the CI job test-adapters-e2e runs them.
+adapters-e2e: ## End-to-end suites of the Hermes adapter and the Claude Code runner against the real server (tests/realserver)
+	cd plugins/hermes-adapter && $(UV) run --locked pytest -m e2e tests/realserver
+	cd plugins/claude-code-runner && $(UV) run --locked pytest -m e2e tests/realserver
 
 # The desktop E2E suite and the performance level (M4-34; 15 19 and 20), each with its terminal
 # part (M4-38: the client stack of the terminal with a host container, Go and Docker). Not part

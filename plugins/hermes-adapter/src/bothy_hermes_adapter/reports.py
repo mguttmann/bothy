@@ -66,6 +66,7 @@ __all__ = [
     "direct_send",
     "parse_target",
     "post_report",
+    "recovered_reply",
     "report_title",
     "standalone_send",
 ]
@@ -100,6 +101,33 @@ class ReportTarget:
 
     channel_id: UUID
     thread_id: UUID | None = None
+
+
+RECOVERED_PREFIX = "\u267b\ufe0f Recovered reply"
+"""The start of every notice of Hermes' delivery ledger before a reply it sends again."""
+_RECOVERED_END = ":\n\n"
+
+
+def recovered_reply(content: str) -> str | None:
+    r"""The reply behind a notice of Hermes' delivery ledger, or ``None`` for any other text.
+
+    Hermes records each final reply before the send and, when the send failed or the gateway
+    restarted during it, sends it again with a notice that it may be a duplicate (its
+    ``gateway.delivery_ledger``: restart, reconnect and rate limit notices). The notice is one
+    line ending with a colon and an empty line.
+
+    Examples:
+        >>> recovered_reply("\u267b\ufe0f Recovered reply (restart), may be a duplicate:\n\nDone.")
+        'Done.'
+        >>> recovered_reply("Done.") is None
+        True
+    """
+    if not content.startswith(RECOVERED_PREFIX):
+        return None
+    notice, end, reply = content.partition(_RECOVERED_END)
+    if not end or "\n" in notice:
+        return None
+    return reply
 
 
 def parse_target(chat_id: str, thread_id: str | None) -> ReportTarget:

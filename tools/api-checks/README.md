@@ -12,7 +12,7 @@ needs only Python and PyYAML and reads the action catalogue through
 
 | Command | Effect |
 |---|---|
-| `make api-checks` | Gate: all four rules, exit 1 with one line per finding (`api_checks.py check`; one rule alone with `--rule api-catalogue-sync`, `--rule api-tables`, `--rule viz-fixtures` or `--rule gdpr-export`) |
+| `make api-checks` | Gate: all rules, exit 1 with one line per finding (`api_checks.py check`; one rule alone with `--rule api-catalogue-sync`, `--rule api-tables`, `--rule viz-fixtures`, `--rule gdpr-export` or `--rule client-routes`) |
 | `make api-tables` | rewrite the generated blocks in 06 and `webhooks.md` (`api_checks.py generate`); writes nothing while an input is unreadable or malformed, a value cannot become a table cell, a marker is broken, unknown or missing, or one of the files to change cannot be written |
 | `uv run --project tools --locked pytest tools/api-checks/tests` | Tests: per sub-check and per block one mutation of a copy of the real inputs, which must be red; the repository itself is green |
 
@@ -155,6 +155,20 @@ file (`ref`), every section file is referenced by the schema of its file (`secti
 and line schema is in the table of the README (`readme`), and 06-api.md links the directory
 (`spec`). The server test DP-T03 validates a real package against the same schemas. Tests:
 `tests/test_gdpr_export.py`.
+
+## Rule `client-routes` (HERMES-E2E-REAL-SERVER)
+
+`client_routes.py` holds the HTTP calls of the Python clients to the server: every generated
+operation module (`bothy_sdk.generated.api.<tag>.<operation>`) that the hand-written code of the
+Python SDK (`sdk/python/src/bothy_sdk` without `generated/`) or the code of a Python plugin under
+`plugins/` (without its tests) imports must be generated (`module`), have its method and path as
+an operation of `openapi.yaml` whose `operationId` fits the module name (`openapi`), stand under
+`enabled` in `services/server/api/operations.yaml` (`enabled`) and be registered with that method
+and path in `services/server/api/routes/routes.gen.go` (`router`). A documented operation that the
+server does not serve yet (it stands under `later`) is how the Hermes adapter's allow list broke
+in live use (SERVER-AGENT-TRIGGERERS); the end-to-end suites of the adapters
+(`plugins/*/tests/realserver`) find what this static rule cannot, such as a request the server
+refuses. Tests: `tests/test_client_routes.py`.
 
 ## Breaking change check `api-breaking` (G6)
 

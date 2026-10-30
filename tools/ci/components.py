@@ -179,6 +179,10 @@ COMPONENT_TEST_JOBS: dict[str, tuple[str, ...]] = {
     "test-server": ("server",),
     "test-apps": ("apps",),
     "test-sdk-plugins": ("sdk-python", "sdk-typescript", "plugins"),
+    # The end-to-end suites of the Python adapters against the server of this tree (`make
+    # adapters-e2e`, HERMES-E2E-REAL-SERVER): an SDK, plugin or server change (both components
+    # own services/server/) and every change of the API contract run them.
+    "test-adapters-e2e": ("sdk-python", "plugins"),
 }
 # The platform jobs of the desktop hosts; apps-ios runs the iOS simulator entries on macOS (PL/44).
 DESKTOP_JOBS = ("apps-macos", "apps-ios", "apps-windows")

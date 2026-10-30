@@ -452,6 +452,33 @@ jobs:
           done
           make test coverage COMPONENTS="${selected# }"
 
+  # The end-to-end suites of the Python adapters against the server of this tree (make
+  # adapters-e2e, HERMES-E2E-REAL-SERVER): the Hermes adapter with its fake Hermes runtime and the
+  # Claude Code runner with Fake-Claude, each against services/server/test/sdkserver on a
+  # disposable PostgreSQL (Docker of the runner). `make test` leaves them out (pytest marker e2e).
+  # Only when the plan selects the Python SDK or the plugins, which both own services/server/, or
+  # the API contract changes (tools/ci/components.py).
+  test-adapters-e2e:
+    name: test (adapters end to end)
+    needs: plan
+    if: contains(format(' {0} ', needs.plan.outputs.jobs), ' test-adapters-e2e ')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: plugins/*/uv.lock
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: services/server/go.mod
+          cache-dependency-path: services/*/go.sum
+      - name: make adapters-e2e
+        run: make adapters-e2e
+
   # Documentation, configuration reference, diagrams, API contract and client gates.
   docs:
     name: docs and contracts
@@ -998,7 +1025,7 @@ jobs:
   # missing plan fails it.
   build-verify-ok:
     name: build-verify-ok
-    needs: [plan, static, test-tools, test-server, test-server-coverage, test-server-contract, test-apps, test-sdk-plugins, docs, security, denylist, postgres-image-amd64, postgres-image-arm64, console-e2e, apps-macos, apps-ios, apps-windows, apps-android-26, apps-android-36, desktop-trial-macos, desktop-trial-windows, mobile-trial-ios, mobile-trial-android, host-trial-macos, host-trial-windows]
+    needs: [plan, static, test-tools, test-server, test-server-coverage, test-server-contract, test-apps, test-sdk-plugins, test-adapters-e2e, docs, security, denylist, postgres-image-amd64, postgres-image-arm64, console-e2e, apps-macos, apps-ios, apps-windows, apps-android-26, apps-android-36, desktop-trial-macos, desktop-trial-windows, mobile-trial-ios, mobile-trial-android, host-trial-macos, host-trial-windows]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5

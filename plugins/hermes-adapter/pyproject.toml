@@ -44,7 +44,10 @@ package = false
 
 [tool.pytest.ini_options]
 minversion = "9.0"
-addopts = ["-ra", "--strict-markers", "--strict-config", "--import-mode=importlib"]
+# The end-to-end suite against the real server (tests/realserver, marker e2e) needs Go and a
+# container runtime; it runs with `make adapters-e2e` (CI job test-adapters-e2e), not here.
+addopts = ["-ra", "--strict-markers", "--strict-config", "--import-mode=importlib", "-m", "not e2e"]
+markers = ["e2e: end-to-end test against the real server of this tree (make adapters-e2e)"]
 testpaths = ["tests"]
 pythonpath = ["src", "../../sdk/python/src", "tests"]
 filterwarnings = ["error"]
@@ -87,6 +90,7 @@ max-args = 7
 [tool.ruff.lint.per-file-ignores]
 "tests/**/test_*.py" = ["D", "S101", "S105", "S106", "S108", "PLR0913", "PLR0915", "PLC0415", "B023"]
 "tests/adapter_kit.py" = ["D101", "D102", "D103", "D105", "D107", "S101", "PLR0913"]
+"tests/real_kit.py" = ["S101"]
 "tests/fake_hermes_kit.py" = ["D101", "D102", "D103", "D105", "D107", "S101", "S603", "PLR0913", "SLF001"]
 "tests/**/conftest.py" = ["D", "S101", "PLC0415"]
 "tests/fake_hermes/*.py" = ["D", "S101", "PLC0415"]

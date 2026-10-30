@@ -60,7 +60,7 @@ from bothy_sdk.generated.api.agent_runtime import (
 )
 from bothy_sdk.generated.api.files import download_file, get_file
 from bothy_sdk.generated.api.interactions import update_component
-from bothy_sdk.generated.api.messages import update_message
+from bothy_sdk.generated.api.messages import get_message, update_message
 from bothy_sdk.generated.api.threads import get_thread, set_thread_title
 from bothy_sdk.generated.models import (
     AgentChannelConfig,
@@ -75,6 +75,7 @@ from bothy_sdk.generated.models import (
     InteractionRespond,
     InteractionRespondState,
     InteractionResponse,
+    Message,
     MessageUpdate,
     RunContext,
     RunMetrics,
@@ -91,8 +92,12 @@ from bothy_sdk.sources import Envelope
 from bothy_hermes_adapter import cards
 from bothy_hermes_adapter.actual_mode import ActualMode, determine
 from bothy_hermes_adapter.config import AdapterSettings
-from bothy_hermes_adapter.context_format import BuiltContext, build_context, cut_utf8
-from bothy_hermes_adapter.context_format import find_message_text as _find_text
+from bothy_hermes_adapter.context_format import (
+    BuiltContext,
+    build_context,
+    command_system_part,
+    cut_utf8,
+)
 from bothy_hermes_adapter.hermes_commands import (
     BUILT_IN,
     COMMAND_CLASSES,
@@ -108,7 +113,13 @@ from bothy_hermes_adapter.media import (
     upload,
     with_transcripts,
 )
-from bothy_hermes_adapter.reports import ReportError, direct_send, parse_target, post_report
+from bothy_hermes_adapter.reports import (
+    ReportError,
+    direct_send,
+    parse_target,
+    post_report,
+    recovered_reply,
+)
 from bothy_hermes_adapter.runtime import (
     CardKind,
     CardRequest,
@@ -172,6 +183,7 @@ class _Turn:
     final_reply: bool = False
     upload_limit: int | None = None
     anchored: bool = True
+    quotes: bool = False
     dropped: bool = False
     interrupted: bool = False
     settled: asyncio.Event = field(default_factory=asyncio.Event)
@@ -207,6 +219,7 @@ class HermesHandler(AgentHandler):
         self._turns: dict[UUID, _Turn] = {}
         self._by_run: dict[UUID, _Turn] = {}
         self._prepared: dict[UUID, BuiltContext] = {}
+        self._anchors: dict[UUID, bool] = {}
         self._voice: dict[UUID, tuple[RunContext, ChannelBehavior | None]] = {}
         self._channels: dict[UUID, tuple[int, ChannelBehavior]] = {}
         self._tool_class = self._read_tool_class()
@@ -324,23 +337,48 @@ class HermesHandler(AgentHandler):
         elif kind != "message":
             _LOG.warning("run %s refused: trigger kind %s", run.run_id, kind)
             raise PrepareRefused(kind)
-        ctx = await run.load_context()
         channel = await self._channel(payload, run) if _operator_run(payload) else None
+        if skill_text is not None:
+            # A command run has no run context: 09 4.6 defines it for a triggering message, and
+            # the server answers getRunContext of any other trigger kind with 500. The turn is
+            # Hermes' own skill invocation with the fixed note and the channel instructions.
+            self._prepared[run.run_id] = BuiltContext(command_system_part(channel), skill_text)
+            actual = self.actual_mode()
+            return StartOptions(billing_evidence=BillingEvidence.from_dict(actual.evidence))
+        ctx = await run.load_context()
+        self._anchors[run.run_id] = await self._trigger_in_thread(payload, run)
         self._prepared[run.run_id] = await build_context(
             ctx,
             channel=channel,
             fetch=self._fetcher(run),
             attachment_limit=self.settings.attachment_text_max_bytes,
         )
-        if skill_text is not None:
-            # The turn is Hermes' own skill invocation; the context stays the system part.
-            built = self._prepared[run.run_id]
-            self._prepared[run.run_id] = BuiltContext(built.system_part, skill_text)
-        elif audio_to_transcribe(ctx):
+        if audio_to_transcribe(ctx):
             # Transcribed after the start, before the turn (09 13): the run is running meanwhile.
             self._voice[run.run_id] = (ctx, channel)
         actual = self.actual_mode()
         return StartOptions(billing_evidence=BillingEvidence.from_dict(actual.evidence))
+
+    async def _trigger_in_thread(self, payload: Any, run: RunHandle) -> bool:
+        """Whether the triggering message lies in the run's thread (09 17.3, answer anchor).
+
+        A reply names a message of its own thread (03 ``messages``, ``reply_to_message_id``;
+        ``400 validation_failed`` ``not_in_thread`` otherwise). With ``auto_thread`` the trigger
+        stays in the main thread while the run lives in the thread opened on it (09 3.4 point
+        5), so the answer there quotes nothing. When the message cannot be read the answer
+        quotes nothing either: an answer without a quote is always accepted.
+        """
+        try:
+            message = await run.client.call_as(
+                Message, get_message.asyncio_detailed, message_id=payload.message_id
+            )
+        except ProblemError as exc:
+            _LOG.info("run %s: trigger not read code=%s", run.run_id, exc.code)
+            return False
+        except httpx.TransportError:
+            _LOG.info("run %s: trigger not read code=transport_error", run.run_id)
+            return False
+        return bool(message.thread_id == run.thread_id)
 
     def _skill_text(self, payload: Any) -> str | None:
         """The turn text of a model command: Hermes' skill invocation, or ``None`` (09 17.3)."""
@@ -405,6 +443,7 @@ class HermesHandler(AgentHandler):
             mode_used=inv.claims.billing_mode,
             live=LiveBox(run.patch, self._now),
             anchored=str(getattr(payload, "trigger_kind", "message")) == "message",
+            quotes=self._anchors.pop(run.run_id, False),
         )
         self._turns[run.thread_id] = turn
         self._by_run[run.run_id] = turn
@@ -675,6 +714,7 @@ class HermesHandler(AgentHandler):
             del self._turns[turn.thread_id]
         self._by_run.pop(turn.run_id, None)
         self._prepared.pop(turn.run_id, None)
+        self._anchors.pop(turn.run_id, None)
         self._voice.pop(turn.run_id, None)
         self._spawn(self.store.drop_card(turn.run_id))
 
@@ -736,10 +776,23 @@ class HermesHandler(AgentHandler):
         return True
 
     async def _followup_text(self, run: RunHandle, message_id: UUID) -> str | None:
-        ctx = await run.load_context()
-        text = _find_text(ctx, message_id)
-        if text is None:
-            _LOG.info("run %s: follow-up not in the context", run.run_id)
+        """The text of a follow-up: its message read with the run's token (``message.read``).
+
+        The run context holds the messages before the triggering message only (09 4.6
+        ``thread_context``), never a follow-up, which comes after it; transcripts of follow-ups
+        are not made (17.6). A message the server refuses passes nothing.
+        """
+        try:
+            message = await run.client.call_as(
+                Message, get_message.asyncio_detailed, message_id=message_id
+            )
+        except ProblemError as exc:
+            _LOG.info("run %s: follow-up not read code=%s", run.run_id, exc.code)
+            return None
+        except httpx.TransportError:
+            _LOG.info("run %s: follow-up not read code=transport_error", run.run_id)
+            return None
+        text = message.content_md if isinstance(message.content_md, str) else ""
         return text
 
     async def _disable_card(self, turn: _Turn) -> None:
@@ -968,6 +1021,9 @@ class HermesHandler(AgentHandler):
         turn = self._active(thread_id)
         if turn is None or turn.live is None:
             return None
+        # Recorded before the send: whatever the outbox does with it, a later copy from Hermes'
+        # delivery ledger is the same answer (`recovered_duplicate`).
+        await self.store.put_answer(turn.thread_id, text)
         with self._bound(turn):
             turn.live.answer()
             # One message, never several (M4-47): above max_message_bytes the head stays the
@@ -980,13 +1036,34 @@ class HermesHandler(AgentHandler):
                 text,
                 max_content_bytes=self.settings.max_message_bytes,
                 run_id=turn.run_id,
-                reply_to_message_id=_uuid_or_none(reply_to) if turn.anchored else None,
+                reply_to_message_id=_quote(turn, reply_to),
             )
         if entry.message_id is None:
             return None
         key = str(entry.message_id)
         turn.answers[key] = (entry.message_id, int(entry.message_version or 1))
         return key
+
+    async def recovered_duplicate(self, thread_id: UUID | None, content: str) -> bool:
+        """Whether ``content`` is a reply Hermes sends again that this adapter took over already.
+
+        Hermes' delivery ledger sends a final reply again, behind a notice that it may be a
+        duplicate, when the first send failed or the gateway restarted during it. An answer the
+        adapter took over for a run is the outbox's to deliver, also after a restart, and a
+        refused one ended its run with the error; posting the copy as a report without a run
+        would show the text twice or detached from its run (09 17.3).
+
+        Args:
+            thread_id: The thread Hermes names (its ``metadata`` ``thread_id``), if any.
+            content: The text of the send.
+
+        Returns:
+            True when the send carries the notice and its reply was an answer in the thread.
+        """
+        reply = recovered_reply(content)
+        if reply is None or thread_id is None:
+            return False
+        return await self.store.answered(thread_id, reply)
 
     async def on_edit(self, thread_id: UUID, message_id: str, text: str, finalize: bool) -> bool:
         """An edit of an own answer: buffered; one ``updateMessage`` at ``finalize``.
@@ -1169,6 +1246,22 @@ class HermesHandler(AgentHandler):
         """
         turn = self._active(thread_id)
         return turn.run_id if turn is not None else None
+
+
+def _quote(turn: _Turn, reply_to: str | None) -> UUID | None:
+    """The message an answer quotes: only one that lies in the run's thread (09 17.3).
+
+    Hermes names the message of the turn's event: the triggering message, which may lie in the
+    main thread while the run lives in its auto thread (`_Turn.quotes` is then false), or a
+    follow-up passed into the turn, which always lies in the run's thread. A turn without a
+    triggering message (a command run) quotes nothing.
+    """
+    target = _uuid_or_none(reply_to)
+    if target is None or not turn.anchored:
+        return None
+    if target in turn.steered:
+        return target
+    return target if turn.quotes else None
 
 
 def _claim_key(run_id: UUID, card: OpenCard) -> str:

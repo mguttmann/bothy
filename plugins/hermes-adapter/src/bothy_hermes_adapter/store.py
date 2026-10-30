@@ -8,12 +8,15 @@ only what the Hermes side adds, in one SQLite file through the standard library:
 * the open card per run (its kind, Hermes ID, Hermes session key, card message and component
   IDs);
 * the Hermes session ID of each thread as Hermes last reported it (and its parent in a
-  compression chain), so a new process still knows which threads hold a session (09 9.1).
+  compression chain), so a new process still knows which threads hold a session (09 9.1);
+* a digest of each answer the adapter took over for a run (thread and text, SHA-256), so a
+  reply Hermes' delivery ledger sends again after a failure or a restart is recognised and not
+  posted a second time (09 17.3, HERMES-E2E-REAL-SERVER).
 
-No content is stored: no question, no answer text, no label (BR-13, SEC-LOG-4 applied to the
-adapter); the texts of an open card live only in the process. Every write is committed before the
-Hermes callback or the send it guards (``synchronous = FULL``). The file is created with mode
-``0600`` in a directory the SDK requires to be closed to group and others.
+No content is stored: no question, no answer text (only its digest), no label (BR-13, SEC-LOG-4
+applied to the adapter); the texts of an open card live only in the process. Every write is
+committed before the Hermes callback or the send it guards (``synchronous = FULL``). The file is
+created with mode ``0600`` in a directory the SDK requires to be closed to group and others.
 
 Examples:
     >>> import asyncio, tempfile, pathlib
@@ -30,21 +33,38 @@ Examples:
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import os
 import sqlite3
+import time
 from pathlib import Path
 from typing import Any
 from uuid import UUID
 
-__all__ = ["CallbackStore", "CardRecord"]
+__all__ = ["ANSWER_RETENTION_SECONDS", "CallbackStore", "CardRecord", "answer_digest"]
+
+ANSWER_RETENTION_SECONDS = 8 * 24 * 60 * 60
+"""How long an answer digest is kept: longer than Hermes keeps a delivery obligation."""
 
 _SCHEMA = (
     "CREATE TABLE IF NOT EXISTS resolved (callback_id TEXT PRIMARY KEY)",
     "CREATE TABLE IF NOT EXISTS open_cards (run_id TEXT PRIMARY KEY, record TEXT NOT NULL)",
     "CREATE TABLE IF NOT EXISTS sessions (thread_id TEXT PRIMARY KEY, session_id TEXT NOT NULL,"
     " parent_id TEXT)",
+    "CREATE TABLE IF NOT EXISTS answers (digest TEXT PRIMARY KEY, at REAL NOT NULL)",
 )
+
+
+def answer_digest(thread_id: UUID, text: str) -> str:
+    """The digest of an answer in a thread (never the text itself).
+
+    Examples:
+        >>> len(answer_digest(UUID(int=1), "Done."))
+        64
+    """
+    return hashlib.sha256(f"{thread_id}\n{text}".encode()).hexdigest()
+
 
 CardRecord = dict[str, Any]
 """The stored form of an open card: identifiers only."""
@@ -189,6 +209,43 @@ class CallbackStore:
 
         rows = await self._run(fn)
         return {UUID(t): (sid, parent) for t, sid, parent in rows}
+
+    async def put_answer(self, thread_id: UUID, text: str, now: float | None = None) -> None:
+        """Record that the adapter took ``text`` over as an answer in the thread.
+
+        Digests older than `ANSWER_RETENTION_SECONDS` are dropped in the same write.
+
+        Args:
+            thread_id: The run's thread.
+            text: The answer as Hermes sent it.
+            now: The wall time in seconds (tests).
+        """
+        at = time.time() if now is None else now
+        digest = answer_digest(thread_id, text)
+
+        def fn(conn: sqlite3.Connection) -> None:
+            conn.execute("INSERT OR REPLACE INTO answers (digest, at) VALUES (?, ?)", (digest, at))
+            conn.execute("DELETE FROM answers WHERE at < ?", (at - ANSWER_RETENTION_SECONDS,))
+
+        await self._run(fn)
+
+    async def answered(self, thread_id: UUID, text: str) -> bool:
+        """Tell whether ``text`` was taken over as an answer in the thread.
+
+        Args:
+            thread_id: The thread.
+            text: The text without Hermes' recovery notice.
+
+        Returns:
+            True when recorded by `put_answer`.
+        """
+        digest = answer_digest(thread_id, text)
+
+        def fn(conn: sqlite3.Connection) -> bool:
+            row = conn.execute("SELECT 1 FROM answers WHERE digest = ?", (digest,)).fetchone()
+            return row is not None
+
+        return bool(await self._run(fn))
 
     async def close(self) -> None:
         """Close the file."""
