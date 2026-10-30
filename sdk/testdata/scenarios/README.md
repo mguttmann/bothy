@@ -146,3 +146,22 @@ Expected outcomes:
 - Step 4: exactly one renewal and one `startRun`; the run started with the renewed token, not
   the expired one, and has `starts` 1.
 - Step 5: the replayed delivery is not acknowledged and does not reach the runtime again.
+
+### rag19_allowlist_from_server
+
+R-AG-19 for the SDK (docs/spec/09-agents.md 17.7): an adapter keeps its allow list from the
+server's `getAgentTriggerers`, and the list admits the person the server let trigger. The name
+carries the requirement ID because 09 16.2 has no scenario row for the allow list.
+
+Steps:
+
+1. Read `getAgentTriggerers` with the agent's own credentials (API token and DPoP).
+2. An adapter with the allow list on (Python `AdapterConfig.allowlist`, TypeScript
+   `AdapterConfig.allowlist`); trigger a run.
+
+Expected outcomes:
+
+- Step 1: `200` with an `AgentTriggerers` body: at least one person, no repeated ID, neither the
+  agent nor the other agent, `permission_version` at least 1.
+- Step 2: the adapter read `getAgentTriggerers` at least once; the run started exactly once
+  (`starts` 1) and the runtime executed once.

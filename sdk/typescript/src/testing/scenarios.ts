@@ -9,9 +9,10 @@
  * scenario leaves `queued` never reaches another: a new consumer starts at `head_seq` (04 15.1
  * point 2).
  *
- * Scenarios (docs/spec/09-agents.md 16.2, 07 AZ-P6, sdk/testdata/scenarios/README.md):
+ * Scenarios (docs/spec/09-agents.md 16.2, 07 AZ-P6, 09 R-AG-19, sdk/testdata/scenarios/README.md):
  * {@link ag08InvalidTokens}, {@link ag09DoubleDelivery}, {@link ag12PatchRules},
- * {@link ag28SlowStartAndRestart}, {@link azp6AdapterNeverStarts}. A failed check throws
+ * {@link ag28SlowStartAndRestart}, {@link azp6AdapterNeverStarts},
+ * {@link rag19AllowlistFromServer}. A failed check throws
  * {@link ScenarioFailed}; its message names the check and never contains a token.
  *
  * @example
@@ -159,6 +160,7 @@ function adapterFor(
   handler: RecordingHandler,
   consumer: string,
   fetch?: (request: Request) => Promise<Response>,
+  allowlist = false,
 ): Adapter {
   const config: AdapterConfig = {
     baseUrl: server.baseUrl,
@@ -166,6 +168,7 @@ function adapterFor(
     agentId: server.agentId,
     credentials: server.credentials,
     consumer,
+    allowlist,
     adapterName: "scenario-adapter",
     adapterVersion: "1.0.0",
     runtimeName: "scenario-runtime",
@@ -983,5 +986,71 @@ export async function ag28SlowStartAndRestart(
     const view = await server.runState(runId);
     check(view.starts === 1, `starts ${view.starts}`);
     check(handler.count("execute") === 1, "execute ran more than once");
+  });
+}
+
+// ---- R-AG-19 ----------------------------------------------------------------------------------
+
+/**
+ * R-AG-19 (09 17.7): the adapter's allow list comes from the server and admits the trigger.
+ *
+ * The agent reads `getAgentTriggerers` with its own credentials; then an adapter with the allow
+ * list on runs Alex's trigger, so the server's list holds the person the server let trigger, in
+ * the form the SDK decodes.
+ *
+ * @param server - The server under test.
+ * @returns A promise that resolves when every check held.
+ * @throws {@link ScenarioFailed} when a check failed.
+ */
+export async function rag19AllowlistFromServer(
+  server: ScenarioServer,
+): Promise<void> {
+  let allow: S["AgentTriggerers"];
+  try {
+    allow = await unwrap(
+      clientFor(server).GET("/agents/me/triggerers"),
+      "getAgentTriggerers",
+    );
+  } catch (error) {
+    if (error instanceof ProblemError)
+      throw new ScenarioFailed(
+        `getAgentTriggerers: ${error.status} ${error.code}`,
+      );
+    throw error;
+  }
+  const people = allow.principal_ids.map((id) => id.toLowerCase());
+  check(people.length > 0, "the allow list is empty");
+  check(
+    new Set(people).size === people.length,
+    "the allow list repeats a person",
+  );
+  check(
+    !people.includes(server.agentId.toLowerCase()) &&
+      !people.includes(server.otherAgentId.toLowerCase()),
+    "an agent is on the allow list",
+  );
+  check(
+    allow.permission_version >= 1,
+    `permission_version ${allow.permission_version}`,
+  );
+  const handler = new RecordingHandler();
+  const counting = new Counting();
+  const adapter = adapterFor(
+    server,
+    handler,
+    "rag19-allow",
+    counting.fetch,
+    true,
+  );
+  await running(adapter, async (rec) => {
+    await until(server, ready(rec), "the adapter to connect");
+    const triggered = await server.trigger("R-AG-19 @Lotse");
+    await until(server, () => handler.count("execute") === 1, "execute");
+    check(
+      counting.count("GET", "/agents/me/triggerers") >= 1,
+      "the adapter did not load the allow list",
+    );
+    const view = await server.runState(triggered.runId);
+    check(view.starts === 1, `starts ${view.starts}`);
   });
 }

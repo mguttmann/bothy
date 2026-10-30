@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
-"""AG-08, AG-09, AG-12, AG-28 and AZ-P6 against the FakeServer (the same scenario functions run
-against the real server in tests/realserver)."""
+"""AG-08, AG-09, AG-12, AG-28, AZ-P6 and R-AG-19 against the FakeServer (the same scenario
+functions run against the real server in tests/realserver)."""
 
 from __future__ import annotations
 
@@ -15,6 +15,7 @@ from bothy_sdk.testing.scenarios import (
     ag12_patch_rules,
     ag28_slow_start_and_restart,
     azp6_adapter_never_starts,
+    rag19_allowlist_from_server,
 )
 
 
@@ -47,3 +48,8 @@ async def test_ag12_fake(fake: FakeServer) -> None:
 @pytest.mark.anyio
 async def test_ag28_fake(fake: FakeServer) -> None:
     await ag28_slow_start_and_restart(fake)
+
+
+@pytest.mark.anyio
+async def test_rag19_fake(fake: FakeServer) -> None:
+    await rag19_allowlist_from_server(fake)

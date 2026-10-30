@@ -48,4 +48,5 @@ export {
   ag12PatchRules,
   ag28SlowStartAndRestart,
   azp6AdapterNeverStarts,
+  rag19AllowlistFromServer,
 } from "./scenarios.js";

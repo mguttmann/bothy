@@ -109,17 +109,22 @@ func (ag *Agents) BindCommands(cfg agentsapp.CommandConfig, pool *pg.Pool, d Com
 // NewAgents builds the agents module over pool with the unit of work uow, the Authorizer az, the
 // rights hook rights (it names agents as affected), the recorder and appender of w, the identity
 // module id (principal writer, directory and token revocation), the clock (nil means
-// clock.System()) and log. It opens no connection. Errors: a missing collaborator or a page size
-// the use cases refuse.
+// clock.System()) and log. It opens no connection. az must also answer the trigger set of an
+// agent (authorize.AgentTriggerers, getAgentTriggerers). Errors: a missing collaborator, an az
+// without that port or a page size the use cases refuse.
 func NewAgents(cfg agentsapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize.Authorizer, rights authz.RightsChanges,
 	w IdentityWrites, id *Identity, clk clock.Clock, _ *slog.Logger) (*Agents, error) {
 	if id == nil || id.Principals == nil || id.Tokens == nil {
 		return nil, errors.New("wire: the agents module needs the identity module")
 	}
+	tr, ok := az.(authorize.AgentTriggerers)
+	if !ok {
+		return nil, errors.New("wire: the Authorizer of agents does not answer the trigger set of an agent")
+	}
 	svc, err := agentsapp.New(cfg, agentsapp.Deps{
 		Store: agentspg.NewRepository(pool), Principals: id.Principals, Directory: identityapp.NewDirectory(identitypg.NewRepository(pool)),
 		Tokens: id.Tokens, Rights: rights, UoW: uow, Authorizer: az, Audit: w.Audit, Events: w.Events,
-		Cursors: agentshttp.Cursors{}, Clock: clk, Measure: w.Measure,
+		Cursors: agentshttp.Cursors{}, Clock: clk, Measure: w.Measure, Triggerers: tr,
 	})
 	if err != nil {
 		return nil, err

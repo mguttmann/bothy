@@ -14,6 +14,7 @@ import {
   ag12PatchRules,
   ag28SlowStartAndRestart,
   azp6AdapterNeverStarts,
+  rag19AllowlistFromServer,
 } from "../../src/testing/index.js";
 import { type RealServer, startRealServer } from "./sdkserver.js";
 
@@ -37,4 +38,6 @@ describe("the scenarios against the real server", () => {
   it("AG-12", () => ag12PatchRules(real));
 
   it("AG-28", () => ag28SlowStartAndRestart(real));
+
+  it("R-AG-19", () => rag19AllowlistFromServer(real));
 });

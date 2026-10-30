@@ -26,8 +26,8 @@ import (
 
 // Agents implements listAgents, createAgent, getAgent, updateAgent, disableAgent, enableAgent,
 // setAgentBillingMode, setAllAgentsBillingMode, setCredentialHolder and setAgentToolClass, and the
-// consumer operations getConsumerState, pollAgentEvents and ackAgentEvents (M2-07) and
-// sendHeartbeat (M2-20).
+// consumer operations getConsumerState, pollAgentEvents and ackAgentEvents (M2-07),
+// sendHeartbeat (M2-20) and getAgentTriggerers.
 type Agents struct {
 	agents    agents.Agents
 	consumers agents.ConsumerAPI

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// AG-08, AG-09, AG-12, AG-28 and AZ-P6 against the FakeServer (port of
+// AG-08, AG-09, AG-12, AG-28, AZ-P6 and R-AG-19 against the FakeServer (port of
 // sdk/python/tests/test_scenarios_fake.py; the same scenario functions run against the real
 // server in test/live/scenarios.live.test.ts), plus the check that the scenario functions of
 // `testing` equal the shared list of sdk/testdata/scenarios/README.md in camelCase (port of
@@ -19,6 +19,7 @@ import {
   ag12PatchRules,
   ag28SlowStartAndRestart,
   azp6AdapterNeverStarts,
+  rag19AllowlistFromServer,
 } from "../src/testing/index.js";
 
 const README = join(
@@ -88,4 +89,6 @@ describe("the scenarios against the FakeServer", () => {
   it("AG-12", () => ag12PatchRules(fake), TEST_TIMEOUT);
 
   it("AG-28", () => ag28SlowStartAndRestart(fake), TEST_TIMEOUT);
+
+  it("R-AG-19", () => rag19AllowlistFromServer(fake), TEST_TIMEOUT);
 });
