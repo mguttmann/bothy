@@ -279,9 +279,7 @@ void main() {
     );
     expect(retried.statusCode, 202);
     expect(retried.data!.id, isNot(run['id']));
-    final again = await api.getRunsApi().retryRun(
-      runId: run['id']! as String,
-    );
+    final again = await api.getRunsApi().retryRun(runId: run['id']! as String);
     expect(again.data!.id, retried.data!.id);
 
     // A second device of Alex through a pairing.
