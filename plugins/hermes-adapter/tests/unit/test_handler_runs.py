@@ -24,6 +24,8 @@ from bothy_sdk.testing.doubles import KEEP
 from bothy_sdk.testing.fakeserver import ContextFile, ContextMessage
 from bothy_sdk.testing.faults import Fault
 
+import bothy_hermes_adapter
+from bothy_hermes_adapter.defaults import NO_SPLIT_LENGTH
 from bothy_hermes_adapter.runtime import (
     CardKind,
     CardRequest,
@@ -34,6 +36,8 @@ from bothy_hermes_adapter.runtime import (
 )
 
 pytestmark = pytest.mark.anyio
+
+PACKAGE = Path(bothy_hermes_adapter.__file__).resolve().parent
 
 
 @pytest.fixture
@@ -110,6 +114,39 @@ async def test_status_draft_answer_and_finish_order(tmp_path: Path) -> None:
     assert all(s["kind"] == "tool_call" for s in steps)
     assert all(s["status"] == "completed" for s in steps)
     assert [s["title"] for s in steps] == ["Searching the files", "Reading notes"]
+
+
+async def test_a_long_answer_is_one_message_with_its_rest_attached(tmp_path: Path) -> None:
+    """M4-47: above ``max_message_bytes`` the answer keeps its head and the rest is one file."""
+    text = "\n".join(f"Step {i}: checked" for i in range(30))
+
+    async def script(turn: TurnRequest, rt: FakeRuntime) -> TurnOutcome:
+        assert await rt.events.on_answer(turn.thread_id, text, None) is not None
+        return TurnOutcome.COMPLETED
+
+    async with rig(tmp_path, runtime=FakeRuntime(script=script), max_message_bytes=120) as r:
+        r.fake.uploads.part_size = 64
+        triggered = await r.fake.trigger()
+        await r.until(lambda: r.finished(triggered.run_id))
+    assert r.fake.run_state(triggered.run_id).state == "completed"
+    assert len(r.fake.messages) == 1, "never split into several messages"
+    body = r.fake.messages[0]
+    assert len(body["content_md"].encode()) <= 120
+    (upload,) = r.fake.uploads.sessions.values()
+    assert upload.name == "answer.txt"
+    assert body["attachment_file_ids"] == [str(upload.file_id)]
+    assert body["content_md"] + upload.content().decode() == text
+
+
+def test_hermes_never_splits_an_answer() -> None:
+    """M4-47: Hermes hands the whole answer to the adapter; the adapter applies the limit."""
+    platform = (PACKAGE / "platform.py").read_text(encoding="utf-8")
+    entry = (PACKAGE / "entry.py").read_text(encoding="utf-8")
+    assert "splits_long_messages = True" in platform
+    assert "MAX_MESSAGE_LENGTH = NO_SPLIT_LENGTH" in platform
+    assert "self.MAX_MESSAGE_LENGTH =" not in platform
+    assert "max_message_length=NO_SPLIT_LENGTH" in entry
+    assert NO_SPLIT_LENGTH >= 2**31 - 1
 
 
 async def test_tool_events_become_steps(tmp_path: Path) -> None:

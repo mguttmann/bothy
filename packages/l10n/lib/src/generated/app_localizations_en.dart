@@ -3746,6 +3746,14 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String composerOverflowNote(String name) {
+    return 'Longer than one message: the rest goes out as $name with this message';
+  }
+
+  @override
+  String get composerPasteAsText => 'Insert as text';
+
+  @override
   String get composerDraftOverwritten =>
       'This draft replaced a newer version from another device';
 

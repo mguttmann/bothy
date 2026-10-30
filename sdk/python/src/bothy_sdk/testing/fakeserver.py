@@ -1446,6 +1446,10 @@ class FakeServer:
         """
         world = self.world
         uploads = []
+        content = str(body.get("content_md", "")) if isinstance(body, dict) else ""
+        # The server refuses a content above message.max_content_bytes (M4-47, 06).
+        if len(content.encode("utf-8")) > self.uploads.limits["message_max_content_bytes"]:
+            raise field_error("/content_md", "too_long")
         ids = body.get("attachment_file_ids") if isinstance(body, dict) else None
         known = isinstance(body, dict) and _known_message(world, body.get("client_msg_id"))
         if ids is not None and not known:

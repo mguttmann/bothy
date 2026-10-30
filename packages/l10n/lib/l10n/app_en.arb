@@ -5673,6 +5673,19 @@
       }
     }
   },
+  "composerOverflowNote": "Longer than one message: the rest goes out as {name} with this message",
+  "@composerOverflowNote": {
+    "description": "Note above the composer while the draft is larger than one message may carry; on send the rest becomes one text attachment of the same message (M4-47). {name} is the file name.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "composerPasteAsText": "Insert as text",
+  "@composerPasteAsText": {
+    "description": "Button on the chip of a long paste that became a file: puts the pasted text into the field instead (M4-47)."
+  },
   "composerDraftOverwritten": "This draft replaced a newer version from another device",
   "@composerDraftOverwritten": {
     "description": "Note after a draft write reported overwrote_newer (04 section 14)."

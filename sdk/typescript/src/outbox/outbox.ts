@@ -94,6 +94,8 @@ export interface SendMessageOptions {
   readonly kind?: "text" | "card" | undefined;
   /** The components of a card, held to the limits of `checkComponents` before storing. */
   readonly components?: readonly ComponentCreate[] | undefined;
+  /** Completed uploads of the caller to attach, in display order (12 10; M4-47). */
+  readonly attachmentFileIds?: readonly string[] | undefined;
 }
 
 /** Options of {@link Outbox.call}. */
@@ -186,6 +188,11 @@ export class Outbox {
       checkComponents(options.components, this.api.settings);
       body.components = [...options.components];
     }
+    if (
+      options.attachmentFileIds !== undefined &&
+      options.attachmentFileIds.length > 0
+    )
+      body.attachment_file_ids = [...options.attachmentFileIds];
     return this.store_(threadId, "message", body.client_msg_id, body, options);
   }
 

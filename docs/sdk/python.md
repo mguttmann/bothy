@@ -41,6 +41,7 @@ would only repeat that.
 | `components` | Message components of `component.v1`. |
 | `commands` | Slash commands: a declared list, reconciliation and autocomplete. |
 | `outbox` | Writes that must never go out twice or get lost. |
+| `long_answers` | A long answer stays one message: the head as its text, the rest above `message_max_content_bytes` as one attachment `answer.txt` (M4-47). |
 | `heartbeat` | The heartbeat building block for `agent_heartbeat.v1`. |
 | `tolerance` | Tolerance of the generated core for what a newer server may send (gate G5). |
 | `webhooks` | Standard Webhooks verification for apps: `verify_webhook` and the key cache (M2-50). |
@@ -85,6 +86,8 @@ would only repeat that.
 ::: bothy_sdk.outbox
 
 ::: bothy_sdk.uploads
+
+::: bothy_sdk.long_answers
 
 ::: bothy_sdk.heartbeat
 

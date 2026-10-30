@@ -354,6 +354,12 @@ States: empty, text, command selected, options incomplete (send disabled with a 
 offline (sending goes to the outbox), no write permission (field replaced by the note "Read
 only in this channel").
 
+Long texts (M4-47, 01 6.13): a paste over `ui.composer_paste_file_chars` characters or
+`ui.composer_paste_file_lines` lines becomes a file chip (`paste.txt`, or `paste.<extension>`
+for one fenced block) above the field with the ghost button "Insert as text"; a text over
+`message.max_content_bytes` shows the note "Longer than one message: the rest goes out as
+message.txt with this message" with `state.info` above the field.
+
 Keyboard: arrows select, Tab or Enter accepts, Escape closes; Enter sends, Shift+Enter
 makes a new line (reversible through `composer.enter_sends`); arrow up in the empty field edits
 your own last message.

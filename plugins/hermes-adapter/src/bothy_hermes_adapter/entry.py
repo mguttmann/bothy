@@ -26,7 +26,7 @@ import sys
 from typing import Any, Final
 from uuid import UUID
 
-from bothy_hermes_adapter.defaults import DEFAULT_MAX_MESSAGE_BYTES
+from bothy_hermes_adapter.defaults import NO_SPLIT_LENGTH
 
 __all__ = ["HOOKS", "make_register", "parse_target_ref", "standalone_send"]
 
@@ -113,7 +113,8 @@ def make_register(platform_key: str) -> Any:
             check_fn=lambda: True,
             allowed_users_env=f"{platform_key.upper()}_ALLOWED_USERS",
             allow_all_env=f"{platform_key.upper()}_ALLOW_ALL_USERS",
-            max_message_length=DEFAULT_MAX_MESSAGE_BYTES,
+            # Hermes never splits an answer; the adapter keeps one message (M4-47).
+            max_message_length=NO_SPLIT_LENGTH,
             cron_deliver_env_var=f"{platform_key.upper()}_HOME_CHANNEL",
             parse_target_ref_fn=parse_target_ref,
             standalone_sender_fn=standalone_send,

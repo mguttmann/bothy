@@ -6133,6 +6133,18 @@ abstract class AppLocalizations {
   /// **'The message is too long: at most {limit} bytes'**
   String composerTooLong(int limit);
 
+  /// Note above the composer while the draft is larger than one message may carry; on send the rest becomes one text attachment of the same message (M4-47). {name} is the file name.
+  ///
+  /// In en, this message translates to:
+  /// **'Longer than one message: the rest goes out as {name} with this message'**
+  String composerOverflowNote(String name);
+
+  /// Button on the chip of a long paste that became a file: puts the pasted text into the field instead (M4-47).
+  ///
+  /// In en, this message translates to:
+  /// **'Insert as text'**
+  String get composerPasteAsText;
+
   /// Note after a draft write reported overwrote_newer (04 section 14).
   ///
   /// In en, this message translates to:

@@ -2,7 +2,7 @@
 
 // The composer of the thread view (brief M4-20 Tests; components.md 9; 04 12, 14): Enter and
 // Shift+Enter by `composer.enter_sends`, arrow up edits the last own message, mention
-// suggestions only from stored principals, content over the limit is refused with the reason,
+// suggestions only from stored principals, content over the limit goes out as one message,
 // the draft is saved through the outbox with one coalesced write, a foreign draft is not
 // applied while typing, the `overwrote_newer` notice and the typing line.
 
@@ -179,23 +179,24 @@ void main() {
     await host.dispose(tester);
   });
 
-  testWidgets('content over the limit is refused with the reason', (
-    tester,
-  ) async {
-    final host = await open(tester, maxBytes: 10);
-    await type(tester, host, 'This is longer than ten bytes');
-    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
-    await host.settle(tester);
-    expect(find.text(en.composerTooLong(10)), findsOneWidget);
-    expect(
-      (await entries(
-        tester,
-        host,
-      )).where((e) => e.kind == MessageOps.createMessage),
-      isEmpty,
-    );
-    await host.dispose(tester);
-  });
+  testWidgets(
+    'content over the limit goes out as one message, the rest attached (M4-47)',
+    (tester) async {
+      final host = await open(tester, maxBytes: 10);
+      await type(tester, host, 'This is longer than ten bytes');
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await host.settle(tester);
+      expect(find.text(en.composerTooLong(10)), findsNothing);
+      expect(
+        (await entries(
+          tester,
+          host,
+        )).where((e) => e.kind == MessageOps.createMessage),
+        hasLength(1),
+      );
+      await host.dispose(tester);
+    },
+  );
 
   testWidgets(
     'the draft is saved with one coalesced write per typed sentence',

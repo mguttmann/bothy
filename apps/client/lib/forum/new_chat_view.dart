@@ -21,6 +21,10 @@ import 'package:sync_engine/sync_engine.dart';
 import '../app/providers/ports.dart';
 import '../app/providers/session.dart';
 import '../app/router.dart' show NewChatLocation;
+import '../composer/attachment_chips.dart';
+import '../composer/composer_controller.dart' show ContentTooLong;
+import '../composer/long_text.dart';
+import '../files/providers.dart' show newPostAttachmentsProvider;
 import '../settings/settings_providers.dart';
 import '../sidebar/providers.dart' show collapsedGroupsProvider;
 import '../sync/thread_ops.dart';
@@ -192,6 +196,13 @@ class NewChatComposeState extends ConsumerState<NewChatCompose> {
 
   bool _hadStoredDraft = false;
 
+  /// The outbox of the session; its entries without a thread are the uploads of the post.
+  Outbox? _outbox;
+
+  /// The outbox entries without a thread while the post has files (M4-47): a stream allows one
+  /// listener, so a new one is made each time the chips appear again.
+  Stream<List<OutboxEntryView>>? _uploads;
+
   /// This device overwrote a newer draft of another device (04 14).
   bool _overwritten = false;
 
@@ -201,6 +212,7 @@ class NewChatComposeState extends ConsumerState<NewChatCompose> {
     final engine = ref.read(syncEngineProvider);
     final db = ref.read(localDatabaseProvider);
     if (engine == null || db == null) return;
+    _outbox = engine.outbox;
     final forum = widget.forum;
     final chat = _chat = NewChatController(
       forum: forum,
@@ -208,6 +220,8 @@ class NewChatComposeState extends ConsumerState<NewChatCompose> {
       dao: db.outboxDao,
       editing: ref.read(draftEditingProvider),
       deviceId: ref.read(signedInServicesProvider)?.auth.session?.deviceId,
+      // M4-47: a long paste and the rest of a long text go out as files of the post.
+      attach: ref.read(newPostAttachmentsProvider(forum.value)),
       dropStoredDraft: () async {
         final stored = await db.personalDao.watchDraft(channelId: forum).first;
         if (stored != null) await db.personalDao.deleteDraft(stored.id);
@@ -285,11 +299,72 @@ class NewChatComposeState extends ConsumerState<NewChatCompose> {
     super.dispose();
   }
 
+  /// The refusal over the limit, the note of a text larger than one message and the chips of
+  /// the attached files (M4-47).
+  List<Widget> _composerNotes(NewChatController chat, AppLocalizations l) {
+    final composer = chat.composer;
+    final attach = composer.attach;
+    final hasFiles = attach != null && attach.attachments.isNotEmpty;
+    final uploads = hasFiles
+        ? _uploads ??= _outbox?.watchThread(null)
+        : _uploads = null;
+    Widget note(Key key, DsTone tone, String text) => Padding(
+      key: key,
+      padding: const EdgeInsets.only(bottom: DsSpace.s4),
+      child: DsBanner(tone: tone, text: text, liveRegion: true),
+    );
+    return [
+      if (composer.error case ContentTooLong(:final limit))
+        note(
+          const ValueKey('newChat.error'),
+          DsTone.danger,
+          l.composerTooLong(limit),
+        ),
+      if (composer.overflows)
+        note(
+          const ValueKey('newChat.overflow'),
+          DsTone.info,
+          l.composerOverflowNote(overflowFileName),
+        ),
+      if (attachRefusalText(
+            l,
+            attach?.refusal,
+            locale: Localizations.localeOf(context).languageCode,
+          )
+          case final refused?)
+        note(const ValueKey('newChat.attachError'), DsTone.danger, refused),
+      if (hasFiles)
+        Padding(
+          key: const ValueKey('newChat.attachments'),
+          padding: const EdgeInsets.only(bottom: DsSpace.s4),
+          child: StreamBuilder<List<OutboxEntryView>>(
+            stream: uploads,
+            builder: (context, entries) => ComposerAttachmentChips(
+              attach: attach,
+              // Before the first list the chips follow the upload progress.
+              views: entries.data,
+              onInsertAsText: (key) =>
+                  unawaited(composer.insertPasteAsText(key)),
+            ),
+          ),
+        ),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final c = context.dsColors;
     final chat = _chat;
+    final config = ref.watch(appConfigProvider);
+    // The limits of the instance can arrive after the view opened (M4-47: the note and the
+    // cut of a text larger than one message need them).
+    final limits = ref.watch(instanceLimitsProvider).value;
+    if (chat != null && limits != null) chat.composer.limits = limits;
+    chat?.composer.pasteRule = PasteRule(
+      maxChars: config.composerPasteFileChars,
+      maxLines: config.composerPasteFileLines,
+    );
     final forum = widget.forum.value;
     final channel = ref.watch(storedChannelProvider(forum)).value;
     final tags = ref.watch(forumTagsProvider(forum)).value ?? const [];
@@ -367,6 +442,7 @@ class NewChatComposeState extends ConsumerState<NewChatCompose> {
                       onAction: () => setState(() => _overwritten = false),
                     ),
                   ),
+                if (chat != null) ..._composerNotes(chat, l),
                 if (missingTitle)
                   Padding(
                     padding: const EdgeInsets.only(bottom: DsSpace.s6),
@@ -383,7 +459,7 @@ class NewChatComposeState extends ConsumerState<NewChatCompose> {
                     child: DsComposer(
                       key: const ValueKey('newChat.composer'),
                       targetName: channel?.name ?? '',
-                      maxLines: ref.watch(appConfigProvider).composerMaxLines,
+                      maxLines: config.composerMaxLines,
                       enterSends: ref
                           .watch(personalSettingsProvider)
                           .enterSends,
@@ -392,6 +468,8 @@ class NewChatComposeState extends ConsumerState<NewChatCompose> {
                       onSend: (text) => unawaited(_send(text)),
                       offline: offline,
                       sendEnabled: chat.canSend,
+                      hasAttachments:
+                          chat.composer.attach?.attachments.isNotEmpty ?? false,
                     ),
                   ),
               ],

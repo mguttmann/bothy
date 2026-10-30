@@ -2,20 +2,23 @@
 
 /// The state of the composer of a thread (brief M4-20 Design note 3; components.md 9; 04 12,
 /// 04 14): the text, the reply being prepared, the mention suggestions, the draft sync and the
-/// send path with the content limit of the instance.
+/// send path with the content limit of the instance. A long paste becomes a text file and a
+/// draft over the limit goes out as one message with its rest as one attachment (M4-47,
+/// 01 6.13).
 library;
 
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:domain/domain.dart';
 import 'package:flutter/widgets.dart';
 import 'package:sync_engine/sync_engine.dart';
 
 import '../files/attach_controller.dart';
+import '../files/upload_executor.dart' show MessageAttachments;
 import '../telemetry/measurements.dart';
 import '../thread/thread_actions.dart';
 import 'draft_sync.dart';
+import 'long_text.dart';
 import 'mention_suggestions.dart';
 
 /// Why a send was refused before it reached the outbox.
@@ -23,7 +26,9 @@ sealed class ComposerError {
   const ComposerError();
 }
 
-/// The content is larger than `message_max_content_bytes` of the instance (D-W-115).
+/// The content is larger than `message_max_content_bytes` of the instance (D-W-115) and its
+/// rest could not become an attachment (no file support here, or the attachment was refused;
+/// M4-47).
 final class ContentTooLong extends ComposerError {
   /// Creates the error.
   const ContentTooLong(this.limit);
@@ -39,7 +44,10 @@ final class ContentTooLong extends ComposerError {
 /// Every change of the text by the person ([onChanged]) marks the draft as being edited
 /// (`DraftEditing`, 04 14), writes it through the [DraftWriter], sends `typing.start` through
 /// the throttle (or `typing.stop` when the field is cleared, 04 12) and updates the mention
-/// suggestions. [send] checks the limit, puts the message into the outbox with `clear_draft`,
+/// suggestions. A change that inserts more than [pasteRule] allows (a long paste) takes the
+/// inserted text out of the field and attaches it as a file through [attach] (M4-47).
+/// [send] checks the limit (a draft over it keeps its head and sends the rest as the
+/// attachment [overflowFileName]), puts the message into the outbox with `clear_draft`,
 /// drops the waiting draft write, sends `typing.stop` and clears the field.
 ///
 /// Example:
@@ -63,8 +71,10 @@ final class ComposerController extends ChangeNotifier {
     this.sendNew,
   });
 
-  /// Sends the first message of a new post (the text, trimmed); used when [thread] is null.
-  final Future<void> Function(String body)? sendNew;
+  /// Sends the first message of a new post (the text, trimmed, and the attachments of
+  /// [attach]); used when [thread] is null.
+  final Future<void> Function(String body, MessageAttachments? attachments)?
+  sendNew;
 
   /// The measurement points of the app metrics: a send reports `client.send_local.duration`
   /// (brief M4-31), or nothing when null.
@@ -100,6 +110,31 @@ final class ComposerController extends ChangeNotifier {
   /// The attachments of the composer (M4-22), or null without file support.
   AttachController? attach;
 
+  /// When a paste becomes a file (`ui.composer_paste_file_chars`,
+  /// `ui.composer_paste_file_lines`), or null to keep every paste as text.
+  PasteRule? pasteRule;
+
+  /// The text of the field as this controller last saw it; a change is compared with it to
+  /// find the inserted text of a paste.
+  String _seen = '';
+
+  /// Whether the draft is larger than one message may carry and has file support, so the
+  /// send keeps the head and attaches the rest (the note before sending, M4-47).
+  bool get overflows {
+    final max = limits?.messageMaxContentBytes;
+    return max != null && attach != null && exceedsBytes(text.text.trim(), max);
+  }
+
+  /// Sets the field to [next] with the cursor at [offset] (the end without one), as text this
+  /// controller put there, never a paste.
+  void _setText(String next, {int? offset}) {
+    _seen = next;
+    text.value = TextEditingValue(
+      text: next,
+      selection: TextSelection.collapsed(offset: offset ?? next.length),
+    );
+  }
+
   /// The stored principals (mention suggestions).
   Map<PrincipalId, Principal> principals = const {};
 
@@ -133,8 +168,24 @@ final class ComposerController extends ChangeNotifier {
   void _markEditing() =>
       _editing.setEditing(channel, thread, editing: _focused && _dirty);
 
-  /// The person changed the text to [value].
-  void onChanged(String value) {
+  /// The person changed the text to [value]; a long paste in it becomes a file (M4-47).
+  void onChanged(String changed) {
+    final previous = _seen;
+    var value = _seen = changed;
+    final rule = pasteRule;
+    final files = attach;
+    if (rule != null && files != null) {
+      final paste = insertionOf(previous, value);
+      if (paste != null && rule.isLong(paste.inserted)) {
+        value = value.replaceRange(
+          paste.start,
+          paste.start + paste.inserted.length,
+          '',
+        );
+        _setText(value, offset: paste.start);
+        unawaited(_attachPaste(files, paste));
+      }
+    }
     _dirty = true;
     error = null;
     _markEditing();
@@ -150,6 +201,41 @@ final class ComposerController extends ChangeNotifier {
     unawaited(_writeDraft(value));
     _suggest();
     notifyListeners();
+  }
+
+  /// Attaches the long [paste] as a file; a refused file (count or size) goes back into the
+  /// field as text, and the refusal shows its reason.
+  Future<void> _attachPaste(AttachController files, TextInsertion paste) async {
+    final file = pasteFileOf(paste.inserted);
+    final ok = await files.addText(
+      file.name,
+      file.content,
+      mimeType: file.mimeType,
+      pastedText: paste.inserted,
+    );
+    if (!ok) _insertAt(paste.inserted, paste.start);
+  }
+
+  /// "Insert as text" on the chip of the long paste [key]: the file goes and its text is
+  /// inserted at the cursor (M4-47).
+  Future<void> insertPasteAsText(String key) async {
+    final files = attach;
+    if (files == null) return;
+    String? pasted;
+    for (final a in files.attachments) {
+      if (a.key == key) pasted = a.pastedText;
+    }
+    if (pasted == null) return;
+    await files.remove(key);
+    insert(pasted);
+  }
+
+  void _insertAt(String content, int at) {
+    final current = text.text;
+    final where = at.clamp(0, current.length);
+    final next = current.replaceRange(where, where, content);
+    _setText(next, offset: where + content.length);
+    onChanged(next);
   }
 
   Future<void> _writeDraft(String value) =>
@@ -184,10 +270,7 @@ final class ComposerController extends ChangeNotifier {
     final next = draft?.contentMd ?? '';
     if (draft != null) _draftVersion = draft.version;
     if (next == text.text) return;
-    text.value = TextEditingValue(
-      text: next,
-      selection: TextSelection.collapsed(offset: next.length),
-    );
+    _setText(next);
     replyTo = draft?.replyToMessageId;
     notifyListeners();
   }
@@ -207,10 +290,7 @@ final class ComposerController extends ChangeNotifier {
   Future<void> restoreUnsent() async {
     final unsent = await _drafts.restore();
     if (unsent == null || _typingNow || unsent == text.text) return;
-    text.value = TextEditingValue(
-      text: unsent,
-      selection: TextSelection.collapsed(offset: unsent.length),
-    );
+    _setText(unsent);
     notifyListeners();
   }
 
@@ -227,10 +307,7 @@ final class ComposerController extends ChangeNotifier {
       query,
       principal.handle,
     );
-    text.value = TextEditingValue(
-      text: next,
-      selection: TextSelection.collapsed(offset: at),
-    );
+    _setText(next, offset: at);
     suggestions = const [];
     onChanged(next);
   }
@@ -271,30 +348,53 @@ final class ComposerController extends ChangeNotifier {
         ? value.selection.end
         : value.text.length;
     final next = value.text.replaceRange(at, at, content);
-    text.value = TextEditingValue(
-      text: next,
-      selection: TextSelection.collapsed(
-        offset: atStart ? next.length : at + content.length,
-      ),
-    );
+    // A template, a quote or the text of a paste the person chose to keep: never a file.
+    _setText(next, offset: atStart ? next.length : at + content.length);
     onChanged(next);
   }
 
-  /// Sends [value] with the attachments of [attach]; returns false and sets [error] when it
-  /// is over the limit of the instance (checked before sending, D-W-115). A message of
-  /// attachments only has no text.
+  /// Whether [send] writes the rest of a long text as [overflowFileName] (M4-47).
+  bool _overflowing = false;
+
+  /// Sends [value] with the attachments of [attach]. Over the limit of the instance
+  /// (D-W-115) the message keeps the head and the rest becomes the attachment
+  /// [overflowFileName] of the same message (M4-47, D-M4-47-3); only when that attachment
+  /// cannot be made it returns false and sets [error]. A message of attachments only has no
+  /// text.
   Future<bool> send(String value) async {
-    final body = value.trim();
+    // A second send while the rest of a long text is written would send it twice.
+    if (_overflowing) return false;
+    var body = value.trim();
     final hasFiles = attach?.attachments.isNotEmpty ?? false;
     if (body.isEmpty && !hasFiles) return false;
     final started = measurements?.sendStarted();
     final max = limits?.messageMaxContentBytes;
-    if (max != null && utf8.encode(body).length > max) {
-      error = ContentTooLong(max);
-      notifyListeners();
-      return false;
+    if (max != null && exceedsBytes(body, max)) {
+      final files = attach;
+      final cut = splitForLimit(body, max);
+      final bool attached;
+      _overflowing = true;
+      try {
+        attached =
+            files != null &&
+            await files.addText(
+              overflowFileName,
+              cut.overflow!,
+              mimeType: 'text/plain',
+            );
+      } finally {
+        _overflowing = false;
+      }
+      if (!attached) {
+        error = ContentTooLong(max);
+        notifyListeners();
+        return false;
+      }
+      // Head and attachment together are exactly the text (D-M4-47-3).
+      body = cut.head.trim().isEmpty ? '' : cut.head;
     }
     final reply = replyTo;
+    _seen = '';
     text.clear();
     replyTo = null;
     replyName = null;
@@ -308,7 +408,7 @@ final class ComposerController extends ChangeNotifier {
     final files = attach?.take();
     await _drafts.dropWaiting();
     if (thread == null) {
-      await sendNew?.call(body);
+      await sendNew?.call(body, files);
     } else {
       await _actions?.send(thread, body, replyTo: reply, attachments: files);
     }
@@ -321,6 +421,7 @@ final class ComposerController extends ChangeNotifier {
   /// the server does not clear the draft with it; the empty text is written as the draft and
   /// the typing indicator ends.
   void clearAfterCommand() {
+    _seen = '';
     text.clear();
     suggestions = const [];
     error = null;

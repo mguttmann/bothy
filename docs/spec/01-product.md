@@ -104,7 +104,7 @@ milestones from the [plan](../PLAN.md).
 
 | Feature | Milestone | Where | Action(s) | Remark |
 |---|---|---|---|---|
-| Markdown, code blocks, long answers without splitting, collapsed with "Show more" | core | D, M | `message.create` | limit `message.max_content_bytes`; a single code or quote block copies on its own (6.12) |
+| Markdown, code blocks, long answers without splitting, collapsed with "Show more" | core | D, M | `message.create` | limit `message.max_content_bytes`; a single code or quote block copies on its own (6.12); a longer text goes as one attachment of the same message and a long paste becomes a file (6.13, addendum of 2026-10-29) |
 | Edit and delete own messages, view versions | core | D, M | `message.update`, `message.delete`, `message.revisions.read` | no editing deadline |
 | Reply with quote | core | D, M | `message.create` | |
 | Reactions with a free Unicode character | core | D, M | `reaction.add` | status is not a reaction |
@@ -1487,7 +1487,8 @@ the screen reader label. Icons and colors: [components.md](../design/components.
 
 Messages over `ui.message_collapse_lines` lines are collapsed with "Show more";
 code blocks scroll horizontally instead of wrapping. Long replies are never split across several
-messages.
+messages; one fenced code block renders as one block however long it is. A text larger than
+`message.max_content_bytes` goes out as one message whose rest is one text attachment (6.13).
 
 ### 6.5 Components
 
@@ -1716,6 +1717,37 @@ Applies to every message the renderer draws, on the desktop (macOS, Windows) and
 6. **Selection.** Selecting part of a message with the system selection, where a view offers it,
    is not changed by the copy targets: a tap is the block's, a long press and a drag stay with
    the selection and the message.
+
+### 6.13 Long texts
+
+Addendum of 2026-10-29 (R-PR-26, rulings D-M4-47-1 to D-M4-47-6). Reason: owner decision of
+2026-10-29; a person must never hit a length limit, unlike the 2000 characters of the former chat
+tool that forced splitting a text or a paid plan.
+
+1. **Long paste.** In the composer of a thread and of a new post (desktop and phone), a paste of
+   more than `ui.composer_paste_file_chars` characters or more than `ui.composer_paste_file_lines`
+   lines does not go into the field: it becomes the attachment `paste.txt`, shown as a file chip
+   above the field. A paste that is exactly one fenced code block with a known language becomes
+   `paste.<extension>` with the code of the block (for example `paste.py`); text that is clearly a
+   file (a script with `#!`, JSON, XML, HTML, a diff) gets that extension. The chip has "Insert as
+   text", which removes the file and puts the pasted text into the field at the cursor. Typed
+   text, templates and quotes never become a file. A paste the attachment rules refuse (count,
+   size) stays text and the refusal shows its reason.
+2. **Text over the limit.** While the text of the composer is larger than
+   `message.max_content_bytes` (UTF-8 bytes), a note above the field says that the rest goes out
+   as `message.txt` with this message. Sending never fails with a length error: the message
+   carries the head (cut at a line break, never inside a character, never inside a fenced code
+   block, which moves whole into the rest) and the rest as the one attachment `message.txt` of the
+   same message; head and attachment together are the text. A message is never split into
+   several. Only when that attachment is refused (the count of attachments is full) the composer
+   shows the limit as before and keeps the text.
+3. **Agents.** The SDKs (Python `bothy_sdk.long_answers`, TypeScript `sendLongMessage`), the
+   Hermes adapter and the Claude Code runner send a long answer the same way: one message, the
+   rest above the limit as one attachment `answer.txt`; they never split an answer into several
+   messages. When the attachment cannot be made, the head goes out with a short note, still one
+   message ([09-agents.md](09-agents.md) 17.3, 18.10).
+4. **Edits.** Editing a message keeps the limit of `message.max_content_bytes`: an edit carries no
+   attachments ([06-api.md](06-api.md) `MessageUpdate`).
 
 ## 7. Keyboard shortcuts
 
@@ -1969,6 +2001,7 @@ Rules:
 | R-PR-23 | A forum group in the sidebar lists every open post by last activity, newest first, the newest `ui.sidebar_forum_posts_visible` and then "Show more" in place (kept per device); text channels keep the rule of 6.8 item 2 (addendum of 2026-10-29). | Owner decision 2026-10-29 ("like Discord"): after an import most open posts had no recent activity and vanished from the sidebar; a forum with 24 open posts showed none. |
 | R-PR-24 | Each device navigates on its own: route, selected row, open columns, collapsed spaces and groups and scroll position stay on the device and never follow another device of the person; only data (messages, read state, counters, drafts, settings, sidebar order, notification preferences) syncs (6.7, 04 14; addendum of 2026-10-29). | Owner report 2026-10-29 (iPhone and Mac app of one person): opening a chat on the phone appeared to open the same chat on the Mac. The cause was the synchronized collapse of a space: the space a device expanded to open a chat expanded on the other device at the same moment, while the route never followed. The owner wants to do different things on phone and desktop. Two-device tests over the fake server hold the rule (docs/decisions.d/FIX-device-mirroring.md, docs/decisions.d/FIX-device-mirroring-2.md). |
 | R-PR-25 | Every code block and quote block of a message copies on its own: on the desktop through a copy button at its top right, on the phone through a tap with "Copied" and a haptic, while a long press keeps the message menu; a code block copies its raw content byte for byte, a quote its text without markers and, where the clipboard holds rich text, also as HTML (6.12, addendum of 2026-10-29). | Owner request 2026-10-29: in Discord a tap on a code block on the phone never copied it and "Copy text" always copied the whole message. |
+| R-PR-26 | A paste over `ui.composer_paste_file_chars` characters or `ui.composer_paste_file_lines` lines becomes a text file attachment with "Insert as text"; a text over `message.max_content_bytes` goes out as one message with its rest as one attachment, from people and agents alike; a message is never split (6.13, addendum of 2026-10-29). | Owner decision 2026-10-29: a person never hits a length limit, as in the former chat tool where 2000 characters forced splitting or a paid plan; one message keeps a reply readable and quotable as one. |
 
 ## 14. Configuration values of this chapter
 
@@ -1978,6 +2011,8 @@ Rules:
 | `ui.message_collapse_lines` | `24` | from this many lines on, a message is collapsed |
 | `ui.livebox_visible_steps` | `6` | visible steps in the running live box |
 | `ui.composer_max_lines` | `12` | the input grows up to this many lines |
+| `ui.composer_paste_file_chars` | `4000` | a paste of more characters becomes a text file attachment in the composer (6.13) |
+| `ui.composer_paste_file_lines` | `100` | a paste of more lines becomes a text file attachment in the composer (6.13) |
 | `ui.autocomplete_debounce` | `150ms` | waiting time before `command.autocomplete` |
 | `ui.quick_switch_max_results` | `20` | hits in the quick switcher |
 | `ui.desktop_min_width_four_columns` | `1280px` | below this width the session column collapses |

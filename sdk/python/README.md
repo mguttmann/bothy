@@ -14,7 +14,7 @@ Python SDK for agent adapters (among them the Hermes adapter) and apps that use 
 |---|---|
 | `src/bothy_sdk/generated/` | Generated core: models and functions of every REST operation of `docs/api/openapi.yaml`, written by openapi-python-client 0.29.1. Never edited by hand. |
 | `src/bothy_sdk/tolerance.py` | Tolerance layer (gate G5), installed on import of `bothy_sdk`. |
-| `src/bothy_sdk/*.py` | Hand layer (M2-29): `adapter`, `inbox`, `invocation`, `gateway`, `sources`, `runs`, `context`, `components`, `commands`, `outbox`, `heartbeat`, `client`, `sync`, `retry`, `auth`, `errors`, `settings`, `clock`, `ids`, and `webhooks` (M2-50); reference page [docs/sdk/python.md](../../docs/sdk/python.md). |
+| `src/bothy_sdk/*.py` | Hand layer (M2-29): `adapter`, `inbox`, `invocation`, `gateway`, `sources`, `runs`, `context`, `components`, `commands`, `outbox`, `long_answers` (M4-47), `heartbeat`, `client`, `sync`, `retry`, `auth`, `errors`, `settings`, `clock`, `ids`, and `webhooks` (M2-50); reference page [docs/sdk/python.md](../../docs/sdk/python.md). |
 | `src/bothy_sdk/testing/` | FakeServer (extra `testing`), faults, scenario functions, doubles and recorded fixtures. |
 | `src/bothy_sdk/__init__.py` | Package entry; calls `tolerance.install()`. |
 | `tests/` | G4 and G5 tests (pytest); the fixtures are shared with the TypeScript SDK in [`../testdata/tolerance/`](../testdata/tolerance/README.md). |
@@ -216,6 +216,14 @@ pending, with the refusal on the returned entry (`OutboxEntry.problem`). The Fak
 bytes per file in `FakeServer.uploads.sessions`) and attaches completed own uploads in
 `createMessage`; `Fault.passthrough` and `Fault.hold` let a fault hit a later call or hold a call
 until the test opens its `HoldGate`.
+
+Long answers (M4-47, docs/spec/01-product.md 6.13): `bothy_sdk.long_answers.send_long_message`
+sends an answer within `message_max_content_bytes` as it is and a longer one as one message with
+the head (`split_for_limit`: at a line break, never inside a character or a fenced code block) and
+the rest as one attachment `answer.txt` (`upload_text`, mode `direct`); when that upload fails the
+head goes out with a short note, still one message. An answer is never split into several
+messages. The FakeServer refuses a `content_md` above `FakeServer.uploads.limits
+["message_max_content_bytes"]` with `400 validation_failed` `too_long`, as the server does.
 
 For files and voice messages (M3-09) the Fake-Agent has `read_file` (`downloadFile`; the reply
 holds only `status`, the problem members and the byte length `bytes`, never the content) and

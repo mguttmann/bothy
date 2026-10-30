@@ -84,6 +84,7 @@ from bothy_sdk.generated.models import (
     TranscriptSubmit,
 )
 from bothy_sdk.generated.types import File, Unset
+from bothy_sdk.long_answers import send_long_message
 from bothy_sdk.runs import RunHandle
 from bothy_sdk.sources import Envelope
 
@@ -967,11 +968,20 @@ class HermesHandler(AgentHandler):
         turn = self._active(thread_id)
         if turn is None or turn.live is None:
             return None
-        body = self._cut(turn, text)
         with self._bound(turn):
             turn.live.answer()
-            anchor = _uuid_or_none(reply_to) if turn.anchored else None
-            entry = await turn.handle.send(body, reply_to_message_id=anchor)
+            # One message, never several (M4-47): above max_message_bytes the head stays the
+            # text and the rest goes as one attachment (D-M4-47-5).
+            entry = await send_long_message(
+                turn.handle.client,
+                turn.handle.outbox,
+                turn.thread_id,
+                turn.channel_id,
+                text,
+                max_content_bytes=self.settings.max_message_bytes,
+                run_id=turn.run_id,
+                reply_to_message_id=_uuid_or_none(reply_to) if turn.anchored else None,
+            )
         if entry.message_id is None:
             return None
         key = str(entry.message_id)

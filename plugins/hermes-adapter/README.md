@@ -108,7 +108,8 @@ In `gateway.platforms.<platform key>.extra`, written by the installer (09 21):
 `hermes_adapter.platform_key` (`bothy`), `hermes_adapter.consumer` (`default`),
 `hermes_adapter.server_url`, `hermes_adapter.instance_id`, `hermes_adapter.token_file`,
 `hermes_adapter.dpop_key_file`, `hermes_adapter.max_message_bytes` (change it together with the
-server's `message.max_content_bytes`), `hermes_adapter.attachment_text_max_bytes`, and the SDK keys
+server's `message.max_content_bytes`; a longer answer goes out as one message with its rest as
+one attachment `answer.txt`, and Hermes never splits an answer, M4-47), `hermes_adapter.attachment_text_max_bytes`, and the SDK keys
 `adapter.invocation_token_leeway`, `adapter.jwks_refresh_min_interval`, `sdk.http_timeout`,
 `sdk.retry_max_attempts`, `sdk.retry_backoff_base`, `sdk.retry_backoff_cap`. The adapter never
 reads the process environment.

@@ -316,6 +316,7 @@ class UploadChip extends StatelessWidget {
     this.onRemove,
     this.onRetry,
     this.previewPath,
+    this.onInsertAsText,
   });
 
   /// The attachment key.
@@ -346,6 +347,10 @@ class UploadChip extends StatelessWidget {
 
   /// Sends a failed upload again, or null.
   final VoidCallback? onRetry;
+
+  /// "Insert as text" of a long paste that became this file (M4-47): the file goes and its
+  /// text goes into the field; null for any other file.
+  final VoidCallback? onInsertAsText;
 
   @override
   Widget build(BuildContext context) {
@@ -453,6 +458,13 @@ class UploadChip extends StatelessWidget {
                       label: l.fileUploadAgain,
                       style: DsButtonStyle.ghost,
                       onPressed: onRetry,
+                    ),
+                  if (onInsertAsText != null)
+                    DsButton(
+                      key: ValueKey('upload.$attachmentKey.insertText'),
+                      label: l.composerPasteAsText,
+                      style: DsButtonStyle.ghost,
+                      onPressed: onInsertAsText,
                     ),
                   if (state == AttachmentState.uploading)
                     SizedBox(

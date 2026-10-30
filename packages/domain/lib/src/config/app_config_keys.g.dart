@@ -41,6 +41,8 @@ const List<AppConfigKey> appConfigKeys = <AppConfigKey>[
   AppConfigKey('terminal.max_session_duration', 'Server', AppConfigKind.duration, '12h'),
   AppConfigKey('ui.autocomplete_debounce', 'App', AppConfigKind.duration, '150ms'),
   AppConfigKey('ui.composer_max_lines', 'App', AppConfigKind.integer, '12'),
+  AppConfigKey('ui.composer_paste_file_chars', 'App', AppConfigKind.integer, '4000'),
+  AppConfigKey('ui.composer_paste_file_lines', 'App', AppConfigKind.integer, '100'),
   AppConfigKey('ui.desktop_min_width_four_columns', 'App', AppConfigKind.pixels, '1280px'),
   AppConfigKey('ui.desktop_min_width_three_columns', 'App', AppConfigKind.pixels, '960px'),
   AppConfigKey('ui.livebox_visible_steps', 'App', AppConfigKind.integer, '6'),
@@ -148,6 +150,10 @@ extension AppConfigValues on AppConfig {
   Duration get autocompleteDebounce => value<Duration>('ui.autocomplete_debounce');
   /// `ui.composer_max_lines` (integer, default `12`).
   int get composerMaxLines => value<int>('ui.composer_max_lines');
+  /// `ui.composer_paste_file_chars` (integer, default `4000`).
+  int get composerPasteFileChars => value<int>('ui.composer_paste_file_chars');
+  /// `ui.composer_paste_file_lines` (integer, default `100`).
+  int get composerPasteFileLines => value<int>('ui.composer_paste_file_lines');
   /// `ui.desktop_min_width_four_columns` (pixels, default `1280px`).
   int get desktopMinWidthFourColumns => value<int>('ui.desktop_min_width_four_columns');
   /// `ui.desktop_min_width_three_columns` (pixels, default `960px`).

@@ -72,6 +72,7 @@ from bothy_sdk.generated.models import (
     TranscriptSubmit,
 )
 from bothy_sdk.generated.types import Unset
+from bothy_sdk.long_answers import split_for_limit
 from bothy_sdk.outbox import OutboxState
 from bothy_sdk.runs import RunHandle, is_run_ended
 
@@ -111,8 +112,10 @@ from claude_code_runner.recovery import (
 )
 from claude_code_runner.reply_attachments import split_attach_lines
 from claude_code_runner.reply_upload import (
+    LIMIT_READ_FLOOR_BYTES,
     ReplyContext,
     RunEnded,
+    read_content_limit,
     remove_run_files,
     send_answer_with_attachments,
 )
@@ -939,11 +942,19 @@ class RunTurn:
             self.title = title
         body, paths = split_attach_lines(reply)
         problem: str | None = None
-        if paths:
+        # M4-47: an answer is never split; above message_max_content_bytes its rest becomes
+        # the last attachment answer.txt of the same message (D-M4-47-6).
+        try:
+            body, overflow, limit = await self._cut_to_limit(body if paths else reply)
+        except RunEnded:
+            self.server_ended = True
+            _log("run_ended_by_server", **self.ids)
+            return
+        if paths or overflow is not None:
             # Answer attachments (M3-12 note 9): an answer with ATTACH lines is sent also with
             # an empty text, with its files or with the notice.
             sent, problem = await self._answer_with_attachments(
-                body, paths, planned.client_msg_id, line
+                body, paths, planned.client_msg_id, line, overflow=overflow, limit=limit
             )
             if not sent:
                 return  # a stop, or the run ended on the server: nothing was sent
@@ -955,8 +966,29 @@ class RunTurn:
         self.ledger.answer_sent(line)
         self._persist()
 
-    async def _answer_with_attachments(
-        self, text: str, paths: list[str], client_msg_id: UUID, line: int
+    async def _cut_to_limit(self, text: str) -> tuple[str, str | None, int | None]:
+        """The head, the rest and the limit of an answer above ``message_max_content_bytes``.
+
+        A text up to `LIMIT_READ_FLOOR_BYTES` is not checked; a longer one reads the limit
+        (``getInstance``, M4-47). Without a limit the text goes out as it is.
+        """
+        if len(text.encode("utf-8")) <= LIMIT_READ_FLOOR_BYTES:
+            return text, None, None
+        limit = await read_content_limit(self.handle.client, self.ids)
+        if limit is None:
+            return text, None, None
+        head, rest = split_for_limit(text, limit)
+        return head, rest, limit
+
+    async def _answer_with_attachments(  # noqa: PLR0913 - the answer, its rest and limit
+        self,
+        text: str,
+        paths: list[str],
+        client_msg_id: UUID,
+        line: int,
+        *,
+        overflow: str | None = None,
+        limit: int | None = None,
     ) -> tuple[bool, str | None]:
         """Send an answer with ``ATTACH:`` lines (M3-12).
 
@@ -980,7 +1012,9 @@ class RunTurn:
             ids=self.ids,
         )
         try:
-            sent = await send_answer_with_attachments(ctx, text, paths, answer, client_msg_id)
+            sent = await send_answer_with_attachments(
+                ctx, text, paths, answer, client_msg_id, overflow=overflow, limit=limit
+            )
         except RunEnded:
             self.server_ended = True
             _log("run_ended_by_server", **self.ids)

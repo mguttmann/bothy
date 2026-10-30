@@ -9,6 +9,7 @@
 library;
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:desktop_drop/desktop_drop.dart';
@@ -68,6 +69,7 @@ final class PendingAttachment {
     required this.sizeBytes,
     required this.path,
     required this.mimeType,
+    this.pastedText,
   });
 
   /// The attachment key: the message's slot `file:<key>` and the upload's `attachment_key`.
@@ -88,6 +90,10 @@ final class PendingAttachment {
   /// The declared type.
   final String mimeType;
 
+  /// The text the person pasted when a long paste became this file (M4-47), kept so "Insert
+  /// as text" can put it back after the upload deleted the file; null for any other file.
+  final String? pastedText;
+
   /// A copy with [entryId].
   PendingAttachment withEntry(String entryId) => PendingAttachment(
     key: key,
@@ -96,10 +102,12 @@ final class PendingAttachment {
     sizeBytes: sizeBytes,
     path: path,
     mimeType: mimeType,
+    pastedText: pastedText,
   );
 }
 
-/// The attachments of the composer of [thread] in [channel].
+/// The attachments of the composer of [thread] in [channel]; without a thread, of the first
+/// message of a new post in the forum [channel] (M4-47).
 ///
 /// Example:
 /// ```dart
@@ -121,8 +129,8 @@ final class AttachController extends ChangeNotifier {
     this.limits,
   });
 
-  /// The thread.
-  final ThreadId thread;
+  /// The thread, or null for the first message of a new post.
+  final ThreadId? thread;
 
   /// Its channel.
   final ChannelId channel;
@@ -217,6 +225,60 @@ final class AttachController extends ChangeNotifier {
       _items.add(await _enqueue(source, key: key, owned: true));
       notifyListeners();
     }
+    return true;
+  }
+
+  /// Attaches [content] as a text file [name] the app writes itself (M4-47: a long paste, or
+  /// the rest of a draft over `message_max_content_bytes`), declared as [mimeType];
+  /// [pastedText] is kept on the attachment for "Insert as text". Refuses like [add] (count,
+  /// size) before anything is written and returns false then.
+  Future<bool> addText(
+    String name,
+    String content, {
+    required String mimeType,
+    String? pastedText,
+  }) async {
+    refusal = null;
+    final maxCount = limits?.messageMaxAttachments;
+    if (maxCount != null && _items.length + 1 > maxCount) {
+      return _refuse(TooManyFiles(maxCount));
+    }
+    final bytes = utf8.encode(content);
+    if (bytes.isEmpty) return _refuse(FileUnreadable(name));
+    final maxBytes = limits?.fileMaxUploadBytes;
+    if (maxBytes != null && bytes.length > maxBytes) {
+      return _refuse(FileTooLarge(name, maxBytes));
+    }
+    final key = _newKey();
+    final UploadSource source;
+    try {
+      final dir = Directory(
+        '${(await _outgoing()).path}${Platform.pathSeparator}$key',
+      );
+      await dir.create(recursive: true);
+      final file = File(
+        '${dir.path}${Platform.pathSeparator}${FileCache.safeFileName(name)}',
+      );
+      await file.writeAsBytes(bytes, flush: true);
+      source = await prepareUpload(file.path, name: name, mimeType: mimeType);
+    } on FileSystemException {
+      return _refuse(FileUnreadable(name));
+    }
+    final item = await _enqueue(source, key: key, owned: true);
+    _items.add(
+      pastedText == null
+          ? item
+          : PendingAttachment(
+              key: item.key,
+              entryId: item.entryId,
+              name: item.name,
+              sizeBytes: item.sizeBytes,
+              path: item.path,
+              mimeType: item.mimeType,
+              pastedText: pastedText,
+            ),
+    );
+    notifyListeners();
     return true;
   }
 

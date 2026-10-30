@@ -27,6 +27,15 @@ export {
   type SendMessageOptions,
 } from "./outbox.js";
 export {
+  OVERFLOW_NAME,
+  overflowNote,
+  sendLongMessage,
+  splitForLimit,
+  uploadText,
+  type LimitSplit,
+  type SendLongMessageOptions,
+} from "./long-answers.js";
+export {
   FileOutboxStore,
   MemoryOutboxStore,
   OutboxState,
