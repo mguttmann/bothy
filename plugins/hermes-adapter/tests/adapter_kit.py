@@ -340,3 +340,47 @@ def card_script(request: CardRequest) -> Script:
         return TurnOutcome.COMPLETED
 
     return script
+
+
+@dataclass
+class MemoryBridge:
+    """`bothy_hermes_adapter.installer.ProfileBridge` with the profile in memory."""
+
+    home: Path
+    config: dict[str, Any] = field(default_factory=dict)
+    env: dict[str, str] = field(default_factory=dict)
+    credential: ResolvedCredential = field(
+        default_factory=lambda: ResolvedCredential("anthropic", "api_key")
+    )
+    login_file: bool = False
+
+    def read_config(self) -> dict[str, Any]:
+        return dict(self.config)
+
+    def write_config(self, config: Any) -> None:
+        self.config = dict(config)
+
+    def env_defines(self, name: str) -> bool:
+        return bool(self.env.get(name))
+
+    def set_env(self, name: str, value: str) -> None:
+        self.env[name] = value
+
+    def remove_env(self, name: str) -> None:
+        self.env.pop(name, None)
+
+    def predict(self) -> ResolvedCredential:
+        return self.credential
+
+    def account_home(self) -> Path:
+        home = self.home / "account"
+        if self.login_file:
+            (home / ".claude").mkdir(parents=True, exist_ok=True)
+            (home / ".claude" / ".credentials.json").write_text("{}", encoding="utf-8")
+        return home
+
+    def api_key_variable(self) -> str:
+        return "ANTHROPIC_API_KEY"
+
+    def oauth_variables(self) -> tuple[str, ...]:
+        return ("ANTHROPIC_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN")

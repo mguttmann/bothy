@@ -52,11 +52,20 @@ installation.
 The adapter runs on Python 3.11 and newer, in the Python of the profile's gateway; it is tested
 against Hermes Agent `v0.22.5` (the pin, on Python 3.14, the only Python its lock installs).
 
-Neither this component nor the SDK is packaged before the release chain (M7). Until then make
-`sdk/python/src` and `plugins/hermes-adapter/src` importable in the Python that runs the
-profile's gateway (for example with a `.pth` file in its `site-packages`) and install `attrs`
-there; the other runtime dependencies of the SDK are already part of the Hermes environment at
-versions the SDK accepts. Then, with that Python:
+Neither this component nor the SDK is packaged before the release chain (M7). Hermes replaces
+the Python environment of a profile on many of its commands (a new environment, the old one is
+collected), so nothing of the adapter goes into that environment: no `.pth` file, no `attrs`.
+Run the installer with the Python of the profile's gateway and put what it needs on
+`PYTHONPATH` for that one command: the two source trees of a checkout and a directory with
+`attrs` made outside every Hermes environment (the SDK's other runtime dependencies are part of
+the Hermes environment at versions the SDK accepts):
+
+```sh
+python -m pip install --target /tmp/bothy-attrs 'attrs>=26.1.0'   # any Python, any directory
+export PYTHONPATH=<checkout>/sdk/python/src:<checkout>/plugins/hermes-adapter/src:/tmp/bothy-attrs
+```
+
+Then, with that Python:
 
 ```sh
 python -m bothy_hermes_adapter install \
@@ -71,11 +80,29 @@ python -m bothy_hermes_adapter install \
 `--report-channel <channel ID>` (optionally with `--report-thread <thread ID>`) makes that channel
 the platform's home channel, the target of `deliver=<platform key>` cron jobs and of `hermes send
 --to <platform key>`.
-`install` places the plugin in `<home>/plugins/<platform key>`, writes the platform section,
+`install` places the plugin in `<home>/plugins/<platform key>` as a self-contained directory,
+the place Hermes itself discovers directory plugins: `packages.json` names the directory of each
+package the plugin needs (the source trees by their path, so the checkout must stay where it
+is), and `attrs` is copied into `vendor/` (as is a package that lay inside Hermes' environment),
+so the attrs directory may go after the install. At every start the plugin entry serves exactly
+those packages, the adapter's own before the environment and `attrs` only when the environment
+lacks it; a missing package stops the plugin with an error in the gateway log that names the
+package and says to run `install` again. A `.pth` file of an earlier install may stay; it no
+longer matters. Run `install` again after updating the checkout's `attrs` pin or moving the
+checkout. `install` also writes the platform section,
 `display.busy_input_mode`, `tool_progress: off`, the own access policy and the home channel (the
 report channel, or a placeholder that refuses every report), and refuses to change an existing
 platform key: every thread would lose its Hermes session. Restart the gateway of the profile
 afterwards.
+
+## Checking an install
+
+`python -m bothy_hermes_adapter check --profile-home <home>`, with the same Python and
+`PYTHONPATH` as `install`, is the doctor of the install: besides the billing state it prints
+`adapter: loadable`, or `adapter: not loadable: <reasons>` and exits with `1`. The reasons: the
+plugin is not listed in `plugins.enabled`, a file of the plugin entry or a package it names is
+missing, or a dependency Hermes ships (`cryptography`, `httpx`, `jwt`, `websockets`) is gone from
+its environment. The output names no path or other value.
 
 ## Commands
 

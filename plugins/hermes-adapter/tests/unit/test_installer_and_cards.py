@@ -6,12 +6,12 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
-from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 from uuid import UUID
 
 import pytest
+from adapter_kit import MemoryBridge
 from bothy_sdk.ids import uuid7
 from bothy_sdk.settings import SdkSettings
 
@@ -41,48 +41,6 @@ def anyio_backend() -> str:
     return "asyncio"
 
 
-@dataclass
-class MemoryBridge:
-    home: Path
-    config: dict[str, Any] = field(default_factory=dict)
-    env: dict[str, str] = field(default_factory=dict)
-    credential: ResolvedCredential = field(
-        default_factory=lambda: ResolvedCredential("anthropic", "api_key")
-    )
-    login_file: bool = False
-
-    def read_config(self) -> dict[str, Any]:
-        return dict(self.config)
-
-    def write_config(self, config: Any) -> None:
-        self.config = dict(config)
-
-    def env_defines(self, name: str) -> bool:
-        return bool(self.env.get(name))
-
-    def set_env(self, name: str, value: str) -> None:
-        self.env[name] = value
-
-    def remove_env(self, name: str) -> None:
-        self.env.pop(name, None)
-
-    def predict(self) -> ResolvedCredential:
-        return self.credential
-
-    def account_home(self) -> Path:
-        home = self.home / "account"
-        if self.login_file:
-            (home / ".claude").mkdir(parents=True, exist_ok=True)
-            (home / ".claude" / ".credentials.json").write_text("{}", encoding="utf-8")
-        return home
-
-    def api_key_variable(self) -> str:
-        return "ANTHROPIC_API_KEY"
-
-    def oauth_variables(self) -> tuple[str, ...]:
-        return ("ANTHROPIC_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN")
-
-
 def _request(**over: Any) -> InstallRequest:
     values: dict[str, Any] = {
         "server_url": "https://example.com/api/v1",
@@ -92,6 +50,10 @@ def _request(**over: Any) -> InstallRequest:
     }
     values.update(over)
     return InstallRequest(**values)
+
+
+def _no_copy(source: Path, target: Path) -> None:
+    raise AssertionError("nothing to copy")
 
 
 def test_plan_install_writes_every_part() -> None:
@@ -126,11 +88,12 @@ def test_plan_install_keeps_the_platform_key() -> None:
 def test_install_switch_and_check_without_values(tmp_path: Path) -> None:
     bridge = MemoryBridge(tmp_path, env={"ANTHROPIC_API_KEY": CANARY})
     placed: dict[Path, str] = {}
-    lines = install(bridge, _request(), placed.__setitem__)
+    lines = install(bridge, _request(), placed.__setitem__, [], _no_copy)
     assert lines[0] == "installed"
     assert set(placed) == {
         tmp_path / "plugins" / "bothy" / "plugin.yaml",
         tmp_path / "plugins" / "bothy" / "__init__.py",
+        tmp_path / "plugins" / "bothy" / "packages.json",
     }
     assert "predicted mode: organization" in "\n".join(lines)
     with pytest.raises(InstallError, match="credential-holder"):
@@ -162,7 +125,7 @@ def test_switch_refuses_without_install_and_with_a_login_file(tmp_path: Path) ->
     with pytest.raises(InstallError, match="not installed"):
         switch_mode(MemoryBridge(tmp_path), "personal", uuid7())
     bridge = MemoryBridge(tmp_path, env={"ANTHROPIC_API_KEY": CANARY}, login_file=True)
-    install(bridge, _request(), lambda path, text: None)
+    install(bridge, _request(), lambda path, text: None, [], _no_copy)
     with pytest.raises(InstallError, match="login file"):
         switch_mode(bridge, "organization", None)
 
@@ -173,7 +136,7 @@ def test_install_refuses_a_section_that_does_not_read_back(tmp_path: Path) -> No
             self.config = {}
 
     with pytest.raises(InstallError, match="read back"):
-        install(Forgetful(tmp_path), _request(), lambda path, text: None)
+        install(Forgetful(tmp_path), _request(), lambda path, text: None, [], _no_copy)
 
 
 def test_plugin_entry_imports_neither_hermes_nor_the_platform() -> None:

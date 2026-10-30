@@ -5,7 +5,10 @@ Three commands (``python -m bothy_hermes_adapter``, run with the profile's own P
 module of the package starts a process; docs/DECISIONS.md D-M2-33-12):
 
 * ``install``: places the plugin entry where the pinned version discovers it
-  (``<home>/plugins/<platform key>``), writes the platform section with the adapter's keys, the
+  (``<home>/plugins/<platform key>``) as a self-contained directory (``packages.json`` names the
+  directory of each package the plugin needs, a package that lay inside the installing Python
+  environment is copied into ``vendor/``, because Hermes replaces that environment; 09 17.2),
+  writes the platform section with the adapter's keys, the
   own access policy (``dm_policy: allowlist``), the adapter's control sender as slash-command
   admin, ``display.busy_input_mode`` (``steer`` or ``queue``; ``interrupt`` is refused) and
   ``busy_ack_enabled: false``, ``tool_progress: off`` and ``busy_steer_ack_enabled: false`` for
@@ -19,7 +22,9 @@ module of the package starts a process; docs/DECISIONS.md D-M2-33-12):
   platform, refuses a login file of another tool in the profile's home and sets
   ``auth.adopt_external_logins: false``; ``personal`` empties the API-key variable and writes
   Hermes's allow list (``<KEY>_ALLOWED_USERS``) with exactly the credential holder (17.7 layer 3).
-* ``check``: the same reads and the prediction without a change.
+* ``check``: the same reads and the prediction without a change, and whether the gateway can
+  load the adapter (``adapter: loadable`` or ``adapter: not loadable: <reasons>``; the command
+  then exits with ``1``).
 
 Every command reads the configuration with Hermes's own reader before and after, prints a summary
 without any value (no URL, no path, no token, no key) and the mode Hermes would now resolve; it
@@ -33,7 +38,9 @@ Examples:
 from __future__ import annotations
 
 import copy
-from collections.abc import Callable, Mapping
+import importlib.util
+import json
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Final, Protocol
@@ -44,12 +51,23 @@ from bothy_hermes_adapter.config import load_settings
 from bothy_hermes_adapter.runtime import ResolvedCredential
 
 __all__ = [
+    "ADAPTER_LOADABLE",
+    "ADAPTER_NOT_LOADABLE",
+    "ADDED_PACKAGES",
     "CONTROL_SENDER",
+    "HERMES_PACKAGES",
+    "OWN_PACKAGES",
+    "PACKAGES_FILE",
     "InstallError",
     "InstallRequest",
+    "PackageSource",
     "ProfileBridge",
+    "adapter_problems",
     "check",
     "install",
+    "loadable",
+    "locate_packages",
+    "packages_manifest",
     "plugin_entry",
     "switch_mode",
 ]
@@ -62,6 +80,26 @@ _LOGIN_FILE: Final = Path(".claude") / ".credentials.json"
 HOME_CHANNEL_UNASSIGNED: Final = "unassigned"
 """``chat_id`` of the platform's home channel without a report channel (09 17.9): Hermes stops
 asking for a home channel in the first turn's thread, and a report to it is refused."""
+
+
+OWN_PACKAGES: Final = ("bothy_hermes_adapter", "bothy_sdk")
+"""The adapter's own import packages: found before anything of Hermes' environment."""
+
+ADDED_PACKAGES: Final = ("attr", "attrs")
+"""Import packages the SDK needs beyond Hermes' environment (``attrs``): used only when the
+environment lacks them."""
+
+HERMES_PACKAGES: Final = ("cryptography", "httpx", "jwt", "websockets")
+"""Import packages of the SDK's other dependencies, which Hermes' environment ships (11 11.3)."""
+
+PACKAGES_FILE: Final = "packages.json"
+"""File of the plugin directory naming the directory of each package (``first``, ``last``)."""
+
+VENDOR_DIR: Final = "vendor"
+"""Directory of the plugin directory with the copied packages."""
+
+ADAPTER_LOADABLE: Final = "adapter: loadable"
+ADAPTER_NOT_LOADABLE: Final = "adapter: not loadable"
 
 
 class InstallError(ValueError):
@@ -137,14 +175,156 @@ class InstallRequest:
     report_thread: UUID | None = None
 
 
+@dataclass(frozen=True)
+class PackageSource:
+    """Where the installing Python found one package the plugin needs.
+
+    Attributes:
+        name: The import name (``bothy_sdk``).
+        directory: The package's directory.
+        copy: The installer copies it into the plugin directory: an added package always, an
+            own package when it lies inside the installing Python environment, which Hermes
+            replaces; an own package outside it (a source tree) is named by its directory.
+        first: An own package, found before Hermes' environment; otherwise found only when the
+            environment lacks it.
+    """
+
+    name: str
+    directory: Path
+    copy: bool
+    first: bool
+
+
+def locate_packages(locate: Callable[[str], Path | None], environment: Path) -> list[PackageSource]:
+    """Find every package the plugin needs (`OWN_PACKAGES`, `ADDED_PACKAGES`) and its placement.
+
+    Args:
+        locate: The directory of an import package in the installing Python, or ``None``.
+        environment: The installing Python's environment (``sys.prefix``).
+
+    Returns:
+        One source per package.
+
+    Raises:
+        InstallError: A package is not importable in the installing Python.
+    """
+    root = environment.resolve()
+    found = []
+    for name in (*OWN_PACKAGES, *ADDED_PACKAGES):
+        directory = locate(name)
+        if directory is None:
+            raise InstallError(f"{name} is not importable in this Python (see the README)")
+        directory = directory.resolve()
+        own = name in OWN_PACKAGES
+        # An added package is always copied: wherever the operator put it for the install
+        # (Hermes' environment, a directory of its own) need not outlive the install.
+        copied = directory.is_relative_to(root) or not own
+        found.append(PackageSource(name, directory, copy=copied, first=own))
+    return found
+
+
+def packages_manifest(packages: Sequence[PackageSource]) -> str:
+    """``packages.json``: a copied package relative to the plugin directory, others absolute.
+
+    Args:
+        packages: The packages of `locate_packages`.
+
+    Returns:
+        The JSON text.
+
+    Examples:
+        >>> text = packages_manifest([PackageSource("attrs", Path("/e/attrs"), True, False)])
+        >>> json.loads(text)
+        {'first': {}, 'last': {'attrs': 'vendor/attrs'}}
+    """
+    data: dict[str, dict[str, str]] = {"first": {}, "last": {}}
+    for package in packages:
+        where = f"{VENDOR_DIR}/{package.name}" if package.copy else str(package.directory)
+        data["first" if package.first else "last"][package.name] = where
+    return json.dumps(data, indent=2, sort_keys=True) + "\n"
+
+
+_PLUGIN_MODULE = """\
+# SPDX-License-Identifier: Apache-2.0
+\"\"\"Plugin entry written by the installer of bothy_hermes_adapter (09 17.2).
+
+Hermes replaces the Python environment of a profile on many of its commands, so nothing of the
+adapter lives there: packages.json names the directory of each package, and a finder serves
+exactly those names, the adapter's own before the environment and the added dependencies only
+when the environment lacks them. A missing package is named in the gateway log.
+\"\"\"
+
+import importlib.abc
+import importlib.util
+import json
+import logging
+import sys
+from pathlib import Path
+
+_HERE = Path(__file__).resolve().parent
+_FIX = "run `python -m bothy_hermes_adapter install` for this profile again"
+
+
+class _Packages(importlib.abc.MetaPathFinder):
+    bothy_plugin_packages = True
+
+    def __init__(self, packages):
+        self.packages = packages
+
+    def find_spec(self, name, path=None, target=None):
+        directory = self.packages.get(name)
+        if directory is None:
+            return None
+        return importlib.util.spec_from_file_location(
+            name, directory / "__init__.py", submodule_search_locations=[str(directory)]
+        )
+
+
+def _install_finders():
+    try:
+        listed = json.loads((_HERE / "packages.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        message = f"bothy_hermes_adapter: packages.json of the plugin is unreadable ({exc}); {_FIX}"
+        logging.getLogger("bothy_hermes_adapter").error(message)
+        raise ImportError(message) from exc
+    groups = {}
+    missing = []
+    for group in ("first", "last"):
+        groups[group] = {}
+        for name, where in sorted(listed.get(group, {}).items()):
+            directory = (_HERE / where).resolve()
+            if (directory / "__init__.py").is_file():
+                groups[group][name] = directory
+            else:
+                missing.append(name)
+    if missing:
+        message = f"bothy_hermes_adapter: missing package(s) {', '.join(missing)}; {_FIX}"
+        logging.getLogger("bothy_hermes_adapter").error(message)
+        raise ImportError(message)
+    sys.meta_path[:] = [
+        f for f in sys.meta_path if not getattr(f, "bothy_plugin_packages", False)
+    ]
+    sys.meta_path.insert(0, _Packages(groups["first"]))
+    sys.meta_path.append(_Packages(groups["last"]))
+
+
+_install_finders()
+
+from bothy_hermes_adapter.entry import make_register  # noqa: E402
+
+register = make_register("{platform_key}")
+"""
+
+
 def plugin_entry(platform_key: str) -> dict[str, str]:
-    """The files of the plugin directory the pinned version discovers.
+    """The files of the plugin directory the pinned version discovers (without the packages).
 
     Args:
         platform_key: `hermes_adapter.platform_key`.
 
     Returns:
-        File name to text: ``plugin.yaml`` (``kind: platform``) and ``__init__.py``.
+        File name to text: ``plugin.yaml`` (``kind: platform``) and ``__init__.py``, which
+        loads the packages ``packages.json`` names.
     """
     manifest = (
         "# SPDX-License-Identifier: Apache-2.0\n"
@@ -154,12 +334,7 @@ def plugin_entry(platform_key: str) -> dict[str, str]:
         "version: 0.0.0\n"
         "description: Connects this Hermes profile to the chat server as one agent.\n"
     )
-    module = (
-        "# SPDX-License-Identifier: Apache-2.0\n"
-        '"""Plugin entry written by the installer of bothy_hermes_adapter."""\n\n'
-        "from bothy_hermes_adapter.entry import make_register\n\n"
-        f'register = make_register("{platform_key}")\n'
-    )
+    module = _PLUGIN_MODULE.replace("{platform_key}", platform_key)
     return {"plugin.yaml": manifest, "__init__.py": module}
 
 
@@ -296,14 +471,20 @@ def _prediction(bridge: ProfileBridge) -> tuple[ActualMode, list[str]]:
 
 
 def install(
-    bridge: ProfileBridge, request: InstallRequest, place: Callable[[Path, str], None]
+    bridge: ProfileBridge,
+    request: InstallRequest,
+    place: Callable[[Path, str], None],
+    packages: Sequence[PackageSource],
+    copy_package: Callable[[Path, Path], None],
 ) -> list[str]:
-    """``install``: write the platform section and place the plugin entry.
+    """``install``: write the platform section and place the self-contained plugin directory.
 
     Args:
         bridge: Hermes's reader and writer for the profile.
         request: The arguments.
         place: Writes one file of the plugin entry (path, text).
+        packages: The packages of `locate_packages`.
+        copy_package: Replaces a package directory (source, target) with a copy.
 
     Returns:
         The printed summary (no values).
@@ -323,6 +504,12 @@ def install(
     if (display or {}).get("busy_input_mode") != request.busy_input_mode:
         raise InstallError("busy_input_mode did not read back")
     directory = bridge.home / "plugins" / request.platform_key
+    # Packages first, their list next and the entry last: a first install never leaves an
+    # entry without the packages it names.
+    for package in packages:
+        if package.copy:
+            copy_package(package.directory, directory / VENDOR_DIR / package.name)
+    place(directory / PACKAGES_FILE, packages_manifest(packages))
     for name, text in plugin_entry(request.platform_key).items():
         place(directory / name, text)
     _, lines = _prediction(bridge)
@@ -372,15 +559,75 @@ def switch_mode(bridge: ProfileBridge, mode: str, credential_holder: UUID | None
     return [f"switched to {mode}", *_summary(bridge, after, key), *lines]
 
 
-def check(bridge: ProfileBridge) -> list[str]:
-    """``check``: the reads and the prediction without a change.
+def _importable(name: str) -> bool:
+    return importlib.util.find_spec(name) is not None
+
+
+def adapter_problems(directory: Path, enabled: bool, available: Callable[[str], bool]) -> list[str]:
+    """Why a gateway of the profile could not load the adapter (empty: it can).
+
+    Args:
+        directory: The plugin directory (``<home>/plugins/<platform key>``).
+        enabled: Whether ``plugins.enabled`` lists the platform key.
+        available: Whether an import package is importable in Hermes' environment.
+
+    Returns:
+        The reasons, without a path or another value.
+    """
+    problems = []
+    if not enabled:
+        problems.append("the plugin is not enabled in plugins.enabled")
+    entry = [name for name in ("plugin.yaml", "__init__.py") if not (directory / name).is_file()]
+    if entry:
+        problems.append(f"the plugin entry lacks {', '.join(entry)}")
+    try:
+        listed = json.loads((directory / PACKAGES_FILE).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        problems.append(f"the plugin entry lacks a readable {PACKAGES_FILE}")
+        listed = None
+    if isinstance(listed, Mapping):
+        named: dict[str, str] = {}
+        for group in ("first", "last"):
+            part = listed.get(group)
+            named.update(part if isinstance(part, Mapping) else {})
+        for name in (*OWN_PACKAGES, *ADDED_PACKAGES):
+            where = named.get(name)
+            if where is None or not (directory / where / "__init__.py").is_file():
+                problems.append(f"package {name} is missing")
+    problems.extend(
+        f"package {name} is not in Hermes' environment"
+        for name in HERMES_PACKAGES
+        if not available(name)
+    )
+    if problems:
+        problems.append("run install again")
+    return problems
+
+
+def loadable(lines: Sequence[str]) -> bool:
+    """Whether the lines of `check` report no adapter that cannot be loaded (exit status)."""
+    return not any(line.startswith(ADAPTER_NOT_LOADABLE) for line in lines)
+
+
+def check(bridge: ProfileBridge, available: Callable[[str], bool] = _importable) -> list[str]:
+    """``check``: the reads and the prediction without a change, and the adapter's state.
 
     Args:
         bridge: Hermes's reader and writer for the profile.
+        available: Whether an import package is importable in Hermes' environment (default:
+            in this Python, which is the profile's).
 
     Returns:
-        The printed summary (no values).
+        The printed summary (no values); `loadable` decides the exit status.
     """
     config = bridge.read_config()
+    key = _installed_key(config)
+    state = []
+    if key is not None:
+        plugins = config.get("plugins") if isinstance(config.get("plugins"), Mapping) else {}
+        listed = (plugins or {}).get("enabled")
+        enabled = isinstance(listed, list) and key in listed
+        problems = adapter_problems(bridge.home / "plugins" / key, enabled, available)
+        state = [f"{ADAPTER_NOT_LOADABLE}: {'; '.join(problems)}" if problems else ADAPTER_LOADABLE]
     _, lines = _prediction(bridge)
-    return ["check", *_summary(bridge, config, _installed_key(config)), *lines]
+    return ["check", *_summary(bridge, config, key), *state, *lines]
