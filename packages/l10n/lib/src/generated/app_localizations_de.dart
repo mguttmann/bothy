@@ -1072,7 +1072,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get triggerReasonOperatorNotInChannel =>
-      'Der Agent dieses Threads arbeitet nicht mehr in diesem Kanal. Ein Owner kann ihn wieder zum Operator des Kanals machen.';
+      'Der Agent dieses Threads arbeitet nicht mehr in diesem Kanal. Ein Owner kann ihn wieder zum Bediener des Kanals machen.';
 
   @override
   String get liveBoxReasonUserCancelledNoName => 'Von einer Person abgebrochen';
