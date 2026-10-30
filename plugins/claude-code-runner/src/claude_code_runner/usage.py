@@ -161,9 +161,15 @@ def find_transcript(config_dir: Path, ref: str) -> Path | None:
         found = [f / f"{ref}.jsonl" for f in folders if (f / f"{ref}.jsonl").is_file()]
     except OSError:
         return None
-    if not found:
-        return None
-    return max(found, key=lambda p: p.stat().st_mtime_ns)
+    newest: tuple[int, Path] | None = None
+    for path in found:
+        try:
+            mtime = path.stat().st_mtime_ns
+        except OSError:  # removed after the listing
+            continue
+        if newest is None or mtime > newest[0]:
+            newest = (mtime, path)
+    return newest[1] if newest is not None else None
 
 
 def transcript_totals(path: Path) -> dict[str, ModelUsage] | None:

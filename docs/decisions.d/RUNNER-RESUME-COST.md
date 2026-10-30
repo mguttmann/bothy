@@ -1,10 +1,10 @@
 # RUNNER-RESUME-COST Resumed sessions book only their own turns
 
 Live finding of 2026-10-30: the first run after a takeover of a Discord session (import with
-`--sessions`) booked the whole old session as the cost of one run (about 29 USD instead of cents),
+`--sessions`) booked the whole old session as the cost of one run,
 because Claude Code reports `modelUsage` and `total_cost_usd` cumulatively on `--resume` and the
 runner had no stored values for the session. Operations had worked around it by writing a start
-value into the database for 24 threads. Normative text: 09 18.7 and 4.10, 22 9 step 7.
+value into the database for each affected thread. Normative text: 09 18.7 and 4.10, 22 9 step 7.
 
 | No | Date | Ruling | Reason |
 |---|---|---|---|
