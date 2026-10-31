@@ -21,7 +21,8 @@ final Channel forum = channel(1, kind: ChannelKind.forum, name: 'server');
 
 List<int> ids(List<SidebarThread> rows) => [
   for (final r in rows)
-    [for (var n = 0; n < 50; n++) n].firstWhere((n) => threadId(n) == r.thread.id),
+    [for (var n = 0; n < 50; n++) n]
+        .firstWhere((n) => threadId(n) == r.thread.id),
 ];
 
 SidebarThreadGroup select(

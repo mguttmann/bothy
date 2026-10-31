@@ -65,8 +65,9 @@ func chatConfigKeys() []config.Key {
 			Chapter: chapter03,
 		},
 		{
-			// The maxItems of the lists in docs/api/openapi.yaml is the default (M4-51).
-			Name: "sidebar.order_max_items", Kind: config.KindInt, Default: "1000", Min: "1",
+			// The maxItems of the lists in docs/api/openapi.yaml is this maximum (M4-51), so an answer
+			// never leaves its schema.
+			Name: "sidebar.order_max_items", Kind: config.KindInt, Default: "1000", Min: "1", Max: "1000",
 			Doc:     "Most items of a personal order list of the sidebar: channel_order of a space and thread_order of a channel (M4-51).",
 			Chapter: chapter03,
 		},

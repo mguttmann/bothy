@@ -215,9 +215,8 @@ class _SidebarDragRowState extends State<SidebarDragRow> {
         ),
         child: Text(
           dsIsolate(w.label),
-          style: dsTextStyle(
-            DsType.bodySm,
-          ).copyWith(color: context.dsColors.textOnSidebar),
+          style: dsTextStyle(DsType.bodySm)
+              .copyWith(color: context.dsColors.textOnSidebar),
         ),
       ),
     );

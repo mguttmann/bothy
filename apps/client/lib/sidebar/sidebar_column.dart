@@ -22,6 +22,7 @@ import '../new_project/project_sync_dialog.dart' show showProjectSyncDialog;
 import '../notifications_settings/providers.dart' show isOwnerProvider;
 import '../onboarding/onboarding_controller.dart';
 import '../running/providers.dart' show activeRunCountProvider;
+import '../settings/settings_providers.dart' show sidebarArrangementProvider;
 import '../switcher/quick_switcher.dart' show showQuickSwitcher;
 import '../sync/sidebar_ops.dart';
 import '../telemetry/telemetry_providers.dart';
@@ -471,6 +472,40 @@ class SidebarColumn extends ConsumerWidget {
       onMove: (space, to) => unawaited(
         writer()?.move(moveSpace([for (final n in nodes) n.entry], space, to)),
       ),
+      // 01 6.15: the levels arranged by activity, and the moves of the manual ones. A move writes
+      // the whole order of the level as the device holds it (D-M4-51-3); for a forum every open
+      // post, also those behind "Show more" (D-M4-51-9).
+      arrangement: ref.watch(sidebarArrangementProvider),
+      onMoveChannel: (space, channel, to) {
+        final node = nodes.where((n) => n.entry.space.id == space).firstOrNull;
+        if (node == null) return;
+        final all = [for (final c in node.channels) c.channel.id];
+        unawaited(
+          writer()?.orderChannels(
+            space,
+            moveAmong(all, all, channel, to),
+            collapsed: node.entry.storedCollapsed,
+          ),
+        );
+      },
+      onMoveThread: (forum, thread, to) {
+        final group = ref.read(channelThreadsProvider(forum.value));
+        if (group == null) return;
+        unawaited(
+          writer()?.orderThreads(
+            forum,
+            moveAmong(
+              [
+                for (final e in group.candidates)
+                  if (e.thread.state == ThreadState.open) e.thread.id,
+              ],
+              [for (final e in group.rows) e.thread.id],
+              thread,
+              to,
+            ),
+          ),
+        );
+      },
       onOpenChannel: (channel) => context.go('/c/${channel.value}'),
       // The desktop and M1 of the phone show the thread groups (01 6.8, D-SB-13): a thread
       // row opens the history, on the phone as M3 on top of M1.

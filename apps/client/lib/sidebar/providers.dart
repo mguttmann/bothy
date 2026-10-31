@@ -21,6 +21,8 @@ import '../forum/providers.dart'
         PendingPost,
         pendingPostsProvider,
         unsentChannelDraftProvider;
+import '../settings/settings_providers.dart' show sidebarArrangementProvider;
+import 'sidebar_arrange.dart';
 import 'sidebar_model.dart';
 import 'sidebar_order.dart';
 import 'sidebar_threads.dart';
@@ -53,14 +55,74 @@ Stream<Set<SpaceId>> collapsedSpaces(Ref ref) {
       : db.forumViewDao.watchCollapsedSpaces();
 }
 
-/// The spaces with the person's state, in the personal order with the global order as the
-/// fallback (`orderSpaces`), collapsed as on this device; empty while either source loads.
+/// The spaces with the person's state, collapsed as on this device; empty while either source
+/// loads.
+///
+/// The order is the personal one with the global order as the fallback (`orderSpaces`), or, with
+/// "Arrange spaces automatically" (01 6.15 item 4, D-M4-51-4), the newest activity of each
+/// space's channels first with the personal order breaking ties; an automatic order holds while
+/// [sidebarHoldProvider] holds, so no space moves under the pointer.
 @riverpod
-List<SidebarSpace> spacesWithState(Ref ref) => orderSpaces(
-  ref.watch(storedSpacesProvider).value ?? const [],
-  ref.watch(userSpaceStatesProvider).value ?? const [],
-  collapsed: ref.watch(collapsedSpacesProvider).value ?? const {},
-);
+class SpacesWithState extends _$SpacesWithState {
+  /// The spaces of the last build in their order; kept while the sidebar holds them.
+  List<SpaceId> _shown = const [];
+
+  @override
+  List<SidebarSpace> build() {
+    final manual = orderSpaces(
+      ref.watch(storedSpacesProvider).value ?? const [],
+      ref.watch(userSpaceStatesProvider).value ?? const [],
+      collapsed: ref.watch(collapsedSpacesProvider).value ?? const {},
+    );
+    if (!ref.watch(sidebarArrangementProvider).autoSpaces) {
+      _shown = const [];
+      return manual;
+    }
+    final at = {
+      for (final e in manual)
+        e.space.id: spaceActivity(e.space, [
+          for (final c
+              in ref.watch(spaceChannelsProvider(e.space.id.value)).value ??
+                  const <Channel>[])
+            if (c.archivedAt == null && c.kind != ChannelKind.dm)
+              ref.watch(channelActivityOfProvider(c.id.value)),
+        ]),
+    };
+    final fresh = orderByActivity(manual, (e) => at[e.space.id]!);
+    final out = ref.watch(sidebarHoldProvider)
+        ? holdOrder(fresh, _shown, (e) => e.space.id)
+        : fresh;
+    _shown = [for (final e in out) e.space.id];
+    return out;
+  }
+}
+
+/// The activity of the channel [channelId] (01 6.15 item 4, D-M4-51-4): the newest
+/// `last_activity_at` of its stored threads, the main history included, else its creation time;
+/// the epoch while the channel is not stored.
+@riverpod
+DateTime channelActivityOf(Ref ref, String channelId) {
+  final channel = ref.watch(storedChannelOfRouteProvider(channelId)).value;
+  if (channel == null) {
+    return DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
+  }
+  return channelActivity(
+    channel,
+    ref.watch(forumThreadsProvider(channelId)).value ?? const [],
+  );
+}
+
+/// The person's sidebar state of every channel (03 `user_channel_states`): the manual order of
+/// a forum's posts (01 6.15 item 3).
+@riverpod
+Stream<Map<ChannelId, UserChannelState>> userChannelStates(Ref ref) {
+  final db = ref.watch(localDatabaseProvider);
+  return db == null
+      ? Stream.value(const {})
+      : db.structureDao.watchUserChannelStates().map(
+          (rows) => {for (final r in rows) r.channelId: r},
+        );
+}
 
 /// The stored channels of [spaceId] in their order.
 @riverpod
@@ -188,6 +250,12 @@ class ChannelThreads extends _$ChannelThreads {
     final toggled = _inFull != null && _inFull != inFull;
     _inFull = inFull;
     final held = ref.watch(sidebarHoldProvider) && !toggled;
+    // 01 6.15: with "Arrange chats automatically" off a forum follows the person's order; a
+    // forum without one stays by activity, held as before.
+    final order = ref.watch(sidebarArrangementProvider).autoChats
+        ? null
+        : ref.watch(userChannelStatesProvider).value?[channel.id]?.threadOrder;
+    final manual = order == null || order.isEmpty ? null : order;
     final prefs = ref.watch(notificationPreferencesProvider).value ?? const [];
     final now = ref.watch(appPortsProvider).clock.now();
     final group = selectSidebarThreads(
@@ -204,6 +272,7 @@ class ChannelThreads extends _$ChannelThreads {
       keep: held ? _shown.toSet() : const {},
       heldOrder: held ? _shown : const [],
       showAllPosts: inFull,
+      manualOrder: manual,
       mutedThreads: {
         for (final p in prefs)
           if (p.targetKind == NotificationTargetKind.thread &&
@@ -251,19 +320,54 @@ List<SidebarNewChatRow> newChatRows(Ref ref, String channelId) {
 /// The channel rows of [spaceId]: counters ([channelCounts]), active run, muted state and the
 /// thread group with its collapse state on this device (01 6.8); direct messages and archived
 /// channels are not part of the tree.
+///
+/// The order is the global one in the person's `channel_order` (rows not in it first, 01 6.15
+/// item 3), or, with "Arrange channels and projects automatically", the newest activity first
+/// with that order breaking ties, held while [sidebarHoldProvider] holds (D-M4-51-4).
 @riverpod
-List<SidebarChannel> channelsOfSpace(Ref ref, String spaceId) {
-  ref.watch(counterTicksProvider);
-  final engine = ref.watch(syncEngineProvider);
-  final reads = ref.watch(allReadStatesProvider).value ?? const [];
-  final prefs = ref.watch(notificationPreferencesProvider).value ?? const [];
-  final runs = ref.watch(activeRunsProvider).value ?? const [];
-  final collapsed = ref.watch(collapsedGroupsProvider).value ?? const {};
-  final now = ref.watch(appPortsProvider).clock.now();
-  return [
-    for (final c
-        in ref.watch(spaceChannelsProvider(spaceId)).value ?? const <Channel>[])
-      if (c.archivedAt == null && c.kind != ChannelKind.dm)
+class ChannelsOfSpace extends _$ChannelsOfSpace {
+  /// The channels of the last build in their order; kept while the sidebar holds them.
+  List<ChannelId> _shown = const [];
+
+  @override
+  List<SidebarChannel> build(String spaceId) {
+    ref.watch(counterTicksProvider);
+    final engine = ref.watch(syncEngineProvider);
+    final reads = ref.watch(allReadStatesProvider).value ?? const [];
+    final prefs = ref.watch(notificationPreferencesProvider).value ?? const [];
+    final runs = ref.watch(activeRunsProvider).value ?? const [];
+    final collapsed = ref.watch(collapsedGroupsProvider).value ?? const {};
+    final now = ref.watch(appPortsProvider).clock.now();
+    final space = SpaceId.parse(spaceId);
+    final state = (ref.watch(userSpaceStatesProvider).value ?? const [])
+        .where((s) => s.spaceId == space)
+        .firstOrNull;
+    final manual = applyPersonalOrder(
+      [
+        for (final c
+            in ref.watch(spaceChannelsProvider(spaceId)).value ??
+                const <Channel>[])
+          if (c.archivedAt == null && c.kind != ChannelKind.dm) c,
+      ],
+      state?.channelOrder,
+      (c) => c.id,
+    );
+    var ordered = manual;
+    if (ref.watch(sidebarArrangementProvider).autoChannels) {
+      final at = {
+        for (final c in manual)
+          c.id: ref.watch(channelActivityOfProvider(c.id.value)),
+      };
+      final fresh = orderByActivity(manual, (c) => at[c.id]!);
+      ordered = ref.watch(sidebarHoldProvider)
+          ? holdOrder(fresh, _shown, (c) => c.id)
+          : fresh;
+      _shown = [for (final c in ordered) c.id];
+    } else {
+      _shown = const [];
+    }
+    return [
+      for (final c in ordered)
         SidebarChannel(
           channel: c,
           counts: channelCounts(
@@ -277,7 +381,8 @@ List<SidebarChannel> channelsOfSpace(Ref ref, String spaceId) {
           expanded: !collapsed.contains(c.id),
           newChatRows: ref.watch(newChatRowsProvider(c.id.value)),
         ),
-  ];
+    ];
+  }
 }
 
 /// The whole tree: the spaces in the person's order with their channel rows.
