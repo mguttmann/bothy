@@ -3,8 +3,5 @@
 # Accepted findings of `make osv` for the Node development tools in this directory only.
 # These tools are not shipped. Each entry names the reason and expires, so it is reviewed
 # again; Renovate proposes the fixed version as soon as one exists.
-
-[[IgnoredVulns]]
-id = "GHSA-86w9-cpqp-85rv"
-ignoreUntil = 2026-11-10
-reason = "node-forge 1.4.0 via @sonar/scan 5.0.1 (the latest release); no fixed node-forge release exists. Not reachable here: @sonar/scan uses node-forge only to read a PKCS#12 truststore (sonar.scanner.truststorePath or <sonar.userHome>/ssl/truststore.p12; this repository configures neither) and never calls RSA signature verification; TLS is verified by Node. Ruling D-DEPS-2 in docs/DECISIONS.md. Re-check when node-forge or @sonar/scan publishes a fix."
+#
+# None today: node-forge is overridden to a fixed release in package.json (SEC-OSV-2026-10-31).

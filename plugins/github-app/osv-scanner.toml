@@ -10,3 +10,8 @@ ecosystem = "npm"
 version = "0.0.0"
 license.override = ["Apache-2.0"]
 reason = "local package of the repository under Apache-2.0, sdk/typescript (linked with file:../../sdk/typescript, never published, OQ-17); its package.json declares license Apache-2.0."
+
+[[IgnoredVulns]]
+id = "GHSA-g3hv-75wg-m249"
+ignoreUntil = 2026-11-30
+reason = "minimatch 3.1.5 (eslint, @eslint/config-array, @eslint/eslintrc) and 9.0.9 (typedoc, typescript-eslint), dev dependencies that lint and document the app and never ship. The fix exists only in minimatch 11, which drops the API these callers use (the default export of 3.x, Minimatch#matchOne for typedoc), and none of them has moved to it. Not reachable: the amplification is in firstPhasePreProcess, which minimatch 9 runs only with optimizationLevel 2 or higher and 3.x does not contain; every caller uses the default level 1, and no glob is installed. Ruling SEC-OSV/2. Re-check when one of these callers moves to minimatch 11."

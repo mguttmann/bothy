@@ -8,11 +8,11 @@
 # package version and its reason; never a blanket override.
 
 [[PackageOverrides]]
-name = "@isaacs/cliui"
+name = "@isaacs/nonrecursive-glob-match"
 ecosystem = "npm"
-version = "9.0.0"
+version = "1.0.3"
 license.ignore = true
-reason = "License BlueOak-1.0.0. Not shipped: a dev dependency of jest (glob), used only to build, lint or test the plugin."
+reason = "License BlueOak-1.0.0. Not shipped: a dev dependency of jest and the scaffold webpack configuration (glob, minimatch), used only to build, lint or test the plugin."
 
 [[PackageOverrides]]
 name = "body"
@@ -66,30 +66,9 @@ reason = "License no license field; the README names none. Not shipped: reached 
 [[PackageOverrides]]
 name = "glob"
 ecosystem = "npm"
-version = "11.1.0"
+version = "14.0.3"
 license.ignore = true
 reason = "License BlueOak-1.0.0. Not shipped: a dev dependency of jest and the scaffold webpack configuration, used only to build, lint or test the plugin."
-
-[[PackageOverrides]]
-name = "glob"
-ecosystem = "npm"
-version = "13.0.6"
-license.ignore = true
-reason = "License BlueOak-1.0.0. Not shipped: a dev dependency of jest and the scaffold webpack configuration, used only to build, lint or test the plugin."
-
-[[PackageOverrides]]
-name = "jackspeak"
-ecosystem = "npm"
-version = "3.4.3"
-license.ignore = true
-reason = "License BlueOak-1.0.0. Not shipped: a dev dependency of jest (glob), used only to build, lint or test the plugin."
-
-[[PackageOverrides]]
-name = "jackspeak"
-ecosystem = "npm"
-version = "4.2.3"
-license.ignore = true
-reason = "License BlueOak-1.0.0. Not shipped: a dev dependency of jest (glob), used only to build, lint or test the plugin."
 
 [[PackageOverrides]]
 name = "lru-cache"
@@ -110,7 +89,14 @@ name = "minimatch"
 ecosystem = "npm"
 version = "10.2.6"
 license.ignore = true
-reason = "License BlueOak-1.0.0. Not shipped: reached through the dev tools glob and typescript-eslint and the externals @grafana/*, which webpack marks external and Grafana provides at runtime; the plugin bundle contains no file of it."
+reason = "License BlueOak-1.0.0. Not shipped: reached through the dev tool typescript-eslint and the externals @grafana/*, which webpack marks external and Grafana provides at runtime; the plugin bundle contains no file of it."
+
+[[PackageOverrides]]
+name = "minimatch"
+ecosystem = "npm"
+version = "11.0.3"
+license.ignore = true
+reason = "License BlueOak-1.0.0. Not shipped: a dev dependency of jest and the scaffold webpack configuration (glob), used only to build, lint or test the plugin."
 
 [[PackageOverrides]]
 name = "minipass"
@@ -127,25 +113,11 @@ license.ignore = true
 reason = "License Unlicense. Not shipped: reached through @grafana/data via react-use, which webpack marks external and Grafana provides at runtime; the plugin bundle contains no file of it."
 
 [[PackageOverrides]]
-name = "package-json-from-dist"
-ecosystem = "npm"
-version = "1.0.1"
-license.ignore = true
-reason = "License BlueOak-1.0.0. Not shipped: a dev dependency of jest (glob), used only to build, lint or test the plugin."
-
-[[PackageOverrides]]
 name = "path-scurry"
 ecosystem = "npm"
-version = "1.11.1"
+version = "3.0.0"
 license.ignore = true
-reason = "License BlueOak-1.0.0. Not shipped: a dev dependency of jest (glob), used only to build, lint or test the plugin."
-
-[[PackageOverrides]]
-name = "path-scurry"
-ecosystem = "npm"
-version = "2.0.2"
-license.ignore = true
-reason = "License BlueOak-1.0.0. Not shipped: a dev dependency of jest (glob), used only to build, lint or test the plugin."
+reason = "License BlueOak-1.0.0. Not shipped: a dev dependency of jest and the scaffold webpack configuration (glob), used only to build, lint or test the plugin."
 
 [[PackageOverrides]]
 name = "react-universal-interface"
@@ -193,3 +165,8 @@ reason = "License Unlicense. Not shipped: reached through @grafana/data via reac
 id = "GHSA-gcqx-w48m-w2h4"
 ignoreUntil = 2026-11-18
 reason = "deepmerge 4.3.1, a dev dependency of jest-config and fork-ts-checker-webpack-plugin; it merges only the plugin's own test and type-check configuration and never ships. No fixed release exists yet; Renovate proposes it when one does."
+
+[[IgnoredVulns]]
+id = "GHSA-g3hv-75wg-m249"
+ignoreUntil = 2026-11-30
+reason = "minimatch 3.1.5 (eslint, @eslint/config-array, @eslint/eslintrc, eslint-plugin-react, fork-ts-checker-webpack-plugin) and 10.2.6 (typescript-eslint, test-exclude), build and test tools only; eslint and typescript-eslint also come through the @grafana/* externals that Grafana provides at runtime, never in dist/. The fix exists only in minimatch 11, which drops the API these callers use, and none of them has moved to it. Not reachable: the amplification is in firstPhasePreProcess, which minimatch 10 runs only with optimizationLevel 2 or higher and 3.x does not contain; these callers use the default level 1, and glob, the one caller that sets level 2, is on 14.0.3 with minimatch 11.0.3. Ruling SEC-OSV/2. Re-check when one of these callers moves to minimatch 11."
