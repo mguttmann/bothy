@@ -89,6 +89,7 @@ final class AppPorts {
     required this.deviceName,
     required this.secureBackend,
     required this.deviceKeys,
+    this.deviceKeyScopes = const DeviceKeyScopes(),
     required this.discovery,
     required this.dataRoot,
     required this.browser,
@@ -152,6 +153,9 @@ final class AppPorts {
 
   /// The device keys.
   final DeviceKeyStore deviceKeys;
+
+  /// The scope of an instance's device keys (docs/decisions.d/FIX-app-logout.md FIX-AL/4).
+  final DeviceKeyScopes deviceKeyScopes;
 
   /// `getDiscovery` for E1.
   final DiscoveryClient discovery;
@@ -355,6 +359,13 @@ AppPorts productionPorts({
         )
       : null;
   final measurements = AppMeasurements(ClientMetrics());
+  // The secrets belong to this app identity (docs/decisions.d/FIX-app-logout.md): another
+  // bundle identifier never picks up its session from a shared keychain or file.
+  final secrets = FlutterSecureBackend(
+    appId: Platform.isAndroid ? branding.applicationId : branding.bundleId,
+    hasLocalData: () async =>
+        InstanceServices.hasLocalData(await getApplicationSupportDirectory()),
+  );
   return AppPorts(
     measurements: measurements,
     push: _platformPush(measurements.metrics),
@@ -368,12 +379,13 @@ AppPorts productionPorts({
     branding: branding,
     platform: platform,
     deviceName: android?.deviceName ?? Platform.localHostname,
-    // The secrets belong to this app identity (docs/decisions.d/FIX-app-logout.md): another
-    // bundle identifier never picks up its session from a shared keychain or file.
-    secureBackend: FlutterSecureBackend(
-      appId: Platform.isAndroid ? branding.applicationId : branding.bundleId,
-      hasLocalData: () async =>
-          InstanceServices.hasLocalData(await getApplicationSupportDirectory()),
+    secureBackend: secrets,
+    // The device keys of a shared key store belong to this app identity as well
+    // (docs/decisions.d/FIX-app-logout.md FIX-AL/4); the macOS keys go to the login keychain
+    // exactly when the secrets do (both lack the keychain entitlements).
+    deviceKeyScopes: DeviceKeyScopes(
+      appId: Platform.isMacOS || Platform.isWindows ? branding.bundleId : null,
+      shared: () => secrets.sharedStore,
     ),
     deviceKeys: PlatformDeviceKeyStore(
       dk.DeviceKeyClient(),
@@ -459,9 +471,9 @@ final class InstanceServices {
     return instances.list().any((entry) => entry is Directory);
   }
 
-  /// Builds the services of [instance] (Design note 1): the device keys with the instance ID as
-  /// scope, the secrets prefixed with the instance ID, the database key (32 random bytes at the
-  /// first start, kept in the secret store), the encrypted database in
+  /// Builds the services of [instance] (Design note 1): the device keys with the scope of
+  /// [AppPorts.deviceKeyScopes], the secrets prefixed with the instance ID, the database key
+  /// (32 random bytes at the first start, kept in the secret store), the encrypted database in
   /// `<dataRoot>/instances/<instance_id>/local.db`, the auth session with its login flows and
   /// the sync engine (not started), whose every gateway attempt first asks the version gate
   /// ([versions], starting from [version], the decision of E1's discovery; brief M7-13).
@@ -473,7 +485,8 @@ final class InstanceServices {
     ClientVersionDecision version = const ClientVersionAllowed(),
   }) async {
     final secrets = InstanceSecrets(ports.secureBackend, instance.instanceId);
-    final keys = await ports.deviceKeys.ensure(instance.instanceId);
+    final keyScope = await ports.deviceKeyScopes.resolve(secrets);
+    final keys = await ports.deviceKeys.ensure(keyScope);
     final root = await ports.dataRoot();
     final folder = Directory(
       '${root.path}${Platform.pathSeparator}instances'
@@ -627,6 +640,7 @@ final class InstanceServices {
       },
       wipeDatabase: database.wipe,
       keys: ports.deviceKeys,
+      keyScope: keyScope,
       secrets: secrets,
       // M5-04, M5-05: the stored push registration goes with every end of the account.
       forgetPush: ports.push?.forget,

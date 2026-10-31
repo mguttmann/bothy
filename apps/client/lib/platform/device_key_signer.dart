@@ -9,6 +9,8 @@ import 'dart:typed_data';
 import 'package:auth/auth.dart';
 import 'package:device_key/device_key.dart' as dk;
 
+import 'secure_store.dart' show InstanceSecrets;
+
 /// The device keys of one instance, created on demand and deleted on a wipe.
 ///
 /// [PlatformDeviceKeyStore] uses the secure hardware of the platform; the tests and the
@@ -23,9 +25,52 @@ abstract interface class DeviceKeyStore {
   Future<void> delete(String scope);
 }
 
+/// The scope of the device keys of one instance (docs/decisions.d/FIX-app-logout.md FIX-AL/4).
+///
+/// Where the keys lie in a store every app of the person reaches (the macOS login keychain of a
+/// debug or profile build, the Windows key storage of the user; [shared] says so, none: always),
+/// [appId] is the app identity and a new enrollment gets the scope `<appId>/<instance_id>`, so another bundle identifier never
+/// signs with, or deletes, this app's keys. An instance that already has secrets (a session from
+/// a build before this rule, moved into the app's scope) keeps its keys under the `instance_id`,
+/// so an update signs no one out. The choice is stored with the instance's secrets and goes with
+/// them on a wipe. Without [appId] or in a store of the app's own (iOS, Android, the macOS Data
+/// Protection keychain with its access group; there the app extensions open the keys by the
+/// `instance_id`) the scope is the `instance_id`.
+///
+/// Example: `final scope = await DeviceKeyScopes(appId: 'com.example.chat').resolve(secrets);`
+final class DeviceKeyScopes {
+  /// Creates the rule; [appId] is null where the key store belongs to the app alone.
+  const DeviceKeyScopes({this.appId, this.shared});
+
+  /// The name of the stored scope in the instance's secrets.
+  static const String keyName = 'device_key_scope';
+
+  /// The app identity of a shared key store, or null.
+  final String? appId;
+
+  /// Whether the key store is shared between apps; none: it is whenever [appId] is set.
+  final Future<bool> Function()? shared;
+
+  /// Returns the scope of the instance of [secrets], storing it at the first call.
+  Future<String> resolve(InstanceSecrets secrets) async {
+    final instanceId = secrets.instanceId;
+    final id = appId;
+    final isShared = shared;
+    if (id == null || (isShared != null && !await isShared())) {
+      return instanceId;
+    }
+    final stored = await secrets.read(keyName);
+    if (stored != null) return stored;
+    final scope = await secrets.isEmpty() ? '$id/$instanceId' : instanceId;
+    await secrets.write(keyName, scope);
+    return scope;
+  }
+}
+
 /// [DeviceKeyStore] over the `device_key` plugin.
 ///
-/// The scope is the `instance_id` of discovery, so a key never serves two instances.
+/// The scope comes from [DeviceKeyScopes] and contains the `instance_id` of discovery, so a key
+/// never serves two instances.
 /// [stepUpPrompt] gives the texts of the system dialog of a step-up signature in the current
 /// language.
 ///

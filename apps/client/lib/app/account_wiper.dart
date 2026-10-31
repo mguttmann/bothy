@@ -73,6 +73,7 @@ final class AccountWiper {
     required Future<void> Function() stop,
     required Future<void> Function() wipeDatabase,
     required DeviceKeyStore keys,
+    String? keyScope,
     required InstanceSecrets secrets,
     Future<void> Function(String instanceId)? forgetPush,
     Future<void> Function(String instanceId)? forgetShare,
@@ -81,6 +82,7 @@ final class AccountWiper {
        _forgetShare = forgetShare,
        _wipeDatabase = wipeDatabase,
        _keys = keys,
+       _keyScope = keyScope ?? instanceId,
        _secrets = secrets;
 
   /// The instance whose data goes.
@@ -92,6 +94,9 @@ final class AccountWiper {
   final Future<void> Function() _stop;
   final Future<void> Function() _wipeDatabase;
   final DeviceKeyStore _keys;
+
+  /// The scope of the instance's device keys ([DeviceKeyScopes]); the instance ID by default.
+  final String _keyScope;
   final InstanceSecrets _secrets;
   final Future<void> Function(String instanceId)? _forgetPush;
   final Future<void> Function(String instanceId)? _forgetShare;
@@ -115,7 +120,7 @@ final class AccountWiper {
     await step(() async {
       if (await folder.exists()) await folder.delete(recursive: true);
     });
-    await step(() => _keys.delete(instanceId));
+    await step(() => _keys.delete(_keyScope));
     final forgetPush = _forgetPush;
     if (forgetPush != null) await step(() => forgetPush(instanceId));
     final forgetShare = _forgetShare;

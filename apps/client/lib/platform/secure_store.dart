@@ -170,6 +170,14 @@ final class FlutterSecureBackend implements SecureBackend {
     return _downgraded;
   }
 
+  /// Whether the secrets lie in a store every app of the person reaches: the Windows file, the
+  /// macOS login keychain (a debug or profile build, or a build without keychain entitlements).
+  Future<bool> get sharedStore async {
+    if (_platform == TargetPlatform.windows) return true;
+    if (!_macOS) return false;
+    return !(await _ready()).usesDataProtectionKeychain;
+  }
+
   /// The macOS options of every call, chosen once before the first call, after the old secrets
   /// moved into the app scope. A failed choice or move is not kept, so the next call tries
   /// again.
@@ -360,6 +368,10 @@ final class InstanceSecrets implements SecretStore {
 
   @override
   Future<void> delete(String key) => _backend.delete('$_prefix$key');
+
+  /// Whether this instance has no secret yet.
+  Future<bool> isEmpty() async =>
+      !(await _backend.keys()).any((key) => key.startsWith(_prefix));
 
   /// Deletes every secret of this instance: tokens, device ID and database key (R-SY-14).
   Future<void> deleteAll() async {

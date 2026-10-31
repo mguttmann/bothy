@@ -285,4 +285,21 @@ void main() {
     await Directory('${root.path}/instances/i-1').create();
     expect(await InstanceServices.hasLocalData(root), isTrue);
   });
+
+  test(
+    'the store is shared in the login keychain and on Windows only',
+    () async {
+      Future<bool> shared(TargetPlatform platform, [MacOsOptions? keychain]) =>
+          _backend(
+            SharedStorage(platform),
+            _oldApp,
+            keychain: keychain ?? _loginKeychain,
+          ).sharedStore;
+      expect(await shared(TargetPlatform.macOS), isTrue);
+      expect(await shared(TargetPlatform.windows), isTrue);
+      expect(await shared(TargetPlatform.macOS, _dataProtection), isFalse);
+      expect(await shared(TargetPlatform.iOS), isFalse);
+      expect(await shared(TargetPlatform.android), isFalse);
+    },
+  );
 }
