@@ -54,3 +54,13 @@ final class StepUpCancelled extends AuthException {
   @override
   String toString() => 'StepUpCancelled: the confirmation was cancelled';
 }
+
+/// The device has no step-up key (Windows by design, 08 6.1, D-M4-11-2), so the step-up with
+/// the device key is not possible; the other step-up methods of 08 6 are not built yet.
+final class StepUpUnavailable extends AuthException {
+  /// Creates the error.
+  const StepUpUnavailable();
+
+  @override
+  String toString() => 'StepUpUnavailable: this device has no step-up key';
+}

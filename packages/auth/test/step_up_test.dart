@@ -134,6 +134,18 @@ void main() {
     },
   );
 
+  test('a device without a step-up key fails with StepUpUnavailable before any request', () async {
+    h = Harness(withStepUpKey: false);
+    await h.signIn();
+    await expectLater(
+      h.session.stepUp.confirm(purposeText: 'x'),
+      throwsA(isA<StepUpUnavailable>()),
+    );
+    expect(h.prompt.asked, isEmpty);
+    expect(h.server.to('/auth/step-up/challenge'), isEmpty);
+    expect(h.server.to('/auth/step-up/device-key'), isEmpty);
+  });
+
   test(
     'a cancelled OS confirmation in the signer is StepUpCancelled too',
     () async {

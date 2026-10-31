@@ -369,15 +369,16 @@ Map<String, Object?> deviceBody(
 
 /// A complete test setup: fake server, store, clock, keys and the session.
 class Harness {
-  /// Builds a session against a fresh fake server.
-  Harness({DateTime? start})
+  /// Builds a session against a fresh fake server; [withStepUpKey] `false` builds the keys of a
+  /// device without a step-up key (Windows, D-M4-11-2).
+  Harness({DateTime? start, bool withStepUpKey = true})
     : clock = FakeClock(start ?? DateTime.utc(2026, 10, 15, 10)) {
     store = FakeSecretStore(log);
     server.onSend = (r) => log.add('send ${r.path}');
     var counter = 0;
     session = AuthSession(
       serverUrl: serverUrl,
-      keys: DeviceKeys(dpop: dpopKey, stepUp: stepUpKey),
+      keys: DeviceKeys(dpop: dpopKey, stepUp: withStepUpKey ? stepUpKey : null),
       secrets: store,
       clock: clock,
       ids: Uuid7Generator(

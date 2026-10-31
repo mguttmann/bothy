@@ -179,7 +179,8 @@ final class LoginService {
 
   /// The registration fields of this device (08 5.1): `device_id` (a UUIDv7 created once and
   /// kept in the `SecretStore` for this server), name, platform and app version, the public
-  /// JWK and `alg` of the DPoP key and the step-up key.
+  /// JWK and `alg` of the DPoP key and the step-up key; without a step-up key
+  /// ([DeviceKeys.stepUp] `null`) the registration has no `step_up_key`.
   ///
   /// The API names the keys `public_jwk` and `step_up_key.public_jwk` (the brief's `dpop_jwk`
   /// and `step_up_jwk`).
@@ -192,22 +193,25 @@ final class LoginService {
     final deviceId = id;
     final dpop = _core.keys.dpop;
     final stepUp = _core.keys.stepUp;
-    return DeviceRegistration(
-      (b) => b
+    return DeviceRegistration((b) {
+      b
         ..deviceId = deviceId
         ..name = _device.name
         ..platform = DevicePlatform.valueOf(_device.platform)
         ..appVersion = _device.appVersion
         ..publicJwk.replace(_json(dpop.publicJwk))
-        ..alg = DeviceRegistrationAlgEnum.valueOf(dpop.alg)
-        ..stepUpKey.replace(
+        ..alg = DeviceRegistrationAlgEnum.valueOf(dpop.alg);
+      // A device without a step-up key leaves `step_up_key` out (06: optional).
+      if (stepUp != null) {
+        b.stepUpKey.replace(
           DeviceKeyRegistration(
             (k) => k
               ..publicJwk.replace(_json(stepUp.publicJwk))
               ..alg = DeviceKeyRegistrationAlgEnum.valueOf(stepUp.alg),
           ),
-        ),
-    );
+        );
+      }
+    });
   }
 
   /// OIDC in the system browser with PKCE on the app leg (08 2.2, 14.1).
@@ -637,6 +641,7 @@ final class LoginService {
     SessionEnded(:final reason) => reason.name,
     RefreshUnavailable() => 'network',
     StepUpCancelled() => 'cancelled',
+    StepUpUnavailable() => 'step_up_unavailable',
   };
 
   /// The wire code of a generated enum value: its Dart name is the camelCase of the code.

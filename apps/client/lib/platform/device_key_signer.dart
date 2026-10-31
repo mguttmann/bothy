@@ -9,13 +9,14 @@ import 'dart:typed_data';
 import 'package:auth/auth.dart';
 import 'package:device_key/device_key.dart' as dk;
 
-/// The two device keys of one instance, created on demand and deleted on a wipe.
+/// The device keys of one instance, created on demand and deleted on a wipe.
 ///
 /// [PlatformDeviceKeyStore] uses the secure hardware of the platform; the tests and the
 /// integration test entry use software keys.
 abstract interface class DeviceKeyStore {
   /// Creates the `dpop` and `step_up` keys of [scope] if they do not exist and returns their
-  /// signers. Throws a `DeviceKeyException` when the platform cannot create a key.
+  /// signers; [DeviceKeys.stepUp] is `null` on a platform without a step-up key (Windows).
+  /// Throws a `DeviceKeyException` when the platform cannot create a key it should have.
   Future<DeviceKeys> ensure(String scope);
 
   /// Deletes both keys of [scope]; missing keys are no error.
@@ -36,19 +37,29 @@ final class PlatformDeviceKeyStore implements DeviceKeyStore {
   final dk.DeviceKeyClient _client;
   final dk.StepUpPrompt Function() _stepUpPrompt;
 
+  /// A step-up key that the plugin reports as `not_available` is no error: Windows has none by
+  /// design (08 6.1, D-M4-11-2), and the device registers without it ([DeviceKeys.stepUp]
+  /// `null`). Every other failure of either key throws.
   @override
   Future<DeviceKeys> ensure(String scope) async {
     final dpop = await _client.ensure(scope, dk.KeyPurpose.dpop);
-    final stepUp = await _client.ensure(scope, dk.KeyPurpose.stepUp);
+    dk.DeviceKeyInfo? stepUp;
+    try {
+      stepUp = await _client.ensure(scope, dk.KeyPurpose.stepUp);
+    } on dk.DeviceKeyException catch (e) {
+      if (e.code != dk.DeviceKeyError.notAvailable) rethrow;
+    }
     return DeviceKeys(
       dpop: DeviceKeySignerAdapter(_client, scope, dk.KeyPurpose.dpop, dpop),
-      stepUp: DeviceKeySignerAdapter(
-        _client,
-        scope,
-        dk.KeyPurpose.stepUp,
-        stepUp,
-        prompt: _stepUpPrompt,
-      ),
+      stepUp: stepUp == null
+          ? null
+          : DeviceKeySignerAdapter(
+              _client,
+              scope,
+              dk.KeyPurpose.stepUp,
+              stepUp,
+              prompt: _stepUpPrompt,
+            ),
     );
   }
 

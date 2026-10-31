@@ -1328,11 +1328,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get onboardingKeychainUnavailable =>
-      'This device\'s keychain refused the app\'s keys for this instance. Unlock the keychain or use a signed build of the app, then try again. The app log has the details.';
+      'This device\'s keychain refused the app\'s keys for this instance. Unlock the keychain or use a signed build of the app, then try again.';
 
   @override
   String get onboardingOpenFailed =>
-      'The app could not open its local data for this instance on this device. Try again; the app log has the details.';
+      'The app could not open its local data for this instance on this device. Try again.';
 
   @override
   String get onboardingCertificateInvalid =>

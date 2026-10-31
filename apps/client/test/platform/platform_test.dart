@@ -30,6 +30,10 @@ class FakeDeviceKeyClient implements dk.DeviceKeyClient {
   final List<String> calls = [];
   dk.StepUpPrompt? lastPrompt;
 
+  /// Thrown by `ensure` of the step-up key, as the Windows plugin does with `not_available`
+  /// (D-M4-11-2); `null` creates the key.
+  Object? stepUpError;
+
   dk.DeviceKeyInfo _info(int seed) => dk.DeviceKeyInfo(
     x: Uint8List.fromList(List.filled(32, seed)),
     y: Uint8List.fromList(List.filled(32, seed + 1)),
@@ -40,6 +44,8 @@ class FakeDeviceKeyClient implements dk.DeviceKeyClient {
   @override
   Future<dk.DeviceKeyInfo> ensure(String scope, dk.KeyPurpose purpose) async {
     calls.add('ensure $scope ${purpose.name}');
+    final error = stepUpError;
+    if (purpose == dk.KeyPurpose.stepUp && error != null) throw error;
     return _info(purpose == dk.KeyPurpose.dpop ? 1 : 2);
   }
 
@@ -153,15 +159,61 @@ void main() {
         ]);
         expect(keys.dpop.alg, 'ES256');
         expect(keys.dpop.publicJwk['kty'], 'EC');
-        expect(keys.dpop.thumbprint, isNot(keys.stepUp.thumbprint));
+        expect(keys.dpop.thumbprint, isNot(keys.stepUp!.thumbprint));
         expect(await keys.dpop.sign(Uint8List(3)), hasLength(64));
         expect(client.lastPrompt, isNull);
-        await keys.stepUp.sign(Uint8List(3));
+        await keys.stepUp!.sign(Uint8List(3));
         expect(client.lastPrompt?.title, 'Confirm');
         await store.delete('instance-1');
         expect(client.calls.last, 'delete instance-1');
       },
     );
+
+    test('a platform without a step-up key (Windows, not_available) gets the DPoP key alone', () async {
+      final client = FakeDeviceKeyClient()
+        ..stepUpError = const dk.DeviceKeyException(
+          dk.DeviceKeyError.notAvailable,
+        );
+      final store = PlatformDeviceKeyStore(
+        client,
+        () => const dk.StepUpPrompt(title: 'Confirm', negativeButton: 'Cancel'),
+      );
+      final keys = await store.ensure('instance-1');
+      expect(client.calls, [
+        'ensure instance-1 dpop',
+        'ensure instance-1 stepUp',
+      ]);
+      expect(keys.stepUp, isNull);
+      expect(keys.dpop.alg, 'ES256');
+      expect(await keys.dpop.sign(Uint8List(3)), hasLength(64));
+    });
+
+    for (final code in [
+      dk.DeviceKeyError.userCancelled,
+      dk.DeviceKeyError.keyInvalidated,
+      dk.DeviceKeyError.internal,
+    ]) {
+      test(
+        'any other failure of the step-up key (${code.wire}) still fails',
+        () async {
+          final client = FakeDeviceKeyClient()
+            ..stepUpError = dk.DeviceKeyException(code);
+          final store = PlatformDeviceKeyStore(
+            client,
+            () => const dk.StepUpPrompt(
+              title: 'Confirm',
+              negativeButton: 'Cancel',
+            ),
+          );
+          await expectLater(
+            store.ensure('instance-1'),
+            throwsA(
+              isA<dk.DeviceKeyException>().having((e) => e.code, 'code', code),
+            ),
+          );
+        },
+      );
+    }
   });
 
   group('loopback redirect', () {

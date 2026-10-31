@@ -37,18 +37,20 @@ final class StepUpService {
 
   /// Runs one step-up for the current session.
   ///
-  /// Throws [StepUpCancelled] when the person declines the prompt or the signer reports a
+  /// Throws [StepUpUnavailable] before any request when the device has no step-up key,
+  /// [StepUpCancelled] when the person declines the prompt or the signer reports a
   /// cancelled confirmation, [NotSignedIn] without a session, and the `DioException` of a
   /// rejected challenge or confirmation (`401 step_up_required`, `403 forbidden` with
   /// `step_up_not_possible`).
   Future<void> confirm({required String purposeText}) async {
+    final key = _core.keys.stepUp;
+    if (key == null) throw const StepUpUnavailable();
     final challenge = (await _core.api.getAuthApi().createStepUpChallenge(
       extra: {internalRequestExtra: true},
     )).data!;
     final session = _core.tokens.state?.session;
     if (session == null) throw const NotSignedIn();
     if (!await _prompt.ask(purposeText)) throw const StepUpCancelled();
-    final key = _core.keys.stepUp;
     final jws = await signCompactJws(
       signer: key,
       header: {'alg': key.alg},

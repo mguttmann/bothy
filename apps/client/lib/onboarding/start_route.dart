@@ -40,12 +40,13 @@ enum ServerStatus {
   noInstance,
 
   /// The device keys or the keychain of this device refused the app (for example a macOS
-  /// build without the keychain entitlements whose login keychain is locked); the cause is in
-  /// the app log.
+  /// build without the keychain entitlements whose login keychain is locked); the cause goes
+  /// to the developer log, which a release build does not keep.
   keychainUnavailable,
 
   /// The local data of the instance could not be opened on this device
-  /// (folder or database); the cause is in the app log.
+  /// (folder or database); the cause goes to the developer log, which a release build does
+  /// not keep.
   openFailed,
 
   /// The TLS handshake failed; no way to continue (R-PR-14).
