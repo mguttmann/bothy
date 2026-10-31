@@ -6,9 +6,14 @@ Status: built (M1-71). Component `testsupport`. G7 of
 ## Run
 
 ```sh
-make contract-test                      # CONTRACT_MAX_EXAMPLES=100 (quality.contract.max_examples)
-CONTRACT_SEED=<seed> make contract-test # repeat a run
+make contract-test                      # quality.contract.max_examples and quality.contract.seed
+CONTRACT_SEED=<seed> make contract-test # draw other cases
 ```
+
+The seed is fixed (named value `quality.contract.seed`): every run draws the same cases in the
+owner and user passes and in the stateful phase, so a failure repeats on a rerun instead of
+passing with another seed (flake list #238). The test fails when `CONTRACT_SEED` is not a decimal
+unsigned integer; it never draws a seed of its own.
 
 `TestG7_SchemathesisAllEnabledOperations` (build tags `contract_validate`, `contract_live`) starts
 the harness server with `EgressDenyAll`, APNs enabled for `registerPush` (topic `com.example.chat`, the adapter pointed at a Fake-APNs that egress denial keeps unreached; the test fails if a request reaches it) and every rate-limit class raised (23 R-QA-11: G7 checks
