@@ -53,10 +53,16 @@ func (m *recMetrics) snapshot() (int, []string) {
 
 // TestGatewayMetrics_QueueDroppedAt4014: at the 4014 close of a full outbound queue the adapter
 // counts the queued frames and the one that did not fit in bothy.gateway.outbound.dropped.
+//
+// The writer must hold the first heartbeat_ack before the next ones arrive: if it took that frame
+// out of the queue only after the overflow, one queued frame fewer is left at the close and the
+// count is 2 (the flake of issue #238). The test therefore sends the further heartbeats only once
+// the writer blocks with the first frame.
 func TestGatewayMetrics_QueueDroppedAt4014(t *testing.T) {
 	t.Parallel()
 	m := &recMetrics{}
 	release := make(chan struct{})
+	blocked := make(chan struct{}, 1)
 	var block bool
 	var mu gosync.Mutex
 	s := newTestServer(t, 2, func(h *Handler) {
@@ -66,6 +72,10 @@ func TestGatewayMetrics_QueueDroppedAt4014(t *testing.T) {
 			b := block
 			mu.Unlock()
 			if b {
+				select {
+				case blocked <- struct{}{}:
+				default:
+				}
 				<-release
 			}
 		}
@@ -80,7 +90,17 @@ func TestGatewayMetrics_QueueDroppedAt4014(t *testing.T) {
 	mu.Lock()
 	block = true
 	mu.Unlock()
-	for i := 0; i < 4; i++ {
+	// The first heartbeat_ack goes to the writer, which blocks with it; the next two fill the
+	// queue of two, the fourth does not fit.
+	if err := c.Send("heartbeat", map[string]any{"last_seq": 0}); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-blocked:
+	case <-ctx.Done():
+		t.Fatal("the writer did not take the first heartbeat_ack")
+	}
+	for i := 0; i < 3; i++ {
 		if err := c.Send("heartbeat", map[string]any{"last_seq": 0}); err != nil {
 			break
 		}
