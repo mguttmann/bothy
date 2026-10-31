@@ -210,9 +210,17 @@ func (s *Service) notReady() error {
 	return e
 }
 
+// voiceMIME is the type the voice checks read for f: the stored type refined by the declared one
+// (RefineMP4Type, FIX-voice-send). A row the scan stored as video/mp4 before the fix still counts
+// as MP4 audio when it was declared as such; this is no backfill, and a video track still fails
+// rule 4 through its width and height.
+func voiceMIME(f FileRecord) string {
+	return domain.RefineMP4Type(f.MIMEType, f.DeclaredMIMEType)
+}
+
 // voiceFacts returns the facts of the voice check of f for an author of authorKind.
 func voiceFacts(f FileRecord, authorKind string, maxDuration time.Duration) domain.VoiceFacts {
-	return domain.VoiceFacts{UploadState: f.UploadState, ScanStatus: f.ScanStatus, Deleted: f.Deleted, MimeType: f.MIMEType,
+	return domain.VoiceFacts{UploadState: f.UploadState, ScanStatus: f.ScanStatus, Deleted: f.Deleted, MimeType: voiceMIME(f),
 		AuthorKind: authorKind, HasWidth: f.Width > 0, HasHeight: f.Height > 0, DurationMs: f.DurationMS,
 		HasDuration: f.DurationMS > 0, MaxDuration: maxDuration}
 }
@@ -310,7 +318,7 @@ func (s *Service) lockVoiceFile(ctx context.Context, fileID ids.ID) (FileRecord,
 	if err != nil {
 		return FileRecord{}, err
 	}
-	if !domain.IsVoiceFormat(f.MIMEType, kind) {
+	if !domain.IsVoiceFormat(voiceMIME(f), kind) {
 		return FileRecord{}, conflict(reasonTranscriptionUnavailable, "")
 	}
 	return f, nil

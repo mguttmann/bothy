@@ -274,7 +274,7 @@ Error classes (`classify`, docs/DECISIONS.md D-M4-15-1):
 | Response | Class |
 |---|---|
 | `2xx`, `200` with `Idempotent-Replay: true`, `204` | confirmed |
-| network error (also a TLS error), timeout, `5xx` except `503 setup_required`, `429`, `409 request_in_progress` | retry with full jitter between `client.outbox_retry_base` and `client.outbox_retry_cap`; `429` and `503` wait `Retry-After` plus that jitter (`retryWait`) |
+| network error (also a TLS error), timeout, `5xx` except `503 setup_required`, `429`, `409 request_in_progress`, `409 file_not_ready` (a voice message whose file is still being checked, FIX-voice-send) | retry with full jitter between `client.outbox_retry_base` and `client.outbox_retry_cap`; `429`, `503` and `409 file_not_ready` wait `Retry-After` plus that jitter (`retryWait`) |
 | `412 version_conflict` | conflict: `failed` with the `current` revision |
 | `400`, `401`, `403`, `404`, any other `409`, `410`, `413`, `415`, `422`, `428`, `503 setup_required` | final: `failed` with code and reason |
 | an error that is no transport error and no response (a bug in an executor) | final: `executor_error` |
@@ -495,7 +495,8 @@ stays "being checked" and answers `409 file_not_ready` until `world.finishScan(i
 `Repr-Digest`) and `transcriptionMode`. `world.addReadyFile` seeds a checked file,
 `world.setTranscript` reports a transcript, `world.limits` is what `getInstance` reports, and
 `createMessage` attaches `attachment_file_ids` by the rules of 12 10 (`409 conflict` with
-`file_not_attachable`). Other
+`file_not_attachable`); a voice message answers `409 file_not_ready` with `Retry-After` or `409
+file_blocked` until its file is ready, as the server does (12 8.1). Other
 writes with `Idempotency-Key` repeat their
 stored answer with `Idempotent-Replay: true` (04 5.2, 06 7). Later tickets add operations with `server.handle(operationId,
 handler)` in their own `rest/` file (D-M4-17-2). Gateway: `hello`, `identify`, `resume`,

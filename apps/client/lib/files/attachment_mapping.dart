@@ -127,9 +127,10 @@ String uploadFailureText(AppLocalizations l, String code, {String? reason}) =>
 bool isImage(FileMeta file) =>
     file.mimeType.startsWith('image/') && file.thumbnails.isNotEmpty;
 
-/// Whether [file] is audio for a ticket player (12 9.3 inline list).
+/// Whether [file] is audio for a ticket player (12 9.3 inline list): MP4 audio under both
+/// names the server's type detection gives (`audio/x-m4a` for an Apple recording) and MP3.
 bool isAudio(FileMeta file) =>
-    file.mimeType == 'audio/mp4' || file.mimeType == 'audio/mpeg';
+    const {'audio/mp4', 'audio/x-m4a', 'audio/mpeg'}.contains(file.mimeType);
 
 /// Whether [file] is a video for a ticket player (12 9.3 inline list).
 bool isVideo(FileMeta file) => file.mimeType == 'video/mp4';

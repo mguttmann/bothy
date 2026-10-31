@@ -2,9 +2,19 @@
 
 package app
 
-import "context"
+import (
+	"context"
+	"time"
+
+	"github.com/OWNER/bothy/services/server/internal/files/domain"
+)
 
 // ScheduleTextExtract exposes the trigger of the text extraction to the tests of app_test.
 func ScheduleTextExtract(t *ExtractTrigger, ctx context.Context, f FileRecord) error {
 	return t.schedule(ctx, f)
+}
+
+// VoiceFacts exposes the facts of the voice check to the tests of app_test.
+func VoiceFacts(f FileRecord, authorKind string, maxDuration time.Duration) domain.VoiceFacts {
+	return voiceFacts(f, authorKind, maxDuration)
 }

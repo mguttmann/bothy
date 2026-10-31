@@ -18764,6 +18764,57 @@ func (response DownloadFile200AudiompegResponse) VisitDownloadFileResponse(w htt
 	return err
 }
 
+type DownloadFile200AudioxM4aResponse struct {
+	Body          io.Reader
+	Headers       DownloadFile200ResponseHeaders
+	ContentLength int64
+}
+
+func (response DownloadFile200AudioxM4aResponse) VisitDownloadFileResponse(w http.ResponseWriter) error {
+
+	w.Header().Set("Content-Type", "audio/x-m4a")
+	if response.ContentLength != 0 {
+		w.Header().Set("Content-Length", fmt.Sprint(response.ContentLength))
+	}
+	if response.Headers.AcceptRanges != nil {
+		w.Header().Set("Accept-Ranges", fmt.Sprint(*response.Headers.AcceptRanges))
+	}
+	if response.Headers.CacheControl != nil {
+		w.Header().Set("Cache-Control", fmt.Sprint(*response.Headers.CacheControl))
+	}
+	if response.Headers.ContentDisposition != nil {
+		w.Header().Set("Content-Disposition", fmt.Sprint(*response.Headers.ContentDisposition))
+	}
+	if response.Headers.ContentSecurityPolicy != nil {
+		w.Header().Set("Content-Security-Policy", fmt.Sprint(*response.Headers.ContentSecurityPolicy))
+	}
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.CrossOriginResourcePolicy != nil {
+		w.Header().Set("Cross-Origin-Resource-Policy", fmt.Sprint(*response.Headers.CrossOriginResourcePolicy))
+	}
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	if response.Headers.ReprDigest != nil {
+		w.Header().Set("Repr-Digest", fmt.Sprint(*response.Headers.ReprDigest))
+	}
+	w.WriteHeader(200)
+
+	if closer, ok := response.Body.(io.ReadCloser); ok {
+		defer closer.Close()
+	}
+	_, err := io.Copy(w, response.Body)
+	return err
+}
+
 type DownloadFile200ImagegifResponse struct {
 	Body          io.Reader
 	Headers       DownloadFile200ResponseHeaders
@@ -19099,6 +19150,60 @@ type DownloadFile206AudiompegResponse struct {
 func (response DownloadFile206AudiompegResponse) VisitDownloadFileResponse(w http.ResponseWriter) error {
 
 	w.Header().Set("Content-Type", "audio/mpeg")
+	if response.ContentLength != 0 {
+		w.Header().Set("Content-Length", fmt.Sprint(response.ContentLength))
+	}
+	if response.Headers.AcceptRanges != nil {
+		w.Header().Set("Accept-Ranges", fmt.Sprint(*response.Headers.AcceptRanges))
+	}
+	if response.Headers.CacheControl != nil {
+		w.Header().Set("Cache-Control", fmt.Sprint(*response.Headers.CacheControl))
+	}
+	if response.Headers.ContentDisposition != nil {
+		w.Header().Set("Content-Disposition", fmt.Sprint(*response.Headers.ContentDisposition))
+	}
+	if response.Headers.ContentRange != nil {
+		w.Header().Set("Content-Range", fmt.Sprint(*response.Headers.ContentRange))
+	}
+	if response.Headers.ContentSecurityPolicy != nil {
+		w.Header().Set("Content-Security-Policy", fmt.Sprint(*response.Headers.ContentSecurityPolicy))
+	}
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.CrossOriginResourcePolicy != nil {
+		w.Header().Set("Cross-Origin-Resource-Policy", fmt.Sprint(*response.Headers.CrossOriginResourcePolicy))
+	}
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	if response.Headers.ReprDigest != nil {
+		w.Header().Set("Repr-Digest", fmt.Sprint(*response.Headers.ReprDigest))
+	}
+	w.WriteHeader(206)
+
+	if closer, ok := response.Body.(io.ReadCloser); ok {
+		defer closer.Close()
+	}
+	_, err := io.Copy(w, response.Body)
+	return err
+}
+
+type DownloadFile206AudioxM4aResponse struct {
+	Body          io.Reader
+	Headers       DownloadFile206ResponseHeaders
+	ContentLength int64
+}
+
+func (response DownloadFile206AudioxM4aResponse) VisitDownloadFileResponse(w http.ResponseWriter) error {
+
+	w.Header().Set("Content-Type", "audio/x-m4a")
 	if response.ContentLength != 0 {
 		w.Header().Set("Content-Length", fmt.Sprint(response.ContentLength))
 	}
@@ -28607,200 +28712,6 @@ type CompleteImportdefaultApplicationProblemPlusJSONResponse struct {
 }
 
 func (response CompleteImportdefaultApplicationProblemPlusJSONResponse) VisitCompleteImportResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	if response.Headers.CorrelationId != nil {
-		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
-	}
-	w.WriteHeader(response.StatusCode)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type SetImportCursorRequestObject struct {
-	ImportId ImportIdPath `json:"import_id"`
-	Body     *SetImportCursorJSONRequestBody
-}
-
-type SetImportCursorResponseObject interface {
-	VisitSetImportCursorResponse(w http.ResponseWriter) error
-}
-
-type SetImportCursor200ResponseHeaders struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-}
-
-type SetImportCursor200JSONResponse struct {
-	Body    ImportSource
-	Headers SetImportCursor200ResponseHeaders
-}
-
-func (response SetImportCursor200JSONResponse) VisitSetImportCursorResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/json")
-	if response.Headers.CorrelationId != nil {
-		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
-	}
-	if response.Headers.RateLimit != nil {
-		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
-	}
-	if response.Headers.RateLimitPolicy != nil {
-		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
-	}
-	w.WriteHeader(200)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type SetImportCursor400ApplicationProblemPlusJSONResponse struct {
-	BadRequestApplicationProblemPlusJSONResponse
-}
-
-func (response SetImportCursor400ApplicationProblemPlusJSONResponse) VisitSetImportCursorResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	if response.Headers.CorrelationId != nil {
-		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
-	}
-	w.WriteHeader(400)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type SetImportCursor401ApplicationProblemPlusJSONResponse struct {
-	UnauthorizedApplicationProblemPlusJSONResponse
-}
-
-func (response SetImportCursor401ApplicationProblemPlusJSONResponse) VisitSetImportCursorResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	if response.Headers.CorrelationId != nil {
-		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
-	}
-	if response.Headers.DPoPNonce != nil {
-		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
-	}
-	if response.Headers.SetCookie != nil {
-		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
-	}
-	if response.Headers.WWWAuthenticate != nil {
-		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
-	}
-	w.WriteHeader(401)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type SetImportCursor403ApplicationProblemPlusJSONResponse struct {
-	ForbiddenApplicationProblemPlusJSONResponse
-}
-
-func (response SetImportCursor403ApplicationProblemPlusJSONResponse) VisitSetImportCursorResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	if response.Headers.CorrelationId != nil {
-		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
-	}
-	w.WriteHeader(403)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type SetImportCursor404ApplicationProblemPlusJSONResponse struct {
-	NotFoundApplicationProblemPlusJSONResponse
-}
-
-func (response SetImportCursor404ApplicationProblemPlusJSONResponse) VisitSetImportCursorResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	if response.Headers.CorrelationId != nil {
-		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
-	}
-	w.WriteHeader(404)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type SetImportCursor409ApplicationProblemPlusJSONResponse struct {
-	ConflictApplicationProblemPlusJSONResponse
-}
-
-func (response SetImportCursor409ApplicationProblemPlusJSONResponse) VisitSetImportCursorResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	if response.Headers.CorrelationId != nil {
-		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
-	}
-	w.WriteHeader(409)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type SetImportCursor429ApplicationProblemPlusJSONResponse struct {
-	TooManyRequestsApplicationProblemPlusJSONResponse
-}
-
-func (response SetImportCursor429ApplicationProblemPlusJSONResponse) VisitSetImportCursorResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	if response.Headers.CorrelationId != nil {
-		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
-	}
-	if response.Headers.RateLimit != nil {
-		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
-	}
-	if response.Headers.RateLimitPolicy != nil {
-		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
-	}
-	if response.Headers.RetryAfter != nil {
-		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
-	}
-	w.WriteHeader(429)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type SetImportCursordefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	Headers    ErrorResponseHeaders
-	StatusCode int
-}
-
-func (response SetImportCursordefaultApplicationProblemPlusJSONResponse) VisitSetImportCursorResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
