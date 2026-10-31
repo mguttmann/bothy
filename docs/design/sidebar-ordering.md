@@ -70,9 +70,8 @@ and the forum to the top of its space, once the person is back in the history.
 
 **D-M4-51-5 Three personal settings.** `sidebar.auto_arrange_spaces` (default `false`),
 `sidebar.auto_arrange_channels` (default `false`) and `sidebar.auto_arrange_chats` (default `true`)
-are personal settings of 01 11, synchronized like the theme. The German interface calls them
-"Bereiche automatisch anordnen", "Kanäle und Projekte automatisch anordnen" and "Chats automatisch
-anordnen". Reason: 01 11 makes personal settings synchronized; the manual order they switch
+are personal settings of 01 11, synchronized like the theme; the `de` locale carries their German
+labels. Reason: 01 11 makes personal settings synchronized; the manual order they switch
 between follows the person, so the switch does too. `chats` on is the order of M4-46, so nothing
 changes for a person who never opens the settings.
 
