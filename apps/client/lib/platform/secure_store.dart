@@ -256,22 +256,25 @@ final class FlutterSecureBackend implements SecureBackend {
         (_macOS && !scoped.usesDataProtectionKeychain);
     final check = hasLocalData;
     final adopt = !shared || (check != null && await check());
-    if (adopt) {
-      final legacy = await _legacyItems(legacyMac);
-      final current = await _readAll(scoped);
-      for (final MapEntry(:key, :value) in legacy.entries) {
-        if (!current.containsKey(key)) await _write(key, value, scoped);
-        await _storage.delete(
-          key: key,
-          iOptions: _apple ? _iosOptions(key, legacyMac.accountName!) : null,
-          mOptions: legacyMac,
-        );
-      }
-      if (legacy.isNotEmpty) {
-        _log('moved ${legacy.length} secrets into the scope of $appId');
-      }
-    }
+    if (adopt) await _moveLegacy(legacyMac, scoped);
     await _write(scopeMarkerKey, '1', scoped);
+  }
+
+  /// Moves every secret under [legacyMac] into [scoped] without overwriting a scoped one.
+  Future<void> _moveLegacy(MacOsOptions legacyMac, MacOsOptions scoped) async {
+    final legacy = await _legacyItems(legacyMac);
+    final current = await _readAll(scoped);
+    for (final MapEntry(:key, :value) in legacy.entries) {
+      if (!current.containsKey(key)) await _write(key, value, scoped);
+      await _storage.delete(
+        key: key,
+        iOptions: _apple ? _iosOptions(key, legacyMac.accountName!) : null,
+        mOptions: legacyMac,
+      );
+    }
+    if (legacy.isNotEmpty) {
+      _log('moved ${legacy.length} secrets into the scope of $appId');
+    }
   }
 
   /// The secrets a build before the app scope left: on Apple every item of the old service, on
