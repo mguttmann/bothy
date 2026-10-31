@@ -889,7 +889,10 @@ drives the real text input from the native side on the iOS simulator and an Andr
 through the text input probe, the method channel `bothy/text_input_probe` that only debug builds
 register (iOS: `AppDelegate.swift` under `#if DEBUG`, set by `ios/Flutter/Debug.xcconfig`;
 Android: `android/app/src/debug/kotlin`, with a no-op in `src/probeoff` for the other build
-types).
+types). The Paste of the field's selection menu goes through `pasteFromMenu`
+(`test/support/paste_menu.dart`): on iOS 16 and later the field shows the native edit menu, which
+has no Flutter button, so its Paste is sent as `paste:`; elsewhere the app's Paste button is
+tapped once the field knows the clipboard holds text.
 
 ## Search, quick switcher, mentions and Running now
 

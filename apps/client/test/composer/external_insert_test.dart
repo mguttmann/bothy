@@ -24,6 +24,7 @@ import 'package:sync_engine/sync_engine.dart';
 import '../support/column_host.dart';
 import '../support/file_fakes.dart';
 import '../support/file_widgets.dart';
+import '../support/paste_menu.dart';
 import '../support/structure.dart';
 import '../support/thread_fixtures.dart';
 import '../support/thread_host.dart';
@@ -189,6 +190,104 @@ void main() {
     expect(decodePayload(up.payload)['name'], 'paste.txt');
     expect(sendEnabled(tester), isTrue);
     await host.dispose(tester);
+  });
+
+  /// How late `Clipboard.hasStrings` of [mockClipboard] answers, as on a device under load.
+  var hasStringsDelay = Duration.zero;
+
+  /// The clipboard of the platform.
+  void mockClipboard(WidgetTester tester) {
+    String? clip;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        switch (call.method) {
+          case 'Clipboard.setData':
+            clip = (call.arguments as Map)['text'] as String?;
+            return null;
+          case 'Clipboard.getData':
+            return {'text': clip};
+          case 'Clipboard.hasStrings':
+            final has = clip?.isNotEmpty ?? false;
+            if (hasStringsDelay > Duration.zero) {
+              await Future<void>.delayed(hasStringsDelay);
+            }
+            return {'value': has};
+        }
+        return null;
+      },
+    );
+  }
+
+  void unmockClipboard(WidgetTester tester) => tester
+      .binding
+      .defaultBinaryMessenger
+      .setMockMethodCallHandler(SystemChannels.platform, null);
+
+  testWidgets('the Paste of the native edit menu on iOS 16 and later', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    tester.platformDispatcher.supportsShowingSystemContextMenu = true;
+    mockClipboard(tester);
+    try {
+      final host = await open(tester);
+      final pasted = <String>[];
+      final menu = await pasteFromMenu(
+        tester,
+        composerField,
+        'From the dictation app',
+        patience: const Duration(seconds: 10),
+        // The engine's `paste:` inserts the text of the pasteboard at the cursor.
+        systemPaste: (text) async {
+          pasted.add(text);
+          platformValue(tester, text);
+        },
+      );
+      expect(menu, PasteMenu.system);
+      expect(pasted, ['From the dictation app']);
+      expect(find.text('Paste'), findsNothing);
+      await host.settle(tester);
+      expect(fieldValue(tester).text, 'From the dictation app');
+      expect(sendEnabled(tester), isTrue);
+      expect(await draftText(tester, host), 'From the dictation app');
+      await host.dispose(tester);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+      tester.platformDispatcher.resetSupportsShowingSystemContextMenu();
+      unmockClipboard(tester);
+    }
+  });
+
+  testWidgets('the app Paste button when the clipboard answers late', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    mockClipboard(tester);
+    hasStringsDelay = const Duration(milliseconds: 300);
+    try {
+      final host = await open(tester);
+      final menu = await pasteFromMenu(
+        tester,
+        composerField,
+        'From the dictation app',
+        patience: const Duration(seconds: 10),
+        systemPaste: (_) async => fail('no native menu on Android'),
+      );
+      hasStringsDelay = Duration.zero;
+      // The answers asked for while it was late.
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(menu, PasteMenu.app);
+      await host.settle(tester);
+      expect(fieldValue(tester).text, 'From the dictation app');
+      expect(sendEnabled(tester), isTrue);
+      expect(await draftText(tester, host), 'From the dictation app');
+      await host.dispose(tester);
+    } finally {
+      hasStringsDelay = Duration.zero;
+      debugDefaultTargetPlatformOverride = null;
+      unmockClipboard(tester);
+    }
   });
 
   for (final (platform, command) in [

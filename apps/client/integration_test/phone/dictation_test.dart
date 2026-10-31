@@ -24,6 +24,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 
+import '../../test/support/paste_menu.dart';
 import '../../test/support/widgets.dart' show en;
 import 'support/phone_flow.dart';
 import 'support/text_input_probe.dart';
@@ -244,8 +245,9 @@ void main() {
   }, skip: !Platform.isAndroid);
 }
 
-/// The app's own Paste button of the field's selection toolbar, then the paste key of a
-/// hardware keyboard ([command] with V), each with text that a dictation app copied.
+/// The Paste of the field's selection menu ([pasteFromMenu]: the app's own button, or the
+/// native edit menu of iOS 16 and later), then the paste key of a hardware keyboard ([command]
+/// with V), each with text that a dictation app copied.
 Future<void> _appPasteAndKeys(
   WidgetTester tester,
   TestApp app,
@@ -255,13 +257,13 @@ Future<void> _appPasteAndKeys(
   Future<void> Function(WidgetTester, TestApp, String, String) sendAndCheck,
   LogicalKeyboardKey command,
 ) async {
-  await Clipboard.setData(const ClipboardData(text: 'From the toolbar'));
-  await tester.longPress(composerField);
-  await tester.pump();
-  final paste = find.text('Paste');
-  await app.waitFor(paste);
-  await tester.tap(paste.last);
-  await tester.pump();
+  // On iOS 16 and later the long press opens the native edit menu, whose Paste is `paste:`.
+  await pasteFromMenu(
+    tester,
+    composerField,
+    'From the toolbar',
+    systemPaste: nativePaste,
+  );
   await expectInserted(tester, app, draft, 'From the toolbar');
   await sendAndCheck(tester, app, thread, 'From the toolbar');
 
@@ -303,8 +305,21 @@ Future<void> _longInsert(
   final send = find.byWidgetPredicate(
     (w) => w is DsTappable && w.label == en.composerSend,
   );
+  await until(
+    tester,
+    'send is enabled',
+    () => tester.widget<DsTappable>(send).onTap != null,
+  );
   await tester.tap(send);
   await tester.pump();
+  // The tap sent: the composer gave up its text and the file.
+  await until(
+    tester,
+    'the composer is empty after send',
+    () =>
+        field(tester).text.isEmpty &&
+        find.byKey(const ValueKey('composer.attachments')).evaluate().isEmpty,
+  );
   final world = app.fake.server.world;
   await until(tester, 'the message with paste.txt', () {
     for (final m in world.messagesOf(thread)) {
