@@ -1,2 +1,5 @@
 #include "Generated.xcconfig"
 #include "../Runner/Configs/AppInfo.xcconfig"
+// Debug builds compile the text input probe of the phone integration tests
+// (Runner/AppDelegate.swift, DICTATION-MOBILE); profile and release builds do not.
+SWIFT_ACTIVE_COMPILATION_CONDITIONS = $(inherited) DEBUG

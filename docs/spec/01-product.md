@@ -1753,7 +1753,12 @@ tool that forced splitting a text or a paid plan.
    file (a script with `#!`, JSON, XML, HTML, a diff) gets that extension. The chip has "Insert as
    text", which removes the file and puts the pasted text into the field at the cursor. Typed
    text, templates and quotes never become a file. A paste the attachment rules refuse (count,
-   size) stays text and the refusal shows its reason.
+   size) stays text and the refusal shows its reason. Text that an input source outside the app
+   puts into the field (a dictation app or its keyboard extension, the system dictation or voice
+   typing, a paste of the system menu or of an input method, the paste key of a hardware
+   keyboard) counts as typed or pasted by what it inserts at once: it shows at once, enables
+   send and is saved as the draft; inserted at once over either bound it becomes `paste.txt`,
+   while a dictation that grows in small steps stays text as typing does (DICTATION-MOBILE).
 2. **Text over the limit.** While the text of the composer is larger than
    `message.max_content_bytes` (UTF-8 bytes), a note above the field says that the rest goes out
    as `message.txt` with this message. Sending never fails with a length error: the message

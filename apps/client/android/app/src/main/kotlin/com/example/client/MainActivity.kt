@@ -31,7 +31,8 @@ import kotlinx.coroutines.launch
  * It also takes the shares that [ShareActivity] forwards to the process's [ShareReceiver] and
  * connects that receiver to the Pigeon channels [ShareAndroidHostApi] and
  * [ShareAndroidFlutterApi] (brief M5-06 Design note 6), and the clipboard of block copies
- * [RichClipboardChannel] (brief M4-48).
+ * [RichClipboardChannel] (brief M4-48). A debug build also connects the text input probe of the
+ * phone integration tests ([TextInputProbe], DICTATION-MOBILE).
  */
 class MainActivity : FlutterFragmentActivity(), PermissionAsker {
     private val login = CustomTabsLogin { this }
@@ -94,6 +95,8 @@ class MainActivity : FlutterFragmentActivity(), PermissionAsker {
         shareNotify = notify
         share.attach(notify)
         RichClipboardChannel(messenger, applicationContext)
+        // Debug builds only: the probe of the phone integration tests (DICTATION-MOBILE).
+        TextInputProbe.attach(messenger, this)
         val links = DeepLinkChannel(messenger)
         deepLinks = links
         // A cold start by a link: LinkActivity started this activity with the link as data.
