@@ -516,7 +516,15 @@ and the Microsoft providers take that password from the process through `NCRYPT_
 (https://learn.microsoft.com/en-us/windows/win32/seccng/key-storage-property-identifiers); Windows
 Hello's `KeyCredentialManager` keys are RSA and sign with SHA-256 and PKCS #1
 (https://learn.microsoft.com/en-us/windows/apps/develop/security/windows-hello), all retrieved
-2026-10-15 [verified]. Not checked on a Windows host.
+2026-10-15 [verified]. Not checked on a Windows host. The Windows secrets of
+`flutter_secure_storage_windows` 4.2.2 (the locked version) sit in one JSON file in
+`getApplicationSupportDirectory()` encrypted with `CryptProtectData` (DPAPI), read from the package
+source `lib/src/flutter_secure_storage_windows_ffi.dart` (https://pub.dev/packages/flutter_secure_storage_windows,
+retrieved 2026-10-31 [verified]). On macOS the file-based keychain (the login keychain) controls
+access with access control lists, while only the Data Protection keychain uses keychain access
+groups (Apple TN3137, https://developer.apple.com/documentation/technotes/tn3137-on-mac-keychains,
+retrieved 2026-10-31 [verified]); that an app outside an item's list gets an access prompt is
+[assumed] from the observed incident.
 
 `packages/device_key` is one Flutter plugin package with a folder per platform and a typed
 Pigeon (flutter.dev) interface as its boundary, not a set of federated packages (docs/DECISIONS.md
