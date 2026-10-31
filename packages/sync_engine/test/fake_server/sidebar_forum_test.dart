@@ -95,6 +95,144 @@ void main() {
     );
   });
 
+  test(
+    'the channel order of a space: set, keep, clear and duplicates (M4-51)',
+    () async {
+      final alex = h.device();
+      await signedIn(h, alex);
+      final prefs = alex.api.getPreferencesApi();
+      final order = [h.seed.support, h.seed.general];
+      final set = (await prefs.putMySidebarSpace(
+        spaceId: h.seed.space,
+        sidebarStatePut: SidebarStatePut(
+          (b) => b
+            ..collapsed = false
+            ..channelOrder = ListBuilder(order),
+        ),
+      )).data!;
+      expect(set.channelOrder?.toList(), order);
+
+      // Absent keeps the stored list.
+      final kept = (await prefs.putMySidebarSpace(
+        spaceId: h.seed.space,
+        sidebarStatePut: SidebarStatePut((b) => b..collapsed = true),
+      )).data!;
+      expect(kept.channelOrder?.toList(), order);
+      expect(
+        (h.server.world.snapshot(h.seed.alex.id)['sidebar']! as List).single,
+        containsPair('channel_order', order),
+      );
+
+      // An empty list returns to the default order: the member is absent.
+      final cleared = (await prefs.putMySidebarSpace(
+        spaceId: h.seed.space,
+        sidebarStatePut: SidebarStatePut(
+          (b) => b
+            ..collapsed = true
+            ..channelOrder = ListBuilder(<String>[]),
+        ),
+      )).data!;
+      expect(cleared.channelOrder, isNull);
+
+      final e = await failure(
+        prefs.putMySidebarSpace(
+          spaceId: h.seed.space,
+          sidebarStatePut: SidebarStatePut(
+            (b) => b
+              ..collapsed = true
+              ..channelOrder = ListBuilder([h.seed.general, h.seed.general]),
+          ),
+        ),
+      );
+      expect(e?.response?.statusCode, 400);
+      expect(
+        ((e?.response?.data as Map)['errors'] as List).single,
+        allOf(
+          containsPair('pointer', '/channel_order'),
+          containsPair('code', 'duplicate'),
+        ),
+      );
+      expect(h.server.violations, isEmpty);
+    },
+  );
+
+  test(
+    'the thread order of a channel: put, event, list and snapshot (M4-51)',
+    () async {
+      final alex = h.device();
+      await signedIn(h, alex);
+      final prefs = alex.api.getPreferencesApi();
+      final order = [h.seed.releaseNotes, h.server.world.nextId()];
+      final put = (await prefs.putMySidebarChannel(
+        channelId: h.seed.general,
+        sidebarChannelPut: SidebarChannelPut(
+          (b) => b..threadOrder = ListBuilder(order),
+        ),
+      )).data!;
+      expect(put.channelId, h.seed.general);
+      expect(put.threadOrder.toList(), order);
+      expect(put.version, 1);
+      expect(put.updatedByDeviceId, isNotNull);
+
+      final again = (await prefs.putMySidebarChannel(
+        channelId: h.seed.general,
+        sidebarChannelPut: SidebarChannelPut(
+          (b) => b..threadOrder = ListBuilder(<String>[]),
+        ),
+      )).data!;
+      expect(again.threadOrder, isEmpty);
+      expect(again.version, 2);
+
+      final event = h.server.world.log.lastWhere(
+        (e) => e.type == 'sidebar_channel.updated',
+      );
+      expect(event.audience, h.seed.alex.id);
+      expect(
+        (event.envelope['payload']! as Map<String, Object?>)['state'],
+        containsPair('version', 2),
+      );
+      final listed = (await prefs.getMySidebar()).data!.channels!;
+      expect(listed.single.channelId, h.seed.general);
+      expect(
+        (h.server.world.snapshot(h.seed.alex.id)['sidebar_channels']! as List)
+            .single,
+        containsPair('channel_id', h.seed.general),
+      );
+      expect(
+        h.server.world.snapshot(h.seed.sam.id)['sidebar_channels'],
+        isEmpty,
+        reason: 'the rows of another person',
+      );
+
+      final hidden = await failure(
+        prefs.putMySidebarChannel(
+          channelId: h.seed.private,
+          sidebarChannelPut: SidebarChannelPut(
+            (b) => b..threadOrder = ListBuilder(<String>[]),
+          ),
+        ),
+      );
+      expect(hidden?.response?.statusCode, 404);
+      final twice = await failure(
+        prefs.putMySidebarChannel(
+          channelId: h.seed.general,
+          sidebarChannelPut: SidebarChannelPut(
+            (b) => b..threadOrder = ListBuilder([order.first, order.first]),
+          ),
+        ),
+      );
+      expect(twice?.response?.statusCode, 400);
+      expect(
+        ((twice?.response?.data as Map)['errors'] as List).single,
+        allOf(
+          containsPair('pointer', '/thread_order'),
+          containsPair('code', 'duplicate'),
+        ),
+      );
+      expect(h.server.violations, isEmpty);
+    },
+  );
+
   test('forum tags and a post with its first message', () async {
     final alex = h.device();
     await signedIn(h, alex);

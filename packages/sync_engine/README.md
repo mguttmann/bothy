@@ -175,7 +175,8 @@ through the `Fetcher` instead.
 | `draft.updated` | `drafts` (not the echo of this device, not while typed here) | version |
 | `draft.deleted` | `drafts` (not while typed here) | seq |
 | `settings.updated` | `user_settings` (`deleted: true` removes the key) | version of the setting |
-| `sidebar.updated` | `user_space_states` | version of the state |
+| `sidebar.updated` | `user_space_states` (`channel_order` included, M4-51; not the echo of this device) | version of the state |
+| `sidebar_channel.updated` | `user_channel_states` (the own thread order of a channel, M4-51; not the echo of this device) | version of the state |
 | `notification_pref.updated` | `notification_preferences` | version of the preference |
 | `quiet_hours.updated` | `quiet_hours_rules` (rules missing from the payload are deleted) | version per rule |
 | `file.updated` | `files` | seq |
@@ -303,7 +304,7 @@ Registered by this package: `MessageOps.register` (`createMessage`, `updateMessa
 `putThreadDraft`, `deleteThreadDraft`, `putMySetting`, `deleteMySetting`). M4-21 adds the
 interactions and commands, M4-22 the uploads. An app registers its own writes with the
 `registerExecutors` argument of `SyncEngine.create` (M4-19: `putMySidebarSpace` and
-`createThread` of `apps/client/lib/sync/`).
+`createThread` of `apps/client/lib/sync/`; M4-51: `putMySidebarChannel`).
 
 The sidebar counters (M4-19, 04 14): `CatchUpListener.countsOfChannel` returns the counts of
 every thread of a channel the engine counts (the snapshot's `unread_threads`, read states and
@@ -456,7 +457,10 @@ the connections that may see them. Test controls: `addPerson`, `addSpace`, `addC
 `deleteThreadDraft`, `listMyReadStates`, `listMyDrafts`, `listMySettings`, `putMySetting`,
 `deleteMySetting`, `getRun`, `cancelRun`, `retryRun` (09 5.7); since M4-19 also `getMySidebar`,
 `putMySidebarSpace` (the `fracindex` check of the server: a `sort_key` outside the fractional
-index is `400 validation_failed` at `/sort_key`), `listForumTags`, `createThread` (forum posts
+index is `400 validation_failed` at `/sort_key`; since M4-51 with `channel_order`, a repeated
+ID is `400 validation_failed` with `duplicate`), `putMySidebarChannel` (M4-51: the own thread
+order of a visible channel, `sidebar_channel.updated`, a repeated ID `duplicate` at
+`/thread_order`; `getMySidebar` lists the rows under `channels`), `listForumTags`, `createThread` (forum posts
 only; without `first_message` `400 validation_failed` at `/first_message` with the reason
 `required_for_forum_post`), `getBrandingLogo` (bytes of
 `world.logo`, else `404`) and `listChannelThreads` with `state`, `tag_id`, `sort`, `limit` and
@@ -662,8 +666,9 @@ above it (the app under test in the macOS app sandbox, M4-18), it uses the copy 
   posts cards, waits for an interaction or a gate of the test, and writes the live box anchor
   with `anchors: true`; `world.resolveMentions` resolves `@handle` tokens like the server.
 - Snapshot: `unread_threads` and the read state's `mention_count` are computed (messages of
-  others after the read position, not deleted); `sidebar` and the agent presence (`agents`) are
-  always empty. `active_threads` holds per visible channel the open threads of kind `thread` with
+  others after the read position, not deleted); `sidebar` and `sidebar_channels` (M4-51) hold the
+  person's rows of the visible spaces and channels; the agent presence (`agents`) is always
+  empty. `active_threads` holds per visible channel the open threads of kind `thread` with
   an active run or unread, then the newest others up to 20 (`snapshotThreadsPerChannel`; no
   activity window). Every channel carries `project_bound`; `setProjectBound` creates or deletes a
   binding as the server does: the flag, a higher `version` and `channel.updated` (R-DM-54).

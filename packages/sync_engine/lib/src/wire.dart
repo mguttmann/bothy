@@ -558,11 +558,22 @@ UserSetting settingFromJson(Json j) => UserSetting(
   updatedAt: optTime(j, 'updated_at'),
 );
 
-/// Maps an API `SidebarState`.
+/// Maps an API `SidebarState`; an absent `channel_order` is null, the default order (M4-51).
 UserSpaceState sidebarFromJson(Json j) => UserSpaceState(
   spaceId: SpaceId.parse(str(j, 'space_id')),
   collapsed: flag(j, 'collapsed'),
   sortKey: optStr(j, 'sort_key'),
+  channelOrder: j['channel_order'] == null
+      ? null
+      : [for (final c in strList(j, 'channel_order')) ChannelId.parse(c)],
+  version: ResourceVersion(integer(j, 'version')),
+  updatedByDeviceId: _opt(optStr(j, 'updated_by_device_id'), DeviceId.parse),
+);
+
+/// Maps an API `SidebarChannelState`: the own thread order of a channel (M4-51).
+UserChannelState sidebarChannelFromJson(Json j) => UserChannelState(
+  channelId: ChannelId.parse(str(j, 'channel_id')),
+  threadOrder: [for (final t in strList(j, 'thread_order')) ThreadId.parse(t)],
   version: ResourceVersion(integer(j, 'version')),
   updatedByDeviceId: _opt(optStr(j, 'updated_by_device_id'), DeviceId.parse),
 );
@@ -657,6 +668,7 @@ final class SnapshotData {
     required this.spaces,
     required this.channels,
     required this.sidebar,
+    this.sidebarChannels = const [],
     required this.unreadThreads,
     required this.activeRuns,
     required this.activeThreads,
@@ -689,6 +701,10 @@ final class SnapshotData {
 
   /// Sidebar states.
   final List<UserSpaceState> sidebar;
+
+  /// The own thread orders of channels (`sidebar_channels`, M4-51); empty in a snapshot of an
+  /// older server.
+  final List<UserChannelState> sidebarChannels;
 
   /// Threads with unread messages or mentions.
   final List<UnreadThread> unreadThreads;
@@ -726,6 +742,9 @@ SnapshotData snapshotFromJson(Json j) => SnapshotData(
   spaces: [for (final s in objList(j, 'spaces')) spaceViewFromJson(s)],
   channels: [for (final c in objList(j, 'channels')) channelViewFromJson(c)],
   sidebar: [for (final s in objList(j, 'sidebar')) sidebarFromJson(s)],
+  sidebarChannels: [
+    for (final s in objList(j, 'sidebar_channels')) sidebarChannelFromJson(s),
+  ],
   unreadThreads: [
     for (final u in objList(j, 'unread_threads'))
       UnreadThread(
