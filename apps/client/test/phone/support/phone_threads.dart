@@ -84,7 +84,7 @@ Finder addAction(Channel forum, AppLocalizations l) => find.byTooltip(
 /// path the router goes to is recorded in [ColumnHost.visited]. The shell stays while the path
 /// changes (one page key, as the app's phone routes), so a tab keeps its stack. The target
 /// platform of the routes is the test's ([TargetPlatformVariant] or the default); [created]
-/// records the threads of sent posts.
+/// records the threads of sent posts; [theme] is the theme of the app (light by default).
 Future<void> pumpPhone(
   WidgetTester tester,
   ColumnHost host, {
@@ -93,6 +93,7 @@ Future<void> pumpPhone(
   Locale locale = const Locale('en'),
   List<Override> overrides = const [],
   CreatedPosts? created,
+  DsThemeMode theme = DsThemeMode.light,
 }) async {
   phoneWindow(tester);
   final router = GoRouter(
@@ -110,8 +111,8 @@ Future<void> pumpPhone(
       ),
     ],
   );
-  const ds = DsContext(
-    theme: DsThemeMode.light,
+  final ds = DsContext(
+    theme: theme,
     density: DsDensityMode.touch,
     motion: DsMotionMode.reduced,
     accent: dsDefaultAccent,
