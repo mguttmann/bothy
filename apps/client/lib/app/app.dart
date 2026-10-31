@@ -33,6 +33,7 @@ import '../share/providers.dart';
 import '../share/share_route.dart';
 import '../status/status_route.dart';
 import '../telemetry/telemetry_providers.dart';
+import 'code_block_preference.dart';
 import 'deep_links.dart';
 import 'form_factor.dart';
 import 'layout/desktop_shell.dart';
@@ -379,24 +380,27 @@ class _ClientAppState extends ConsumerState<ClientApp> {
           // M4-48: a quote block copies as plain text and HTML (01 6.12 item 4).
           child: DsClipboardScope(
             clipboard: const PlatformRichClipboard(),
-            child: DsThemeScope(
-              dsContext: dsContext,
-              child: cover == null
-                  ? content
-                  : PrivacyCoverHost(
-                      cover: cover,
-                      productName: instance?.productName ?? branding.appName,
-                      logo: instance?.logo,
-                      hidden: lockHidesContent(_lock),
-                      // Every pointer event is activity of the person for the app lock.
-                      child: Listener(
-                        behavior: HitTestBehavior.translucent,
-                        onPointerDown: (_) => _lock?.recordActivity(),
-                        onPointerMove: (_) => _lock?.recordActivity(),
-                        onPointerSignal: (_) => _lock?.recordActivity(),
-                        child: content,
+            // M4-49: code blocks wrap or scroll by the choice of this device (01 6.14).
+            child: CodeBlockPreferenceScope(
+              child: DsThemeScope(
+                dsContext: dsContext,
+                child: cover == null
+                    ? content
+                    : PrivacyCoverHost(
+                        cover: cover,
+                        productName: instance?.productName ?? branding.appName,
+                        logo: instance?.logo,
+                        hidden: lockHidesContent(_lock),
+                        // Every pointer event is activity of the person for the app lock.
+                        child: Listener(
+                          behavior: HitTestBehavior.translucent,
+                          onPointerDown: (_) => _lock?.recordActivity(),
+                          onPointerMove: (_) => _lock?.recordActivity(),
+                          onPointerSignal: (_) => _lock?.recordActivity(),
+                          child: content,
+                        ),
                       ),
-                    ),
+              ),
             ),
           ),
         );

@@ -810,7 +810,12 @@ nothing from a message (SEC-T13). Every code block and quote block copies on its
 M4-48): the button at its top right on the desktop, a tap with "Copied" and a haptic on the
 phone, where a long press on the message opens the message menu; `lib/app/rich_clipboard.dart`
 writes a quote as plain text and HTML through the runners' channel `bothy/clipboard` (macOS,
-Windows, iOS, Android) and falls back to plain text (docs/decisions.d/M4-48.md). The session column (`lib/session_column/`) has its frame with
+Windows, iOS, Android) and falls back to plain text (docs/decisions.d/M4-48.md). Code blocks
+wrap their long lines by default (01 6.14, M4-49): `lib/app/code_block_preference.dart` gives the
+renderer, from the app root, the device's choice of the toggle "Wrap lines" (kept in the local
+view state, `shell_view_state.code_blocks_unwrapped`) and the limit
+`ui.code_block_collapse_lines` above which a block shows collapsed with "Show all"
+(docs/decisions.d/M4-49.md). The session column (`lib/session_column/`) has its frame with
 the pinned messages and the files of the thread; the agent session follows (M4-21).
 
 ## Files and voice messages

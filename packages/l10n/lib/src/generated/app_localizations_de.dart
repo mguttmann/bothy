@@ -1040,6 +1040,15 @@ class AppLocalizationsDe extends AppLocalizations {
   String get markdownCopyQuote => 'Zitat kopieren';
 
   @override
+  String get markdownCodeWrap => 'Zeilen umbrechen';
+
+  @override
+  String get markdownCodeShowAll => 'Alles anzeigen';
+
+  @override
+  String get markdownCodeShowLess => 'Weniger';
+
+  @override
   String get triggerReasonMultipleAgentsMentioned =>
       'Bitte nur einen Agenten erwähnen.';
 

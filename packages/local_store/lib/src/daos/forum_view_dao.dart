@@ -5,7 +5,8 @@
 /// 01 6.8 item 7, D-SB-6), and whether the channel column next to an open thread is hidden (01
 /// D1, D2; M4-42), whether the session column shows (01 D1, D2; M4-45) and whether a forum group
 /// shows every open post (01 6.8 item 3; M4-46) and whether a space is collapsed (01 6.7,
-/// R-PR-24; FIX-device-mirroring-2). Nothing of it is synchronized: 01 11 has no key for it.
+/// R-PR-24; FIX-device-mirroring-2) and whether code blocks wrap their long lines (01 6.14;
+/// M4-49). Nothing of it is synchronized: 01 11 has no key for it.
 library;
 
 import 'package:domain/domain.dart';
@@ -31,6 +32,8 @@ import '../database.dart';
 /// print(await db.forumViewDao.channelColumnHidden()); // true
 /// await db.forumViewDao.setSessionColumnHidden(textThread: false, hidden: true);
 /// print(await db.forumViewDao.sessionColumnHidden(textThread: false)); // true
+/// await db.forumViewDao.setCodeBlocksUnwrapped(unwrapped: true);
+/// print(await db.forumViewDao.codeBlocksUnwrapped()); // true
 /// ```
 final class ForumViewDao {
   /// Creates the DAO on a database; use `LocalDatabase.forumViewDao`.
@@ -237,6 +240,36 @@ final class ForumViewDao {
                   id: const Value(1),
                   sessionColumnHidden: Value(hidden),
                 ),
+        );
+  }
+
+  /// Whether the code blocks of messages show one line per line with a horizontal scroll on
+  /// this device ("Wrap lines" off, 01 6.14 item 1; M4-49), emitted on every change; false
+  /// (long lines wrap) without the stored row.
+  Stream<bool> watchCodeBlocksUnwrapped() => _db
+      .select(_db.shellViewStates)
+      .map((row) => row.codeBlocksUnwrapped)
+      .watchSingleOrNull()
+      .map((unwrapped) => unwrapped ?? false);
+
+  /// Whether the code blocks show unwrapped, read once; false without the stored row.
+  Future<bool> codeBlocksUnwrapped() async =>
+      await _db
+          .select(_db.shellViewStates)
+          .map((row) => row.codeBlocksUnwrapped)
+          .getSingleOrNull() ??
+      false;
+
+  /// Stores whether the code blocks show [unwrapped] on this device; the rest of the shell's
+  /// view state stays.
+  Future<void> setCodeBlocksUnwrapped({required bool unwrapped}) async {
+    await _db
+        .into(_db.shellViewStates)
+        .insertOnConflictUpdate(
+          ShellViewStatesCompanion.insert(
+            id: const Value(1),
+            codeBlocksUnwrapped: Value(unwrapped),
+          ),
         );
   }
 

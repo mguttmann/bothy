@@ -10,8 +10,9 @@
 // version 8 (M4-45) the columns `shell_view_state.session_column_hidden` and
 // `text_thread_session_shown`, version 9 (M4-46) the column
 // `channel_view_states.posts_shown_in_full` and version 10 (FIX-device-mirroring-2) the
-// local-only table `space_view_states`, filled from `user_space_states.collapsed`; each keeps
-// every row of the mirror. The preserved
+// local-only table `space_view_states`, filled from `user_space_states.collapsed`, and version
+// 11 (M4-49) the column `shell_view_state.code_blocks_unwrapped`; each keeps every row of the
+// mirror. The preserved
 // tables are checked by
 // `survival_test.dart`.
 
@@ -23,6 +24,7 @@ import 'package:test/test.dart';
 import 'generated/schema.dart';
 import 'generated/schema_v1.dart' as v1;
 import 'generated/schema_v10.dart' as v10;
+import 'generated/schema_v11.dart' as v11;
 import 'generated/schema_v2.dart' as v2;
 import 'generated/schema_v3.dart' as v3;
 import 'generated/schema_v4.dart' as v4;
@@ -347,6 +349,38 @@ void main() {
         expect(await newDb.select(newDb.spaceViewStates).get(), [
           const v10.SpaceViewStatesData(spaceId: 'a', collapsed: 1),
           const v10.SpaceViewStatesData(spaceId: 'b', collapsed: 0),
+        ]);
+      },
+    );
+  });
+
+  test('the migration 10 to 11 keeps the view state of the shell and lets '
+      'code blocks wrap', () async {
+    const row = v10.ShellViewStateData(
+      id: 1,
+      overviewPinned: 1,
+      channelColumnHidden: 1,
+      sessionColumnHidden: 1,
+      textThreadSessionShown: 1,
+    );
+    await verifier.testWithDataIntegrity(
+      oldVersion: 10,
+      newVersion: 11,
+      createOld: v10.DatabaseAtV10.new,
+      createNew: v11.DatabaseAtV11.new,
+      openTestedDatabase: LocalDatabase.new,
+      createItems: (batch, oldDb) =>
+          batch.insertAll(oldDb.shellViewState, [row]),
+      validateItems: (newDb) async {
+        expect(await newDb.select(newDb.shellViewState).get(), [
+          const v11.ShellViewStateData(
+            id: 1,
+            overviewPinned: 1,
+            channelColumnHidden: 1,
+            sessionColumnHidden: 1,
+            textThreadSessionShown: 1,
+            codeBlocksUnwrapped: 0,
+          ),
         ]);
       },
     );

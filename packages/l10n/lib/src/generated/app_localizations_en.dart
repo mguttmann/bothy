@@ -1031,6 +1031,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get markdownCopyQuote => 'Copy quote';
 
   @override
+  String get markdownCodeWrap => 'Wrap lines';
+
+  @override
+  String get markdownCodeShowAll => 'Show all';
+
+  @override
+  String get markdownCodeShowLess => 'Show less';
+
+  @override
   String get triggerReasonMultipleAgentsMentioned =>
       'Please mention only one agent.';
 

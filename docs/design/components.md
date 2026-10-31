@@ -62,8 +62,14 @@ Pin, More).
 | deleted | `deleted_at` set | line "Message deleted" in `color.text.muted`; no hover bar |
 
 Long replies: content over `ui.message_collapse_lines` lines is collapsed; a text button
-"Show more" (`color.text.link`) expands it. Code blocks in `type.code` on `color.code.bg`,
-horizontally scrollable. Every code block and quote block copies on its own (01 6.12, M4-48): on
+"Show more" (`color.text.link`) expands it. Code blocks in `type.code` on `color.code.bg` wrap
+their long lines by default, an indented line with a hanging indent (01 6.14, M4-49). The text
+toggle "Wrap lines" in `type.label` in the block header (left of the copy button on the desktop,
+highlighted with `color.surface.selected` and `color.text.link` while on) switches every block of
+the device to one line per line with a horizontal scroll and a scrollbar that is always visible on
+the desktop. A block higher than `ui.code_block_collapse_lines` lines shows that height with a
+fade into `color.code.bg` and a text button "Show all" (`color.text.link`) below it; expanded it
+reads "Show less". Every code block and quote block copies on its own (01 6.12, M4-48): on
 the desktop a text button "Copy code" or "Copy quote" in `type.label`, `color.text.link`, at the
 top right of the block; on the phone (density `touch`) the whole block is the tap target, with a
 snack bar "Copied" and a light haptic, and a long press on the message opens the message menu.

@@ -139,6 +139,7 @@ Source: [01-product.md](../spec/01-product.md), section 14.
 | `ui.composer_max_lines` |  | App |  | `12` | the input grows up to this many lines |  |
 | `ui.composer_paste_file_chars` |  | App |  | `4000` | a paste of more characters becomes a text file attachment in the composer (6.13) |  |
 | `ui.composer_paste_file_lines` |  | App |  | `100` | a paste of more lines becomes a text file attachment in the composer (6.13) |  |
+| `ui.code_block_collapse_lines` |  | App |  | `20` | a code block higher than this many lines of code shows collapsed with a fade and "Show all" (6.14) |  |
 | `ui.autocomplete_debounce` |  | App |  | `150ms` | waiting time before `command.autocomplete` |  |
 | `ui.quick_switch_max_results` |  | App |  | `20` | hits in the quick switcher |  |
 | `ui.desktop_min_width_four_columns` |  | App |  | `1280px` | below this width the session column collapses |  |

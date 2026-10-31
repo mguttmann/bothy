@@ -131,6 +131,7 @@ final Map<int, Map<String, List<Map<String, Object?>>>> _fixtureRows = {
   8: _rowsV4,
   9: _rowsV4,
   10: _rowsV4,
+  11: _rowsV4,
 };
 
 void _insert(Database raw, Map<String, List<Map<String, Object?>>> rows) {

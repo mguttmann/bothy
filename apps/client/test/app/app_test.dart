@@ -15,6 +15,7 @@ import 'package:client/app/rich_clipboard.dart';
 import 'package:client/app/target_resolver.dart';
 import 'package:client/onboarding/onboarding_controller.dart';
 import 'package:design_system/design_system.dart';
+import 'package:domain/domain.dart' show AppConfig, AppConfigValues;
 import 'package:flutter/material.dart' hide ConnectionState;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
@@ -94,6 +95,18 @@ void main() {
       find.byType(DsClipboardScope),
     );
     expect(scope.clipboard, isA<PlatformRichClipboard>());
+  });
+
+  testWidgets('code blocks follow the choice of the device and the limit of '
+      'the configuration (M4-49)', (tester) async {
+    await pumpApp(tester);
+    final scope = tester.widget<DsCodeBlockScope>(
+      find.byType(DsCodeBlockScope),
+    );
+    // Signed out there is no local database: blocks wrap, the toggle stores nothing.
+    expect(scope.wrap, isTrue);
+    expect(scope.collapseLines, AppConfig.defaults().codeBlockCollapseLines);
+    expect(scope.onWrapChanged, isNotNull);
   });
 
   testWidgets('each step of the controller has its screen', (tester) async {

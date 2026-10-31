@@ -177,7 +177,8 @@ void main() {
   });
 
   testWidgets(
-    'a fenced block scrolls horizontally and copies exactly the code',
+    'a fenced block wraps by default, scrolls horizontally without wrap and '
+    'copies exactly the code (01 6.14, M4-49)',
     (tester) async {
       String? copied;
       tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
@@ -191,14 +192,21 @@ void main() {
       );
       const code =
           'make check && echo "a very long line that does not wrap at all"';
-      await pumpDs(tester, md('```sh\n$code\n```'), width: 240);
-      final scroll = tester.widget<SingleChildScrollView>(
-        find.descendant(
-          of: find.byType(DsMarkdownCodeBlock),
-          matching: find.byType(SingleChildScrollView),
-        ),
+      Finder scroll() => find.descendant(
+        of: find.byType(DsMarkdownCodeBlock),
+        matching: find.byType(SingleChildScrollView),
       );
-      expect(scroll.scrollDirection, Axis.horizontal);
+      await pumpDs(tester, md('```sh\n$code\n```'), width: 240);
+      expect(scroll(), findsNothing);
+      await pumpDs(
+        tester,
+        DsCodeBlockScope(wrap: false, child: md('```sh\n$code\n```')),
+        width: 240,
+      );
+      expect(
+        tester.widget<SingleChildScrollView>(scroll()).scrollDirection,
+        Axis.horizontal,
+      );
       expect(find.text('sh'), findsOneWidget);
       final l = await en();
       await tester.tap(find.bySemanticsLabel(l.markdownCopyCode));

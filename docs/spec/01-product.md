@@ -1503,7 +1503,10 @@ the screen reader label. Icons and colors: [components.md](../design/components.
 ### 6.4 Long replies
 
 Messages over `ui.message_collapse_lines` lines are collapsed with "Show more";
-code blocks scroll horizontally instead of wrapping. Long replies are never split across several
+code blocks wrap long lines by default and can be switched to a horizontal scroll, and a code
+block higher than `ui.code_block_collapse_lines` lines shows collapsed with "Show all" (6.14,
+addendum of 2026-10-31; this replaces the earlier rule that code blocks scroll horizontally
+instead of wrapping). Long replies are never split across several
 messages; one fenced code block renders as one block however long it is. A text larger than
 `message.max_content_bytes` goes out as one message whose rest is one text attachment (6.13).
 
@@ -1767,6 +1770,36 @@ tool that forced splitting a text or a paid plan.
 4. **Edits.** Editing a message keeps the limit of `message.max_content_bytes`: an edit carries no
    attachments ([06-api.md](06-api.md) `MessageUpdate`).
 
+### 6.14 Readable code blocks
+
+Addendum of 2026-10-31 (R-PR-28, rulings D-M4-49-1 to D-M4-49-6). Reason: owner decision of
+2026-10-31, which overrides the former rule of 6.4 that code blocks scroll horizontally instead of
+wrapping. An agent sent a long German sentence as a fenced block "to copy"; the macOS app showed it
+as one cut-off line that could not be scrolled sideways (no visible scrollbar, the trackpad did not
+move it) and could not be expanded, so the owner could not read what he would copy. Applies to
+every code block the renderer draws, on the desktop (macOS, Windows) and on the phone (iOS,
+Android).
+
+1. **Wrap by default.** A code block (fenced or indented) wraps its long lines, so its whole
+   content is visible without scrolling. A small toggle "Wrap lines" in the header of every block,
+   beside the copy button on the desktop, switches to no wrap: every line stays one line and the
+   block scrolls horizontally, with a visible scrollbar on the desktop that can be dragged, shift
+   and the mouse wheel, a sideways trackpad gesture, and a drag on the phone. The choice is kept per
+   device and applies to every code block of that device (local view state, never synchronized);
+   without a local database (before the sign-in) the toggle switches only its own block. A tap on
+   the toggle on the phone never copies the block (6.12 item 2).
+2. **Long blocks.** A code block higher than `ui.code_block_collapse_lines` lines of code (the
+   rendered height, so wrapped lines count) shows collapsed to that height with a fade at its
+   bottom and a control "Show all" below it, which expands the block in place;
+   "Show less" collapses it again. The control is a button for the keyboard and the
+   screen reader with its expanded state. The state lasts while the block is on screen.
+3. **Indentation.** A wrapped line that starts with spaces or tabs keeps that indentation on every
+   wrapped line (hanging indent), up to 16 columns, so indented code stays readable. Code blocks
+   have no line numbers.
+4. **Display only.** Wrapping, the horizontal scroll and the collapse change only the display: the
+   copy of a block is its raw content as 6.12 item 3 defines, also while it is collapsed, and a
+   system selection over a wrapped block keeps its line breaks and indentation (6.12 item 6).
+
 ## 7. Keyboard shortcuts
 
 Shortcuts apply on desktop. They avoid system assignments (Cmd+H, Cmd+M, Cmd+Q, Alt+F4,
@@ -2021,6 +2054,7 @@ Rules:
 | R-PR-25 | Every code block and quote block of a message copies on its own: on the desktop through a copy button at its top right, on the phone through a tap with "Copied" and a haptic, while a long press keeps the message menu; a code block copies its raw content byte for byte, a quote its text without markers and, where the clipboard holds rich text, also as HTML (6.12, addendum of 2026-10-29). | Owner request 2026-10-29: in Discord a tap on a code block on the phone never copied it and "Copy text" always copied the whole message. |
 | R-PR-26 | A paste over `ui.composer_paste_file_chars` characters or `ui.composer_paste_file_lines` lines becomes a text file attachment with "Insert as text"; a text over `message.max_content_bytes` goes out as one message with its rest as one attachment, from people and agents alike; a message is never split (6.13, addendum of 2026-10-29). | Owner decision 2026-10-29: a person never hits a length limit, as in the former chat tool where 2000 characters forced splitting or a paid plan; one message keeps a reply readable and quotable as one. |
 | R-PR-27 | Every forum the Claude Code runner operates is a Claude Code chat: its folder need not be a Git repository, a forum without a project binding works in the runner's default folder when one is set, and a failed run shows its cause in the thread next to the reason (section 4, addendum of 2026-10-30). | Owner expectation 2026-10-30: three forums bound to folders without Git stayed "not ready", and a forum without a binding failed after 0 s with only "Error in the adapter" (docs/decisions.d/RUNNER-NO-GIT.md). |
+| R-PR-28 | A code block wraps its long lines by default, keeps the indentation of a wrapped line, and switches per device to one line per line with a working horizontal scroll through the toggle "Wrap lines"; a block higher than `ui.code_block_collapse_lines` lines shows collapsed with a fade and "Show all" / "Show less"; the copy stays the raw content (6.14, addendum of 2026-10-31). | Owner decision 2026-10-31: a long sentence sent as a fenced block "to copy" showed as one cut-off line that could neither be scrolled nor expanded on macOS, so the owner could not read what he would copy (docs/decisions.d/M4-49.md). |
 
 ## 14. Configuration values of this chapter
 
@@ -2032,6 +2066,7 @@ Rules:
 | `ui.composer_max_lines` | `12` | the input grows up to this many lines |
 | `ui.composer_paste_file_chars` | `4000` | a paste of more characters becomes a text file attachment in the composer (6.13) |
 | `ui.composer_paste_file_lines` | `100` | a paste of more lines becomes a text file attachment in the composer (6.13) |
+| `ui.code_block_collapse_lines` | `20` | a code block higher than this many lines of code shows collapsed with a fade and "Show all" (6.14) |
 | `ui.autocomplete_debounce` | `150ms` | waiting time before `command.autocomplete` |
 | `ui.quick_switch_max_results` | `20` | hits in the quick switcher |
 | `ui.desktop_min_width_four_columns` | `1280px` | below this width the session column collapses |

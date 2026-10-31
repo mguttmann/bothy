@@ -300,6 +300,7 @@ const Map<String, List<String>> expected = {
     'channel_column_hidden',
     'session_column_hidden',
     'text_thread_session_shown',
+    'code_blocks_unwrapped',
   ],
 };
 
@@ -313,8 +314,8 @@ void main() {
     return [for (final r in rows) r.read<String>('name')];
   }
 
-  test('schema version 10 has exactly the tables of 15 6.1', () async {
-    expect(db.schemaVersion, 10);
+  test('schema version 11 has exactly the tables of 15 6.1', () async {
+    expect(db.schemaVersion, 11);
     final rows = await db
         .customSelect(
           "SELECT name FROM sqlite_master WHERE type = 'table' "
