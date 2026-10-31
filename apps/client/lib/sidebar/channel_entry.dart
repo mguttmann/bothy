@@ -34,7 +34,7 @@ import 'thread_entry.dart';
 /// other with [onMoveThread] unless chats are arranged by activity ([chatsArranged]); their
 /// menus and screen reader actions have "Move up" and "Move down" (01 6.15, M4-51). The
 /// channel's own [moves] go to its menu and its row's screen reader actions; the channel row is
-/// dragged by its space ([SidebarDragRow]). Text channel threads keep their order (D-M4-51-1).
+/// dragged through [channelDrag] ([SidebarDragRow] of its space). Text channel threads keep their order (D-M4-51-1).
 class ChannelEntry extends StatefulWidget {
   /// Creates the entry.
   const ChannelEntry({
@@ -54,7 +54,12 @@ class ChannelEntry extends StatefulWidget {
     this.onMoveThread,
     this.chatsArranged = true,
     this.touch = false,
+    this.channelDrag,
   });
+
+  /// Wraps the channel row (only the row, not its thread group) so it is dragged among the
+  /// channels of its space (01 6.15, M4-51), or null.
+  final Widget Function(Widget row)? channelDrag;
 
   /// "Move up" and "Move down" of the channel (01 6.15, M4-51), or null for none.
   final SidebarMoves? moves;
@@ -263,7 +268,7 @@ class _ChannelEntryState extends State<ChannelEntry> {
     final addLabel = e.channel.projectBound
         ? l.sidebarNewChatIn(e.channel.name)
         : l.sidebarNewPostIn(e.channel.name);
-    final channelRow = Padding(
+    final channelRowOnly = Padding(
       padding: const EdgeInsetsDirectional.only(
         start: DsSpace.s16,
         end: DsSpace.s4,
@@ -301,6 +306,9 @@ class _ChannelEntryState extends State<ChannelEntry> {
         ),
       ),
     );
+    // Only the channel row lifts the channel: a drag on one of its posts must never move the
+    // forum (review of M4-51).
+    final channelRow = (w.channelDrag ?? (row) => row)(channelRowOnly);
     if (rows.isEmpty && newChats.isEmpty) return channelRow;
     // The channel with its rows is one node inside the space's group, and the rows one node
     // below the channel row, so VoiceOver and TalkBack get the levels space, channel, thread as

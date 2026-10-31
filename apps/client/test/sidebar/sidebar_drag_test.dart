@@ -283,6 +283,34 @@ void main() {
     });
   }
 
+  testWidgets('desktop, default settings: a small mouse drag on a post never '
+      'moves its forum and shows the note (review of M4-51)', (tester) async {
+    final moves = await pumpSidebar(
+      tester,
+      arrangement: const SidebarArrangement(),
+    );
+    final g = await tester.startGesture(
+      tester.getCenter(postRow(2)),
+      kind: PointerDeviceKind.mouse,
+    );
+    for (var i = 0; i < 3; i++) {
+      await g.moveBy(const Offset(0, 1));
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    final target = tester.getCenter(channelRow(3));
+    final start = tester.getCenter(postRow(2));
+    for (var i = 1; i <= 10; i++) {
+      await g.moveTo(Offset.lerp(start, target, i / 10)!);
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    await g.up();
+    await tester.pumpAndSettle();
+    expect(moves.channels, isEmpty);
+    expect(moves.threads, isEmpty);
+    expect(find.textContaining('Chats are arranged by activity'), findsOneWidget);
+    await moves.host.dispose(tester);
+  });
+
   testWidgets('automatic chats on touch: a long press shows the note', (
     tester,
   ) async {

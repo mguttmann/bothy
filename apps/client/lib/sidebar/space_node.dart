@@ -220,45 +220,47 @@ class _SpaceNodeState extends State<SpaceNode> {
         ),
         if (node.expanded)
           for (final (i, c) in node.channels.indexed)
-            SidebarDragRow(
-              key: ValueKey('sidebar.dragChannel.${c.channel.id.value}'),
-              data: SidebarDragData(
-                level: SidebarLevel.channels,
-                parent: space.id.value,
-                id: c.channel.id.value,
-                index: i,
-              ),
-              label: c.channel.name,
-              enabled: onMoveChannel != null && !channelsArranged,
-              arranged: onMoveChannel != null && channelsArranged,
-              touch: touch,
-              onDrop: (id, to) => onMoveChannel!(ChannelId.parse(id), to),
-              child: ChannelEntry(
-                key: ValueKey('sidebar.entry.${c.channel.id.value}'),
-                moves: channelMoves(c.channel.id, i),
-                onMoveThread: onMoveThread == null
-                    ? null
-                    : (thread, to) => onMoveThread(c.channel.id, thread, to),
-                chatsArranged: arrangement.isAuto(SidebarLevel.chats),
+            ChannelEntry(
+              key: ValueKey('sidebar.entry.${c.channel.id.value}'),
+              // Only the channel row lifts the channel, never one of its posts.
+              channelDrag: (row) => SidebarDragRow(
+                key: ValueKey('sidebar.dragChannel.${c.channel.id.value}'),
+                data: SidebarDragData(
+                  level: SidebarLevel.channels,
+                  parent: space.id.value,
+                  id: c.channel.id.value,
+                  index: i,
+                ),
+                label: c.channel.name,
+                enabled: onMoveChannel != null && !channelsArranged,
+                arranged: onMoveChannel != null && channelsArranged,
                 touch: touch,
-                entry: c,
-                selected: c.channel.id == selectedChannel,
-                selectedThread: selectedThread,
-                onOpen: () => onOpenChannel(c.channel.id),
-                onOpenThread: onOpenThread,
-                onToggleGroup: onToggleGroup == null
-                    ? null
-                    : (expanded) => onToggleGroup(c.channel.id, expanded),
-                onShowAllPosts: onShowAllPosts == null
-                    ? null
-                    : (inFull) => onShowAllPosts(c.channel.id, inFull),
-                onAdd: onAdd == null ? null : () => onAdd(c.channel.id),
-                selectedNewChat: selectedNewChat,
-                onOpenNewChat: onOpenNewChat == null
-                    ? null
-                    : (entry) => onOpenNewChat(c.channel.id, entry),
-                onParent: _row.requestFocus,
+                onDrop: (id, to) => onMoveChannel!(ChannelId.parse(id), to),
+                child: row,
               ),
+              moves: channelMoves(c.channel.id, i),
+              onMoveThread: onMoveThread == null
+                  ? null
+                  : (thread, to) => onMoveThread(c.channel.id, thread, to),
+              chatsArranged: arrangement.isAuto(SidebarLevel.chats),
+              touch: touch,
+              entry: c,
+              selected: c.channel.id == selectedChannel,
+              selectedThread: selectedThread,
+              onOpen: () => onOpenChannel(c.channel.id),
+              onOpenThread: onOpenThread,
+              onToggleGroup: onToggleGroup == null
+                  ? null
+                  : (expanded) => onToggleGroup(c.channel.id, expanded),
+              onShowAllPosts: onShowAllPosts == null
+                  ? null
+                  : (inFull) => onShowAllPosts(c.channel.id, inFull),
+              onAdd: onAdd == null ? null : () => onAdd(c.channel.id),
+              selectedNewChat: selectedNewChat,
+              onOpenNewChat: onOpenNewChat == null
+                  ? null
+                  : (entry) => onOpenNewChat(c.channel.id, entry),
+              onParent: _row.requestFocus,
             ),
       ],
     );

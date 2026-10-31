@@ -114,7 +114,9 @@ List<T> holdOrder<T, K>(List<T> fresh, List<K> held, K Function(T) idOf) {
 ///
 /// Rows of [full] that are not on screen (behind "Show more") keep their place relative to the
 /// others: the item lands right before the visible row that will follow it, or right after the
-/// last visible row. An [item] not in [full] or [visible] changes nothing.
+/// last visible row. A row on screen that is not in [full] (a selected done post, a row the
+/// sidebar holds) is no place to land on: the item lands before the next visible row of [full],
+/// or after the last one before it. An [item] not in [full] or [visible] changes nothing.
 ///
 /// Example: `moveAmong(['a', 'b', 'c', 'd'], ['a', 'b'], 'a', 1)` is `['b', 'a', 'c', 'd']`.
 List<K> moveAmong<K>(List<K> full, List<K> visible, K item, int to) {
@@ -128,12 +130,15 @@ List<K> moveAmong<K>(List<K> full, List<K> visible, K item, int to) {
     for (final f in full)
       if (f != item) f,
   ];
-  if (others.isEmpty) return full;
-  if (at < others.length) {
-    rest.insert(rest.indexOf(others[at]), item);
-  } else {
-    rest.insert(rest.indexOf(others.last) + 1, item);
+  // The first row of the order at or after the place, else the last one before it.
+  final after = others.skip(at).where(full.contains).firstOrNull;
+  if (after != null) {
+    rest.insert(rest.indexOf(after), item);
+    return rest;
   }
+  final before = others.take(at).where(full.contains).lastOrNull;
+  if (before == null) return full;
+  rest.insert(rest.indexOf(before) + 1, item);
   return rest;
 }
 
