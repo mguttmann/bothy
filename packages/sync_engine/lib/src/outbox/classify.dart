@@ -16,8 +16,9 @@ enum OutcomeClass {
   /// done and leaves the outbox.
   confirmed,
 
-  /// A network error, a timeout, `5xx`, `429` or `409 request_in_progress`: the same request
-  /// with the same ID again after the backoff or `Retry-After`.
+  /// A network error, a timeout, `5xx`, `429`, `409 request_in_progress` or
+  /// `409 file_not_ready`: the same request with the same ID again after the backoff or
+  /// `Retry-After`.
   retry,
 
   /// A permanent refusal: the entry stays visible as failed with the code and reason.
@@ -47,7 +48,7 @@ final class Classification {
   /// The `reason` member of the problem, if any.
   final String? reason;
 
-  /// The server's `Retry-After` of a `429` or `503`, if any.
+  /// The server's `Retry-After` of a `429`, a `503` or a `409 file_not_ready`, if any.
   final Duration? retryAfter;
 
   /// The `current` revision of a `412 version_conflict`, as raw JSON.
@@ -58,8 +59,9 @@ final class Classification {
 ///
 /// Accepts a `DioException` of the generated client (with or without an [ApiProblem]), an
 /// [ApiProblem], a [TimeoutException], an [IOException] (socket, HTTP and TLS errors) or any
-/// other object. Rules (Design note 2): transport errors, timeouts, `5xx`, `429` and
-/// `409 request_in_progress` retry; `429` and `503` carry `Retry-After`; `503 setup_required`
+/// other object. Rules (Design note 2): transport errors, timeouts, `5xx`, `429`,
+/// `409 request_in_progress` and `409 file_not_ready` (FIX-voice-send) retry; `429`, `503` and
+/// `409 file_not_ready` carry `Retry-After`; `503 setup_required`
 /// is final; `412` is a conflict; every other status is final with its problem code and
 /// reason. `401` is handled by the interceptors of `auth` before the outbox sees it, so one
 /// that arrives here is final. Any other error is a programming error of the executor
@@ -126,17 +128,23 @@ Classification _problem(ApiProblem p) {
       current: p.current,
     );
   }
+  // A voice message whose file is still being checked (12 8.1 rule 1) waits in the outbox
+  // until the file is ready (15 13, FIX-voice-send); 409 file_blocked stays final.
+  final notReady = status == 409 && p.code == 'file_not_ready';
   final retry =
       (status >= 500 && !(status == 503 && p.code == 'setup_required')) ||
       status == 429 ||
-      (status == 409 && p.code == 'request_in_progress');
+      (status == 409 && p.code == 'request_in_progress') ||
+      notReady;
   if (retry) {
     return Classification(
       OutcomeClass.retry,
       code: p.code,
       reason: p.reason,
-      // Only 429 and 503 name a wait (06 5); other statuses back off.
-      retryAfter: status == 429 || status == 503 ? p.retryAfter : null,
+      // 429, 503 and 409 file_not_ready name a wait (06 5, 12 9.3); other statuses back off.
+      retryAfter: status == 429 || status == 503 || notReady
+          ? p.retryAfter
+          : null,
     );
   }
   return Classification(OutcomeClass.failed, code: p.code, reason: p.reason);

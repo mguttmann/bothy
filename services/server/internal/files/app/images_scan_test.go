@@ -97,3 +97,59 @@ func TestScanConcurrentRunsKeepImageOriginal(t *testing.T) {
 		t.Error("the losing run deleted the original awaiting files.thumbnail")
 	}
 }
+
+// TestScanPassRefinesDeclaredMP4Audio (FIX-voice-send): an MP4 the detection names video/mp4 (a
+// generic brand such as the mp42 of the Windows recorder) that the uploader declared as MP4 audio
+// is stored as audio/mp4 and stays pending for the container phase; declared as video, or without
+// an audio declaration, it keeps video/mp4 and completes.
+func TestScanPassRefinesDeclaredMP4Audio(t *testing.T) {
+	t.Parallel()
+	content := []byte("bytes of a recording of Alex")
+	for _, c := range []struct {
+		declared, mime, state string
+		fin                   bool
+	}{
+		{"audio/mp4", "audio/mp4", "pending", false},
+		{"audio/x-m4a", "audio/mp4", "pending", false},
+		{"video/mp4", "video/mp4", "complete", true},
+		{"text/plain", "video/mp4", "complete", true},
+	} {
+		e := newScanEnvTypes(t, scanCfg, fixedType("video/mp4"))
+		s := e.seed(t, content, content, true)
+		e.repo.mu.Lock()
+		f := e.repo.files[s.FileID]
+		f.DeclaredMIMEType = c.declared
+		e.repo.files[s.FileID] = f
+		e.repo.mu.Unlock()
+		if _, err := e.pass.Run(context.Background(), s.FileID, 0); err != nil {
+			t.Fatal(err)
+		}
+		got := e.file(s.FileID)
+		if got.MIMEType != c.mime || got.UploadState != c.state || len(e.queue.thumbnails()) != 1 || (e.finalCount(s.FileID) == 1) != c.fin {
+			t.Errorf("declared %s: mime %s, state %s, jobs %d, finalized %d", c.declared, got.MIMEType, got.UploadState,
+				len(e.queue.thumbnails()), e.finalCount(s.FileID))
+		}
+	}
+}
+
+// TestScanPassDenyListSeesDetectedMP4 (FIX-voice-send): a denied video/mp4 stays denied when the
+// uploader declares MP4 audio, so the declaration cannot pass the deny list of 12 6.1.
+func TestScanPassDenyListSeesDetectedMP4(t *testing.T) {
+	t.Parallel()
+	cfg := scanCfg
+	cfg.DeniedMIMETypes = []string{"video/mp4"}
+	e := newScanEnvTypes(t, cfg, fixedType("video/mp4"))
+	content := []byte("bytes of a clip of Alex")
+	s := e.seed(t, content, content, true)
+	e.repo.mu.Lock()
+	f := e.repo.files[s.FileID]
+	f.DeclaredMIMEType = "audio/mp4"
+	e.repo.files[s.FileID] = f
+	e.repo.mu.Unlock()
+	if _, err := e.pass.Run(context.Background(), s.FileID, 0); err != nil {
+		t.Fatal(err)
+	}
+	if got := e.file(s.FileID); got.UploadState != "failed" {
+		t.Fatalf("denied video/mp4 declared as audio: %+v", got)
+	}
+}

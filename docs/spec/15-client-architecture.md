@@ -422,7 +422,7 @@ stateDiagram-v2
   [*] --> Pending: entry with client_msg_id, client_interaction_id or Idempotency-Key
   Pending --> Sending: predecessor in the thread confirmed
   Sending --> Confirmed: response 2xx or echo in the event stream
-  Sending --> Waiting: network error, timeout, 5xx, 429, 409 request_in_progress
+  Sending --> Waiting: network error, timeout, 5xx, 429, 409 request_in_progress or file_not_ready
   Waiting --> Sending: backoff with full jitter
   Sending --> Failed: 400, 404, 410, 413, 422
   Sending --> Failed: 412 version_conflict (both revisions kept)
@@ -439,7 +439,10 @@ attaches them; the check of the server goes on, and the server holds the agent i
 the check is final, at most `file.invocation_hold_max`, after which the invocation shows the attachments with their state ([12](12-files.md) 10; ruling D-M4-22-1).
 
 `409 request_in_progress` (the first request with the same `Idempotency-Key` is still running,
-04 5.2) is retried like a `5xx` with the same ID. `412 version_conflict` ends in `Failed` with the
+04 5.2) is retried like a `5xx` with the same ID. So is `409 file_not_ready` (a voice message
+whose file is still being checked, [12](12-files.md) 8.1 rule 1), after at least its
+`Retry-After` (addendum of 2026-10-31, docs/decisions.d/FIX-voice-send.md); `409 file_blocked`
+stays final. `412 version_conflict` ends in `Failed` with the
 `current` revision of the problem kept in the entry; the interface shows both revisions and the
 person decides, without an automatic merge (04 13.3). The outcome classes of every other status
 are in docs/DECISIONS.md D-M4-15-1.
@@ -868,8 +871,14 @@ Package `record` (7.1.2, publisher cow-level.ovh): AAC-LC is the only compressed
 records on all targets; on iOS, Opus is usable only in the CAF container
 (https://pub.dev/packages/record, retrieved 2026-10-10 [verified according to research]). Therefore: AAC-LC in an
 MP4 container (`.m4a`), mono, bitrate `client.voice.bitrate`, maximum duration `voice.max_duration` ([12-files.md](12-files.md)).
+The container is not the same on every target (live report of 2026-10-31): macOS and iOS write
+the MP4 brand `M4A `, Windows writes `mp42` through Media Foundation, and Android's `MediaMuxer`
+probably a generic brand too (not verified). The app therefore declares every recording as
+`audio/mp4`, and the server stores a generic-brand MP4 declared as audio as `audio/mp4`
+([12](12-files.md) 6.1); the player accepts both stored names, `audio/mp4` and `audio/x-m4a`.
 Flow: ask for the microphone permission at the first use; record into a temporary file; on
-sending, upload as a file with `kind = voice` on the outbox entry; then `file.transcribe`,
+sending, upload as a file with `kind = voice` on the outbox entry, which waits through `409
+file_not_ready` until the server has checked the file and read its duration (7.5); then `file.transcribe`,
 if the channel agent or a service transcribes. Playback at speed 1, 1.5, 2; the
 transcript appears as soon as `file.updated` reports it.
 

@@ -618,7 +618,7 @@ extension FilesWorld on FakeWorld {
   /// The `MessageAttachment`s of [ids] for a message of [authorId] in [channelId] (12 10):
   /// own files of purpose `attachment` in the channel with a completed session, not failed and
   /// not attached yet; at most `message_max_attachments`; a voice message has exactly one
-  /// `audio/mp4` or `audio/mpeg` file (12 8.1).
+  /// ready `audio/mp4` or `audio/mpeg` file (12 8.1).
   List<JsonMap> _attachable(
     String authorId,
     String channelId,
@@ -651,6 +651,10 @@ extension FilesWorld on FakeWorld {
       out.add({'position': out.length + 1, 'file': f.json});
     }
     if (kind == 'voice') {
+      // The file of a voice message must be ready first (12 8.1 rules 1 and 2): `409
+      // file_not_ready` with `Retry-After` while the upload or check runs, `409 file_blocked`
+      // after a block, as the server answers (FIX-voice-send).
+      if (out.length == 1) _requireServable(files[ids.single]!);
       final audio =
           out.length == 1 &&
           {

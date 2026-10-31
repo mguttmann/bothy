@@ -44,6 +44,34 @@ func TestIsVoiceFormat(t *testing.T) {
 	}
 }
 
+// TestRefineMP4Type (FIX-voice-send): an MP4 of a generic brand that the uploader declared as MP4
+// audio is stored as audio/mp4; every other pair keeps the detected type. The Windows recorder
+// writes brand mp42, which the type detection names video/mp4.
+func TestRefineMP4Type(t *testing.T) {
+	t.Parallel()
+	det := mimetype.Detector{}
+	mp42 := det.Detect(filestest.M4A(1000, 4500, filestest.AudioOptions{Brand: "mp42", Compatible: []string{"mp41", "isom"}}))
+	if mp42 != "video/mp4" {
+		t.Fatalf("detected name of brand mp42 changed: %q", mp42)
+	}
+	cases := []struct{ detected, declared, want string }{
+		{"video/mp4", "audio/mp4", "audio/mp4"},
+		{"video/mp4", "audio/x-m4a", "audio/mp4"},
+		{"video/mp4", "Audio/MP4; codecs=mp4a.40.2", "audio/mp4"},
+		{"video/mp4", "video/mp4", "video/mp4"},
+		{"video/mp4", "", "video/mp4"},
+		{"video/mp4", "audio/mpeg", "video/mp4"},
+		{"image/png", "audio/mp4", "image/png"},
+		{"audio/x-m4a", "audio/mp4", "audio/x-m4a"},
+		{"video/quicktime", "audio/mp4", "video/quicktime"},
+	}
+	for _, c := range cases {
+		if got := domain.RefineMP4Type(c.detected, c.declared); got != c.want {
+			t.Errorf("RefineMP4Type(%q, %q) = %q, want %q", c.detected, c.declared, got, c.want)
+		}
+	}
+}
+
 func TestDeferContainerComplete(t *testing.T) {
 	t.Parallel()
 	for mime, want := range map[string]bool{"audio/x-m4a": true, "audio/mp4": true, "video/mp4": false,

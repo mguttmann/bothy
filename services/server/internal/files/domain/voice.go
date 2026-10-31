@@ -11,7 +11,9 @@ import (
 
 // The detected names of MP4 audio as the pinned type detection reports them (12 8.1, M3-09
 // design note 4 a): brand "M4A " gives audio/x-m4a, brand "M4B " audio/mp4. An MP4 of a generic
-// brand (isom, mp42) is named video/mp4 whatever its tracks are, so it is no voice format.
+// brand (isom, mp42) is named video/mp4 whatever its tracks are; the scan pass stores it as
+// audio/mp4 when the uploader declared MP4 audio (RefineMP4Type, FIX-voice-send), and only then
+// is it a voice format. A video track still fails the voice check (rule 4).
 const (
 	mimeAudioXM4A = "audio/x-m4a"
 	mimeAudioMP4  = "audio/mp4"
@@ -19,7 +21,28 @@ const (
 	mimeAudioMPEG = "audio/mpeg"
 	// authorAgent is the principal kind of an agent.
 	authorAgent = "agent"
+	// mimeVideoMP4 is the name the type detection gives every MP4 of a generic brand.
+	mimeVideoMP4 = "video/mp4"
 )
+
+// RefineMP4Type returns the type the scan pass stores for the detected type detected and the
+// declared type declared (12 6.1, FIX-voice-send): audio/mp4 when detected is video/mp4 and
+// declared is MP4 audio (audio/mp4 or audio/x-m4a, parameters and case ignored), else detected
+// unchanged. The detection names MP4 by its major brand only, and recorders write generic brands
+// (mp42 on Windows, isom on Android) for an audio-only file; the declaration tells them apart.
+// It never turns a non-MP4 into audio, and the container phase still reads width and height, so a
+// declared-audio file with a video track fails the voice check.
+//
+// Example:
+//
+//	domain.RefineMP4Type("video/mp4", "audio/mp4") // "audio/mp4"
+//	domain.RefineMP4Type("video/mp4", "video/mp4") // "video/mp4"
+func RefineMP4Type(detected, declared string) string {
+	if detected == mimeVideoMP4 && isMP4Audio(MediaType(declared)) {
+		return mimeAudioMP4
+	}
+	return detected
+}
 
 // isMP4Audio reports the MP4 audio names of the type detection.
 func isMP4Audio(mimeType string) bool {

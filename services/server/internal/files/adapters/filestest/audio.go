@@ -15,6 +15,9 @@ import (
 type AudioOptions struct {
 	// Brand is the major brand of ftyp; "" means "M4A ".
 	Brand string
+	// Compatible are the compatible brands of ftyp; nil means Brand and "isom". The recorder of
+	// Windows writes brand "mp42" with "mp41" and "isom" (FIX-voice-send).
+	Compatible []string
 	// NoMovieHeader leaves mvhd out, so the box reader finds no duration.
 	NoMovieHeader bool
 	// VideoTrack adds a second track with handler vide and a display size of 640 by 360.
@@ -35,7 +38,15 @@ func M4A(timescale, duration uint32, opts AudioOptions) []byte {
 	if brand == "" {
 		brand = "M4A "
 	}
-	ft := box("ftyp", []byte(brand), be32(0), []byte(brand), []byte("isom"))
+	compatible := opts.Compatible
+	if compatible == nil {
+		compatible = []string{brand, "isom"}
+	}
+	brands := make([][]byte, 0, len(compatible))
+	for _, c := range compatible {
+		brands = append(brands, []byte(c))
+	}
+	ft := box("ftyp", []byte(brand), be32(0), cat(brands...))
 	var moov []byte
 	if !opts.NoMovieHeader {
 		moov = append(moov, fullBox("mvhd", be32(0), be32(0), be32(timescale), be32(duration), make([]byte, 80))...)

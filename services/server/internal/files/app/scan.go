@@ -267,11 +267,14 @@ func (p *ScanPass) pass(ctx context.Context, t SessionRecord) (passState, error)
 	}
 	copy(st.facts.ComputedSHA256[:], h.Sum(nil))
 	st.facts.DeclaredSize, st.facts.DeclaredSHA256, st.facts.CountedSize = declared, t.DeclaredSHA256, cnt.n
-	st.mimeType = domain.MediaType(p.d.Types.Detect(head.b))
+	detected := domain.MediaType(p.d.Types.Detect(head.b))
+	// An MP4 of a generic brand declared as MP4 audio is stored as audio/mp4 (12 6.1,
+	// FIX-voice-send); the deny list still sees the detected name.
+	st.mimeType = domain.RefineMP4Type(detected, t.File.DeclaredMIMEType)
 	// The purpose rule of 12 7.1 for avatar and branding (brief M3-10 design note 4): a type
 	// whose original would be stored unchanged or as a re-encoded GIF is refused here, before the
 	// file can become deliverable; a still WebP is checked again by files.thumbnail.
-	st.facts.TypeDenied = domain.TypeDenied(st.mimeType, p.cfg.DeniedMIMETypes) ||
+	st.facts.TypeDenied = domain.TypeDenied(detected, p.cfg.DeniedMIMETypes) || domain.TypeDenied(st.mimeType, p.cfg.DeniedMIMETypes) ||
 		!domain.StoredOriginalAllowed(domain.Purpose(t.File.Purpose), domain.PlannedOriginal(domain.OriginalPlanFor(st.mimeType)))
 	if put != nil {
 		if cnt.n != declared || st.facts.ComputedSHA256 != t.DeclaredSHA256 {
