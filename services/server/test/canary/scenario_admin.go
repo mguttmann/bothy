@@ -145,7 +145,7 @@ func (sc *Scenario) agents() {
 }
 
 // settings drives the personal and instance settings, feature flags, branding, notification
-// preferences, quiet hours and the sidebar.
+// preferences, quiet hours and the sidebar of spaces and channels.
 func (sc *Scenario) settings() {
 	sc.T.Helper()
 	o, alex := sc.W.Owner, sc.W.People["Alex"]
@@ -178,6 +178,7 @@ func (sc *Scenario) settings() {
 	sc.get(alex, "/me/quiet-hours", ok...)
 	sc.del(alex, "/me/quiet-hours/"+q, none...)
 	sc.put(o, "/me/sidebar/spaces/"+research, map[string]any{"collapsed": true}, ok...)
+	sc.put(alex, "/me/sidebar/channels/"+esk, map[string]any{"thread_order": []any{}}, ok...)
 	sc.get(o, "/me/sidebar", ok...)
 	sc.clientMetrics()
 	// The live frame of the instance (M6-15): the canaries of messages, titles and runs must not

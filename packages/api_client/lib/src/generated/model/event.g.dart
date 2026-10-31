@@ -127,6 +127,8 @@ const EventTypeEnum _$eventTypeEnum_settingsPeriodUpdated =
     const EventTypeEnum._('settingsPeriodUpdated');
 const EventTypeEnum _$eventTypeEnum_sidebarPeriodUpdated =
     const EventTypeEnum._('sidebarPeriodUpdated');
+const EventTypeEnum _$eventTypeEnum_sidebarChannelPeriodUpdated =
+    const EventTypeEnum._('sidebarChannelPeriodUpdated');
 const EventTypeEnum _$eventTypeEnum_notificationPrefPeriodUpdated =
     const EventTypeEnum._('notificationPrefPeriodUpdated');
 const EventTypeEnum _$eventTypeEnum_quietHoursPeriodUpdated =
@@ -238,6 +240,8 @@ EventTypeEnum _$eventTypeEnumValueOf(String name) {
       return _$eventTypeEnum_settingsPeriodUpdated;
     case 'sidebarPeriodUpdated':
       return _$eventTypeEnum_sidebarPeriodUpdated;
+    case 'sidebarChannelPeriodUpdated':
+      return _$eventTypeEnum_sidebarChannelPeriodUpdated;
     case 'notificationPrefPeriodUpdated':
       return _$eventTypeEnum_notificationPrefPeriodUpdated;
     case 'quietHoursPeriodUpdated':
@@ -312,6 +316,7 @@ final BuiltSet<EventTypeEnum> _$eventTypeEnumValues = BuiltSet<EventTypeEnum>(
     _$eventTypeEnum_draftPeriodDeleted,
     _$eventTypeEnum_settingsPeriodUpdated,
     _$eventTypeEnum_sidebarPeriodUpdated,
+    _$eventTypeEnum_sidebarChannelPeriodUpdated,
     _$eventTypeEnum_notificationPrefPeriodUpdated,
     _$eventTypeEnum_quietHoursPeriodUpdated,
     _$eventTypeEnum_gdprPeriodRequestUpdated,
@@ -408,6 +413,7 @@ class _$EventTypeEnumSerializer implements PrimitiveSerializer<EventTypeEnum> {
     'draftPeriodDeleted': 'draft.deleted',
     'settingsPeriodUpdated': 'settings.updated',
     'sidebarPeriodUpdated': 'sidebar.updated',
+    'sidebarChannelPeriodUpdated': 'sidebar_channel.updated',
     'notificationPrefPeriodUpdated': 'notification_pref.updated',
     'quietHoursPeriodUpdated': 'quiet_hours.updated',
     'gdprPeriodRequestUpdated': 'gdpr.request_updated',
@@ -463,6 +469,7 @@ class _$EventTypeEnumSerializer implements PrimitiveSerializer<EventTypeEnum> {
     'draft.deleted': 'draftPeriodDeleted',
     'settings.updated': 'settingsPeriodUpdated',
     'sidebar.updated': 'sidebarPeriodUpdated',
+    'sidebar_channel.updated': 'sidebarChannelPeriodUpdated',
     'notification_pref.updated': 'notificationPrefPeriodUpdated',
     'quiet_hours.updated': 'quietHoursPeriodUpdated',
     'gdpr.request_updated': 'gdprPeriodRequestUpdated',

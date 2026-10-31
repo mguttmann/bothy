@@ -236,6 +236,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - putFeatureFlag
   - putInstanceSetting
   - putMySetting
+  - putMySidebarChannel
   - putMySidebarSpace
   - putNotificationPreference
   - putProjectBinding

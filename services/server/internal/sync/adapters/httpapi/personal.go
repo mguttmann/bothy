@@ -176,16 +176,19 @@ func (h *Personal) GetMySidebar(ctx context.Context, _ rest.GetMySidebarRequestO
 	if err != nil {
 		return nil, err
 	}
+	chans, err := h.settings.ListSidebarChannels(ctx)
+	if err != nil {
+		return nil, err
+	}
 	out := rest.SidebarStateList{Items: make([]rest.SidebarState, 0, len(list))}
 	for _, st := range list {
-		v := rest.SidebarState{SpaceId: rest.Uuid(st.SpaceID), Collapsed: st.Collapsed, Version: st.Version,
-			UpdatedByDeviceId: optionalID(st.UpdatedByDeviceID)}
-		if st.SortKey != "" {
-			k := st.SortKey
-			v.SortKey = &k
-		}
-		out.Items = append(out.Items, v)
+		out.Items = append(out.Items, sidebarREST(st))
 	}
+	channels := make([]rest.SidebarChannelState, 0, len(chans))
+	for _, st := range chans {
+		channels = append(channels, sidebarChannelREST(st))
+	}
+	out.Channels = &channels
 	return rest.GetMySidebar200JSONResponse{Body: out}, nil
 }
 

@@ -232,7 +232,8 @@ void main() {
         settingsRepositoryProvider.overrideWithValue(null),
         ...extra,
       ],
-      child: hostScreen(Scaffold(body: child)),
+      // The settings shell scrolls a section (settings_shell.dart); so does the test host.
+      child: hostScreen(Scaffold(body: SingleChildScrollView(child: child))),
     );
 
     testWidgets('appearance shows the defaults', (tester) async {

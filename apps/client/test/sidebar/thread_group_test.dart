@@ -3,7 +3,8 @@
 // The thread groups of the sidebar over the local database (brief M4-40 Tests; 01 6.8 items 4
 // and 7; Design note 2; brief M4-46): a row that stops qualifying stays while the pointer is in
 // the sidebar and leaves when it leaves; a new thread appears at the top at once; the collapse
-// state of a group survives a restart on this device; thread rows cannot be dragged; a forum
+// state of a group survives a restart on this device; a thread row of an automatic forum does not
+// move (01 6.16); a forum
 // lists every open post by last activity with "Show more" and "Show less" in place, kept on this
 // device, and no row moves under the pointer.
 
@@ -194,7 +195,9 @@ void main() {
     await tester.runAsync(db!.close);
   });
 
-  testWidgets('a thread row cannot be dragged', (tester) async {
+  testWidgets('a thread row of a forum arranged by activity does not move', (
+    tester,
+  ) async {
     final host = await ColumnHost.open(tester);
     await tester.runAsync(() async {
       await fill(host.db);

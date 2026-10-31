@@ -9,12 +9,14 @@ part of 'sidebar_state_list.dart';
 class _$SidebarStateList extends SidebarStateList {
   @override
   final BuiltList<SidebarState> items;
+  @override
+  final BuiltList<SidebarChannelState>? channels;
 
   factory _$SidebarStateList([
     void Function(SidebarStateListBuilder)? updates,
   ]) => (SidebarStateListBuilder()..update(updates))._build();
 
-  _$SidebarStateList._({required this.items}) : super._();
+  _$SidebarStateList._({required this.items, this.channels}) : super._();
   @override
   SidebarStateList rebuild(void Function(SidebarStateListBuilder) updates) =>
       (toBuilder()..update(updates)).build();
@@ -26,22 +28,26 @@ class _$SidebarStateList extends SidebarStateList {
   @override
   bool operator ==(Object other) {
     if (identical(other, this)) return true;
-    return other is SidebarStateList && items == other.items;
+    return other is SidebarStateList &&
+        items == other.items &&
+        channels == other.channels;
   }
 
   @override
   int get hashCode {
     var _$hash = 0;
     _$hash = $jc(_$hash, items.hashCode);
+    _$hash = $jc(_$hash, channels.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
 
   @override
   String toString() {
-    return (newBuiltValueToStringHelper(
-      r'SidebarStateList',
-    )..add('items', items)).toString();
+    return (newBuiltValueToStringHelper(r'SidebarStateList')
+          ..add('items', items)
+          ..add('channels', channels))
+        .toString();
   }
 }
 
@@ -54,6 +60,12 @@ class SidebarStateListBuilder
       _$this._items ??= ListBuilder<SidebarState>();
   set items(ListBuilder<SidebarState>? items) => _$this._items = items;
 
+  ListBuilder<SidebarChannelState>? _channels;
+  ListBuilder<SidebarChannelState> get channels =>
+      _$this._channels ??= ListBuilder<SidebarChannelState>();
+  set channels(ListBuilder<SidebarChannelState>? channels) =>
+      _$this._channels = channels;
+
   SidebarStateListBuilder() {
     SidebarStateList._defaults(this);
   }
@@ -62,6 +74,7 @@ class SidebarStateListBuilder
     final $v = _$v;
     if ($v != null) {
       _items = $v.items.toBuilder();
+      _channels = $v.channels?.toBuilder();
       _$v = null;
     }
     return this;
@@ -83,12 +96,19 @@ class SidebarStateListBuilder
   _$SidebarStateList _build() {
     _$SidebarStateList _$result;
     try {
-      _$result = _$v ?? _$SidebarStateList._(items: items.build());
+      _$result =
+          _$v ??
+          _$SidebarStateList._(
+            items: items.build(),
+            channels: _channels?.build(),
+          );
     } catch (_) {
       late String _$failedField;
       try {
         _$failedField = 'items';
         items.build();
+        _$failedField = 'channels';
+        _channels?.build();
       } catch (e) {
         throw BuiltValueNestedFieldError(
           r'SidebarStateList',

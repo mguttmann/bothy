@@ -3,6 +3,7 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:built_collection/built_collection.dart';
 import 'package:built_value/built_value.dart';
 import 'package:built_value/serializer.dart';
 
@@ -14,6 +15,7 @@ part 'sidebar_state_put.g.dart';
 /// * [collapsed]
 /// * [sortKey]
 /// * [useGlobalOrder] - True removes the personal order. Replaces sending null.
+/// * [channelOrder] - New personal order of the channels and forums of the space, unique IDs; absent keeps the stored order, an empty list returns to the default order. At most `sidebar.order_max_items`.
 @BuiltValue()
 abstract class SidebarStatePut
     implements Built<SidebarStatePut, SidebarStatePutBuilder> {
@@ -26,6 +28,10 @@ abstract class SidebarStatePut
   /// True removes the personal order. Replaces sending null.
   @BuiltValueField(wireName: r'use_global_order')
   bool? get useGlobalOrder;
+
+  /// New personal order of the channels and forums of the space, unique IDs; absent keeps the stored order, an empty list returns to the default order. At most `sidebar.order_max_items`.
+  @BuiltValueField(wireName: r'channel_order')
+  BuiltList<String>? get channelOrder;
 
   SidebarStatePut._();
 
@@ -70,6 +76,13 @@ class _$SidebarStatePutSerializer
       yield serializers.serialize(
         object.useGlobalOrder,
         specifiedType: const FullType(bool),
+      );
+    }
+    if (object.channelOrder != null) {
+      yield r'channel_order';
+      yield serializers.serialize(
+        object.channelOrder,
+        specifiedType: const FullType(BuiltList, [FullType(String)]),
       );
     }
   }
@@ -121,6 +134,16 @@ class _$SidebarStatePutSerializer
           ) as bool?;
           if (valueDes == null) continue;
           result.useGlobalOrder = valueDes;
+          break;
+        case r'channel_order':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(BuiltList, [
+              FullType(String),
+            ]),
+          ) as BuiltList<String>?;
+          if (valueDes == null) continue;
+          result.channelOrder.replace(valueDes);
           break;
         default:
           unhandled.add(key);

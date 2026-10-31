@@ -23,12 +23,14 @@ import '../new_project/project_sync_dialog.dart' show showProjectSyncDialog;
 import '../notifications_settings/providers.dart' show isOwnerProvider;
 import '../onboarding/onboarding_controller.dart';
 import '../running/providers.dart' show activeRunCountProvider;
+import '../settings/settings_providers.dart' show sidebarArrangementProvider;
 import '../switcher/quick_switcher.dart' show showQuickSwitcher;
 import '../sync/sidebar_ops.dart';
 import '../telemetry/telemetry_providers.dart';
 import '../terminal/hosts_group.dart';
 import '../viz/live_page.dart' show livePath;
 import 'providers.dart';
+import 'sidebar_arrange.dart';
 import 'sidebar_footer.dart';
 import 'sidebar_header.dart';
 import 'sidebar_live_group.dart';
@@ -74,7 +76,22 @@ class SidebarView extends StatelessWidget {
     this.holdMode = SidebarHoldMode.pointer,
     this.selectedNewChat,
     this.onOpenNewChat,
+    this.arrangement = const SidebarArrangement(),
+    this.onMoveChannel,
+    this.onMoveThread,
   });
+
+  /// Which levels are arranged by activity (01 6.16, M4-51): an automatic level cannot be
+  /// dragged and its rows' menus say why.
+  final SidebarArrangement arrangement;
+
+  /// Moves a channel within its space to an index (in the list without it), or null for no
+  /// drag (01 6.16).
+  final void Function(SpaceId space, ChannelId channel, int to)? onMoveChannel;
+
+  /// Moves an open post within its forum to an index among the post rows on screen, or null
+  /// for no drag (01 6.16).
+  final void Function(ChannelId forum, ThreadId thread, int to)? onMoveThread;
 
   /// `branding.product_name` of the instance.
   final String productName;
@@ -219,6 +236,11 @@ class SidebarView extends StatelessWidget {
           onAddFolderForums: onAddFolderForums,
           selectedNewChat: selectedNewChat,
           onOpenNewChat: onOpenNewChat,
+          arrangement: arrangement,
+          // A touch screen lifts a row after a long press (D-M4-51-6).
+          touch: holdMode == SidebarHoldMode.touch,
+          onMoveChannel: onMoveChannel,
+          onMoveThread: onMoveThread,
         ),
       ),
       // The group scrolls within a share of the column, so the spaces keep their room.
@@ -461,6 +483,40 @@ class SidebarColumn extends ConsumerWidget {
       onMove: (space, to) => unawaited(
         writer()?.move(moveSpace([for (final n in nodes) n.entry], space, to)),
       ),
+      // 01 6.16: the levels arranged by activity, and the moves of the manual ones. A move writes
+      // the whole order of the level as the device holds it (D-M4-51-3); for a forum every open
+      // post, also those behind "Show more" (D-M4-51-9).
+      arrangement: ref.watch(sidebarArrangementProvider),
+      onMoveChannel: (space, channel, to) {
+        final node = nodes.where((n) => n.entry.space.id == space).firstOrNull;
+        if (node == null) return;
+        final all = [for (final c in node.channels) c.channel.id];
+        unawaited(
+          writer()?.orderChannels(
+            space,
+            moveAmong(all, all, channel, to),
+            collapsed: node.entry.storedCollapsed,
+          ),
+        );
+      },
+      onMoveThread: (forum, thread, to) {
+        final group = ref.read(channelThreadsProvider(forum.value));
+        if (group == null) return;
+        unawaited(
+          writer()?.orderThreads(
+            forum,
+            moveAmong(
+              [
+                for (final e in group.candidates)
+                  if (e.thread.state == ThreadState.open) e.thread.id,
+              ],
+              [for (final e in group.rows) e.thread.id],
+              thread,
+              to,
+            ),
+          ),
+        );
+      },
       onOpenChannel: (channel) => context.go('/c/${channel.value}'),
       // The desktop and M1 of the phone show the thread groups (01 6.8, D-SB-13): a thread
       // row opens the history, on the phone as M3 on top of M1.

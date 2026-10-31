@@ -895,8 +895,8 @@ actions:
   effect: write
 - id: sidebar.update
   section: structure
-  description: change one's own sidebar state (collapse, own order)
-  resource: space
+  description: change one's own sidebar state (collapse, own order of spaces, channels and posts)
+  resource: space, channel
   right: self and read
   owner: false
   step_up: false
@@ -2728,6 +2728,12 @@ events:
 - type: sidebar.updated
   kind: durable
   resource: space
+  receive_action: self
+  audience: self
+  resource_version: false
+- type: sidebar_channel.updated
+  kind: durable
+  resource: channel
   receive_action: self
   audience: self
   resource_version: false

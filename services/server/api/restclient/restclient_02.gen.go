@@ -2571,10 +2571,32 @@ type ClientInterface interface {
 
 	// GetMySidebar Read own sidebar state
 	//
+	// The caller's rows of the spaces they may read that are not archived (`items`) and of the channels they may read that are not archived and lie in a space that is not archived (`channels`, the personal post order).
+	//
 	// Corresponds with GET /me/sidebar (the `GetMySidebar` operationId).
 	GetMySidebar(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// PutMySidebarChannelWithBody Reorder the posts of a channel for oneself
+	//
+	// Stores the caller's personal order of the posts of a channel the caller can read, version + 1, last write wins, no If-Match; an empty list returns to the default order. The server checks the form of the list (unique items, at most `sidebar.order_max_items`), not whether each ID names a thread the caller can see. A channel the caller cannot read and an unknown one give the same 404. Writes `sidebar_channel.updated` for the caller.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /me/sidebar/channels/{channel_id} (the `PutMySidebarChannel` operationId).
+	PutMySidebarChannelWithBody(ctx context.Context, channelId ChannelIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutMySidebarChannel Reorder the posts of a channel for oneself
+	//
+	// Stores the caller's personal order of the posts of a channel the caller can read, version + 1, last write wins, no If-Match; an empty list returns to the default order. The server checks the form of the list (unique items, at most `sidebar.order_max_items`), not whether each ID names a thread the caller can see. A channel the caller cannot read and an unknown one give the same 404. Writes `sidebar_channel.updated` for the caller.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /me/sidebar/channels/{channel_id} (the `PutMySidebarChannel` operationId).
+	PutMySidebarChannel(ctx context.Context, channelId ChannelIdPath, body PutMySidebarChannelJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// PutMySidebarSpaceWithBody Collapse or reorder a space for oneself
+	//
+	// Stores the caller's row of the space, version + 1, last write wins, no If-Match. `channel_order` absent keeps the stored channel order, a list replaces it and an empty list returns to the default order. The server checks the form of the list (unique items, at most `sidebar.order_max_items`), not whether each ID names a channel the caller can see. Writes `sidebar.updated` for the caller.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -2582,6 +2604,8 @@ type ClientInterface interface {
 	PutMySidebarSpaceWithBody(ctx context.Context, spaceId SpaceIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// PutMySidebarSpace Collapse or reorder a space for oneself
+	//
+	// Stores the caller's row of the space, version + 1, last write wins, no If-Match. `channel_order` absent keeps the stored channel order, a list replaces it and an empty list returns to the default order. The server checks the form of the list (unique items, at most `sidebar.order_max_items`), not whether each ID names a channel the caller can see. Writes `sidebar.updated` for the caller.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -9477,6 +9501,8 @@ func (c *Client) PutMySetting(ctx context.Context, key KeyPath, body PutMySettin
 
 // GetMySidebar Read own sidebar state
 //
+// The caller's rows of the spaces they may read that are not archived (`items`) and of the channels they may read that are not archived and lie in a space that is not archived (`channels`, the personal post order).
+//
 // Corresponds with GET /me/sidebar (the `GetMySidebar` operationId).
 func (c *Client) GetMySidebar(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetMySidebarRequest(c.Server)
@@ -9490,7 +9516,47 @@ func (c *Client) GetMySidebar(ctx context.Context, reqEditors ...RequestEditorFn
 	return c.Client.Do(req)
 }
 
+// PutMySidebarChannelWithBody Reorder the posts of a channel for oneself
+//
+// Stores the caller's personal order of the posts of a channel the caller can read, version + 1, last write wins, no If-Match; an empty list returns to the default order. The server checks the form of the list (unique items, at most `sidebar.order_max_items`), not whether each ID names a thread the caller can see. A channel the caller cannot read and an unknown one give the same 404. Writes `sidebar_channel.updated` for the caller.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /me/sidebar/channels/{channel_id} (the `PutMySidebarChannel` operationId).
+func (c *Client) PutMySidebarChannelWithBody(ctx context.Context, channelId ChannelIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPutMySidebarChannelRequestWithBody(c.Server, channelId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PutMySidebarChannel Reorder the posts of a channel for oneself
+//
+// Stores the caller's personal order of the posts of a channel the caller can read, version + 1, last write wins, no If-Match; an empty list returns to the default order. The server checks the form of the list (unique items, at most `sidebar.order_max_items`), not whether each ID names a thread the caller can see. A channel the caller cannot read and an unknown one give the same 404. Writes `sidebar_channel.updated` for the caller.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /me/sidebar/channels/{channel_id} (the `PutMySidebarChannel` operationId).
+func (c *Client) PutMySidebarChannel(ctx context.Context, channelId ChannelIdPath, body PutMySidebarChannelJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPutMySidebarChannelRequest(c.Server, channelId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // PutMySidebarSpaceWithBody Collapse or reorder a space for oneself
+//
+// Stores the caller's row of the space, version + 1, last write wins, no If-Match. `channel_order` absent keeps the stored channel order, a list replaces it and an empty list returns to the default order. The server checks the form of the list (unique items, at most `sidebar.order_max_items`), not whether each ID names a channel the caller can see. Writes `sidebar.updated` for the caller.
 //
 // Takes any type of body and a specified content type.
 //
@@ -9508,6 +9574,8 @@ func (c *Client) PutMySidebarSpaceWithBody(ctx context.Context, spaceId SpaceIdP
 }
 
 // PutMySidebarSpace Collapse or reorder a space for oneself
+//
+// Stores the caller's row of the space, version + 1, last write wins, no If-Match. `channel_order` absent keeps the stored channel order, a list replaces it and an empty list returns to the default order. The server checks the form of the list (unique items, at most `sidebar.order_max_items`), not whether each ID names a channel the caller can see. Writes `sidebar.updated` for the caller.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -22702,6 +22770,53 @@ func NewGetMySidebarRequest(server string) (*http.Request, error) {
 	return req, nil
 }
 
+// NewPutMySidebarChannelRequest calls the generic PutMySidebarChannel builder with application/json body
+func NewPutMySidebarChannelRequest(server string, channelId ChannelIdPath, body PutMySidebarChannelJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPutMySidebarChannelRequestWithBody(server, channelId, "application/json", bodyReader)
+}
+
+// NewPutMySidebarChannelRequestWithBody constructs an http.Request for the PutMySidebarChannel method, with any body, and a specified content type
+func NewPutMySidebarChannelRequestWithBody(server string, channelId ChannelIdPath, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "channel_id", channelId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/me/sidebar/channels/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewPutMySidebarSpaceRequest calls the generic PutMySidebarSpace builder with application/json body
 func NewPutMySidebarSpaceRequest(server string, spaceId SpaceIdPath, body PutMySidebarSpaceJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -24392,286 +24507,6 @@ func NewListRunStepsRequest(server string, runId RunIdPath, params *ListRunSteps
 				}
 			}
 
-		}
-
-		if encoded := queryValues.Encode(); encoded != "" {
-			rawQueryFragments = append(rawQueryFragments, encoded)
-		}
-		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewSearchRequest constructs an http.Request for the Search method
-func NewSearchRequest(server string, params *SearchParams) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/search")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-		// queryValues collects non-styled parameters (passthrough, JSON)
-		// that are safe to round-trip through url.Values.Encode().
-		queryValues := queryURL.Query()
-		// rawQueryFragments collects pre-encoded query fragments from
-		// styled parameters, preserving literal commas as delimiters
-		// per the OpenAPI spec (e.g. "color=blue,black,brown").
-		var rawQueryFragments []string
-
-		if params.Cursor != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if params.Limit != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "q", params.Q, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
-			return nil, err
-		} else {
-			for _, qp := range strings.Split(queryFrag, "&") {
-				rawQueryFragments = append(rawQueryFragments, qp)
-			}
-		}
-
-		if params.Type != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "type", *params.Type, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if params.Sort != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "sort", *params.Sort, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if params.SpaceId != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "space_id", *params.SpaceId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "array", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if params.ChannelId != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "channel_id", *params.ChannelId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "array", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if params.ThreadId != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "thread_id", *params.ThreadId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if params.AuthorId != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "author_id", *params.AuthorId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if params.AgentId != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "agent_id", *params.AgentId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if params.After != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "after", *params.After, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if params.Before != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "before", *params.Before, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if params.HasFile != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "has_file", *params.HasFile, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if params.ThreadState != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "thread_state", *params.ThreadState, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if params.TagId != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "tag_id", *params.TagId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "array", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if encoded := queryValues.Encode(); encoded != "" {
-			rawQueryFragments = append(rawQueryFragments, encoded)
-		}
-		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewSearchThreadTitlesRequest constructs an http.Request for the SearchThreadTitles method
-func NewSearchThreadTitlesRequest(server string, params *SearchThreadTitlesParams) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/search/thread-titles")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-		// queryValues collects non-styled parameters (passthrough, JSON)
-		// that are safe to round-trip through url.Values.Encode().
-		queryValues := queryURL.Query()
-		// rawQueryFragments collects pre-encoded query fragments from
-		// styled parameters, preserving literal commas as delimiters
-		// per the OpenAPI spec (e.g. "color=blue,black,brown").
-		var rawQueryFragments []string
-
-		if params.Limit != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "q", params.Q, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
-			return nil, err
-		} else {
-			for _, qp := range strings.Split(queryFrag, "&") {
-				rawQueryFragments = append(rawQueryFragments, qp)
-			}
 		}
 
 		if encoded := queryValues.Encode(); encoded != "" {

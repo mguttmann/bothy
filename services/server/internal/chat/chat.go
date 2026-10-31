@@ -15,15 +15,15 @@ import (
 // space.created, space.updated, space.archived and sidebar.updated (M1-52); channel.created,
 // channel.updated, channel.archived and thread.created for the main thread (M1-53); thread.updated,
 // thread.closed and thread.reopened (M1-55); thread.moved and thread.moved_out (M1-62);
-// channel.settings_changed and agent.config_changed (M2-02). internal/wire lists it in
-// moduleRegistrations.
+// channel.settings_changed and agent.config_changed (M2-02); sidebar_channel.updated (M4-51).
+// internal/wire lists it in moduleRegistrations.
 func Register(r *authorize.Registry) {
 	for _, t := range []authorize.EventType{
 		authorize.EventSpaceCreated, authorize.EventSpaceUpdated, authorize.EventSpaceArchived, authorize.EventSidebarUpdated,
 		authorize.EventChannelCreated, authorize.EventChannelUpdated, authorize.EventChannelArchived, authorize.EventThreadCreated,
 		authorize.EventThreadUpdated, authorize.EventThreadClosed, authorize.EventThreadReopened,
 		authorize.EventThreadMoved, authorize.EventThreadMovedOut,
-		authorize.EventChannelSettingsChanged, authorize.EventAgentConfigChanged,
+		authorize.EventChannelSettingsChanged, authorize.EventAgentConfigChanged, authorize.EventSidebarChannelUpdated,
 	} {
 		r.Event("chat", t)
 	}
@@ -109,6 +109,9 @@ type SidebarState struct {
 	Collapsed bool
 	// SortKey is the personal order; "" uses the global order.
 	SortKey string
+	// ChannelOrder is the personal order of the channels and forums of the space (M4-51); nil is
+	// the default order.
+	ChannelOrder []ids.ID
 	// Version counts the changes of the row.
 	Version int64
 	// UpdatedByDeviceID is the device of the last change; zero for none.
@@ -122,6 +125,27 @@ type SidebarPutCmd struct {
 	SortKey *string
 	// UseGlobalOrder removes the personal key.
 	UseGlobalOrder bool
+	// ChannelOrder is the new channel order (M4-51): nil keeps the stored list, an empty list
+	// stores the default order (NULL), any other list replaces it.
+	ChannelOrder *[]ids.ID
+}
+
+// SidebarChannelState is the personal sidebar state of one channel (schema SidebarChannelState,
+// M4-51): the personal order of its open posts.
+type SidebarChannelState struct {
+	ChannelID ids.ID
+	// ThreadOrder is the personal order of the posts; empty is the default order.
+	ThreadOrder []ids.ID
+	// Version counts the changes of the row.
+	Version int64
+	// UpdatedByDeviceID is the device of the last change; zero for none.
+	UpdatedByDeviceID ids.ID
+}
+
+// SidebarChannelPutCmd is the body of putMySidebarChannel (schema SidebarChannelPut, M4-51).
+type SidebarChannelPutCmd struct {
+	// ThreadOrder replaces the stored post order.
+	ThreadOrder []ids.ID
 }
 
 // ChannelOperator is the operator of a channel (schema ChannelOperator): Mode is inherit, none or
@@ -294,6 +318,14 @@ type Structure interface {
 	// ListSidebarStates returns the sidebar rows of the person a for the spaces a may read that
 	// are not archived, ascending by space id (getMySidebar, M1-61).
 	ListSidebarStates(ctx context.Context, a actor.Actor) ([]SidebarState, error)
+	// PutSidebarChannel sets the caller's personal post order of the channel (sidebar.update,
+	// people only, M4-51), last write wins. Errors: validation_failed on /thread_order, not_found
+	// for a channel the caller cannot read, forbidden subject_kind_not_allowed.
+	PutSidebarChannel(ctx context.Context, a actor.Actor, channelID ids.ID, cmd SidebarChannelPutCmd) (SidebarChannelState, error)
+	// ListSidebarChannelStates returns the channel rows of the person a for the channels a may
+	// read that are not archived and lie in a space that is not archived, ascending by channel id
+	// (getMySidebar and the snapshot, M4-51).
+	ListSidebarChannelStates(ctx context.Context, a actor.Actor) ([]SidebarChannelState, error)
 
 	// ListSpaceChannels returns the channels of the space the caller may read that are not
 	// archived, in their order, without pagination (space.read on the space, then channel.read

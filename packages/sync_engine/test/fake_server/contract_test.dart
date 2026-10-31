@@ -9,6 +9,7 @@ import 'dart:typed_data';
 
 import 'package:api_client/api_client.dart';
 import 'package:auth/auth.dart';
+import 'package:built_collection/built_collection.dart';
 import 'package:built_value/json_object.dart';
 import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
@@ -145,6 +146,12 @@ void main() {
         (b) => b
           ..collapsed = true
           ..sortKey = 'a0V',
+      ),
+    );
+    await prefs.putMySidebarChannel(
+      channelId: w.general,
+      sidebarChannelPut: SidebarChannelPut(
+        (b) => b..threadOrder = ListBuilder([w.releaseNotes]),
       ),
     );
     await prefs.getMySidebar();

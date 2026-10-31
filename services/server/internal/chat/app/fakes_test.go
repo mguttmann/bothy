@@ -28,11 +28,13 @@ import (
 // store is an in-memory app.Store with the rules of the tables: a name unique case-insensitively
 // among spaces that are not archived.
 type store struct {
-	mu       sync.Mutex
-	spaces   map[ids.ID]domain.Space
-	sidebar  map[[2]ids.ID]domain.SidebarState
-	channels map[ids.ID]domain.Channel
-	tags     map[ids.ID]domain.ForumTag
+	mu      sync.Mutex
+	spaces  map[ids.ID]domain.Space
+	sidebar map[[2]ids.ID]domain.SidebarState
+	// channelSidebar holds the rows of user_channel_states (M4-51).
+	channelSidebar map[[2]ids.ID]domain.SidebarChannelState
+	channels       map[ids.ID]domain.Channel
+	tags           map[ids.ID]domain.ForumTag
 	threadStore
 	// policies are the agent policies storePolicies answers.
 	policies map[ids.ID]authz.AgentPolicy
@@ -311,13 +313,16 @@ func (s *store) MoveSpace(_ context.Context, sp domain.Space) error {
 
 func (s *store) ArchiveSpace(ctx context.Context, sp domain.Space) error { return s.MoveSpace(ctx, sp) }
 
-func (s *store) PutSidebarState(_ context.Context, st domain.SidebarState, keep bool) (domain.SidebarState, error) {
+func (s *store) PutSidebarState(_ context.Context, st domain.SidebarState, keep app.SidebarKeep) (domain.SidebarState, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	k := [2]ids.ID{st.UserID, st.SpaceID}
 	old, ok := s.sidebar[k]
-	if keep {
+	if keep.Key {
 		st.SortKey = old.SortKey
+	}
+	if keep.ChannelOrder {
+		st.ChannelOrder = old.ChannelOrder
 	}
 	st.Version = 1
 	if ok {
@@ -337,6 +342,37 @@ func (s *store) SidebarStates(_ context.Context, user ids.ID, all bool, visible 
 		}
 	}
 	slices.SortFunc(out, func(a, b domain.SidebarState) int { return strings.Compare(a.SpaceID.String(), b.SpaceID.String()) })
+	return out, s.fail
+}
+
+func (s *store) PutSidebarChannelState(_ context.Context, st domain.SidebarChannelState) (domain.SidebarChannelState, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.channelSidebar == nil {
+		s.channelSidebar = map[[2]ids.ID]domain.SidebarChannelState{}
+	}
+	k := [2]ids.ID{st.UserID, st.ChannelID}
+	st.Version = s.channelSidebar[k].Version + 1
+	s.channelSidebar[k] = st
+	return st, s.fail
+}
+
+func (s *store) SidebarChannelStates(_ context.Context, user ids.ID, all bool, visible, fully []ids.ID) ([]domain.SidebarChannelState, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var out []domain.SidebarChannelState
+	for k, st := range s.channelSidebar {
+		c := s.channels[k[1]]
+		if k[0] != user || c.Archived() || s.spaces[c.SpaceID].Archived() {
+			continue
+		}
+		if all || slices.Contains(visible, c.ID) || slices.Contains(fully, c.SpaceID) {
+			out = append(out, st)
+		}
+	}
+	slices.SortFunc(out, func(a, b domain.SidebarChannelState) int {
+		return strings.Compare(a.ChannelID.String(), b.ChannelID.String())
+	})
 	return out, s.fail
 }
 

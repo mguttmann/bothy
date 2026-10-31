@@ -98,7 +98,10 @@ void registerPersonalHandlers(RestFake rest) {
     })
     ..handle(
       'getMySidebar',
-      (r) => FakeResponse(200, {'items': world.sidebarOf(r.person.id)}),
+      (r) => FakeResponse(200, {
+        'items': world.sidebarOf(r.person.id),
+        'channels': world.sidebarChannelsOf(r.person.id),
+      }),
     )
     ..handle(
       'putMySidebarSpace',
@@ -107,6 +110,18 @@ void registerPersonalHandlers(RestFake rest) {
         world.putSidebar(
           r.person.id,
           r.param('space_id'),
+          r.json,
+          deviceId: r.session!.deviceId,
+        ),
+      ),
+    )
+    ..handle(
+      'putMySidebarChannel',
+      (r) => FakeResponse(
+        200,
+        world.putSidebarChannel(
+          r.person.id,
+          r.param('channel_id'),
           r.json,
           deviceId: r.session!.deviceId,
         ),

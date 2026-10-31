@@ -104,6 +104,7 @@ export 'src/wire.dart'
         preferenceFromJson,
         quietHoursFromJson,
         runFromJson,
+        sidebarChannelFromJson,
         sidebarFromJson,
         snapshotFromJson,
         spaceViewFromJson,

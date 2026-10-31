@@ -101,7 +101,7 @@ var idConfig = identityapp.Config{
 
 // chatConfig is the configuration of the chat use cases of the world.
 var chatConfig = chatapp.Config{
-	SpaceNameMaxChars: 40, ChannelNameMaxChars: 40, ChannelTopicMaxChars: 200, TagNameMaxChars: 20,
+	SidebarOrderMaxItems: 1000, SpaceNameMaxChars: 40, ChannelNameMaxChars: 40, ChannelTopicMaxChars: 200, TagNameMaxChars: 20,
 	HistoryBackfillLimitDefault: 20, HistoryBackfillLimitMax: 200,
 	ThreadTitleMaxChars: 200, ThreadMaxTags: 5,
 	PlaceholderTitles: []string{"Neuer Chat", "New chat", "Chat", "Ohne Titel", "Untitled", "Test"},

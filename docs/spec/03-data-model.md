@@ -958,6 +958,7 @@ across devices. Module: `chat`.
 | `space_id` | `uuid` | no | | |
 | `collapsed` | `boolean` | no | `false` | |
 | `sort_key` | `text COLLATE "C"` | yes | | NULL = global order |
+| `channel_order` | `uuid[]` | yes | | personal order of the channels and forums of the space; NULL = the default order (the global `channels.sort_key`); channels not in the list come first in the default order; at most `sidebar.order_max_items` unique IDs, which the server does not check against existing or visible channels (M4-51) |
 | `version` | `bigint` | no | `1` | for the rule see [04-sync-protocol.md](04-sync-protocol.md) |
 | `updated_by_device_id` | `uuid` | yes | | |
 | `updated_at` | `timestamptz` | no | `now()` | |
@@ -965,6 +966,24 @@ across devices. Module: `chat`.
 PK: `(user_id, space_id)`. FK: `user_id` -> `users(principal_id)` ON DELETE CASCADE;
 `space_id` -> `spaces(id)` ON DELETE CASCADE; `updated_by_device_id` -> `devices(id)` ON DELETE
 SET NULL. Indexes: covered by the PK. Retention: `personal_sync`.
+
+#### `user_channel_states`
+
+Purpose: personal sidebar state per channel (the own order of the open posts of a forum), across
+devices (M4-51). Module: `chat`.
+
+| Field | Type | Null | Default | Rules / notes |
+|---|---|---|---|---|
+| `user_id` | `uuid` | no | | |
+| `channel_id` | `uuid` | no | | |
+| `thread_order` | `uuid[]` | no | `'{}'` | personal order of the posts; empty = the default order (last activity, newest first); posts not in the list come first in the default order; at most `sidebar.order_max_items` unique IDs, which the server does not check against existing or visible threads |
+| `version` | `bigint` | no | `1` | for the rule see [04-sync-protocol.md](04-sync-protocol.md) |
+| `updated_by_device_id` | `uuid` | yes | | |
+| `updated_at` | `timestamptz` | no | `now()` | |
+
+PK: `(user_id, channel_id)`. FK: `user_id` -> `users(principal_id)` ON DELETE CASCADE;
+`channel_id` -> `channels(id)` ON DELETE CASCADE; `updated_by_device_id` -> `devices(id)` ON
+DELETE SET NULL. Indexes: covered by the PK. Retention: `personal_sync`.
 
 #### `channels`
 
@@ -2842,6 +2861,7 @@ The values are defaults. Other chapters refer only to the name.
 | `channel.prompt_max_bytes` | `32768` | size of a channel prompt |
 | `thread.title_max_chars` | `200` | length of a thread title |
 | `thread.max_tags` | `5` | forum tags per thread |
+| `sidebar.order_max_items` | `1000` | items of a personal order list of the sidebar (`user_space_states.channel_order`, `user_channel_states.thread_order`) |
 | `message.max_content_bytes` | `262144` | size of a message (long answers without splitting) |
 | `message.max_attachments` | `10` | attachments per message |
 | `message.max_mentions` | `50` | distinct mention handles per message (content format, `messages`) |

@@ -385,7 +385,7 @@ make sure that clients clear their cache and runs end (R-AZ-15).
 | `space.reorder` | global order of the spaces | instance | owner | yes | no | yes | no | `rl.admin` |
 | `space.archive` | archive a space | space | owner | yes | yes | yes | yes | `rl.admin` |
 | `space.operator.set` | set the default operator (I1); optionally `resolve_i1` | space | owner | yes | yes | yes | yes | `rl.admin` |
-| `sidebar.update` | change one's own sidebar state (collapse, own order) | space | self and read | no | no | no | no | `rl.write` |
+| `sidebar.update` | change one's own sidebar state (collapse, own order of spaces, channels and posts) | space, channel | self and read | no | no | no | no | `rl.write` |
 | `channel.read` | see a channel, read its header data | channel | read | no | no | no | no | `rl.read` |
 | `channel.create` | create a channel | space | manage | no | no | yes | no | `rl.admin` |
 | `channel.update` | change name, topic, the channel default for notifications | channel | manage | no | no | yes | no | `rl.admin` |
@@ -748,6 +748,7 @@ allows it. Personal events (`audience = self`) go only to the named principal.
 | `draft.deleted` | draft | self | |
 | `settings.updated` | user | self | |
 | `sidebar.updated` | space | self | |
+| `sidebar_channel.updated` | channel | self | |
 | `notification_pref.updated` | user | self | |
 | `quiet_hours.updated` | user | self | |
 | `gdpr.request_updated` | gdpr_request | `gdpr.request.read` | |

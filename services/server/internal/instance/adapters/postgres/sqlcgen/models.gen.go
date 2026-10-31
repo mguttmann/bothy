@@ -1145,6 +1145,15 @@ type User struct {
 	LastActiveAt pgtype.Timestamptz
 }
 
+type UserChannelState struct {
+	UserID            pgtype.UUID
+	ChannelID         pgtype.UUID
+	ThreadOrder       []pgtype.UUID
+	Version           int64
+	UpdatedByDeviceID pgtype.UUID
+	UpdatedAt         pgtype.Timestamptz
+}
+
 type UserIdentity struct {
 	ID          pgtype.UUID
 	UserID      pgtype.UUID
@@ -1174,6 +1183,7 @@ type UserSpaceState struct {
 	Version           int64
 	UpdatedByDeviceID pgtype.UUID
 	UpdatedAt         pgtype.Timestamptz
+	ChannelOrder      []pgtype.UUID
 }
 
 type WebhookDelivery struct {

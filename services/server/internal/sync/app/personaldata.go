@@ -91,7 +91,8 @@ func (*PersonalData) Module() string { return moduleName }
 // personal reference. event_log is listed for the coverage but neither exported nor erased here:
 // its payloads are copies of changes whose originals the owning modules export, they leave with
 // the window sync.event_retention, and the deletion of a message or file redacts the related
-// payloads (20 sections 4.2 and 4.3). The personal sidebar (user_space_states) belongs to chat.
+// payloads (20 sections 4.2 and 4.3). The personal sidebar (user_space_states,
+// user_channel_states) belongs to chat.
 func (*PersonalData) Tables() []string {
 	return []string{"event_log", "idempotency_keys", "read_states", "drafts", "user_settings"}
 }

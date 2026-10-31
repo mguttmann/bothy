@@ -24,9 +24,23 @@ func (q *Queries) DeletePersonalSidebar(ctx context.Context, userID pgtype.UUID)
 	return result.RowsAffected(), nil
 }
 
+const deletePersonalSidebarChannels = `-- name: DeletePersonalSidebarChannels :execrows
+DELETE FROM user_channel_states WHERE user_id = $1
+`
+
+// Step 3 of the account deletion (20 section 4.4): the channel rows of the sidebar go with the
+// account (M4-51).
+func (q *Queries) DeletePersonalSidebarChannels(ctx context.Context, userID pgtype.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, deletePersonalSidebarChannels, userID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const listPersonalSidebar = `-- name: ListPersonalSidebar :many
 
-SELECT space_id, collapsed, sort_key, updated_by_device_id, updated_at FROM user_space_states
+SELECT space_id, collapsed, sort_key, channel_order, updated_by_device_id, updated_at FROM user_space_states
 WHERE user_id = $1
 ORDER BY space_id
 `
@@ -35,13 +49,15 @@ type ListPersonalSidebarRow struct {
 	SpaceID           pgtype.UUID
 	Collapsed         bool
 	SortKey           pgtype.Text
+	ChannelOrder      []pgtype.UUID
 	UpdatedByDeviceID pgtype.UUID
 	UpdatedAt         pgtype.Timestamptz
 }
 
 // SPDX-License-Identifier: Apache-2.0
 // The personal data of chat (M7-06, docs/spec/20-privacy.md sections 4.4 and 5.2): the sidebar of
-// one person. Only this module reads and writes user_space_states (03 principle 12).
+// one person. Only this module reads and writes user_space_states and user_channel_states (03
+// principle 12).
 // Every sidebar row of the person for the export, archived spaces included, by space.
 func (q *Queries) ListPersonalSidebar(ctx context.Context, userID pgtype.UUID) ([]ListPersonalSidebarRow, error) {
 	rows, err := q.db.Query(ctx, listPersonalSidebar, userID)
@@ -56,6 +72,46 @@ func (q *Queries) ListPersonalSidebar(ctx context.Context, userID pgtype.UUID) (
 			&i.SpaceID,
 			&i.Collapsed,
 			&i.SortKey,
+			&i.ChannelOrder,
+			&i.UpdatedByDeviceID,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPersonalSidebarChannels = `-- name: ListPersonalSidebarChannels :many
+SELECT channel_id, thread_order, updated_by_device_id, updated_at FROM user_channel_states
+WHERE user_id = $1
+ORDER BY channel_id
+`
+
+type ListPersonalSidebarChannelsRow struct {
+	ChannelID         pgtype.UUID
+	ThreadOrder       []pgtype.UUID
+	UpdatedByDeviceID pgtype.UUID
+	UpdatedAt         pgtype.Timestamptz
+}
+
+// Every channel row of the person for the export (M4-51), archived channels included, by channel.
+func (q *Queries) ListPersonalSidebarChannels(ctx context.Context, userID pgtype.UUID) ([]ListPersonalSidebarChannelsRow, error) {
+	rows, err := q.db.Query(ctx, listPersonalSidebarChannels, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListPersonalSidebarChannelsRow
+	for rows.Next() {
+		var i ListPersonalSidebarChannelsRow
+		if err := rows.Scan(
+			&i.ChannelID,
+			&i.ThreadOrder,
 			&i.UpdatedByDeviceID,
 			&i.UpdatedAt,
 		); err != nil {

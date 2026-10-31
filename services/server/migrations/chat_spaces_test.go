@@ -58,6 +58,8 @@ func TestChatSpacesMigration_Schema(t *testing.T) {
 			{"version", "bigint", false, "1"},
 			{"updated_by_device_id", "uuid", true, ""},
 			{"updated_at", ts, false, "now()"},
+			// M4-51 (migration 00085): the personal channel order.
+			{"channel_order", "ARRAY", true, ""},
 		}, []string{
 			"FOREIGN KEY (space_id) REFERENCES spaces(id) ON DELETE CASCADE",
 			"FOREIGN KEY (updated_by_device_id) REFERENCES devices(id) ON DELETE SET NULL",

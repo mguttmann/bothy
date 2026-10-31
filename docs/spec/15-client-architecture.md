@@ -255,7 +255,7 @@ for reconciliation. Fields that can only be read with `manage` (channel prompt, 
 
 | Local table | Server table | Note |
 |---|---|---|
-| `spaces`, `user_space_states` | same name | sidebar |
+| `spaces`, `user_space_states`, `user_channel_states` | same name | sidebar; `user_channel_states` holds the own thread order of a channel (M4-51) |
 | `channels`, `forum_tags`, `channel_operators` | `channels` (without `prompt`), `forum_tags` | effective operator as a column |
 | `threads`, `thread_tags` | same name | `last_message_seq`, state, title source |
 | `messages` | `messages` | without `client_payload_sha256`; with `trigger_state` |

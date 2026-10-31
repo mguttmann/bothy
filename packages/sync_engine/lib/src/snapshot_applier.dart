@@ -34,8 +34,8 @@ final class SnapshotApplier {
 
   /// Applies the whole snapshot inside [txn] (the caller empties the mirror first and stores
   /// cursor and epoch in the same transaction): spaces and channels with access, the active
-  /// threads of the held channels, sidebar, the person, settings and active runs; after the
-  /// commit the counters, presence and flags,
+  /// threads of the held channels, sidebar (with the own channel and thread orders, M4-51), the
+  /// person, settings and active runs; after the commit the counters, presence and flags,
   /// and in the background the drafts newer than the local ones, the read states and the
   /// instance information, which the snapshot names only by version or not at all.
   Future<void> applyFull(
@@ -68,6 +68,9 @@ final class SnapshotApplier {
     }
     for (final state in s.sidebar) {
       await db.structureDao.upsertUserSpaceStateIfNewer(state);
+    }
+    for (final state in s.sidebarChannels) {
+      await db.structureDao.upsertUserChannelStateIfNewer(state);
     }
     await db.principalsDao.put(s.principal);
     for (final setting in s.settings) {

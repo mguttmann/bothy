@@ -145,25 +145,33 @@ final class CollapsedSpacesProvider
 
 String _$collapsedSpacesHash() => r'23495b56aa2aba7da077c5770e1a6d918df9fc5c';
 
-/// The spaces with the person's state, in the personal order with the global order as the
-/// fallback (`orderSpaces`), collapsed as on this device; empty while either source loads.
+/// The spaces with the person's state, collapsed as on this device; empty while either source
+/// loads.
+///
+/// The order is the personal one with the global order as the fallback (`orderSpaces`), or, with
+/// "Arrange spaces automatically" (01 6.16 item 4, D-M4-51-4), the newest activity of each
+/// space's channels first with the personal order breaking ties; an automatic order holds while
+/// [sidebarHoldProvider] holds, so no space moves under the pointer.
 
-@ProviderFor(spacesWithState)
+@ProviderFor(SpacesWithState)
 final spacesWithStateProvider = SpacesWithStateProvider._();
 
-/// The spaces with the person's state, in the personal order with the global order as the
-/// fallback (`orderSpaces`), collapsed as on this device; empty while either source loads.
-
+/// The spaces with the person's state, collapsed as on this device; empty while either source
+/// loads.
+///
+/// The order is the personal one with the global order as the fallback (`orderSpaces`), or, with
+/// "Arrange spaces automatically" (01 6.16 item 4, D-M4-51-4), the newest activity of each
+/// space's channels first with the personal order breaking ties; an automatic order holds while
+/// [sidebarHoldProvider] holds, so no space moves under the pointer.
 final class SpacesWithStateProvider
-    extends
-        $FunctionalProvider<
-          List<SidebarSpace>,
-          List<SidebarSpace>,
-          List<SidebarSpace>
-        >
-    with $Provider<List<SidebarSpace>> {
-  /// The spaces with the person's state, in the personal order with the global order as the
-  /// fallback (`orderSpaces`), collapsed as on this device; empty while either source loads.
+    extends $NotifierProvider<SpacesWithState, List<SidebarSpace>> {
+  /// The spaces with the person's state, collapsed as on this device; empty while either source
+  /// loads.
+  ///
+  /// The order is the personal one with the global order as the fallback (`orderSpaces`), or, with
+  /// "Arrange spaces automatically" (01 6.16 item 4, D-M4-51-4), the newest activity of each
+  /// space's channels first with the personal order breaking ties; an automatic order holds while
+  /// [sidebarHoldProvider] holds, so no space moves under the pointer.
   SpacesWithStateProvider._()
     : super(
         from: null,
@@ -180,14 +188,7 @@ final class SpacesWithStateProvider
 
   @$internal
   @override
-  $ProviderElement<List<SidebarSpace>> $createElement(
-    $ProviderPointer pointer,
-  ) => $ProviderElement(pointer);
-
-  @override
-  List<SidebarSpace> create(Ref ref) {
-    return spacesWithState(ref);
-  }
+  SpacesWithState create() => SpacesWithState();
 
   /// {@macro riverpod.override_with_value}
   Override overrideWithValue(List<SidebarSpace> value) {
@@ -198,7 +199,178 @@ final class SpacesWithStateProvider
   }
 }
 
-String _$spacesWithStateHash() => r'ff6f5ea0782cccc4668c529efe793e93753909f8';
+String _$spacesWithStateHash() => r'5f7a597389f63be12e6b7cb60b0f373575d7f939';
+
+/// The spaces with the person's state, collapsed as on this device; empty while either source
+/// loads.
+///
+/// The order is the personal one with the global order as the fallback (`orderSpaces`), or, with
+/// "Arrange spaces automatically" (01 6.16 item 4, D-M4-51-4), the newest activity of each
+/// space's channels first with the personal order breaking ties; an automatic order holds while
+/// [sidebarHoldProvider] holds, so no space moves under the pointer.
+
+abstract class _$SpacesWithState extends $Notifier<List<SidebarSpace>> {
+  List<SidebarSpace> build();
+  @$mustCallSuper
+  @override
+  WhenComplete runBuild() {
+    final ref = this.ref as $Ref<List<SidebarSpace>, List<SidebarSpace>>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<List<SidebarSpace>, List<SidebarSpace>>,
+              List<SidebarSpace>,
+              Object?,
+              Object?
+            >;
+    return element.handleCreate(ref, build);
+  }
+}
+
+/// The activity of the channel [channelId] (01 6.16 item 4, D-M4-51-4): the newest
+/// `last_activity_at` of its stored threads, the main history included, else its creation time;
+/// the epoch while the channel is not stored.
+
+@ProviderFor(channelActivityOf)
+final channelActivityOfProvider = ChannelActivityOfFamily._();
+
+/// The activity of the channel [channelId] (01 6.16 item 4, D-M4-51-4): the newest
+/// `last_activity_at` of its stored threads, the main history included, else its creation time;
+/// the epoch while the channel is not stored.
+
+final class ChannelActivityOfProvider
+    extends $FunctionalProvider<DateTime, DateTime, DateTime>
+    with $Provider<DateTime> {
+  /// The activity of the channel [channelId] (01 6.16 item 4, D-M4-51-4): the newest
+  /// `last_activity_at` of its stored threads, the main history included, else its creation time;
+  /// the epoch while the channel is not stored.
+  ChannelActivityOfProvider._({
+    required ChannelActivityOfFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'channelActivityOfProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$channelActivityOfHash();
+
+  @override
+  String toString() {
+    return r'channelActivityOfProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $ProviderElement<DateTime> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  DateTime create(Ref ref) {
+    final argument = this.argument as String;
+    return channelActivityOf(ref, argument);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(DateTime value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<DateTime>(value),
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is ChannelActivityOfProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$channelActivityOfHash() => r'91ca55879a2e359fdbbbc06528f2c69586d28e58';
+
+/// The activity of the channel [channelId] (01 6.16 item 4, D-M4-51-4): the newest
+/// `last_activity_at` of its stored threads, the main history included, else its creation time;
+/// the epoch while the channel is not stored.
+
+final class ChannelActivityOfFamily extends $Family
+    with $FunctionalFamilyOverride<DateTime, String> {
+  ChannelActivityOfFamily._()
+    : super(
+        retry: null,
+        name: r'channelActivityOfProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// The activity of the channel [channelId] (01 6.16 item 4, D-M4-51-4): the newest
+  /// `last_activity_at` of its stored threads, the main history included, else its creation time;
+  /// the epoch while the channel is not stored.
+
+  ChannelActivityOfProvider call(String channelId) =>
+      ChannelActivityOfProvider._(argument: channelId, from: this);
+
+  @override
+  String toString() => r'channelActivityOfProvider';
+}
+
+/// The person's sidebar state of every channel (03 `user_channel_states`): the manual order of
+/// a forum's posts (01 6.16 item 3).
+
+@ProviderFor(userChannelStates)
+final userChannelStatesProvider = UserChannelStatesProvider._();
+
+/// The person's sidebar state of every channel (03 `user_channel_states`): the manual order of
+/// a forum's posts (01 6.16 item 3).
+
+final class UserChannelStatesProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<Map<ChannelId, UserChannelState>>,
+          Map<ChannelId, UserChannelState>,
+          Stream<Map<ChannelId, UserChannelState>>
+        >
+    with
+        $FutureModifier<Map<ChannelId, UserChannelState>>,
+        $StreamProvider<Map<ChannelId, UserChannelState>> {
+  /// The person's sidebar state of every channel (03 `user_channel_states`): the manual order of
+  /// a forum's posts (01 6.16 item 3).
+  UserChannelStatesProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'userChannelStatesProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$userChannelStatesHash();
+
+  @$internal
+  @override
+  $StreamProviderElement<Map<ChannelId, UserChannelState>> $createElement(
+    $ProviderPointer pointer,
+  ) => $StreamProviderElement(pointer);
+
+  @override
+  Stream<Map<ChannelId, UserChannelState>> create(Ref ref) {
+    return userChannelStates(ref);
+  }
+}
+
+String _$userChannelStatesHash() => r'90727bd3e8f04b4f3e7d39ab40cc9c2b7c55e32c';
 
 /// The stored channels of [spaceId] in their order.
 
@@ -785,7 +957,7 @@ final class ChannelThreadsProvider
   }
 }
 
-String _$channelThreadsHash() => r'ed41ac68bf2cabf2f063d8a96f1278fce2422578';
+String _$channelThreadsHash() => r'aef2524fee080a0c227b4de3388661d13a141574';
 
 /// The thread group of [channelId] (01 6.8 items 2 to 6; `selectSidebarThreads`): its stored
 /// threads, the counters per thread, its runs, the selected thread of the route, the person,
@@ -969,25 +1141,30 @@ final class NewChatRowsFamily extends $Family
 /// The channel rows of [spaceId]: counters ([channelCounts]), active run, muted state and the
 /// thread group with its collapse state on this device (01 6.8); direct messages and archived
 /// channels are not part of the tree.
+///
+/// The order is the global one in the person's `channel_order` (rows not in it first, 01 6.16
+/// item 3), or, with "Arrange channels and projects automatically", the newest activity first
+/// with that order breaking ties, held while [sidebarHoldProvider] holds (D-M4-51-4).
 
-@ProviderFor(channelsOfSpace)
+@ProviderFor(ChannelsOfSpace)
 final channelsOfSpaceProvider = ChannelsOfSpaceFamily._();
 
 /// The channel rows of [spaceId]: counters ([channelCounts]), active run, muted state and the
 /// thread group with its collapse state on this device (01 6.8); direct messages and archived
 /// channels are not part of the tree.
-
+///
+/// The order is the global one in the person's `channel_order` (rows not in it first, 01 6.16
+/// item 3), or, with "Arrange channels and projects automatically", the newest activity first
+/// with that order breaking ties, held while [sidebarHoldProvider] holds (D-M4-51-4).
 final class ChannelsOfSpaceProvider
-    extends
-        $FunctionalProvider<
-          List<SidebarChannel>,
-          List<SidebarChannel>,
-          List<SidebarChannel>
-        >
-    with $Provider<List<SidebarChannel>> {
+    extends $NotifierProvider<ChannelsOfSpace, List<SidebarChannel>> {
   /// The channel rows of [spaceId]: counters ([channelCounts]), active run, muted state and the
   /// thread group with its collapse state on this device (01 6.8); direct messages and archived
   /// channels are not part of the tree.
+  ///
+  /// The order is the global one in the person's `channel_order` (rows not in it first, 01 6.16
+  /// item 3), or, with "Arrange channels and projects automatically", the newest activity first
+  /// with that order breaking ties, held while [sidebarHoldProvider] holds (D-M4-51-4).
   ChannelsOfSpaceProvider._({
     required ChannelsOfSpaceFamily super.from,
     required String super.argument,
@@ -1011,15 +1188,7 @@ final class ChannelsOfSpaceProvider
 
   @$internal
   @override
-  $ProviderElement<List<SidebarChannel>> $createElement(
-    $ProviderPointer pointer,
-  ) => $ProviderElement(pointer);
-
-  @override
-  List<SidebarChannel> create(Ref ref) {
-    final argument = this.argument as String;
-    return channelsOfSpace(ref, argument);
-  }
+  ChannelsOfSpace create() => ChannelsOfSpace();
 
   /// {@macro riverpod.override_with_value}
   Override overrideWithValue(List<SidebarChannel> value) {
@@ -1040,14 +1209,25 @@ final class ChannelsOfSpaceProvider
   }
 }
 
-String _$channelsOfSpaceHash() => r'5d497ca53f57e1e9dbba9d27dae45facf74c9a13';
+String _$channelsOfSpaceHash() => r'680367bf20456d5e40c43d185f5e84820bf21817';
 
 /// The channel rows of [spaceId]: counters ([channelCounts]), active run, muted state and the
 /// thread group with its collapse state on this device (01 6.8); direct messages and archived
 /// channels are not part of the tree.
+///
+/// The order is the global one in the person's `channel_order` (rows not in it first, 01 6.16
+/// item 3), or, with "Arrange channels and projects automatically", the newest activity first
+/// with that order breaking ties, held while [sidebarHoldProvider] holds (D-M4-51-4).
 
 final class ChannelsOfSpaceFamily extends $Family
-    with $FunctionalFamilyOverride<List<SidebarChannel>, String> {
+    with
+        $ClassFamilyOverride<
+          ChannelsOfSpace,
+          List<SidebarChannel>,
+          List<SidebarChannel>,
+          List<SidebarChannel>,
+          String
+        > {
   ChannelsOfSpaceFamily._()
     : super(
         retry: null,
@@ -1060,12 +1240,45 @@ final class ChannelsOfSpaceFamily extends $Family
   /// The channel rows of [spaceId]: counters ([channelCounts]), active run, muted state and the
   /// thread group with its collapse state on this device (01 6.8); direct messages and archived
   /// channels are not part of the tree.
+  ///
+  /// The order is the global one in the person's `channel_order` (rows not in it first, 01 6.16
+  /// item 3), or, with "Arrange channels and projects automatically", the newest activity first
+  /// with that order breaking ties, held while [sidebarHoldProvider] holds (D-M4-51-4).
 
   ChannelsOfSpaceProvider call(String spaceId) =>
       ChannelsOfSpaceProvider._(argument: spaceId, from: this);
 
   @override
   String toString() => r'channelsOfSpaceProvider';
+}
+
+/// The channel rows of [spaceId]: counters ([channelCounts]), active run, muted state and the
+/// thread group with its collapse state on this device (01 6.8); direct messages and archived
+/// channels are not part of the tree.
+///
+/// The order is the global one in the person's `channel_order` (rows not in it first, 01 6.16
+/// item 3), or, with "Arrange channels and projects automatically", the newest activity first
+/// with that order breaking ties, held while [sidebarHoldProvider] holds (D-M4-51-4).
+
+abstract class _$ChannelsOfSpace extends $Notifier<List<SidebarChannel>> {
+  late final _$args = ref.$arg as String;
+  String get spaceId => _$args;
+
+  List<SidebarChannel> build(String spaceId);
+  @$mustCallSuper
+  @override
+  WhenComplete runBuild() {
+    final ref = this.ref as $Ref<List<SidebarChannel>, List<SidebarChannel>>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<List<SidebarChannel>, List<SidebarChannel>>,
+              List<SidebarChannel>,
+              Object?,
+              Object?
+            >;
+    return element.handleCreate(ref, () => build(_$args));
+  }
 }
 
 /// The whole tree: the spaces in the person's order with their channel rows.

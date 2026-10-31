@@ -50,6 +50,7 @@ const Map<String, EventInfo> _catalogue = <String, EventInfo>{
   'session.revoked': EventInfo(type: 'session.revoked', durable: true, carriesResourceVersion: false, resourceKind: 'auth_session', personal: true),
   'settings.updated': EventInfo(type: 'settings.updated', durable: true, carriesResourceVersion: false, resourceKind: 'user', personal: true),
   'sidebar.updated': EventInfo(type: 'sidebar.updated', durable: true, carriesResourceVersion: false, resourceKind: 'space', personal: true),
+  'sidebar_channel.updated': EventInfo(type: 'sidebar_channel.updated', durable: true, carriesResourceVersion: false, resourceKind: 'channel', personal: true),
   'space.archived': EventInfo(type: 'space.archived', durable: true, carriesResourceVersion: true, resourceKind: 'space', personal: false),
   'space.created': EventInfo(type: 'space.created', durable: true, carriesResourceVersion: true, resourceKind: 'space', personal: false),
   'space.updated': EventInfo(type: 'space.updated', durable: true, carriesResourceVersion: true, resourceKind: 'space', personal: false),

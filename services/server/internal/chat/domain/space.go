@@ -173,8 +173,41 @@ type SidebarState struct {
 	Collapsed       bool
 	// SortKey is the personal key; "" uses the global order.
 	SortKey string
+	// ChannelOrder is the personal order of the channels and forums of the space (M4-51); nil
+	// (NULL) is the default order.
+	ChannelOrder []ids.ID
 	// Version counts the writes of the row.
 	Version int64
 	// UpdatedByDeviceID is the device of the last write; zero for none (personal tokens).
 	UpdatedByDeviceID ids.ID
+}
+
+// SidebarChannelState is one row of user_channel_states (03 section 4.5, M4-51): the personal
+// order of the posts of one channel, last write wins (04 section 14).
+type SidebarChannelState struct {
+	UserID, ChannelID ids.ID
+	// ThreadOrder is the personal order of the open posts; empty is the default order.
+	ThreadOrder []ids.ID
+	// Version counts the writes of the row.
+	Version int64
+	// UpdatedByDeviceID is the device of the last write; zero for none (personal tokens).
+	UpdatedByDeviceID ids.ID
+}
+
+// CheckSidebarOrder checks a personal order list of the sidebar (M4-51, D-M4-51-8): every ID at
+// most once and at most maxItems items (sidebar.order_max_items). It never checks that an ID
+// names an existing or visible row, so the answer reveals nothing about rows the caller cannot
+// see. Errors: validation_failed on pointer with duplicate or limit_reached.
+func CheckSidebarOrder(pointer string, order []ids.ID, maxItems int) error {
+	if len(order) > maxItems {
+		return fieldError(pointer, FieldLimitReached, "the list has too many items")
+	}
+	seen := make(map[ids.ID]bool, len(order))
+	for _, id := range order {
+		if seen[id] {
+			return fieldError(pointer, FieldDuplicate, "an item is named twice")
+		}
+		seen[id] = true
+	}
+	return nil
 }

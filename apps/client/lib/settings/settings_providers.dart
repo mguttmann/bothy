@@ -19,6 +19,7 @@ import 'package:timezone/timezone.dart' as tz;
 import '../app/providers/ports.dart';
 import '../app/providers/session.dart';
 import '../app/providers/settings.dart';
+import '../sidebar/sidebar_arrange.dart';
 
 part 'settings_providers.g.dart';
 
@@ -47,6 +48,15 @@ abstract final class SettingKeys {
 
   /// The object of column widths (D-M4-18-5).
   static const String columnWidths = 'layout.column_widths';
+
+  /// `true`, `false`: spaces arranged by activity (01 6.16, D-M4-51-5).
+  static const String autoArrangeSpaces = 'sidebar.auto_arrange_spaces';
+
+  /// `true`, `false`: the channels of a space arranged by activity.
+  static const String autoArrangeChannels = 'sidebar.auto_arrange_channels';
+
+  /// `true`, `false`: the open posts of a forum arranged by activity.
+  static const String autoArrangeChats = 'sidebar.auto_arrange_chats';
 }
 
 /// The personal settings with the defaults of 01 11 applied where a key is absent.
@@ -64,6 +74,7 @@ final class PersonalSettings {
     required this.crashReports,
     required this.clientMetrics,
     required this.hasColumnWidths,
+    required this.arrangement,
   });
 
   /// Reads [stored] (key to JSON value); a value outside the list of 01 11 counts as absent.
@@ -100,6 +111,11 @@ final class PersonalSettings {
       crashReports: flag(SettingKeys.crashReports, hasCrashTarget),
       clientMetrics: flag(SettingKeys.clientMetrics, true),
       hasColumnWidths: stored[SettingKeys.columnWidths] is Map,
+      arrangement: SidebarArrangement(
+        autoSpaces: flag(SettingKeys.autoArrangeSpaces, false),
+        autoChannels: flag(SettingKeys.autoArrangeChannels, false),
+        autoChats: flag(SettingKeys.autoArrangeChats, true),
+      ),
     );
   }
 
@@ -111,6 +127,9 @@ final class PersonalSettings {
     SettingKeys.reduceMotion: 'system',
     SettingKeys.clientMetrics: true,
     SettingKeys.pasteOriginals: false,
+    SettingKeys.autoArrangeSpaces: false,
+    SettingKeys.autoArrangeChannels: false,
+    SettingKeys.autoArrangeChats: true,
   };
 
   /// `appearance.theme`.
@@ -136,6 +155,10 @@ final class PersonalSettings {
 
   /// Whether `layout.column_widths` is stored (the reset has something to delete).
   final bool hasColumnWidths;
+
+  /// `sidebar.auto_arrange_spaces`, `sidebar.auto_arrange_channels` and
+  /// `sidebar.auto_arrange_chats` (01 6.16, D-M4-51-5).
+  final SidebarArrangement arrangement;
 }
 
 /// The personal settings of the signed-in person on this device: `composer.enter_sends` is
@@ -146,6 +169,12 @@ PersonalSettings personalSettings(Ref ref) => PersonalSettings.resolve(
   desktop: !ref.watch(appPortsProvider).formFactor.isPhone,
   hasCrashTarget: ref.watch(appPortsProvider).branding.hasCrashTarget,
 );
+
+/// Which levels of the sidebar are arranged by activity, from the personal settings (01 6.16,
+/// D-M4-51-5); synchronized like every personal setting.
+@Riverpod(keepAlive: true)
+SidebarArrangement sidebarArrangement(Ref ref) =>
+    ref.watch(personalSettingsProvider).arrangement;
 
 /// Writes personal settings (04 14, brief M4-25 Design note 1).
 ///

@@ -587,6 +587,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"shutdown.jobs_soft_timeout = 20s  # default\n" +
 		"shutdown.telemetry_flush_timeout = 5s  # default\n" +
 		"shutdown.total_timeout = 1m  # default\n" +
+		"sidebar.order_max_items = 1000  # default\n" +
 		"signing_key.accept_lost_keys = false  # default\n" +
 		"signing_key.access_token_rotation_interval = 30d  # default\n" +
 		"signing_key.cache_ttl = 30s  # default\n" +

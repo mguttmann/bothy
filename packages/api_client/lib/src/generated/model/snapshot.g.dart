@@ -24,6 +24,8 @@ class _$Snapshot extends Snapshot {
   @override
   final BuiltList<SidebarState> sidebar;
   @override
+  final BuiltList<SidebarChannelState>? sidebarChannels;
+  @override
   final BuiltList<UnreadThread> unreadThreads;
   @override
   final BuiltList<RunSummary> activeRuns;
@@ -50,6 +52,7 @@ class _$Snapshot extends Snapshot {
     required this.spaces,
     required this.channels,
     required this.sidebar,
+    this.sidebarChannels,
     required this.unreadThreads,
     required this.activeRuns,
     required this.activeThreads,
@@ -77,6 +80,7 @@ class _$Snapshot extends Snapshot {
         spaces == other.spaces &&
         channels == other.channels &&
         sidebar == other.sidebar &&
+        sidebarChannels == other.sidebarChannels &&
         unreadThreads == other.unreadThreads &&
         activeRuns == other.activeRuns &&
         activeThreads == other.activeThreads &&
@@ -97,6 +101,7 @@ class _$Snapshot extends Snapshot {
     _$hash = $jc(_$hash, spaces.hashCode);
     _$hash = $jc(_$hash, channels.hashCode);
     _$hash = $jc(_$hash, sidebar.hashCode);
+    _$hash = $jc(_$hash, sidebarChannels.hashCode);
     _$hash = $jc(_$hash, unreadThreads.hashCode);
     _$hash = $jc(_$hash, activeRuns.hashCode);
     _$hash = $jc(_$hash, activeThreads.hashCode);
@@ -119,6 +124,7 @@ class _$Snapshot extends Snapshot {
           ..add('spaces', spaces)
           ..add('channels', channels)
           ..add('sidebar', sidebar)
+          ..add('sidebarChannels', sidebarChannels)
           ..add('unreadThreads', unreadThreads)
           ..add('activeRuns', activeRuns)
           ..add('activeThreads', activeThreads)
@@ -171,6 +177,12 @@ class SnapshotBuilder implements Builder<Snapshot, SnapshotBuilder> {
   ListBuilder<SidebarState> get sidebar =>
       _$this._sidebar ??= ListBuilder<SidebarState>();
   set sidebar(ListBuilder<SidebarState>? sidebar) => _$this._sidebar = sidebar;
+
+  ListBuilder<SidebarChannelState>? _sidebarChannels;
+  ListBuilder<SidebarChannelState> get sidebarChannels =>
+      _$this._sidebarChannels ??= ListBuilder<SidebarChannelState>();
+  set sidebarChannels(ListBuilder<SidebarChannelState>? sidebarChannels) =>
+      _$this._sidebarChannels = sidebarChannels;
 
   ListBuilder<UnreadThread>? _unreadThreads;
   ListBuilder<UnreadThread> get unreadThreads =>
@@ -227,6 +239,7 @@ class SnapshotBuilder implements Builder<Snapshot, SnapshotBuilder> {
       _spaces = $v.spaces.toBuilder();
       _channels = $v.channels.toBuilder();
       _sidebar = $v.sidebar.toBuilder();
+      _sidebarChannels = $v.sidebarChannels?.toBuilder();
       _unreadThreads = $v.unreadThreads.toBuilder();
       _activeRuns = $v.activeRuns.toBuilder();
       _activeThreads = $v.activeThreads.toBuilder();
@@ -282,6 +295,7 @@ class SnapshotBuilder implements Builder<Snapshot, SnapshotBuilder> {
             spaces: spaces.build(),
             channels: channels.build(),
             sidebar: sidebar.build(),
+            sidebarChannels: _sidebarChannels?.build(),
             unreadThreads: unreadThreads.build(),
             activeRuns: activeRuns.build(),
             activeThreads: activeThreads.build(),
@@ -302,6 +316,8 @@ class SnapshotBuilder implements Builder<Snapshot, SnapshotBuilder> {
         channels.build();
         _$failedField = 'sidebar';
         sidebar.build();
+        _$failedField = 'sidebarChannels';
+        _sidebarChannels?.build();
         _$failedField = 'unreadThreads';
         unreadThreads.build();
         _$failedField = 'activeRuns';

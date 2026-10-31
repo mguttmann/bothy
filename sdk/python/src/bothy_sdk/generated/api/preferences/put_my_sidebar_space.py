@@ -91,6 +91,11 @@ def sync_detailed(
 ) -> Response[Problem | SidebarState]:
     """Collapse or reorder a space for oneself
 
+     Stores the caller's row of the space, version + 1, last write wins, no If-Match. `channel_order`
+    absent keeps the stored channel order, a list replaces it and an empty list returns to the default
+    order. The server checks the form of the list (unique items, at most `sidebar.order_max_items`), not
+    whether each ID names a channel the caller can see. Writes `sidebar.updated` for the caller.
+
     Args:
         space_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         body (SidebarStatePut):
@@ -123,6 +128,11 @@ def sync(
 ) -> Problem | SidebarState | None:
     """Collapse or reorder a space for oneself
 
+     Stores the caller's row of the space, version + 1, last write wins, no If-Match. `channel_order`
+    absent keeps the stored channel order, a list replaces it and an empty list returns to the default
+    order. The server checks the form of the list (unique items, at most `sidebar.order_max_items`), not
+    whether each ID names a channel the caller can see. Writes `sidebar.updated` for the caller.
+
     Args:
         space_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         body (SidebarStatePut):
@@ -149,6 +159,11 @@ async def asyncio_detailed(
     body: SidebarStatePut,
 ) -> Response[Problem | SidebarState]:
     """Collapse or reorder a space for oneself
+
+     Stores the caller's row of the space, version + 1, last write wins, no If-Match. `channel_order`
+    absent keeps the stored channel order, a list replaces it and an empty list returns to the default
+    order. The server checks the form of the list (unique items, at most `sidebar.order_max_items`), not
+    whether each ID names a channel the caller can see. Writes `sidebar.updated` for the caller.
 
     Args:
         space_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -179,6 +194,11 @@ async def asyncio(
     body: SidebarStatePut,
 ) -> Problem | SidebarState | None:
     """Collapse or reorder a space for oneself
+
+     Stores the caller's row of the space, version + 1, last write wins, no If-Match. `channel_order`
+    absent keeps the stored channel order, a list replaces it and an empty list returns to the default
+    order. The server checks the form of the list (unique items, at most `sidebar.order_max_items`), not
+    whether each ID names a channel the caller can see. Writes `sidebar.updated` for the caller.
 
     Args:
         space_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
