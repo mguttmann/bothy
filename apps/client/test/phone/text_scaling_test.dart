@@ -39,6 +39,13 @@ Map<String, List<Finder>> actions(AppLocalizations l) => {
     find.byKey(const ValueKey('ds-component-deny')),
     find.byType(TextField),
   ],
+  'm3_dense': [
+    find.byKey(const ValueKey('phone.back')),
+    find.byKey(const ValueKey('thread.more')),
+    find.bySemanticsLabel(l.liveBoxStopRun('Robin')),
+    find.byKey(const ValueKey('voice.mic')),
+    find.byType(TextField),
+  ],
   'm3_waiting': [
     find.bySemanticsLabel(l.liveBoxStopRun('Robin')),
     find.byType(TextField),

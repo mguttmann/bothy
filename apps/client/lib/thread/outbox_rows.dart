@@ -93,12 +93,13 @@ class PendingRow extends StatelessWidget {
 
   /// The files of the waiting message: one chip per attachment with the state of its upload
   /// entry; a confirmed upload is being checked by the server (12 2).
-  Widget? _files(AppLocalizations l) {
+  Widget? _files(BuildContext context, AppLocalizations l) {
     final preview = view.payload['attachment_preview'];
     if (preview is! List || preview.isEmpty) return null;
     return Padding(
-      padding: const EdgeInsets.only(
-        left: DsSize.avatarMd + DsSpace.s12 + DsSpace.s8,
+      // Beside the content, `density.message-gutter` from the row (M5-17).
+      padding: EdgeInsets.only(
+        left: context.dsDensity.messageGutter + DsSpace.s8,
         top: DsSpace.s4,
       ),
       child: Wrap(
@@ -150,7 +151,7 @@ class PendingRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final delivery = deliveryOf(view);
-    final files = _files(l);
+    final files = _files(context, l);
     final message = _message(l, delivery);
     if (files == null) return message;
     final live = progress;
@@ -165,7 +166,8 @@ class PendingRow extends StatelessWidget {
         else
           ListenableBuilder(
             listenable: live,
-            builder: (context, _) => _files(l) ?? const SizedBox.shrink(),
+            builder: (context, _) =>
+                _files(context, l) ?? const SizedBox.shrink(),
           ),
       ],
     );

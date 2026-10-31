@@ -11,6 +11,10 @@
     "message-pad-y": {"$value": {"value": 4, "unit": "px"}},
     "message-font-size": {"$value": {"value": 15, "unit": "px"}},
     "livebox-pad": {"$value": {"value": 12, "unit": "px"}},
-    "composer-min-height": {"$value": {"value": 44, "unit": "px"}}
+    "composer-min-height": {"$value": {"value": 44, "unit": "px"}},
+    "message-gutter": {"$value": {"value": 44, "unit": "px"}, "$description": "Indent of the message content from the start of the row: the avatar column (size.avatar-md plus space.12) where it fits; 0 on touch, where a small avatar (size.avatar-sm) leads the header line and the content uses the full width (M5-17)."},
+    "composer-pad-x": {"$value": {"value": 12, "unit": "px"}, "$description": "Horizontal padding of the text inside the input, between the buttons in the field (M5-17)."},
+    "composer-inset-x": {"$value": {"value": 16, "unit": "px"}, "$description": "Horizontal gap between the input and the edges of the history column (M5-17)."},
+    "composer-inset-bottom": {"$value": {"value": 12, "unit": "px"}, "$description": "Gap below the input (M5-17)."}
   }
 }

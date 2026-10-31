@@ -24,32 +24,34 @@ class DsStatusLine extends StatelessWidget {
   /// `status_line`, or null.
   final String? text;
 
-  @override
-  Widget build(BuildContext context) {
-    final value = text?.trim() ?? '';
-    if (value.isEmpty) return const SizedBox.shrink();
+  /// The spans of [value] in the styles of the line: text between backticks as inline code;
+  /// shared with the one-line mobile live box (brief M5-17), which sets the line after the
+  /// state in the same text.
+  static List<InlineSpan> spans(BuildContext context, String value) {
     final colors = context.dsColors;
     final body = dsTextStyle(DsType.bodySm).copyWith(color: colors.textPrimary);
     final code = dsTextStyle(DsType.codeSm)
         .copyWith(color: colors.codeFg, backgroundColor: colors.codeBg);
     final parts = value.split('`');
+    return [
+      for (var i = 0; i < parts.length; i++)
+        // Odd parts lie between two backticks; an unpaired backtick stays text.
+        if (i.isOdd && i < parts.length - 1)
+          TextSpan(text: parts[i], style: code)
+        else
+          TextSpan(text: i.isOdd ? '`${parts[i]}' : parts[i], style: body),
+    ];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final value = text?.trim() ?? '';
+    if (value.isEmpty) return const SizedBox.shrink();
     return Tooltip(
       message: value,
       excludeFromSemantics: true,
       child: Text.rich(
-        TextSpan(
-          children: [
-            for (var i = 0; i < parts.length; i++)
-              // Odd parts lie between two backticks; an unpaired backtick stays text.
-              if (i.isOdd && i < parts.length - 1)
-                TextSpan(text: parts[i], style: code)
-              else
-                TextSpan(
-                  text: i.isOdd ? '`${parts[i]}' : parts[i],
-                  style: body,
-                ),
-          ],
-        ),
+        TextSpan(children: spans(context, value)),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),

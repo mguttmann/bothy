@@ -844,6 +844,22 @@ running app over `bothy/deep_links`; Flutter's own deep link handling is off. Th
 `<application ID>:/oidc/callback`, received from a Custom Tab (the default browser without a
 Custom Tabs provider).
 
+Phone thread layout, addendum of 2026-10-31 (M5-17, 01 R-PR-31, docs/decisions.d/M5-17.md).
+Reason: owner screenshots of the iPhone thread showed a quarter of the width lost to the avatar
+column and the input's text area as a small box in its middle, while header and live box took a
+large part of the height. The phone shell's frame draws no back bar above a thread page; it hands
+the back action down (`PhoneBackScope` in `apps/client/lib/phone/phone_back_scope.dart`) and the
+thread's one-line header shows it, while the frame keeps its bar until a header claims the action
+(a thread still loading or not found). The header collapses while the reversed history scrolls
+towards older messages (`HeaderCollapse` in `apps/client/lib/thread/collapsing_header.dart`, from
+the history's `UserScrollNotification`s) and shows again on the way back, at the newest message
+and always under `MediaQuery.accessibleNavigation`. Layout values come from the density tokens of
+the `touch` context: `density.message-gutter` (0: content at the full width, a small avatar in
+the header line), `density.composer-pad-x`, `density.composer-inset-x` and
+`density.composer-inset-bottom`; the desktop's comfortable and compact values keep the earlier
+layout. The phone composer puts the press-and-hold microphone into `DsComposer.trailing` inside
+the field and the templates into the attachment menu.
+
 ## 12. Sharing from other apps
 
 | Platform | Mechanism | Target selection | Sending |

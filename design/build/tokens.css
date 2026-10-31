@@ -853,11 +853,15 @@
 }
 
 :root, [data-density="comfortable"] {
+  --ds-density-composer-inset-bottom: 12px;
+  --ds-density-composer-inset-x: 16px;
   --ds-density-composer-min-height: 44px;
+  --ds-density-composer-pad-x: 12px;
   --ds-density-control-height: 32px;
   --ds-density-livebox-pad: 12px;
   --ds-density-message-font-size: 15px;
   --ds-density-message-gap: 16px;
+  --ds-density-message-gutter: 44px;
   --ds-density-message-pad-y: 4px;
   --ds-density-row-channel: 32px;
   --ds-density-row-post: 52px;
@@ -866,11 +870,15 @@
 }
 
 [data-density="compact"] {
+  --ds-density-composer-inset-bottom: 12px;
+  --ds-density-composer-inset-x: 16px;
   --ds-density-composer-min-height: 40px;
+  --ds-density-composer-pad-x: 12px;
   --ds-density-control-height: 28px;
   --ds-density-livebox-pad: 8px;
   --ds-density-message-font-size: 15px;
   --ds-density-message-gap: 8px;
+  --ds-density-message-gutter: 44px;
   --ds-density-message-pad-y: 2px;
   --ds-density-row-channel: 28px;
   --ds-density-row-post: 44px;
@@ -879,11 +887,15 @@
 }
 
 [data-density="touch"] {
+  --ds-density-composer-inset-bottom: 8px;
+  --ds-density-composer-inset-x: 8px;
   --ds-density-composer-min-height: 48px;
+  --ds-density-composer-pad-x: 4px;
   --ds-density-control-height: 44px;
   --ds-density-livebox-pad: 12px;
   --ds-density-message-font-size: 16px;
   --ds-density-message-gap: 16px;
+  --ds-density-message-gutter: 0px;
   --ds-density-message-pad-y: 6px;
   --ds-density-row-channel: 44px;
   --ds-density-row-post: 64px;

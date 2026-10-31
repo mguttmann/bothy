@@ -13,6 +13,7 @@ import 'package:client/agents/run_mapping.dart';
 import 'package:client/forum/forum_model.dart';
 import 'package:client/forum/post_list_column.dart';
 import 'package:client/phone/android/android_controls.dart';
+import 'package:client/phone/phone_back_scope.dart';
 import 'package:client/phone/phone_navigation.dart';
 import 'package:client/phone/phone_shell.dart';
 import 'package:client/sidebar/sidebar_column.dart';
@@ -358,30 +359,64 @@ Widget _header({bool done = false}) => ThreadHeader(
   onColumn: () {},
 );
 
-Widget _tile(Message m, {String time = '10:22'}) => MessageTile(
-  data: messageData(m, principals: _principals, me: alex, timeLabel: time),
-  continuation: false,
-  collapseLines: 6,
-  actions: messageActions(
-    m,
-    me: alex,
-    permissions: _writer,
-    mainHistory: false,
-  ),
-  onAction: (_) {},
-  onOpenLink: (_) {},
-);
+Widget _tile(Message m, {String time = '10:22', bool continuation = false}) =>
+    MessageTile(
+      data: messageData(m, principals: _principals, me: alex, timeLabel: time),
+      continuation: continuation,
+      collapseLines: 6,
+      actions: messageActions(
+        m,
+        me: alex,
+        permissions: _writer,
+        mainHistory: false,
+      ),
+      onAction: (_) {},
+      onOpenLink: (_) {},
+    );
 
-Widget _composer({bool offline = false}) => Padding(
-  padding: const EdgeInsets.all(DsSpace.s8),
-  child: DsComposer(
-    targetName: 'Robin',
-    maxLines: 6,
-    enterSends: false,
-    offline: offline,
-    onSend: (_) {},
-  ),
-);
+/// The phone's input as `ThreadComposer` lays it out (brief M5-17): the compact insets of the
+/// density, attach and the microphone inside the field, the templates in the attachment menu;
+/// [text] is what the person is typing.
+Widget _composer({bool offline = false, String? text, String? followup}) =>
+    Builder(
+      builder: (context) {
+        final density = context.dsDensity;
+        return Padding(
+          padding: EdgeInsets.fromLTRB(
+            density.composerInsetX,
+            DsSpace.s4,
+            density.composerInsetX,
+            density.composerInsetBottom,
+          ),
+          child: DsComposer(
+            targetName: 'Robin',
+            followupAgentName: followup,
+            controller: text == null ? null : TextEditingController(text: text),
+            maxLines: 6,
+            enterSends: false,
+            offline: offline,
+            onSend: (_) {},
+            onAttach: () {},
+            trailing: DsTappable(
+              key: const ValueKey('voice.mic'),
+              label: 'Record voice message',
+              excludeChildSemantics: true,
+              onTap: () {},
+              child: Center(
+                widthFactor: 1,
+                heightFactor: 1,
+                child: DsIcon(
+                  DsIcons.actionVoice,
+                  size: DsIconSizeRole.md,
+                  color: context.dsColors.textSecondary,
+                  decorative: true,
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
 
 /// The approval card of M3: buttons stacked at full width.
 Widget _approval() {
@@ -397,28 +432,32 @@ Widget _approval() {
     ),
     button(3, cardId, customId: 'deny', label: 'Deny', style: 'danger'),
   ];
-  return DsMessageComponents(
-    componentData(
-      message,
-      components,
-      principals: _principals,
-      now: t0,
-      timeLabel: (_) => '10:16',
+  return Padding(
+    // The history's rows bring their own inset; the card of a scene gets the same.
+    padding: const EdgeInsets.symmetric(horizontal: DsSpace.s8),
+    child: DsMessageComponents(
+      componentData(
+        message,
+        components,
+        principals: _principals,
+        now: t0,
+        timeLabel: (_) => '10:16',
+      ),
+      key: const ValueKey('scene.approval'),
+      permitted: true,
+      deniedReasonText: null,
+      header: componentHeader(
+        message,
+        components,
+        principals: _principals,
+        runLabel: '10:12',
+      ),
+      agentText: message.contentMd,
+      onOpenLink: (_) {},
+      onActivate: (_, _) {},
+      stacked: true,
+      sheets: true,
     ),
-    key: const ValueKey('scene.approval'),
-    permitted: true,
-    deniedReasonText: null,
-    header: componentHeader(
-      message,
-      components,
-      principals: _principals,
-      runLabel: '10:12',
-    ),
-    agentText: message.contentMd,
-    onOpenLink: (_) {},
-    onActivate: (_, _) {},
-    stacked: true,
-    sheets: true,
   );
 }
 
@@ -430,30 +469,41 @@ DsRunData _runOf(Map<String, Object?> doc) => runFromDocument(
 
 /// The history of a thread under the compact header, with [top] pinned over it (the live box)
 /// and the input at the bottom.
+///
+/// The back button to "requests" sits in the one-line header (brief M5-17), on iOS and
+/// Android alike; the history rows use the full width.
 Widget _thread(
   List<Widget> history, {
   Widget? top,
   Widget? banner,
   bool offline = false,
   bool android = false,
+  String? typing,
+  String? followup,
 }) => phoneFrame(
   banner: banner,
-  back: 'requests',
   android: android,
-  body: Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      _header(),
-      if (top != null)
-        Padding(padding: const EdgeInsets.all(DsSpace.s8), child: top),
-      Expanded(
-        child: ListView(
-          padding: const EdgeInsets.symmetric(horizontal: DsSpace.s8),
-          children: history,
-        ),
-      ),
-      _composer(offline: offline),
-    ],
+  body: PhoneBackScope(
+    label: 'requests',
+    onBack: () {},
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _header(),
+        if (top != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              DsSpace.s8,
+              DsSpace.s4,
+              DsSpace.s8,
+              DsSpace.s4,
+            ),
+            child: top,
+          ),
+        Expanded(child: ListView(children: history)),
+        _composer(offline: offline, text: typing, followup: followup),
+      ],
+    ),
   ),
 );
 
@@ -473,6 +523,53 @@ Widget runningScene({bool android = false}) => _thread(
   [
     _approval(),
     _tile(msg(4, author: alex, text: 'Please include expired threads.')),
+  ],
+);
+
+/// M3 in the density of brief M5-17: a long message of Alex with a continuation, Robin's
+/// answer, the one-line live box running and the input while Alex types two lines.
+Widget denseScene({bool android = false}) => _thread(
+  android: android,
+  top: DsLiveBox.mobile(
+    _runOf(
+      runDoc(1, statusLine: 'compacting the conversation', contextPct: 81),
+    ),
+    key: const ValueKey('scene.livebox'),
+    announceMinInterval: _interval,
+    onOpen: () {},
+    onStop: () {},
+  ),
+  typing: 'Also check the expired threads\nand tell me what you changed.',
+  followup: 'Robin',
+  [
+    _tile(
+      msg(
+        4,
+        author: alex,
+        text:
+            'The gateway drops the session when the phone changes networks. '
+            'Please find out why the resume fails after a switch from Wi-Fi '
+            'to mobile data, and keep the fix small:\n\n'
+            '1. reproduce it with a test\n'
+            '2. fix the resume path\n'
+            '3. run the sync suite',
+      ),
+    ),
+    _tile(
+      msg(5, author: alex, text: 'Logs are in the thread above.'),
+      continuation: true,
+    ),
+    _tile(
+      msg(
+        6,
+        author: robin,
+        origin: MessageOrigin.agent,
+        text:
+            'Reproduced: the resume token expires while the socket reconnects. '
+            'I am changing the order now.',
+      ),
+      time: '10:24',
+    ),
   ],
 );
 
@@ -608,6 +705,7 @@ final Map<String, Widget Function()> androidPhoneScenes = {
   'm1_spaces': spacesScene,
   'm2_post_list': () => postListScene(android: true),
   'm3_running': () => runningScene(android: true),
+  'm3_dense': () => denseScene(android: true),
 };
 
 /// Every phone scene by name.
@@ -615,6 +713,7 @@ final Map<String, Widget Function()> phoneScenes = {
   'm1_spaces': spacesScene,
   'm2_post_list': postListScene,
   'm3_running': runningScene,
+  'm3_dense': denseScene,
   'm3_waiting': waitingScene,
   'm3_collapsed': collapsedScene,
   'm4_components': componentsScene,

@@ -950,26 +950,48 @@ directly; a tap on the forum name opens the post list M2.
 +--------------------------------------+
 ```
 
-**M3 History with compact live box.** Stop is always reachable at the top right of the live box
+**M3 History with compact live box.** Stop is always reachable at the end of the live box
 row; tapping opens the full live box as a sheet. Approval buttons stacked at full width. The sheet
 has a button "Graph" that opens M12 (addendum of 2026-10-24).
 
+Density of the phone thread: addendum of 2026-10-31 (R-PR-31, M5-17). Reason: owner screenshots
+of 2026-10-31 (iPhone, a thread in a development forum while Claude Code ran): the message text
+started about a quarter of the screen width from the edge, the input's text area was a small box
+in the middle of the input with a separate "+" and microphone beside it, and the back link, the
+title, the operator line and the two-line live box took a large part of the height. On iPhone and
+Android:
+
+1. **Messages use the full width.** The content starts at the row padding; a small avatar
+   (`size.avatar-sm`) leads the header line of a group's first message, and continuation messages
+   align with that content (`density.message-gutter` 0 in the density `touch`).
+2. **One-line header.** Back button, title (one line, cut at its end) and the one overflow menu,
+   whose first line names the operator; the page has no back bar above it. While the person
+   scrolls towards older messages the header collapses and gives its height to the history;
+   scrolling back or reaching the newest message shows it again. With a screen reader or switch
+   control it never collapses. While a thread is loading or not found the page keeps its back bar.
+3. **One-line live box.** State icon, state, run time and status line in one line cut at its end,
+   Stop at the end; a tap opens the full box as a sheet.
+4. **Input.** The text field fills the input from the attachment button to the microphone, which
+   sits inside the input before Send; the text starts at the left, a tap anywhere on it focuses
+   it, it grows to `ui.composer_max_lines` lines and then scrolls. The templates are an entry of
+   the attachment menu. Insets follow `density.composer-inset-*` and `density.composer-pad-x`.
+   Every button keeps `density.target-min`.
+
 ```text
 +--------------------------------------+
-| < server   Gateway: resume ...  ...  |
+| <  Gateway: resume after net...  ... |
 +--------------------------------------+
-| (o) Running 4:12 62 %      [STOP]    |
-|     go test ./internal/sync/...      |
+| (o) Running 4:12 go test ./int.. [S] |
 +--------------------------------------+
 | [A] dev-runner 10:16                 |
-|  Approval needed: go test ...        |
-|  [         Allow once         ]      |
-|  [      For this session      ]      |
-|  [           Deny             ]      |
-| (AL) Alex 10:22 {..}                 |
-|  Please include expired threads.     |
+| Approval needed: go test ...         |
+| [          Allow once          ]     |
+| [       For this session       ]     |
+| [            Deny              ]     |
+| (A) Alex 10:22                       |
+| Please include expired threads.      |
 +--------------------------------------+
-| [+] Follow-up to dev-runner  [Mic]   |
+| [Clip] Follow-up to dev-r.. [Mic][>] |
 +--------------------------------------+
 ```
 
@@ -2193,6 +2215,7 @@ Rules:
 | R-PR-29 | The content of a message in the history is selectable with the mouse on the desktop (drag, double and triple click, shift and click) within one message, Cmd+C (Ctrl+C) and "Copy" of the message menu copy it as plain text in the structure of the message with code parts exact; on the phone "Select text" in the message menu opens the message with the system selection (6.15, addendum of 2026-10-31). | Owner report 2026-10-31 (macOS app): no text of the history could be selected, so parts of messages, logs and code could not be copied; the history offered no system selection (docs/decisions.d/M4-50.md). |
 | R-PR-30 | Spaces, the channels and forums of a space and the open posts of a forum are dragged into the person's own order (a line shows the drop on the desktop, a long press lifts the row on the phone, "Move up" and "Move down" in the row menu), kept per person across devices and never visible to others; three personal settings arrange each level by last activity instead (spaces and channels off, chats on by default), and an automatic level cannot be dragged (6.16, addendum of 2026-10-31). | Owner request 2026-10-31: nothing in the sidebar could be moved, not five imported spaces, not 25 project forums of a dev space, not the chats of a forum; the sidebar order is data that follows the person (R-PR-24), and chats by activity is the order of R-PR-23 (docs/decisions.d/M4-51.md). |
 | R-PR-31 | A chat row in the sidebar shows a status mark (green done, yellow working, blue waiting for the person, red failed, each with its own shape, tooltip and label) only for an agent state the person has not seen since they last had the chat open; opening the chat clears it, a new change brings it back, seen follows the person's read state, the mark replaces the unread bar on rows with agent runs, and forum and project rows show the most urgent unseen state behind the setting `sidebar.show_project_status` (6.17, addendum of 2026-10-31). | Owner request and amendment 2026-10-31: with many agent chats the person could not tell where something had happened without opening each one; only news the person has not seen is worth a mark, and two markers on one row would compete (docs/decisions.d/M4-52.md). |
+| R-PR-32 | On iPhone and Android the thread uses the screen: message content at the full width with a small avatar in the header line of a group, a one-line header (back, title, overflow menu with the operator) that collapses while older messages are read and never with a screen reader, a one-line live box, and an input whose text field fills it from the attachment button to the microphone inside it, starts at the left and grows to `ui.composer_max_lines` lines (5.3 M3, addendum of 2026-10-31). | Owner screenshots 2026-10-31 (iPhone): about a quarter of the width went to an avatar column, the input's text area was a small box in its middle, and header, operator line and live box took a large part of the height (docs/decisions.d/M5-17.md). |
 
 ## 14. Configuration values of this chapter
 

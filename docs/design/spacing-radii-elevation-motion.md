@@ -101,6 +101,9 @@ Three contexts in the resolver; the app chooses the context, not the person alon
 | `density.message-font-size` | message text |
 | `density.livebox-pad` | padding of the live box |
 | `density.composer-min-height` | minimum height of the input |
+| `density.composer-pad-x` | horizontal padding of the text inside the input, between its buttons (M5-17) |
+| `density.composer-inset-x`, `density.composer-inset-bottom` | gap between the input and the edges of the history column (M5-17) |
+| `density.message-gutter` | indent of the message content: the avatar column on desktop, 0 on touch, where a small avatar leads the header line (M5-17) |
 
 Evidence for hit areas: WCAG 2.2 SC 2.5.8 requires 24 by 24 CSS pixels
 (https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html, retrieved 2026-10-10

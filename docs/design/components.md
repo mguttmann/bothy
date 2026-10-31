@@ -80,7 +80,10 @@ text" in `type.heading`, a close button and the content with the system selectio
 
 Sizes: avatar `size.avatar-md`; gap from avatar to content `space.12`; group gap
 `density.message-gap`; row padding `density.message-pad-y`; reading width at most
-`layout.message-max-width`.
+`layout.message-max-width`. The content starts after `density.message-gutter`: the avatar column
+on desktop; in the density `touch` (phones, gutter 0, M5-17) the content uses the full width of
+the row, a small avatar `size.avatar-sm` leads the header line of a group's first message and a
+continuation message aligns with it.
 
 Accessibility: A message is a semantics node with the label "<Name>, <Time>, <Text>"; the
 trigger state is a separate node with a label (section 5). The hover bar is reachable by keyboard
@@ -142,11 +145,12 @@ proposed the format "Ran 28 min · 3 agents · USD 1.20"; it is adopted.
 
 ### 2.3 Mobile
 
-Compact line below the navigation bar (height `density.control-height` plus padding):
-state icon, state and run time, status line truncated to one line, stop button on the right with
-hit area `density.target-min`. Tapping opens the full live box as a sheet. As built (M5-02): state
-icon, state and run time wrap and the status line sits below them, so text scaling up to 200
-percent loses nothing; the stop button stays at the top right of the line.
+Compact line below the thread header (height `density.target-min`): state icon, then state, run
+time and status line as one line of text cut at its end, stop button on the right with hit area
+`density.target-min`. Tapping opens the full live box as a sheet, which shows everything the line
+cuts. As built since M5-17 (addendum of 2026-10-31): one line also at a text scale of 200
+percent; before, state and run time wrapped and the status line sat below them (M5-02), which
+cost a phone two to three lines of history.
 
 ### 2.4 Accessibility
 
@@ -356,8 +360,14 @@ Purpose: compose a message, commands (`commands`) with options and autocompletio
 mentions, attachments, voice recording.
 
 Anatomy: field (surface `color.surface.input`, border `color.border.control`, radius `radius.lg`,
-minimum height `density.composer-min-height`, grows up to `ui.composer_max_lines`), attachment on
-the left, microphone and send on the right. Above it the "typing" line ("Sam is typing"), during an
+minimum height `density.composer-min-height`, grows up to `ui.composer_max_lines` and then
+scrolls), attachment on the left, microphone and send on the right, all inside the field. The text
+field fills the field between the buttons and is the tap target there, with
+`density.composer-pad-x` inside it; the text starts at the left, a single line sits on the middle
+of the buttons. The input keeps `density.composer-inset-x` and `density.composer-inset-bottom` to
+the edges of the column. On the phone (M5-17) the press-and-hold microphone sits inside the field
+before send and the templates are an entry of the attachment menu, so the text field keeps the
+rest of the width. Above it the "typing" line ("Sam is typing"), during an
 active run the placeholder "Follow-up to <Agent>".
 
 Suggestion list (overlay `color.surface.overlay`, `elevation.menu`): opens on "/" at the start of

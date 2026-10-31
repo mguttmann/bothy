@@ -23,6 +23,7 @@ import '../running/providers.dart' show activeRunCountProvider;
 import '../settings/settings_shell.dart' show SettingsSection;
 import '../sidebar/providers.dart';
 import 'android/android_controls.dart';
+import 'phone_back_scope.dart';
 import 'phone_navigation.dart';
 import 'phone_pages.dart';
 import 'providers.dart';
@@ -228,15 +229,97 @@ class _PageFrame extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (under != null)
-            android
-                ? PhoneTopAppBar(page: page, below: under)
-                : PhoneBackBar(below: under),
-          Expanded(child: content),
+          // A thread draws the back button in its one-line header (brief M5-17).
+          if (under != null && page.kind == PhonePageKind.thread)
+            Expanded(
+              child: PhoneHeaderBackFrame(
+                page: page,
+                below: under,
+                android: android,
+                child: content,
+              ),
+            )
+          else ...[
+            if (under != null)
+              android
+                  ? PhoneTopAppBar(page: page, below: under)
+                  : PhoneBackBar(below: under),
+            Expanded(child: content),
+          ],
         ],
       ),
     );
   }
+}
+
+/// The back action to [below] for a page that shows it in its own header (a thread, brief
+/// M5-17): the same name and the same pop as [PhoneBackBar]. Until the page's header claims it
+/// (the thread is loading or not found) the bar of the frame shows, so there is always a way
+/// back.
+class PhoneHeaderBackFrame extends ConsumerStatefulWidget {
+  /// Creates the frame of [page] over [below]; [android] chooses the top app bar as the bar.
+  const PhoneHeaderBackFrame({
+    super.key,
+    required this.page,
+    required this.below,
+    required this.android,
+    required this.child,
+  });
+
+  /// The page.
+  final PhonePage page;
+
+  /// The page the back action returns to.
+  final PhonePage below;
+
+  /// Whether the bar is the Android top app bar.
+  final bool android;
+
+  /// The page's content.
+  final Widget child;
+
+  @override
+  ConsumerState<PhoneHeaderBackFrame> createState() =>
+      PhoneHeaderBackFrameState();
+}
+
+/// State of [PhoneHeaderBackFrame]: the claims of the header buttons below.
+class PhoneHeaderBackFrameState extends ConsumerState<PhoneHeaderBackFrame> {
+  final PhoneBackClaims _claims = PhoneBackClaims();
+
+  @override
+  void dispose() {
+    _claims.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        ListenableBuilder(
+          listenable: _claims,
+          builder: (context, _) => _claims.count > 0
+              ? const SizedBox.shrink()
+              : widget.android
+              ? PhoneTopAppBar(page: widget.page, below: widget.below)
+              : PhoneBackBar(below: widget.below),
+        ),
+        Expanded(
+          child: PhoneBackScope(
+            label: phonePageName(ref, l, widget.below) ?? l.phoneBack,
+            onBack: _back,
+            claims: _claims,
+            child: widget.child,
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _back() => unawaited(Navigator.of(context).maybePop());
 }
 
 /// The name of [page] as a back button or a title shows it: the tab's name, a channel's name

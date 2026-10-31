@@ -33,6 +33,23 @@ final class SaveTemplate extends TemplateChoice {
   const SaveTemplate();
 }
 
+/// Opens the templates of [channelId] with fresh lists; [canSave] offers "Save as template".
+/// Returns the choice, or null when the dialog closes without one. The desktop's button and
+/// the phone's attachment menu (brief M5-17) both open it.
+Future<TemplateChoice?> showTemplates(
+  BuildContext context,
+  WidgetRef ref, {
+  required ChannelId channelId,
+  required bool canSave,
+}) {
+  ref.invalidate(templateListsProvider(channelId.value));
+  return showDialog<TemplateChoice>(
+    context: context,
+    builder: (context) =>
+        TemplatesDialog(channelId: channelId, canSave: canSave),
+  );
+}
+
 /// The button "Templates" that opens the menu of the templates of [channelId]; [canSave]
 /// offers "Save as template" for the current text.
 class TemplatesButton extends ConsumerWidget {
@@ -54,11 +71,11 @@ class TemplatesButton extends ConsumerWidget {
   final ValueChanged<TemplateChoice> onChoice;
 
   Future<void> _open(BuildContext context, WidgetRef ref) async {
-    ref.invalidate(templateListsProvider(channelId.value));
-    final choice = await showDialog<TemplateChoice>(
-      context: context,
-      builder: (context) =>
-          TemplatesDialog(channelId: channelId, canSave: canSave),
+    final choice = await showTemplates(
+      context,
+      ref,
+      channelId: channelId,
+      canSave: canSave,
     );
     if (choice != null) onChoice(choice);
   }

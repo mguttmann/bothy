@@ -228,8 +228,9 @@ class ThreadComposerState extends ConsumerState<ThreadComposer> {
 
   MediaPicker? _media;
 
-  /// The attachment menu of the phone (M5-07): camera, photo library or a file.
-  Future<void> _attachMenu() async {
+  /// The attachment menu of the phone (M5-07): camera, photo library or a file, and the
+  /// templates, which have no button of their own beside the phone's field (brief M5-17).
+  Future<void> _attachMenu({required bool templates}) async {
     final l = AppLocalizations.of(context);
     final choice = await showModalBottomSheet<String>(
       context: context,
@@ -244,6 +245,7 @@ class ThreadComposerState extends ConsumerState<ThreadComposer> {
               ('camera', l.composerAttachCamera),
               ('library', l.composerAttachLibrary),
               ('file', l.composerAttachFile),
+              if (templates) ('templates', l.composerTemplates),
             ])
               DsTappable(
                 key: ValueKey('composer.attach.$key'),
@@ -270,6 +272,16 @@ class ThreadComposerState extends ConsumerState<ThreadComposer> {
     final attach = _attach;
     if (attach == null) return;
     if (choice == 'file') return _pick();
+    if (choice == 'templates') {
+      final picked = await showTemplates(
+        context,
+        ref,
+        channelId: widget.channelId,
+        canSave: _composer?.text.text.trim().isNotEmpty ?? false,
+      );
+      if (picked != null && mounted) await _template(picked);
+      return;
+    }
     final ports = ref.read(filePortsProvider);
     final media = _media ??= MediaPicker(
       port: ports.media(),
@@ -616,12 +628,15 @@ class ThreadComposerState extends ConsumerState<ThreadComposer> {
             onAction: onClose,
           ),
         );
+    final density = context.dsDensity;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        DsSpace.s16,
+      // `density.composer-inset-*` (brief M5-17): the phone's input reaches closer to the
+      // edges of the screen.
+      padding: EdgeInsets.fromLTRB(
+        density.composerInsetX,
         DsSpace.s4,
-        DsSpace.s16,
-        DsSpace.s12,
+        density.composerInsetX,
+        density.composerInsetBottom,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -721,7 +736,8 @@ class ThreadComposerState extends ConsumerState<ThreadComposer> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              if (!permissions.readOnly)
+              // The phone offers the templates in the attachment menu (brief M5-17).
+              if (!permissions.readOnly && phoneVoice == null)
                 TemplatesButton(
                   channelId: widget.channelId,
                   canSave: composer.text.text.trim().isNotEmpty,
@@ -776,19 +792,24 @@ class ThreadComposerState extends ConsumerState<ThreadComposer> {
                       onAttach: attach == null || permissions.readOnly
                           ? null
                           : phoneVoice != null
-                          ? () => unawaited(_attachMenu())
+                          ? () => unawaited(
+                              _attachMenu(templates: !permissions.readOnly),
+                            )
                           : () => unawaited(_pick()),
-                      // The phone's microphone sits beside the field (M5-07).
+                      // The phone's own microphone is [trailing] (M5-07, M5-17).
                       onVoice: voice == null || permissions.readOnly
                           ? null
                           : () => unawaited(voice.start()),
                       hasAttachments: attach?.attachments.isNotEmpty ?? false,
+                      // The phone's microphone sits inside the field before Send (brief
+                      // M5-17), so the text field keeps the rest of the width.
+                      trailing: phoneVoice != null && !permissions.readOnly
+                          ? PhoneVoiceButton(controller: phoneVoice)
+                          : null,
                     ),
                   ),
                 ),
               ),
-              if (phoneVoice != null && !permissions.readOnly)
-                PhoneVoiceButton(controller: phoneVoice),
             ],
           ),
         ],

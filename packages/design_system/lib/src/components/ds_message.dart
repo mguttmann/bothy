@@ -38,6 +38,11 @@ final class DsMessageAction {
 
 /// A post in a thread (`messages`) from a person, agent, app, import or the system.
 ///
+/// Layout (M5-17): the avatar sits in the gutter `density.message-gutter` beside the content
+/// where the gutter holds it; in the density `touch` (the phone, gutter 0) the content uses the
+/// full width and a small avatar (`size.avatar-sm`) leads the header line of a group's first
+/// message.
+///
 /// Variants (components.md section 1): text, continuation ([isContinuation], computed by the
 /// caller from `ui.message_group_window`: no avatar and header), voice, live box anchor
 /// ([liveBox] at this position), card ([components] on `color.surface.raised`, which draws the
@@ -247,9 +252,24 @@ class DsMessageState extends State<DsMessage> {
     final density = context.dsDensity;
     final showBar =
         !d.deleted && widget.actions.isNotEmpty && (_hover || _within);
+    // `density.message-gutter` (brief M5-17): where the gutter holds the avatar the avatar
+    // sits in it beside the content; a narrower gutter (the phone's 0) gives the content the
+    // full width and a small avatar leads the header line instead.
+    final gutter = density.messageGutter;
+    final inline = gutter < DsSize.avatarMd + DsSpace.s12;
 
     final body = <Widget>[
-      if (!widget.isContinuation) _header(context),
+      if (!widget.isContinuation)
+        _header(
+          context,
+          avatar: inline
+              ? DsAvatar(
+                  name: d.authorName,
+                  origin: d.origin,
+                  size: DsSize.avatarSm,
+                )
+              : null,
+        ),
       if (d.replyToName != null && !d.deleted) _reply(context),
       ..._content(context),
       if (d.attachmentNames.isNotEmpty && !d.deleted) _attachments(context),
@@ -260,11 +280,14 @@ class DsMessageState extends State<DsMessage> {
     Widget row = Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (widget.isContinuation)
-          const SizedBox(width: DsSize.avatarMd)
-        else
-          DsAvatar(name: d.authorName, origin: d.origin),
-        const SizedBox(width: DsSpace.s12),
+        if (!inline) ...[
+          if (widget.isContinuation)
+            const SizedBox(width: DsSize.avatarMd)
+          else
+            DsAvatar(name: d.authorName, origin: d.origin),
+          SizedBox(width: gutter - DsSize.avatarMd),
+        ] else if (gutter > 0)
+          SizedBox(width: gutter),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -392,7 +415,9 @@ class DsMessageState extends State<DsMessage> {
     );
   }
 
-  Widget _header(BuildContext context) {
+  /// The header line: [avatar] (the small one of a narrow gutter, brief M5-17) or none, the
+  /// name, the origin badge, the time and the trigger state.
+  Widget _header(BuildContext context, {Widget? avatar}) {
     final colors = context.dsColors;
     final d = widget.data;
     final badge = _originBadge(context);
@@ -404,6 +429,7 @@ class DsMessageState extends State<DsMessage> {
         spacing: DsSpace.s6,
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [
+          ?avatar,
           ExcludeSemantics(
             child: Text(
               dsIsolate(d.authorName),
@@ -834,15 +860,26 @@ class _HoverBar extends StatelessWidget {
 
 /// The avatar of a message author: a person round, an agent as a rounded square
 /// (`radius.md`), an app with a small badge; initials on a category tile chosen from the name.
+///
+/// [size] is `size.avatar-md` beside the content, `size.avatar-sm` in the header line of a
+/// narrow gutter (the phone, brief M5-17); the small one scales its initial down to fit.
 class DsAvatar extends StatelessWidget {
   /// Creates the avatar of [name].
-  const DsAvatar({super.key, required this.name, required this.origin});
+  const DsAvatar({
+    super.key,
+    required this.name,
+    required this.origin,
+    this.size = DsSize.avatarMd,
+  });
 
   /// The display name.
   final String name;
 
   /// The origin; decides the shape.
   final DsMessageOrigin origin;
+
+  /// The edge length of the tile.
+  final double size;
 
   @override
   Widget build(BuildContext context) {
@@ -861,19 +898,25 @@ class DsAvatar extends StatelessWidget {
         ? '?'
         : String.fromCharCode(name.trim().runes.first).toUpperCase();
     final person = origin == DsMessageOrigin.human;
+    final small = size < DsSize.avatarMd;
+    final letter = Text(
+      dsIsolate(initial),
+      style: dsTextStyle(small ? DsType.caption : DsType.label)
+          .copyWith(color: fg),
+    );
     final tile = Container(
-      width: DsSize.avatarMd,
-      height: DsSize.avatarMd,
+      width: size,
+      height: size,
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: bg,
         shape: person ? BoxShape.circle : BoxShape.rectangle,
-        borderRadius: person ? null : BorderRadius.circular(DsRadius.md),
+        borderRadius: person
+            ? null
+            : BorderRadius.circular(small ? DsRadius.sm : DsRadius.md),
       ),
-      child: Text(
-        dsIsolate(initial),
-        style: dsTextStyle(DsType.label).copyWith(color: fg),
-      ),
+      // A scaled text (01 8) must not spill out of the small tile.
+      child: small ? FittedBox(fit: BoxFit.scaleDown, child: letter) : letter,
     );
     return ExcludeSemantics(
       child: origin == DsMessageOrigin.app

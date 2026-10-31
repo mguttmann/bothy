@@ -90,11 +90,15 @@ by `tokens.py check`.
 
 | Token | Type | `comfortable` | `compact` | `touch` |
 |---|---|---|---|---|
+| `density.composer-inset-bottom` | dimension | 12px | 12px | 8px |
+| `density.composer-inset-x` | dimension | 16px | 16px | 8px |
 | `density.composer-min-height` | dimension | 44px | 40px | 48px |
+| `density.composer-pad-x` | dimension | 12px | 12px | 4px |
 | `density.control-height` | dimension | 32px | 28px | 44px |
 | `density.livebox-pad` | dimension | 12px | 8px | 12px |
 | `density.message-font-size` | dimension | 15px | 15px | 16px |
 | `density.message-gap` | dimension | 16px | 8px | 16px |
+| `density.message-gutter` | dimension | 44px | 44px | 0px |
 | `density.message-pad-y` | dimension | 4px | 2px | 6px |
 | `density.row-channel` | dimension | 32px | 28px | 44px |
 | `density.row-post` | dimension | 52px | 44px | 64px |

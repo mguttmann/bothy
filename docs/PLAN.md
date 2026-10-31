@@ -961,6 +961,7 @@ Share Extension (solved through child sessions from M1-34; the NSE uses the prev
 | M5-14 | Run graph and control room on iPhone and Android | Screens M11 and M12 from 01 in density `touch` (09 5.6). | `apps/client/lib` (phone layouts), `packages/bothy_viz` (touch layout of the trace view) | goldens in density `touch`, portrait and landscape; integration tests on the iPhone and Android layouts against the fake server; live only in the foreground; VoiceOver and TalkBack check of the list forms | M4-39, M5-03 |
 | M5-15 | Threads in the sidebar and new chat on iPhone and Android | Screen M1 with the thread groups of 01 6.8 and the "+" action at forum rows in density `touch`; a thread row opens M3 (D-SB-13). | `apps/client/lib` (phone layouts) | goldens of M1 in density `touch`, text scaling 1 and 2, de and en; integration tests on the iPhone and Android layouts against the fake server: a tap on a thread row opens its history, "+" opens the new chat view and sending creates the post; VoiceOver and TalkBack labels of the tree | M4-41, M5-03 |
 | M5-16 | Several photos from the library at once on the phone | The library entry of the phone composer picks several photos in one go up to the free slots of `message_max_attachments`; they become the attachments of one message in picker order, all or none; the camera stays one photo (15 14). | `apps/client/lib` (phone compose, attachments) | unit tests of the conversion of a list (order, limit, all or nothing with deletion of every temporary file, cancel, camera one photo); widget tests: four photos in one message, limit 1 with nine attachments, no picker with ten; device test on the iOS simulator and the Android emulator in the CI: three photos arrive in one message | M5-07 |
+| M5-17 | Phone thread density | On iPhone and Android the thread uses the screen (01 5.3 M3, R-PR-31, addendum of 2026-10-31): message content at the full width with a small avatar in the header line of a group, a one-line header (back, title, overflow menu with the operator) that collapses while older messages are read, a one-line live box with tap to expand, and an input whose text field fills it from the attachment button to the microphone inside it, starts at the left, grows to `ui.composer_max_lines` lines and then scrolls; the desktop input keeps its layout. | `packages/design_system` (density tokens, `DsMessage`, `DsComposer`, `DsLiveBox.mobile`), `design/tokens`, `apps/client/lib` (phone frame, thread header, history, composer) | widget tests: message content start and avatar per density, the text field fills the input between its buttons, the placeholder at its left, a tap on its edge focuses it, growth to the line limit and then scrolling, the header in one line with the back button and the operator in the menu, collapsing while reading older messages and never with a screen reader, the back bar while no header claims it, the one-line live box at text scale 2; goldens of the phone thread in light and dark with a long message, a typing input and a running live box, on iOS and Android | M5-15, M5-16 |
 
 ## 12. M6 Admin console, statistics and visualization
 
@@ -1494,8 +1495,8 @@ holds the exclusion, the chapter names it.
 | | Set Done, a new message reopens | M1-55, M1-56, M4-20 |
 | | Move a thread | M1-62, M4-20 |
 | | Direct messages (later) | V3-01 |
-| Agents | Operator in the channel header | M1-54, M4-19 |
-| | Live box running, collapsed, with stop | M2-09, M2-10, M4-21 |
+| Agents | Operator in the channel header | M1-54, M4-19, M5-17 |
+| | Live box running, collapsed, with stop | M2-09, M2-10, M4-21, M5-17 |
 | | Trigger state as icons | M2-05, M4-07, M4-21 |
 | | Follow-ups during a run | M2-11, M4-21 |
 | | Buttons, selects, forms | M2-15, M4-21 |

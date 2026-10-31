@@ -78,8 +78,9 @@ class DsLiveBox extends StatefulWidget {
        onOpen = null,
        question = null;
 
-  /// The mobile line: state icon, state and run time, the status line in one line and the
-  /// stop button with the hit area `density.target-min`; [onOpen] opens the sheet.
+  /// The mobile line: one line of state icon, state, run time and status line, cut at its
+  /// end (M5-17), and the stop button with the hit area `density.target-min` at the end;
+  /// [onOpen] opens the sheet with the full box.
   ///
   /// [announceMinInterval] (`a11y.live_announce_min_interval`): the mobile line announces
   /// state changes and new questions like the full box.
@@ -586,12 +587,10 @@ class DsLiveBoxState extends State<DsLiveBox> {
     final colors = context.dsColors;
     final run = widget.run;
     final density = context.dsDensity;
+    final status = run.statusLine?.trim() ?? '';
     return Container(
       constraints: BoxConstraints(minHeight: density.controlHeight),
-      padding: const EdgeInsets.symmetric(
-        horizontal: DsSpace.s8,
-        vertical: DsSpace.s4,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: DsSpace.s8),
       decoration: BoxDecoration(
         color: colors.surfaceRaised,
         border: Border(
@@ -603,7 +602,6 @@ class DsLiveBoxState extends State<DsLiveBox> {
         ),
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(
             child: DsTappable(
@@ -611,28 +609,50 @@ class DsLiveBoxState extends State<DsLiveBox> {
               label: _label(context),
               hint: l.liveBoxOpen,
               excludeChildSemantics: true,
-              // State and run time wrap, the status line sits below them, so text scaling
-              // up to 200 percent loses nothing and Stop stays at the top right (01 5.3 M3,
-              // 01 8).
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
+              // One line (brief M5-17, 01 5.3 M3): state icon, state, run time and the status
+              // line, cut at its end, also at a text scale of 200 percent. The full box opens
+              // as a sheet on a tap; Stop stays at the end of the line.
+              child: Row(
                 children: [
-                  Wrap(
-                    spacing: DsSpace.s6,
-                    runSpacing: DsSpace.s2,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      _stateIcon(context),
-                      Text(
-                        dsRunStateWord(l, run),
-                        style: dsTextStyle(DsType.label)
-                            .copyWith(color: colors.textPrimary),
+                  _stateIcon(context),
+                  const SizedBox(width: DsSpace.s6),
+                  // One text, so the state comes first and only the end is cut: the state
+                  // word, the run time and the status line (with its full text in a tooltip).
+                  Expanded(
+                    child: Tooltip(
+                      message: status,
+                      excludeFromSemantics: true,
+                      child: Text.rich(
+                        key: const ValueKey('ds-livebox-mobile-text'),
+                        TextSpan(
+                          children: [
+                            TextSpan(
+                              text: dsRunStateWord(l, run),
+                              style: dsTextStyle(DsType.label)
+                                  .copyWith(color: colors.textPrimary),
+                            ),
+                            TextSpan(
+                              text: '  ',
+                              style: dsTextStyle(DsType.bodySm),
+                            ),
+                            TextSpan(
+                              text: f.elapsed(run.elapsed),
+                              style: _mono(context),
+                            ),
+                            if (status.isNotEmpty) ...[
+                              TextSpan(
+                                text: '  ',
+                                style: dsTextStyle(DsType.bodySm),
+                              ),
+                              ...DsStatusLine.spans(context, status),
+                            ],
+                          ],
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      Text(f.elapsed(run.elapsed), style: _mono(context)),
-                    ],
+                    ),
                   ),
-                  DsStatusLine(run.statusLine),
                 ],
               ),
             ),
