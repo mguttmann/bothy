@@ -29,7 +29,7 @@ import json
 import re
 import secrets
 from collections import defaultdict, deque
-from collections.abc import Awaitable, Mapping
+from collections.abc import Awaitable, Mapping, Sequence
 from dataclasses import dataclass
 from types import TracebackType
 from typing import Any
@@ -562,6 +562,15 @@ class FakeServer:
             content, name=name, mime=mime, status=status, transcript=transcript
         )
 
+    def set_file_status(self, file_id: UUID, status: str) -> None:
+        """End or change the check of a stored file, as the scan pass of the server does.
+
+        Args:
+            file_id: A file of `add_file`.
+            status: ``clean``, ``skipped``, ``pending`` or ``blocked``.
+        """
+        self.world.files[file_id]["status"] = status
+
     def file_etag(self, file_id: UUID) -> str:
         """The current transcript ``ETag`` of a stored file, as ``getFile`` sends it.
 
@@ -739,6 +748,7 @@ class FakeServer:
         *,
         author: str = "alex",
         claims: Mapping[str, Any] | None = None,
+        files: Sequence[UUID] = (),
     ) -> UUID:
         """A person posts a follow-up to the run: its row ``queued`` and ``agent.followup``.
 
@@ -749,12 +759,15 @@ class FakeServer:
             claims: Claims that replace those of every token of this event (still signed with
                 the server key), for example ``{"billing_mode": "personal"}``,
                 ``{"tool_class": "chat"}`` or ``{"sub": "<another principal>"}``.
+            files: Files of `add_file` attached to the message, in their order; ``getMessage``
+                shows each with its state at the time of the read, as the server does (the
+                follow-up is delivered at once, also while a file is still checked, 12 10).
 
         Returns:
             The follow-up message ID.
         """
         person = {"alex": self.world.alex, "robin": self.world.robin, "sam": self.world.sam}[author]
-        message_id = self.world.followup(run_id, text, author=person, claims=claims)
+        message_id = self.world.followup(run_id, text, author=person, claims=claims, files=files)
         await _settle()
         return message_id
 

@@ -91,7 +91,11 @@ void main() {
       findsOneWidget,
     );
     expect(inTile(fileId(4), find.text(en.fileStateBlocked)), findsOneWidget);
-    expect(inTile(fileId(5), find.text(en.fileStateBlocked)), findsOneWidget);
+    // A failed check is its own state, not "blocked" (FIX-scan-state-stale).
+    expect(
+      inTile(fileId(5), find.text(en.fileStateCheckFailed)),
+      findsOneWidget,
+    );
     expect(
       inTile(fileId(6), find.byKey(ValueKey('file.${fileId(6).value}.save'))),
       findsOneWidget,

@@ -162,6 +162,32 @@ void main() {
       expect(await db.personalDao.watchSettings().first, isEmpty);
     });
 
+    test('composer.paste_originals is off by default and on deletes nothing '
+        'but stores true (FIX-scan-state-stale)', () async {
+      expect(
+        PersonalSettings.resolve(
+          const {},
+          desktop: true,
+          hasCrashTarget: false,
+        ).pasteOriginals,
+        isFalse,
+      );
+      expect(
+        PersonalSettings.resolve(
+          const {SettingKeys.pasteOriginals: true},
+          desktop: true,
+          hasCrashTarget: false,
+        ).pasteOriginals,
+        isTrue,
+      );
+      await writer().set(SettingKeys.pasteOriginals, true);
+      await writer().set(SettingKeys.pasteOriginals, false);
+      expect((await outbox()).map((e) => e['kind']), [
+        PersonalOps.putMySetting,
+        PersonalOps.deleteMySetting,
+      ]);
+    });
+
     test('reset of an absent key sends nothing', () async {
       await writer().reset(SettingKeys.columnWidths);
       expect(await outbox(), isEmpty);
@@ -232,6 +258,15 @@ void main() {
             )
             .onPressed,
         isNull,
+      );
+      // A pasted screenshot goes as a smaller JPEG unless switched on (FIX-scan-state-stale).
+      expect(
+        tester
+            .widget<Switch>(
+              find.byKey(const ValueKey('settings.pasteOriginals')),
+            )
+            .value,
+        isFalse,
       );
     });
 

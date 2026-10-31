@@ -2787,7 +2787,21 @@ a follow-up that starts with `/` never becomes a command of the CLI. With
 user messages from stdin back on stdout for acknowledgment", CLI reference, [verified]); the echo
 with the same `uuid` sets `absorbed` (never before `delivered`; a second echo, the prompt's echo
 and unknown `uuid`s change nothing). A `404`, a message with `deleted_at` or an empty
-`content_md` is not written (log code `followup_no_text`).
+`content_md` without attachments is not written (log code `followup_no_text`).
+
+Attachments of a follow-up (addendum of 2026-10-31, docs/decisions.d/FIX-scan-state-stale.md):
+the server delivers `agent.followup` when the message is stored, also while its files are still
+checked ([12-files.md](12-files.md) 10 rule 1), and holds no follow-up the way it holds an
+invocation. Before the write, the runner therefore reads the message again every
+`runner.poll_interval` until every attachment is final (servable: `upload_state` `complete`
+with `scan_status` `clean` or `skipped`; or never: `failed`, `infected`, `error`), the turn ends
+or a stop comes, at most `runner.followup_file_wait` (log codes `followup_waits_for_files`,
+`followup_files_not_ready`); the wait holds no lock, so other follow-ups and the stop go on.
+The line then lists the files after the text under `Attachments:`, one line `- <name>
+(<mime type>): <text>` each: a servable file is downloaded like an attachment of the trigger
+into `<runner.state_dir>/files/<thread_id>/<file_id>` and its text is `local file: <path>`; a
+blocked or failed one is `unavailable: file_blocked`, one still not ready after the wait
+`unavailable: file_not_ready`. A follow-up of attachments only is written with the list alone.
 
 At the moment of writing the runner checks the follow-up's token again as before a start: expiry
 with `adapter.invocation_token_leeway` (4.5 point 5), the actual mode and tool class (points 8
@@ -3384,6 +3398,7 @@ configuration of the respective program outside the server.
 | `runner.default_workspace` | Runner | empty | folder of a forum without a project binding (18.1): `.` for `runner.projects_root`, else a folder name under it; empty means off, and a run in such a forum ends with the cause `project_not_bound` |
 | `runner.state_dir` | Runner | no default, required | state, recordings, incoming files |
 | `runner.followup_grace` | Runner | `30s` | stdin stays open for follow-ups after `result` |
+| `runner.followup_file_wait` | Runner | `2m` | longest wait for the server's check of a follow-up's attachments before the follow-up is written; a file still not ready is named as such (18.5, addendum of 2026-10-31) |
 | `runner.stop_grace` | Runner | `10s` | after SIGINT until SIGTERM |
 | `runner.kill_grace` | Runner | `5s` | after SIGTERM until SIGKILL; `runner.stop_grace` plus `runner.kill_grace` must stay below `agent.cancel_grace` of the server (18.6), which the runner cannot read |
 | `runner.session_lock_wait` | Runner | `10m` | wait time for a busy session |

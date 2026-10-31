@@ -398,10 +398,21 @@ extension FilesWorld on FakeWorld {
 
   /// Ends the scan of [fileId] with [result] (default [FakeFileSettings.scanResult]): the
   /// file becomes `complete`; a servable image gets thumbnails and a voice file its duration;
-  /// appends `file.updated` (12 3.4).
+  /// appends `file.updated` (12 3.4). As on the server, a clean or skipped image first stays
+  /// `pending` with its scan result (one `file.updated`), and the image job then makes it
+  /// `complete` with its thumbnails (a second one; 12 7.1, FIX-scan-state-stale).
   void finishScan(String fileId, {String? result}) {
     final f = files[fileId]!;
-    _scanned(f, result ?? fileSettings.scanResult);
+    final status = result ?? fileSettings.scanResult;
+    final mime = f.json['mime_type']! as String;
+    if ((status == 'clean' || status == 'skipped') &&
+        mime.startsWith('image/')) {
+      f.json
+        ..['upload_state'] = 'pending'
+        ..['scan_status'] = status;
+      _fileUpdated(f);
+    }
+    _scanned(f, status);
     _fileUpdated(f);
   }
 
@@ -686,17 +697,18 @@ extension FilesWorld on FakeWorld {
     }
   }
 
-  /// Appends `file.updated` (12 2): to the channel once the file is attached, to the uploader
-  /// alone before (12 3.7).
+  /// Appends `file.updated` (12 2): to the thread of its message once the file is attached,
+  /// to the uploader alone in the scope of its channel before (12 3.7, D-M3-07).
   void _fileUpdated(FakeFile f) {
     final channel = f.channelId;
     final space = channel == null
         ? null
         : channels[channel]?.json['space_id'] as String?;
+    final thread = messages[f.attachedTo]?['thread_id'] as String?;
     append(
       'file.updated',
       resource: {'kind': 'file', 'id': f.id},
-      scope: {'space_id': ?space, 'channel_id': ?channel},
+      scope: {'space_id': ?space, 'channel_id': ?channel, 'thread_id': ?thread},
       payload: {'file': f.json},
       audience: f.attachedTo == null ? f.uploadedBy : null,
     );

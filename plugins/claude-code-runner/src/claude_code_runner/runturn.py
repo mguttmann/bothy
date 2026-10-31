@@ -77,6 +77,7 @@ from bothy_sdk.outbox import OutboxState
 from bothy_sdk.runs import RunHandle, is_run_ended
 
 from claude_code_runner.adoption import read_identity
+from claude_code_runner.attachments import followup_file_texts, followup_files_final
 from claude_code_runner.causes import cause
 from claude_code_runner.commandline import SessionChoice, build_argv, reported_model
 from claude_code_runner.failures import (
@@ -815,6 +816,10 @@ class RunTurn:
         if not isinstance(message_id, UUID):
             return
         ids = {**self.ids, "message_id": message_id}
+        read: tuple[Message | None] | None = None
+        if self.phase == "open" and message_id not in self.followups:
+            # Outside the lock, so other follow-ups and the stop go on while a file is checked.
+            read = (await self._await_followup_files(message_id, ids),)
         async with self.write_lock:
             if self.stop_reason is not None or self.phase in ("closed", "ended"):
                 _log("followup_not_deliverable", **ids)
@@ -828,7 +833,7 @@ class RunTurn:
                 return
             if message_id in self.followups:
                 return
-            message = await self._read_message(message_id, ids)
+            message = read[0] if read is not None else await self._read_message(message_id, ids)
             if message is None:
                 return
             process = self.process
@@ -854,7 +859,12 @@ class RunTurn:
                 return
             author = message.author.to_dict()
             line_uuid = str(uuid4())
-            line = build_followup_line(author, message.content_md, line_uuid)
+            files = await followup_file_texts(
+                self.handle.client,
+                message.attachments,
+                self.cfg.state_dir / "files" / str(self.state.thread_id),
+            )
+            line = build_followup_line(author, message.content_md, line_uuid, files)
             # The record knows the line before the CLI can: a runner that adopts the turn maps
             # its echo to the follow-up and patches it absorbed (design note 12 f 3).
             self.followups.add(message_id, line_uuid, line)
@@ -889,11 +899,39 @@ class RunTurn:
         if (
             message is None
             or not isinstance(message.deleted_at, Unset | type(None))
-            or not message.content_md.strip()
+            or (not message.content_md.strip() and not message.attachments)
         ):
             _log("followup_no_text", **ids)
             return None
         return message
+
+    async def _await_followup_files(
+        self, message_id: UUID, ids: Mapping[str, Any]
+    ) -> Message | None:
+        """Wait until the attachments of a follow-up are final (FIX-scan-state-stale).
+
+        The server delivers a follow-up when the message is stored, also while its files are
+        still checked (12 10 rule 1). The runner reads the message again every
+        ``runner.poll_interval`` until every file is final, a stop or the end of the turn comes,
+        or ``runner.followup_file_wait`` has passed; the follow-up is then offered as usual and
+        names a file that is still not ready as such.
+
+        Returns:
+            The message of the last read (``None`` when it cannot be written), so the follow-up
+            is not read once more.
+        """
+        deadline = self.monotonic() + self.cfg.followup_file_wait
+        while True:
+            message = await self._read_message(message_id, ids)
+            if message is None or followup_files_final(message.attachments):
+                return message
+            if self._stop_requested() or self.phase != "open":
+                return message
+            if self.monotonic() >= deadline:
+                _log("followup_files_not_ready", **ids)
+                return message
+            _log("followup_waits_for_files", **ids)
+            await asyncio.sleep(self.cfg.poll_interval)
 
     async def _echo(self, line_uuid: object, *, adopted: bool = False) -> None:
         """The echo of an input line: its follow-up is ``absorbed`` (note 4 b).

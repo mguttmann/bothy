@@ -214,7 +214,8 @@ class _AttachmentTileState extends ConsumerState<AttachmentTile> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 DsIcon(
-                  state == AttachmentState.blocked
+                  state == AttachmentState.blocked ||
+                          state == AttachmentState.checkFailed
                       ? DsIcons.stateWarning
                       : state == AttachmentState.failed
                       ? DsIcons.stateError
@@ -359,8 +360,7 @@ class UploadChip extends StatelessWidget {
     final locale = Localizations.localeOf(context).languageCode;
     final size = fileSizeLabel(l, sizeBytes, locale: locale);
     final stateText = attachmentStateLabel(l, state, percent: percent);
-    final failed =
-        state == AttachmentState.failed || state == AttachmentState.canceled;
+    final failed = isFailedState(state);
     return Semantics(
       container: true,
       label: l.fileTileLabel(name, size, stateText),
@@ -435,14 +435,15 @@ class UploadChip extends StatelessWidget {
                           style: dsTextStyle(DsType.caption)
                               .copyWith(color: colors.textSecondary),
                         ),
-                        Text(
-                          stateText,
-                          style: dsTextStyle(DsType.caption).copyWith(
-                            color: failed
-                                ? colors.dangerFg
-                                : colors.textSecondary,
+                        if (stateText.isNotEmpty)
+                          Text(
+                            stateText,
+                            style: dsTextStyle(DsType.caption).copyWith(
+                              color: failed
+                                  ? colors.dangerFg
+                                  : colors.textSecondary,
+                            ),
                           ),
-                        ),
                       ],
                     ),
                   ),
@@ -452,7 +453,11 @@ class UploadChip extends StatelessWidget {
                       style: dsTextStyle(DsType.caption)
                           .copyWith(color: colors.textSecondary),
                     ),
-                  if (failed && onRetry != null)
+                  // Only an upload can be sent again; a file the server refused after its
+                  // check cannot (FIX-scan-state-stale).
+                  if ((state == AttachmentState.failed ||
+                          state == AttachmentState.canceled) &&
+                      onRetry != null)
                     DsButton(
                       key: ValueKey('upload.$attachmentKey.retry'),
                       label: l.fileUploadAgain,

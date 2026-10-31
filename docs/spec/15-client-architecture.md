@@ -898,14 +898,20 @@ file again; the uploads of a channel go one at a time, and an upload that waits 
 attempt shows "Paused, trying again shortly" ([12](12-files.md) 3.8, addendum of 2026-10-30), and
 attaches the file as soon as its upload session is completed
 (`completeUpload` with `200`, [12](12-files.md) 3.4), not only at `upload_state = complete`: until
-the result of the check the message shows the file as "being checked" ([12](12-files.md) 2), and
+the result of the check the message shows the file as "being checked", then "Preparing" while
+the server still prepares a checked file, and the composer and a waiting message follow the
+stored file that `file.updated` keeps current ([12](12-files.md) 2, addendum of 2026-10-31), and
 the server holds the agent invocation, at most `file.invocation_hold_max` ([12](12-files.md) 10; ruling D-M4-22-1). The app uploads photos from the
 media library as JPEG: it requests a JPEG representation from the system or converts
 by itself ([12-files.md](12-files.md), section 7.1;
 [ADR 0047](../adr/0047-remove-image-metadata-losslessly.md)). Reason: the server does not strip HEIC
 losslessly; HEIC should reach it only as a deliberately sent file. The app sends all other images
 unchanged; the server removes the metadata (baseline
-R-Objektspeicher). Preview before sending locally; after sending from `file_thumbnails` through the
+R-Objektspeicher). One exception (addendum of 2026-10-31, docs/decisions.d/FIX-scan-state-stale.md):
+a bitmap pasted from the clipboard on the desktop, which the app writes as a PNG itself, goes as
+a JPEG of quality 90 when that is at most 70 percent of the PNG's size, unless the personal
+setting `composer.paste_originals` is on ([01](01-product.md) 11); a file the person copied,
+dropped or picked is never re-encoded. Preview before sending locally; after sending from `file_thumbnails` through the
 server.
 
 On the phone the photo library picker is multi-select: one opening picks several photos, limited

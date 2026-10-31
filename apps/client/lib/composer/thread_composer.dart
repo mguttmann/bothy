@@ -329,6 +329,7 @@ class ThreadComposerState extends ConsumerState<ThreadComposer> {
         controller: attach,
         paste: ref.read(filePortsProvider).paste,
         scratch: () async => ref.read(outgoingFolderProvider),
+        originals: () => ref.read(personalSettingsProvider).pasteOriginals,
         child: child,
       ),
     );

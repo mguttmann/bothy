@@ -231,6 +231,7 @@ class Handle:
             thread_id=self.world.thread_id,
             deleted_at=None,
             content_md=followup.text,
+            attachments=[],
         )
 
     async def send(self, reply: str, *, client_msg_id: UUID) -> Any:

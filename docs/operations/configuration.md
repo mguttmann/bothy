@@ -484,6 +484,7 @@ Source: [09-agents.md](../spec/09-agents.md), section 21.
 | `runner.default_workspace` |  | Runner |  | empty | folder of a forum without a project binding (18.1): `.` for `runner.projects_root`, else a folder name under it; empty means off, and a run in such a forum ends with the cause `project_not_bound` |  |
 | `runner.state_dir` |  | Runner |  | no default, required | state, recordings, incoming files |  |
 | `runner.followup_grace` |  | Runner |  | `30s` | stdin stays open for follow-ups after `result` |  |
+| `runner.followup_file_wait` |  | Runner |  | `2m` | longest wait for the server's check of a follow-up's attachments before the follow-up is written; a file still not ready is named as such (18.5, addendum of 2026-10-31) |  |
 | `runner.stop_grace` |  | Runner |  | `10s` | after SIGINT until SIGTERM |  |
 | `runner.kill_grace` |  | Runner |  | `5s` | after SIGTERM until SIGKILL; `runner.stop_grace` plus `runner.kill_grace` must stay below `agent.cancel_grace` of the server (18.6), which the runner cannot read |  |
 | `runner.session_lock_wait` |  | Runner |  | `10m` | wait time for a busy session |  |

@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from collections.abc import Collection, Iterator, Mapping
+from collections.abc import Collection, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
@@ -129,25 +129,40 @@ def followup_verdict(check: FollowupCheck) -> tuple[FollowupVerdict, str]:  # no
 
 
 def build_followup_line(
-    author: Mapping[str, Any], text: str, line_uuid: str | None = None
+    author: Mapping[str, Any],
+    text: str,
+    line_uuid: str | None = None,
+    files: Sequence[str] = (),
 ) -> bytes:
-    """Build the stdin line of one follow-up (design note 3).
+    r"""Build the stdin line of one follow-up (design note 3).
 
     Args:
         author: The message's author (``display_name``, ``handle``).
-        text: ``content_md`` of the message.
+        text: ``content_md`` of the message; may be blank when the message has attachments.
         line_uuid: The ``uuid`` of the line; a fresh UUIDv4 when omitted.
+        files: One text per attachment (`attachments.followup_file_texts`), listed after the
+            text under ``Attachments:`` (FIX-scan-state-stale).
 
     Returns:
         One JSON line of type ``user`` with its line break.
+
+    Examples:
+        >>> import json
+        >>> line = build_followup_line({"handle": "sam"}, "", "u-2", ["a.png (image/png): x"])
+        >>> json.loads(line)["message"]["content"][0]["text"]
+        'Follow-up from sam (@sam):\n\nAttachments:\n- a.png (image/png): x'
     """
     name = str(author.get("display_name") or author.get("handle") or "")
     handle = str(author.get("handle") or "")
-    lead = LEAD_IN.format(name=name, handle=handle)
+    parts = [LEAD_IN.format(name=name, handle=handle)]
+    if text.strip() or not files:
+        parts.append(text)
+    if files:
+        parts.append("Attachments:\n" + "\n".join(f"- {f}" for f in files))
     doc = {
         "type": "user",
         "uuid": line_uuid or str(uuid.uuid4()),
-        "message": {"role": "user", "content": [{"type": "text", "text": f"{lead}\n\n{text}"}]},
+        "message": {"role": "user", "content": [{"type": "text", "text": "\n\n".join(parts)}]},
     }
     return json.dumps(doc, ensure_ascii=False, separators=(",", ":")).encode("utf-8") + b"\n"
 

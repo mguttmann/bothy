@@ -36,6 +36,9 @@ abstract final class SettingKeys {
   /// `true`, `false`.
   static const String enterSends = 'composer.enter_sends';
 
+  /// `true`, `false` (FIX-scan-state-stale).
+  static const String pasteOriginals = 'composer.paste_originals';
+
   /// `true`, `false`.
   static const String crashReports = 'privacy.crash_reports';
 
@@ -57,6 +60,7 @@ final class PersonalSettings {
     required this.density,
     required this.reduceMotion,
     required this.enterSends,
+    required this.pasteOriginals,
     required this.crashReports,
     required this.clientMetrics,
     required this.hasColumnWidths,
@@ -92,6 +96,7 @@ final class PersonalSettings {
         'off',
       ]),
       enterSends: flag(SettingKeys.enterSends, desktop),
+      pasteOriginals: flag(SettingKeys.pasteOriginals, false),
       crashReports: flag(SettingKeys.crashReports, hasCrashTarget),
       clientMetrics: flag(SettingKeys.clientMetrics, true),
       hasColumnWidths: stored[SettingKeys.columnWidths] is Map,
@@ -105,6 +110,7 @@ final class PersonalSettings {
     SettingKeys.density: 'comfortable',
     SettingKeys.reduceMotion: 'system',
     SettingKeys.clientMetrics: true,
+    SettingKeys.pasteOriginals: false,
   };
 
   /// `appearance.theme`.
@@ -118,6 +124,9 @@ final class PersonalSettings {
 
   /// `composer.enter_sends`.
   final bool enterSends;
+
+  /// `composer.paste_originals`: a pasted bitmap goes as it is, never as a smaller JPEG.
+  final bool pasteOriginals;
 
   /// `privacy.crash_reports`.
   final bool crashReports;

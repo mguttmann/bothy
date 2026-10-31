@@ -37,6 +37,9 @@ projects_root = "/srv/projects"
 default_workspace = ""
 state_dir = "/var/lib/claude-code-runner"
 followup_grace = "30s"
+# Longest wait for the server's check of a follow-up's attachments before the follow-up goes to
+# the turn; a file still not ready is then named as such.
+followup_file_wait = "2m"
 stop_grace = "10s"
 kill_grace = "5s"
 session_lock_wait = "10m"
