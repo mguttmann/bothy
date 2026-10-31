@@ -177,6 +177,8 @@ void main() {
         ),
       );
       expect(s.unreadBar, isFalse);
+      // The title stays bold while unread, only the bar gives way to the mark.
+      expect(s.boldTitle, isTrue);
       expect(_mark(), findsOneWidget);
       expect(find.text('1'), findsOneWidget);
       // The mark stands before the counter, at the trailing edge where the counters stand.
@@ -244,6 +246,7 @@ void main() {
       );
       final s = tester.state<DsChannelRowState>(find.byType(DsChannelRow));
       expect(s.unreadBar, isFalse);
+      expect(s.boldTitle, isTrue);
       expect(
         tester.widget<DsChatStatusMark>(_mark()).status,
         DsChatStatus.failed,

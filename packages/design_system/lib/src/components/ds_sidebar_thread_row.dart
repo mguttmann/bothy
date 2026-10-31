@@ -130,12 +130,14 @@ class DsSidebarThreadRowState extends State<DsSidebarThreadRow> {
     return c.textOnSidebarSecondary;
   }
 
+  /// Whether the title is bold: unread and not muted, also while the status mark replaces the
+  /// unread bar (01 6.17 item 4).
+  @visibleForTesting
+  bool get boldTitle => !widget.data.muted && widget.data.unreadCount > 0;
+
   /// Whether the unread bar on the left shows; the status mark replaces it (01 6.17 item 4).
   @visibleForTesting
-  bool get unreadBar =>
-      !widget.data.muted &&
-      widget.data.unreadCount > 0 &&
-      widget.data.status == null;
+  bool get unreadBar => boldTitle && widget.data.status == null;
 
   /// The row background of the selected state, or null.
   @visibleForTesting
@@ -202,7 +204,7 @@ class DsSidebarThreadRowState extends State<DsSidebarThreadRow> {
                     overflow: TextOverflow.ellipsis,
                     style: dsTextStyle(DsType.bodySm).copyWith(
                       color: color,
-                      fontWeight: unreadBar ? FontWeight.w700 : null,
+                      fontWeight: boldTitle ? FontWeight.w700 : null,
                     ),
                   ),
                 ),
