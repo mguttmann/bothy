@@ -890,7 +890,9 @@ missed write deadline (`gateway.write_timeout`) with `4014`; a panic or an inter
 `4000`.
 
 **Report.** After `ready` the host service sends `report` before it accepts any `session.open`,
-and the server sends `session.open` only after the first applied `report` after `ready`. The
+and the server sends `session.open` only after the first applied `report` after `ready`. The host
+service counts that `report` as sent from the moment it writes it, so a `session.open` the server
+sends at once is accepted even when it arrives before the write returned on the host. The
 server checks the report: every check `hd1_user` to `hd11_shared_locations` at least once;
 `check` and `session_user` unique together; `session_user` only on entries with `ok = false`;
 session user names unique without regard to case, each a name of 03 of at most

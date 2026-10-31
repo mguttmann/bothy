@@ -94,7 +94,10 @@ type Client struct {
 	stopped  chan struct{}
 	stopErr  error
 	loopDone chan struct{}
-	closed   bool
+	// reportWritten, when set, runs after a report was written and before sendReport returns
+	// (a seam of the internal tests that hold the reporting goroutine at that point).
+	reportWritten func()
+	closed        bool
 }
 
 // Compile-time check: the port of M2-42.
