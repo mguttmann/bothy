@@ -21,7 +21,8 @@ import 'support/agent_flow.dart';
 const MethodChannel _probe = MethodChannel('bothy/a11y_probe');
 
 /// Whether tool/run_composer_ax_insert_test.sh started the writer of another process
-/// (macos/AxWriteProbe/ax_write_probe.swift), which it does only with the Accessibility permission.
+/// (macos/AxWriteProbe/ax_write_probe.swift), which it does only with BOTHY_AX_CROSS_PROCESS=1
+/// and the Accessibility permission.
 const bool _crossProcess = bool.fromEnvironment('BOTHY_AX_CROSS_PROCESS');
 
 /// The composer text the writer of another process waits for, with the cursor before `|`.
@@ -155,7 +156,8 @@ void main() {
     (tester) async {
       if (!Platform.isMacOS || !_crossProcess) {
         markTestSkipped(
-          'unproven here: no writer of another process with the Accessibility permission '
+          'unproven here: no writer of another process (BOTHY_AX_CROSS_PROCESS=1 and the '
+          'Accessibility permission) '
           '(tool/run_composer_ax_insert_test.sh)',
         );
         return;
