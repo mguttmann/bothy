@@ -3702,6 +3702,18 @@ class AppLocalizationsDe extends AppLocalizations {
   String get messageActionCopyLink => 'Link kopieren';
 
   @override
+  String get messageActionCopySelection => 'Kopieren';
+
+  @override
+  String get messageActionSelectText => 'Text auswählen';
+
+  @override
+  String get messageSelectTextTitle => 'Text auswählen';
+
+  @override
+  String get messageSelectTextClose => 'Schließen';
+
+  @override
   String get messageMenuLabel => 'Aktionen der Nachricht';
 
   @override

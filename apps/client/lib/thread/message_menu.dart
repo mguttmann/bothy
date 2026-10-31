@@ -46,6 +46,14 @@ enum MessageAction {
 
   /// Copy the link `<scheme>://t/<thread>?m=<message>`.
   copyLink,
+
+  /// Copy the text selected in the message (the desktop, 01 6.15 item 2); offered by the tile
+  /// only while text is selected, and run by the tile itself.
+  copySelection,
+
+  /// Open the message in a view with selectable text (the phone, 01 6.15 item 5); offered and
+  /// run by the tile itself.
+  selectText,
 }
 
 /// The actions of [message] for the reader [me] with [permissions] (05 action table:
@@ -95,6 +103,8 @@ String messageActionLabel(AppLocalizations l, MessageAction action) =>
       MessageAction.markUnread => l.messageActionMarkUnread,
       MessageAction.copyText => l.messageActionCopyText,
       MessageAction.copyLink => l.messageActionCopyLink,
+      MessageAction.copySelection => l.messageActionCopySelection,
+      MessageAction.selectText => l.messageActionSelectText,
     };
 
 /// The icon of [action] on the hover bar, or null for an action only in the menu.

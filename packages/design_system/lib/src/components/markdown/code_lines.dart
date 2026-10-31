@@ -3,8 +3,9 @@
 /// The lines of a wrapped code block with a hanging indent (01 6.14 item 3; brief M4-49).
 library;
 
-import 'package:flutter/rendering.dart' show SelectedContent;
 import 'package:flutter/widgets.dart';
+
+import 'selection_join.dart';
 
 /// Draws [code] line by line, each line wrapping at the width it gets; a line that starts with
 /// spaces or tabs keeps that indentation on every wrapped line (hanging indent), so the
@@ -55,10 +56,20 @@ class DsCodeLines extends StatelessWidget {
         for (final line in code.split('\n')) _line(line, maxIndent, selectable),
       ],
     );
-    return selectable ? _JoinedSelection(child: column) : column;
+    return selectable
+        ? DsSelectionJoin(separator: '\n', child: column)
+        : column;
   }
 
   Widget _line(String line, double maxIndent, bool selectable) {
+    if (line.isEmpty && selectable) {
+      // An empty paragraph has nothing to select, so a selection over it would lose the
+      // empty line; a space that copies as nothing keeps its line break (01 6.15 item 3).
+      return DsSelectionJoin.replace(
+        replacement: '',
+        child: Text(' ', style: style),
+      );
+    }
     final indent = _indent.firstMatch(line);
     if (indent == null || indent.end == line.length) {
       return Text(line, style: style);
@@ -78,49 +89,6 @@ class DsCodeLines extends StatelessWidget {
         Expanded(child: Text(line.substring(indent.end), style: style)),
       ],
     );
-    return selectable ? _JoinedSelection(lines: false, child: row) : row;
-  }
-}
-
-/// A selection container whose content joins its parts with a line break ([lines]) or with
-/// nothing (the indentation and the rest of one line).
-class _JoinedSelection extends StatefulWidget {
-  const _JoinedSelection({this.lines = true, required this.child});
-
-  final bool lines;
-  final Widget child;
-
-  @override
-  State<_JoinedSelection> createState() => _JoinedSelectionState();
-}
-
-class _JoinedSelectionState extends State<_JoinedSelection> {
-  late final _JoinDelegate _delegate = _JoinDelegate(widget.lines ? '\n' : '');
-
-  @override
-  void dispose() {
-    _delegate.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) =>
-      SelectionContainer(delegate: _delegate, child: widget.child);
-}
-
-class _JoinDelegate extends StaticSelectionContainerDelegate {
-  _JoinDelegate(this.separator);
-
-  final String separator;
-
-  @override
-  SelectedContent? getSelectedContent() {
-    final parts = [
-      for (final selectable in selectables)
-        if (selectable.getSelectedContent() case final SelectedContent data)
-          data.plainText,
-    ];
-    if (parts.isEmpty) return null;
-    return SelectedContent(plainText: parts.join(separator));
+    return selectable ? DsSelectionJoin(separator: '', child: row) : row;
   }
 }

@@ -311,6 +311,9 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
           ),
         );
         _copied(l);
+      case MessageAction.copySelection || MessageAction.selectText:
+        // The tile runs them: they read what it shows, not the stored message (01 6.15).
+        break;
     }
   }
 

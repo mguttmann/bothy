@@ -122,7 +122,7 @@ the waves before it are merged; many can start earlier, as soon as their own dep
 | 38 | M4-24, M4-39, M5-02, M6-06, M6-14, M7-05, M8-05, M8-06 |
 | 39 | M4-32, M4-34, M4-36, M4-40, M4-48, M5-03, M5-04, M7-06, M7-09, M8-07 |
 | 40 | M4-38, M4-41, M4-42, M4-49, M5-05, M5-06, M5-07, M5-08, M5-09, M5-14, M6-16, M7-07, M7-08, M7-12, M7-14, M8-09 |
-| 41 | M4-43, M4-45, M5-10, M5-11, M5-15, M5-16, M6-17, M7-18, M7-21, M7-23, M7-26, M7-27 |
+| 41 | M4-43, M4-45, M4-50, M5-10, M5-11, M5-15, M5-16, M6-17, M7-18, M7-21, M7-23, M7-26, M7-27 |
 | 42 | M4-44, M4-46, M5-12, M7-13 |
 | 43 | M4-47, M5-13 |
 | 44 | M7-28 |
@@ -335,6 +335,7 @@ names listed here.
 | 39 | M4-48 | Copy single blocks of a message | `M4-48-copy-blocks.md` | M5-02 |
 | 43 | M4-47 | Long pastes become a file and long texts stay one message | `M4-47-paste-as-file.md` | M3-12, M4-46 |
 | 40 | M4-49 | Readable code blocks | `M4-49-readable-code-blocks.md` | M4-48 |
+| 41 | M4-50 | Free text selection in the history | `M4-50-text-selection.md` | M4-49 |
 | 23 | M6-01 | Console session following the BFF pattern | `M6-01-console-session.md` | M1-39, M1-40, M1-41, M1-43, M1-45, M1-49, M1-64 |
 | 37 | M6-05 | Statistics in the server | `M6-05-stats-server.md` | M2-22, M2-26, M3-22 |
 | 2 | M6-10 | Design tokens for charts: check for color vision deficiency | `M6-10-viz-cvd-check.md` | M4-03 |
@@ -990,6 +991,7 @@ flowchart TB
   M4_47["M4-47"]
   M4_48["M4-48"]
   M4_49["M4-49"]
+  M4_50["M4-50"]
   M5_02["M5-02"]
   M6_11["M6-11"]
   M1_01 --> M4_01
@@ -1079,6 +1081,7 @@ flowchart TB
   M4_46 --> M4_47
   M5_02 --> M4_48
   M4_48 --> M4_49
+  M4_49 --> M4_50
 ```
 
 Tickets of M5:

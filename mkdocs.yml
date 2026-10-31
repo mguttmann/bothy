@@ -453,6 +453,7 @@ nav:
           - "M4-47: Long pastes become a file": briefs/M4-47-paste-as-file.md
           - "M4-48: Copy single blocks of a message": briefs/M4-48-copy-blocks.md
           - "M4-49: Readable code blocks": briefs/M4-49-readable-code-blocks.md
+          - "M4-50: Free text selection in the history": briefs/M4-50-text-selection.md
       - Milestone M6:
           - "M6-01: Console session following the BFF pattern": briefs/M6-01-console-session.md
           - "M6-05: Statistics in the server": briefs/M6-05-stats-server.md

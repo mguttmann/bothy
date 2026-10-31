@@ -1735,9 +1735,9 @@ Applies to every message the renderer draws, on the desktop (macOS, Windows) and
    cannot be written, the plain text still is.
 5. **Nesting.** A block inside another copies only itself: the code block or quote inside a
    quote copies its own content, the outer quote copies all of its content as text.
-6. **Selection.** Selecting part of a message with the system selection, where a view offers it,
-   is not changed by the copy targets: a tap is the block's, a long press and a drag stay with
-   the selection and the message.
+6. **Selection.** Selecting part of a message with the system selection (6.15 on the desktop, the
+   view "Select text" on the phone) is not changed by the copy targets: a tap is the block's, a
+   long press and a drag stay with the selection and the message.
 
 ### 6.13 Long texts
 
@@ -1799,6 +1799,44 @@ Android).
 4. **Display only.** Wrapping, the horizontal scroll and the collapse change only the display: the
    copy of a block is its raw content as 6.12 item 3 defines, also while it is collapsed, and a
    system selection over a wrapped block keeps its line breaks and indentation (6.12 item 6).
+
+### 6.15 Text selection in the history
+
+Addendum of 2026-10-31 (R-PR-29, rulings D-M4-50-1 to D-M4-50-6). Reason: owner report of
+2026-10-31 (macOS app): text in the history could be neither clicked nor dragged to select, also
+not inside code blocks, so parts of messages, logs and code could not be copied; only "Copy code"
+(a whole block) and "Copy text" (a whole message) worked. The cause: nothing above the messages
+offered a system selection, so the text of a message was never selectable. Applies to the content
+of every message of the history (main history and threads).
+
+1. **Desktop (macOS, Windows).** The content of a message is selectable with the mouse: a click
+   and a drag select across its paragraphs, lists, quotes, tables and code blocks; a double click
+   selects a word, a triple click a paragraph or a line of code, and shift with a click extends
+   the selection. The selection lies within one message: a drag never continues into the next
+   message, because the history is a virtualized list whose messages off screen are not built,
+   and a selection across them would lose text without notice. Only the content is selectable:
+   the author's name, the time, the reply line, "(edited)", "Show more", the reactions, the files,
+   the hover bar, the language label and the controls of a code block ("Copy code", "Wrap
+   lines", "Show all") never are. The text of a card's components (6.5) and of a message still in
+   the outbox is not selectable; "Copy text" copies it.
+2. **Copy.** Cmd+C (Ctrl+C) copies the selection, and while text is selected the message menu of
+   a right click starts with "Copy", which copies it and confirms with "Copied". On macOS a right
+   click on a word outside the selection first selects that word, as the system does; on Windows
+   a right click outside the selection clears it. The selection draws no menu of its own: the
+   message menu is the one menu of a right click.
+3. **Plain text.** A copied selection is plain text in the structure the person sees: blocks
+   apart by an empty line, list items on their own lines with "- " or their number when the
+   marker is selected, a table row as its cells apart by a tab, inline Markdown as its text and a
+   link as its text. A part of a code block copies exactly the selected characters of its raw
+   content (6.12 item 3): its line breaks, indentation, tabs and empty lines, never a fence, the
+   language label or a line break of the display wrap (6.14).
+4. **Actions stay.** A click or a drag that selects triggers no action of the message: no menu,
+   no reply, no mark unread. A click on a link opens it; the copy buttons, "Wrap lines", "Show
+   all" and "Show more" work as before. A click in another message ends the selection.
+5. **Phone (iOS, Android).** The history keeps its gestures: a tap on a block copies it, a long
+   press opens the message menu (6.12 item 2). The menu has "Select text" after "Copy text"; it
+   opens the message in a sheet with the system selection (handles, the system menu with Copy and
+   Select all), whose copy follows item 3. A link in the sheet opens and closes the sheet.
 
 ## 7. Keyboard shortcuts
 
@@ -2055,6 +2093,7 @@ Rules:
 | R-PR-26 | A paste over `ui.composer_paste_file_chars` characters or `ui.composer_paste_file_lines` lines becomes a text file attachment with "Insert as text"; a text over `message.max_content_bytes` goes out as one message with its rest as one attachment, from people and agents alike; a message is never split (6.13, addendum of 2026-10-29). | Owner decision 2026-10-29: a person never hits a length limit, as in the former chat tool where 2000 characters forced splitting or a paid plan; one message keeps a reply readable and quotable as one. |
 | R-PR-27 | Every forum the Claude Code runner operates is a Claude Code chat: its folder need not be a Git repository, a forum without a project binding works in the runner's default folder when one is set, and a failed run shows its cause in the thread next to the reason (section 4, addendum of 2026-10-30). | Owner expectation 2026-10-30: three forums bound to folders without Git stayed "not ready", and a forum without a binding failed after 0 s with only "Error in the adapter" (docs/decisions.d/RUNNER-NO-GIT.md). |
 | R-PR-28 | A code block wraps its long lines by default, keeps the indentation of a wrapped line, and switches per device to one line per line with a working horizontal scroll through the toggle "Wrap lines"; a block higher than `ui.code_block_collapse_lines` lines shows collapsed with a fade and "Show all" / "Show less"; the copy stays the raw content (6.14, addendum of 2026-10-31). | Owner decision 2026-10-31: a long sentence sent as a fenced block "to copy" showed as one cut-off line that could neither be scrolled nor expanded on macOS, so the owner could not read what he would copy (docs/decisions.d/M4-49.md). |
+| R-PR-29 | The content of a message in the history is selectable with the mouse on the desktop (drag, double and triple click, shift and click) within one message, Cmd+C (Ctrl+C) and "Copy" of the message menu copy it as plain text in the structure of the message with code parts exact; on the phone "Select text" in the message menu opens the message with the system selection (6.15, addendum of 2026-10-31). | Owner report 2026-10-31 (macOS app): no text of the history could be selected, so parts of messages, logs and code could not be copied; the history offered no system selection (docs/decisions.d/M4-50.md). |
 
 ## 14. Configuration values of this chapter
 

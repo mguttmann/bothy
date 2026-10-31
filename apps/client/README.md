@@ -815,7 +815,10 @@ wrap their long lines by default (01 6.14, M4-49): `lib/app/code_block_preferenc
 renderer, from the app root, the device's choice of the toggle "Wrap lines" (kept in the local
 view state, `shell_view_state.code_blocks_unwrapped`) and the limit
 `ui.code_block_collapse_lines` above which a block shows collapsed with "Show all"
-(docs/decisions.d/M4-49.md). The session column (`lib/session_column/`) has its frame with
+(docs/decisions.d/M4-49.md). On the desktop the content of a message is selectable with the
+mouse within the message, and while text is selected the message menu starts with "Copy"; on
+the phone the menu has "Select text", which opens `lib/thread/select_text_view.dart`, a sheet with
+the system selection (01 6.15, M4-50, docs/decisions.d/M4-50.md). The session column (`lib/session_column/`) has its frame with
 the pinned messages and the files of the thread; the agent session follows (M4-21).
 
 ## Files and voice messages

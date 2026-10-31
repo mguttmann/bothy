@@ -42,6 +42,7 @@ the apps pass them from the app configuration (M4-08), this package holds no num
 | `DsMarkdown` | the Markdown source, `DsAttachmentResolver` | none | 1 |
 | `DsMarkdownCodeBlock`, `DsMarkdownQuoteBlock`, `DsClipboardScope` | `DsCopyData`, `DsClipboard`, `dsCodeBlockText`, `dsQuoteCopy` | none | 1 (01 6.12) |
 | `DsCodeBlockScope`, `DsCodeLines` | the wrap choice of the device, its callback, `ui.code_block_collapse_lines` | none | 1 (01 6.14, M4-49: wrap by default with a hanging indent, the toggle "Wrap lines" with a visible horizontal scrollbar, a long block collapsed with "Show all") |
+| `DsSelectionJoin` | the separator of a container, `.table`, `.replace` | none | 1 (01 6.15, M4-50: the plain text of a selection over a message: blocks apart by an empty line, list items, table cells and code lines; `DsMessage.onSelectionChanged` makes the content selectable on the desktop) |
 | `DsLiveBox`, `.collapsed`, `.mobile` | `DsRunData`, `DsStepData` | `visibleSteps` (`ui.livebox_visible_steps`), `announceMinInterval` (`a11y.live_announce_min_interval`) | 2 |
 | `LiveAnnouncer` | run state and question ID | `minInterval` (`a11y.live_announce_min_interval`) | 2.4 |
 | `DsToolChip` | `DsStepData` | none | 3 |

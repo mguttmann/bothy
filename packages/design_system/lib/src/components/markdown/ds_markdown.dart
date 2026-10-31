@@ -16,11 +16,13 @@ import 'block_copy.dart';
 import 'code_block_scope.dart';
 import 'code_lines.dart';
 import 'link_policy.dart';
+import 'selection_join.dart';
 
 export 'block_copy.dart';
 export 'code_block_scope.dart';
 export 'code_lines.dart';
 export 'link_policy.dart';
+export 'selection_join.dart';
 
 /// Resolves an image reference of a message to a widget, or returns null for the text form.
 ///
@@ -136,10 +138,13 @@ class DsMarkdown extends StatelessWidget {
       attachments,
       mentionHandles,
     );
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
-      children: builder.blocks(parse(source)),
+    return builder.join(
+      '\n\n',
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: builder.blocks(parse(source)),
+      ),
     );
   }
 }
@@ -159,6 +164,14 @@ class _Builder {
   final void Function(Uri) onOpenLink;
   final DsAttachmentResolver? attachments;
   final Set<String> mentionHandles;
+
+  /// Whether a system selection is above the renderer (01 6.15): only then do the containers
+  /// join their selected text with the separators of [DsSelectionJoin].
+  late final bool _selectable = SelectionContainer.maybeOf(context) != null;
+
+  /// [child] joined with [separator] under a selection, else as it is.
+  Widget join(String separator, Widget child) =>
+      _selectable ? DsSelectionJoin(separator: separator, child: child) : child;
 
   /// [text] as spans in [style], with the tokens of [mentionHandles] in the mention style.
   void _text(String text, TextStyle style, List<InlineSpan> out) {
@@ -263,10 +276,13 @@ class _Builder {
       case 'blockquote':
         return DsMarkdownQuoteBlock(
           content: () => dsQuoteCopy(e),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            mainAxisSize: MainAxisSize.min,
-            children: blocks(e.children ?? const []),
+          child: join(
+            '\n\n',
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: blocks(e.children ?? const []),
+            ),
           ),
         );
       case 'ul' || 'ol':
@@ -298,20 +314,29 @@ class _Builder {
     final ordered = list.tag == 'ol';
     final start = int.tryParse(list.attributes['start'] ?? '') ?? 1;
     final items = (list.children ?? const []).whereType<md.Element>().toList();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        for (var i = 0; i < items.length; i++)
-          Padding(
-            padding: const EdgeInsets.only(bottom: DsSpace.s4),
-            child: _listItem(items[i], ordered ? '${start + i}.' : '•'),
-          ),
-      ],
+    return join(
+      '\n',
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (var i = 0; i < items.length; i++)
+            Padding(
+              padding: const EdgeInsets.only(bottom: DsSpace.s4),
+              child: _listItem(
+                items[i],
+                ordered ? '${start + i}.' : '•',
+                ordered ? '${start + i}. ' : '- ',
+              ),
+            ),
+        ],
+      ),
     );
   }
 
-  Widget _listItem(md.Element item, String marker) {
+  /// One item of a list with its [marker]; a selection that covers the marker copies
+  /// [copyMarker] instead (01 6.15 item 3), like the copy of a quote (01 6.12 item 4).
+  Widget _listItem(md.Element item, String marker, String copyMarker) {
     final children = List<md.Node>.of(item.children ?? const []);
     Widget? lead;
     // In a loose list (blank lines between items) the box sits inside the first paragraph.
@@ -339,26 +364,37 @@ class _Builder {
         ),
       );
     }
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: DsSpace.s24,
-          child:
-              lead ??
-              Text(
-                marker,
-                style: base.copyWith(color: context.dsColors.textSecondary),
+    Widget? markerText;
+    if (lead == null) {
+      markerText = Text(
+        marker,
+        style: base.copyWith(color: context.dsColors.textSecondary),
+      );
+      if (_selectable) {
+        markerText = DsSelectionJoin.replace(
+          replacement: copyMarker,
+          child: markerText,
+        );
+      }
+    }
+    return join(
+      '',
+      Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(width: DsSpace.s24, child: lead ?? markerText),
+          Expanded(
+            child: join(
+              '\n',
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
+                children: blocks(children),
               ),
-        ),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            mainAxisSize: MainAxisSize.min,
-            children: blocks(children),
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -378,35 +414,36 @@ class _Builder {
     final colors = context.dsColors;
     final strong = dsTextStyle(DsType.bodyStrong)
         .copyWith(color: colors.textPrimary);
+    final Widget grid = Table(
+      defaultColumnWidth: const IntrinsicColumnWidth(),
+      border: TableBorder.all(
+        color: colors.borderSubtle,
+        width: DsBorderWidth.hairline,
+      ),
+      children: [
+        for (var r = 0; r < rows.length; r++)
+          TableRow(
+            children: [
+              for (var c = 0; c < width; c++)
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: DsSpace.s8,
+                    vertical: DsSpace.s4,
+                  ),
+                  child: c < rows[r].length
+                      ? _paragraph(
+                          rows[r][c].children ?? const [],
+                          headerRows.contains(r) ? strong : base,
+                        )
+                      : const SizedBox.shrink(),
+                ),
+            ],
+          ),
+      ],
+    );
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      child: Table(
-        defaultColumnWidth: const IntrinsicColumnWidth(),
-        border: TableBorder.all(
-          color: colors.borderSubtle,
-          width: DsBorderWidth.hairline,
-        ),
-        children: [
-          for (var r = 0; r < rows.length; r++)
-            TableRow(
-              children: [
-                for (var c = 0; c < width; c++)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: DsSpace.s8,
-                      vertical: DsSpace.s4,
-                    ),
-                    child: c < rows[r].length
-                        ? _paragraph(
-                            rows[r][c].children ?? const [],
-                            headerRows.contains(r) ? strong : base,
-                          )
-                        : const SizedBox.shrink(),
-                  ),
-              ],
-            ),
-        ],
-      ),
+      child: _selectable ? DsSelectionJoin.table(child: grid) : grid,
     );
   }
 
@@ -442,10 +479,13 @@ class _Builder {
       );
     }
     if (block.length == 1) return block.single;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: block,
+    return join(
+      '\n',
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: block,
+      ),
     );
   }
 
@@ -879,9 +919,12 @@ class _DsMarkdownCodeBlockState extends State<DsMarkdownCodeBlock> {
     void copy() => _copyBlock(context, DsCopyData(code), touch: touch);
     final style = dsTextStyle(DsType.code).copyWith(color: colors.codeFg);
     final lineHeight = _lineHeight(style, MediaQuery.textScalerOf(context));
-    final label = Text(
-      widget.language ?? '',
-      style: dsTextStyle(DsType.codeSm).copyWith(color: colors.textSecondary),
+    // The language is a label of the block, not its content: never part of a selection.
+    final label = SelectionContainer.disabled(
+      child: Text(
+        widget.language ?? '',
+        style: dsTextStyle(DsType.codeSm).copyWith(color: colors.textSecondary),
+      ),
     );
     final toggle = _WrapToggle(
       label: l.markdownCodeWrap,
