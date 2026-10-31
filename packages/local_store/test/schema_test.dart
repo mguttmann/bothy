@@ -22,6 +22,14 @@ const Map<String, List<String>> expected = {
     'sort_key',
     'version',
     'updated_by_device_id',
+    'channel_order',
+  ],
+  // 03 `user_channel_states` (one person per database: no `user_id`; M4-51).
+  'user_channel_states': [
+    'channel_id',
+    'thread_order',
+    'version',
+    'updated_by_device_id',
   ],
   // 03 `channels` without `prompt` and the behaviour fields; `effective_operator_agent_id`:
   // API `ChannelOperator.effective_agent_id`; `main_thread_id`, `dm_participant_ids`,
@@ -314,8 +322,8 @@ void main() {
     return [for (final r in rows) r.read<String>('name')];
   }
 
-  test('schema version 11 has exactly the tables of 15 6.1', () async {
-    expect(db.schemaVersion, 11);
+  test('schema version 12 has exactly the tables of 15 6.1', () async {
+    expect(db.schemaVersion, 12);
     final rows = await db
         .customSelect(
           "SELECT name FROM sqlite_master WHERE type = 'table' "

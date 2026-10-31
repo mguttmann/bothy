@@ -10,7 +10,7 @@ import (
 // chatConfigKeys returns the keys the module chat reads from docs/spec/03-data-model.md
 // "Configuration values of this chapter": the space name limit (M1-52), the channel and tag text
 // limits and the history backfill limits of a channel (M1-53), the tag limit of a thread (M1-55),
-// the prompt limit of a channel (M2-02);
+// the prompt limit of a channel (M2-02), the length of a personal order list of the sidebar (M4-51);
 // and from docs/spec/09-agents.md the placeholder titles (M1-55) and the text limit of a project
 // binding (M2-03). thread.title_max_chars is
 // declared with messaging (configkeys_messaging.go), the page sizes with the API keys.
@@ -62,6 +62,13 @@ func chatConfigKeys() []config.Key {
 		{
 			Name: "thread.max_tags", Kind: config.KindInt, Default: "5", Min: "1",
 			Doc:     "Most forum tags of one thread.",
+			Chapter: chapter03,
+		},
+		{
+			// The maxItems of the lists in docs/api/openapi.yaml is this maximum (M4-51), so an answer
+			// never leaves its schema.
+			Name: "sidebar.order_max_items", Kind: config.KindInt, Default: "1000", Min: "1", Max: "1000",
+			Doc:     "Most items of a personal order list of the sidebar: channel_order of a space and thread_order of a channel (M4-51).",
 			Chapter: chapter03,
 		},
 		{

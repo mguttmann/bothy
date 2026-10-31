@@ -58,7 +58,7 @@ SHA-256 of uploads and downloads), and for files and voice (M4-22, docs/DECISION
 | `lib/session_column/` | the frame of the session column with the agent part (M4-21) and the sections "Pinned" (M4-20) and "Files" (M4-22) |
 | `lib/files/` | files (M4-22): the upload executor and the attaching of its files, the part plan and hashing, the composer's attachments (button, drag and drop, paste), attachment tiles and their states, image previews, downloads with `Repr-Digest`, the file cache, ticket players, the file ports and providers |
 | `lib/voice/` | voice messages (M4-22): the recorder port over `record`, the recording bar, the player with speeds and the transcript |
-| `lib/sync/` | the app's outbox executors: `putMySidebarSpace` (`sidebar_ops.dart`), `createThread` (`thread_ops.dart`), the thread view's writes (`message_ops_app.dart`), the notification levels and quiet hours (`notify_ops.dart`, M4-33), the interactions, commands and session actions of the agent interface (`agent_ops.dart`, M4-21); the transcript feed of the offline search (`search_index_feed.dart`, M4-23) |
+| `lib/sync/` | the app's outbox executors: `putMySidebarSpace` and `putMySidebarChannel` (`sidebar_ops.dart`, M4-51), `createThread` (`thread_ops.dart`), the thread view's writes (`message_ops_app.dart`), the notification levels and quiet hours (`notify_ops.dart`, M4-33), the interactions, commands and session actions of the agent interface (`agent_ops.dart`, M4-21); the transcript feed of the offline search (`search_index_feed.dart`, M4-23) |
 | `lib/search/` | search D7 (M4-23): the notation of `from:`, `in:`, `has:file`, `before:` and `after:`, the controller that merges server and local hits, the offline search over the FTS5 index, the segments of the server, the view with its filter column |
 | `lib/switcher/` | the quick switcher D6 (M4-23): local sources and the prefix search of thread titles, the recently visited targets of this device, the overlay |
 | `lib/mentions/` | the view of the own mentions (M4-23) over `listMyMentions` |
@@ -656,8 +656,26 @@ snapshot's `active_threads` and the events the engine applies, never from a list
 channel. Each group collapses with its own arrow; the state is kept per device in
 `channel_view_states` of `local_store`. The arrow keys walk the tree (arrow right expands a group
 or enters its first row, arrow left goes back or collapses), and "next or previous channel" and
-"next unread" stop at thread rows too. Thread and channel rows cannot be dragged; only a space
-row starts a drag.
+"next unread" stop at thread rows too. Text channel threads cannot be dragged.
+
+### Sidebar ordering (M4-51)
+
+The spaces, the channels of a space and the open posts of a forum each have an order (01 6.16,
+D-M4-51-1 to D-M4-51-9; design note `docs/design/sidebar-ordering.md`). The pure rules are in
+`sidebar_arrange.dart` (`applyPersonalOrder`, `orderByActivity`, `holdOrder`, `moveAmong`, the
+activity of a channel and a space); `selectSidebarThreads` takes the manual order of a forum.
+`sidebar_drag.dart` holds `SidebarDragRow` (a mouse drag on the desktop, a long press on touch, a
+drop line on the target, drops only within the same level and parent), `SidebarArrangedRow` (the
+note at an automatic level) and the "Move up" and "Move down" entries of the sidebar menus and
+screen reader actions; the spaces keep the reorderable list of `space_tree.dart`, with the delayed
+drag start on touch. The personal orders are synchronized per person
+(`user_space_states.channel_order`, `user_channel_states.thread_order`) and written through the
+outbox by `SidebarWriter.orderChannels` and `SidebarWriter.orderThreads` of
+`lib/sync/sidebar_ops.dart`. The personal settings `sidebar.auto_arrange_spaces`,
+`sidebar.auto_arrange_channels` and `sidebar.auto_arrange_chats` (`SettingKeys.autoArrange*`,
+`sidebarArrangementProvider`, the switches in Settings, Appearance) arrange a level by activity;
+`SpacesWithState` and `ChannelsOfSpace` then order by activity and hold their order while
+`SidebarHold` holds.
 
 A click on a forum (or "All posts") opens the forum overview D15 in the content column: the post
 list of `lib/forum/` with the kind sentence, "New chat" in a project forum or "New post", the

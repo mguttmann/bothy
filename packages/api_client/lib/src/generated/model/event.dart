@@ -35,6 +35,7 @@ import 'package:api_client/src/generated/model/agent_session_changed_event.dart'
 import 'package:api_client/src/generated/model/gdpr_request_due_event.dart';
 import 'package:api_client/src/generated/model/pin_removed_event.dart';
 import 'package:api_client/src/generated/model/command_invoked_event.dart';
+import 'package:api_client/src/generated/model/sidebar_channel_updated_event.dart';
 import 'package:api_client/src/generated/model/read_state_updated_event.dart';
 import 'package:api_client/src/generated/model/notification_pref_updated_event.dart';
 import 'package:api_client/src/generated/model/file_updated_event.dart';
@@ -90,7 +91,7 @@ part 'event.g.dart';
 /// * [payload]
 @BuiltValue()
 abstract class Event implements Built<Event, EventBuilder> {
-  /// One Of [AccessChangedEvent], [AccessExpiringEvent], [AgentConfigChangedEvent], [AgentFollowupEvent], [AgentInvocationEvent], [AgentSessionChangedEvent], [AgentUpdatedEvent], [ChannelArchivedEvent], [ChannelCreatedEvent], [ChannelSettingsChangedEvent], [ChannelUpdatedEvent], [CommandChangedEvent], [CommandInvokedEvent], [DevicePendingEvent], [DraftDeletedEvent], [DraftUpdatedEvent], [FileUpdatedEvent], [GdprRequestDueEvent], [GdprRequestUpdatedEvent], [GrantChangedEvent], [GroupChangedEvent], [HostUpdatedEvent], [ImportProgressEvent], [InstanceUpdatedEvent], [InteractionCreatedEvent], [MessageCreatedEvent], [MessageDeletedEvent], [MessageUpdatedEvent], [NotificationPrefUpdatedEvent], [PinAddedEvent], [PinRemovedEvent], [QuietHoursUpdatedEvent], [ReactionAddedEvent], [ReactionRemovedEvent], [ReadStateUpdatedEvent], [RunCancelRequestedEvent], [RunStateChangedEvent], [SessionRevokedEvent], [SettingsUpdatedEvent], [SidebarUpdatedEvent], [SpaceArchivedEvent], [SpaceCreatedEvent], [SpaceUpdatedEvent], [StatusUpdatedEvent], [TerminalSessionChangedEvent], [ThreadClosedEvent], [ThreadCreatedEvent], [ThreadMovedEvent], [ThreadMovedOutEvent], [ThreadReopenedEvent], [ThreadUpdatedEvent], [UserUpdatedEvent]
+  /// One Of [AccessChangedEvent], [AccessExpiringEvent], [AgentConfigChangedEvent], [AgentFollowupEvent], [AgentInvocationEvent], [AgentSessionChangedEvent], [AgentUpdatedEvent], [ChannelArchivedEvent], [ChannelCreatedEvent], [ChannelSettingsChangedEvent], [ChannelUpdatedEvent], [CommandChangedEvent], [CommandInvokedEvent], [DevicePendingEvent], [DraftDeletedEvent], [DraftUpdatedEvent], [FileUpdatedEvent], [GdprRequestDueEvent], [GdprRequestUpdatedEvent], [GrantChangedEvent], [GroupChangedEvent], [HostUpdatedEvent], [ImportProgressEvent], [InstanceUpdatedEvent], [InteractionCreatedEvent], [MessageCreatedEvent], [MessageDeletedEvent], [MessageUpdatedEvent], [NotificationPrefUpdatedEvent], [PinAddedEvent], [PinRemovedEvent], [QuietHoursUpdatedEvent], [ReactionAddedEvent], [ReactionRemovedEvent], [ReadStateUpdatedEvent], [RunCancelRequestedEvent], [RunStateChangedEvent], [SessionRevokedEvent], [SettingsUpdatedEvent], [SidebarChannelUpdatedEvent], [SidebarUpdatedEvent], [SpaceArchivedEvent], [SpaceCreatedEvent], [SpaceUpdatedEvent], [StatusUpdatedEvent], [TerminalSessionChangedEvent], [ThreadClosedEvent], [ThreadCreatedEvent], [ThreadMovedEvent], [ThreadMovedOutEvent], [ThreadReopenedEvent], [ThreadUpdatedEvent], [UserUpdatedEvent]
   OneOf get oneOf;
 
   static const String discriminatorFieldName = r'type';
@@ -136,6 +137,7 @@ abstract class Event implements Built<Event, EventBuilder> {
     r'session.revoked': SessionRevokedEvent,
     r'settings.updated': SettingsUpdatedEvent,
     r'sidebar.updated': SidebarUpdatedEvent,
+    r'sidebar_channel.updated': SidebarChannelUpdatedEvent,
     r'space.archived': SpaceArchivedEvent,
     r'space.created': SpaceCreatedEvent,
     r'space.updated': SpaceUpdatedEvent,
@@ -282,6 +284,9 @@ extension EventDiscriminatorExt on Event {
     }
     if (this is SidebarUpdatedEvent) {
       return r'sidebar.updated';
+    }
+    if (this is SidebarChannelUpdatedEvent) {
+      return r'sidebar_channel.updated';
     }
     if (this is SpaceArchivedEvent) {
       return r'space.archived';
@@ -445,6 +450,9 @@ extension EventBuilderDiscriminatorExt on EventBuilder {
     if (this is SidebarUpdatedEventBuilder) {
       return r'sidebar.updated';
     }
+    if (this is SidebarChannelUpdatedEventBuilder) {
+      return r'sidebar_channel.updated';
+    }
     if (this is SpaceArchivedEventBuilder) {
       return r'space.archived';
     }
@@ -567,6 +575,7 @@ class _$EventSerializer implements PrimitiveSerializer<Event> {
       SessionRevokedEvent,
       SettingsUpdatedEvent,
       SidebarUpdatedEvent,
+      SidebarChannelUpdatedEvent,
       SpaceArchivedEvent,
       SpaceCreatedEvent,
       SpaceUpdatedEvent,
@@ -863,6 +872,13 @@ class _$EventSerializer implements PrimitiveSerializer<Event> {
         ) as SidebarUpdatedEvent;
         oneOfType = SidebarUpdatedEvent;
         break;
+      case r'sidebar_channel.updated':
+        oneOfResult = serializers.deserialize(
+          oneOfDataSrc,
+          specifiedType: FullType(SidebarChannelUpdatedEvent),
+        ) as SidebarChannelUpdatedEvent;
+        oneOfType = SidebarChannelUpdatedEvent;
+        break;
       case r'space.archived':
         oneOfResult = serializers.deserialize(
           oneOfDataSrc,
@@ -1095,6 +1111,9 @@ class EventTypeEnum extends EnumClass {
   @BuiltValueEnumConst(wireName: r'sidebar.updated')
   static const EventTypeEnum sidebarPeriodUpdated =
       _$eventTypeEnum_sidebarPeriodUpdated;
+  @BuiltValueEnumConst(wireName: r'sidebar_channel.updated')
+  static const EventTypeEnum sidebarChannelPeriodUpdated =
+      _$eventTypeEnum_sidebarChannelPeriodUpdated;
   @BuiltValueEnumConst(wireName: r'notification_pref.updated')
   static const EventTypeEnum notificationPrefPeriodUpdated =
       _$eventTypeEnum_notificationPrefPeriodUpdated;

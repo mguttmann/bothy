@@ -8,6 +8,7 @@ import 'package:domain/domain.dart';
 import 'package:drift/drift.dart';
 
 import '../database.dart';
+import '../mappers/codec.dart';
 import '../mappers/structure.dart';
 import '../models.dart';
 import 'upsert.dart';
@@ -78,15 +79,20 @@ final class StructureDao {
   }
 
   /// Writes the sidebar state of [spaceId] at once on this device, before the server confirms
-  /// it (brief M4-19 Design note 2): [collapsed], and [sortKey] when given (null keeps the
-  /// stored order). The version stays, so the server's state of the write (stored by the
-  /// executor) and a later change of another device win by version (04 14); a missing row
-  /// starts at version 0.
+  /// it (brief M4-19 Design note 2): [collapsed], [sortKey] when given (null keeps the stored
+  /// order) and [channelOrder] when given (null keeps the stored list, an empty list clears it
+  /// to the default order; M4-51). The version stays, so the server's state of the write
+  /// (stored by the executor) and a later change of another device win by version (04 14); a
+  /// missing row starts at version 0.
   Future<void> putUserSpaceStateLocally(
     SpaceId spaceId, {
     required bool collapsed,
     String? sortKey,
+    List<ChannelId>? channelOrder,
   }) => _db.transaction(() async {
+    final order = channelOrder == null
+        ? const Value<String?>.absent()
+        : Value(encodeChannelOrder(channelOrder));
     final updated =
         await (_db.update(
           _db.userSpaceStates,
@@ -94,6 +100,7 @@ final class StructureDao {
           UserSpaceStatesCompanion(
             collapsed: Value(collapsed),
             sortKey: sortKey == null ? const Value.absent() : Value(sortKey),
+            channelOrder: order,
           ),
         );
     if (updated > 0) return;
@@ -104,6 +111,7 @@ final class StructureDao {
             spaceId: spaceId.value,
             collapsed: collapsed,
             sortKey: Value(sortKey),
+            channelOrder: order,
             version: 0,
           ),
         );
@@ -112,6 +120,48 @@ final class StructureDao {
   /// The sidebar states of all spaces.
   Stream<List<UserSpaceState>> watchUserSpaceStates() =>
       _db.select(_db.userSpaceStates).map(userSpaceStateFromRow).watch();
+
+  /// Stores the channel sidebar [state] (the own thread order) if its version is newer
+  /// (04 9 item 3, 04 14); returns whether it applied (M4-51).
+  Future<bool> upsertUserChannelStateIfNewer(UserChannelState state) {
+    final row = userChannelStateToCompanion(state);
+    return upsertIfNewerVersion(
+      _db,
+      _db.userChannelStates,
+      row,
+      update: row,
+      version: (t) => t.version,
+    );
+  }
+
+  /// Writes the own [threadOrder] of [channelId] at once on this device, before the server
+  /// confirms it, as [putUserSpaceStateLocally] does (M4-51, D-M4-51-3): the version and the
+  /// device of the last write stay, so the server's state of the write and a later change of
+  /// another device win by version (04 14); a missing row starts at version 0.
+  Future<void> putUserChannelStateLocally(
+    ChannelId channelId,
+    List<ThreadId> threadOrder,
+  ) => _db.transaction(() async {
+    final order = encodeTexts(threadOrder);
+    final updated =
+        await (_db.update(_db.userChannelStates)
+              ..where((t) => t.channelId.equals(channelId.value)))
+            .write(UserChannelStatesCompanion(threadOrder: Value(order)));
+    if (updated > 0) return;
+    await _db
+        .into(_db.userChannelStates)
+        .insert(
+          UserChannelStatesCompanion.insert(
+            channelId: channelId.value,
+            threadOrder: Value(order),
+            version: 0,
+          ),
+        );
+  });
+
+  /// The sidebar states of all channels that have one (M4-51).
+  Stream<List<UserChannelState>> watchUserChannelStates() =>
+      _db.select(_db.userChannelStates).map(userChannelStateFromRow).watch();
 
   /// Stores [channel] and its operator setting if its version is newer, in one transaction;
   /// returns whether it applied.

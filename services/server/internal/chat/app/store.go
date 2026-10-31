@@ -64,8 +64,16 @@ type ThreadQuery struct {
 	Limit int
 }
 
+// SidebarKeep names the stored values a sidebar write keeps (putMySidebarSpace, 04 section 14).
+type SidebarKeep struct {
+	// Key keeps the stored personal sort key.
+	Key bool
+	// ChannelOrder keeps the stored channel order (M4-51).
+	ChannelOrder bool
+}
+
 // Store is the outgoing port of the chat application layer over spaces, user_space_states,
-// channels, forum_tags, threads and thread_tags (implemented by adapters/postgres). Reads run in the ambient transaction of ctx when there is
+// user_channel_states, channels, forum_tags, threads and thread_tags (implemented by adapters/postgres). Reads run in the ambient transaction of ctx when there is
 // one and on the pool otherwise; writes and locks run only inside a unit of work of kernel/txn and
 // fail with kind internal outside one. Errors are kernel/errs errors without SQL text or values.
 type Store interface {
@@ -96,11 +104,18 @@ type Store interface {
 	// ArchiveSpace writes archived_at and version of s.
 	ArchiveSpace(ctx context.Context, s domain.Space) error
 	// PutSidebarState inserts or replaces the row of st.UserID and st.SpaceID with version + 1;
-	// keepKey keeps the stored personal key. It returns the stored row.
-	PutSidebarState(ctx context.Context, st domain.SidebarState, keepKey bool) (domain.SidebarState, error)
+	// keep names the stored values that stay. It returns the stored row.
+	PutSidebarState(ctx context.Context, st domain.SidebarState, keep SidebarKeep) (domain.SidebarState, error)
 	// SidebarStates returns the rows of user for spaces that are not archived, all of them (all)
 	// or those in visible, ascending by space (07 section 7.4 rule 1).
 	SidebarStates(ctx context.Context, user ids.ID, all bool, visible []ids.ID) ([]domain.SidebarState, error)
+	// PutSidebarChannelState inserts or replaces the row of st.UserID and st.ChannelID with
+	// version + 1 (M4-51). It returns the stored row.
+	PutSidebarChannelState(ctx context.Context, st domain.SidebarChannelState) (domain.SidebarChannelState, error)
+	// SidebarChannelStates returns the channel rows of user for channels that are not archived
+	// and lie in a space that is not archived: all of them (all), else those in visible or in a
+	// space of fullyVisible, ascending by channel (07 section 7.4 rule 1, M4-51).
+	SidebarChannelStates(ctx context.Context, user ids.ID, all bool, visible, fullyVisible []ids.ID) ([]domain.SidebarChannelState, error)
 
 	// Channel returns the channel id with its space facts; found is false for an unknown id.
 	Channel(ctx context.Context, id ids.ID) (c ChannelRow, found bool, err error)

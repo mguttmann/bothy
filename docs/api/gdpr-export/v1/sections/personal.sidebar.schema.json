@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "personal.json sidebar",
-  "description": "The personal sidebar of the person (table user_space_states, docs/spec/20-privacy.md section 5.2): per space the collapsed state and the personal order, archived spaces included. Only the space ID, never the space name.",
+  "description": "The personal sidebar of the person (table user_space_states, docs/spec/20-privacy.md section 5.2): per space the collapsed state, the personal order and the personal order of its channels, archived spaces included. Only the space ID, never the space name.",
   "type": "array",
   "items": {
     "type": "object",
@@ -11,6 +11,7 @@
       "space_id": {"description": "ID of the space the row belongs to.", "type": "string", "format": "uuid"},
       "collapsed": {"description": "Whether the person collapsed the space in the sidebar.", "type": "boolean"},
       "sort_key": {"description": "The personal sort key of the space; absent when the person follows the global order.", "type": "string"},
+      "channel_order": {"description": "The personal order of the channels and forums of the space, as channel IDs; absent when the person follows the default order.", "type": "array", "items": {"type": "string", "format": "uuid"}},
       "updated_by_device_id": {"description": "ID of the device of the last change; absent when unknown or the device is gone.", "type": "string", "format": "uuid"},
       "updated_at": {"description": "When the row was last changed.", "type": "string", "format": "date-time"}
     }

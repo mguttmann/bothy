@@ -1955,6 +1955,38 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sidebarMoveDown => 'Move down';
 
   @override
+  String get sidebarArrangedByActivity => 'Arranged by activity';
+
+  @override
+  String get sidebarSpacesArrangedHint =>
+      'Spaces are arranged by activity. Turn off \"Arrange spaces automatically\" in Settings, Appearance, to arrange them yourself.';
+
+  @override
+  String get sidebarChannelsArrangedHint =>
+      'Channels and projects are arranged by activity. Turn off \"Arrange channels and projects automatically\" in Settings, Appearance, to arrange them yourself.';
+
+  @override
+  String get sidebarChatsArrangedHint =>
+      'Chats are arranged by activity. Turn off \"Arrange chats automatically\" in Settings, Appearance, to arrange them yourself.';
+
+  @override
+  String get settingsSidebarHeading => 'Sidebar';
+
+  @override
+  String get settingsAutoArrangeSpaces => 'Arrange spaces automatically';
+
+  @override
+  String get settingsAutoArrangeChannels =>
+      'Arrange channels and projects automatically';
+
+  @override
+  String get settingsAutoArrangeChats => 'Arrange chats automatically';
+
+  @override
+  String get settingsAutoArrangeHint =>
+      'Newest activity first. Off: drag to arrange.';
+
+  @override
   String get sidebarNoSpaces => 'No spaces yet';
 
   @override

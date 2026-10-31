@@ -82,6 +82,10 @@ func (s *snapStubs) ListSidebar(context.Context) ([]syncmod.SidebarState, error)
 	return nil, s.err("sidebar")
 }
 
+func (s *snapStubs) ListSidebarChannels(context.Context) ([]syncmod.SidebarChannelState, error) {
+	return nil, s.err("sidebar_channels")
+}
+
 func (s *snapStubs) List(context.Context) ([]syncmod.UserSetting, error) {
 	return nil, s.err("settings")
 }
@@ -131,7 +135,7 @@ func (s *snapStubs) EvaluateAll(context.Context, instance.FlagSubject) ([]instan
 // is, and a space that disappeared between both reads (404) is skipped.
 func TestSnapshot_ReturnsEveryCollaboratorError(t *testing.T) {
 	t.Parallel()
-	steps := []string{"", "authorize", "head", "epoch", "scope", "principal", "user", "spaces", "channels", "sidebar", "settings",
+	steps := []string{"", "authorize", "head", "epoch", "scope", "principal", "user", "spaces", "channels", "sidebar", "sidebar_channels", "settings",
 		"drafts", "counters", "read_states", "mentions", "thread", "runs", "active_threads", "agents", "flags"}
 	for _, step := range steps {
 		t.Run("fail="+step, func(t *testing.T) {

@@ -294,7 +294,8 @@ invisible thread or channel the same `404`.
   value `400` on `/value`; the stored value (jsonb equality) answers without event and version;
   delete appends `settings.updated` with the last value, version + 1 and `deleted`, and a later PUT
   starts at version 1 (M1-61/1). Defaults are not stored. `getMySidebar` (`settings.read`) returns
-  `chat.Structure.ListSidebarStates`.
+  `chat.Structure.ListSidebarStates` as `items` and, since M4-51, `chat.Structure.ListSidebarChannelStates`
+  as `channels`.
 - **Events.** Durable, audience and actor the person, receive action `self`, schema version 1:
   `read_state.updated` (resource the thread without version, scope space, channel, thread,
   `ReadStatePayload`), `draft.updated` (resource the draft with its version, scope with the thread
@@ -348,7 +349,7 @@ through `test/messagingworld` with `NewPersonal`) and
   COMMITTED), so every change up to `head_seq` is contained and later ones arrive by catch-up:
   `permission_version` from `Authorizer.Scope`; `principal` and `is_owner` from
   `identity.Directory`; `spaces` and `channels` through the chat listings of `listSpaces` and
-  `listSpaceChannels` (visible, not archived); `sidebar`, `settings` and `drafts` through the
+  `listSpaceChannels` (visible, not archived); `sidebar`, `sidebar_channels` (M4-51), `settings` and `drafts` through the
   personal data ports of M1-61; `unread_threads` from `chat.Threads.Counters` of the listed
   channels and the person's `read_states` there, combined in Go: unread =
   `last_message_seq - GREATEST(last_read_seq, unread_floor_seq)`, the mentions from
@@ -365,7 +366,7 @@ through `test/messagingworld` with `NewPersonal`) and
   process (`agents.Presence`, M2-20; ends the presence part of M1-63/3): tracked agents from memory, the
   others as stored (`unknown` or `offline`); only agents the principal may read, and only agents
   have presence; `features` from
-  `instance.Flags`. Agents and apps get empty `sidebar`, `unread_threads`, `settings` and
+  `instance.Flags`. Agents and apps get empty `sidebar`, `sidebar_channels`, `unread_threads`, `settings` and
   `drafts`. The snapshot carries no thread content.
 - **Configuration.** `sync.catchup_page_size`, `sync.catchup_max_events`,
   `sync.snapshot_thread_window` and `sync.snapshot_threads_per_channel` (04 18; `SnapshotConfig` of
@@ -436,7 +437,7 @@ below the value of 02; the threshold comes from the table of 02 through
   `event_log` is listed for the coverage of 20 section 2 only: its payloads are copies of changes
   whose originals the owning modules export, they leave with the window `sync.event_retention`, and
   the deletion of a message or file redacts the related payloads (20 sections 4.2 and 4.3). The
-  personal sidebar (`user_space_states`) belongs to `chat` (architecture/modules.yaml, 03), whose
+  personal sidebar (`user_space_states`, `user_channel_states`) belongs to `chat` (architecture/modules.yaml, 03), whose
   participant covers it.
 - Export: the sections `read_states`, `drafts` (the own text, the quoted message and the IDs of
   the unsent uploads, also drafts of channels the person no longer reads) and `settings` (the

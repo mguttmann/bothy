@@ -765,6 +765,10 @@ final class FakeWorld {
   /// Sidebar states (API `SidebarState`) by `<principal>|<space>`.
   final Map<String, JsonMap> sidebarStates = {};
 
+  /// Channel sidebar states (API `SidebarChannelState`, the own thread order) by
+  /// `<principal>|<channel>` (M4-51).
+  final Map<String, JsonMap> sidebarChannelStates = {};
+
   /// Stored answers of `Idempotency-Key` writes by `<principal>|<key>`.
   final Map<String, StoredResponse> idempotency = {};
 
@@ -1284,6 +1288,7 @@ final class FakeWorld {
       'spaces': spaceViews(principalId),
       'channels': channelViews(principalId),
       'sidebar': sidebarOf(principalId),
+      'sidebar_channels': sidebarChannelsOf(principalId),
       'unread_threads': unread,
       'active_runs': [
         for (final r in runs.values)
@@ -2048,10 +2053,12 @@ final class FakeWorld {
   /// Stores the sidebar state of [principalId] for [spaceId] from a `SidebarStatePut` [body]
   /// and appends the personal `sidebar.updated` (04 14: last write wins per space).
   ///
-  /// An absent `sort_key` keeps the stored one, `use_global_order` removes it. Throws
+  /// An absent `sort_key` keeps the stored one, `use_global_order` removes it; an absent
+  /// `channel_order` keeps the stored list, an empty one removes it (M4-51). Throws
   /// [FakeProblem]: `404` for a space the principal does not see, `400 validation_failed` for
   /// a `sort_key` outside the fractional index (`/sort_key`, `invalid`, as the server's
-  /// `fracindex` check of M1-52) or together with `use_global_order`.
+  /// `fracindex` check of M1-52) or together with `use_global_order`, and for a repeated ID in
+  /// `channel_order` (`/channel_order`, `duplicate`).
   JsonMap putSidebar(
     String principalId,
     String spaceId,
@@ -2081,13 +2088,19 @@ final class FakeWorld {
         ],
       );
     }
+    final order = _uniqueOrder(body['channel_order'], '/channel_order');
     final slot = '$principalId|$spaceId';
     final previous = sidebarStates[slot];
     final sortKey = global ? null : key ?? previous?['sort_key'];
+    final stored = previous?['channel_order'];
+    final channelOrder = order == null
+        ? stored
+        : (order.isEmpty ? null : order);
     final state = <String, Object?>{
       'space_id': spaceId,
       'collapsed': body['collapsed'] == true,
       'sort_key': ?sortKey,
+      'channel_order': ?channelOrder,
       'version': ((previous?['version'] as int?) ?? 0) + 1,
       'updated_by_device_id': ?deviceId,
     };
@@ -2101,6 +2114,79 @@ final class FakeWorld {
       audience: principalId,
     );
     return state;
+  }
+
+  /// The channel sidebar states of [principalId] for the channels it sees (API
+  /// `SidebarChannelState`, M4-51).
+  List<JsonMap> sidebarChannelsOf(String principalId) => [
+    for (final MapEntry(:key, :value) in sidebarChannelStates.entries)
+      if (key.startsWith('$principalId|') &&
+          seesChannel(principalId, value['channel_id']! as String))
+        value,
+  ];
+
+  /// Stores the own thread order of [principalId] for [channelId] from a `SidebarChannelPut`
+  /// [body] (`putMySidebarChannel`, M4-51): version + 1, last write wins, and the personal
+  /// `sidebar_channel.updated`. The IDs are not checked against threads (D-M4-51-8).
+  ///
+  /// Throws [FakeProblem]: `404` for a channel the principal does not see, `400
+  /// validation_failed` for a missing `thread_order` (`required`) or a repeated ID in it
+  /// (`duplicate`), both on `/thread_order`.
+  JsonMap putSidebarChannel(
+    String principalId,
+    String channelId,
+    JsonMap body, {
+    String? deviceId,
+  }) {
+    if (!seesChannel(principalId, channelId)) {
+      throw const FakeProblem(404, 'not_found');
+    }
+    final order = _uniqueOrder(body['thread_order'], '/thread_order');
+    if (order == null) {
+      throw const FakeProblem(
+        400,
+        'validation_failed',
+        errors: [
+          {'pointer': '/thread_order', 'code': 'required'},
+        ],
+      );
+    }
+    final slot = '$principalId|$channelId';
+    final previous = sidebarChannelStates[slot];
+    final state = <String, Object?>{
+      'channel_id': channelId,
+      'thread_order': order,
+      'version': ((previous?['version'] as int?) ?? 0) + 1,
+      'updated_by_device_id': ?deviceId,
+    };
+    sidebarChannelStates[slot] = state;
+    final spaceId = channels[channelId]?.spaceId;
+    append(
+      'sidebar_channel.updated',
+      resource: {'kind': 'channel', 'id': channelId},
+      scope: {'space_id': ?spaceId, 'channel_id': channelId},
+      payload: {'state': state},
+      actor: principalId,
+      audience: principalId,
+    );
+    return state;
+  }
+
+  /// The order list [value] of a sidebar write, null when absent; a repeated ID is `400
+  /// validation_failed` with `duplicate` on [pointer] (M4-51).
+  List<String>? _uniqueOrder(Object? value, String pointer) {
+    if (value == null) return null;
+    final order = [for (final id in value as List) id as String];
+    if (order.toSet().length != order.length) {
+      throw FakeProblem(
+        400,
+        'validation_failed',
+        errors: [
+          {'pointer': pointer, 'code': 'duplicate'},
+        ],
+      );
+    }
+    return order;
   }
 
   /// Creates a forum post of [principalId] in [channelId] from a `ThreadCreate` [body]: the

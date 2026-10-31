@@ -7,11 +7,12 @@ library;
 
 import 'package:design_system/design_system.dart';
 import 'package:domain/domain.dart';
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:l10n/l10n.dart';
 
 import '../notifications_settings/providers.dart';
+import '../sidebar/sidebar_drag.dart' show SidebarMoves, sidebarMoveMenuItems;
 import 'level_menu.dart';
 
 /// The level menu of [space] around [child].
@@ -24,7 +25,11 @@ class SpaceMenu extends StatelessWidget {
     this.newProjectLabel,
     this.onNewProject,
     this.onAddFolderForums,
+    this.moves,
   });
+
+  /// "Move up" and "Move down" of the space in the sidebar (01 6.16, M4-51), or null for none.
+  final SidebarMoves? moves;
 
   /// The space.
   final Space space;
@@ -62,6 +67,10 @@ class SpaceMenu extends StatelessWidget {
             child: Text(AppLocalizations.of(context).spaceMenuAddFolderForums),
           ),
         ...levelMenuItems(context, ref, spaceMenuTarget(ref, space)),
+        if (moves case final moves?) ...[
+          const Divider(),
+          ...sidebarMoveMenuItems(context, moves),
+        ],
       ];
     },
     child: child,

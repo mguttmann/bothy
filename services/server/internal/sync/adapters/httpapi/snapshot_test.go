@@ -41,8 +41,14 @@ type snapshot struct {
 		} `json:"channel"`
 	} `json:"channels"`
 	Sidebar []struct {
-		SpaceID string `json:"space_id"`
+		SpaceID      string   `json:"space_id"`
+		ChannelOrder []string `json:"channel_order"`
 	} `json:"sidebar"`
+	SidebarChannels []struct {
+		ChannelID   string   `json:"channel_id"`
+		ThreadOrder []string `json:"thread_order"`
+		Version     int64    `json:"version"`
+	} `json:"sidebar_channels"`
 	UnreadThreads []struct {
 		ThreadID       string `json:"thread_id"`
 		ChannelID      string `json:"channel_id"`
@@ -107,7 +113,12 @@ func TestSnapshotContents(t *testing.T) {
 	e.Send("owner", e.marketingMain, "@alex not for you", http.StatusCreated)
 	e.Want(e.Do("alex", http.MethodPut, threadDraftPath(e.supportMain), `{"content_md":"draft text"}`), http.StatusOK, "")
 	e.Want(e.Do("alex", http.MethodPut, settingPath("appearance.theme"), `{"value":"dark"}`), http.StatusOK, "")
-	e.Want(e.Do("alex", http.MethodPut, "/api/v1/me/sidebar/spaces/"+e.support.String(), `{"collapsed":true}`), http.StatusOK, "")
+	e.Want(e.Do("alex", http.MethodPut, "/api/v1/me/sidebar/spaces/"+e.support.String(),
+		`{"collapsed":true,"channel_order":["`+forum.String()+`","`+e.supportChan.String()+`"]}`), http.StatusOK, "")
+	post := ids.New()
+	e.Want(e.Do("alex", http.MethodPut, "/api/v1/me/sidebar/channels/"+forum.String(), `{"thread_order":["`+post.String()+`"]}`), http.StatusOK, "")
+	// A row of Alex for a channel Alex cannot read (written as a fixture) stays out (M4-51).
+	e.SQL(`INSERT INTO user_channel_states (user_id, channel_id) VALUES ($1, $2)`, e.alex.String(), e.marketingChan.String())
 
 	s, _ := e.snap("alex")
 	var epoch string
@@ -126,8 +137,13 @@ func TestSnapshotContents(t *testing.T) {
 	if got := s.channelIDs(); len(got) != 2 || !slices.Contains(got, e.supportChan.String()) || !slices.Contains(got, forum.String()) {
 		t.Fatalf("channels %v", got)
 	}
-	if len(s.Sidebar) != 1 || s.Sidebar[0].SpaceID != e.support.String() {
+	if len(s.Sidebar) != 1 || s.Sidebar[0].SpaceID != e.support.String() ||
+		!slices.Equal(s.Sidebar[0].ChannelOrder, []string{forum.String(), e.supportChan.String()}) {
 		t.Fatalf("sidebar %+v", s.Sidebar)
+	}
+	if len(s.SidebarChannels) != 1 || s.SidebarChannels[0].ChannelID != forum.String() ||
+		!slices.Equal(s.SidebarChannels[0].ThreadOrder, []string{post.String()}) || s.SidebarChannels[0].Version != 1 {
+		t.Fatalf("sidebar channels %+v", s.SidebarChannels)
 	}
 	if len(s.UnreadThreads) != 1 {
 		t.Fatalf("unread threads %+v", s.UnreadThreads)

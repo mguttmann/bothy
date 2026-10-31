@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package httpapi holds the REST handlers of the chat module (M1-52): listSpaces, createSpace,
-// getSpace, updateSpace, moveSpace, archiveSpace and putMySidebarSpace of docs/api/openapi.yaml
-// as part of rest.StrictServerInterface. The use cases of chat.Structure authorize; the handlers
+// getSpace, updateSpace, moveSpace, archiveSpace, putMySidebarSpace and putMySidebarChannel (M4-51)
+// of docs/api/openapi.yaml as part of rest.StrictServerInterface. The use cases of chat.Structure authorize; the handlers
 // only convert, set ETag from the version and pass errors to the problem writer of the chain
 // unchanged.
 //
@@ -19,12 +19,14 @@ import (
 
 	"github.com/OWNER/bothy/services/server/api/rest"
 	"github.com/OWNER/bothy/services/server/internal/chat"
+	"github.com/OWNER/bothy/services/server/internal/chat/domain"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
+	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
 )
 
-// Spaces implements the seven space and sidebar operations.
+// Spaces implements the eight space and sidebar operations.
 type Spaces struct {
 	structure chat.Structure
 }
@@ -135,11 +137,48 @@ func (h *Spaces) ArchiveSpace(ctx context.Context, req rest.ArchiveSpaceRequestO
 func (h *Spaces) PutMySidebarSpace(ctx context.Context, req rest.PutMySidebarSpaceRequestObject) (rest.PutMySidebarSpaceResponseObject, error) {
 	b := req.Body
 	cmd := chat.SidebarPutCmd{Collapsed: b.Collapsed, SortKey: b.SortKey, UseGlobalOrder: b.UseGlobalOrder != nil && *b.UseGlobalOrder}
+	if b.ChannelOrder != nil {
+		order := idsOf(*b.ChannelOrder)
+		cmd.ChannelOrder = &order
+	}
 	st, err := h.structure.PutSidebarSpace(ctx, principal(ctx), ids.ID(req.SpaceId), cmd)
 	if err != nil {
 		return nil, err
 	}
 	return rest.PutMySidebarSpace200JSONResponse{Body: SidebarREST(st)}, nil
+}
+
+// PutMySidebarChannel implements rest.StrictServerInterface (PUT /me/sidebar/channels/{channel_id},
+// M4-51). A body without thread_order, or with null, is 400 validation_failed on /thread_order
+// (the member is required); the use case checks the rest.
+func (h *Spaces) PutMySidebarChannel(ctx context.Context, req rest.PutMySidebarChannelRequestObject) (rest.PutMySidebarChannelResponseObject, error) {
+	if req.Body.ThreadOrder == nil {
+		return nil, errs.New(errs.CodeValidationFailed, "thread_order is required").
+			WithFields(errs.FieldError{Pointer: "/thread_order", Code: domain.FieldRequired, Detail: "thread_order is required"})
+	}
+	st, err := h.structure.PutSidebarChannel(ctx, principal(ctx), ids.ID(req.ChannelId), chat.SidebarChannelPutCmd{ThreadOrder: idsOf(req.Body.ThreadOrder)})
+	if err != nil {
+		return nil, err
+	}
+	return rest.PutMySidebarChannel200JSONResponse{Body: SidebarChannelREST(st)}, nil
+}
+
+// idsOf converts a list of the API into IDs, never nil.
+func idsOf(list []rest.Uuid) []ids.ID {
+	out := make([]ids.ID, 0, len(list))
+	for _, u := range list {
+		out = append(out, ids.ID(u))
+	}
+	return out
+}
+
+// restIDs converts IDs into a list of the API, never nil.
+func restIDs(list []ids.ID) []rest.Uuid {
+	out := make([]rest.Uuid, 0, len(list))
+	for _, id := range list {
+		out = append(out, rest.Uuid(id))
+	}
+	return out
 }
 
 // spaceREST converts a space (schema Space); empty values become absent members, never null (ADR
@@ -161,10 +200,25 @@ func viewREST(v chat.SpaceView) rest.SpaceView {
 	return rest.SpaceView{Space: spaceREST(v.Space), Level: rest.Level(v.Level), Capabilities: caps}
 }
 
-// SidebarREST converts a sidebar state (schema SidebarState); getMySidebar (M1-61) reuses it.
+// SidebarREST converts a sidebar state (schema SidebarState); getMySidebar (M1-61) reuses it. A
+// nil channel order (the default order) is absent.
 func SidebarREST(st chat.SidebarState) rest.SidebarState {
-	return rest.SidebarState{
+	out := rest.SidebarState{
 		SpaceId: rest.Uuid(st.SpaceID), Collapsed: st.Collapsed, SortKey: optional(st.SortKey), Version: st.Version,
+		UpdatedByDeviceId: optionalID(st.UpdatedByDeviceID),
+	}
+	if st.ChannelOrder != nil {
+		order := restIDs(st.ChannelOrder)
+		out.ChannelOrder = &order
+	}
+	return out
+}
+
+// SidebarChannelREST converts a channel row of the sidebar (schema SidebarChannelState, M4-51);
+// thread_order is always present.
+func SidebarChannelREST(st chat.SidebarChannelState) rest.SidebarChannelState {
+	return rest.SidebarChannelState{
+		ChannelId: rest.Uuid(st.ChannelID), ThreadOrder: restIDs(st.ThreadOrder), Version: st.Version,
 		UpdatedByDeviceId: optionalID(st.UpdatedByDeviceID),
 	}
 }

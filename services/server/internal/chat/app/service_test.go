@@ -460,5 +460,5 @@ func TestErrorsPass(t *testing.T) {
 func testConfig(n int) app.Config {
 	return app.Config{SpaceNameMaxChars: n, ChannelNameMaxChars: 8, ChannelTopicMaxChars: 8, TagNameMaxChars: 8,
 		HistoryBackfillLimitDefault: 20, HistoryBackfillLimitMax: 200, ThreadTitleMaxChars: 200, ThreadMaxTags: 5,
-		PageSizeDefault: 50, PageSizeMax: 200}
+		PageSizeDefault: 50, PageSizeMax: 200, SidebarOrderMaxItems: 3}
 }

@@ -29,13 +29,14 @@ func TestSnapshotRESTConvertsEveryOptionalMember(t *testing.T) {
 		Channels: []bsync.SnapshotChannel{{ID: ids.New(), Kind: "forum", Name: "ideas", SortKey: "a", OperatorMode: "inherit",
 			ForumDefaultSort: "latest_activity", DefaultNotificationLevel: "mentions", CreatedAt: now, Level: "write",
 			Capabilities: []string{"message.send"}}},
-		Sidebar:       []bsync.SidebarState{{SpaceID: ids.New(), Collapsed: true, SortKey: "b", Version: 1}},
-		UnreadThreads: []bsync.UnreadThread{{ThreadID: ids.New(), ChannelID: ids.New(), UnreadCount: 2, LastMessageSeq: 5}},
-		ActiveRuns:    []bsync.RunSummary{run},
-		Agents:        []bsync.AgentPresence{{AgentID: ids.New(), State: "online", ReportedBillingMode: "api"}, {AgentID: ids.New(), State: "offline"}},
-		Settings:      []bsync.UserSetting{{Key: "layout.column_widths", Value: json.RawMessage(`[240,320]`), Version: 1}},
-		Drafts:        []bsync.DraftRef{{ID: ids.New(), ChannelID: ids.New(), Version: 1}},
-		Features:      []bsync.EvaluatedFlag{{Key: "personal_tokens", Enabled: true}},
+		Sidebar:         []bsync.SidebarState{{SpaceID: ids.New(), Collapsed: true, SortKey: "b", Version: 1}, {SpaceID: ids.New(), ChannelOrder: []ids.ID{ids.New()}, Version: 2}},
+		SidebarChannels: []bsync.SidebarChannelState{{ChannelID: ids.New(), Version: 1}},
+		UnreadThreads:   []bsync.UnreadThread{{ThreadID: ids.New(), ChannelID: ids.New(), UnreadCount: 2, LastMessageSeq: 5}},
+		ActiveRuns:      []bsync.RunSummary{run},
+		Agents:          []bsync.AgentPresence{{AgentID: ids.New(), State: "online", ReportedBillingMode: "api"}, {AgentID: ids.New(), State: "offline"}},
+		Settings:        []bsync.UserSetting{{Key: "layout.column_widths", Value: json.RawMessage(`[240,320]`), Version: 1}},
+		Drafts:          []bsync.DraftRef{{ID: ids.New(), ChannelID: ids.New(), Version: 1}},
+		Features:        []bsync.EvaluatedFlag{{Key: "personal_tokens", Enabled: true}},
 	}
 	out, err := httpapi.SnapshotREST(v)
 	if err != nil {
@@ -68,8 +69,15 @@ func TestSnapshotRESTConvertsEveryOptionalMember(t *testing.T) {
 	if len(out.Features) != 1 || !out.Features[0].Enabled || len(out.Drafts) != 1 || out.Drafts[0].ThreadId != nil {
 		t.Fatalf("features %v, drafts %v", out.Features, out.Drafts)
 	}
-	if len(out.Sidebar) != 1 || out.Sidebar[0].SortKey == nil || len(out.UnreadThreads) != 1 || len(out.Settings) != 1 {
+	if len(out.Sidebar) != 2 || out.Sidebar[0].SortKey == nil || len(out.UnreadThreads) != 1 || len(out.Settings) != 1 {
 		t.Fatalf("sidebar %v, unread %v, settings %v", out.Sidebar, out.UnreadThreads, out.Settings)
+	}
+	// M4-51: a nil channel order is absent, a list is carried; thread_order is always an array.
+	if out.Sidebar[0].ChannelOrder != nil || out.Sidebar[1].ChannelOrder == nil || len(*out.Sidebar[1].ChannelOrder) != 1 {
+		t.Fatalf("channel_order %v, %v", out.Sidebar[0].ChannelOrder, out.Sidebar[1].ChannelOrder)
+	}
+	if out.SidebarChannels == nil || len(*out.SidebarChannels) != 1 || (*out.SidebarChannels)[0].ThreadOrder == nil {
+		t.Fatalf("sidebar_channels %v", out.SidebarChannels)
 	}
 }
 

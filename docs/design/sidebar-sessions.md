@@ -100,7 +100,8 @@ the overview column is pinned (default: not pinned) are kept per device in the l
 are not synchronized. Reason: 01 11 is normative and has no key for them, like the Done section
 (D-M4-19-4); a new personal setting key would need a server change for a view preference.
 
-**D-SB-7 Dragging.** Thread rows and channel rows cannot be dragged; the personal order of spaces
+**D-SB-7 Dragging.** (Replaced for channels and forum posts on 2026-10-31 by D-M4-51-6, see
+[sidebar-ordering.md](sidebar-ordering.md).) Thread rows and channel rows cannot be dragged; the personal order of spaces
 stays as it is. Moving a thread stays the dialog with only valid targets (6.7). Reason: thread order
 is derived (D-SB-3) and channel order is global; a drop onto another channel would be a move, which
 needs the target check and a reason, and an accidental drag must not move a session.

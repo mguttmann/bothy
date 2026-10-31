@@ -67,7 +67,7 @@ var start = time.Date(2026, 10, 14, 9, 0, 0, 0, time.UTC)
 
 // chatConfig is the chat configuration of the world.
 var chatConfig = chatapp.Config{
-	SpaceNameMaxChars: 40, ChannelNameMaxChars: 40, ChannelTopicMaxChars: 40, TagNameMaxChars: 20,
+	SidebarOrderMaxItems: 1000, SpaceNameMaxChars: 40, ChannelNameMaxChars: 40, ChannelTopicMaxChars: 40, TagNameMaxChars: 20,
 	HistoryBackfillLimitDefault: 20, HistoryBackfillLimitMax: 200, ThreadTitleMaxChars: 80, ThreadMaxTags: 3,
 	PlaceholderTitles: []string{"New chat"}, PageSizeDefault: 20, PageSizeMax: 50,
 }

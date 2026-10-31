@@ -177,6 +177,7 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"channel.topic_max_chars":               {Kind: config.KindInt, Default: "1024", Min: "1", Chapter: "03-data-model.md"},
 		"forum_tag.name_max_chars":              {Kind: config.KindInt, Default: "50", Min: "1", Chapter: "03-data-model.md"},
 		"thread.max_tags":                       {Kind: config.KindInt, Default: "5", Min: "1", Chapter: "03-data-model.md"},
+		"sidebar.order_max_items":               {Kind: config.KindInt, Default: "1000", Min: "1", Max: "1000", Chapter: "03-data-model.md"},
 		"thread.placeholder_titles": {Kind: config.KindStringList, Default: `["Neuer Chat", "Chat", "Ohne Titel", "Test", "New chat", "Untitled"]`,
 			Chapter: "09-agents.md"},
 		"channel.history_backfill_limit_default": {Kind: config.KindInt, Default: "20", Min: "0", Chapter: "03-data-model.md"},

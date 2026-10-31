@@ -748,6 +748,45 @@ func TestGetMySidebarVisibleOnly(t *testing.T) {
 	}
 }
 
+// TestGetMySidebarChannels (M4-51): getMySidebar carries the member channels with the own post
+// orders of readable channels that are not archived, and channel_order on the space rows (absent
+// for the default order).
+func TestGetMySidebarChannels(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t)
+	other := e.Space("Other")
+	hidden := e.Channel(other, "forum", "hidden")
+	post := ids.New()
+	e.Want(e.Do("alex", http.MethodPut, "/api/v1/me/sidebar/spaces/"+e.space.String(), `{"collapsed":false,"channel_order":["`+e.forum.String()+`"]}`), http.StatusOK, "")
+	e.Want(e.Do("alex", http.MethodPut, "/api/v1/me/sidebar/channels/"+e.forum.String(), `{"thread_order":["`+post.String()+`"]}`), http.StatusOK, "")
+	e.Want(e.Do("alex", http.MethodPut, "/api/v1/me/sidebar/channels/"+e.text.String(), `{"thread_order":[]}`), http.StatusOK, "")
+	// A row of Alex for a channel Alex cannot read (written as a fixture).
+	e.SQL(`INSERT INTO user_channel_states (user_id, channel_id) VALUES ($1, $2)`, e.alex.String(), hidden.String())
+	e.SQL(`UPDATE channels SET archived_at = now() WHERE id = $1`, e.text.String())
+	m := e.Want(e.Do("alex", http.MethodGet, "/api/v1/me/sidebar", ""), http.StatusOK, "")
+	items, _ := m["items"].([]any)
+	if len(items) != 1 {
+		t.Fatalf("items %v", m)
+	}
+	if order, _ := items[0].(map[string]any)["channel_order"].([]any); len(order) != 1 || order[0] != e.forum.String() {
+		t.Fatalf("channel_order %v", items[0])
+	}
+	chans, _ := m["channels"].([]any)
+	if len(chans) != 1 {
+		t.Fatalf("channels %v", m["channels"])
+	}
+	c, _ := chans[0].(map[string]any)
+	if order, _ := c["thread_order"].([]any); c["channel_id"] != e.forum.String() || len(order) != 1 || order[0] != post.String() || c["version"] != float64(1) {
+		t.Fatalf("channel row %v", c)
+	}
+	e.Want(e.Do("alex", http.MethodPut, "/api/v1/me/sidebar/spaces/"+e.space.String(), `{"collapsed":false,"channel_order":[]}`), http.StatusOK, "")
+	m = e.Want(e.Do("alex", http.MethodGet, "/api/v1/me/sidebar", ""), http.StatusOK, "")
+	items, _ = m["items"].([]any)
+	if _, has := items[0].(map[string]any)["channel_order"]; has {
+		t.Fatalf("the default order must be absent: %v", items[0])
+	}
+}
+
 // TestPersonalOperationsRejectAgentToken: an agent with write on the space gets 403
 // subject_kind_not_allowed on each of the twelve operations, an app too.
 func TestPersonalOperationsRejectAgentToken(t *testing.T) {

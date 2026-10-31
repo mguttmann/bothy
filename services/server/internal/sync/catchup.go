@@ -255,8 +255,11 @@ type SnapshotView struct {
 	Spaces            []SnapshotSpace
 	Channels          []SnapshotChannel
 	Sidebar           []SidebarState
-	UnreadThreads     []UnreadThread
-	ActiveRuns        []RunSummary
+	// SidebarChannels are the personal post orders of the caller (M4-51); empty for agents and
+	// apps.
+	SidebarChannels []SidebarChannelState
+	UnreadThreads   []UnreadThread
+	ActiveRuns      []RunSummary
 	// ActiveThreads are the active threads of 04 section 6.3 item 4 (R-SY-28), in the order of
 	// Channels, then by descending last activity.
 	ActiveThreads []SnapshotThread

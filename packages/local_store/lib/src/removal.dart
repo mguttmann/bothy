@@ -87,6 +87,10 @@ extension LocalStoreRemoval on LocalDatabase {
     await _deleteWhereIn(channels, 'channel_view_states', 'channel_id', {
       channelViewStates,
     });
+    // A removed channel leaves no personal thread order behind (04 8.3; M4-51).
+    await _deleteWhereIn(channels, 'user_channel_states', 'channel_id', {
+      userChannelStates,
+    });
     await _deleteWhereIn(spaceIds, 'user_space_states', 'space_id', {
       userSpaceStates,
     });

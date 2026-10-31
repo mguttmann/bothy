@@ -621,6 +621,9 @@ type ServerInterface interface {
 	// GetMySidebar Read own sidebar state
 	// (GET /me/sidebar)
 	GetMySidebar(w http.ResponseWriter, r *http.Request)
+	// PutMySidebarChannel Reorder the posts of a channel for oneself
+	// (PUT /me/sidebar/channels/{channel_id})
+	PutMySidebarChannel(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath)
 	// PutMySidebarSpace Collapse or reorder a space for oneself
 	// (PUT /me/sidebar/spaces/{space_id})
 	PutMySidebarSpace(w http.ResponseWriter, r *http.Request, spaceId SpaceIdPath)
@@ -8647,6 +8650,32 @@ func (siw *ServerInterfaceWrapper) GetMySidebar(w http.ResponseWriter, r *http.R
 	handler.ServeHTTP(w, r)
 }
 
+// PutMySidebarChannel operation middleware
+func (siw *ServerInterfaceWrapper) PutMySidebarChannel(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "channel_id" -------------
+	var channelId ChannelIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "channel_id", r.PathValue("channel_id"), &channelId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "channel_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PutMySidebarChannel(w, r, channelId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // PutMySidebarSpace operation middleware
 func (siw *ServerInterfaceWrapper) PutMySidebarSpace(w http.ResponseWriter, r *http.Request) {
 
@@ -13833,6 +13862,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/spaces/{space_id}/operator", wrapper.SetSpaceOperator)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me/sidebar", wrapper.GetMySidebar)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/me/sidebar/spaces/{space_id}", wrapper.PutMySidebarSpace)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/me/sidebar/channels/{channel_id}", wrapper.PutMySidebarChannel)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/spaces/{space_id}/channels", wrapper.ListSpaceChannels)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/spaces/{space_id}/channels", wrapper.CreateChannel)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/channels/{channel_id}", wrapper.GetChannel)
@@ -14817,6 +14847,9 @@ type StrictServerInterface interface {
 	// GetMySidebar Read own sidebar state
 	// (GET /me/sidebar)
 	GetMySidebar(ctx context.Context, request GetMySidebarRequestObject) (GetMySidebarResponseObject, error)
+	// PutMySidebarChannel Reorder the posts of a channel for oneself
+	// (PUT /me/sidebar/channels/{channel_id})
+	PutMySidebarChannel(ctx context.Context, request PutMySidebarChannelRequestObject) (PutMySidebarChannelResponseObject, error)
 	// PutMySidebarSpace Collapse or reorder a space for oneself
 	// (PUT /me/sidebar/spaces/{space_id})
 	PutMySidebarSpace(ctx context.Context, request PutMySidebarSpaceRequestObject) (PutMySidebarSpaceResponseObject, error)
@@ -21170,6 +21203,39 @@ func (sh *strictHandler) GetMySidebar(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetMySidebarResponseObject); ok {
 		if err := validResponse.VisitGetMySidebarResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PutMySidebarChannel operation middleware
+func (sh *strictHandler) PutMySidebarChannel(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath) {
+	var request PutMySidebarChannelRequestObject
+
+	request.ChannelId = channelId
+
+	var body PutMySidebarChannelJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PutMySidebarChannel(ctx, request.(PutMySidebarChannelRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PutMySidebarChannel")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PutMySidebarChannelResponseObject); ok {
+		if err := validResponse.VisitPutMySidebarChannelResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

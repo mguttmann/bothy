@@ -1970,6 +1970,38 @@ class AppLocalizationsDe extends AppLocalizations {
   String get sidebarMoveDown => 'Nach unten verschieben';
 
   @override
+  String get sidebarArrangedByActivity => 'Nach Aktivität angeordnet';
+
+  @override
+  String get sidebarSpacesArrangedHint =>
+      'Bereiche werden nach Aktivität angeordnet. Schalte „Bereiche automatisch anordnen“ in Einstellungen, Darstellung aus, um sie selbst anzuordnen.';
+
+  @override
+  String get sidebarChannelsArrangedHint =>
+      'Kanäle und Projekte werden nach Aktivität angeordnet. Schalte „Kanäle und Projekte automatisch anordnen“ in Einstellungen, Darstellung aus, um sie selbst anzuordnen.';
+
+  @override
+  String get sidebarChatsArrangedHint =>
+      'Chats werden nach Aktivität angeordnet. Schalte „Chats automatisch anordnen“ in Einstellungen, Darstellung aus, um sie selbst anzuordnen.';
+
+  @override
+  String get settingsSidebarHeading => 'Seitenleiste';
+
+  @override
+  String get settingsAutoArrangeSpaces => 'Bereiche automatisch anordnen';
+
+  @override
+  String get settingsAutoArrangeChannels =>
+      'Kanäle und Projekte automatisch anordnen';
+
+  @override
+  String get settingsAutoArrangeChats => 'Chats automatisch anordnen';
+
+  @override
+  String get settingsAutoArrangeHint =>
+      'Neueste Aktivität zuerst. Aus: per Ziehen anordnen.';
+
+  @override
   String get sidebarNoSpaces => 'Noch keine Bereiche';
 
   @override

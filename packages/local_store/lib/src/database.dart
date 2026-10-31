@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The drift database of the apps, schema version 11 (docs/spec/15-client-architecture.md 6, ADR
+/// The drift database of the apps, schema version 12 (docs/spec/15-client-architecture.md 6, ADR
 /// 0029): the mirror tables of 15 6.1 and the local-only tables, `host_key_pins` (M4-36) and
 /// the sidebar view state `channel_view_states`, `shell_view_state` (M4-40, M4-42) and
 /// `space_view_states` (FIX-device-mirroring-2) included; version 11 adds the code block wrap
-/// choice of `shell_view_state` (M4-49).
+/// choice of `shell_view_state` (M4-49), version 12 the personal channel and thread orders of
+/// the sidebar (`user_space_states.channel_order`, `user_channel_states`, M4-51).
 library;
 
 import 'dart:io';
@@ -44,6 +45,7 @@ part 'database.g.dart';
   tables: [
     Spaces,
     UserSpaceStates,
+    UserChannelStates,
     Channels,
     ChannelOperators,
     ForumTags,
@@ -92,7 +94,7 @@ class LocalDatabase extends _$LocalDatabase {
   final DateTime Function() clock;
 
   @override
-  int get schemaVersion => 11;
+  int get schemaVersion => 12;
 
   /// Closes the database and releases its file, also while watched queries come and go.
   ///
@@ -185,6 +187,18 @@ class LocalDatabase extends _$LocalDatabase {
           schema.shellViewState.codeBlocksUnwrapped,
         );
       },
+      // Version 12 (M4-51): the column `user_space_states.channel_order`, null (the default
+      // order) in every kept row, and the mirror table `user_channel_states`; no row moves. The
+      // cursor goes, so the next connection loads a whole snapshot with the orders other
+      // devices wrote before this upgrade (04 7.3, D-M4-51-2).
+      from11To12: (m, schema) async {
+        await m.addColumn(
+          schema.userSpaceStates,
+          schema.userSpaceStates.channelOrder,
+        );
+        await m.createTable(schema.userChannelStates);
+        await MigrationRules.resetCursor(m);
+      },
     ),
   );
 
@@ -193,6 +207,7 @@ class LocalDatabase extends _$LocalDatabase {
   List<TableInfo<Table, Object?>> get mirrorTables => [
     spaces,
     userSpaceStates,
+    userChannelStates,
     channels,
     channelOperators,
     forumTags,

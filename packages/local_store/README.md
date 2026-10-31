@@ -1,6 +1,6 @@
 # local_store
 
-The encrypted local database of the apps: drift on SQLite3MultipleCiphers, schema version 11
+The encrypted local database of the apps: drift on SQLite3MultipleCiphers, schema version 12
 with the mirror tables and the local-only tables, data access objects that hand out the domain
 types of `packages/domain`, removal and wipe, the cache cleanup and offline search
 (docs/spec/15-client-architecture.md 6, ADR 0029, R-CL-08). The interface reads only from this
@@ -41,11 +41,11 @@ hooks:
       source: sqlite3mc
 ```
 
-## Tables (schema version 11)
+## Tables (schema version 12)
 
 | Group | File | Tables |
 |---|---|---|
-| Structure | `lib/src/tables/structure.dart` | `spaces`, `user_space_states`, `channels` (effective operator, caller's `level` and `capabilities`, the derived `project_bound` of the API `Channel` since version 6, M4-40, R-DM-54; no `prompt`), `channel_operators`, `forum_tags` |
+| Structure | `lib/src/tables/structure.dart` | `spaces`, `user_space_states` (with the personal channel order of a space in `channel_order` since version 12, M4-51), `user_channel_states` (version 12, M4-51: the personal thread order of a channel), `channels` (effective operator, caller's `level` and `capabilities`, the derived `project_bound` of the API `Channel` since version 6, M4-40, R-DM-54; no `prompt`), `channel_operators`, `forum_tags` |
 | Threads and messages | `lib/src/tables/threads_messages.dart` | `threads` (local `last_accessed_at`), `thread_tags`, `messages` (`trigger_state`, `thread_seq`, tombstone fields, no `client_payload_sha256`), `reactions_summary`, `my_mentions`, `message_components` |
 | Files | `lib/src/tables/files.dart` | `files`, `message_attachments` |
 | Runs and agents | `lib/src/tables/runs_agents.dart` | `runs` (summary of `run.state_changed`), `agents`, `principals` |
@@ -69,7 +69,7 @@ whether it applied (04 9); reactions and pins carry absolute values and leave
 
 | DAO | Purpose |
 |---|---|
-| `StructureDao`, `ThreadsDao`, `MessagesDao`, `RunsDao`, `PrincipalsDao`, `CommandsDao`, `InstanceDao` | mirror tables; `MessagesDao.watchContiguous` emits only the contiguous range of `loaded_ranges` that ends at the newest loaded message plus the first gap |
+| `StructureDao`, `ThreadsDao`, `MessagesDao`, `RunsDao`, `PrincipalsDao`, `CommandsDao`, `InstanceDao` | mirror tables; the personal sidebar orders of `StructureDao` (M4-51): `watchUserSpaceStates`, `upsertUserSpaceStateIfNewer` and `putUserSpaceStateLocally` with the optional `channelOrder` (null keeps the stored list, an empty list clears it to the default order), `watchUserChannelStates`, `upsertUserChannelStateIfNewer` and `putUserChannelStateLocally` (the local write at once keeps the version, a missing row starts at 0, so the server state wins by version); `MessagesDao.watchContiguous` emits only the contiguous range of `loaded_ranges` that ends at the newest loaded message plus the first gap |
 | `PersonalDao` | read states through `mergeReadState` (monotonic), drafts, settings, notification preferences, quiet hours |
 | `SyncStateDao` | `commitPage` stores a page and the cursor with the sync epoch in one transaction; `saveSession`, `markDisconnected`, `markSnapshot`, `resetCursor`; `clearMirror` for a resync |
 | `OutboxDao` | FIFO per thread by `created_at`, then `id`; `depends_on`; failures with the `current` revision of a `412` |
@@ -81,8 +81,8 @@ whether it applied (04 9); reactions and pins carry absolute values and leave
 
 - `removeTargets(List<TargetRef>)` deletes spaces, channels and threads with everything below
   them (messages, attachments, reactions, mentions, components, runs, drafts, read states, loaded
-  ranges, search rows, file cache rows, recently visited rows, the collapsed thread group of a
-  channel) in one transaction and returns the file cache paths, so
+  ranges, search rows, file cache rows, recently visited rows, the collapsed thread group and
+  the personal thread order of a channel) in one transaction and returns the file cache paths, so
   the caller deletes the bytes (04 8.3). Outbox entries stay; they fail with `404`. Host targets
   are ignored and the pins of `host_key_pins` stay.
 - `wipe()` closes the database and deletes the file with its `-wal` and `-shm` files (`4012`,

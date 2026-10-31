@@ -11,6 +11,8 @@ import 'package:flutter/services.dart';
 import 'package:l10n/l10n.dart';
 
 import '../menus/channel_menu.dart';
+import 'sidebar_arrange.dart';
+import 'sidebar_drag.dart';
 import 'sidebar_model.dart';
 import 'sidebar_threads.dart';
 import 'thread_entry.dart';
@@ -28,8 +30,11 @@ import 'thread_entry.dart';
 /// end of a forum's group, its own arrow ([onToggleGroup])
 /// and on a forum the "+" action ([onAdd]). The arrow keys walk the tree (D-SB-8): arrow right
 /// on the channel expands its group or enters its first row, arrow left collapses it; arrow left
-/// on a thread row goes back to the channel. Neither the channel nor its rows can be dragged
-/// (01 6.8 item 10).
+/// on a thread row goes back to the channel. The open posts of a forum are dragged among each
+/// other with [onMoveThread] unless chats are arranged by activity ([chatsArranged]); their
+/// menus and screen reader actions have "Move up" and "Move down" (01 6.16, M4-51). The
+/// channel's own [moves] go to its menu and its row's screen reader actions; the channel row is
+/// dragged through [channelDrag] ([SidebarDragRow] of its space). Text channel threads keep their order (D-M4-51-1).
 class ChannelEntry extends StatefulWidget {
   /// Creates the entry.
   const ChannelEntry({
@@ -45,7 +50,29 @@ class ChannelEntry extends StatefulWidget {
     this.selectedNewChat,
     this.onOpenNewChat,
     this.onShowAllPosts,
+    this.moves,
+    this.onMoveThread,
+    this.chatsArranged = true,
+    this.touch = false,
+    this.channelDrag,
   });
+
+  /// Wraps the channel row (only the row, not its thread group) so it is dragged among the
+  /// channels of its space (01 6.16, M4-51), or null.
+  final Widget Function(Widget row)? channelDrag;
+
+  /// "Move up" and "Move down" of the channel (01 6.16, M4-51), or null for none.
+  final SidebarMoves? moves;
+
+  /// Moves an open post of the forum to an index among the post rows on screen (in the list
+  /// without it), or null for no drag (01 6.16, M4-51).
+  final void Function(ThreadId thread, int to)? onMoveThread;
+
+  /// Whether the posts of the forum are arranged by activity ("Arrange chats automatically").
+  final bool chatsArranged;
+
+  /// Whether the screen is a touch screen: a long press starts a drag (D-M4-51-6).
+  final bool touch;
 
   /// Lists every open post of a forum group (true, "Show more") or the newest ones (false,
   /// "Show less"); null shows no such row (01 6.8 item 3, M4-46).
@@ -181,6 +208,42 @@ class _ChannelEntryState extends State<ChannelEntry> {
     return KeyEventResult.ignored;
   }
 
+  /// The drag of the open forum post [r] at index [i] of [count] post rows (01 6.16, M4-51); a
+  /// text channel thread, or a forum without [ChannelEntry.onMoveThread], is not wrapped.
+  Widget _post(int i, int count, Widget row, SidebarThread r) {
+    final move = widget.onMoveThread;
+    if (move == null || widget.entry.channel.kind != ChannelKind.forum) {
+      return row;
+    }
+    return SidebarDragRow(
+      key: ValueKey('sidebar.dragPost.${r.thread.id.value}'),
+      data: SidebarDragData(
+        level: SidebarLevel.chats,
+        parent: widget.entry.channel.id.value,
+        id: r.thread.id.value,
+        index: i,
+      ),
+      label: r.thread.title,
+      enabled: !widget.chatsArranged,
+      arranged: widget.chatsArranged,
+      touch: widget.touch,
+      onDrop: (id, to) => move(ThreadId.parse(id), to),
+      child: row,
+    );
+  }
+
+  SidebarMoves? _postMoves(ThreadId id, int i, int count) {
+    final move = widget.onMoveThread;
+    if (move == null || widget.entry.channel.kind != ChannelKind.forum) {
+      return null;
+    }
+    if (widget.chatsArranged) return const SidebarMoves(arranged: true);
+    return SidebarMoves(
+      up: i > 0 ? () => move(id, i - 1) : null,
+      down: i < count - 1 ? () => move(id, i + 1) : null,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
@@ -205,7 +268,7 @@ class _ChannelEntryState extends State<ChannelEntry> {
     final addLabel = e.channel.projectBound
         ? l.sidebarNewChatIn(e.channel.name)
         : l.sidebarNewPostIn(e.channel.name);
-    final channelRow = Padding(
+    final channelRowOnly = Padding(
       padding: const EdgeInsetsDirectional.only(
         start: DsSpace.s16,
         end: DsSpace.s4,
@@ -217,28 +280,35 @@ class _ChannelEntryState extends State<ChannelEntry> {
         // 01 6.8 item 8: the context menu of a forum has the same entry as "+".
         newChatLabel: forum && w.onAdd != null ? addLabel : null,
         onNewChat: forum ? w.onAdd : null,
+        moves: w.moves,
         child: Focus(
           canRequestFocus: false,
           skipTraversal: true,
           includeSemantics: false,
           onKeyEvent: _onChannelKey,
-          child: DsChannelRow(
-            grouped ? e.treeRowData : e.rowData,
-            key: ValueKey('sidebar.channel.${e.channel.id.value}'),
-            // With a thread row of this channel selected, the row is the one marked (D1).
-            selected: w.selected && !threadSelected,
-            // The forum of the open post still offers "+" (D1: `{} server [+]`).
-            current: w.selected,
-            onOpen: w.onOpen,
-            focusNode: _channel,
-            groupExpanded: grouped && e.hasGroup ? e.expanded : null,
-            onToggleGroup: grouped && e.hasGroup ? w.onToggleGroup : null,
-            addLabel: forum && w.onAdd != null ? addLabel : null,
-            onAdd: forum ? w.onAdd : null,
+          child: Semantics(
+            customSemanticsActions: w.moves?.semanticsActions(l),
+            child: DsChannelRow(
+              grouped ? e.treeRowData : e.rowData,
+              key: ValueKey('sidebar.channel.${e.channel.id.value}'),
+              // With a thread row of this channel selected, the row is the one marked (D1).
+              selected: w.selected && !threadSelected,
+              // The forum of the open post still offers "+" (D1: `{} server [+]`).
+              current: w.selected,
+              onOpen: w.onOpen,
+              focusNode: _channel,
+              groupExpanded: grouped && e.hasGroup ? e.expanded : null,
+              onToggleGroup: grouped && e.hasGroup ? w.onToggleGroup : null,
+              addLabel: forum && w.onAdd != null ? addLabel : null,
+              onAdd: forum ? w.onAdd : null,
+            ),
           ),
         ),
       ),
     );
+    // Only the channel row lifts the channel: a drag on one of its posts must never move the
+    // forum (review of M4-51).
+    final channelRow = (w.channelDrag ?? (row) => row)(channelRowOnly);
     if (rows.isEmpty && newChats.isEmpty) return channelRow;
     // The channel with its rows is one node inside the space's group, and the rows one node
     // below the channel row, so VoiceOver and TalkBack get the levels space, channel, thread as
@@ -275,14 +345,21 @@ class _ChannelEntryState extends State<ChannelEntry> {
                     onKeyEvent: _onRowKey,
                   ),
                 for (final (i, r) in rows.indexed)
-                  ThreadEntry(
-                    entry: r,
-                    channel: e.channel,
-                    selected: r.thread.id == w.selectedThread,
-                    last: rest == null && more == null && i == rows.length - 1,
-                    onOpen: () => w.onOpenThread!(r.thread.id),
-                    focusNode: _threadNode(r.thread.id),
-                    onKeyEvent: _onRowKey,
+                  _post(
+                    i,
+                    rows.length,
+                    ThreadEntry(
+                      entry: r,
+                      channel: e.channel,
+                      selected: r.thread.id == w.selectedThread,
+                      last:
+                          rest == null && more == null && i == rows.length - 1,
+                      onOpen: () => w.onOpenThread!(r.thread.id),
+                      focusNode: _threadNode(r.thread.id),
+                      onKeyEvent: _onRowKey,
+                      moves: _postMoves(r.thread.id, i, rows.length),
+                    ),
+                    r,
                   ),
                 if (more != null)
                   MorePostsEntry(

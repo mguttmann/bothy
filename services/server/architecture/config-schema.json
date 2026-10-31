@@ -4338,6 +4338,18 @@
       "doc": "Whole budget of the shutdown; at least the sum of the step budgets, and the orchestrator waits longer."
     },
     {
+      "name": "sidebar.order_max_items",
+      "env": "BOTHY_SIDEBAR__ORDER_MAX_ITEMS",
+      "kind": "int",
+      "default": "1000",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "1000",
+      "chapter": "03-data-model.md",
+      "doc": "Most items of a personal order list of the sidebar: channel_order of a space and thread_order of a channel (M4-51)."
+    },
+    {
       "name": "signing_key.accept_lost_keys",
       "env": "BOTHY_SIGNING_KEY__ACCEPT_LOST_KEYS",
       "kind": "bool",
