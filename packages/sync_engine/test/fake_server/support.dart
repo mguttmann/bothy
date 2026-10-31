@@ -40,11 +40,16 @@ class FakeWorldHarness {
   final List<TestDevice> _devices = [];
 
   /// A device of [login] with its own key ([keySeed]) and auth session.
-  TestDevice device({String login = WorldSeed.alexLogin, int keySeed = 1}) {
+  TestDevice device({
+    String login = WorldSeed.alexLogin,
+    int keySeed = 1,
+    bool stepUpKey = true,
+  }) {
     final d = TestDevice(
       server.baseUri,
       SoftwareP256Signer.seeded(keySeed),
       login,
+      stepUpKey: stepUpKey,
     );
     _devices.add(d);
     return d;
@@ -62,16 +67,30 @@ class FakeWorldHarness {
 class _Prompt implements StepUpPrompt {
   @override
   Future<bool> ask(String purposeText) async => true;
+
+  /// A device without a step-up key types the password and code of the seed once; a second
+  /// prompt (after a rejection) cancels.
+  @override
+  Future<StepUpCredentials?> askPassword(
+    String purposeText, {
+    bool rejected = false,
+  }) async => rejected
+      ? null
+      : (password: WorldSeed.password, totpCode: WorldSeed.totp);
 }
 
 /// One device: the auth session of `package:auth` against the fake.
 class TestDevice {
-  /// Builds the session for [login] with the DPoP key [key].
-  TestDevice(this.baseUri, this.key, this.login) {
+  /// Builds the session for [login] with the DPoP key [key]; without [stepUpKey] the device
+  /// has no step-up key (Windows, D-M4-11-2).
+  TestDevice(this.baseUri, this.key, this.login, {bool stepUpKey = true}) {
     final random = Random(key.thumbprint.hashCode);
     auth = AuthSession(
       serverUrl: baseUri,
-      keys: DeviceKeys(dpop: key, stepUp: SoftwareP256Signer.seeded(99)),
+      keys: DeviceKeys(
+        dpop: key,
+        stepUp: stepUpKey ? SoftwareP256Signer.seeded(99) : null,
+      ),
       secrets: MemorySecretStore(),
       clock: const SystemClock(),
       ids: Uuid7Generator(

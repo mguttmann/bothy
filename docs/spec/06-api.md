@@ -775,7 +775,7 @@ Generated from openapi.yaml.
 | POST | `/api/v1/auth/step-up/challenge` | `createStepUpChallenge` | `auth.step_up` | Create a step-up challenge |
 | POST | `/api/v1/auth/step-up/passkey` | `completeStepUpWithPasskey` | `auth.step_up` | Confirm step-up with a passkey |
 | POST | `/api/v1/auth/step-up/device-key` | `completeStepUpWithDeviceKey` | `auth.step_up` | Confirm step-up with the device key after user verification |
-| POST | `/api/v1/auth/step-up/password` | `stepUpWithPassword` | `auth.step_up` | Console step-up with password and TOTP |
+| POST | `/api/v1/auth/step-up/password` | `stepUpWithPassword` | `auth.step_up` | Confirm step-up with password and TOTP |
 | POST | `/api/v1/auth/step-up/oidc` | `beginStepUpOidcReauth` | `auth.step_up` | Start a console step-up with OIDC |
 | POST | `/api/v1/auth/step-up/oidc/complete` | `completeStepUpOidcReauth` | `auth.step_up` | Finish a console step-up with OIDC |
 | GET | `/api/v1/console/session` | `getConsoleSession` | `self.read` | Read the console session |

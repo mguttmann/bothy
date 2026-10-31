@@ -11,7 +11,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:api_client/api_client.dart' show ApiClient;
-import 'package:auth/auth.dart' show StepUpPrompt;
+import 'package:auth/auth.dart' show StepUpCredentials, StepUpPrompt;
 import 'package:client/export/channel_export.dart';
 import 'package:client/files/file_ports.dart';
 import 'package:client/menus/channel_menu.dart';
@@ -41,6 +41,13 @@ class RecordingPrompt implements StepUpPrompt {
     asked.add(purposeText);
     return true;
   }
+
+  /// These tests confirm with the step-up key; a password prompt cancels.
+  @override
+  Future<StepUpCredentials?> askPassword(
+    String purposeText, {
+    bool rejected = false,
+  }) async => null;
 }
 
 /// An adapter whose one response streams what the test adds to [body].

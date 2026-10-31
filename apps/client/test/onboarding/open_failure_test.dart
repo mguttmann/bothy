@@ -3,12 +3,15 @@
 // A failure to open the services of a found instance (docs/decisions.d/FIX-macos-keychain.md):
 // E1 shows its own text, never "No instance at this address", because discovery did answer.
 // A platform without a step-up key (Windows) opens and logs in with its DPoP key alone
-// (docs/decisions.d/FIX-windows-keystore.md).
+// (docs/decisions.d/FIX-windows-keystore.md) and confirms step-up actions with password and
+// TOTP (docs/decisions.d/FIX-stepup-macos.md).
 
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:auth/auth.dart' show DeviceKeys;
+import 'package:api_client/api_client.dart';
+import 'package:auth/auth.dart'
+    show DeviceKeys, StepUpCredentials, StepUpPrompt, stepUpPurposeExtra;
 import 'package:client/onboarding/onboarding_controller.dart';
 import 'package:client/onboarding/start_route.dart';
 import 'package:client/platform/device_key_signer.dart';
@@ -79,6 +82,28 @@ class _WindowsLikeClient implements dk.DeviceKeyClient {
   ) => throw UnimplementedError();
 }
 
+/// The step-up prompt of the app: confirms with the device key and types the seed's password
+/// and code into the password variant.
+class _Prompt implements StepUpPrompt {
+  final List<String> asked = [];
+  final List<String> askedPassword = [];
+
+  @override
+  Future<bool> ask(String purposeText) async {
+    asked.add(purposeText);
+    return true;
+  }
+
+  @override
+  Future<StepUpCredentials?> askPassword(
+    String purposeText, {
+    bool rejected = false,
+  }) async {
+    askedPassword.add(purposeText);
+    return (password: WorldSeed.password, totpCode: WorldSeed.totp);
+  }
+}
+
 void main() {
   test('each cause of a failed open maps to its status', () {
     final cases = <Object, ServerStatus>{
@@ -131,12 +156,15 @@ void main() {
     HttpOverrides? saved;
     late FakeInstance f;
     late ProviderContainer c;
+    late _Prompt prompt;
 
     setUp(() async {
       saved = HttpOverrides.current;
       HttpOverrides.global = null;
+      prompt = _Prompt();
       f = await FakeInstance.start(
         platform: 'windows',
+        stepUpPrompt: prompt,
         deviceKeys: PlatformDeviceKeyStore(
           _WindowsLikeClient(),
           () =>
@@ -169,6 +197,63 @@ void main() {
         final id = state.services!.auth.session!.deviceId.value;
         final device = f.server.world.devices[id]!;
         expect(device.stepUpJwk, isNull);
+        expect(f.server.violations, isEmpty);
+      },
+    );
+
+    test(
+      'a step-up action asks for password and code and then succeeds',
+      () async {
+        final control = await connected(c, f);
+        await control.loginWithPassword(
+          WorldSeed.alexLogin,
+          WorldSeed.password,
+          WorldSeed.totp,
+        );
+        final auth = c.read(onboardingControllerProvider).services!.auth;
+        final world = f.server.world;
+        final other = world.nextId();
+        world.devices[other] = FakeDevice(
+          id: other,
+          userId: f.seed.alex.id,
+          name: 'Old phone',
+          platform: 'android',
+          state: 'active',
+          jkt: 'jkt-$other',
+          createdAt: world.stamp(),
+        );
+        f.server.requests.clear();
+
+        final revoked = await auth.api.getDevicesApi().revokeDevice(
+          deviceId: other,
+          reasonBody: ReasonBody((b) => b..reason = 'lost'),
+          extra: {
+            idempotencyKeyExtra: '0193f2a7-0000-7000-8000-0000000000a1',
+            stepUpPurposeExtra: 'Revoke the device Old phone',
+          },
+        );
+
+        expect(revoked.data!.state, DeviceStateEnum.revoked);
+        expect(prompt.askedPassword, ['Revoke the device Old phone']);
+        expect(prompt.asked, isEmpty);
+        const stepUpFlow = {
+          'revokeDevice',
+          'createStepUpChallenge',
+          'completeStepUpWithDeviceKey',
+          'stepUpWithPassword',
+        };
+        expect(
+          [
+            for (final r in f.server.requests)
+              if (stepUpFlow.contains(r.operationId)) r.operationId,
+          ],
+          [
+            'revokeDevice',
+            'createStepUpChallenge',
+            'stepUpWithPassword',
+            'revokeDevice',
+          ],
+        );
         expect(f.server.violations, isEmpty);
       },
     );

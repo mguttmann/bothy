@@ -22,6 +22,7 @@ import (
 // The causes of a refused console step-up (audit details, codes only).
 const (
 	causeNotConsole       stepup.Cause = "not_console"
+	causeStepUpKeyPresent              = "step_up_key_present"
 	causeIdentityOther    stepup.Cause = "identity_mismatch"
 	causeAuthTimeTooOld   stepup.Cause = "auth_time_before_challenge"
 	causeNoLocalAccount                = "no_local_account"
@@ -34,18 +35,41 @@ const (
 	fieldCodeInvalid = "invalid"
 )
 
-// consoleOnly answers the 403 of a console step-up called from another session (08 section 6.2:
-// native apps always have a step-up key), with its audit denial.
-func consoleOnly(a actor.Actor) error {
+// consoleOnly answers the 403 of the OIDC re-login called from a session other than a console
+// session (08 section 6.2: its redirect is the console callback), with its audit denial.
+func consoleOnly(_ context.Context, a actor.Actor) error {
 	if a.ClientComponent == string(identity.ComponentConsole) {
 		return nil
 	}
 	return notPossible(string(causeNotConsole), a.SessionID)
 }
 
-// begin runs the checks of every console step-up operation: the caller in ctx, a console session
-// and auth.step_up on the own session (StepUps.admit). Refusals are audited.
-func (c *Console) begin(ctx context.Context, a actor.Actor) (context.Context, error) {
+// passwordCaller answers the 403 of stepUpWithPassword from a session that may not use it (08
+// section 6.2, FIX-stepup-macos): a console session may; an app session only while its device
+// has no active step_up key (Windows, D-M4-11-2), so a device with one keeps the device key and
+// gets no weaker method. A cli device is refused by admit (08 section 6.4).
+func (c *Console) passwordCaller(ctx context.Context, a actor.Actor) error {
+	switch a.ClientComponent {
+	case string(identity.ComponentConsole):
+		return nil
+	case string(identity.ComponentApp):
+	default:
+		return notPossible(string(causeNotConsole), a.SessionID)
+	}
+	_, found, err := c.stepUps.d.Devices.ActiveKey(ctx, a.DeviceID, identity.KeyPurposeStepUp)
+	if err != nil {
+		return err
+	}
+	if found {
+		return notPossible(causeStepUpKeyPresent, a.SessionID)
+	}
+	return nil
+}
+
+// begin runs the checks of every console step-up operation: the caller in ctx, the session check
+// of the operation (allowed) and auth.step_up on the own session (StepUps.admit). Refusals are
+// audited.
+func (c *Console) begin(ctx context.Context, a actor.Actor, allowed func(context.Context, actor.Actor) error) (context.Context, error) {
 	ctx, err := withCaller(ctx, a)
 	if err != nil {
 		return nil, err
@@ -53,7 +77,7 @@ func (c *Console) begin(ctx context.Context, a actor.Actor) (context.Context, er
 	if c.stepUps == nil {
 		return nil, errs.New(errs.CodeInternalError, "identity: the console step-up is not bound")
 	}
-	if err := consoleOnly(a); err != nil {
+	if err := allowed(ctx, a); err != nil {
 		return nil, c.stepUps.finish(ctx, err)
 	}
 	if err := c.stepUps.admit(ctx, a); err != nil {
@@ -62,16 +86,18 @@ func (c *Console) begin(ctx context.Context, a actor.Actor) (context.Context, er
 	return ctx, nil
 }
 
-// StepUpWithPassword implements identity.Console (stepUpWithPassword, D-M6-01-6): the password and
-// the TOTP code are verified by the rules of the login (one Argon2id computation, the lockout of
-// auth.login_fail_limit counted and committed); then one unit of work locks session and challenge
-// and confirms with method password_totp, or fails the challenge, which counts toward
-// auth.step_up_fail_limit.
+// StepUpWithPassword implements identity.Console (stepUpWithPassword, D-M6-01-6): a console
+// session, or an app session on a device without an active step_up key (passwordCaller,
+// FIX-stepup-macos); the password and the TOTP code are verified by the rules of the login (one
+// Argon2id computation, the lockout of auth.login_fail_limit counted and committed); then one unit
+// of work locks session and challenge and confirms with method password_totp, or fails the
+// challenge, which counts toward auth.step_up_fail_limit. Only a console session gets a new
+// cookie (confirmed).
 func (c *Console) StepUpWithPassword(ctx context.Context, a actor.Actor, challengeID ids.ID, password, totpCode string) (identity.StepUpResult, error) {
 	if c.local == nil || !c.local.enabled {
 		return identity.StepUpResult{}, invisible()
 	}
-	ctx, err := c.begin(ctx, a)
+	ctx, err := c.begin(ctx, a, c.passwordCaller)
 	if err != nil {
 		return identity.StepUpResult{}, err
 	}
@@ -91,7 +117,7 @@ func (c *Console) BeginStepUpOIDC(ctx context.Context, a actor.Actor, in identit
 	if c.oidc == nil {
 		return identity.OIDCBeginResult{}, invisible()
 	}
-	ctx, err := c.begin(ctx, a)
+	ctx, err := c.begin(ctx, a, consoleOnly)
 	if err != nil {
 		return identity.OIDCBeginResult{}, err
 	}
@@ -141,7 +167,7 @@ func (c *Console) CompleteStepUpOIDC(ctx context.Context, a actor.Actor, loginCo
 	if c.oidc == nil {
 		return identity.StepUpResult{}, invisible()
 	}
-	ctx, err := c.begin(ctx, a)
+	ctx, err := c.begin(ctx, a, consoleOnly)
 	if err != nil {
 		return identity.StepUpResult{}, err
 	}

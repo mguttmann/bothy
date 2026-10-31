@@ -510,7 +510,9 @@ Both keys are non-exportable and, where the platform offers it, hardware-backed:
 |---|---|---|---|
 | iOS, iPadOS, macOS | Secure Enclave | `ES256` | step-up key bound to the currently enrolled biometrics, so that newly added fingerprints invalidate it |
 | Android | Android Keystore, StrongBox if available | `ES256` | step-up key with mandatory user authentication; on API 26 to 29 strong biometrics only, from API 30 biometrics or the device credential ([15](15-client-architecture.md) 9) |
-| Windows | `dpop`: TPM via the Platform Crypto Provider, without P-256 or TPM a software key reported as not hardware-bound | `ES256` | settled by M4-11 (D-M4-11-2): Windows has no system-enforced confirmation per use for an `ES256` key (strong key protection is a password the process can supply and that is cached per process; Windows Hello keys are RSA), so Windows clients have no `step_up` key and use the other step-up methods of this section. A Windows Hello step-up key would need `RS256` or `PS256` in `device_keys.alg` (03) and in the JOSE profile (ADR 0067), a core contract change (section 17) |
+| Windows | `dpop`: TPM via the Platform Crypto Provider, without P-256 or TPM a software key reported as not hardware-bound | `ES256` | settled by M4-11 (D-M4-11-2): Windows has no system-enforced confirmation per use for an `ES256` key (strong key protection is a password the process can supply and that is cached per process; Windows Hello keys are RSA), so Windows clients have no `step_up` key and confirm with password and TOTP (section 6.2,
+docs/decisions.d/FIX-stepup-macos.md); the terminal, which needs a step-up with `passkey` or
+`device_key` (section 6.3), stays unavailable on them. A Windows Hello step-up key would need `RS256` or `PS256` in `device_keys.alg` (03) and in the JOSE profile (ADR 0067), a core contract change (section 17) |
 | Web console | no device key | | session by cookie (section 7.5), step-up by passkey |
 
 Without attestation the server cannot check whether a key really is hardware-backed.
@@ -553,15 +555,22 @@ Web console: WebAuthn assertion with `userVerification = required` against the p
 person. Without a passkey: a new OIDC login with `prompt=login` and `max_age=0`; the server
 requires an `auth_time` after the start of the challenge. Local accounts without a passkey:
 password with TOTP. The operations for the last two methods come with the console session
-(PLAN M6-01), spec first; native apps always have a step-up key and do not need them.
+(PLAN M6-01), spec first. A native app whose device has no active `step_up` key (Windows, 6.1,
+D-M4-11-2; a Mac without a Secure Enclave in the login keychain) confirms with password and TOTP
+as well (docs/decisions.d/FIX-stepup-macos.md); every other native app confirms with its
+`step_up` key and never with the password.
 
 Console step-up operations (M6-01, docs/DECISIONS.md D-M6-01-6): every console step-up starts with
 `createStepUpChallenge`. The passkey uses `completeStepUpWithPasskey` as for apps (every passkey
 ceremony of this server asks `userVerification = required`). Password with TOTP uses
 `stepUpWithPassword` (`POST /api/v1/auth/step-up/password`, body `challenge_id`, `password`,
-`totp_code`): only for a console session of a person with a local account while
-`auth.local_password_enabled` is true; password and code are checked like the login of section 2.5
-with the same lockout, and `step_up_method = password_totp`. The OIDC re-login uses
+`totp_code`): for a console session, and for an `app` session whose device is not `cli` and has no
+active `step_up` key, of a person with a local account while `auth.local_password_enabled` is
+true; password and code are checked like the login of section 2.5 with the same lockout, and
+`step_up_method = password_totp`. An `app` session whose device has an active `step_up` key, a
+`share_ext` session and a `cli` device get `403 forbidden` with reason `step_up_not_possible` (no
+downgrade from the device key; audit cause `step_up_key_present`, `not_console` or
+`cli_device`). The OIDC re-login uses
 `beginStepUpOidcReauth` (`POST /api/v1/auth/step-up/oidc`, body `challenge_id`, `provider_id`,
 `app_redirect_uri`, `client_challenge`; the redirect must be `/console/step-up/callback` on the
 origin of `server.public_url`) and `completeStepUpOidcReauth` (`POST
@@ -570,8 +579,10 @@ provider for `prompt=login` and `max_age=0`; the identity must be one of the per
 identities (same issuer and subject) and its `auth_time` must not lie before the second in which
 the challenge was created (`auth_time` has whole seconds); then `step_up_method = oidc_reauth`. A
 wrong password, code, identity or `auth_time` fails the challenge and counts toward
-`auth.step_up_fail_limit`. From any other session the two operations answer `403 forbidden`. Every
-successful step-up of a console session sets a new cookie value (section 7.5).
+`auth.step_up_fail_limit`. The OIDC re-login stays console-only, because its redirect is the
+console callback: from any other session its two operations answer `403 forbidden` with reason
+`step_up_not_possible`. Every successful step-up of a console session sets a new cookie value
+(section 7.5); an app session has no cookie and gets none.
 
 Only people in a session can provide step-up (07, SR5). The confirmation applies only to the
 session in which it was provided, that is, to one device.
@@ -1086,6 +1097,7 @@ sequenceDiagram
 | ID-T27 | Random parts of refresh token, console cookie and API token 256 bits each, enrollment code at least 128 bits, all from the cryptographic random number generator; TOTP with a 30-second step and at most one step of tolerance | lengths and source as stated |
 | ID-T28 | Terminal: step-up with password and TOTP, older than `terminal.step_up_max_age`, twice for two openings, in the console with a passkey without `userVerification = required`, reattach in the console within `terminal.quick_reattach_window` without passkey, simultaneous openings with one confirmation | each `401 step_up_required` (in the console with `reason: passkey_required`); for simultaneous openings exactly one session |
 | ID-T29 | Registration with `platform = 'cli'` and `step_up_jwk`; challenge and confirmation with device key and with passkey from a `cli` session; action with step-up from a `cli` session | `400 validation_failed`; `403 forbidden` with audit `step_up_not_possible`; `401 step_up_required` |
+| ID-T30 | `stepUpWithPassword` from an `app` session on a device without an active `step_up` key; from a device with one; from a `cli` device | `200`, `step_up_method = password_totp`, audit `auth.step_up` confirm with method `password_totp`, no cookie; `403 forbidden` with `step_up_not_possible` (cause `step_up_key_present`), nothing counted; `403 forbidden` with `step_up_not_possible` |
 
 ## 16. Decisions of this chapter
 
@@ -1108,6 +1120,7 @@ sequenceDiagram
 | R-ID-15 | Verification code of the device derived (HMAC over device ID and key), not stored. | No column needed; a second attempt by an attacker shows a different code. |
 | R-ID-16 | Step-up for the terminal only by passkey or step-up device key, recent and consumed per opening. | Owner requirement "renewed passkey confirmation when opening"; a terminal is remote access, not administration. |
 | R-ID-17 | `cli` devices have no step-up key and provide no step-up (6.4). | A key in a tool signs without user confirmation; without attestation, the server cannot tell it apart from a key in secure storage. |
+| R-ID-18 | A native app without an active `step_up` key confirms with password and TOTP; a device with one keeps the device key (6.2, docs/decisions.d/FIX-stepup-macos.md). | Windows has no `step_up` key by design (D-M4-11-2), and the console-only rule left such a device without any step-up method; password and TOTP are the strength the console already accepts, and the terminal still requires `passkey` or `device_key` (6.3). |
 
 ## 17. Alignment with the core contract
 
