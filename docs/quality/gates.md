@@ -31,7 +31,7 @@ once for the components of the plan, the tests split by component
 |---|---|---|
 | `gates` | `fmt-check codegen-check lint typecheck arch register-check migrations-lint flag-check commitlint fragments-check runners-check labels-check release-pins install-options` | always |
 | `gates (docs and contracts)` | `docs config-doc-check linkcheck diagrams catalog-check api-lint api-checks api-breaking ops-check api-clients tokens` | always |
-| `gates (security and supply chain)` | `gitleaks semgrep trivy osv licenses` | always |
+| `gates (security and supply chain)` | `gitleaks semgrep trivy osv licenses`, after `gradle/actions/wrapper-validation` checks every tracked `gradle-wrapper.jar` | always |
 | `test (tools)` | `test coverage` with no component (the Python tools) | always |
 | `test (server, shard I of N)` | `test COMPONENTS=server AREAS=none GO_TEST_SHARD=I/N`, one job per shard of a matrix | when the plan needs it |
 | `test (server coverage)` | `-o test coverage COMPONENTS=server AREAS=none` on the merged profiles of the shards | when the plan needs it |

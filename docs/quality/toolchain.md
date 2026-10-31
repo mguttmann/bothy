@@ -133,6 +133,7 @@ tags, the commit SHA behind the tag).
 | `subosito/flutter-action` | `v2.23.0` | Flutter for every Dart package (jobs `gates`, `sonar`, `apps (macOS)`, `apps (iOS)`, `apps (Windows)` and the Pages build), from `environment.flutter` of the root `pubspec.yaml` |
 | `actions/setup-java` | `v6.1.0` | Temurin 17 for the Gradle builds of the Android code (jobs `gates`, `sonar`, `apps (Android API 26)`, `apps (Android API 36)`, brief M5-01) |
 | `android-actions/setup-android` | `v4.0.4` | Android SDK for the JVM tests of the Android core in `make test` (jobs `gates`, `sonar`) |
+| `gradle/actions` | `v6.4.1` | `wrapper-validation` checks every tracked `gradle-wrapper.jar` against the checksums Gradle publishes (job `gates (security and supply chain)`) |
 | `reactivecircus/android-emulator-runner` | `v2.38.0` | Android emulators with API 26 and 36 for the instrumented tests (jobs `apps (Android API 26)` and `apps (Android API 36)`) |
 | `github/codeql-action` | `v4.38.3` | CodeQL and SARIF upload (public) |
 | `ossf/scorecard-action` | `v2.4.4` | OpenSSF Scorecard (public) |

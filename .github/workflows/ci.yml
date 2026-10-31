@@ -269,6 +269,12 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      # Every tracked gradle-wrapper.jar must match a checksum that Gradle publishes, before any
+      # step can run it; the count is the number of tracked wrappers, so none drops out unseen
+      # (tools/ci/tests/test_gradle_wrapper_validation.py; docs/decisions.d/SEC-ALERTS-2026-10-31.md).
+      - uses: gradle/actions/wrapper-validation@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+        with:
+          min-wrapper-count: 2
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           enable-cache: true

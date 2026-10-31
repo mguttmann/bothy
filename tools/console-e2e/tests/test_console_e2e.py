@@ -13,6 +13,7 @@ import datetime
 import hashlib
 import json
 import re
+import ssl
 import subprocess
 import sys
 import tomllib
@@ -25,7 +26,9 @@ import console_e2e as e2e
 import pytest
 import yaml
 from cryptography import x509
-from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.x509.oid import NameOID
 
 ROOT = Path(__file__).resolve().parents[3]
 OVERLAY = ROOT / "infra" / "compose" / "test" / "compose.console-e2e.yaml"
@@ -1659,6 +1662,31 @@ def test_upgrade_request_carries_the_foreign_origin_and_the_cookie() -> None:
     assert raw.endswith(b"\r\n\r\n")
     with pytest.raises(ValueError, match="line break"):
         term.upgrade_request("/x", host="h", origin="o\r\nX: y", cookie="", key="k")
+
+
+def test_upgrade_tls_context_refuses_tls_below_1_2(tmp_path: Path) -> None:
+    # The upgrade request trusts only the test CA and never offers TLS 1.0 or 1.1, whatever the
+    # defaults of the Python in the browser image are (SEC-ALERTS-2026-10-31).
+    key = ec.generate_private_key(ec.SECP256R1())
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "e2e test CA")])
+    now = datetime.datetime.now(datetime.UTC)
+    cert = (
+        x509.CertificateBuilder()
+        .subject_name(name)
+        .issuer_name(name)
+        .public_key(key.public_key())
+        .serial_number(1)
+        .not_valid_before(now)
+        .not_valid_after(now + datetime.timedelta(days=1))
+        .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+        .sign(key, hashes.SHA256())
+    )
+    ca = tmp_path / "ca.pem"
+    ca.write_bytes(cert.public_bytes(serialization.Encoding.PEM))
+    context = term.upgrade_tls_context(str(ca))
+    assert context.minimum_version >= ssl.TLSVersion.TLSv1_2
+    assert context.verify_mode == ssl.CERT_REQUIRED
+    assert context.check_hostname
 
 
 def test_status_code_of_a_response_head() -> None:

@@ -820,6 +820,13 @@ def serve_foreign(route: Route) -> None:
     route.fulfill(status=200, content_type="text/html", body="<!doctype html><title>e2e</title>")
 
 
+def upgrade_tls_context(cafile: str) -> ssl.SSLContext:
+    """The TLS context of the upgrade request: trusts only ``cafile``, refuses TLS below 1.2."""
+    context = ssl.create_default_context(cafile=cafile)
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
+    return context
+
+
 def upgrade_status(path: str, cookie: str) -> int:
     """Sends the upgrade request of ``path`` from FOREIGN_ORIGIN and returns the answer's status.
 
@@ -827,7 +834,7 @@ def upgrade_status(path: str, cookie: str) -> int:
     """
     parts = urlsplit(ORIGIN)
     host = parts.hostname or "localhost"
-    context = ssl.create_default_context(cafile=CA_FILE)
+    context = upgrade_tls_context(CA_FILE)
     key = base64.b64encode(secrets.token_bytes(16)).decode()
     request = upgrade_request(
         path, host=parts.netloc, origin=FOREIGN_ORIGIN, cookie=cookie, key=key
