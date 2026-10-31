@@ -223,6 +223,60 @@ def test_missing_documented_file_fails(repo: Repo) -> None:
     assert "README.md" in findings[0]
 
 
+def unreleased(repo: Repo, readme_status: str, index_status: str) -> None:
+    """Turn the fixture into a repository before its first product release."""
+    repo.write("VERSION", f"{ioc.NO_RELEASE_VERSION}\n")
+    repo.write(
+        "README.md",
+        f"# Product\n\n{readme_status}\n\n    curl -fsSL {url(ioc.NO_RELEASE_VERSION)} | sh\n",
+    )
+    repo.write("docs/index.md", f"# Product\n\n{index_status}\n")
+    repo.write(
+        "docs/operations/install-compose.md",
+        f"# Install\n\n```sh\ncurl -fsSL {url(ioc.NO_RELEASE_VERSION)} | sh\n```\n",
+    )
+
+
+def test_unreleased_with_the_status_passes(repo: Repo) -> None:
+    status = f"**{ioc.NO_RELEASE_STATUS}.** The quick start works from the first release."
+    unreleased(repo, status, status)
+    assert ioc.check(repo.root) == []
+
+
+def test_unreleased_readme_without_the_status_fails(repo: Repo) -> None:
+    unreleased(repo, "A finished product.", f"{ioc.NO_RELEASE_STATUS}.")
+    findings = ioc.check(repo.root)
+    assert len(findings) == 1
+    assert "README.md" in findings[0]
+    assert ioc.NO_RELEASE_STATUS in findings[0]
+
+
+def test_unreleased_docs_index_without_the_status_fails(repo: Repo) -> None:
+    unreleased(repo, f"{ioc.NO_RELEASE_STATUS}.", "A finished product.")
+    findings = ioc.check(repo.root)
+    assert len(findings) == 1
+    assert "docs/index.md" in findings[0]
+
+
+def test_unreleased_missing_docs_index_fails(repo: Repo) -> None:
+    unreleased(repo, f"{ioc.NO_RELEASE_STATUS}.", "")
+    (repo.root / "docs/index.md").unlink()
+    findings = ioc.check(repo.root)
+    assert len(findings) == 1
+    assert "docs/index.md" in findings[0]
+
+
+def test_released_while_still_saying_no_release_fails(repo: Repo) -> None:
+    repo.write(
+        "README.md",
+        f"# Product\n\n{ioc.NO_RELEASE_STATUS}.\n\n    curl -fsSL {url('0.3.0')} | sh\n",
+    )
+    findings = ioc.check(repo.root)
+    assert len(findings) == 1
+    assert "README.md" in findings[0]
+    assert "0.3.0" in findings[0]
+
+
 def test_cli_exit_codes(repo: Repo, capsys: pytest.CaptureFixture[str]) -> None:
     assert ioc.main(["check", "--repo", str(repo.root)]) == 0
     repo.write("VERSION", "9.9.9\n")

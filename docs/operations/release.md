@@ -74,7 +74,10 @@ by a product release; existing installations raise `BOTHY_VERSION` themselves
    pre-release identifier. Commit on a branch, pull request to `main`; the diff shows the pinned
    server version. The gate `release-pins` checks the same rule in the pre-push of this branch
    and in the required check `ci-ok` of the pull request. The push of the tag alone starts no
-   check ([18-release.md](../spec/18-release.md) 2.1, rule 1).
+   check ([18-release.md](../spec/18-release.md) 2.1, rule 1). The first product release also
+   rewrites the status block of `README.md` and `docs/index.md` in the same branch: while
+   `VERSION` is `0.0.0` they say "No release yet", and after it the gate `install-options`
+   fails as long as either still does.
 3. After the merge, set the signed tag on the squash commit on `main`: `vA.B.C` (beta:
    `vA.B.C-beta.M`). The numbers do not depend on the
    server version ([environments-and-flags.md](environments-and-flags.md) 1.3).

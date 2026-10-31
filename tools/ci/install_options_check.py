@@ -15,10 +15,14 @@ Two checks for `make check`:
    one URL `https://github.com/<owner>/bothy/releases/download/v<X>/install.sh`, and every
    such URL has X equal to the content of VERSION. `make release-prep` of the product
    rewrites these URLs together with VERSION (tools/ci/release_prep.py).
+3. Release status. While VERSION is 0.0.0 (no product release has been prepared), README.md
+   and docs/index.md each say `No release yet` in their status block, so a reader does not
+   take the documented command for one that works today. From the first release on neither
+   file may say it any more: the release that sets VERSION also rewrites the status.
 
 Usage:
   install_options_check.py check [--repo <dir>]
-Exit codes: 0 both checks pass, 1 findings (named on stderr), 2 usage error.
+Exit codes: 0 all checks pass, 1 findings (named on stderr), 2 usage error.
 """
 
 from __future__ import annotations
@@ -39,6 +43,10 @@ INSTALL_URL = re.compile(
     r"https://github\.com/(?P<owner>[A-Za-z0-9-]+)/bothy/releases/download/"
     r"v(?P<version>[0-9A-Za-z.+-]+)/install\.sh"
 )
+# VERSION before the first product release, and the words of the status block that say so.
+NO_RELEASE_VERSION = "0.0.0"
+NO_RELEASE_STATUS = "No release yet"
+STATUS_FILES = ("README.md", "docs/index.md")
 FLAGS = frozenset({"--yes"})
 # The test sets --storage per run (only its value may differ) and adds --bundle.
 ANY_VALUE = frozenset({"--storage"})
@@ -255,8 +263,43 @@ def documented_command_findings(repo: Path) -> list[str]:
     return findings
 
 
+def release_status_findings(repo: Path) -> list[str]:
+    """Check 3: the status block says "No release yet" exactly while VERSION is 0.0.0.
+
+    Args:
+        repo: the repository root.
+
+    Returns:
+        A finding per status file that is missing or misses the words before the first
+        release, and per status file that still has them after it.
+    """
+    version_file = repo / "VERSION"
+    if not version_file.is_file():
+        return []  # check 2 names the missing VERSION
+    version = version_file.read_text(encoding="utf-8").strip()
+    released = version != NO_RELEASE_VERSION
+    findings: list[str] = []
+    for name in STATUS_FILES:
+        path = repo / name
+        text = path.read_text(encoding="utf-8") if path.is_file() else None
+        if released:
+            if text is not None and NO_RELEASE_STATUS in text:
+                findings.append(
+                    f"{name} still says '{NO_RELEASE_STATUS}', VERSION is {version};"
+                    " rewrite its status block for the release"
+                )
+        elif text is None:
+            findings.append(f"{name} is missing; it must say '{NO_RELEASE_STATUS}'")
+        elif NO_RELEASE_STATUS not in text:
+            findings.append(
+                f"{name} does not say '{NO_RELEASE_STATUS}' in its status block,"
+                f" VERSION is {version} (no product release)"
+            )
+    return findings
+
+
 def check(repo: Path) -> list[str]:
-    """Run both checks.
+    """Run all three checks.
 
     Args:
         repo: the repository root.
@@ -264,7 +307,7 @@ def check(repo: Path) -> list[str]:
     Returns:
         All findings, options first; empty when the repository passes.
     """
-    return option_findings(repo) + documented_command_findings(repo)
+    return option_findings(repo) + documented_command_findings(repo) + release_status_findings(repo)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -279,7 +322,10 @@ def main(argv: list[str] | None = None) -> int:
         print(f"install-options: {finding}", file=sys.stderr)
     if findings:
         return 1
-    print("install-options: options and documented installation command agree with the spec")
+    print(
+        "install-options: options, documented installation command and release status"
+        " agree with the spec and VERSION"
+    )
     return 0
 
 
