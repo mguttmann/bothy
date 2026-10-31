@@ -22,8 +22,14 @@ enum AttachmentState {
   /// waits for its next one: "Paused, trying again shortly" (FIX-upload-retry-storm).
   retrying,
 
-  /// The client is done, the server checks: "being checked".
+  /// The client is done, the server's malware check runs (`scan_status` `pending`): "being
+  /// checked".
   checking,
+
+  /// The check passed (`clean` or `skipped`) and the server still prepares the file before it
+  /// serves it (the cleaned original and the thumbnails of an image, the duration of MP4
+  /// audio; 12 3.4): "Preparing" (FIX-scan-state-stale).
+  preparing,
 
   /// Size or checksum wrong, or the upload was refused: "Upload failed".
   failed,
@@ -34,28 +40,50 @@ enum AttachmentState {
   /// Servable.
   ready,
 
-  /// The scan found something or failed: "blocked".
+  /// The scan found something (`infected`): "blocked".
   blocked,
+
+  /// The check could not be completed (`scan_status` `error`); the file is never served:
+  /// "Check failed" (FIX-scan-state-stale).
+  checkFailed,
 
   /// Deleted: only the tombstone fields remain (04 2.2 rule 5).
   deleted,
 }
 
-/// The view of the stored [file] (12 2): servable is `ready`; `complete` with `infected` or
-/// `error` is `blocked`; `failed` is "Upload failed"; everything else waits for the check. A
-/// redacted file (empty name, size 0, no thumbnails) is `deleted`.
+/// The view of the stored [file] (12 2, FIX-scan-state-stale): a redacted file (empty name,
+/// size 0, no thumbnails) is `deleted`; `failed` is "Upload failed"; `infected` is `blocked`
+/// and `error` is `checkFailed`; servable is `ready`. "Being checked" stands only while the
+/// server's scan is `pending`; a file whose scan passed and that the server still prepares
+/// (`upload_state` `pending`, an image before its thumbnail job) is `preparing`.
 AttachmentState stateOfFile(FileMeta file) {
   if (isTombstone(file)) return AttachmentState.deleted;
   if (file.uploadState == UploadState.failed) return AttachmentState.failed;
-  if (file.uploadState == UploadState.complete) {
-    return switch (file.scanStatus) {
-      ScanStatus.clean || ScanStatus.skipped => AttachmentState.ready,
-      ScanStatus.infected || ScanStatus.error => AttachmentState.blocked,
-      _ => AttachmentState.checking,
-    };
-  }
-  return AttachmentState.checking;
+  return switch (file.scanStatus) {
+    ScanStatus.infected => AttachmentState.blocked,
+    ScanStatus.error => AttachmentState.checkFailed,
+    ScanStatus.clean || ScanStatus.skipped =>
+      file.uploadState == UploadState.complete
+          ? AttachmentState.ready
+          : AttachmentState.preparing,
+    _ => AttachmentState.checking,
+  };
 }
+
+/// The view of a confirmed upload whose stored file is [file]: the stored state, which
+/// `file.updated` keeps current, or "being checked" while the row has not arrived yet
+/// (FIX-scan-state-stale).
+AttachmentState stateAfterUpload(FileMeta? file) =>
+    file == null ? AttachmentState.checking : stateOfFile(file);
+
+/// Whether [state] ends without a servable file (shown in the danger style).
+bool isFailedState(AttachmentState state) => switch (state) {
+  AttachmentState.failed ||
+  AttachmentState.canceled ||
+  AttachmentState.blocked ||
+  AttachmentState.checkFailed => true,
+  _ => false,
+};
 
 /// Whether [file] is the tombstone of a deleted file (04 2.2 rule 5: `original_name` `""`,
 /// `size_bytes` `0`, no thumbnails).
@@ -87,10 +115,12 @@ String attachmentStateLabel(
   AttachmentState.uploading => l.fileStateUploading(percent),
   AttachmentState.retrying => l.fileStateRetrying,
   AttachmentState.checking => l.fileStateChecking,
+  AttachmentState.preparing => l.fileStatePreparing,
   AttachmentState.failed => l.fileStateUploadFailed,
   AttachmentState.canceled => l.fileStateCanceled,
   AttachmentState.ready => '',
   AttachmentState.blocked => l.fileStateBlocked,
+  AttachmentState.checkFailed => l.fileStateCheckFailed,
   AttachmentState.deleted => l.fileDeleted,
 };
 

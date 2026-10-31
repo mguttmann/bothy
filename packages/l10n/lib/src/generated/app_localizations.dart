@@ -3163,6 +3163,18 @@ abstract class AppLocalizations {
   /// **'Shift+Enter: new line'**
   String get settingsEnterSendsHint;
 
+  /// Switch of composer.paste_originals: when off, a pasted bitmap image is sent as a JPEG when that is much smaller (FIX-scan-state-stale).
+  ///
+  /// In en, this message translates to:
+  /// **'Send pasted images as originals'**
+  String get settingsPasteOriginals;
+
+  /// Hint of the switch composer.paste_originals; files attached as files are never changed.
+  ///
+  /// In en, this message translates to:
+  /// **'Off: large pasted screenshots are sent as a smaller JPEG'**
+  String get settingsPasteOriginalsHint;
+
   /// Label of the reset of layout.column_widths (01 section 11).
   ///
   /// In en, this message translates to:
@@ -7824,6 +7836,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Being checked'**
   String get fileStateChecking;
+
+  /// State of a file whose malware check passed while the server still prepares it (the cleaned original and the thumbnails of an image, the duration of a voice recording) (12 2, FIX-scan-state-stale).
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing'**
+  String get fileStatePreparing;
+
+  /// State of a file whose malware check could not be completed (scan_status error); the file is not delivered (12 2, FIX-scan-state-stale).
+  ///
+  /// In en, this message translates to:
+  /// **'Check failed'**
+  String get fileStateCheckFailed;
 
   /// State of a file whose upload or check failed (12 2).
   ///

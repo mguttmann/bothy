@@ -353,3 +353,63 @@ async def test_a_followup_folded_into_a_notification_turn_never_runs_twice(world
     assert retry["stdin"] == [failed["stdin"][2]]  # the second follow-up only
     for message_id in (m1, m2):
         assert world.fake.followup_state(run.run_id, message_id) == "absorbed"
+
+
+async def test_followup_with_scanning_attachment_reaches_turn_once_clean(world: World) -> None:
+    # FIX-scan-state-stale: a follow-up whose screenshot is still being checked when it is sent
+    # reaches the running turn once the server reports the file clean, with the file stored
+    # beside the turn's other attachments.
+    _, run_id, gate = await gated_turn(world)
+    shot = world.fake.add_file(b"png bytes", name="shot.png", mime="image/png", status="pending")
+    message_id = await world.fake.deliver_followup(
+        run_id, "See the screenshot", author="sam", files=(shot,)
+    )
+    await world.until(lambda: len(world.requests("getMessage")) >= 2)  # it waits for the scan
+    assert len(world.turns()[0]["stdin"]) == 1
+    assert world.fake.followup_state(run_id, message_id) == "queued"
+    world.fake.set_file_status(shot, "clean")
+    await world.until(lambda: len(world.turns()[0]["stdin"]) == 2)
+    text = text_of(world.turns()[0]["stdin"][1])
+    stored = world.state / "files" / str(world.fake.world.runs[run_id].thread_id) / str(shot)
+    assert text == (
+        f"Follow-up from Sam (@sam):\n\nSee the screenshot\n\nAttachments:\n"
+        f"- shot.png (image/png): local file: {stored}"
+    )
+    assert stored.read_bytes() == b"png bytes"
+    await world.until(lambda: world.fake.followup_state(run_id, message_id) == "delivered")
+    world.release(gate)
+    assert await world.ended(run_id) == "completed"
+
+
+async def test_followup_of_files_only_names_a_blocked_file(world: World) -> None:
+    # A follow-up of attachments only is written too; a blocked file is named, never fetched.
+    _, run_id, gate = await gated_turn(world)
+    bad = world.fake.add_file(b"x", name="setup.zip", mime="application/zip", status="blocked")
+    message_id = await world.fake.deliver_followup(run_id, "", author="sam", files=(bad,))
+    await world.until(lambda: len(world.turns()[0]["stdin"]) == 2)
+    assert text_of(world.turns()[0]["stdin"][1]) == (
+        "Follow-up from Sam (@sam):\n\nAttachments:\n"
+        "- setup.zip (application/zip): unavailable: file_blocked"
+    )
+    assert world.requests("downloadFile") == []
+    await world.until(lambda: world.fake.followup_state(run_id, message_id) == "delivered")
+    world.release(gate)
+    assert await world.ended(run_id) == "completed"
+
+
+async def test_followup_files_still_pending_after_the_wait_are_named(world: World) -> None:
+    # runner.followup_file_wait bounds the wait: the follow-up goes in with the file named as
+    # not ready, so the turn is never held by a check that does not end.
+    gate = world.gate("turn_gate")
+    world.scenario(fixture="plain", turn_gate=str(gate))
+    await world.start(world.config(followup_file_wait="200ms"))
+    run = await world.fake.trigger("Fix the form", channel_id=world.forum_a)
+    await world.until(lambda: len(world.calls("gate_wait")) == 1)
+    slow = world.fake.add_file(b"x", name="big.png", mime="image/png", status="pending")
+    await world.fake.deliver_followup(run.run_id, "Big one", author="sam", files=(slow,))
+    await world.until(lambda: len(world.turns()[0]["stdin"]) == 2)
+    assert text_of(world.turns()[0]["stdin"][1]).endswith(
+        "- big.png (image/png): unavailable: file_not_ready"
+    )
+    world.release(gate)
+    assert await world.ended(run.run_id) == "completed"

@@ -21,6 +21,7 @@ import 'package:sync_engine/sync_engine.dart';
 import '../voice/recorder.dart';
 import 'file_cache.dart';
 import 'file_ports.dart';
+import 'pasted_image.dart';
 import 'upload_executor.dart';
 import 'upload_planner.dart';
 
@@ -473,7 +474,9 @@ class AttachDropTarget extends StatelessWidget {
 }
 
 /// Paste (Cmd+V on macOS, Ctrl+V on Windows) of files or an image from the clipboard into
-/// [controller] through [paste]; a paste without files leaves the text paste of the field.
+/// [controller] through [paste]; a paste without files leaves the text paste of the field. The
+/// bitmap of the clipboard goes as a JPEG when that is much smaller, unless [originals]
+/// (`composer.paste_originals`) says otherwise (FIX-scan-state-stale, [compactPastedImages]).
 class AttachPasteShortcut extends StatelessWidget {
   /// Creates the shortcut around [child].
   const AttachPasteShortcut({
@@ -482,7 +485,13 @@ class AttachPasteShortcut extends StatelessWidget {
     required this.paste,
     required this.scratch,
     required this.child,
+    this.originals = _never,
   });
+
+  static bool _never() => false;
+
+  /// Whether a pasted bitmap goes as it is (`composer.paste_originals`), read at each paste.
+  final bool Function() originals;
 
   /// The attachments.
   final AttachController controller;
@@ -497,8 +506,11 @@ class AttachPasteShortcut extends StatelessWidget {
   final Widget child;
 
   Future<void> _paste() async {
-    final files = await paste.read(await scratch());
-    if (files.isNotEmpty) await controller.add(files);
+    final read = await paste.read(await scratch());
+    if (read.isEmpty) return;
+    await controller.add(
+      await compactPastedImages(read, originals: originals()),
+    );
   }
 
   @override

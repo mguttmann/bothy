@@ -75,6 +75,31 @@ class EnterSendsRow extends ConsumerWidget {
   }
 }
 
+/// The switch of `composer.paste_originals` (FIX-scan-state-stale): off, a pasted bitmap goes
+/// as a smaller JPEG when that is much smaller; files attached as files never change.
+class PasteOriginalsRow extends ConsumerWidget {
+  /// Creates the row.
+  const PasteOriginalsRow({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context);
+    final settings = ref.watch(personalSettingsProvider);
+    final writer = ref.watch(settingsRepositoryProvider);
+    return SettingRow(
+      label: l.settingsPasteOriginals,
+      hint: l.settingsPasteOriginalsHint,
+      control: Switch(
+        key: const ValueKey('settings.pasteOriginals'),
+        value: settings.pasteOriginals,
+        onChanged: writer == null
+            ? null
+            : (on) => unawaited(writer.set(SettingKeys.pasteOriginals, on)),
+      ),
+    );
+  }
+}
+
 /// The Appearance section.
 class AppearanceSection extends ConsumerWidget {
   /// Creates the section.
@@ -136,6 +161,8 @@ class AppearanceSection extends ConsumerWidget {
           ),
         ),
         const EnterSendsRow(),
+        // Pasting a bitmap is a desktop way of attaching (15 14).
+        if (!phone) const PasteOriginalsRow(),
         if (!phone)
           SettingRow(
             label: l.settingsColumnWidths,

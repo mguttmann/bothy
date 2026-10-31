@@ -1889,6 +1889,13 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsEnterSendsHint => 'Umschalt+Enter: neue Zeile';
 
   @override
+  String get settingsPasteOriginals => 'Eingefügte Bilder als Original senden';
+
+  @override
+  String get settingsPasteOriginalsHint =>
+      'Aus: große eingefügte Screenshots gehen als kleineres JPEG';
+
+  @override
   String get settingsColumnWidths => 'Spaltenbreiten';
 
   @override
@@ -4857,6 +4864,12 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get fileStateChecking => 'Wird geprüft';
+
+  @override
+  String get fileStatePreparing => 'Wird vorbereitet';
+
+  @override
+  String get fileStateCheckFailed => 'Prüfung fehlgeschlagen';
 
   @override
   String get fileStateUploadFailed => 'Hochladen fehlgeschlagen';

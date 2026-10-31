@@ -2034,6 +2034,7 @@ unknown keys and values outside the list.
 | `appearance.density` | `comfortable`, `compact` | `comfortable` | desktop only; mobile fixed to `touch` |
 | `appearance.reduce_motion` | `system`, `on`, `off` | `system` | Reduce motion |
 | `composer.enter_sends` | `true`, `false` | without a stored value `true` on desktop and `false` on mobile; a stored value applies on all devices | Enter sends |
+| `composer.paste_originals` | `true`, `false` | `false` | Send pasted images as originals; with `false` the desktop app sends a bitmap pasted from the clipboard as a JPEG when that is much smaller (addendum of 2026-10-31, docs/decisions.d/FIX-scan-state-stale.md); files attached as files are never changed |
 | `privacy.crash_reports` | `true`, `false` | `true` if the instance has set up a crash service | Send crash reports |
 | `privacy.client_metrics` | `true`, `false` | `true` | Send performance data without content |
 | `layout.column_widths` | Object: names `^[a-z][a-z0-9_]*$` (column, for example `sidebar`, `post_list`, `main_history`, `session`), values non-negative integers in logical pixels | empty | Column widths on desktop; the client interprets the names |

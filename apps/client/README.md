@@ -830,7 +830,12 @@ The executor (`upload_executor.dart`) creates the session with the entry ID as
 `Idempotency-Key`, sends the parts `getUpload` has not confirmed, at most `UploadOps.parallelParts` at a time and each
 with `Content-Digest`, and completes the session; the message then attaches the files
 (12 3.4, D-M4-22-1). The SHA-256 is computed in a background isolate while the file streams.
-Attachments show the states of 12 2 (`attachment_mapping.dart`, `attachment_tile.dart`); images
+A bitmap pasted from the clipboard goes as a JPEG when that is much smaller, unless
+`composer.paste_originals` is on (`pasted_image.dart`); copied, dropped and picked files are never
+re-encoded (FIX-scan-state-stale).
+Attachments show the states of 12 2 (`attachment_mapping.dart`, `attachment_tile.dart`): "being
+checked" only while the scan is `pending`, then "Preparing" or the file; the chips of the composer
+and of a waiting message follow the stored file once the upload is confirmed; images
 show thumbnails from `downloadThumbnail` only, never from a URL in the content (SEC-OUT-2), and
 `![alt](attachment:<file_id>)` in the content shows the thumbnail of the message's own file.
 Downloads (`download_service.dart`) stream into the file cache (`file_cache.dart`,

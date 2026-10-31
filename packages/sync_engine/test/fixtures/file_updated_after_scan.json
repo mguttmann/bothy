@@ -1,0 +1,67 @@
+[
+  {
+    "id": "0192f4a0-7b1c-78f9-8074-000000902329",
+    "seq": 9001,
+    "type": "file.updated",
+    "schema_version": 1,
+    "occurred_at": "2026-10-31T10:00:01.123456789Z",
+    "scope": {
+      "space_id": "0192f4a0-7b1c-78f9-8074-000000000101",
+      "channel_id": "0192f4a0-7b1c-78f9-8074-000000000201"
+    },
+    "resource": {
+      "kind": "file",
+      "id": "0192f4a0-7b1c-78f9-8074-000000007001"
+    },
+    "audience": "self",
+    "payload": {
+      "file": {
+        "id": "0192f4a0-7b1c-78f9-8074-000000007001",
+        "size_bytes": 29,
+        "mime_type": "image/png",
+        "original_name": "pasted.png",
+        "uploaded_by": "0192f4a0-7b1c-78f9-8074-0000000000a1",
+        "purpose": "attachment",
+        "scope_channel_id": "0192f4a0-7b1c-78f9-8074-000000000201",
+        "upload_state": "pending",
+        "scan_status": "clean",
+        "transcript_status": "none",
+        "thumbnails": [],
+        "created_at": "2026-10-19T09:00:00.000Z"
+      }
+    },
+    "permission_version": 3
+  },
+  {
+    "id": "0192f4a0-7b1c-78f9-8074-00000090232a",
+    "seq": 9002,
+    "type": "file.updated",
+    "schema_version": 1,
+    "occurred_at": "2026-10-31T10:00:01.123456789Z",
+    "scope": {
+      "space_id": "0192f4a0-7b1c-78f9-8074-000000000101",
+      "channel_id": "0192f4a0-7b1c-78f9-8074-000000000201",
+      "thread_id": "0192f4a0-7b1c-78f9-8074-000000000301"
+    },
+    "resource": {
+      "kind": "file",
+      "id": "0192f4a0-7b1c-78f9-8074-000000007001"
+    },
+    "payload": {
+      "file": {
+        "id": "0192f4a0-7b1c-78f9-8074-000000007001",
+        "size_bytes": 29,
+        "mime_type": "image/png",
+        "original_name": "pasted.png",
+        "uploaded_by": "0192f4a0-7b1c-78f9-8074-0000000000a1",
+        "purpose": "attachment",
+        "upload_state": "pending",
+        "scan_status": "clean",
+        "transcript_status": "none",
+        "thumbnails": [],
+        "created_at": "2026-10-19T09:00:00.000Z"
+      }
+    },
+    "permission_version": 3
+  }
+]

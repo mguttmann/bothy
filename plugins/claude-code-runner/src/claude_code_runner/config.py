@@ -120,6 +120,8 @@ class RunnerConfig:
         projects_root: ``runner.projects_root``.
         state_dir: ``runner.state_dir``.
         followup_grace: ``runner.followup_grace`` (used from M2-35 on).
+        followup_file_wait: ``runner.followup_file_wait``, the longest wait for the check of a
+            follow-up's attachments before it is written (FIX-scan-state-stale).
         stop_grace: ``runner.stop_grace``.
         kill_grace: ``runner.kill_grace``.
         session_lock_wait: ``runner.session_lock_wait``.
@@ -169,6 +171,7 @@ class RunnerConfig:
     projects_root: Path
     state_dir: Path
     followup_grace: float
+    followup_file_wait: float
     stop_grace: float
     kill_grace: float
     session_lock_wait: float
@@ -434,6 +437,7 @@ def load_config(path: Path) -> RunnerConfig:
         projects_root=projects_root,
         state_dir=_state_dir(r),
         followup_grace=r.duration("followup_grace", "30s"),
+        followup_file_wait=r.duration("followup_file_wait", "2m"),
         stop_grace=r.duration("stop_grace", "10s"),
         kill_grace=r.duration("kill_grace", "5s"),
         session_lock_wait=r.duration("session_lock_wait", "10m"),

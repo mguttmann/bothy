@@ -207,6 +207,12 @@ level-one switch test holds them against the installed CLI.
   check writes nothing and never ends the run. Follow-ups of a run that has not started are held
   and written after the prompt line. After a `result` stdin stays open for
   `runner.followup_grace` while written follow-ups have no echo.
+- **Attachments of follow-ups** (09 18.5, FIX-scan-state-stale): a follow-up whose files are
+  still being checked waits, without a lock, until the server reports every file final, at most
+  `runner.followup_file_wait`; its line then lists each file after the text under
+  `Attachments:` as `local file: <path>` (downloaded into the thread's files folder), or
+  `unavailable: file_blocked` or `unavailable: file_not_ready`. A follow-up of files only is
+  written too.
 - **Stop** (`run.cancel_requested`): SIGINT to the turn's process group and stdin closed, SIGTERM
   after `runner.stop_grace`, SIGKILL after `runner.kill_grace` (log code `stop_escalated`); the
   run finishes `cancelled` with the request's reason only when no process of the group is left,

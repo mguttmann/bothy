@@ -12,11 +12,13 @@ import 'dart:convert';
 import 'package:design_system/design_system.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:l10n/l10n.dart';
 import 'package:sync_engine/sync_engine.dart';
 
 import '../files/attachment_mapping.dart';
 import '../files/attachment_tile.dart';
+import '../files/providers.dart';
 import '../files/upload_executor.dart';
 
 /// The delivery of [view] in the message component.
@@ -113,10 +115,24 @@ class PendingRow extends StatelessWidget {
   Widget _chip(AppLocalizations l, Map<String, Object?> item) {
     final key = item['key']! as String;
     final upload = uploads[key];
-    final state = upload == null
-        ? AttachmentState.checking
-        : stateOfUpload(upload);
-    final code = upload?.failureCode;
+    if (upload == null) {
+      // A confirmed upload left the outbox: the chip shows the stored file, which
+      // file.updated keeps current (12 2, FIX-scan-state-stale).
+      final slot = view.payload[UploadOps.slotOf(key)];
+      final fileId = slot is String ? slot : progress?.completedFileOf(key);
+      return Consumer(
+        builder: (context, ref, _) => UploadChip(
+          attachmentKey: key,
+          name: item['name'] as String? ?? '',
+          sizeBytes: item['size_bytes'] as int? ?? 0,
+          state: fileId == null
+              ? AttachmentState.checking
+              : stateAfterUpload(ref.watch(fileMetaProvider(fileId)).value),
+        ),
+      );
+    }
+    final state = stateOfUpload(upload);
+    final code = upload.failureCode;
     return UploadChip(
       attachmentKey: key,
       name: item['name'] as String? ?? '',
@@ -125,10 +141,8 @@ class PendingRow extends StatelessWidget {
       percent: ((progress?.fractionOf(key) ?? 0) * 100).round(),
       reason: code == null
           ? null
-          : uploadFailureText(l, code, reason: upload?.failureReason),
-      onRetry: upload == null || onRetryUpload == null
-          ? null
-          : () => onRetryUpload!(upload.id),
+          : uploadFailureText(l, code, reason: upload.failureReason),
+      onRetry: onRetryUpload == null ? null : () => onRetryUpload!(upload.id),
     );
   }
 

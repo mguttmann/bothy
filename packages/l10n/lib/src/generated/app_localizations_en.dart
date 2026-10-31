@@ -1874,6 +1874,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsEnterSendsHint => 'Shift+Enter: new line';
 
   @override
+  String get settingsPasteOriginals => 'Send pasted images as originals';
+
+  @override
+  String get settingsPasteOriginalsHint =>
+      'Off: large pasted screenshots are sent as a smaller JPEG';
+
+  @override
   String get settingsColumnWidths => 'Column widths';
 
   @override
@@ -4833,6 +4840,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get fileStateChecking => 'Being checked';
+
+  @override
+  String get fileStatePreparing => 'Preparing';
+
+  @override
+  String get fileStateCheckFailed => 'Check failed';
 
   @override
   String get fileStateUploadFailed => 'Upload failed';

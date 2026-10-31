@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import copy
 import re
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
@@ -202,6 +202,8 @@ class World:
         self.created_threads: list[UUID] = []
         self.files: dict[UUID, dict[str, Any]] = {}
         self.context_attachments: dict[UUID, list[UUID]] = {}
+        # The files of a follow-up message by message ID, read live by getMessage.
+        self.message_files: dict[UUID, list[UUID]] = {}
         self.sessions: dict[UUID, list[dict[str, Any]]] = {}
         # Trust marks of context messages, titles set, message updates and session reports (M2-33).
         self.extra = Extras(self.lotse.id)
@@ -517,8 +519,12 @@ class World:
         *,
         author: Person | None = None,
         claims: Mapping[str, Any] | None = None,
+        files: Sequence[UUID] = (),
     ) -> UUID:
         """A follow-up message in the run's thread, its row ``queued`` and ``agent.followup``.
+
+        ``files`` are stored files attached to the message; ``getMessage`` shows them with their
+        state at the time of the read.
 
         ``claims`` replaces claims of the token of every delivery of this event (M2-35), for
         example ``billing_mode`` or ``sub``; the token stays correctly signed.
@@ -526,6 +532,8 @@ class World:
         run = self.runs[run_id]
         person = author or self.alex
         message = self._message(run.thread_id, person, text)
+        if files:
+            self.message_files[UUID(message["id"])] = list(files)
         rows = run.live.setdefault("followups", {})
         rows[message["id"]] = {"message_id": message["id"], "state": "queued"}
         if claims:
@@ -1484,6 +1492,16 @@ class World:
             {k: v for k, v in self.components[UUID(c["id"])].items() if k != "message_id"}
             for c in message["components"]
         ]
+        # The attachments of a message with files as they are now (12 10: a check may end later).
+        attachments = [
+            {
+                "position": n,
+                "file": file_doc(f, self.files[f], uploader=self.alex.id, at=self.now_iso()),
+            }
+            for n, f in enumerate(self.message_files.get(key, []), start=1)
+        ]
+        if attachments:
+            return {**message, "components": components, "attachments": attachments}
         return {**message, "components": components}
 
     def report_session(self, thread_id: str, body: Any, if_match: str | None) -> dict[str, Any]:

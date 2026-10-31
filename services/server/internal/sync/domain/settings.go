@@ -44,6 +44,7 @@ var registry = []SettingSpec{
 	{Key: "appearance.density", Kind: SettingEnum, Values: []string{"comfortable", "compact"}},
 	{Key: "appearance.reduce_motion", Kind: SettingEnum, Values: []string{"system", "on", "off"}},
 	{Key: "composer.enter_sends", Kind: SettingBool},
+	{Key: "composer.paste_originals", Kind: SettingBool},
 	{Key: "privacy.crash_reports", Kind: SettingBool},
 	{Key: "privacy.client_metrics", Kind: SettingBool},
 	{Key: "layout.column_widths", Kind: SettingObject},

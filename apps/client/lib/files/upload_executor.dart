@@ -62,6 +62,11 @@ final class UploadProgress extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Records the completed upload of [key] with [fileId] as the executor does, for tests of
+  /// the views that follow the stored file after the upload.
+  @visibleForTesting
+  void debugComplete(String key, String fileId) => _complete(key, fileId);
+
   void _begin(String key, int total) {
     _total[key] = total;
     // A retry keeps the bytes the last attempt confirmed until the server's state is read.

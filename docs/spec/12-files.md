@@ -38,11 +38,22 @@ of the upload session (section 3.1; table `file_upload_sessions` in 03).
 | Upload running | `pending` | `pending` | `open` | no |
 | Client done, check running | `pending` | `pending` | `completed` | no; label "being checked" |
 | Checksum or size wrong | `failed` | `pending` | `completed` | no; label "Upload failed" |
-| Image being cleaned (JPEG, PNG, GIF, WebP; 7.1) | `pending` | `clean` or `skipped` | `completed` | no; label "being checked" |
+| Image being cleaned (JPEG, PNG, GIF, WebP; 7.1), MP4 audio before its container phase | `pending` | `clean` or `skipped` | `completed` | no; label "Preparing" (addendum of 2026-10-31) |
 | Broken image structure (JPEG or PNG; 7.1) | `failed` | `clean` or `skipped` | `completed` | no; label "Upload failed" |
 | ready | `complete` | `clean` or `skipped` | `completed` | yes |
-| blocked | `complete` | `infected` or `error` | `completed` | no; label "blocked" |
+| blocked | `complete` | `infected` | `completed` | no; label "blocked" |
+| check failed | `complete` | `error` | `completed` | no; label "Check failed" (addendum of 2026-10-31) |
 | canceled or expired | `failed` | `pending` | `aborted` or `expired` | no |
+
+Labels in the apps (addendum of 2026-10-31, live report of the same day,
+docs/decisions.d/FIX-scan-state-stale.md): "being checked" stands only while `scan_status` is
+`pending`; a file whose scan passed and that the server still prepares shows "Preparing", a
+servable one the normal attachment view, and a scan `error` is shown as "Check failed", apart
+from a found threat ("blocked"). The apps take the state from the stored file that `file.updated`
+keeps current, also in the composer and in a message that still waits in the outbox once the
+upload of the file is confirmed; the state of the upload entry applies only while the bytes are
+sent. The envelope of `file.updated` the scan pass writes is held as a golden file between the
+server and the sync engine of the apps (`packages/sync_engine/test/fixtures/file_updated_after_scan.json`).
 
 A file is **servable** exactly when `upload_state = 'complete'` and
 `scan_status IN ('clean','skipped')` and `deleted_at IS NULL`. A file is **final**

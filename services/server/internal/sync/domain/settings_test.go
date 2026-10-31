@@ -25,6 +25,7 @@ func TestSettingValues(t *testing.T) {
 		"appearance.density":                     {`"comfortable"`, `"compact"`},
 		"appearance.reduce_motion":               {`"system"`, `"on"`, `"off"`},
 		"composer.enter_sends":                   {`true`, `false`},
+		"composer.paste_originals":               {`true`, `false`},
 		"privacy.crash_reports":                  {`true`},
 		"privacy.client_metrics":                 {`false`},
 		"layout.column_widths":                   {`{}`, `{"sidebar":240,"post_list":0}`, ` {"a9_b": 12} `},
@@ -34,9 +35,10 @@ func TestSettingValues(t *testing.T) {
 		"notify.admin_enabled":                   {`false`},
 	}
 	invalid := map[string][]string{
-		"appearance.theme":     {`null`, `"Light"`, `"touch"`, `1`, `["dark"]`, `""`, `"dark" "dark"`},
-		"appearance.density":   {`"touch"`},
-		"composer.enter_sends": {`null`, `1`, `0`, `"true"`, `{}`},
+		"appearance.theme":         {`null`, `"Light"`, `"touch"`, `1`, `["dark"]`, `""`, `"dark" "dark"`},
+		"appearance.density":       {`"touch"`},
+		"composer.enter_sends":     {`null`, `1`, `0`, `"true"`, `{}`},
+		"composer.paste_originals": {`"false"`, `0`},
 		"layout.column_widths": {`null`, `[]`, `{"sidebar":{"w":1}}`, `{"sidebar":-1}`, `{"sidebar":1.5}`, `{"sidebar":1e3}`,
 			`{"Sidebar":1}`, `{"1a":1}`, `{"sidebar":"240"}`, `{"sidebar":null}`, `{"sidebar":1,"sidebar":2}`, `{"a":` + strings.Repeat("9", 20) + `}`},
 		"notify.preview_mode":  {`"all"`},

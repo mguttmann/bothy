@@ -2679,6 +2679,14 @@
   "@settingsEnterSendsHint": {
     "description": "Hint of the setting composer.enter_sends."
   },
+  "settingsPasteOriginals": "Send pasted images as originals",
+  "@settingsPasteOriginals": {
+    "description": "Switch of composer.paste_originals: when off, a pasted bitmap image is sent as a JPEG when that is much smaller (FIX-scan-state-stale)."
+  },
+  "settingsPasteOriginalsHint": "Off: large pasted screenshots are sent as a smaller JPEG",
+  "@settingsPasteOriginalsHint": {
+    "description": "Hint of the switch composer.paste_originals; files attached as files are never changed."
+  },
   "settingsColumnWidths": "Column widths",
   "@settingsColumnWidths": {
     "description": "Label of the reset of layout.column_widths (01 section 11)."
@@ -7297,6 +7305,14 @@
   "fileStateChecking": "Being checked",
   "@fileStateChecking": {
     "description": "State of a file after the upload while the server checks it (12 2)."
+  },
+  "fileStatePreparing": "Preparing",
+  "@fileStatePreparing": {
+    "description": "State of a file whose malware check passed while the server still prepares it (the cleaned original and the thumbnails of an image, the duration of a voice recording) (12 2, FIX-scan-state-stale)."
+  },
+  "fileStateCheckFailed": "Check failed",
+  "@fileStateCheckFailed": {
+    "description": "State of a file whose malware check could not be completed (scan_status error); the file is not delivered (12 2, FIX-scan-state-stale)."
   },
   "fileStateUploadFailed": "Upload failed",
   "@fileStateUploadFailed": {

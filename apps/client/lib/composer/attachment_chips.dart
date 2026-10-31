@@ -78,7 +78,7 @@ class ComposerAttachmentChips extends ConsumerWidget {
               spacing: DsSpace.s6,
               runSpacing: DsSpace.s6,
               children: [
-                for (final a in attach.attachments) _chip(l, a, progress),
+                for (final a in attach.attachments) _chip(ref, l, a, progress),
               ],
             ),
           ),
@@ -88,6 +88,7 @@ class ComposerAttachmentChips extends ConsumerWidget {
   }
 
   Widget _chip(
+    WidgetRef ref,
     AppLocalizations l,
     PendingAttachment a,
     UploadProgress progress,
@@ -98,17 +99,25 @@ class ComposerAttachmentChips extends ConsumerWidget {
     }
     final code = view?.failureCode;
     final fraction = progress.fractionOf(a.key);
+    // A confirmed upload left the outbox: from then on the chip shows the stored file, which
+    // file.updated keeps current (12 2, FIX-scan-state-stale). Without a thread the chip
+    // follows the progress of the upload until it is confirmed.
+    final fileId = progress.completedFileOf(a.key);
+    final AttachmentState state;
+    if (view != null) {
+      state = stateOfUpload(view);
+    } else if (fileId != null) {
+      state = stateAfterUpload(ref.watch(fileMetaProvider(fileId)).value);
+    } else if (views == null && fraction != null && fraction < 1) {
+      state = AttachmentState.uploading;
+    } else {
+      state = AttachmentState.checking;
+    }
     return UploadChip(
       attachmentKey: a.key,
       name: a.name,
       sizeBytes: a.sizeBytes,
-      // A confirmed upload left the outbox: the server checks the file now. Without a thread
-      // the chip follows the progress of the upload.
-      state: view != null
-          ? stateOfUpload(view)
-          : views == null && fraction != null && fraction < 1
-          ? AttachmentState.uploading
-          : AttachmentState.checking,
+      state: state,
       percent: ((fraction ?? 0) * 100).round(),
       reason: code == null
           ? null

@@ -490,8 +490,11 @@ headers of 12 9.3 (`Repr-Digest`, one byte range), `createFileTicket` (a ticket 
 no DPoP and answers `404` for another file, variant or a revoked session),
 `getTranscript`, `requestTranscription` and `deleteFile`. `world.fileSettings` holds the
 faults: `abortAfterParts` (the next part answers `503 unavailable` once), `holdScan` (the file
-stays "being checked" and answers `409 file_not_ready` until `world.finishScan(id)`),
-`scanResult` (`infected` or `error`: "blocked", `409 file_blocked`), `wrongDigest` (a damaged
+stays "being checked" and answers `409 file_not_ready` until `world.finishScan(id)`; as on
+the server, a clean image first gets a `file.updated` with `upload_state` `pending` and then one
+with `complete` and its thumbnails, and an attached file's event names the thread of its
+message, FIX-scan-state-stale), `scanResult` (`infected`: "blocked", `error`: "Check failed",
+both `409 file_blocked`), `wrongDigest` (a damaged
 `Repr-Digest`) and `transcriptionMode`. `world.addReadyFile` seeds a checked file,
 `world.setTranscript` reports a transcript, `world.limits` is what `getInstance` reports, and
 `createMessage` attaches `attachment_file_ids` by the rules of 12 10 (`409 conflict` with
