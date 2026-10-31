@@ -6025,6 +6025,30 @@ abstract class AppLocalizations {
   /// **'Copy link'**
   String get messageActionCopyLink;
 
+  /// First action of the message menu on the desktop while text of the message is selected; copies the selected text as plain text (01 6.15, M4-50).
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get messageActionCopySelection;
+
+  /// Action of the message menu on the phone that opens the message in a view where its text can be selected and copied (01 6.15, M4-50).
+  ///
+  /// In en, this message translates to:
+  /// **'Select text'**
+  String get messageActionSelectText;
+
+  /// Title of the view on the phone that shows a message with selectable text (01 6.15, M4-50).
+  ///
+  /// In en, this message translates to:
+  /// **'Select text'**
+  String get messageSelectTextTitle;
+
+  /// Button that closes the view with the selectable text of a message (01 6.15, M4-50).
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get messageSelectTextClose;
+
   /// Screen reader label of the action menu of a message.
   ///
   /// In en, this message translates to:

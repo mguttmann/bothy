@@ -3684,6 +3684,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get messageActionCopyLink => 'Copy link';
 
   @override
+  String get messageActionCopySelection => 'Copy';
+
+  @override
+  String get messageActionSelectText => 'Select text';
+
+  @override
+  String get messageSelectTextTitle => 'Select text';
+
+  @override
+  String get messageSelectTextClose => 'Close';
+
+  @override
   String get messageMenuLabel => 'Actions of the message';
 
   @override

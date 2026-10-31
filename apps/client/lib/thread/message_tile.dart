@@ -18,6 +18,7 @@ import 'package:l10n/l10n.dart';
 import '../agents/trigger_state_mapping.dart';
 import '../composer/mention_suggestions.dart';
 import 'message_menu.dart';
+import 'select_text_view.dart';
 
 /// [message] as `DsMessageData` for the reader [me]: the author's name from [principals]
 /// (a missing one shows the handle-less placeholder of the system), [timeLabel] formatted by
@@ -82,7 +83,13 @@ String excerpt(String text) => text.trim().split('\n').first.trim();
 /// unread" (01 7). On the phone ([longPressMenu]) a long press opens the same menu, because a
 /// tap on a code or quote block copies that block and there is no hover (01 6.12 item 2). While
 /// [editing], an inline editor replaces the content.
-class MessageTile extends StatelessWidget {
+///
+/// Text selection (01 6.15, R-PR-29; brief M4-50): on the desktop the content is selectable
+/// with the mouse, and while text is selected the menu starts with "Copy", which copies it; on
+/// the phone the menu has "Select text" after "Copy text", which opens the message in a view
+/// with the system selection ([showSelectText]). The tile runs both itself; [onAction] never
+/// hears them.
+class MessageTile extends StatefulWidget {
   /// Creates the tile.
   const MessageTile({
     super.key,
@@ -139,13 +146,65 @@ class MessageTile extends StatelessWidget {
   /// fields and the agent's text below the divider (SEC-OUT-4).
   final Widget? components;
 
-  /// Whether a long press opens the menu of [actions] (the phone, 01 6.12 item 2).
+  /// Whether a long press opens the menu of [actions] (the phone, 01 6.12 item 2); without it
+  /// (the desktop) the content is selectable with the mouse (01 6.15).
   final bool longPressMenu;
 
+  @override
+  State<MessageTile> createState() => _MessageTileState();
+}
+
+class _MessageTileState extends State<MessageTile> {
+  /// The text selected in the content now, empty without a selection (the desktop).
+  String _selected = '';
+
+  /// Whether a right click is down; the menu opens when it is released (see [build]).
+  Offset? _rightClick;
+
+  /// The menu's actions: "Copy" first while text is selected, "Select text" after "Copy
+  /// text" on the phone (01 6.15 items 2 and 5).
+  List<MessageAction> _menuActions(String selected) {
+    final actions = widget.actions;
+    final selectText = widget.longPressMenu && widget.data.content.isNotEmpty;
+    return [
+      if (selected.isNotEmpty && widget.editing == null)
+        MessageAction.copySelection,
+      for (final a in actions) ...[
+        a,
+        if (selectText && a == MessageAction.copyText) MessageAction.selectText,
+      ],
+      if (selectText && !actions.contains(MessageAction.copyText))
+        MessageAction.selectText,
+    ];
+  }
+
   Future<void> _menu(BuildContext context, Offset at) async {
-    if (actions.isEmpty) return;
-    final chosen = await showMessageMenu(context, at, actions);
-    if (chosen != null) onAction(chosen);
+    if (widget.actions.isEmpty) return;
+    // The menu takes the focus, which ends the selection; its copy is the text selected when
+    // the menu opened.
+    final selected = _selected;
+    final chosen = await showMessageMenu(context, at, _menuActions(selected));
+    if (!context.mounted) return;
+    switch (chosen) {
+      case null:
+        return;
+      case MessageAction.copySelection:
+        await Clipboard.setData(ClipboardData(text: selected));
+        if (!context.mounted) return;
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          SnackBar(content: Text(AppLocalizations.of(context).messageCopied)),
+        );
+      case MessageAction.selectText:
+        await showSelectText(
+          context,
+          content: widget.data.content,
+          mentionHandles: widget.data.mentionHandles,
+          resolver: widget.resolver,
+          onOpenLink: widget.onOpenLink,
+        );
+      default:
+        widget.onAction(chosen);
+    }
   }
 
   Offset _anchor(BuildContext context) {
@@ -159,15 +218,21 @@ class MessageTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final colors = context.dsColors;
+    final data = widget.data;
+    final editing = widget.editing;
+    final actions = widget.actions;
+    final onAction = widget.onAction;
+    final longPressMenu = widget.longPressMenu;
     Widget body =
         editing ??
         DsMessage(
           data,
-          collapseLines: collapseLines,
-          isContinuation: continuation,
-          onOpenLink: onOpenLink,
-          attachments: resolver,
-          components: components,
+          collapseLines: widget.collapseLines,
+          isContinuation: widget.continuation,
+          onOpenLink: widget.onOpenLink,
+          attachments: widget.resolver,
+          components: widget.components,
+          onSelectionChanged: longPressMenu ? null : (text) => _selected = text,
           actions: [
             for (final a in actions)
               if (messageActionGlyph(a) case final glyph?)
@@ -184,7 +249,7 @@ class MessageTile extends StatelessWidget {
               ),
           ],
         );
-    if (highlighted) {
+    if (widget.highlighted) {
       body = DecoratedBox(
         key: const ValueKey('history.highlight'),
         decoration: BoxDecoration(
@@ -215,7 +280,7 @@ class MessageTile extends StatelessWidget {
         // link, the text) must not swallow the right click.
         onPointerDown: (e) {
           if (e.buttons == kSecondaryMouseButton) {
-            unawaited(_menu(context, e.position));
+            _rightClick = e.position;
             return;
           }
           // 01 7: Option+Click (Alt+Click on Windows) marks unread from this message.
@@ -225,12 +290,26 @@ class MessageTile extends StatelessWidget {
             onAction(MessageAction.markUnread);
           }
         },
+        // The menu of a right click opens on release, after the selection had its turn: on
+        // macOS a right click selects the word under the pointer, which "Copy" then copies
+        // (01 6.15 item 2). The recognizers see the release after this listener, so the menu
+        // waits for the end of the event.
+        onPointerUp: (e) {
+          final at = _rightClick;
+          _rightClick = null;
+          if (at != null) {
+            unawaited(
+              Future(() => context.mounted ? _menu(context, at) : null),
+            );
+          }
+        },
+        onPointerCancel: (_) => _rightClick = null,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,
           children: [
             body,
-            if (attachments case final files? when editing == null)
+            if (widget.attachments case final files? when editing == null)
               Padding(
                 // Under the content, beside the avatar like the content itself.
                 padding: const EdgeInsets.only(
@@ -239,7 +318,7 @@ class MessageTile extends StatelessWidget {
                 ),
                 child: files,
               ),
-            ...started,
+            ...widget.started,
           ],
         ),
       ),

@@ -5581,6 +5581,22 @@
   "@messageActionCopyLink": {
     "description": "Action of a message that copies its link."
   },
+  "messageActionCopySelection": "Copy",
+  "@messageActionCopySelection": {
+    "description": "First action of the message menu on the desktop while text of the message is selected; copies the selected text as plain text (01 6.15, M4-50)."
+  },
+  "messageActionSelectText": "Select text",
+  "@messageActionSelectText": {
+    "description": "Action of the message menu on the phone that opens the message in a view where its text can be selected and copied (01 6.15, M4-50)."
+  },
+  "messageSelectTextTitle": "Select text",
+  "@messageSelectTextTitle": {
+    "description": "Title of the view on the phone that shows a message with selectable text (01 6.15, M4-50)."
+  },
+  "messageSelectTextClose": "Close",
+  "@messageSelectTextClose": {
+    "description": "Button that closes the view with the selectable text of a message (01 6.15, M4-50)."
+  },
   "messageMenuLabel": "Actions of the message",
   "@messageMenuLabel": {
     "description": "Screen reader label of the action menu of a message."
