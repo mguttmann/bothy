@@ -121,7 +121,7 @@ func (t *Transcription) transcribe(ctx context.Context, f FileRecord, hint strin
 		return TranscribeResult{}, err
 	}
 	defer func() { _ = body.Close() }()
-	return t.d.Transcriber.Transcribe(ctx, TranscribeRequest{FileID: f.ID, MIMEType: f.MIMEType, Audio: body, LanguageHint: hint})
+	return t.d.Transcriber.Transcribe(ctx, TranscribeRequest{FileID: f.ID, MIMEType: voiceMIME(f), Audio: body, LanguageHint: hint})
 }
 
 // warn logs one failed attempt with the file id and its class only, never text, URL or key.

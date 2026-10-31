@@ -32,3 +32,26 @@ func TestVoiceFacts_LegacyGenericBrandRow(t *testing.T) {
 		t.Fatalf("row declared as video: verdict %v, want VoiceFormatUnsupported", v)
 	}
 }
+
+// TestVoiceTranscribable_LegacyAndVideoTrack (FIX-voice-send, review): the transcription accepts
+// the legacy row and sends the refined type to the transcriber, and refuses a declared-audio file
+// with a video track as the voice check does (12 8.1 rule 4).
+func TestVoiceTranscribable_LegacyAndVideoTrack(t *testing.T) {
+	t.Parallel()
+	legacy := app.FileRecord{MIMEType: "video/mp4", DeclaredMIMEType: "audio/mp4", DurationMS: 16695}
+	if !app.VoiceTranscribable(legacy, "user") {
+		t.Fatal("legacy row: not transcribable")
+	}
+	if got := app.VoiceMIME(legacy); got != "audio/mp4" {
+		t.Fatalf("legacy row: transcriber type %q, want audio/mp4", got)
+	}
+	for _, f := range []app.FileRecord{
+		{MIMEType: "video/mp4", DeclaredMIMEType: "audio/mp4", Width: 640, Height: 480},
+		{MIMEType: "audio/mp4", DeclaredMIMEType: "audio/mp4", Width: 640},
+		{MIMEType: "audio/mp4", DeclaredMIMEType: "audio/mp4", Height: 480},
+	} {
+		if app.VoiceTranscribable(f, "user") {
+			t.Fatalf("%+v with a video track: transcribable", f)
+		}
+	}
+}
