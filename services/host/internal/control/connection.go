@@ -45,8 +45,8 @@ type conn struct {
 	done chan struct{}
 	once gosync.Once
 	mu   gosync.Mutex
-	// reported is set once a report was sent after the last ready; until then session.open is a
-	// protocol violation (24 section 2.2 point 5) and no heartbeat goes out.
+	// reported is set with the write of the first report after the last ready (writeFrame); until
+	// then session.open is a protocol violation (24 section 2.2 point 5) and no heartbeat goes out.
 	reported bool
 	// writeTimeout bounds every write: the heartbeat interval of hello.
 	writeTimeout time.Duration
@@ -92,6 +92,14 @@ func (k *conn) read(ctx context.Context) {
 
 // write sends the frame {op, d} within the write timeout.
 func (k *conn) write(ctx context.Context, op string, d any) error {
+	return k.writeFrame(ctx, op, d, false)
+}
+
+// writeFrame sends the frame {op, d} within the write timeout. With report set the connection
+// counts as reported from before the write on, under the same lock: the server may answer the
+// report with session.open at once (24 section 2.2 point 5), and that frame can reach the reader
+// before the writing goroutine returns from the write. A failed write takes the mark back.
+func (k *conn) writeFrame(ctx context.Context, op string, d any, report bool) error {
 	b, err := encodeFrame(op, d)
 	if err != nil {
 		return err
@@ -107,7 +115,15 @@ func (k *conn) write(ctx context.Context, op string, d any) error {
 	if k.closeCode != 0 {
 		return ErrClosed
 	}
-	return k.ws.Write(wctx, websocket.MessageText, b)
+	before := k.reported
+	if report {
+		k.reported = true
+	}
+	if err := k.ws.Write(wctx, websocket.MessageText, b); err != nil {
+		k.reported = before
+		return err
+	}
+	return nil
 }
 
 // close closes the connection with code once; the close frame follows every frame written
@@ -130,12 +146,12 @@ func (k *conn) sendReport(ctx context.Context) error {
 	if !ok {
 		return nil
 	}
-	if err := k.write(ctx, opReport, withPeer(r, k.peerLocal)); err != nil {
+	if err := k.writeFrame(ctx, opReport, withPeer(r, k.peerLocal), true); err != nil {
 		return err
 	}
-	k.mu.Lock()
-	k.reported = true
-	k.mu.Unlock()
+	if k.c.reportWritten != nil {
+		k.c.reportWritten()
+	}
 	return nil
 }
 

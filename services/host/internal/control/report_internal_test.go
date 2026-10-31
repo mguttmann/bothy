@@ -86,3 +86,81 @@ func TestReportAfterReadyOnlyOnTheLiveConnection(t *testing.T) {
 		t.Fatalf("changed report %q, want v2", got)
 	}
 }
+
+// openRecorder is a Sessions that records every session.open it gets.
+type openRecorder struct {
+	RefuseSessions
+	opened chan SessionOpen
+}
+
+// Open implements Sessions: it records o.
+func (r openRecorder) Open(_ context.Context, o SessionOpen, _ Notifier) { r.opened <- o }
+
+// TestSessionOpenRightAfterTheFirstReport (flake TestPlatformSuiteLinux, TestPlatform_TMT29l, "no
+// data connection 1 of the session"): after a start the first report after ready comes from the
+// start sequence (Client.Report), not from the ready itself, because the host has no report yet
+// when ready arrives. The server may send session.open as soon as it received that report (24
+// section 2.2 point 5). The connection must accept it even when the reporting goroutine has not
+// returned from its write yet: before the fix the connection counted the report as sent only
+// after the write returned, took the session.open for one before the report, closed with 4002
+// and lost the opening.
+func TestSessionOpenRightAfterTheFirstReport(t *testing.T) {
+	t.Parallel()
+	ctx := testkit.Context(t)
+	srv := controltest.New(t)
+	const hostID = "0192f4a0-7b1c-7b22-9d4f-5a6b7c8d9e0f"
+	seed := sha256.Sum256([]byte("control-recording/host-auth"))
+	rec := openRecorder{opened: make(chan SessionOpen, 1)}
+	c, err := New(Config{ServerURL: srv.URL, HostID: hostID, AuthKey: ed25519.NewKeyFromSeed(seed[:]), HostVersion: "1.0.0",
+		BackoffBase: 20 * time.Millisecond, BackoffCap: testkit.Patience, RootCAs: srv.Pool}, rec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = c.Close() })
+	release := make(chan struct{})
+	c.reportWritten = func() { <-release }
+	t.Cleanup(func() {
+		select {
+		case <-release:
+		default:
+			close(release)
+		}
+	})
+
+	login := make(chan error, 1)
+	go func() { _, err := c.Login(ctx); login <- err }()
+	k := srv.Accept(ctx)
+	if err := k.Send(ctx, "hello", controltest.Hello(60000, 3)); err != nil {
+		t.Fatal(err)
+	}
+	k.Expect(t, ctx, "identify")
+	if err := k.Send(ctx, "ready", controltest.Ready(hostID, "none")); err != nil {
+		t.Fatal(err)
+	}
+	if err := <-login; err != nil {
+		t.Fatal(err)
+	}
+	reported := make(chan error, 1)
+	go func() { reported <- c.Report(ctx, startup.Report{OSVersion: "v1"}) }()
+	k.Expect(t, ctx, "report")
+	// The reporting goroutine now waits in reportWritten, right after its write.
+	id := "0192f4a0-7b1c-7b22-9d4f-5a6b7c8d9e10"
+	if err := k.Send(ctx, "session.open", SessionOpen{SessionID: id, DataPath: DataPathPrefix + id + "/stream", Profile: "shell",
+		ExpiresAt: time.Now().Add(time.Minute).UTC().Format(time.RFC3339Nano)}); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case o := <-rec.opened:
+		if o.SessionID != id {
+			t.Errorf("session.open of %s, want %s", o.SessionID, id)
+		}
+	case <-k.Done():
+		t.Fatal("the host closed the control connection on a session.open sent after its report")
+	case <-ctx.Done():
+		t.Fatal("the session.open never reached the session manager")
+	}
+	close(release)
+	if err := <-reported; err != nil {
+		t.Fatal(err)
+	}
+}
