@@ -350,6 +350,14 @@ request fails only for vulnerable dependencies the pull request itself adds or c
 * A push to `main` (`ci.yml`) and the daily workflow `advisories.yml` run the full scan without
   `OSV_BASE`; local runs scan in full too. When either fails on a new advisory, the keeper opens
   the update pull request at once.
+* The fix is an upgrade of the direct dependency or an npm `overrides` entry to a fixed release
+  in the affected lock file. Only when no release that the callers can use has the fix and the
+  vulnerable code is not reachable, the `osv-scanner.toml` next to the lock file accepts the
+  finding with an `[[IgnoredVulns]]` entry: one advisory `id`, a `reason` that names the
+  packages, the reachability argument and a ruling, and an `ignoreUntil` date that forces a new
+  check (D-QA-19). `tools/ci/tests/test_osv_ignores.py` refuses an entry without one advisory
+  id, a reason or a TOML date as expiry, because OSV-Scanner ignores an entry without
+  `ignoreUntil` forever.
 
 `make licenses` judges no advisory (PL/32): OSV-Scanner has no license-only mode and also
 exits 1 for a vulnerability when it checks licenses, so `tools/ci/dep_licenses.py` (tests

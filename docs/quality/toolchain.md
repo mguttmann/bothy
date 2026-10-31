@@ -40,6 +40,7 @@ same make target in GitHub Actions. All gate tools run in both places.
 | `katex` | `0.18.10` | math typesetting inside Mermaid diagrams | MIT | dependency of mermaid-cli and mermaid, which still ask for 0.16; pinned through `overrides` in `tools/node/package.json` to a release with the fix for GHSA-238p-pmpm-9mq7 (https://github.com/advisories/GHSA-238p-pmpm-9mq7, ranges in https://registry.npmjs.org/@mermaid-js/mermaid-cli/11.17.0 and https://registry.npmjs.org/mermaid/11.17.2, retrieved 2026-10-11; D-DEPS-1) |
 | `@redocly/cli` | `2.62.1` | lint of OpenAPI and AsyncAPI | MIT | lints both formats with its own rules |
 | `@sonar/scan` | `5.0.1` | SonarScanner without a local Java installation | LGPL-3.0 | same scanner locally and in CI, no Docker for the scan |
+| `node-forge` | `1.4.2` | PKCS#12 truststore reading inside `@sonar/scan` | BSD-3-Clause OR GPL-2.0 | dependency of `@sonar/scan`, whose newest release still pins 1.4.0 exactly; pinned through `overrides` in `tools/node/package.json` to a release with the fixes for the node-forge advisories up to 1.4.0, including GHSA-86w9-cpqp-85rv (SEC-OSV/1 in `docs/decisions.d/SEC-OSV-2026-10-31.md`) |
 | `actionlint` | `1.7.12` | syntax and expressions of the workflows | MIT | required by the planning basis |
 | `gitleaks` | `8.30.1` | secrets in all commits | MIT | as a CLI, not as an action (license obligation of the action in organizations) |
 | `golangci-lint` | `2.14.0` | Go linter bundle including gosec and depguard | GPL-3.0 | standard for Go; dependency rules of the modules (chapter 02) |
