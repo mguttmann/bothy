@@ -190,16 +190,6 @@ license.ignore = true
 reason = "License Unlicense. Not shipped: reached through @grafana/data via react-use, which webpack marks external and Grafana provides at runtime; the plugin bundle contains no file of it."
 
 [[IgnoredVulns]]
-id = "GHSA-337j-9hxr-rhxg"
-ignoreUntil = 2026-11-18
-reason = "react-router 6.30.6 via @grafana/ui 13.2.3. Not shipped: react-router and @grafana/ui are webpack externals that Grafana provides at runtime, and the plugin never imports react-router. Re-check with the next @grafana/ui release that moves to the fixed line."
-
-[[IgnoredVulns]]
-id = "GHSA-wrjc-x8rr-h8h6"
-ignoreUntil = 2026-11-18
-reason = "react-router 6.30.6 via @grafana/ui 13.2.3; same reason as GHSA-337j-9hxr-rhxg: an external provided by Grafana, never bundled or imported by the plugin."
-
-[[IgnoredVulns]]
 id = "GHSA-gcqx-w48m-w2h4"
 ignoreUntil = 2026-11-18
 reason = "deepmerge 4.3.1, a dev dependency of jest-config and fork-ts-checker-webpack-plugin; it merges only the plugin's own test and type-check configuration and never ships. No fixed release exists yet; Renovate proposes it when one does."
