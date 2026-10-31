@@ -68,6 +68,21 @@ void main() {
     }
   }
 
+  /// Whether the insert left no composition. On Android the system keyboard marks the word
+  /// before the cursor as its own composing region for suggestions whenever the selection
+  /// moves (LatinIME on API 26 does so), so a composing range over just that last word is the
+  /// keyboard's, not the insert's; a composition the insert failed to end spans more.
+  bool compositionEnded(TextEditingValue value) {
+    final composing = value.composing;
+    if (!composing.isValid || composing.isCollapsed) return true;
+    if (!Platform.isAndroid) return false;
+    final end = value.selection.baseOffset;
+    if (composing.end != end || end != value.text.length) return false;
+    final word = value.text.substring(composing.start, composing.end);
+    final before = composing.start == 0 ? ' ' : value.text[composing.start - 1];
+    return RegExp(r'^[A-Za-z0-9]+$').hasMatch(word) && before == ' ';
+  }
+
   Future<(TestApp, String, String)> open(WidgetTester tester) async {
     final app = await startPhone(tester);
     final world = app.fake.server.world;
@@ -111,8 +126,7 @@ void main() {
       () async => await nativeText() == expected,
     );
     expect(
-      field(tester).value.composing.isCollapsed ||
-          !field(tester).value.composing.isValid,
+      compositionEnded(field(tester).value),
       isTrue,
       reason: 'the composition ended',
     );
