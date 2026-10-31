@@ -42,7 +42,9 @@ commit per feature, signed and linear.
    results (`tools/ci/ci_ok.py`), so it reports on every run; the job `plan` marks it pending
    for the head commit at the start of a pull request run.
 8. **Merge.** "Squash and merge". GitHub signs the resulting commit; its message is the
-   pull request body (repository setting below). `main` stays linear.
+   pull request body (repository setting below). `main` stays linear. Once the repository has
+   a merge queue, the pull request joins it instead and the queue runs the full suite before
+   it squashes (gates.md, "How a pull request lands").
 
 ## Build branches
 

@@ -107,6 +107,16 @@ file name and, with `BOTHY_CODERABBIT=1`, also runs the CodeRabbit CLI.
   the planned text before the push with `PR_TITLE=... PR_BODY_FILE=<file> make denylist`.
 - The required status check is `ci-ok`. Maintainers merge with squash only, so the history
   of `main` stays linear and every pull request is one commit.
+- How a pull request lands once `main` has a merge queue
+  ([gates](docs/quality/gates.md#how-a-pull-request-lands)): the pull request CI runs the fast
+  checks (lint, codegen, docs, security and supply chain, and the tests of the changed
+  components only) until `ci-ok` is green. Then `gh pr merge --squash --auto` (or "Merge when
+  ready" on the page) adds it to the queue. The queue runs the full suite of every platform
+  once per batch of up to five pull requests (`max_entries_to_merge` in
+  `tools/ci/merge_queue.py`); when it is green the batch is squashed into
+  `main`, and when it fails the queue removes the pull request at the head of the failed
+  group and tests the others again without it. Without a merge queue `ci-ok` of the pull
+  request runs the full plan of its diff, as before.
 - Reviews from automated reviewers (CodeRabbit, SonarQube Cloud) are part of the review.
   If one of them finds something the local gates missed, we add a local rule so that it
   is caught before the next push ([push discipline](docs/quality/push-discipline.md)).

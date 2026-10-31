@@ -3,6 +3,11 @@
 # Merge gate for pull requests to main, and the gate stage of release.yml.
 # Runs exactly the make targets of `make check`: gates, denylist, sonar
 # (docs/quality/gates.md). The only required status check is "ci-ok".
+# Two stages while the repository variable BOTHY_MERGE_QUEUE is true (docs/quality/gates.md,
+# "How a pull request lands"; docs/decisions.d/CI-SPLIT-MERGE-QUEUE.md): a pull request runs the
+# fast plan of its diff (tools/ci/components.py ci-plan --stage pr), and the merge queue
+# (merge_group) runs every job of a push to main on the merge group commit before it lands.
+# Without the variable a pull request runs the full plan of its diff, as before.
 # The tests run once per run, in the job gates; the job sonar scans the coverage reports that
 # job wrote. A push to main runs the workflow too, so SonarQube keeps an analysis of main (its
 # overall state and the reference of new code); push events only come from this repository's
@@ -23,6 +28,8 @@ on:
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened, edited]
+  merge_group:
+    types: [checks_requested]
   push:
     branches: [main]
   workflow_dispatch:
@@ -44,14 +51,17 @@ on:
 permissions:
   contents: read
 
-# The base commit of a pull request (empty on a push): a failed Go test in a package the pull
-# request changes is not rerun into a pass (tools/ci/flakes.py, docs/quality/gates.md "Flakes").
+# The base commit of a pull request or merge group (empty on a push): a failed Go test in a
+# package the change touches is not rerun into a pass (tools/ci/flakes.py, docs/quality/gates.md
+# "Flakes").
 env:
-  FLAKE_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || '' }}
+  FLAKE_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event_name == 'merge_group' && github.event.merge_group.base_sha || '' }}
 
 # A new commit of a pull request cancels its older run. A push to main never cancels the run
 # in progress: merges come faster than one full run, and SonarQube needs a finished analysis of
 # main. The newer push waits; GitHub keeps at most one pending run per group.
+# A merge group has a ref of its own (gh-readonly-queue/main/...), so its run never cancels
+# another one; the queue itself drops a group that it rebuilds.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name != 'push' }}
@@ -101,20 +111,29 @@ jobs:
         with:
           enable-cache: false
       # The components and the conditional jobs this change needs (tools/ci/components.py
-      # ci-plan, docs/quality/gates.md "Jobs a change needs"): a pull request by its diff, a push
-      # to main and a manual run everything, a release the components of its tag. ci-ok accepts
-      # a skipped job only when this plan left it out (tools/ci/ci_ok.py).
+      # ci-plan, docs/quality/gates.md "Jobs a change needs"): a pull request by its diff (the
+      # fast stage pr while the repository has a merge queue, BOTHY_MERGE_QUEUE), the merge
+      # queue every job of a push to main plus the trials of its diff (stage queue), a push to
+      # main and a manual run everything, a release the components of its tag. ci-ok accepts a
+      # skipped job only when this plan left it out (tools/ci/ci_ok.py).
       - id: jobs
         name: Select the components and jobs this change needs
         env:
           EVENT: ${{ github.event_name }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          QUEUE_BASE_SHA: ${{ github.event.merge_group.base_sha }}
+          QUEUE_HEAD_SHA: ${{ github.event.merge_group.head_sha }}
+          MERGE_QUEUE: ${{ vars.BOTHY_MERGE_QUEUE }}
           INPUT_COMPONENTS: ${{ inputs.components }}
           PUBLIC: ${{ github.event.repository.visibility == 'public' || (github.event_name == 'schedule' && vars.BOTHY_VISIBILITY == 'public') }}
         run: |
           if [ "$EVENT" = pull_request ]; then
-            plan=$(uv run --no-project --python 3.14 tools/ci/components.py ci-plan --base "$BASE_SHA" --head "$HEAD_SHA" --public "$PUBLIC")
+            stage=full
+            if [ "$MERGE_QUEUE" = true ]; then stage=pr; fi
+            plan=$(uv run --no-project --python 3.14 tools/ci/components.py ci-plan --base "$BASE_SHA" --head "$HEAD_SHA" --public "$PUBLIC" --stage "$stage")
+          elif [ "$EVENT" = merge_group ]; then
+            plan=$(uv run --no-project --python 3.14 tools/ci/components.py ci-plan --base "$QUEUE_BASE_SHA" --head "$QUEUE_HEAD_SHA" --public "$PUBLIC" --stage queue)
           else
             plan=$(uv run --no-project --python 3.14 tools/ci/components.py ci-plan --components "${INPUT_COMPONENTS:-all}" --public "$PUBLIC")
           fi
@@ -316,12 +335,13 @@ jobs:
             ~/.cache/pre-commit
           key: gates-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('tools/bin/tools.lock.json', '.pre-commit-config.yaml') }}
       - run: make bootstrap-ci
-      # In a pull request a vulnerability that its merge base has too (a new advisory) does
-      # not fail; a push to main and the daily advisories.yml scan everything (PL/25).
+      # In a pull request and in the merge queue a vulnerability that the base has too (a new
+      # advisory) does not fail; a push to main and the daily advisories.yml scan everything
+      # (PL/25), so a new advisory never stops the queue for unrelated pull requests.
       - name: make gitleaks semgrep trivy osv licenses
         env:
           COMPONENTS: ${{ needs.plan.outputs.components }}
-          OSV_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || '' }}
+          OSV_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event_name == 'merge_group' && github.event.merge_group.base_sha || '' }}
         run: make gitleaks semgrep trivy osv licenses COMPONENTS="$COMPONENTS" OSV_BASE="$OSV_BASE"
 
   # The tests of the Python tools and their coverage: no component selected. On every change:
@@ -936,11 +956,14 @@ jobs:
     # which ci-ok already fails. On main only with the repository variable SONAR_MAIN_ANALYSIS:
     # until the main branch of the SonarQube Cloud project is named `main`, the server takes
     # `main` for a short-lived branch and fails its analysis (docs/quality/sonarqube-local.md).
+    # Not in the merge queue: the pull request's scan is the quality gate of its new code, and a
+    # scan of each temporary gh-readonly-queue branch would only add branch analyses.
     needs: [plan, test-server, test-server-coverage, test-apps, test-sdk-plugins]
     if: >-
       always() && needs.plan.result == 'success' && needs.plan.outputs.private_checks == 'true'
       && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
       && (github.ref != 'refs/heads/main' || vars.SONAR_MAIN_ANALYSIS == 'true')
+      && github.event_name != 'merge_group'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:

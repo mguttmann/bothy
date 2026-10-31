@@ -130,6 +130,50 @@ A new commit of a pull request cancels the run of the older commit, and so does 
 body, which starts a new run (the `concurrency` group of `ci.yml` per pull request); a newer push
 to a build branch cancels its older `build-verify` run.
 
+## How a pull request lands
+
+`ci.yml` has two stages (docs/decisions.d/CI-SPLIT-MERGE-QUEUE.md). They are switched on together
+with the merge queue of `main`: the repository variable `BOTHY_MERGE_QUEUE` is `true` exactly while
+the ruleset "main merge queue" exists (`tools/ci/merge_queue.py apply` sets both, the ruleset
+first; `disable` takes the variable back first). Without it a pull request runs the full plan of
+its diff as described above, and a maintainer squashes it by hand.
+
+1. **Pull request CI, the fast stage.** The plan runs `ci-plan --stage pr`: `gates`,
+   `gates (docs and contracts)`, `gates (security and supply chain)`, `test (tools)` and the
+   deny list run always, the gates for the components of the diff; the component tests,
+   `postgres-image`, `console-e2e` and the trials as in the table above. Only the platform jobs
+   are narrowed (`NATIVE_FOLDER_JOBS`, `ALL_PLATFORM_FILES` and `SMOKE_*` in
+   `tools/ci/components.py`):
+
+   | The change touches | Platform jobs in the pull request |
+   |---|---|
+   | only a native folder of a member (`apps/<m>/<folder>/`, `packages/<m>/<folder>/`) | `windows/`: `apps (Windows)`; `macos/`: `apps (macOS)`; `ios/` and `darwin/`: `apps (iOS)` and `apps (macOS)`; `android/`: both Android jobs and `test (apps)` (the JVM tests); no other job of the component `apps`, but `console-e2e` for a folder under `packages/` or `apps/console/` |
+   | other files of the Dart workspace, or a shared input | `apps (Windows)` and `apps (Android API 36)` (`apps (iOS)` while the repository is private): one desktop and one mobile job, on a macOS runner only while the repository is private |
+   | the root `pubspec.yaml` or `pubspec.lock`, the `pubspec.yaml` or `platform-tests.json` of a member | all five, because dependencies and the Flutter pin reach every native build |
+
+2. **Queue.** When `ci-ok` is green, `gh pr merge --squash --auto` (or "Merge when ready")
+   adds the pull request to the queue. GitHub builds a merge group commit of `main` and the
+   queued pull requests and sends `merge_group`; the plan runs `ci-plan --stage queue`: every
+   job of a push to `main`, plus the trials the diff of the group needs, with the base of the
+   group as base of the flake and advisory checks (`FLAKE_BASE`, `OSV_BASE`). `sonar` does not
+   run there; the scan of the pull request is the quality gate of its new code. The ruleset
+   (`tools/ci/merge_queue.py ruleset`, values in `QUEUE_PARAMETERS`): squash, up to five pull
+   requests per group (`max_entries_to_merge`), no minimum (`min_entries_to_merge`), two groups
+   built at a time (`max_entries_to_build`; each holds two macOS jobs), only the head of a group
+   needs a green `ci-ok` (`grouping_strategy` `HEADGREEN`, one full run per batch), and a check
+   that has not reported after 360 minutes (`check_response_timeout_minutes`) fails the group. When the run of a group fails, GitHub removes the pull request at its head
+   from the queue and rebuilds the groups behind it without that pull request; the group in
+   front of it, built at the same time with the earlier pull requests alone, can still land.
+3. **Main.** The queue squashes the group into `main`; the push runs the full suite once more,
+   as every push to `main` does (the run the watcher reads), and `denylist-main.yml`.
+
+`ci-ok` stays the only required check (branch protection of `main`) and applies to both events:
+the pull request's run and the merge group's run each end with their own `ci-ok`. GitHub offers
+merge queues only to repositories owned by an organization (docs/DECISIONS-PLANNING.md D-W-34);
+`merge_queue.py apply` refuses a repository of a personal account before it changes anything.
+`merge_queue.py show --repo <owner>/<name>` prints the ruleset, the branch protection of `main`
+and the variable.
+
 Source of the diagram: `docs/quality/pipeline.mmd`.
 
 ## List

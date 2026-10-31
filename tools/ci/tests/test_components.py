@@ -662,3 +662,136 @@ def test_tool_components_name_known_components() -> None:
     for key, owners in components.TOOL_COMPONENTS.items():
         assert key.startswith("tools/"), key
         assert set(owners) <= set(components.GATE_COMPONENTS), key
+
+
+# --- the two stages of a pull request: fast checks, then the merge queue (CI-SPLIT-MERGE-QUEUE) ---
+
+# One desktop and one mobile platform job for a Dart change in the fast pull request checks: no
+# macOS runner, which GitHub has few of; the merge queue runs all five.
+SMOKE = {"apps-windows", "apps-android-36"}
+SMOKE_PRIVATE = {"apps-windows", "apps-ios"}
+
+
+@pytest.mark.parametrize(
+    ("files", "expected"),
+    [
+        # A change limited to one platform folder runs only that platform (and console-e2e for a
+        # folder under packages/, which the console build reads, as in the full plan).
+        (["apps/client/windows/runner/flutter_window.cpp"], {"apps-windows"}),
+        (["apps/client/macos/Runner/Notifications.swift"], {"apps-macos"}),
+        # The macOS job runs the tests of ios/ClientKit, which both apps share.
+        (["apps/client/ios/ClientKit/Sources/x.swift"], {"apps-ios", "apps-macos"}),
+        (["packages/device_key/darwin/Sources/core.swift"], {"apps-ios", "apps-macos"} | CONSOLE),
+        (["packages/device_key/windows/core/core.cpp"], {"apps-windows"} | CONSOLE),
+        # The JVM tests of the Android code run in test (apps).
+        (["packages/device_key/android/core/src/main/x.kt"], {"test-apps"} | ANDROID | CONSOLE),
+        (["apps/client/android/app/src/main/x.kt"], {"test-apps"} | ANDROID),
+        (
+            [
+                "apps/client/windows/runner/flutter_window.cpp",
+                "apps/client/macos/Runner/Notifications.swift",
+            ],
+            {"apps-windows", "apps-macos"},
+        ),
+        # A file of the trials keeps its trials beside the platform job.
+        (["apps/client/windows/CMakeLists.txt"], {"apps-windows"} | TRIALS),
+        # A Dart change: the Linux app tests plus one desktop and one mobile platform job.
+        (["apps/client/lib/main.dart"], {"test-apps"} | SMOKE),
+        (["packages/domain/lib/domain.dart"], {"test-apps"} | SMOKE | CONSOLE),
+        (["apps/console/lib/main.dart"], {"test-apps"} | SMOKE | CONSOLE),
+        (
+            ["apps/client/lib/main.dart", "apps/client/windows/runner/x.cpp"],
+            {"test-apps"} | SMOKE,
+        ),
+        (
+            ["apps/client/lib/main.dart", "apps/client/macos/Runner/x.swift"],
+            {"test-apps", "apps-macos"} | SMOKE,
+        ),
+        # Dependencies, the Flutter pin and the list of platform tests reach every platform.
+        (["pubspec.lock"], {"test-apps"} | PLATFORM | CONSOLE),
+        (["pubspec.yaml"], {"test-apps"} | PLATFORM | CONSOLE),
+        (["packages/domain/pubspec.yaml"], {"test-apps"} | PLATFORM | CONSOLE),
+        (["apps/client/pubspec.yaml"], {"test-apps"} | PLATFORM),
+        (["apps/client/platform-tests.json"], {"test-apps"} | PLATFORM),
+        # Other components keep the jobs of their files.
+        (["services/server/internal/chat/x.go"], TESTS_SERVER | POSTGRES | CONSOLE | SDK),
+        (["sdk/python/src/x.py"], SDK | {"test-server"}),
+        (["docs/spec/07-permissions.md"], set()),
+        # A shared input runs every component's tests, but of the platform jobs only the pair.
+        (["Makefile"], (EVERY_JOB - PLATFORM) | SMOKE),
+        ([".github/workflows/ci.yml"], (EVERY_JOB - PLATFORM) | SMOKE),
+        ([], (EVERY_JOB - PLATFORM) | SMOKE),
+        (["tools/distribution/apple.py"], TRIALS | MOBILE | HOST_TRIALS),
+    ],
+)
+def test_the_pull_request_stage_runs_the_affected_jobs(
+    files: list[str], expected: set[str]
+) -> None:
+    assert set(components.ci_plan(files=files, public=True, stage="pr").jobs) == expected
+
+
+def test_the_pull_request_stage_keeps_the_components_of_the_gates() -> None:
+    # The gates (lint, codegen) still run for the component of a platform folder.
+    plan = components.ci_plan(files=["apps/client/windows/runner/x.cpp"], public=True, stage="pr")
+    assert plan.components == ["apps"]
+    assert components.ci_plan(files=["Makefile"], public=True, stage="pr").components == ["all"]
+
+
+def test_the_pull_request_stage_picks_a_mobile_job_without_android() -> None:
+    plan = components.ci_plan(files=["apps/client/lib/main.dart"], public=False, stage="pr")
+    assert set(plan.jobs) == {"test-apps"} | SMOKE_PRIVATE
+    plan = components.ci_plan(files=["packages/device_key/android/x.kt"], public=False, stage="pr")
+    assert set(plan.jobs) == {"test-apps", "console-e2e"}
+
+
+@pytest.mark.parametrize(
+    ("files", "expected"),
+    [
+        # The merge queue runs every job of a push to main for any change ...
+        ([], EVERY_JOB),
+        (["docs/spec/07-permissions.md"], EVERY_JOB),
+        (["apps/client/windows/runner/x.cpp"], EVERY_JOB),
+        # ... and the trials the change of a pull request needs, as the full plan does.
+        (["apps/client/Makefile"], EVERY_JOB | TRIALS | MOBILE),
+        (["services/host/x.go"], EVERY_JOB | HOST_TRIALS),
+    ],
+)
+def test_the_merge_queue_stage_runs_every_job(files: list[str], expected: set[str]) -> None:
+    plan = components.ci_plan(files=files, public=True, stage="queue")
+    assert set(plan.jobs) == expected
+    assert plan.components == ["all"]
+
+
+def test_the_full_stage_is_the_default() -> None:
+    files = ["apps/client/windows/runner/x.cpp"]
+    assert components.ci_plan(files=files, public=True).jobs == (
+        components.ci_plan(files=files, public=True, stage="full").jobs
+    )
+    assert set(components.ci_plan(files=files, public=True).jobs) == {"test-apps"} | PLATFORM
+
+
+def test_ci_plan_rejects_an_unknown_stage_and_a_queue_without_a_diff() -> None:
+    with pytest.raises(ValueError, match="unknown stage 'fast'"):
+        components.ci_plan(files=[], public=True, stage="fast")
+    with pytest.raises(ValueError, match="stage queue needs files"):
+        components.ci_plan(selected=["all"], public=True, stage="queue")
+    with pytest.raises(ValueError, match="stage pr needs files"):
+        components.ci_plan(selected=["all"], public=True, stage="pr")
+
+
+def test_cli_ci_plan_stage(capsys: pytest.CaptureFixture[str]) -> None:
+    files = ["apps/client/windows/runner/x.cpp"]
+    assert components.main(["ci-plan", "--files", *files, "--public", "true", "--stage", "pr"]) == 0
+    assert capsys.readouterr().out == "components=apps\njobs=apps-windows\n"
+    assert (
+        components.main(["ci-plan", "--files", *files, "--public", "true", "--stage", "queue"]) == 0
+    )
+    out = capsys.readouterr().out
+    assert out.startswith("components=all\njobs=")
+    assert "apps-macos" in out
+
+
+def test_cli_ci_plan_stage_needs_a_diff(capsys: pytest.CaptureFixture[str]) -> None:
+    with pytest.raises(SystemExit):
+        components.main(["ci-plan", "--components", "all", "--public", "true", "--stage", "pr"])
+    assert "needs --files" in capsys.readouterr().err
