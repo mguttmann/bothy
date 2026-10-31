@@ -51,14 +51,28 @@ abstract interface class SecureBackend {
 /// [appId] (the bundle identifier, on Android the application ID). On iOS and macOS they sit
 /// under the keychain service [serviceFor] of it, elsewhere under the key prefix `<appId>/`.
 /// A build with another identity therefore never reads, lists or deletes them, also not where
-/// the platform store is shared (the login keychain, the Windows file). Secrets of a build
-/// before the scope (service `flutter_secure_storage_service`, keys without prefix) move into
-/// the scope once, before the first call, and leave the old place, so no stale refresh token
-/// stays behind: always where only this app reaches the old store (iOS, Android, the Data
-/// Protection keychain), in a shared store (the login keychain, Windows) only when
-/// [hasLocalData] says this app has local data of an instance, the sign that the old secrets
-/// are its own. Otherwise the shared store is not touched: no access prompt, no foreign
-/// session. The marker [scopeMarkerKey] in the scope records the step.
+/// the platform store is shared (the login keychain, the Windows file).
+///
+/// The update from a build before the scope (docs/decisions.d/FIX-secure-store-migration.md):
+/// before the first call the secrets of the old place (service `flutter_secure_storage_service`,
+/// keys without prefix) are copied into the scope once, per instance and only for an instance
+/// without secrets in the scope yet. Where only this app reaches the old store (iOS, Android,
+/// the Data Protection keychain) every instance is its own; in a shared store (the login
+/// keychain, Windows) only the instances with a folder under this app's data root
+/// ([localInstances]), and the app keys only when the remembered instance (`app/instance`) is
+/// one of them, so a new identity never takes another app's session and, without an instance
+/// of its own, never reads the old store (no access prompt). In a shared store the copy also
+/// records the instance's device key scope as the `instance_id`, the scope the old build's keys
+/// have ([deviceKeyScopeKey]). The old items stay until the first successful refresh of their
+/// instance (a write of its refresh token, [legacyPendingKey]) and are deleted then; a failed
+/// copy is logged, leaves the old items alone and is tried again at the next start, and the app
+/// starts without them (enrollment). The marker [scopeMarkerKey] (the app identity) records the
+/// step.
+///
+/// The login keychain cannot list its items with their data: `readAll` fails with -50
+/// (`errSecParam`). There the backend keeps the list of its keys in the item [indexKey] and
+/// finds the old secrets by their names ([legacyAppKeys], [legacyInstanceKeys],
+/// [legacyAuthKeys]).
 ///
 /// A macOS release build without the keychain entitlements (an ad-hoc signature, no team and no
 /// provisioning profile) cannot use the Data Protection keychain: every write fails with
@@ -69,14 +83,14 @@ abstract interface class SecureBackend {
 final class FlutterSecureBackend implements SecureBackend {
   /// Creates the backend of the app identity [appId]; [storage] replaces the platform store in
   /// tests, [platform] the platform, [keychainOptions] the macOS options of this build,
-  /// [hasLocalData] the check for local instance data (none: false) and [log] the developer
-  /// log.
+  /// [localInstances] the instance IDs with a folder under this app's data root (none: no
+  /// instance) and [log] the developer log.
   FlutterSecureBackend({
     required this.appId,
     FlutterSecureStorage? storage,
     TargetPlatform? platform,
     MacOsOptions keychainOptions = FlutterSecureBackend.macOsOptions,
-    this.hasLocalData,
+    this.localInstances,
     void Function(String line)? log,
   }) : _storage =
            storage ??
@@ -92,8 +106,8 @@ final class FlutterSecureBackend implements SecureBackend {
   /// The app identity whose secrets this backend keeps.
   final String appId;
 
-  /// Whether this app has local data of an instance; null counts as no.
-  final Future<bool> Function()? hasLocalData;
+  /// The instance IDs that have a folder under this app's data root; null counts as none.
+  final Future<Set<String>> Function()? localInstances;
 
   /// The options of the Android store: the data in AES-GCM, its key wrapped by an RSA key of
   /// the Android Keystore, no biometric prompt (the device keys of M5-01 carry the step-up).
@@ -135,12 +149,56 @@ final class FlutterSecureBackend implements SecureBackend {
   /// The key of the item that tries the Data Protection keychain; it never holds a secret.
   static const String probeKey = 'app/keychain_probe';
 
-  /// The key of the item in the app scope that records the move of the old secrets; never a
-  /// secret and never listed by [keys].
+  /// The key of the item in the app scope that records the copy of the old secrets (its value
+  /// is the app identity); never a secret and never listed by [keys].
   static const String scopeMarkerKey = 'app/secret_scope';
+
+  /// The key of the item in the app scope that lists the keys of the scope where the store
+  /// cannot list them (the login keychain); never listed by [keys].
+  static const String indexKey = 'app/secret_index';
+
+  /// The key of the item in the app scope that names the old items still waiting for the first
+  /// refresh of their instance: a JSON object from the `instance_id` to the old keys, the old
+  /// app keys under ""; never listed by [keys].
+  static const String legacyPendingKey = 'app/legacy_pending';
+
+  /// The name of the stored device key scope in an instance's secrets ([DeviceKeyScopes]).
+  static const String deviceKeyScopeKey = 'device_key_scope';
 
   /// The key prefixes of the secrets a build before the app scope wrote.
   static const List<String> legacyPrefixes = ['app/', 'instance/'];
+
+  /// The app keys a build before the app scope wrote; frozen with that build.
+  static const List<String> legacyAppKeys = [
+    'app/server_address',
+    'app/instance',
+    'app/update_notice_dismissed',
+  ];
+
+  /// The instance keys (after `instance/<instance_id>/`) a build before the app scope wrote,
+  /// besides [legacyAuthKeys]; frozen with that build.
+  static const Set<String> legacyInstanceKeys = {
+    'database_key',
+    'app_lock/enabled',
+    'push/apns_token',
+    'push/fcm_token',
+    'onboarding/pending_device',
+  };
+
+  /// The keys of a server session (after `instance/<instance_id>/auth/<origin>/`) a build
+  /// before the app scope wrote; frozen with that build.
+  static const List<String> legacyAuthKeys = ['refresh_token', 'device_id'];
+
+  static const Set<String> _internalKeys = {
+    scopeMarkerKey,
+    indexKey,
+    legacyPendingKey,
+    probeKey,
+  };
+
+  static final RegExp _refreshTokenKey = RegExp(
+    r'^instance/([^/]+)/auth/.+/refresh_token$',
+  );
 
   /// The status `errSecMissingEntitlement` of the Security framework.
   static const int missingEntitlementStatus = -34018;
@@ -151,6 +209,9 @@ final class FlutterSecureBackend implements SecureBackend {
   final void Function(String line) _log;
   Future<MacOsOptions>? _chosen;
   bool _downgraded = false;
+  Set<String>? _index;
+  bool _pendingChecked = false;
+  Future<void> _serial = Future<void>.value();
 
   bool get _macOS => _platform == TargetPlatform.macOS;
   bool get _apple => _macOS || _platform == TargetPlatform.iOS;
@@ -172,15 +233,18 @@ final class FlutterSecureBackend implements SecureBackend {
 
   /// Whether the secrets lie in a store every app of the person reaches: the Windows file, the
   /// macOS login keychain (a debug or profile build, or a build without keychain entitlements).
-  Future<bool> get sharedStore async {
-    if (_platform == TargetPlatform.windows) return true;
-    if (!_macOS) return false;
-    return !(await _ready()).usesDataProtectionKeychain;
-  }
+  Future<bool> get sharedStore async => _shared(await _ready());
+
+  bool _shared(MacOsOptions mac) =>
+      _platform == TargetPlatform.windows ||
+      (_macOS && !mac.usesDataProtectionKeychain);
+
+  /// Whether the store cannot list its items (the login keychain), so [indexKey] lists them.
+  bool _indexed(MacOsOptions mac) => _macOS && !mac.usesDataProtectionKeychain;
 
   /// The macOS options of every call, chosen once before the first call, after the old secrets
-  /// moved into the app scope. A failed choice or move is not kept, so the next call tries
-  /// again.
+  /// were copied into the app scope. A failed choice is not kept, so the next call tries
+  /// again; a failed copy is logged and does not fail the call.
   Future<MacOsOptions> _ready() {
     final chosen = _chosen;
     if (chosen != null) return chosen;
@@ -220,6 +284,13 @@ final class FlutterSecureBackend implements SecureBackend {
     dp: options.usesDataProtectionKeychain,
   );
 
+  /// The macOS options of the old place: the old service in the keychain of this build.
+  MacOsOptions _legacyMac(MacOsOptions scoped) => _macOptions(
+    scoped,
+    AppleOptions.defaultAccountName,
+    dp: scoped.usesDataProtectionKeychain,
+  );
+
   static MacOsOptions _macOptions(
     MacOsOptions options,
     String? service, {
@@ -243,55 +314,201 @@ final class FlutterSecureBackend implements SecureBackend {
 
   String get _prefix => _apple ? '' : '$appId/';
 
-  /// Moves the secrets of a build before the app scope into it (see the class comment).
-  Future<void> _adoptLegacy(MacOsOptions scoped) async {
-    if (await _read(scopeMarkerKey, scoped) != null) return;
-    final legacyMac = _macOptions(
-      scoped,
-      AppleOptions.defaultAccountName,
-      dp: scoped.usesDataProtectionKeychain,
-    );
-    final shared =
-        _platform == TargetPlatform.windows ||
-        (_macOS && !scoped.usesDataProtectionKeychain);
-    final check = hasLocalData;
-    final adopt = !shared || (check != null && await check());
-    if (adopt) await _moveLegacy(legacyMac, scoped);
-    await _write(scopeMarkerKey, '1', scoped);
+  /// Runs [step] after every earlier one, so the read-modify-write of [indexKey] and
+  /// [legacyPendingKey] never interleaves.
+  Future<T> _serialized<T>(Future<T> Function() step) {
+    final result = _serial.then((_) => step());
+    _serial = result.then<void>((_) {}, onError: (Object _) {});
+    return result;
   }
 
-  /// Moves every secret under [legacyMac] into [scoped] without overwriting a scoped one.
-  Future<void> _moveLegacy(MacOsOptions legacyMac, MacOsOptions scoped) async {
-    final legacy = await _legacyItems(legacyMac);
-    final current = await _readAll(scoped);
-    for (final MapEntry(:key, :value) in legacy.entries) {
-      if (!current.containsKey(key)) await _write(key, value, scoped);
-      await _storage.delete(
-        key: key,
-        iOptions: _apple ? _iosOptions(key, legacyMac.accountName!) : null,
-        mOptions: legacyMac,
+  /// Copies the secrets of a build before the app scope into it (see the class comment); never
+  /// throws.
+  Future<void> _adoptLegacy(MacOsOptions scoped) async {
+    try {
+      if (await _read(scopeMarkerKey, scoped) != null) return;
+      final Set<String>? own = _shared(scoped)
+          ? await (localInstances?.call() ?? Future.value(<String>{}))
+          : null;
+      if (own == null || own.isNotEmpty) await _copyLegacy(scoped, own);
+      await _write(scopeMarkerKey, appId, scoped);
+    } on Object catch (error) {
+      _log(
+        'the secrets of the build before the app scope were not copied ($error): '
+        'the app starts without them, the next start tries again',
       );
     }
-    if (legacy.isNotEmpty) {
-      _log('moved ${legacy.length} secrets into the scope of $appId');
-    }
   }
 
-  /// The secrets a build before the app scope left: on Apple every item of the old service, on
-  /// the other platforms the keys under [legacyPrefixes].
-  Future<Map<String, String>> _legacyItems(MacOsOptions legacyMac) async {
+  /// Copies the old secrets of the instances in [own] (null: every instance) into [scoped].
+  Future<void> _copyLegacy(MacOsOptions scoped, Set<String>? own) async {
+    final legacy = await _legacyItems(_legacyMac(scoped), own);
+    if (legacy.isEmpty) return;
+    final current = await _scopedKeys(scoped);
+    final pending = <String, List<String>>{};
+    for (final key in legacy.keys) {
+      final id = _instanceOf(key);
+      if (id == null) continue;
+      if (own != null && !own.contains(id)) continue;
+      if (current.any((k) => k.startsWith('instance/$id/'))) continue;
+      (pending[id] ??= []).add(key);
+    }
+    final appKeys = [
+      for (final key in legacy.keys)
+        if (key.startsWith('app/') && !_internalKeys.contains(key)) key,
+    ];
+    final remembered = _instanceIdOf(legacy['app/instance']);
+    if (own == null || (remembered != null && own.contains(remembered))) {
+      if (appKeys.isNotEmpty) pending[''] = appKeys;
+    }
+    if (pending.isEmpty) return;
+    var copied = 0;
+    for (final key in pending.values.expand((keys) => keys)) {
+      if (current.contains(key)) continue;
+      await _put(key, legacy[key]!, scoped);
+      copied++;
+    }
+    if (_shared(scoped)) {
+      for (final id in pending.keys.where((id) => id.isNotEmpty)) {
+        await _put('instance/$id/$deviceKeyScopeKey', id, scoped);
+      }
+    }
+    await _write(legacyPendingKey, jsonEncode(pending), scoped);
+    _log(
+      'copied $copied secrets of the build before the app scope into the scope of '
+      '$appId (instances ${pending.keys.where((id) => id.isNotEmpty).join(', ')}); '
+      'the old items stay until the first refresh',
+    );
+  }
+
+  /// The secrets a build before the app scope left, under [legacyPrefixes]: listed where the
+  /// store can list them, else read by their names for the instances in [own].
+  Future<Map<String, String>> _legacyItems(
+    MacOsOptions legacyMac,
+    Set<String>? own,
+  ) async {
+    if (_indexed(legacyMac)) return _legacyByName(legacyMac, own ?? const {});
     final all = await _storage.readAll(
       iOptions: _apple
           ? _iosOptions('', AppleOptions.defaultAccountName)
           : null,
       mOptions: legacyMac,
     );
-    if (_apple) return all;
     return {
       for (final MapEntry(:key, :value) in all.entries)
-        if (legacyPrefixes.any(key.startsWith)) key: value,
+        if (legacyPrefixes.any(key.startsWith) && !_internalKeys.contains(key))
+          key: value,
     };
   }
+
+  /// The old secrets of the instances [ids] in the login keychain, read by their names: the app
+  /// keys, the instance keys and the session keys under the origin of the remembered server.
+  Future<Map<String, String>> _legacyByName(
+    MacOsOptions legacyMac,
+    Set<String> ids,
+  ) async {
+    final found = <String, String>{};
+    Future<void> take(String key) async {
+      final value = await _storage.read(key: key, mOptions: legacyMac);
+      if (value != null) found[key] = value;
+    }
+
+    for (final key in legacyAppKeys) {
+      await take(key);
+    }
+    final origins = <String>{
+      for (final address in [
+        found['app/server_address'],
+        _addressOf(found['app/instance']),
+      ])
+        if (address != null && Uri.tryParse(address)?.hasAuthority == true)
+          Uri.parse(address).origin,
+    };
+    for (final id in ids) {
+      for (final name in legacyInstanceKeys) {
+        await take('instance/$id/$name');
+      }
+      for (final origin in origins) {
+        for (final name in legacyAuthKeys) {
+          await take('instance/$id/auth/$origin/$name');
+        }
+      }
+    }
+    return found;
+  }
+
+  static String? _instanceOf(String key) {
+    if (!key.startsWith('instance/')) return null;
+    final rest = key.substring('instance/'.length);
+    final slash = rest.indexOf('/');
+    return slash <= 0 ? null : rest.substring(0, slash);
+  }
+
+  static Map<Object?, Object?>? _jsonMap(String? json) {
+    if (json == null) return null;
+    try {
+      final decoded = jsonDecode(json);
+      return decoded is Map ? decoded : null;
+    } on FormatException {
+      return null;
+    }
+  }
+
+  static String? _instanceIdOf(String? instanceJson) {
+    final id = _jsonMap(instanceJson)?['instance_id'];
+    return id is String ? id : null;
+  }
+
+  static String? _addressOf(String? instanceJson) {
+    final address = _jsonMap(instanceJson)?['address'];
+    return address is String ? address : null;
+  }
+
+  /// Deletes the old items of [instanceId] after its first successful refresh (see the class
+  /// comment), and the old app keys with the last instance; never throws.
+  Future<void> _retireLegacy(
+    String instanceId,
+    MacOsOptions scoped,
+  ) => _serialized(() async {
+    if (_pendingChecked) return;
+    try {
+      final pending = _jsonMap(await _read(legacyPendingKey, scoped));
+      if (pending == null) {
+        _pendingChecked = true;
+        return;
+      }
+      final keys = pending.remove(instanceId);
+      if (keys is! List) return;
+      final last = !pending.keys.any((id) => id != '');
+      final appKeys = last ? pending.remove('') : null;
+      final drop = [...keys, if (appKeys is List) ...appKeys];
+      final legacyMac = _legacyMac(scoped);
+      for (final key in drop.whereType<String>()) {
+        await _storage.delete(
+          key: key,
+          iOptions: _apple
+              ? _iosOptions(key, AppleOptions.defaultAccountName)
+              : null,
+          mOptions: legacyMac,
+        );
+      }
+      if (pending.isEmpty) {
+        await _remove(legacyPendingKey, scoped);
+        _pendingChecked = true;
+      } else {
+        await _write(legacyPendingKey, jsonEncode(pending), scoped);
+      }
+      _log(
+        'removed ${drop.length} old secrets of instance $instanceId after its '
+        'first refresh',
+      );
+    } on Object catch (error) {
+      _log(
+        'the old secrets of instance $instanceId were not removed ($error): '
+        'the next refresh tries again',
+      );
+    }
+  });
 
   Future<String?> _read(String key, MacOsOptions mac) => _storage.read(
     key: '$_prefix$key',
@@ -307,39 +524,73 @@ final class FlutterSecureBackend implements SecureBackend {
         mOptions: mac,
       );
 
-  /// Every secret of the app scope with its key without the prefix, the marker included.
-  Future<Map<String, String>> _readAll(MacOsOptions mac) async {
+  Future<void> _remove(String key, MacOsOptions mac) => _storage.delete(
+    key: '$_prefix$key',
+    iOptions: _iosOptions(key, serviceFor(appId)),
+    mOptions: mac,
+  );
+
+  /// Writes [key] and lists it in [indexKey] where the store needs the index.
+  Future<void> _put(String key, String value, MacOsOptions mac) async {
+    await _write(key, value, mac);
+    if (!_indexed(mac) || _internalKeys.contains(key)) return;
+    await _serialized(() async {
+      final index = await _loadIndex(mac);
+      if (index.add(key)) await _saveIndex(index, mac);
+    });
+  }
+
+  Future<Set<String>> _loadIndex(MacOsOptions mac) async {
+    final known = _index;
+    if (known != null) return known;
+    final raw = await _read(indexKey, mac);
+    final decoded = raw == null ? null : jsonDecode(raw);
+    return _index = {if (decoded is List) ...decoded.whereType<String>()};
+  }
+
+  Future<void> _saveIndex(Set<String> index, MacOsOptions mac) =>
+      _write(indexKey, jsonEncode(index.toList()..sort()), mac);
+
+  /// Every key of the app scope without the prefix and without the internal items.
+  Future<Set<String>> _scopedKeys(MacOsOptions mac) async {
+    if (_indexed(mac)) {
+      return _serialized(() async => {...await _loadIndex(mac)});
+    }
     final all = await _storage.readAll(
       iOptions: _iosOptions('', serviceFor(appId)),
       mOptions: mac,
     );
     final prefix = _prefix;
     return {
-      for (final MapEntry(:key, :value) in all.entries)
-        if (key.startsWith(prefix)) key.substring(prefix.length): value,
-    };
+      for (final key in all.keys)
+        if (key.startsWith(prefix)) key.substring(prefix.length),
+    }..removeAll(_internalKeys);
   }
 
   @override
   Future<String?> read(String key) async => _read(key, await _ready());
 
   @override
-  Future<void> write(String key, String value) async =>
-      _write(key, value, await _ready());
+  Future<void> write(String key, String value) async {
+    final mac = await _ready();
+    await _put(key, value, mac);
+    final refreshed = _refreshTokenKey.firstMatch(key)?.group(1);
+    if (refreshed != null) await _retireLegacy(refreshed, mac);
+  }
 
   @override
   Future<void> delete(String key) async {
     final mac = await _ready();
-    await _storage.delete(
-      key: '$_prefix$key',
-      iOptions: _iosOptions(key, serviceFor(appId)),
-      mOptions: mac,
-    );
+    await _remove(key, mac);
+    if (!_indexed(mac)) return;
+    await _serialized(() async {
+      final index = await _loadIndex(mac);
+      if (index.remove(key)) await _saveIndex(index, mac);
+    });
   }
 
   @override
-  Future<Set<String>> keys() async =>
-      (await _readAll(await _ready())).keys.toSet()..remove(scopeMarkerKey);
+  Future<Set<String>> keys() async => _scopedKeys(await _ready());
 }
 
 /// The [SecretStore] of one instance: every key is prefixed with the instance ID, so the

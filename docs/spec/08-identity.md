@@ -801,6 +801,12 @@ Operations and rules of the console session (M6-01, docs/DECISIONS.md D-M6-01-1 
 - The local database is encrypted with a key from secure storage. Tokens and
   keys are stored only on this device (no synchronization into cloud keychains,
   not in backups).
+- Device and session storage across an app update (addendum of 2026-10-31,
+  FIX-secure-store-migration; reason: an update that moved the secrets into the app's own place
+  signed macOS installations out although their devices stayed active): an update keeps the
+  session and the device key of an instance; the old items are removed only after the first
+  successful refresh with them, and an app of another identity never takes them. Details:
+  [15-client-architecture.md](15-client-architecture.md) section 9.
 - The owner can require the lock instance-wide (`security.app_lock_required`). The server cannot
   check it; it is protection against curiosity at the unlocked device, not a server control.
   What the server checks is step-up.

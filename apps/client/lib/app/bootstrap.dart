@@ -363,8 +363,8 @@ AppPorts productionPorts({
   // bundle identifier never picks up its session from a shared keychain or file.
   final secrets = FlutterSecureBackend(
     appId: Platform.isAndroid ? branding.applicationId : branding.bundleId,
-    hasLocalData: () async =>
-        InstanceServices.hasLocalData(await getApplicationSupportDirectory()),
+    localInstances: () async =>
+        InstanceServices.localInstances(await getApplicationSupportDirectory()),
   );
   return AppPorts(
     measurements: measurements,
@@ -460,15 +460,19 @@ final class InstanceServices {
 
   final Future<void> Function() _stopWatching;
 
-  /// Whether [root] (the `dataRoot`) holds the folder of at least one instance: the sign that
-  /// the secrets of a build before the app scope in a shared store are this app's own
-  /// ([FlutterSecureBackend], docs/decisions.d/FIX-app-logout.md).
-  static Future<bool> hasLocalData(Directory root) async {
+  /// The instance IDs with a folder under [root] (the `dataRoot`): the instances whose old
+  /// secrets in a shared store are this app's own ([FlutterSecureBackend],
+  /// docs/decisions.d/FIX-secure-store-migration.md).
+  static Future<Set<String>> localInstances(Directory root) async {
     final instances = Directory(
       '${root.path}${Platform.pathSeparator}instances',
     );
-    if (!await instances.exists()) return false;
-    return instances.list().any((entry) => entry is Directory);
+    if (!await instances.exists()) return {};
+    return {
+      await for (final entry in instances.list())
+        if (entry is Directory)
+          entry.uri.pathSegments.lastWhere((s) => s.isNotEmpty),
+    };
   }
 
   /// Builds the services of [instance] (Design note 1): the device keys with the scope of

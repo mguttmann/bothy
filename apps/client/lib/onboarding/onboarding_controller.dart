@@ -316,21 +316,21 @@ class OnboardingController extends _$OnboardingController {
   }
 
   /// What is stored for [instance], without opening anything: a refresh token, and whether the
-  /// device waited for its confirmation ([_pendingKey]).
+  /// device waited for its confirmation ([pendingKey]).
   Future<StoredAccount> _storedAccount(InstanceInfo instance) async {
     final secrets = InstanceSecrets(_ports.secureBackend, instance.instanceId);
     if (await secrets.read('auth/${instance.address.origin}/refresh_token') ==
         null) {
       return StoredAccount.none;
     }
-    return await secrets.read(_pendingKey) == null
+    return await secrets.read(pendingKey) == null
         ? StoredAccount.signedIn
         : StoredAccount.devicePending;
   }
 
   /// The instance secret that marks a waiting device: its verification code and `created_at`
   /// as JSON, written when E4 shows and deleted at the login (D-M4-18-15).
-  static const _pendingKey = 'onboarding/pending_device';
+  static const pendingKey = 'onboarding/pending_device';
 
   static Object? _decode(String? json) {
     if (json == null) return null;
@@ -572,7 +572,7 @@ class OnboardingController extends _$OnboardingController {
     since ??= _ports.clock.now();
     if (flow != _flow) return;
     await services.secrets.write(
-      _pendingKey,
+      pendingKey,
       jsonEncode({
         'code': device.verificationCode,
         'created_at': since.toUtc().toIso8601String(),
@@ -663,7 +663,7 @@ class OnboardingController extends _$OnboardingController {
       _signedIn(restored: true);
       return;
     }
-    final saved = _decode(await services.secrets.read(_pendingKey));
+    final saved = _decode(await services.secrets.read(pendingKey));
     final savedMap = saved is Map ? saved : const <Object?, Object?>{};
     final code = device?.verificationCode ?? savedMap['code'];
     if (flow != _flow) return;
@@ -683,7 +683,7 @@ class OnboardingController extends _$OnboardingController {
     final services = _services;
     if (services == null) return;
     state = state.next(step: OnboardingStep.signedIn, restored: restored);
-    unawaited(services.secrets.delete(_pendingKey));
+    unawaited(services.secrets.delete(pendingKey));
     services.engine.start();
   }
 

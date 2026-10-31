@@ -588,17 +588,24 @@ Therefore the secrets belong to one app identity (FIX-app-logout, docs/decisions
 on iOS and macOS they sit under the keychain service `<bundle identifier>.secrets`, on Windows and
 Android under the key prefix `<bundle identifier or application ID>/`, and a build with another
 identity never reads, lists or deletes them; a new identity starts with enrollment. Secrets of a
-build before this rule move into the scope once at the first start and leave the old place: always
-where only the app reaches the old store, in a shared store (the macOS login keychain, Windows) only
-when the app already has an instance folder under its data root.
+build before this rule are copied into the scope once at the first start (addendum of 2026-10-31,
+FIX-secure-store-migration, docs/decisions.d/FIX-secure-store-migration.md; reason: the first
+version of the move failed in the macOS login keychain and signed updated installations out): per
+instance and only for an instance without secrets in the scope; where only the app reaches the old
+store every instance, in a shared store (the macOS login keychain, Windows) only the instances with
+a folder under the app's data root, and the remembered server only with its instance. The old items
+stay until the first successful refresh of their instance and are deleted then; a failed copy is
+logged, tried again at the next start, and the app starts with enrollment. The login keychain cannot
+list its items (`readAll` answers -50, `errSecParam`), so there the app keeps the list of its keys
+in the item `app/secret_index` and reads the old secrets by their names.
 The database key is 32 bytes from `Random.secure()`, created at the first start of an instance;
 the database is `<application support>/instances/<instance_id>/local.db`, the file cache lives
 in the same folder, and the device keys of `packages/device_key` use the `instance_id` as scope.
 Where the key store is shared between apps (the macOS login keychain of a debug or profile build,
 the key storage of the Windows user), a new enrollment uses the scope
 `<bundle identifier>/<instance_id>` instead, so another app identity never signs with or deletes
-these keys; an instance that already has secrets from a build before this rule keeps its keys
-under the `instance_id`. The scope is stored with the instance's secrets
+these keys; an instance copied from a build before this rule keeps its keys under the
+`instance_id`, which the copy records as its scope. The scope is stored with the instance's secrets
 (docs/decisions.d/FIX-app-logout.md FIX-AL/4).
 A wipe (R-SY-14) deletes that folder, both device keys and every secret with the prefix.
 

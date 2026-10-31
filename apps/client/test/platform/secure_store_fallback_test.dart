@@ -9,8 +9,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../support/secure_storage_fakes.dart';
+
 /// A keychain that answers like the system's: without the entitlements every write to the Data
-/// Protection keychain fails with -34018 and every read of it finds nothing.
+/// Protection keychain fails with -34018 and every read of it finds nothing; the login keychain
+/// refuses `readAll` with -50.
 class FakeKeychainStorage extends Fake implements FlutterSecureStorage {
   FakeKeychainStorage({required this.missingEntitlement});
 
@@ -91,7 +94,9 @@ class FakeKeychainStorage extends Fake implements FlutterSecureStorage {
     WindowsOptions? wOptions,
   }) async {
     final dp = _dataProtection(mOptions as MacOsOptions?);
-    if (dp && missingEntitlement) return {};
+    // The login keychain cannot return the data of all items (measured, FIX-SSM/1).
+    if (!dp) throw loginKeychainReadAllError();
+    if (missingEntitlement) return {};
     return Map.of(items[dp]!);
   }
 }
@@ -117,7 +122,9 @@ void main() {
       await backend.write('instance/a/device_id', '1');
       expect(await backend.read('instance/a/device_id'), '1');
       expect(keychain.items[false], {
-        FlutterSecureBackend.scopeMarkerKey: '1',
+        FlutterSecureBackend.scopeMarkerKey: 'com.example.chat',
+        // The login keychain cannot list its items, so the scope keeps their list.
+        FlutterSecureBackend.indexKey: '["instance/a/device_id"]',
         'instance/a/device_id': '1',
       });
       expect(await backend.keys(), {'instance/a/device_id'});
@@ -143,7 +150,7 @@ void main() {
     );
     await backend.write('app/server_address', 'https://chat.example.com');
     expect(keychain.items[true], {
-      FlutterSecureBackend.scopeMarkerKey: '1',
+      FlutterSecureBackend.scopeMarkerKey: 'com.example.chat',
       'app/server_address': 'https://chat.example.com',
     });
     expect(keychain.items[false], isEmpty);
