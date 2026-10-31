@@ -188,6 +188,31 @@ void main() {
     },
   );
 
+  test(
+    'removing a channel or its space deletes its thread order (M4-51)',
+    () async {
+      await fill(1, s: 1);
+      await fill(2, s: 2);
+      await fill(3, s: 1);
+      for (final c in [1, 2, 3]) {
+        await db.structureDao.putUserChannelStateLocally(channel(c).id, [
+          threadId(c),
+        ]);
+      }
+      await db.removeTargets([
+        TargetRef.channel(channel(3).id),
+        TargetRef.space(space(2).id),
+      ]);
+      expect(
+        [
+          for (final s in await db.structureDao.watchUserChannelStates().first)
+            s.channelId,
+        ],
+        [channel(1).id],
+      );
+    },
+  );
+
   test('removing a space deletes its collapse state on this device', () async {
     await fill(1, s: 1);
     await fill(2, s: 2);
