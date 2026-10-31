@@ -72,15 +72,17 @@ void main() {
   });
 
   group('holdOrder', () {
-    test('held rows keep their held order; rows new to the level come first',
-        () {
-      expect(holdOrder(['c', 'a', 'x', 'b'], ['a', 'b', 'c'], (s) => s), [
-        'x',
-        'a',
-        'b',
-        'c',
-      ]);
-    });
+    test(
+      'held rows keep their held order; rows new to the level come first',
+      () {
+        expect(holdOrder(['c', 'a', 'x', 'b'], ['a', 'b', 'c'], (s) => s), [
+          'x',
+          'a',
+          'b',
+          'c',
+        ]);
+      },
+    );
 
     test('without a held order the fresh order applies', () {
       expect(holdOrder(['c', 'a'], const [], (s) => s), ['c', 'a']);
@@ -156,19 +158,21 @@ void main() {
   });
 
   group('activity', () {
-    test('a channel: the newest activity of its threads, else its creation',
-        () {
-      final c = channel(1, kind: ChannelKind.forum);
-      expect(channelActivity(c, const []), c.createdAt);
-      expect(
-        channelActivity(c, [
-          thread(1, activeMinutes: 4),
-          thread(2, activeMinutes: 9),
-          thread(3, channelN: 2, activeMinutes: 99),
-        ]),
-        t0.add(const Duration(minutes: 9)),
-      );
-    });
+    test(
+      'a channel: the newest activity of its threads, else its creation',
+      () {
+        final c = channel(1, kind: ChannelKind.forum);
+        expect(channelActivity(c, const []), c.createdAt);
+        expect(
+          channelActivity(c, [
+            thread(1, activeMinutes: 4),
+            thread(2, activeMinutes: 9),
+            thread(3, channelN: 2, activeMinutes: 99),
+          ]),
+          t0.add(const Duration(minutes: 9)),
+        );
+      },
+    );
 
     test('a space: the newest of its channels, else its creation', () {
       final s = space(1);
@@ -180,11 +184,13 @@ void main() {
     });
   });
 
-  test('SidebarArrangement: the defaults of 01 11 (chats on, the rest off)',
-      () {
-    const a = SidebarArrangement();
-    expect(a.isAuto(SidebarLevel.spaces), isFalse);
-    expect(a.isAuto(SidebarLevel.channels), isFalse);
-    expect(a.isAuto(SidebarLevel.chats), isTrue);
-  });
+  test(
+    'SidebarArrangement: the defaults of 01 11 (chats on, the rest off)',
+    () {
+      const a = SidebarArrangement();
+      expect(a.isAuto(SidebarLevel.spaces), isFalse);
+      expect(a.isAuto(SidebarLevel.channels), isFalse);
+      expect(a.isAuto(SidebarLevel.chats), isTrue);
+    },
+  );
 }

@@ -4345,7 +4345,7 @@
       "required": false,
       "enum": [],
       "min": "1",
-      "max": "",
+      "max": "1000",
       "chapter": "03-data-model.md",
       "doc": "Most items of a personal order list of the sidebar: channel_order of a space and thread_order of a channel (M4-51)."
     },

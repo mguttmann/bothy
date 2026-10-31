@@ -116,7 +116,7 @@ final class SidebarArrangementProvider
 }
 
 String _$sidebarArrangementHash() =>
-    r'c431c0c2750f4bf526a5697823a6d508c83dc89b';
+    r'fde1545679e66caa4dfeca682368be0b4a9a70bf';
 
 /// The settings writer of the signed-in instance, or null before the login.
 
