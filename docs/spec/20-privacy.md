@@ -55,6 +55,7 @@ personal data, also of third parties and also special categories under Art. 9),
 | `commands`, `channel_skill_bindings`, `project_bindings`, `forum_tags` | no | configuration | `config` / `content` | on change |
 | `spaces` | indirect | name, created by | `content` | archiving; contents after `retention.content` |
 | `user_space_states` | indirect | personal sidebar | `personal_sync` | with the account |
+| `user_channel_states` | indirect | personal sidebar (post order of a forum) | `personal_sync` | with the account |
 | `channels` | content | name, topic, channel prompt | `content` | archiving; after `retention.content` |
 | `dm_participants` | indirect | who writes with whom | `content` | with the DM channel |
 | `threads` | content | title, times, created by | `content` | `retention.content` |

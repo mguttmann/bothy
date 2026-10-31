@@ -45,6 +45,13 @@ erDiagram
     uuid user_id PK, FK
     uuid space_id PK, FK
     boolean collapsed
+    uuid[] channel_order "personal channel order"
+    uuid updated_by_device_id FK
+  }
+  user_channel_states {
+    uuid user_id PK, FK
+    uuid channel_id PK, FK
+    uuid[] thread_order "personal post order"
     uuid updated_by_device_id FK
   }
   channels {
@@ -126,6 +133,9 @@ erDiagram
   users ||--o{ user_space_states : "has"
   spaces ||--o{ user_space_states : "state"
   devices |o--o{ user_space_states : "last by"
+  users ||--o{ user_channel_states : "has"
+  channels ||--o{ user_channel_states : "state"
+  devices |o--o{ user_channel_states : "last by"
   spaces |o--o{ channels : "contains"
   agents |o--o{ channels : "operates"
   channels ||--o{ channel_skill_bindings : "loads"

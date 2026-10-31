@@ -478,6 +478,10 @@ import 'package:api_client/src/generated/model/session_revoked_event.dart';
 import 'package:api_client/src/generated/model/session_revoked_payload.dart';
 import 'package:api_client/src/generated/model/settings_payload.dart';
 import 'package:api_client/src/generated/model/settings_updated_event.dart';
+import 'package:api_client/src/generated/model/sidebar_channel_payload.dart';
+import 'package:api_client/src/generated/model/sidebar_channel_put.dart';
+import 'package:api_client/src/generated/model/sidebar_channel_state.dart';
+import 'package:api_client/src/generated/model/sidebar_channel_updated_event.dart';
 import 'package:api_client/src/generated/model/sidebar_payload.dart';
 import 'package:api_client/src/generated/model/sidebar_state.dart';
 import 'package:api_client/src/generated/model/sidebar_state_list.dart';
@@ -1088,6 +1092,10 @@ part 'serializers.g.dart';
   SessionRevokedPayload,
   SettingsPayload,
   SettingsUpdatedEvent,
+  SidebarChannelPayload,
+  SidebarChannelPut,
+  SidebarChannelState,
+  SidebarChannelUpdatedEvent,
   SidebarPayload,
   SidebarState,
   SidebarStateList,
@@ -1462,6 +1470,10 @@ Serializers serializers =
           ..addBuilderFactory(
             const FullType(BuiltList, [FullType(Group)]),
             () => ListBuilder<Group>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(SidebarChannelState)]),
+            () => ListBuilder<SidebarChannelState>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, [FullType(GroupMember)]),

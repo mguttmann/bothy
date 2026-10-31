@@ -184,7 +184,8 @@ func (s *SnapshotService) Build(ctx context.Context) (sync.SnapshotView, error) 
 func emptyView() sync.SnapshotView {
 	return sync.SnapshotView{
 		Spaces: []sync.SnapshotSpace{}, Channels: []sync.SnapshotChannel{}, Sidebar: []sync.SidebarState{},
-		UnreadThreads: []sync.UnreadThread{}, ActiveRuns: []sync.RunSummary{}, ActiveThreads: []sync.SnapshotThread{},
+		SidebarChannels: []sync.SidebarChannelState{},
+		UnreadThreads:   []sync.UnreadThread{}, ActiveRuns: []sync.RunSummary{}, ActiveThreads: []sync.SnapshotThread{},
 		Agents:   []sync.AgentPresence{},
 		Settings: []sync.UserSetting{}, Drafts: []sync.DraftRef{}, Features: []sync.EvaluatedFlag{},
 	}
@@ -233,13 +234,19 @@ func (s *SnapshotService) structure(ctx context.Context, a actor.Actor, v *sync.
 	return nil
 }
 
-// personal fills the parts of a person: sidebar, settings, drafts and unread threads.
+// personal fills the parts of a person: sidebar (spaces and channels), settings, drafts and unread
+// threads.
 func (s *SnapshotService) personal(ctx context.Context, a actor.Actor, channels []ids.ID, v *sync.SnapshotView) error {
 	sidebar, err := s.d.Settings.ListSidebar(ctx)
 	if err != nil {
 		return err
 	}
 	v.Sidebar = append(v.Sidebar, sidebar...)
+	sidebarChannels, err := s.d.Settings.ListSidebarChannels(ctx)
+	if err != nil {
+		return err
+	}
+	v.SidebarChannels = append(v.SidebarChannels, sidebarChannels...)
 	settings, err := s.d.Settings.List(ctx)
 	if err != nil {
 		return err

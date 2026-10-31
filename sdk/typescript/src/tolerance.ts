@@ -77,6 +77,7 @@ export const KNOWN_EVENT_TYPES = [
   "draft.deleted",
   "settings.updated",
   "sidebar.updated",
+  "sidebar_channel.updated",
   "notification_pref.updated",
   "quiet_hours.updated",
   "gdpr.request_updated",

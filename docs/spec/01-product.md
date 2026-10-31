@@ -2084,6 +2084,9 @@ unknown keys and values outside the list.
 | `privacy.crash_reports` | `true`, `false` | `true` if the instance has set up a crash service | Send crash reports |
 | `privacy.client_metrics` | `true`, `false` | `true` | Send performance data without content |
 | `layout.column_widths` | Object: names `^[a-z][a-z0-9_]*$` (column, for example `sidebar`, `post_list`, `main_history`, `session`), values non-negative integers in logical pixels | empty | Column widths on desktop; the client interprets the names |
+| `sidebar.auto_arrange_spaces` | `true`, `false` | `false` | Spaces in the sidebar arranged by last activity instead of the personal order (6.15) |
+| `sidebar.auto_arrange_channels` | `true`, `false` | `false` | Channels and forums of a space arranged by last activity (6.15) |
+| `sidebar.auto_arrange_chats` | `true`, `false` | `true` | Open posts of a forum arranged by last activity (6.15) |
 
 ## 12. Branding per instance
 

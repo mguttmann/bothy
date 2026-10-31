@@ -295,7 +295,7 @@ the problem code from [06-api.md](06-api.md) (for example `rate_limited`, `forbi
     replay.
 4. **`ready`.** The server answers with `{gateway_session_id, principal, device_id,
    permission_version, head_seq, sync_epoch, snapshot}`. `snapshot` contains: visible spaces and channels
-   with versions, sidebar state, unread and mention counters, active runs
+   with versions, sidebar state of spaces and channels, unread and mention counters, active runs
    (summary), the active threads, presence of the visible agents, versions of settings and drafts,
    the feature flags evaluated for the principal.
    Active threads (`active_threads`, addendum of 2026-10-27, R-SY-28) are, per visible channel,
@@ -561,8 +561,9 @@ thus without effect before its expiry.
     - `reaction.*` and `pin.*`: they do not increase `messages.version` (otherwise the author would
       get `412` when editing after every reaction); their payload carries absolute values (count per
       emoji, pinned yes or no).
-    - `read_state.updated` (resource `thread`) and `sidebar.updated` (resource `space`): their
-      payload carries the version of the personal sub-object; the client compares that one.
+    - `read_state.updated` (resource `thread`), `sidebar.updated` (resource `space`) and
+      `sidebar_channel.updated` (resource `channel`, M4-51): their payload carries the version of
+      the personal sub-object; the client compares that one.
     - `channel.settings_changed` and `agent.config_changed` (resource `channel`, payload with
       `settings_version`), `thread.moved_out` (the source channel does not change),
       `agent_session.changed` (resource `thread`), `agent.invocation`, `agent.followup` and
@@ -742,7 +743,8 @@ the commit order in the server, expressed by the version.
 | Read state | `read_state.updated` | monotonic: `last_read_seq = GREATEST(old, new)`. Resetting ("mark as unread") is a separate operation with `If-Match`. Imported content never counts as unread, through `threads.unread_floor_seq` (section 15.8). The server does not store unread and mention counters (03 `read_states`): the snapshot, `listMyReadStates` and `read_state.updated` give the computed value; in between, the client counts by itself from `message.created`, `message.updated` and `message.deleted` (`mention_ids`). A new mention writes no personal event. The server does not advance the read state of the author on sending; the author's client does that through REST like any other change of personal data. |
 | Drafts | `draft.updated`, `draft.deleted` | the last write wins in server order; every write increments `version`. The client sends `base_version`; the server answers with `overwrote_newer: true`, and the client shows a notice, only when the write replaced a stored draft that another device saved with different text or files and whose version the client had not seen (`base_version` absent or older); a write over this device's own last write (its `updated_by_device_id`), over the same text and files, and an empty draft never report it (addendum of 2026-10-29, R-SY-12). A device takes over incoming changes from another device only when the person is not currently typing in this draft on it; otherwise the next local write wins. Successful sending with `clear_draft: true` deletes the draft in the same transaction. An empty draft (no text except whitespace, no files) is deleted; a `PUT` with an empty draft answers `200` with the empty final state. On saving, the server checks `file_ids` only in form and number (`message.max_attachments`); ownership and state are checked on sending ([12-files.md](12-files.md), section 10). |
 | Settings | `settings.updated` | per key, the last write wins; changes to different keys do not interfere with each other. The server does not store default values, because some depend on the device or the instance; the client applies the defaults from 01 and 13. Deleting a key writes `settings.updated` with `deleted: true`. |
-| Sidebar | `sidebar.updated` | per space (`user_space_states`), the last write wins; the client writes and shows only the personal order (`sort_key`) from it and sends `collapsed` unchanged, because whether a space is collapsed is kept on each device (addendum of 2026-10-29, R-SY-29, 01 6.7) |
+| Sidebar | `sidebar.updated` | per space (`user_space_states`), the last write wins; the client writes and shows only the personal order (`sort_key`) and the personal channel order (`channel_order`, M4-51; absent in a write keeps it, an empty list returns to the default order) from it and sends `collapsed` unchanged, because whether a space is collapsed is kept on each device (addendum of 2026-10-29, R-SY-29, 01 6.7) |
+| Sidebar channel | `sidebar_channel.updated` | per channel (`user_channel_states`, M4-51), the last write wins: the personal order of the posts of a forum (`thread_order`, empty = the default order), written whole with `putMySidebarChannel`; the snapshot member `sidebar_channels` and `getMySidebar` (`channels`) carry the rows of the channels the person may read |
 | Notification, quiet hours | `notification_pref.updated`, `quiet_hours.updated` | per row, the last write wins |
 
 A device recognizes its own echo by `updated_by_device_id` and ignores it.

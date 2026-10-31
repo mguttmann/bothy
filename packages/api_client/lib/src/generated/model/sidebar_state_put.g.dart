@@ -13,6 +13,8 @@ class _$SidebarStatePut extends SidebarStatePut {
   final String? sortKey;
   @override
   final bool? useGlobalOrder;
+  @override
+  final BuiltList<String>? channelOrder;
 
   factory _$SidebarStatePut([void Function(SidebarStatePutBuilder)? updates]) =>
       (SidebarStatePutBuilder()..update(updates))._build();
@@ -21,6 +23,7 @@ class _$SidebarStatePut extends SidebarStatePut {
     required this.collapsed,
     this.sortKey,
     this.useGlobalOrder,
+    this.channelOrder,
   }) : super._();
   @override
   SidebarStatePut rebuild(void Function(SidebarStatePutBuilder) updates) =>
@@ -35,7 +38,8 @@ class _$SidebarStatePut extends SidebarStatePut {
     return other is SidebarStatePut &&
         collapsed == other.collapsed &&
         sortKey == other.sortKey &&
-        useGlobalOrder == other.useGlobalOrder;
+        useGlobalOrder == other.useGlobalOrder &&
+        channelOrder == other.channelOrder;
   }
 
   @override
@@ -44,6 +48,7 @@ class _$SidebarStatePut extends SidebarStatePut {
     _$hash = $jc(_$hash, collapsed.hashCode);
     _$hash = $jc(_$hash, sortKey.hashCode);
     _$hash = $jc(_$hash, useGlobalOrder.hashCode);
+    _$hash = $jc(_$hash, channelOrder.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -53,7 +58,8 @@ class _$SidebarStatePut extends SidebarStatePut {
     return (newBuiltValueToStringHelper(r'SidebarStatePut')
           ..add('collapsed', collapsed)
           ..add('sortKey', sortKey)
-          ..add('useGlobalOrder', useGlobalOrder))
+          ..add('useGlobalOrder', useGlobalOrder)
+          ..add('channelOrder', channelOrder))
         .toString();
   }
 }
@@ -75,6 +81,12 @@ class SidebarStatePutBuilder
   set useGlobalOrder(bool? useGlobalOrder) =>
       _$this._useGlobalOrder = useGlobalOrder;
 
+  ListBuilder<String>? _channelOrder;
+  ListBuilder<String> get channelOrder =>
+      _$this._channelOrder ??= ListBuilder<String>();
+  set channelOrder(ListBuilder<String>? channelOrder) =>
+      _$this._channelOrder = channelOrder;
+
   SidebarStatePutBuilder() {
     SidebarStatePut._defaults(this);
   }
@@ -85,6 +97,7 @@ class SidebarStatePutBuilder
       _collapsed = $v.collapsed;
       _sortKey = $v.sortKey;
       _useGlobalOrder = $v.useGlobalOrder;
+      _channelOrder = $v.channelOrder?.toBuilder();
       _$v = null;
     }
     return this;
@@ -104,17 +117,34 @@ class SidebarStatePutBuilder
   SidebarStatePut build() => _build();
 
   _$SidebarStatePut _build() {
-    final _$result =
-        _$v ??
-        _$SidebarStatePut._(
-          collapsed: BuiltValueNullFieldError.checkNotNull(
-            collapsed,
-            r'SidebarStatePut',
-            'collapsed',
-          ),
-          sortKey: sortKey,
-          useGlobalOrder: useGlobalOrder,
+    _$SidebarStatePut _$result;
+    try {
+      _$result =
+          _$v ??
+          _$SidebarStatePut._(
+            collapsed: BuiltValueNullFieldError.checkNotNull(
+              collapsed,
+              r'SidebarStatePut',
+              'collapsed',
+            ),
+            sortKey: sortKey,
+            useGlobalOrder: useGlobalOrder,
+            channelOrder: _channelOrder?.build(),
+          );
+    } catch (_) {
+      late String _$failedField;
+      try {
+        _$failedField = 'channelOrder';
+        _channelOrder?.build();
+      } catch (e) {
+        throw BuiltValueNestedFieldError(
+          r'SidebarStatePut',
+          _$failedField,
+          e.toString(),
         );
+      }
+      rethrow;
+    }
     replace(_$result);
     return _$result;
   }

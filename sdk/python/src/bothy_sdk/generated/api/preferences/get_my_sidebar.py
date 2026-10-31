@@ -64,6 +64,10 @@ def sync_detailed(
 ) -> Response[Problem | SidebarStateList]:
     """Read own sidebar state
 
+     The caller's rows of the spaces they may read that are not archived (`items`) and of the channels
+    they may read that are not archived and lie in a space that is not archived (`channels`, the
+    personal post order).
+
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
@@ -87,6 +91,10 @@ def sync(
 ) -> Problem | SidebarStateList | None:
     """Read own sidebar state
 
+     The caller's rows of the spaces they may read that are not archived (`items`) and of the channels
+    they may read that are not archived and lie in a space that is not archived (`channels`, the
+    personal post order).
+
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
@@ -105,6 +113,10 @@ async def asyncio_detailed(
     client: AuthenticatedClient | Client,
 ) -> Response[Problem | SidebarStateList]:
     """Read own sidebar state
+
+     The caller's rows of the spaces they may read that are not archived (`items`) and of the channels
+    they may read that are not archived and lie in a space that is not archived (`channels`, the
+    personal post order).
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -126,6 +138,10 @@ async def asyncio(
     client: AuthenticatedClient | Client,
 ) -> Problem | SidebarStateList | None:
     """Read own sidebar state
+
+     The caller's rows of the spaces they may read that are not archived (`items`) and of the channels
+    they may read that are not archived and lie in a space that is not archived (`channels`, the
+    personal post order).
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

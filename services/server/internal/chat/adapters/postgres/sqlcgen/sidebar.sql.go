@@ -11,8 +11,60 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const listSidebarChannelStates = `-- name: ListSidebarChannelStates :many
+SELECT st.user_id, st.channel_id, st.thread_order, st.version, st.updated_by_device_id, st.updated_at FROM user_channel_states st
+JOIN channels c ON c.id = st.channel_id
+LEFT JOIN spaces sp ON sp.id = c.space_id
+WHERE st.user_id = $1 AND c.archived_at IS NULL AND sp.archived_at IS NULL
+  AND ($2::boolean OR st.channel_id = ANY ($3::uuid[]) OR c.space_id = ANY ($4::uuid[]))
+ORDER BY st.channel_id
+`
+
+type ListSidebarChannelStatesParams struct {
+	UserID       pgtype.UUID
+	AllChannels  bool
+	Visible      []pgtype.UUID
+	FullyVisible []pgtype.UUID
+}
+
+// The channel rows of one person (M4-51) for the channels that are not archived and whose space
+// is not archived, with the predicate of 07 section 7.4 rule 1: every channel for an
+// instance-wide reader or a fully visible space, else the visible channels of Scope; authorize
+// then checks each row.
+func (q *Queries) ListSidebarChannelStates(ctx context.Context, arg ListSidebarChannelStatesParams) ([]UserChannelState, error) {
+	rows, err := q.db.Query(ctx, listSidebarChannelStates,
+		arg.UserID,
+		arg.AllChannels,
+		arg.Visible,
+		arg.FullyVisible,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []UserChannelState
+	for rows.Next() {
+		var i UserChannelState
+		if err := rows.Scan(
+			&i.UserID,
+			&i.ChannelID,
+			&i.ThreadOrder,
+			&i.Version,
+			&i.UpdatedByDeviceID,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listSidebarStates = `-- name: ListSidebarStates :many
-SELECT st.user_id, st.space_id, st.collapsed, st.sort_key, st.version, st.updated_by_device_id, st.updated_at FROM user_space_states st
+SELECT st.user_id, st.space_id, st.collapsed, st.sort_key, st.version, st.updated_by_device_id, st.updated_at, st.channel_order FROM user_space_states st
 JOIN spaces sp ON sp.id = st.space_id
 WHERE st.user_id = $1 AND sp.archived_at IS NULL
   AND ($2::boolean OR st.space_id = ANY ($3::uuid[]))
@@ -45,6 +97,7 @@ func (q *Queries) ListSidebarStates(ctx context.Context, arg ListSidebarStatesPa
 			&i.Version,
 			&i.UpdatedByDeviceID,
 			&i.UpdatedAt,
+			&i.ChannelOrder,
 		); err != nil {
 			return nil, err
 		}
@@ -56,17 +109,57 @@ func (q *Queries) ListSidebarStates(ctx context.Context, arg ListSidebarStatesPa
 	return items, nil
 }
 
+const upsertSidebarChannelState = `-- name: UpsertSidebarChannelState :one
+INSERT INTO user_channel_states (user_id, channel_id, thread_order, updated_by_device_id)
+VALUES ($1, $2, $3::uuid[], $4)
+ON CONFLICT (user_id, channel_id) DO UPDATE
+SET thread_order = EXCLUDED.thread_order,
+    version = user_channel_states.version + 1,
+    updated_by_device_id = EXCLUDED.updated_by_device_id,
+    updated_at = now()
+RETURNING user_id, channel_id, thread_order, version, updated_by_device_id, updated_at
+`
+
+type UpsertSidebarChannelStateParams struct {
+	UserID            pgtype.UUID
+	ChannelID         pgtype.UUID
+	ThreadOrder       []pgtype.UUID
+	UpdatedByDeviceID pgtype.UUID
+}
+
+// Last write wins per channel (M4-51): the personal post order of the person for the channel,
+// version + 1, the device of the write.
+func (q *Queries) UpsertSidebarChannelState(ctx context.Context, arg UpsertSidebarChannelStateParams) (UserChannelState, error) {
+	row := q.db.QueryRow(ctx, upsertSidebarChannelState,
+		arg.UserID,
+		arg.ChannelID,
+		arg.ThreadOrder,
+		arg.UpdatedByDeviceID,
+	)
+	var i UserChannelState
+	err := row.Scan(
+		&i.UserID,
+		&i.ChannelID,
+		&i.ThreadOrder,
+		&i.Version,
+		&i.UpdatedByDeviceID,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const upsertSidebarState = `-- name: UpsertSidebarState :one
 
-INSERT INTO user_space_states (user_id, space_id, collapsed, sort_key, updated_by_device_id)
-VALUES ($1, $2, $3, $4, $5)
+INSERT INTO user_space_states (user_id, space_id, collapsed, sort_key, channel_order, updated_by_device_id)
+VALUES ($1, $2, $3, $4, $5::uuid[], $6)
 ON CONFLICT (user_id, space_id) DO UPDATE
 SET collapsed = EXCLUDED.collapsed,
-    sort_key = CASE WHEN $6::boolean THEN user_space_states.sort_key ELSE EXCLUDED.sort_key END,
+    sort_key = CASE WHEN $7::boolean THEN user_space_states.sort_key ELSE EXCLUDED.sort_key END,
+    channel_order = CASE WHEN $8::boolean THEN user_space_states.channel_order ELSE EXCLUDED.channel_order END,
     version = user_space_states.version + 1,
     updated_by_device_id = EXCLUDED.updated_by_device_id,
     updated_at = now()
-RETURNING user_id, space_id, collapsed, sort_key, version, updated_by_device_id, updated_at
+RETURNING user_id, space_id, collapsed, sort_key, version, updated_by_device_id, updated_at, channel_order
 `
 
 type UpsertSidebarStateParams struct {
@@ -74,23 +167,29 @@ type UpsertSidebarStateParams struct {
 	SpaceID           pgtype.UUID
 	Collapsed         bool
 	SortKey           pgtype.Text
+	ChannelOrder      []pgtype.UUID
 	UpdatedByDeviceID pgtype.UUID
 	KeepKey           bool
+	KeepOrder         bool
 }
 
 // SPDX-License-Identifier: Apache-2.0
-// Queries on user_space_states (chat module, M1-52; docs/spec/03-data-model.md section 4.5,
-// 04 section 14). Only this module reads and writes the table (03 Grundsatz 12).
+// Queries on user_space_states (chat module, M1-52) and user_channel_states (M4-51;
+// docs/spec/03-data-model.md section 4.5, 04 section 14). Only this module reads and writes the
+// tables (03 Grundsatz 12).
 // Last write wins per space: the row of the person for the space, version + 1, the device of the
-// write; keep_key keeps the stored personal key.
+// write; keep_key keeps the stored personal key and keep_order the stored channel order (M4-51);
+// a NULL channel_order is the default order.
 func (q *Queries) UpsertSidebarState(ctx context.Context, arg UpsertSidebarStateParams) (UserSpaceState, error) {
 	row := q.db.QueryRow(ctx, upsertSidebarState,
 		arg.UserID,
 		arg.SpaceID,
 		arg.Collapsed,
 		arg.SortKey,
+		arg.ChannelOrder,
 		arg.UpdatedByDeviceID,
 		arg.KeepKey,
+		arg.KeepOrder,
 	)
 	var i UserSpaceState
 	err := row.Scan(
@@ -101,6 +200,7 @@ func (q *Queries) UpsertSidebarState(ctx context.Context, arg UpsertSidebarState
 		&i.Version,
 		&i.UpdatedByDeviceID,
 		&i.UpdatedAt,
+		&i.ChannelOrder,
 	)
 	return i, err
 }

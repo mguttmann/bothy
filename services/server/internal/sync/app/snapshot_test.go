@@ -61,7 +61,7 @@ func TestSnapshot_UseCase(t *testing.T) {
 	}
 
 	ag, err := w.Sync.Snapshot.Build(actor.WithActor(context.Background(), w.Actor("helper")))
-	if err != nil || len(ag.Sidebar)+len(ag.UnreadThreads)+len(ag.Settings)+len(ag.Drafts) != 0 || ag.Principal.Kind != "agent" {
+	if err != nil || len(ag.Sidebar)+len(ag.SidebarChannels)+len(ag.UnreadThreads)+len(ag.Settings)+len(ag.Drafts) != 0 || ag.Principal.Kind != "agent" {
 		t.Fatalf("agent snapshot %+v %v", ag, err)
 	}
 	if _, err := w.Sync.Snapshot.Build(context.Background()); errs.KindOf(err) != errs.KindUnauthenticated {

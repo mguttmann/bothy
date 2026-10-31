@@ -602,6 +602,11 @@ Serializers _$serializers =
           ..add(SettingsPayload.serializer)
           ..add(SettingsUpdatedEvent.serializer)
           ..add(SettingsUpdatedEventTypeEnum.serializer)
+          ..add(SidebarChannelPayload.serializer)
+          ..add(SidebarChannelPut.serializer)
+          ..add(SidebarChannelState.serializer)
+          ..add(SidebarChannelUpdatedEvent.serializer)
+          ..add(SidebarChannelUpdatedEventTypeEnum.serializer)
           ..add(SidebarPayload.serializer)
           ..add(SidebarState.serializer)
           ..add(SidebarStateList.serializer)
@@ -1407,6 +1412,12 @@ Serializers _$serializers =
             () => ListBuilder<SidebarState>(),
           )
           ..addBuilderFactory(
+            const FullType(BuiltList, const [
+              const FullType(SidebarChannelState),
+            ]),
+            () => ListBuilder<SidebarChannelState>(),
+          )
+          ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(SpaceView)]),
             () => ListBuilder<SpaceView>(),
           )
@@ -1429,6 +1440,12 @@ Serializers _$serializers =
           ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(SidebarState)]),
             () => ListBuilder<SidebarState>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [
+              const FullType(SidebarChannelState),
+            ]),
+            () => ListBuilder<SidebarChannelState>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(UnreadThread)]),
@@ -1505,6 +1522,22 @@ Serializers _$serializers =
           ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(StatusIncident)]),
             () => ListBuilder<StatusIncident>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(String)]),
+            () => ListBuilder<String>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(String)]),
+            () => ListBuilder<String>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(String)]),
+            () => ListBuilder<String>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(String)]),
+            () => ListBuilder<String>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(String)]),

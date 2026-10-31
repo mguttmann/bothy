@@ -47,6 +47,7 @@ if TYPE_CHECKING:
     from ..models.run_state_changed_event import RunStateChangedEvent
     from ..models.session_revoked_event import SessionRevokedEvent
     from ..models.settings_updated_event import SettingsUpdatedEvent
+    from ..models.sidebar_channel_updated_event import SidebarChannelUpdatedEvent
     from ..models.sidebar_updated_event import SidebarUpdatedEvent
     from ..models.space_archived_event import SpaceArchivedEvent
     from ..models.space_created_event import SpaceCreatedEvent
@@ -77,9 +78,10 @@ class EventPage:
             InstanceUpdatedEvent | InteractionCreatedEvent | MessageCreatedEvent | MessageDeletedEvent | MessageUpdatedEvent
             | NotificationPrefUpdatedEvent | PinAddedEvent | PinRemovedEvent | QuietHoursUpdatedEvent | ReactionAddedEvent |
             ReactionRemovedEvent | ReadStateUpdatedEvent | RunCancelRequestedEvent | RunStateChangedEvent |
-            SessionRevokedEvent | SettingsUpdatedEvent | SidebarUpdatedEvent | SpaceArchivedEvent | SpaceCreatedEvent |
-            SpaceUpdatedEvent | StatusUpdatedEvent | TerminalSessionChangedEvent | ThreadClosedEvent | ThreadCreatedEvent |
-            ThreadMovedEvent | ThreadMovedOutEvent | ThreadReopenedEvent | ThreadUpdatedEvent | UserUpdatedEvent]):
+            SessionRevokedEvent | SettingsUpdatedEvent | SidebarChannelUpdatedEvent | SidebarUpdatedEvent |
+            SpaceArchivedEvent | SpaceCreatedEvent | SpaceUpdatedEvent | StatusUpdatedEvent | TerminalSessionChangedEvent |
+            ThreadClosedEvent | ThreadCreatedEvent | ThreadMovedEvent | ThreadMovedOutEvent | ThreadReopenedEvent |
+            ThreadUpdatedEvent | UserUpdatedEvent]):
         next_cursor (int): Highest checked `seq`; use as `after` for the next call even if `events` is empty.
         head_seq (int):
         sync_epoch (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -125,6 +127,7 @@ class EventPage:
         | RunStateChangedEvent
         | SessionRevokedEvent
         | SettingsUpdatedEvent
+        | SidebarChannelUpdatedEvent
         | SidebarUpdatedEvent
         | SpaceArchivedEvent
         | SpaceCreatedEvent
@@ -186,6 +189,7 @@ class EventPage:
         from ..models.run_state_changed_event import RunStateChangedEvent
         from ..models.session_revoked_event import SessionRevokedEvent
         from ..models.settings_updated_event import SettingsUpdatedEvent
+        from ..models.sidebar_channel_updated_event import SidebarChannelUpdatedEvent
         from ..models.sidebar_updated_event import SidebarUpdatedEvent
         from ..models.space_archived_event import SpaceArchivedEvent
         from ..models.space_created_event import SpaceCreatedEvent
@@ -242,6 +246,7 @@ class EventPage:
                 or isinstance(events_item_data, DraftDeletedEvent)
                 or isinstance(events_item_data, SettingsUpdatedEvent)
                 or isinstance(events_item_data, SidebarUpdatedEvent)
+                or isinstance(events_item_data, SidebarChannelUpdatedEvent)
                 or isinstance(events_item_data, NotificationPrefUpdatedEvent)
                 or isinstance(events_item_data, QuietHoursUpdatedEvent)
                 or isinstance(events_item_data, GdprRequestUpdatedEvent)
@@ -323,6 +328,7 @@ class EventPage:
         from ..models.run_state_changed_event import RunStateChangedEvent
         from ..models.session_revoked_event import SessionRevokedEvent
         from ..models.settings_updated_event import SettingsUpdatedEvent
+        from ..models.sidebar_channel_updated_event import SidebarChannelUpdatedEvent
         from ..models.sidebar_updated_event import SidebarUpdatedEvent
         from ..models.space_archived_event import SpaceArchivedEvent
         from ..models.space_created_event import SpaceCreatedEvent
@@ -384,6 +390,7 @@ class EventPage:
                 | RunStateChangedEvent
                 | SessionRevokedEvent
                 | SettingsUpdatedEvent
+                | SidebarChannelUpdatedEvent
                 | SidebarUpdatedEvent
                 | SpaceArchivedEvent
                 | SpaceCreatedEvent
@@ -746,7 +753,7 @@ class EventPage:
                     if not isinstance(data, dict):
                         raise TypeError()
                     componentsschemas_event_type_39 = (
-                        NotificationPrefUpdatedEvent.from_dict(data)
+                        SidebarChannelUpdatedEvent.from_dict(data)
                     )
 
                     return componentsschemas_event_type_39
@@ -755,8 +762,8 @@ class EventPage:
                 try:
                     if not isinstance(data, dict):
                         raise TypeError()
-                    componentsschemas_event_type_40 = QuietHoursUpdatedEvent.from_dict(
-                        data
+                    componentsschemas_event_type_40 = (
+                        NotificationPrefUpdatedEvent.from_dict(data)
                     )
 
                     return componentsschemas_event_type_40
@@ -765,7 +772,7 @@ class EventPage:
                 try:
                     if not isinstance(data, dict):
                         raise TypeError()
-                    componentsschemas_event_type_41 = GdprRequestUpdatedEvent.from_dict(
+                    componentsschemas_event_type_41 = QuietHoursUpdatedEvent.from_dict(
                         data
                     )
 
@@ -775,7 +782,7 @@ class EventPage:
                 try:
                     if not isinstance(data, dict):
                         raise TypeError()
-                    componentsschemas_event_type_42 = GdprRequestDueEvent.from_dict(
+                    componentsschemas_event_type_42 = GdprRequestUpdatedEvent.from_dict(
                         data
                     )
 
@@ -785,7 +792,7 @@ class EventPage:
                 try:
                     if not isinstance(data, dict):
                         raise TypeError()
-                    componentsschemas_event_type_43 = ImportProgressEvent.from_dict(
+                    componentsschemas_event_type_43 = GdprRequestDueEvent.from_dict(
                         data
                     )
 
@@ -795,7 +802,7 @@ class EventPage:
                 try:
                     if not isinstance(data, dict):
                         raise TypeError()
-                    componentsschemas_event_type_44 = AgentInvocationEvent.from_dict(
+                    componentsschemas_event_type_44 = ImportProgressEvent.from_dict(
                         data
                     )
 
@@ -805,7 +812,9 @@ class EventPage:
                 try:
                     if not isinstance(data, dict):
                         raise TypeError()
-                    componentsschemas_event_type_45 = AgentFollowupEvent.from_dict(data)
+                    componentsschemas_event_type_45 = AgentInvocationEvent.from_dict(
+                        data
+                    )
 
                     return componentsschemas_event_type_45
                 except (TypeError, ValueError, AttributeError, KeyError):
@@ -813,9 +822,7 @@ class EventPage:
                 try:
                     if not isinstance(data, dict):
                         raise TypeError()
-                    componentsschemas_event_type_46 = RunCancelRequestedEvent.from_dict(
-                        data
-                    )
+                    componentsschemas_event_type_46 = AgentFollowupEvent.from_dict(data)
 
                     return componentsschemas_event_type_46
                 except (TypeError, ValueError, AttributeError, KeyError):
@@ -823,7 +830,7 @@ class EventPage:
                 try:
                     if not isinstance(data, dict):
                         raise TypeError()
-                    componentsschemas_event_type_47 = InteractionCreatedEvent.from_dict(
+                    componentsschemas_event_type_47 = RunCancelRequestedEvent.from_dict(
                         data
                     )
 
@@ -833,7 +840,7 @@ class EventPage:
                 try:
                     if not isinstance(data, dict):
                         raise TypeError()
-                    componentsschemas_event_type_48 = CommandInvokedEvent.from_dict(
+                    componentsschemas_event_type_48 = InteractionCreatedEvent.from_dict(
                         data
                     )
 
@@ -843,7 +850,7 @@ class EventPage:
                 try:
                     if not isinstance(data, dict):
                         raise TypeError()
-                    componentsschemas_event_type_49 = AgentConfigChangedEvent.from_dict(
+                    componentsschemas_event_type_49 = CommandInvokedEvent.from_dict(
                         data
                     )
 
@@ -853,18 +860,28 @@ class EventPage:
                 try:
                     if not isinstance(data, dict):
                         raise TypeError()
-                    componentsschemas_event_type_50 = HostUpdatedEvent.from_dict(data)
+                    componentsschemas_event_type_50 = AgentConfigChangedEvent.from_dict(
+                        data
+                    )
 
                     return componentsschemas_event_type_50
                 except (TypeError, ValueError, AttributeError, KeyError):
                     pass
+                try:
+                    if not isinstance(data, dict):
+                        raise TypeError()
+                    componentsschemas_event_type_51 = HostUpdatedEvent.from_dict(data)
+
+                    return componentsschemas_event_type_51
+                except (TypeError, ValueError, AttributeError, KeyError):
+                    pass
                 if not isinstance(data, dict):
                     raise TypeError()
-                componentsschemas_event_type_51 = TerminalSessionChangedEvent.from_dict(
+                componentsschemas_event_type_52 = TerminalSessionChangedEvent.from_dict(
                     data
                 )
 
-                return componentsschemas_event_type_51
+                return componentsschemas_event_type_52
 
             events_item = _parse_events_item(events_item_data)
 

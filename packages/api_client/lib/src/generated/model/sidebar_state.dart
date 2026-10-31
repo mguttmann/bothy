@@ -3,6 +3,7 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:built_collection/built_collection.dart';
 import 'package:built_value/built_value.dart';
 import 'package:built_value/serializer.dart';
 
@@ -14,6 +15,7 @@ part 'sidebar_state.g.dart';
 /// * [spaceId] - UUIDv7 (RFC 9562), lowercase canonical form.
 /// * [collapsed]
 /// * [sortKey] - Personal order; absent uses the global order.
+/// * [channelOrder] - Personal order of the channels and forums of the space; absent uses the default order. At most `sidebar.order_max_items`.
 /// * [version]
 /// * [updatedByDeviceId] - UUIDv7 (RFC 9562), lowercase canonical form.
 @BuiltValue()
@@ -29,6 +31,10 @@ abstract class SidebarState
   /// Personal order; absent uses the global order.
   @BuiltValueField(wireName: r'sort_key')
   String? get sortKey;
+
+  /// Personal order of the channels and forums of the space; absent uses the default order. At most `sidebar.order_max_items`.
+  @BuiltValueField(wireName: r'channel_order')
+  BuiltList<String>? get channelOrder;
 
   @BuiltValueField(wireName: r'version')
   int get version;
@@ -75,6 +81,13 @@ class _$SidebarStateSerializer implements PrimitiveSerializer<SidebarState> {
       yield serializers.serialize(
         object.sortKey,
         specifiedType: const FullType(String),
+      );
+    }
+    if (object.channelOrder != null) {
+      yield r'channel_order';
+      yield serializers.serialize(
+        object.channelOrder,
+        specifiedType: const FullType(BuiltList, [FullType(String)]),
       );
     }
     yield r'version';
@@ -137,6 +150,16 @@ class _$SidebarStateSerializer implements PrimitiveSerializer<SidebarState> {
           ) as String?;
           if (valueDes == null) continue;
           result.sortKey = valueDes;
+          break;
+        case r'channel_order':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(BuiltList, [
+              FullType(String),
+            ]),
+          ) as BuiltList<String>?;
+          if (valueDes == null) continue;
+          result.channelOrder.replace(valueDes);
           break;
         case r'version':
           final valueDes = serializers.deserialize(

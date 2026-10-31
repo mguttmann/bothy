@@ -967,6 +967,8 @@ const (
 	EventSettingsUpdated EventType = "settings.updated"
 	// EventSidebarUpdated is the event type sidebar.updated.
 	EventSidebarUpdated EventType = "sidebar.updated"
+	// EventSidebarChannelUpdated is the event type sidebar_channel.updated.
+	EventSidebarChannelUpdated EventType = "sidebar_channel.updated"
 	// EventSpaceArchived is the event type space.archived.
 	EventSpaceArchived EventType = "space.archived"
 	// EventSpaceCreated is the event type space.created.
@@ -1044,6 +1046,7 @@ var eventTypeByID = map[string]EventType{
 	"session.revoked":                EventSessionRevoked,
 	"settings.updated":               EventSettingsUpdated,
 	"sidebar.updated":                EventSidebarUpdated,
+	"sidebar_channel.updated":        EventSidebarChannelUpdated,
 	"space.archived":                 EventSpaceArchived,
 	"space.created":                  EventSpaceCreated,
 	"space.updated":                  EventSpaceUpdated,
@@ -1107,6 +1110,7 @@ var eventTypeList = []EventType{
 	EventSessionRevoked,
 	EventSettingsUpdated,
 	EventSidebarUpdated,
+	EventSidebarChannelUpdated,
 	EventSpaceArchived,
 	EventSpaceCreated,
 	EventSpaceUpdated,

@@ -62,6 +62,7 @@ var chatConfig = chatapp.Config{
 	ThreadTitleMaxChars: titleMax, ThreadMaxTags: 2,
 	PlaceholderTitles: title.DefaultEntries(),
 	PageSizeDefault:   3, PageSizeMax: 4,
+	SidebarOrderMaxItems: 3,
 }
 
 // titleMax is thread.title_max_chars of the world, small enough to test the limit (M1-55).

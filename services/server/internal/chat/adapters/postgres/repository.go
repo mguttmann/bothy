@@ -2,7 +2,7 @@
 
 // Package postgres is the PostgreSQL adapter of the chat module (M1-52, M1-53, M1-55): the sqlc queries
 // in queries/, the generated code in sqlcgen/ and Repository, which implements app.Store over the
-// tables spaces, user_space_states, channels, forum_tags, threads and thread_tags
+// tables spaces, user_space_states, user_channel_states, channels, forum_tags, threads and thread_tags
 // (docs/spec/03-data-model.md section 4.5). Only this package
 // runs SQL on them (03 principle 12).
 //
@@ -182,14 +182,18 @@ func (r *Repository) ArchiveSpace(ctx context.Context, s domain.Space) error {
 }
 
 // PutSidebarState implements app.Store.
-func (r *Repository) PutSidebarState(ctx context.Context, st domain.SidebarState, keepKey bool) (domain.SidebarState, error) {
+func (r *Repository) PutSidebarState(ctx context.Context, st domain.SidebarState, keep app.SidebarKeep) (domain.SidebarState, error) {
 	q, err := r.write(ctx)
 	if err != nil {
 		return domain.SidebarState{}, err
 	}
+	var order []pgtype.UUID // nil is NULL, the default order (M4-51)
+	if len(st.ChannelOrder) > 0 {
+		order = uuids(st.ChannelOrder)
+	}
 	row, err := q.UpsertSidebarState(ctx, sqlcgen.UpsertSidebarStateParams{
 		UserID: uuid(st.UserID), SpaceID: uuid(st.SpaceID), Collapsed: st.Collapsed, SortKey: optionalText(st.SortKey),
-		UpdatedByDeviceID: optionalUUID(st.UpdatedByDeviceID), KeepKey: keepKey,
+		ChannelOrder: order, UpdatedByDeviceID: optionalUUID(st.UpdatedByDeviceID), KeepKey: keep.Key, KeepOrder: keep.ChannelOrder,
 	})
 	if err != nil {
 		return domain.SidebarState{}, mapError(err, "writing a sidebar state")
@@ -214,6 +218,37 @@ func (r *Repository) SidebarStates(ctx context.Context, user ids.ID, all bool, v
 	return out, nil
 }
 
+// PutSidebarChannelState implements app.Store (M4-51).
+func (r *Repository) PutSidebarChannelState(ctx context.Context, st domain.SidebarChannelState) (domain.SidebarChannelState, error) {
+	q, err := r.write(ctx)
+	if err != nil {
+		return domain.SidebarChannelState{}, err
+	}
+	row, err := q.UpsertSidebarChannelState(ctx, sqlcgen.UpsertSidebarChannelStateParams{
+		UserID: uuid(st.UserID), ChannelID: uuid(st.ChannelID), ThreadOrder: uuids(st.ThreadOrder),
+		UpdatedByDeviceID: optionalUUID(st.UpdatedByDeviceID),
+	})
+	if err != nil {
+		return domain.SidebarChannelState{}, mapError(err, "writing a sidebar channel state")
+	}
+	return toSidebarChannel(row), nil
+}
+
+// SidebarChannelStates implements app.Store (M4-51).
+func (r *Repository) SidebarChannelStates(ctx context.Context, user ids.ID, all bool, visible, fullyVisible []ids.ID) ([]domain.SidebarChannelState, error) {
+	rows, err := r.read(ctx).ListSidebarChannelStates(ctx, sqlcgen.ListSidebarChannelStatesParams{
+		UserID: uuid(user), AllChannels: all, Visible: uuids(visible), FullyVisible: uuids(fullyVisible),
+	})
+	if err != nil {
+		return nil, mapError(err, "reading the sidebar channel states")
+	}
+	out := make([]domain.SidebarChannelState, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, toSidebarChannel(row))
+	}
+	return out, nil
+}
+
 // one converts the result of a single-row query; no rows is found false.
 func one(row sqlcgen.Space, err error, what string) (domain.Space, bool, error) {
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -234,10 +269,22 @@ func toSpace(row sqlcgen.Space) domain.Space {
 	}
 }
 
-// toSidebar converts a row.
+// toSidebar converts a row; a NULL channel order (the default order) stays nil.
 func toSidebar(row sqlcgen.UserSpaceState) domain.SidebarState {
+	var order []ids.ID
+	if row.ChannelOrder != nil {
+		order = idsOf(row.ChannelOrder)
+	}
 	return domain.SidebarState{
 		UserID: idOf(row.UserID), SpaceID: idOf(row.SpaceID), Collapsed: row.Collapsed, SortKey: row.SortKey.String,
+		ChannelOrder: order, Version: row.Version, UpdatedByDeviceID: idOf(row.UpdatedByDeviceID),
+	}
+}
+
+// toSidebarChannel converts a row of user_channel_states (M4-51).
+func toSidebarChannel(row sqlcgen.UserChannelState) domain.SidebarChannelState {
+	return domain.SidebarChannelState{
+		UserID: idOf(row.UserID), ChannelID: idOf(row.ChannelID), ThreadOrder: idsOf(row.ThreadOrder),
 		Version: row.Version, UpdatedByDeviceID: idOf(row.UpdatedByDeviceID),
 	}
 }

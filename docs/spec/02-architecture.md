@@ -157,7 +157,7 @@ Diagram: [c4-3-server-components.svg](../architecture/c4-3-server-components.svg
 | `authz` | `authorize`, permission cache, visible targets, groups, grants, permission version, I1 check, "Who has access", "View as person" | `groups`, `group_memberships`, `grants` | 07 |
 | `billing` | price table, cost postings, totals per run, thread, space, agent, reconciliation | `price_table`, `cost_entries` | 10 |
 | `identity` | principals, people, owners, login drivers, identities, local credentials, enrollment codes, login flows, device pairing, passkeys, devices and device keys, sessions, refresh families, API tokens, step-up, access tokens | `principals`, `users`, `owners`, `identity_providers`, `user_identities`, `local_credentials`, `enrollment_codes`, `auth_login_flows`, `auth_challenges`, `device_pairings`, `passkey_credentials`, `devices`, `device_keys`, `auth_sessions`, `refresh_token_families`, `refresh_tokens`, `api_tokens` | 08 |
-| `chat` | spaces, sidebar state, channels with behavior, skills, project binding, DM participants, forum tags, threads with thread sequence | `spaces`, `user_space_states`, `channels`, `channel_skill_bindings`, `project_bindings`, `dm_participants`, `forum_tags`, `threads`, `thread_tags` | 01, 07, 09 |
+| `chat` | spaces, sidebar state, channels with behavior, skills, project binding, DM participants, forum tags, threads with thread sequence | `spaces`, `user_space_states`, `user_channel_states`, `channels`, `channel_skill_bindings`, `project_bindings`, `dm_participants`, `forum_tags`, `threads`, `thread_tags` | 01, 07, 09 |
 | `agents` | agents, backend policy and tool class (configured), reported state, consumer cursors with fencing, command register, agent sessions, dev environments (milestone) | `agents`, `agent_consumer_cursors`, `commands`, `agent_sessions`, `dev_environments` | 09, 10, 21 |
 | `files` | upload sessions in parts, object storage drivers, scan, metadata removal, thumbnails, attachments, transcripts, file text extracts | `files`, `file_upload_sessions`, `file_upload_parts`, `file_thumbnails`, `message_attachments`, `file_text_extracts` | 12, 14 |
 | `messaging` | messages, revisions, mentions, reactions, pins, templates, channel export | `messages`, `message_revisions`, `mentions`, `reactions`, `pins`, `message_templates` | 06, 14 |
@@ -347,7 +347,7 @@ An event type has exactly one producing module. The receive action is in 05 sect
 | `audit` | | | |
 | `authz` | `grant.changed`, `group.changed`, `access.changed`, `access.expiring` | | |
 | `identity` | `user.updated`, `session.revoked`, `device.pending` | | |
-| `chat` | `thread.created`, `thread.updated`, `thread.closed`, `thread.reopened`, `thread.moved`, `thread.moved_out`, `space.created`, `space.updated`, `space.archived`, `channel.created`, `channel.updated`, `channel.settings_changed`, `channel.archived`, `sidebar.updated`, `agent.config_changed` | | |
+| `chat` | `thread.created`, `thread.updated`, `thread.closed`, `thread.reopened`, `thread.moved`, `thread.moved_out`, `space.created`, `space.updated`, `space.archived`, `channel.created`, `channel.updated`, `channel.settings_changed`, `channel.archived`, `sidebar.updated`, `sidebar_channel.updated`, `agent.config_changed` | | |
 | `agents` | `agent_session.changed`, `command.changed`, `agent.updated` | `agent.presence_changed` | `ack` |
 | `files` | `file.updated` | | |
 | `messaging` | `message.created`, `message.updated`, `message.deleted`, `reaction.added`, `reaction.removed`, `pin.added`, `pin.removed` | | |
@@ -543,8 +543,8 @@ api: {vendors: []}               # with the first generated code (M1-17)
 testsupport: {paths: [test, perf]}   # test code across module boundaries; may use everything, nothing may use it
 modules:
   chat:
-    tables: [spaces, user_space_states, channels, channel_skill_bindings, project_bindings,
-             dm_participants, forum_tags, threads, thread_tags]
+    tables: [spaces, user_space_states, user_channel_states, channels, channel_skill_bindings,
+             project_bindings, dm_participants, forum_tags, threads, thread_tags]
     actions: [space.read, space.create, thread.move, agent.config.read]   # complete in the register
     events: [thread.created, channel.created]                              # complete in the register
     ephemeral_events: []

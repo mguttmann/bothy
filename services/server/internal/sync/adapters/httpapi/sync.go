@@ -99,6 +99,11 @@ func SnapshotREST(v sync.SnapshotView) (rest.Snapshot, error) {
 	for _, st := range v.Sidebar {
 		out.Sidebar = append(out.Sidebar, sidebarREST(st))
 	}
+	chans := make([]rest.SidebarChannelState, 0, len(v.SidebarChannels))
+	for _, st := range v.SidebarChannels {
+		chans = append(chans, sidebarChannelREST(st))
+	}
+	out.SidebarChannels = &chans
 	for _, u := range v.UnreadThreads {
 		out.UnreadThreads = append(out.UnreadThreads, rest.UnreadThread{ThreadId: rest.Uuid(u.ThreadID), ChannelId: rest.Uuid(u.ChannelID),
 			UnreadCount: u.UnreadCount, MentionCount: u.MentionCount, LastMessageSeq: u.LastMessageSeq, LastReadSeq: u.LastReadSeq})
@@ -170,10 +175,32 @@ func channelViewREST(c sync.SnapshotChannel) rest.ChannelView {
 // empty values become absent members, never null (ADR 0053); the tags are always an array.
 func threadREST(th sync.SnapshotThread) rest.Thread { return rest.ThreadOf(rest.ThreadFields(th)) }
 
-// sidebarREST converts a sidebar state (schema SidebarState).
+// sidebarREST converts a sidebar state (schema SidebarState); a nil channel order (the default
+// order) is absent.
 func sidebarREST(st sync.SidebarState) rest.SidebarState {
-	return rest.SidebarState{SpaceId: rest.Uuid(st.SpaceID), Collapsed: st.Collapsed, SortKey: optionalString(st.SortKey), Version: st.Version,
+	out := rest.SidebarState{SpaceId: rest.Uuid(st.SpaceID), Collapsed: st.Collapsed, SortKey: optionalString(st.SortKey), Version: st.Version,
 		UpdatedByDeviceId: optionalID(st.UpdatedByDeviceID)}
+	if st.ChannelOrder != nil {
+		order := restIDs(st.ChannelOrder)
+		out.ChannelOrder = &order
+	}
+	return out
+}
+
+// sidebarChannelREST converts a channel row of the sidebar (schema SidebarChannelState, M4-51);
+// thread_order is always an array.
+func sidebarChannelREST(st sync.SidebarChannelState) rest.SidebarChannelState {
+	return rest.SidebarChannelState{ChannelId: rest.Uuid(st.ChannelID), ThreadOrder: restIDs(st.ThreadOrder), Version: st.Version,
+		UpdatedByDeviceId: optionalID(st.UpdatedByDeviceID)}
+}
+
+// restIDs converts IDs into a list of the API, never nil.
+func restIDs(list []ids.ID) []rest.Uuid {
+	out := make([]rest.Uuid, 0, len(list))
+	for _, id := range list {
+		out = append(out, rest.Uuid(id))
+	}
+	return out
 }
 
 // runREST converts a running run (schema RunSummary).

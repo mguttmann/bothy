@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/chat/adapters/postgres"
+	"github.com/OWNER/bothy/services/server/internal/chat/app"
 	"github.com/OWNER/bothy/services/server/internal/chat/domain"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
@@ -149,7 +150,7 @@ func TestRepositoryRoundTrip(t *testing.T) {
 	}
 	// The sidebar: insert, keep, replace, delete the key; rows of archived spaces are not listed.
 	var st domain.SidebarState
-	put := func(s domain.SidebarState, keep bool) {
+	put := func(s domain.SidebarState, keep app.SidebarKeep) {
 		t.Helper()
 		if err := e.write(t, func(ctx context.Context) error {
 			var err error
@@ -159,19 +160,25 @@ func TestRepositoryRoundTrip(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	put(domain.SidebarState{UserID: alex, SpaceID: research.ID, Collapsed: true, SortKey: "a0V", UpdatedByDeviceID: dev}, false)
-	if st.Version != 1 || st.SortKey != "a0V" || st.UpdatedByDeviceID != dev {
+	order1 := []ids.ID{ids.New(), ids.New()}
+	put(domain.SidebarState{UserID: alex, SpaceID: research.ID, Collapsed: true, SortKey: "a0V", ChannelOrder: order1, UpdatedByDeviceID: dev}, app.SidebarKeep{})
+	if st.Version != 1 || st.SortKey != "a0V" || st.UpdatedByDeviceID != dev || !slices.Equal(st.ChannelOrder, order1) {
 		t.Fatalf("first put %+v", st)
 	}
-	put(domain.SidebarState{UserID: alex, SpaceID: research.ID}, true)
-	if st.Version != 2 || st.SortKey != "a0V" || st.Collapsed || !st.UpdatedByDeviceID.IsZero() {
+	put(domain.SidebarState{UserID: alex, SpaceID: research.ID}, app.SidebarKeep{Key: true, ChannelOrder: true})
+	if st.Version != 2 || st.SortKey != "a0V" || st.Collapsed || !st.UpdatedByDeviceID.IsZero() || !slices.Equal(st.ChannelOrder, order1) {
 		t.Fatalf("keep %+v", st)
 	}
-	put(domain.SidebarState{UserID: alex, SpaceID: research.ID}, false)
-	if st.SortKey != "" || st.Version != 3 {
-		t.Fatalf("replace %+v", st)
+	put(domain.SidebarState{UserID: alex, SpaceID: research.ID}, app.SidebarKeep{ChannelOrder: true})
+	if st.SortKey != "" || st.Version != 3 || !slices.Equal(st.ChannelOrder, order1) {
+		t.Fatalf("replace the key %+v", st)
 	}
-	put(domain.SidebarState{UserID: alex, SpaceID: support.ID, Collapsed: true}, false)
+	// M4-51: no list stores NULL, the default order.
+	put(domain.SidebarState{UserID: alex, SpaceID: research.ID}, app.SidebarKeep{})
+	if st.ChannelOrder != nil || st.Version != 4 {
+		t.Fatalf("clear the channel order %+v", st)
+	}
+	put(domain.SidebarState{UserID: alex, SpaceID: support.ID, Collapsed: true}, app.SidebarKeep{})
 	list, err := e.repo.SidebarStates(ctx, alex, true, nil)
 	if err != nil || len(list) != 1 || list[0].SpaceID != research.ID {
 		t.Fatalf("sidebar states %+v, %v", list, err)
@@ -183,7 +190,7 @@ func TestRepositoryRoundTrip(t *testing.T) {
 	if list, err := e.repo.SidebarStates(ctx, alex, false, []ids.ID{support.ID}); err != nil || len(list) != 0 {
 		t.Fatalf("sidebar states outside the scope %+v, %v", list, err)
 	}
-	if _, err := e.repo.PutSidebarState(ctx, st, false); err == nil {
+	if _, err := e.repo.PutSidebarState(ctx, st, app.SidebarKeep{}); err == nil {
 		t.Fatal("sidebar write outside a unit of work")
 	}
 }
