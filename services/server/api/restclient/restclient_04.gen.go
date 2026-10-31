@@ -7,6 +7,34 @@ import (
 	"net/http"
 )
 
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r ApproveDeviceResponse) GetApplicationproblemJSON422() *UnprocessableEntity {
+	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
+func (r ApproveDeviceResponse) GetApplicationproblemJSON429() *TooManyRequests {
+	return r.ApplicationproblemJSON429
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r ApproveDeviceResponse) GetApplicationproblemJSONDefault() *Error {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ApproveDeviceResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ApproveDeviceResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
 // StatusCode returns HTTPResponse.StatusCode
 func (r ApproveDeviceResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
@@ -26040,28 +26068,5 @@ type ResetAgentSessionResponse403Headers struct {
 
 // ResetAgentSessionResponse404Headers the declared response headers of an HTTP 404 response for ResetAgentSession
 type ResetAgentSessionResponse404Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// ResetAgentSessionResponse409Headers the declared response headers of an HTTP 409 response for ResetAgentSession
-type ResetAgentSessionResponse409Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// ResetAgentSessionResponse422Headers the declared response headers of an HTTP 422 response for ResetAgentSession
-type ResetAgentSessionResponse422Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// ResetAgentSessionResponse429Headers the declared response headers of an HTTP 429 response for ResetAgentSession
-type ResetAgentSessionResponse429Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      *int
-}
-
-// ResetAgentSessionResponseDefaultHeaders the declared response headers of an HTTP default response for ResetAgentSession
-type ResetAgentSessionResponseDefaultHeaders struct {
 	CorrelationId *CorrelationId
 }

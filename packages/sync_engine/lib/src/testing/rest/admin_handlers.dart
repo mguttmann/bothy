@@ -20,8 +20,8 @@ import '../world.dart';
 import 'agent_handlers.dart' show FakeI1Guard;
 import 'self_handlers.dart' show requireStepUp;
 
-/// Throws `401 step_up_required` (or `403 step_up_not_possible`) for an operation whose action
-/// has `step_up: true` or `fresh` in [catalog], unless the session confirmed recently
+/// Throws `401 step_up_required` for an operation whose action has `step_up: true` or `fresh`
+/// in [catalog], unless the session confirmed recently, for `fresh` with the device key
 /// ([requireStepUp]); `false` and `conditional` ask nothing here.
 void requireCatalogStepUp(
   FakeRequest r,
@@ -31,7 +31,9 @@ void requireCatalogStepUp(
   final action = contract.operation(r.operationId).authzAction;
   if (action == null) return;
   final value = catalog.stepUp(action);
-  if (value == 'true' || value == 'fresh') requireStepUp(r);
+  if (value == 'true' || value == 'fresh') {
+    requireStepUp(r, fresh: value == 'fresh');
+  }
 }
 
 /// Registers the administration handlers on [rest], with the step-up of [catalog]; the audit

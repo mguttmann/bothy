@@ -1041,6 +1041,11 @@ cookie writer and the handlers of `getConsoleSession`, `endViewAs`, `stepUpWithP
   and `max_age=0` (`beginStepUpOidcReauth`, `completeStepUpOidcReauth`; the flow is a link-mode
   flow of the person whose stored redirect names the challenge; the identity must be the person's
   and `auth_time` not before the second of the challenge). `step_up_method` records the method.
+  Password with TOTP also serves an `app` session whose device is not `cli` and has no active
+  `step_up` key, the Windows app (`Console.passwordCaller`, docs/decisions.d/FIX-stepup-macos.md);
+  a device with a `step_up` key gets `403 forbidden` with reason `step_up_not_possible` (cause
+  `step_up_key_present`), and only a console session gets a new cookie. The OIDC re-login stays
+  console-only.
 - Idle rule: `last_seen_at` is written only when older than one hundredth of
   `auth.console_session_idle_timeout`; a session is idle from `last_seen_at` plus the timeout plus
   that hundredth on. The request that finds an idle or expired session and the job

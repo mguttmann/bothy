@@ -296,8 +296,11 @@ final class FakeSession {
   /// The `client_component` of a child session (`share_ext`), or null for an app session.
   String? clientComponent;
 
-  /// When the session last confirmed with its step-up key (08 6.2), or null.
+  /// When the session last confirmed a step-up (08 6.2), or null.
   DateTime? stepUpAt;
+
+  /// The method of that step-up: `device_key` or `password_totp` (08 6.2, 6.3), or null.
+  String? stepUpMethod;
 
   /// The time of the last authenticated request of the session.
   String? lastSeenAt;

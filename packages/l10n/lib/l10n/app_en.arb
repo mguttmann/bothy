@@ -2303,6 +2303,26 @@
   "@stepUpContinue": {
     "description": "Button of the step-up dialog that continues to the system prompt."
   },
+  "stepUpPasswordNext": "This device has no key for confirmations. Enter your password and the 6-digit code from your authenticator app.",
+  "@stepUpPasswordNext": {
+    "description": "Second line of the step-up dialog on a device without a step-up key, for example Windows (08 section 6.2)."
+  },
+  "stepUpPasswordLabel": "Password",
+  "@stepUpPasswordLabel": {
+    "description": "Label of the password field of the step-up dialog on a device without a step-up key."
+  },
+  "stepUpCodeLabel": "6-digit code",
+  "@stepUpCodeLabel": {
+    "description": "Label of the field for the one-time code of the authenticator app in the step-up dialog."
+  },
+  "stepUpPasswordRejected": "The password or the code was not accepted. Try again with a new code.",
+  "@stepUpPasswordRejected": {
+    "description": "Error line of the step-up dialog after a wrong password or one-time code."
+  },
+  "stepUpConfirm": "Confirm",
+  "@stepUpConfirm": {
+    "description": "Button of the step-up dialog that sends password and one-time code."
+  },
   "selfCancel": "Cancel",
   "@selfCancel": {
     "description": "Cancel button of the device, session and step-up dialogs."
