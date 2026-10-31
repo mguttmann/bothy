@@ -3,7 +3,8 @@
 import Cocoa
 import FlutterMacOS
 
-/// The main window: the Flutter view, the plugins, the deep link channel, the channel of
+/// The main window: the Flutter view, the accessibility writes into text fields
+/// (`AccessibilityTextInput`), the plugins, the deep link channel, the channel of
 /// "Start at login" (`LoginItemChannel`), the clipboard of block copies
 /// (`RichClipboardChannel`), the push channel (`PushApple`), the sharing channel
 /// (`ShareApple`) and the updater of the Developer ID edition (`AppUpdater`, only when the
@@ -15,6 +16,10 @@ class MainFlutterWindow: NSWindow {
     self.contentViewController = flutterViewController
     self.setFrame(windowFrame, display: true)
 
+    // Dictation and text tools that write through the Accessibility API (AXSelectedText,
+    // AXValue) reach Flutter's text model (FIX-macos-ax-text-insert); before the plugins, so
+    // no text field can take focus first.
+    AccessibilityTextInput.install()
     RegisterGeneratedPlugins(registry: flutterViewController)
     DeepLinkChannel.shared.attach(messenger: flutterViewController.engine.binaryMessenger)
     LoginItemChannel.attach(messenger: flutterViewController.engine.binaryMessenger)
@@ -52,6 +57,13 @@ class MainFlutterWindow: NSWindow {
   /// reads (role, description, title, value, placeholder) and returns one map per element. It
   /// runs inside the app, so it needs no accessibility permission for another process and
   /// works in the app sandbox (docs/decisions.d/M4-32.md).
+  ///
+  /// For `integration_test/composer_ax_insert_test.dart` (FIX-macos-ax-text-insert):
+  /// `activate` brings the app and its window to the front, `textInput` returns the text and selection of the window's first responder when it is the
+  /// engine's text input, else nil; `axInsert` writes `text` into it as a dictation tool does,
+  /// as the selected text or (`attribute` `value`) the whole value, through the setter of
+  /// NSAccessibility or (`legacy`) through `accessibilitySetValue:forAttribute:`, and returns
+  /// `inserted`, or `noTextInput` without a focused engine text input.
   enum AccessibilityTreeProbe {
     /// Connects the channel to the engine of the main window.
     static func attach(
@@ -71,6 +83,38 @@ class MainFlutterWindow: NSWindow {
             engine.setValue(true, forKey: "semanticsEnabled")
           }
           result(nil)
+        case "activate":
+          NSApp.activate(ignoringOtherApps: true)
+          window?.makeKeyAndOrderFront(nil)
+          result(nil)
+        case "textInput":
+          guard let input = focusedTextInput(window) else {
+            result(nil)
+            return
+          }
+          let selection = input.selectedRange()
+          result([
+            "text": input.string, "start": selection.location, "length": selection.length,
+          ])
+        case "axInsert":
+          let arguments = call.arguments as? [String: Any] ?? [:]
+          guard let input = focusedTextInput(window) else {
+            result("noTextInput")
+            return
+          }
+          let text = arguments["text"] as? String ?? ""
+          let value = arguments["attribute"] as? String == "value"
+          if arguments["legacy"] as? Bool == true {
+            let attribute: NSAccessibility.Attribute = value ? .value : .selectedText
+            _ = input.perform(
+              NSSelectorFromString("accessibilitySetValue:forAttribute:"), with: text,
+              with: attribute.rawValue)
+          } else if value {
+            input.setAccessibilityValue(text)
+          } else {
+            input.setAccessibilitySelectedText(text)
+          }
+          result("inserted")
         case "tree":
           var elements: [[String: String]] = []
           if let root = window?.contentView {
@@ -81,6 +125,14 @@ class MainFlutterWindow: NSWindow {
           result(FlutterMethodNotImplemented)
         }
       }
+    }
+
+    /// The window's first responder when it is the engine's text input plugin.
+    private static func focusedTextInput(_ window: NSWindow?) -> NSTextView? {
+      guard let plugin = NSClassFromString(AccessibilityTextInput.pluginClassName),
+        let responder = window?.firstResponder as? NSTextView, responder.isKind(of: plugin)
+      else { return nil }
+      return responder
     }
 
     /// The texts a screen reader reads as the name, with the new accessibility method and the
