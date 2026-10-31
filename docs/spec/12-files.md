@@ -712,8 +712,10 @@ legal assessment remains the instance operator's responsibility (no legal advice
   declared type is MP4 audio (`audio/mp4` or `audio/x-m4a`), the server stores `audio/mp4`
   (`files/domain.RefineMP4Type`). It never turns another type into audio; the container phase
   (7.3) still reads width and height, so a declared-audio file with a video track stays no voice
-  recording (8.1 rule 4). `file.denied_mime_types` is checked against the detected and the
-  stored type.
+  recording (8.1 rule 4). The voice checks (8.1, transcription) apply the same refinement when
+  they read a row, so a row stored as `video/mp4` before the addendum and declared as MP4 audio
+  counts as MP4 audio without a backfill. `file.denied_mime_types` is checked against the
+  detected and the stored type.
 - `file.denied_mime_types` (default empty) blocks types that the instance operator does not
   want. The check runs twice: upfront against the declared type and the extension (early
   rejection, `415 unsupported_media_type` with `reason` `file_type_denied`), then against the detected type (`upload_state = 'failed'`).
