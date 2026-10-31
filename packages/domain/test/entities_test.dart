@@ -21,6 +21,8 @@ void main() {
   final space = SpaceId.parse(uuid(40));
   final device = DeviceId.parse(uuid(50));
   const v1 = ResourceVersion(1);
+  final channel2 = ChannelId.parse(uuid(22));
+  final thread2 = ThreadId.parse(uuid(12));
 
   Space mkSpace() => Space(
     id: space,
@@ -51,6 +53,59 @@ void main() {
     uss.copyWith(),
     uss.copyWith(collapsed: true),
   );
+  // M4-51 (D-M4-51-2, D-M4-51-3): the personal channel order of a space is part of the value,
+  // compared by its elements; absent means the default order.
+  _value(
+    'UserSpaceState.channelOrder',
+    uss.copyWith(channelOrder: [channel1, channel2]),
+    mkUss().copyWith(channelOrder: [channel1, channel2]),
+    uss.copyWith(channelOrder: [channel1, channel2]).copyWith(),
+    uss.copyWith(channelOrder: [channel2, channel1]),
+  );
+  test(
+    'UserSpaceState.channelOrder is absent by default and kept by copyWith',
+    () {
+      expect(uss.channelOrder, isNull);
+      expect(uss.copyWith(channelOrder: []), isNot(uss));
+      final ordered = uss.copyWith(channelOrder: [channel1]);
+      expect(ordered.copyWith(collapsed: true).channelOrder, [channel1]);
+    },
+  );
+
+  UserChannelState mkUcs() => UserChannelState(
+    channelId: channel1,
+    threadOrder: [thread1, thread2],
+    version: v1,
+    updatedByDeviceId: device,
+  );
+  final ucs = mkUcs();
+  _value(
+    'UserChannelState',
+    ucs,
+    mkUcs(),
+    ucs.copyWith(),
+    ucs.copyWith(threadOrder: [thread2, thread1]),
+  );
+  test('UserChannelState compares every field', () {
+    expect(ucs.copyWith(version: const ResourceVersion(2)), isNot(ucs));
+    expect(
+      UserChannelState(
+        channelId: channel1,
+        threadOrder: [thread1, thread2],
+        version: v1,
+      ),
+      isNot(ucs),
+    );
+    expect(
+      UserChannelState(
+        channelId: ChannelId.parse(uuid(21)),
+        threadOrder: [thread1, thread2],
+        version: v1,
+        updatedByDeviceId: device,
+      ),
+      isNot(ucs),
+    );
+  });
 
   ChannelOperator mkOp() => ChannelOperator(
     mode: OperatorMode.agent,
