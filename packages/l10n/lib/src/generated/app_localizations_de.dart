@@ -1339,11 +1339,11 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get onboardingKeychainUnavailable =>
-      'Der Schlüsselbund dieses Geräts hat die Schlüssel der App für diese Instanz abgelehnt. Entsperre den Schlüsselbund oder nutze eine signierte Version der App und versuche es erneut. Details stehen im App-Protokoll.';
+      'Der Schlüsselbund dieses Geräts hat die Schlüssel der App für diese Instanz abgelehnt. Entsperre den Schlüsselbund oder nutze eine signierte Version der App und versuche es erneut.';
 
   @override
   String get onboardingOpenFailed =>
-      'Die App konnte ihre lokalen Daten für diese Instanz auf diesem Gerät nicht öffnen. Versuche es erneut; Details stehen im App-Protokoll.';
+      'Die App konnte ihre lokalen Daten für diese Instanz auf diesem Gerät nicht öffnen. Versuche es erneut.';
 
   @override
   String get onboardingCertificateInvalid =>

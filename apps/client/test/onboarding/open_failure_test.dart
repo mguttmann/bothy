@@ -2,7 +2,10 @@
 
 // A failure to open the services of a found instance (docs/decisions.d/FIX-macos-keychain.md):
 // E1 shows its own text, never "No instance at this address", because discovery did answer.
+// A platform without a step-up key (Windows) opens and logs in with its DPoP key alone
+// (docs/decisions.d/FIX-windows-keystore.md).
 
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:auth/auth.dart' show DeviceKeys;
@@ -13,8 +16,10 @@ import 'package:device_key/device_key.dart' as dk;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sync_engine/testing.dart';
 
 import '../support/fake_instance.dart';
+import '../support/software_keys.dart';
 
 /// Device keys that the platform refuses, as the keychain of an app without entitlements does.
 class _RefusedKeys implements DeviceKeyStore {
@@ -24,6 +29,54 @@ class _RefusedKeys implements DeviceKeyStore {
 
   @override
   Future<void> delete(String scope) async {}
+}
+
+/// The `device_key` plugin as on Windows (D-M4-11-2): the DPoP key exists in software here,
+/// `ensure` of the step-up key fails with `not_available`.
+class _WindowsLikeClient implements dk.DeviceKeyClient {
+  final Map<String, SoftwareP256Signer> _dpop = {};
+
+  SoftwareP256Signer _key(String scope) =>
+      _dpop[scope] ??= SoftwareP256Signer.seeded('$scope/windows/dpop');
+
+  static Uint8List _bytes(String b64) =>
+      base64Url.decode(base64Url.normalize(b64));
+
+  @override
+  Future<dk.DeviceKeyInfo> ensure(String scope, dk.KeyPurpose purpose) async {
+    if (purpose == dk.KeyPurpose.stepUp) {
+      throw const dk.DeviceKeyException(dk.DeviceKeyError.notAvailable);
+    }
+    final jwk = _key(scope).publicJwk;
+    return dk.DeviceKeyInfo(
+      x: _bytes(jwk['x']!),
+      y: _bytes(jwk['y']!),
+      hardwareBound: true,
+      requiresUserPresence: false,
+    );
+  }
+
+  @override
+  Future<Uint8List> sign(
+    String scope,
+    dk.KeyPurpose purpose,
+    Uint8List data, {
+    dk.StepUpPrompt? prompt,
+  }) => _key(scope).sign(data);
+
+  @override
+  Future<void> delete(String scope) async => _dpop.remove(scope);
+
+  @override
+  Future<dk.DeviceKeyInfo?> keyInfo(String scope, dk.KeyPurpose purpose) =>
+      throw UnimplementedError();
+
+  @override
+  Future<Uint8List?> attestation(
+    String scope,
+    dk.KeyPurpose purpose,
+    Uint8List challenge,
+  ) => throw UnimplementedError();
 }
 
 void main() {
@@ -72,5 +125,52 @@ void main() {
       expect(state.serverStatus, ServerStatus.keychainUnavailable);
       expect(state.services, isNull);
     });
+  });
+
+  group('a platform without a step-up key (Windows)', () {
+    HttpOverrides? saved;
+    late FakeInstance f;
+    late ProviderContainer c;
+
+    setUp(() async {
+      saved = HttpOverrides.current;
+      HttpOverrides.global = null;
+      f = await FakeInstance.start(
+        platform: 'windows',
+        deviceKeys: PlatformDeviceKeyStore(
+          _WindowsLikeClient(),
+          () =>
+              const dk.StepUpPrompt(title: 'Confirm', negativeButton: 'Cancel'),
+        ),
+      );
+      c = appContainer(f);
+    });
+
+    tearDown(() async {
+      c.dispose();
+      await f.stop();
+      HttpOverrides.global = saved;
+    });
+
+    test(
+      'connects to E2 and registers the device without a step-up key',
+      () async {
+        final control = await connected(c, f);
+        var state = c.read(onboardingControllerProvider);
+        expect(state.serverStatus, isNot(ServerStatus.keychainUnavailable));
+        expect(state.step, OnboardingStep.login);
+        await control.loginWithPassword(
+          WorldSeed.alexLogin,
+          WorldSeed.password,
+          WorldSeed.totp,
+        );
+        state = c.read(onboardingControllerProvider);
+        expect(state.step, OnboardingStep.signedIn);
+        final id = state.services!.auth.session!.deviceId.value;
+        final device = f.server.world.devices[id]!;
+        expect(device.stepUpJwk, isNull);
+        expect(f.server.violations, isEmpty);
+      },
+    );
   });
 }

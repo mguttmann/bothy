@@ -2218,13 +2218,13 @@ abstract class AppLocalizations {
   /// E1 result when discovery found the instance but the device keys or the keychain failed (for example a build without keychain entitlements and a locked login keychain).
   ///
   /// In en, this message translates to:
-  /// **'This device\'s keychain refused the app\'s keys for this instance. Unlock the keychain or use a signed build of the app, then try again. The app log has the details.'**
+  /// **'This device\'s keychain refused the app\'s keys for this instance. Unlock the keychain or use a signed build of the app, then try again.'**
   String get onboardingKeychainUnavailable;
 
   /// E1 result when discovery found the instance but its local folder or database could not be opened.
   ///
   /// In en, this message translates to:
-  /// **'The app could not open its local data for this instance on this device. Try again; the app log has the details.'**
+  /// **'The app could not open its local data for this instance on this device. Try again.'**
   String get onboardingOpenFailed;
 
   /// E1 result for a TLS error; there is no way to continue (01 section 5.6, R-PR-14).

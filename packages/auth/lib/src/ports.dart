@@ -32,17 +32,20 @@ abstract interface class DeviceKeySigner {
   Future<Uint8List> sign(Uint8List signingInput);
 }
 
-/// The two keys of a native device (R-CL-05): [dpop] signs every proof without asking the
+/// The keys of a native device (R-CL-05): [dpop] signs every proof without asking the
 /// person; [stepUp] signs step-up confirmations only after user verification.
 final class DeviceKeys {
-  /// Creates the pair.
-  const DeviceKeys({required this.dpop, required this.stepUp});
+  /// Creates the keys; [stepUp] is `null` on a device without a step-up key.
+  const DeviceKeys({required this.dpop, this.stepUp});
 
   /// The DPoP key; also the key of the refresh family (08 7.4).
   final DeviceKeySigner dpop;
 
-  /// The step-up key with user presence (08 6.1, 6.2).
-  final DeviceKeySigner stepUp;
+  /// The step-up key with user presence (08 6.1, 6.2), or `null` where the platform has none:
+  /// Windows by design (08 6.1, D-M4-11-2), or a device whose key store cannot hold a key with
+  /// user presence. Such a device registers without `step_up_key`, and its step-up with the
+  /// device key fails with `StepUpUnavailable`.
+  final DeviceKeySigner? stepUp;
 }
 
 /// Persistent secret storage of the platform (keychain, Keystore, Credential Manager), by key.

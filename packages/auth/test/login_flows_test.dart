@@ -54,6 +54,23 @@ void main() {
         expect(a.appVersion, '1.0.0');
       },
     );
+
+    test('a device without a step-up key registers its DPoP key alone, without step_up_key', () async {
+      h = Harness(withStepUpKey: false);
+      final fields = await h.session.login.registerDeviceFields();
+      expect(fields.stepUpKey, isNull);
+      expect(fields.publicJwk.keys.toSet(), {'kty', 'crv', 'x', 'y'});
+
+      h.server.routes['POST /auth/password/login'] = (_) => tokens();
+      await h.session.login.loginWithPassword(
+        loginName: 'alex',
+        password: 'pw-canary',
+        totpCode: '123456',
+      );
+      final device = deviceOf(h.server.to('/auth/password/login').single);
+      expect(device['public_jwk'], h.dpopKey.publicJwk);
+      expect(device.containsKey('step_up_key'), isFalse);
+    });
   });
 
   group('OIDC with PKCE', () {
