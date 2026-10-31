@@ -4,12 +4,12 @@
 library;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:markdown/markdown.dart' as md;
 
 import '../generated/design_tokens.g.dart';
 import '../icons/ds_icon.dart';
 import '../theme/ds_theme.dart';
+import 'ds_clip_to_height.dart';
 import 'ds_common.dart';
 import 'ds_focus_ring.dart';
 import 'ds_trigger_state.dart';
@@ -926,7 +926,7 @@ class _DsCollapsibleState extends State<DsCollapsible> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
-        _ClipToHeight(
+        DsClipToHeight(
           maxHeight: maxHeight,
           onOverflow: (value) {
             if (value != _overflows) {
@@ -957,81 +957,5 @@ class _DsCollapsibleState extends State<DsCollapsible> {
           ),
       ],
     );
-  }
-}
-
-class _ClipToHeight extends SingleChildRenderObjectWidget {
-  const _ClipToHeight({
-    required this.maxHeight,
-    required this.onOverflow,
-    required super.child,
-  });
-
-  final double maxHeight;
-  final ValueChanged<bool> onOverflow;
-
-  @override
-  _RenderClipToHeight createRenderObject(BuildContext context) =>
-      _RenderClipToHeight(maxHeight, onOverflow);
-
-  @override
-  void updateRenderObject(
-    BuildContext context,
-    _RenderClipToHeight renderObject,
-  ) {
-    renderObject
-      ..maxHeight = maxHeight
-      ..onOverflow = onOverflow;
-  }
-}
-
-/// Lays the child out with its natural height and keeps at most [maxHeight] of it.
-class _RenderClipToHeight extends RenderProxyBox {
-  _RenderClipToHeight(this._maxHeight, this.onOverflow);
-
-  double _maxHeight;
-  ValueChanged<bool> onOverflow;
-
-  set maxHeight(double value) {
-    if (value == _maxHeight) return;
-    _maxHeight = value;
-    markNeedsLayout();
-  }
-
-  bool _clipped = false;
-
-  @override
-  void performLayout() {
-    final box = child!;
-    box.layout(
-      constraints.copyWith(maxHeight: double.infinity),
-      parentUsesSize: true,
-    );
-    _clipped = box.size.height > _maxHeight;
-    size = constraints.constrain(
-      Size(box.size.width, _clipped ? _maxHeight : box.size.height),
-    );
-    onOverflow(_clipped);
-  }
-
-  @override
-  void paint(PaintingContext context, Offset offset) {
-    if (!_clipped) {
-      super.paint(context, offset);
-      return;
-    }
-    layer = context.pushClipRect(
-      needsCompositing,
-      offset,
-      Offset.zero & size,
-      super.paint,
-      oldLayer: layer as ClipRectLayer?,
-    );
-  }
-
-  @override
-  bool hitTest(BoxHitTestResult result, {required Offset position}) {
-    if (!size.contains(position)) return false;
-    return super.hitTest(result, position: position);
   }
 }

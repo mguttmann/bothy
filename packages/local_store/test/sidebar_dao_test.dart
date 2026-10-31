@@ -306,6 +306,36 @@ void main() {
     },
   );
 
+  test('code blocks wrap until the device stores otherwise, and the choice '
+      'keeps the other view state (M4-49)', () async {
+    final dao = db.forumViewDao;
+    // 01 6.14 item 1: long lines wrap by default.
+    expect(await dao.codeBlocksUnwrapped(), isFalse);
+    expect(await dao.watchCodeBlocksUnwrapped().first, isFalse);
+
+    await dao.setOverviewPinned(pinned: true);
+    await dao.setSessionColumnHidden(textThread: false, hidden: true);
+    await dao.setCodeBlocksUnwrapped(unwrapped: true);
+    expect(await dao.codeBlocksUnwrapped(), isTrue);
+    expect(await dao.watchCodeBlocksUnwrapped().first, isTrue);
+    expect(await dao.overviewPinned(), isTrue, reason: 'the pin stays');
+    expect(
+      await dao.sessionColumnHidden(textThread: false),
+      isTrue,
+      reason: 'the session column stays',
+    );
+
+    // Another write of the row keeps the choice.
+    await dao.setChannelColumnHidden(hidden: true);
+    expect(await dao.codeBlocksUnwrapped(), isTrue);
+    await dao.setCodeBlocksUnwrapped(unwrapped: false);
+    expect(await dao.watchCodeBlocksUnwrapped().first, isFalse);
+    final rows = await db
+        .customSelect('SELECT count(*) AS n FROM shell_view_state')
+        .getSingle();
+    expect(rows.read<int>('n'), 1);
+  });
+
   test('the collapse of a space is kept on this device and is independent of '
       'the synchronized sidebar state', () async {
     final spaceB = SpaceId.parse(uuid(0x102));

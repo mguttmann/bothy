@@ -174,6 +174,7 @@ class DsTappable extends StatefulWidget {
     this.radius = DsRadius.sm,
     this.selected,
     this.expanded,
+    this.toggled,
     this.button = true,
     this.onSidebar = false,
     this.focusNode,
@@ -204,6 +205,10 @@ class DsTappable extends StatefulWidget {
 
   /// The expanded state of a tree node, or null.
   final bool? expanded;
+
+  /// The on or off state of a toggle button for screen readers, or null when the surface is
+  /// no toggle (the "Wrap lines" toggle of a code block, M4-49).
+  final bool? toggled;
 
   /// Whether the surface reads as a button.
   final bool button;
@@ -283,6 +288,7 @@ class _DsTappableState extends State<DsTappable> {
       hint: widget.hint,
       selected: widget.selected,
       expanded: widget.expanded,
+      toggled: widget.toggled,
       child: content,
     );
   }

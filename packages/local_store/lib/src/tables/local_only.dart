@@ -232,7 +232,8 @@ class SpaceViewStates extends Table {
 
 /// How the desktop shell looks on this device (01 6.8 item 7, D-SB-6; 01 D1, D15): whether the
 /// forum overview is pinned as its own column, whether the channel column next to an open thread
-/// is hidden (M4-42) and whether the session column shows in either layout (M4-45). One row,
+/// is hidden (M4-42), whether the session column shows in either layout (M4-45) and whether
+/// code blocks wrap their long lines (M4-49). One row,
 /// like `sync_state`; kept per device and never synchronized, because 01 11 has no key for it;
 /// without the row the overview is not pinned.
 @DataClassName('ShellViewStateRow')
@@ -263,6 +264,11 @@ class ShellViewStates extends Table {
   /// Whether the person showed the session column next to a thread of a text channel, where it
   /// is collapsed by default (01 D2; M4-45).
   BoolColumn get textThreadSessionShown =>
+      boolean().withDefault(const Constant(false))();
+
+  /// Whether the person switched the code blocks of messages to one line per line with a
+  /// horizontal scroll ("Wrap lines" off, 01 6.14 item 1; M4-49); by default long lines wrap.
+  BoolColumn get codeBlocksUnwrapped =>
       boolean().withDefault(const Constant(false))();
 
   @override

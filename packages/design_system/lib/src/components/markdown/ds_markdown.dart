@@ -9,12 +9,17 @@ import 'package:markdown/markdown.dart' as md;
 
 import '../../generated/design_tokens.g.dart';
 import '../../theme/ds_theme.dart';
+import '../ds_clip_to_height.dart';
 import '../ds_common.dart';
 import '../ds_focus_ring.dart';
 import 'block_copy.dart';
+import 'code_block_scope.dart';
+import 'code_lines.dart';
 import 'link_policy.dart';
 
 export 'block_copy.dart';
+export 'code_block_scope.dart';
+export 'code_lines.dart';
 export 'link_policy.dart';
 
 /// Resolves an image reference of a message to a widget, or returns null for the text form.
@@ -29,9 +34,9 @@ typedef DsAttachmentResolver = Widget? Function(Uri reference);
 ///
 /// The source is parsed with package `markdown` (GitHub flavored, without the HTML block and
 /// inline HTML syntaxes) and the subset paragraph, emphasis, strong, strikethrough, inline
-/// code, fenced code (language label, horizontal scroll, copy), block quote (copy), ordered
-/// and unordered lists, read-only task boxes, headings (at most `type.heading`), horizontal
-/// rule, tables (horizontal scroll) and links is built from the AST:
+/// code, fenced code (language label, wrap or horizontal scroll, collapse, copy; 01 6.14),
+/// block quote (copy), ordered and unordered lists, read-only task boxes, headings (at most
+/// `type.heading`), horizontal rule, tables (horizontal scroll) and links is built from the AST:
 ///
 /// * raw HTML (`<script>`, `<img>`, any tag) shows as its literal text;
 /// * an image shows as the text "Image: {alt} ({domain})"; only [attachments] may turn a
@@ -789,12 +794,25 @@ class DsMarkdownQuoteBlock extends StatelessWidget {
   }
 }
 
-/// A code block of [DsMarkdown]: `type.code` on `color.code.bg`, horizontal scroll, language
-/// label, and the copy of exactly [code]: the button "Copy code" at its top right on the
-/// desktop, a tap on the block on the phone (01 6.12).
-class DsMarkdownCodeBlock extends StatelessWidget {
+/// A code block of [DsMarkdown]: `type.code` on `color.code.bg` with its language label, the
+/// copy of exactly [code] (the button "Copy code" at its top right on the desktop, a tap on the
+/// block on the phone; 01 6.12) and the readable layout of 01 6.14 (M4-49):
+///
+/// * long lines wrap by default, with a hanging indent for indented lines ([DsCodeLines]);
+/// * the toggle "Wrap lines" in the header switches to one line per line with a horizontal
+///   scroll: a visible scrollbar on the desktop, shift and the mouse wheel, the trackpad, a drag
+///   on the phone. The choice goes to [DsCodeBlockScope.onWrapChanged], so every block of the
+///   device follows it; without a callback only this block switches;
+/// * a block higher than [DsCodeBlockScope.collapseLines] lines shows collapsed with a fade and
+///   "Show all", which expands it in place, and "Show less" collapses it again.
+///
+/// Wrapping, scrolling and collapsing are display only: the copy is [code] as it is.
+class DsMarkdownCodeBlock extends StatefulWidget {
   /// Creates the block.
   const DsMarkdownCodeBlock({super.key, required this.code, this.language});
+
+  /// The key of the fade over the bottom of a collapsed block (01 6.14 item 2).
+  static const Key fadeKey = ValueKey('ds-code-block-fade');
 
   /// The raw code, as [dsCodeBlockText] gives it.
   final String code;
@@ -803,15 +821,208 @@ class DsMarkdownCodeBlock extends StatelessWidget {
   final String? language;
 
   @override
+  State<DsMarkdownCodeBlock> createState() => _DsMarkdownCodeBlockState();
+}
+
+class _DsMarkdownCodeBlockState extends State<DsMarkdownCodeBlock> {
+  final ScrollController _scroll = ScrollController();
+
+  /// This block's choice from its toggle until the scope reports the same value; the block's
+  /// own choice for good when nothing stores it.
+  bool? _wrapChoice;
+
+  /// Whether the person expanded the long block ("Show all").
+  bool _expanded = false;
+
+  /// Whether the content is higher than the limit, from the last layout.
+  bool _overflows = false;
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  bool _wrap(DsCodeBlockScope? scope) {
+    final stored = scope?.wrap ?? true;
+    // The stored choice caught up with this block's toggle: from now on the block follows the
+    // device again, also when another block switches it.
+    if (scope?.onWrapChanged != null && _wrapChoice == stored) {
+      _wrapChoice = null;
+    }
+    return _wrapChoice ?? stored;
+  }
+
+  void _toggleWrap(DsCodeBlockScope? scope, bool wrap) {
+    setState(() => _wrapChoice = !wrap);
+    scope?.onWrapChanged?.call(!wrap);
+  }
+
+  void _reportOverflow(bool overflows) {
+    if (overflows == _overflows) return;
+    // The report comes during layout; the control below the block follows in the next frame.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && overflows != _overflows) {
+        setState(() => _overflows = overflows);
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final colors = context.dsColors;
     final l = dsL10n(context);
     final touch = _touch(context);
+    final scope = DsCodeBlockScope.maybeOf(context);
+    final wrap = _wrap(scope);
+    final code = widget.code;
     void copy() => _copyBlock(context, DsCopyData(code), touch: touch);
+    final style = dsTextStyle(DsType.code).copyWith(color: colors.codeFg);
+    final lineHeight = _lineHeight(style, MediaQuery.textScalerOf(context));
     final label = Text(
-      language ?? '',
+      widget.language ?? '',
       style: dsTextStyle(DsType.codeSm).copyWith(color: colors.textSecondary),
     );
+    final toggle = _WrapToggle(
+      label: l.markdownCodeWrap,
+      wrap: wrap,
+      onTap: () => _toggleWrap(scope, wrap),
+    );
+    final header = touch
+        ? Row(
+            children: [
+              const SizedBox(width: DsSpace.s8),
+              Expanded(child: label),
+              toggle,
+              const SizedBox(width: DsSpace.s4),
+            ],
+          )
+        // The copy button stays the first stop of the keyboard (M4-48), the toggle the second.
+        : FocusTraversalGroup(
+            policy: OrderedTraversalPolicy(),
+            child: Row(
+              children: [
+                const SizedBox(width: DsSpace.s8),
+                Expanded(child: label),
+                FocusTraversalOrder(
+                  order: const NumericFocusOrder(2),
+                  child: toggle,
+                ),
+                FocusTraversalOrder(
+                  order: const NumericFocusOrder(1),
+                  child: _CopyButton(label: l.markdownCopyCode, onTap: copy),
+                ),
+              ],
+            ),
+          );
+
+    final collapsed = _overflows && !_expanded;
+    Widget text = DsClipToHeight(
+      maxHeight:
+          lineHeight *
+          (scope?.collapseLines ?? DsCodeBlockScope.defaultCollapseLines),
+      clip: !_expanded,
+      onOverflow: _reportOverflow,
+      child: wrap
+          ? DsCodeLines(code: code, style: style)
+          : Text(code, softWrap: false, style: style),
+    );
+    if (collapsed) {
+      text = Stack(
+        children: [
+          text,
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: lineHeight * 2,
+            child: IgnorePointer(
+              child: DecoratedBox(
+                key: DsMarkdownCodeBlock.fadeKey,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [colors.codeBg.withValues(alpha: 0), colors.codeBg],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+    final Widget body;
+    if (wrap) {
+      body = Padding(
+        padding: const EdgeInsets.fromLTRB(
+          DsSpace.s12,
+          0,
+          DsSpace.s12,
+          DsSpace.s8,
+        ),
+        child: text,
+      );
+    } else {
+      // The default scroll behavior draws no scrollbar on a horizontal scroll, so the block
+      // brings its own: always visible on the desktop, while scrolling on the phone. The room
+      // below the text keeps the thumb off the last line.
+      body = Scrollbar(
+        controller: _scroll,
+        thumbVisibility: !touch,
+        child: SingleChildScrollView(
+          controller: _scroll,
+          primary: false,
+          scrollDirection: Axis.horizontal,
+          padding: EdgeInsets.fromLTRB(
+            DsSpace.s12,
+            0,
+            DsSpace.s12,
+            touch ? DsSpace.s8 : DsSpace.s16,
+          ),
+          child: text,
+        ),
+      );
+    }
+    final more = _overflows
+        ? SelectionContainer.disabled(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(
+                DsSpace.s4,
+                0,
+                DsSpace.s4,
+                DsSpace.s4,
+              ),
+              child: Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: DsTappable(
+                  label: _expanded
+                      ? l.markdownCodeShowLess
+                      : l.markdownCodeShowAll,
+                  expanded: _expanded,
+                  excludeChildSemantics: true,
+                  onTap: () => setState(() => _expanded = !_expanded),
+                  child: Center(
+                    widthFactor: 1,
+                    heightFactor: 1,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: DsSpace.s8,
+                      ),
+                      child: Text(
+                        _expanded
+                            ? l.markdownCodeShowLess
+                            : l.markdownCodeShowAll,
+                        style: dsTextStyle(DsType.label)
+                            .copyWith(color: context.dsAccent.textLink),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          )
+        : null;
     final block = Container(
       decoration: BoxDecoration(
         color: colors.codeBg,
@@ -824,44 +1035,78 @@ class DsMarkdownCodeBlock extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
+        // The code is its own node for the screen reader, as the scroll view made it before,
+        // so the block's label stays "Copy code" on the phone (01 6.12 item 2).
         children: [
-          if (touch)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                DsSpace.s8,
-                DsSpace.s4,
-                DsSpace.s8,
-                0,
-              ),
-              child: label,
-            )
-          else
-            Row(
-              children: [
-                const SizedBox(width: DsSpace.s8),
-                Expanded(child: label),
-                _CopyButton(label: l.markdownCopyCode, onTap: copy),
-              ],
-            ),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.fromLTRB(
-              DsSpace.s12,
-              0,
-              DsSpace.s12,
-              DsSpace.s8,
-            ),
-            child: Text(
-              code,
-              softWrap: false,
-              style: dsTextStyle(DsType.code).copyWith(color: colors.codeFg),
-            ),
-          ),
+          header,
+          Semantics(container: true, child: body),
+          ?more,
         ],
       ),
     );
     return touch
         ? _TapToCopy(label: l.markdownCopyCode, onTap: copy, child: block)
         : block;
+  }
+}
+
+/// The height of one line of [style] under [scaler]: the unit of the collapse limit.
+double _lineHeight(TextStyle style, TextScaler scaler) {
+  final painter = TextPainter(
+    text: TextSpan(text: 'X', style: style),
+    textDirection: TextDirection.ltr,
+    textScaler: scaler,
+  )..layout();
+  final height = painter.preferredLineHeight;
+  painter.dispose();
+  return height;
+}
+
+/// The toggle "Wrap lines" in the header of a code block: a small text button, highlighted and
+/// read as "on" by the screen reader while lines wrap (01 6.14 item 1).
+///
+/// Kept out of the system selection, so a selection across the block never copies its label.
+class _WrapToggle extends StatelessWidget {
+  const _WrapToggle({
+    required this.label,
+    required this.wrap,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool wrap;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.dsColors;
+    return SelectionContainer.disabled(
+      child: DsTappable(
+        label: label,
+        toggled: wrap,
+        excludeChildSemantics: true,
+        onTap: onTap,
+        child: Center(
+          widthFactor: 1,
+          heightFactor: 1,
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: DsSpace.s6,
+              vertical: DsSpace.s2,
+            ),
+            decoration: BoxDecoration(
+              color: wrap ? colors.surfaceSelected : null,
+              borderRadius: BorderRadius.circular(DsRadius.sm),
+            ),
+            child: Text(
+              label,
+              style: dsTextStyle(DsType.label).copyWith(
+                color: wrap ? context.dsAccent.textLink : colors.textSecondary,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

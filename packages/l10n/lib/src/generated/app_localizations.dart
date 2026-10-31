@@ -1699,6 +1699,24 @@ abstract class AppLocalizations {
   /// **'Copy quote'**
   String get markdownCopyQuote;
 
+  /// Toggle in the header of a code block in a message: on, long lines wrap so the whole content is visible; off, the block keeps one line per line and scrolls sideways. Kept per device (01 6.14, M4-49).
+  ///
+  /// In en, this message translates to:
+  /// **'Wrap lines'**
+  String get markdownCodeWrap;
+
+  /// Control below a long code block shown collapsed with a fade; expands the block in place (01 6.14, M4-49).
+  ///
+  /// In en, this message translates to:
+  /// **'Show all'**
+  String get markdownCodeShowAll;
+
+  /// Control below an expanded long code block; collapses it again (01 6.14, M4-49).
+  ///
+  /// In en, this message translates to:
+  /// **'Show less'**
+  String get markdownCodeShowLess;
+
   /// Notice for the rejection reason `multiple_agents_mentioned` at acceptance of a triggering message (docs/spec/09 section 3.5; components.md section 5).
   ///
   /// In en, this message translates to:

@@ -1512,6 +1512,18 @@
   "@markdownCopyQuote": {
     "description": "Copy button of a quote block in a message; on the phone the label of the tap action of the block (01 6.12)."
   },
+  "markdownCodeWrap": "Wrap lines",
+  "@markdownCodeWrap": {
+    "description": "Toggle in the header of a code block in a message: on, long lines wrap so the whole content is visible; off, the block keeps one line per line and scrolls sideways. Kept per device (01 6.14, M4-49)."
+  },
+  "markdownCodeShowAll": "Show all",
+  "@markdownCodeShowAll": {
+    "description": "Control below a long code block shown collapsed with a fade; expands the block in place (01 6.14, M4-49)."
+  },
+  "markdownCodeShowLess": "Show less",
+  "@markdownCodeShowLess": {
+    "description": "Control below an expanded long code block; collapses it again (01 6.14, M4-49)."
+  },
   "triggerReasonMultipleAgentsMentioned": "Please mention only one agent.",
   "@triggerReasonMultipleAgentsMentioned": {
     "description": "Notice for the rejection reason `multiple_agents_mentioned` at acceptance of a triggering message (docs/spec/09 section 3.5; components.md section 5)."

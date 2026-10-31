@@ -40,6 +40,7 @@ const List<AppConfigKey> appConfigKeys = <AppConfigKey>[
   AppConfigKey('sync.typing_ttl', 'Server', AppConfigKind.duration, '8s'),
   AppConfigKey('terminal.max_session_duration', 'Server', AppConfigKind.duration, '12h'),
   AppConfigKey('ui.autocomplete_debounce', 'App', AppConfigKind.duration, '150ms'),
+  AppConfigKey('ui.code_block_collapse_lines', 'App', AppConfigKind.integer, '20'),
   AppConfigKey('ui.composer_max_lines', 'App', AppConfigKind.integer, '12'),
   AppConfigKey('ui.composer_paste_file_chars', 'App', AppConfigKind.integer, '4000'),
   AppConfigKey('ui.composer_paste_file_lines', 'App', AppConfigKind.integer, '100'),
@@ -148,6 +149,8 @@ extension AppConfigValues on AppConfig {
   Duration get maxSessionDuration => value<Duration>('terminal.max_session_duration');
   /// `ui.autocomplete_debounce` (duration, default `150ms`).
   Duration get autocompleteDebounce => value<Duration>('ui.autocomplete_debounce');
+  /// `ui.code_block_collapse_lines` (integer, default `20`).
+  int get codeBlockCollapseLines => value<int>('ui.code_block_collapse_lines');
   /// `ui.composer_max_lines` (integer, default `12`).
   int get composerMaxLines => value<int>('ui.composer_max_lines');
   /// `ui.composer_paste_file_chars` (integer, default `4000`).

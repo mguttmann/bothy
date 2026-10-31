@@ -18753,6 +18753,20 @@ class $ShellViewStatesTable extends ShellViewStates
         ),
         defaultValue: const Constant(false),
       );
+  static const VerificationMeta _codeBlocksUnwrappedMeta =
+      const VerificationMeta('codeBlocksUnwrapped');
+  @override
+  late final GeneratedColumn<bool> codeBlocksUnwrapped = GeneratedColumn<bool>(
+    'code_blocks_unwrapped',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("code_blocks_unwrapped" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -18760,6 +18774,7 @@ class $ShellViewStatesTable extends ShellViewStates
     channelColumnHidden,
     sessionColumnHidden,
     textThreadSessionShown,
+    codeBlocksUnwrapped,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -18812,6 +18827,15 @@ class $ShellViewStatesTable extends ShellViewStates
         ),
       );
     }
+    if (data.containsKey('code_blocks_unwrapped')) {
+      context.handle(
+        _codeBlocksUnwrappedMeta,
+        codeBlocksUnwrapped.isAcceptableOrUnknown(
+          data['code_blocks_unwrapped']!,
+          _codeBlocksUnwrappedMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -18840,6 +18864,10 @@ class $ShellViewStatesTable extends ShellViewStates
       textThreadSessionShown: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}text_thread_session_shown'],
+      )!,
+      codeBlocksUnwrapped: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}code_blocks_unwrapped'],
       )!,
     );
   }
@@ -18870,12 +18898,17 @@ class ShellViewStateRow extends DataClass
   /// Whether the person showed the session column next to a thread of a text channel, where it
   /// is collapsed by default (01 D2; M4-45).
   final bool textThreadSessionShown;
+
+  /// Whether the person switched the code blocks of messages to one line per line with a
+  /// horizontal scroll ("Wrap lines" off, 01 6.14 item 1; M4-49); by default long lines wrap.
+  final bool codeBlocksUnwrapped;
   const ShellViewStateRow({
     required this.id,
     required this.overviewPinned,
     required this.channelColumnHidden,
     required this.sessionColumnHidden,
     required this.textThreadSessionShown,
+    required this.codeBlocksUnwrapped,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -18885,6 +18918,7 @@ class ShellViewStateRow extends DataClass
     map['channel_column_hidden'] = Variable<bool>(channelColumnHidden);
     map['session_column_hidden'] = Variable<bool>(sessionColumnHidden);
     map['text_thread_session_shown'] = Variable<bool>(textThreadSessionShown);
+    map['code_blocks_unwrapped'] = Variable<bool>(codeBlocksUnwrapped);
     return map;
   }
 
@@ -18895,6 +18929,7 @@ class ShellViewStateRow extends DataClass
       channelColumnHidden: Value(channelColumnHidden),
       sessionColumnHidden: Value(sessionColumnHidden),
       textThreadSessionShown: Value(textThreadSessionShown),
+      codeBlocksUnwrapped: Value(codeBlocksUnwrapped),
     );
   }
 
@@ -18915,6 +18950,9 @@ class ShellViewStateRow extends DataClass
       textThreadSessionShown: serializer.fromJson<bool>(
         json['textThreadSessionShown'],
       ),
+      codeBlocksUnwrapped: serializer.fromJson<bool>(
+        json['codeBlocksUnwrapped'],
+      ),
     );
   }
   @override
@@ -18926,6 +18964,7 @@ class ShellViewStateRow extends DataClass
       'channelColumnHidden': serializer.toJson<bool>(channelColumnHidden),
       'sessionColumnHidden': serializer.toJson<bool>(sessionColumnHidden),
       'textThreadSessionShown': serializer.toJson<bool>(textThreadSessionShown),
+      'codeBlocksUnwrapped': serializer.toJson<bool>(codeBlocksUnwrapped),
     };
   }
 
@@ -18935,6 +18974,7 @@ class ShellViewStateRow extends DataClass
     bool? channelColumnHidden,
     bool? sessionColumnHidden,
     bool? textThreadSessionShown,
+    bool? codeBlocksUnwrapped,
   }) => ShellViewStateRow(
     id: id ?? this.id,
     overviewPinned: overviewPinned ?? this.overviewPinned,
@@ -18942,6 +18982,7 @@ class ShellViewStateRow extends DataClass
     sessionColumnHidden: sessionColumnHidden ?? this.sessionColumnHidden,
     textThreadSessionShown:
         textThreadSessionShown ?? this.textThreadSessionShown,
+    codeBlocksUnwrapped: codeBlocksUnwrapped ?? this.codeBlocksUnwrapped,
   );
   ShellViewStateRow copyWithCompanion(ShellViewStatesCompanion data) {
     return ShellViewStateRow(
@@ -18958,6 +18999,9 @@ class ShellViewStateRow extends DataClass
       textThreadSessionShown: data.textThreadSessionShown.present
           ? data.textThreadSessionShown.value
           : this.textThreadSessionShown,
+      codeBlocksUnwrapped: data.codeBlocksUnwrapped.present
+          ? data.codeBlocksUnwrapped.value
+          : this.codeBlocksUnwrapped,
     );
   }
 
@@ -18968,7 +19012,8 @@ class ShellViewStateRow extends DataClass
           ..write('overviewPinned: $overviewPinned, ')
           ..write('channelColumnHidden: $channelColumnHidden, ')
           ..write('sessionColumnHidden: $sessionColumnHidden, ')
-          ..write('textThreadSessionShown: $textThreadSessionShown')
+          ..write('textThreadSessionShown: $textThreadSessionShown, ')
+          ..write('codeBlocksUnwrapped: $codeBlocksUnwrapped')
           ..write(')'))
         .toString();
   }
@@ -18980,6 +19025,7 @@ class ShellViewStateRow extends DataClass
     channelColumnHidden,
     sessionColumnHidden,
     textThreadSessionShown,
+    codeBlocksUnwrapped,
   );
   @override
   bool operator ==(Object other) =>
@@ -18989,7 +19035,8 @@ class ShellViewStateRow extends DataClass
           other.overviewPinned == this.overviewPinned &&
           other.channelColumnHidden == this.channelColumnHidden &&
           other.sessionColumnHidden == this.sessionColumnHidden &&
-          other.textThreadSessionShown == this.textThreadSessionShown);
+          other.textThreadSessionShown == this.textThreadSessionShown &&
+          other.codeBlocksUnwrapped == this.codeBlocksUnwrapped);
 }
 
 class ShellViewStatesCompanion extends UpdateCompanion<ShellViewStateRow> {
@@ -18998,12 +19045,14 @@ class ShellViewStatesCompanion extends UpdateCompanion<ShellViewStateRow> {
   final Value<bool> channelColumnHidden;
   final Value<bool> sessionColumnHidden;
   final Value<bool> textThreadSessionShown;
+  final Value<bool> codeBlocksUnwrapped;
   const ShellViewStatesCompanion({
     this.id = const Value.absent(),
     this.overviewPinned = const Value.absent(),
     this.channelColumnHidden = const Value.absent(),
     this.sessionColumnHidden = const Value.absent(),
     this.textThreadSessionShown = const Value.absent(),
+    this.codeBlocksUnwrapped = const Value.absent(),
   });
   ShellViewStatesCompanion.insert({
     this.id = const Value.absent(),
@@ -19011,6 +19060,7 @@ class ShellViewStatesCompanion extends UpdateCompanion<ShellViewStateRow> {
     this.channelColumnHidden = const Value.absent(),
     this.sessionColumnHidden = const Value.absent(),
     this.textThreadSessionShown = const Value.absent(),
+    this.codeBlocksUnwrapped = const Value.absent(),
   });
   static Insertable<ShellViewStateRow> custom({
     Expression<int>? id,
@@ -19018,6 +19068,7 @@ class ShellViewStatesCompanion extends UpdateCompanion<ShellViewStateRow> {
     Expression<bool>? channelColumnHidden,
     Expression<bool>? sessionColumnHidden,
     Expression<bool>? textThreadSessionShown,
+    Expression<bool>? codeBlocksUnwrapped,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -19028,6 +19079,8 @@ class ShellViewStatesCompanion extends UpdateCompanion<ShellViewStateRow> {
         'session_column_hidden': sessionColumnHidden,
       if (textThreadSessionShown != null)
         'text_thread_session_shown': textThreadSessionShown,
+      if (codeBlocksUnwrapped != null)
+        'code_blocks_unwrapped': codeBlocksUnwrapped,
     });
   }
 
@@ -19037,6 +19090,7 @@ class ShellViewStatesCompanion extends UpdateCompanion<ShellViewStateRow> {
     Value<bool>? channelColumnHidden,
     Value<bool>? sessionColumnHidden,
     Value<bool>? textThreadSessionShown,
+    Value<bool>? codeBlocksUnwrapped,
   }) {
     return ShellViewStatesCompanion(
       id: id ?? this.id,
@@ -19045,6 +19099,7 @@ class ShellViewStatesCompanion extends UpdateCompanion<ShellViewStateRow> {
       sessionColumnHidden: sessionColumnHidden ?? this.sessionColumnHidden,
       textThreadSessionShown:
           textThreadSessionShown ?? this.textThreadSessionShown,
+      codeBlocksUnwrapped: codeBlocksUnwrapped ?? this.codeBlocksUnwrapped,
     );
   }
 
@@ -19068,6 +19123,9 @@ class ShellViewStatesCompanion extends UpdateCompanion<ShellViewStateRow> {
         textThreadSessionShown.value,
       );
     }
+    if (codeBlocksUnwrapped.present) {
+      map['code_blocks_unwrapped'] = Variable<bool>(codeBlocksUnwrapped.value);
+    }
     return map;
   }
 
@@ -19078,7 +19136,8 @@ class ShellViewStatesCompanion extends UpdateCompanion<ShellViewStateRow> {
           ..write('overviewPinned: $overviewPinned, ')
           ..write('channelColumnHidden: $channelColumnHidden, ')
           ..write('sessionColumnHidden: $sessionColumnHidden, ')
-          ..write('textThreadSessionShown: $textThreadSessionShown')
+          ..write('textThreadSessionShown: $textThreadSessionShown, ')
+          ..write('codeBlocksUnwrapped: $codeBlocksUnwrapped')
           ..write(')'))
         .toString();
   }

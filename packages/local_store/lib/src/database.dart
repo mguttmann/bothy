@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The drift database of the apps, schema version 10 (docs/spec/15-client-architecture.md 6, ADR
+/// The drift database of the apps, schema version 11 (docs/spec/15-client-architecture.md 6, ADR
 /// 0029): the mirror tables of 15 6.1 and the local-only tables, `host_key_pins` (M4-36) and
 /// the sidebar view state `channel_view_states`, `shell_view_state` (M4-40, M4-42) and
-/// `space_view_states` (FIX-device-mirroring-2) included.
+/// `space_view_states` (FIX-device-mirroring-2) included; version 11 adds the code block wrap
+/// choice of `shell_view_state` (M4-49).
 library;
 
 import 'dart:io';
@@ -91,7 +92,7 @@ class LocalDatabase extends _$LocalDatabase {
   final DateTime Function() clock;
 
   @override
-  int get schemaVersion => 10;
+  int get schemaVersion => 11;
 
   /// Closes the database and releases its file, also while watched queries come and go.
   ///
@@ -173,6 +174,15 @@ class LocalDatabase extends _$LocalDatabase {
         await m.database.customStatement(
           'INSERT INTO space_view_states (space_id, collapsed) '
           'SELECT space_id, collapsed FROM user_space_states',
+        );
+      },
+      // Version 11 (M4-49): the column `shell_view_state.code_blocks_unwrapped`, false in the
+      // kept row (01 6.14 item 1: code blocks wrap until the person switches them); no row
+      // moves.
+      from10To11: (m, schema) async {
+        await m.addColumn(
+          schema.shellViewState,
+          schema.shellViewState.codeBlocksUnwrapped,
         );
       },
     ),
