@@ -26,6 +26,13 @@ String get _source =>
     '> Quoted **bold** line\n'
     '> second ñ line\n';
 
+// The code block's header also holds the wrap toggle and a long block a "Show all" button
+// (M4-49), so the copy button is found by its label.
+Finder _codeCopyButton(String label) => find.descendant(
+  of: find.byType(DsMarkdownCodeBlock),
+  matching: find.byWidgetPredicate((w) => w is DsTappable && w.label == label),
+);
+
 Finder _button(Type block) => find
     .descendant(of: find.byType(block), matching: find.byType(DsTappable))
     .last;
@@ -60,7 +67,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(_button(DsMarkdownCodeBlock));
+    final l = AppLocalizations.of(tester.element(find.byType(DsMarkdown)));
+    await tester.tap(_codeCopyButton(l.markdownCopyCode));
     await tester.pumpAndSettle();
     final code = await Clipboard.getData(Clipboard.kTextPlain);
     // The fence's last line break is not part of the copy; the blank line before it is.
