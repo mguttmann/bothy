@@ -202,6 +202,7 @@ nav:
       - Name: design/naming.md
       - Run visualization: design/run-visualization.md
       - Sessions in the sidebar: design/sidebar-sessions.md
+      - Sidebar ordering: design/sidebar-ordering.md
       - New project from the app: design/new-project.md
   - Operations:
       - Configuration: operations/configuration.md
@@ -454,6 +455,7 @@ nav:
           - "M4-48: Copy single blocks of a message": briefs/M4-48-copy-blocks.md
           - "M4-49: Readable code blocks": briefs/M4-49-readable-code-blocks.md
           - "M4-50: Free text selection in the history": briefs/M4-50-text-selection.md
+          - "M4-51: Sidebar ordering": briefs/M4-51-sidebar-ordering.md
       - Milestone M6:
           - "M6-01: Console session following the BFF pattern": briefs/M6-01-console-session.md
           - "M6-05: Statistics in the server": briefs/M6-05-stats-server.md

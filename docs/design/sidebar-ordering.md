@@ -2,7 +2,7 @@
 
 Status: design of 2026-10-31 after an owner request; a short design with the decisions, then one
 build ticket. This note explains and justifies; the normative text is in the chapters it changes
-([01-product.md](../spec/01-product.md) 6.7, 6.15, 11, 13 R-PR-29, 14;
+([01-product.md](../spec/01-product.md) 6.7, 6.8, 6.15, 11, 13 R-PR-29;
 [03-data-model.md](../spec/03-data-model.md) `user_space_states`, `user_channel_states`;
 [04-sync-protocol.md](../spec/04-sync-protocol.md) 14; [06-api.md](../spec/06-api.md) Preferences).
 Rulings: [decisions.d/M4-51.md](../decisions.d/M4-51.md) (`D-M4-51-1` to `D-M4-51-9`). Ticket:

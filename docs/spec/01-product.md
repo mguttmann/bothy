@@ -1546,7 +1546,8 @@ a second interaction.
   and hidden columns, which spaces and thread groups of the sidebar are collapsed and the scroll
   position are never written to the server and never follow another device of the person. Only
   data crosses devices (04 14): messages, read state and the counters it gives, drafts, settings,
-  the personal order of the spaces and notification preferences. Expanding a space on the phone
+  the personal order of the sidebar (spaces, channels, forum posts; 6.16) and notification
+  preferences. Expanding a space on the phone
   to open a chat leaves the space as it was on the desktop; an upgraded app keeps the collapse
   state it showed last, a new device starts with every space expanded. Opening a thread on one
   device marks it read there; the other device updates its
@@ -1581,8 +1582,8 @@ none of them.
    device like the collapse state (item 7). A text channel has at most
    `ui.sidebar_threads_per_channel` thread rows. When more qualify, they are chosen in this
    order: selected, waiting for the person, active run, unread mentions, unread, newest activity.
-4. **Order.** In a forum by last activity (`last_activity_at`), newest first; in a text channel by
-   creation time, newest first. A row that no longer qualifies disappears, and the rows of a forum
+4. **Order.** In a forum by last activity (`last_activity_at`), newest first, unless the person
+   arranges the forum's posts by hand (6.16); in a text channel by creation time, newest first. A row that no longer qualifies disappears, and the rows of a forum
    change their order, only while the pointer is outside the sidebar and the keyboard focus is
    not in it; until then the rows stay in place, and a post new to the group appears at the top.
    "Show more" and "Show less" apply at once.
@@ -1613,8 +1614,10 @@ none of them.
    place. An empty draft is discarded when the person leaves the view.
 9. **No worktree per post.** A new chat in a project forum is a new agent session in the same
    project folder; the app and the runner create no git worktree for it (09 18.1).
-10. **Dragging.** Thread rows and channel rows cannot be dragged; the personal order of spaces stays
-    (components.md 7). Moving a thread stays the dialog of 6.7.
+10. **Dragging.** Spaces, channels and forum posts are dragged within their parent into the
+    person's own order, and each level can be arranged by activity instead (6.16, addendum of
+    2026-10-31, replaces the former rule that channel and thread rows cannot be dragged). Threads of
+    a text channel cannot be dragged. Moving a thread to another channel stays the dialog of 6.7.
 11. **Kind of a channel.** The channel icon (`channel.text`, `channel.forum`, `channel.project`) has
     a tooltip and a screen reader text that explain the kind in one sentence (section 4); the
     channel header shows the same sentence as its subtitle, and an empty forum shows it as its
@@ -1837,6 +1840,49 @@ of every message of the history (main history and threads).
    press opens the message menu (6.12 item 2). The menu has "Select text" after "Copy text"; it
    opens the message in a sheet with the system selection (handles, the system menu with Copy and
    Select all), whose copy follows item 3. A link in the sheet opens and closes the sheet.
+
+### 6.16 Sidebar ordering
+
+Addendum of 2026-10-31 (R-PR-30, rulings D-M4-51-1 to D-M4-51-9,
+[design note](../design/sidebar-ordering.md)). Reason: owner request of 2026-10-31; nothing in the
+sidebar could be put into an order of one's own, neither the spaces (for example five imported
+spaces), nor the channels and forums of a space (a dev space with 25 project forums), nor the chats
+of a forum. Applies to the desktop sidebar (D1) and to M1 on the phone. Replaces 6.8 item 10 for
+channels and forum posts.
+
+1. **Three levels.** The spaces, the channels and forums of one space, and the open posts of one
+   forum each have an order. Each level is either in the person's manual order or arranged by
+   activity. Threads of a text channel keep 6.8 items 2 to 4.
+2. **Manual order.** The person drags a row to a new place among its siblings: on macOS and Windows
+   with the mouse, a line between two rows shows where it lands; on iOS and Android a long press
+   lifts the row, which then follows the finger, while a short touch opens it and a swipe scrolls.
+   A row stays in its parent: a channel in its space, a post in its forum (moving a post to
+   another forum stays the dialog of 6.7). The menu of a space, a channel and a forum post in the
+   sidebar (right click, the menu key, Shift+F10) has "Move up" and "Move down", disabled at the
+   ends, and screen readers have the same two actions on the row.
+3. **Personal and kept.** The manual order of every level is the person's own and follows the
+   person to every device (04 14): the spaces by `user_space_states.sort_key`, the channels of a
+   space by `user_space_states.channel_order`, the posts of a forum by
+   `user_channel_states.thread_order` (03). It never changes the order anyone else sees. Rows that
+   are not in the person's list (a forum created later, a new post) come first, in the default
+   order of the level: channels in the global order, posts by last activity, newest first. The
+   collapse state of a space stays per device (6.7).
+4. **Arranged by activity.** The settings `sidebar.auto_arrange_spaces` ("Arrange spaces
+   automatically", default off), `sidebar.auto_arrange_channels` ("Arrange channels and projects
+   automatically", default off) and `sidebar.auto_arrange_chats` ("Arrange chats automatically",
+   default on) in Settings, Appearance (section 11) arrange their level by the last activity, newest
+   first: a post by its `last_activity_at` (a message, a run step), a channel by the newest activity
+   of its threads the device holds (its main history included), else its creation time, a space by
+   the newest activity of its channels. Ties keep the manual order. Writing a message in a chat
+   therefore moves the chat to the top of its forum and the forum to the top of its space when
+   those levels are arranged by activity. As in 6.8 item 4 the rows of an automatic level keep
+   their order while the pointer or the keyboard focus is in the sidebar (on a touch screen: a
+   finger, a scroll or the screen reader) and change it once the person has left.
+5. **Switched off dragging.** At a level arranged by activity a row does not lift; a note says that
+   the level is arranged by activity and names the switch to turn off. "Move up" and "Move down"
+   in its menu are disabled below the entry "Arranged by activity".
+6. **Show more.** A forum in manual order shows the first `ui.sidebar_forum_posts_visible` posts of
+   that order (6.8 item 3); a move keeps the place of the posts behind "Show more".
 
 ## 7. Keyboard shortcuts
 
@@ -2094,6 +2140,7 @@ Rules:
 | R-PR-27 | Every forum the Claude Code runner operates is a Claude Code chat: its folder need not be a Git repository, a forum without a project binding works in the runner's default folder when one is set, and a failed run shows its cause in the thread next to the reason (section 4, addendum of 2026-10-30). | Owner expectation 2026-10-30: three forums bound to folders without Git stayed "not ready", and a forum without a binding failed after 0 s with only "Error in the adapter" (docs/decisions.d/RUNNER-NO-GIT.md). |
 | R-PR-28 | A code block wraps its long lines by default, keeps the indentation of a wrapped line, and switches per device to one line per line with a working horizontal scroll through the toggle "Wrap lines"; a block higher than `ui.code_block_collapse_lines` lines shows collapsed with a fade and "Show all" / "Show less"; the copy stays the raw content (6.14, addendum of 2026-10-31). | Owner decision 2026-10-31: a long sentence sent as a fenced block "to copy" showed as one cut-off line that could neither be scrolled nor expanded on macOS, so the owner could not read what he would copy (docs/decisions.d/M4-49.md). |
 | R-PR-29 | The content of a message in the history is selectable with the mouse on the desktop (drag, double and triple click, shift and click) within one message, Cmd+C (Ctrl+C) and "Copy" of the message menu copy it as plain text in the structure of the message with code parts exact; on the phone "Select text" in the message menu opens the message with the system selection (6.15, addendum of 2026-10-31). | Owner report 2026-10-31 (macOS app): no text of the history could be selected, so parts of messages, logs and code could not be copied; the history offered no system selection (docs/decisions.d/M4-50.md). |
+| R-PR-30 | Spaces, the channels and forums of a space and the open posts of a forum are dragged into the person's own order (a line shows the drop on the desktop, a long press lifts the row on the phone, "Move up" and "Move down" in the row menu), kept per person across devices and never visible to others; three personal settings arrange each level by last activity instead (spaces and channels off, chats on by default), and an automatic level cannot be dragged (6.15, addendum of 2026-10-31). | Owner request 2026-10-31: nothing in the sidebar could be moved, not five imported spaces, not 25 project forums of a dev space, not the chats of a forum; the sidebar order is data that follows the person (R-PR-24), and chats by activity is the order of R-PR-23 (docs/decisions.d/M4-51.md). |
 
 ## 14. Configuration values of this chapter
 
