@@ -182,6 +182,12 @@ android {
         getByName("androidTest") {
             if (firebaseConfigured) java.srcDir("src/androidTestFirebase/kotlin")
         }
+        // The text input probe of the phone integration tests (DICTATION-MOBILE): the channel in
+        // the debug build, a no-op in every other build type.
+        getByName("debug") { java.srcDir("src/debug/kotlin") }
+        buildTypes.names.filter { it != "debug" }.forEach { buildType ->
+            getByName(buildType) { java.srcDir("src/probeoff/kotlin") }
+        }
     }
 
     signingConfigs {

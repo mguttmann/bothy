@@ -875,6 +875,22 @@ simulator or an Android emulator when the microphone was granted before the run 
 recording works (the script grants it on the simulator); otherwise it prints a
 `SKIP client voice-device` line and uses the fake recorder.
 
+## Dictation and inserts of other apps
+
+Text from outside the app reaches the composer through the platform's text input, not through
+keys: a dictation app's keyboard extension on iOS (`textDocumentProxy.insertText`, which arrives
+as `insertText:` of Flutter's text input view), the system dictation (marked text, then
+`unmarkText`), voice typing and other input methods on Android (`setComposingText`,
+`commitText`, `finishComposingText`), the paste of the system menu or of an input method, and the
+paste key of a hardware keyboard. The composer treats such text as typed or pasted (01 6.13
+item 1): the widget tests of `test/composer/external_insert_test.dart` drive the editing values
+the platform hands the framework, and `integration_test/phone/dictation_test.dart` (phone suite)
+drives the real text input from the native side on the iOS simulator and an Android emulator
+through the text input probe, the method channel `bothy/text_input_probe` that only debug builds
+register (iOS: `AppDelegate.swift` under `#if DEBUG`, set by `ios/Flutter/Debug.xcconfig`;
+Android: `android/app/src/debug/kotlin`, with a no-op in `src/probeoff` for the other build
+types).
+
 ## Search, quick switcher, mentions and Running now
 
 The cross-cutting views of 01 3.5 and 5.1 (M4-23) open from the sidebar head and the routes
