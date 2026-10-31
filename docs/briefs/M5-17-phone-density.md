@@ -29,14 +29,28 @@ two-line live box ("Running 0:56" over "compacting") took a large part of the he
 
 ## Fixed requirements that apply
 
-1. No MVP; strictly modular; doc comment on every public symbol; documentation in the repo is
-   part of the change; quality gates block the merge (the owner's fixed build rules).
-2. Test first: write the failing test, keep its red output for the report, then make it green.
-3. No en dash and no em dash in any file.
-4. White label: Alex, Sam, Robin and `example.com` in tests and goldens.
-5. No GUI test on the owner's devices; widget tests and goldens run headless.
-6. Tap targets stay at least `density.target-min` (48 on touch, which covers 44 pt and 48 dp);
-   every control keeps its screen reader label.
+Owner's fixed build rules (apply verbatim):
+
+1. No MVP. New from scratch and directly in the final state; stages are only the order.
+2. Strictly modular: clear module and service boundaries, dependencies only through defined
+   interfaces, no cross access.
+3. Documentation in code: every public module, class, function and interface with a docstring/doc
+   comment (purpose, parameters, return value, errors, example where useful); comments explain the
+   why, not the what. API documentation is generated from code (OpenAPI from the routes, dartdoc,
+   Python API docs in MkDocs).
+4. Documentation in the repo: README per module/service, ADR for every architecture decision,
+   CHANGELOG per release, keep the documentation site current. A change without matching
+   documentation is not done.
+5. Quality gates (SonarQube, linters, type checking, security scanners, test coverage) block the
+   merge.
+
+Rules for every brief:
+
+6. Test first: write the failing test, keep its red output for the report, then make it green.
+7. No en dash and no em dash in any file.
+8. White label: Alex, Sam, Robin and `example.com` in tests and goldens.
+9. No GUI test on the owner's devices; widget tests and goldens run headless.
+10. Tap targets stay at least `density.target-min` (48 on touch, which covers 44 pt and 48 dp); every control keeps its screen reader label.
 
 ## Scope
 
@@ -65,6 +79,16 @@ Fragments: `docs/decisions.d/M5-17.md` (`D-M5-17-<n>`), `changelog.d/M5-17.md`.
 - A swap of microphone and Send by the text state (one button that changes): it changes the
   voice flows of M5-07 and was not asked for.
 - Collapsing the live box while scrolling: it is one line and carries Stop.
+
+## Boundaries
+
+- Work in a dedicated git worktree on its own branch; one writer per worktree.
+- Conventional Commits with the package or component as scope and a DCO sign-off on every commit (`git commit -s`).
+- Never push to `main`, never tag; the only remote steps are the branch push and the pull request of `AGENTS.md`.
+- Do not modify files outside the scope above, except the fragments and READMEs named in this brief.
+- Tests bind no port and make no network call.
+- Never lower a threshold, disable a gate or delete a test.
+- This brief was written together with the change, in the manner of D-W-100 and D-W-114. Where the merged code names a package, type, function, file, provider or make target differently from this brief, follow the code and list each difference in the report; where it behaves differently from the specification, stop with `Verdict: BLOCKED <reason>`.
 
 ## Design notes
 
@@ -113,8 +137,21 @@ Commands that must pass, from the repository root: `cd packages/design_system &&
 - [ ] Targets and labels kept; spec 01 and 15, components, tokens, PLAN, rulings and changelog
       updated.
 
+## Definition of done
+
+- Code and tests as specified; doc comment on every public symbol; comments cite 01 5.3 M3 or M5-17.
+- Rulings in `docs/decisions.d/M5-17.md`; changelog fragment as in Scope.
+- An independent code review over the diff, then the red team gate (`docs/quality/red-team-gate.md`, verdict `JA` or `NEIN`).
+- Land the change as `AGENTS.md` ("How work lands on `main`") describes.
+
 ## Report
+
+Write to `{{REPORT_PATH}}`:
 
 1. First line exactly `Verdict: DONE` or `Verdict: BLOCKED <reason>`.
 2. Commits, changed files, the red and the green test runs.
-3. What is not proven (the real devices; no GUI test runs on the owner's devices).
+3. Review and red team verdicts and the findings fixed.
+4. What is not proven (the real devices; no GUI test runs on the owner's devices).
+5. Follow-ups with reasons and differences to the names of this brief.
+
+Then write `{{DONE_PATH}}` with `exit=0 sha=<sha>` or `exit=1 <reason>`.
