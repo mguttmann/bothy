@@ -3295,37 +3295,37 @@ abstract class AppLocalizations {
   /// **'Space {name} with its channels'**
   String sidebarSpaceGroup(String name);
 
-  /// Accessibility action and menu entry of a sidebar row (space, channel or forum post) that moves it one place up in the personal order (components.md section 7; 01 section 6.15).
+  /// Accessibility action and menu entry of a sidebar row (space, channel or forum post) that moves it one place up in the personal order (components.md section 7; 01 section 6.16).
   ///
   /// In en, this message translates to:
   /// **'Move up'**
   String get sidebarMoveUp;
 
-  /// Accessibility action and menu entry of a sidebar row (space, channel or forum post) that moves it one place down in the personal order (components.md section 7; 01 section 6.15).
+  /// Accessibility action and menu entry of a sidebar row (space, channel or forum post) that moves it one place down in the personal order (components.md section 7; 01 section 6.16).
   ///
   /// In en, this message translates to:
   /// **'Move down'**
   String get sidebarMoveDown;
 
-  /// Disabled entry of the menu of a sidebar row whose level is arranged by activity; it explains why Move up and Move down are disabled (01 section 6.15, M4-51).
+  /// Disabled entry of the menu of a sidebar row whose level is arranged by activity; it explains why Move up and Move down are disabled (01 section 6.16, M4-51).
   ///
   /// In en, this message translates to:
   /// **'Arranged by activity'**
   String get sidebarArrangedByActivity;
 
-  /// Note when the person tries to drag a space while spaces are arranged automatically (01 section 6.15, M4-51).
+  /// Note when the person tries to drag a space while spaces are arranged automatically (01 section 6.16, M4-51).
   ///
   /// In en, this message translates to:
   /// **'Spaces are arranged by activity. Turn off \"Arrange spaces automatically\" in Settings, Appearance, to arrange them yourself.'**
   String get sidebarSpacesArrangedHint;
 
-  /// Note when the person tries to drag a channel while channels are arranged automatically (01 section 6.15, M4-51).
+  /// Note when the person tries to drag a channel while channels are arranged automatically (01 section 6.16, M4-51).
   ///
   /// In en, this message translates to:
   /// **'Channels and projects are arranged by activity. Turn off \"Arrange channels and projects automatically\" in Settings, Appearance, to arrange them yourself.'**
   String get sidebarChannelsArrangedHint;
 
-  /// Note when the person tries to drag a forum post while chats are arranged automatically (01 section 6.15, M4-51).
+  /// Note when the person tries to drag a forum post while chats are arranged automatically (01 section 6.16, M4-51).
   ///
   /// In en, this message translates to:
   /// **'Chats are arranged by activity. Turn off \"Arrange chats automatically\" in Settings, Appearance, to arrange them yourself.'**

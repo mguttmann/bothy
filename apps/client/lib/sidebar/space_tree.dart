@@ -3,7 +3,7 @@
 /// The tree of spaces, channels and thread rows (components.md 7; 01 6.8): spaces in the
 /// person's order, dragged into a new order by their row (brief M4-19 Design note 2) with the
 /// mouse or, on a touch screen, after a long press; channels and forum posts are dragged within
-/// their parent (01 6.15, brief M4-51).
+/// their parent (01 6.16, brief M4-51).
 library;
 
 import 'package:design_system/design_system.dart';
@@ -45,7 +45,7 @@ class SpaceTree extends StatelessWidget {
     this.onMoveThread,
   });
 
-  /// Which levels are arranged by activity (01 6.15): an automatic level cannot be dragged.
+  /// Which levels are arranged by activity (01 6.16): an automatic level cannot be dragged.
   final SidebarArrangement arrangement;
 
   /// Whether the screen is a touch screen: a long press starts a drag (D-M4-51-6).

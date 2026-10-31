@@ -59,7 +59,7 @@ Stream<Set<SpaceId>> collapsedSpaces(Ref ref) {
 /// loads.
 ///
 /// The order is the personal one with the global order as the fallback (`orderSpaces`), or, with
-/// "Arrange spaces automatically" (01 6.15 item 4, D-M4-51-4), the newest activity of each
+/// "Arrange spaces automatically" (01 6.16 item 4, D-M4-51-4), the newest activity of each
 /// space's channels first with the personal order breaking ties; an automatic order holds while
 /// [sidebarHoldProvider] holds, so no space moves under the pointer.
 @riverpod
@@ -97,7 +97,7 @@ class SpacesWithState extends _$SpacesWithState {
   }
 }
 
-/// The activity of the channel [channelId] (01 6.15 item 4, D-M4-51-4): the newest
+/// The activity of the channel [channelId] (01 6.16 item 4, D-M4-51-4): the newest
 /// `last_activity_at` of its stored threads, the main history included, else its creation time;
 /// the epoch while the channel is not stored.
 @riverpod
@@ -113,7 +113,7 @@ DateTime channelActivityOf(Ref ref, String channelId) {
 }
 
 /// The person's sidebar state of every channel (03 `user_channel_states`): the manual order of
-/// a forum's posts (01 6.15 item 3).
+/// a forum's posts (01 6.16 item 3).
 @riverpod
 Stream<Map<ChannelId, UserChannelState>> userChannelStates(Ref ref) {
   final db = ref.watch(localDatabaseProvider);
@@ -250,7 +250,7 @@ class ChannelThreads extends _$ChannelThreads {
     final toggled = _inFull != null && _inFull != inFull;
     _inFull = inFull;
     final held = ref.watch(sidebarHoldProvider) && !toggled;
-    // 01 6.15: with "Arrange chats automatically" off a forum follows the person's order; a
+    // 01 6.16: with "Arrange chats automatically" off a forum follows the person's order; a
     // forum without one stays by activity, held as before.
     final order = ref.watch(sidebarArrangementProvider).autoChats
         ? null
@@ -321,7 +321,7 @@ List<SidebarNewChatRow> newChatRows(Ref ref, String channelId) {
 /// thread group with its collapse state on this device (01 6.8); direct messages and archived
 /// channels are not part of the tree.
 ///
-/// The order is the global one in the person's `channel_order` (rows not in it first, 01 6.15
+/// The order is the global one in the person's `channel_order` (rows not in it first, 01 6.16
 /// item 3), or, with "Arrange channels and projects automatically", the newest activity first
 /// with that order breaking ties, held while [sidebarHoldProvider] holds (D-M4-51-4).
 @riverpod

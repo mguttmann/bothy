@@ -48,7 +48,7 @@ class ThreadMenu extends StatelessWidget {
     this.moves,
   });
 
-  /// "Move up" and "Move down" of the post in the sidebar (01 6.15, M4-51), or null for none.
+  /// "Move up" and "Move down" of the post in the sidebar (01 6.16, M4-51), or null for none.
   final SidebarMoves? moves;
 
   /// The thread.

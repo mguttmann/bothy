@@ -80,16 +80,16 @@ class SidebarView extends StatelessWidget {
     this.onMoveThread,
   });
 
-  /// Which levels are arranged by activity (01 6.15, M4-51): an automatic level cannot be
+  /// Which levels are arranged by activity (01 6.16, M4-51): an automatic level cannot be
   /// dragged and its rows' menus say why.
   final SidebarArrangement arrangement;
 
   /// Moves a channel within its space to an index (in the list without it), or null for no
-  /// drag (01 6.15).
+  /// drag (01 6.16).
   final void Function(SpaceId space, ChannelId channel, int to)? onMoveChannel;
 
   /// Moves an open post within its forum to an index among the post rows on screen, or null
-  /// for no drag (01 6.15).
+  /// for no drag (01 6.16).
   final void Function(ChannelId forum, ThreadId thread, int to)? onMoveThread;
 
   /// `branding.product_name` of the instance.
@@ -472,7 +472,7 @@ class SidebarColumn extends ConsumerWidget {
       onMove: (space, to) => unawaited(
         writer()?.move(moveSpace([for (final n in nodes) n.entry], space, to)),
       ),
-      // 01 6.15: the levels arranged by activity, and the moves of the manual ones. A move writes
+      // 01 6.16: the levels arranged by activity, and the moves of the manual ones. A move writes
       // the whole order of the level as the device holds it (D-M4-51-3); for a forum every open
       // post, also those behind "Show more" (D-M4-51-9).
       arrangement: ref.watch(sidebarArrangementProvider),

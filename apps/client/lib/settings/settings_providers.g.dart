@@ -62,13 +62,13 @@ final class PersonalSettingsProvider
 
 String _$personalSettingsHash() => r'369e9c461972a04378943563bfa3b51e43d26c2d';
 
-/// Which levels of the sidebar are arranged by activity, from the personal settings (01 6.15,
+/// Which levels of the sidebar are arranged by activity, from the personal settings (01 6.16,
 /// D-M4-51-5); synchronized like every personal setting.
 
 @ProviderFor(sidebarArrangement)
 final sidebarArrangementProvider = SidebarArrangementProvider._();
 
-/// Which levels of the sidebar are arranged by activity, from the personal settings (01 6.15,
+/// Which levels of the sidebar are arranged by activity, from the personal settings (01 6.16,
 /// D-M4-51-5); synchronized like every personal setting.
 
 final class SidebarArrangementProvider
@@ -79,7 +79,7 @@ final class SidebarArrangementProvider
           SidebarArrangement
         >
     with $Provider<SidebarArrangement> {
-  /// Which levels of the sidebar are arranged by activity, from the personal settings (01 6.15,
+  /// Which levels of the sidebar are arranged by activity, from the personal settings (01 6.16,
   /// D-M4-51-5); synchronized like every personal setting.
   SidebarArrangementProvider._()
     : super(

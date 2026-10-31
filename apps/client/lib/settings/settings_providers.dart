@@ -46,7 +46,7 @@ abstract final class SettingKeys {
   /// The object of column widths (D-M4-18-5).
   static const String columnWidths = 'layout.column_widths';
 
-  /// `true`, `false`: spaces arranged by activity (01 6.15, D-M4-51-5).
+  /// `true`, `false`: spaces arranged by activity (01 6.16, D-M4-51-5).
   static const String autoArrangeSpaces = 'sidebar.auto_arrange_spaces';
 
   /// `true`, `false`: the channels of a space arranged by activity.
@@ -148,7 +148,7 @@ final class PersonalSettings {
   final bool hasColumnWidths;
 
   /// `sidebar.auto_arrange_spaces`, `sidebar.auto_arrange_channels` and
-  /// `sidebar.auto_arrange_chats` (01 6.15, D-M4-51-5).
+  /// `sidebar.auto_arrange_chats` (01 6.16, D-M4-51-5).
   final SidebarArrangement arrangement;
 }
 
@@ -161,7 +161,7 @@ PersonalSettings personalSettings(Ref ref) => PersonalSettings.resolve(
   hasCrashTarget: ref.watch(appPortsProvider).branding.hasCrashTarget,
 );
 
-/// Which levels of the sidebar are arranged by activity, from the personal settings (01 6.15,
+/// Which levels of the sidebar are arranged by activity, from the personal settings (01 6.16,
 /// D-M4-51-5); synchronized like every personal setting.
 @Riverpod(keepAlive: true)
 SidebarArrangement sidebarArrangement(Ref ref) =>

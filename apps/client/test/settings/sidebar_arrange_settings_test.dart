@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// The three switches of the sidebar ordering (brief M4-51; 01 11 and 6.15; D-M4-51-5): their
+// The three switches of the sidebar ordering (brief M4-51; 01 11 and 6.16; D-M4-51-5): their
 // defaults (spaces and channels off, chats on), a change written through the outbox as a
 // personal setting and applied at once, the default deleting the key, the arrangement the
 // sidebar reads, and the switches in Settings, Appearance on the desktop and the phone, in

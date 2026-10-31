@@ -183,7 +183,7 @@ const Set<RunState> _activeStates = {
 /// [SidebarThreadGroup.more] describes the row.
 ///
 /// [manualOrder] is the person's order of the forum's posts when "Arrange chats automatically" is
-/// off (01 6.15, brief M4-51): the posts follow it, posts not in it come first by activity
+/// off (01 6.16, brief M4-51): the posts follow it, posts not in it come first by activity
 /// (D-M4-51-3), the limit takes the first posts of that order, and [heldOrder] does not apply,
 /// because activity never moves a row of a manual group and a drag must show at once. Null is the
 /// order by activity. Text channels ignore it.

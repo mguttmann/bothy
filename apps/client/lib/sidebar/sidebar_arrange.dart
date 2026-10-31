@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The ordering rules of the sidebar levels (docs/spec/01-product.md 6.15; brief M4-51; design
+/// The ordering rules of the sidebar levels (docs/spec/01-product.md 6.16; brief M4-51; design
 /// note sidebar-ordering.md D-M4-51-1 to D-M4-51-9): the manual order of a level as a personal
 /// list, the automatic order by activity, the held order while the person is in the sidebar and
 /// the move of one row. Pure functions, shared by the desktop and the phone.

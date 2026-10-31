@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// The sidebar ordering over the local database (brief M4-51; 01 6.15; D-M4-51-2 to D-M4-51-9):
+// The sidebar ordering over the local database (brief M4-51; 01 6.16; D-M4-51-2 to D-M4-51-9):
 // a channel and a forum post moved by the menu write the person's order through the outbox and
 // keep it after a restart; an order from another device of the person applies; the automatic
 // levels order by activity, a new message moves its chat, its forum and its space to the top,

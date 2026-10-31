@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Dragging in the sidebar (brief M4-51; 01 6.15; D-M4-51-6, D-M4-51-7): on the desktop a mouse
+// Dragging in the sidebar (brief M4-51; 01 6.16; D-M4-51-6, D-M4-51-7): on the desktop a mouse
 // drag moves a space, a channel within its space and an open post within its forum, with a line
 // where the row lands; on a touch screen a long press lifts the row and a swipe does not; a row
 // never lands in another parent; at an automatic level nothing moves and a note says why; the
