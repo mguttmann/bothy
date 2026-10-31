@@ -3,7 +3,7 @@
 /// Appliers of the personal data of 04 14 (brief M4-14 Design note 5): the echo of this device
 /// (`updated_by_device_id`) is ignored, the read state only increases (`mergeReadState`) and
 /// sets the counters from the payload, a draft being typed on this device keeps its local text,
-/// settings, sidebar, notification preferences and quiet hours apply per row by version.
+/// settings, sidebar (spaces and channels), notification preferences and quiet hours apply per row by version.
 library;
 
 import 'package:domain/domain.dart';
@@ -19,6 +19,7 @@ final Map<String, Applier> personalAppliers = {
   'draft.deleted': _draftDeleted,
   'settings.updated': _settings,
   'sidebar.updated': _sidebar,
+  'sidebar_channel.updated': _sidebarChannel,
   'notification_pref.updated': _notificationPref,
   'quiet_hours.updated': _quietHours,
 };
@@ -98,6 +99,14 @@ Future<void> _sidebar(ApplyContext c) async {
   final state = sidebarFromJson(obj(c.payload, 'state'));
   if (_ownEcho(c, state.updatedByDeviceId)) return;
   await c.db.structureDao.upsertUserSpaceStateIfNewer(state);
+}
+
+/// `sidebar_channel.updated` (M4-51): the own thread order of a channel by version; the echo of
+/// this device is ignored as for the space rows.
+Future<void> _sidebarChannel(ApplyContext c) async {
+  final state = sidebarChannelFromJson(obj(c.payload, 'state'));
+  if (_ownEcho(c, state.updatedByDeviceId)) return;
+  await c.db.structureDao.upsertUserChannelStateIfNewer(state);
 }
 
 Future<void> _notificationPref(ApplyContext c) async {
