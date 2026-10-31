@@ -205,6 +205,7 @@ fixed and the delta is checked again; the threat model (chapter 19) is updated. 
 | `quality.coverage.python_min_percent` | `80` | percent | Minimum coverage per Python project under `sdk/` and `plugins/` | the project's `pyproject.toml` (`fail_under` in `[tool.coverage.report]`) |
 | `quality.coverage.typescript_min_percent` | `80` | percent | Minimum coverage per TypeScript project | the project's `vitest.config.ts` (`coverage.thresholds`) |
 | `quality.contract.max_examples` | `100` | count | Examples per operation in G7 | `Makefile` (`CONTRACT_MAX_EXAMPLES`) |
+| `quality.contract.seed` | `238` | integer | Seed of the generated cases in G7 (Hypothesis); every run draws the same cases, so a failure repeats | `Makefile` (`CONTRACT_SEED`) |
 | `quality.contract.timeout` | `180m` | duration | Time limit of `make contract-test` (G7) | `Makefile` (`CONTRACT_TIMEOUT`) |
 | `quality.perf.timeout` | `60m` | duration | Time limit of `make perf` per Go module | `Makefile` (`PERF_TIMEOUT`) |
 | `quality.test.go_timeout` | `40m` | duration | Time limit of each Go test binary in `make test` (`go test -timeout`); in CI a binary that runs longer than half of it fails (PL/39) | `Makefile` (`GO_TEST_TIMEOUT`) |

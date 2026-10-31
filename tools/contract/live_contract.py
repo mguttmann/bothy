@@ -498,6 +498,9 @@ def test_owner_pass(case: Any, called: dict[str, set[str]]) -> None:
     run_case(case, "owner", called)
 
 
+# run_state_machine_as_test reads the seed from the state machine class; without it the stateful
+# phase drew different sequences in every run (flake list #238).
+@hypothesis.seed(SEED)
 class _OwnerMachine(SCHEMAS["owner"].as_state_machine()):  # type: ignore[misc]
     """Stateful phase as the owner over the links Schemathesis infers (openapi.yaml has none)."""
 
