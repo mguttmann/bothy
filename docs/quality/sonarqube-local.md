@@ -131,6 +131,40 @@ and the gate has no status. `make sonar-new-code` (same variables) sets the last
 of `main` does not wait for the gate (`SONAR_QUALITYGATE_WAIT=false` in ci.yml): it records the
 overall state and the baseline and must not block `main`; pull requests wait and fail with it.
 
+### Findings that only the analysis of main shows
+
+From the analysis of 2026-10-25 on, the gate of `main` was `ERROR` (`new_security_rating` C)
+while every pull request gate was green. Two vulnerabilities caused it; neither appeared in a
+pull request analysis (docs/decisions.d/SONAR-MAIN-GATE.md):
+
+* `pythonsecurity:S8707` in `sdk/python/src/bothy_sdk/auth.py`: a taint flow from the command
+  line of `plugins/hermes-adapter` into `FileDpopKey.generate` of the SDK. The SDK pull request
+  (289) had no source, so no flow; the adapter pull request (318) created the flow, but its sink
+  lies in `auth.py`, which that pull request did not change. A pull request analysis keeps only
+  issues on the code the pull request changes, so the finding first appeared in the next
+  analysis of `main`.
+* `text:S8569` in `packages/device_key/android/build.gradle.kts`: the file was new in pull
+  request 116, whose analysis reported no vulnerability and has no S8569 issue on record, while
+  the same rule did report the app's build file in pull request 360. Why pull request 116 missed
+  it is not visible through the public API or the log of that run (unverified).
+
+Two settings let such a finding stay unnoticed on `main`. The new code of `main` is the last
+30 days, and the server dates an issue on an unchanged line back to the line's commit, so a
+finding the analysis of `main` discovers late still counts as new code and fails the gate. The
+scan of `main` does not wait for the gate (above), so the CI job stays green. Read the gate of
+`main` after a merge, or whenever a pull request touches a file that code of another component
+calls, with the public API (public project, no token):
+
+```sh
+curl -fsS "https://sonarcloud.io/api/qualitygates/project_status?projectKey=<project-key>"
+curl -fsS "https://sonarcloud.io/api/issues/search?componentKeys=<project-key>&types=VULNERABILITY&statuses=OPEN"
+```
+
+A finding is fixed in code when it is real. A false positive is marked on its line with
+`NOSONAR` (`# NOSONAR` in Python, `// NOSONAR` in Go, Kotlin and Dart), the reason in one line
+next to it and a ruling in the ticket's `docs/decisions.d/` file; a rule is never deactivated
+or weakened for a single finding.
+
 Where the token exists only as the GitHub Actions secret `SONAR_TOKEN`, the manual workflow
 `.github/workflows/sonar-config.yml` runs these targets against the cloud
 (`gh workflow run sonar-config.yml --ref main`, variable `SONAR_ORGANIZATION`). The cloud
