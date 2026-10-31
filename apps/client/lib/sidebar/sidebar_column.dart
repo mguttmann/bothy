@@ -28,6 +28,7 @@ import '../telemetry/telemetry_providers.dart';
 import '../terminal/hosts_group.dart';
 import '../viz/live_page.dart' show livePath;
 import 'providers.dart';
+import 'sidebar_arrange.dart';
 import 'sidebar_footer.dart';
 import 'sidebar_header.dart';
 import 'sidebar_live_group.dart';
@@ -73,7 +74,22 @@ class SidebarView extends StatelessWidget {
     this.holdMode = SidebarHoldMode.pointer,
     this.selectedNewChat,
     this.onOpenNewChat,
+    this.arrangement = const SidebarArrangement(),
+    this.onMoveChannel,
+    this.onMoveThread,
   });
+
+  /// Which levels are arranged by activity (01 6.15, M4-51): an automatic level cannot be
+  /// dragged and its rows' menus say why.
+  final SidebarArrangement arrangement;
+
+  /// Moves a channel within its space to an index (in the list without it), or null for no
+  /// drag (01 6.15).
+  final void Function(SpaceId space, ChannelId channel, int to)? onMoveChannel;
+
+  /// Moves an open post within its forum to an index among the post rows on screen, or null
+  /// for no drag (01 6.15).
+  final void Function(ChannelId forum, ThreadId thread, int to)? onMoveThread;
 
   /// `branding.product_name` of the instance.
   final String productName;
@@ -208,6 +224,11 @@ class SidebarView extends StatelessWidget {
           onAddFolderForums: onAddFolderForums,
           selectedNewChat: selectedNewChat,
           onOpenNewChat: onOpenNewChat,
+          arrangement: arrangement,
+          // A touch screen lifts a row after a long press (D-M4-51-6).
+          touch: holdMode == SidebarHoldMode.touch,
+          onMoveChannel: onMoveChannel,
+          onMoveThread: onMoveThread,
         ),
       ),
       // The group scrolls within a share of the column, so the spaces keep their room.

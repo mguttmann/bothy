@@ -12,6 +12,8 @@ import 'package:l10n/l10n.dart';
 
 import '../menus/space_menu.dart';
 import 'channel_entry.dart';
+import 'sidebar_arrange.dart';
+import 'sidebar_drag.dart';
 import 'sidebar_model.dart';
 
 /// The node of [node].
@@ -22,8 +24,10 @@ import 'sidebar_model.dart';
 /// that end), the keyboard and screen reader way to change the personal order besides
 /// dragging. The channels follow when the space is expanded, each with its thread group when
 /// [onOpenThread] is given (01 6.8). A right click, the menu key or Shift+F10 opens the space's
-/// menu (M4-33). Only the space row can start a drag ([dragHandle]); channel and thread rows
-/// cannot be dragged (01 6.8 item 10).
+/// menu (M4-33), which also has "Move up" and "Move down" (01 6.15, M4-51). The space row starts
+/// the drag of the space ([dragHandle]); the channels of the space are dragged among each other
+/// with [onMoveChannel] and the open posts of a forum with [onMoveThread], unless [arrangement]
+/// arranges their level by activity (D-M4-51-6).
 class SpaceNode extends StatefulWidget {
   /// Creates the node.
   const SpaceNode({
@@ -44,7 +48,24 @@ class SpaceNode extends StatefulWidget {
     this.onMoveUp,
     this.onMoveDown,
     this.dragHandle,
+    this.arrangement = const SidebarArrangement(),
+    this.touch = false,
+    this.onMoveChannel,
+    this.onMoveThread,
   });
+
+  /// Which levels are arranged by activity (01 6.15).
+  final SidebarArrangement arrangement;
+
+  /// Whether the screen is a touch screen: a long press starts a drag (D-M4-51-6).
+  final bool touch;
+
+  /// Moves a channel of the space to an index among its channels (in the list without it), or
+  /// null for no drag and no move entries.
+  final void Function(ChannelId channel, int to)? onMoveChannel;
+
+  /// Moves an open post of a forum to an index among its post rows on screen, or null.
+  final void Function(ChannelId forum, ThreadId thread, int to)? onMoveThread;
 
   /// The space with its channels.
   final SidebarSpaceNode node;
@@ -129,7 +150,24 @@ class _SpaceNodeState extends State<SpaceNode> {
       :onMoveUp,
       :onMoveDown,
       :dragHandle,
+      :arrangement,
+      :touch,
+      :onMoveChannel,
+      :onMoveThread,
     ) = widget;
+    final spacesArranged = arrangement.isAuto(SidebarLevel.spaces);
+    final channelsArranged = arrangement.isAuto(SidebarLevel.channels);
+    final count = node.channels.length;
+    SidebarMoves? channelMoves(ChannelId id, int i) {
+      final move = onMoveChannel;
+      if (move == null) return null;
+      if (channelsArranged) return const SidebarMoves(arranged: true);
+      return SidebarMoves(
+        up: i > 0 ? () => move(id, i - 1) : null,
+        down: i < count - 1 ? () => move(id, i + 1) : null,
+      );
+    }
+
     final space = node.entry.space;
     final newProject = onNewProject == null ? null : () => onNewProject(space);
     final newProjectLabel = newProject == null
@@ -162,6 +200,11 @@ class _SpaceNodeState extends State<SpaceNode> {
                   onAddFolderForums: onAddFolderForums == null
                       ? null
                       : () => onAddFolderForums(space),
+                  moves: SidebarMoves(
+                    up: onMoveUp,
+                    down: onMoveDown,
+                    arranged: spacesArranged,
+                  ),
                   child: DsSpaceRow(
                     node.rowData,
                     key: ValueKey('sidebar.space.${node.entry.space.id.value}'),
@@ -176,26 +219,46 @@ class _SpaceNodeState extends State<SpaceNode> {
           ),
         ),
         if (node.expanded)
-          for (final c in node.channels)
-            ChannelEntry(
-              key: ValueKey('sidebar.entry.${c.channel.id.value}'),
-              entry: c,
-              selected: c.channel.id == selectedChannel,
-              selectedThread: selectedThread,
-              onOpen: () => onOpenChannel(c.channel.id),
-              onOpenThread: onOpenThread,
-              onToggleGroup: onToggleGroup == null
-                  ? null
-                  : (expanded) => onToggleGroup(c.channel.id, expanded),
-              onShowAllPosts: onShowAllPosts == null
-                  ? null
-                  : (inFull) => onShowAllPosts(c.channel.id, inFull),
-              onAdd: onAdd == null ? null : () => onAdd(c.channel.id),
-              selectedNewChat: selectedNewChat,
-              onOpenNewChat: onOpenNewChat == null
-                  ? null
-                  : (entry) => onOpenNewChat(c.channel.id, entry),
-              onParent: _row.requestFocus,
+          for (final (i, c) in node.channels.indexed)
+            SidebarDragRow(
+              key: ValueKey('sidebar.dragChannel.${c.channel.id.value}'),
+              data: SidebarDragData(
+                level: SidebarLevel.channels,
+                parent: space.id.value,
+                id: c.channel.id.value,
+                index: i,
+              ),
+              label: c.channel.name,
+              enabled: onMoveChannel != null && !channelsArranged,
+              arranged: onMoveChannel != null && channelsArranged,
+              touch: touch,
+              onDrop: (id, to) => onMoveChannel!(ChannelId.parse(id), to),
+              child: ChannelEntry(
+                key: ValueKey('sidebar.entry.${c.channel.id.value}'),
+                moves: channelMoves(c.channel.id, i),
+                onMoveThread: onMoveThread == null
+                    ? null
+                    : (thread, to) => onMoveThread(c.channel.id, thread, to),
+                chatsArranged: arrangement.isAuto(SidebarLevel.chats),
+                touch: touch,
+                entry: c,
+                selected: c.channel.id == selectedChannel,
+                selectedThread: selectedThread,
+                onOpen: () => onOpenChannel(c.channel.id),
+                onOpenThread: onOpenThread,
+                onToggleGroup: onToggleGroup == null
+                    ? null
+                    : (expanded) => onToggleGroup(c.channel.id, expanded),
+                onShowAllPosts: onShowAllPosts == null
+                    ? null
+                    : (inFull) => onShowAllPosts(c.channel.id, inFull),
+                onAdd: onAdd == null ? null : () => onAdd(c.channel.id),
+                selectedNewChat: selectedNewChat,
+                onOpenNewChat: onOpenNewChat == null
+                    ? null
+                    : (entry) => onOpenNewChat(c.channel.id, entry),
+                onParent: _row.requestFocus,
+              ),
             ),
       ],
     );

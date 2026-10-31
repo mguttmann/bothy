@@ -8,14 +8,19 @@ import 'package:design_system/design_system.dart';
 import 'package:domain/domain.dart';
 import 'package:flutter/material.dart';
 
+import 'package:l10n/l10n.dart';
+
 import '../menus/thread_menu.dart';
+import 'sidebar_drag.dart';
 import 'sidebar_model.dart';
 import 'sidebar_threads.dart';
 
 /// The row of [entry] in the group of [channel].
 ///
 /// A click or Enter calls [onOpen] (the router path `/t/<id>`); a right click, the menu key or
-/// Shift+F10 opens the thread's menu (M4-33). The row cannot be dragged (01 6.8 item 10).
+/// Shift+F10 opens the thread's menu (M4-33). A forum post is dragged by its parent
+/// ([SidebarDragRow], 01 6.15); [moves] adds "Move up" and "Move down" to its menu and to the
+/// screen reader actions of the row (D-M4-51-7).
 class ThreadEntry extends StatelessWidget {
   /// Creates the entry.
   const ThreadEntry({
@@ -27,7 +32,12 @@ class ThreadEntry extends StatelessWidget {
     required this.onOpen,
     this.focusNode,
     this.onKeyEvent,
+    this.moves,
   });
+
+  /// The moves of a forum post in the sidebar (01 6.15, M4-51), or null for none (text channel
+  /// threads keep their order, D-M4-51-1).
+  final SidebarMoves? moves;
 
   /// The thread with what its row shows.
   final SidebarThread entry;
@@ -60,19 +70,25 @@ class ThreadEntry extends StatelessWidget {
       thread: entry.thread.id,
       title: entry.thread.title,
       channel: channel,
+      moves: moves,
       // Below the menu region: its menu anchor binds the arrow keys to directional focus.
       child: Focus(
         canRequestFocus: false,
         skipTraversal: true,
         includeSemantics: false,
         onKeyEvent: onKeyEvent,
-        child: DsSidebarThreadRow(
-          entry.rowData,
-          key: ValueKey('sidebar.thread.${entry.thread.id.value}'),
-          selected: selected,
-          last: last,
-          onOpen: onOpen,
-          focusNode: focusNode,
+        child: Semantics(
+          customSemanticsActions: moves?.semanticsActions(
+            AppLocalizations.of(context),
+          ),
+          child: DsSidebarThreadRow(
+            entry.rowData,
+            key: ValueKey('sidebar.thread.${entry.thread.id.value}'),
+            selected: selected,
+            last: last,
+            onOpen: onOpen,
+            focusNode: focusNode,
+          ),
         ),
       ),
     ),

@@ -2800,11 +2800,47 @@
   },
   "sidebarMoveUp": "Move up",
   "@sidebarMoveUp": {
-    "description": "Accessibility action of a space row that moves the space one place up in the personal order (components.md section 7)."
+    "description": "Accessibility action and menu entry of a sidebar row (space, channel or forum post) that moves it one place up in the personal order (components.md section 7; 01 section 6.15)."
   },
   "sidebarMoveDown": "Move down",
   "@sidebarMoveDown": {
-    "description": "Accessibility action of a space row that moves the space one place down in the personal order (components.md section 7)."
+    "description": "Accessibility action and menu entry of a sidebar row (space, channel or forum post) that moves it one place down in the personal order (components.md section 7; 01 section 6.15)."
+  },
+  "sidebarArrangedByActivity": "Arranged by activity",
+  "@sidebarArrangedByActivity": {
+    "description": "Disabled entry of the menu of a sidebar row whose level is arranged by activity; it explains why Move up and Move down are disabled (01 section 6.15, M4-51)."
+  },
+  "sidebarSpacesArrangedHint": "Spaces are arranged by activity. Turn off \"Arrange spaces automatically\" in Settings, Appearance, to arrange them yourself.",
+  "@sidebarSpacesArrangedHint": {
+    "description": "Note when the person tries to drag a space while spaces are arranged automatically (01 section 6.15, M4-51)."
+  },
+  "sidebarChannelsArrangedHint": "Channels and projects are arranged by activity. Turn off \"Arrange channels and projects automatically\" in Settings, Appearance, to arrange them yourself.",
+  "@sidebarChannelsArrangedHint": {
+    "description": "Note when the person tries to drag a channel while channels are arranged automatically (01 section 6.15, M4-51)."
+  },
+  "sidebarChatsArrangedHint": "Chats are arranged by activity. Turn off \"Arrange chats automatically\" in Settings, Appearance, to arrange them yourself.",
+  "@sidebarChatsArrangedHint": {
+    "description": "Note when the person tries to drag a forum post while chats are arranged automatically (01 section 6.15, M4-51)."
+  },
+  "settingsSidebarHeading": "Sidebar",
+  "@settingsSidebarHeading": {
+    "description": "Heading of the sidebar ordering switches in Settings, Appearance (01 section 11, M4-51)."
+  },
+  "settingsAutoArrangeSpaces": "Arrange spaces automatically",
+  "@settingsAutoArrangeSpaces": {
+    "description": "Label of the setting sidebar.auto_arrange_spaces (01 section 11, M4-51)."
+  },
+  "settingsAutoArrangeChannels": "Arrange channels and projects automatically",
+  "@settingsAutoArrangeChannels": {
+    "description": "Label of the setting sidebar.auto_arrange_channels (01 section 11, M4-51)."
+  },
+  "settingsAutoArrangeChats": "Arrange chats automatically",
+  "@settingsAutoArrangeChats": {
+    "description": "Label of the setting sidebar.auto_arrange_chats (01 section 11, M4-51)."
+  },
+  "settingsAutoArrangeHint": "Newest activity first. Off: drag to arrange.",
+  "@settingsAutoArrangeHint": {
+    "description": "Hint below each sidebar ordering switch (01 section 11, M4-51)."
   },
   "sidebarNoSpaces": "No spaces yet",
   "@sidebarNoSpaces": {

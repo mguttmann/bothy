@@ -40,6 +40,9 @@ const Map<String, String> exceptions = {
   // text of costEstimate, the German term for an estimate itself (M4-23).
   'searchResultCount': 'German plural of the term Channel',
   'switcherFilterChannels': 'German plural of the term Channel',
+  // The sidebar ordering of M4-51 names the channels in the plural.
+  'sidebarChannelsArrangedHint': 'German plural of the term Channel',
+  'settingsAutoArrangeChannels': 'German plural of the term Channel',
   'runningSumOrganization':
       'German plural of the term Run; {estimate} is costEstimate',
   'runningPersonalNote': 'German plural of the term Run',

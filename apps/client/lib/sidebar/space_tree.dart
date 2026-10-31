@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// The tree of spaces, channels and thread rows (components.md 7; 01 6.8): spaces in the
-/// person's order, dragged into a new order with the mouse by their row (brief M4-19 Design
-/// note 2; channel and thread rows cannot be dragged, 01 6.8 item 10).
+/// person's order, dragged into a new order by their row (brief M4-19 Design note 2) with the
+/// mouse or, on a touch screen, after a long press; channels and forum posts are dragged within
+/// their parent (01 6.15, brief M4-51).
 library;
 
 import 'package:design_system/design_system.dart';
@@ -10,6 +11,8 @@ import 'package:domain/domain.dart';
 import 'package:flutter/material.dart';
 import 'package:l10n/l10n.dart';
 
+import 'sidebar_arrange.dart';
+import 'sidebar_drag.dart';
 import 'sidebar_model.dart';
 import 'space_node.dart';
 
@@ -36,7 +39,23 @@ class SpaceTree extends StatelessWidget {
     this.onAddFolderForums,
     this.selectedNewChat,
     this.onOpenNewChat,
+    this.arrangement = const SidebarArrangement(),
+    this.touch = false,
+    this.onMoveChannel,
+    this.onMoveThread,
   });
+
+  /// Which levels are arranged by activity (01 6.15): an automatic level cannot be dragged.
+  final SidebarArrangement arrangement;
+
+  /// Whether the screen is a touch screen: a long press starts a drag (D-M4-51-6).
+  final bool touch;
+
+  /// Moves a channel within its space to an index (in the list without it), or null.
+  final void Function(SpaceId space, ChannelId channel, int to)? onMoveChannel;
+
+  /// Moves an open post within its forum to an index among the post rows on screen, or null.
+  final void Function(ChannelId forum, ThreadId thread, int to)? onMoveThread;
 
   /// The spaces in order with their channels.
   final List<SidebarSpaceNode> nodes;
@@ -107,6 +126,7 @@ class SpaceTree extends StatelessWidget {
       itemBuilder: (context, i) {
         final node = nodes[i];
         final id = node.entry.space.id;
+        final arranged = arrangement.isAuto(SidebarLevel.spaces);
         return KeyedSubtree(
           key: ValueKey('sidebar.node.${id.value}'),
           // The list gives every item the actions to move it on a node of its own; the space's
@@ -128,12 +148,28 @@ class SpaceTree extends StatelessWidget {
               onAddFolderForums: onAddFolderForums,
               selectedNewChat: selectedNewChat,
               onOpenNewChat: onOpenNewChat,
-              onMoveUp: i > 0 ? () => onMove(id, i - 1) : null,
-              onMoveDown: i < nodes.length - 1 ? () => onMove(id, i + 1) : null,
-              // Only the space row starts a drag: a channel or thread row must never move
-              // anything (01 6.8 item 10, D-SB-7).
-              dragHandle: (row) =>
-                  ReorderableDragStartListener(index: i, child: row),
+              onMoveUp: !arranged && i > 0 ? () => onMove(id, i - 1) : null,
+              onMoveDown: !arranged && i < nodes.length - 1
+                  ? () => onMove(id, i + 1)
+                  : null,
+              arrangement: arrangement,
+              touch: touch,
+              onMoveChannel: onMoveChannel == null
+                  ? null
+                  : (channel, to) => onMoveChannel!(id, channel, to),
+              onMoveThread: onMoveThread,
+              // The space row starts the drag of the space; on a touch screen after a long
+              // press, so a swipe scrolls the list (D-M4-51-6). An automatic level shows the
+              // note instead.
+              dragHandle: (row) => arranged
+                  ? SidebarArrangedRow(
+                      level: SidebarLevel.spaces,
+                      touch: touch,
+                      child: row,
+                    )
+                  : touch
+                  ? ReorderableDelayedDragStartListener(index: i, child: row)
+                  : ReorderableDragStartListener(index: i, child: row),
             ),
           ),
         );

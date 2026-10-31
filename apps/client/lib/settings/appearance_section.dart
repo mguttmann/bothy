@@ -100,6 +100,66 @@ class PasteOriginalsRow extends ConsumerWidget {
   }
 }
 
+/// The three switches of the sidebar ordering (01 6.15 and 11, brief M4-51): each level is
+/// arranged by activity while its switch is on; off, the person's own order applies.
+class SidebarArrangeRows extends ConsumerWidget {
+  /// Creates the rows.
+  const SidebarArrangeRows({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context);
+    final a = ref.watch(personalSettingsProvider).arrangement;
+    final writer = ref.watch(settingsRepositoryProvider);
+    Widget row(String key, String setting, String label, bool value) =>
+        SettingRow(
+          label: label,
+          hint: l.settingsAutoArrangeHint,
+          control: Switch(
+            key: ValueKey(key),
+            value: value,
+            onChanged: writer == null
+                ? null
+                : (on) => unawaited(writer.set(setting, on)),
+          ),
+        );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(top: DsSpace.s16, bottom: DsSpace.s4),
+          child: Semantics(
+            header: true,
+            child: Text(
+              l.settingsSidebarHeading,
+              style: dsTextStyle(DsType.bodyStrong),
+            ),
+          ),
+        ),
+        row(
+          'settings.autoArrangeSpaces',
+          SettingKeys.autoArrangeSpaces,
+          l.settingsAutoArrangeSpaces,
+          a.autoSpaces,
+        ),
+        row(
+          'settings.autoArrangeChannels',
+          SettingKeys.autoArrangeChannels,
+          l.settingsAutoArrangeChannels,
+          a.autoChannels,
+        ),
+        row(
+          'settings.autoArrangeChats',
+          SettingKeys.autoArrangeChats,
+          l.settingsAutoArrangeChats,
+          a.autoChats,
+        ),
+      ],
+    );
+  }
+}
+
 /// The Appearance section.
 class AppearanceSection extends ConsumerWidget {
   /// Creates the section.
@@ -163,6 +223,8 @@ class AppearanceSection extends ConsumerWidget {
         const EnterSendsRow(),
         // Pasting a bitmap is a desktop way of attaching (15 14).
         if (!phone) const PasteOriginalsRow(),
+        // 01 6.15: the order of the sidebar levels, on the desktop and the phone.
+        const SidebarArrangeRows(),
         if (!phone)
           SettingRow(
             label: l.settingsColumnWidths,

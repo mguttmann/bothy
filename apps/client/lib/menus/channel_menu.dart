@@ -19,6 +19,7 @@ import 'package:l10n/l10n.dart';
 import '../export/channel_export.dart';
 import '../new_project/rename_project_dialog.dart';
 import '../notifications_settings/providers.dart';
+import '../sidebar/sidebar_drag.dart' show SidebarMoves, sidebarMoveMenuItems;
 import '../thread/providers.dart';
 import 'level_menu.dart';
 
@@ -31,7 +32,11 @@ class ChannelMenu extends StatelessWidget {
     required this.child,
     this.newChatLabel,
     this.onNewChat,
+    this.moves,
   });
+
+  /// "Move up" and "Move down" of the channel in the sidebar (01 6.15, M4-51), or null for none.
+  final SidebarMoves? moves;
 
   /// The channel.
   final Channel channel;
@@ -73,6 +78,10 @@ class ChannelMenu extends StatelessWidget {
             child: Text(AppLocalizations.of(context).channelMenuRenameProject),
           ),
         ...channelMenuItems(context, ref, channel),
+        if (moves case final moves?) ...[
+          const Divider(),
+          ...sidebarMoveMenuItems(context, moves),
+        ],
       ];
     },
     child: child,
