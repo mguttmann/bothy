@@ -7,6 +7,8 @@ request for them.
 
 Use GitHub private vulnerability reporting: the "Report a vulnerability" button on the
 repository's Security tab. This is the only reporting path; there is no e-mail address.
+GitHub explains the steps in
+[Privately reporting a security vulnerability](https://docs.github.com/en/code-security/how-tos/report-and-fix-vulnerabilities/report-privately).
 
 Please include the affected component and version, the steps to reproduce, the impact you
 expect, and whether the issue is already known to others. Remove real personal data and
