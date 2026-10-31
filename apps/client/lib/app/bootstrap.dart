@@ -368,7 +368,13 @@ AppPorts productionPorts({
     branding: branding,
     platform: platform,
     deviceName: android?.deviceName ?? Platform.localHostname,
-    secureBackend: FlutterSecureBackend(),
+    // The secrets belong to this app identity (docs/decisions.d/FIX-app-logout.md): another
+    // bundle identifier never picks up its session from a shared keychain or file.
+    secureBackend: FlutterSecureBackend(
+      appId: Platform.isAndroid ? branding.applicationId : branding.bundleId,
+      hasLocalData: () async =>
+          InstanceServices.hasLocalData(await getApplicationSupportDirectory()),
+    ),
     deviceKeys: PlatformDeviceKeyStore(
       dk.DeviceKeyClient(),
       () => dk.StepUpPrompt(
@@ -441,6 +447,17 @@ final class InstanceServices {
   });
 
   final Future<void> Function() _stopWatching;
+
+  /// Whether [root] (the `dataRoot`) holds the folder of at least one instance: the sign that
+  /// the secrets of a build before the app scope in a shared store are this app's own
+  /// ([FlutterSecureBackend], docs/decisions.d/FIX-app-logout.md).
+  static Future<bool> hasLocalData(Directory root) async {
+    final instances = Directory(
+      '${root.path}${Platform.pathSeparator}instances',
+    );
+    if (!await instances.exists()) return false;
+    return instances.list().any((entry) => entry is Directory);
+  }
 
   /// Builds the services of [instance] (Design note 1): the device keys with the instance ID as
   /// scope, the secrets prefixed with the instance ID, the database key (32 random bytes at the

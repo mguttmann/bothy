@@ -84,7 +84,9 @@ final class MobilePerfApp {
     // read or overwritten and [stop] removes exactly what the run wrote. The fake's instance ID
     // is the same in every run, so the name has a random part, and what an aborted run left in
     // the store (the iOS keychain outlives the app) is removed first.
-    final store = phone ? FlutterSecureBackend() : MemorySecureBackend();
+    final store = phone
+        ? FlutterSecureBackend(appId: testBranding.bundleId)
+        : MemorySecureBackend();
     await _RunSecrets(store, _runPrefix).clear();
     final run = Random.secure().nextInt(1 << 32).toRadixString(16);
     final secrets = _RunSecrets(store, '$_runPrefix$run/');

@@ -569,9 +569,17 @@ keeps the refresh token, the device ID and the database key of each instance in
 `flutter_secure_storage`, every key prefixed with `instance/<instance_id>/`; the only key outside
 an instance is the remembered server address (`app/server_address`). On macOS a release build uses
 the Data Protection keychain, not synchronized, with `first_unlock_this_device` and the keychain
-access group `$(AppIdentifierPrefix)<bundle identifier>`; a local debug or profile build has no
-team signature and so no access group, and keeps the items in the login keychain under the app's
-own access list. On Windows the package default applies (Credential Manager plus AES-GCM files).
+access group `$(AppIdentifierPrefix)<bundle identifier>`; a debug or profile build keeps the items
+in the login keychain, which has no access group, so every app of the person reaches them (an app
+signed differently from the writer gets an access prompt). On Windows the package default applies
+(a DPAPI-encrypted file in the support folder, which every branding of the runner shares).
+Therefore the secrets belong to one app identity (FIX-app-logout, docs/decisions.d/FIX-app-logout.md):
+on iOS and macOS they sit under the keychain service `<bundle identifier>.secrets`, on Windows and
+Android under the key prefix `<bundle identifier or application ID>/`, and a build with another
+identity never reads, lists or deletes them; a new identity starts with enrollment. Secrets of a
+build before this rule move into the scope once at the first start and leave the old place: always
+where only the app reaches the old store, in a shared store (the macOS login keychain, Windows) only
+when the app already has an instance folder under its data root.
 The database key is 32 bytes from `Random.secure()`, created at the first start of an instance;
 the database is `<application support>/instances/<instance_id>/local.db`, the file cache lives
 in the same folder, and the device keys of `packages/device_key` use the `instance_id` as scope.
