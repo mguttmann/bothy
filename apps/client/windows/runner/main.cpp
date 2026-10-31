@@ -6,6 +6,7 @@
 #include "branding.h"
 #include "deep_link.h"
 #include "flutter_window.h"
+#include "key_scan_code.h"
 #include "utils.h"
 
 int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
@@ -48,6 +49,14 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
 
   ::MSG msg;
   while (::GetMessage(&msg, nullptr, 0, 0)) {
+    // Key messages of tools that send virtual keys only (a dictation tool's Ctrl+V) get their
+    // scan code before TranslateMessage and the engine see them, so Flutter knows Ctrl and V
+    // apart (docs/decisions.d/FIX-windows-dictation.md).
+    msg.lParam = static_cast<LPARAM>(key_scan_code::WithScanCode(
+        msg.message, msg.wParam, msg.lParam,
+        [](uint32_t vk) -> uint32_t {
+          return ::MapVirtualKeyW(vk, MAPVK_VK_TO_VSC_EX);
+        }));
     ::TranslateMessage(&msg);
     ::DispatchMessage(&msg);
   }
