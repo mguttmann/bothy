@@ -263,7 +263,7 @@ the gateway and `GET /api/v1/events`. These are all ephemeral events and the fol
 
 | Group | Event types | Reason |
 |---|---|---|
-| personal events of people | `read_state.updated`, `draft.updated`, `draft.deleted`, `settings.updated`, `sidebar.updated`, `notification_pref.updated`, `quiet_hours.updated`, `session.revoked` | concern the devices and the interface of a person; an app or an agent is never the receiver |
+| personal events of people | `read_state.updated`, `draft.updated`, `draft.deleted`, `settings.updated`, `sidebar.updated`, `sidebar_channel.updated`, `notification_pref.updated`, `quiet_hours.updated`, `session.revoked` | concern the devices and the interface of a person; an app or an agent is never the receiver |
 | expiry reminder | `access.expiring` | a hint for the interface; an app or an agent learns the effective expiry through `access.changed` |
 | administration | `grant.changed`, `group.changed`, `gdpr.request_updated`, `import.progress` | data of the console; apps have no `manage` (11 section 5) and see their own permissions through `access.changed` |
 | terminal | `host.updated`, `terminal_session.changed` | terminal actions only for people in a session (R-AZ-23) |

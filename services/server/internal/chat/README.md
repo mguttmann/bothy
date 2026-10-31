@@ -11,7 +11,8 @@ Spaces, sidebar state, channels with behavior, skills, project binding, DM parti
 
 - `internal/chat` (`chat.go`): the port. `Structure` with its space and sidebar part (M1-52):
   `ListSpaces`, `GetSpace`, `CreateSpace`, `UpdateSpace`, `MoveSpace`, `ArchiveSpace`,
-  `PutSidebarSpace` and `ListSidebarStates` (for `getMySidebar`, M1-61); the DTOs `Space`,
+  `PutSidebarSpace` and `ListSidebarStates` (for `getMySidebar`, M1-61), `PutSidebarChannel` and
+  `ListSidebarChannelStates` (M4-51); the DTOs `Space`,
   `SpaceView`, `SidebarState`, `Precondition` (the parsed If-Match) and one command per body; the
   in-transaction event `SpaceArchived{SpaceID}`; `Register` declares the durable events
   `space.created`, `space.updated`, `space.archived` and `sidebar.updated`.
@@ -27,7 +28,8 @@ Spaces, sidebar state, channels with behavior, skills, project binding, DM parti
   Locks and writes run only inside a unit of work; a taken name is `409 conflict` on `/name`, no
   error carries SQL text, constraint names or values.
 - `adapters/httpapi/`: `Spaces`, the handlers of `listSpaces`, `createSpace`, `getSpace`,
-  `updateSpace`, `moveSpace`, `archiveSpace` and `putMySidebarSpace`; `ETag` from `version` on
+  `updateSpace`, `moveSpace`, `archiveSpace`, `putMySidebarSpace` and `putMySidebarChannel`
+  (M4-51); `ETag` from `version` on
   `getSpace` and `updateSpace`.
 - `adapters/authzsource/`: `Source`, the space and channel part of `authz.StructureSource`
   (`Space`, `SpaceArchived`, `Spaces`, `SpaceDetails`; since M1-53 `Channel`, `Channels`,
@@ -50,6 +52,7 @@ Spaces, sidebar state, channels with behavior, skills, project binding, DM parti
 | `moveSpace` | `space.reorder` on the instance (owner) | no | `space.updated` |
 | `archiveSpace` | `space.archive` (owner, step-up) | yes (target: the space) | `space.archived` |
 | `putMySidebarSpace` | `sidebar.update` (self and read, people only) | no | `sidebar.updated` (self) |
+| `putMySidebarChannel` (M4-51) | `sidebar.update` on the channel (self and read, people only) | no | `sidebar_channel.updated` (self) |
 
 - Visibility (07 section 4.3): `read` on the space or on one of its channels; a missing and an
   invisible space give the same `404`. `listSpaces` filters in SQL with
@@ -77,6 +80,27 @@ Spaces, sidebar state, channels with behavior, skills, project binding, DM parti
   audited.
 
 Rulings: docs/DECISIONS.md M1-52.
+
+### Personal sidebar order (M4-51)
+
+- `putMySidebarSpace` takes an optional `channel_order` (`SidebarPutCmd.ChannelOrder`): absent
+  keeps the stored list, a list replaces it, an empty list stores NULL (the default order); the
+  answer, `sidebar.updated`, the snapshot member `sidebar` and `getMySidebar` carry it, absent for
+  NULL. Migration `00085_chat_sidebar_order.sql` adds `user_space_states.channel_order` and the
+  table `user_channel_states` (grants as `user_space_states`).
+- `putMySidebarChannel` (`Structure.PutSidebarChannel`, action `sidebar.update` on the channel,
+  people only, a channel the caller cannot read is `404`) upserts the caller's `thread_order` with
+  version + 1 and the device, last write wins, no If-Match, no audit, and appends
+  `sidebar_channel.updated` (resource channel, audience self, no `resource.version`). A body
+  without `thread_order` is `400` on `/thread_order`.
+- Both lists: unique IDs and at most `sidebar.order_max_items` (`Config.SidebarOrderMaxItems`),
+  else `400 validation_failed` with `duplicate` or `limit_reached` on the member
+  (`domain.CheckSidebarOrder`). The IDs are not checked against existing or visible rows (no
+  oracle, D-M4-51-8).
+- `Structure.ListSidebarChannelStates` gives sync the caller's channel rows for the snapshot
+  member `sidebar_channels` and the member `channels` of `getMySidebar`: channels that are not
+  archived, in a space that is not archived, filtered in SQL by the Scope of `channel.read`
+  (visible channels, fully visible spaces, instance-wide), then authorized per row in filter mode.
 
 ### Tests
 
@@ -589,7 +613,7 @@ Checked by go-arch-lint (ADR 0008).
 
 ## Tables
 
-`spaces`, `user_space_states`, `channels`, `channel_skill_bindings`, `project_bindings`, `dm_participants`, `forum_tags`, `threads`, `thread_tags`.
+`spaces`, `user_space_states`, `user_channel_states`, `channels`, `channel_skill_bindings`, `project_bindings`, `dm_participants`, `forum_tags`, `threads`, `thread_tags`.
 
 Only this module writes and reads these tables by SQL (03-data-model.md, principle 12).
 
@@ -599,7 +623,7 @@ Only this module writes and reads these tables by SQL (03-data-model.md, princip
 
 ## Events and WebSocket ops
 
-- Durable: `thread.created`, `thread.updated`, `thread.closed`, `thread.reopened`, `thread.moved`, `thread.moved_out`, `space.created`, `space.updated`, `space.archived`, `channel.created`, `channel.updated`, `channel.settings_changed`, `channel.archived`, `sidebar.updated`, `agent.config_changed`.
+- Durable: `thread.created`, `thread.updated`, `thread.closed`, `thread.reopened`, `thread.moved`, `thread.moved_out`, `space.created`, `space.updated`, `space.archived`, `channel.created`, `channel.updated`, `channel.settings_changed`, `channel.archived`, `sidebar.updated`, `sidebar_channel.updated`, `agent.config_changed`.
 - Ephemeral: none.
 - WebSocket ops (client to server): none.
 
@@ -627,14 +651,18 @@ read.
 
 `postgres.PersonalData` (`postgres.NewPersonalData(pool)`) is the participant of chat in the
 privacy requests (`kernel/personaldata`, 20 sections 4.4 and 5.2). Tables: `spaces`,
-`user_space_states`, `channels`, `dm_participants`, `threads`, `thread_tags`.
+`user_space_states`, `user_channel_states`, `channels`, `dm_participants`, `threads`, `thread_tags`.
 
 - Export: the section `sidebar` of `personal.json` with every `user_space_states` row of the
-  person, archived spaces included: space ID, collapsed state, personal sort key, device of the last
-  change and its time; never the space name (schema
-  `docs/api/gdpr-export/v1/sections/personal.sidebar.schema.json`).
-- Erase: step 3 (`personal`) deletes the person's `user_space_states` rows in one statement, without
-  an event (`sidebar.updated` is personal to the person, whose devices step 2 already removed).
+  person, archived spaces included: space ID, collapsed state, personal sort key, personal channel
+  order (M4-51), device of the last change and its time; never the space name (schema
+  `docs/api/gdpr-export/v1/sections/personal.sidebar.schema.json`). The section `sidebar_channels`
+  (M4-51) holds every `user_channel_states` row, archived channels included: channel ID, personal
+  post order, device and time; never a name or title (schema
+  `docs/api/gdpr-export/v1/sections/personal.sidebar_channels.schema.json`).
+- Erase: step 3 (`personal`) deletes the person's `user_space_states` rows and then their
+  `user_channel_states` rows, one statement each, without an event (`sidebar.updated` and
+  `sidebar_channel.updated` are personal to the person, whose devices step 2 already removed).
   Spaces, channels, threads, tags and DM participants stay (03 principle 7): `created_by` and
   `set_by` are evidence and become pseudonymous with step 6 of identity. Every other step has
   nothing to do in chat.

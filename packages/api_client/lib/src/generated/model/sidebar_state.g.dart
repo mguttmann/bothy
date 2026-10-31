@@ -14,6 +14,8 @@ class _$SidebarState extends SidebarState {
   @override
   final String? sortKey;
   @override
+  final BuiltList<String>? channelOrder;
+  @override
   final int version;
   @override
   final String? updatedByDeviceId;
@@ -25,6 +27,7 @@ class _$SidebarState extends SidebarState {
     required this.spaceId,
     required this.collapsed,
     this.sortKey,
+    this.channelOrder,
     required this.version,
     this.updatedByDeviceId,
   }) : super._();
@@ -42,6 +45,7 @@ class _$SidebarState extends SidebarState {
         spaceId == other.spaceId &&
         collapsed == other.collapsed &&
         sortKey == other.sortKey &&
+        channelOrder == other.channelOrder &&
         version == other.version &&
         updatedByDeviceId == other.updatedByDeviceId;
   }
@@ -52,6 +56,7 @@ class _$SidebarState extends SidebarState {
     _$hash = $jc(_$hash, spaceId.hashCode);
     _$hash = $jc(_$hash, collapsed.hashCode);
     _$hash = $jc(_$hash, sortKey.hashCode);
+    _$hash = $jc(_$hash, channelOrder.hashCode);
     _$hash = $jc(_$hash, version.hashCode);
     _$hash = $jc(_$hash, updatedByDeviceId.hashCode);
     _$hash = $jf(_$hash);
@@ -64,6 +69,7 @@ class _$SidebarState extends SidebarState {
           ..add('spaceId', spaceId)
           ..add('collapsed', collapsed)
           ..add('sortKey', sortKey)
+          ..add('channelOrder', channelOrder)
           ..add('version', version)
           ..add('updatedByDeviceId', updatedByDeviceId))
         .toString();
@@ -86,6 +92,12 @@ class SidebarStateBuilder
   String? get sortKey => _$this._sortKey;
   set sortKey(String? sortKey) => _$this._sortKey = sortKey;
 
+  ListBuilder<String>? _channelOrder;
+  ListBuilder<String> get channelOrder =>
+      _$this._channelOrder ??= ListBuilder<String>();
+  set channelOrder(ListBuilder<String>? channelOrder) =>
+      _$this._channelOrder = channelOrder;
+
   int? _version;
   int? get version => _$this._version;
   set version(int? version) => _$this._version = version;
@@ -105,6 +117,7 @@ class SidebarStateBuilder
       _spaceId = $v.spaceId;
       _collapsed = $v.collapsed;
       _sortKey = $v.sortKey;
+      _channelOrder = $v.channelOrder?.toBuilder();
       _version = $v.version;
       _updatedByDeviceId = $v.updatedByDeviceId;
       _$v = null;
@@ -126,27 +139,44 @@ class SidebarStateBuilder
   SidebarState build() => _build();
 
   _$SidebarState _build() {
-    final _$result =
-        _$v ??
-        _$SidebarState._(
-          spaceId: BuiltValueNullFieldError.checkNotNull(
-            spaceId,
-            r'SidebarState',
-            'spaceId',
-          ),
-          collapsed: BuiltValueNullFieldError.checkNotNull(
-            collapsed,
-            r'SidebarState',
-            'collapsed',
-          ),
-          sortKey: sortKey,
-          version: BuiltValueNullFieldError.checkNotNull(
-            version,
-            r'SidebarState',
-            'version',
-          ),
-          updatedByDeviceId: updatedByDeviceId,
+    _$SidebarState _$result;
+    try {
+      _$result =
+          _$v ??
+          _$SidebarState._(
+            spaceId: BuiltValueNullFieldError.checkNotNull(
+              spaceId,
+              r'SidebarState',
+              'spaceId',
+            ),
+            collapsed: BuiltValueNullFieldError.checkNotNull(
+              collapsed,
+              r'SidebarState',
+              'collapsed',
+            ),
+            sortKey: sortKey,
+            channelOrder: _channelOrder?.build(),
+            version: BuiltValueNullFieldError.checkNotNull(
+              version,
+              r'SidebarState',
+              'version',
+            ),
+            updatedByDeviceId: updatedByDeviceId,
+          );
+    } catch (_) {
+      late String _$failedField;
+      try {
+        _$failedField = 'channelOrder';
+        _channelOrder?.build();
+      } catch (e) {
+        throw BuiltValueNestedFieldError(
+          r'SidebarState',
+          _$failedField,
+          e.toString(),
         );
+      }
+      rethrow;
+    }
     replace(_$result);
     return _$result;
   }

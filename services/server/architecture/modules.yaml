@@ -113,8 +113,8 @@ modules:
     # normalises to NFC and adapters/passwordhash runs Argon2id (M1-39).
     adapter_vendors: [pgx, xtext, webauthn, xcrypto]
   chat:
-    tables: [spaces, user_space_states, channels, channel_skill_bindings, project_bindings,
-             dm_participants, forum_tags, threads, thread_tags]
+    tables: [spaces, user_space_states, user_channel_states, channels, channel_skill_bindings,
+             project_bindings, dm_participants, forum_tags, threads, thread_tags]
     actions: [space.read, space.create, space.update, space.reorder, space.archive,
               space.operator.set, sidebar.update, channel.read, channel.create, channel.update,
               channel.reorder, channel.behavior.read, channel.behavior.update, channel.operator.set,
@@ -124,7 +124,7 @@ modules:
     events: [thread.created, thread.updated, thread.closed, thread.reopened, thread.moved,
              thread.moved_out, space.created, space.updated, space.archived, channel.created,
              channel.updated, channel.settings_changed, channel.archived, sidebar.updated,
-             agent.config_changed]
+             sidebar_channel.updated, agent.config_changed]
     ephemeral_events: []
     ws_ops: []
     depends_on: [identity, authz]

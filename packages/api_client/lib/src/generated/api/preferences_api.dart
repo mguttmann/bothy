@@ -22,6 +22,8 @@ import 'package:api_client/src/generated/model/quiet_hours_rule_input.dart';
 import 'package:api_client/src/generated/model/read_state.dart';
 import 'package:api_client/src/generated/model/read_state_list.dart';
 import 'package:api_client/src/generated/model/read_state_put.dart';
+import 'package:api_client/src/generated/model/sidebar_channel_put.dart';
+import 'package:api_client/src/generated/model/sidebar_channel_state.dart';
 import 'package:api_client/src/generated/model/sidebar_state.dart';
 import 'package:api_client/src/generated/model/sidebar_state_list.dart';
 import 'package:api_client/src/generated/model/sidebar_state_put.dart';
@@ -472,7 +474,7 @@ class PreferencesApi {
   }
 
   /// Read own sidebar state
-  ///
+  /// The caller&#39;s rows of the spaces they may read that are not archived (&#x60;items&#x60;) and of the channels they may read that are not archived and lie in a space that is not archived (&#x60;channels&#x60;, the personal post order).
   ///
   /// Parameters:
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
@@ -1306,8 +1308,121 @@ class PreferencesApi {
     );
   }
 
-  /// Collapse or reorder a space for oneself
+  /// Reorder the posts of a channel for oneself
+  /// Stores the caller&#39;s personal order of the posts of a channel the caller can read, version + 1, last write wins, no If-Match; an empty list returns to the default order. The server checks the form of the list (unique items, at most &#x60;sidebar.order_max_items&#x60;), not whether each ID names a thread the caller can see. A channel the caller cannot read and an unknown one give the same 404. Writes &#x60;sidebar_channel.updated&#x60; for the caller.
   ///
+  /// Parameters:
+  /// * [channelId]
+  /// * [sidebarChannelPut]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [SidebarChannelState] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<SidebarChannelState>> putMySidebarChannel({
+    required String channelId,
+    required SidebarChannelPut sidebarChannelPut,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/me/sidebar/channels/{channel_id}'.replaceAll(
+      '{'
+      r'channel_id'
+      '}',
+      encodeQueryParameter(
+        _serializers,
+        channelId,
+        const FullType(String),
+      ).toString(),
+    );
+    final _options = Options(
+      method: r'PUT',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'apiKey',
+            'name': 'consoleSession',
+            'keyName': '__Host-console_session',
+            'where': '',
+          },
+          {'type': 'http', 'scheme': 'DPoP', 'name': 'dpopAuth'},
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearerAuth'},
+        ],
+        ...?extra,
+      },
+      contentType: 'application/json',
+      validateStatus: validateStatus,
+    );
+
+    dynamic _bodyData;
+
+    try {
+      const _type = FullType(SidebarChannelPut);
+      _bodyData = _serializers.serialize(
+        sidebarChannelPut,
+        specifiedType: _type,
+      );
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _options.compose(_dio.options, _path),
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    final _response = await _dio.request<Object>(
+      _path,
+      data: _bodyData,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    SidebarChannelState? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(
+              rawResponse,
+              specifiedType: const FullType(SidebarChannelState),
+            ) as SidebarChannelState;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<SidebarChannelState>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// Collapse or reorder a space for oneself
+  /// Stores the caller&#39;s row of the space, version + 1, last write wins, no If-Match. &#x60;channel_order&#x60; absent keeps the stored channel order, a list replaces it and an empty list returns to the default order. The server checks the form of the list (unique items, at most &#x60;sidebar.order_max_items&#x60;), not whether each ID names a channel the caller can see. Writes &#x60;sidebar.updated&#x60; for the caller.
   ///
   /// Parameters:
   /// * [spaceId]

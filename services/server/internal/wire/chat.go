@@ -24,7 +24,7 @@ import (
 )
 
 // ChatConfig binds the keys of the chat use cases (space.name_max_chars, the channel keys of
-// M1-53 and the thread and page keys of M1-55). The error names the key whose binding failed, never a value.
+// M1-53, the thread and page keys of M1-55 and sidebar.order_max_items of M4-51). The error names the key whose binding failed, never a value.
 func ChatConfig(v *config.Values) (chatapp.Config, error) {
 	var c chatapp.Config
 	if err := config.Bind(v, &c); err != nil {

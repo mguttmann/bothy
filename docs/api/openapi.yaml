@@ -6001,6 +6001,9 @@ paths:
     get:
       operationId: getMySidebar
       summary: Read own sidebar state
+      description: >-
+        The caller's rows of the spaces they may read that are not archived (`items`) and of the channels they may
+        read that are not archived and lie in a space that is not archived (`channels`, the personal post order).
       tags: [Preferences]
       x-authz-action: settings.read
       x-rate-limit-class: rl.read
@@ -6040,6 +6043,11 @@ paths:
     put:
       operationId: putMySidebarSpace
       summary: Collapse or reorder a space for oneself
+      description: >-
+        Stores the caller's row of the space, version + 1, last write wins, no If-Match. `channel_order` absent
+        keeps the stored channel order, a list replaces it and an empty list returns to the default order. The
+        server checks the form of the list (unique items, at most `sidebar.order_max_items`), not whether each ID
+        names a channel the caller can see. Writes `sidebar.updated` for the caller.
       tags: [Preferences]
       x-authz-action: sidebar.update
       x-rate-limit-class: rl.write
@@ -6078,6 +6086,70 @@ paths:
                     collapsed: false
                     sort_key: a0V
                     version: 3
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /me/sidebar/channels/{channel_id}:
+    put:
+      operationId: putMySidebarChannel
+      summary: Reorder the posts of a channel for oneself
+      description: >-
+        Stores the caller's personal order of the posts of a channel the caller can read, version + 1, last write
+        wins, no If-Match; an empty list returns to the default order. The server checks the form of the list
+        (unique items, at most `sidebar.order_max_items`), not whether each ID names a thread the caller can see.
+        A channel the caller cannot read and an unknown one give the same 404. Writes `sidebar_channel.updated`
+        for the caller.
+      tags: [Preferences]
+      x-authz-action: sidebar.update
+      x-rate-limit-class: rl.write
+      parameters:
+      - $ref: '#/components/parameters/ChannelIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SidebarChannelPut'
+            examples:
+              default:
+                summary: Request
+                value:
+                  thread_order:
+                  - 0192f4a0-7b1c-7881-8522-0a58634abc31
+                  - 0192f4a0-7b1c-7881-8522-0a58634abc30
+      responses:
+        '200':
+          description: OK.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SidebarChannelState'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    channel_id: 0192f4a0-7b1c-7881-8522-0a58634abc20
+                    thread_order:
+                    - 0192f4a0-7b1c-7881-8522-0a58634abc31
+                    - 0192f4a0-7b1c-7881-8522-0a58634abc30
+                    version: 2
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -24655,6 +24727,12 @@ components:
           type: string
           description: Personal order; absent uses the global order.
           examples: [a0V]
+        channel_order:
+          type: array
+          maxItems: 1000
+          description: Personal order of the channels and forums of the space; absent uses the default order. At most `sidebar.order_max_items`.
+          items:
+            $ref: '#/components/schemas/Uuid'
         version:
           type: integer
           format: int64
@@ -24672,6 +24750,12 @@ components:
         use_global_order:
           type: boolean
           description: True removes the personal order. Replaces sending null.
+        channel_order:
+          type: array
+          maxItems: 1000
+          description: New personal order of the channels and forums of the space, unique IDs; absent keeps the stored order, an empty list returns to the default order. At most `sidebar.order_max_items`.
+          items:
+            $ref: '#/components/schemas/Uuid'
     SidebarStateList:
       type: object
       required: [items]
@@ -24680,6 +24764,39 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/SidebarState'
+        channels:
+          type: array
+          description: The caller's personal post orders of channels.
+          items:
+            $ref: '#/components/schemas/SidebarChannelState'
+    SidebarChannelState:
+      type: object
+      required: [channel_id, thread_order, version]
+      properties:
+        channel_id:
+          $ref: '#/components/schemas/Uuid'
+        thread_order:
+          type: array
+          maxItems: 1000
+          description: Personal order of the open posts of the channel; empty uses the default order. At most `sidebar.order_max_items`.
+          items:
+            $ref: '#/components/schemas/Uuid'
+        version:
+          type: integer
+          format: int64
+        updated_by_device_id:
+          $ref: '#/components/schemas/Uuid'
+    SidebarChannelPut:
+      type: object
+      additionalProperties: false
+      required: [thread_order]
+      properties:
+        thread_order:
+          type: array
+          maxItems: 1000
+          description: New personal order of the posts of the channel, unique IDs; an empty list returns to the default order. At most `sidebar.order_max_items`.
+          items:
+            $ref: '#/components/schemas/Uuid'
     ForumTag:
       type: object
       required: [id, channel_id, name, sort_key, restricted]
@@ -25920,6 +26037,11 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/SidebarState'
+        sidebar_channels:
+          type: array
+          description: The caller's personal post orders of the channels they may read that are not archived and lie in a space that is not archived.
+          items:
+            $ref: '#/components/schemas/SidebarChannelState'
         unread_threads:
           type: array
           description: Only threads with unread messages or mentions.
@@ -28740,6 +28862,12 @@ components:
       properties:
         state:
           $ref: '#/components/schemas/SidebarState'
+    SidebarChannelPayload:
+      type: object
+      required: [state]
+      properties:
+        state:
+          $ref: '#/components/schemas/SidebarChannelState'
     NotificationPrefPayload:
       type: object
       required: [preference]
@@ -30582,6 +30710,18 @@ components:
             enum: [sidebar.updated]
           payload:
             $ref: '#/components/schemas/SidebarPayload'
+    SidebarChannelUpdatedEvent:
+      description: Durable event `sidebar_channel.updated`.
+      allOf:
+      - $ref: '#/components/schemas/EventEnvelope'
+      - type: object
+        required: [type, payload]
+        properties:
+          type:
+            type: string
+            enum: [sidebar_channel.updated]
+          payload:
+            $ref: '#/components/schemas/SidebarChannelPayload'
     NotificationPrefUpdatedEvent:
       description: Durable event `notification_pref.updated`.
       allOf:
@@ -30888,6 +31028,7 @@ components:
       - $ref: '#/components/schemas/DraftDeletedEvent'
       - $ref: '#/components/schemas/SettingsUpdatedEvent'
       - $ref: '#/components/schemas/SidebarUpdatedEvent'
+      - $ref: '#/components/schemas/SidebarChannelUpdatedEvent'
       - $ref: '#/components/schemas/NotificationPrefUpdatedEvent'
       - $ref: '#/components/schemas/QuietHoursUpdatedEvent'
       - $ref: '#/components/schemas/GdprRequestUpdatedEvent'
@@ -30943,6 +31084,7 @@ components:
           draft.deleted: '#/components/schemas/DraftDeletedEvent'
           settings.updated: '#/components/schemas/SettingsUpdatedEvent'
           sidebar.updated: '#/components/schemas/SidebarUpdatedEvent'
+          sidebar_channel.updated: '#/components/schemas/SidebarChannelUpdatedEvent'
           notification_pref.updated: '#/components/schemas/NotificationPrefUpdatedEvent'
           quiet_hours.updated: '#/components/schemas/QuietHoursUpdatedEvent'
           gdpr.request_updated: '#/components/schemas/GdprRequestUpdatedEvent'

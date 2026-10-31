@@ -4,6 +4,7 @@
 
 // ignore_for_file: unused_element
 import 'package:built_collection/built_collection.dart';
+import 'package:api_client/src/generated/model/sidebar_channel_state.dart';
 import 'package:api_client/src/generated/model/sidebar_state.dart';
 import 'package:built_value/built_value.dart';
 import 'package:built_value/serializer.dart';
@@ -14,11 +15,16 @@ part 'sidebar_state_list.g.dart';
 ///
 /// Properties:
 /// * [items]
+/// * [channels] - The caller's personal post orders of channels.
 @BuiltValue()
 abstract class SidebarStateList
     implements Built<SidebarStateList, SidebarStateListBuilder> {
   @BuiltValueField(wireName: r'items')
   BuiltList<SidebarState> get items;
+
+  /// The caller's personal post orders of channels.
+  @BuiltValueField(wireName: r'channels')
+  BuiltList<SidebarChannelState>? get channels;
 
   SidebarStateList._();
 
@@ -51,6 +57,15 @@ class _$SidebarStateListSerializer
       object.items,
       specifiedType: const FullType(BuiltList, [FullType(SidebarState)]),
     );
+    if (object.channels != null) {
+      yield r'channels';
+      yield serializers.serialize(
+        object.channels,
+        specifiedType: const FullType(BuiltList, [
+          FullType(SidebarChannelState),
+        ]),
+      );
+    }
   }
 
   @override
@@ -84,6 +99,16 @@ class _$SidebarStateListSerializer
             specifiedType: const FullType(BuiltList, [FullType(SidebarState)]),
           ) as BuiltList<SidebarState>;
           result.items.replace(valueDes);
+          break;
+        case r'channels':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(BuiltList, [
+              FullType(SidebarChannelState),
+            ]),
+          ) as BuiltList<SidebarChannelState>?;
+          if (valueDes == null) continue;
+          result.channels.replace(valueDes);
           break;
         default:
           unhandled.add(key);

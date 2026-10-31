@@ -151,7 +151,21 @@ type SidebarState struct {
 	Collapsed bool
 	// SortKey is the personal order; "" uses the global order.
 	SortKey string
-	Version int64
+	// ChannelOrder is the personal order of the channels of the space (M4-51); nil is the
+	// default order.
+	ChannelOrder []ids.ID
+	Version      int64
+	// UpdatedByDeviceID is the device of the last change; zero for none.
+	UpdatedByDeviceID ids.ID
+}
+
+// SidebarChannelState is the personal post order of one channel (schema SidebarChannelState,
+// M4-51).
+type SidebarChannelState struct {
+	ChannelID ids.ID
+	// ThreadOrder is the personal order of the posts; empty is the default order.
+	ThreadOrder []ids.ID
+	Version     int64
 	// UpdatedByDeviceID is the device of the last change; zero for none.
 	UpdatedByDeviceID ids.ID
 }
@@ -176,6 +190,9 @@ type Settings interface {
 	// ListSidebar returns the sidebar states of the caller for the spaces it may read that are
 	// not archived (settings.read, R-AZ-21).
 	ListSidebar(ctx context.Context) ([]SidebarState, error)
+	// ListSidebarChannels returns the channel rows of the caller for the channels it may read
+	// that are not archived and lie in a space that is not archived (settings.read, M4-51).
+	ListSidebarChannels(ctx context.Context) ([]SidebarChannelState, error)
 	// ValuesFor returns the stored values of keys for the people userIDs in one read, keyed by
 	// person and key (M3-18: notify gathers notify.default_level for every candidate of a thread;
 	// M3-19 reads its switches the same way). It does not authorize: the caller asks for facts of

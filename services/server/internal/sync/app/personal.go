@@ -90,6 +90,7 @@ type ThreadSource interface {
 type ChannelSource interface {
 	GetChannel(ctx context.Context, a actor.Actor, id ids.ID) (chat.ChannelView, error)
 	ListSidebarStates(ctx context.Context, a actor.Actor) ([]chat.SidebarState, error)
+	ListSidebarChannelStates(ctx context.Context, a actor.Actor) ([]chat.SidebarChannelState, error)
 }
 
 // MentionCounter is the part of messaging.Mentions that computes ReadState.mention_count.

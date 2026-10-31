@@ -3,17 +3,18 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:api_client/src/generated/model/agent_presence.dart';
+import 'package:api_client/src/generated/model/thread.dart';
+import 'package:api_client/src/generated/model/run_summary.dart';
+import 'package:api_client/src/generated/model/evaluated_flag.dart';
 import 'package:api_client/src/generated/model/channel_view.dart';
 import 'package:api_client/src/generated/model/space_view.dart';
 import 'package:api_client/src/generated/model/draft_ref.dart';
-import 'package:api_client/src/generated/model/agent_presence.dart';
 import 'package:built_collection/built_collection.dart';
-import 'package:api_client/src/generated/model/thread.dart';
-import 'package:api_client/src/generated/model/run_summary.dart';
+import 'package:api_client/src/generated/model/sidebar_channel_state.dart';
 import 'package:api_client/src/generated/model/unread_thread.dart';
 import 'package:api_client/src/generated/model/principal_ref.dart';
 import 'package:api_client/src/generated/model/sidebar_state.dart';
-import 'package:api_client/src/generated/model/evaluated_flag.dart';
 import 'package:api_client/src/generated/model/user_setting.dart';
 import 'package:built_value/built_value.dart';
 import 'package:built_value/serializer.dart';
@@ -31,6 +32,7 @@ part 'snapshot.g.dart';
 /// * [spaces]
 /// * [channels]
 /// * [sidebar]
+/// * [sidebarChannels] - The caller's personal post orders of the channels they may read that are not archived and lie in a space that is not archived.
 /// * [unreadThreads] - Only threads with unread messages or mentions.
 /// * [activeRuns]
 /// * [activeThreads] - Per visible channel the open threads (`kind = thread`, as `getThread`, without messages) with an active run, the open threads in `unread_threads`, plus the open threads whose `last_activity_at` lies within `sync.snapshot_thread_window`, newest activity first, until the channel has `sync.snapshot_threads_per_channel` entries; threads with an active run and unread threads count toward this bound but are never left out (04 6.3 item 4, R-SY-28). Ordered by channel, then by descending `last_activity_at`. The client keeps them current through `thread.*` and `message.created`.
@@ -64,6 +66,10 @@ abstract class Snapshot implements Built<Snapshot, SnapshotBuilder> {
 
   @BuiltValueField(wireName: r'sidebar')
   BuiltList<SidebarState> get sidebar;
+
+  /// The caller's personal post orders of the channels they may read that are not archived and lie in a space that is not archived.
+  @BuiltValueField(wireName: r'sidebar_channels')
+  BuiltList<SidebarChannelState>? get sidebarChannels;
 
   /// Only threads with unread messages or mentions.
   @BuiltValueField(wireName: r'unread_threads')
@@ -152,6 +158,15 @@ class _$SnapshotSerializer implements PrimitiveSerializer<Snapshot> {
       object.sidebar,
       specifiedType: const FullType(BuiltList, [FullType(SidebarState)]),
     );
+    if (object.sidebarChannels != null) {
+      yield r'sidebar_channels';
+      yield serializers.serialize(
+        object.sidebarChannels,
+        specifiedType: const FullType(BuiltList, [
+          FullType(SidebarChannelState),
+        ]),
+      );
+    }
     yield r'unread_threads';
     yield serializers.serialize(
       object.unreadThreads,
@@ -269,6 +284,16 @@ class _$SnapshotSerializer implements PrimitiveSerializer<Snapshot> {
             specifiedType: const FullType(BuiltList, [FullType(SidebarState)]),
           ) as BuiltList<SidebarState>;
           result.sidebar.replace(valueDes);
+          break;
+        case r'sidebar_channels':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(BuiltList, [
+              FullType(SidebarChannelState),
+            ]),
+          ) as BuiltList<SidebarChannelState>?;
+          if (valueDes == null) continue;
+          result.sidebarChannels.replace(valueDes);
           break;
         case r'unread_threads':
           final valueDes = serializers.deserialize(

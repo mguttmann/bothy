@@ -60,6 +60,9 @@ type Config struct {
 	ProjectBindingTextMaxChars int `config:"project.binding_text_max_chars"`
 	// ReasonMaxChars is audit.reason_max_chars, the longest reason of putProjectBinding (SEC-AUD-5).
 	ReasonMaxChars int `config:"audit.reason_max_chars"`
+	// SidebarOrderMaxItems is sidebar.order_max_items, the most items of a personal order list
+	// of the sidebar (channel_order, thread_order; M4-51).
+	SidebarOrderMaxItems int `config:"sidebar.order_max_items"`
 }
 
 // limits returns the text limits of channels and tags.
@@ -80,6 +83,8 @@ func (c Config) check() error {
 		return errors.New("chat: thread.title_max_chars and thread.max_tags must be at least 1")
 	case c.PageSizeDefault < 1 || c.PageSizeMax < 1:
 		return errors.New("chat: api.page_size_default and api.page_size_max must be at least 1")
+	case c.SidebarOrderMaxItems < 1:
+		return errors.New("chat: sidebar.order_max_items must be at least 1")
 	}
 	return nil
 }
@@ -356,11 +361,21 @@ func spaceBody(sp domain.Space) spaceJSON {
 
 // sidebarJSON is the schema SidebarState, the payload member state of sidebar.updated.
 type sidebarJSON struct {
-	SpaceID           string `json:"space_id"`
-	Collapsed         bool   `json:"collapsed"`
-	SortKey           string `json:"sort_key,omitempty"`
-	Version           int64  `json:"version"`
-	UpdatedByDeviceID string `json:"updated_by_device_id,omitempty"`
+	SpaceID           string   `json:"space_id"`
+	Collapsed         bool     `json:"collapsed"`
+	SortKey           string   `json:"sort_key,omitempty"`
+	ChannelOrder      []string `json:"channel_order,omitempty"`
+	Version           int64    `json:"version"`
+	UpdatedByDeviceID string   `json:"updated_by_device_id,omitempty"`
+}
+
+// sidebarChannelJSON is the schema SidebarChannelState, the payload member state of
+// sidebar_channel.updated (M4-51); thread_order is always present, empty as [].
+type sidebarChannelJSON struct {
+	ChannelID         string   `json:"channel_id"`
+	ThreadOrder       []string `json:"thread_order"`
+	Version           int64    `json:"version"`
+	UpdatedByDeviceID string   `json:"updated_by_device_id,omitempty"`
 }
 
 // eventActor returns the actor of the request in ctx; none outside a request.
@@ -415,10 +430,46 @@ func (s *Service) emitSidebar(ctx context.Context, st domain.SidebarState) error
 	})
 }
 
-// sidebarBody converts a sidebar row into the JSON form of the schema SidebarState.
+// emitSidebarChannel appends sidebar_channel.updated for st (04 sections 2.2 and 14, M4-51): a
+// personal event for the person, resource the channel without resource version (the payload
+// carries the version of the personal row), scope the channel and its space, payload
+// SidebarChannelPayload.
+func (s *Service) emitSidebarChannel(ctx context.Context, space ids.ID, st domain.SidebarChannelState) error {
+	payload, err := json.Marshal(struct {
+		State sidebarChannelJSON `json:"state"`
+	}{sidebarChannelJSON{
+		ChannelID: st.ChannelID.String(), ThreadOrder: idStrings(st.ThreadOrder), Version: st.Version,
+		UpdatedByDeviceID: optionalID(st.UpdatedByDeviceID),
+	}})
+	if err != nil {
+		return errs.Wrap(errs.CodeInternalError, err, "chat: sidebar_channel.updated payload")
+	}
+	kind, id := eventActor(ctx)
+	return s.d.Events.Append(ctx, eventlog.Event{
+		Type: string(authorize.EventSidebarChannelUpdated), SchemaVersion: 1, ActorKind: kind, ActorPrincipalID: id, SpaceID: space,
+		ChannelID: st.ChannelID, ResourceKind: resourceChannel, ResourceID: st.ChannelID, AudiencePrincipalID: st.UserID,
+		ReceiveAction: receiveSelf, Payload: payload,
+	})
+}
+
+// idStrings returns the string forms of list; empty for an empty list, never nil.
+func idStrings(list []ids.ID) []string {
+	out := make([]string, 0, len(list))
+	for _, id := range list {
+		out = append(out, id.String())
+	}
+	return out
+}
+
+// sidebarBody converts a sidebar row into the JSON form of the schema SidebarState; a nil channel
+// order (the default order) is absent.
 func sidebarBody(st domain.SidebarState) sidebarJSON {
+	var order []string
+	if st.ChannelOrder != nil {
+		order = idStrings(st.ChannelOrder)
+	}
 	return sidebarJSON{
-		SpaceID: st.SpaceID.String(), Collapsed: st.Collapsed, SortKey: st.SortKey, Version: st.Version,
+		SpaceID: st.SpaceID.String(), Collapsed: st.Collapsed, SortKey: st.SortKey, ChannelOrder: order, Version: st.Version,
 		UpdatedByDeviceID: optionalID(st.UpdatedByDeviceID),
 	}
 }
@@ -426,8 +477,18 @@ func sidebarBody(st domain.SidebarState) sidebarJSON {
 // sidebarView converts a sidebar row into the port DTO.
 func sidebarView(st domain.SidebarState) chat.SidebarState {
 	return chat.SidebarState{
-		SpaceID: st.SpaceID, Collapsed: st.Collapsed, SortKey: st.SortKey, Version: st.Version, UpdatedByDeviceID: st.UpdatedByDeviceID,
+		SpaceID: st.SpaceID, Collapsed: st.Collapsed, SortKey: st.SortKey, ChannelOrder: st.ChannelOrder, Version: st.Version,
+		UpdatedByDeviceID: st.UpdatedByDeviceID,
 	}
+}
+
+// sidebarChannelView converts a channel row of the sidebar into the port DTO.
+func sidebarChannelView(st domain.SidebarChannelState) chat.SidebarChannelState {
+	order := st.ThreadOrder
+	if order == nil {
+		order = []ids.ID{}
+	}
+	return chat.SidebarChannelState{ChannelID: st.ChannelID, ThreadOrder: order, Version: st.Version, UpdatedByDeviceID: st.UpdatedByDeviceID}
 }
 
 // codes converts field names into audit codes.

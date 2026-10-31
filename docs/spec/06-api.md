@@ -1008,6 +1008,7 @@ Generated from openapi.yaml.
 |---|---|---|---|---|
 | GET | `/api/v1/me/sidebar` | `getMySidebar` | `settings.read` | Read own sidebar state |
 | PUT | `/api/v1/me/sidebar/spaces/{space_id}` | `putMySidebarSpace` | `sidebar.update` | Collapse or reorder a space for oneself |
+| PUT | `/api/v1/me/sidebar/channels/{channel_id}` | `putMySidebarChannel` | `sidebar.update` | Reorder the posts of a channel for oneself |
 | PUT | `/api/v1/threads/{thread_id}/read-state` | `putReadState` | `read_state.update` | Advance the read position |
 | POST | `/api/v1/threads/{thread_id}/read-state/mark-unread` | `markThreadUnread` | `read_state.mark_unread` | Move the read position back |
 | PUT | `/api/v1/threads/{thread_id}/draft` | `putThreadDraft` | `draft.write` | Save the draft of a thread |
@@ -1293,6 +1294,7 @@ Events (receive action per 05, section 6; schema in openapi.yaml):
 | `draft.deleted` | durable | `self` | self | `DraftDeletedEvent` |  |
 | `settings.updated` | durable | `self` | self | `SettingsUpdatedEvent` |  |
 | `sidebar.updated` | durable | `self` | self | `SidebarUpdatedEvent` |  |
+| `sidebar_channel.updated` | durable | `self` | self | `SidebarChannelUpdatedEvent` |  |
 | `notification_pref.updated` | durable | `self` | self | `NotificationPrefUpdatedEvent` |  |
 | `quiet_hours.updated` | durable | `self` | self | `QuietHoursUpdatedEvent` |  |
 | `gdpr.request_updated` | durable | `gdpr.request.read` |  | `GdprRequestUpdatedEvent` |  |

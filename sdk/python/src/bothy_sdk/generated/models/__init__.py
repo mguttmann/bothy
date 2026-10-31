@@ -636,6 +636,11 @@ from .session_step_up_method import SessionStepUpMethod
 from .settings_payload import SettingsPayload
 from .settings_updated_event import SettingsUpdatedEvent
 from .settings_updated_event_type import SettingsUpdatedEventType
+from .sidebar_channel_payload import SidebarChannelPayload
+from .sidebar_channel_put import SidebarChannelPut
+from .sidebar_channel_state import SidebarChannelState
+from .sidebar_channel_updated_event import SidebarChannelUpdatedEvent
+from .sidebar_channel_updated_event_type import SidebarChannelUpdatedEventType
 from .sidebar_payload import SidebarPayload
 from .sidebar_state import SidebarState
 from .sidebar_state_list import SidebarStateList
@@ -1425,6 +1430,11 @@ __all__ = (
     "SettingsPayload",
     "SettingsUpdatedEvent",
     "SettingsUpdatedEventType",
+    "SidebarChannelPayload",
+    "SidebarChannelPut",
+    "SidebarChannelState",
+    "SidebarChannelUpdatedEvent",
+    "SidebarChannelUpdatedEventType",
     "SidebarPayload",
     "SidebarState",
     "SidebarStateList",

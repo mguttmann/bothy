@@ -19,19 +19,26 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/pg/pgtest"
 )
 
-// sidebarSchema is the schema of the section sidebar of personal.json, from the root of the
-// repository (six levels above this package).
-var sidebarSchema = filepath.Join("..", "..", "..", "..", "..", "..", "docs", "api", "gdpr-export", "v1", "sections",
-	"personal.sidebar.schema.json")
+// sidebarSchema and sidebarChannelsSchema are the schemas of the sections sidebar and
+// sidebar_channels of personal.json, from the root of the repository (six levels above this
+// package).
+var (
+	sidebarSchema = filepath.Join("..", "..", "..", "..", "..", "..", "docs", "api", "gdpr-export", "v1", "sections",
+		"personal.sidebar.schema.json")
+	sidebarChannelsSchema = filepath.Join("..", "..", "..", "..", "..", "..", "docs", "api", "gdpr-export", "v1", "sections",
+		"personal.sidebar_channels.schema.json")
+)
 
 // personalWorld is a database with Alex (the subject) and Sam, two spaces and the sidebar rows of
-// both: Alex has a row for each space (one with a personal key and the device of the write), Sam
-// one.
+// both: Alex has a row for each space (one with a personal key, a channel order and the device of
+// the write), Sam one; and a forum with a channel row of each (M4-51).
 type personalWorld struct {
 	pool             *pg.Pool
 	alex, sam        ids.ID
 	support, finance ids.ID
-	count            func(user ids.ID) int
+	forum, post      ids.ID
+	// count returns the sidebar rows of user: space rows plus channel rows.
+	count func(user ids.ID) int
 }
 
 // newPersonalWorld builds the rows of personalWorld as the database owner.
@@ -46,7 +53,8 @@ func newPersonalWorld(t *testing.T) personalWorld {
 			t.Fatalf("%s: %v", sql, err)
 		}
 	}
-	w := personalWorld{pool: db.Pool(t, pg.RoleApp), alex: ids.New(), sam: ids.New(), support: ids.New(), finance: ids.New()}
+	w := personalWorld{pool: db.Pool(t, pg.RoleApp), alex: ids.New(), sam: ids.New(), support: ids.New(), finance: ids.New(),
+		forum: ids.New(), post: ids.New()}
 	for _, p := range []struct {
 		id     ids.ID
 		handle string
@@ -58,13 +66,19 @@ func newPersonalWorld(t *testing.T) personalWorld {
 	exec(`INSERT INTO devices (id, user_id, name, platform, state) VALUES ($1, $2, 'Laptop', 'web', 'active')`, device, w.alex)
 	exec(`INSERT INTO spaces (id, name, sort_key, created_by) VALUES ($1, 'Support', 'a', $2), ($3, 'Finance', 'b', $2)`,
 		w.support, w.sam, w.finance)
-	exec(`INSERT INTO user_space_states (user_id, space_id, collapsed, sort_key, updated_by_device_id) VALUES ($1, $2, true, 'k', $3)`,
-		w.alex, w.support, device)
+	exec(`INSERT INTO user_space_states (user_id, space_id, collapsed, sort_key, channel_order, updated_by_device_id)
+		VALUES ($1, $2, true, 'k', ARRAY[$4::uuid], $3)`, w.alex, w.support, device, w.forum)
 	exec(`INSERT INTO user_space_states (user_id, space_id) VALUES ($1, $2), ($3, $2)`, w.alex, w.finance, w.sam)
+	exec(`INSERT INTO channels (id, space_id, kind, name, sort_key, history_backfill_limit, created_by)
+		VALUES ($1, $2, 'forum', 'Projects', 'a', 20, $3)`, w.forum, w.support, w.sam)
+	exec(`INSERT INTO user_channel_states (user_id, channel_id, thread_order, updated_by_device_id) VALUES ($1, $2, ARRAY[$3::uuid], $4)`,
+		w.alex, w.forum, w.post, device)
+	exec(`INSERT INTO user_channel_states (user_id, channel_id) VALUES ($1, $2)`, w.sam, w.forum)
 	w.count = func(user ids.ID) int {
 		t.Helper()
 		var n int
-		if err := super.QueryRow(ctx, `SELECT count(*)::int FROM user_space_states WHERE user_id = $1`, user).Scan(&n); err != nil {
+		if err := super.QueryRow(ctx, `SELECT (SELECT count(*) FROM user_space_states WHERE user_id = $1)::int
+			+ (SELECT count(*) FROM user_channel_states WHERE user_id = $1)::int`, user).Scan(&n); err != nil {
 			t.Fatal(err)
 		}
 		return n
@@ -105,7 +119,7 @@ func TestPersonalDataExport(t *testing.T) {
 	if p.Module() != "chat" {
 		t.Fatalf("Module() = %q", p.Module())
 	}
-	want := []string{"spaces", "user_space_states", "channels", "dm_participants", "threads", "thread_tags"}
+	want := []string{"spaces", "user_space_states", "user_channel_states", "channels", "dm_participants", "threads", "thread_tags"}
 	if got := p.Tables(); !slices.Equal(got, want) {
 		t.Fatalf("Tables() = %v, want %v", got, want)
 	}
@@ -113,8 +127,8 @@ func TestPersonalDataExport(t *testing.T) {
 	if err := p.Export(context.Background(), personaldata.Export{Subject: w.alex}, mw); err != nil {
 		t.Fatal(err)
 	}
-	if len(mw.Sections) != 1 || len(mw.Sections[personaldata.FilePersonal]) != 1 || len(mw.Lines) != 0 || len(mw.Contents) != 0 {
-		t.Fatalf("the export wrote more than the section sidebar: %v %v", mw.Sections, mw.Lines)
+	if len(mw.Sections) != 1 || len(mw.Sections[personaldata.FilePersonal]) != 2 || len(mw.Lines) != 0 || len(mw.Contents) != 0 {
+		t.Fatalf("the export wrote more than the sections sidebar and sidebar_channels: %v %v", mw.Sections, mw.Lines)
 	}
 	raw := mw.Sections[personaldata.FilePersonal]["sidebar"]
 	validateSchema(t, sidebarSchema, raw)
@@ -133,11 +147,26 @@ func TestPersonalDataExport(t *testing.T) {
 	if s == nil || f == nil {
 		t.Fatalf("sidebar rows %s", raw)
 	}
-	if s["collapsed"] != true || s["sort_key"] != "k" || s["updated_by_device_id"] == nil {
+	if order, _ := s["channel_order"].([]any); s["collapsed"] != true || s["sort_key"] != "k" || s["updated_by_device_id"] == nil ||
+		len(order) != 1 || order[0] != w.forum.String() {
 		t.Errorf("support row %v", s)
 	}
 	if _, ok := f["sort_key"]; ok || f["collapsed"] != false {
 		t.Errorf("finance row %v: an empty key must be absent", f)
+	}
+	if _, ok := f["channel_order"]; ok {
+		t.Errorf("finance row %v: the default channel order must be absent", f)
+	}
+	// M4-51: Alex's channel row, never Sam's.
+	rawChans := mw.Sections[personaldata.FilePersonal]["sidebar_channels"]
+	validateSchema(t, sidebarChannelsSchema, rawChans)
+	var chans []map[string]any
+	if err := json.Unmarshal(rawChans, &chans); err != nil {
+		t.Fatal(err)
+	}
+	if order, _ := chans[0]["thread_order"].([]any); len(chans) != 1 || chans[0]["channel_id"] != w.forum.String() || len(order) != 1 ||
+		order[0] != w.post.String() || chans[0]["updated_by_device_id"] == nil {
+		t.Fatalf("sidebar_channels %s", rawChans)
 	}
 
 	// A person without rows gets an empty array, never null.
@@ -145,14 +174,16 @@ func TestPersonalDataExport(t *testing.T) {
 	if err := p.Export(context.Background(), personaldata.Export{Subject: ids.New()}, empty); err != nil {
 		t.Fatal(err)
 	}
-	if got := string(empty.Sections[personaldata.FilePersonal]["sidebar"]); got != "[]" {
-		t.Errorf("sidebar of a person without rows = %s, want []", got)
+	for _, key := range []string{"sidebar", "sidebar_channels"} {
+		if got := string(empty.Sections[personaldata.FilePersonal][key]); got != "[]" {
+			t.Errorf("%s of a person without rows = %s, want []", key, got)
+		}
 	}
 }
 
 // TestPersonalDataErase (M7-06, 20 section 4.4 item 3): the steps 1 to 6 in order, twice (the
-// second run is the resume after a crash), delete Alex's sidebar rows in StepPersonal and nothing
-// before it; Sam's row and the spaces stay, in both content modes.
+// second run is the resume after a crash), delete Alex's sidebar rows (spaces and channels, M4-51)
+// in StepPersonal and nothing before it; Sam's rows and the spaces stay, in both content modes.
 func TestPersonalDataErase(t *testing.T) {
 	t.Parallel()
 	for _, mode := range []personaldata.ContentMode{personaldata.KeepPseudonymized, personaldata.DeleteContent} {
@@ -166,7 +197,7 @@ func TestPersonalDataErase(t *testing.T) {
 					if err := p.Erase(context.Background(), step, e); err != nil {
 						t.Fatalf("run %d step %s: %v", run, step, err)
 					}
-					want := 2
+					want := 3
 					if run > 0 || step >= personaldata.StepPersonal {
 						want = 0
 					}
@@ -175,8 +206,8 @@ func TestPersonalDataErase(t *testing.T) {
 					}
 				}
 			}
-			if got := w.count(w.sam); got != 1 {
-				t.Errorf("Sam's sidebar rows: %d, want 1", got)
+			if got := w.count(w.sam); got != 2 {
+				t.Errorf("Sam's sidebar rows: %d, want 2", got)
 			}
 		})
 	}

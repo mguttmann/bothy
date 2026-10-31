@@ -569,6 +569,10 @@ func (stubServer) PutMySidebarSpace(context.Context, rest.PutMySidebarSpaceReque
 	return nil, nil
 }
 
+func (stubServer) PutMySidebarChannel(context.Context, rest.PutMySidebarChannelRequestObject) (rest.PutMySidebarChannelResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) ListSpaceChannels(context.Context, rest.ListSpaceChannelsRequestObject) (rest.ListSpaceChannelsResponseObject, error) {
 	return nil, nil
 }
@@ -1409,6 +1413,8 @@ func TestRealTable_Enabled(t *testing.T) {
 		"moveSpace":         {"POST /api/v1/spaces/{space_id}/move", "space.reorder", "rl.admin"},
 		"archiveSpace":      {"POST /api/v1/spaces/{space_id}/archive", "space.archive", "rl.admin"},
 		"putMySidebarSpace": {"PUT /api/v1/me/sidebar/spaces/{space_id}", "sidebar.update", "rl.write"},
+		// M4-51
+		"putMySidebarChannel": {"PUT /api/v1/me/sidebar/channels/{channel_id}", "sidebar.update", "rl.write"},
 		// M1-53
 		"listSpaceChannels": {"GET /api/v1/spaces/{space_id}/channels", "channel.read", "rl.read"},
 		"createChannel":     {"POST /api/v1/spaces/{space_id}/channels", "channel.create", "rl.admin"},

@@ -7,6 +7,8 @@ from uuid import UUID
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
+from ..types import UNSET, Unset
+
 if TYPE_CHECKING:
     from ..models.agent_presence import AgentPresence
     from ..models.channel_view import ChannelView
@@ -14,6 +16,7 @@ if TYPE_CHECKING:
     from ..models.evaluated_flag import EvaluatedFlag
     from ..models.principal_ref import PrincipalRef
     from ..models.run_summary import RunSummary
+    from ..models.sidebar_channel_state import SidebarChannelState
     from ..models.sidebar_state import SidebarState
     from ..models.space_view import SpaceView
     from ..models.thread import Thread
@@ -50,6 +53,8 @@ class Snapshot:
         drafts (list[DraftRef]):
         features (list[EvaluatedFlag]): Feature flags evaluated for the principal, as in `InstanceInfo.features` (04
             section 6.3, step 4).
+        sidebar_channels (list[SidebarChannelState] | Unset): The caller's personal post orders of the channels they may
+            read that are not archived and lie in a space that is not archived.
     """
 
     head_seq: int
@@ -67,6 +72,7 @@ class Snapshot:
     settings: list[UserSetting]
     drafts: list[DraftRef]
     features: list[EvaluatedFlag]
+    sidebar_channels: list[SidebarChannelState] | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -130,6 +136,13 @@ class Snapshot:
             features_item = features_item_data.to_dict()
             features.append(features_item)
 
+        sidebar_channels: list[dict[str, Any]] | Unset = UNSET
+        if not isinstance(self.sidebar_channels, Unset):
+            sidebar_channels = []
+            for sidebar_channels_item_data in self.sidebar_channels:
+                sidebar_channels_item = sidebar_channels_item_data.to_dict()
+                sidebar_channels.append(sidebar_channels_item)
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -151,6 +164,8 @@ class Snapshot:
                 "features": features,
             }
         )
+        if sidebar_channels is not UNSET:
+            field_dict["sidebar_channels"] = sidebar_channels
 
         return field_dict
 
@@ -162,6 +177,7 @@ class Snapshot:
         from ..models.evaluated_flag import EvaluatedFlag
         from ..models.principal_ref import PrincipalRef
         from ..models.run_summary import RunSummary
+        from ..models.sidebar_channel_state import SidebarChannelState
         from ..models.sidebar_state import SidebarState
         from ..models.space_view import SpaceView
         from ..models.thread import Thread
@@ -249,6 +265,17 @@ class Snapshot:
 
             features.append(features_item)
 
+        _sidebar_channels = d.pop("sidebar_channels", UNSET)
+        sidebar_channels: list[SidebarChannelState] | Unset = UNSET
+        if _sidebar_channels is not UNSET:
+            sidebar_channels = []
+            for sidebar_channels_item_data in _sidebar_channels:
+                sidebar_channels_item = SidebarChannelState.from_dict(
+                    sidebar_channels_item_data
+                )
+
+                sidebar_channels.append(sidebar_channels_item)
+
         snapshot = cls(
             head_seq=head_seq,
             permission_version=permission_version,
@@ -265,6 +292,7 @@ class Snapshot:
             settings=settings,
             drafts=drafts,
             features=features,
+            sidebar_channels=sidebar_channels,
         )
 
         snapshot.additional_properties = d

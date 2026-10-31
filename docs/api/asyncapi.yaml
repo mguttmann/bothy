@@ -155,6 +155,8 @@ channels:
         $ref: '#/components/messages/event.settings.updated'
       event.sidebar.updated:
         $ref: '#/components/messages/event.sidebar.updated'
+      event.sidebar_channel.updated:
+        $ref: '#/components/messages/event.sidebar_channel.updated'
       event.notification_pref.updated:
         $ref: '#/components/messages/event.notification_pref.updated'
       event.quiet_hours.updated:
@@ -722,6 +724,7 @@ operations:
     - $ref: '#/channels/gateway/messages/event.draft.deleted'
     - $ref: '#/channels/gateway/messages/event.settings.updated'
     - $ref: '#/channels/gateway/messages/event.sidebar.updated'
+    - $ref: '#/channels/gateway/messages/event.sidebar_channel.updated'
     - $ref: '#/channels/gateway/messages/event.notification_pref.updated'
     - $ref: '#/channels/gateway/messages/event.quiet_hours.updated'
     - $ref: '#/channels/gateway/messages/event.gdpr.request_updated'
@@ -1813,6 +1816,22 @@ components:
             enum: [dispatch]
           d:
             $ref: ./openapi.yaml#/components/schemas/SidebarUpdatedEvent
+      x-audience: self
+    event.sidebar_channel.updated:
+      name: sidebar_channel.updated
+      title: dispatch sidebar_channel.updated
+      summary: Durable event, at least once, in `seq` order.
+      x-event-kind: durable
+      x-receive-action: self
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/SidebarChannelUpdatedEvent
       x-audience: self
     event.notification_pref.updated:
       name: notification_pref.updated

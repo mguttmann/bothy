@@ -135,6 +135,9 @@ func TestPersonal_UseCases(t *testing.T) {
 	if side, err := s.ListSidebar(ctx); err != nil || len(side) != 0 {
 		t.Fatalf("sidebar %+v %v", side, err)
 	}
+	if side, err := s.ListSidebarChannels(ctx); err != nil || len(side) != 0 {
+		t.Fatalf("sidebar channels %+v %v", side, err)
+	}
 
 	// Without a caller authorize refuses every operation.
 	anon := context.Background()
@@ -149,5 +152,8 @@ func TestPersonal_UseCases(t *testing.T) {
 	}
 	if _, err := s.ListSidebar(anon); err == nil {
 		t.Fatal("anonymous sidebar")
+	}
+	if _, err := s.ListSidebarChannels(anon); err == nil {
+		t.Fatal("anonymous sidebar channels")
 	}
 }

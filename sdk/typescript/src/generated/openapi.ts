@@ -1738,7 +1738,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Read own sidebar state */
+        /**
+         * Read own sidebar state
+         * @description The caller's rows of the spaces they may read that are not archived (`items`) and of the channels they may read that are not archived and lie in a space that is not archived (`channels`, the personal post order).
+         */
         get: operations["getMySidebar"];
         put?: never;
         post?: never;
@@ -1756,8 +1759,31 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Collapse or reorder a space for oneself */
+        /**
+         * Collapse or reorder a space for oneself
+         * @description Stores the caller's row of the space, version + 1, last write wins, no If-Match. `channel_order` absent keeps the stored channel order, a list replaces it and an empty list returns to the default order. The server checks the form of the list (unique items, at most `sidebar.order_max_items`), not whether each ID names a channel the caller can see. Writes `sidebar.updated` for the caller.
+         */
         put: operations["putMySidebarSpace"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/sidebar/channels/{channel_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Reorder the posts of a channel for oneself
+         * @description Stores the caller's personal order of the posts of a channel the caller can read, version + 1, last write wins, no If-Match; an empty list returns to the default order. The server checks the form of the list (unique items, at most `sidebar.order_max_items`), not whether each ID names a thread the caller can see. A channel the caller cannot read and an unknown one give the same 404. Writes `sidebar_channel.updated` for the caller.
+         */
+        put: operations["putMySidebarChannel"];
         post?: never;
         delete?: never;
         options?: never;
@@ -7160,6 +7186,8 @@ export interface components {
              * @example a0V
              */
             sort_key?: string;
+            /** @description Personal order of the channels and forums of the space; absent uses the default order. At most `sidebar.order_max_items`. */
+            channel_order?: components["schemas"]["Uuid"][];
             /** Format: int64 */
             version: number;
             updated_by_device_id?: components["schemas"]["Uuid"];
@@ -7169,9 +7197,25 @@ export interface components {
             sort_key?: string;
             /** @description True removes the personal order. Replaces sending null. */
             use_global_order?: boolean;
+            /** @description New personal order of the channels and forums of the space, unique IDs; absent keeps the stored order, an empty list returns to the default order. At most `sidebar.order_max_items`. */
+            channel_order?: components["schemas"]["Uuid"][];
         };
         SidebarStateList: {
             items: components["schemas"]["SidebarState"][];
+            /** @description The caller's personal post orders of channels. */
+            channels?: components["schemas"]["SidebarChannelState"][];
+        };
+        SidebarChannelState: {
+            channel_id: components["schemas"]["Uuid"];
+            /** @description Personal order of the open posts of the channel; empty uses the default order. At most `sidebar.order_max_items`. */
+            thread_order: components["schemas"]["Uuid"][];
+            /** Format: int64 */
+            version: number;
+            updated_by_device_id?: components["schemas"]["Uuid"];
+        };
+        SidebarChannelPut: {
+            /** @description New personal order of the posts of the channel, unique IDs; an empty list returns to the default order. At most `sidebar.order_max_items`. */
+            thread_order: components["schemas"]["Uuid"][];
         };
         ForumTag: {
             id: components["schemas"]["Uuid"];
@@ -7874,6 +7918,8 @@ export interface components {
             spaces: components["schemas"]["SpaceView"][];
             channels: components["schemas"]["ChannelView"][];
             sidebar: components["schemas"]["SidebarState"][];
+            /** @description The caller's personal post orders of the channels they may read that are not archived and lie in a space that is not archived. */
+            sidebar_channels?: components["schemas"]["SidebarChannelState"][];
             /** @description Only threads with unread messages or mentions. */
             unread_threads: components["schemas"]["UnreadThread"][];
             active_runs: components["schemas"]["RunSummary"][];
@@ -9418,6 +9464,9 @@ export interface components {
         SidebarPayload: {
             state: components["schemas"]["SidebarState"];
         };
+        SidebarChannelPayload: {
+            state: components["schemas"]["SidebarChannelState"];
+        };
         NotificationPrefPayload: {
             preference: components["schemas"]["NotificationPreference"];
             deleted?: boolean;
@@ -10692,6 +10741,18 @@ export interface components {
              */
             type: "sidebar.updated";
         };
+        /** @description Durable event `sidebar_channel.updated`. */
+        SidebarChannelUpdatedEvent: components["schemas"]["EventEnvelope"] & {
+            /** @enum {string} */
+            type: "sidebar_channel.updated";
+            payload: components["schemas"]["SidebarChannelPayload"];
+        } & {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "sidebar_channel.updated";
+        };
         /** @description Durable event `notification_pref.updated`. */
         NotificationPrefUpdatedEvent: components["schemas"]["EventEnvelope"] & {
             /** @enum {string} */
@@ -10901,7 +10962,7 @@ export interface components {
             image_url?: string;
         };
         /** @description Any durable event, discriminated by `type`. Clients skip unknown types and still advance their cursor. */
-        Event: components["schemas"]["MessageCreatedEvent"] | components["schemas"]["MessageUpdatedEvent"] | components["schemas"]["MessageDeletedEvent"] | components["schemas"]["ReactionAddedEvent"] | components["schemas"]["ReactionRemovedEvent"] | components["schemas"]["PinAddedEvent"] | components["schemas"]["PinRemovedEvent"] | components["schemas"]["ThreadCreatedEvent"] | components["schemas"]["ThreadUpdatedEvent"] | components["schemas"]["ThreadClosedEvent"] | components["schemas"]["ThreadReopenedEvent"] | components["schemas"]["ThreadMovedEvent"] | components["schemas"]["ThreadMovedOutEvent"] | components["schemas"]["AgentSessionChangedEvent"] | components["schemas"]["RunStateChangedEvent"] | components["schemas"]["SpaceCreatedEvent"] | components["schemas"]["SpaceUpdatedEvent"] | components["schemas"]["SpaceArchivedEvent"] | components["schemas"]["ChannelCreatedEvent"] | components["schemas"]["ChannelUpdatedEvent"] | components["schemas"]["ChannelSettingsChangedEvent"] | components["schemas"]["ChannelArchivedEvent"] | components["schemas"]["CommandChangedEvent"] | components["schemas"]["FileUpdatedEvent"] | components["schemas"]["UserUpdatedEvent"] | components["schemas"]["AgentUpdatedEvent"] | components["schemas"]["InstanceUpdatedEvent"] | components["schemas"]["StatusUpdatedEvent"] | components["schemas"]["GrantChangedEvent"] | components["schemas"]["GroupChangedEvent"] | components["schemas"]["AccessChangedEvent"] | components["schemas"]["AccessExpiringEvent"] | components["schemas"]["DevicePendingEvent"] | components["schemas"]["SessionRevokedEvent"] | components["schemas"]["ReadStateUpdatedEvent"] | components["schemas"]["DraftUpdatedEvent"] | components["schemas"]["DraftDeletedEvent"] | components["schemas"]["SettingsUpdatedEvent"] | components["schemas"]["SidebarUpdatedEvent"] | components["schemas"]["NotificationPrefUpdatedEvent"] | components["schemas"]["QuietHoursUpdatedEvent"] | components["schemas"]["GdprRequestUpdatedEvent"] | components["schemas"]["GdprRequestDueEvent"] | components["schemas"]["ImportProgressEvent"] | components["schemas"]["AgentInvocationEvent"] | components["schemas"]["AgentFollowupEvent"] | components["schemas"]["RunCancelRequestedEvent"] | components["schemas"]["InteractionCreatedEvent"] | components["schemas"]["CommandInvokedEvent"] | components["schemas"]["AgentConfigChangedEvent"] | components["schemas"]["HostUpdatedEvent"] | components["schemas"]["TerminalSessionChangedEvent"];
+        Event: components["schemas"]["MessageCreatedEvent"] | components["schemas"]["MessageUpdatedEvent"] | components["schemas"]["MessageDeletedEvent"] | components["schemas"]["ReactionAddedEvent"] | components["schemas"]["ReactionRemovedEvent"] | components["schemas"]["PinAddedEvent"] | components["schemas"]["PinRemovedEvent"] | components["schemas"]["ThreadCreatedEvent"] | components["schemas"]["ThreadUpdatedEvent"] | components["schemas"]["ThreadClosedEvent"] | components["schemas"]["ThreadReopenedEvent"] | components["schemas"]["ThreadMovedEvent"] | components["schemas"]["ThreadMovedOutEvent"] | components["schemas"]["AgentSessionChangedEvent"] | components["schemas"]["RunStateChangedEvent"] | components["schemas"]["SpaceCreatedEvent"] | components["schemas"]["SpaceUpdatedEvent"] | components["schemas"]["SpaceArchivedEvent"] | components["schemas"]["ChannelCreatedEvent"] | components["schemas"]["ChannelUpdatedEvent"] | components["schemas"]["ChannelSettingsChangedEvent"] | components["schemas"]["ChannelArchivedEvent"] | components["schemas"]["CommandChangedEvent"] | components["schemas"]["FileUpdatedEvent"] | components["schemas"]["UserUpdatedEvent"] | components["schemas"]["AgentUpdatedEvent"] | components["schemas"]["InstanceUpdatedEvent"] | components["schemas"]["StatusUpdatedEvent"] | components["schemas"]["GrantChangedEvent"] | components["schemas"]["GroupChangedEvent"] | components["schemas"]["AccessChangedEvent"] | components["schemas"]["AccessExpiringEvent"] | components["schemas"]["DevicePendingEvent"] | components["schemas"]["SessionRevokedEvent"] | components["schemas"]["ReadStateUpdatedEvent"] | components["schemas"]["DraftUpdatedEvent"] | components["schemas"]["DraftDeletedEvent"] | components["schemas"]["SettingsUpdatedEvent"] | components["schemas"]["SidebarUpdatedEvent"] | components["schemas"]["SidebarChannelUpdatedEvent"] | components["schemas"]["NotificationPrefUpdatedEvent"] | components["schemas"]["QuietHoursUpdatedEvent"] | components["schemas"]["GdprRequestUpdatedEvent"] | components["schemas"]["GdprRequestDueEvent"] | components["schemas"]["ImportProgressEvent"] | components["schemas"]["AgentInvocationEvent"] | components["schemas"]["AgentFollowupEvent"] | components["schemas"]["RunCancelRequestedEvent"] | components["schemas"]["InteractionCreatedEvent"] | components["schemas"]["CommandInvokedEvent"] | components["schemas"]["AgentConfigChangedEvent"] | components["schemas"]["HostUpdatedEvent"] | components["schemas"]["TerminalSessionChangedEvent"];
         /** @description One page. `next_cursor` is absent on the last page. */
         MentionItemPage: {
             items: components["schemas"]["MentionItem"][];
@@ -15509,6 +15570,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SidebarState"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
+    putMySidebarChannel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                channel_id: components["parameters"]["ChannelIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SidebarChannelPut"];
+            };
+        };
+        responses: {
+            /** @description OK. */
+            200: {
+                headers: {
+                    "Correlation-Id": components["headers"]["Correlation-Id"];
+                    RateLimit: components["headers"]["RateLimit"];
+                    "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SidebarChannelState"];
                 };
             };
             400: components["responses"]["BadRequest"];

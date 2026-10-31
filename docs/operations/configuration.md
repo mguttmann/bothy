@@ -246,6 +246,7 @@ Source: [03-data-model.md](../spec/03-data-model.md), section 9.
 | `channel.prompt_max_bytes` | `BOTHY_CHANNEL__PROMPT_MAX_BYTES` | Server | int | `32768` | size of a channel prompt | active |
 | `thread.title_max_chars` | `BOTHY_THREAD__TITLE_MAX_CHARS` | Server | int | `200` | length of a thread title | active |
 | `thread.max_tags` | `BOTHY_THREAD__MAX_TAGS` | Server | int | `5` | forum tags per thread | active |
+| `sidebar.order_max_items` | `BOTHY_SIDEBAR__ORDER_MAX_ITEMS` | Server | int | `1000` | items of a personal order list of the sidebar (`user_space_states.channel_order`, `user_channel_states.thread_order`) | active |
 | `message.max_content_bytes` | `BOTHY_MESSAGE__MAX_CONTENT_BYTES` | Server | int | `262144` | size of a message (long answers without splitting) | active |
 | `message.max_attachments` | `BOTHY_MESSAGE__MAX_ATTACHMENTS` | Server | int | `10` | attachments per message | active |
 | `message.max_mentions` | `BOTHY_MESSAGE__MAX_MENTIONS` | Server | int | `50` | distinct mention handles per message (content format, `messages`) | active |
