@@ -128,6 +128,14 @@ void main() {
       ]);
     });
 
+    test('rows on screen that are not in the order (a selected done post, a '
+        'held row) are skipped (review of M4-51)', () {
+      expect(moveAmong(['a', 'b'], ['a', 'x', 'b'], 'b', 0), ['b', 'a']);
+      expect(moveAmong(['a', 'b'], ['a', 'x', 'b'], 'b', 1), ['a', 'b']);
+      expect(moveAmong(['a', 'b'], ['a', 'b', 'k'], 'a', 2), ['b', 'a']);
+      expect(moveAmong(['a'], ['x', 'a'], 'a', 0), ['a']);
+    });
+
     test('an index beyond the ends is clamped; an unknown row changes '
         'nothing', () {
       expect(moveAmong(['a', 'b'], ['a', 'b'], 'a', 9), ['b', 'a']);
