@@ -97,13 +97,15 @@ void registerSelfHandlers(RestFake rest) {
       return confirmed(r, 'device_key');
     })
     // Password with TOTP (08 6.2): an app session on a device without a step-up key, of a
-    // person with a local account; a device with a step-up key keeps the device key. The fake
-    // has no console sessions.
+    // person with a local account; a device with a step-up key and a cli device keep their
+    // refusal. The fake has no console sessions.
     ..handle('stepUpWithPassword', (r) {
       final session = r.session!;
       final person = r.person;
+      final device = world.devices[session.deviceId]!;
       if (session.clientComponent != null ||
-          world.devices[session.deviceId]!.stepUpJwk != null ||
+          device.platform == 'cli' ||
+          device.stepUpJwk != null ||
           person.password == null) {
         throw const FakeProblem(
           403,

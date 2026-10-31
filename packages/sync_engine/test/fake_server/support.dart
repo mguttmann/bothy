@@ -44,12 +44,14 @@ class FakeWorldHarness {
     String login = WorldSeed.alexLogin,
     int keySeed = 1,
     bool stepUpKey = true,
+    String platform = 'macos',
   }) {
     final d = TestDevice(
       server.baseUri,
       SoftwareP256Signer.seeded(keySeed),
       login,
       stepUpKey: stepUpKey,
+      platform: platform,
     );
     _devices.add(d);
     return d;
@@ -82,8 +84,14 @@ class _Prompt implements StepUpPrompt {
 /// One device: the auth session of `package:auth` against the fake.
 class TestDevice {
   /// Builds the session for [login] with the DPoP key [key]; without [stepUpKey] the device
-  /// has no step-up key (Windows, D-M4-11-2).
-  TestDevice(this.baseUri, this.key, this.login, {bool stepUpKey = true}) {
+  /// has no step-up key (Windows, D-M4-11-2); [platform] is the `DevicePlatform` it registers.
+  TestDevice(
+    this.baseUri,
+    this.key,
+    this.login, {
+    bool stepUpKey = true,
+    String platform = 'macos',
+  }) {
     final random = Random(key.thumbprint.hashCode);
     auth = AuthSession(
       serverUrl: baseUri,
@@ -98,9 +106,9 @@ class TestDevice {
         random: (bits) => random.nextInt(1 << (bits > 31 ? 31 : bits)),
       ),
       config: AppConfig.defaults(),
-      device: const DeviceDescription(
+      device: DeviceDescription(
         name: 'Alex laptop',
-        platform: 'macos',
+        platform: platform,
         appVersion: '1.0.0',
       ),
       buildClient: (interceptors) => createApiClient(
