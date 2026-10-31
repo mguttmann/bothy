@@ -11,7 +11,6 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"encoding/pem"
-	"math/big"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -51,13 +50,11 @@ func TestG7_SchemathesisAllEnabledOperations(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = b.Close() })
 	root := repoRoot(t)
-	seed := os.Getenv("CONTRACT_SEED") //nolint:forbidigo // test input from make contract-test, not server configuration
-	if seed == "" {
-		n, err := rand.Int(rand.Reader, big.NewInt(1<<62))
-		if err != nil {
-			t.Fatal(err)
-		}
-		seed = n.String()
+	// A fixed seed (quality.contract.seed through make contract-test): every run draws the same
+	// cases, so a failure repeats instead of passing on a rerun with another seed.
+	seed, err := Seed(os.Getenv("CONTRACT_SEED")) //nolint:forbidigo // test input from make contract-test, not server configuration
+	if err != nil {
+		t.Fatal(err)
 	}
 	examples := os.Getenv("CONTRACT_MAX_EXAMPLES") //nolint:forbidigo // test input from make contract-test
 	if examples == "" {

@@ -58,9 +58,11 @@ comma := ,
 # Host system of the Dart performance tests: they run in profile mode on macOS only.
 PERF_HOST ?= $(shell uname -s)
 
-# Examples per operation of G7 and its time limit (named values quality.contract.max_examples,
-# quality.contract.timeout).
+# Examples per operation of G7, its seed and its time limit (named values
+# quality.contract.max_examples, quality.contract.seed, quality.contract.timeout). The fixed seed
+# makes every run draw the same cases; CONTRACT_SEED=<n> make contract-test tries another one.
 CONTRACT_MAX_EXAMPLES ?= 100
+CONTRACT_SEED ?= 238
 CONTRACT_TIMEOUT ?= 180m
 SONAR_HOST_URL ?= http://127.0.0.1:9000
 SONAR_ORGANIZATION ?=
@@ -344,7 +346,7 @@ test: ## All tests with coverage data
 contract-test: ## Contract tests G7: Schemathesis against the server of this tree (Docker runtime)
 	@if [ -z "$(GO_ON)" ]; then $(call skip,contract-test,no Go module selected); \
 	else $(GO_PREREQS) test || exit 1; $(gotestsum) \
-	  cd services/server && CONTRACT_MAX_EXAMPLES=$(CONTRACT_MAX_EXAMPLES) $(call go_test,-count=1 -tags contract_validate$(comma)contract_live \
+	  cd services/server && CONTRACT_MAX_EXAMPLES=$(CONTRACT_MAX_EXAMPLES) CONTRACT_SEED=$(CONTRACT_SEED) $(call go_test,-count=1 -tags contract_validate$(comma)contract_live \
 	    -run '^TestG7_' -timeout $(CONTRACT_TIMEOUT),./test/contract/...) || exit 1; fi
 
 coverage: test ## Coverage thresholds (named values quality.coverage.*)

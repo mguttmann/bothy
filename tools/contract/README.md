@@ -16,7 +16,9 @@ the lifetimes of the session).
 | `reporting.py` | `curl` reproduction with `"$BOTHY_CONTRACT_AUTH"` and a fresh proof instead of the credentials, plus the seed. |
 | `live_contract.py` | the live tests: one test per enabled operation and pass (owner, Alex; a positive `unregisterPush` removes a fresh registration, a positive `getPushPreview` asks for every second `nid` for a readable message of the world, and a pass that called it fails unless a preview token was accepted once), the stateful phase over the links Schemathesis infers, SEC-T06 (`x_unknown_field` gives `400 validation_failed`, a duplicate member `400 malformed_request`; the two post operations of the incoming webhooks answer the uniform `404 not_found` instead, because their token check runs before the body is read and the pass holds no webhook token) and the coverage check that fails when an enabled operation was not called in a pass. A positive case of an operation with the action `user.disable` or `owner.remove` never names a principal of a pass: `_shield` gives it an unknown person, so a generated call cannot end the owner or user the broker issues sessions for (D-M6-05-8). Its name does not match `test_*.py`, so the default `pytest` run never collects it. |
 
-Unit tests: `tests/` (run by `make test`). A run prints one line `G7 summary:` with the seed, the
+Unit tests: `tests/` (run by `make test`). The owner and user passes and the stateful phase all draw
+from `CONTRACT_SEED` (`hypothesis.seed`), which `make contract-test` fixes
+(`quality.contract.seed`), so every run sends the same cases. A run prints one line `G7 summary:` with the seed, the
 inferred transitions and the answers per pass and status class. To narrow a reproduction, set
-`CONTRACT_SEED` and `CONTRACT_PYTEST_K` (a pytest `-k` expression) for `make contract-test`; a
+`CONTRACT_PYTEST_K` (a pytest `-k` expression) and, for other cases, `CONTRACT_SEED` for `make contract-test`; a
 narrowed run fails its coverage check by design.
