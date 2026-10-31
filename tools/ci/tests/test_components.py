@@ -675,15 +675,16 @@ SMOKE_PRIVATE = {"apps-windows", "apps-ios"}
 @pytest.mark.parametrize(
     ("files", "expected"),
     [
-        # A change limited to one platform folder runs only that platform.
+        # A change limited to one platform folder runs only that platform (and console-e2e for a
+        # folder under packages/, which the console build reads, as in the full plan).
         (["apps/client/windows/runner/flutter_window.cpp"], {"apps-windows"}),
         (["apps/client/macos/Runner/Notifications.swift"], {"apps-macos"}),
         # The macOS job runs the tests of ios/ClientKit, which both apps share.
         (["apps/client/ios/ClientKit/Sources/x.swift"], {"apps-ios", "apps-macos"}),
-        (["packages/device_key/darwin/Sources/core.swift"], {"apps-ios", "apps-macos"}),
-        (["packages/device_key/windows/core/core.cpp"], {"apps-windows"}),
+        (["packages/device_key/darwin/Sources/core.swift"], {"apps-ios", "apps-macos"} | CONSOLE),
+        (["packages/device_key/windows/core/core.cpp"], {"apps-windows"} | CONSOLE),
         # The JVM tests of the Android code run in test (apps).
-        (["packages/device_key/android/core/src/main/x.kt"], {"test-apps"} | ANDROID),
+        (["packages/device_key/android/core/src/main/x.kt"], {"test-apps"} | ANDROID | CONSOLE),
         (["apps/client/android/app/src/main/x.kt"], {"test-apps"} | ANDROID),
         (
             [
@@ -740,7 +741,7 @@ def test_the_pull_request_stage_picks_a_mobile_job_without_android() -> None:
     plan = components.ci_plan(files=["apps/client/lib/main.dart"], public=False, stage="pr")
     assert set(plan.jobs) == {"test-apps"} | SMOKE_PRIVATE
     plan = components.ci_plan(files=["packages/device_key/android/x.kt"], public=False, stage="pr")
-    assert set(plan.jobs) == {"test-apps"}
+    assert set(plan.jobs) == {"test-apps", "console-e2e"}
 
 
 @pytest.mark.parametrize(

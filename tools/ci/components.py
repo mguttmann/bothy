@@ -300,9 +300,9 @@ NATIVE_FOLDER_JOBS: dict[str, tuple[str, ...]] = {
     "darwin": ("apps-macos", "apps-ios"),
     "android": (*ANDROID_JOBS, "test-apps"),
 }
-# One desktop and one mobile platform job for a Dart change in the stage `pr`: neither needs a
-# macOS runner, of which GitHub gives few; the mobile one is iOS while the repository is private
-# (no Android emulator jobs then). The merge queue runs all five.
+# One desktop and one mobile platform job for a Dart change in the stage `pr`: in a public
+# repository neither needs a macOS runner, of which GitHub gives few; the mobile one is iOS while
+# the repository is private (no Android emulator jobs then). The merge queue runs all five.
 SMOKE_DESKTOP_JOB = "apps-windows"
 SMOKE_MOBILE_JOB = "apps-android-36"
 SMOKE_MOBILE_JOB_PRIVATE = "apps-ios"
@@ -537,6 +537,9 @@ def _pr_plan(files: list[str], *, public: bool) -> CIPlan:
             jobs.update((SMOKE_DESKTOP_JOB, mobile))
     for owned in native.values():
         jobs.update(owned or ())
+    # console-e2e builds the console from apps/console/ and packages/, native folders included.
+    if any(f.startswith(CONSOLE_E2E_PREFIXES) for f in files):
+        jobs.update(CONSOLE_E2E_JOBS)
     if not public:
         jobs.difference_update(ANDROID_JOBS)
     return CIPlan(components=names, jobs=sorted(jobs & set(CONDITIONAL_JOBS)))

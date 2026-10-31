@@ -35,6 +35,8 @@ from typing import Any
 RULESET_NAME = "main merge queue"
 VARIABLE = "BOTHY_MERGE_QUEUE"
 BRANCH = "main"
+# Seconds one `gh api` call may take before it counts as a failed GitHub call.
+GH_TIMEOUT = 120
 # Up to five pull requests per batch, merged with squash as before. Only the head of a group must
 # pass (HEADGREEN), so one full run covers the batch; when it fails, GitHub drops the pull request
 # at its head and rebuilds the groups behind it. Two
@@ -75,13 +77,17 @@ def gh_api(method: str, path: str, body: dict[str, Any] | None = None) -> Any:
     args = ["gh", "api", "-X", method, path]
     if body is not None:
         args += ["--input", "-"]
-    done = subprocess.run(
-        args,
-        input=json.dumps(body) if body is not None else None,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    try:
+        done = subprocess.run(
+            args,
+            input=json.dumps(body) if body is not None else None,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=GH_TIMEOUT,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise GitHubError(f"{method} {path}: {exc}") from exc
     if done.returncode != 0:
         raise GitHubError(f"{method} {path}: {(done.stderr or done.stdout).strip()}")
     return json.loads(done.stdout) if done.stdout.strip() else None

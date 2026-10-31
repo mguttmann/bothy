@@ -9,6 +9,7 @@ machine.
 from __future__ import annotations
 
 import json
+import subprocess
 from typing import Any
 
 import merge_queue
@@ -220,3 +221,21 @@ def test_gh_api_raises_on_an_error(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(merge_queue.subprocess, "run", lambda *a, **k: Failed())
     with pytest.raises(merge_queue.GitHubError, match="HTTP 422"):
         merge_queue.gh_api("GET", "repos/x/y")
+
+
+@pytest.mark.parametrize(
+    "error", [FileNotFoundError("gh"), subprocess.TimeoutExpired(["gh"], merge_queue.GH_TIMEOUT)]
+)
+def test_gh_api_turns_a_missing_or_hanging_gh_into_an_error(
+    monkeypatch: pytest.MonkeyPatch, error: Exception
+) -> None:
+    seen: dict[str, Any] = {}
+
+    def run(*args: Any, **kwargs: Any) -> None:
+        seen["timeout"] = kwargs.get("timeout")
+        raise error
+
+    monkeypatch.setattr(merge_queue.subprocess, "run", run)
+    with pytest.raises(merge_queue.GitHubError, match="GET repos/x/y"):
+        merge_queue.gh_api("GET", "repos/x/y")
+    assert seen["timeout"] == merge_queue.GH_TIMEOUT

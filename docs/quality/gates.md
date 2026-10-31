@@ -147,8 +147,8 @@ its diff as described above, and a maintainer squashes it by hand.
 
    | The change touches | Platform jobs in the pull request |
    |---|---|
-   | only a native folder of a member (`apps/<m>/<folder>/`, `packages/<m>/<folder>/`) | `windows/`: `apps (Windows)`; `macos/`: `apps (macOS)`; `ios/` and `darwin/`: `apps (iOS)` and `apps (macOS)`; `android/`: both Android jobs and `test (apps)` (the JVM tests); no other job of the component `apps` |
-   | other files of the Dart workspace, or a shared input | `apps (Windows)` and `apps (Android API 36)` (`apps (iOS)` while the repository is private): one desktop and one mobile job, neither on a macOS runner |
+   | only a native folder of a member (`apps/<m>/<folder>/`, `packages/<m>/<folder>/`) | `windows/`: `apps (Windows)`; `macos/`: `apps (macOS)`; `ios/` and `darwin/`: `apps (iOS)` and `apps (macOS)`; `android/`: both Android jobs and `test (apps)` (the JVM tests); no other job of the component `apps`, but `console-e2e` for a folder under `packages/` or `apps/console/` |
+   | other files of the Dart workspace, or a shared input | `apps (Windows)` and `apps (Android API 36)` (`apps (iOS)` while the repository is private): one desktop and one mobile job, on a macOS runner only while the repository is private |
    | the root `pubspec.yaml` or `pubspec.lock`, the `pubspec.yaml` or `platform-tests.json` of a member | all five, because dependencies and the Flutter pin reach every native build |
 
 2. **Queue.** When `ci-ok` is green, `gh pr merge --squash --auto` (or "Merge when ready")
@@ -157,10 +157,11 @@ its diff as described above, and a maintainer squashes it by hand.
    job of a push to `main`, plus the trials the diff of the group needs, with the base of the
    group as base of the flake and advisory checks (`FLAKE_BASE`, `OSV_BASE`). `sonar` does not
    run there; the scan of the pull request is the quality gate of its new code. The ruleset
-   (`tools/ci/merge_queue.py ruleset`): squash, up to five pull requests per group, no minimum,
-   two groups built at a time (each holds two macOS jobs), only the head of a group needs a
-   green `ci-ok` (one full run per batch), and a check that has not reported after 360 minutes
-   fails the group. When the run of a group fails, GitHub removes the pull request at its head
+   (`tools/ci/merge_queue.py ruleset`, values in `QUEUE_PARAMETERS`): squash, up to five pull
+   requests per group (`max_entries_to_merge`), no minimum (`min_entries_to_merge`), two groups
+   built at a time (`max_entries_to_build`; each holds two macOS jobs), only the head of a group
+   needs a green `ci-ok` (`grouping_strategy` `HEADGREEN`, one full run per batch), and a check
+   that has not reported after 360 minutes (`check_response_timeout_minutes`) fails the group. When the run of a group fails, GitHub removes the pull request at its head
    from the queue and rebuilds the groups behind it without that pull request; the group in
    front of it, built at the same time with the earlier pull requests alone, can still land.
 3. **Main.** The queue squashes the group into `main`; the push runs the full suite once more,

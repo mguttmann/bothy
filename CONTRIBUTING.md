@@ -112,7 +112,8 @@ file name and, with `BOTHY_CODERABBIT=1`, also runs the CodeRabbit CLI.
   checks (lint, codegen, docs, security and supply chain, and the tests of the changed
   components only) until `ci-ok` is green. Then `gh pr merge --squash --auto` (or "Merge when
   ready" on the page) adds it to the queue. The queue runs the full suite of every platform
-  once per batch of up to five pull requests; when it is green the batch is squashed into
+  once per batch of up to five pull requests (`max_entries_to_merge` in
+  `tools/ci/merge_queue.py`); when it is green the batch is squashed into
   `main`, and when it fails the queue removes the pull request at the head of the failed
   group and tests the others again without it. Without a merge queue `ci-ok` of the pull
   request runs the full plan of its diff, as before.
