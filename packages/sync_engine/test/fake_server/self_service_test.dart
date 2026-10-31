@@ -131,6 +131,32 @@ void main() {
     },
   );
 
+  test('a cli device cannot confirm with the password', () async {
+    final cli = h.device(stepUpKey: false, platform: 'cli');
+    await signedIn(h, cli);
+    final challenge =
+        (await cli.api.getAuthApi().createStepUpChallenge()).data!;
+    final error = await cli.api
+        .getAuthApi()
+        .stepUpWithPassword(
+          stepUpPasswordRequest: StepUpPasswordRequest(
+            (b) => b
+              ..challengeId = challenge.challengeId
+              ..password = WorldSeed.password
+              ..totpCode = WorldSeed.totp,
+          ),
+        )
+        .then<DioException?>(
+          (_) => null,
+          onError: (Object e) => e as DioException,
+        );
+    expect(ApiProblem.of(error!)?.reason, 'step_up_not_possible');
+    expect(
+      h.server.world.sessions.values.every((s) => s.stepUpAt == null),
+      isTrue,
+    );
+  });
+
   test('revoking a device needs step-up and ends its sessions', () async {
     final alex = h.device();
     await signedIn(h, alex);

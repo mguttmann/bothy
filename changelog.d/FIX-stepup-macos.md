@@ -5,4 +5,6 @@
   dialog and sends them to the server, instead of failing with "The confirmation was
   cancelled" before any request. A wrong password or code shows the dialog again with an error
   line. iOS, Android and macOS keep confirming with the device key; the terminal still needs a
-  device key or a passkey and stays unavailable on Windows.
+  device key or a passkey and stays unavailable on Windows. The password step-up needs a local
+  account with TOTP and local passwords switched on (`auth.local_password_enabled`); without
+  them the action stays unavailable on Windows.

@@ -216,6 +216,8 @@ void main() {
         throwsA(isA<StepUpCancelled>()),
       );
       expect(h.server.to(passwordPath), isEmpty);
+      // The challenge is created only after the prompt, so it cannot expire while open.
+      expect(h.server.to('/auth/step-up/challenge'), isEmpty);
     });
 
     test('a wrong password or code asks again with a new challenge until it is accepted', () async {

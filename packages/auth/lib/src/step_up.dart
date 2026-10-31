@@ -113,15 +113,18 @@ final class StepUpService {
   }
 
   /// The step-up with password and TOTP of a device without a step-up key; each attempt has
-  /// its own challenge, because the server ends a challenge with every answer.
+  /// its own challenge, created after the prompt, because the server ends a challenge with
+  /// every answer.
   Future<void> _confirmWithPassword(String purposeText) async {
     final auth = _core.api.getAuthApi();
     for (var rejected = false; ; rejected = true) {
-      final challenge = (await auth.createStepUpChallenge(extra: _internal))
-          .data!;
       if (_core.tokens.state?.session == null) throw const NotSignedIn();
       final typed = await _prompt.askPassword(purposeText, rejected: rejected);
       if (typed == null) throw const StepUpCancelled();
+      // The challenge comes after the prompt: it lives auth.step_up_challenge_ttl, and a
+      // prompt left open longer must not send an expired one with correct credentials.
+      final challenge = (await auth.createStepUpChallenge(extra: _internal))
+          .data!;
       try {
         await auth.stepUpWithPassword(
           stepUpPasswordRequest: StepUpPasswordRequest(
