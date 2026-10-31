@@ -92,6 +92,24 @@ void main() {
     await host.settle(tester);
   }
 
+  // The entries once the send wrote its message or post: a send of a long draft first writes
+  // `message.txt` with real IO, which a loaded machine may not finish within a fixed number
+  // of settle rounds (issue #238).
+  Future<List<OutboxEntry>> sent(WidgetTester tester, ColumnHost host) async {
+    await host.outboxUntil(
+      tester,
+      (all) => all.any(
+        (e) =>
+            e.kind == MessageOps.createMessage ||
+            e.kind == ThreadOps.createThread,
+      ),
+      what: 'the send',
+    );
+    // The frame after the write shows the emptied composer.
+    await host.settle(tester);
+    return entries(tester, host);
+  }
+
   Map<String, Object?> payload(OutboxEntry e) =>
       decodePayload(e.payload).cast<String, Object?>();
 
@@ -182,7 +200,7 @@ void main() {
       await host.settle(tester);
       await paste(tester, host, 'See $long');
       await send(tester, host);
-      final all = await entries(tester, host);
+      final all = await sent(tester, host);
       final message = all.singleWhere(
         (e) => e.kind == MessageOps.createMessage,
       );
@@ -204,8 +222,8 @@ void main() {
       await host.settle(tester);
       expect(find.text(en.composerOverflowNote('message.txt')), findsOneWidget);
       await send(tester, host);
+      final all = await sent(tester, host);
       expect(find.text(en.composerTooLong(100)), findsNothing);
-      final all = await entries(tester, host);
       final messages = [
         for (final e in all)
           if (e.kind == MessageOps.createMessage) e,
@@ -232,8 +250,7 @@ void main() {
       await tester.showKeyboard(composerField);
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);
-      await host.settle(tester);
-      final all = await entries(tester, host);
+      final all = await sent(tester, host);
       expect(
         all.where((e) => e.kind == MessageOps.createMessage),
         hasLength(1),
@@ -308,8 +325,7 @@ void main() {
       await host.settle(tester);
       await tester.showKeyboard(forum.composerField);
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);
-      await host.settle(tester);
-      final all = await entries(tester, host);
+      final all = await sent(tester, host);
       final post = forum.creates(all).single;
       expect(payload(post)['content_md'], 'Look at this');
       expect(payload(post)['attachment_keys'], hasLength(1));
@@ -329,8 +345,7 @@ void main() {
       expect(find.text(en.composerOverflowNote('message.txt')), findsOneWidget);
       await tester.showKeyboard(forum.composerField);
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);
-      await host.settle(tester);
-      final all = await entries(tester, host);
+      final all = await sent(tester, host);
       final post = forum.creates(all).single;
       final head = payload(post)['content_md']! as String;
       expect(utf8.encode(head).length, lessThanOrEqualTo(50));
