@@ -49,18 +49,9 @@ func (s *Service) PutSidebarSpace(ctx context.Context, a actor.Actor, spaceID id
 		if !found {
 			return invisible()
 		}
-		key, err := domain.SidebarKey("", cmd.SortKey, cmd.UseGlobalOrder)
+		key, order, err := s.sidebarSpaceInput(cmd)
 		if err != nil {
 			return err
-		}
-		var order []ids.ID
-		if cmd.ChannelOrder != nil {
-			if err := domain.CheckSidebarOrder("/channel_order", *cmd.ChannelOrder, s.cfg.SidebarOrderMaxItems); err != nil {
-				return err
-			}
-			if len(*cmd.ChannelOrder) > 0 {
-				order = *cmd.ChannelOrder
-			}
 		}
 		keep := SidebarKeep{Key: cmd.SortKey == nil && !cmd.UseGlobalOrder, ChannelOrder: cmd.ChannelOrder == nil}
 		out, err = s.d.Store.PutSidebarState(ctx, domain.SidebarState{
@@ -72,6 +63,24 @@ func (s *Service) PutSidebarSpace(ctx context.Context, a actor.Actor, spaceID id
 		return s.emitSidebar(ctx, out)
 	})
 	return sidebarView(out), err
+}
+
+// sidebarSpaceInput checks the sort key of cmd with domain.SidebarKey and its channel_order with
+// domain.CheckSidebarOrder, and returns the key and the list to store: nil for an absent or empty
+// list (an absent one is kept by SidebarKeep, an empty one stores the default order), else the
+// list itself (M4-51).
+func (s *Service) sidebarSpaceInput(cmd chat.SidebarPutCmd) (string, []ids.ID, error) {
+	key, err := domain.SidebarKey("", cmd.SortKey, cmd.UseGlobalOrder)
+	if err != nil || cmd.ChannelOrder == nil {
+		return key, nil, err
+	}
+	if err := domain.CheckSidebarOrder("/channel_order", *cmd.ChannelOrder, s.cfg.SidebarOrderMaxItems); err != nil {
+		return "", nil, err
+	}
+	if len(*cmd.ChannelOrder) == 0 {
+		return key, nil, nil
+	}
+	return key, *cmd.ChannelOrder, nil
 }
 
 // ListSidebarStates implements chat.Structure: the rows of the person a for spaces that are not
