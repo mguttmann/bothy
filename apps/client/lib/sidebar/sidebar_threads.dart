@@ -9,6 +9,8 @@ library;
 import 'package:design_system/design_system.dart';
 import 'package:domain/domain.dart';
 
+import 'sidebar_arrange.dart' show applyPersonalOrder;
+
 /// The limits of the selection, from `AppConfig`: never a literal in code (brief M4-40 rule 9).
 final class SidebarThreadLimits {
   /// Creates the limits.
@@ -180,6 +182,12 @@ const Set<RunState> _activeStates = {
 /// until [showAllPosts] (the "Show more" state of this device) lists them all, and
 /// [SidebarThreadGroup.more] describes the row.
 ///
+/// [manualOrder] is the person's order of the forum's posts when "Arrange chats automatically" is
+/// off (01 6.15, brief M4-51): the posts follow it, posts not in it come first by activity
+/// (D-M4-51-3), the limit takes the first posts of that order, and [heldOrder] does not apply,
+/// because activity never moves a row of a manual group and a drag must show at once. Null is the
+/// order by activity. Text channels ignore it.
+///
 /// [keep] holds rows that stay although they no longer qualify (the pointer or the focus is in
 /// the sidebar, 01 6.8 item 4); they stay while stored. In a forum [heldOrder] is the order of
 /// the rows shown last while the sidebar holds them: those rows keep it, and rows new to the
@@ -208,6 +216,7 @@ SidebarThreadGroup selectSidebarThreads({
   bool channelMuted = false,
   bool showAllPosts = false,
   List<ThreadId> heldOrder = const [],
+  List<ThreadId>? manualOrder,
 }) {
   final active = <ThreadId, RunSummary>{};
   final last = <ThreadId, RunSummary>{};
@@ -241,6 +250,7 @@ SidebarThreadGroup selectSidebarThreads({
   }
 
   final forum = channel.kind == ChannelKind.forum;
+  final manual = forum ? manualOrder : null;
   final since = now.subtract(limits.window);
   bool qualifies(SidebarThread e) {
     final t = e.thread;
@@ -260,10 +270,13 @@ SidebarThreadGroup selectSidebarThreads({
     for (final t in threads)
       if (t.channelId == channel.id && t.kind == ThreadKind.thread) entry(t),
   ];
-  final candidates = [
+  final sorted = [
     for (final e in own)
       if (qualifies(e)) e,
   ]..sort(forum ? _byActivity : (a, b) => _byPriority(a, b, selected));
+  final candidates = manual == null
+      ? sorted
+      : applyPersonalOrder(sorted, manual, (e) => e.thread.id);
   final Set<ThreadId> chosen;
   SidebarMorePosts? more;
   if (forum) {
@@ -290,10 +303,22 @@ SidebarThreadGroup selectSidebarThreads({
     final bound = limits.perChannel < 0 ? 0 : limits.perChannel;
     chosen = {for (final e in candidates.take(bound)) e.thread.id};
   }
-  final rows = [
-    for (final e in own)
-      if (_shownIn(e, chosen, keep)) e,
-  ]..sort(forum ? _heldThenActivity(heldOrder) : _byCreation);
+  final List<SidebarThread> rows;
+  if (manual != null) {
+    // A manual group keeps the order of [candidates]; a kept row that no longer qualifies
+    // (selected before, done now) stays where it was by activity, after them.
+    rows = [
+      for (final e in candidates)
+        if (_shownIn(e, chosen, keep)) e,
+      for (final e in own)
+        if (!candidates.contains(e) && keep.contains(e.thread.id)) e,
+    ];
+  } else {
+    rows = [
+      for (final e in own)
+        if (_shownIn(e, chosen, keep)) e,
+    ]..sort(forum ? _heldThenActivity(heldOrder) : _byCreation);
+  }
 
   var total = ThreadCounts.zero;
   for (final c in counts.values) {

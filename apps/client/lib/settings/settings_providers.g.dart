@@ -62,6 +62,62 @@ final class PersonalSettingsProvider
 
 String _$personalSettingsHash() => r'369e9c461972a04378943563bfa3b51e43d26c2d';
 
+/// Which levels of the sidebar are arranged by activity, from the personal settings (01 6.15,
+/// D-M4-51-5); synchronized like every personal setting.
+
+@ProviderFor(sidebarArrangement)
+final sidebarArrangementProvider = SidebarArrangementProvider._();
+
+/// Which levels of the sidebar are arranged by activity, from the personal settings (01 6.15,
+/// D-M4-51-5); synchronized like every personal setting.
+
+final class SidebarArrangementProvider
+    extends
+        $FunctionalProvider<
+          SidebarArrangement,
+          SidebarArrangement,
+          SidebarArrangement
+        >
+    with $Provider<SidebarArrangement> {
+  /// Which levels of the sidebar are arranged by activity, from the personal settings (01 6.15,
+  /// D-M4-51-5); synchronized like every personal setting.
+  SidebarArrangementProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'sidebarArrangementProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$sidebarArrangementHash();
+
+  @$internal
+  @override
+  $ProviderElement<SidebarArrangement> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  SidebarArrangement create(Ref ref) {
+    return sidebarArrangement(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(SidebarArrangement value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<SidebarArrangement>(value),
+    );
+  }
+}
+
+String _$sidebarArrangementHash() =>
+    r'c431c0c2750f4bf526a5697823a6d508c83dc89b';
+
 /// The settings writer of the signed-in instance, or null before the login.
 
 @ProviderFor(settingsRepository)

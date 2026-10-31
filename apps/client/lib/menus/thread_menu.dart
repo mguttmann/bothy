@@ -12,6 +12,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:l10n/l10n.dart';
 
 import '../notifications_settings/providers.dart';
+import '../sidebar/sidebar_drag.dart' show SidebarMoves, sidebarMoveMenuItems;
 import '../thread/thread_header.dart' show ThreadHeaderAction;
 import 'channel_menu.dart';
 import 'level_menu.dart';
@@ -44,7 +45,11 @@ class ThreadMenu extends StatelessWidget {
     required this.title,
     required this.channel,
     required this.child,
+    this.moves,
   });
+
+  /// "Move up" and "Move down" of the post in the sidebar (01 6.15, M4-51), or null for none.
+  final SidebarMoves? moves;
 
   /// The thread.
   final ThreadId thread;
@@ -61,8 +66,13 @@ class ThreadMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) => TargetMenuRegion(
     label: AppLocalizations.of(context).notifyMenuOf(title),
-    menuChildren: (context, ref) =>
-        levelMenuItems(context, ref, threadMenuTarget(ref, thread, channel)),
+    menuChildren: (context, ref) => [
+      ...levelMenuItems(context, ref, threadMenuTarget(ref, thread, channel)),
+      if (moves case final moves?) ...[
+        const Divider(),
+        ...sidebarMoveMenuItems(context, moves),
+      ],
+    ],
     child: child,
   );
 }
