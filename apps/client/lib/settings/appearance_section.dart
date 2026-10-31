@@ -100,8 +100,9 @@ class PasteOriginalsRow extends ConsumerWidget {
   }
 }
 
-/// The three switches of the sidebar ordering (01 6.16 and 11, brief M4-51): each level is
-/// arranged by activity while its switch is on; off, the person's own order applies.
+/// The switches of the sidebar (01 11): the three of the sidebar ordering (01 6.16, brief M4-51),
+/// each level arranged by activity while its switch is on, and "Show status on projects" (01
+/// 6.17 item 6, brief M4-52).
 class SidebarArrangeRows extends ConsumerWidget {
   /// Creates the rows.
   const SidebarArrangeRows({super.key});
@@ -154,6 +155,19 @@ class SidebarArrangeRows extends ConsumerWidget {
           SettingKeys.autoArrangeChats,
           l.settingsAutoArrangeChats,
           a.autoChats,
+        ),
+        // 01 6.17 item 6 (M4-52): the status of a forum's chats on its row.
+        SettingRow(
+          label: l.settingsShowProjectStatus,
+          hint: l.settingsShowProjectStatusHint,
+          control: Switch(
+            key: const ValueKey('settings.showProjectStatus'),
+            value: ref.watch(personalSettingsProvider).showProjectStatus,
+            onChanged: writer == null
+                ? null
+                : (on) =>
+                      unawaited(writer.set(SettingKeys.showProjectStatus, on)),
+          ),
         ),
       ],
     );

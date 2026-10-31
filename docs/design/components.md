@@ -277,6 +277,7 @@ hides (addendum of 2026-10-29, M4-46).
 | unread | `color.text.on-sidebar`, bold, bar on the left |
 | mentions | counter (`color.attention.bg`, `radius.pill`) |
 | active run | run dot `category.spruce.on-sidebar` with pulse `motion.duration.pulse` |
+| unseen agent news (01 6.17) | status mark at `size.status-dot` at the trailing edge before the counter, instead of the unread bar: done a dot in `category.moss.on-sidebar`, working a ring in `category.gorse.on-sidebar`, waiting a diamond in `category.loch.on-sidebar`, failed a triangle in `category.rowan.on-sidebar`; tooltip with the state in words; on a forum or channel row the most urgent state of its chats |
 | muted | `color.text.on-sidebar-muted`, icon `action.mute` |
 | selected | `color.surface.sidebar-selected` |
 | hover | `color.surface.sidebar-hover` |
@@ -297,7 +298,8 @@ up" and "Move down". A level arranged by activity does not lift its rows and sho
 Accessibility: tree with the role "tree"; spaces are expandable nodes with the state
 "collapsed" or "expanded"; channel label "<Name>, <kind>, <n> unread, <m> mentions, run
 active"; a channel with thread rows is an expandable node of level 2, a thread row a node of level
-3 with the label "<Title>, <State>, <n> unread, <m> mentions"; the action "+" is a button with its
+3 with the label "<Title>, <State>, <n> unread, <m> mentions"; a row with a status mark ends its
+label with the words of the mark ("New: run failed", 01 6.17); the action "+" is a button with its
 label. The row of a space carries its move actions ("Move up", "Move down") itself; the group
 of a space and its channels, which the list gives the actions to move it, is named "Space <Name>
 with its channels" (M5-10).

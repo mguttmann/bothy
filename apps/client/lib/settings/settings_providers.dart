@@ -57,6 +57,10 @@ abstract final class SettingKeys {
 
   /// `true`, `false`: the open posts of a forum arranged by activity.
   static const String autoArrangeChats = 'sidebar.auto_arrange_chats';
+
+  /// `true`, `false`: forum and project rows show the most urgent unseen status of their chats
+  /// (01 6.17 item 6, D-M4-52-6).
+  static const String showProjectStatus = 'sidebar.show_project_status';
 }
 
 /// The personal settings with the defaults of 01 11 applied where a key is absent.
@@ -75,6 +79,7 @@ final class PersonalSettings {
     required this.clientMetrics,
     required this.hasColumnWidths,
     required this.arrangement,
+    required this.showProjectStatus,
   });
 
   /// Reads [stored] (key to JSON value); a value outside the list of 01 11 counts as absent.
@@ -116,6 +121,7 @@ final class PersonalSettings {
         autoChannels: flag(SettingKeys.autoArrangeChannels, false),
         autoChats: flag(SettingKeys.autoArrangeChats, true),
       ),
+      showProjectStatus: flag(SettingKeys.showProjectStatus, true),
     );
   }
 
@@ -130,6 +136,7 @@ final class PersonalSettings {
     SettingKeys.autoArrangeSpaces: false,
     SettingKeys.autoArrangeChannels: false,
     SettingKeys.autoArrangeChats: true,
+    SettingKeys.showProjectStatus: true,
   };
 
   /// `appearance.theme`.
@@ -159,6 +166,9 @@ final class PersonalSettings {
   /// `sidebar.auto_arrange_spaces`, `sidebar.auto_arrange_channels` and
   /// `sidebar.auto_arrange_chats` (01 6.16, D-M4-51-5).
   final SidebarArrangement arrangement;
+
+  /// `sidebar.show_project_status` (01 6.17 item 6).
+  final bool showProjectStatus;
 }
 
 /// The personal settings of the signed-in person on this device: `composer.enter_sends` is
@@ -175,6 +185,12 @@ PersonalSettings personalSettings(Ref ref) => PersonalSettings.resolve(
 @Riverpod(keepAlive: true)
 SidebarArrangement sidebarArrangement(Ref ref) =>
     ref.watch(personalSettingsProvider).arrangement;
+
+/// Whether forum and project rows show the most urgent unseen status of their chats (01 6.17
+/// item 6, `sidebar.show_project_status`); synchronized like every personal setting.
+@Riverpod(keepAlive: true)
+bool showProjectStatus(Ref ref) =>
+    ref.watch(personalSettingsProvider).showProjectStatus;
 
 /// Writes personal settings (04 14, brief M4-25 Design note 1).
 ///

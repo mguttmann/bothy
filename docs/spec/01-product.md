@@ -1595,7 +1595,8 @@ none of them.
    title that is still empty reads "New chat" with the "automatic" mark (6.7, 09 12). The channel
    row of an expanded group counts unread and mentions only of its threads that are not shown and
    of its main thread; a collapsed group counts all; the run dot of a channel covers all its
-   threads.
+   threads. A chat with agent news the person has not seen shows the status mark of 6.17 instead
+   of the unread bar (addendum of 2026-10-31).
 7. **Collapse.** Each channel with thread rows has its own arrow; groups are expanded by default.
    The collapse state of a group, whether a forum group shows all its open posts (item 3) and
    whether the forum overview is pinned as a column are kept per device in the local database and
@@ -1889,6 +1890,45 @@ channels and forum posts.
 6. **Show more.** A forum in manual order shows the first `ui.sidebar_forum_posts_visible` posts of
    that order (6.8 item 3); a move keeps the place of the posts behind "Show more".
 
+### 6.17 Status dots for unseen agent news
+
+Addendum of 2026-10-31 (R-PR-31, rulings D-M4-52-1 to D-M4-52-9). Reason: owner request and
+amendment of 2026-10-31; with many agent chats the person could not tell where an agent had
+finished, failed or asked something without opening each chat; the idea comes from the tab dots of
+a terminal app. Applies to the desktop sidebar (D1) and to M1 on the phone, on macOS, Windows, iOS
+and Android.
+
+1. **States.** The newest run of a chat (by `queued_at`) gives its status: working (`queued`,
+   `running`; yellow, a ring), waiting for the person (`waiting_input`: an open question, an
+   approval card, an input request; blue, a diamond), done (`completed`; green, a dot) and failed
+   (`failed`; red, a triangle). A cancelled run gives none. Colours are the `on-sidebar` steps of
+   the categories moss, gorse, loch and rowan ([components.md](../design/components.md) 7); the
+   shapes differ, so no state rests on colour (section 8 "Color").
+2. **Only unseen news.** A chat row shows the mark of its status only when the status changed
+   since the person last had the chat open. Opening the chat (its history shows on the desktop or
+   the phone) clears the mark, whatever its colour; the open chat never shows one. The mark comes
+   back only with the next change: the run the person started finishes while they are elsewhere
+   (green), the agent asks something (blue), an error (red), a new run starts (yellow).
+3. **Seen follows the person.** A status counts as seen when (a) the chat is open on this device,
+   (b) this device's seen mark names the same run and status (kept per device in
+   `thread_seen_states`, [15](15-client-architecture.md) 6.1, never synchronized), (c) the
+   person's read state of the chat was written at or after the change, on any device
+   (`read_states.updated_at`; the change time is `queued_at` for working and `finished_at` for
+   done and failed), or (d) for working, waiting and done, when no time can be compared, the chat
+   has nothing unread and no unread mention, because these changes come with a message the person
+   has then read ([09](09-agents.md) 5: the live box anchor, the question card, the answer before
+   `run.finish`). A failure can come without a message and needs (a) to (c).
+4. **One marker.** On a row with a status mark the unread bar does not show; the title stays bold
+   while unread and the mention counter stays. Chats without agent runs keep the unread bar.
+5. **Words.** The mark has a tooltip and the row label ends with the same words: "New: run
+   finished", "New: agent is working", "New: waiting for you", "New: run failed". The mark stands at
+   `size.status-dot` at the trailing edge of the row, before the mention counter.
+6. **Projects.** A forum or channel row shows the most urgent unseen status of its chats, its
+   main history included (red over blue over yellow over green), while the personal setting
+   `sidebar.show_project_status` ("Show status on projects", default on, section 11) is on; off, a
+   text channel row shows only the status of its main history, which is its own chat. Space rows
+   show no status.
+
 ## 7. Keyboard shortcuts
 
 Shortcuts apply on desktop. They avoid system assignments (Cmd+H, Cmd+M, Cmd+Q, Alt+F4,
@@ -2093,6 +2133,7 @@ unknown keys and values outside the list.
 | `sidebar.auto_arrange_spaces` | `true`, `false` | `false` | Spaces in the sidebar arranged by last activity instead of the personal order (6.16) |
 | `sidebar.auto_arrange_channels` | `true`, `false` | `false` | Channels and forums of a space arranged by last activity (6.16) |
 | `sidebar.auto_arrange_chats` | `true`, `false` | `true` | Open posts of a forum arranged by last activity (6.16) |
+| `sidebar.show_project_status` | `true`, `false` | `true` | Forum and project rows show the most urgent unseen agent status of their chats (6.17) |
 
 ## 12. Branding per instance
 
@@ -2151,6 +2192,7 @@ Rules:
 | R-PR-28 | A code block wraps its long lines by default, keeps the indentation of a wrapped line, and switches per device to one line per line with a working horizontal scroll through the toggle "Wrap lines"; a block higher than `ui.code_block_collapse_lines` lines shows collapsed with a fade and "Show all" / "Show less"; the copy stays the raw content (6.14, addendum of 2026-10-31). | Owner decision 2026-10-31: a long sentence sent as a fenced block "to copy" showed as one cut-off line that could neither be scrolled nor expanded on macOS, so the owner could not read what he would copy (docs/decisions.d/M4-49.md). |
 | R-PR-29 | The content of a message in the history is selectable with the mouse on the desktop (drag, double and triple click, shift and click) within one message, Cmd+C (Ctrl+C) and "Copy" of the message menu copy it as plain text in the structure of the message with code parts exact; on the phone "Select text" in the message menu opens the message with the system selection (6.15, addendum of 2026-10-31). | Owner report 2026-10-31 (macOS app): no text of the history could be selected, so parts of messages, logs and code could not be copied; the history offered no system selection (docs/decisions.d/M4-50.md). |
 | R-PR-30 | Spaces, the channels and forums of a space and the open posts of a forum are dragged into the person's own order (a line shows the drop on the desktop, a long press lifts the row on the phone, "Move up" and "Move down" in the row menu), kept per person across devices and never visible to others; three personal settings arrange each level by last activity instead (spaces and channels off, chats on by default), and an automatic level cannot be dragged (6.16, addendum of 2026-10-31). | Owner request 2026-10-31: nothing in the sidebar could be moved, not five imported spaces, not 25 project forums of a dev space, not the chats of a forum; the sidebar order is data that follows the person (R-PR-24), and chats by activity is the order of R-PR-23 (docs/decisions.d/M4-51.md). |
+| R-PR-31 | A chat row in the sidebar shows a status mark (green done, yellow working, blue waiting for the person, red failed, each with its own shape, tooltip and label) only for an agent state the person has not seen since they last had the chat open; opening the chat clears it, a new change brings it back, seen follows the person's read state, the mark replaces the unread bar on rows with agent runs, and forum and project rows show the most urgent unseen state behind the setting `sidebar.show_project_status` (6.17, addendum of 2026-10-31). | Owner request and amendment 2026-10-31: with many agent chats the person could not tell where something had happened without opening each one; only news the person has not seen is worth a mark, and two markers on one row would compete (docs/decisions.d/M4-52.md). |
 
 ## 14. Configuration values of this chapter
 

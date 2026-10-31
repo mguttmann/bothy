@@ -679,6 +679,22 @@ outbox by `SidebarWriter.orderChannels` and `SidebarWriter.orderThreads` of
 `SpacesWithState` and `ChannelsOfSpace` then order by activity and hold their order while
 `SidebarHold` holds.
 
+### Status dots (M4-52)
+
+A chat row shows a status mark only for agent news the person has not seen (01 6.17, R-PR-31,
+docs/decisions.d/M4-52.md): green a finished run, yellow a working run, blue the agent waits for
+the person, red a failed run. The pure rules are in `sidebar_status.dart` (`chatStatusOf`,
+`newestRuns`, `statusChangedAt`, `unseenChatStatus`, `unseenStatuses`, `aggregateStatus`): a
+status is seen when the chat is open, when this device's seen mark names the same run and status,
+when the person's read state was written after the change on any device, or, for a change that
+comes with a message, when nothing is unread. `ChatSeenMarker` (`chat_seen_marker.dart`), which the
+history column wraps around itself, writes the seen mark (`thread_seen_states` of `local_store`,
+per device) while a chat shows. `channelStatusesProvider` gives the unseen status of every chat of
+a channel; `ChannelThreads` passes it to the thread rows and `ChannelsOfSpace` to the channel row,
+the most urgent one while `sidebar.show_project_status` (`SettingKeys.showProjectStatus`,
+`showProjectStatusProvider`, the switch "Show status on projects" in Settings, Appearance) is on,
+else only that of the main history. The mark replaces the unread bar of its row.
+
 A click on a forum (or "All posts") opens the forum overview D15 in the content column: the post
 list of `lib/forum/` with the kind sentence, "New chat" in a project forum or "New post", the
 search in the forum, "Pin", the filters and the Done section. "Pin" or Cmd+Shift+O (Ctrl+Shift+O)

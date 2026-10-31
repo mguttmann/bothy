@@ -45,6 +45,7 @@ import '../menus/thread_menu.dart';
 import '../running/providers.dart' show mayStop;
 import '../search/thread_search.dart';
 import '../session_column/session_column.dart';
+import '../sidebar/chat_seen_marker.dart';
 import '../sidebar/providers.dart';
 import '../telemetry/telemetry_providers.dart';
 import 'delete_confirm.dart';
@@ -690,109 +691,113 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
         enabled: !main && header.canSetDone,
       ),
     };
-    return KeyboardActions(
-      priority: main ? 0 : 1,
-      handlers: keyboard,
-      child: Focus(
-        canRequestFocus: false,
-        skipTraversal: true,
-        onKeyEvent: (_, event) => _onKey(event, window),
-        child: Column(
-          key: ValueKey('history.$_thread'),
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            ThreadHeader(
-              data: header,
-              // 01 5.3 M3: the phone has no session column; its actions sit in one menu and
-              // the session (pins, agent session, costs) opens as a sheet.
-              compact: phone,
-              onEditTitle: () => unawaited(_title(thread)),
-              onDone: () => unawaited(
-                _actions?.setDone(
-                  thread,
-                  reopen: thread.state == ThreadState.closed,
+    // 01 6.17: while the history shows, the chat's agent status is seen on this device.
+    return ChatSeenMarker(
+      threadId: widget.threadId,
+      child: KeyboardActions(
+        priority: main ? 0 : 1,
+        handlers: keyboard,
+        child: Focus(
+          canRequestFocus: false,
+          skipTraversal: true,
+          onKeyEvent: (_, event) => _onKey(event, window),
+          child: Column(
+            key: ValueKey('history.$_thread'),
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              ThreadHeader(
+                data: header,
+                // 01 5.3 M3: the phone has no session column; its actions sit in one menu and
+                // the session (pins, agent session, costs) opens as a sheet.
+                compact: phone,
+                onEditTitle: () => unawaited(_title(thread)),
+                onDone: () => unawaited(
+                  _actions?.setDone(
+                    thread,
+                    reopen: thread.state == ThreadState.closed,
+                  ),
                 ),
-              ),
-              onMove: () => unawaited(_move(thread, channel)),
-              onPin: phone
-                  ? () => unawaited(_openSession())
-                  : () => unawaited(
-                      showSessionColumn(
-                        ref.read(localDatabaseProvider),
-                        textThread: textLayout,
+                onMove: () => unawaited(_move(thread, channel)),
+                onPin: phone
+                    ? () => unawaited(_openSession())
+                    : () => unawaited(
+                        showSessionColumn(
+                          ref.read(localDatabaseProvider),
+                          textThread: textLayout,
+                        ),
                       ),
-                    ),
-              // M4-45 (01 D1, D2): kept on this device per layout.
-              onColumn: () => unawaited(
-                toggleSessionColumn(
-                  ref.read(localDatabaseProvider),
-                  textThread: textLayout,
+                // M4-45 (01 D1, D2): kept on this device per layout.
+                onColumn: () => unawaited(
+                  toggleSessionColumn(
+                    ref.read(localDatabaseProvider),
+                    textThread: textLayout,
+                  ),
                 ),
-              ),
-              sessionColumnHidden: sessionHidden,
-              // M4-42 (01 D1, D2): the channel column beside the thread can be hidden.
-              onChannelColumn: channelColumn
-                  ? () => unawaited(
-                      toggleChannelColumn(ref.read(localDatabaseProvider)),
-                    )
-                  : null,
-              channelColumnHidden: channelHidden,
-              // The level of the thread, or of the channel for its main history (M4-33).
-              menu: channel == null
-                  ? null
-                  : TargetMenuButton(
-                      channel: channel,
-                      thread: main ? null : thread.id,
-                    ),
-              // FIX-draft-conflict-banner: on the phone the menu of M4-33 joins the header's
-              // one overflow menu instead of a second button beside it.
-              compactMenu: channel == null
-                  ? null
-                  : (actions) => TargetMenuButton(
-                      channel: channel,
-                      thread: main ? null : thread.id,
-                      actions: actions,
-                    ),
-            ),
-            // M4-21: the live box of the active run, pinned over the history (01 6.2).
-            LiveBoxSlot(
-              threadId: widget.threadId,
-              channelId: thread.channelId,
-              keyboardPriority: main ? 0 : 1,
-            ),
-            Expanded(
-              child: items.isEmpty
-                  ? Center(
-                      key: const ValueKey('history.empty'),
-                      child: Text(
-                        l.threadEmpty,
-                        style: dsTextStyle(DsType.body)
-                            .copyWith(color: context.dsColors.textSecondary),
+                sessionColumnHidden: sessionHidden,
+                // M4-42 (01 D1, D2): the channel column beside the thread can be hidden.
+                onChannelColumn: channelColumn
+                    ? () => unawaited(
+                        toggleChannelColumn(ref.read(localDatabaseProvider)),
+                      )
+                    : null,
+                channelColumnHidden: channelHidden,
+                // The level of the thread, or of the channel for its main history (M4-33).
+                menu: channel == null
+                    ? null
+                    : TargetMenuButton(
+                        channel: channel,
+                        thread: main ? null : thread.id,
                       ),
-                    )
-                  : MessageList(
-                      items: items,
-                      itemBuilder: row,
-                      jumpTo: jumpKey,
-                      onNearTop: () => unawaited(_loadOlder(window, thread)),
-                      onNewestVisible: (visible) {
-                        _newestVisible = visible;
-                        if (visible) _markRead(window);
-                      },
-                    ),
-            ),
-            ThreadComposer(
-              key: _composer,
-              threadId: widget.threadId,
-              channelId: thread.channelId,
-              targetName: main ? channel?.name ?? '' : thread.title,
-              onEditLast: () => _editLast(window),
-              operatorId: operatorId,
-              builtins: builtins,
-              onBuiltin: (command, argument) =>
-                  runThreadBuiltin(context, ref, thread, command, argument),
-            ),
-          ],
+                // FIX-draft-conflict-banner: on the phone the menu of M4-33 joins the header's
+                // one overflow menu instead of a second button beside it.
+                compactMenu: channel == null
+                    ? null
+                    : (actions) => TargetMenuButton(
+                        channel: channel,
+                        thread: main ? null : thread.id,
+                        actions: actions,
+                      ),
+              ),
+              // M4-21: the live box of the active run, pinned over the history (01 6.2).
+              LiveBoxSlot(
+                threadId: widget.threadId,
+                channelId: thread.channelId,
+                keyboardPriority: main ? 0 : 1,
+              ),
+              Expanded(
+                child: items.isEmpty
+                    ? Center(
+                        key: const ValueKey('history.empty'),
+                        child: Text(
+                          l.threadEmpty,
+                          style: dsTextStyle(DsType.body)
+                              .copyWith(color: context.dsColors.textSecondary),
+                        ),
+                      )
+                    : MessageList(
+                        items: items,
+                        itemBuilder: row,
+                        jumpTo: jumpKey,
+                        onNearTop: () => unawaited(_loadOlder(window, thread)),
+                        onNewestVisible: (visible) {
+                          _newestVisible = visible;
+                          if (visible) _markRead(window);
+                        },
+                      ),
+              ),
+              ThreadComposer(
+                key: _composer,
+                threadId: widget.threadId,
+                channelId: thread.channelId,
+                targetName: main ? channel?.name ?? '' : thread.title,
+                onEditLast: () => _editLast(window),
+                operatorId: operatorId,
+                builtins: builtins,
+                onBuiltin: (command, argument) =>
+                    runThreadBuiltin(context, ref, thread, command, argument),
+              ),
+            ],
+          ),
         ),
       ),
     );

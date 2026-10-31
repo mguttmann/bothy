@@ -57,7 +57,13 @@ final class SidebarChannel {
     this.group,
     this.expanded = true,
     this.newChatRows = const [],
+    this.status,
   });
+
+  /// The status mark of the row (01 6.17 item 6): the most urgent unseen status of the
+  /// channel's chats, or of its main history alone when "Show status on projects" is off; null
+  /// for none.
+  final DsChatStatus? status;
 
   /// The rows of a forum above its thread rows that are not threads yet: the draft row and the
   /// sent posts (01 6.8 item 8, M4-41); they show while the group is expanded and count
@@ -130,6 +136,7 @@ final class SidebarChannel {
     mentionCount: shown.mentions,
     runActive: runActive,
     muted: muted,
+    status: status,
   );
 }
 
