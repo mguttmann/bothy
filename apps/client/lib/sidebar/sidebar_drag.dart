@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// Dragging a channel or forum post row into a new place among its siblings (docs/spec/
-/// 01-product.md 6.15; brief M4-51; D-M4-51-6): the row is the drag source, every sibling row a
+/// 01-product.md 6.16; brief M4-51; D-M4-51-6): the row is the drag source, every sibling row a
 /// drop target with a line that shows where the row lands. The spaces keep the reorderable list of
 /// M4-19 (`SpaceTree`), whose gap is their drop indicator.
 library;

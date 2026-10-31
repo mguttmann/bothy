@@ -660,7 +660,7 @@ or enters its first row, arrow left goes back or collapses), and "next or previo
 
 ### Sidebar ordering (M4-51)
 
-The spaces, the channels of a space and the open posts of a forum each have an order (01 6.15,
+The spaces, the channels of a space and the open posts of a forum each have an order (01 6.16,
 D-M4-51-1 to D-M4-51-9; design note `docs/design/sidebar-ordering.md`). The pure rules are in
 `sidebar_arrange.dart` (`applyPersonalOrder`, `orderByActivity`, `holdOrder`, `moveAmong`, the
 activity of a channel and a space); `selectSidebarThreads` takes the manual order of a forum.

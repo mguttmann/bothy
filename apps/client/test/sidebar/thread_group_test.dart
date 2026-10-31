@@ -4,7 +4,7 @@
 // and 7; Design note 2; brief M4-46): a row that stops qualifying stays while the pointer is in
 // the sidebar and leaves when it leaves; a new thread appears at the top at once; the collapse
 // state of a group survives a restart on this device; a thread row of an automatic forum does not
-// move (01 6.15); a forum
+// move (01 6.16); a forum
 // lists every open post by last activity with "Show more" and "Show less" in place, kept on this
 // device, and no row moves under the pointer.
 

@@ -32,7 +32,7 @@ import 'thread_entry.dart';
 /// on the channel expands its group or enters its first row, arrow left collapses it; arrow left
 /// on a thread row goes back to the channel. The open posts of a forum are dragged among each
 /// other with [onMoveThread] unless chats are arranged by activity ([chatsArranged]); their
-/// menus and screen reader actions have "Move up" and "Move down" (01 6.15, M4-51). The
+/// menus and screen reader actions have "Move up" and "Move down" (01 6.16, M4-51). The
 /// channel's own [moves] go to its menu and its row's screen reader actions; the channel row is
 /// dragged through [channelDrag] ([SidebarDragRow] of its space). Text channel threads keep their order (D-M4-51-1).
 class ChannelEntry extends StatefulWidget {
@@ -58,14 +58,14 @@ class ChannelEntry extends StatefulWidget {
   });
 
   /// Wraps the channel row (only the row, not its thread group) so it is dragged among the
-  /// channels of its space (01 6.15, M4-51), or null.
+  /// channels of its space (01 6.16, M4-51), or null.
   final Widget Function(Widget row)? channelDrag;
 
-  /// "Move up" and "Move down" of the channel (01 6.15, M4-51), or null for none.
+  /// "Move up" and "Move down" of the channel (01 6.16, M4-51), or null for none.
   final SidebarMoves? moves;
 
   /// Moves an open post of the forum to an index among the post rows on screen (in the list
-  /// without it), or null for no drag (01 6.15, M4-51).
+  /// without it), or null for no drag (01 6.16, M4-51).
   final void Function(ThreadId thread, int to)? onMoveThread;
 
   /// Whether the posts of the forum are arranged by activity ("Arrange chats automatically").
@@ -208,7 +208,7 @@ class _ChannelEntryState extends State<ChannelEntry> {
     return KeyEventResult.ignored;
   }
 
-  /// The drag of the open forum post [r] at index [i] of [count] post rows (01 6.15, M4-51); a
+  /// The drag of the open forum post [r] at index [i] of [count] post rows (01 6.16, M4-51); a
   /// text channel thread, or a forum without [ChannelEntry.onMoveThread], is not wrapped.
   Widget _post(int i, int count, Widget row, SidebarThread r) {
     final move = widget.onMoveThread;

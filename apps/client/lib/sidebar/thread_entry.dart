@@ -19,7 +19,7 @@ import 'sidebar_threads.dart';
 ///
 /// A click or Enter calls [onOpen] (the router path `/t/<id>`); a right click, the menu key or
 /// Shift+F10 opens the thread's menu (M4-33). A forum post is dragged by its parent
-/// ([SidebarDragRow], 01 6.15); [moves] adds "Move up" and "Move down" to its menu and to the
+/// ([SidebarDragRow], 01 6.16); [moves] adds "Move up" and "Move down" to its menu and to the
 /// screen reader actions of the row (D-M4-51-7).
 class ThreadEntry extends StatelessWidget {
   /// Creates the entry.
@@ -35,7 +35,7 @@ class ThreadEntry extends StatelessWidget {
     this.moves,
   });
 
-  /// The moves of a forum post in the sidebar (01 6.15, M4-51), or null for none (text channel
+  /// The moves of a forum post in the sidebar (01 6.16, M4-51), or null for none (text channel
   /// threads keep their order, D-M4-51-1).
   final SidebarMoves? moves;
 

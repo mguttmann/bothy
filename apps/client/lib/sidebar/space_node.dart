@@ -24,7 +24,7 @@ import 'sidebar_model.dart';
 /// that end), the keyboard and screen reader way to change the personal order besides
 /// dragging. The channels follow when the space is expanded, each with its thread group when
 /// [onOpenThread] is given (01 6.8). A right click, the menu key or Shift+F10 opens the space's
-/// menu (M4-33), which also has "Move up" and "Move down" (01 6.15, M4-51). The space row starts
+/// menu (M4-33), which also has "Move up" and "Move down" (01 6.16, M4-51). The space row starts
 /// the drag of the space ([dragHandle]); the channels of the space are dragged among each other
 /// with [onMoveChannel] and the open posts of a forum with [onMoveThread], unless [arrangement]
 /// arranges their level by activity (D-M4-51-6).
@@ -54,7 +54,7 @@ class SpaceNode extends StatefulWidget {
     this.onMoveThread,
   });
 
-  /// Which levels are arranged by activity (01 6.15).
+  /// Which levels are arranged by activity (01 6.16).
   final SidebarArrangement arrangement;
 
   /// Whether the screen is a touch screen: a long press starts a drag (D-M4-51-6).

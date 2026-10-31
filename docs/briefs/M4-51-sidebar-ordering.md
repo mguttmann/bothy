@@ -23,7 +23,7 @@ imported spaces, nor the 25 project forums of a dev space, nor the chats of a fo
   schema version 11); through them this ticket builds on M4-19 (the personal space order), M4-40
   and M4-45.
 - `docs/design/sidebar-ordering.md` (the decisions D-M4-51-1 to D-M4-51-9).
-- `docs/spec/01-product.md`: 6.7, 6.8 items 3, 4 and 10, 6.15 (new), 11, 13 (R-PR-24, R-PR-29).
+- `docs/spec/01-product.md`: 6.7, 6.8 items 3, 4 and 10, 6.16 (new), 11, 13 (R-PR-24, R-PR-30).
 - `docs/spec/03-data-model.md` `user_space_states`, `user_channel_states`; `docs/spec/04-sync-protocol.md`
   14; `docs/spec/06-api.md` Preferences.
 - Code on the base branch: `apps/client/lib/sidebar/` (`space_tree.dart`, `space_node.dart`,
@@ -59,7 +59,7 @@ Rules for every brief:
 
 Product requirements implemented here:
 
-11. Three levels, each in the manual order or arranged by activity (01 6.15 item 1); text channel
+11. Three levels, each in the manual order or arranged by activity (01 6.16 item 1); text channel
     threads keep their rule.
 12. Desktop: a mouse drag with a drop line; touch: a long press lifts the row, a swipe scrolls, a
     short touch opens; a row never lands in another parent (item 2).
@@ -155,7 +155,7 @@ Commands that must pass, from the repository root:
 
 ## Definition of done
 
-- Code and tests as specified; doc comment on every public symbol; comments cite 01 6.15 or M4-51.
+- Code and tests as specified; doc comment on every public symbol; comments cite 01 6.16 or M4-51.
 - Rulings in `docs/decisions.d/M4-51.md`; changelog fragments as in Scope.
 - An independent code review over the diff, then the red team gate (`docs/quality/red-team-gate.md`, verdict `JA` or `NEIN`).
 - Land the change as `AGENTS.md` ("How work lands on `main`") describes.

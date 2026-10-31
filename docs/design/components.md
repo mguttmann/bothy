@@ -285,7 +285,7 @@ Behavior: collapse by click, Enter or arrow left/right; the collapse state of a 
 channel's thread group is kept on the device (01 6.7 R-PR-24, 01 6.8 item 7).
 Dragging a space changes the personal order (`user_space_states.sort_key`); the global order is
 changed only by `space.reorder` in the administration. A channel row is dragged within its space
-and a forum post row within its forum (01 6.15): on the desktop with the mouse and a 2 px line in
+and a forum post row within its forum (01 6.16): on the desktop with the mouse and a 2 px line in
 `color.focus.ring-on-sidebar` above or below the row where it lands, on a touch screen after a long
 press; the lifted row shows its name on `color.surface.sidebar-selected`. The sidebar menus have "Move
 up" and "Move down". A level arranged by activity does not lift its rows and shows a note instead.

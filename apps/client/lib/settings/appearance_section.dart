@@ -100,7 +100,7 @@ class PasteOriginalsRow extends ConsumerWidget {
   }
 }
 
-/// The three switches of the sidebar ordering (01 6.15 and 11, brief M4-51): each level is
+/// The three switches of the sidebar ordering (01 6.16 and 11, brief M4-51): each level is
 /// arranged by activity while its switch is on; off, the person's own order applies.
 class SidebarArrangeRows extends ConsumerWidget {
   /// Creates the rows.
@@ -223,7 +223,7 @@ class AppearanceSection extends ConsumerWidget {
         const EnterSendsRow(),
         // Pasting a bitmap is a desktop way of attaching (15 14).
         if (!phone) const PasteOriginalsRow(),
-        // 01 6.15: the order of the sidebar levels, on the desktop and the phone.
+        // 01 6.16: the order of the sidebar levels, on the desktop and the phone.
         const SidebarArrangeRows(),
         if (!phone)
           SettingRow(

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// The manual order of the posts of a forum group (brief M4-51; 01 6.15; D-M4-51-3, D-M4-51-9):
+// The manual order of the posts of a forum group (brief M4-51; 01 6.16; D-M4-51-3, D-M4-51-9):
 // with "Arrange chats automatically" off the rows follow the person's list, posts not in it come
 // first by activity, the limit of "Show more" takes the first posts of that order, and text
 // channels keep their rule.
