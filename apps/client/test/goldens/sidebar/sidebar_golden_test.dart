@@ -204,25 +204,22 @@ void main() {
         locales: const [Locale('de'), Locale('en')],
         builder: () => cell(
           Builder(
-            builder: (context) => ColoredBox(
-              color: context.dsColors.surfaceSidebar,
-              child: SizedBox.fromSize(
-                size: column,
-                child: SidebarView(
-                  productName: 'Team Chat',
-                  nodes: nodes(),
-                  ownName: 'Alex',
-                  selectedChannel: channelId(9),
-                  selectedThread: threadId(1),
-                  onOpenThread: (_) {},
-                  onToggleGroup: (_, _) {},
-                  onAdd: (_) {},
-                  onToggle: (_, _) {},
-                  onMove: (_, _) {},
-                  onOpenChannel: (_) {},
-                  onSettings: () {},
-                  onLogout: () {},
-                ),
+            builder: (context) => SizedBox.fromSize(
+              size: column,
+              child: SidebarView(
+                productName: 'Team Chat',
+                nodes: nodes(),
+                ownName: 'Alex',
+                selectedChannel: channelId(9),
+                selectedThread: threadId(1),
+                onOpenThread: (_) {},
+                onToggleGroup: (_, _) {},
+                onAdd: (_) {},
+                onToggle: (_, _) {},
+                onMove: (_, _) {},
+                onOpenChannel: (_) {},
+                onSettings: () {},
+                onLogout: () {},
               ),
             ),
           ),

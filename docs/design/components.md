@@ -239,6 +239,10 @@ Accessibility: list with the role "list", rows with the label "<Title>, <State>,
 Purpose: sidebar with spaces (`spaces`) and channels (`channels`), collapsible and sortable per
 person (`user_space_states`).
 
+Surface: the tree stands on `color.surface.sidebar` in both themes, on the desktop and on the
+phone's Spaces page (M1) alike; the sidebar view paints this surface itself, because every
+`*.on-sidebar` role is paired only with the `surface.sidebar*` roles (design-rules.json).
+
 Space row: arrow (`action.expand` or `action.collapse`), icon of the space from
 `space-icons` in the category color (`category.<name>.on-sidebar`, on a lightly tinted
 tile of the same color), name in `type.section`, `color.text.on-sidebar`. Collapsed with unread

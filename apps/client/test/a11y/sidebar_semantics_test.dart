@@ -5,7 +5,6 @@
 // muted in words, the selected channel is selected, and every control is a labelled button.
 
 import 'package:client/sidebar/sidebar_column.dart';
-import 'package:design_system/design_system.dart';
 import 'package:design_system/testing.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -14,21 +13,18 @@ import '../goldens/sidebar/sidebar_golden_test.dart' as golden;
 import '../support/structure.dart';
 
 Widget sidebar() => Builder(
-  builder: (context) => ColoredBox(
-    color: context.dsColors.surfaceSidebar,
-    child: SizedBox.fromSize(
-      size: golden.column,
-      child: SidebarView(
-        productName: 'Team Chat',
-        nodes: golden.nodes(),
-        ownName: 'Alex',
-        selectedChannel: channelId(6),
-        onToggle: (_, _) {},
-        onMove: (_, _) {},
-        onOpenChannel: (_) {},
-        onSettings: () {},
-        onLogout: () {},
-      ),
+  builder: (context) => SizedBox.fromSize(
+    size: golden.column,
+    child: SidebarView(
+      productName: 'Team Chat',
+      nodes: golden.nodes(),
+      ownName: 'Alex',
+      selectedChannel: channelId(6),
+      onToggle: (_, _) {},
+      onMove: (_, _) {},
+      onOpenChannel: (_) {},
+      onSettings: () {},
+      onLogout: () {},
     ),
   ),
 );
