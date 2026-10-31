@@ -655,14 +655,26 @@ type ClientInterface interface {
 	// Corresponds with POST /auth/step-up/passkey (the `CompleteStepUpWithPasskey` operationId).
 	CompleteStepUpWithPasskey(ctx context.Context, params *CompleteStepUpWithPasskeyParams, body CompleteStepUpWithPasskeyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// StepUpWithPasswordWithBody Console step-up with password and TOTP
+	// StepUpWithPasswordWithBody Confirm step-up with password and TOTP
+	//
+	// For a console session, and for an app session whose device is not `cli` and has no
+	// active `step_up` key (Windows, 08 6.2); a device with a `step_up` key, a share extension
+	// session and a `cli` device get `403 forbidden` with reason `step_up_not_possible`.
+	// `X-Console-Request` applies only to a request authenticated by the console cookie; an
+	// app sends its DPoP token without it. Only a console session gets a new cookie.
 	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with POST /auth/step-up/password (the `StepUpWithPassword` operationId).
 	StepUpWithPasswordWithBody(ctx context.Context, params *StepUpWithPasswordParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// StepUpWithPassword Console step-up with password and TOTP
+	// StepUpWithPassword Confirm step-up with password and TOTP
+	//
+	// For a console session, and for an app session whose device is not `cli` and has no
+	// active `step_up` key (Windows, 08 6.2); a device with a `step_up` key, a share extension
+	// session and a `cli` device get `403 forbidden` with reason `step_up_not_possible`.
+	// `X-Console-Request` applies only to a request authenticated by the console cookie; an
+	// app sends its DPoP token without it. Only a console session gets a new cookie.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -5261,7 +5273,13 @@ func (c *Client) CompleteStepUpWithPasskey(ctx context.Context, params *Complete
 	return c.Client.Do(req)
 }
 
-// StepUpWithPasswordWithBody Console step-up with password and TOTP
+// StepUpWithPasswordWithBody Confirm step-up with password and TOTP
+//
+// For a console session, and for an app session whose device is not `cli` and has no
+// active `step_up` key (Windows, 08 6.2); a device with a `step_up` key, a share extension
+// session and a `cli` device get `403 forbidden` with reason `step_up_not_possible`.
+// `X-Console-Request` applies only to a request authenticated by the console cookie; an
+// app sends its DPoP token without it. Only a console session gets a new cookie.
 //
 // Takes any type of body and a specified content type.
 //
@@ -5278,7 +5296,13 @@ func (c *Client) StepUpWithPasswordWithBody(ctx context.Context, params *StepUpW
 	return c.Client.Do(req)
 }
 
-// StepUpWithPassword Console step-up with password and TOTP
+// StepUpWithPassword Confirm step-up with password and TOTP
+//
+// For a console session, and for an app session whose device is not `cli` and has no
+// active `step_up` key (Windows, 08 6.2); a device with a `step_up` key, a share extension
+// session and a `cli` device get `403 forbidden` with reason `step_up_not_possible`.
+// `X-Console-Request` applies only to a request authenticated by the console cookie; an
+// app sends its DPoP token without it. Only a console session gets a new cookie.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -24610,68 +24634,6 @@ func NewSearchRequest(server string, params *SearchParams) (*http.Request, error
 				}
 			}
 
-		}
-
-		if encoded := queryValues.Encode(); encoded != "" {
-			rawQueryFragments = append(rawQueryFragments, encoded)
-		}
-		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewSearchThreadTitlesRequest constructs an http.Request for the SearchThreadTitles method
-func NewSearchThreadTitlesRequest(server string, params *SearchThreadTitlesParams) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/search/thread-titles")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-		// queryValues collects non-styled parameters (passthrough, JSON)
-		// that are safe to round-trip through url.Values.Encode().
-		queryValues := queryURL.Query()
-		// rawQueryFragments collects pre-encoded query fragments from
-		// styled parameters, preserving literal commas as delimiters
-		// per the OpenAPI spec (e.g. "color=blue,black,brown").
-		var rawQueryFragments []string
-
-		if params.Limit != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "q", params.Q, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
-			return nil, err
-		} else {
-			for _, qp := range strings.Split(queryFrag, "&") {
-				rawQueryFragments = append(rawQueryFragments, qp)
-			}
 		}
 
 		if encoded := queryValues.Encode(); encoded != "" {

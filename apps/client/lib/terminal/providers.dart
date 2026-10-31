@@ -113,7 +113,9 @@ TerminalServices? terminalServices(Ref ref) {
     pins: LocalHostKeyPinStore(services.database.hostKeyPinsDao),
     events: EngineHostEvents(services.engine.hostEvents),
     engineEvents: services.engine.hostEvents,
-    stepUp: auth.stepUp.confirm,
+    // The terminal's step-up must be fresh (08 6.3): only the step-up key gives it, so a device
+    // without one (Windows) is refused before any request instead of asking for a password.
+    stepUp: auth.stepUp.confirmFresh,
     newTransport: () => IoTerminalTransport(
       origin: services.instance.address,
       auth: auth,

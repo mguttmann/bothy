@@ -40,6 +40,13 @@ class MicrotaskTicker implements FrameTicker {
 class _Prompt implements StepUpPrompt {
   @override
   Future<bool> ask(String purposeText) async => true;
+
+  /// These tests confirm with the step-up key; a password prompt cancels.
+  @override
+  Future<StepUpCredentials?> askPassword(
+    String purposeText, {
+    bool rejected = false,
+  }) async => null;
 }
 
 /// Starts a fake with the standard world; [run] gets it with a fresh engine client, and the

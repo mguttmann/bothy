@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// Handlers of the own devices, sessions and profile and of the step-up with the device key
-/// (brief M4-25 Scope; 08 5.4, 6.2, 10; 05 `device.approve`, `device.revoke` with step-up,
-/// `session.revoke` without).
+/// Handlers of the own devices, sessions and profile and of the step-up with the device key or,
+/// on a device without a step-up key, with password and TOTP (brief M4-25 Scope; 08 5.4, 6.2,
+/// 10; 05 `device.approve`, `device.revoke` with step-up, `session.revoke` without).
 library;
 
 import '../dpop_verifier.dart';
@@ -12,34 +12,53 @@ import '../world.dart';
 /// How long one confirmation of a session counts (`auth.step_up_max_age`).
 const Duration stepUpMaxAge = Duration(minutes: 5);
 
-/// Throws `401 step_up_required` unless the session of [r] confirmed with its step-up key
-/// within [stepUpMaxAge], and `403 forbidden` with `step_up_not_possible` for a device
-/// without an active `step_up` key (08 6.2).
-void requireStepUp(FakeRequest r) {
+/// Throws `401 step_up_required` unless the session of [r] confirmed within [stepUpMaxAge];
+/// with [fresh] (the terminal, 08 6.3) only a confirmation with the device key counts, so a
+/// step-up with password and TOTP answers `401 step_up_required` with reason
+/// `terminal_step_up_not_fresh`.
+void requireStepUp(FakeRequest r, {bool fresh = false}) {
   final session = r.session!;
-  final device = r.world.devices[session.deviceId]!;
-  if (device.stepUpJwk == null) {
-    throw const FakeProblem(403, 'forbidden', reason: 'step_up_not_possible');
-  }
   final at = session.stepUpAt;
   if (at == null || r.world.now().difference(at) > stepUpMaxAge) {
     throw const FakeProblem(401, 'step_up_required');
+  }
+  if (fresh && session.stepUpMethod != 'device_key') {
+    throw const FakeProblem(
+      401,
+      'step_up_required',
+      reason: 'terminal_step_up_not_fresh',
+    );
   }
 }
 
 /// Registers the self-service and step-up handlers on [rest].
 void registerSelfHandlers(RestFake rest) {
   final world = rest.world;
+
+  /// The open challenge [id] of the session of [r], removed (each answer ends it); `401
+  /// step_up_required` for an unknown one or one of another session.
+  void takeChallenge(FakeRequest r, Object? id) {
+    final open = world.stepUpChallenges.remove(id);
+    if (open == null || open.sessionId != r.session!.id) {
+      throw const FakeProblem(401, 'step_up_required');
+    }
+  }
+
+  /// Sets the step-up of the session of [r] with [method] and answers `StepUpDone`.
+  FakeResponse confirmed(FakeRequest r, String method) {
+    final now = world.now();
+    r.session!
+      ..stepUpAt = now
+      ..stepUpMethod = method;
+    return FakeResponse(200, {
+      'step_up_at': world.stamp(now),
+      'valid_until': world.stamp(now.add(stepUpMaxAge)),
+    });
+  }
+
   rest
     ..handle('createStepUpChallenge', (r) {
       final session = r.session!;
-      if (world.devices[session.deviceId]!.stepUpJwk == null) {
-        throw const FakeProblem(
-          403,
-          'forbidden',
-          reason: 'step_up_not_possible',
-        );
-      }
       final id = world.nextId();
       final challenge = 'c${id.replaceAll('-', '')}';
       world.stepUpChallenges[id] = (
@@ -75,12 +94,31 @@ void registerSelfHandlers(RestFake rest) {
           payload['sid'] != session.id) {
         throw const FakeProblem(401, 'step_up_required');
       }
-      final now = world.now();
-      session.stepUpAt = now;
-      return FakeResponse(200, {
-        'step_up_at': world.stamp(now),
-        'valid_until': world.stamp(now.add(stepUpMaxAge)),
-      });
+      return confirmed(r, 'device_key');
+    })
+    // Password with TOTP (08 6.2): an app session on a device without a step-up key, of a
+    // person with a local account; a device with a step-up key and a cli device keep their
+    // refusal. The fake has no console sessions.
+    ..handle('stepUpWithPassword', (r) {
+      final session = r.session!;
+      final person = r.person;
+      final device = world.devices[session.deviceId]!;
+      if (session.clientComponent != null ||
+          device.platform == 'cli' ||
+          device.stepUpJwk != null ||
+          person.password == null) {
+        throw const FakeProblem(
+          403,
+          'forbidden',
+          reason: 'step_up_not_possible',
+        );
+      }
+      takeChallenge(r, r.json['challenge_id']);
+      if (r.json['password'] != person.password ||
+          r.json['totp_code'] != person.totpCode) {
+        throw const FakeProblem(401, 'step_up_required');
+      }
+      return confirmed(r, 'password_totp');
     })
     ..handle(
       'listMyDevices',

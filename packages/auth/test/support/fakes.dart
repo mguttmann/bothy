@@ -275,10 +275,27 @@ class FakePrompt implements StepUpPrompt {
   /// Texts shown.
   final List<String> asked = [];
 
+  /// The answers of the password prompts in order; null cancels, and so does a prompt after
+  /// the last answer.
+  final List<StepUpCredentials?> passwordAnswers = [];
+
+  /// The password prompts shown: the text and whether the previous attempt was rejected.
+  final List<({String purposeText, bool rejected})> askedPassword = [];
+
   @override
   Future<bool> ask(String purposeText) async {
     asked.add(purposeText);
     return answer;
+  }
+
+  @override
+  Future<StepUpCredentials?> askPassword(
+    String purposeText, {
+    bool rejected = false,
+  }) async {
+    final i = askedPassword.length;
+    askedPassword.add((purposeText: purposeText, rejected: rejected));
+    return i < passwordAnswers.length ? passwordAnswers[i] : null;
   }
 }
 

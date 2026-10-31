@@ -103,6 +103,13 @@ final class _Yes implements StepUpPrompt {
 
   @override
   Future<bool> ask(String purposeText) async => true;
+
+  /// These tests confirm with the step-up key; a password prompt cancels.
+  @override
+  Future<StepUpCredentials?> askPassword(
+    String purposeText, {
+    bool rejected = false,
+  }) async => null;
 }
 
 /// Answers every question of the controller with yes and the preselected choice.

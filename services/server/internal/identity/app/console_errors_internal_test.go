@@ -125,6 +125,19 @@ type fakeDeviceStore struct {
 	dev   identity.Device
 	found bool
 	err   error
+	// stepUpKey reports an active step_up key of the device (ActiveKey); keyErr fails the read.
+	stepUpKey bool
+	keyErr    error
+}
+
+func (f *fakeDeviceStore) ActiveKey(_ context.Context, deviceID ids.ID, purpose identity.KeyPurpose) (identity.DeviceKey, bool, error) {
+	if f.keyErr != nil {
+		return identity.DeviceKey{}, false, f.keyErr
+	}
+	if purpose != identity.KeyPurposeStepUp || !f.stepUpKey {
+		return identity.DeviceKey{}, false, nil
+	}
+	return identity.DeviceKey{DeviceID: deviceID, Purpose: purpose, Alg: "ES256"}, true, nil
 }
 
 func (f *fakeDeviceStore) InsertDevice(_ context.Context, d device.Device) (identity.Device, error) {

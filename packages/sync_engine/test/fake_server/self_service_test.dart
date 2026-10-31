@@ -8,6 +8,7 @@
 import 'package:api_client/api_client.dart';
 import 'package:auth/auth.dart';
 import 'package:dio/dio.dart';
+import 'package:sync_engine/testing.dart' show WorldSeed;
 import 'package:test/test.dart';
 
 import 'support.dart';
@@ -73,6 +74,87 @@ void main() {
     expect(ApiProblem.of(error!)?.code, 'forbidden');
     expect(ApiProblem.of(error)?.reason, 'step_up_not_possible');
     expect(h.server.world.devices[s.deviceId]!.state, 'active');
+  });
+
+  test(
+    'a device without a step-up key confirms with password and TOTP',
+    () async {
+      final alex = h.device(stepUpKey: false);
+      await signedIn(h, alex);
+      final phone = h.device(keySeed: 2);
+      final p = await signedIn(h, phone);
+      h.server.requests.clear();
+
+      await alex.api.getDevicesApi().revokeDevice(
+        deviceId: p.deviceId,
+        reasonBody: ReasonBody((b) => b..reason = 'Lost on the train'),
+        idempotencyKey: '0193f2a7-0000-7000-8000-000000000009',
+      );
+
+      expect(ops(), [
+        'revokeDevice 401',
+        'createStepUpChallenge 200',
+        'stepUpWithPassword 200',
+        'revokeDevice 200',
+      ]);
+      expect(h.server.world.devices[p.deviceId]!.state, 'revoked');
+      expect(h.server.violations, isEmpty);
+    },
+  );
+
+  test(
+    'a device with a step-up key cannot confirm with the password',
+    () async {
+      final alex = h.device();
+      await signedIn(h, alex);
+      final challenge =
+          (await alex.api.getAuthApi().createStepUpChallenge()).data!;
+      final error = await alex.api
+          .getAuthApi()
+          .stepUpWithPassword(
+            stepUpPasswordRequest: StepUpPasswordRequest(
+              (b) => b
+                ..challengeId = challenge.challengeId
+                ..password = WorldSeed.password
+                ..totpCode = WorldSeed.totp,
+            ),
+          )
+          .then<DioException?>(
+            (_) => null,
+            onError: (Object e) => e as DioException,
+          );
+      expect(ApiProblem.of(error!)?.reason, 'step_up_not_possible');
+      expect(
+        h.server.world.sessions.values.every((s) => s.stepUpAt == null),
+        isTrue,
+      );
+    },
+  );
+
+  test('a cli device cannot confirm with the password', () async {
+    final cli = h.device(stepUpKey: false, platform: 'cli');
+    await signedIn(h, cli);
+    final challenge =
+        (await cli.api.getAuthApi().createStepUpChallenge()).data!;
+    final error = await cli.api
+        .getAuthApi()
+        .stepUpWithPassword(
+          stepUpPasswordRequest: StepUpPasswordRequest(
+            (b) => b
+              ..challengeId = challenge.challengeId
+              ..password = WorldSeed.password
+              ..totpCode = WorldSeed.totp,
+          ),
+        )
+        .then<DioException?>(
+          (_) => null,
+          onError: (Object e) => e as DioException,
+        );
+    expect(ApiProblem.of(error!)?.reason, 'step_up_not_possible');
+    expect(
+      h.server.world.sessions.values.every((s) => s.stepUpAt == null),
+      isTrue,
+    );
   });
 
   test('revoking a device needs step-up and ends its sessions', () async {

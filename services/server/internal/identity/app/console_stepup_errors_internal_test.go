@@ -14,6 +14,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/identity/domain/stepup"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/auditing"
+	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
@@ -27,6 +28,7 @@ type fakeChallenges struct {
 	lockErr  error
 	failures []time.Time
 	finished []ChallengeStatus
+	methods  []string
 }
 
 func (f *fakeChallenges) LockChallenge(context.Context, ids.ID) (ChallengeRecord, bool, error) {
@@ -42,7 +44,8 @@ func (f *fakeChallenges) FailedStepUpTimes(context.Context, ids.ID, time.Time) (
 	return f.failures, nil
 }
 
-func (f *fakeChallenges) SetSessionStepUp(context.Context, ids.ID, time.Time, string) error {
+func (f *fakeChallenges) SetSessionStepUp(_ context.Context, _ ids.ID, _ time.Time, method string) error {
+	f.methods = append(f.methods, method)
 	return nil
 }
 
@@ -772,4 +775,132 @@ func TestConsoleStepUpEntries(t *testing.T) {
 	if e.Decision != auditing.DecisionAllow || e.ResourceID != sid || e.Attrs[attrStep].Data() != stepOIDCBegin {
 		t.Fatalf("entry = %+v", e)
 	}
+}
+
+// appActor is a person in an app session on a device (the Windows app of D-M4-11-2 when the device
+// has no step_up key).
+func appActor() actor.Actor {
+	a := consoleActor()
+	a.ClientComponent = string(identity.ComponentApp)
+	return a
+}
+
+// passwordStepUpApp is a test console with the step-up use cases and local credentials, an issued
+// challenge of the app session of a on an active device of platform, which has a step_up key when
+// stepUpKey is true.
+func passwordStepUpApp(t *testing.T, a actor.Actor, platform identity.Platform, stepUpKey bool) (*Console, *stepUpFakes, ids.ID) {
+	t.Helper()
+	c, f := newTestStepUpConsole(t)
+	c.local, _ = localForStepUp()
+	f.devices.dev = identity.Device{ID: a.DeviceID, UserID: a.ID, Platform: platform, State: identity.DeviceStateActive}
+	f.devices.found = true
+	f.devices.stepUpKey = stepUpKey
+	id := openChallenge(f, a)
+	f.sessions.tree[0].Component = identity.ClientComponent(a.ClientComponent)
+	return c, f, id
+}
+
+// TestStepUpWithPasswordFromAppWithoutStepUpKey (FIX-stepup-macos): an app session on a device
+// without an active step_up key confirms with password and TOTP: 200 with method password_totp,
+// the auth.step_up confirm entry with that method and no cookie, because only a console session
+// has one.
+func TestStepUpWithPasswordFromAppWithoutStepUpKey(t *testing.T) {
+	t.Parallel()
+	a := appActor()
+	c, f, id := passwordStepUpApp(t, a, identity.PlatformWindows, false)
+	got, err := c.StepUpWithPassword(context.Background(), a, id, "password", validTOTP())
+	if err != nil {
+		t.Fatal(err)
+	}
+	// f.store.rotated is false, so a rotation of the cookie would have failed the step-up.
+	if !got.Cookie.IsZero() || got.CookieMaxAge != 0 || got.StepUpAt.IsZero() {
+		t.Fatalf("result %+v, want a step-up without a cookie", got)
+	}
+	if len(f.challenges.methods) != 1 || f.challenges.methods[0] != identity.StepUpMethodPasswordTOTP ||
+		len(f.challenges.finished) != 1 || f.challenges.finished[0] != ChallengeUsed {
+		t.Fatalf("methods %v, finished %v", f.challenges.methods, f.challenges.finished)
+	}
+	var confirmed int
+	for _, e := range f.audit.entries {
+		if e.Action == string(authorize.ActionAuthStepUp) && e.Attrs[attrStep].Data() == stepConfirm &&
+			e.Attrs[attrMethod].Data() == identity.StepUpMethodPasswordTOTP && e.ResourceID == a.SessionID {
+			confirmed++
+		}
+	}
+	if confirmed != 1 || len(f.audit.denials) != 0 {
+		t.Fatalf("entries %+v, denials %+v", f.audit.entries, f.audit.denials)
+	}
+}
+
+// TestStepUpWithPasswordFromAppWithStepUpKey: an app session on a device with an active step_up
+// key gets 403 step_up_not_possible (no downgrade from the device key), audited with cause
+// step_up_key_present, and the challenge stays open.
+func TestStepUpWithPasswordFromAppWithStepUpKey(t *testing.T) {
+	t.Parallel()
+	a := appActor()
+	c, f, id := passwordStepUpApp(t, a, identity.PlatformMacOS, true)
+	_, err := c.StepUpWithPassword(context.Background(), a, id, "password", validTOTP())
+	if e := problemOf(t, err, errs.CodeForbidden); e.Reason != reasonStepUpNotPossible {
+		t.Fatalf("reason = %q", e.Reason)
+	}
+	if len(f.audit.denials) != 1 || f.audit.denials[0].Attrs[attrCause].Data() != causeStepUpKeyPresent {
+		t.Fatalf("denials = %+v", f.audit.denials)
+	}
+	if len(f.challenges.finished) != 0 {
+		t.Fatalf("finished = %v, want the challenge untouched", f.challenges.finished)
+	}
+}
+
+// TestStepUpWithPasswordFromCLI: a session of a cli device gets 403 step_up_not_possible (08 6.4).
+func TestStepUpWithPasswordFromCLI(t *testing.T) {
+	t.Parallel()
+	a := appActor()
+	c, f, id := passwordStepUpApp(t, a, identity.PlatformCLI, false)
+	_, err := c.StepUpWithPassword(context.Background(), a, id, "password", validTOTP())
+	if e := problemOf(t, err, errs.CodeForbidden); e.Reason != reasonStepUpNotPossible {
+		t.Fatalf("reason = %q", e.Reason)
+	}
+	if len(f.audit.denials) != 1 || len(f.challenges.finished) != 0 {
+		t.Fatalf("denials %+v, finished %v", f.audit.denials, f.challenges.finished)
+	}
+}
+
+// TestStepUpWithPasswordOtherComponents: a share extension session gets 403 step_up_not_possible
+// with cause not_console, and a failing key read is handed on.
+func TestStepUpWithPasswordOtherComponents(t *testing.T) {
+	t.Parallel()
+	t.Run("share extension", func(t *testing.T) {
+		t.Parallel()
+		a := appActor()
+		a.ClientComponent = string(identity.ComponentShareExt)
+		c, f, id := passwordStepUpApp(t, a, identity.PlatformWindows, false)
+		_, err := c.StepUpWithPassword(context.Background(), a, id, "password", validTOTP())
+		if e := problemOf(t, err, errs.CodeForbidden); e.Reason != reasonStepUpNotPossible {
+			t.Fatalf("reason = %q", e.Reason)
+		}
+		if len(f.audit.denials) != 1 || f.audit.denials[0].Attrs[attrCause].Data() != string(causeNotConsole) {
+			t.Fatalf("denials = %+v", f.audit.denials)
+		}
+	})
+	t.Run("key read", func(t *testing.T) {
+		t.Parallel()
+		a := appActor()
+		c, f, id := passwordStepUpApp(t, a, identity.PlatformWindows, false)
+		f.devices.keyErr = errStoreDown
+		_, err := c.StepUpWithPassword(context.Background(), a, id, "password", validTOTP())
+		wantStoreDown(t, err)
+	})
+	t.Run("oidc stays console-only", func(t *testing.T) {
+		t.Parallel()
+		a := appActor()
+		c, f, _ := passwordStepUpApp(t, a, identity.PlatformWindows, false)
+		c.oidc = &OIDC{}
+		_, err := c.BeginStepUpOIDC(context.Background(), a, identity.StepUpOIDCBegin{AppRedirectURI: c.stepUpCallback()})
+		if e := problemOf(t, err, errs.CodeForbidden); e.Reason != reasonStepUpNotPossible {
+			t.Fatalf("reason = %q", e.Reason)
+		}
+		if len(f.audit.denials) != 1 || f.audit.denials[0].Attrs[attrCause].Data() != string(causeNotConsole) {
+			t.Fatalf("denials = %+v", f.audit.denials)
+		}
+	})
 }

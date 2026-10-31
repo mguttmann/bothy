@@ -33,7 +33,7 @@ void registerTerminalHandlers(RestFake rest) {
 
   /// A fresh, unused step-up (08 6.3): the confirmation is consumed by this request.
   void freshStepUp(FakeRequest r) {
-    requireStepUp(r);
+    requireStepUp(r, fresh: true);
     r.session!.stepUpAt = null;
   }
 
