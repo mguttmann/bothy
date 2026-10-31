@@ -334,7 +334,9 @@ Tests (D-M5-03-7): the widget and golden tests of `test/phone/` (system back, th
 adapters, the Android tap target guideline) and `test/goldens/phone/android_*` run on every host.
 With exactly one device or emulator attached, `make apps-platform` runs
 `tool/run_android_tests.sh`: the phone integration tests (`integration_test/phone_suite_test.dart`,
-the same files as on the iPhone simulator, system back instead of the edge swipe) and the
+the same files as on the iPhone simulator, system back instead of the edge swipe; every input
+method of the device is disabled while they run and enabled again afterwards, so no system
+keyboard edits the composer beside the dictation test's probe, FIX-main-red-2026-10-31) and the
 instrumented tests of the runner (`android/app/src/androidTest`: channels in the system settings,
 backup rules, recent apps protection). The CI jobs `apps-android-26` and `apps-android-36` run them
 on emulators of the lowest and the current API level.

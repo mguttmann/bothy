@@ -42,6 +42,15 @@ once for the components of the plan, the tests split by component
 `AREAS=none` leaves the tools suite to `test (tools)`; only the three tools tests that read
 component sources (`TOOLS_SOURCE_TESTS`) run in each test job as well.
 
+Disk space: every Linux job of `ci.yml` and `build-verify.yml` except the short ones that only
+plan, scan or report runs `tools/ci/free_disk.sh` right after checkout. The ubuntu runner image
+ships toolchains that no job uses, and with them the disk ran full on main ("No space left on
+device" in `gates`, `test (tools)` and `console-e2e`, FIX-main-red-2026-10-31). The script
+removes .NET, GHC, Swift, Boost, the CodeQL bundles of the tool cache and every Docker image,
+and the Android SDK unless the job installs a JDK, the Android SDK, Flutter or an emulator
+(`--keep-android`); it prints the free space before and after. A new Linux job either runs it
+or is listed as short in `tools/ci/tests/test_free_disk.py`.
+
 The Go tests run in shards at the same time (`tools/ci/go_shards.py`): every package of
 `go list ./...` in every Go module is assigned to exactly one shard, balanced by the package
 durations in `tools/ci/go_test_timings.json` (a package without a duration weighs the median),
