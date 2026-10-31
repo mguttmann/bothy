@@ -148,7 +148,10 @@ void main() {
     });
 
     Future<void> writeSecrets() async {
-      final secrets = InstanceSecrets(FlutterSecureBackend(), 'instance-a');
+      final secrets = InstanceSecrets(
+        FlutterSecureBackend(appId: 'com.example.chat'),
+        'instance-a',
+      );
       await SecureDatabaseKeySource(secrets).obtainKey();
       await secrets.write('auth/https://chat.example.com/refresh_token', 'r');
     }
@@ -175,7 +178,7 @@ void main() {
       debugDefaultTargetPlatformOverride = TargetPlatform.android;
       await writeSecrets();
       expect(
-        writes['instance/instance-a/database_key'],
+        writes['com.example.chat/instance/instance-a/database_key'],
         FlutterSecureBackend.androidOptions.toMap(),
       );
     });

@@ -83,8 +83,9 @@ void main() {
     test(
       'FlutterSecureBackend reads, writes, deletes and lists keys',
       () async {
-        FlutterSecureStorage.setMockInitialValues({'a': '1'});
-        final backend = FlutterSecureBackend();
+        // The test platform is Android: the keys carry the prefix of the app scope.
+        FlutterSecureStorage.setMockInitialValues({'com.example.chat/a': '1'});
+        final backend = FlutterSecureBackend(appId: 'com.example.chat');
         expect(await backend.read('a'), '1');
         await backend.write('b', '2');
         expect(await backend.keys(), {'a', 'b'});

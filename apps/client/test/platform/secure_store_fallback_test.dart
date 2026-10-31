@@ -22,6 +22,9 @@ class FakeKeychainStorage extends Fake implements FlutterSecureStorage {
   /// The keychain of every write, in order.
   final List<bool> writes = [];
 
+  /// The key of every write, in order.
+  final List<String> writtenKeys = [];
+
   static bool _dataProtection(MacOsOptions? options) =>
       (options ?? MacOsOptions.defaultOptions).usesDataProtectionKeychain;
 
@@ -38,6 +41,7 @@ class FakeKeychainStorage extends Fake implements FlutterSecureStorage {
   }) async {
     final dp = _dataProtection(mOptions as MacOsOptions?);
     writes.add(dp);
+    writtenKeys.add(key);
     if (dp && missingEntitlement) {
       throw PlatformException(
         code: 'Unexpected security result code',
@@ -104,14 +108,18 @@ void main() {
       final keychain = FakeKeychainStorage(missingEntitlement: true);
       final logs = <String>[];
       final backend = FlutterSecureBackend(
+        appId: 'com.example.chat',
         storage: keychain,
-        macOS: true,
+        platform: TargetPlatform.macOS,
         keychainOptions: signed,
         log: logs.add,
       );
       await backend.write('instance/a/device_id', '1');
       expect(await backend.read('instance/a/device_id'), '1');
-      expect(keychain.items[false], {'instance/a/device_id': '1'});
+      expect(keychain.items[false], {
+        FlutterSecureBackend.scopeMarkerKey: '1',
+        'instance/a/device_id': '1',
+      });
       expect(await backend.keys(), {'instance/a/device_id'});
       await backend.delete('instance/a/device_id');
       expect(await backend.read('instance/a/device_id'), isNull);
@@ -127,13 +135,15 @@ void main() {
     final keychain = FakeKeychainStorage(missingEntitlement: false);
     final logs = <String>[];
     final backend = FlutterSecureBackend(
+      appId: 'com.example.chat',
       storage: keychain,
-      macOS: true,
+      platform: TargetPlatform.macOS,
       keychainOptions: signed,
       log: logs.add,
     );
     await backend.write('app/server_address', 'https://chat.example.com');
     expect(keychain.items[true], {
+      FlutterSecureBackend.scopeMarkerKey: '1',
       'app/server_address': 'https://chat.example.com',
     });
     expect(keychain.items[false], isEmpty);
@@ -147,8 +157,9 @@ void main() {
     final keychain = FakeKeychainStorage(missingEntitlement: true);
     keychain.items[false]!['app/server_address'] = 'https://chat.example.com';
     final backend = FlutterSecureBackend(
+      appId: 'com.example.chat',
       storage: keychain,
-      macOS: true,
+      platform: TargetPlatform.macOS,
       keychainOptions: signed,
       log: (_) {},
     );
@@ -163,15 +174,22 @@ void main() {
       (false, signed),
       (true, const MacOsOptions(usesDataProtectionKeychain: false)),
     ]) {
-      final keychain = FakeKeychainStorage(missingEntitlement: true);
+      // The fake answers like the macOS keychain; only the login keychain case keeps the
+      // missing entitlement, which never touches the Data Protection keychain.
+      final keychain = FakeKeychainStorage(missingEntitlement: macOS);
       final backend = FlutterSecureBackend(
+        appId: 'com.example.chat',
         storage: keychain,
-        macOS: macOS,
+        platform: macOS ? TargetPlatform.macOS : TargetPlatform.windows,
         keychainOptions: options,
         log: (_) {},
       );
       expect(await backend.read('x'), isNull);
-      expect(keychain.writes, isEmpty);
+      expect(
+        keychain.writtenKeys,
+        isNot(contains(FlutterSecureBackend.probeKey)),
+      );
+      expect(keychain.writes.where((dp) => dp && macOS), isEmpty);
       expect(await backend.downgraded, isFalse);
     }
   });
@@ -200,8 +218,9 @@ void main() {
 
   test('another keychain failure of the probe is not hidden', () async {
     final backend = FlutterSecureBackend(
+      appId: 'com.example.chat',
       storage: _FailingStorage(),
-      macOS: true,
+      platform: TargetPlatform.macOS,
       keychainOptions: signed,
       log: (_) {},
     );

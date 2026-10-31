@@ -35,15 +35,30 @@ abstract interface class SecureBackend {
 /// [SecureBackend] on `flutter_secure_storage` (publisher steenbakker.dev).
 ///
 /// macOS: the Data Protection keychain in a release build, not synchronized, accessible after
-/// the first unlock on this device only; a debug or profile build is not signed by a team and
-/// so has no keychain access group, and keeps its items in the login keychain under the app's
-/// access list. Windows: the package default (Credential Manager with AES-GCM files). iOS
-/// (15 9 row iOS; brief M5-02 fixed requirement 17): the keychain of this device only, never
-/// synchronized; the tokens after the first unlock, the database key only while the device
-/// is unlocked ([iosOptionsFor]). Android (15 9 row Android; brief M5-03 Design note 3): an
-/// AES-GCM store whose key the Android Keystore wraps ([androidOptions]), in the app's private
-/// shared preferences, which the backup rules exclude (15 6.3). The package finds an item under
-/// every accessibility, so reads, deletes and the wipe need no per-key options.
+/// the first unlock on this device only; a debug or profile build keeps its items in the login
+/// keychain, which has no access group: every app of the person reaches its items, and an app
+/// signed differently from the writer gets a keychain access prompt. Windows: the package
+/// default (a DPAPI-encrypted file in the support folder of the app, readable by every process
+/// of the person). iOS (15 9 row iOS; brief M5-02 fixed requirement 17): the keychain of this
+/// device only, never synchronized; the tokens after the first unlock, the database key only
+/// while the device is unlocked ([iosOptionsFor]). Android (15 9 row Android; brief M5-03
+/// Design note 3): an AES-GCM store whose key the Android Keystore wraps ([androidOptions]),
+/// in the app's private shared preferences, which the backup rules exclude (15 6.3). The
+/// package finds an item under every accessibility, so reads, deletes and the wipe need no
+/// per-key options.
+///
+/// The app scope (docs/decisions.d/FIX-app-logout.md): the secrets belong to one app identity,
+/// [appId] (the bundle identifier, on Android the application ID). On iOS and macOS they sit
+/// under the keychain service [serviceFor] of it, elsewhere under the key prefix `<appId>/`.
+/// A build with another identity therefore never reads, lists or deletes them, also not where
+/// the platform store is shared (the login keychain, the Windows file). Secrets of a build
+/// before the scope (service `flutter_secure_storage_service`, keys without prefix) move into
+/// the scope once, before the first call, and leave the old place, so no stale refresh token
+/// stays behind: always where only this app reaches the old store (iOS, Android, the Data
+/// Protection keychain), in a shared store (the login keychain, Windows) only when
+/// [hasLocalData] says this app has local data of an instance, the sign that the old secrets
+/// are its own. Otherwise the shared store is not touched: no access prompt, no foreign
+/// session. The marker [scopeMarkerKey] in the scope records the step.
 ///
 /// A macOS release build without the keychain entitlements (an ad-hoc signature, no team and no
 /// provisioning profile) cannot use the Data Protection keychain: every write fails with
@@ -52,12 +67,16 @@ abstract interface class SecureBackend {
 /// rest of the process, logs the downgrade once and reports it in [downgraded]
 /// (docs/decisions.d/FIX-macos-keychain.md). A signed build keeps the Data Protection keychain.
 final class FlutterSecureBackend implements SecureBackend {
-  /// Creates the backend; [storage] replaces the platform store in tests, [macOS] the platform
-  /// check, [keychainOptions] the macOS options of this build and [log] the developer log.
+  /// Creates the backend of the app identity [appId]; [storage] replaces the platform store in
+  /// tests, [platform] the platform, [keychainOptions] the macOS options of this build,
+  /// [hasLocalData] the check for local instance data (none: false) and [log] the developer
+  /// log.
   FlutterSecureBackend({
+    required this.appId,
     FlutterSecureStorage? storage,
-    bool? macOS,
+    TargetPlatform? platform,
     MacOsOptions keychainOptions = FlutterSecureBackend.macOsOptions,
+    this.hasLocalData,
     void Function(String line)? log,
   }) : _storage =
            storage ??
@@ -66,10 +85,15 @@ final class FlutterSecureBackend implements SecureBackend {
              iOptions: iosOptions,
              aOptions: androidOptions,
            ),
-       _macOS =
-           macOS ?? (!kIsWeb && defaultTargetPlatform == TargetPlatform.macOS),
+       _platform = platform ?? (kIsWeb ? null : defaultTargetPlatform),
        _keychainOptions = keychainOptions,
        _log = log ?? _developerLog;
+
+  /// The app identity whose secrets this backend keeps.
+  final String appId;
+
+  /// Whether this app has local data of an instance; null counts as no.
+  final Future<bool> Function()? hasLocalData;
 
   /// The options of the Android store: the data in AES-GCM, its key wrapped by an RSA key of
   /// the Android Keystore, no biometric prompt (the device keys of M5-01 carry the step-up).
@@ -103,18 +127,33 @@ final class FlutterSecureBackend implements SecureBackend {
     usesDataProtectionKeychain: kReleaseMode,
   );
 
+  /// The keychain service of the secrets of [appId] on iOS and macOS.
+  ///
+  /// Example: `serviceFor('com.example.chat')` is `com.example.chat.secrets`.
+  static String serviceFor(String appId) => '$appId.secrets';
+
   /// The key of the item that tries the Data Protection keychain; it never holds a secret.
   static const String probeKey = 'app/keychain_probe';
+
+  /// The key of the item in the app scope that records the move of the old secrets; never a
+  /// secret and never listed by [keys].
+  static const String scopeMarkerKey = 'app/secret_scope';
+
+  /// The key prefixes of the secrets a build before the app scope wrote.
+  static const List<String> legacyPrefixes = ['app/', 'instance/'];
 
   /// The status `errSecMissingEntitlement` of the Security framework.
   static const int missingEntitlementStatus = -34018;
 
   final FlutterSecureStorage _storage;
-  final bool _macOS;
+  final TargetPlatform? _platform;
   final MacOsOptions _keychainOptions;
   final void Function(String line) _log;
   Future<MacOsOptions>? _chosen;
   bool _downgraded = false;
+
+  bool get _macOS => _platform == TargetPlatform.macOS;
+  bool get _apple => _macOS || _platform == TargetPlatform.iOS;
 
   static void _developerLog(String line) =>
       developer.log(line, name: 'secure_store');
@@ -127,16 +166,28 @@ final class FlutterSecureBackend implements SecureBackend {
   /// Whether the secrets went to the login keychain because the Data Protection keychain is not
   /// available to this build; false on every other platform.
   Future<bool> get downgraded async {
-    await _options();
+    await _ready();
     return _downgraded;
   }
 
-  /// The macOS options of every call: chosen once, before the first call. A failed choice is
-  /// not kept, so the next call tries again.
-  Future<MacOsOptions> _options() {
+  /// Whether the secrets lie in a store every app of the person reaches: the Windows file, the
+  /// macOS login keychain (a debug or profile build, or a build without keychain entitlements).
+  Future<bool> get sharedStore async {
+    if (_platform == TargetPlatform.windows) return true;
+    if (!_macOS) return false;
+    return !(await _ready()).usesDataProtectionKeychain;
+  }
+
+  /// The macOS options of every call, chosen once before the first call, after the old secrets
+  /// moved into the app scope. A failed choice or move is not kept, so the next call tries
+  /// again.
+  Future<MacOsOptions> _ready() {
     final chosen = _chosen;
     if (chosen != null) return chosen;
-    final choice = _choose();
+    final choice = _choose().then((options) async {
+      await _adoptLegacy(options);
+      return options;
+    });
     _chosen = choice;
     return choice.catchError((Object error) {
       if (identical(_chosen, choice)) _chosen = null;
@@ -145,7 +196,7 @@ final class FlutterSecureBackend implements SecureBackend {
   }
 
   Future<MacOsOptions> _choose() async {
-    final options = _keychainOptions;
+    final options = _scoped(_keychainOptions);
     if (!_macOS || !options.usesDataProtectionKeychain) return options;
     try {
       await _storage.write(key: probeKey, value: '1', mOptions: options);
@@ -157,36 +208,138 @@ final class FlutterSecureBackend implements SecureBackend {
         '(errSecMissingEntitlement, no keychain entitlements): the secrets are kept '
         'in the login keychain',
       );
-      return MacOsOptions(
-        accountName: options.accountName,
-        accessibility: options.accessibility,
-        synchronizable: options.synchronizable,
-        usesDataProtectionKeychain: false,
-      );
+      return _macOptions(options, options.accountName, dp: false);
     }
     await _storage.delete(key: probeKey, mOptions: options);
     return options;
   }
 
-  @override
-  Future<String?> read(String key) async =>
-      _storage.read(key: key, mOptions: await _options());
-
-  @override
-  Future<void> write(String key, String value) async => _storage.write(
-    key: key,
-    value: value,
-    iOptions: iosOptionsFor(key),
-    mOptions: await _options(),
+  MacOsOptions _scoped(MacOsOptions options) => _macOptions(
+    options,
+    serviceFor(appId),
+    dp: options.usesDataProtectionKeychain,
   );
 
+  static MacOsOptions _macOptions(
+    MacOsOptions options,
+    String? service, {
+    required bool dp,
+  }) => MacOsOptions(
+    accountName: service,
+    accessibility: options.accessibility,
+    synchronizable: options.synchronizable,
+    usesDataProtectionKeychain: dp,
+  );
+
+  /// The iOS options of [key] under [service].
+  static IOSOptions _iosOptions(String key, String service) {
+    final options = iosOptionsFor(key);
+    return IOSOptions(
+      accountName: service,
+      accessibility: options.accessibility,
+      synchronizable: options.synchronizable,
+    );
+  }
+
+  String get _prefix => _apple ? '' : '$appId/';
+
+  /// Moves the secrets of a build before the app scope into it (see the class comment).
+  Future<void> _adoptLegacy(MacOsOptions scoped) async {
+    if (await _read(scopeMarkerKey, scoped) != null) return;
+    final legacyMac = _macOptions(
+      scoped,
+      AppleOptions.defaultAccountName,
+      dp: scoped.usesDataProtectionKeychain,
+    );
+    final shared =
+        _platform == TargetPlatform.windows ||
+        (_macOS && !scoped.usesDataProtectionKeychain);
+    final check = hasLocalData;
+    final adopt = !shared || (check != null && await check());
+    if (adopt) await _moveLegacy(legacyMac, scoped);
+    await _write(scopeMarkerKey, '1', scoped);
+  }
+
+  /// Moves every secret under [legacyMac] into [scoped] without overwriting a scoped one.
+  Future<void> _moveLegacy(MacOsOptions legacyMac, MacOsOptions scoped) async {
+    final legacy = await _legacyItems(legacyMac);
+    final current = await _readAll(scoped);
+    for (final MapEntry(:key, :value) in legacy.entries) {
+      if (!current.containsKey(key)) await _write(key, value, scoped);
+      await _storage.delete(
+        key: key,
+        iOptions: _apple ? _iosOptions(key, legacyMac.accountName!) : null,
+        mOptions: legacyMac,
+      );
+    }
+    if (legacy.isNotEmpty) {
+      _log('moved ${legacy.length} secrets into the scope of $appId');
+    }
+  }
+
+  /// The secrets a build before the app scope left: on Apple every item of the old service, on
+  /// the other platforms the keys under [legacyPrefixes].
+  Future<Map<String, String>> _legacyItems(MacOsOptions legacyMac) async {
+    final all = await _storage.readAll(
+      iOptions: _apple
+          ? _iosOptions('', AppleOptions.defaultAccountName)
+          : null,
+      mOptions: legacyMac,
+    );
+    if (_apple) return all;
+    return {
+      for (final MapEntry(:key, :value) in all.entries)
+        if (legacyPrefixes.any(key.startsWith)) key: value,
+    };
+  }
+
+  Future<String?> _read(String key, MacOsOptions mac) => _storage.read(
+    key: '$_prefix$key',
+    iOptions: _iosOptions(key, serviceFor(appId)),
+    mOptions: mac,
+  );
+
+  Future<void> _write(String key, String value, MacOsOptions mac) =>
+      _storage.write(
+        key: '$_prefix$key',
+        value: value,
+        iOptions: _iosOptions(key, serviceFor(appId)),
+        mOptions: mac,
+      );
+
+  /// Every secret of the app scope with its key without the prefix, the marker included.
+  Future<Map<String, String>> _readAll(MacOsOptions mac) async {
+    final all = await _storage.readAll(
+      iOptions: _iosOptions('', serviceFor(appId)),
+      mOptions: mac,
+    );
+    final prefix = _prefix;
+    return {
+      for (final MapEntry(:key, :value) in all.entries)
+        if (key.startsWith(prefix)) key.substring(prefix.length): value,
+    };
+  }
+
   @override
-  Future<void> delete(String key) async =>
-      _storage.delete(key: key, mOptions: await _options());
+  Future<String?> read(String key) async => _read(key, await _ready());
+
+  @override
+  Future<void> write(String key, String value) async =>
+      _write(key, value, await _ready());
+
+  @override
+  Future<void> delete(String key) async {
+    final mac = await _ready();
+    await _storage.delete(
+      key: '$_prefix$key',
+      iOptions: _iosOptions(key, serviceFor(appId)),
+      mOptions: mac,
+    );
+  }
 
   @override
   Future<Set<String>> keys() async =>
-      (await _storage.readAll(mOptions: await _options())).keys.toSet();
+      (await _readAll(await _ready())).keys.toSet()..remove(scopeMarkerKey);
 }
 
 /// The [SecretStore] of one instance: every key is prefixed with the instance ID, so the
@@ -218,6 +371,10 @@ final class InstanceSecrets implements SecretStore {
 
   @override
   Future<void> delete(String key) => _backend.delete('$_prefix$key');
+
+  /// Whether this instance has no secret yet.
+  Future<bool> isEmpty() async =>
+      !(await _backend.keys()).any((key) => key.startsWith(_prefix));
 
   /// Deletes every secret of this instance: tokens, device ID and database key (R-SY-14).
   Future<void> deleteAll() async {

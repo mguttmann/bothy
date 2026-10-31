@@ -501,7 +501,7 @@ That is why all clients use **ES256** for DPoP and step-up, although the data mo
 | iOS | Secure Enclave, P-256, without user confirmation, keychain access group with the extensions, `AfterFirstUnlockThisDeviceOnly` | Secure Enclave, P-256, `.biometryCurrentSet` when biometrics are enrolled (new biometrics invalidate the key, [08](08-identity.md) 6.1), otherwise `.userPresence` (device password); `WhenPasscodeSetThisDeviceOnly` | Keychain through `flutter_secure_storage` (publisher steenbakker.dev); tokens for the extensions in the shared access group with `AfterFirstUnlockThisDeviceOnly`, DB key `WhenUnlockedThisDeviceOnly` |
 | macOS | Secure Enclave (Macs with an Apple chip or with Touch Bar and Touch ID according to the Apple documentation), otherwise a keychain key without the enclave, reported to the server as "not hardware-bound" | like iOS; without an enclave a software key whose keychain item carries `.userPresence` | Data Protection keychain |
 | Android | Android Keystore, StrongBox if available (`setIsStrongBoxBacked`, fallback on `StrongBoxUnavailableException`), P-256; without StrongBox and trusted execution environment (emulators) a software Keystore key, reported as not hardware-bound | Keystore key with user authentication per operation through `BiometricPrompt`: from API 30 strong biometrics or the device credential (PIN, pattern, password), on API 26 to 29 strong biometrics only, because a per-operation key cannot be unlocked with the device credential there; without enrolled biometrics on those levels there is no step-up key (`not_available`). Invalidated by new biometrics (`setInvalidatedByBiometricEnrollment`) | `flutter_secure_storage` (RSA-OAEP plus AES-GCM, key in the Keystore according to the package documentation) |
-| Windows | CNG with Microsoft Platform Crypto Provider (TPM), ECDSA P-256 after a check with `NCryptIsAlgSupported`; without a TPM a software key, reported as not hardware-bound; per user, export policy `0`, the provider fixed at creation (D-M4-11-1) | none: Windows enforces no confirmation per use for a P-256 key that code in the process cannot answer itself, so the plugin reports `not_available` and the step-up falls back to the other methods of [08](08-identity.md) 6 (D-M4-11-2) [verified, see below] | `flutter_secure_storage` (Windows Credential Manager plus AES-GCM files according to the package README [verified through search, source code not read]) |
+| Windows | CNG with Microsoft Platform Crypto Provider (TPM), ECDSA P-256 after a check with `NCryptIsAlgSupported`; without a TPM a software key, reported as not hardware-bound; per user, export policy `0`, the provider fixed at creation (D-M4-11-1) | none: Windows enforces no confirmation per use for a P-256 key that code in the process cannot answer itself, so the plugin reports `not_available` and the step-up falls back to the other methods of [08](08-identity.md) 6 (D-M4-11-2) [verified, see below] | `flutter_secure_storage` (a DPAPI-encrypted file in the support folder, see 9) |
 | Web (console) | none: cookie session according to the backend-for-frontend pattern, tokens only in the server ([08](08-identity.md) section 7.5) | WebAuthn passkey, otherwise a renewed OIDC login or password with TOTP | none in the browser; cookie `HttpOnly` |
 
 Sources: https://pub.dev/packages/flutter_secure_storage (version 11.2.0, retrieved 2026-10-10
@@ -516,7 +516,15 @@ and the Microsoft providers take that password from the process through `NCRYPT_
 (https://learn.microsoft.com/en-us/windows/win32/seccng/key-storage-property-identifiers); Windows
 Hello's `KeyCredentialManager` keys are RSA and sign with SHA-256 and PKCS #1
 (https://learn.microsoft.com/en-us/windows/apps/develop/security/windows-hello), all retrieved
-2026-10-15 [verified]. Not checked on a Windows host.
+2026-10-15 [verified]. Not checked on a Windows host. The Windows secrets of
+`flutter_secure_storage_windows` 4.2.2 (the locked version) sit in one JSON file in
+`getApplicationSupportDirectory()` encrypted with `CryptProtectData` (DPAPI), read from the package
+source `lib/src/flutter_secure_storage_windows_ffi.dart` (https://pub.dev/packages/flutter_secure_storage_windows,
+retrieved 2026-10-31 [verified]). On macOS the file-based keychain (the login keychain) controls
+access with access control lists, while only the Data Protection keychain uses keychain access
+groups (Apple TN3137, https://developer.apple.com/documentation/technotes/tn3137-on-mac-keychains,
+retrieved 2026-10-31 [verified]); that an app outside an item's list gets an access prompt is
+[assumed] from the observed incident.
 
 `packages/device_key` is one Flutter plugin package with a folder per platform and a typed
 Pigeon (flutter.dev) interface as its boundary, not a set of federated packages (docs/DECISIONS.md
@@ -569,12 +577,26 @@ keeps the refresh token, the device ID and the database key of each instance in
 `flutter_secure_storage`, every key prefixed with `instance/<instance_id>/`; the only key outside
 an instance is the remembered server address (`app/server_address`). On macOS a release build uses
 the Data Protection keychain, not synchronized, with `first_unlock_this_device` and the keychain
-access group `$(AppIdentifierPrefix)<bundle identifier>`; a local debug or profile build has no
-team signature and so no access group, and keeps the items in the login keychain under the app's
-own access list. On Windows the package default applies (Credential Manager plus AES-GCM files).
+access group `$(AppIdentifierPrefix)<bundle identifier>`; a debug or profile build keeps the items
+in the login keychain, which has no access group, so every app of the person reaches them (an app
+signed differently from the writer gets an access prompt). On Windows the package default applies
+(a DPAPI-encrypted file in the support folder, which every branding of the runner shares).
+Therefore the secrets belong to one app identity (FIX-app-logout, docs/decisions.d/FIX-app-logout.md):
+on iOS and macOS they sit under the keychain service `<bundle identifier>.secrets`, on Windows and
+Android under the key prefix `<bundle identifier or application ID>/`, and a build with another
+identity never reads, lists or deletes them; a new identity starts with enrollment. Secrets of a
+build before this rule move into the scope once at the first start and leave the old place: always
+where only the app reaches the old store, in a shared store (the macOS login keychain, Windows) only
+when the app already has an instance folder under its data root.
 The database key is 32 bytes from `Random.secure()`, created at the first start of an instance;
 the database is `<application support>/instances/<instance_id>/local.db`, the file cache lives
 in the same folder, and the device keys of `packages/device_key` use the `instance_id` as scope.
+Where the key store is shared between apps (the macOS login keychain of a debug or profile build,
+the key storage of the Windows user), a new enrollment uses the scope
+`<bundle identifier>/<instance_id>` instead, so another app identity never signs with or deletes
+these keys; an instance that already has secrets from a build before this rule keeps its keys
+under the `instance_id`. The scope is stored with the instance's secrets
+(docs/decisions.d/FIX-app-logout.md FIX-AL/4).
 A wipe (R-SY-14) deletes that folder, both device keys and every secret with the prefix.
 
 ## 10. Background behavior and push
