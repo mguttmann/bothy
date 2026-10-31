@@ -185,6 +185,13 @@ void main() {
       final host = await open(tester, maxBytes: 10);
       await type(tester, host, 'This is longer than ten bytes');
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      // The rest is written as a file with real IO before the message: wait for the message,
+      // never for a number of settle rounds (issue #238).
+      await host.outboxUntil(
+        tester,
+        (all) => all.any((e) => e.kind == MessageOps.createMessage),
+        what: 'the message',
+      );
       await host.settle(tester);
       expect(find.text(en.composerTooLong(10)), findsNothing);
       expect(

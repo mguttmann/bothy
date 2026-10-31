@@ -170,9 +170,13 @@ void main() {
     await settleUntil(tester, host, find.byKey(const ValueKey('voice.bar')));
     expect(recorder.calls, containsAllInOrder(['permission', 'start']));
     await tester.tap(find.byKey(const ValueKey('voice.send')));
-    for (var i = 0; i < 5; i++) {
-      await host.settle(tester);
-    }
+    // The recorder writes its file and the send copies it with real IO before the message:
+    // wait for the message, never for a number of settle rounds (issue #238).
+    await host.outboxUntil(
+      tester,
+      (all) => all.any((e) => e.kind == MessageOps.createMessage),
+      what: 'the voice message',
+    );
     final all = await entries(tester, host);
     final message = all.firstWhere((e) => e.kind == MessageOps.createMessage);
     expect(decodePayload(message.payload)['kind'], 'voice');
