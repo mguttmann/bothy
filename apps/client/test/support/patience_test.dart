@@ -16,6 +16,7 @@ import 'until.dart';
 /// sharing.
 const List<String> _helpers = [
   'test/support/until.dart',
+  'test/support/column_host.dart',
   'test/support/ready.dart',
   'test/support/fake_instance.dart',
   'integration_test/support/test_app.dart',

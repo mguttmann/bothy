@@ -20,6 +20,7 @@ import 'package:sync_engine/sync_engine.dart';
 import 'engine.dart';
 import 'fakes.dart';
 import 'structure.dart';
+import 'until.dart';
 import 'widgets.dart';
 
 /// The database, engine and route of a hosted column.
@@ -123,6 +124,34 @@ final class ColumnHost {
         () => Future<void>.delayed(const Duration(milliseconds: 5)),
       );
       await tester.pump();
+    }
+  }
+
+  /// Lets real IO run and the frames settle until the outbox entries satisfy [done], and
+  /// returns them; fails naming [what] once [patience] of wall-clock time has passed. Use it
+  /// after a send that writes a file before its message (a long draft, a long paste, a voice
+  /// message) instead of a fixed number of [settle] calls: how long that real IO takes depends
+  /// on the load of the machine.
+  ///
+  /// Example:
+  /// ```dart
+  /// final all = await host.outboxUntil(tester, (all) => all.any(isMessage), what: 'the send');
+  /// ```
+  Future<List<OutboxEntry>> outboxUntil(
+    WidgetTester tester,
+    bool Function(List<OutboxEntry> all) done, {
+    required String what,
+    Duration patience = testPatience,
+  }) async {
+    // dart:core's Stopwatch runs on the real clock, also inside the fake zone of testWidgets.
+    final watch = Stopwatch()..start();
+    while (true) {
+      final all = await run(tester, db.outboxDao.allEntries);
+      if (done(all)) return all;
+      if (watch.elapsed >= patience) {
+        fail('$what did not happen within $patience');
+      }
+      await settle(tester);
     }
   }
 
