@@ -6,6 +6,15 @@ your own hosts and see what it costs. Every person sees only what has been grant
 Self-hosted and open source, for teams that work with AI agents and for the people who run the
 instance for them.
 
+!!! note "Status: in development. No release yet."
+
+    Bothy is in daily use at one self-hosted installation, run by its maintainer. There are no
+    published server images and no distributed apps: whoever tries it today builds the server
+    image and the apps from source (see [Try it today](#try-it-today)). The one-command quick
+    start works from the first release on. What works today, the known limits, the idea behind
+    Bothy and how it is used today are in the [README](../README.md); what comes next is in the
+    [roadmap](roadmap.md).
+
 ![Desktop app on macOS: the sidebar with the spaces, the channel releases, and a thread where the agent Release Guard waits for approval with the buttons Allow once, Allow for this session, Always allow and Deny](assets/showcase/macos/approval-light.png#only-light)
 ![Desktop app on macOS: the sidebar with the spaces, the channel releases, and a thread where the agent Release Guard waits for approval with the buttons Allow once, Allow for this session, Always allow and Deny](assets/showcase/macos/approval-dark.png#only-dark)
 
@@ -61,20 +70,27 @@ script; the video shows one flow on the phone:
 
 </div>
 
-## Quick start
+## Try it today
 
-One command on a Linux or macOS host with Docker Engine 26 and Compose 2.26 or newer. The setup
-wizard checks the host, downloads and verifies the bundle, asks for the public address, the edge
-and the first owner, starts the instance and shows the enrollment code for the app
-([16 Operations](spec/16-operations.md), section 3.1):
+Until the first release Bothy runs from source: `make image && make demo` builds the server image
+and starts the demo instance with made-up data ([Run the demo](operations/demo.md)); the desktop
+and phone apps are built from `apps/client` with the branding of your instance; your own instance
+runs on the Compose stack with the image of `make image`
+([Installation with Docker Compose](operations/install-compose.md)).
+
+## Quick start (from the first release)
+
+From the first release on, one command on a Linux or macOS host with Docker Engine 26 and Compose
+2.26 or newer sets up an instance. The setup wizard checks the host, downloads and verifies the
+bundle, asks for the public address, the edge and the first owner, starts the instance and shows
+the enrollment code for the app ([16 Operations](spec/16-operations.md), section 3.1):
 
 ```sh
 curl -fsSL https://github.com/OWNER/bothy/releases/download/v0.0.0/install.sh | sh
 ```
 
-It ships with the first product release. Step by step and every option:
-[Installation with Docker Compose](operations/install-compose.md). To look around first:
-[Run the demo](operations/demo.md).
+This command does not work yet: the release sets the owner and the version in it. Step by step
+and every option: [Installation with Docker Compose](operations/install-compose.md).
 
 ## Reading path
 

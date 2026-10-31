@@ -16,7 +16,7 @@ versions run as in CI. Setup once per clone: `make bootstrap`.
 | `ci/build_base.py` | base of the change plan of a build branch: the merge base with `build-base/<ticket>` when that ref was pushed, else with `origin/main` | CI job `plan` of `build-verify.yml` | `ci/tests/test_build_base.py` |
 | `ci/components.py` | component map: path filters in CI, resolution of release tags; `pins` checks the server version that the product bundle pins | `release-pins` (otherwise CI) | `ci/tests/` |
 | `ci/product_release.py` | release build of the product: bundle and `install.sh` (docs/spec/18-release.md 2.1) | `release-build` | `ci/tests/test_release_build_bothy.py` |
-| `ci/install_options_check.py` | options of the portability test and the documented install command (brief M7-29) | `install-options` | `ci/tests/test_install_options_check.py` |
+| `ci/install_options_check.py` | options of the portability test, the documented install command (brief M7-29) and the release status of README and docs index (DOCS-README-HONEST) | `install-options` | `ci/tests/test_install_options_check.py` |
 | `ci/changelog_summary.py` | every release section of every `CHANGELOG.md` starts with a `Summary: ` line for users; the placeholder of `release-prep` does not count (brief M7-28) | `fragments-check` | `ci/tests/test_changelog_summary.py` |
 | `ci/release_notes.py` | the text of a GitHub release page from `.github/release-template.md` and the changelog section, the summary first (brief M7-28) | CI job `publish` of `release.yml` | `ci/tests/test_release_notes.py` |
 | `showcase/` | showcase images and video from the demo instance: capture per platform, metadata strip, manifest and its check (brief M7-28, `showcase/README.md`) | `showcase`, check in `docs` | `showcase/tests/` |
