@@ -2554,5 +2554,11 @@
   "renameProjectHint": "Nur das Forum wird umbenannt; der Ordner auf dem Runner bleibt, wie er ist.",
   "renameProjectSubmit": "Umbenennen",
   "renameProjectCancel": "Abbrechen",
-  "renameProjectChanged": "Das Forum wurde inzwischen geändert. Prüfe den Namen und tippe erneut auf Umbenennen."
+  "renameProjectChanged": "Das Forum wurde inzwischen geändert. Prüfe den Namen und tippe erneut auf Umbenennen.",
+  "chatStatusDone": "Neu: Lauf beendet",
+  "chatStatusWorking": "Neu: Agent arbeitet",
+  "chatStatusWaiting": "Neu: wartet auf dich",
+  "chatStatusFailed": "Neu: Lauf fehlgeschlagen",
+  "settingsShowProjectStatus": "Status auf Projekten anzeigen",
+  "settingsShowProjectStatusHint": "Jedes Forum und Projekt zeigt in seiner Zeile den dringendsten neuen Status seiner Chats."
 }

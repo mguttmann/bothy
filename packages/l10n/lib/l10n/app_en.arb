@@ -14317,5 +14317,29 @@
   "renameProjectChanged": "The forum was changed meanwhile. Check the name and press Rename again.",
   "@renameProjectChanged": {
     "description": "Shown after a version conflict while renaming a project forum."
+  },
+  "chatStatusDone": "New: run finished",
+  "@chatStatusDone": {
+    "description": "Words of the sidebar status mark (green) for a run that finished since the person last had the chat open; tooltip and end of the row label (01 6.17, M4-52)."
+  },
+  "chatStatusWorking": "New: agent is working",
+  "@chatStatusWorking": {
+    "description": "Words of the sidebar status mark (yellow) for a run that started working since the person last had the chat open (01 6.17, M4-52)."
+  },
+  "chatStatusWaiting": "New: waiting for you",
+  "@chatStatusWaiting": {
+    "description": "Words of the sidebar status mark (blue): since the person last had the chat open, the agent asks a question or waits for an approval or an input (01 6.17, M4-52)."
+  },
+  "chatStatusFailed": "New: run failed",
+  "@chatStatusFailed": {
+    "description": "Words of the sidebar status mark (red) for a run that failed since the person last had the chat open (01 6.17, M4-52)."
+  },
+  "settingsShowProjectStatus": "Show status on projects",
+  "@settingsShowProjectStatus": {
+    "description": "Label of the setting sidebar.show_project_status: forum and project rows show the most urgent unseen status of their chats (01 section 11 and 6.17, M4-52)."
+  },
+  "settingsShowProjectStatusHint": "Forum and project rows show the most urgent new state of their chats.",
+  "@settingsShowProjectStatusHint": {
+    "description": "Hint below the setting sidebar.show_project_status (01 section 11, M4-52)."
   }
 }

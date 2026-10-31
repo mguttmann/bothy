@@ -15437,6 +15437,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The forum was changed meanwhile. Check the name and press Rename again.'**
   String get renameProjectChanged;
+
+  /// Words of the sidebar status mark (green) for a run that finished since the person last had the chat open; tooltip and end of the row label (01 6.17, M4-52).
+  ///
+  /// In en, this message translates to:
+  /// **'New: run finished'**
+  String get chatStatusDone;
+
+  /// Words of the sidebar status mark (yellow) for a run that started working since the person last had the chat open (01 6.17, M4-52).
+  ///
+  /// In en, this message translates to:
+  /// **'New: agent is working'**
+  String get chatStatusWorking;
+
+  /// Words of the sidebar status mark (blue): since the person last had the chat open, the agent asks a question or waits for an approval or an input (01 6.17, M4-52).
+  ///
+  /// In en, this message translates to:
+  /// **'New: waiting for you'**
+  String get chatStatusWaiting;
+
+  /// Words of the sidebar status mark (red) for a run that failed since the person last had the chat open (01 6.17, M4-52).
+  ///
+  /// In en, this message translates to:
+  /// **'New: run failed'**
+  String get chatStatusFailed;
+
+  /// Label of the setting sidebar.show_project_status: forum and project rows show the most urgent unseen status of their chats (01 section 11 and 6.17, M4-52).
+  ///
+  /// In en, this message translates to:
+  /// **'Show status on projects'**
+  String get settingsShowProjectStatus;
+
+  /// Hint below the setting sidebar.show_project_status (01 section 11, M4-52).
+  ///
+  /// In en, this message translates to:
+  /// **'Forum and project rows show the most urgent new state of their chats.'**
+  String get settingsShowProjectStatusHint;
 }
 
 class _AppLocalizationsDelegate

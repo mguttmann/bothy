@@ -853,6 +853,84 @@ Widget badgeSheet() => Sheet([
 ]);
 
 /// Every sheet by golden file name.
+/// The status marks of unseen agent news of M4-52 (components.md 7, 01 6.17): a project forum
+/// with the most urgent state of its chats, one chat per state (done, working, waiting, failed),
+/// a waiting chat that is also unread and mentioned (mark instead of the bar, counter after the
+/// mark), a chat without runs that keeps the unread bar, and a text channel with the state of its
+/// main history.
+Widget sidebarStatusSheet() => Sheet([
+  _sidebar([
+    _forum(
+      const DsChannelRowData(
+        id: 'c1',
+        name: 'server',
+        kind: DsChannelKind.forum,
+        projectBound: true,
+        unreadCount: 3,
+        runActive: true,
+        status: DsChatStatus.failed,
+      ),
+      expanded: true,
+    ),
+    DsSidebarThreadRow(
+      const DsSidebarThreadRowData(
+        id: 't1',
+        title: 'Gateway: resume after network change',
+        unreadCount: 1,
+        status: DsChatStatus.done,
+      ),
+      onOpen: () {},
+    ),
+    DsSidebarThreadRow(
+      const DsSidebarThreadRowData(
+        id: 't2',
+        title: 'Export format',
+        runState: DsRunState.running,
+        status: DsChatStatus.working,
+      ),
+      onOpen: () {},
+    ),
+    DsSidebarThreadRow(
+      const DsSidebarThreadRowData(
+        id: 't3',
+        title: 'Review: grant the deploy key',
+        runState: DsRunState.waitingInput,
+        unreadCount: 2,
+        mentionCount: 1,
+        status: DsChatStatus.waiting,
+      ),
+      onOpen: () {},
+    ),
+    DsSidebarThreadRow(
+      const DsSidebarThreadRowData(
+        id: 't4',
+        title: 'Check migration 0042',
+        runState: DsRunState.failed,
+        status: DsChatStatus.failed,
+      ),
+      onOpen: () {},
+    ),
+    DsSidebarThreadRow(
+      const DsSidebarThreadRowData(
+        id: 't5',
+        title: 'Notes from Sam',
+        unreadCount: 3,
+      ),
+      onOpen: () {},
+    ),
+    DsSidebarAllPostsRow(onOpen: () {}),
+    DsChannelRow(
+      const DsChannelRowData(
+        id: 'c2',
+        name: 'general',
+        unreadCount: 1,
+        status: DsChatStatus.waiting,
+      ),
+      onOpen: () {},
+    ),
+  ]),
+]);
+
 final Map<String, Widget Function()> sheets = {
   'message': messageSheet,
   'live_box_active': liveBoxActiveSheet,
@@ -862,6 +940,7 @@ final Map<String, Widget Function()> sheets = {
   'sidebar_channels': sidebarChannelsSheet,
   'sidebar_threads': sidebarThreadsSheet,
   'sidebar_drafts': sidebarDraftsSheet,
+  'sidebar_status': sidebarStatusSheet,
   'message_components_active': componentsActiveSheet,
   'message_components_final': componentsFinalSheet,
   'composer': composerSheet,
