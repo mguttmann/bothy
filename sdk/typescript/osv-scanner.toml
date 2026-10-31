@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Accepted findings of `make osv` for the TypeScript SDK (docs/quality/gates.md, "Advisories").
+# Each entry names one advisory, its reason and an expiry date, so it is reviewed again; never a
+# blanket ignore.
+
+[[IgnoredVulns]]
+id = "GHSA-g3hv-75wg-m249"
+ignoreUntil = 2026-11-30
+reason = "minimatch 3.1.5 (eslint, @eslint/config-array, @eslint/eslintrc), 5.1.9 (@redocly/openapi-core) and 9.0.9 (typedoc, typescript-eslint), dev dependencies that lint, generate and document the SDK; the runtime dependencies of the SDK (jose, openapi-fetch, ws) include none of them. The fix exists only in minimatch 11, which drops the API these callers use (the default export of 3.x and 5.x, Minimatch#matchOne for typedoc), and none of them has moved to it. Not reachable: the amplification is in firstPhasePreProcess, which minimatch 9 runs only with optimizationLevel 2 or higher and 3.x and 5.x do not contain; every caller uses the default level 1, and no glob is installed. Ruling SEC-OSV/2. Re-check when one of these callers moves to minimatch 11."
