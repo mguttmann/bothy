@@ -24,7 +24,7 @@ enum AccessibilityTextInput {
   static let pluginClassName = "FlutterTextInputPlugin"
 
   private static let log = OSLog(
-    subsystem: Bundle.main.bundleIdentifier ?? "bothy", category: "accessibility")
+    subsystem: Bundle.main.bundleIdentifier ?? "Runner", category: "accessibility")
 
   private static let selectedTextSetter = #selector(
     NSTextView.setAccessibilitySelectedText(_:))
