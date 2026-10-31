@@ -264,8 +264,11 @@ and inserts the job `files.thumbnail`; the image becomes `complete` only in the 
 that job that stores its cleaned original (section 7.1), so the original with its location data
 is never servable and never "final" for a held agent invocation (section 10). MP4 and
 QuickTime files (`video/mp4`, `video/quicktime`, `video/x-m4v`, `audio/mp4`, `audio/x-m4a`)
-become `complete` as before and get `files.thumbnail` for their display size and duration
-(section 7.3). Blocked and failed files never get the job.
+get `files.thumbnail` for their display size and duration (section 7.3); video and QuickTime
+become `complete` as before, MP4 audio stays `pending` until that job has read its duration
+(D-M3-09-6). The stored `mime_type` of an MP4 that the detection names `video/mp4` is
+`audio/mp4` when the declared type is `audio/mp4` or `audio/x-m4a` (section 6.1, addendum of
+2026-10-31). Blocked and failed files never get the job.
 
 Rules of the pass (M3-04, docs/DECISIONS.md D-M3-04-1 to D-M3-04-15): the job reads
 `object_key` when it exists (after an earlier attempt or, on S3, after the pass ran
@@ -703,7 +706,14 @@ legal assessment remains the instance operator's responsibility (no legal advice
   than the header [Q14, verified].
 - `declared_mime_type` stays for diagnosis only. The file extension in the name changes nothing.
 - If the detected type differs from the declared one, the detected one applies. This is not an
-  error.
+  error. One refinement (addendum of 2026-10-31, docs/decisions.d/FIX-voice-send.md): the
+  detection names an MP4 by its major brand only, and every generic brand (`isom`, `mp41`,
+  `mp42`) gives `video/mp4` whatever the tracks are. When the detected type is `video/mp4` and the
+  declared type is MP4 audio (`audio/mp4` or `audio/x-m4a`), the server stores `audio/mp4`
+  (`files/domain.RefineMP4Type`). It never turns another type into audio; the container phase
+  (7.3) still reads width and height, so a declared-audio file with a video track stays no voice
+  recording (8.1 rule 4). `file.denied_mime_types` is checked against the detected and the
+  stored type.
 - `file.denied_mime_types` (default empty) blocks types that the instance operator does not
   want. The check runs twice: upfront against the declared type and the extension (early
   rejection, `415 unsupported_media_type` with `reason` `file_type_denied`), then against the detected type (`upload_state = 'failed'`).
@@ -840,8 +850,11 @@ and never blocks the file (D-M3-06-9). Every change of the values writes `file.u
 
 - A voice message is a message with `kind = 'voice'` and exactly one attachment.
 - Format of Bothy's own apps: AAC-LC in an MP4 container (`audio/mp4`, extension `.m4a`). This is
-  the only compressed format that the recording package reliably produces on all target platforms
-  [Q19, verified; conclusion derived]. For `kind = 'voice'`, `audio/mpeg` (MP3) is also accepted
+  the only compressed format that the recording package records on all target platforms [Q19,
+  verified]. The MP4 brand differs per platform (addendum of 2026-10-31): the Apple recorder
+  writes `M4A ` (detected `audio/x-m4a`), the Windows recorder `mp42` (detected `video/mp4`), so
+  the apps declare `audio/mp4` and the server stores a generic-brand MP4 declared as audio as
+  `audio/mp4` (6.1). For `kind = 'voice'`, `audio/mpeg` (MP3) is also accepted
   for agents. Other formats: `400 validation_failed` with `errors[].code`
   `voice_format_unsupported`; they can
   be sent as a normal file.
@@ -863,8 +876,9 @@ server checks the locked file row in this order and stops at the first failure
 2. Final but not deliverable (`upload_state = 'failed'`, `scan_status` `infected` or `error`):
    `409 file_blocked`.
 3. Not a voice format: `400 validation_failed` with `errors[].code` `voice_format_unsupported`.
-   Voice formats are the detected MP4 audio types `audio/mp4` and `audio/x-m4a` for every author,
-   and `audio/mpeg` in addition for an agent; people and apps send only MP4 audio (D-M3-09-3).
+   Voice formats are the stored MP4 audio types `audio/mp4` and `audio/x-m4a` (6.1) for every
+   author, and `audio/mpeg` in addition for an agent; people and apps send only MP4 audio
+   (D-M3-09-3, FIX-VS/1).
 4. An MP4 with a width or height (it has a video track) or without a duration (the box reader
    found no `mvhd` duration): `400 validation_failed` with `errors[].code`
    `voice_format_unsupported`.
@@ -875,8 +889,12 @@ The `400` answers carry the pointer of the entry (`/attachment_file_ids/0`, in `
 `/first_message/attachment_file_ids/0`). On every failure nothing is stored, and the thread
 sequence number is given back. The file must therefore be ready when the message is sent, because
 the worker writes the detected type and the duration only after its read pass (3.4, 7.3); a
-client keeps a voice message in its outbox until `file.updated` reports the file ready
-([15-client-architecture.md](15-client-architecture.md) 13). An MP3 voice message has no
+client keeps a voice message in its outbox until the file is ready: it treats `409
+file_not_ready` like a `5xx`, retries the same request with the same `client_msg_id` after at
+least `Retry-After` plus the backoff, and never fails the entry for it
+([15-client-architecture.md](15-client-architecture.md) 7.5 and 13, addendum of 2026-10-31). A
+message of another kind with files whose check has not ended is stored at once (section 10 rule
+1); only the agent invocation waits. An MP3 voice message has no
 `duration_ms`: no request field carries the client's value, so the duration rule does not apply to
 it. The codec inside the MP4 (AAC-LC) is not verified: the API process must not parse audio
 (SEC-UP-5), and a wrong codec only fails the playback on a device (D-M3-09-5).
@@ -1047,7 +1065,7 @@ Additions of M3-05 (rulings D-M3-05-1 to D-M3-05-4 and D-M3-05-13 in
 | Header | Value |
 |---|---|
 | `Content-Type` | detected type; for types outside the inline list `application/octet-stream` |
-| `Content-Disposition` | `inline` only for the inline list: stored images per section 7.1 (`image/jpeg`, `image/png` losslessly sanitized, `image/gif` re-encoded), thumbnails, `audio/mp4`, `audio/mpeg`, `video/mp4`. Everything else `attachment`. Always `filename="<ASCII fallback>"` first, then `filename*=UTF-8''<percent-encoded>` [Q15, verified]. |
+| `Content-Disposition` | `inline` only for the inline list: stored images per section 7.1 (`image/jpeg`, `image/png` losslessly sanitized, `image/gif` re-encoded), thumbnails, `audio/mp4`, `audio/x-m4a` (MP4 audio of brand `M4A `, addendum of 2026-10-31), `audio/mpeg`, `video/mp4`. Everything else `attachment`. Always `filename="<ASCII fallback>"` first, then `filename*=UTF-8''<percent-encoded>` [Q15, verified]. |
 | `X-Content-Type-Options` | `nosniff` |
 | `Content-Security-Policy` | `default-src 'none'; sandbox` |
 | `Cross-Origin-Resource-Policy` | `same-origin` |

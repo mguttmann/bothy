@@ -77,6 +77,8 @@ func TestPresentation_InlineList(t *testing.T) {
 		{"image/gif", domain.VariantOriginal, "image/gif", true},
 		{"audio/mp4", domain.VariantOriginal, "audio/mp4", true},
 		{"audio/mpeg", domain.VariantOriginal, "audio/mpeg", true},
+		// The detected name of an Apple recording (brand "M4A "), FIX-voice-send.
+		{"audio/x-m4a", domain.VariantOriginal, "audio/x-m4a", true},
 		{"video/mp4", domain.VariantOriginal, "video/mp4", true},
 		{"IMAGE/PNG", domain.VariantOriginal, "image/png", true},
 		{"image/jpeg; charset=utf-8", domain.VariantOriginal, "image/jpeg", true},

@@ -19,6 +19,7 @@ import 'package:domain/domain.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:local_store/local_store.dart';
 import 'package:sync_engine/sync_engine.dart' show decodePayload;
+import 'package:sync_engine/testing.dart' show FilesWorld;
 
 import '../support/fake_instance.dart' show eventually;
 import '../support/file_fakes.dart';
@@ -264,6 +265,82 @@ void main() {
       expect(sent['attachment_file_ids'], [h.progress.completedFileOf('ka')]);
     },
   );
+
+  // FIX-voice-send: the server answers a voice message whose file is still being checked with
+  // `409 file_not_ready` (12 8.1 rule 1); the message waits in the outbox until the file is
+  // ready instead of failing (15 13).
+  test('a voice message waits while its file is being checked', () async {
+    h.server.world.fileSettings.holdScan = true;
+    final up = await enqueueUpload(
+      await h.file('voice.m4a', utf8.encode('recorded audio')),
+      'kv',
+    );
+    final message = await h.outbox.enqueue(
+      ThreadActions.messageRequest(
+        thread(),
+        '',
+        kind: MessageKind.voice,
+        attachments: MessageAttachments(keys: const ['kv'], uploads: [up]),
+      ),
+    );
+    await h.outbox.start();
+    await eventually(
+      'refused while being checked',
+      () => h.server.requestsOf('createMessage').any((r) => r.status == 409),
+    );
+    final waiting = (await h.db.outboxDao.byId(message.id))!;
+    expect(waiting.state, isNot(OutboxState.failed));
+
+    h.server.world.finishScan(h.progress.completedFileOf('kv')!);
+    await eventually('message sent', () => gone(message.id));
+    final sends = h.server.requestsOf('createMessage');
+    expect(sends.first.status, 409);
+    expect(sends.last.status, 201);
+    expect({for (final r in sends) r.headers['idempotency-key']}, hasLength(1));
+    final stored = h.server.world.messagesOf(h.seed.releaseNotes).last;
+    expect(stored['kind'], 'voice');
+    expect((stored['attachments']! as List), hasLength(1));
+    expect(h.server.violations, isEmpty);
+  });
+
+  // "Send again" of a voice message that failed (here as the server answered the Windows
+  // recording before FIX-voice-send) sends the same file in a new entry and is stored.
+  test('send again of a failed voice message attaches its file', () async {
+    final up = await enqueueUpload(
+      await h.file('voice.m4a', utf8.encode('recorded audio')),
+      'kv',
+    );
+    h.server.faults.onRequest(
+      'createMessage',
+      status: 400,
+      code: 'validation_failed',
+    );
+    final message = await h.outbox.enqueue(
+      ThreadActions.messageRequest(
+        thread(),
+        '',
+        kind: MessageKind.voice,
+        attachments: MessageAttachments(keys: const ['kv'], uploads: [up]),
+      ),
+    );
+    await h.outbox.start();
+    await eventually(
+      'failed',
+      () async =>
+          (await h.db.outboxDao.byId(message.id))?.state == OutboxState.failed,
+    );
+    final again = await h.outbox.retry(message.id);
+    await eventually('sent again', () => gone(again));
+    final sends = h.server.requestsOf('createMessage');
+    expect([for (final r in sends) r.status], [400, 201]);
+    expect((sends.last.body! as Map)['attachment_file_ids'], [
+      h.progress.completedFileOf('kv'),
+    ]);
+    expect(
+      h.server.world.messagesOf(h.seed.releaseNotes).last['kind'],
+      'voice',
+    );
+  });
 
   group('limits before any entry', () {
     late AttachController attach;

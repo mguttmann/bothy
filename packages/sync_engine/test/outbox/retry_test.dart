@@ -92,6 +92,27 @@ void main() {
     '409 request_in_progress is retried',
     () => expectRetried(problem(409, 'request_in_progress')),
   );
+  // A voice message sent while its file is still being checked (12 8.1 rule 1): the outbox
+  // keeps it until the file is ready instead of failing it (FIX-voice-send, 15 13).
+  test(
+    '409 file_not_ready is retried',
+    () => expectRetried(problem(409, 'file_not_ready')),
+  );
+  test(
+    '409 file_not_ready waits Retry-After',
+    () => expectRetried(
+      problem(409, 'file_not_ready', retryAfter: const Duration(seconds: 5)),
+      wait: const Duration(seconds: 5),
+    ),
+  );
+  test('classify keeps file_not_ready as a retry with its Retry-After', () {
+    final c = classify(
+      problem(409, 'file_not_ready', retryAfter: const Duration(seconds: 5)),
+    );
+    expect(c.outcome, OutcomeClass.retry);
+    expect(c.code, 'file_not_ready');
+    expect(c.retryAfter, const Duration(seconds: 5));
+  });
 
   test('the backoff grows with the attempts and stays below the cap', () async {
     final exec = h.fake('createMessage');
@@ -135,6 +156,7 @@ void main() {
     (403, 'forbidden'),
     (404, 'not_found'),
     (409, 'conflict'),
+    (409, 'file_blocked'),
     (410, 'thread_deleted'),
     (413, 'payload_too_large'),
     (415, 'unsupported_media_type'),
