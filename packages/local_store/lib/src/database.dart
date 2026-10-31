@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The drift database of the apps, schema version 12 (docs/spec/15-client-architecture.md 6, ADR
+/// The drift database of the apps, schema version 13 (docs/spec/15-client-architecture.md 6, ADR
 /// 0029): the mirror tables of 15 6.1 and the local-only tables, `host_key_pins` (M4-36) and
 /// the sidebar view state `channel_view_states`, `shell_view_state` (M4-40, M4-42) and
 /// `space_view_states` (FIX-device-mirroring-2) included; version 11 adds the code block wrap
 /// choice of `shell_view_state` (M4-49), version 12 the personal channel and thread orders of
-/// the sidebar (`user_space_states.channel_order`, `user_channel_states`, M4-51).
+/// the sidebar (`user_space_states.channel_order`, `user_channel_states`, M4-51), version 13 the
+/// seen marks of the sidebar status dots (`thread_seen_states`, M4-52).
 library;
 
 import 'dart:io';
@@ -78,6 +79,7 @@ part 'database.g.dart';
     ChannelViewStates,
     ShellViewStates,
     SpaceViewStates,
+    ThreadSeenStates,
   ],
   include: {'search.drift'},
 )
@@ -94,7 +96,7 @@ class LocalDatabase extends _$LocalDatabase {
   final DateTime Function() clock;
 
   @override
-  int get schemaVersion => 12;
+  int get schemaVersion => 13;
 
   /// Closes the database and releases its file, also while watched queries come and go.
   ///
@@ -199,6 +201,9 @@ class LocalDatabase extends _$LocalDatabase {
         await m.createTable(schema.userChannelStates);
         await MigrationRules.resetCursor(m);
       },
+      // Version 13 (M4-52): the local-only table `thread_seen_states` (01 6.17); no row moves
+      // and the cursor stays, because nothing of the mirror changes.
+      from12To13: (m, schema) => m.createTable(schema.threadSeenStates),
     ),
   );
 
