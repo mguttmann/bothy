@@ -132,7 +132,9 @@ void main() {
       const Locale('de'),
       [
         'Bereiche automatisch anordnen',
+        // language-check: off
         'Kanäle und Projekte automatisch anordnen',
+        // language-check: on
         'Chats automatisch anordnen',
       ],
     ),

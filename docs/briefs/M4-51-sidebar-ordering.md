@@ -10,9 +10,8 @@ the desktop a row is dragged with the mouse and a line shows where it lands; on 
 press lifts the row; on the desktop keyboard and with a screen reader "Move up" and "Move down" in
 the row menu move it one place. The order is the person's own, follows the person to every device
 and never changes what anyone else sees. Three switches in Settings, Appearance ("Arrange spaces
-automatically", "Arrange channels and projects automatically", "Arrange chats automatically";
-German "Bereiche automatisch anordnen", "Kanäle und Projekte automatisch anordnen", "Chats
-automatisch anordnen") arrange a level by its last activity instead, newest first; such a level
+automatically", "Arrange channels and projects automatically", "Arrange chats automatically",
+German labels in the `de` locale) arrange a level by its last activity instead, newest first; such a level
 cannot be dragged and says so. Defaults: spaces and channels manual, chats by activity (the order
 of M4-46). Why: owner request of 2026-10-31; nothing in the sidebar could be moved, neither five
 imported spaces, nor the 25 project forums of a dev space, nor the chats of a forum.

@@ -307,7 +307,10 @@ void main() {
     await tester.pumpAndSettle();
     expect(moves.channels, isEmpty);
     expect(moves.threads, isEmpty);
-    expect(find.textContaining('Chats are arranged by activity'), findsOneWidget);
+    expect(
+      find.textContaining('Chats are arranged by activity'),
+      findsOneWidget,
+    );
     await moves.host.dispose(tester);
   });
 
@@ -323,7 +326,9 @@ void main() {
     await tester.longPress(postRow(2));
     await tester.pumpAndSettle();
     expect(
+      // language-check: off
       find.textContaining('Chats werden nach Aktivität angeordnet'),
+      // language-check: on
       findsOneWidget,
     );
     await moves.host.dispose(tester);
