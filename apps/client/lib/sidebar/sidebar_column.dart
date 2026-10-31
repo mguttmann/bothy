@@ -8,6 +8,7 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:admin_ui/admin_ui.dart' show AdminLocation, AdminSection;
+import 'package:design_system/design_system.dart';
 import 'package:domain/domain.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -180,7 +181,17 @@ class SidebarView extends StatelessWidget {
     };
   }
 
-  Widget _column(BuildContext context) => Column(
+  // The view paints its brand surface itself (D-DS-02): every `text.on-sidebar*` and
+  // `category.*.on-sidebar` role is paired only with `surface.sidebar*`, so the view must
+  // never stand on the host's surface. The phone's Spaces page has no column around it; on
+  // `surface.canvas` the light theme's sidebar texts were nearly invisible
+  // (FIX-light-theme-contrast).
+  Widget _column(BuildContext context) => ColoredBox(
+    color: context.dsColors.surfaceSidebar,
+    child: _content(context),
+  );
+
+  Widget _content(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
       SidebarHeader(

@@ -107,46 +107,42 @@ SidebarChannel _entry(
 Widget spacesScene() => phoneFrame(
   tab: PhoneTab.spaces,
   running: 2,
-  body: Builder(
-    builder: (context) => ColoredBox(
-      color: context.dsColors.surfaceSidebar,
-      child: SidebarView(
-        productName: 'Team Chat',
-        nodes: [
-          SidebarSpaceNode(
-            entry: SidebarSpace(space: space(1, name: 'Support')),
-            channels: [
-              _entry(channel(1, name: 'general')),
-              _entry(
-                channel(2, name: 'requests', kind: ChannelKind.forum),
-                unread: 3,
-                run: true,
-              ),
-              _entry(channel(3, name: 'alerts')),
-            ],
+  // The view paints surface.sidebar itself, as on the phone.
+  body: SidebarView(
+    productName: 'Team Chat',
+    nodes: [
+      SidebarSpaceNode(
+        entry: SidebarSpace(space: space(1, name: 'Support')),
+        channels: [
+          _entry(channel(1, name: 'general')),
+          _entry(
+            channel(2, name: 'requests', kind: ChannelKind.forum),
+            unread: 3,
+            run: true,
           ),
-          SidebarSpaceNode(
-            entry: SidebarSpace(space: space(2, name: 'Engineering')),
-            channels: [
-              _entry(
-                channel(4, spaceN: 2, name: 'server', kind: ChannelKind.forum),
-                mentions: 1,
-                unread: 1,
-              ),
-            ],
+          _entry(channel(3, name: 'alerts')),
+        ],
+      ),
+      SidebarSpaceNode(
+        entry: SidebarSpace(space: space(2, name: 'Engineering')),
+        channels: [
+          _entry(
+            channel(4, spaceN: 2, name: 'server', kind: ChannelKind.forum),
+            mentions: 1,
+            unread: 1,
           ),
         ],
-        runningCount: 2,
-        onRunningNow: () {},
-        onJumpTo: () {},
-        onToggle: (_, _) {},
-        onMove: (_, _) {},
-        onOpenChannel: (_) {},
-        onSettings: () {},
-        onLogout: () {},
-        showFooter: false,
       ),
-    ),
+    ],
+    runningCount: 2,
+    onRunningNow: () {},
+    onJumpTo: () {},
+    onToggle: (_, _) {},
+    onMove: (_, _) {},
+    onOpenChannel: (_) {},
+    onSettings: () {},
+    onLogout: () {},
+    showFooter: false,
   ),
 );
 
@@ -259,27 +255,23 @@ List<SidebarSpaceNode> threadNodes() {
 Widget spacesThreadsScene() => phoneFrame(
   tab: PhoneTab.spaces,
   running: 1,
-  body: Builder(
-    builder: (context) => ColoredBox(
-      color: context.dsColors.surfaceSidebar,
-      child: SidebarView(
-        productName: 'Team Chat',
-        nodes: threadNodes(),
-        runningCount: 1,
-        onRunningNow: () {},
-        onJumpTo: () {},
-        onToggle: (_, _) {},
-        onMove: (_, _) {},
-        onOpenChannel: (_) {},
-        onOpenThread: (_) {},
-        onToggleGroup: (_, _) {},
-        onAdd: (_) {},
-        onOpenNewChat: (_, _) {},
-        onSettings: () {},
-        onLogout: () {},
-        showFooter: false,
-      ),
-    ),
+  // The view paints surface.sidebar itself, as on the phone.
+  body: SidebarView(
+    productName: 'Team Chat',
+    nodes: threadNodes(),
+    runningCount: 1,
+    onRunningNow: () {},
+    onJumpTo: () {},
+    onToggle: (_, _) {},
+    onMove: (_, _) {},
+    onOpenChannel: (_) {},
+    onOpenThread: (_) {},
+    onToggleGroup: (_, _) {},
+    onAdd: (_) {},
+    onOpenNewChat: (_, _) {},
+    onSettings: () {},
+    onLogout: () {},
+    showFooter: false,
   ),
 );
 
