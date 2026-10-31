@@ -107,3 +107,15 @@ A move writes the order of every open post of the forum the client holds, includ
   `sort_key` of spaces and channels stays the owners' tool).
 - Dragging a row into another parent (a channel to another space, a post to another forum).
 - An order of text channel threads and of direct messages.
+
+## 5. Known minor gaps
+
+Collected for the next change in this area; none loses an order or moves a row of someone else.
+
+- A manual forum with "Show more" collapsed and a selected post beyond the limit: a move to the
+  end of the shown rows can place the moved post right after the selected one, so it lands behind
+  "Show more".
+- With an automatic level every channel's threads are watched to compute the activity; a forum
+  with many posts rebuilds the order on every thread change.
+- The fake server of `packages/sync_engine` checks the order lists for duplicates, not for
+  `sidebar.order_max_items`.
