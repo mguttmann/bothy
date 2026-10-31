@@ -14,7 +14,7 @@ job plan) and fails when a job did not pass:
   shards of test-server, test-server-contract runs the contract tests beside them) is needed
   exactly when the plan lists that job;
 - `sonar` (MAY_SKIP) may end skipped: without the secrets, on main without SONAR_MAIN_ANALYSIS,
-  and after a failed or cancelled test job, which fails through that job;
+  in the merge queue, and after a failed or cancelled test job, which fails through that job;
 - of the deny-list pair (ONE_OF) exactly the one that ran must pass; both skipped fails;
 - every other job must succeed;
 - a missing, empty or unknown plan fails (docs/quality/gates.md, "Jobs a change needs").

@@ -674,7 +674,8 @@ def test_ci_sets_the_base_of_a_pull_request_and_fetches_it_for_every_go_test() -
     # Every job whose make targets run `go test` through flakes.py needs the base commit.
     workflow = yaml.safe_load((REPO / ".github/workflows/ci.yml").read_text(encoding="utf-8"))
     assert workflow["env"]["FLAKE_BASE"] == (
-        "${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || '' }}"
+        "${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha"
+        " || github.event_name == 'merge_group' && github.event.merge_group.base_sha || '' }}"
     )
     go_targets = {"test", "contract-test", "image-test", "postgres-image-test"}
     checked = []

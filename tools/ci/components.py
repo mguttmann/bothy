@@ -19,8 +19,10 @@ Usage:
   components.py changed --base <sha> --head <sha>   print components for `make COMPONENTS=`
   components.py changed --files <path>...
   components.py ci-plan (--base <sha> --head <sha> | --files <path>... | --components <names>)
-                        --public true|false        print `components=` and `jobs=` for the
-                                                    plan of ci.yml and build-verify.yml
+                        --public true|false [--stage full|pr|queue]
+                                                    print `components=` and `jobs=` for the
+                                                    plan of ci.yml and build-verify.yml; the
+                                                    stages pr and queue need a diff
   components.py release --tag <tag> [--github-output]
                                                     print release info as JSON, or as
                                                     key=value lines for $GITHUB_OUTPUT
@@ -282,6 +284,33 @@ CONDITIONAL_JOBS: tuple[str, ...] = (
 # committed under packages/, and the Dart gates of test (apps) catch a stale one.
 PLATFORM_PREFIXES = ("apps/", "packages/")
 PLATFORM_FILES = ("pubspec.yaml", "pubspec.lock")
+# The two stages of a pull request (docs/quality/gates.md, "How a pull request lands",
+# docs/decisions.d/CI-SPLIT-MERGE-QUEUE.md): `pr` is the fast plan of the pull request checks,
+# `queue` the full suite of the merge queue, `full` the plan of a diff without a merge queue
+# (build branches, and pull requests while the repository has no merge queue).
+STAGES = ("full", "pr", "queue")
+# Native folders of a member of the Dart workspace (`apps/<member>/<folder>/`,
+# `packages/<member>/<folder>/`) and the platform jobs that build and test them in the stage
+# `pr`. The macOS job also runs the tests of `apps/client/ios/ClientKit`, which the Mac app shares
+# (platform-tests.json); the JVM tests of the Android code run in test (apps).
+NATIVE_FOLDER_JOBS: dict[str, tuple[str, ...]] = {
+    "windows": ("apps-windows",),
+    "macos": ("apps-macos",),
+    "ios": ("apps-ios", "apps-macos"),
+    "darwin": ("apps-macos", "apps-ios"),
+    "android": (*ANDROID_JOBS, "test-apps"),
+}
+# One desktop and one mobile platform job for a Dart change in the stage `pr`: neither needs a
+# macOS runner, of which GitHub gives few; the mobile one is iOS while the repository is private
+# (no Android emulator jobs then). The merge queue runs all five.
+SMOKE_DESKTOP_JOB = "apps-windows"
+SMOKE_MOBILE_JOB = "apps-android-36"
+SMOKE_MOBILE_JOB_PRIVATE = "apps-ios"
+# Files that reach the native build of every platform in the stage `pr`: the dependencies and
+# Flutter pin of the workspace and of each member, and the list of platform tests.
+ALL_PLATFORM_FILES = re.compile(
+    r"^(?:pubspec\.(?:yaml|lock)|(?:apps|packages)/[^/]+/(?:pubspec\.yaml|platform-tests\.json))$"
+)
 # What bothy-postgres is built and tested from: the build context of
 # services/server/images/bothy-postgres/Dockerfile.dockerignore (bothy-backupd and the internal
 # packages it imports, the scripts of the image), the Dockerfile, the two-container test, the
@@ -378,8 +407,23 @@ class CIPlan:
     jobs: list[str]
 
 
+def native_folder_jobs(path: str) -> tuple[str, ...] | None:
+    """Return the platform jobs of a file in a native folder of a Dart member, else None.
+
+    Example: `native_folder_jobs("apps/client/windows/runner/main.cpp")` is `("apps-windows",)`.
+    """
+    parts = path.split("/")
+    if len(parts) < 4 or parts[0] not in ("apps", "packages"):
+        return None
+    return NATIVE_FOLDER_JOBS.get(parts[2])
+
+
 def ci_plan(
-    *, files: list[str] | None = None, selected: list[str] | None = None, public: bool
+    *,
+    files: list[str] | None = None,
+    selected: list[str] | None = None,
+    public: bool,
+    stage: str = "full",
 ) -> CIPlan:
     """Return the components and conditional jobs a change needs.
 
@@ -395,18 +439,32 @@ def ci_plan(
             the gate components of a release tag); every job of these components runs, the
             distribution, phone and host trials not.
         public: whether the repository is public; the Android emulator jobs need it.
+        stage: `full` (the default) as described above; `pr`, the fast checks of a pull request
+            in front of a merge queue (`_pr_plan`); `queue`, the merge queue: every job of a
+            push to main plus the trials the changed `files` need. `pr` and `queue` need
+            `files`.
 
     Returns:
         The plan; `jobs` lists job ids of CONDITIONAL_JOBS, sorted.
 
     Raises:
-        ValueError: not exactly one of `files` and `selected`, or an unknown component.
+        ValueError: not exactly one of `files` and `selected`, an unknown component or stage,
+            or the stage `pr` or `queue` without `files`.
 
     Example: `ci_plan(files=["services/host/x.go"], public=True).jobs` is
     `["host-trial-macos", "host-trial-windows", "test-server"]`.
     """
     if (files is None) == (selected is None):
         raise ValueError("ci_plan needs exactly one of files or selected")
+    if stage not in STAGES:
+        raise ValueError(f"unknown stage '{stage}'")
+    if stage != "full" and files is None:
+        raise ValueError(f"stage {stage} needs files")
+    if stage == "pr":
+        return _pr_plan(files or [], public=public)
+    if stage == "queue":
+        every = ci_plan(selected=["all"], public=public).jobs
+        return CIPlan(components=["all"], jobs=sorted({*every, *_trial_jobs(files or [])}))
     if files is not None:
         names = changed(files) if files else ["all"]
         full = names == ["all"] or any(f.startswith(API_PREFIX) for f in files)
@@ -415,17 +473,6 @@ def ci_plan(
             f.startswith(POSTGRES_IMAGE_PREFIXES) or f in POSTGRES_IMAGE_FILES for f in files
         )
         console = any(f.startswith(CONSOLE_E2E_PREFIXES) or f in CONSOLE_E2E_FILES for f in files)
-        distribution = any(
-            (f.startswith(DISTRIBUTION_PREFIXES) and f not in HOST_DISTRIBUTION_FILES)
-            or f in DISTRIBUTION_FILES
-            for f in files
-        )
-        mobile = any(
-            (f.startswith(DISTRIBUTION_PREFIXES) and f not in HOST_DISTRIBUTION_FILES)
-            or f in MOBILE_TRIAL_FILES
-            for f in files
-        )
-        host_trials = any(f.startswith(HOST_TRIAL_PREFIXES) or f in HOST_TRIAL_FILES for f in files)
     else:
         names = list(selected or [])
         unknown = [n for n in names if n != "all" and n not in GATE_COMPONENTS]
@@ -435,7 +482,6 @@ def ci_plan(
         platform = "apps" in names
         postgres = "server" in names
         console = bool({"apps", "server"} & set(names))
-        distribution = mobile = host_trials = False
     trials = {*DISTRIBUTION_JOBS, *MOBILE_TRIAL_JOBS, *HOST_TRIAL_JOBS}
     jobs: set[str] = set(CONDITIONAL_JOBS) - trials if full else set()
     if not full:
@@ -446,12 +492,51 @@ def ci_plan(
             jobs.update(POSTGRES_IMAGE_JOBS)
         if console:
             jobs.update(CONSOLE_E2E_JOBS)
-    if distribution:
-        jobs.update(DISTRIBUTION_JOBS)
-    if mobile:
-        jobs.update(MOBILE_TRIAL_JOBS)
-    if host_trials:
-        jobs.update(HOST_TRIAL_JOBS)
+    jobs.update(_trial_jobs(files or []))
+    if not public:
+        jobs.difference_update(ANDROID_JOBS)
+    return CIPlan(components=names, jobs=sorted(jobs & set(CONDITIONAL_JOBS)))
+
+
+def _trial_jobs(files: list[str]) -> set[str]:
+    """Return the distribution, phone and host trials the changed `files` need."""
+    jobs: set[str] = set()
+    for f in files:
+        release_step = f.startswith(DISTRIBUTION_PREFIXES) and f not in HOST_DISTRIBUTION_FILES
+        if release_step or f in DISTRIBUTION_FILES:
+            jobs.update(DISTRIBUTION_JOBS)
+        if release_step or f in MOBILE_TRIAL_FILES:
+            jobs.update(MOBILE_TRIAL_JOBS)
+        if f.startswith(HOST_TRIAL_PREFIXES) or f in HOST_TRIAL_FILES:
+            jobs.update(HOST_TRIAL_JOBS)
+    return jobs
+
+
+def _pr_plan(files: list[str], *, public: bool) -> CIPlan:
+    """Return the fast plan of a pull request in front of the merge queue (stage `pr`).
+
+    The full plan of the same files, with the platform jobs narrowed: a file in a native folder
+    of a member (NATIVE_FOLDER_JOBS) runs the jobs of its platform and no other job of the
+    component apps; a file that reaches every native build (ALL_PLATFORM_FILES) runs all
+    platform jobs; any other change of the Dart workspace, and a shared input, runs one desktop
+    and one mobile platform job (SMOKE_*). The gates keep every component of the files.
+    """
+    names = changed(files) if files else ["all"]
+    native = {f: native_folder_jobs(f) for f in files}
+    # The files whose jobs follow the full plan: every file but those of a native folder.
+    rest = [f for f in files if native[f] is None]
+    platform_jobs = {*DESKTOP_JOBS, *ANDROID_JOBS}
+    jobs = set(ci_plan(files=rest, public=public).jobs) if rest or not files else set()
+    jobs.update(_trial_jobs(files))
+    if jobs & platform_jobs or not files:
+        jobs -= platform_jobs
+        if any(ALL_PLATFORM_FILES.match(f) for f in files):
+            jobs.update(platform_jobs)
+        else:
+            mobile = SMOKE_MOBILE_JOB if public else SMOKE_MOBILE_JOB_PRIVATE
+            jobs.update((SMOKE_DESKTOP_JOB, mobile))
+    for owned in native.values():
+        jobs.update(owned or ())
     if not public:
         jobs.difference_update(ANDROID_JOBS)
     return CIPlan(components=names, jobs=sorted(jobs & set(CONDITIONAL_JOBS)))
@@ -605,11 +690,13 @@ def _diff_files(base: str, head: str) -> list[str]:
 def _print_ci_plan(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
     public = args.public == "true"
     if args.files is not None:
-        plan = ci_plan(files=args.files, public=public)
+        plan = ci_plan(files=args.files, public=public, stage=args.stage)
     elif args.base and args.head:
-        plan = ci_plan(files=_diff_files(args.base, args.head), public=public)
-    elif args.components:
+        plan = ci_plan(files=_diff_files(args.base, args.head), public=public, stage=args.stage)
+    elif args.components and args.stage == "full":
         plan = ci_plan(selected=args.components.split(), public=public)
+    elif args.components:
+        parser.error(f"ci-plan --stage {args.stage} needs --files, or --base and --head")
     else:
         parser.error("ci-plan needs --files, --base and --head, or --components")
     print(f"components={format_for_make(plan.components)}")
@@ -631,6 +718,7 @@ def main(argv: list[str] | None = None) -> int:
     p_plan.add_argument("--files", nargs="*")
     p_plan.add_argument("--components")
     p_plan.add_argument("--public", choices=["true", "false"], required=True)
+    p_plan.add_argument("--stage", choices=STAGES, default="full")
     p_release = sub.add_parser("release")
     p_release.add_argument("--tag", required=True)
     p_release.add_argument("--repo", type=Path, default=Path.cwd())

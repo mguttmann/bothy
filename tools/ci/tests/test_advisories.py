@@ -249,11 +249,12 @@ def _workflow(name: str) -> dict:
     return yaml.safe_load((REPO / ".github" / "workflows" / name).read_text(encoding="utf-8"))
 
 
-def test_ci_gives_the_security_gate_the_base_only_for_a_pull_request() -> None:
+def test_ci_gives_the_security_gate_the_base_only_for_a_pull_request_or_the_queue() -> None:
     steps = _workflow("ci.yml")["jobs"]["gates-security"]["steps"]
     (step,) = [s for s in steps if "osv" in s.get("run", "")]
     assert step["env"]["OSV_BASE"] == (
-        "${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || '' }}"
+        "${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha"
+        " || github.event_name == 'merge_group' && github.event.merge_group.base_sha || '' }}"
     )
     assert 'OSV_BASE="$OSV_BASE"' in step["run"]
 
