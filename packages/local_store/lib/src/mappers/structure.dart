@@ -49,6 +49,7 @@ UserSpaceStatesCompanion userSpaceStateToCompanion(UserSpaceState state) =>
       sortKey: Value(state.sortKey),
       version: state.version.value,
       updatedByDeviceId: Value(state.updatedByDeviceId?.value),
+      channelOrder: Value(encodeChannelOrder(state.channelOrder)),
     );
 
 /// The sidebar state of [row].
@@ -56,9 +57,37 @@ UserSpaceState userSpaceStateFromRow(UserSpaceStateRow row) => UserSpaceState(
   spaceId: SpaceId.parse(row.spaceId),
   collapsed: row.collapsed,
   sortKey: row.sortKey,
+  channelOrder: optional(
+    row.channelOrder,
+    (json) => decodeTexts(json, ChannelId.parse),
+  ),
   version: ResourceVersion(row.version),
   updatedByDeviceId: optional(row.updatedByDeviceId, DeviceId.parse),
 );
+
+/// The column value of a channel order: null for the default order, which an empty list means
+/// too (M4-51, D-M4-51-3).
+String? encodeChannelOrder(List<ChannelId>? order) =>
+    order == null || order.isEmpty ? null : encodeTexts(order);
+
+/// The insert companion of [state].
+UserChannelStatesCompanion userChannelStateToCompanion(
+  UserChannelState state,
+) => UserChannelStatesCompanion.insert(
+  channelId: state.channelId.value,
+  threadOrder: Value(encodeTexts(state.threadOrder)),
+  version: state.version.value,
+  updatedByDeviceId: Value(state.updatedByDeviceId?.value),
+);
+
+/// The channel sidebar state of [row].
+UserChannelState userChannelStateFromRow(UserChannelStateRow row) =>
+    UserChannelState(
+      channelId: ChannelId.parse(row.channelId),
+      threadOrder: decodeTexts(row.threadOrder, ThreadId.parse),
+      version: ResourceVersion(row.version),
+      updatedByDeviceId: optional(row.updatedByDeviceId, DeviceId.parse),
+    );
 
 /// The insert companion of [channel]; `level` and `capabilities` stay as stored.
 ChannelsCompanion channelToCompanion(Channel channel) =>

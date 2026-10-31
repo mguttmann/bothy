@@ -11,8 +11,9 @@
 // `text_thread_session_shown`, version 9 (M4-46) the column
 // `channel_view_states.posts_shown_in_full` and version 10 (FIX-device-mirroring-2) the
 // local-only table `space_view_states`, filled from `user_space_states.collapsed`, and version
-// 11 (M4-49) the column `shell_view_state.code_blocks_unwrapped`; each keeps every row of the
-// mirror. The preserved
+// 11 (M4-49) the column `shell_view_state.code_blocks_unwrapped`, version 12 (M4-51) the
+// column `user_space_states.channel_order` and the mirror table `user_channel_states` with a
+// cleared cursor; each keeps every row of the mirror. The preserved
 // tables are checked by
 // `survival_test.dart`.
 
@@ -25,6 +26,7 @@ import 'generated/schema.dart';
 import 'generated/schema_v1.dart' as v1;
 import 'generated/schema_v10.dart' as v10;
 import 'generated/schema_v11.dart' as v11;
+import 'generated/schema_v12.dart' as v12;
 import 'generated/schema_v2.dart' as v2;
 import 'generated/schema_v3.dart' as v3;
 import 'generated/schema_v4.dart' as v4;
@@ -385,4 +387,67 @@ void main() {
       },
     );
   });
+
+  test(
+    'the migration 11 to 12 keeps the sidebar states with the default '
+    'channel order, adds no thread order and clears cursor and epoch',
+    () async {
+      const rows = [
+        v11.UserSpaceStatesData(spaceId: 'a', collapsed: 1, version: 3),
+        v11.UserSpaceStatesData(
+          spaceId: 'b',
+          collapsed: 0,
+          sortKey: 'a0V',
+          version: 1,
+          updatedByDeviceId: 'd',
+        ),
+      ];
+      const state = v11.SyncStateData(
+        id: 1,
+        cursor: 812,
+        syncEpoch: 'epoch-3',
+        headSeq: 812,
+        permissionVersion: 7,
+        lastSnapshotAt: 40,
+      );
+      await verifier.testWithDataIntegrity(
+        oldVersion: 11,
+        newVersion: 12,
+        createOld: v11.DatabaseAtV11.new,
+        createNew: v12.DatabaseAtV12.new,
+        openTestedDatabase: LocalDatabase.new,
+        createItems: (batch, oldDb) {
+          batch
+            ..insertAll(oldDb.userSpaceStates, rows)
+            ..insertAll(oldDb.syncState, [state]);
+        },
+        validateItems: (newDb) async {
+          expect(await newDb.select(newDb.userSpaceStates).get(), [
+            const v12.UserSpaceStatesData(
+              spaceId: 'a',
+              collapsed: 1,
+              version: 3,
+            ),
+            const v12.UserSpaceStatesData(
+              spaceId: 'b',
+              collapsed: 0,
+              sortKey: 'a0V',
+              version: 1,
+              updatedByDeviceId: 'd',
+            ),
+          ]);
+          expect(await newDb.select(newDb.userChannelStates).get(), isEmpty);
+          // The next connection loads a whole snapshot with the orders of other devices (04 7.3).
+          expect(await newDb.select(newDb.syncState).get(), [
+            const v12.SyncStateData(
+              id: 1,
+              headSeq: 812,
+              permissionVersion: 7,
+              lastSnapshotAt: 40,
+            ),
+          ]);
+        },
+      );
+    },
+  );
 }

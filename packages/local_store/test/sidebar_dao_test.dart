@@ -76,6 +76,140 @@ void main() {
     },
   );
 
+  test('a local sidebar write sets, keeps and clears the channel order of a '
+      'space (M4-51)', () async {
+    final dao = db.structureDao;
+    final c1 = ChannelId.parse(uuid(0x201));
+    final c2 = ChannelId.parse(uuid(0x202));
+    await dao.putUserSpaceStateLocally(
+      spaceA,
+      collapsed: false,
+      channelOrder: [c2, c1],
+    );
+    var state = (await dao.watchUserSpaceStates().first).single;
+    expect(state.channelOrder, [c2, c1]);
+    expect(state.version, const ResourceVersion(0));
+
+    await dao.putUserSpaceStateLocally(spaceA, collapsed: true);
+    state = (await dao.watchUserSpaceStates().first).single;
+    expect(state.collapsed, isTrue);
+    expect(state.channelOrder, [c2, c1], reason: 'null keeps the order');
+
+    await dao.putUserSpaceStateLocally(
+      spaceA,
+      collapsed: true,
+      channelOrder: const [],
+    );
+    state = (await dao.watchUserSpaceStates().first).single;
+    expect(state.channelOrder, isNull, reason: 'empty clears to the default');
+
+    // A new row with an empty list stores the default order too.
+    final spaceB = SpaceId.parse(uuid(0x102));
+    await dao.putUserSpaceStateLocally(
+      spaceB,
+      collapsed: false,
+      channelOrder: const [],
+    );
+    final b = (await dao.watchUserSpaceStates().first).firstWhere(
+      (s) => s.spaceId == spaceB,
+    );
+    expect(b.channelOrder, isNull);
+  });
+
+  test('a space state from the server carries its channel order by the '
+      'version rule (M4-51)', () async {
+    final dao = db.structureDao;
+    final c1 = ChannelId.parse(uuid(0x201));
+    final device = DeviceId.parse(uuid(0x501));
+    final state = UserSpaceState(
+      spaceId: spaceA,
+      collapsed: false,
+      channelOrder: [c1],
+      version: const ResourceVersion(3),
+      updatedByDeviceId: device,
+    );
+    expect(await dao.upsertUserSpaceStateIfNewer(state), isTrue);
+    expect((await dao.watchUserSpaceStates().first).single, state);
+
+    // An older state does not apply; a newer one without an order clears it.
+    expect(
+      await dao.upsertUserSpaceStateIfNewer(
+        UserSpaceState(
+          spaceId: spaceA,
+          collapsed: true,
+          version: const ResourceVersion(2),
+        ),
+      ),
+      isFalse,
+    );
+    final cleared = UserSpaceState(
+      spaceId: spaceA,
+      collapsed: false,
+      version: const ResourceVersion(4),
+    );
+    expect(await dao.upsertUserSpaceStateIfNewer(cleared), isTrue);
+    expect((await dao.watchUserSpaceStates().first).single, cleared);
+  });
+
+  test('the thread order of a channel: a local write at once, then the '
+      'server state by the version rule (M4-51)', () async {
+    final dao = db.structureDao;
+    final forum = ChannelId.parse(uuid(0x201));
+    final other = ChannelId.parse(uuid(0x202));
+    final device = DeviceId.parse(uuid(0x501));
+    expect(await dao.watchUserChannelStates().first, isEmpty);
+
+    await dao.putUserChannelStateLocally(forum, [threadId(2), threadId(1)]);
+    expect(await dao.watchUserChannelStates().first, [
+      UserChannelState(
+        channelId: forum,
+        threadOrder: [threadId(2), threadId(1)],
+        version: const ResourceVersion(0),
+      ),
+    ]);
+
+    final server = UserChannelState(
+      channelId: forum,
+      threadOrder: [threadId(2), threadId(1)],
+      version: const ResourceVersion(5),
+      updatedByDeviceId: device,
+    );
+    expect(await dao.upsertUserChannelStateIfNewer(server), isTrue);
+    expect(
+      await dao.upsertUserChannelStateIfNewer(
+        server.copyWith(threadOrder: [], version: const ResourceVersion(5)),
+      ),
+      isFalse,
+      reason: 'an equal version does not apply',
+    );
+    expect(await dao.watchUserChannelStates().first, [server]);
+
+    // A local write keeps the version and the device, so the server state of that write
+    // and a later write of another device win by version (04 14).
+    await dao.putUserChannelStateLocally(forum, [threadId(1)]);
+    expect(await dao.watchUserChannelStates().first, [
+      server.copyWith(threadOrder: [threadId(1)]),
+    ]);
+
+    await dao.upsertUserChannelStateIfNewer(
+      UserChannelState(
+        channelId: other,
+        threadOrder: const [],
+        version: const ResourceVersion(1),
+      ),
+    );
+    final all = await dao.watchUserChannelStates().first;
+    expect({for (final s in all) s.channelId}, {forum, other});
+    expect(all.firstWhere((s) => s.channelId == other).threadOrder, isEmpty);
+  });
+
+  test('a resync discards the personal sidebar orders: they are mirror '
+      'tables (M4-51)', () {
+    expect([
+      for (final t in db.mirrorTables) t.actualTableName,
+    ], containsAll(['user_space_states', 'user_channel_states']));
+  });
+
   test('every read state and every notification preference', () async {
     final dao = db.personalDao;
     for (final (n, channelN) in [(1, 1), (2, 2)]) {

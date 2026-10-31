@@ -1180,6 +1180,17 @@ class $UserSpaceStatesTable extends UserSpaceStates
         type: DriftSqlType.string,
         requiredDuringInsert: false,
       );
+  static const VerificationMeta _channelOrderMeta = const VerificationMeta(
+    'channelOrder',
+  );
+  @override
+  late final GeneratedColumn<String> channelOrder = GeneratedColumn<String>(
+    'channel_order',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     spaceId,
@@ -1187,6 +1198,7 @@ class $UserSpaceStatesTable extends UserSpaceStates
     sortKey,
     version,
     updatedByDeviceId,
+    channelOrder,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1239,6 +1251,15 @@ class $UserSpaceStatesTable extends UserSpaceStates
         ),
       );
     }
+    if (data.containsKey('channel_order')) {
+      context.handle(
+        _channelOrderMeta,
+        channelOrder.isAcceptableOrUnknown(
+          data['channel_order']!,
+          _channelOrderMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -1268,6 +1289,10 @@ class $UserSpaceStatesTable extends UserSpaceStates
         DriftSqlType.string,
         data['${effectivePrefix}updated_by_device_id'],
       ),
+      channelOrder: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}channel_order'],
+      ),
     );
   }
 
@@ -1293,12 +1318,17 @@ class UserSpaceStateRow extends DataClass
 
   /// 03 `user_space_states.updated_by_device_id`.
   final String? updatedByDeviceId;
+
+  /// 03 `user_space_states.channel_order` as a JSON array of channel IDs; null is the default
+  /// order (version 12, M4-51).
+  final String? channelOrder;
   const UserSpaceStateRow({
     required this.spaceId,
     required this.collapsed,
     this.sortKey,
     required this.version,
     this.updatedByDeviceId,
+    this.channelOrder,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1311,6 +1341,9 @@ class UserSpaceStateRow extends DataClass
     map['version'] = Variable<int>(version);
     if (!nullToAbsent || updatedByDeviceId != null) {
       map['updated_by_device_id'] = Variable<String>(updatedByDeviceId);
+    }
+    if (!nullToAbsent || channelOrder != null) {
+      map['channel_order'] = Variable<String>(channelOrder);
     }
     return map;
   }
@@ -1326,6 +1359,9 @@ class UserSpaceStateRow extends DataClass
       updatedByDeviceId: updatedByDeviceId == null && nullToAbsent
           ? const Value.absent()
           : Value(updatedByDeviceId),
+      channelOrder: channelOrder == null && nullToAbsent
+          ? const Value.absent()
+          : Value(channelOrder),
     );
   }
 
@@ -1342,6 +1378,7 @@ class UserSpaceStateRow extends DataClass
       updatedByDeviceId: serializer.fromJson<String?>(
         json['updatedByDeviceId'],
       ),
+      channelOrder: serializer.fromJson<String?>(json['channelOrder']),
     );
   }
   @override
@@ -1353,6 +1390,7 @@ class UserSpaceStateRow extends DataClass
       'sortKey': serializer.toJson<String?>(sortKey),
       'version': serializer.toJson<int>(version),
       'updatedByDeviceId': serializer.toJson<String?>(updatedByDeviceId),
+      'channelOrder': serializer.toJson<String?>(channelOrder),
     };
   }
 
@@ -1362,6 +1400,7 @@ class UserSpaceStateRow extends DataClass
     Value<String?> sortKey = const Value.absent(),
     int? version,
     Value<String?> updatedByDeviceId = const Value.absent(),
+    Value<String?> channelOrder = const Value.absent(),
   }) => UserSpaceStateRow(
     spaceId: spaceId ?? this.spaceId,
     collapsed: collapsed ?? this.collapsed,
@@ -1370,6 +1409,7 @@ class UserSpaceStateRow extends DataClass
     updatedByDeviceId: updatedByDeviceId.present
         ? updatedByDeviceId.value
         : this.updatedByDeviceId,
+    channelOrder: channelOrder.present ? channelOrder.value : this.channelOrder,
   );
   UserSpaceStateRow copyWithCompanion(UserSpaceStatesCompanion data) {
     return UserSpaceStateRow(
@@ -1380,6 +1420,9 @@ class UserSpaceStateRow extends DataClass
       updatedByDeviceId: data.updatedByDeviceId.present
           ? data.updatedByDeviceId.value
           : this.updatedByDeviceId,
+      channelOrder: data.channelOrder.present
+          ? data.channelOrder.value
+          : this.channelOrder,
     );
   }
 
@@ -1390,14 +1433,21 @@ class UserSpaceStateRow extends DataClass
           ..write('collapsed: $collapsed, ')
           ..write('sortKey: $sortKey, ')
           ..write('version: $version, ')
-          ..write('updatedByDeviceId: $updatedByDeviceId')
+          ..write('updatedByDeviceId: $updatedByDeviceId, ')
+          ..write('channelOrder: $channelOrder')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(spaceId, collapsed, sortKey, version, updatedByDeviceId);
+  int get hashCode => Object.hash(
+    spaceId,
+    collapsed,
+    sortKey,
+    version,
+    updatedByDeviceId,
+    channelOrder,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1406,7 +1456,8 @@ class UserSpaceStateRow extends DataClass
           other.collapsed == this.collapsed &&
           other.sortKey == this.sortKey &&
           other.version == this.version &&
-          other.updatedByDeviceId == this.updatedByDeviceId);
+          other.updatedByDeviceId == this.updatedByDeviceId &&
+          other.channelOrder == this.channelOrder);
 }
 
 class UserSpaceStatesCompanion extends UpdateCompanion<UserSpaceStateRow> {
@@ -1415,6 +1466,7 @@ class UserSpaceStatesCompanion extends UpdateCompanion<UserSpaceStateRow> {
   final Value<String?> sortKey;
   final Value<int> version;
   final Value<String?> updatedByDeviceId;
+  final Value<String?> channelOrder;
   final Value<int> rowid;
   const UserSpaceStatesCompanion({
     this.spaceId = const Value.absent(),
@@ -1422,6 +1474,7 @@ class UserSpaceStatesCompanion extends UpdateCompanion<UserSpaceStateRow> {
     this.sortKey = const Value.absent(),
     this.version = const Value.absent(),
     this.updatedByDeviceId = const Value.absent(),
+    this.channelOrder = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   UserSpaceStatesCompanion.insert({
@@ -1430,6 +1483,7 @@ class UserSpaceStatesCompanion extends UpdateCompanion<UserSpaceStateRow> {
     this.sortKey = const Value.absent(),
     required int version,
     this.updatedByDeviceId = const Value.absent(),
+    this.channelOrder = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : spaceId = Value(spaceId),
        collapsed = Value(collapsed),
@@ -1440,6 +1494,7 @@ class UserSpaceStatesCompanion extends UpdateCompanion<UserSpaceStateRow> {
     Expression<String>? sortKey,
     Expression<int>? version,
     Expression<String>? updatedByDeviceId,
+    Expression<String>? channelOrder,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1448,6 +1503,7 @@ class UserSpaceStatesCompanion extends UpdateCompanion<UserSpaceStateRow> {
       if (sortKey != null) 'sort_key': sortKey,
       if (version != null) 'version': version,
       if (updatedByDeviceId != null) 'updated_by_device_id': updatedByDeviceId,
+      if (channelOrder != null) 'channel_order': channelOrder,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1458,6 +1514,7 @@ class UserSpaceStatesCompanion extends UpdateCompanion<UserSpaceStateRow> {
     Value<String?>? sortKey,
     Value<int>? version,
     Value<String?>? updatedByDeviceId,
+    Value<String?>? channelOrder,
     Value<int>? rowid,
   }) {
     return UserSpaceStatesCompanion(
@@ -1466,6 +1523,7 @@ class UserSpaceStatesCompanion extends UpdateCompanion<UserSpaceStateRow> {
       sortKey: sortKey ?? this.sortKey,
       version: version ?? this.version,
       updatedByDeviceId: updatedByDeviceId ?? this.updatedByDeviceId,
+      channelOrder: channelOrder ?? this.channelOrder,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1488,6 +1546,9 @@ class UserSpaceStatesCompanion extends UpdateCompanion<UserSpaceStateRow> {
     if (updatedByDeviceId.present) {
       map['updated_by_device_id'] = Variable<String>(updatedByDeviceId.value);
     }
+    if (channelOrder.present) {
+      map['channel_order'] = Variable<String>(channelOrder.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1500,6 +1561,350 @@ class UserSpaceStatesCompanion extends UpdateCompanion<UserSpaceStateRow> {
           ..write('spaceId: $spaceId, ')
           ..write('collapsed: $collapsed, ')
           ..write('sortKey: $sortKey, ')
+          ..write('version: $version, ')
+          ..write('updatedByDeviceId: $updatedByDeviceId, ')
+          ..write('channelOrder: $channelOrder, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $UserChannelStatesTable extends UserChannelStates
+    with TableInfo<$UserChannelStatesTable, UserChannelStateRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $UserChannelStatesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _channelIdMeta = const VerificationMeta(
+    'channelId',
+  );
+  @override
+  late final GeneratedColumn<String> channelId = GeneratedColumn<String>(
+    'channel_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _threadOrderMeta = const VerificationMeta(
+    'threadOrder',
+  );
+  @override
+  late final GeneratedColumn<String> threadOrder = GeneratedColumn<String>(
+    'thread_order',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('[]'),
+  );
+  static const VerificationMeta _versionMeta = const VerificationMeta(
+    'version',
+  );
+  @override
+  late final GeneratedColumn<int> version = GeneratedColumn<int>(
+    'version',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedByDeviceIdMeta = const VerificationMeta(
+    'updatedByDeviceId',
+  );
+  @override
+  late final GeneratedColumn<String> updatedByDeviceId =
+      GeneratedColumn<String>(
+        'updated_by_device_id',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  @override
+  List<GeneratedColumn> get $columns => [
+    channelId,
+    threadOrder,
+    version,
+    updatedByDeviceId,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'user_channel_states';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<UserChannelStateRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('channel_id')) {
+      context.handle(
+        _channelIdMeta,
+        channelId.isAcceptableOrUnknown(data['channel_id']!, _channelIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_channelIdMeta);
+    }
+    if (data.containsKey('thread_order')) {
+      context.handle(
+        _threadOrderMeta,
+        threadOrder.isAcceptableOrUnknown(
+          data['thread_order']!,
+          _threadOrderMeta,
+        ),
+      );
+    }
+    if (data.containsKey('version')) {
+      context.handle(
+        _versionMeta,
+        version.isAcceptableOrUnknown(data['version']!, _versionMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_versionMeta);
+    }
+    if (data.containsKey('updated_by_device_id')) {
+      context.handle(
+        _updatedByDeviceIdMeta,
+        updatedByDeviceId.isAcceptableOrUnknown(
+          data['updated_by_device_id']!,
+          _updatedByDeviceIdMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {channelId};
+  @override
+  UserChannelStateRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return UserChannelStateRow(
+      channelId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}channel_id'],
+      )!,
+      threadOrder: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}thread_order'],
+      )!,
+      version: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}version'],
+      )!,
+      updatedByDeviceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}updated_by_device_id'],
+      ),
+    );
+  }
+
+  @override
+  $UserChannelStatesTable createAlias(String alias) {
+    return $UserChannelStatesTable(attachedDatabase, alias);
+  }
+}
+
+class UserChannelStateRow extends DataClass
+    implements Insertable<UserChannelStateRow> {
+  /// 03 `user_channel_states.channel_id`.
+  final String channelId;
+
+  /// 03 `user_channel_states.thread_order` as a JSON array of thread IDs.
+  final String threadOrder;
+
+  /// 03 `user_channel_states.version`.
+  final int version;
+
+  /// 03 `user_channel_states.updated_by_device_id`.
+  final String? updatedByDeviceId;
+  const UserChannelStateRow({
+    required this.channelId,
+    required this.threadOrder,
+    required this.version,
+    this.updatedByDeviceId,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['channel_id'] = Variable<String>(channelId);
+    map['thread_order'] = Variable<String>(threadOrder);
+    map['version'] = Variable<int>(version);
+    if (!nullToAbsent || updatedByDeviceId != null) {
+      map['updated_by_device_id'] = Variable<String>(updatedByDeviceId);
+    }
+    return map;
+  }
+
+  UserChannelStatesCompanion toCompanion(bool nullToAbsent) {
+    return UserChannelStatesCompanion(
+      channelId: Value(channelId),
+      threadOrder: Value(threadOrder),
+      version: Value(version),
+      updatedByDeviceId: updatedByDeviceId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(updatedByDeviceId),
+    );
+  }
+
+  factory UserChannelStateRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return UserChannelStateRow(
+      channelId: serializer.fromJson<String>(json['channelId']),
+      threadOrder: serializer.fromJson<String>(json['threadOrder']),
+      version: serializer.fromJson<int>(json['version']),
+      updatedByDeviceId: serializer.fromJson<String?>(
+        json['updatedByDeviceId'],
+      ),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'channelId': serializer.toJson<String>(channelId),
+      'threadOrder': serializer.toJson<String>(threadOrder),
+      'version': serializer.toJson<int>(version),
+      'updatedByDeviceId': serializer.toJson<String?>(updatedByDeviceId),
+    };
+  }
+
+  UserChannelStateRow copyWith({
+    String? channelId,
+    String? threadOrder,
+    int? version,
+    Value<String?> updatedByDeviceId = const Value.absent(),
+  }) => UserChannelStateRow(
+    channelId: channelId ?? this.channelId,
+    threadOrder: threadOrder ?? this.threadOrder,
+    version: version ?? this.version,
+    updatedByDeviceId: updatedByDeviceId.present
+        ? updatedByDeviceId.value
+        : this.updatedByDeviceId,
+  );
+  UserChannelStateRow copyWithCompanion(UserChannelStatesCompanion data) {
+    return UserChannelStateRow(
+      channelId: data.channelId.present ? data.channelId.value : this.channelId,
+      threadOrder: data.threadOrder.present
+          ? data.threadOrder.value
+          : this.threadOrder,
+      version: data.version.present ? data.version.value : this.version,
+      updatedByDeviceId: data.updatedByDeviceId.present
+          ? data.updatedByDeviceId.value
+          : this.updatedByDeviceId,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('UserChannelStateRow(')
+          ..write('channelId: $channelId, ')
+          ..write('threadOrder: $threadOrder, ')
+          ..write('version: $version, ')
+          ..write('updatedByDeviceId: $updatedByDeviceId')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(channelId, threadOrder, version, updatedByDeviceId);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is UserChannelStateRow &&
+          other.channelId == this.channelId &&
+          other.threadOrder == this.threadOrder &&
+          other.version == this.version &&
+          other.updatedByDeviceId == this.updatedByDeviceId);
+}
+
+class UserChannelStatesCompanion extends UpdateCompanion<UserChannelStateRow> {
+  final Value<String> channelId;
+  final Value<String> threadOrder;
+  final Value<int> version;
+  final Value<String?> updatedByDeviceId;
+  final Value<int> rowid;
+  const UserChannelStatesCompanion({
+    this.channelId = const Value.absent(),
+    this.threadOrder = const Value.absent(),
+    this.version = const Value.absent(),
+    this.updatedByDeviceId = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  UserChannelStatesCompanion.insert({
+    required String channelId,
+    this.threadOrder = const Value.absent(),
+    required int version,
+    this.updatedByDeviceId = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : channelId = Value(channelId),
+       version = Value(version);
+  static Insertable<UserChannelStateRow> custom({
+    Expression<String>? channelId,
+    Expression<String>? threadOrder,
+    Expression<int>? version,
+    Expression<String>? updatedByDeviceId,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (channelId != null) 'channel_id': channelId,
+      if (threadOrder != null) 'thread_order': threadOrder,
+      if (version != null) 'version': version,
+      if (updatedByDeviceId != null) 'updated_by_device_id': updatedByDeviceId,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  UserChannelStatesCompanion copyWith({
+    Value<String>? channelId,
+    Value<String>? threadOrder,
+    Value<int>? version,
+    Value<String?>? updatedByDeviceId,
+    Value<int>? rowid,
+  }) {
+    return UserChannelStatesCompanion(
+      channelId: channelId ?? this.channelId,
+      threadOrder: threadOrder ?? this.threadOrder,
+      version: version ?? this.version,
+      updatedByDeviceId: updatedByDeviceId ?? this.updatedByDeviceId,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (channelId.present) {
+      map['channel_id'] = Variable<String>(channelId.value);
+    }
+    if (threadOrder.present) {
+      map['thread_order'] = Variable<String>(threadOrder.value);
+    }
+    if (version.present) {
+      map['version'] = Variable<int>(version.value);
+    }
+    if (updatedByDeviceId.present) {
+      map['updated_by_device_id'] = Variable<String>(updatedByDeviceId.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('UserChannelStatesCompanion(')
+          ..write('channelId: $channelId, ')
+          ..write('threadOrder: $threadOrder, ')
           ..write('version: $version, ')
           ..write('updatedByDeviceId: $updatedByDeviceId, ')
           ..write('rowid: $rowid')
@@ -19375,6 +19780,8 @@ abstract class _$LocalDatabase extends GeneratedDatabase {
   late final $UserSpaceStatesTable userSpaceStates = $UserSpaceStatesTable(
     this,
   );
+  late final $UserChannelStatesTable userChannelStates =
+      $UserChannelStatesTable(this);
   late final $ChannelsTable channels = $ChannelsTable(this);
   late final $ChannelOperatorsTable channelOperators = $ChannelOperatorsTable(
     this,
@@ -19484,6 +19891,7 @@ abstract class _$LocalDatabase extends GeneratedDatabase {
     searchIndex,
     spaces,
     userSpaceStates,
+    userChannelStates,
     channels,
     channelOperators,
     forumTags,

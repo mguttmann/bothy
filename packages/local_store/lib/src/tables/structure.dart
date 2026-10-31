@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// Mirror tables of the sidebar structure (15 6.1: `spaces`, `user_space_states`, `channels`,
-/// `forum_tags`, `channel_operators`). Columns carry the 03 names; nothing readable only with
+/// Mirror tables of the sidebar structure (15 6.1: `spaces`, `user_space_states`,
+/// `user_channel_states`, `channels`, `forum_tags`, `channel_operators`). Columns carry the 03 names; nothing readable only with
 /// `manage` (channel prompt, skills, project binding) has a column (15 6.1); of the binding only
 /// the derived flag `project_bound` of the API `Channel` is kept, which every reader gets
 /// (R-DM-54).
@@ -73,8 +73,35 @@ class UserSpaceStates extends Table {
   /// 03 `user_space_states.updated_by_device_id`.
   TextColumn get updatedByDeviceId => text().nullable()();
 
+  /// 03 `user_space_states.channel_order` as a JSON array of channel IDs; null is the default
+  /// order (version 12, M4-51).
+  TextColumn get channelOrder => text().nullable()();
+
   @override
   Set<Column<Object>> get primaryKey => {spaceId};
+}
+
+/// 03 `user_channel_states` of the person (the user column is implied: one person per
+/// database; version 12, M4-51).
+@DataClassName('UserChannelStateRow')
+class UserChannelStates extends Table {
+  @override
+  String get tableName => 'user_channel_states';
+
+  /// 03 `user_channel_states.channel_id`.
+  TextColumn get channelId => text()();
+
+  /// 03 `user_channel_states.thread_order` as a JSON array of thread IDs.
+  TextColumn get threadOrder => text().withDefault(const Constant('[]'))();
+
+  /// 03 `user_channel_states.version`.
+  IntColumn get version => integer()();
+
+  /// 03 `user_channel_states.updated_by_device_id`.
+  TextColumn get updatedByDeviceId => text().nullable()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {channelId};
 }
 
 /// 03 `channels` without `prompt` and the behaviour fields (readable only with `manage`), with
