@@ -18,6 +18,22 @@ pluginManagement {
     }
 }
 
+// Dependency locking of this standalone build (SonarQube rule S8569,
+// docs/decisions.d/SONAR-MAIN-GATE.md D-SONAR-MAIN-GATE-2): every configuration of both projects
+// resolves the versions in their gradle.lockfile, the buildscript classpath of build.gradle.kts
+// those in buildscript-gradle.lockfile. Set here and not in build.gradle.kts, because an app reads
+// that file and resolves the plugin against its own dependencies. After a change of a dependency
+// or of the Android Gradle plugin run in this folder:
+// ./gradlew dependencies buildEnvironment :devicekeycore:dependencies --write-locks
+gradle.beforeProject {
+    dependencyLocking {
+        lockAllConfigurations()
+    }
+    buildscript.configurations.configureEach {
+        resolutionStrategy.activateDependencyLocking()
+    }
+}
+
 rootProject.name = "device_key"
 
 include(":devicekeycore")

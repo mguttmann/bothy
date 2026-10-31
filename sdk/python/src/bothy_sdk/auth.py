@@ -256,7 +256,8 @@ class FileDpopKey:
             serialization.PrivateFormat.PKCS8,
             serialization.NoEncryption(),
         )
-        fd = os.open(os.fspath(path), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        # S8707: the caller picks the file by design; O_EXCL never replaces one (SONAR-MAIN-GATE).
+        fd = os.open(os.fspath(path), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)  # NOSONAR
         with os.fdopen(fd, "wb") as fh:
             fh.write(pem)
         return cls(key)
