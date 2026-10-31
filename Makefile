@@ -127,6 +127,9 @@ DART_PKGS := $(filter-out .,$(patsubst %/,%,$(sort $(dir $(shell git ls-files --
 # Gradle modules of the Dart members with JVM tests (brief M5-01): <member>/android/<module>
 # with a tracked src/test/; each runs through the member's Gradle wrapper in <member>/android.
 JVM_TEST_MODULES := $(sort $(shell git ls-files -- 'packages/*/android/*/src/test/*' 2>/dev/null | sed -E 's|^(packages/[^/]+/android/[^/]+)/src/test/.*|\1|'))
+# Host compiler tests of the header-only code of the Windows runners (FIX-windows-dictation): each
+# script builds its *_test.cpp files with CXX (default c++) and runs them, on any system.
+RUNNER_TESTS := $(sort $(wildcard apps/*/windows/runner/test/run_tests.sh))
 DART_GENERATED := \.(g|freezed|drift)\.dart$$|/lib/src/generated/|^(apps|packages)/[^/]+/build/
 # Hand-written Dart files of the members, set in a recipe as `files`.
 dart_files = files=$$(git ls-files -- $(foreach p,$(DART_PKGS),'$(p)/*.dart')) || exit 1; \
@@ -163,7 +166,7 @@ TOOLS_SOURCE_TESTS := ci/tests/test_product_name_places.py docs/tests/test_confi
         runners-check release-pins install-options tofu-check tofu-vm-test commitlint fragments-check changelog-preview \
         review labels-check labels-sync tools-lock release-build release-prep release-trial scancode install-test clean \
         codegen-check arch register-check migrations-lint migrations-lock sql-visibility flag-check perf bench-search ops-check signal-check \
-        image image-test postgres-image postgres-image-test apps-platform contract-test e2e-desktop e2e-mobile perf-desktop \
+        image image-test postgres-image postgres-image-test apps-platform runner-test contract-test e2e-desktop e2e-mobile perf-desktop \
         e2e-desktop-terminal perf-desktop-terminal terminal-stack demo demo-e2e showcase
 
 help: ## Show the targets
@@ -325,6 +328,8 @@ test: ## All tests with coverage data
 	elif [ -z "$(JVM_TEST_MODULES)" ]; then $(call skip,jvm-test,no Gradle module with src/test under packages/*/android); \
 	else for m in $(JVM_TEST_MODULES); do \
 	  (cd $${m%/*} && ./gradlew --no-daemon --quiet --console=plain -p $${m##*/} testDebugUnitTest) || exit 1; done; fi
+	@if [ -z "$(DART_ON)" ]; then $(call skip,runner-test,no Dart package selected); \
+	else $(MAKE) --no-print-directory runner-test || exit 1; fi
 	@if [ -z "$(PY_ON)" ]; then $(call skip,py-test,no Python project selected); \
 	else for p in $(PY_PROJECTS); do (cd $$p && $(UV) run --locked pytest --cov --cov-report=xml:coverage.xml); done; fi
 	@if [ -z "$(TS_ON)" ]; then $(call skip,ts-test,no TypeScript project selected); \
@@ -1077,6 +1082,10 @@ perf-desktop-terminal: ## M4-38: the terminal targets of perf-desktop alone, fra
 # docs/quality/gates.md.
 e2e-mobile: ## M5-11 and M5-13: the phone E2E suites (login, push, share, offline against the Compose stack; terminal against the terminal stack with a host container, needs Go) on an iOS simulator and an Android emulator (MOBILE_E2E_PLATFORMS, MOBILE_E2E_SUITES, MOBILE_E2E_AVD, MOBILE_E2E_SERIAL, MOBILE_E2E_UDID; E2E_SERVER_IMAGE)
 	$(UVRUN) python tools/e2e/mobile_e2e.py
+
+runner-test: ## Tests of the header-only code of the Windows runners with the host C++ compiler (CXX; part of `make test` for the apps)
+	@if [ -z "$(RUNNER_TESTS)" ]; then $(call skip,runner-test,no apps/*/windows/runner/test/run_tests.sh); \
+	else for t in $(RUNNER_TESTS); do sh $$t || exit 1; done; fi
 
 # ---- platform tests of the apps (not part of `gates`: they need a desktop session or a device) -
 apps-platform: ## Platform tests of the members on this host and an attached Android device (platform-tests.json; CI jobs apps-macos, apps-ios, apps-windows, apps-android)
