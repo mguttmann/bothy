@@ -27,6 +27,9 @@ const _vkControl = 0x11;
 const _vkV = 0x56;
 const _modifierControl = 1 << 3;
 
+/// The method channel of package pasteboard.
+const _pasteboard = MethodChannel('pasteboard');
+
 /// One key message as the Windows embedder delivers it: the key data events of the message
 /// (with the synthesized ones before it), then the legacy raw message with the virtual key,
 /// which releases them to the framework (KeyDataTransitMode.keyDataThenRawKeyData).
@@ -141,11 +144,20 @@ void main() {
           }
           return null;
         });
+    // The attachment paste beside the field (AttachPasteShortcut) asks package pasteboard for
+    // copied files and images on Ctrl+V outside macOS: the clipboard holds neither.
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(_pasteboard, (call) async {
+          if (call.method == 'files') return <Object?>[];
+          return null;
+        });
   });
 
   tearDown(() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(SystemChannels.platform, null);
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(_pasteboard, null);
   });
 
   Future<ColumnHost> open(WidgetTester tester) async {
