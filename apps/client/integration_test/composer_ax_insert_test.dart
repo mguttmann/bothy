@@ -21,7 +21,7 @@ import 'support/agent_flow.dart';
 const MethodChannel _probe = MethodChannel('bothy/a11y_probe');
 
 /// Whether tool/run_composer_ax_insert_test.sh started the writer of another process
-/// (tool/ax_write_probe.swift), which it does only with the Accessibility permission.
+/// (macos/AxWriteProbe/ax_write_probe.swift), which it does only with the Accessibility permission.
 const bool _crossProcess = bool.fromEnvironment('BOTHY_AX_CROSS_PROCESS');
 
 /// The composer text the writer of another process waits for, with the cursor before `|`.
@@ -179,7 +179,7 @@ void main() {
         while (controller.text != expected) {
           if (DateTime.now().isAfter(end)) {
             fail(
-              'the write of tool/ax_write_probe.swift did not reach the composer: '
+              'the write of macos/AxWriteProbe/ax_write_probe.swift did not reach the composer: '
               '"${controller.text}", native ${await _textInput()}',
             );
           }
