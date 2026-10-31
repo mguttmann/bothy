@@ -10724,6 +10724,10 @@ paths:
               schema:
                 type: string
                 format: binary
+            audio/x-m4a:
+              schema:
+                type: string
+                format: binary
             audio/mpeg:
               schema:
                 type: string
@@ -10775,6 +10779,10 @@ paths:
                 type: string
                 format: binary
             audio/mp4:
+              schema:
+                type: string
+                format: binary
+            audio/x-m4a:
               schema:
                 type: string
                 format: binary
