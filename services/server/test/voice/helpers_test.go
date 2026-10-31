@@ -242,8 +242,18 @@ func digest(b []byte) string {
 // (M3-03) and returns the file id. The file is pending until the test runs the scan.
 func (w *world) upload(c *harness.Client, channel, name string, content []byte) string {
 	w.t.Helper()
-	r := c.Do(w.t.Context(), harness.Request{Method: http.MethodPost, Path: "/channels/" + channel + "/uploads",
-		Body: map[string]any{"name": name, "size_bytes": len(content), "sha256": sha(content)}})
+	return w.uploadAs(c, channel, name, "", content)
+}
+
+// uploadAs is upload with declared_mime_type set to declared ("" leaves it out), as the apps
+// declare their recordings (FIX-voice-send).
+func (w *world) uploadAs(c *harness.Client, channel, name, declared string, content []byte) string {
+	w.t.Helper()
+	body := map[string]any{"name": name, "size_bytes": len(content), "sha256": sha(content)}
+	if declared != "" {
+		body["declared_mime_type"] = declared
+	}
+	r := c.Do(w.t.Context(), harness.Request{Method: http.MethodPost, Path: "/channels/" + channel + "/uploads", Body: body})
 	if r.Status != http.StatusCreated {
 		w.t.Fatalf("createUpload: %d %s", r.Status, r.Body)
 	}

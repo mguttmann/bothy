@@ -18318,6 +18318,7 @@ export interface operations {
                     "image/png": string;
                     "image/gif": string;
                     "audio/mp4": string;
+                    "audio/x-m4a": string;
                     "audio/mpeg": string;
                     "video/mp4": string;
                 };
@@ -18344,6 +18345,7 @@ export interface operations {
                     "image/png": string;
                     "image/gif": string;
                     "audio/mp4": string;
+                    "audio/x-m4a": string;
                     "audio/mpeg": string;
                     "video/mp4": string;
                 };

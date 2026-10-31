@@ -86,12 +86,15 @@ const (
 // image/svg+xml above all, leaves the server as an attachment, so an upload never runs as a page
 // of the instance's origin (SEC-T03).
 var inlineOriginals = map[string]bool{
-	mediaJPEG:    true,
-	mediaPNG:     true,
-	"image/gif":  true,
-	"audio/mp4":  true,
-	"audio/mpeg": true,
-	"video/mp4":  true,
+	mediaJPEG:   true,
+	mediaPNG:    true,
+	"image/gif": true,
+	"audio/mp4": true,
+	// audio/x-m4a is the detected name of MP4 audio of brand "M4A " (Apple recordings),
+	// FIX-voice-send.
+	"audio/x-m4a": true,
+	"audio/mpeg":  true,
+	"video/mp4":   true,
 }
 
 // mediaType returns the media type of a MIME type in lower case, without parameters and

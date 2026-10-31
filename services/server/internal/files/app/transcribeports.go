@@ -20,7 +20,8 @@ var ErrTranscriptionPermanent = errors.New("files: permanent transcription failu
 type TranscribeRequest struct {
 	// FileID is the file; adapters log only this id (bothy.file.id).
 	FileID ids.ID
-	// MIMEType is the stored, detected type of the audio (audio/mp4 and the like, audio/mpeg).
+	// MIMEType is the stored type of the audio refined by the declared one (voiceMIME; audio/mp4
+	// and the like, audio/mpeg).
 	MIMEType string
 	// Audio streams the object; the caller closes it after the call.
 	Audio io.Reader

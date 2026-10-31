@@ -704,7 +704,8 @@ security chapter). The cache is only a copy; the truth lies on the server. Entri
    between `client.outbox_retry_base` and `client.outbox_retry_cap`. The same ID on every
    retry. A `Retry-After` is a floor: the client waits it plus the full-jitter backoff of the
    attempt, so entries refused together do not return together (addendum of 2026-10-30,
-   [12](12-files.md) 3.8).
+   [12](12-files.md) 3.8). `409 file_not_ready` of a voice message is retried the same way,
+   because the file becomes ready by itself ([12](12-files.md) 8.1, addendum of 2026-10-31).
 5. Permanent errors (`400`, `404`, `410`, `413`, `422`) end the retries. The entry stays
    visible as "failed" with a reason; the person can edit it, send it again (new ID) or discard
    it. Nothing is discarded silently.
