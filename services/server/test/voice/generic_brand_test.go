@@ -117,3 +117,22 @@ func TestAttachments_PendingFilesAreAttachable(t *testing.T) {
 		t.Fatalf("attachments %s", r.Body)
 	}
 }
+
+// TestVoice_GenericBrandStoredBeforeTheFix (FIX-voice-send, red team): a Windows recording the
+// scan stored as video/mp4 before the fix, declared audio/mp4, complete with a duration, is a
+// voice message on "Send again" without a backfill: the voice check refines the stored type by
+// the declared one when it reads the row.
+func TestVoice_GenericBrandStoredBeforeTheFix(t *testing.T) {
+	t.Parallel()
+	w := newWorld(t, worldOptions{})
+	f := w.uploadAs(w.alex, w.allgemein, "voice-1.m4a", "audio/mp4", windowsM4A(filestest.AudioOptions{}))
+	w.mustScan(f)
+	w.mustThumbnail(f)
+	if _, err := w.db.Exec(w.t.Context(), `UPDATE files SET mime_type = 'video/mp4' WHERE id = $1`, f); err != nil {
+		t.Fatal(err)
+	}
+	r := w.send(w.alex, w.main, "voice", "", f)
+	if r.Status != http.StatusCreated {
+		t.Fatalf("createMessage voice with the row stored as video/mp4: %d %s", r.Status, r.Body)
+	}
+}
