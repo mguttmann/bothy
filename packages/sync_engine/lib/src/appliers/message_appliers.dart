@@ -27,7 +27,10 @@ final Map<String, Applier> messageAppliers = {
 /// Stores [b] by the version rule with its author, files, attachments, reactions, components,
 /// the mention of [me] and its search row; a tombstone (`deleted_at`) clears the content and
 /// removes the search row (04 2.2 item 5) and the cached files of the message, whose paths go
-/// to [onErased] for deleting the bytes after the commit (20 4.7). Returns whether the message
+/// to [onErased] for deleting the bytes after the commit (20 4.7). A stored message moves the
+/// `last_activity_at` of its thread forward to its creation time (04 6.3 item 4; brief
+/// FIX-autoarrange-delay), so every path that brings a message (an event, the `201` of an own
+/// message, a loaded page or gap) reorders the sidebar at once. Returns whether the message
 /// changed.
 ///
 /// Runs inside the caller's transaction.
@@ -55,6 +58,9 @@ Future<bool> storeMessage(
     return dao.upsertIfNewer(m);
   }
   if (!await dao.upsertIfNewer(m)) return false;
+  // The server moved the thread's activity with this message and sends no thread event for it
+  // (04 6.3 item 4): the sidebar orders by that time, so it moves here, at once.
+  await db.threadsDao.advanceActivity(m.threadId, m.createdAt);
   await db.principalsDao.put(b.author);
   for (final f in b.files) {
     await dao.putFile(f);
