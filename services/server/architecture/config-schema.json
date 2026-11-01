@@ -1073,7 +1073,7 @@
       "name": "billing.show_personal_estimates",
       "env": "BOTHY_BILLING__SHOW_PERSONAL_ESTIMATES",
       "kind": "bool",
-      "default": "false",
+      "default": "true",
       "required": false,
       "enum": [],
       "min": "",

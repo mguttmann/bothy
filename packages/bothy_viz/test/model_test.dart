@@ -62,7 +62,7 @@ void main() {
       },
     );
 
-    test('a run in mode personal shows no cost on its card', () async {
+    test('a run in mode personal shows its cost as "information only" (FIX-cost-display)', () async {
       final model = LiveTopologyModel.fromFrame(
         await fixtures.liveFrame('normal'),
       );
@@ -70,7 +70,11 @@ void main() {
         (c) => c.billingMode == api.BillingMode.personal,
       );
       expect(personal, isNotEmpty);
-      expect(personal.map((c) => c.cost), everyElement(isNull));
+      for (final card in personal) {
+        expect(card.cost, isNotNull);
+        expect(card.cost!.label, CostLabel.informationOnly);
+        expect(card.cost!.amount, greaterThan(0));
+      }
     });
   });
 

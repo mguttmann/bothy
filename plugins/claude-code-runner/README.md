@@ -250,6 +250,14 @@ level-one switch test holds them against the installed CLI.
 
 ## Costs
 
+While a run works, `livecost.py` keeps its `/cost` current (FIX-cost-display): every `assistant`
+message adds its `message.usage` priced with `prices.json`, a byte copy of the server's start
+prices (`services/server/internal/billing/domain/startprices/start_prices.json`, a unit test holds
+both equal); a message counts once with its newest usage, a model without a price adds nothing,
+and every `result` settles the value on the exact amount the run would book at that point. The
+patcher throttles the patches; `run.finish` books the reports below and the server replaces the
+run's cost with the booked sum.
+
 The runtime reports cumulative values per session (`result.modelUsage`), also across
 `--resume`. The runner keeps the last values of each session in
 `<runner.state_dir>/sessions/<ref>/usage.json` and reports per run only the difference

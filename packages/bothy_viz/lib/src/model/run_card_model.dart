@@ -64,17 +64,14 @@ final class RunCardModel {
 
   /// Derives the card from [run]; [names] gives the agent name.
   ///
-  /// The cost appears only for a run in mode `organization` and only when `cost_micros` and
-  /// `currency` are both present; `cost_is_estimate` gives the "Estimate" label. A run in mode
-  /// `personal` never shows a cost on its card (25 6.1); a missing member stays missing,
-  /// never zero (25 4 rule 5).
+  /// The cost appears only when `cost_micros` and `currency` are both present; in mode
+  /// `organization` `cost_is_estimate` gives the "Estimate" label, in mode `personal` it carries
+  /// "information only" (25 6.1, FIX-cost-display); a missing member stays missing, never zero
+  /// (25 4 rule 5).
   factory RunCardModel.fromRun(api.StatsLiveRun run, VizNames names) {
     final micros = run.costMicros;
     final currency = run.currency;
-    final showCost =
-        run.billingMode == api.BillingMode.organization &&
-        micros != null &&
-        currency != null;
+    final showCost = micros != null && currency != null;
     return RunCardModel(
       runId: run.runId,
       threadId: run.threadId,

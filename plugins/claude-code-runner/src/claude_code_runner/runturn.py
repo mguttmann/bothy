@@ -100,6 +100,7 @@ from claude_code_runner.followups import (
 )
 from claude_code_runner.ledger import TurnLedger, is_success
 from claude_code_runner.livebox import LiveBox
+from claude_code_runner.livecost import LiveCost, load_prices
 from claude_code_runner.locks import LockTimeout, acquire, release
 from claude_code_runner.prompt import context_items, system_prompt, user_line
 from claude_code_runner.recovery import (
@@ -138,6 +139,7 @@ from claude_code_runner.turn import (
     write_turn_record,
 )
 from claude_code_runner.usage import (
+    ModelUsage,
     UsageStore,
     claude_config_dir,
     context_windows,
@@ -347,6 +349,9 @@ class RunTurn:
         """The upload of an answer's attachment set while it runs (a stop cancels it)."""
         self.rebased = False
         """The run's first process started; only it takes the session totals (09 18.7)."""
+        self.live_cost = LiveCost(load_prices())
+        """The run's ``/cost`` while it works (FIX-cost-display)."""
+        self._cost_sent = 0
 
     # ---- the run ---------------------------------------------------------------------------
 
@@ -734,10 +739,13 @@ class RunTurn:
                 # An API error the CLI writes as an assistant message is no work (note 8 b).
                 no_error = api_error_text(message) is None
                 self._worked = self._worked or (self.ledger.init_seen and no_error)
+                if self.live_cost.assistant(message):
+                    self._report_cost()
             elif kind == "user" and message.get("isReplay") is True:
                 await self._echo(message.get("uuid"), adopted=not own)
             elif kind == "result":
                 last_result_at = self.monotonic()
+                self._settle_cost()
                 if self.ledger.kind == "turn" and is_success(message):
                     await self._answer(message, reader.line_offset)
             if self.ledger.kind == "turn" and self.live is not None:
@@ -1263,6 +1271,44 @@ class RunTurn:
         """``cancelled`` with the request's reason; no answer (note 6 b)."""
         await self._finish("cancelled", reason=self.stop_reason or "user_cancelled")
 
+    def _report_cost(self) -> None:
+        """Patch ``/cost`` with the run's amount so far when it changed (FIX-cost-display)."""
+        amount = self.live_cost.amount
+        if amount != self._cost_sent:
+            self._cost_sent = amount
+            self.handle.patch.set_cost(amount, _RUNTIME_CURRENCY)
+
+    def _settle_cost(self) -> None:
+        """At a ``result``: the exact amount the run would book now, then report it."""
+        result = self.ledger.cost_result
+        if result is None:
+            return
+        store = UsageStore(self.cfg.state_dir / "sessions" / self.session.ref)
+        reports, _, _ = self._run_reports(store, result)
+        self.live_cost.settle(sum(_n(r.amount_micros) for r in reports))
+        self._report_cost()
+
+    def _run_reports(
+        self, store: UsageStore, result: dict[str, Any]
+    ) -> tuple[list[CostReport], dict[str, ModelUsage], int | None]:
+        """The run's reports from ``result`` against the stored session values (09 18.7).
+
+        Returns:
+            The reports, the session values of ``result`` and the remaining baseline.
+        """
+        stored = store.load()
+        current = parse_model_usage(result)
+        reports = cost_reports(difference(stored.values, current))
+        remaining = stored.baseline_remaining
+        if remaining is None and not stored.values:
+            remaining = self._start_baseline()
+        if remaining is not None:
+            if counters_reset(stored.values, current):
+                # The runtime counts again: the old amounts are no longer in its sums.
+                remaining = 0
+            reports, remaining = subtract_baseline(reports, remaining)
+        return reports, current, remaining
+
     def _usage(self) -> tuple[list[CostReport], RunMetrics | None]:
         """Cost reports and metrics from the run's last ``result`` (none without one, 12 f 2)."""
         result = self.ledger.cost_result
@@ -1271,17 +1317,7 @@ class RunTurn:
         store = UsageStore(self.cfg.state_dir / "sessions" / self.session.ref)
         reports = store.pending_for(str(self.handle.run_id))
         if reports is None:
-            stored = store.load()
-            current = parse_model_usage(result)
-            reports = cost_reports(difference(stored.values, current))
-            remaining = stored.baseline_remaining
-            if remaining is None and not stored.values:
-                remaining = self._start_baseline()
-            if remaining is not None:
-                if counters_reset(stored.values, current):
-                    # The runtime counts again: the old amounts are no longer in its sums.
-                    remaining = 0
-                reports, remaining = subtract_baseline(reports, remaining)
+            reports, current, remaining = self._run_reports(store, result)
             store.record(
                 str(self.handle.run_id), current, reports, context_windows(result), remaining
             )

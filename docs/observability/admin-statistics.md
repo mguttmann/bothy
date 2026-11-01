@@ -42,7 +42,7 @@ its table, never by `stats` itself, and only for the channels the caller may rea
 | Messages by origin, active people, refused triggers | `messaging.StatsSource` | active people only per week or month, counted inside `messaging` |
 | New and done threads, channel to space, thread to channel | `chat.StatsSource` | done is a thread closed in the bucket and still closed |
 | Runs, failure reasons, durations, tool calls | `runs.StatsSource` | over the threads of the visible channels (runs has no `channel_id`) |
-| Costs | `billing.StatsSource` | valid entries; `personal` only with `billing.show_personal_estimates` |
+| Costs | `billing.StatsSource` | valid entries; `personal` while `billing.show_personal_estimates` is on (default) |
 | Storage, scans | `files.StatsSource` | scans only for an owner on the instance |
 | Webhook deliveries | `apps.StatsSource` | only for an owner on the instance |
 | Push registrations | `notify.StatsSource` | only for an owner on the instance |
