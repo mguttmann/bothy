@@ -1154,6 +1154,30 @@
       "doc": "Longest channel topic in Unicode characters."
     },
     {
+      "name": "chat.delete_purge_interval",
+      "env": "BOTHY_CHAT__DELETE_PURGE_INTERVAL",
+      "kind": "duration",
+      "default": "30s",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "03-data-model.md",
+      "doc": "Interval of the job messaging.purge_deleted, which also runs once at the start of the worker (D-DEL-1)."
+    },
+    {
+      "name": "chat.delete_undo_window",
+      "env": "BOTHY_CHAT__DELETE_UNDO_WINDOW",
+      "kind": "duration",
+      "default": "30s",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "03-data-model.md",
+      "doc": "How long a deleted space, channel or chat can be restored before the job messaging.purge_deleted removes its content (01 6.18, D-DEL-1)."
+    },
+    {
       "name": "client.app_lock_after",
       "env": "BOTHY_CLIENT__APP_LOCK_AFTER",
       "kind": "duration",

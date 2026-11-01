@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from ..models.billing_evidence import BillingEvidence
     from ..models.json_object import JsonObject
     from ..models.project_readiness import ProjectReadiness
+    from ..models.project_trash_result import ProjectTrashResult
 
 
 T = TypeVar("T", bound="Heartbeat")
@@ -43,6 +44,9 @@ class Heartbeat:
         project_folders (list[str] | Unset): Runners only, the folder names directly under the projects root that are
             Git work trees, sorted, at most `runner.project_folders_max` (09 18.13, M4-44). Applied only when present and
             different from the last list this server process applied; absent means "unchanged". Names only, never a path.
+        project_trash_results (list[ProjectTrashResult] | Unset): Runners only, the outcome of each folder move of
+            `HeartbeatAck.project_trash` the runner finished since its last heartbeat (09 18.15); the server stores it once
+            and audits it as `channel.project.trash`.
     """
 
     state: HeartbeatState
@@ -55,6 +59,7 @@ class Heartbeat:
     details: JsonObject | Unset = UNSET
     project_readiness: list[ProjectReadiness] | Unset = UNSET
     project_folders: list[str] | Unset = UNSET
+    project_trash_results: list[ProjectTrashResult] | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         state = self.state.value
@@ -99,6 +104,13 @@ class Heartbeat:
         if not isinstance(self.project_folders, Unset):
             project_folders = self.project_folders
 
+        project_trash_results: list[dict[str, Any]] | Unset = UNSET
+        if not isinstance(self.project_trash_results, Unset):
+            project_trash_results = []
+            for project_trash_results_item_data in self.project_trash_results:
+                project_trash_results_item = project_trash_results_item_data.to_dict()
+                project_trash_results.append(project_trash_results_item)
+
         field_dict: dict[str, Any] = {}
 
         field_dict.update(
@@ -124,6 +136,8 @@ class Heartbeat:
             field_dict["project_readiness"] = project_readiness
         if project_folders is not UNSET:
             field_dict["project_folders"] = project_folders
+        if project_trash_results is not UNSET:
+            field_dict["project_trash_results"] = project_trash_results
 
         return field_dict
 
@@ -133,6 +147,7 @@ class Heartbeat:
         from ..models.billing_evidence import BillingEvidence
         from ..models.json_object import JsonObject
         from ..models.project_readiness import ProjectReadiness
+        from ..models.project_trash_result import ProjectTrashResult
 
         d = dict(src_dict)
         state = HeartbeatState(d.pop("state"))
@@ -198,6 +213,17 @@ class Heartbeat:
 
         project_folders = cast(list[str], d.pop("project_folders", UNSET))
 
+        _project_trash_results = d.pop("project_trash_results", UNSET)
+        project_trash_results: list[ProjectTrashResult] | Unset = UNSET
+        if _project_trash_results is not UNSET:
+            project_trash_results = []
+            for project_trash_results_item_data in _project_trash_results:
+                project_trash_results_item = ProjectTrashResult.from_dict(
+                    project_trash_results_item_data
+                )
+
+                project_trash_results.append(project_trash_results_item)
+
         heartbeat = cls(
             state=state,
             runtime_version=runtime_version,
@@ -209,6 +235,7 @@ class Heartbeat:
             details=details,
             project_readiness=project_readiness,
             project_folders=project_folders,
+            project_trash_results=project_trash_results,
         )
 
         return heartbeat

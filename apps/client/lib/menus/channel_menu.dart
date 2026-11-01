@@ -5,7 +5,8 @@
 /// the server gives the capability `export` (07 2.4; fixed requirement 9); in the sidebar a
 /// forum's menu starts with "New chat in" or "New post in" (01 6.8 item 8, brief M4-41), and a
 /// forum with a project binding has "Rename project" for a person with `manage` (01 6.11,
-/// M4-44).
+/// M4-44). Both menus end with "Delete channel..." or, for a project forum, "Delete project..."
+/// for a person with `manage` (01 6.18 item 1, D-DEL-14).
 library;
 
 import 'dart:async';
@@ -16,6 +17,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:l10n/l10n.dart';
 
+import '../delete/delete_flow.dart';
+import '../delete/delete_port.dart';
+import '../delete/delete_text.dart';
 import '../export/channel_export.dart';
 import '../new_project/rename_project_dialog.dart';
 import '../notifications_settings/providers.dart';
@@ -82,6 +86,7 @@ class ChannelMenu extends StatelessWidget {
           const Divider(),
           ...sidebarMoveMenuItems(context, moves),
         ],
+        ...channelDeleteItems(context, ref, channel),
       ];
     },
     child: child,
@@ -119,5 +124,38 @@ List<Widget> channelMenuItems(
         onPressed: () => unawaited(showChannelExport(context, channel)),
         child: Text(AppLocalizations.of(context).channelMenuExport),
       ),
+  ];
+}
+
+/// The end of the menu of [channel]: a divider and "Delete channel..." or, for a forum with a
+/// project binding, "Delete project...", for a person with `manage` (01 6.18 items 1 and 2); none
+/// for a direct message, which is never deleted.
+List<Widget> channelDeleteItems(
+  BuildContext context,
+  WidgetRef ref,
+  Channel channel,
+) {
+  final session = DeleteSession.watch(ref);
+  if (session == null || channel.kind == ChannelKind.dm) return const [];
+  final access = ref.watch(channelAccessProvider(channel.id.value)).value;
+  if (!(access?.capabilities.contains(Capability.manage) ?? false)) {
+    return const [];
+  }
+  final kind = channel.kind == ChannelKind.forum && channel.projectBound
+      ? DeleteKind.project
+      : DeleteKind.channel;
+  return [
+    const Divider(),
+    DsMenuItem(
+      key: const ValueKey('menu.delete'),
+      onPressed: () => unawaited(
+        startDelete(
+          context,
+          session,
+          DeleteTarget(kind: kind, id: channel.id.value, name: channel.name),
+        ),
+      ),
+      child: Text(deleteMenuLabel(AppLocalizations.of(context), kind)),
+    ),
   ];
 }

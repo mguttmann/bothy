@@ -13,10 +13,12 @@ import 'package:api_client/src/generated/model/channel.dart';
 import 'package:api_client/src/generated/model/channel_behavior.dart';
 import 'package:api_client/src/generated/model/channel_behavior_put.dart';
 import 'package:api_client/src/generated/model/channel_create.dart';
+import 'package:api_client/src/generated/model/channel_delete.dart';
 import 'package:api_client/src/generated/model/channel_read_only_set.dart';
 import 'package:api_client/src/generated/model/channel_update.dart';
 import 'package:api_client/src/generated/model/channel_view.dart';
 import 'package:api_client/src/generated/model/channel_view_list.dart';
+import 'package:api_client/src/generated/model/deletion_info.dart';
 import 'package:api_client/src/generated/model/dm_create.dart';
 import 'package:api_client/src/generated/model/forum_tag.dart';
 import 'package:api_client/src/generated/model/forum_tag_create.dart';
@@ -604,6 +606,123 @@ class ChannelsApi {
     );
   }
 
+  /// Delete a channel
+  /// Soft delete with undo (01 6.18, 07 4.5a): the channel is archived and marked deleted in one rights change, leaves every list at once and &#x60;channel.archived&#x60; carries &#x60;deleted_at&#x60;; active runs in it end. With &#x60;trash_project_folder&#x60; (a forum with a project binding only) the caller also needs &#x60;channel.project.bind&#x60;, and the last folder check of the serving runner must be ok (&#x60;409 conflict&#x60; with &#x60;reason&#x60; &#x60;project_folder_refused&#x60; otherwise); the runner moves the folder to the trash of its host once the deletion is final (09 18.15). Until &#x60;undo_until&#x60; &#x60;restoreChannel&#x60; undoes it; then &#x60;messaging.purge_deleted&#x60; deletes the content for good. A dm channel is never deleted (&#x60;409 conflict&#x60;, &#x60;reason&#x60; &#x60;dm_channel&#x60;).
+  ///
+  /// Parameters:
+  /// * [channelId]
+  /// * [idempotencyKey] - UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+  /// * [channelDelete]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [DeletionInfo] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<DeletionInfo>> deleteChannel({
+    required String channelId,
+    String? idempotencyKey,
+    ChannelDelete? channelDelete,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/channels/{channel_id}/delete'.replaceAll(
+      '{'
+      r'channel_id'
+      '}',
+      encodeQueryParameter(
+        _serializers,
+        channelId,
+        const FullType(String),
+      ).toString(),
+    );
+    final _options = Options(
+      method: r'POST',
+      headers: <String, dynamic>{
+        if (idempotencyKey != null) r'Idempotency-Key': idempotencyKey,
+        ...?headers,
+      },
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'apiKey',
+            'name': 'consoleSession',
+            'keyName': '__Host-console_session',
+            'where': '',
+          },
+          {'type': 'http', 'scheme': 'DPoP', 'name': 'dpopAuth'},
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearerAuth'},
+        ],
+        ...?extra,
+      },
+      contentType: 'application/json',
+      validateStatus: validateStatus,
+    );
+
+    dynamic _bodyData;
+
+    try {
+      const _type = FullType(ChannelDelete);
+      _bodyData = channelDelete == null
+          ? null
+          : _serializers.serialize(channelDelete, specifiedType: _type);
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _options.compose(_dio.options, _path),
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    final _response = await _dio.request<Object>(
+      _path,
+      data: _bodyData,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    DeletionInfo? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(
+              rawResponse,
+              specifiedType: const FullType(DeletionInfo),
+            ) as DeletionInfo;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<DeletionInfo>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
   /// Delete a forum tag
   ///
   ///
@@ -979,6 +1098,98 @@ class ChannelsApi {
     }
 
     return Response<ChannelBehavior>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// What deleting a channel removes, or the state of its deletion
+  /// Before a deletion, the counts of what it removes and, for owners and a forum with a project binding, the folder and the last check of the serving runner (&#x60;project_folder&#x60;); after it, &#x60;state&#x60; &#x60;pending&#x60; until &#x60;undo_until&#x60;, then &#x60;final&#x60;, with the folder outcome. Read with &#x60;channel.read&#x60;, also for a deleted channel.
+  ///
+  /// Parameters:
+  /// * [channelId]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [DeletionInfo] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<DeletionInfo>> getChannelDeletion({
+    required String channelId,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/channels/{channel_id}/deletion'.replaceAll(
+      '{'
+      r'channel_id'
+      '}',
+      encodeQueryParameter(
+        _serializers,
+        channelId,
+        const FullType(String),
+      ).toString(),
+    );
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'apiKey',
+            'name': 'consoleSession',
+            'keyName': '__Host-console_session',
+            'where': '',
+          },
+          {'type': 'http', 'scheme': 'DPoP', 'name': 'dpopAuth'},
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearerAuth'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    DeletionInfo? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(
+              rawResponse,
+              specifiedType: const FullType(DeletionInfo),
+            ) as DeletionInfo;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<DeletionInfo>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,
@@ -1880,6 +2091,103 @@ class ChannelsApi {
     }
 
     return Response<ProjectBinding>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// Undo the deletion of a channel
+  /// Undoes a pending deletion before &#x60;undo_until&#x60;: clears &#x60;deleted_at&#x60; and the archive the deletion set, drops a folder request, as a rights change with &#x60;access.changed&#x60;, and publishes &#x60;channel.updated&#x60;. A channel that is not deleted is answered without effect; after &#x60;undo_until&#x60; &#x60;409 conflict&#x60; with &#x60;reason&#x60; &#x60;undo_window_passed&#x60;; in a deleted space &#x60;409 conflict&#x60; with &#x60;reason&#x60; &#x60;space_deleted&#x60;.
+  ///
+  /// Parameters:
+  /// * [channelId]
+  /// * [idempotencyKey] - UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [Channel] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<Channel>> restoreChannel({
+    required String channelId,
+    String? idempotencyKey,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/channels/{channel_id}/restore'.replaceAll(
+      '{'
+      r'channel_id'
+      '}',
+      encodeQueryParameter(
+        _serializers,
+        channelId,
+        const FullType(String),
+      ).toString(),
+    );
+    final _options = Options(
+      method: r'POST',
+      headers: <String, dynamic>{
+        if (idempotencyKey != null) r'Idempotency-Key': idempotencyKey,
+        ...?headers,
+      },
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'apiKey',
+            'name': 'consoleSession',
+            'keyName': '__Host-console_session',
+            'where': '',
+          },
+          {'type': 'http', 'scheme': 'DPoP', 'name': 'dpopAuth'},
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearerAuth'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    Channel? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(
+              rawResponse,
+              specifiedType: const FullType(Channel),
+            ) as Channel;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<Channel>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,

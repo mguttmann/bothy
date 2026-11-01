@@ -228,6 +228,9 @@ type ThreadFacts struct {
 	OperatorAgentID ids.ID
 	// CreatedBy is the creator.
 	CreatedBy ids.ID
+	// Deleted reports a deleted thread (03 threads.deleted_at, D-DEL-3): authorize answers
+	// not_found for it, except for the actions that read or undo the deletion (07 4.5a).
+	Deleted bool
 }
 
 // StructureSource gives authz the structure: spaces, channels, threads and dm participation. The

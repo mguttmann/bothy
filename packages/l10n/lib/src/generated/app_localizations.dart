@@ -6259,6 +6259,12 @@ abstract class AppLocalizations {
   /// **'No access anymore'**
   String get threadNoAccess;
 
+  /// Text that replaces an open chat whose chat, channel or space was deleted on another device (01 section 6.18 item 8).
+  ///
+  /// In en, this message translates to:
+  /// **'This chat was deleted.'**
+  String get threadDeleted;
+
   /// Heading above the waiting messages kept as text after the access was removed (01 section 6.6).
   ///
   /// In en, this message translates to:
@@ -15689,6 +15695,264 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Forum and project rows show the most urgent new state of their chats.'**
   String get settingsShowProjectStatusHint;
+
+  /// Last entry of the space menu in the sidebar for an owner; opens the delete dialog (01 6.18 item 1).
+  ///
+  /// In en, this message translates to:
+  /// **'Delete space...'**
+  String get menuDeleteSpace;
+
+  /// Last entry of the menu of a channel or forum and of the More button of its main history, for a person with manage (01 6.18 item 1).
+  ///
+  /// In en, this message translates to:
+  /// **'Delete channel...'**
+  String get menuDeleteChannel;
+
+  /// Last entry of the menu of a forum with a project binding, for a person with manage (01 6.18 item 1).
+  ///
+  /// In en, this message translates to:
+  /// **'Delete project...'**
+  String get menuDeleteProject;
+
+  /// Last entry of the menu of a chat row, a post list row and the More button of a chat history, for its creator or a person with manage (01 6.18 item 1).
+  ///
+  /// In en, this message translates to:
+  /// **'Delete chat...'**
+  String get menuDeleteChat;
+
+  /// Title of the delete dialog with the name of the space, channel, project or chat (01 6.18 item 3).
+  ///
+  /// In en, this message translates to:
+  /// **'Delete {name}?'**
+  String deleteTitle(String name);
+
+  /// Loading state of the delete dialog while the counts are read (01 6.18 item 3).
+  ///
+  /// In en, this message translates to:
+  /// **'Counting what this deletes.'**
+  String get deleteLoading;
+
+  /// Error sentence of the delete dialog when the counts could not be read; Try again follows (01 6.18 item 3).
+  ///
+  /// In en, this message translates to:
+  /// **'Could not read what this deletes.'**
+  String get deleteLoadFailed;
+
+  /// Button of the delete dialog that reads the counts again after a failure (01 6.18 item 3).
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get deleteRetry;
+
+  /// Sentence of the delete dialog that names the non-zero counts, joined by deleteListAnd (01 6.18 item 3).
+  ///
+  /// In en, this message translates to:
+  /// **'This deletes {parts}.'**
+  String deleteSummary(String parts);
+
+  /// Sentence of the delete dialog when every count is zero (01 6.18 item 3).
+  ///
+  /// In en, this message translates to:
+  /// **'It is empty.'**
+  String get deleteSummaryEmpty;
+
+  /// Joins the last count of the delete dialog to the ones before it, which are separated by commas.
+  ///
+  /// In en, this message translates to:
+  /// **'{head} and {last}'**
+  String deleteListAnd(String head, String last);
+
+  /// Count of channels and forums a space deletion removes (01 6.18 item 3).
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 channel} other{{count} channels}}'**
+  String deleteCountChannels(int count);
+
+  /// Count of chats and threads a deletion removes (01 6.18 item 3).
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 chat} other{{count} chats}}'**
+  String deleteCountChats(int count);
+
+  /// Count of messages a deletion removes (01 6.18 item 3).
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 message} other{{count} messages}}'**
+  String deleteCountMessages(int count);
+
+  /// Count of files a deletion removes (01 6.18 item 3).
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 file} other{{count} files}}'**
+  String deleteCountFiles(int count);
+
+  /// Count of agent sessions a deletion removes (01 6.18 item 3).
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 agent session} other{{count} agent sessions}}'**
+  String deleteCountSessions(int count);
+
+  /// Hint of the delete dialog about the undo window; the client does not know its length (01 6.18 item 3).
+  ///
+  /// In en, this message translates to:
+  /// **'You can undo this for a short time.'**
+  String get deleteUndoHint;
+
+  /// Checkbox of the delete dialog of a project for an owner, unchecked by default (01 6.18 item 4).
+  ///
+  /// In en, this message translates to:
+  /// **'Also move the project folder {name} to the trash'**
+  String deleteFolderBox(String name);
+
+  /// Why the folder checkbox is disabled: no folder check reported yet (01 6.18 item 4).
+  ///
+  /// In en, this message translates to:
+  /// **'The runner has not checked the folder yet.'**
+  String get deleteFolderUnchecked;
+
+  /// Folder check refusal outside_root (01 6.18 item 4).
+  ///
+  /// In en, this message translates to:
+  /// **'The folder is outside the runner\'s projects folder.'**
+  String get deleteFolderOutsideRoot;
+
+  /// Folder check refusal symlink (01 6.18 item 4).
+  ///
+  /// In en, this message translates to:
+  /// **'The folder is a link to another place.'**
+  String get deleteFolderSymlink;
+
+  /// Folder check refusal foreign_worktree (01 6.18 item 4).
+  ///
+  /// In en, this message translates to:
+  /// **'The folder is a Git work tree of another repository.'**
+  String get deleteFolderForeignWorktree;
+
+  /// Folder check refusal uncommitted_changes (01 6.18 item 4).
+  ///
+  /// In en, this message translates to:
+  /// **'The folder has changes that are not committed.'**
+  String get deleteFolderUncommittedChanges;
+
+  /// Folder check refusal unpushed_commits (01 6.18 item 4).
+  ///
+  /// In en, this message translates to:
+  /// **'The folder has commits that are not pushed.'**
+  String get deleteFolderUnpushedCommits;
+
+  /// Folder check refusal contains_other_project (01 6.18 item 4).
+  ///
+  /// In en, this message translates to:
+  /// **'The folder contains another project.'**
+  String get deleteFolderContainsOtherProject;
+
+  /// Folder check refusal workspace_missing (01 6.18 item 4).
+  ///
+  /// In en, this message translates to:
+  /// **'The folder does not exist on the runner\'s host.'**
+  String get deleteFolderWorkspaceMissing;
+
+  /// Folder check refusal check_failed (01 6.18 item 4).
+  ///
+  /// In en, this message translates to:
+  /// **'The runner could not check the folder.'**
+  String get deleteFolderCheckFailed;
+
+  /// Folder check refusal with a reason code this app does not know (01 6.18 item 4).
+  ///
+  /// In en, this message translates to:
+  /// **'The runner does not move this folder.'**
+  String get deleteFolderRefusedOther;
+
+  /// Button of the delete dialog that closes it without deleting.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get deleteCancel;
+
+  /// Destructive button of the delete dialog (01 6.18 item 3).
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get deleteConfirm;
+
+  /// Snack bar after a deletion, with the button Undo (01 6.18 item 6).
+  ///
+  /// In en, this message translates to:
+  /// **'Deleted {name}'**
+  String deleteDone(String name);
+
+  /// Button of the snack bar after a deletion that restores the item (01 6.18 item 6).
+  ///
+  /// In en, this message translates to:
+  /// **'Undo'**
+  String get deleteUndo;
+
+  /// Snack bar when Undo came after the undo window (409 undo_window_passed, 01 6.18 item 6).
+  ///
+  /// In en, this message translates to:
+  /// **'The deletion can no longer be undone.'**
+  String get deleteUndoTooLate;
+
+  /// Snack bar when Undo failed for another reason (01 6.18 item 6).
+  ///
+  /// In en, this message translates to:
+  /// **'Could not undo the deletion of {name}.'**
+  String deleteUndoFailed(String name);
+
+  /// Snack bar when the runner moved the project folder to the trash (01 6.18 item 7).
+  ///
+  /// In en, this message translates to:
+  /// **'Moved the folder {name} to the trash.'**
+  String deleteFolderTrashed(String name);
+
+  /// Snack bar when the runner refused to move the project folder; reason is one of the deleteFolder reason sentences (01 6.18 item 7).
+  ///
+  /// In en, this message translates to:
+  /// **'Kept the folder {name}: {reason}'**
+  String deleteFolderKept(String name, String reason);
+
+  /// Purpose shown by the step-up prompt when a space is deleted (01 6.18 item 5).
+  ///
+  /// In en, this message translates to:
+  /// **'Delete the space {name}'**
+  String stepUpPurposeDeleteSpace(String name);
+
+  /// Purpose shown by the step-up prompt when a channel or forum is deleted (01 6.18 item 5).
+  ///
+  /// In en, this message translates to:
+  /// **'Delete the channel {name}'**
+  String stepUpPurposeDeleteChannel(String name);
+
+  /// Purpose shown by the step-up prompt when a project forum is deleted (01 6.18 item 5).
+  ///
+  /// In en, this message translates to:
+  /// **'Delete the project {name}'**
+  String stepUpPurposeDeleteProject(String name);
+
+  /// Purpose shown by the step-up prompt when Undo restores a space (01 6.18 item 5).
+  ///
+  /// In en, this message translates to:
+  /// **'Restore the space {name}'**
+  String stepUpPurposeRestoreSpace(String name);
+
+  /// Purpose shown by the step-up prompt when Undo restores a channel or forum (01 6.18 item 5).
+  ///
+  /// In en, this message translates to:
+  /// **'Restore the channel {name}'**
+  String stepUpPurposeRestoreChannel(String name);
+
+  /// Purpose shown by the step-up prompt when Undo restores a project forum (01 6.18 item 5).
+  ///
+  /// In en, this message translates to:
+  /// **'Restore the project {name}'**
+  String stepUpPurposeRestoreProject(String name);
+
+  /// Problem conflict with reason project_folder_refused: a delete asked to move a project folder whose last check is not ok (01 6.18 item 4).
+  ///
+  /// In en, this message translates to:
+  /// **'The runner\'s last check does not allow moving the project folder to the trash.'**
+  String get problemConflictProjectFolderRefused;
 }
 
 class _AppLocalizationsDelegate

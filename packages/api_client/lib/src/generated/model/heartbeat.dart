@@ -5,6 +5,7 @@
 // ignore_for_file: unused_element
 import 'package:api_client/src/generated/model/tool_class.dart';
 import 'package:api_client/src/generated/model/project_readiness.dart';
+import 'package:api_client/src/generated/model/project_trash_result.dart';
 import 'package:built_collection/built_collection.dart';
 import 'package:api_client/src/generated/model/billing_mode.dart';
 import 'package:api_client/src/generated/model/billing_evidence.dart';
@@ -28,6 +29,7 @@ part 'heartbeat.g.dart';
 /// * [details] - Further fields of schema `agent_heartbeat.v1`, a closed object; any other key, also inside `capabilities`, `adapter` and `runtime`, is refused. Keys: `capabilities` (object: `followups` `steer` or `queue`; `components`, `voice_input`, `title`, `files_out` booleans), `active_runs` (distinct run ids), `degraded_reasons` (distinct codes), `adapter` (`name` required, `version` optional), `runtime` (`name` required), `protocol_version` (integer, at least 1). Names match `^[a-z0-9][a-z0-9._-]*$`, versions `^[0-9A-Za-z][0-9A-Za-z.+_-]*$`, codes `^[a-z0-9][a-z0-9_.:-]*$`. No secrets, no content, no paths.
 /// * [projectReadiness] - Readiness per bound forum of a runner (M2-03); the channels must be distinct. Applied only when present and different from the last list this server process applied; absent means \"unchanged\".
 /// * [projectFolders] - Runners only, the folder names directly under the projects root that are Git work trees, sorted, at most `runner.project_folders_max` (09 18.13, M4-44). Applied only when present and different from the last list this server process applied; absent means \"unchanged\". Names only, never a path.
+/// * [projectTrashResults] - Runners only, the outcome of each folder move of `HeartbeatAck.project_trash` the runner finished since its last heartbeat (09 18.15); the server stores it once and audits it as `channel.project.trash`.
 @BuiltValue()
 abstract class Heartbeat implements Built<Heartbeat, HeartbeatBuilder> {
   @BuiltValueField(wireName: r'state')
@@ -68,6 +70,10 @@ abstract class Heartbeat implements Built<Heartbeat, HeartbeatBuilder> {
   /// Runners only, the folder names directly under the projects root that are Git work trees, sorted, at most `runner.project_folders_max` (09 18.13, M4-44). Applied only when present and different from the last list this server process applied; absent means \"unchanged\". Names only, never a path.
   @BuiltValueField(wireName: r'project_folders')
   BuiltSet<String>? get projectFolders;
+
+  /// Runners only, the outcome of each folder move of `HeartbeatAck.project_trash` the runner finished since its last heartbeat (09 18.15); the server stores it once and audits it as `channel.project.trash`.
+  @BuiltValueField(wireName: r'project_trash_results')
+  BuiltList<ProjectTrashResult>? get projectTrashResults;
 
   Heartbeat._();
 
@@ -161,6 +167,15 @@ class _$HeartbeatSerializer implements PrimitiveSerializer<Heartbeat> {
       yield serializers.serialize(
         object.projectFolders,
         specifiedType: const FullType(BuiltSet, [FullType(String)]),
+      );
+    }
+    if (object.projectTrashResults != null) {
+      yield r'project_trash_results';
+      yield serializers.serialize(
+        object.projectTrashResults,
+        specifiedType: const FullType(BuiltList, [
+          FullType(ProjectTrashResult),
+        ]),
       );
     }
   }
@@ -277,6 +292,16 @@ class _$HeartbeatSerializer implements PrimitiveSerializer<Heartbeat> {
           ) as BuiltSet<String>?;
           if (valueDes == null) continue;
           result.projectFolders.replace(valueDes);
+          break;
+        case r'project_trash_results':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(BuiltList, [
+              FullType(ProjectTrashResult),
+            ]),
+          ) as BuiltList<ProjectTrashResult>?;
+          if (valueDes == null) continue;
+          result.projectTrashResults.replace(valueDes);
           break;
         default:
           unhandled.add(key);

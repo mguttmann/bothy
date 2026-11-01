@@ -227,6 +227,9 @@ type Channel struct {
 	ArchivedAt               pgtype.Timestamptz
 	Version                  int64
 	SettingsVersion          int64
+	DeletedAt                pgtype.Timestamptz
+	DeletedBy                pgtype.UUID
+	PurgedAt                 pgtype.Timestamptz
 }
 
 type ChannelSkillBinding struct {
@@ -863,17 +866,24 @@ type Principal struct {
 }
 
 type ProjectBinding struct {
-	ChannelID     pgtype.UUID
-	WorkspaceRef  string
-	RepositoryUrl pgtype.Text
-	DefaultBranch pgtype.Text
-	RunnerConfig  []byte
-	Ready         bool
-	CreatedBy     pgtype.UUID
-	CreatedAt     pgtype.Timestamptz
-	Version       int64
-	Provision     string
-	ReadyReason   pgtype.Text
+	ChannelID        pgtype.UUID
+	WorkspaceRef     string
+	RepositoryUrl    pgtype.Text
+	DefaultBranch    pgtype.Text
+	RunnerConfig     []byte
+	Ready            bool
+	CreatedBy        pgtype.UUID
+	CreatedAt        pgtype.Timestamptz
+	Version          int64
+	Provision        string
+	ReadyReason      pgtype.Text
+	TrashCheckOk     pgtype.Bool
+	TrashCheckReason pgtype.Text
+	TrashCheckedAt   pgtype.Timestamptz
+	TrashState       pgtype.Text
+	TrashReason      pgtype.Text
+	TrashAgentID     pgtype.UUID
+	TrashRequestedAt pgtype.Timestamptz
 }
 
 type PushRegistration struct {
@@ -1029,6 +1039,9 @@ type Space struct {
 	CreatedAt              pgtype.Timestamptz
 	ArchivedAt             pgtype.Timestamptz
 	Version                int64
+	DeletedAt              pgtype.Timestamptz
+	DeletedBy              pgtype.UUID
+	PurgedAt               pgtype.Timestamptz
 }
 
 type StatsMinute struct {
@@ -1128,6 +1141,9 @@ type Thread struct {
 	Version         int64
 	SearchLanguage  interface{}
 	TitleSearch     interface{}
+	DeletedAt       pgtype.Timestamptz
+	DeletedBy       pgtype.UUID
+	PurgedAt        pgtype.Timestamptz
 }
 
 type ThreadTag struct {

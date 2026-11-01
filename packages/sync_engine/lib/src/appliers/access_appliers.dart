@@ -55,31 +55,7 @@ Future<void> _accessChanged(ApplyContext c) async {
     sync.removedTargets.removeAll([for (final t in added) t.id]);
     // 04 8.4: the structure of new targets through REST, no catch-up of older events. A
     // removal while the reads run wins (04 8.3).
-    c.after.reads.add(() async {
-      final s = await sync.fetcher.loadStructure(added);
-      await sync.db.transaction(() async {
-        for (final v in s.spaces) {
-          if (!sync.removedTargets.contains(v.space.id.value)) {
-            await storeSpaceView(sync.db, v);
-          }
-        }
-        for (final v in s.channels) {
-          if (sync.mayStoreChannel(v.channel.id, v.channel.spaceId)) {
-            await storeChannelView(sync.db, v);
-          }
-        }
-        for (final t in s.threads) {
-          // The server lists the thread in a channel the person sees now: a moved-out thread
-          // that moved into it is visible again.
-          if (sync.mayStoreChannel(t.channelId, null)) {
-            sync.removedTargets.remove(t.id.value);
-          }
-          if (await sync.holdsContent(sync.db, t.channelId, t.id)) {
-            await storeThread(sync.db, t);
-          }
-        }
-      });
-    });
+    c.after.reads.add(() => loadStructureOf(sync, added));
   }
   for (final t in changed) {
     // The new level and capabilities come with the view; controls follow them (15 1). Only a

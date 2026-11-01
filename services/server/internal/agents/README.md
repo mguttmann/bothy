@@ -298,6 +298,16 @@ Agents, backend policy and tool class (configured), reported state, consumer cur
   in-process reader).
 - Rulings: docs/DECISIONS.md M2-20.
 
+## Project folder moves (FEAT-delete-spaces-chats)
+
+The heartbeat decodes `ProjectReadiness.trash_check` (ok, a reason only with ok false) and
+`project_trash_results` (closed members, one entry per channel, a reason only with `refused`). The
+tracker hands the check to chat with the readiness entry (applied only when different, like
+readiness), hands the results to `chat.ProjectTrash` on every heartbeat that carries them (chat
+stores each once and audits it) and returns the moves the runner owes as
+`HeartbeatAck.project_trash`. The gateway heartbeat takes the results too, but its acknowledgement
+carries no `project_trash`.
+
 ## Allow list of the adapter (getAgentTriggerers)
 
 `triggerers.go` holds the port `Triggerers`; `app/triggerers.go` implements it on `Service`:
@@ -490,7 +500,7 @@ The handlers of `registerCommand`, `updateCommand`, `removeCommand`, `getCommand
 - Declares the source ports `ConsumerFeed` (M2-07) and `RunSource` (M2-12).
 - Emits in-tx events: `AgentDisabled`, `SessionAttached` (M2-12).
 - Subscribes to in-tx events: none.
-- Implements source ports and cross-cutting ports: `authz.AgentPolicySource` (policy, tool class, readiness of the dev environment; M1-51), kernel `personaldata.Participant`.
+- Implements source ports and cross-cutting ports: `authz.AgentPolicySource` (policy, tool class, readiness of the dev environment; M1-51), `chat.SessionCounter` (`adapters/postgres`, the sessions of `DeletionInfo`, FEAT-delete-spaces-chats), kernel `personaldata.Participant`.
 
 ## Dependencies
 

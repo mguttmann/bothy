@@ -5772,6 +5772,10 @@
   "@threadNoAccess": {
     "description": "Text that replaces an open thread or channel whose access was removed (01 section 6.6)."
   },
+  "threadDeleted": "This chat was deleted.",
+  "@threadDeleted": {
+    "description": "Text that replaces an open chat whose chat, channel or space was deleted on another device (01 section 6.18 item 8)."
+  },
   "threadNoAccessWaiting": "Messages that were not sent, to copy:",
   "@threadNoAccessWaiting": {
     "description": "Heading above the waiting messages kept as text after the access was removed (01 section 6.6)."
@@ -14520,5 +14524,299 @@
   "settingsShowProjectStatusHint": "Forum and project rows show the most urgent new state of their chats.",
   "@settingsShowProjectStatusHint": {
     "description": "Hint below the setting sidebar.show_project_status (01 section 11, M4-52)."
+  },
+  "menuDeleteSpace": "Delete space...",
+  "@menuDeleteSpace": {
+    "description": "Last entry of the space menu in the sidebar for an owner; opens the delete dialog (01 6.18 item 1)."
+  },
+  "menuDeleteChannel": "Delete channel...",
+  "@menuDeleteChannel": {
+    "description": "Last entry of the menu of a channel or forum and of the More button of its main history, for a person with manage (01 6.18 item 1)."
+  },
+  "menuDeleteProject": "Delete project...",
+  "@menuDeleteProject": {
+    "description": "Last entry of the menu of a forum with a project binding, for a person with manage (01 6.18 item 1)."
+  },
+  "menuDeleteChat": "Delete chat...",
+  "@menuDeleteChat": {
+    "description": "Last entry of the menu of a chat row, a post list row and the More button of a chat history, for its creator or a person with manage (01 6.18 item 1)."
+  },
+  "deleteTitle": "Delete {name}?",
+  "@deleteTitle": {
+    "description": "Title of the delete dialog with the name of the space, channel, project or chat (01 6.18 item 3).",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "website"
+      }
+    }
+  },
+  "deleteLoading": "Counting what this deletes.",
+  "@deleteLoading": {
+    "description": "Loading state of the delete dialog while the counts are read (01 6.18 item 3)."
+  },
+  "deleteLoadFailed": "Could not read what this deletes.",
+  "@deleteLoadFailed": {
+    "description": "Error sentence of the delete dialog when the counts could not be read; Try again follows (01 6.18 item 3)."
+  },
+  "deleteRetry": "Try again",
+  "@deleteRetry": {
+    "description": "Button of the delete dialog that reads the counts again after a failure (01 6.18 item 3)."
+  },
+  "deleteSummary": "This deletes {parts}.",
+  "@deleteSummary": {
+    "description": "Sentence of the delete dialog that names the non-zero counts, joined by deleteListAnd (01 6.18 item 3).",
+    "placeholders": {
+      "parts": {
+        "type": "String",
+        "example": "2 chats, 140 messages and 3 files"
+      }
+    }
+  },
+  "deleteSummaryEmpty": "It is empty.",
+  "@deleteSummaryEmpty": {
+    "description": "Sentence of the delete dialog when every count is zero (01 6.18 item 3)."
+  },
+  "deleteListAnd": "{head} and {last}",
+  "@deleteListAnd": {
+    "description": "Joins the last count of the delete dialog to the ones before it, which are separated by commas.",
+    "placeholders": {
+      "head": {
+        "type": "String",
+        "example": "2 chats, 140 messages"
+      },
+      "last": {
+        "type": "String",
+        "example": "3 files"
+      }
+    }
+  },
+  "deleteCountChannels": "{count, plural, =1{1 channel} other{{count} channels}}",
+  "@deleteCountChannels": {
+    "description": "Count of channels and forums a space deletion removes (01 6.18 item 3).",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "2"
+      }
+    }
+  },
+  "deleteCountChats": "{count, plural, =1{1 chat} other{{count} chats}}",
+  "@deleteCountChats": {
+    "description": "Count of chats and threads a deletion removes (01 6.18 item 3).",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "2"
+      }
+    }
+  },
+  "deleteCountMessages": "{count, plural, =1{1 message} other{{count} messages}}",
+  "@deleteCountMessages": {
+    "description": "Count of messages a deletion removes (01 6.18 item 3).",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "2"
+      }
+    }
+  },
+  "deleteCountFiles": "{count, plural, =1{1 file} other{{count} files}}",
+  "@deleteCountFiles": {
+    "description": "Count of files a deletion removes (01 6.18 item 3).",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "2"
+      }
+    }
+  },
+  "deleteCountSessions": "{count, plural, =1{1 agent session} other{{count} agent sessions}}",
+  "@deleteCountSessions": {
+    "description": "Count of agent sessions a deletion removes (01 6.18 item 3).",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "2"
+      }
+    }
+  },
+  "deleteUndoHint": "You can undo this for a short time.",
+  "@deleteUndoHint": {
+    "description": "Hint of the delete dialog about the undo window; the client does not know its length (01 6.18 item 3)."
+  },
+  "deleteFolderBox": "Also move the project folder {name} to the trash",
+  "@deleteFolderBox": {
+    "description": "Checkbox of the delete dialog of a project for an owner, unchecked by default (01 6.18 item 4).",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "website"
+      }
+    }
+  },
+  "deleteFolderUnchecked": "The runner has not checked the folder yet.",
+  "@deleteFolderUnchecked": {
+    "description": "Why the folder checkbox is disabled: no folder check reported yet (01 6.18 item 4)."
+  },
+  "deleteFolderOutsideRoot": "The folder is outside the runner's projects folder.",
+  "@deleteFolderOutsideRoot": {
+    "description": "Folder check refusal outside_root (01 6.18 item 4)."
+  },
+  "deleteFolderSymlink": "The folder is a link to another place.",
+  "@deleteFolderSymlink": {
+    "description": "Folder check refusal symlink (01 6.18 item 4)."
+  },
+  "deleteFolderForeignWorktree": "The folder is a Git work tree of another repository.",
+  "@deleteFolderForeignWorktree": {
+    "description": "Folder check refusal foreign_worktree (01 6.18 item 4)."
+  },
+  "deleteFolderUncommittedChanges": "The folder has changes that are not committed.",
+  "@deleteFolderUncommittedChanges": {
+    "description": "Folder check refusal uncommitted_changes (01 6.18 item 4)."
+  },
+  "deleteFolderUnpushedCommits": "The folder has commits that are not pushed.",
+  "@deleteFolderUnpushedCommits": {
+    "description": "Folder check refusal unpushed_commits (01 6.18 item 4)."
+  },
+  "deleteFolderContainsOtherProject": "The folder contains another project.",
+  "@deleteFolderContainsOtherProject": {
+    "description": "Folder check refusal contains_other_project (01 6.18 item 4)."
+  },
+  "deleteFolderWorkspaceMissing": "The folder does not exist on the runner's host.",
+  "@deleteFolderWorkspaceMissing": {
+    "description": "Folder check refusal workspace_missing (01 6.18 item 4)."
+  },
+  "deleteFolderCheckFailed": "The runner could not check the folder.",
+  "@deleteFolderCheckFailed": {
+    "description": "Folder check refusal check_failed (01 6.18 item 4)."
+  },
+  "deleteFolderRefusedOther": "The runner does not move this folder.",
+  "@deleteFolderRefusedOther": {
+    "description": "Folder check refusal with a reason code this app does not know (01 6.18 item 4)."
+  },
+  "deleteCancel": "Cancel",
+  "@deleteCancel": {
+    "description": "Button of the delete dialog that closes it without deleting."
+  },
+  "deleteConfirm": "Delete",
+  "@deleteConfirm": {
+    "description": "Destructive button of the delete dialog (01 6.18 item 3)."
+  },
+  "deleteDone": "Deleted {name}",
+  "@deleteDone": {
+    "description": "Snack bar after a deletion, with the button Undo (01 6.18 item 6).",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "website"
+      }
+    }
+  },
+  "deleteUndo": "Undo",
+  "@deleteUndo": {
+    "description": "Button of the snack bar after a deletion that restores the item (01 6.18 item 6)."
+  },
+  "deleteUndoTooLate": "The deletion can no longer be undone.",
+  "@deleteUndoTooLate": {
+    "description": "Snack bar when Undo came after the undo window (409 undo_window_passed, 01 6.18 item 6)."
+  },
+  "deleteUndoFailed": "Could not undo the deletion of {name}.",
+  "@deleteUndoFailed": {
+    "description": "Snack bar when Undo failed for another reason (01 6.18 item 6).",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "website"
+      }
+    }
+  },
+  "deleteFolderTrashed": "Moved the folder {name} to the trash.",
+  "@deleteFolderTrashed": {
+    "description": "Snack bar when the runner moved the project folder to the trash (01 6.18 item 7).",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "website"
+      }
+    }
+  },
+  "deleteFolderKept": "Kept the folder {name}: {reason}",
+  "@deleteFolderKept": {
+    "description": "Snack bar when the runner refused to move the project folder; reason is one of the deleteFolder reason sentences (01 6.18 item 7).",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "website"
+      },
+      "reason": {
+        "type": "String",
+        "example": "The folder has commits that are not pushed."
+      }
+    }
+  },
+  "stepUpPurposeDeleteSpace": "Delete the space {name}",
+  "@stepUpPurposeDeleteSpace": {
+    "description": "Purpose shown by the step-up prompt when a space is deleted (01 6.18 item 5).",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Team"
+      }
+    }
+  },
+  "stepUpPurposeDeleteChannel": "Delete the channel {name}",
+  "@stepUpPurposeDeleteChannel": {
+    "description": "Purpose shown by the step-up prompt when a channel or forum is deleted (01 6.18 item 5).",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "general"
+      }
+    }
+  },
+  "stepUpPurposeDeleteProject": "Delete the project {name}",
+  "@stepUpPurposeDeleteProject": {
+    "description": "Purpose shown by the step-up prompt when a project forum is deleted (01 6.18 item 5).",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "website"
+      }
+    }
+  },
+  "stepUpPurposeRestoreSpace": "Restore the space {name}",
+  "@stepUpPurposeRestoreSpace": {
+    "description": "Purpose shown by the step-up prompt when Undo restores a space (01 6.18 item 5).",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Team"
+      }
+    }
+  },
+  "stepUpPurposeRestoreChannel": "Restore the channel {name}",
+  "@stepUpPurposeRestoreChannel": {
+    "description": "Purpose shown by the step-up prompt when Undo restores a channel or forum (01 6.18 item 5).",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "general"
+      }
+    }
+  },
+  "stepUpPurposeRestoreProject": "Restore the project {name}",
+  "@stepUpPurposeRestoreProject": {
+    "description": "Purpose shown by the step-up prompt when Undo restores a project forum (01 6.18 item 5).",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "website"
+      }
+    }
+  },
+  "problemConflictProjectFolderRefused": "The runner's last check does not allow moving the project folder to the trash.",
+  "@problemConflictProjectFolderRefused": {
+    "description": "Problem conflict with reason project_folder_refused: a delete asked to move a project folder whose last check is not ok (01 6.18 item 4)."
   }
 }

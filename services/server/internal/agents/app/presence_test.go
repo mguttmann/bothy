@@ -314,6 +314,22 @@ type fakeReadiness struct {
 	calls [][]chat.ProjectReadiness
 	// bound are the workspace_ref values of the bindings, for BoundProjectFolders (M4-44).
 	bound []string
+	// results are the folder move outcomes handed on; requests the moves the runner owes.
+	results  [][]chat.ProjectTrashResult
+	requests []chat.ProjectTrashRequest
+}
+
+func (r *fakeReadiness) ApplyProjectTrashResults(_ context.Context, _ ids.ID, results []chat.ProjectTrashResult) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.results = append(r.results, results)
+	return nil
+}
+
+func (r *fakeReadiness) ProjectTrashRequests(context.Context, ids.ID) ([]chat.ProjectTrashRequest, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return slices.Clone(r.requests), nil
 }
 
 func (r *fakeReadiness) ApplyProjectReadiness(_ context.Context, _ ids.ID, reports []chat.ProjectReadiness) error {
@@ -540,6 +556,34 @@ func TestHeartbeat_ReadinessOnlyOnChange(t *testing.T) {
 	w.beat(`{"state":"online","project_readiness":[{"channel_id":"` + ch + `","ready":false,"reason":"provisioning"}]}`)
 	if w.rd.count() != 4 {
 		t.Fatalf("%d calls after the persist interval, want 4", w.rd.count())
+	}
+}
+
+// TestHeartbeat_TrashCheckAndMoves (09 18.15, D-DEL-10, D-DEL-11): the trash_check of a readiness
+// entry reaches the port, project_trash_results are handed on on every heartbeat that carries
+// them, and the moves the runner owes come back in the status.
+func TestHeartbeat_TrashCheckAndMoves(t *testing.T) {
+	t.Parallel()
+	w := newTracker(t)
+	ch := ids.New()
+	w.beat(`{"state":"online","project_readiness":[{"channel_id":"` + ch.String() + `","ready":true,"trash_check":{"ok":false,"reason":"symlink"}}]}`)
+	w.rd.mu.Lock()
+	got := w.rd.calls[0][0].TrashCheck
+	w.rd.mu.Unlock()
+	if got == nil || got.OK || got.Reason != "symlink" {
+		t.Fatalf("trash check %+v", got)
+	}
+	w.rd.mu.Lock()
+	w.rd.requests = []chat.ProjectTrashRequest{{ChannelID: ch, WorkspaceRef: "website"}}
+	w.rd.mu.Unlock()
+	st := w.beat(`{"state":"online","project_trash_results":[{"channel_id":"` + ch.String() + `","result":"refused","reason":"unpushed_commits"}]}`)
+	if len(st.ProjectTrash) != 1 || st.ProjectTrash[0].WorkspaceRef != "website" {
+		t.Fatalf("status %+v", st.ProjectTrash)
+	}
+	w.rd.mu.Lock()
+	defer w.rd.mu.Unlock()
+	if len(w.rd.results) != 1 || w.rd.results[0][0] != (chat.ProjectTrashResult{ChannelID: ch, Result: "refused", Reason: "unpushed_commits"}) {
+		t.Fatalf("results %+v", w.rd.results)
 	}
 }
 

@@ -8,7 +8,11 @@ from pathlib import Path
 from uuid import UUID
 
 import pytest
-from bothy_sdk.generated.models import ProjectReadiness
+from bothy_sdk.generated.models import (
+    ProjectReadiness,
+    ProjectTrashResult,
+    ProjectTrashResultResult,
+)
 from bothy_sdk.heartbeat import build_heartbeat
 from bothy_sdk.testing._patience import PATIENCE
 
@@ -147,3 +151,11 @@ def test_runtime_status_carries_the_project_folders() -> None:
     status = runtime_status(Probe(PINNED_CLAUDE_CODE_VERSION, ()), [], None, ["api", "website"])
     assert status.project_folders == ("api", "website")
     assert runtime_status(Probe(PINNED_CLAUDE_CODE_VERSION, ()), [], None).project_folders is None
+
+
+def test_runtime_status_carries_the_folder_move_results() -> None:
+    """``project_trash_results`` of 09 18.15; ``None`` or empty leaves the member out."""
+    done = ProjectTrashResult(channel_id=CHANNEL, result=ProjectTrashResultResult.TRASHED)
+    status = runtime_status(Probe(PINNED_CLAUDE_CODE_VERSION, ()), [], None, None, [done])
+    assert status.project_trash_results == (done,)
+    assert runtime_status(Probe(), [], None, None, []).project_trash_results is None

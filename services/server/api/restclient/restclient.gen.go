@@ -1306,6 +1306,48 @@ func (e ConsoleSessionStepUpMethodsAvailable) Valid() bool {
 	}
 }
 
+// Defines values for DeletionInfoState.
+const (
+	DeletionInfoStateFinal   DeletionInfoState = "final"
+	DeletionInfoStateLive    DeletionInfoState = "live"
+	DeletionInfoStatePending DeletionInfoState = "pending"
+)
+
+// Valid indicates whether the value is a known member of the DeletionInfoState enum.
+func (e DeletionInfoState) Valid() bool {
+	switch e {
+	case DeletionInfoStateFinal:
+		return true
+	case DeletionInfoStateLive:
+		return true
+	case DeletionInfoStatePending:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeletionInfoTargetKind.
+const (
+	DeletionInfoTargetKindChannel DeletionInfoTargetKind = "channel"
+	DeletionInfoTargetKindSpace   DeletionInfoTargetKind = "space"
+	DeletionInfoTargetKindThread  DeletionInfoTargetKind = "thread"
+)
+
+// Valid indicates whether the value is a known member of the DeletionInfoTargetKind enum.
+func (e DeletionInfoTargetKind) Valid() bool {
+	switch e {
+	case DeletionInfoTargetKindChannel:
+		return true
+	case DeletionInfoTargetKindSpace:
+		return true
+	case DeletionInfoTargetKindThread:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for DeviceRevokeReason.
 const (
 	DeviceRevokeReasonInactive           DeviceRevokeReason = "inactive"
@@ -3451,6 +3493,27 @@ func (e PrincipalKind) Valid() bool {
 	}
 }
 
+// Defines values for ProjectFolderDeletionTrashState.
+const (
+	ProjectFolderDeletionTrashStateRefused   ProjectFolderDeletionTrashState = "refused"
+	ProjectFolderDeletionTrashStateRequested ProjectFolderDeletionTrashState = "requested"
+	ProjectFolderDeletionTrashStateTrashed   ProjectFolderDeletionTrashState = "trashed"
+)
+
+// Valid indicates whether the value is a known member of the ProjectFolderDeletionTrashState enum.
+func (e ProjectFolderDeletionTrashState) Valid() bool {
+	switch e {
+	case ProjectFolderDeletionTrashStateRefused:
+		return true
+	case ProjectFolderDeletionTrashStateRequested:
+		return true
+	case ProjectFolderDeletionTrashStateTrashed:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ProjectProvision.
 const (
 	ProjectProvisionClone ProjectProvision = "clone"
@@ -3466,6 +3529,24 @@ func (e ProjectProvision) Valid() bool {
 	case ProjectProvisionInit:
 		return true
 	case ProjectProvisionNone:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ProjectTrashResultResult.
+const (
+	ProjectTrashResultResultRefused ProjectTrashResultResult = "refused"
+	ProjectTrashResultResultTrashed ProjectTrashResultResult = "trashed"
+)
+
+// Valid indicates whether the value is a known member of the ProjectTrashResultResult enum.
+func (e ProjectTrashResultResult) Valid() bool {
+	switch e {
+	case ProjectTrashResultResultRefused:
+		return true
+	case ProjectTrashResultResultTrashed:
 		return true
 	default:
 		return false
@@ -7344,7 +7425,10 @@ type Channel struct {
 
 	// DefaultNotificationLevel Default for people without an own setting (13, 3.1); absent means none.
 	DefaultNotificationLevel *NotificationLevel `json:"default_notification_level,omitempty"`
-	DmParticipantIds         *[]Uuid            `json:"dm_participant_ids,omitempty"`
+
+	// DeletedAt Set while the item is deleted, pending or final (01 6.18); clients remove it and its local content, and a later version without it brings it back.
+	DeletedAt        *Timestamp `json:"deleted_at,omitempty"`
+	DmParticipantIds *[]Uuid    `json:"dm_participant_ids,omitempty"`
 
 	// ForumDefaultSort Sort order of forum posts.
 	ForumDefaultSort *ForumSort `json:"forum_default_sort,omitempty"`
@@ -7550,6 +7634,12 @@ type ChannelCreatedEventAudience string
 
 // ChannelCreatedEventType defines model for ChannelCreatedEvent.Type.
 type ChannelCreatedEventType string
+
+// ChannelDelete defines model for ChannelDelete.
+type ChannelDelete struct {
+	// TrashProjectFolder Also move the project folder of a forum with a project binding to the trash of the serving runner's host once the deletion is final (09 18.15). Needs `channel.project.bind` and an ok folder check.
+	TrashProjectFolder *bool `json:"trash_project_folder,omitempty"`
+}
 
 // ChannelKind defines model for ChannelKind.
 type ChannelKind string
@@ -8463,6 +8553,50 @@ type CspReportList = []JsonObject
 //
 // Examples: eyJrIjoiMDE5MmY0YTAtN2IxYy03MDAwLThhMDAtMDAwMDAwMDAwMDAxIn0
 type Cursor = string
+
+// DeletionContents What the deletion removes, counted when read; for a pending or final deletion what it removed or removes.
+type DeletionContents struct {
+	// Channels Channels and forums, not counting dm channels.
+	Channels int64 `json:"channels"`
+
+	// Files Files attached to those messages.
+	Files    int64 `json:"files"`
+	Messages int64 `json:"messages"`
+
+	// Sessions Agent sessions of those chats.
+	Sessions int64 `json:"sessions"`
+
+	// Threads Chats and threads, not counting main threads.
+	Threads int64 `json:"threads"`
+}
+
+// DeletionInfo defines model for DeletionInfo.
+type DeletionInfo struct {
+	// Contents What the deletion removes, counted when read; for a pending or final deletion what it removed or removes.
+	Contents DeletionContents `json:"contents"`
+
+	// DeletedAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+	DeletedAt *Timestamp `json:"deleted_at,omitempty"`
+
+	// ProjectFolder The project folder of a forum with a project binding; only for owners (`channel.project.bind`).
+	ProjectFolder *ProjectFolderDeletion `json:"project_folder,omitempty"`
+
+	// State `live` before a deletion (a preview), `pending` while it can be undone, `final` after `undo_until`.
+	State DeletionInfoState `json:"state"`
+
+	// TargetId UUIDv7 (RFC 9562), lowercase canonical form.
+	TargetId   Uuid                   `json:"target_id"`
+	TargetKind DeletionInfoTargetKind `json:"target_kind"`
+
+	// UndoUntil The end of the undo window, `deleted_at` plus `chat.delete_undo_window`; absent while `live`.
+	UndoUntil *Timestamp `json:"undo_until,omitempty"`
+}
+
+// DeletionInfoState `live` before a deletion (a preview), `pending` while it can be undone, `final` after `undo_until`.
+type DeletionInfoState string
+
+// DeletionInfoTargetKind defines model for DeletionInfo.TargetKind.
+type DeletionInfoTargetKind string
 
 // Device defines model for Device.
 type Device struct {
@@ -10153,6 +10287,9 @@ type Heartbeat struct {
 	// ProjectReadiness Readiness per bound forum of a runner (M2-03); the channels must be distinct. Applied only when present and different from the last list this server process applied; absent means "unchanged".
 	ProjectReadiness *[]ProjectReadiness `json:"project_readiness,omitempty"`
 
+	// ProjectTrashResults Runners only, the outcome of each folder move of `HeartbeatAck.project_trash` the runner finished since its last heartbeat (09 18.15); the server stores it once and audits it as `channel.project.trash`.
+	ProjectTrashResults *[]ProjectTrashResult `json:"project_trash_results,omitempty"`
+
 	// RateLimit Stored in `agents.reported_details.rate_limit` as exactly `state` and `resets_at`; absent clears a stored one, because every heartbeat is the full reported state. Shown by `getStatsBackends`.
 	RateLimit *AgentRateLimitState `json:"rate_limit,omitempty"`
 
@@ -10179,6 +10316,9 @@ type HeartbeatAck struct {
 
 	// Presence Reported state of the agent runtime (heartbeat), not the configured state.
 	Presence AgentRuntimeStatus `json:"presence"`
+
+	// ProjectTrash Runners only, the project folders of deleted forums this agent served whose deletion is final and whose move is not reported yet (09 18.15); absent when there are none.
+	ProjectTrash *[]ProjectTrashRequest `json:"project_trash,omitempty"`
 }
 
 // Host A connected host. Keys are public; the client pins `noise_public_key` per device (24, 5.5).
@@ -13042,6 +13182,24 @@ type ProjectFolder struct {
 	Name ProjectFolderName `json:"name"`
 }
 
+// ProjectFolderDeletion The project folder of a forum with a project binding; only for owners (`channel.project.bind`).
+type ProjectFolderDeletion struct {
+	// TrashCheck Whether the serving runner would move the folder to the trash now (09 18.15). Absent in `ProjectFolderDeletion` before the runner's first check.
+	TrashCheck *ProjectTrashCheck `json:"trash_check,omitempty"`
+
+	// TrashReason The refusal code of the runner with `trash_state` `refused` (09 18.15).
+	TrashReason *string `json:"trash_reason,omitempty"`
+
+	// TrashState Absent when no move was requested; `requested` until the runner reports.
+	TrashState *ProjectFolderDeletionTrashState `json:"trash_state,omitempty"`
+
+	// WorkspaceRef Examples: website
+	WorkspaceRef string `json:"workspace_ref"`
+}
+
+// ProjectFolderDeletionTrashState Absent when no move was requested; `requested` until the runner reports.
+type ProjectFolderDeletionTrashState string
+
 // ProjectFolderList defines model for ProjectFolderList.
 type ProjectFolderList struct {
 	// Items The reported folders without a binding, in name order.
@@ -13067,6 +13225,9 @@ type ProjectReadiness struct {
 
 	// Reason Why the forum is not ready, a code of 09 18.12 (for example `provisioning`, `workspace_exists`, `clone_failed`); only with `ready` false. Stored as `project_bindings.ready_reason`.
 	Reason *string `json:"reason,omitempty"`
+
+	// TrashCheck Runners only, the folder check of 09 18.15, at most every `runner.trash_check_interval`; stored on the binding. Absent means unchanged.
+	TrashCheck *ProjectTrashCheckReport `json:"trash_check,omitempty"`
 }
 
 // ProjectRunnerConfig Schema `project_runner_config.v1`. No secrets.
@@ -13074,6 +13235,46 @@ type ProjectRunnerConfig struct {
 	AllowedTools *[]string `json:"allowed_tools,omitempty"`
 	Model        *string   `json:"model,omitempty"`
 }
+
+// ProjectTrashCheck Whether the serving runner would move the folder to the trash now (09 18.15). Absent in `ProjectFolderDeletion` before the runner's first check.
+type ProjectTrashCheck struct {
+	// CheckedAt When the server received the check.
+	CheckedAt *Timestamp `json:"checked_at,omitempty"`
+	Ok        bool       `json:"ok"`
+
+	// Reason Why not, with `ok` false; a code of 09 18.15 (`outside_root`, `symlink`, `foreign_worktree`, `uncommitted_changes`, `unpushed_commits`, `contains_other_project`, `workspace_missing`, `check_failed`).
+	Reason *string `json:"reason,omitempty"`
+}
+
+// ProjectTrashCheckReport The folder check a runner reports in its readiness entry (09 18.15).
+type ProjectTrashCheckReport struct {
+	Ok bool `json:"ok"`
+
+	// Reason Why not, with `ok` false; a code of 09 18.15.
+	Reason *string `json:"reason,omitempty"`
+}
+
+// ProjectTrashRequest A project folder the runner moves to the trash (09 18.15).
+type ProjectTrashRequest struct {
+	// ChannelId UUIDv7 (RFC 9562), lowercase canonical form.
+	ChannelId Uuid `json:"channel_id"`
+
+	// WorkspaceRef Examples: website
+	WorkspaceRef string `json:"workspace_ref"`
+}
+
+// ProjectTrashResult defines model for ProjectTrashResult.
+type ProjectTrashResult struct {
+	// ChannelId UUIDv7 (RFC 9562), lowercase canonical form.
+	ChannelId Uuid `json:"channel_id"`
+
+	// Reason The refusal code with `result` `refused` (09 18.15).
+	Reason *string                  `json:"reason,omitempty"`
+	Result ProjectTrashResultResult `json:"result"`
+}
+
+// ProjectTrashResultResult defines model for ProjectTrashResult.Result.
+type ProjectTrashResultResult string
 
 // PublicBranding defines model for PublicBranding.
 type PublicBranding struct {
@@ -14718,6 +14919,9 @@ type Space struct {
 	// DefaultOperatorAgentId UUIDv7 (RFC 9562), lowercase canonical form.
 	DefaultOperatorAgentId *Uuid `json:"default_operator_agent_id,omitempty"`
 
+	// DeletedAt Set while the item is deleted, pending or final (01 6.18); clients remove it and its local content, and a later version without it brings it back.
+	DeletedAt *Timestamp `json:"deleted_at,omitempty"`
+
 	// Icon Glyph name from the list `space-icons` of the design tokens (`kernel/designkeys`). No emoji.
 	//
 	// Examples: headset
@@ -15917,6 +16121,9 @@ type Thread struct {
 
 	// CreatedBy UUIDv7 (RFC 9562), lowercase canonical form.
 	CreatedBy Uuid `json:"created_by"`
+
+	// DeletedAt Set while the item is deleted, pending or final (01 6.18); clients remove it and its local content, and a later version without it brings it back.
+	DeletedAt *Timestamp `json:"deleted_at,omitempty"`
 
 	// Id UUIDv7 (RFC 9562), lowercase canonical form.
 	Id   Uuid       `json:"id"`
@@ -17580,6 +17787,12 @@ type InvokeCommandParams struct {
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
+// DeleteChannelParams defines parameters for DeleteChannel.
+type DeleteChannelParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
 // ExportChannelParams defines parameters for ExportChannel.
 type ExportChannelParams struct {
 	// From Start of the range (inclusive).
@@ -17623,6 +17836,12 @@ type PutProjectBindingParams struct {
 type SetChannelReadOnlyParams struct {
 	// IfMatch ETag of the version the change is based on, e.g. `"7"`. Mismatch gives 412 `version_conflict`.
 	IfMatch IfMatchRequired `json:"If-Match"`
+}
+
+// RestoreChannelParams defines parameters for RestoreChannel.
+type RestoreChannelParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
 // CreateForumTagParams defines parameters for CreateForumTag.
@@ -18310,6 +18529,12 @@ type CreateChannelParams struct {
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
+// DeleteSpaceParams defines parameters for DeleteSpace.
+type DeleteSpaceParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
 // MoveSpaceParams defines parameters for MoveSpace.
 type MoveSpaceParams struct {
 	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
@@ -18320,6 +18545,12 @@ type MoveSpaceParams struct {
 type SetSpaceOperatorParams struct {
 	// IfMatch ETag of the version the change is based on, e.g. `"7"`. Mismatch gives 412 `version_conflict`.
 	IfMatch IfMatchRequired `json:"If-Match"`
+}
+
+// RestoreSpaceParams defines parameters for RestoreSpace.
+type RestoreSpaceParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
 // GetStatsBackendsParams defines parameters for GetStatsBackends.
@@ -18527,6 +18758,12 @@ type CloseThreadParams struct {
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
+// DeleteThreadParams defines parameters for DeleteThread.
+type DeleteThreadParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
 // ListThreadMessagesParams defines parameters for ListThreadMessages.
 type ListThreadMessagesParams struct {
 	// BeforeSeq Messages with `thread_seq` below this value.
@@ -18559,6 +18796,12 @@ type MarkThreadUnreadParams struct {
 
 // ReopenThreadParams defines parameters for ReopenThread.
 type ReopenThreadParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// RestoreThreadParams defines parameters for RestoreThread.
+type RestoreThreadParams struct {
 	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
@@ -19209,6 +19452,9 @@ type AutocompleteCommandJSONRequestBody = AutocompleteQuery
 
 // InvokeCommandJSONRequestBody defines body for InvokeCommand for application/json ContentType.
 type InvokeCommandJSONRequestBody = CommandInvoke
+
+// DeleteChannelJSONRequestBody defines body for DeleteChannel for application/json ContentType.
+type DeleteChannelJSONRequestBody = ChannelDelete
 
 // PutChannelDraftJSONRequestBody defines body for PutChannelDraft for application/json ContentType.
 type PutChannelDraftJSONRequestBody = DraftPut

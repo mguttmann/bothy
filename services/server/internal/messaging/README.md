@@ -108,6 +108,16 @@ no `deleted_by` and no audit entry is written. With `none` the participant is re
 a period and never runs.
 
 
+## Purge of deleted spaces, channels and chats (FEAT-delete-spaces-chats)
+
+`app/purge.go` is the job `messaging.purge_deleted` (`adapters/jobs`, queue `maintenance`, periodic
+every `chat.delete_purge_interval` and at worker start): it reads the due items from
+`chat.Purges`, deletes their messages that are not deleted and not system lines
+(`LiveMessagesOfDeleted`) through the same no-actor path as retention (`Retention.remove`, one unit
+per message, batches of `retention.batch_size`), then calls `FinishPurge`. A round that deletes no
+message of an item is internal, so a refusal cannot loop. The history (`readThread`) answers 404
+for a deleted thread, which `thread.read` still lets through.
+
 ## Deletion journal (M7-07)
 
 `app.Journal` (`Service.Journal`) implements the port `messaging.JournalMessages` of
@@ -152,6 +162,7 @@ the participant of messaging in the privacy requests (`kernel/personaldata`, 20 
 - Inbound: `ImportMessages` (M8-11), `Messages` (create, create a thread with its first message, edit, delete, history, `SetTriggerState`, anchor, `AppendSystemLine` since M2-12, `LastAnchorBefore`, `AnchorOf`, `LastAgentMessageBefore`, `Newest`, `ForPreview`), `Reactions`, `Pins`, `Templates`, `Mentions` (list, unread per thread), `Export`, `SearchReads` (`SearchMessages`, `HitMessages` for the search coordinator, M3-14); declares `ComponentReader` and `ComponentWriter` (M2-15, implemented by runs in `internal/runs/adapters/messagingsource`). `Messages` offers runs `LockCard`, `ComponentsChanged` and `PrincipalOf` (M2-15) and `Authors` (M2-25).
 - Emits in-tx events: `MessagePosted`, `MessageDeleted`.
 - Subscribes to in-tx events: `chat.ThreadMoved`.
+- Uses `chat.Purges` for the job `messaging.purge_deleted` (FEAT-delete-spaces-chats).
 - Implements source ports and cross-cutting ports: kernel `personaldata.Participant`.
 
 ## Dependencies

@@ -44,8 +44,11 @@ from bothy_sdk.generated.models import (
     HeartbeatState,
     JsonObject,
     ProjectReadiness,
+    ProjectTrashResult,
+    ProjectTrashResultResult,
     ToolClass,
 )
+from bothy_sdk.generated.types import UNSET, Unset
 
 __all__ = [
     "CAPABILITY_KEYS",
@@ -53,6 +56,7 @@ __all__ = [
     "DETAILS_KEYS",
     "HEARTBEAT_MEMBERS",
     "NAME_FORM",
+    "REASON_FORM",
     "VERSION_FORM",
     "build_heartbeat",
 ]
@@ -65,6 +69,9 @@ VERSION_FORM = "^[0-9A-Za-z][0-9A-Za-z.+_-]*$"
 
 CODE_FORM = "^[a-z0-9][a-z0-9_.:-]*$"
 """Form of ``billing_evidence.provider``, ``billing_evidence.method`` and each degraded reason."""
+
+REASON_FORM = "^[a-z0-9][a-z0-9_]*$"
+"""Form of the folder check and folder move reasons of 09 18.15, at most 64 characters."""
 
 DETAILS_KEYS = (
     "capabilities",
@@ -90,6 +97,7 @@ HEARTBEAT_MEMBERS = (
     "details",
     "project_readiness",
     "project_folders",
+    "project_trash_results",
 )
 """The top-level members `build_heartbeat` sets."""
 
@@ -108,6 +116,8 @@ _PROTOCOL_VERSION_MAX = 2**31 - 1
 _NAME = re.compile(NAME_FORM[1:-1])
 _VERSION = re.compile(VERSION_FORM[1:-1])
 _CODE = re.compile(CODE_FORM[1:-1])
+_REASON = re.compile(REASON_FORM[1:-1])
+_REASON_MAX = 64
 
 E = TypeVar("E", bound=enum.Enum)
 
@@ -124,12 +134,14 @@ def build_heartbeat(  # noqa: PLR0913 - keywords mirror the members of Heartbeat
     details: Mapping[str, Any] | None = None,
     project_readiness: Iterable[ProjectReadiness] | None = None,
     project_folders: Iterable[str] | None = None,
+    project_trash_results: Iterable[ProjectTrashResult] | None = None,
 ) -> Heartbeat:
     """Build a heartbeat of schema ``agent_heartbeat.v1``.
 
     Every heartbeat is the whole reported state: an argument left at ``None`` is "not
     reported" (09 4.8 "Full state"), except ``project_readiness`` and ``project_folders``,
-    where absent means "unchanged".
+    where absent means "unchanged", and ``project_trash_results``, which carries only the
+    outcomes not yet reported.
 
     Args:
         state: ``online`` or ``degraded``.
@@ -152,7 +164,11 @@ def build_heartbeat(  # noqa: PLR0913 - keywords mirror the members of Heartbeat
         project_readiness: Runners only: one entry per bound forum, distinct channels.
         project_folders: Runners only: the distinct folder names under the projects root,
             each one segment of letters, digits, ``.``, ``_`` and ``-`` that starts with a
-            letter or digit, at most 255 characters (09 18.13, M4-44).
+            letter or digit, at most 255 characters (09 18.13, M4-44). A readiness entry may carry
+            ``trash_check`` (09 18.15) whose ``reason`` has the form `REASON_FORM`.
+        project_trash_results: Runners only: the outcome of each folder move of
+            ``HeartbeatAck.project_trash`` not yet reported, distinct channels, a ``reason`` of
+            the form `REASON_FORM` (09 18.15).
 
     Returns:
         The generated `Heartbeat`.
@@ -188,11 +204,41 @@ def build_heartbeat(  # noqa: PLR0913 - keywords mirror the members of Heartbeat
         for entry in readiness:
             if not isinstance(entry, ProjectReadiness):
                 raise ValueError("project_readiness: entries must be ProjectReadiness")
+            _trash_check(entry)
         _distinct([r.channel_id for r in readiness], "project_readiness")
         beat.project_readiness = readiness
     if project_folders is not None:
         beat.project_folders = _folders(project_folders)
+    if project_trash_results is not None:
+        beat.project_trash_results = _trash_results(project_trash_results)
     return beat
+
+
+def _reason(value: object, field: str) -> None:
+    """Refuse a reason of 09 18.15 outside `REASON_FORM` or above 64 characters."""
+    if value is UNSET:
+        return
+    if not isinstance(value, str) or len(value) > _REASON_MAX or not _REASON.fullmatch(value):
+        raise ValueError(f"{field}: not a reason code")
+
+
+def _trash_check(entry: ProjectReadiness) -> None:
+    """The ``trash_check`` of a readiness entry: its reason is a code."""
+    check = entry.trash_check
+    if not isinstance(check, Unset):
+        _reason(check.reason, "project_readiness.trash_check.reason")
+
+
+def _trash_results(results: Iterable[ProjectTrashResult]) -> list[ProjectTrashResult]:
+    """``project_trash_results``: entries with distinct channels and reason codes."""
+    out = list(results)
+    for entry in out:
+        if not isinstance(entry, ProjectTrashResult):
+            raise ValueError("project_trash_results: entries must be ProjectTrashResult")
+        _member(ProjectTrashResultResult, entry.result, "project_trash_results.result")
+        _reason(entry.reason, "project_trash_results.reason")
+    _distinct([r.channel_id for r in out], "project_trash_results")
+    return out
 
 
 def _folders(names: Iterable[str]) -> list[str]:

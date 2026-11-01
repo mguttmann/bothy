@@ -65,6 +65,8 @@ type ProjectReadiness struct {
 	// Reason is the code of 09 section 18.12 the runner sent with Ready false; "" for none. It is
 	// ignored with Ready true (M4-43).
 	Reason string
+	// TrashCheck is the folder check of 09 18.15; nil means unchanged (D-DEL-10).
+	TrashCheck *ProjectTrashCheckReport
 }
 
 // ProjectBindings binds forums to development projects (05 channel.project.bind) and takes the

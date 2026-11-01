@@ -38,6 +38,9 @@ String problemText(AppLocalizations l, String code, {String? reason}) {
 
     ('channel_read_only', 'channel_archived') =>
       l.problemChannelReadOnlyChannelArchived,
+    // A delete that asks to move a project folder the runner's check does not allow (01 6.18).
+    ('conflict', 'project_folder_refused') =>
+      l.problemConflictProjectFolderRefused,
     ('agent_invocation_denied', 'project_not_ready') =>
       l.problemAgentInvocationDeniedProjectNotReady,
     // The reasons of `terminal_denied` (24 13; brief M4-36: denials show the server's reason).

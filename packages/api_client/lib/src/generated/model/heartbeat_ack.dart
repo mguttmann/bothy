@@ -3,6 +3,8 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:built_collection/built_collection.dart';
+import 'package:api_client/src/generated/model/project_trash_request.dart';
 import 'package:api_client/src/generated/model/agent_runtime_status.dart';
 import 'package:built_value/built_value.dart';
 import 'package:built_value/serializer.dart';
@@ -14,6 +16,7 @@ part 'heartbeat_ack.g.dart';
 /// Properties:
 /// * [presence]
 /// * [intervalMs] - Interval the adapter should keep, `sync.heartbeat_interval`.
+/// * [projectTrash] - Runners only, the project folders of deleted forums this agent served whose deletion is final and whose move is not reported yet (09 18.15); absent when there are none.
 @BuiltValue()
 abstract class HeartbeatAck
     implements Built<HeartbeatAck, HeartbeatAckBuilder> {
@@ -23,6 +26,10 @@ abstract class HeartbeatAck
   /// Interval the adapter should keep, `sync.heartbeat_interval`.
   @BuiltValueField(wireName: r'interval_ms')
   int get intervalMs;
+
+  /// Runners only, the project folders of deleted forums this agent served whose deletion is final and whose move is not reported yet (09 18.15); absent when there are none.
+  @BuiltValueField(wireName: r'project_trash')
+  BuiltList<ProjectTrashRequest>? get projectTrash;
 
   HeartbeatAck._();
 
@@ -57,6 +64,15 @@ class _$HeartbeatAckSerializer implements PrimitiveSerializer<HeartbeatAck> {
       object.intervalMs,
       specifiedType: const FullType(int),
     );
+    if (object.projectTrash != null) {
+      yield r'project_trash';
+      yield serializers.serialize(
+        object.projectTrash,
+        specifiedType: const FullType(BuiltList, [
+          FullType(ProjectTrashRequest),
+        ]),
+      );
+    }
   }
 
   @override
@@ -97,6 +113,16 @@ class _$HeartbeatAckSerializer implements PrimitiveSerializer<HeartbeatAck> {
             specifiedType: const FullType(int),
           ) as int;
           result.intervalMs = valueDes;
+          break;
+        case r'project_trash':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(BuiltList, [
+              FullType(ProjectTrashRequest),
+            ]),
+          ) as BuiltList<ProjectTrashRequest>?;
+          if (valueDes == null) continue;
+          result.projectTrash.replace(valueDes);
           break;
         default:
           unhandled.add(key);

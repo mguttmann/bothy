@@ -32,6 +32,7 @@ part 'thread.g.dart';
 /// * [createdBy] - UUIDv7 (RFC 9562), lowercase canonical form.
 /// * [createdAt] - RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 /// * [movedAt] - RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+/// * [deletedAt] - Set while the item is deleted, pending or final (01 6.18); clients remove it and its local content, and a later version without it brings it back.
 /// * [version]
 /// * [tagIds]
 @BuiltValue()
@@ -105,6 +106,10 @@ abstract class Thread implements Built<Thread, ThreadBuilder> {
   /// RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
   @BuiltValueField(wireName: r'moved_at')
   DateTime? get movedAt;
+
+  /// Set while the item is deleted, pending or final (01 6.18); clients remove it and its local content, and a later version without it brings it back.
+  @BuiltValueField(wireName: r'deleted_at')
+  DateTime? get deletedAt;
 
   @BuiltValueField(wireName: r'version')
   int get version;
@@ -236,6 +241,13 @@ class _$ThreadSerializer implements PrimitiveSerializer<Thread> {
       yield r'moved_at';
       yield serializers.serialize(
         object.movedAt,
+        specifiedType: const FullType(DateTime),
+      );
+    }
+    if (object.deletedAt != null) {
+      yield r'deleted_at';
+      yield serializers.serialize(
+        object.deletedAt,
         specifiedType: const FullType(DateTime),
       );
     }
@@ -408,6 +420,14 @@ class _$ThreadSerializer implements PrimitiveSerializer<Thread> {
           ) as DateTime?;
           if (valueDes == null) continue;
           result.movedAt = valueDes;
+          break;
+        case r'deleted_at':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(DateTime),
+          ) as DateTime?;
+          if (valueDes == null) continue;
+          result.deletedAt = valueDes;
           break;
         case r'version':
           final valueDes = serializers.deserialize(

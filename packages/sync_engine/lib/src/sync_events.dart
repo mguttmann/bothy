@@ -23,14 +23,19 @@ sealed class SyncNotice {
   const SyncNotice();
 }
 
-/// `access.changed` removed [targets]; their rows, search entries and drafts are gone and the
-/// app closes their views with "No access anymore" (04 8.3 item 3).
+/// `access.changed` removed [targets], or they were deleted ([deleted], 01 6.18 item 8); their
+/// rows, search entries and drafts are gone and the app closes their views, with "No access
+/// anymore" on access loss (04 8.3 item 3).
 final class TargetsRemoved extends SyncNotice {
   /// Creates the notice.
-  const TargetsRemoved(this.targets);
+  const TargetsRemoved(this.targets, {this.deleted = false});
 
   /// The removed spaces, channels and threads (hosts are M4-36's).
   final List<TargetRef> targets;
+
+  /// Whether the targets were deleted (`deleted_at`, D-DEL-5) rather than their access lost; a
+  /// later version without `deleted_at` brings them back.
+  final bool deleted;
 }
 
 /// A draft write of this device overwrote a newer draft of another device

@@ -94,12 +94,15 @@ abstract interface class Fetcher {
 
   /// The structure of [targets] (spaces and channels; other kinds are ignored): `getSpace`
   /// and `listSpaceChannels` per space, `getChannel` per channel, and the first page of
-  /// `listChannelThreads` of every channel found.
+  /// `listChannelThreads` of every channel found. Deleted channels and threads are left out,
+  /// and a deleted space or channel comes with its `deletedAt` and nothing below it
+  /// (D-DEL-5).
   Future<StructureData> loadStructure(List<TargetRef> targets);
 
   /// One page of `listChannelThreads` of [channelId] sorted by [sort] (null: the server's
   /// default), from [cursor] (null: the first page), at most [limit] threads (null: the
-  /// server's page size); [openOnly] lists only open threads (`state=open`).
+  /// server's page size); [openOnly] lists only open threads (`state=open`). Deleted threads
+  /// are left out (D-DEL-5).
   Future<ThreadListPage> channelThreads(
     ChannelId channelId, {
     String? cursor,
@@ -231,14 +234,18 @@ final class ApiFetcher implements Fetcher {
       switch (t.kind) {
         case RemovedTargetKind.space:
           final id = SpaceId.parse(t.id);
-          spaces.add(await space(id));
+          final view = await space(id);
+          spaces.add(view);
+          // A deleted space brings none of its channels (D-DEL-5).
+          if (view.deletedAt != null) continue;
           final list = _json(
             (await _client.getChannelsApi().listSpaceChannels(
               spaceId: id.value,
             )).data,
           );
           channels.addAll([
-            for (final c in objList(list, 'items')) channelViewFromJson(c),
+            for (final c in objList(list, 'items'))
+              if (!isDeleted(obj(c, 'channel'))) channelViewFromJson(c),
           ]);
         case RemovedTargetKind.channel:
           channels.add(await channel(ChannelId.parse(t.id)));
@@ -247,13 +254,15 @@ final class ApiFetcher implements Fetcher {
       }
     }
     for (final c in channels) {
+      if (c.deletedAt != null) continue;
       final page = _json(
         (await _client.getThreadsApi().listChannelThreads(
           channelId: c.channel.id.value,
         )).data,
       );
       threads.addAll([
-        for (final t in objList(page, 'items')) threadFromJson(t),
+        for (final t in objList(page, 'items'))
+          if (!isDeleted(t)) threadFromJson(t),
       ]);
     }
     return StructureData(spaces: spaces, channels: channels, threads: threads);
@@ -281,7 +290,10 @@ final class ApiFetcher implements Fetcher {
       )).data,
     );
     return ThreadListPage(
-      threads: [for (final t in objList(page, 'items')) threadFromJson(t)],
+      threads: [
+        for (final t in objList(page, 'items'))
+          if (!isDeleted(t)) threadFromJson(t),
+      ],
       nextCursor: optStr(page, 'next_cursor'),
     );
   }

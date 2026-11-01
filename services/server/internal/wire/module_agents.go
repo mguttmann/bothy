@@ -64,6 +64,17 @@ func (r readinessInMaintenance) ApplyProjectReadiness(ctx context.Context, agent
 	return r.chat.ApplyProjectReadiness(txn.WithWriteInMaintenance(ctx), agentID, reports)
 }
 
+// ApplyProjectTrashResults implements agentsapp.Readiness: the outcomes of folder moves are
+// runtime state of the runner too (D-DEL-11).
+func (r readinessInMaintenance) ApplyProjectTrashResults(ctx context.Context, agentID ids.ID, results []chat.ProjectTrashResult) error {
+	return r.chat.ApplyProjectTrashResults(txn.WithWriteInMaintenance(ctx), agentID, results)
+}
+
+// ProjectTrashRequests implements agentsapp.Readiness; a read.
+func (r readinessInMaintenance) ProjectTrashRequests(ctx context.Context, agentID ids.ID) ([]chat.ProjectTrashRequest, error) {
+	return r.chat.ProjectTrashRequests(ctx, agentID)
+}
+
 // BoundProjectFolders implements agentsapp.Readiness; a read, so it needs no mark (M4-44).
 func (r readinessInMaintenance) BoundProjectFolders(ctx context.Context, names []string) ([]string, error) {
 	return r.chat.BoundProjectFolders(ctx, names)

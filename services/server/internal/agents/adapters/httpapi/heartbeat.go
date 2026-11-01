@@ -38,7 +38,15 @@ func (h *Agents) SendHeartbeat(ctx context.Context, req rest.SendHeartbeatReques
 	if err != nil {
 		return nil, err
 	}
-	return rest.SendHeartbeat200JSONResponse{Body: rest.HeartbeatAck{Presence: presenceREST(st), IntervalMs: h.interval.Milliseconds()}}, nil
+	ack := rest.HeartbeatAck{Presence: presenceREST(st), IntervalMs: h.interval.Milliseconds()}
+	if len(st.ProjectTrash) > 0 {
+		list := make([]rest.ProjectTrashRequest, 0, len(st.ProjectTrash))
+		for _, r := range st.ProjectTrash {
+			list = append(list, rest.ProjectTrashRequest{ChannelId: rest.Uuid(r.ChannelID), WorkspaceRef: r.WorkspaceRef})
+		}
+		ack.ProjectTrash = &list
+	}
+	return rest.SendHeartbeat200JSONResponse{Body: ack}, nil
 }
 
 // presenceREST converts a presence (schema AgentRuntimeStatus); empty values become absent

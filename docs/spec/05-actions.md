@@ -384,6 +384,8 @@ make sure that clients clear their cache and runs end (R-AZ-15).
 | `space.update` | change name, icon, color | space | manage | no | no | yes | no | `rl.admin` |
 | `space.reorder` | global order of the spaces | instance | owner | yes | no | yes | no | `rl.admin` |
 | `space.archive` | archive a space | space | owner | yes | yes | yes | yes | `rl.admin` |
+| `space.delete` | delete a space with its channels and their content; soft with undo until `chat.delete_undo_window`, then purged (01 6.18) | space | owner | yes | yes | yes | yes | `rl.admin` |
+| `space.restore` | undo the deletion of a space before `undo_until` | space | owner | yes | yes | yes | yes | `rl.admin` |
 | `space.operator.set` | set the default operator (I1); optionally `resolve_i1` | space | owner | yes | yes | yes | yes | `rl.admin` |
 | `sidebar.update` | change one's own sidebar state (collapse, own order of spaces, channels and posts) | space, channel | self and read | no | no | no | no | `rl.write` |
 | `channel.read` | see a channel, read its header data | channel | read | no | no | no | no | `rl.read` |
@@ -396,6 +398,9 @@ make sure that clients clear their cache and runs end (R-AZ-15).
 | `channel.project.bind` | set or change the project binding of a forum | channel | owner | yes | yes | yes | no | `rl.admin` |
 | `channel.read_only.set` | set or lift read-only (rule 1.8), with a reason; when it is set, active runs in the channel are cancelled | channel | manage | no | yes | yes | no | `rl.admin` |
 | `channel.archive` | archive a channel | channel | manage | no | yes | yes | yes | `rl.admin` |
+| `channel.delete` | delete a channel or forum with its content; soft with undo until `chat.delete_undo_window`, then purged; moving a project folder to the trash also needs `channel.project.bind` (01 6.18) | channel | manage | no | yes | yes | yes | `rl.admin` |
+| `channel.restore` | undo the deletion of a channel before `undo_until` | channel | manage | no | yes | yes | yes | `rl.admin` |
+| `channel.project.trash` | the serving runner reports that it moved the project folder of a deleted forum to the trash or refused to (09 18.15); recorded from the heartbeat | channel | agent-self | no | no | yes | no | `rl.agent_runtime` |
 | `forum_tag.manage` | create, change, delete the tags of a forum | channel | manage | no | no | yes | no | `rl.admin` |
 | `dm.create` | create a direct message with other people; only with the flag `dm.enabled` | instance | human | no | no | no | no | `rl.write` |
 | `dm.leave` | leave a DM | channel | participant | no | no | no | no | `rl.write` |
@@ -410,6 +415,8 @@ make sure that clients clear their cache and runs end (R-AZ-15).
 | `thread.create` | create a thread from a message or forum post; tags at creation are treated as with `thread.tags.set` (tags with `restricted` need `manage`) | channel | write | no | no | no | no | `rl.message` |
 | `thread.title.update` | change the title; sets `title_source = manual`. The operator agent may set it only with `auto`; the source then stays `auto` | thread | write and (creator or manage or operator agent) | no | no | no | no | `rl.write` |
 | `thread.close` | set a thread to "Done" | thread | write | no | no | no | no | `rl.write` |
+| `thread.delete` | delete a chat or thread with its content; soft with undo until `chat.delete_undo_window`, then purged; never a main thread (01 6.18) | thread | write and (creator or manage) | no | no | yes | no | `rl.write` |
+| `thread.restore` | undo the deletion of a chat before `undo_until` | thread | write and (creator or manage) | no | no | yes | no | `rl.write` |
 | `thread.reopen` | reopen a thread (also implicitly through a new message) | thread | write | no | no | no | no | `rl.write` |
 | `thread.move` | move to another channel; target with the same operator | thread | manage on source and target | no | no | yes | no | `rl.admin` |
 | `thread.tags.set` | set tags; tags with `restricted` need `manage` | thread | write | no | no | no | no | `rl.write` |

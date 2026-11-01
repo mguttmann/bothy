@@ -291,6 +291,11 @@ func subscribeArchivesAndRuns(reg *txn.Registry, m *Modules) error {
 	if err := txn.Subscribe(reg, m.RunsAcceptor.OnAgentDisabled); err != nil {
 		return err
 	}
+	// A deleted space, channel or thread cancels its active runs in the same transaction (05
+	// space.delete, channel.delete, thread.delete; D-DEL-7).
+	if err := txn.Subscribe(reg, m.RunsAcceptor.OnContentDeleted); err != nil {
+		return err
+	}
 	// A channel that becomes read-only cancels its active runs in the same transaction (05
 	// channel.read_only.set, 22 13.4; M8-03).
 	if err := txn.Subscribe(reg, m.RunsAcceptor.OnChannelReadOnlySet); err != nil {

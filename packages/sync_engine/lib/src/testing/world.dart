@@ -23,6 +23,7 @@ import 'package:domain/domain.dart' show EventCatalog, FractionalIndex;
 import 'fake_agent.dart';
 import 'fake_host.dart';
 
+part 'world_deletion.dart';
 part 'world_files.dart';
 part 'world_notify.dart';
 part 'world_search.dart';
@@ -746,6 +747,20 @@ final class FakeWorld {
   /// Messages (API `Message`) by ID.
   final Map<String, JsonMap> messages = {};
 
+  /// `chat.delete_undo_window` (D-DEL-1): how long `restoreSpace`, `restoreChannel` and
+  /// `restoreThread` undo a deletion; tests move the clock past it.
+  Duration deleteUndoWindow = const Duration(seconds: 30);
+
+  /// The deletions of spaces, channels and threads by target ID (01 6.18, `DeletionWorld`);
+  /// a restore removes its entry. The fake purges no content after the window (README).
+  final Map<String, FakeDeletion> deletions = {};
+
+  /// The project folders of forums with a project binding by channel ID (API
+  /// `ProjectFolderDeletion`: `workspace_ref` and the serving runner's last `trash_check`); a
+  /// test sets them, `deleteChannel` with `trash_project_folder` adds `trash_state` `requested`
+  /// (D-DEL-10, D-DEL-11).
+  final Map<String, JsonMap> projectFolders = {};
+
   final Map<String, List<String>> _threadMessages = {};
   final Map<String, ({String id, String hash})> _clientMsgIds = {};
 
@@ -1143,7 +1158,19 @@ final class FakeWorld {
   /// Whether [principalId] sees [threadId].
   bool seesThread(String principalId, String threadId) {
     final t = threads[threadId];
-    return t != null && seesChannel(principalId, t['channel_id']! as String);
+    // A deleted thread answers `404 not_found` to every read and write (D-DEL-3).
+    return t != null &&
+        t['deleted_at'] == null &&
+        seesChannel(principalId, t['channel_id']! as String);
+  }
+
+  /// Whether [channelId] and its space are not deleted, so the lists name it (D-DEL-2).
+  bool listsChannel(String channelId) {
+    final channel = channels[channelId];
+    final spaceId = channel?.spaceId;
+    return channel != null &&
+        channel.json['deleted_at'] == null &&
+        (spaceId == null || spaces[spaceId]?['deleted_at'] == null);
   }
 
   /// Whether [principalId] may receive [event] (04 7.2, 05 6): a personal event only its
@@ -1209,16 +1236,20 @@ final class FakeWorld {
       ? 'write'
       : 'read';
 
-  /// The visible spaces of [principalId], as `SpaceView`s.
+  /// The visible spaces of [principalId], as `SpaceView`s; a deleted space leaves the list
+  /// (D-DEL-2).
   List<JsonMap> spaceViews(String principalId) => [
     for (final id in spaces.keys)
-      if (seesSpace(principalId, id)) spaceView(principalId, id),
+      if (spaces[id]!['deleted_at'] == null && seesSpace(principalId, id))
+        spaceView(principalId, id),
   ];
 
-  /// The visible channels of [principalId], optionally of one space, as `ChannelView`s.
+  /// The visible channels of [principalId], optionally of one space, as `ChannelView`s; a
+  /// deleted channel and the channels of a deleted space leave the list (D-DEL-2).
   List<JsonMap> channelViews(String principalId, {String? spaceId}) => [
     for (final c in channels.values)
       if (c.access.containsKey(principalId) &&
+          listsChannel(c.id) &&
           (spaceId == null || c.spaceId == spaceId))
         channelView(principalId, c.id),
   ];
@@ -1244,7 +1275,7 @@ final class FakeWorld {
         pinned.contains(t['id']) || activeRunOf(t['id']! as String) != null;
     return [
       for (final c in channels.values)
-        if (c.access.containsKey(principalId))
+        if (c.access.containsKey(principalId) && listsChannel(c.id))
           ..._boundedThreads(_openThreads(principalId, c.id), kept),
     ];
   }
@@ -1334,7 +1365,8 @@ final class FakeWorld {
   /// the counts after its read state (04 14).
   List<JsonMap> unreadThreads(String principalId) => [
     for (final t in threads.values)
-      if (seesThread(principalId, t['id']! as String))
+      if (seesThread(principalId, t['id']! as String) &&
+          listsChannel(t['channel_id']! as String))
         ...() {
           final id = t['id']! as String;
           final lastRead =

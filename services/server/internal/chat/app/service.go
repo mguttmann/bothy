@@ -63,6 +63,10 @@ type Config struct {
 	// SidebarOrderMaxItems is sidebar.order_max_items, the most items of a personal order list
 	// of the sidebar (channel_order, thread_order; M4-51).
 	SidebarOrderMaxItems int `config:"sidebar.order_max_items"`
+	// DeleteUndoWindow is chat.delete_undo_window, how long a deleted space, channel or thread can
+	// be restored before messaging.purge_deleted removes its content (D-DEL-1); zero, a Config
+	// built without the key, means defaultUndoWindow.
+	DeleteUndoWindow time.Duration `config:"chat.delete_undo_window"`
 }
 
 // limits returns the text limits of channels and tags.
@@ -81,6 +85,8 @@ func (c Config) check() error {
 		return errors.New("chat: channel.history_backfill_limit_default must be between 0 and channel.history_backfill_limit_max")
 	case c.ThreadTitleMaxChars < 1 || c.ThreadMaxTags < 1:
 		return errors.New("chat: thread.title_max_chars and thread.max_tags must be at least 1")
+	case c.DeleteUndoWindow < 0:
+		return errors.New("chat: chat.delete_undo_window must not be negative")
 	case c.PageSizeDefault < 1 || c.PageSizeMax < 1:
 		return errors.New("chat: api.page_size_default and api.page_size_max must be at least 1")
 	case c.SidebarOrderMaxItems < 1:
@@ -143,6 +149,14 @@ type Deps struct {
 	// Guard tells whether the ownership list of an import controls the read-only flag of a channel
 	// (importer, M8-03); nil means no channel is controlled.
 	Guard chat.ReadOnlyGuard
+	// Deletions writes and reads the deletion state (FEAT-delete-spaces-chats); nil means Store
+	// when it implements DeletionStore. Without one the chat.Deletions, chat.Purges and
+	// chat.ProjectTrash methods answer internal.
+	Deletions DeletionStore
+	// Files and Sessions count the files and agent sessions of DeletionInfo (source ports of chat
+	// that files and agents implement, bound by internal/wire); nil counts zero.
+	Files    chat.FileCounter
+	Sessions chat.SessionCounter
 }
 
 // Cursors is the outgoing port that encodes and checks the opaque list cursors (06 section 6
@@ -189,6 +203,9 @@ func New(cfg Config, d Deps) (*Service, error) {
 	}
 	if d.Unread == nil {
 		d.Unread, _ = d.Store.(UnreadStore)
+	}
+	if d.Deletions == nil {
+		d.Deletions, _ = d.Store.(DeletionStore)
 	}
 	if d.ImportThreads == nil {
 		d.ImportThreads, _ = d.Store.(ImportThreadStore)
@@ -281,6 +298,7 @@ func spaceView(sp domain.Space) chat.Space {
 	return chat.Space{
 		ID: sp.ID, Name: sp.Name, Icon: sp.Icon, Color: sp.Color, SortKey: sp.SortKey,
 		DefaultOperatorAgentID: sp.DefaultOperatorAgentID, CreatedAt: sp.CreatedAt, ArchivedAt: sp.ArchivedAt, Version: sp.Version,
+		DeletedAt: sp.Deletion.At,
 	}
 }
 
@@ -348,6 +366,7 @@ type spaceJSON struct {
 	ArchivedAt             string `json:"archived_at,omitempty"`
 	Version                int64  `json:"version"`
 	CreatedAt              string `json:"created_at"`
+	DeletedAt              string `json:"deleted_at,omitempty"`
 }
 
 // spaceBody converts a space into the JSON form of the schema Space.
@@ -355,7 +374,7 @@ func spaceBody(sp domain.Space) spaceJSON {
 	return spaceJSON{
 		ID: sp.ID.String(), Name: sp.Name, Icon: sp.Icon, Color: sp.Color, SortKey: sp.SortKey,
 		DefaultOperatorAgentID: optionalID(sp.DefaultOperatorAgentID), ArchivedAt: stamp(sp.ArchivedAt), Version: sp.Version,
-		CreatedAt: stamp(sp.CreatedAt),
+		CreatedAt: stamp(sp.CreatedAt), DeletedAt: stamp(sp.Deletion.At),
 	}
 }
 

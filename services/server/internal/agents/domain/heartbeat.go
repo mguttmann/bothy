@@ -133,7 +133,22 @@ type Readiness struct {
 	Ready     bool
 	// Reason is the code of 09 section 18.12 sent with Ready false; "" when absent (M4-43).
 	Reason string
+	// TrashGiven reports a trash_check (09 18.15, D-DEL-10); absent means unchanged. TrashOK is
+	// its ok, TrashReason its code with ok false.
+	TrashGiven  bool
+	TrashOK     bool
+	TrashReason string
 }
+
+// TrashResult is one entry of project_trash_results (schema ProjectTrashResult, D-DEL-11).
+type TrashResult struct {
+	ChannelID ids.ID
+	// Result is trashed or refused; Reason the refusal code, "" when absent.
+	Result, Reason string
+}
+
+// The values of TrashResult.Result.
+var trashResults = []string{"trashed", "refused"}
 
 // Report is one decoded heartbeat (agent_heartbeat.v1). Every heartbeat is the whole reported
 // state (D-M2-20-3): an empty value is "not reported".
@@ -157,6 +172,8 @@ type Report struct {
 	// Readiness is project_readiness; ReadinessGiven tells an absent member from an empty list.
 	Readiness      []Readiness
 	ReadinessGiven bool
+	// TrashResults is project_trash_results (D-DEL-11); nil when absent.
+	TrashResults []TrashResult
 	// Folders is project_folders, the folder names under the runner's projects root (09 section
 	// 18.13, M4-44); FoldersGiven tells an absent member from an empty list.
 	Folders      []string
@@ -439,7 +456,7 @@ func (d *decoder) form(pointer string, raw json.RawMessage, re *regexp.Regexp) (
 
 // The top-level members of the schema Heartbeat.
 var heartbeatMembers = []string{"state", "runtime_version", "reported_billing_mode", "billing_modes_supported", "billing_evidence",
-	"reported_tool_class", "rate_limit", "details", "project_readiness", "project_folders"}
+	"reported_tool_class", "rate_limit", "details", "project_readiness", "project_folders", "project_trash_results"}
 
 // billingModes and toolClasses are the enumerations of BillingMode and ToolClass.
 var (
@@ -503,6 +520,9 @@ func DecodeHeartbeat(raw []byte) (Report, []errs.FieldError) {
 	}
 	if v, has := m["project_folders"]; has {
 		r.Folders, r.FoldersGiven = d.folders(v), true
+	}
+	if v, has := m["project_trash_results"]; has {
+		r.TrashResults = d.trashResults(v)
 	}
 	if len(d.errs) > 0 {
 		return Report{}, d.errs
@@ -786,7 +806,7 @@ func (d *decoder) folders(raw json.RawMessage) []string {
 // readinessItem reads one entry of project_readiness (schema ProjectReadiness); ok is false when
 // it is no object.
 func (d *decoder) readinessItem(ip string, raw json.RawMessage) (Readiness, bool) {
-	m, ok := d.object(ip, raw, "channel_id", "ready", "reason")
+	m, ok := d.object(ip, raw, "channel_id", "ready", "reason", "trash_check")
 	if !ok {
 		return Readiness{}, false
 	}
@@ -809,6 +829,86 @@ func (d *decoder) readinessItem(ip string, raw json.RawMessage) (Readiness, bool
 	}
 	if v, has := m["reason"]; has {
 		r.Reason = d.readinessReason(ip+"/reason", v, r.Ready)
+	}
+	if v, has := m["trash_check"]; has {
+		r.TrashGiven = true
+		r.TrashOK, r.TrashReason = d.trashCheck(ip+"/trash_check", v)
+	}
+	return r, true
+}
+
+// trashCheck reads a trash_check (schema ProjectTrashCheckReport): ok is required, a reason code
+// only with ok false (09 18.15).
+func (d *decoder) trashCheck(p string, raw json.RawMessage) (bool, string) {
+	m, ok := d.object(p, raw, "ok", "reason")
+	if !ok {
+		return false, ""
+	}
+	var okValue bool
+	if v, has := m["ok"]; has {
+		okValue, _ = d.boolean(p+"/ok", v)
+	} else {
+		d.fail(p+"/ok", codeRequired)
+	}
+	reason := ""
+	if v, has := m["reason"]; has {
+		reason = d.readinessReason(p+"/reason", v, okValue)
+	}
+	return okValue, reason
+}
+
+// trashResults reads project_trash_results; a channel listed twice is one error at
+// /project_trash_results.
+func (d *decoder) trashResults(raw json.RawMessage) []TrashResult {
+	const p = "/project_trash_results"
+	items, ok := d.array(p, raw)
+	if !ok {
+		return nil
+	}
+	out := make([]TrashResult, 0, len(items))
+	dup := false
+	for i, it := range items {
+		r, ok := d.trashResult(index(p, i), it)
+		if !ok {
+			continue
+		}
+		if !r.ChannelID.IsZero() && slices.ContainsFunc(out, func(o TrashResult) bool { return o.ChannelID == r.ChannelID }) {
+			dup = true
+		}
+		out = append(out, r)
+	}
+	if dup {
+		d.fail(p, codeDuplicate)
+	}
+	return out
+}
+
+// trashResult reads one entry of project_trash_results (schema ProjectTrashResult); ok is false
+// when it is no object.
+func (d *decoder) trashResult(ip string, raw json.RawMessage) (TrashResult, bool) {
+	m, ok := d.object(ip, raw, "channel_id", "result", "reason")
+	if !ok {
+		return TrashResult{}, false
+	}
+	var r TrashResult
+	if v, has := m["channel_id"]; has {
+		if s, ok := d.str(ip+"/channel_id", v); ok {
+			id, err := ids.Parse(s)
+			if err != nil {
+				d.fail(ip+"/channel_id", codeInvalidFormat)
+			}
+			r.ChannelID = id
+		}
+	} else {
+		d.fail(ip+"/channel_id", codeRequired)
+	}
+	if v, has := m["result"]; has {
+		r.Result, _ = d.enum(ip+"/result", v, trashResults)
+	} else {
+		d.fail(ip+"/result", codeRequired)
+	}
+	if v, has := m["reason"]; has {
+		r.Reason = d.readinessReason(ip+"/reason", v, r.Result != "refused")
 	}
 	return r, true
 }

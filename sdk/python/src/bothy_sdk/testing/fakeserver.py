@@ -351,6 +351,25 @@ class FakeServer:
         """Heartbeat bodies received, in order."""
         return self.world.heartbeats
 
+    def request_project_trash(self, channel_id: UUID, workspace_ref: str) -> None:
+        """Hand a folder move to the agent in every heartbeat answer until it reports one.
+
+        The answer of ``sendHeartbeat`` carries it as ``project_trash`` (09 18.15); the first
+        heartbeat with an outcome for the channel ends the request.
+
+        Args:
+            channel_id: The deleted forum.
+            workspace_ref: Its binding's ``workspace_ref``.
+        """
+        self.world.project_trash.append(
+            {"channel_id": str(channel_id), "workspace_ref": workspace_ref}
+        )
+
+    @property
+    def project_trash_results(self) -> list[dict[str, Any]]:
+        """The outcomes of requested folder moves the agent reported, in order (09 18.15)."""
+        return self.world.project_trash_results
+
     # Life cycle ---------------------------------------------------------------------------
 
     async def start(self) -> None:

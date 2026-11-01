@@ -80,6 +80,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - createWebhookSubscription
   - decideGdprRequest
   - deleteBrandingLogo
+  - deleteChannel
   - deleteChannelDraft
   - deleteFile
   - deleteForumTag
@@ -91,8 +92,10 @@ enabled:             # operationIds that have a handler; sorted ascending
   - deleteNotificationPreference
   - deleteProjectBinding
   - deleteQuietHoursRule
+  - deleteSpace
   - deleteStatusComponent
   - deleteTemplate
+  - deleteThread
   - deleteThreadDraft
   - deleteWebhookSubscription
   - disableAgent
@@ -114,6 +117,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - getBrandingLogo
   - getChannel
   - getChannelBehavior
+  - getChannelDeletion
   - getCommand
   - getConsoleSession
   - getConsumerState
@@ -143,6 +147,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - getServedChannelConfig
   - getSnapshot
   - getSpace
+  - getSpaceDeletion
   - getStatsBackends
   - getStatsLive
   - getStatsSlo
@@ -151,6 +156,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - getTerminalSession
   - getThread
   - getThreadCosts
+  - getThreadDeletion
   - getToolCallStats
   - getTranscript
   - getUpload
@@ -258,6 +264,9 @@ enabled:             # operationIds that have a handler; sorted ascending
   - requestTranscription
   - resetAgentSession
   - respondToInteraction
+  - restoreChannel
+  - restoreSpace
+  - restoreThread
   - resumeApp
   - resumeRun
   - retryRun

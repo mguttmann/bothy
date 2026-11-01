@@ -627,7 +627,8 @@ through the same decoder and have the same effect (action `agent.heartbeat`, `ag
 rate-limit class `rl.agent_runtime`, exempt from `Idempotency-Key`). The body carries no agent id:
 an agent reports only for itself; the owner of the agent gets `403 forbidden` with reason
 `subject_kind_not_allowed`, any other person or app `404 not_found` (visibility first, R-AZ-01). The server answers `HeartbeatAck` with the presence after the heartbeat
-(`AgentRuntimeStatus`) and `interval_ms`, which is `sync.heartbeat_interval`. A gateway heartbeat
+(`AgentRuntimeStatus`) and `interval_ms`, which is `sync.heartbeat_interval`, and for a runner
+`project_trash`, the folder moves of 18.15; the gateway's `heartbeat_ack` carries neither. A gateway heartbeat
 of an agent without the member `agent` keeps the connection alive and changes no presence, because
 presence needs the state report. Errors of the member `agent` answer `error {op: "heartbeat",
 code}` and keep the connection.
@@ -644,8 +645,9 @@ Top-level members (openapi `Heartbeat`, closed; an unknown member is `400 valida
 | `reported_tool_class` | the tool class the runtime actually loaded, section 2.4 |
 | `rate_limit` | state of the provider's rate limits: `state` `ok`, `near_limit`, `limited` or `unknown`, and `resets_at` when known; never quotas, keys or subscription names. Stored as exactly these two members in `agents.reported_details.rate_limit`; a heartbeat without it clears the stored one (full state). Display in the backend view of [25-visualization.md](25-visualization.md), section 6.2 |
 | `details` | closed object, keys below |
-| `project_readiness` | runners only: list of `{channel_id, ready, reason}`, one entry per bound forum, distinct `channel_id` values (sets `project_bindings.ready`, M2-03); `reason` is optional, a code of 18.12 in the reason form below, sent only with `ready` false and stored as `project_bindings.ready_reason` (M4-43) |
+| `project_readiness` | runners only: list of `{channel_id, ready, reason}`, one entry per bound forum, distinct `channel_id` values (sets `project_bindings.ready`, M2-03); `reason` is optional, a code of 18.12 in the reason form below, sent only with `ready` false and stored as `project_bindings.ready_reason` (M4-43); `trash_check` is optional, `{ok, reason}` of the folder check of 18.15 with a code of 18.15 as `reason` when `ok` is false, sent at most every `runner.trash_check_interval` and stored on the binding (FEAT-delete-spaces-chats) |
 | `project_folders` | runners only: the distinct folder names directly under the projects root that are Git work trees, sorted, at most `runner.project_folders_max` (18.13); each one segment of `^[A-Za-z0-9][A-Za-z0-9._-]*$` with the length limit of `ProjectFolderName` in the OpenAPI; stored as `agents.reported_project_folders` (M4-44) |
+| `project_trash_results` | runners only: list of `{channel_id, result, reason}` with distinct `channel_id` values, the outcome (`trashed` or `refused` with a code of 18.15) of each folder move of `HeartbeatAck.project_trash` whose result no accepted `sendHeartbeat` carried yet (18.15); the server stores it once and audits it as `channel.project.trash` |
 
 Keys of `details` (closed; any other key, also inside `capabilities`, `adapter` and `runtime`, is
 an unknown member):
@@ -3305,6 +3307,64 @@ attachment without a transcript would reach the turn only as a file path.
 6. **Privacy.** Neither the transcript nor the path is logged; the audio never leaves the host
    except through the configured program, which the operator chooses.
 
+### 18.15 Moving a project folder to the trash
+
+Addendum of 2026-11-01 (FEAT-delete-spaces-chats, [design note](../design/delete.md) D-DEL-10 to
+D-DEL-13). Whoever deletes a project forum may also have its folder moved to the trash
+([01-product.md](01-product.md) 6.18); only the serving runner sees the folder, so it checks and
+moves it and never trusts the server or an older check for its own file system.
+
+1. **Check.** For every bound forum it serves, the runner computes at most every
+   `runner.trash_check_interval` whether the folder may go and sends `trash_check` `{ok, reason}`
+   in the forum's readiness entry (4.8). The rules apply in this order:
+
+   | Code | The folder is refused when |
+   |---|---|
+   | `outside_root` | `workspace_ref` does not resolve by 18.1 to a strict descendant of the projects root (also the root itself) |
+   | `symlink` | the bound path or one of its components below the root is a symbolic link, also one whose target stays under the root |
+   | `workspace_missing` | it does not exist or is no folder |
+   | `contains_other_project` | it is or holds the folder of another bound forum the runner serves, or holds `runner.state_dir` |
+   | `foreign_worktree` | it lies in a Git work tree whose common Git directory (`git rev-parse --git-common-dir`) is not inside it: a linked work tree, a submodule or a folder of another repository |
+   | `uncommitted_changes` | `git status --porcelain --untracked-files=normal` or `git stash list` prints anything |
+   | `unpushed_commits` | `git log --branches --not --remotes -1` prints a commit |
+   | `check_failed` | a `git` call fails or exceeds `runner.cli_probe_timeout`, or Git refuses a folder below a `.git` |
+
+   A folder outside any Git work tree has no Git rule. `git` runs as in 18.12: `runner.git_bin`,
+   an argument list, the allow list environment, no prompt, `core.fsmonitor` off.
+2. **Request.** Once the deletion is final, the server answers every `sendHeartbeat` of the
+   runner with `HeartbeatAck.project_trash` `{channel_id, workspace_ref}` until the runner
+   reported an outcome. The gateway's `heartbeat_ack` has no such member, so the runner also sends
+   `sendHeartbeat` every `runner.trash_check_interval`. The folder is resolved from
+   `workspace_ref` by item 1; the server never names a path.
+3. **Move.** For a request it has not handled yet, the runner stops the turns of the channel by
+   the stop path of 18.6 with the reason `channel_read_only` and waits until none runs (at most
+   `runner.stop_grace` plus `runner.kill_grace` plus `runner.cli_probe_timeout`, otherwise the
+   request waits for the next answer), checks again by item 1 and moves the folder with one
+   rename, never a copy and never a removal:
+   - macOS: `~/.Trash/<name>`;
+   - Linux and other POSIX systems: the freedesktop trash `$XDG_DATA_HOME/Trash` (default
+     `~/.local/share/Trash`), `files/<name>` with `info/<name>.trashinfo` (`Path=` the percent
+     encoded real path, `DeletionDate=` the local time);
+   - Windows: always `.bothy-trash` under the projects root (below), because the shell's recycle
+     bin deletes for good when it is off, full or the path is too long, without telling a
+     process that has no window.
+
+   A taken name gets `-2`, `-3` and so on. When the host trash is on another file system than the
+   folder, or the runner may not create or write it, the folder goes to
+   `.bothy-trash/<name>-<UTC time stamp>` directly under the projects root instead; a
+   `.bothy-trash` that is a symbolic link or not a folder is refused with `move_failed`, and a
+   `workspace_ref` inside `.bothy-trash` is never a project (`outside_root`). A rename that fails
+   otherwise is refused with `move_failed`.
+4. **Result.** The runner sends `{channel_id, result, reason}` (`trashed`, or `refused` with a code
+   of item 1 or 3) in `project_trash_results` of a heartbeat at once and in every heartbeat until
+   an accepted `sendHeartbeat` carried it. It keeps each handled request with its result in
+   `<runner.state_dir>/trash.json` (a move in progress with its target), so a restart neither
+   repeats a move nor loses a result; a request the server repeats after the result was sent gets
+   the same result again and moves nothing.
+5. **Logs.** `project_trash_moved` (place `trash`, `fallback` or `recovered` after
+   a restart), `project_trash_refused` (code), `project_trash_deferred` and `project_trash_failed`
+   carry codes and channel IDs, never a path or a folder name.
+
 ## 19. Decisions of this chapter
 
 | No. | Decision | Reason |
@@ -3346,6 +3406,7 @@ attachment without a transcript would reach the turn only as a file path.
 | R-AG-35 | The Claude Code runner treats Git as optional: a bound folder without `.git` is ready, a forum without a binding works in `runner.default_workspace` when it is set (default off), and every run the runner ends without a turn or with `adapter_error` names its cause in the `summary` of `finishRun`, which the app shows next to the reason (18.1, 18.9, addendum of 2026-10-30). | Owner expectation 2026-10-30: every development forum is a Claude Code chat; forums bound to folders without Git stayed "not ready" and a forum without a binding failed at once with a bare "Error in the adapter" (docs/decisions.d/RUNNER-NO-GIT.md). |
 | R-AG-36 | A fixed thread operator triggers only while it is allowed in the channel: it is the channel's effective operator, has `write` of its own on the channel, has the active run of the thread, or completed a run in the thread; otherwise a message that would trigger it gets `operator_not_in_channel` and no run (3.4 step 4a, addendum of 2026-10-30). | Live use 2026-10-30: imported threads carry `planned_operator` (R-IM-08), and a switch-over that left the channel without that operator made every message start a run that failed at once; a thread its operator has worked in keeps its session after an operator change (R-DM-12). |
 | R-AG-37 | A failed or cancelled run of the newest trigger of a thread can be retried for the same message with the rights of triggering, idempotently (`retryRun`, 5.7, addendum of 2026-10-30). | Live use 2026-10-30: after `adapter_error` the person had to write the message again; the API and the apps had no way to start it again. |
+| R-AG-38 | The Claude Code runner moves the folder of a deleted project forum only into the trash of its host, or `.bothy-trash` under its projects root, with one rename after it stopped the forum's turns and checked the folder again, and refuses with a code a folder outside its root, a link, a foreign work tree, uncommitted or unpushed work, a folder holding another project and any Git error (18.15, addendum of 2026-11-01). | The owner wants the folder of a deleted project gone but recoverable; a rename cannot half delete a project, and the runner must not trust the server or an older check for its own file system (D-DEL-10 to D-DEL-13). |
 
 ## 20. Alignment with the core contract
 
@@ -3430,6 +3491,7 @@ configuration of the respective program outside the server.
 | `runner.provision_retry_after` | Runner | `5m` | a failed folder creation is not tried again for the same binding content before this time (18.12) |
 | `runner.project_folders_max` | Runner | `500` | most folder names the runner reports in `project_folders` (18.13) |
 | `runner.channels_resync_interval` | Runner | `5m` | the served channels are loaded again at this interval, the fallback for an operator or binding change without an event (18.1); above zero |
+| `runner.trash_check_interval` | Runner | `60s` | the bound folders are checked for a move to the trash at most this often, and the runner sends `sendHeartbeat` at this interval to receive folder moves (18.15); above zero |
 | `runner.transcribe_cmd` | Runner | empty | argument list of a local transcriber; the audio file path is appended and stdout is the transcript (18.14); empty means no transcription |
 | `runner.transcribe_timeout` | Runner | `5m` | time limit of one transcription (18.14); above zero |
 | `runner.projects_root` | Runner | no default, required | root of all project folders |

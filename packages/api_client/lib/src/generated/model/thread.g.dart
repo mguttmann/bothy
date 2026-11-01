@@ -171,6 +171,8 @@ class _$Thread extends Thread {
   @override
   final DateTime? movedAt;
   @override
+  final DateTime? deletedAt;
+  @override
   final int version;
   @override
   final BuiltList<String> tagIds;
@@ -197,6 +199,7 @@ class _$Thread extends Thread {
     required this.createdBy,
     required this.createdAt,
     this.movedAt,
+    this.deletedAt,
     required this.version,
     required this.tagIds,
   }) : super._();
@@ -229,6 +232,7 @@ class _$Thread extends Thread {
         createdBy == other.createdBy &&
         createdAt == other.createdAt &&
         movedAt == other.movedAt &&
+        deletedAt == other.deletedAt &&
         version == other.version &&
         tagIds == other.tagIds;
   }
@@ -254,6 +258,7 @@ class _$Thread extends Thread {
     _$hash = $jc(_$hash, createdBy.hashCode);
     _$hash = $jc(_$hash, createdAt.hashCode);
     _$hash = $jc(_$hash, movedAt.hashCode);
+    _$hash = $jc(_$hash, deletedAt.hashCode);
     _$hash = $jc(_$hash, version.hashCode);
     _$hash = $jc(_$hash, tagIds.hashCode);
     _$hash = $jf(_$hash);
@@ -281,6 +286,7 @@ class _$Thread extends Thread {
           ..add('createdBy', createdBy)
           ..add('createdAt', createdAt)
           ..add('movedAt', movedAt)
+          ..add('deletedAt', deletedAt)
           ..add('version', version)
           ..add('tagIds', tagIds))
         .toString();
@@ -369,6 +375,10 @@ class ThreadBuilder implements Builder<Thread, ThreadBuilder> {
   DateTime? get movedAt => _$this._movedAt;
   set movedAt(DateTime? movedAt) => _$this._movedAt = movedAt;
 
+  DateTime? _deletedAt;
+  DateTime? get deletedAt => _$this._deletedAt;
+  set deletedAt(DateTime? deletedAt) => _$this._deletedAt = deletedAt;
+
   int? _version;
   int? get version => _$this._version;
   set version(int? version) => _$this._version = version;
@@ -402,6 +412,7 @@ class ThreadBuilder implements Builder<Thread, ThreadBuilder> {
       _createdBy = $v.createdBy;
       _createdAt = $v.createdAt;
       _movedAt = $v.movedAt;
+      _deletedAt = $v.deletedAt;
       _version = $v.version;
       _tagIds = $v.tagIds.toBuilder();
       _$v = null;
@@ -486,6 +497,7 @@ class ThreadBuilder implements Builder<Thread, ThreadBuilder> {
               'createdAt',
             ),
             movedAt: movedAt,
+            deletedAt: deletedAt,
             version: BuiltValueNullFieldError.checkNotNull(
               version,
               r'Thread',

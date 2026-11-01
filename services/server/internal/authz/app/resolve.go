@@ -22,6 +22,19 @@ type resolved struct {
 	grantTarget domain.TargetKind
 	// host are the facts of a host resource (M2-39); nil for every other kind.
 	host *authz.HostFacts
+	// threadDeleted reports a deleted thread on the path (07 4.5a).
+	threadDeleted bool
+}
+
+// deletedThreadActions are the actions that still resolve a deleted thread (07 4.5a, D-DEL-3):
+// thread.read for its deletion state and for the receivers of its events (the use case of
+// getThread and the history answer 404 themselves), thread.delete for the answer without effect,
+// thread.restore, and the agent-self actions with which the runner ends a run the deletion
+// cancelled (run.update, run.finish, agent_session.report), so its state and costs arrive. Every
+// other action on the thread, its messages and its runs is not_found.
+var deletedThreadActions = map[authorize.Action]bool{
+	authorize.ActionThreadRead: true, authorize.ActionThreadDelete: true, authorize.ActionThreadRestore: true,
+	authorize.ActionRunUpdate: true, authorize.ActionRunFinish: true, authorize.ActionAgentSessionReport: true,
 }
 
 // pick returns the one id of a resource and its hint: both set and different is a contradiction.
@@ -48,19 +61,7 @@ func (a *Authorizer) resolve(ctx context.Context, act authorize.Action, r author
 		// (M3-03, brief M3-10 design notes 6 and 7).
 		return resolved{path: domain.Path{Kind: domain.PathNone}}, true, nil
 	case domain.IsChannelPathKind(kind):
-		threadID, channelID := r.ThreadID, r.ChannelID
-		var err error
-		if r.Kind == authorize.ResourceThread {
-			if threadID, err = pick(r.ID, r.ThreadID, "thread"); err != nil {
-				return resolved{}, false, err
-			}
-		}
-		if r.Kind == authorize.ResourceChannel {
-			if channelID, err = pick(r.ID, r.ChannelID, "channel"); err != nil {
-				return resolved{}, false, err
-			}
-		}
-		return a.resolveChannel(ctx, threadID, channelID, r.SpaceID)
+		return a.resolveChannelPath(ctx, act, r)
 	case r.Kind == authorize.ResourceSpace:
 		id, err := pick(r.ID, r.SpaceID, "space")
 		if err != nil {
@@ -77,6 +78,28 @@ func (a *Authorizer) resolve(ctx context.Context, act authorize.Action, r author
 		return a.resolveCommand(ctx, r)
 	}
 	return resolved{path: domain.Path{Kind: domain.PathInstance}}, true, nil
+}
+
+// resolveChannelPath resolves a resource on a channel path: its thread or channel and the space;
+// a deleted thread is not found for every action but deletedThreadActions (07 4.5a).
+func (a *Authorizer) resolveChannelPath(ctx context.Context, act authorize.Action, r authorize.Resource) (resolved, bool, error) {
+	threadID, channelID := r.ThreadID, r.ChannelID
+	var err error
+	if r.Kind == authorize.ResourceThread {
+		if threadID, err = pick(r.ID, r.ThreadID, "thread"); err != nil {
+			return resolved{}, false, err
+		}
+	}
+	if r.Kind == authorize.ResourceChannel {
+		if channelID, err = pick(r.ID, r.ChannelID, "channel"); err != nil {
+			return resolved{}, false, err
+		}
+	}
+	res, found, err := a.resolveChannel(ctx, threadID, channelID, r.SpaceID)
+	if found && res.threadDeleted && !deletedThreadActions[act] {
+		return resolved{}, false, nil
+	}
+	return res, found, err
 }
 
 // resolveSpace resolves a space; an archived space caps every level at read (07 section 4.5).
@@ -138,7 +161,7 @@ func (a *Authorizer) resolveChannel(ctx context.Context, threadID, channelID, sp
 	if !th.ID.IsZero() {
 		path.ThreadID, path.ThreadMain, path.ThreadOperatorID, path.ThreadCreatedBy = th.ID, th.Main, th.OperatorAgentID, th.CreatedBy
 	}
-	return resolved{path: path, channel: ch}, true, nil
+	return resolved{path: path, channel: ch, threadDeleted: th.Deleted}, true, nil
 }
 
 // channelPath is the path of channel facts without a thread.

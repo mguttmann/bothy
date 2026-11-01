@@ -332,7 +332,7 @@ func newEmptyWorldWith(t *testing.T, search searchlang.Map) *world {
 			Snapshot: syncapp.SnapshotConfig{ThreadWindow: 7 * 24 * time.Hour, ThreadsPerChannel: 20}})
 	must(t, err)
 	built, err := routes.Build(wire.Handlers{Access: authzhttp.New(w.admin), Agents: ag.Handlers, Spaces: c.Handlers, Channels: c.ChannelHandlers,
-		People: w.id.PeopleHandlers, Threads: c.ThreadHandlers, Behavior: c.BehaviorHandlers, Messages: m.Handlers, Admin: settings.Handlers, Personal: personal.Handlers,
+		People: w.id.PeopleHandlers, Threads: c.ThreadHandlers, Deletion: c.DeletionHandlers, Behavior: c.BehaviorHandlers, Messages: m.Handlers, Admin: settings.Handlers, Personal: personal.Handlers,
 		Runs: rn.Handlers, Sync: reads.Handlers, AgentSessions: ss.Handlers},
 		wire.RouteOptions(), routes.SpecCatalog())
 	must(t, err)

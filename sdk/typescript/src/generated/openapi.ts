@@ -1722,6 +1722,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/spaces/{space_id}/delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Delete a space
+         * @description Soft delete with undo (01 6.18, 07 4.5a): the space is archived and marked deleted in one rights change, leaves every list at once and its archive event carries `deleted_at`; active runs in it end. Until `undo_until` (`chat.delete_undo_window`) `restoreSpace` undoes it; after that the job `messaging.purge_deleted` deletes the content of every channel for good (tombstones, redaction, files). Deleting again while pending answers the pending deletion.
+         */
+        post: operations["deleteSpace"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/spaces/{space_id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Undo the deletion of a space
+         * @description Undoes a pending deletion before `undo_until`: clears `deleted_at` and the archive the deletion set, as a rights change with `access.changed`, and publishes `space.updated`. A space that is not deleted is answered without effect; after `undo_until` `409 conflict` with `reason` `undo_window_passed`.
+         */
+        post: operations["restoreSpace"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/spaces/{space_id}/deletion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What deleting a space removes, or the state of its deletion
+         * @description Before a deletion, the counts of what it removes; after it, `state` `pending` until `undo_until`, then `final`. Read with `space.read`, also for a deleted space.
+         */
+        get: operations["getSpaceDeletion"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/spaces/{space_id}/operator": {
         parameters: {
             query?: never;
@@ -1869,6 +1929,66 @@ export interface paths {
          * @description Final; there is no unarchive. The channel becomes read-only for everyone, owners included (`403 channel_read_only` with `reason: channel_archived`); reading stays for those who could read before. Archiving is a permission change with `access.changed`; archived channels leave `listSpaceChannels` (07, 4.5).
          */
         post: operations["archiveChannel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/channels/{channel_id}/delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Delete a channel
+         * @description Soft delete with undo (01 6.18, 07 4.5a): the channel is archived and marked deleted in one rights change, leaves every list at once and `channel.archived` carries `deleted_at`; active runs in it end. With `trash_project_folder` (a forum with a project binding only) the caller also needs `channel.project.bind`, and the last folder check of the serving runner must be ok (`409 conflict` with `reason` `project_folder_refused` otherwise); the runner moves the folder to the trash of its host once the deletion is final (09 18.15). Until `undo_until` `restoreChannel` undoes it; then `messaging.purge_deleted` deletes the content for good. A dm channel is never deleted (`409 conflict`, `reason` `dm_channel`).
+         */
+        post: operations["deleteChannel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/channels/{channel_id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Undo the deletion of a channel
+         * @description Undoes a pending deletion before `undo_until`: clears `deleted_at` and the archive the deletion set, drops a folder request, as a rights change with `access.changed`, and publishes `channel.updated`. A channel that is not deleted is answered without effect; after `undo_until` `409 conflict` with `reason` `undo_window_passed`; in a deleted space `409 conflict` with `reason` `space_deleted`.
+         */
+        post: operations["restoreChannel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/channels/{channel_id}/deletion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What deleting a channel removes, or the state of its deletion
+         * @description Before a deletion, the counts of what it removes and, for owners and a forum with a project binding, the folder and the last check of the serving runner (`project_folder`); after it, `state` `pending` until `undo_until`, then `final`, with the folder outcome. Read with `channel.read`, also for a deleted channel.
+         */
+        get: operations["getChannelDeletion"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2273,6 +2393,66 @@ export interface paths {
         };
         /** Read a thread */
         get: operations["getThread"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/threads/{thread_id}/delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Delete a thread
+         * @description Soft delete with undo (01 6.18, 07 4.5a): the chat leaves every list at once and `thread.updated` carries `deleted_at`; its history answers `404`, new messages are refused and active runs in it end. A main thread is never deleted alone (`409 conflict`, `reason` `main_thread`). Until `undo_until` `restoreThread` undoes it; then `messaging.purge_deleted` deletes its content for good.
+         */
+        post: operations["deleteThread"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/threads/{thread_id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Undo the deletion of a thread
+         * @description Undoes a pending deletion before `undo_until` and publishes `thread.updated` without `deleted_at`. A thread that is not deleted is answered without effect; after `undo_until` `409 conflict` with `reason` `undo_window_passed`.
+         */
+        post: operations["restoreThread"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/threads/{thread_id}/deletion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What deleting a thread removes, or the state of its deletion
+         * @description Before a deletion, the counts of what it removes; after it, `state` `pending` until `undo_until`, then `final`. Read with `thread.read` on its channel, also for a deleted thread.
+         */
+        get: operations["getThreadDeletion"];
         put?: never;
         post?: never;
         delete?: never;
@@ -6979,6 +7159,8 @@ export interface components {
             sort_key: string;
             default_operator_agent_id?: components["schemas"]["Uuid"];
             archived_at?: components["schemas"]["Timestamp"];
+            /** @description Set while the item is deleted, pending or final (01 6.18); clients remove it and its local content, and a later version without it brings it back. */
+            deleted_at?: components["schemas"]["Timestamp"];
             /** Format: int64 */
             version: number;
             created_at: components["schemas"]["Timestamp"];
@@ -7068,6 +7250,8 @@ export interface components {
             main_thread_id?: components["schemas"]["Uuid"];
             dm_participant_ids?: components["schemas"]["Uuid"][];
             archived_at?: components["schemas"]["Timestamp"];
+            /** @description Set while the item is deleted, pending or final (01 6.18); clients remove it and its local content, and a later version without it brings it back. */
+            deleted_at?: components["schemas"]["Timestamp"];
             /** Format: int64 */
             version: number;
             /** Format: int64 */
@@ -7132,6 +7316,93 @@ export interface components {
             /** @example Answer support tickets politely. */
             prompt: string;
             skills: string[];
+        };
+        ChannelDelete: {
+            /**
+             * @description Also move the project folder of a forum with a project binding to the trash of the serving runner's host once the deletion is final (09 18.15). Needs `channel.project.bind` and an ok folder check.
+             * @default false
+             */
+            trash_project_folder: boolean;
+        };
+        DeletionInfo: {
+            /** @enum {string} */
+            target_kind: "space" | "channel" | "thread";
+            target_id: components["schemas"]["Uuid"];
+            /**
+             * @description `live` before a deletion (a preview), `pending` while it can be undone, `final` after `undo_until`.
+             * @enum {string}
+             */
+            state: "live" | "pending" | "final";
+            deleted_at?: components["schemas"]["Timestamp"];
+            /** @description The end of the undo window, `deleted_at` plus `chat.delete_undo_window`; absent while `live`. */
+            undo_until?: components["schemas"]["Timestamp"];
+            contents: components["schemas"]["DeletionContents"];
+            project_folder?: components["schemas"]["ProjectFolderDeletion"];
+        };
+        /** @description What the deletion removes, counted when read; for a pending or final deletion what it removed or removes. */
+        DeletionContents: {
+            /**
+             * Format: int64
+             * @description Channels and forums, not counting dm channels.
+             */
+            channels: number;
+            /**
+             * Format: int64
+             * @description Chats and threads, not counting main threads.
+             */
+            threads: number;
+            /** Format: int64 */
+            messages: number;
+            /**
+             * Format: int64
+             * @description Files attached to those messages.
+             */
+            files: number;
+            /**
+             * Format: int64
+             * @description Agent sessions of those chats.
+             */
+            sessions: number;
+        };
+        /** @description The project folder of a forum with a project binding; only for owners (`channel.project.bind`). */
+        ProjectFolderDeletion: {
+            /** @example website */
+            workspace_ref: string;
+            trash_check?: components["schemas"]["ProjectTrashCheck"];
+            /**
+             * @description Absent when no move was requested; `requested` until the runner reports.
+             * @enum {string}
+             */
+            trash_state?: "requested" | "trashed" | "refused";
+            /** @description The refusal code of the runner with `trash_state` `refused` (09 18.15). */
+            trash_reason?: string;
+        };
+        /** @description Whether the serving runner would move the folder to the trash now (09 18.15). Absent in `ProjectFolderDeletion` before the runner's first check. */
+        ProjectTrashCheck: {
+            ok: boolean;
+            /** @description Why not, with `ok` false; a code of 09 18.15 (`outside_root`, `symlink`, `foreign_worktree`, `uncommitted_changes`, `unpushed_commits`, `contains_other_project`, `workspace_missing`, `check_failed`). */
+            reason?: string;
+            /** @description When the server received the check. */
+            checked_at?: components["schemas"]["Timestamp"];
+        };
+        /** @description The folder check a runner reports in its readiness entry (09 18.15). */
+        ProjectTrashCheckReport: {
+            ok: boolean;
+            /** @description Why not, with `ok` false; a code of 09 18.15. */
+            reason?: string;
+        };
+        /** @description A project folder the runner moves to the trash (09 18.15). */
+        ProjectTrashRequest: {
+            channel_id: components["schemas"]["Uuid"];
+            /** @example website */
+            workspace_ref: string;
+        };
+        ProjectTrashResult: {
+            channel_id: components["schemas"]["Uuid"];
+            /** @enum {string} */
+            result: "trashed" | "refused";
+            /** @description The refusal code with `result` `refused` (09 18.15). */
+            reason?: string;
         };
         ProjectBinding: {
             /**
@@ -7294,6 +7565,8 @@ export interface components {
             created_by: components["schemas"]["Uuid"];
             created_at: components["schemas"]["Timestamp"];
             moved_at?: components["schemas"]["Timestamp"];
+            /** @description Set while the item is deleted, pending or final (01 6.18); clients remove it and its local content, and a later version without it brings it back. */
+            deleted_at?: components["schemas"]["Timestamp"];
             /** Format: int64 */
             version: number;
             tag_ids: components["schemas"]["Uuid"][];
@@ -8044,6 +8317,8 @@ export interface components {
             project_readiness?: components["schemas"]["ProjectReadiness"][];
             /** @description Runners only, the folder names directly under the projects root that are Git work trees, sorted, at most `runner.project_folders_max` (09 18.13, M4-44). Applied only when present and different from the last list this server process applied; absent means "unchanged". Names only, never a path. */
             project_folders?: components["schemas"]["ProjectFolderName"][];
+            /** @description Runners only, the outcome of each folder move of `HeartbeatAck.project_trash` the runner finished since its last heartbeat (09 18.15); the server stores it once and audits it as `channel.project.trash`. */
+            project_trash_results?: components["schemas"]["ProjectTrashResult"][];
         };
         /**
          * @description One folder name directly under a runner's projects root, the one-segment form of `workspace_ref` (09 18.12 item 2).
@@ -8064,6 +8339,8 @@ export interface components {
             ready: boolean;
             /** @description Why the forum is not ready, a code of 09 18.12 (for example `provisioning`, `workspace_exists`, `clone_failed`); only with `ready` false. Stored as `project_bindings.ready_reason`. */
             reason?: string;
+            /** @description Runners only, the folder check of 09 18.15, at most every `runner.trash_check_interval`; stored on the binding. Absent means unchanged. */
+            trash_check?: components["schemas"]["ProjectTrashCheckReport"];
         };
         HeartbeatAck: {
             presence: components["schemas"]["AgentRuntimeStatus"];
@@ -8072,6 +8349,8 @@ export interface components {
              * @description Interval the adapter should keep, `sync.heartbeat_interval`.
              */
             interval_ms: number;
+            /** @description Runners only, the project folders of deleted forums this agent served whose deletion is final and whose move is not reported yet (09 18.15); absent when there are none. */
+            project_trash?: components["schemas"]["ProjectTrashRequest"][];
         };
         ConsumerAck: {
             /**
@@ -15536,6 +15815,108 @@ export interface operations {
             default: components["responses"]["Error"];
         };
     };
+    deleteSpace: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`. */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                space_id: components["parameters"]["SpaceIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK, the deletion is pending until `undo_until`. */
+            200: {
+                headers: {
+                    "Correlation-Id": components["headers"]["Correlation-Id"];
+                    RateLimit: components["headers"]["RateLimit"];
+                    "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeletionInfo"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["UnprocessableEntity"];
+            429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
+    restoreSpace: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`. */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                space_id: components["parameters"]["SpaceIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK. */
+            200: {
+                headers: {
+                    "Correlation-Id": components["headers"]["Correlation-Id"];
+                    RateLimit: components["headers"]["RateLimit"];
+                    "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Space"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["UnprocessableEntity"];
+            429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
+    getSpaceDeletion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                space_id: components["parameters"]["SpaceIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK. */
+            200: {
+                headers: {
+                    "Correlation-Id": components["headers"]["Correlation-Id"];
+                    RateLimit: components["headers"]["RateLimit"];
+                    "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeletionInfo"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
     setSpaceOperator: {
         parameters: {
             query?: never;
@@ -15897,6 +16278,112 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             422: components["responses"]["UnprocessableEntity"];
+            429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
+    deleteChannel: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`. */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                channel_id: components["parameters"]["ChannelIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ChannelDelete"];
+            };
+        };
+        responses: {
+            /** @description OK, the deletion is pending until `undo_until`. */
+            200: {
+                headers: {
+                    "Correlation-Id": components["headers"]["Correlation-Id"];
+                    RateLimit: components["headers"]["RateLimit"];
+                    "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeletionInfo"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["UnprocessableEntity"];
+            429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
+    restoreChannel: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`. */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                channel_id: components["parameters"]["ChannelIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK. */
+            200: {
+                headers: {
+                    "Correlation-Id": components["headers"]["Correlation-Id"];
+                    RateLimit: components["headers"]["RateLimit"];
+                    "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Channel"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["UnprocessableEntity"];
+            429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
+    getChannelDeletion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                channel_id: components["parameters"]["ChannelIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK. */
+            200: {
+                headers: {
+                    "Correlation-Id": components["headers"]["Correlation-Id"];
+                    RateLimit: components["headers"]["RateLimit"];
+                    "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeletionInfo"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
             429: components["responses"]["TooManyRequests"];
             default: components["responses"]["Error"];
         };
@@ -16901,6 +17388,108 @@ export interface operations {
                 };
             };
             400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
+    deleteThread: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`. */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                thread_id: components["parameters"]["ThreadIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK, the deletion is pending until `undo_until`. */
+            200: {
+                headers: {
+                    "Correlation-Id": components["headers"]["Correlation-Id"];
+                    RateLimit: components["headers"]["RateLimit"];
+                    "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeletionInfo"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["UnprocessableEntity"];
+            429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
+    restoreThread: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`. */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                thread_id: components["parameters"]["ThreadIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK. */
+            200: {
+                headers: {
+                    "Correlation-Id": components["headers"]["Correlation-Id"];
+                    RateLimit: components["headers"]["RateLimit"];
+                    "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Thread"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["UnprocessableEntity"];
+            429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
+    getThreadDeletion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                thread_id: components["parameters"]["ThreadIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK. */
+            200: {
+                headers: {
+                    "Correlation-Id": components["headers"]["Correlation-Id"];
+                    RateLimit: components["headers"]["RateLimit"];
+                    "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeletionInfo"];
+                };
+            };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];

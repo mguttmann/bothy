@@ -3,6 +3,7 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:api_client/src/generated/model/project_trash_check_report.dart';
 import 'package:built_value/built_value.dart';
 import 'package:built_value/serializer.dart';
 
@@ -14,6 +15,7 @@ part 'project_readiness.g.dart';
 /// * [channelId] - UUIDv7 (RFC 9562), lowercase canonical form.
 /// * [ready]
 /// * [reason] - Why the forum is not ready, a code of 09 18.12 (for example `provisioning`, `workspace_exists`, `clone_failed`); only with `ready` false. Stored as `project_bindings.ready_reason`.
+/// * [trashCheck] - Runners only, the folder check of 09 18.15, at most every `runner.trash_check_interval`; stored on the binding. Absent means unchanged.
 @BuiltValue()
 abstract class ProjectReadiness
     implements Built<ProjectReadiness, ProjectReadinessBuilder> {
@@ -27,6 +29,10 @@ abstract class ProjectReadiness
   /// Why the forum is not ready, a code of 09 18.12 (for example `provisioning`, `workspace_exists`, `clone_failed`); only with `ready` false. Stored as `project_bindings.ready_reason`.
   @BuiltValueField(wireName: r'reason')
   String? get reason;
+
+  /// Runners only, the folder check of 09 18.15, at most every `runner.trash_check_interval`; stored on the binding. Absent means unchanged.
+  @BuiltValueField(wireName: r'trash_check')
+  ProjectTrashCheckReport? get trashCheck;
 
   ProjectReadiness._();
 
@@ -69,6 +75,13 @@ class _$ProjectReadinessSerializer
       yield serializers.serialize(
         object.reason,
         specifiedType: const FullType(String),
+      );
+    }
+    if (object.trashCheck != null) {
+      yield r'trash_check';
+      yield serializers.serialize(
+        object.trashCheck,
+        specifiedType: const FullType(ProjectTrashCheckReport),
       );
     }
   }
@@ -119,6 +132,14 @@ class _$ProjectReadinessSerializer
           ) as String?;
           if (valueDes == null) continue;
           result.reason = valueDes;
+          break;
+        case r'trash_check':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(ProjectTrashCheckReport),
+          ) as ProjectTrashCheckReport?;
+          if (valueDes == null) continue;
+          result.trashCheck.replace(valueDes);
           break;
         default:
           unhandled.add(key);

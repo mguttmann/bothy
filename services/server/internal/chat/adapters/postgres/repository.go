@@ -266,6 +266,7 @@ func toSpace(row sqlcgen.Space) domain.Space {
 		ID: idOf(row.ID), Name: row.Name, Icon: row.Icon.String, Color: row.Color.String, SortKey: row.SortKey,
 		DefaultOperatorAgentID: idOf(row.DefaultOperatorAgentID), CreatedBy: idOf(row.CreatedBy), CreatedAt: timeOf(row.CreatedAt),
 		ArchivedAt: timeOf(row.ArchivedAt), Version: row.Version,
+		Deletion: domain.Deletion{At: timeOf(row.DeletedAt), By: idOf(row.DeletedBy), PurgedAt: timeOf(row.PurgedAt)},
 	}
 }
 

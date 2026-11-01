@@ -249,6 +249,21 @@ func (r *Repository) ExpiredMessages(ctx context.Context, cutoff time.Time, limi
 	return out, nil
 }
 
+// LiveMessagesOfDeleted implements app.Store (FEAT-delete-spaces-chats).
+func (r *Repository) LiveMessagesOfDeleted(ctx context.Context, channels, threads []ids.ID, limit int) ([]app.ExpiredMessage, error) {
+	rows, err := r.read(ctx).LiveMessagesOfDeleted(ctx, sqlcgen.LiveMessagesOfDeletedParams{
+		ChannelIds: uuids(channels), ThreadIds: uuids(threads), RowLimit: pg.Limit(limit),
+	})
+	if err != nil {
+		return nil, mapError(err, "reading the messages of a deletion")
+	}
+	out := make([]app.ExpiredMessage, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, app.ExpiredMessage{ID: idOf(row.ID), ChannelID: idOf(row.ChannelID)})
+	}
+	return out, nil
+}
+
 // SetTriggerState implements app.Store.
 func (r *Repository) SetTriggerState(ctx context.Context, id ids.ID, state, reason string, at time.Time) (domain.Message, bool, error) {
 	q, err := r.write(ctx)

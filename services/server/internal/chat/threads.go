@@ -38,6 +38,8 @@ type Thread struct {
 	Version int64
 	// TagIDs are the live tags of a forum post in the order of the tags; never nil.
 	TagIDs []ids.ID
+	// DeletedAt is the deletion time while deleted, pending or final (01 6.18); zero otherwise.
+	DeletedAt time.Time
 }
 
 // ThreadInfo is the routing and state data of a thread (Threads.Info, AppendToThread).
@@ -57,6 +59,9 @@ type ThreadInfo struct {
 	Version int64
 	// ChannelArchived reports an archived channel or a channel of an archived space.
 	ChannelArchived bool
+	// Deleted reports a deleted thread (D-DEL-3): its reads answer 404 and nothing new goes into
+	// it; the purge still removes its messages through the deletion path.
+	Deleted bool
 	// LastMessageSeq and UnreadFloorSeq are the counters of the thread (03 threads): the read
 	// position of a person lies in 0..LastMessageSeq, and messages up to UnreadFloorSeq count as
 	// unread for nobody (M1-61).

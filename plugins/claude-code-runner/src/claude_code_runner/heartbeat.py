@@ -25,7 +25,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from bothy_sdk.adapter import RuntimeStatus
-from bothy_sdk.generated.models import ProjectReadiness
+from bothy_sdk.generated.models import ProjectReadiness, ProjectTrashResult
 
 __all__ = [
     "CAPABILITIES",
@@ -219,6 +219,7 @@ def runtime_status(
     readiness: Sequence[ProjectReadiness],
     modes: tuple[str, ...] | None,
     folders: Sequence[str] | None = None,
+    trash_results: Sequence[ProjectTrashResult] = (),
 ) -> RuntimeStatus:
     """Build the heartbeat members that change at run time.
 
@@ -230,6 +231,8 @@ def runtime_status(
         readiness: One entry per bound forum in the channel cache.
         modes: `billing_modes_supported`.
         folders: The project folder names of 09 18.13; ``None`` leaves the member out.
+        trash_results: The folder move outcomes of 09 18.15 not yet reported; none leaves the
+            member out.
 
     Returns:
         The status.
@@ -241,4 +244,5 @@ def runtime_status(
         billing_modes_supported=modes,
         project_readiness=tuple(readiness),
         project_folders=None if folders is None else tuple(folders),
+        project_trash_results=tuple(trash_results) or None,
     )

@@ -927,6 +927,24 @@ void main() {
     await statusApi.getPublicStatus();
     await statusApi.deleteStatusComponent(componentId: statusComponent.id);
 
+    // FEAT-delete-spaces-chats: delete and undo a chat, a channel and a space (01 6.18).
+    final deleteThreads = api.getThreadsApi();
+    await deleteThreads.getThreadDeletion(threadId: w.releaseNotes);
+    await deleteThreads.deleteThread(threadId: w.releaseNotes);
+    await deleteThreads.restoreThread(threadId: w.releaseNotes);
+    h.server.world.grantCapability(w.alex.id, w.support, 'manage');
+    final deleteChannels = api.getChannelsApi();
+    await deleteChannels.getChannelDeletion(channelId: w.support);
+    await deleteChannels.deleteChannel(
+      channelId: w.support,
+      channelDelete: ChannelDelete((b) => b..trashProjectFolder = false),
+    );
+    await deleteChannels.restoreChannel(channelId: w.support);
+    final deleteSpaces = api.getSpacesApi();
+    await deleteSpaces.getSpaceDeletion(spaceId: w.space);
+    await deleteSpaces.deleteSpace(spaceId: w.space);
+    await deleteSpaces.restoreSpace(spaceId: w.space);
+
     // M5-06: the child session of the Share Extension (08 7.4).
     await api.getDevicesApi().createExtensionSession(
       extensionSessionCreate: ExtensionSessionCreate(

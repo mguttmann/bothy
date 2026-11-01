@@ -267,6 +267,14 @@ FileMeta fileFromJson(Json j) => FileMeta(
 // ---------------------------------------------------------------------------------------------
 // Threads and structure
 
+/// The `deleted_at` of an API `Space`, `Channel` or `Thread` (01 6.18, D-DEL-5): set while the
+/// item is deleted, pending or final; null for an item that is not deleted. The domain models
+/// do not carry it, because a deleted item is never stored (04 8.3 item 3).
+DateTime? deletedAtOf(Json j) => optTime(j, 'deleted_at');
+
+/// Whether the API object [j] carries `deleted_at` (D-DEL-5).
+bool isDeleted(Json j) => deletedAtOf(j) != null;
+
 /// Maps an API `Thread`.
 Thread threadFromJson(Json j) => Thread(
   id: ThreadId.parse(str(j, 'id')),
@@ -355,34 +363,52 @@ AccessView accessFromJson(Json j) => AccessView(
 /// A space with the caller's access (API `SpaceView`).
 final class SpaceWithAccess {
   /// Creates the pair.
-  const SpaceWithAccess(this.space, this.access);
+  const SpaceWithAccess(this.space, this.access, {this.deletedAt});
 
   /// The space.
   final Space space;
 
   /// The caller's level and capabilities.
   final AccessView access;
+
+  /// `Space.deleted_at`: set for a deleted space, which is never stored (D-DEL-5).
+  final DateTime? deletedAt;
 }
 
 /// A channel with the caller's access (API `ChannelView`).
 final class ChannelWithAccess {
   /// Creates the pair.
-  const ChannelWithAccess(this.channel, this.access);
+  const ChannelWithAccess(this.channel, this.access, {this.deletedAt});
 
   /// The channel.
   final Channel channel;
 
   /// The caller's level and capabilities.
   final AccessView access;
+
+  /// `Channel.deleted_at`: set for a deleted channel, which is never stored (D-DEL-5).
+  final DateTime? deletedAt;
 }
 
 /// Maps an API `SpaceView`.
-SpaceWithAccess spaceViewFromJson(Json j) =>
-    SpaceWithAccess(spaceFromJson(obj(j, 'space')), accessFromJson(j));
+SpaceWithAccess spaceViewFromJson(Json j) {
+  final space = obj(j, 'space');
+  return SpaceWithAccess(
+    spaceFromJson(space),
+    accessFromJson(j),
+    deletedAt: deletedAtOf(space),
+  );
+}
 
 /// Maps an API `ChannelView`.
-ChannelWithAccess channelViewFromJson(Json j) =>
-    ChannelWithAccess(channelFromJson(obj(j, 'channel')), accessFromJson(j));
+ChannelWithAccess channelViewFromJson(Json j) {
+  final channel = obj(j, 'channel');
+  return ChannelWithAccess(
+    channelFromJson(channel),
+    accessFromJson(j),
+    deletedAt: deletedAtOf(channel),
+  );
+}
 
 // ---------------------------------------------------------------------------------------------
 // Principals, agents, runs, commands, instance
@@ -732,47 +758,65 @@ final class SnapshotData {
   final Map<String, bool> features;
 }
 
-/// Maps an API `Snapshot`.
-SnapshotData snapshotFromJson(Json j) => SnapshotData(
-  headSeq: GlobalSeq(integer(j, 'head_seq')),
-  permissionVersion: PermissionVersion(integer(j, 'permission_version')),
-  syncEpoch: str(j, 'sync_epoch'),
-  principal: principalFromJson(obj(j, 'principal')),
-  isOwner: flag(j, 'is_owner'),
-  spaces: [for (final s in objList(j, 'spaces')) spaceViewFromJson(s)],
-  channels: [for (final c in objList(j, 'channels')) channelViewFromJson(c)],
-  sidebar: [for (final s in objList(j, 'sidebar')) sidebarFromJson(s)],
-  sidebarChannels: [
-    for (final s in objList(j, 'sidebar_channels')) sidebarChannelFromJson(s),
-  ],
-  unreadThreads: [
-    for (final u in objList(j, 'unread_threads'))
-      UnreadThread(
-        threadId: ThreadId.parse(str(u, 'thread_id')),
-        channelId: ChannelId.parse(str(u, 'channel_id')),
-        unreadCount: integer(u, 'unread_count'),
-        mentionCount: integer(u, 'mention_count'),
-        lastMessageSeq: ThreadSeq(integer(u, 'last_message_seq')),
-        lastReadSeq: ThreadSeq(integer(u, 'last_read_seq')),
-      ),
-  ],
-  activeRuns: [for (final r in objList(j, 'active_runs')) runFromJson(r)],
-  activeThreads: [
-    for (final t in objList(j, 'active_threads')) threadFromJson(t),
-  ],
-  agents: {
-    for (final a in objList(j, 'agents'))
-      PrincipalId.parse(str(a, 'agent_id')): presenceFromJson(a),
-  },
-  settings: [for (final s in objList(j, 'settings')) settingFromJson(s)],
-  drafts: [
-    for (final d in objList(j, 'drafts'))
-      DraftRef(
-        id: DraftId.parse(str(d, 'id')),
-        channelId: ChannelId.parse(str(d, 'channel_id')),
-        threadId: _opt(optStr(d, 'thread_id'), ThreadId.parse),
-        version: ResourceVersion(integer(d, 'version')),
-      ),
-  ],
-  features: featuresFromJson(objList(j, 'features')),
-);
+/// Maps an API `Snapshot`. A deleted space, a deleted channel, a channel of a deleted space and
+/// a deleted thread are left out, so a snapshot never stores a deleted item back (D-DEL-5).
+SnapshotData snapshotFromJson(Json j) {
+  final spaces = [for (final s in objList(j, 'spaces')) spaceViewFromJson(s)];
+  final deletedSpaces = {
+    for (final v in spaces)
+      if (v.deletedAt != null) v.space.id,
+  };
+  return SnapshotData(
+    headSeq: GlobalSeq(integer(j, 'head_seq')),
+    permissionVersion: PermissionVersion(integer(j, 'permission_version')),
+    syncEpoch: str(j, 'sync_epoch'),
+    principal: principalFromJson(obj(j, 'principal')),
+    isOwner: flag(j, 'is_owner'),
+    spaces: [
+      for (final v in spaces)
+        if (v.deletedAt == null) v,
+    ],
+    channels: [
+      for (final c in objList(j, 'channels'))
+        if (channelViewFromJson(c) case final v
+            when v.deletedAt == null &&
+                !deletedSpaces.contains(v.channel.spaceId))
+          v,
+    ],
+    sidebar: [for (final s in objList(j, 'sidebar')) sidebarFromJson(s)],
+    sidebarChannels: [
+      for (final s in objList(j, 'sidebar_channels')) sidebarChannelFromJson(s),
+    ],
+    unreadThreads: [
+      for (final u in objList(j, 'unread_threads'))
+        UnreadThread(
+          threadId: ThreadId.parse(str(u, 'thread_id')),
+          channelId: ChannelId.parse(str(u, 'channel_id')),
+          unreadCount: integer(u, 'unread_count'),
+          mentionCount: integer(u, 'mention_count'),
+          lastMessageSeq: ThreadSeq(integer(u, 'last_message_seq')),
+          lastReadSeq: ThreadSeq(integer(u, 'last_read_seq')),
+        ),
+    ],
+    activeRuns: [for (final r in objList(j, 'active_runs')) runFromJson(r)],
+    activeThreads: [
+      for (final t in objList(j, 'active_threads'))
+        if (!isDeleted(t)) threadFromJson(t),
+    ],
+    agents: {
+      for (final a in objList(j, 'agents'))
+        PrincipalId.parse(str(a, 'agent_id')): presenceFromJson(a),
+    },
+    settings: [for (final s in objList(j, 'settings')) settingFromJson(s)],
+    drafts: [
+      for (final d in objList(j, 'drafts'))
+        DraftRef(
+          id: DraftId.parse(str(d, 'id')),
+          channelId: ChannelId.parse(str(d, 'channel_id')),
+          threadId: _opt(optStr(d, 'thread_id'), ThreadId.parse),
+          version: ResourceVersion(integer(d, 'version')),
+        ),
+    ],
+    features: featuresFromJson(objList(j, 'features')),
+  );
+}

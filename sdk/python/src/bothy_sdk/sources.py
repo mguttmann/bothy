@@ -22,7 +22,7 @@ import contextlib
 import json
 import logging
 import secrets
-from collections.abc import AsyncIterator, Callable, Mapping, Sequence
+from collections.abc import AsyncIterator, Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Protocol, runtime_checkable
 from uuid import UUID
@@ -397,6 +397,7 @@ class PollingSource(_WindowedSource):
         clock: The time source.
         heartbeat: Returns the agent heartbeat to send, or ``None`` for none.
         limit: The page size asked for (the server caps it).
+        on_ack: Called with each heartbeat the server accepted and its `HeartbeatAck`.
     """
 
     def __init__(  # noqa: PLR0913 - every input of the poll loop is explicit
@@ -408,6 +409,7 @@ class PollingSource(_WindowedSource):
         clock: Clock | None = None,
         heartbeat: Callable[[], Heartbeat | None] | None = None,
         limit: int | None = None,
+        on_ack: Callable[[Heartbeat, HeartbeatAck], Awaitable[None]] | None = None,
     ) -> None:
         """Create the source; nothing is sent before iterating."""
         super().__init__()
@@ -417,6 +419,7 @@ class PollingSource(_WindowedSource):
         self.clock = clock or client.clock or SystemClock()
         self._heartbeat = heartbeat
         self._limit = limit
+        self._on_ack = on_ack
         self._stopped = asyncio.Event()
         self._rng = secrets.SystemRandom()
 
@@ -506,9 +509,13 @@ class PollingSource(_WindowedSource):
             if beat is not None:
                 try:
                     result = await self.client.call(send_heartbeat.asyncio_detailed, body=beat)
-                    interval = expect(result, HeartbeatAck).interval_ms / 1000.0
+                    ack = expect(result, HeartbeatAck)
+                    interval = ack.interval_ms / 1000.0
                 except Exception:  # a failed heartbeat is retried in the next interval
                     _LOG.info("heartbeat failed; retrying in the next interval")
+                else:
+                    if self._on_ack is not None:
+                        await self._on_ack(beat, ack)
             await self._wait(interval)
 
     async def ack(self, seq: int) -> None:

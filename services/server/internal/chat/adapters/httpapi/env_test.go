@@ -183,7 +183,7 @@ func newWorld(t *testing.T) *world {
 		t.Fatal(err)
 	}
 	w.svc, w.az = c.Service, az
-	built, err := routes.Build(wire.Handlers{Spaces: c.Handlers, Channels: c.ChannelHandlers, Threads: c.ThreadHandlers}, wire.RouteOptions(), routes.SpecCatalog())
+	built, err := routes.Build(wire.Handlers{Spaces: c.Handlers, Channels: c.ChannelHandlers, Threads: c.ThreadHandlers, Deletion: c.DeletionHandlers}, wire.RouteOptions(), routes.SpecCatalog())
 	if err != nil {
 		t.Fatal(err)
 	}

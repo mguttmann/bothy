@@ -44,6 +44,7 @@ class Channel:
         main_thread_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
         dm_participant_ids (list[UUID] | Unset):
         archived_at (datetime.datetime | Unset): RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+        deleted_at (datetime.datetime | Unset): RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
     """
 
     id: UUID
@@ -63,6 +64,7 @@ class Channel:
     main_thread_id: UUID | Unset = UNSET
     dm_participant_ids: list[UUID] | Unset = UNSET
     archived_at: datetime.datetime | Unset = UNSET
+    deleted_at: datetime.datetime | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -115,6 +117,10 @@ class Channel:
         if not isinstance(self.archived_at, Unset):
             archived_at = self.archived_at.isoformat()
 
+        deleted_at: str | Unset = UNSET
+        if not isinstance(self.deleted_at, Unset):
+            deleted_at = self.deleted_at.isoformat()
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -144,6 +150,8 @@ class Channel:
             field_dict["dm_participant_ids"] = dm_participant_ids
         if archived_at is not UNSET:
             field_dict["archived_at"] = archived_at
+        if deleted_at is not UNSET:
+            field_dict["deleted_at"] = deleted_at
 
         return field_dict
 
@@ -218,6 +226,13 @@ class Channel:
         else:
             archived_at = datetime.datetime.fromisoformat(_archived_at)
 
+        _deleted_at = d.pop("deleted_at", UNSET)
+        deleted_at: datetime.datetime | Unset
+        if isinstance(_deleted_at, Unset):
+            deleted_at = UNSET
+        else:
+            deleted_at = datetime.datetime.fromisoformat(_deleted_at)
+
         channel = cls(
             id=id,
             kind=kind,
@@ -236,6 +251,7 @@ class Channel:
             main_thread_id=main_thread_id,
             dm_participant_ids=dm_participant_ids,
             archived_at=archived_at,
+            deleted_at=deleted_at,
         )
 
         channel.additional_properties = d

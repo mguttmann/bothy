@@ -1,7 +1,7 @@
 -- SPDX-License-Identifier: Apache-2.0
 -- The read operations of chat for the search coordinator (M3-14; docs/spec/14-search.md sections
 -- 4.3 to 4.9 and 10). Each carries the visible set the coordinator passes (07 7.4 rule 1): threads
--- by t.channel_id, channels by c.space_id. None authorizes; the coordinator checks every delivered
+-- by t.channel_id, channels by c.space_id; a deleted thread never matches (D-DEL-3). None authorizes; the coordinator checks every delivered
 -- item with authorize again (14 4.3). The tsquery text comes from the search module and is cast
 -- here (07 7.4 example). No read selects title_search or search_language as a column
 -- (docs/DECISIONS.md D-M3-13-10).
@@ -23,7 +23,7 @@ WITH cand AS (
         ts_rank(t.title_search, sqlc.arg(tsq)::text::tsquery, sqlc.arg(rank_normalization)::integer) AS rank
     FROM threads t
     WHERE t.title_search @@ sqlc.arg(tsq)::text::tsquery
-      AND t.channel_id = ANY(@channel_ids::uuid[])
+      AND t.channel_id = ANY(@channel_ids::uuid[]) AND t.deleted_at IS NULL
       AND t.created_at <= sqlc.arg(ref_time)::timestamptz
       AND (NOT sqlc.arg(restrict_threads)::boolean OR t.id = ANY(@thread_ids::uuid[]))
       AND (sqlc.narg(state)::text IS NULL OR t.state = sqlc.narg(state)::text)
@@ -73,7 +73,7 @@ ORDER BY p.pos;
 -- the visible channels, newest activity first.
 SELECT t.id, t.channel_id, t.title, t.last_activity_at
 FROM threads t
-WHERE t.channel_id = ANY(@channel_ids::uuid[]) AND t.title_search @@ sqlc.arg(tsq)::text::tsquery
+WHERE t.channel_id = ANY(@channel_ids::uuid[]) AND t.title_search @@ sqlc.arg(tsq)::text::tsquery AND t.deleted_at IS NULL
 ORDER BY t.last_activity_at DESC, t.id DESC
 LIMIT sqlc.arg(max_rows)::integer;
 
@@ -82,7 +82,7 @@ LIMIT sqlc.arg(max_rows)::integer;
 -- M3-14 design note 5): state, any of the tags, the operator agent (a main thread has none).
 SELECT t.id
 FROM threads t
-WHERE t.channel_id = ANY(@channel_ids::uuid[])
+WHERE t.channel_id = ANY(@channel_ids::uuid[]) AND t.deleted_at IS NULL
   AND (sqlc.narg(state)::text IS NULL OR t.state = sqlc.narg(state)::text)
   AND (cardinality(@tag_ids::uuid[]) = 0
        OR EXISTS (SELECT 1 FROM thread_tags tt WHERE tt.thread_id = t.id AND tt.tag_id = ANY(@tag_ids::uuid[])))
@@ -108,12 +108,12 @@ WHERE c.space_id = ANY(@visible_space_ids::uuid[]) AND c.id = ANY(@channel_ids::
 -- Thread titles of the hits in the visible channels; a main thread has no title and no label.
 SELECT t.id, t.title
 FROM threads t
-WHERE t.channel_id = ANY(@channel_ids::uuid[]) AND t.id = ANY(@thread_ids::uuid[]) AND t.title <> '';
+WHERE t.channel_id = ANY(@channel_ids::uuid[]) AND t.id = ANY(@thread_ids::uuid[]) AND t.title <> '' AND t.deleted_at IS NULL;
 
 -- name: ThreadsIn :many
 -- The threads of the hits for HitThreads, the columns of GetThread, in the visible channels.
 SELECT t.id, t.channel_id, t.kind, t.parent_message_id, t.title, t.title_source, t.state, t.closed_at, t.closed_by,
     t.operator_agent_id, t.last_message_seq, t.unread_floor_seq, t.last_activity_at, t.message_count, t.created_by, t.created_at,
-    t.moved_at, t.version
+    t.moved_at, t.version, t.deleted_at, t.deleted_by, t.purged_at
 FROM threads t
-WHERE t.channel_id = ANY(@channel_ids::uuid[]) AND t.id = ANY(@thread_ids::uuid[]);
+WHERE t.channel_id = ANY(@channel_ids::uuid[]) AND t.id = ANY(@thread_ids::uuid[]) AND t.deleted_at IS NULL;

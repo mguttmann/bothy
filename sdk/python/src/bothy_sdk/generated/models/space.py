@@ -26,6 +26,7 @@ class Space:
         color (str | Unset): Key of a category color of the design system, never a hex value.
         default_operator_agent_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
         archived_at (datetime.datetime | Unset): RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+        deleted_at (datetime.datetime | Unset): RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
     """
 
     id: UUID
@@ -37,6 +38,7 @@ class Space:
     color: str | Unset = UNSET
     default_operator_agent_id: UUID | Unset = UNSET
     archived_at: datetime.datetime | Unset = UNSET
+    deleted_at: datetime.datetime | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -62,6 +64,10 @@ class Space:
         if not isinstance(self.archived_at, Unset):
             archived_at = self.archived_at.isoformat()
 
+        deleted_at: str | Unset = UNSET
+        if not isinstance(self.deleted_at, Unset):
+            deleted_at = self.deleted_at.isoformat()
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -81,6 +87,8 @@ class Space:
             field_dict["default_operator_agent_id"] = default_operator_agent_id
         if archived_at is not UNSET:
             field_dict["archived_at"] = archived_at
+        if deleted_at is not UNSET:
+            field_dict["deleted_at"] = deleted_at
 
         return field_dict
 
@@ -115,6 +123,13 @@ class Space:
         else:
             archived_at = datetime.datetime.fromisoformat(_archived_at)
 
+        _deleted_at = d.pop("deleted_at", UNSET)
+        deleted_at: datetime.datetime | Unset
+        if isinstance(_deleted_at, Unset):
+            deleted_at = UNSET
+        else:
+            deleted_at = datetime.datetime.fromisoformat(_deleted_at)
+
         space = cls(
             id=id,
             name=name,
@@ -125,6 +140,7 @@ class Space:
             color=color,
             default_operator_agent_id=default_operator_agent_id,
             archived_at=archived_at,
+            deleted_at=deleted_at,
         )
 
         space.additional_properties = d

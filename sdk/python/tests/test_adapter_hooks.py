@@ -28,7 +28,14 @@ from bothy_sdk.adapter import (
     StartOptions,
 )
 from bothy_sdk.commands import AutocompleteRequest, CommandSpec, ReconcileResult
-from bothy_sdk.generated.models import CommandChoice, ProjectReadiness
+from bothy_sdk.generated.models import (
+    CommandChoice,
+    Heartbeat,
+    HeartbeatAck,
+    ProjectReadiness,
+    ProjectTrashResult,
+    ProjectTrashResultResult,
+)
 from bothy_sdk.runs import RunHandle
 from bothy_sdk.sources import EventSource, SourceReady
 from bothy_sdk.testing._patience import eventually, within_patience
@@ -296,6 +303,86 @@ async def test_runtime_status_sends_the_project_folders(fake: FakeServer) -> Non
         before = len(fake.heartbeats)
         await adapter.send_heartbeat()
     assert fake.heartbeats[before]["project_folders"] == ["api", "website"]
+
+
+class Acked(Reporting):
+    def __init__(self, status: RuntimeStatus) -> None:
+        super().__init__(status)
+        self.acks: list[tuple[Heartbeat, HeartbeatAck]] = []
+
+    async def on_heartbeat_ack(self, sent: Heartbeat, ack: HeartbeatAck) -> None:
+        self.acks.append((sent, ack))
+
+
+@pytest.mark.anyio
+async def test_send_heartbeat_hands_the_answer_with_project_trash_to_the_handler(
+    fake: FakeServer,
+) -> None:
+    """A folder move of a deleted forum reaches the runner in the answer (09 18.15)."""
+    channel = UUID("0192d3a0-0000-7000-8000-00000000c0de")
+    handler = Acked(RuntimeStatus())
+    adapter = make_adapter(fake, handler, "trash")
+    fake.request_project_trash(channel, "website")
+    async with running(adapter, fake):
+        await until(fake, lambda: handler.ready == 1)
+        await adapter.send_heartbeat()
+        sent, ack = handler.acks[-1]
+        assert sent.to_dict()["state"] == "online"
+        requested = [(r.channel_id, r.workspace_ref) for r in ack.project_trash]
+        assert requested == [(channel, "website")]
+        # The outcome travels in a later heartbeat and ends the request.
+        handler.status = RuntimeStatus(
+            project_trash_results=(
+                ProjectTrashResult(
+                    channel_id=channel, result=ProjectTrashResultResult.REFUSED, reason="symlink"
+                ),
+            )
+        )
+        before = len(fake.heartbeats)
+        await adapter.send_heartbeat()
+    assert fake.heartbeats[before]["project_trash_results"] == [
+        {"channel_id": str(channel), "result": "refused", "reason": "symlink"}
+    ]
+    assert fake.project_trash_results == [
+        {"channel_id": str(channel), "result": "refused", "reason": "symlink"}
+    ]
+    _, ack = handler.acks[-1]
+    assert not ack.project_trash
+
+
+@pytest.mark.anyio
+async def test_a_failing_heartbeat_ack_hook_changes_nothing(fake: FakeServer) -> None:
+    class Failing(Reporting):
+        async def on_heartbeat_ack(self, sent: Heartbeat, ack: HeartbeatAck) -> None:
+            raise RuntimeError("hook failed")
+
+    handler = Failing(RuntimeStatus())
+    adapter = make_adapter(fake, handler, "failing")
+    async with running(adapter, fake):
+        await until(fake, lambda: handler.ready == 1)
+        before = len(fake.heartbeats)
+        await adapter.send_heartbeat()
+        assert len(fake.heartbeats) == before + 1
+
+
+@pytest.mark.anyio
+async def test_polling_heartbeats_reach_the_heartbeat_ack_hook(fake: FakeServer) -> None:
+    channel = UUID("0192d3a0-0000-7000-8000-00000000c0df")
+    handler = Acked(RuntimeStatus())
+    config = AdapterConfig(
+        base_url=fake.base_url,
+        instance_id=fake.instance_id,
+        agent_id=fake.agent_id,
+        credentials=fake.credentials,
+        consumer="polled",
+        settings=fake.sdk_settings,
+        transport="polling",
+    )
+    handler.clock = fake.clock
+    adapter = Adapter(config, handler, clock=fake.clock)
+    fake.request_project_trash(channel, "docs")
+    async with running(adapter, fake):
+        await until(fake, lambda: any(a.project_trash for _, a in handler.acks))
 
 
 @pytest.mark.anyio

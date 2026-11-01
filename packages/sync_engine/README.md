@@ -139,6 +139,17 @@ same limit after the visible ones) and
   then deletes the file bytes through `FileCacheEraser` and emits `TargetsRemoved`; `added`
   loads the structure through `Fetcher.loadStructure`; `changed` reloads the view with the new
   level and capabilities. The rest of the page applies after it.
+- Deletion (01 6.18 item 8, D-DEL-5): a `space.*` or `channel.*` event whose object carries
+  `deleted_at` (sent as `space.archived` and `channel.archived`) and a `thread.*` event with it
+  remove the item as a removed target, with the person's order rows kept (`removeTargets`
+  `keepOrder`, D-DEL-8), drop the unread counters of its threads and emit
+  `TargetsRemoved(deleted: true)`. `SyncContext.deletedVersions` keeps the version of the
+  deletion: a later version without `deleted_at` is the undo (a space or channel is stored and
+  its structure loads through `Fetcher.loadStructure` as on `added`; a thread is stored and its
+  history loads on open), an older one is stale. An `*.updated` of a space or channel the
+  device does not hold and did not remove for access loss counts as an undo too (a process that
+  started after the deletion). No snapshot, `loadStructure`, thread list or view read stores an
+  object with `deleted_at`; a single thread of a deleted chat answers `404` (D-DEL-3).
 - `4012` (`ConnectionState` `signedOut`/`revoked`, watched with `watchConnection`) and
   `session.revoked` of this device's session wipe the database, stop the page and emit
   `SignedOutNotice(deleteLocalData: true)`; `session.revoked` of another session of the person
@@ -164,10 +175,10 @@ through the `Fetcher` instead.
 | `message.deleted` | `messages` (tombstone), `reactions_summary`, `my_mentions`, `message_components`, `message_attachments`, `search_index` | version |
 | `reaction.added`, `reaction.removed` | `reactions_summary` | seq |
 | `pin.added`, `pin.removed` | `messages.pinned` | seq |
-| `thread.created`, `thread.updated`, `thread.closed`, `thread.reopened`, `thread.moved` | `threads`, `thread_tags`, `search_index` (title) | version |
+| `thread.created`, `thread.updated`, `thread.closed`, `thread.reopened`, `thread.moved` | `threads`, `thread_tags`, `search_index` (title); with `deleted_at` the removal (D-DEL-5) | version |
 | `thread.moved_out` | everything of the thread (`removeTargets`) when it is still in the source channel | seq |
-| `space.created`, `space.updated`, `space.archived` | `spaces` | version |
-| `channel.created`, `channel.updated`, `channel.archived` | `channels` (`project_bound` included, R-DM-54), `channel_operators` | version |
+| `space.created`, `space.updated`, `space.archived` | `spaces`; with `deleted_at` the removal, the undo reloads the structure (D-DEL-5) | version |
+| `channel.created`, `channel.updated`, `channel.archived` | `channels` (`project_bound` included, R-DM-54), `channel_operators`; with `deleted_at` the removal, the undo reloads the structure (D-DEL-5) | version |
 | `run.state_changed` | `runs` | version |
 | `user.updated` | `principals` | seq |
 | `agent.updated` | `agents`, `principals` | version |
@@ -630,6 +641,15 @@ above it (the app under test in the macOS app sandbox, M4-18), it uses the copy 
   tokens with `401 session_revoked`.
 - Gateway: no heartbeat timeout (`4009`), no `reauth_required`, no `identify` timeout, no
   outbound queue limit (`4014`); catch-up runs synchronously, so no live event interleaves.
+- Deletion (`world_deletion.dart`, `rest/deletion_handlers.dart`, 01 6.18): `deleteSpace`
+  (an owner), `deleteChannel` (`manage`; `trash_project_folder` needs a project binding, an
+  owner and an ok `world.projectFolders[channel]['trash_check']`, and sets `trash_state`
+  `requested`) and `deleteThread` (`write` and creator or `manage`; not a main thread, not in an
+  archived or read only channel) with their restores and `get*Deletion`; the step-up follows the
+  action catalogue. Deleted items leave the lists and the snapshot, a deleted thread answers
+  `404`, and the restore after `world.deleteUndoWindow` answers `409 undo_window_passed`.
+  Simplified: no purge after the window, no `access.changed` for the rights change, no run
+  cancellation, no runner hand-off of the folder.
 - Events: `agent.invocation` and the agent consumer side are not modelled; `device.pending` is
   not written (it is not in the API documents of this base); `typing.stop` has no effect.
 - `cancelRun` ends the run at once with `cancelled`.

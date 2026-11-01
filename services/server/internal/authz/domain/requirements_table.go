@@ -29,14 +29,14 @@ var requirementGroups = []struct {
 		"group.update", "identity_provider.manage", "identity_provider.read", "import.manage",
 		"import.read", "instance.branding.update", "instance.settings.read", "instance.settings.update",
 		"owner.add", "owner.remove", "price.manage", "price.read", "signing_key.rotate", "space.archive",
-		"space.create", "space.operator.set", "space.reorder", "status.manage", "user.create",
+		"space.create", "space.delete", "space.restore", "space.operator.set", "space.reorder", "status.manage", "user.create",
 		"user.disable", "user.enable", "user.update", "webhook_out.manage", "webhook_out.read",
 		"webhook_out.redeliver",
 	}},
 	{"agent-self and effective operator", ChannelOperator, []string{"agent.config.read"}},
 	{"agent-self", AgentSelf, []string{
 		"agent.events.consume", "agent.heartbeat", "agent.triggerers.read", "agent_session.report",
-		"run.context.read", "run.finish", "run.update",
+		"channel.project.trash", "run.context.read", "run.finish", "run.update",
 	}},
 	{"trigger and rules from 5", AtLeast(LevelTrigger), []string{"agent.invoke"}},
 	{"owner or agent-self or read on a channel that the agent operates", Any(Owner, AgentSelf, ReadOnOperatedChannel), []string{
@@ -69,7 +69,7 @@ var requirementGroups = []struct {
 	{"public (valid refresh token and DPoP proof of the family)", Public, []string{"auth.token.refresh"}},
 	{"manage", HasCap(CapManage), []string{
 		"channel.archive", "channel.behavior.read", "channel.behavior.update", "channel.create",
-		"channel.read_only.set", "channel.reorder", "channel.update", "forum_tag.manage", "pin.create",
+		"channel.delete", "channel.read_only.set", "channel.reorder", "channel.restore", "channel.update", "forum_tag.manage", "pin.create",
 		"pin.delete", "space.update", "webhook_in.create", "webhook_in.read", "webhook_in.revoke",
 	}},
 	{"human", Human, []string{"client_metrics.submit", "dm.create"}},
@@ -192,6 +192,10 @@ var requirementGroups = []struct {
 	{"self", All(HumanSession, Self), []string{"terminal.stream"}},
 	{"manage on source and target", All(HasCap(CapManage), TargetHasCap(CapManage)), []string{"thread.move"}},
 	{"write", All(AtLeast(LevelWrite), HasCapIf(CapManage, FactRestrictedTags)), []string{"thread.tags.set"}},
+	// A person deletes their own chat like their own message; manage deletes any (D-DEL-4).
+	{"write and (creator or manage)", All(AtLeast(LevelWrite), Any(Self, HasCap(CapManage))), []string{
+		"thread.delete", "thread.restore",
+	}},
 	{"write and (creator or manage or operator agent)", All(AtLeast(LevelWrite), Any(Self, HasCap(CapManage), ThreadOperator)), []string{
 		"thread.title.update",
 	}},

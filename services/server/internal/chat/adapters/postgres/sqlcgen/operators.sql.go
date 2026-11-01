@@ -38,7 +38,7 @@ func (q *Queries) DefaultOperatedSpaces(ctx context.Context, agentID pgtype.UUID
 }
 
 const lockInheritingChannels = `-- name: LockInheritingChannels :many
-SELECT c.id, c.space_id, c.kind, c.name, c.topic, c.sort_key, c.operator_inherit, c.operator_agent_id, c.require_mention, c.thread_require_mention, c.free_response, c.auto_thread, c.allow_mentioned_agents, c.history_backfill_limit, c.prompt, c.forum_default_sort, c.default_notification_level, c.read_only, c.created_by, c.created_at, c.archived_at, c.version, c.settings_version, s.default_operator_agent_id AS space_operator_id,
+SELECT c.id, c.space_id, c.kind, c.name, c.topic, c.sort_key, c.operator_inherit, c.operator_agent_id, c.require_mention, c.thread_require_mention, c.free_response, c.auto_thread, c.allow_mentioned_agents, c.history_backfill_limit, c.prompt, c.forum_default_sort, c.default_notification_level, c.read_only, c.created_by, c.created_at, c.archived_at, c.version, c.settings_version, c.deleted_at, c.deleted_by, c.purged_at, s.default_operator_agent_id AS space_operator_id,
        (s.archived_at IS NOT NULL)::boolean AS space_archived, t.id AS main_thread_id,
        (pb.channel_id IS NOT NULL)::boolean AS project_bound, coalesce(pb.ready, false)::boolean AS project_ready
 FROM channels c
@@ -94,6 +94,9 @@ func (q *Queries) LockInheritingChannels(ctx context.Context, spaceID pgtype.UUI
 			&i.Channel.ArchivedAt,
 			&i.Channel.Version,
 			&i.Channel.SettingsVersion,
+			&i.Channel.DeletedAt,
+			&i.Channel.DeletedBy,
+			&i.Channel.PurgedAt,
 			&i.SpaceOperatorID,
 			&i.SpaceArchived,
 			&i.MainThreadID,
@@ -167,7 +170,7 @@ SELECT c.id, c.space_id
 FROM threads t
 JOIN channels c ON c.id = t.channel_id
 JOIN spaces s ON s.id = c.space_id
-WHERE t.kind = 'thread' AND t.operator_agent_id = $1
+WHERE t.kind = 'thread' AND t.operator_agent_id = $1 AND t.deleted_at IS NULL
   AND c.archived_at IS NULL AND s.archived_at IS NULL
 `
 
@@ -178,7 +181,7 @@ type ServedChannelsRow struct {
 
 // The channels agent_id serves for I1 (10 section 5.2 points 1 and 2, BR-02): channels that are
 // not archived in a space that is not archived whose effective operator is the agent, and those
-// with a thread of kind thread whose fixed operator is the agent, open or closed (the index
+// with a thread of kind thread that is not deleted whose fixed operator is the agent, open or closed (the index
 // threads (operator_agent_id, channel_id) without a condition on state). dm channels have no
 // space and never match.
 func (q *Queries) ServedChannels(ctx context.Context, agentID pgtype.UUID) ([]ServedChannelsRow, error) {

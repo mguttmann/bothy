@@ -11,7 +11,7 @@ INSERT INTO threads (id, channel_id, kind, parent_message_id, title, title_sourc
 VALUES (@id, @channel_id, 'thread', sqlc.narg(parent_message_id), @title, @title_source, @state, sqlc.narg(closed_at),
     sqlc.narg(operator_agent_id), @created_by, @created_at, @last_activity_at, sqlc.arg(search_language)::text::regconfig)
 RETURNING id, channel_id, kind, parent_message_id, title, title_source, state, closed_at, closed_by, operator_agent_id,
-    last_message_seq, unread_floor_seq, last_activity_at, message_count, created_by, created_at, moved_at, version;
+    last_message_seq, unread_floor_seq, last_activity_at, message_count, created_by, created_at, moved_at, version, deleted_at, deleted_by, purged_at;
 
 -- name: SaveImportedThread :exec
 -- The mirror changes of a posted thread (22 12.2 step 3) without the version: the batch raises it
@@ -29,7 +29,7 @@ SET last_message_seq = last_message_seq + sqlc.arg(n)::bigint, message_count = m
     last_activity_at = GREATEST(last_activity_at, @last_activity_at)
 WHERE id = @id
 RETURNING id, channel_id, kind, parent_message_id, title, title_source, state, closed_at, closed_by, operator_agent_id,
-    last_message_seq, unread_floor_seq, last_activity_at, message_count, created_by, created_at, moved_at, version;
+    last_message_seq, unread_floor_seq, last_activity_at, message_count, created_by, created_at, moved_at, version, deleted_at, deleted_by, purged_at;
 
 -- name: FinishImportBatch :one
 -- The end of a batch that changed the thread (04 15.8): imported content is unread for nobody, and
@@ -38,4 +38,4 @@ UPDATE threads
 SET unread_floor_seq = last_message_seq, version = version + 1
 WHERE id = @id
 RETURNING id, channel_id, kind, parent_message_id, title, title_source, state, closed_at, closed_by, operator_agent_id,
-    last_message_seq, unread_floor_seq, last_activity_at, message_count, created_by, created_at, moved_at, version;
+    last_message_seq, unread_floor_seq, last_activity_at, message_count, created_by, created_at, moved_at, version, deleted_at, deleted_by, purged_at;

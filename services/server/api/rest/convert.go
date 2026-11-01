@@ -55,6 +55,7 @@ type ThreadFields struct {
 	CreatedAt, LastActivityAt, MovedAt time.Time
 	Version                            int64
 	TagIDs                             []ids.ID
+	DeletedAt                          time.Time
 }
 
 // ThreadOf converts a thread (schema Thread): empty values become absent members, never null
@@ -68,7 +69,7 @@ func ThreadOf(th ThreadFields) Thread {
 		OperatorAgentId: OptionalID(th.OperatorAgentID), LastMessageSeq: th.LastMessageSeq,
 		LastActivityAt: th.LastActivityAt.UTC().Truncate(time.Millisecond), MessageCount: th.MessageCount,
 		CreatedBy: Uuid(th.CreatedBy), CreatedAt: th.CreatedAt.UTC().Truncate(time.Millisecond), MovedAt: OptionalTime(th.MovedAt),
-		Version: th.Version, TagIds: IDs(th.TagIDs),
+		Version: th.Version, TagIds: IDs(th.TagIDs), DeletedAt: OptionalTime(th.DeletedAt),
 	}
 	if th.UnreadFloorSeq != 0 {
 		v := th.UnreadFloorSeq

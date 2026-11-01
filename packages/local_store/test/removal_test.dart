@@ -213,6 +213,49 @@ void main() {
     },
   );
 
+  test('a deletion keeps the order rows of the person and removes the content (D-DEL-8)', () async {
+    await fill(1, s: 1);
+    await fill(2, s: 2);
+    await fill(3, s: 1);
+    for (final c in [1, 2, 3]) {
+      await db.structureDao.putUserChannelStateLocally(channel(c).id, [
+        threadId(c),
+      ]);
+    }
+    for (final s in [1, 2]) {
+      await db.structureDao.putUserSpaceStateLocally(
+        space(s).id,
+        collapsed: false,
+        sortKey: 'a$s',
+        channelOrder: [channel(s).id],
+      );
+    }
+    final paths = await db.removeTargets([
+      TargetRef.channel(channel(3).id),
+      TargetRef.space(space(2).id),
+    ], keepOrder: true);
+    expect(paths, unorderedEquals(['cache/file-2', 'cache/file-3']));
+    expect(await db.structureDao.spaceById(space(2).id), isNull);
+    expect(await db.structureDao.channelById(channel(2).id), isNull);
+    expect(await db.structureDao.channelById(channel(3).id), isNull);
+    expect(await db.threadsDao.byId(threadId(3)), isNull);
+    expect(await db.messagesDao.byId(messageId(2, 1)), isNull);
+    expect(
+      {
+        for (final s in await db.structureDao.watchUserChannelStates().first)
+          s.channelId,
+      },
+      {channel(1).id, channel(2).id, channel(3).id},
+    );
+    expect(
+      {
+        for (final s in await db.structureDao.watchUserSpaceStates().first)
+          s.spaceId,
+      },
+      {space(1).id, space(2).id},
+    );
+  });
+
   test('removing a space deletes its collapse state on this device', () async {
     await fill(1, s: 1);
     await fill(2, s: 2);

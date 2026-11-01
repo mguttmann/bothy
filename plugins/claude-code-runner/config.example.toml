@@ -26,6 +26,9 @@ project_folders_max = 500
 # Fallback reload of the served channels and their bindings; operator and binding changes
 # normally arrive at once through access.changed and agent.config_changed (09 18.1).
 channels_resync_interval = "5m"
+# Check of the bound folders for a move to the trash, and the heartbeat that can carry the
+# server's request to move the folder of a deleted forum (09 18.15).
+trash_check_interval = "60s"
 # Local transcriber of voice messages and audio attachments (09 18.14): the program and its
 # arguments, the audio file path is appended, stdout is the text. Empty means off, for example
 # ["/usr/local/bin/transcribe-audio"] (a wrapper around a whisper.cpp binary, see the README).

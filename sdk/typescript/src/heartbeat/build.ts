@@ -23,6 +23,7 @@ type BillingEvidence = components["schemas"]["BillingEvidence"];
 type BillingMode = components["schemas"]["BillingMode"];
 type ToolClass = components["schemas"]["ToolClass"];
 type ProjectReadiness = components["schemas"]["ProjectReadiness"];
+type ProjectTrashResult = components["schemas"]["ProjectTrashResult"];
 type AgentRateLimitState = components["schemas"]["AgentRateLimitState"];
 
 /** Form of `details.adapter.name` and `details.runtime.name`. */
@@ -33,6 +34,9 @@ export const VERSION_FORM = "^[0-9A-Za-z][0-9A-Za-z.+_-]*$";
 
 /** Form of `billing_evidence.provider`, `billing_evidence.method` and each degraded reason. */
 export const CODE_FORM = "^[a-z0-9][a-z0-9_.:-]*$";
+
+/** Form of the readiness reasons and the folder check and move reasons of 09 18.12 and 18.15. */
+export const REASON_FORM = "^[a-z0-9][a-z0-9_]*$";
 
 /** The closed key set of `details`. */
 export const DETAILS_KEYS = Object.freeze([
@@ -65,6 +69,7 @@ export const HEARTBEAT_MEMBERS = Object.freeze([
   "details",
   "project_readiness",
   "project_folders",
+  "project_trash_results",
 ] as const);
 
 /** The options of {@link buildHeartbeat}; each maps to the member of the same name. */
@@ -99,7 +104,10 @@ export interface BuildHeartbeatOptions {
    * `runtime` (`name` required) and `protocol_version` (integer, at least 1).
    */
   readonly details?: Readonly<Record<string, unknown>> | undefined;
-  /** `project_readiness`: runners only, one entry per bound forum, distinct channels. */
+  /**
+   * `project_readiness`: runners only, one entry per bound forum, distinct channels; `reason`
+   * and `trash_check.reason` (09 18.15) have the form {@link REASON_FORM}.
+   */
   readonly projectReadiness?: readonly ProjectReadiness[] | undefined;
   /**
    * `project_folders`: runners only, the distinct folder names under the projects root, each one
@@ -107,6 +115,12 @@ export interface BuildHeartbeatOptions {
    * characters (09 18.13, M4-44).
    */
   readonly projectFolders?: readonly string[] | undefined;
+  /**
+   * `project_trash_results`: runners only, the outcome of each folder move of
+   * `HeartbeatAck.project_trash` not yet reported (`trashed`, or `refused` with a reason of the
+   * form {@link REASON_FORM}), distinct channels (09 18.15).
+   */
+  readonly projectTrashResults?: readonly ProjectTrashResult[] | undefined;
 }
 
 const OPTION_KEYS: ReadonlySet<string> = new Set([
@@ -119,6 +133,7 @@ const OPTION_KEYS: ReadonlySet<string> = new Set([
   "details",
   "projectReadiness",
   "projectFolders",
+  "projectTrashResults",
 ]);
 // The records make tsc hold each vocabulary equal to the generated type.
 const STATES: Readonly<Record<Heartbeat["state"], true>> = {
@@ -156,7 +171,19 @@ const RATE_LIMIT_STATES: Readonly<Record<AgentRateLimitState["state"], true>> =
 // RFC 3339 with a time zone (Z or an offset), as the server parses `resets_at`.
 const RFC3339 =
   /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
-const READINESS_KEYS = ["channel_id", "ready"] as const;
+const READINESS_KEYS = [
+  "channel_id",
+  "ready",
+  "reason",
+  "trash_check",
+] as const;
+const TRASH_CHECK_KEYS = ["ok", "reason"] as const;
+const TRASH_RESULT_KEYS = ["channel_id", "result", "reason"] as const;
+const TRASH_RESULTS: Readonly<Record<ProjectTrashResult["result"], true>> = {
+  trashed: true,
+  refused: true,
+};
+const REASON_MAX = 64;
 // `protocol_version` is a 32-bit integer on the server; a larger one is refused there.
 const PROTOCOL_VERSION_MAX = 2 ** 31 - 1;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -166,6 +193,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const NAME = new RegExp(NAME_FORM);
 const VERSION = new RegExp(VERSION_FORM);
 const CODE = new RegExp(CODE_FORM);
+const REASON = new RegExp(REASON_FORM);
 
 /**
  * Builds a heartbeat of schema `agent_heartbeat.v1`.
@@ -234,6 +262,8 @@ export function buildHeartbeat(
     beat.project_readiness = readiness(o.projectReadiness);
   if (o.projectFolders !== undefined)
     beat.project_folders = folders(o.projectFolders);
+  if (o.projectTrashResults !== undefined)
+    beat.project_trash_results = trashResults(o.projectTrashResults);
   return beat;
 }
 
@@ -443,6 +473,17 @@ function folders(value: unknown): string[] {
   return out;
 }
 
+/** A reason of 09 18.12 or 18.15: {@link REASON_FORM}, at most 64 characters. */
+function reason(value: unknown, field: string): string {
+  if (
+    typeof value !== "string" ||
+    value.length > REASON_MAX ||
+    !REASON.test(value)
+  )
+    throw new RangeError(`${field}: not a reason code`);
+  return value;
+}
+
 /** `project_readiness`: closed entries with distinct channels. */
 function readiness(value: unknown): ProjectReadiness[] {
   const field = "project_readiness";
@@ -452,7 +493,50 @@ function readiness(value: unknown): ProjectReadiness[] {
       throw new RangeError(`${field}: entries need a channel_id`);
     if (typeof raw.ready !== "boolean")
       throw new RangeError(`${field}: ready must be a boolean`);
-    return { channel_id: raw.channel_id.toLowerCase(), ready: raw.ready };
+    const item: ProjectReadiness = {
+      channel_id: raw.channel_id.toLowerCase(),
+      ready: raw.ready,
+    };
+    if (raw.reason !== undefined)
+      item.reason = reason(raw.reason, `${field}.reason`);
+    if (raw.trash_check !== undefined) {
+      const check = closed(
+        raw.trash_check,
+        TRASH_CHECK_KEYS,
+        `${field}.trash_check`,
+      );
+      if (typeof check.ok !== "boolean")
+        throw new RangeError(`${field}.trash_check.ok: must be a boolean`);
+      item.trash_check = { ok: check.ok };
+      if (check.reason !== undefined)
+        item.trash_check.reason = reason(
+          check.reason,
+          `${field}.trash_check.reason`,
+        );
+    }
+    return item;
+  });
+  distinct(
+    out.map((r) => r.channel_id),
+    field,
+  );
+  return out;
+}
+
+/** `project_trash_results`: closed entries with distinct channels (09 18.15). */
+function trashResults(value: unknown): ProjectTrashResult[] {
+  const field = "project_trash_results";
+  const out = list(value, field).map((entry) => {
+    const raw = closed(entry, TRASH_RESULT_KEYS, field);
+    if (typeof raw.channel_id !== "string" || !UUID.test(raw.channel_id))
+      throw new RangeError(`${field}: entries need a channel_id`);
+    const item: ProjectTrashResult = {
+      channel_id: raw.channel_id.toLowerCase(),
+      result: member(TRASH_RESULTS, raw.result, `${field}.result`),
+    };
+    if (raw.reason !== undefined)
+      item.reason = reason(raw.reason, `${field}.reason`);
+    return item;
   });
   distinct(
     out.map((r) => r.channel_id),

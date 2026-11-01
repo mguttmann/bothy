@@ -39,6 +39,8 @@ func TestCancelReasonFor(t *testing.T) {
 		"user.disable":        domain.RunReasonUserDisabled,
 		"channel.archive":     domain.RunReasonChannelReadOnly,
 		"space.archive":       domain.RunReasonChannelReadOnly,
+		"channel.delete":      domain.RunReasonChannelReadOnly,
+		"space.delete":        domain.RunReasonChannelReadOnly,
 		"grant.revoke":        domain.RunReasonAccessRevoked,
 		"grant.expire":        domain.RunReasonAccessRevoked,
 		"group.member.remove": domain.RunReasonAccessRevoked,

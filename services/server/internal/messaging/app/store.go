@@ -114,6 +114,10 @@ type Store interface {
 	// created before cutoff, oldest first, with their channel (the job retention.content, M7-05):
 	// a system job without a principal, so it carries no visibility predicate.
 	ExpiredMessages(ctx context.Context, cutoff time.Time, limit int) ([]ExpiredMessage, error)
+	// LiveMessagesOfDeleted returns at most limit messages that are not deleted and not system
+	// lines in channels or threads, oldest first, with their channel (the job
+	// messaging.purge_deleted, FEAT-delete-spaces-chats): a system job without a principal.
+	LiveMessagesOfDeleted(ctx context.Context, channels, threads []ids.ID, limit int) ([]ExpiredMessage, error)
 	// InsertRevision writes r with the next revision number of its message.
 	InsertRevision(ctx context.Context, r domain.Revision, visible []ids.ID) error
 	// Revisions returns the revisions of message in ascending order.

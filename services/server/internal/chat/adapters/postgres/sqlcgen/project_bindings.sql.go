@@ -90,6 +90,20 @@ WHERE channel_id = $1
 FOR UPDATE
 `
 
+type LockProjectBindingRow struct {
+	ChannelID     pgtype.UUID
+	WorkspaceRef  string
+	RepositoryUrl pgtype.Text
+	DefaultBranch pgtype.Text
+	RunnerConfig  []byte
+	Ready         bool
+	CreatedBy     pgtype.UUID
+	CreatedAt     pgtype.Timestamptz
+	Version       int64
+	Provision     string
+	ReadyReason   pgtype.Text
+}
+
 // SPDX-License-Identifier: Apache-2.0
 // Queries on project_bindings (chat module, M2-03; docs/spec/03-data-model.md section 4.5). A
 // change locks the space row FOR SHARE and the channel row FOR UPDATE first (ShareSpace and
@@ -99,9 +113,9 @@ FOR UPDATE
 // channels.sql and operators.sql through a LEFT JOIN on this table.
 // The binding of one forum locked for a PUT or DELETE, read after authorize allowed
 // channel.project.bind on the channel.
-func (q *Queries) LockProjectBinding(ctx context.Context, channelID pgtype.UUID) (ProjectBinding, error) {
+func (q *Queries) LockProjectBinding(ctx context.Context, channelID pgtype.UUID) (LockProjectBindingRow, error) {
 	row := q.db.QueryRow(ctx, lockProjectBinding, channelID)
-	var i ProjectBinding
+	var i LockProjectBindingRow
 	err := row.Scan(
 		&i.ChannelID,
 		&i.WorkspaceRef,
@@ -119,7 +133,7 @@ func (q *Queries) LockProjectBinding(ctx context.Context, channelID pgtype.UUID)
 }
 
 const lockReportedBindings = `-- name: LockReportedBindings :many
-SELECT channel_id, ready, ready_reason
+SELECT channel_id, ready, ready_reason, trash_check_ok, trash_check_reason
 FROM project_bindings
 WHERE channel_id = ANY ($1::uuid[])
 ORDER BY channel_id
@@ -127,12 +141,15 @@ FOR UPDATE
 `
 
 type LockReportedBindingsRow struct {
-	ChannelID   pgtype.UUID
-	Ready       bool
-	ReadyReason pgtype.Text
+	ChannelID        pgtype.UUID
+	Ready            bool
+	ReadyReason      pgtype.Text
+	TrashCheckOk     pgtype.Bool
+	TrashCheckReason pgtype.Text
 }
 
-// The bindings of the channels of a readiness report, locked in ascending channel id.
+// The bindings of the channels of a readiness report, locked in ascending channel id, with the
+// stored folder check (D-DEL-10).
 func (q *Queries) LockReportedBindings(ctx context.Context, channelIds []pgtype.UUID) ([]LockReportedBindingsRow, error) {
 	rows, err := q.db.Query(ctx, lockReportedBindings, channelIds)
 	if err != nil {
@@ -142,7 +159,13 @@ func (q *Queries) LockReportedBindings(ctx context.Context, channelIds []pgtype.
 	var items []LockReportedBindingsRow
 	for rows.Next() {
 		var i LockReportedBindingsRow
-		if err := rows.Scan(&i.ChannelID, &i.Ready, &i.ReadyReason); err != nil {
+		if err := rows.Scan(
+			&i.ChannelID,
+			&i.Ready,
+			&i.ReadyReason,
+			&i.TrashCheckOk,
+			&i.TrashCheckReason,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -156,7 +179,8 @@ func (q *Queries) LockReportedBindings(ctx context.Context, channelIds []pgtype.
 const replaceProjectBinding = `-- name: ReplaceProjectBinding :exec
 UPDATE project_bindings
 SET workspace_ref = $1, repository_url = $2, default_branch = $3,
-    runner_config = $4, provision = $5, ready = false, ready_reason = NULL, version = $6
+    runner_config = $4, provision = $5, ready = false, ready_reason = NULL, version = $6,
+    trash_check_ok = NULL, trash_check_reason = NULL, trash_checked_at = NULL
 WHERE channel_id = $7
 `
 
@@ -170,8 +194,9 @@ type ReplaceProjectBindingParams struct {
 	ChannelID     pgtype.UUID
 }
 
-// Replaces the whole binding of the locked row (HTTP PUT) with ready false, no reason and the new
-// version; created_by and created_at stay.
+// Replaces the whole binding of the locked row (HTTP PUT) with ready false, no reason, no folder
+// check (D-DEL-10: it checked the former folder) and the new version; created_by and created_at
+// stay.
 func (q *Queries) ReplaceProjectBinding(ctx context.Context, arg ReplaceProjectBindingParams) error {
 	_, err := q.db.Exec(ctx, replaceProjectBinding,
 		arg.WorkspaceRef,
@@ -186,13 +211,16 @@ func (q *Queries) ReplaceProjectBinding(ctx context.Context, arg ReplaceProjectB
 }
 
 const resetProjectReadiness = `-- name: ResetProjectReadiness :exec
-UPDATE project_bindings SET ready = false, ready_reason = NULL, version = version + 1
-WHERE channel_id = ANY ($1::uuid[]) AND (ready OR ready_reason IS NOT NULL)
+UPDATE project_bindings
+SET version = CASE WHEN ready OR ready_reason IS NOT NULL THEN version + 1 ELSE version END,
+    ready = false, ready_reason = NULL, trash_check_ok = NULL, trash_check_reason = NULL, trash_checked_at = NULL
+WHERE channel_id = ANY ($1::uuid[]) AND (ready OR ready_reason IS NOT NULL OR trash_check_ok IS NOT NULL)
 `
 
 // Sets ready false and clears the reason with a new version for the bound forums among channel_ids
 // that are ready or have a reason: the effective operator of these channels changed (design note 7
-// of M2-03, R-DM-55).
+// of M2-03, R-DM-55). The folder check of the former runner goes too (D-DEL-10), without a
+// version: it is runtime state of the runner, not part of the binding.
 func (q *Queries) ResetProjectReadiness(ctx context.Context, channelIds []pgtype.UUID) error {
 	_, err := q.db.Exec(ctx, resetProjectReadiness, channelIds)
 	return err

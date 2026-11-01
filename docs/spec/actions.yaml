@@ -882,6 +882,29 @@ actions:
   rights_change: true
   rl_class: rl.admin
   effect: write
+- id: space.delete
+  section: structure
+  description: delete a space with its channels and their content; soft with undo until `chat.delete_undo_window`,
+    then purged (01 6.18)
+  resource: space
+  right: owner
+  owner: true
+  step_up: true
+  audit: always
+  rights_change: true
+  rl_class: rl.admin
+  effect: write
+- id: space.restore
+  section: structure
+  description: undo the deletion of a space before `undo_until`
+  resource: space
+  right: owner
+  owner: true
+  step_up: true
+  audit: always
+  rights_change: true
+  rl_class: rl.admin
+  effect: write
 - id: space.operator.set
   section: structure
   description: set the default operator (I1); optionally `resolve_i1`
@@ -1016,6 +1039,41 @@ actions:
   rights_change: true
   rl_class: rl.admin
   effect: write
+- id: channel.delete
+  section: structure
+  description: delete a channel or forum with its content; soft with undo until `chat.delete_undo_window`,
+    then purged; moving a project folder to the trash also needs `channel.project.bind` (01 6.18)
+  resource: channel
+  right: manage
+  owner: false
+  step_up: true
+  audit: always
+  rights_change: true
+  rl_class: rl.admin
+  effect: write
+- id: channel.restore
+  section: structure
+  description: undo the deletion of a channel before `undo_until`
+  resource: channel
+  right: manage
+  owner: false
+  step_up: true
+  audit: always
+  rights_change: true
+  rl_class: rl.admin
+  effect: write
+- id: channel.project.trash
+  section: structure
+  description: the serving runner reports that it moved the project folder of a deleted forum to the trash
+    or refused to (09 18.15); recorded from the heartbeat
+  resource: channel
+  right: agent-self
+  owner: false
+  step_up: false
+  audit: always
+  rights_change: false
+  rl_class: rl.agent_runtime
+  effect: write
 - id: forum_tag.manage
   section: structure
   description: create, change, delete the tags of a forum
@@ -1094,6 +1152,29 @@ actions:
   owner: false
   step_up: false
   audit: never
+  rights_change: false
+  rl_class: rl.write
+  effect: write
+- id: thread.delete
+  section: threads
+  description: delete a chat or thread with its content; soft with undo until `chat.delete_undo_window`,
+    then purged; never a main thread (01 6.18)
+  resource: thread
+  right: write and (creator or manage)
+  owner: false
+  step_up: false
+  audit: always
+  rights_change: false
+  rl_class: rl.write
+  effect: write
+- id: thread.restore
+  section: threads
+  description: undo the deletion of a chat before `undo_until`
+  resource: thread
+  right: write and (creator or manage)
+  owner: false
+  step_up: false
+  audit: always
   rights_change: false
   rl_class: rl.write
   effect: write

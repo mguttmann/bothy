@@ -73,9 +73,11 @@ from bothy_sdk.generated.models import (
     BillingMode,
     CommandChoice,
     Heartbeat,
+    HeartbeatAck,
     InvocationTokenGrant,
     InvocationTokenRenew,
     ProjectReadiness,
+    ProjectTrashResult,
     Run,
     RunFinish,
     RunFinishState,
@@ -301,6 +303,8 @@ class RuntimeStatus:
         project_readiness: Runners only: one entry per bound forum; ``None`` leaves it out.
         project_folders: Runners only: the folder names under the projects root (09 18.13,
             M4-44); ``None`` leaves it out.
+        project_trash_results: Runners only: the outcomes of folder moves of
+            ``HeartbeatAck.project_trash`` not yet reported (09 18.15); ``None`` leaves it out.
         active_runs: Runs the handler runs outside the adapter's own run loop, for example
             turns a runner adopted after a restart (M2-35); added to ``active_runs``.
         rate_limit: The rate-limit state of the runtime at its provider (M6-14): ``state`` and
@@ -317,6 +321,7 @@ class RuntimeStatus:
     billing_modes_supported: Sequence[str] | None = None
     project_readiness: Sequence[ProjectReadiness] | None = None
     project_folders: Sequence[str] | None = None
+    project_trash_results: Sequence[ProjectTrashResult] | None = None
     active_runs: Sequence[UUID] = ()
     rate_limit: AgentRateLimitState | Mapping[str, Any] | None = None
     reported_billing_mode: str | None = None
@@ -399,6 +404,19 @@ class AgentHandler:
         """Called after every ready source (gateway ``ready`` or the first poll).
 
         A handler that wants its state reported at once calls `Adapter.send_heartbeat` here.
+        """
+
+    async def on_heartbeat_ack(self, sent: Heartbeat, ack: HeartbeatAck) -> None:
+        """Called after the server accepted a heartbeat sent with ``sendHeartbeat``.
+
+        That is `Adapter.send_heartbeat` and every heartbeat of the polling source; the
+        gateway's ``heartbeat_ack`` carries no `HeartbeatAck`, so a runner that waits for
+        ``project_trash`` (09 18.15) calls `Adapter.send_heartbeat` itself from time to time.
+        A failure of this hook is logged and changes nothing else.
+
+        Args:
+            sent: The heartbeat the server accepted.
+            ack: Its answer, for example ``project_trash`` of a runner.
         """
 
     async def on_commands_reconciled(self, result: ReconcileResult) -> None:
@@ -638,6 +656,7 @@ class Adapter:
                 settings=self.settings,
                 clock=self.clock,
                 heartbeat=self.heartbeat,
+                on_ack=self._heartbeat_acked,
             )
         gateway = Gateway(
             gateway_url(self.client.base_url, gateway_path),
@@ -765,6 +784,7 @@ class Adapter:
             details=details,
             project_readiness=None if status is None else status.project_readiness,
             project_folders=None if status is None else status.project_folders,
+            project_trash_results=None if status is None else status.project_trash_results,
         )
 
     async def send_heartbeat(self) -> None:
@@ -773,11 +793,22 @@ class Adapter:
         For a state change the next regular heartbeat would report too late (for example a
         project that became ready). A failure is logged; the regular heartbeat follows anyway.
         """
+        beat = self.heartbeat()
         try:
             with self.client.unbound():
-                await self.client.call(send_heartbeat.asyncio_detailed, body=self.heartbeat())
+                result = await self.client.call(send_heartbeat.asyncio_detailed, body=beat)
         except (ProblemError, httpx.TransportError) as exc:
             _LOG.info("immediate heartbeat failed: %s", type(exc).__name__)
+            return
+        if isinstance(result, HeartbeatAck):
+            await self._heartbeat_acked(beat, result)
+
+    async def _heartbeat_acked(self, sent: Heartbeat, ack: HeartbeatAck) -> None:
+        """Hand an accepted heartbeat and its answer to `AgentHandler.on_heartbeat_ack`."""
+        try:
+            await self.handler.on_heartbeat_ack(sent, ack)
+        except Exception:  # a handler failure must not stop the heartbeat
+            _LOG.exception("on_heartbeat_ack failed")
 
     # ---- restart -------------------------------------------------------------------------
 

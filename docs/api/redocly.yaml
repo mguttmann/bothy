@@ -113,11 +113,14 @@ rules:
         - channel.behavior.read
         - channel.behavior.update
         - channel.create
+        - channel.delete
         - channel.operator.set
         - channel.project.bind
+        - channel.project.trash
         - channel.read
         - channel.read_only.set
         - channel.reorder
+        - channel.restore
         - channel.update
         - client_metrics.submit
         - command.autocomplete
@@ -232,9 +235,11 @@ rules:
         - signing_key.rotate
         - space.archive
         - space.create
+        - space.delete
         - space.operator.set
         - space.read
         - space.reorder
+        - space.restore
         - space.update
         - stats.read
         - status.manage
@@ -250,9 +255,11 @@ rules:
         - terminal.stream
         - thread.close
         - thread.create
+        - thread.delete
         - thread.move
         - thread.read
         - thread.reopen
+        - thread.restore
         - thread.tags.set
         - thread.title.update
         - token.create
@@ -373,11 +380,14 @@ rules:
         - channel.behavior.read
         - channel.behavior.update
         - channel.create
+        - channel.delete
         - channel.operator.set
         - channel.project.bind
+        - channel.project.trash
         - channel.read
         - channel.read_only.set
         - channel.reorder
+        - channel.restore
         - channel.update
         - client_metrics.submit
         - command.autocomplete
@@ -493,9 +503,11 @@ rules:
         - signing_key.rotate
         - space.archive
         - space.create
+        - space.delete
         - space.operator.set
         - space.read
         - space.reorder
+        - space.restore
         - space.update
         - stats.read
         - status.manage
@@ -511,9 +523,11 @@ rules:
         - terminal.stream
         - thread.close
         - thread.create
+        - thread.delete
         - thread.move
         - thread.read
         - thread.reopen
+        - thread.restore
         - thread.tags.set
         - thread.title.update
         - token.create

@@ -69,7 +69,7 @@ func (q *Queries) ChannelIDsOfSpace(ctx context.Context, spaceID pgtype.UUID) ([
 
 const getChannel = `-- name: GetChannel :one
 
-SELECT c.id, c.space_id, c.kind, c.name, c.topic, c.sort_key, c.operator_inherit, c.operator_agent_id, c.require_mention, c.thread_require_mention, c.free_response, c.auto_thread, c.allow_mentioned_agents, c.history_backfill_limit, c.prompt, c.forum_default_sort, c.default_notification_level, c.read_only, c.created_by, c.created_at, c.archived_at, c.version, c.settings_version, s.default_operator_agent_id AS space_operator_id,
+SELECT c.id, c.space_id, c.kind, c.name, c.topic, c.sort_key, c.operator_inherit, c.operator_agent_id, c.require_mention, c.thread_require_mention, c.free_response, c.auto_thread, c.allow_mentioned_agents, c.history_backfill_limit, c.prompt, c.forum_default_sort, c.default_notification_level, c.read_only, c.created_by, c.created_at, c.archived_at, c.version, c.settings_version, c.deleted_at, c.deleted_by, c.purged_at, s.default_operator_agent_id AS space_operator_id,
        (s.archived_at IS NOT NULL)::boolean AS space_archived, t.id AS main_thread_id,
        (pb.channel_id IS NOT NULL)::boolean AS project_bound, coalesce(pb.ready, false)::boolean AS project_ready
 FROM channels c
@@ -121,6 +121,9 @@ func (q *Queries) GetChannel(ctx context.Context, id pgtype.UUID) (GetChannelRow
 		&i.Channel.ArchivedAt,
 		&i.Channel.Version,
 		&i.Channel.SettingsVersion,
+		&i.Channel.DeletedAt,
+		&i.Channel.DeletedBy,
+		&i.Channel.PurgedAt,
 		&i.SpaceOperatorID,
 		&i.SpaceArchived,
 		&i.MainThreadID,
@@ -187,7 +190,7 @@ func (q *Queries) InsertChannel(ctx context.Context, arg InsertChannelParams) er
 }
 
 const listAllChannels = `-- name: ListAllChannels :many
-SELECT c.id, c.space_id, c.kind, c.name, c.topic, c.sort_key, c.operator_inherit, c.operator_agent_id, c.require_mention, c.thread_require_mention, c.free_response, c.auto_thread, c.allow_mentioned_agents, c.history_backfill_limit, c.prompt, c.forum_default_sort, c.default_notification_level, c.read_only, c.created_by, c.created_at, c.archived_at, c.version, c.settings_version, s.default_operator_agent_id AS space_operator_id,
+SELECT c.id, c.space_id, c.kind, c.name, c.topic, c.sort_key, c.operator_inherit, c.operator_agent_id, c.require_mention, c.thread_require_mention, c.free_response, c.auto_thread, c.allow_mentioned_agents, c.history_backfill_limit, c.prompt, c.forum_default_sort, c.default_notification_level, c.read_only, c.created_by, c.created_at, c.archived_at, c.version, c.settings_version, c.deleted_at, c.deleted_by, c.purged_at, s.default_operator_agent_id AS space_operator_id,
        (s.archived_at IS NOT NULL)::boolean AS space_archived, t.id AS main_thread_id,
        (pb.channel_id IS NOT NULL)::boolean AS project_bound, coalesce(pb.ready, false)::boolean AS project_ready
 FROM channels c
@@ -242,6 +245,9 @@ func (q *Queries) ListAllChannels(ctx context.Context) ([]ListAllChannelsRow, er
 			&i.Channel.ArchivedAt,
 			&i.Channel.Version,
 			&i.Channel.SettingsVersion,
+			&i.Channel.DeletedAt,
+			&i.Channel.DeletedBy,
+			&i.Channel.PurgedAt,
 			&i.SpaceOperatorID,
 			&i.SpaceArchived,
 			&i.MainThreadID,
@@ -259,7 +265,7 @@ func (q *Queries) ListAllChannels(ctx context.Context) ([]ListAllChannelsRow, er
 }
 
 const listVisibleChannels = `-- name: ListVisibleChannels :many
-SELECT c.id, c.space_id, c.kind, c.name, c.topic, c.sort_key, c.operator_inherit, c.operator_agent_id, c.require_mention, c.thread_require_mention, c.free_response, c.auto_thread, c.allow_mentioned_agents, c.history_backfill_limit, c.prompt, c.forum_default_sort, c.default_notification_level, c.read_only, c.created_by, c.created_at, c.archived_at, c.version, c.settings_version, s.default_operator_agent_id AS space_operator_id,
+SELECT c.id, c.space_id, c.kind, c.name, c.topic, c.sort_key, c.operator_inherit, c.operator_agent_id, c.require_mention, c.thread_require_mention, c.free_response, c.auto_thread, c.allow_mentioned_agents, c.history_backfill_limit, c.prompt, c.forum_default_sort, c.default_notification_level, c.read_only, c.created_by, c.created_at, c.archived_at, c.version, c.settings_version, c.deleted_at, c.deleted_by, c.purged_at, s.default_operator_agent_id AS space_operator_id,
        (s.archived_at IS NOT NULL)::boolean AS space_archived, t.id AS main_thread_id,
        (pb.channel_id IS NOT NULL)::boolean AS project_bound, coalesce(pb.ready, false)::boolean AS project_ready
 FROM channels c
@@ -328,6 +334,9 @@ func (q *Queries) ListVisibleChannels(ctx context.Context, arg ListVisibleChanne
 			&i.Channel.ArchivedAt,
 			&i.Channel.Version,
 			&i.Channel.SettingsVersion,
+			&i.Channel.DeletedAt,
+			&i.Channel.DeletedBy,
+			&i.Channel.PurgedAt,
 			&i.SpaceOperatorID,
 			&i.SpaceArchived,
 			&i.MainThreadID,
@@ -345,7 +354,7 @@ func (q *Queries) ListVisibleChannels(ctx context.Context, arg ListVisibleChanne
 }
 
 const lockChannel = `-- name: LockChannel :one
-SELECT c.id, c.space_id, c.kind, c.name, c.topic, c.sort_key, c.operator_inherit, c.operator_agent_id, c.require_mention, c.thread_require_mention, c.free_response, c.auto_thread, c.allow_mentioned_agents, c.history_backfill_limit, c.prompt, c.forum_default_sort, c.default_notification_level, c.read_only, c.created_by, c.created_at, c.archived_at, c.version, c.settings_version, s.default_operator_agent_id AS space_operator_id,
+SELECT c.id, c.space_id, c.kind, c.name, c.topic, c.sort_key, c.operator_inherit, c.operator_agent_id, c.require_mention, c.thread_require_mention, c.free_response, c.auto_thread, c.allow_mentioned_agents, c.history_backfill_limit, c.prompt, c.forum_default_sort, c.default_notification_level, c.read_only, c.created_by, c.created_at, c.archived_at, c.version, c.settings_version, c.deleted_at, c.deleted_by, c.purged_at, s.default_operator_agent_id AS space_operator_id,
        (s.archived_at IS NOT NULL)::boolean AS space_archived, t.id AS main_thread_id,
        (pb.channel_id IS NOT NULL)::boolean AS project_bound, coalesce(pb.ready, false)::boolean AS project_ready
 FROM channels c
@@ -393,6 +402,9 @@ func (q *Queries) LockChannel(ctx context.Context, id pgtype.UUID) (LockChannelR
 		&i.Channel.ArchivedAt,
 		&i.Channel.Version,
 		&i.Channel.SettingsVersion,
+		&i.Channel.DeletedAt,
+		&i.Channel.DeletedBy,
+		&i.Channel.PurgedAt,
 		&i.SpaceOperatorID,
 		&i.SpaceArchived,
 		&i.MainThreadID,
@@ -437,8 +449,35 @@ func (q *Queries) SaveChannel(ctx context.Context, arg SaveChannelParams) error 
 	return err
 }
 
+const saveChannelDeletion = `-- name: SaveChannelDeletion :exec
+UPDATE channels
+SET archived_at = $1, deleted_at = $2, deleted_by = $3, version = $4
+WHERE id = $5
+`
+
+type SaveChannelDeletionParams struct {
+	ArchivedAt pgtype.Timestamptz
+	DeletedAt  pgtype.Timestamptz
+	DeletedBy  pgtype.UUID
+	Version    int64
+	ID         pgtype.UUID
+}
+
+// Writes a delete or restore of channel.delete and channel.restore (D-DEL-2): the archive time,
+// the deletion and the version.
+func (q *Queries) SaveChannelDeletion(ctx context.Context, arg SaveChannelDeletionParams) error {
+	_, err := q.db.Exec(ctx, saveChannelDeletion,
+		arg.ArchivedAt,
+		arg.DeletedAt,
+		arg.DeletedBy,
+		arg.Version,
+		arg.ID,
+	)
+	return err
+}
+
 const shareChannel = `-- name: ShareChannel :one
-SELECT c.id, c.space_id, c.kind, c.name, c.topic, c.sort_key, c.operator_inherit, c.operator_agent_id, c.require_mention, c.thread_require_mention, c.free_response, c.auto_thread, c.allow_mentioned_agents, c.history_backfill_limit, c.prompt, c.forum_default_sort, c.default_notification_level, c.read_only, c.created_by, c.created_at, c.archived_at, c.version, c.settings_version, s.default_operator_agent_id AS space_operator_id,
+SELECT c.id, c.space_id, c.kind, c.name, c.topic, c.sort_key, c.operator_inherit, c.operator_agent_id, c.require_mention, c.thread_require_mention, c.free_response, c.auto_thread, c.allow_mentioned_agents, c.history_backfill_limit, c.prompt, c.forum_default_sort, c.default_notification_level, c.read_only, c.created_by, c.created_at, c.archived_at, c.version, c.settings_version, c.deleted_at, c.deleted_by, c.purged_at, s.default_operator_agent_id AS space_operator_id,
        (s.archived_at IS NOT NULL)::boolean AS space_archived, t.id AS main_thread_id,
        (pb.channel_id IS NOT NULL)::boolean AS project_bound, coalesce(pb.ready, false)::boolean AS project_ready
 FROM channels c
@@ -487,6 +526,9 @@ func (q *Queries) ShareChannel(ctx context.Context, id pgtype.UUID) (ShareChanne
 		&i.Channel.ArchivedAt,
 		&i.Channel.Version,
 		&i.Channel.SettingsVersion,
+		&i.Channel.DeletedAt,
+		&i.Channel.DeletedBy,
+		&i.Channel.PurgedAt,
 		&i.SpaceOperatorID,
 		&i.SpaceArchived,
 		&i.MainThreadID,

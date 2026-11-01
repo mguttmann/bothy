@@ -536,6 +536,38 @@ for retention and export.
 Reason: archiving should freeze a history, not hide it; reading without writing is the
 behavior that people know from archived channels, and an owner loses nothing by it.
 
+### 4.5a Deleted spaces, channels and threads
+
+Addendum of 2026-11-01 ([delete.md](../design/delete.md), D-DEL-1 to D-DEL-11; 03 R-DM-57).
+
+1. `space.delete` (owner, step-up) and `channel.delete` (`manage`, step-up) archive the item in
+   the same permission change and mark it deleted; everything of 4.5 applies. Their restores
+   (`space.restore`, `channel.restore`) need the same right and pass `authorize` on the archived
+   item like the other administrative actions of 4.5 point 2; `chat` allows them only before
+   `deleted_at` plus `chat.delete_undo_window` (`409 conflict`, reason `undo_window_passed`
+   after it), and a channel of a deleted space only after the space is restored (`409 conflict`,
+   reason `space_deleted`). A dm channel is never deleted (`409 conflict`, reason `dm_channel`).
+2. `thread.delete` and `thread.restore` need `write` and (creator or `manage`), without step-up;
+   in an archived or read-only channel nobody deletes a thread (4.5 point 1). A main thread is
+   never deleted alone (`409 conflict`, reason `main_thread`).
+3. `authorize` answers `not_found` for every action on a deleted thread, its messages and its
+   runs except `thread.read`, `thread.delete`, `thread.restore` and the agent-self actions with
+   which the runner ends a run the deletion cancelled (`run.update`, `run.finish`,
+   `agent_session.report`). `thread.read` stays for the
+   deletion state (`getThreadDeletion`) and for the receivers of its events; `getThread` and the
+   history answer `404 not_found` themselves, every thread list leaves the thread out, and
+   nothing new goes into it.
+4. Moving the project folder with `trash_project_folder` also needs `channel.project.bind`
+   (owner, step-up) and an ok folder check of the serving runner (`409 conflict`, reason
+   `project_folder_refused` otherwise). `DeletionInfo.project_folder` is shown to owners only.
+5. `channel.project.trash` is recorded from the heartbeat of the runner the move was asked from
+   (`agent-self` on the channel); other runners' results are ignored.
+6. Every delete and restore is audited with `trash_project_folder` (D-DEL-9); the purge after the
+   undo window has no actor and writes no entry.
+
+Reason: deletion follows the right that creates and archives the item; the archive state brings
+every list, write path and I1 rule along without a second hidden state.
+
 ### 4.6 Resolving mentions
 
 A mention token in the content ([03-data-model.md](03-data-model.md), `messages`,

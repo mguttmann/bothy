@@ -941,11 +941,17 @@ Purpose: space, top-level group of the sidebar. Module: `chat`.
 | `created_at` | `timestamptz` | no | `now()` | |
 | `archived_at` | `timestamptz` | yes | | |
 | `version` | `bigint` | no | `1` | |
+| `deleted_at` | `timestamptz` | yes | | set by `space.delete`, cleared by `space.restore` within `chat.delete_undo_window`; a deleted space is archived too, with the same time stamp unless it was archived before (R-DM-57, addendum of 2026-11-01) |
+| `deleted_by` | `uuid` | yes | | the principal that deleted it; set exactly with `deleted_at` |
+| `purged_at` | `timestamptz` | yes | | set by the job `messaging.purge_deleted` once the content is removed; only with `deleted_at` |
 
 PK: `id`. FK: `default_operator_agent_id` -> `agents(principal_id)` ON DELETE RESTRICT;
-`created_by` -> `principals(id)` ON DELETE RESTRICT. Unique: partial index `lower(name) WHERE
+`created_by`, `deleted_by` -> `principals(id)` ON DELETE RESTRICT. Checks: `(deleted_at IS NULL) =
+(deleted_by IS NULL)`; `deleted_at IS NULL OR archived_at IS NOT NULL`; `purged_at IS NULL OR
+deleted_at IS NOT NULL`. Unique: partial index `lower(name) WHERE
 archived_at IS NULL`. Indexes: `(sort_key) WHERE archived_at IS NULL` for the sidebar;
-`(default_operator_agent_id)` for the I1 check. Retention: `content`.
+`(default_operator_agent_id)` for the I1 check; `(deleted_at) WHERE deleted_at IS NOT NULL AND
+purged_at IS NULL` for the purge. Retention: `content`.
 
 #### `user_space_states`
 
@@ -1014,16 +1020,21 @@ Purpose: channel (text, forum or direct message) with operator and behavior. Mod
 | `archived_at` | `timestamptz` | yes | | |
 | `version` | `bigint` | no | `1` | |
 | `settings_version` | `bigint` | no | `1` | separate counter for behavior, prompt, skills, project; events name only this number |
+| `deleted_at` | `timestamptz` | yes | | set by `channel.delete`, cleared by `channel.restore` within `chat.delete_undo_window`; a deleted channel is archived too, with the same time stamp unless it was archived before (R-DM-57, addendum of 2026-11-01) |
+| `deleted_by` | `uuid` | yes | | the principal that deleted it; set exactly with `deleted_at` |
+| `purged_at` | `timestamptz` | yes | | set by the job `messaging.purge_deleted` once the content is removed; only with `deleted_at` |
 
 PK: `id`. FK: `space_id` -> `spaces(id)` ON DELETE RESTRICT; `operator_agent_id` ->
-`agents(principal_id)` ON DELETE RESTRICT; `created_by` -> `principals(id)` ON DELETE RESTRICT.
+`agents(principal_id)` ON DELETE RESTRICT; `created_by`, `deleted_by` -> `principals(id)` ON
+DELETE RESTRICT.
 Checks: `(kind = 'dm') = (space_id IS NULL)`; `NOT operator_inherit OR operator_agent_id IS
 NULL`; for `kind = 'dm'`: `operator_inherit = false AND operator_agent_id IS NULL AND NOT
-read_only`.
+read_only`; the deletion checks of `spaces`.
 Unique: partial index `(space_id, lower(name)) WHERE archived_at IS NULL AND kind <> 'dm'`.
 Indexes: `(space_id, sort_key) WHERE archived_at IS NULL` for the sidebar;
 `(operator_agent_id) WHERE operator_agent_id IS NOT NULL` for "which channels does this agent
-operate" (I1). Retention: `content`.
+operate" (I1); `(deleted_at) WHERE deleted_at IS NOT NULL AND purged_at IS NULL` for the purge.
+Retention: `content`.
 
 Effective operator: `CASE WHEN operator_inherit THEN spaces.default_operator_agent_id ELSE
 operator_agent_id END`. Mention rule: the operator is triggered when an operator exists
@@ -1063,10 +1074,22 @@ Module: `chat`.
 | `created_by` | `uuid` | no | | |
 | `created_at` | `timestamptz` | no | `now()` | |
 | `version` | `bigint` | no | `1` | |
+| `trash_check_ok` | `boolean` | yes | | the last folder check of the serving runner (`ProjectReadiness.trash_check`, 09 18.15): whether it would move the folder to the trash now; NULL before the first check, after an effective binding change and after an effective operator change (addendum of 2026-11-01, R-DM-57) |
+| `trash_check_reason` | `text` | yes | | the code of that check with `trash_check_ok` false |
+| `trash_checked_at` | `timestamptz` | yes | | when the server received that check; set exactly with `trash_check_ok` |
+| `trash_state` | `text` | yes | | `CHECK (trash_state IN ('requested','trashed','refused'))`: a folder move asked with `channel.delete` and its outcome; NULL when none was asked or a restore dropped it |
+| `trash_reason` | `text` | yes | | the refusal code of the runner, only with `refused` |
+| `trash_agent_id` | `uuid` | yes | | the effective operator of the forum at the deletion, the runner asked to move the folder |
+| `trash_requested_at` | `timestamptz` | yes | | time of the request |
 
 PK: `channel_id`. FK: `channel_id` -> `channels(id)` ON DELETE CASCADE; `created_by` ->
-`principals(id)` ON DELETE RESTRICT. Unique: `lower(workspace_ref)`. Indexes: covered by the PK and the unique index.
-Retention: `config`.
+`principals(id)` ON DELETE RESTRICT; `trash_agent_id` -> `agents(principal_id)` ON DELETE
+RESTRICT. Checks: `(trash_check_ok IS NULL) = (trash_checked_at IS NULL)`; `trash_check_reason
+IS NULL OR trash_check_ok = false`; `trash_state`, `trash_agent_id` and `trash_requested_at` are
+set together; `trash_reason IS NULL OR trash_state = 'refused'`. Unique: `lower(workspace_ref)`.
+Indexes: covered by the PK and the unique index; `(trash_agent_id) WHERE trash_state =
+'requested'` for the heartbeat. Retention: `config`. The folder check and the request are runtime
+state of the runner: writing them raises no `version`.
 
 The API document `Channel` carries `project_bound`, true exactly when a row of this table exists
 for the channel; it is derived, not stored. Creating or deleting a binding raises
@@ -1138,20 +1161,25 @@ Purpose: unit of conversation and of agent session with a fixed ID. Module: `cha
 | `version` | `bigint` | no | `1` | |
 | `search_language` | `regconfig` | no | `'simple'` | text search configuration from the creator's language; for the choice see [14-search.md](14-search.md) |
 | `title_search` | `tsvector` | no | generated | see section 5 |
+| `deleted_at` | `timestamptz` | yes | | set by `thread.delete`, cleared by `thread.restore` within `chat.delete_undo_window`; never on a main thread (R-DM-57, addendum of 2026-11-01) |
+| `deleted_by` | `uuid` | yes | | the principal that deleted it; set exactly with `deleted_at` |
+| `purged_at` | `timestamptz` | yes | | set by the job `messaging.purge_deleted` once the messages and the title are removed; only with `deleted_at` |
 
 PK: `id`. FK: `channel_id` -> `channels(id)` ON DELETE RESTRICT; `parent_message_id` ->
 `messages(id)` ON DELETE RESTRICT (deferred, `DEFERRABLE INITIALLY DEFERRED`);
-`operator_agent_id` -> `agents(principal_id)` ON DELETE RESTRICT; `closed_by`, `created_by` ->
-`principals(id)` ON DELETE RESTRICT.
+`operator_agent_id` -> `agents(principal_id)` ON DELETE RESTRICT; `closed_by`, `created_by`,
+`deleted_by` -> `principals(id)` ON DELETE RESTRICT.
 Checks: `(state = 'closed') = (closed_at IS NOT NULL)`; `kind = 'main'` has neither
-`parent_message_id` nor `operator_agent_id`.
+`parent_message_id` nor `operator_agent_id`; `(deleted_at IS NULL) = (deleted_by IS NULL)`;
+`deleted_at IS NULL OR kind <> 'main'`; `purged_at IS NULL OR deleted_at IS NOT NULL`.
 Unique: partial index `(channel_id) WHERE kind = 'main'` (exactly one main thread per text and
 DM channel); `(parent_message_id) WHERE parent_message_id IS NOT NULL` (a message starts
 at most one thread).
 Indexes: `(channel_id, state, last_activity_at DESC)` for the post list with the
 Done section; `(operator_agent_id, channel_id) WHERE operator_agent_id IS NOT NULL` for the
 I1 targets, without a condition on `state`, because a new message reopens a done thread
-(section 6.4); GIN `(title_search)` for search. Retention: `content`.
+(section 6.4); GIN `(title_search)` for search; `(deleted_at) WHERE deleted_at IS NOT NULL AND
+purged_at IS NULL` for the purge. Retention: `content`.
 
 A move changes `channel_id`. It is allowed only for `kind = 'thread'` (the main thread belongs
 permanently to its channel, R-DM-11) and only when the effective operator of the target channel equals
@@ -2831,6 +2859,7 @@ section 4 applies, and the gate fails.
 | R-DM-53 | `runs.last_progress_at` holds the server time of the last start or stored patch, and the server keeps one summary step per parent in `run_steps` (addendum of 2026-10-24, run visualization). | The stall notice needs a server fact instead of a client clock; merging old steps at the root would flatten the run graph ([09-agents.md](09-agents.md), sections 5.3, 5.5 and 5.6). |
 | R-DM-54 | `Channel.project_bound` is derived from `project_bindings`; creating or deleting a binding raises `channels.version` and writes `channel.updated` (addendum of 2026-10-27). | Readers of a forum see that it is a project without the binding, which needs `manage`; clients learn the change through the event they already follow. |
 | R-DM-55 | `project_bindings.provision` asks the serving runner to create the folder (`init`, `clone`) or nothing (`none`); `ready_reason` is the code the runner reported with `ready` false and is cleared with every effective binding change and every report of `ready` true (addendum of 2026-10-28). | A project created from the app needs its folder made where the runner works, and the person must see why a project is not ready (D-M4-43-2, D-M4-43-5). |
+| R-DM-57 | A delete of a space, channel or thread sets `deleted_at` and `deleted_by` (a space or channel is archived in the same rights change, keeping an earlier archive); a restore before `deleted_at` plus `chat.delete_undo_window` clears them and the archive the delete set; after the window the job `messaging.purge_deleted` deletes the messages through the deletion path of [20-privacy.md](20-privacy.md) 4.2, clears thread titles and channel topics and sets `purged_at`. Rows stay (principle 7). `project_bindings` holds the folder check of the serving runner and the folder move request of a deleted forum (addendum of 2026-11-01). | The owner deletes spaces, channels, projects and chats with an undo for a slip; content goes for good, rows stay ([delete.md](../design/delete.md), D-DEL-1 to D-DEL-11). |
 | R-DM-56 | `agents.reported_project_folders` holds the folder names a runner reports under its projects root; `listAgentProjectFolders` shows the owner those that no binding names (`lower(workspace_ref)`), so the app offers a forum only for a folder without one (addendum of 2026-10-29). | The owner adds forums for the folders that already exist; the server never reads host files, and a folder already bound must never get a second forum (D-M4-44-1, D-M4-44-4). |
 
 ## 9. Configuration values of this chapter
@@ -2862,6 +2891,8 @@ The values are defaults. Other chapters refer only to the name.
 | `thread.title_max_chars` | `200` | length of a thread title |
 | `thread.max_tags` | `5` | forum tags per thread |
 | `sidebar.order_max_items` | `1000` | items of a personal order list of the sidebar (`user_space_states.channel_order`, `user_channel_states.thread_order`) |
+| `chat.delete_undo_window` | `30s` | a deleted space, channel or chat can be restored for this long; then `messaging.purge_deleted` removes its content (R-DM-57) |
+| `chat.delete_purge_interval` | `30s` | interval of the job `messaging.purge_deleted`, which also runs at worker start |
 | `message.max_content_bytes` | `262144` | size of a message (long answers without splitting) |
 | `message.max_attachments` | `10` | attachments per message |
 | `message.max_mentions` | `50` | distinct mention handles per message (content format, `messages`) |

@@ -187,7 +187,7 @@ func spaceREST(s chat.Space) rest.Space {
 	return rest.Space{
 		Id: rest.Uuid(s.ID), Name: s.Name, Icon: optional(s.Icon), Color: optional(s.Color), SortKey: s.SortKey,
 		DefaultOperatorAgentId: optionalID(s.DefaultOperatorAgentID), ArchivedAt: optionalTime(s.ArchivedAt),
-		CreatedAt: s.CreatedAt.UTC().Truncate(time.Millisecond), Version: s.Version,
+		CreatedAt: s.CreatedAt.UTC().Truncate(time.Millisecond), Version: s.Version, DeletedAt: optionalTime(s.DeletedAt),
 	}
 }
 

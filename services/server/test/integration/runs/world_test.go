@@ -268,6 +268,7 @@ func newEmptyWorldWithChat(t *testing.T, search searchlang.Map, chatCfg chatapp.
 	must(t, txn.Subscribe(reg, mods.RunsAcceptor.OnMessagePosted))
 	must(t, txn.Subscribe(reg, mods.RunsAcceptor.OnAccessChanged))
 	must(t, txn.Subscribe(reg, mods.RunsAcceptor.OnAgentDisabled))
+	must(t, txn.Subscribe(reg, mods.RunsAcceptor.OnContentDeleted))
 	// The open follow-up of a deleted message (M2-11) and the components of a deleted card (M2-15).
 	must(t, txn.Subscribe(reg, mods.RunsAcceptor.OnMessageDeleted))
 	reg.Seal()
@@ -351,7 +352,7 @@ func newEmptyWorldWithChat(t *testing.T, search searchlang.Map, chatCfg chatapp.
 			Snapshot: syncapp.SnapshotConfig{ThreadWindow: 7 * 24 * time.Hour, ThreadsPerChannel: 20}})
 	must(t, err)
 	built, err := routes.Build(wire.Handlers{Access: authzhttp.New(w.admin), Agents: ag.Handlers, Spaces: c.Handlers, Channels: c.ChannelHandlers,
-		People: w.id.PeopleHandlers, Threads: c.ThreadHandlers, Behavior: c.BehaviorHandlers, Messages: m.Handlers, Admin: settings.Handlers, Personal: personal.Handlers,
+		People: w.id.PeopleHandlers, Threads: c.ThreadHandlers, Deletion: c.DeletionHandlers, Behavior: c.BehaviorHandlers, Messages: m.Handlers, Admin: settings.Handlers, Personal: personal.Handlers,
 		Runs: rn.Handlers, Sync: reads.Handlers},
 		wire.RouteOptions(), routes.SpecCatalog())
 	must(t, err)

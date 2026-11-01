@@ -386,3 +386,60 @@ func TestDecodeHeartbeatProjectFolders(t *testing.T) {
 		}
 	}
 }
+
+// TestDecodeHeartbeatTrashCheck: a readiness entry carries an optional trash_check with ok and a
+// reason code only with ok false (09 18.15, D-DEL-10); absent means unchanged.
+func TestDecodeHeartbeatTrashCheck(t *testing.T) {
+	t.Parallel()
+	entry := func(check string) []byte {
+		return []byte(`{"state":"online","project_readiness":[{"channel_id":"` + runA + `","ready":true` + check + `}]}`)
+	}
+	r, fes := domain.DecodeHeartbeat(entry(`,"trash_check":{"ok":false,"reason":"uncommitted_changes"}`))
+	if len(fes) > 0 || !r.Readiness[0].TrashGiven || r.Readiness[0].TrashOK || r.Readiness[0].TrashReason != "uncommitted_changes" {
+		t.Fatalf("report %+v errors %+v", r, fes)
+	}
+	if r, _ := domain.DecodeHeartbeat(entry(`,"trash_check":{"ok":true}`)); !r.Readiness[0].TrashGiven || !r.Readiness[0].TrashOK {
+		t.Fatalf("ok check %+v", r.Readiness)
+	}
+	if r, _ := domain.DecodeHeartbeat(entry(``)); r.Readiness[0].TrashGiven {
+		t.Fatalf("absent check %+v", r.Readiness)
+	}
+	for name, c := range map[string]struct{ check, pointer, code string }{
+		"no ok":          {`,"trash_check":{}`, "/project_readiness/0/trash_check/ok", "required"},
+		"reason with ok": {`,"trash_check":{"ok":true,"reason":"symlink"}`, "/project_readiness/0/trash_check/reason", "invalid"},
+		"bad reason":     {`,"trash_check":{"ok":false,"reason":"A b"}`, "/project_readiness/0/trash_check/reason", "pattern_mismatch"},
+		"unknown key":    {`,"trash_check":{"ok":true,"path":"x"}`, "/project_readiness/0/trash_check/path", "unknown_member"},
+		"not an object":  {`,"trash_check":true`, "/project_readiness/0/trash_check", "invalid_type"},
+	} {
+		if _, fes := domain.DecodeHeartbeat(entry(c.check)); !hasError(fes, c.pointer, c.code) {
+			t.Errorf("%s: errors %+v, want %s at %s", name, fes, c.code, c.pointer)
+		}
+	}
+}
+
+// TestDecodeHeartbeatTrashResults: project_trash_results lists the outcome of folder moves,
+// trashed or refused with a reason code, one per channel (09 18.15, D-DEL-11).
+func TestDecodeHeartbeatTrashResults(t *testing.T) {
+	t.Parallel()
+	body := func(list string) []byte { return []byte(`{"state":"online","project_trash_results":` + list + `}`) }
+	r, fes := domain.DecodeHeartbeat(body(`[{"channel_id":"` + runA + `","result":"refused","reason":"unpushed_commits"},` +
+		`{"channel_id":"` + runB + `","result":"trashed"}]`))
+	want := []domain.TrashResult{{ChannelID: ids.MustParse(runA), Result: "refused", Reason: "unpushed_commits"},
+		{ChannelID: ids.MustParse(runB), Result: "trashed"}}
+	if len(fes) > 0 || !slices.Equal(r.TrashResults, want) {
+		t.Fatalf("report %+v errors %+v", r.TrashResults, fes)
+	}
+	for name, c := range map[string]struct{ list, pointer, code string }{
+		"no result":         {`[{"channel_id":"` + runA + `"}]`, "/project_trash_results/0/result", "required"},
+		"unknown result":    {`[{"channel_id":"` + runA + `","result":"moved"}]`, "/project_trash_results/0/result", "invalid_enum"},
+		"reason on trashed": {`[{"channel_id":"` + runA + `","result":"trashed","reason":"symlink"}]`, "/project_trash_results/0/reason", "invalid"},
+		"bad channel":       {`[{"channel_id":"x","result":"trashed"}]`, "/project_trash_results/0/channel_id", "invalid_format"},
+		"twice": {`[{"channel_id":"` + runA + `","result":"trashed"},{"channel_id":"` + runA + `","result":"refused"}]`,
+			"/project_trash_results", "duplicate"},
+		"not a list": {`{}`, "/project_trash_results", "invalid_type"},
+	} {
+		if _, fes := domain.DecodeHeartbeat(body(c.list)); !hasError(fes, c.pointer, c.code) {
+			t.Errorf("%s: errors %+v, want %s at %s", name, fes, c.code, c.pointer)
+		}
+	}
+}

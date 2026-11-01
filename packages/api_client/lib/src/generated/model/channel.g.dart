@@ -36,6 +36,8 @@ class _$Channel extends Channel {
   @override
   final DateTime? archivedAt;
   @override
+  final DateTime? deletedAt;
+  @override
   final int version;
   @override
   final int settingsVersion;
@@ -60,6 +62,7 @@ class _$Channel extends Channel {
     this.mainThreadId,
     this.dmParticipantIds,
     this.archivedAt,
+    this.deletedAt,
     required this.version,
     required this.settingsVersion,
     required this.createdAt,
@@ -89,6 +92,7 @@ class _$Channel extends Channel {
         mainThreadId == other.mainThreadId &&
         dmParticipantIds == other.dmParticipantIds &&
         archivedAt == other.archivedAt &&
+        deletedAt == other.deletedAt &&
         version == other.version &&
         settingsVersion == other.settingsVersion &&
         createdAt == other.createdAt;
@@ -111,6 +115,7 @@ class _$Channel extends Channel {
     _$hash = $jc(_$hash, mainThreadId.hashCode);
     _$hash = $jc(_$hash, dmParticipantIds.hashCode);
     _$hash = $jc(_$hash, archivedAt.hashCode);
+    _$hash = $jc(_$hash, deletedAt.hashCode);
     _$hash = $jc(_$hash, version.hashCode);
     _$hash = $jc(_$hash, settingsVersion.hashCode);
     _$hash = $jc(_$hash, createdAt.hashCode);
@@ -135,6 +140,7 @@ class _$Channel extends Channel {
           ..add('mainThreadId', mainThreadId)
           ..add('dmParticipantIds', dmParticipantIds)
           ..add('archivedAt', archivedAt)
+          ..add('deletedAt', deletedAt)
           ..add('version', version)
           ..add('settingsVersion', settingsVersion)
           ..add('createdAt', createdAt))
@@ -208,6 +214,10 @@ class ChannelBuilder implements Builder<Channel, ChannelBuilder> {
   DateTime? get archivedAt => _$this._archivedAt;
   set archivedAt(DateTime? archivedAt) => _$this._archivedAt = archivedAt;
 
+  DateTime? _deletedAt;
+  DateTime? get deletedAt => _$this._deletedAt;
+  set deletedAt(DateTime? deletedAt) => _$this._deletedAt = deletedAt;
+
   int? _version;
   int? get version => _$this._version;
   set version(int? version) => _$this._version = version;
@@ -242,6 +252,7 @@ class ChannelBuilder implements Builder<Channel, ChannelBuilder> {
       _mainThreadId = $v.mainThreadId;
       _dmParticipantIds = $v.dmParticipantIds?.toBuilder();
       _archivedAt = $v.archivedAt;
+      _deletedAt = $v.deletedAt;
       _version = $v.version;
       _settingsVersion = $v.settingsVersion;
       _createdAt = $v.createdAt;
@@ -307,6 +318,7 @@ class ChannelBuilder implements Builder<Channel, ChannelBuilder> {
             mainThreadId: mainThreadId,
             dmParticipantIds: _dmParticipantIds?.build(),
             archivedAt: archivedAt,
+            deletedAt: deletedAt,
             version: BuiltValueNullFieldError.checkNotNull(
               version,
               r'Channel',

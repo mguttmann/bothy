@@ -31,7 +31,7 @@ Upload sessions in parts, object storage drivers, scan, metadata removal, thumbn
 - Emits in-tx events: `FileFinalized` (scan and, if applicable, transcript final; published by the one write that appends `file.updated`, M3-07).
 - Subscribes to in-tx events: `chat.ThreadMoved` (copies of `channel_id` in `message_attachments`, M3-07).
 - Declares source ports: `DraftFileSource` with `UploaderFile` (`cleanup.go`, implemented by `sync`, M3-08).
-- Implements source ports and cross-cutting ports: `identity.AvatarFiles`, `instance.LogoFiles` (both in `adapters/profileimages`, M3-10), kernel `personaldata.Participant`.
+- Implements source ports and cross-cutting ports: `identity.AvatarFiles`, `instance.LogoFiles` (both in `adapters/profileimages`, M3-10), `chat.FileCounter` (`adapters/postgres`, the files of `DeletionInfo`, FEAT-delete-spaces-chats), kernel `personaldata.Participant`.
 
 ## Upload sessions (M3-03)
 

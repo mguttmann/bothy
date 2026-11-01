@@ -11,12 +11,17 @@ class _$HeartbeatAck extends HeartbeatAck {
   final AgentRuntimeStatus presence;
   @override
   final int intervalMs;
+  @override
+  final BuiltList<ProjectTrashRequest>? projectTrash;
 
   factory _$HeartbeatAck([void Function(HeartbeatAckBuilder)? updates]) =>
       (HeartbeatAckBuilder()..update(updates))._build();
 
-  _$HeartbeatAck._({required this.presence, required this.intervalMs})
-    : super._();
+  _$HeartbeatAck._({
+    required this.presence,
+    required this.intervalMs,
+    this.projectTrash,
+  }) : super._();
   @override
   HeartbeatAck rebuild(void Function(HeartbeatAckBuilder) updates) =>
       (toBuilder()..update(updates)).build();
@@ -29,7 +34,8 @@ class _$HeartbeatAck extends HeartbeatAck {
     if (identical(other, this)) return true;
     return other is HeartbeatAck &&
         presence == other.presence &&
-        intervalMs == other.intervalMs;
+        intervalMs == other.intervalMs &&
+        projectTrash == other.projectTrash;
   }
 
   @override
@@ -37,6 +43,7 @@ class _$HeartbeatAck extends HeartbeatAck {
     var _$hash = 0;
     _$hash = $jc(_$hash, presence.hashCode);
     _$hash = $jc(_$hash, intervalMs.hashCode);
+    _$hash = $jc(_$hash, projectTrash.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -45,7 +52,8 @@ class _$HeartbeatAck extends HeartbeatAck {
   String toString() {
     return (newBuiltValueToStringHelper(r'HeartbeatAck')
           ..add('presence', presence)
-          ..add('intervalMs', intervalMs))
+          ..add('intervalMs', intervalMs)
+          ..add('projectTrash', projectTrash))
         .toString();
   }
 }
@@ -64,6 +72,12 @@ class HeartbeatAckBuilder
   int? get intervalMs => _$this._intervalMs;
   set intervalMs(int? intervalMs) => _$this._intervalMs = intervalMs;
 
+  ListBuilder<ProjectTrashRequest>? _projectTrash;
+  ListBuilder<ProjectTrashRequest> get projectTrash =>
+      _$this._projectTrash ??= ListBuilder<ProjectTrashRequest>();
+  set projectTrash(ListBuilder<ProjectTrashRequest>? projectTrash) =>
+      _$this._projectTrash = projectTrash;
+
   HeartbeatAckBuilder() {
     HeartbeatAck._defaults(this);
   }
@@ -73,6 +87,7 @@ class HeartbeatAckBuilder
     if ($v != null) {
       _presence = $v.presence.toBuilder();
       _intervalMs = $v.intervalMs;
+      _projectTrash = $v.projectTrash?.toBuilder();
       _$v = null;
     }
     return this;
@@ -103,12 +118,16 @@ class HeartbeatAckBuilder
               r'HeartbeatAck',
               'intervalMs',
             ),
+            projectTrash: _projectTrash?.build(),
           );
     } catch (_) {
       late String _$failedField;
       try {
         _$failedField = 'presence';
         presence.build();
+
+        _$failedField = 'projectTrash';
+        _projectTrash?.build();
       } catch (e) {
         throw BuiltValueNestedFieldError(
           r'HeartbeatAck',

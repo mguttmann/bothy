@@ -16,7 +16,7 @@ UPDATE threads
 SET unread_floor_seq = last_message_seq, version = version + 1
 WHERE id = $1
 RETURNING id, channel_id, kind, parent_message_id, title, title_source, state, closed_at, closed_by, operator_agent_id,
-    last_message_seq, unread_floor_seq, last_activity_at, message_count, created_by, created_at, moved_at, version
+    last_message_seq, unread_floor_seq, last_activity_at, message_count, created_by, created_at, moved_at, version, deleted_at, deleted_by, purged_at
 `
 
 type FinishImportBatchRow struct {
@@ -38,6 +38,9 @@ type FinishImportBatchRow struct {
 	CreatedAt       pgtype.Timestamptz
 	MovedAt         pgtype.Timestamptz
 	Version         int64
+	DeletedAt       pgtype.Timestamptz
+	DeletedBy       pgtype.UUID
+	PurgedAt        pgtype.Timestamptz
 }
 
 // The end of a batch that changed the thread (04 15.8): imported content is unread for nobody, and
@@ -64,6 +67,9 @@ func (q *Queries) FinishImportBatch(ctx context.Context, id pgtype.UUID) (Finish
 		&i.CreatedAt,
 		&i.MovedAt,
 		&i.Version,
+		&i.DeletedAt,
+		&i.DeletedBy,
+		&i.PurgedAt,
 	)
 	return i, err
 }
@@ -75,7 +81,7 @@ INSERT INTO threads (id, channel_id, kind, parent_message_id, title, title_sourc
 VALUES ($1, $2, 'thread', $3, $4, $5, $6, $7,
     $8, $9, $10, $11, $12::text::regconfig)
 RETURNING id, channel_id, kind, parent_message_id, title, title_source, state, closed_at, closed_by, operator_agent_id,
-    last_message_seq, unread_floor_seq, last_activity_at, message_count, created_by, created_at, moved_at, version
+    last_message_seq, unread_floor_seq, last_activity_at, message_count, created_by, created_at, moved_at, version, deleted_at, deleted_by, purged_at
 `
 
 type InsertImportedThreadParams struct {
@@ -112,6 +118,9 @@ type InsertImportedThreadRow struct {
 	CreatedAt       pgtype.Timestamptz
 	MovedAt         pgtype.Timestamptz
 	Version         int64
+	DeletedAt       pgtype.Timestamptz
+	DeletedBy       pgtype.UUID
+	PurgedAt        pgtype.Timestamptz
 }
 
 // SPDX-License-Identifier: Apache-2.0
@@ -155,6 +164,9 @@ func (q *Queries) InsertImportedThread(ctx context.Context, arg InsertImportedTh
 		&i.CreatedAt,
 		&i.MovedAt,
 		&i.Version,
+		&i.DeletedAt,
+		&i.DeletedBy,
+		&i.PurgedAt,
 	)
 	return i, err
 }
@@ -165,7 +177,7 @@ SET last_message_seq = last_message_seq + $1::bigint, message_count = message_co
     last_activity_at = GREATEST(last_activity_at, $2)
 WHERE id = $3
 RETURNING id, channel_id, kind, parent_message_id, title, title_source, state, closed_at, closed_by, operator_agent_id,
-    last_message_seq, unread_floor_seq, last_activity_at, message_count, created_by, created_at, moved_at, version
+    last_message_seq, unread_floor_seq, last_activity_at, message_count, created_by, created_at, moved_at, version, deleted_at, deleted_by, purged_at
 `
 
 type ReserveImportedSeqsParams struct {
@@ -193,6 +205,9 @@ type ReserveImportedSeqsRow struct {
 	CreatedAt       pgtype.Timestamptz
 	MovedAt         pgtype.Timestamptz
 	Version         int64
+	DeletedAt       pgtype.Timestamptz
+	DeletedBy       pgtype.UUID
+	PurgedAt        pgtype.Timestamptz
 }
 
 // n thread numbers for imported messages under the row lock (03 section 6.2), without a reopen
@@ -219,6 +234,9 @@ func (q *Queries) ReserveImportedSeqs(ctx context.Context, arg ReserveImportedSe
 		&i.CreatedAt,
 		&i.MovedAt,
 		&i.Version,
+		&i.DeletedAt,
+		&i.DeletedBy,
+		&i.PurgedAt,
 	)
 	return i, err
 }

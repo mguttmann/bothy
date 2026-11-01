@@ -42,6 +42,7 @@ class Thread:
             one person.
         unread_floor_seq (int | Unset): Messages up to this `thread_seq` never count as unread (import); absent means 0.
         moved_at (datetime.datetime | Unset): RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+        deleted_at (datetime.datetime | Unset): RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
     """
 
     id: UUID
@@ -64,6 +65,7 @@ class Thread:
     billing_mode: BillingMode | Unset = UNSET
     unread_floor_seq: int | Unset = UNSET
     moved_at: datetime.datetime | Unset = UNSET
+    deleted_at: datetime.datetime | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -122,6 +124,10 @@ class Thread:
         if not isinstance(self.moved_at, Unset):
             moved_at = self.moved_at.isoformat()
 
+        deleted_at: str | Unset = UNSET
+        if not isinstance(self.deleted_at, Unset):
+            deleted_at = self.deleted_at.isoformat()
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -155,6 +161,8 @@ class Thread:
             field_dict["unread_floor_seq"] = unread_floor_seq
         if moved_at is not UNSET:
             field_dict["moved_at"] = moved_at
+        if deleted_at is not UNSET:
+            field_dict["deleted_at"] = deleted_at
 
         return field_dict
 
@@ -236,6 +244,13 @@ class Thread:
         else:
             moved_at = datetime.datetime.fromisoformat(_moved_at)
 
+        _deleted_at = d.pop("deleted_at", UNSET)
+        deleted_at: datetime.datetime | Unset
+        if isinstance(_deleted_at, Unset):
+            deleted_at = UNSET
+        else:
+            deleted_at = datetime.datetime.fromisoformat(_deleted_at)
+
         thread = cls(
             id=id,
             channel_id=channel_id,
@@ -257,6 +272,7 @@ class Thread:
             billing_mode=billing_mode,
             unread_floor_seq=unread_floor_seq,
             moved_at=moved_at,
+            deleted_at=deleted_at,
         )
 
         thread.additional_properties = d

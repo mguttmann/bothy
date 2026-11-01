@@ -95,16 +95,22 @@ const (
 	ActionChannelBehaviorUpdate Action = "channel.behavior.update"
 	// ActionChannelCreate is the action channel.create.
 	ActionChannelCreate Action = "channel.create"
+	// ActionChannelDelete is the action channel.delete.
+	ActionChannelDelete Action = "channel.delete"
 	// ActionChannelOperatorSet is the action channel.operator.set.
 	ActionChannelOperatorSet Action = "channel.operator.set"
 	// ActionChannelProjectBind is the action channel.project.bind.
 	ActionChannelProjectBind Action = "channel.project.bind"
+	// ActionChannelProjectTrash is the action channel.project.trash.
+	ActionChannelProjectTrash Action = "channel.project.trash"
 	// ActionChannelRead is the action channel.read.
 	ActionChannelRead Action = "channel.read"
 	// ActionChannelReadOnlySet is the action channel.read_only.set.
 	ActionChannelReadOnlySet Action = "channel.read_only.set"
 	// ActionChannelReorder is the action channel.reorder.
 	ActionChannelReorder Action = "channel.reorder"
+	// ActionChannelRestore is the action channel.restore.
+	ActionChannelRestore Action = "channel.restore"
 	// ActionChannelUpdate is the action channel.update.
 	ActionChannelUpdate Action = "channel.update"
 	// ActionClientMetricsSubmit is the action client_metrics.submit.
@@ -347,12 +353,16 @@ const (
 	ActionSpaceArchive Action = "space.archive"
 	// ActionSpaceCreate is the action space.create.
 	ActionSpaceCreate Action = "space.create"
+	// ActionSpaceDelete is the action space.delete.
+	ActionSpaceDelete Action = "space.delete"
 	// ActionSpaceOperatorSet is the action space.operator.set.
 	ActionSpaceOperatorSet Action = "space.operator.set"
 	// ActionSpaceRead is the action space.read.
 	ActionSpaceRead Action = "space.read"
 	// ActionSpaceReorder is the action space.reorder.
 	ActionSpaceReorder Action = "space.reorder"
+	// ActionSpaceRestore is the action space.restore.
+	ActionSpaceRestore Action = "space.restore"
 	// ActionSpaceUpdate is the action space.update.
 	ActionSpaceUpdate Action = "space.update"
 	// ActionStatsRead is the action stats.read.
@@ -385,12 +395,16 @@ const (
 	ActionThreadClose Action = "thread.close"
 	// ActionThreadCreate is the action thread.create.
 	ActionThreadCreate Action = "thread.create"
+	// ActionThreadDelete is the action thread.delete.
+	ActionThreadDelete Action = "thread.delete"
 	// ActionThreadMove is the action thread.move.
 	ActionThreadMove Action = "thread.move"
 	// ActionThreadRead is the action thread.read.
 	ActionThreadRead Action = "thread.read"
 	// ActionThreadReopen is the action thread.reopen.
 	ActionThreadReopen Action = "thread.reopen"
+	// ActionThreadRestore is the action thread.restore.
+	ActionThreadRestore Action = "thread.restore"
 	// ActionThreadTagsSet is the action thread.tags.set.
 	ActionThreadTagsSet Action = "thread.tags.set"
 	// ActionThreadTitleUpdate is the action thread.title.update.
@@ -476,11 +490,14 @@ var actionByID = map[string]Action{
 	"channel.behavior.read":        ActionChannelBehaviorRead,
 	"channel.behavior.update":      ActionChannelBehaviorUpdate,
 	"channel.create":               ActionChannelCreate,
+	"channel.delete":               ActionChannelDelete,
 	"channel.operator.set":         ActionChannelOperatorSet,
 	"channel.project.bind":         ActionChannelProjectBind,
+	"channel.project.trash":        ActionChannelProjectTrash,
 	"channel.read":                 ActionChannelRead,
 	"channel.read_only.set":        ActionChannelReadOnlySet,
 	"channel.reorder":              ActionChannelReorder,
+	"channel.restore":              ActionChannelRestore,
 	"channel.update":               ActionChannelUpdate,
 	"client_metrics.submit":        ActionClientMetricsSubmit,
 	"command.autocomplete":         ActionCommandAutocomplete,
@@ -602,9 +619,11 @@ var actionByID = map[string]Action{
 	"signing_key.transition":       ActionSigningKeyTransition,
 	"space.archive":                ActionSpaceArchive,
 	"space.create":                 ActionSpaceCreate,
+	"space.delete":                 ActionSpaceDelete,
 	"space.operator.set":           ActionSpaceOperatorSet,
 	"space.read":                   ActionSpaceRead,
 	"space.reorder":                ActionSpaceReorder,
+	"space.restore":                ActionSpaceRestore,
 	"space.update":                 ActionSpaceUpdate,
 	"stats.read":                   ActionStatsRead,
 	"status.manage":                ActionStatusManage,
@@ -621,9 +640,11 @@ var actionByID = map[string]Action{
 	"terminal.terminate":           ActionTerminalTerminate,
 	"thread.close":                 ActionThreadClose,
 	"thread.create":                ActionThreadCreate,
+	"thread.delete":                ActionThreadDelete,
 	"thread.move":                  ActionThreadMove,
 	"thread.read":                  ActionThreadRead,
 	"thread.reopen":                ActionThreadReopen,
+	"thread.restore":               ActionThreadRestore,
 	"thread.tags.set":              ActionThreadTagsSet,
 	"thread.title.update":          ActionThreadTitleUpdate,
 	"token.create":                 ActionTokenCreate,
@@ -689,11 +710,14 @@ var actionList = []Action{
 	ActionChannelBehaviorRead,
 	ActionChannelBehaviorUpdate,
 	ActionChannelCreate,
+	ActionChannelDelete,
 	ActionChannelOperatorSet,
 	ActionChannelProjectBind,
+	ActionChannelProjectTrash,
 	ActionChannelRead,
 	ActionChannelReadOnlySet,
 	ActionChannelReorder,
+	ActionChannelRestore,
 	ActionChannelUpdate,
 	ActionClientMetricsSubmit,
 	ActionCommandAutocomplete,
@@ -815,9 +839,11 @@ var actionList = []Action{
 	ActionSigningKeyTransition,
 	ActionSpaceArchive,
 	ActionSpaceCreate,
+	ActionSpaceDelete,
 	ActionSpaceOperatorSet,
 	ActionSpaceRead,
 	ActionSpaceReorder,
+	ActionSpaceRestore,
 	ActionSpaceUpdate,
 	ActionStatsRead,
 	ActionStatusManage,
@@ -834,9 +860,11 @@ var actionList = []Action{
 	ActionTerminalTerminate,
 	ActionThreadClose,
 	ActionThreadCreate,
+	ActionThreadDelete,
 	ActionThreadMove,
 	ActionThreadRead,
 	ActionThreadReopen,
+	ActionThreadRestore,
 	ActionThreadTagsSet,
 	ActionThreadTitleUpdate,
 	ActionTokenCreate,

@@ -95,6 +95,7 @@ import 'package:api_client/src/generated/model/channel_behavior.dart';
 import 'package:api_client/src/generated/model/channel_behavior_put.dart';
 import 'package:api_client/src/generated/model/channel_create.dart';
 import 'package:api_client/src/generated/model/channel_created_event.dart';
+import 'package:api_client/src/generated/model/channel_delete.dart';
 import 'package:api_client/src/generated/model/channel_kind.dart';
 import 'package:api_client/src/generated/model/channel_label.dart';
 import 'package:api_client/src/generated/model/channel_operator.dart';
@@ -146,6 +147,8 @@ import 'package:api_client/src/generated/model/cost_total.dart';
 import 'package:api_client/src/generated/model/credential_holder_set.dart';
 import 'package:api_client/src/generated/model/credential_overview.dart';
 import 'package:api_client/src/generated/model/csp_report_legacy.dart';
+import 'package:api_client/src/generated/model/deletion_contents.dart';
+import 'package:api_client/src/generated/model/deletion_info.dart';
 import 'package:api_client/src/generated/model/device.dart';
 import 'package:api_client/src/generated/model/device_approve.dart';
 import 'package:api_client/src/generated/model/device_key_registration.dart';
@@ -411,10 +414,15 @@ import 'package:api_client/src/generated/model/profile_update.dart';
 import 'package:api_client/src/generated/model/project_binding.dart';
 import 'package:api_client/src/generated/model/project_binding_put.dart';
 import 'package:api_client/src/generated/model/project_folder.dart';
+import 'package:api_client/src/generated/model/project_folder_deletion.dart';
 import 'package:api_client/src/generated/model/project_folder_list.dart';
 import 'package:api_client/src/generated/model/project_provision.dart';
 import 'package:api_client/src/generated/model/project_readiness.dart';
 import 'package:api_client/src/generated/model/project_runner_config.dart';
+import 'package:api_client/src/generated/model/project_trash_check.dart';
+import 'package:api_client/src/generated/model/project_trash_check_report.dart';
+import 'package:api_client/src/generated/model/project_trash_request.dart';
+import 'package:api_client/src/generated/model/project_trash_result.dart';
 import 'package:api_client/src/generated/model/public_branding.dart';
 import 'package:api_client/src/generated/model/push_environment.dart';
 import 'package:api_client/src/generated/model/push_preview.dart';
@@ -709,6 +717,7 @@ part 'serializers.g.dart';
   ChannelBehaviorPut,
   ChannelCreate,
   ChannelCreatedEvent,
+  ChannelDelete,
   ChannelKind,
   ChannelLabel,
   ChannelOperator,
@@ -760,6 +769,8 @@ part 'serializers.g.dart';
   CredentialHolderSet,
   CredentialOverview,
   CspReportLegacy,
+  DeletionContents,
+  DeletionInfo,
   Device,
   DeviceApprove,
   DeviceKeyRegistration,
@@ -1026,10 +1037,15 @@ part 'serializers.g.dart';
   ProjectBinding,
   ProjectBindingPut,
   ProjectFolder,
+  ProjectFolderDeletion,
   ProjectFolderList,
   ProjectProvision,
   ProjectReadiness,
   ProjectRunnerConfig,
+  ProjectTrashCheck,
+  ProjectTrashCheckReport,
+  ProjectTrashRequest,
+  ProjectTrashResult,
   PublicBranding,
   PushEnvironment,
   PushPreview,
@@ -1378,6 +1394,10 @@ Serializers serializers =
           ..addBuilderFactory(
             const FullType(BuiltList, [FullType(AccessEffect)]),
             () => ListBuilder<AccessEffect>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(ProjectTrashRequest)]),
+            () => ListBuilder<ProjectTrashRequest>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, [FullType(StatsBackendAgent)]),
@@ -1743,6 +1763,10 @@ Serializers serializers =
           ..addBuilderFactory(
             const FullType(BuiltList, [FullType(RunSummary)]),
             () => ListBuilder<RunSummary>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(ProjectTrashResult)]),
+            () => ListBuilder<ProjectTrashResult>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, [FullType(RunContextMessage)]),

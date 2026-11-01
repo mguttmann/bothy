@@ -62,6 +62,8 @@ type Space struct {
 	CreatedAt, ArchivedAt time.Time
 	// Version is the ETag.
 	Version int64
+	// DeletedAt is the deletion time while deleted, pending or final (01 6.18); zero otherwise.
+	DeletedAt time.Time
 }
 
 // SpaceView is a space with the caller's effective rights on it (schema SpaceView).
@@ -181,6 +183,8 @@ type Channel struct {
 	CreatedAt, ArchivedAt time.Time
 	// Version is the ETag; SettingsVersion the counter of behaviour and prompt.
 	Version, SettingsVersion int64
+	// DeletedAt is the deletion time while deleted, pending or final (01 6.18); zero otherwise.
+	DeletedAt time.Time
 }
 
 // ChannelView is a channel with the caller's effective rights on it (schema ChannelView).

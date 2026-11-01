@@ -879,6 +879,31 @@ type ClientInterface interface {
 	// Corresponds with POST /channels/{channel_id}/commands/{command_id}/invoke (the `InvokeCommand` operationId).
 	InvokeCommand(ctx context.Context, channelId ChannelIdPath, commandId CommandIdPath, params *InvokeCommandParams, body InvokeCommandJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// DeleteChannelWithBody Delete a channel
+	//
+	// Soft delete with undo (01 6.18, 07 4.5a): the channel is archived and marked deleted in one rights change, leaves every list at once and `channel.archived` carries `deleted_at`; active runs in it end. With `trash_project_folder` (a forum with a project binding only) the caller also needs `channel.project.bind`, and the last folder check of the serving runner must be ok (`409 conflict` with `reason` `project_folder_refused` otherwise); the runner moves the folder to the trash of its host once the deletion is final (09 18.15). Until `undo_until` `restoreChannel` undoes it; then `messaging.purge_deleted` deletes the content for good. A dm channel is never deleted (`409 conflict`, `reason` `dm_channel`).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /channels/{channel_id}/delete (the `DeleteChannel` operationId).
+	DeleteChannelWithBody(ctx context.Context, channelId ChannelIdPath, params *DeleteChannelParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteChannel Delete a channel
+	//
+	// Soft delete with undo (01 6.18, 07 4.5a): the channel is archived and marked deleted in one rights change, leaves every list at once and `channel.archived` carries `deleted_at`; active runs in it end. With `trash_project_folder` (a forum with a project binding only) the caller also needs `channel.project.bind`, and the last folder check of the serving runner must be ok (`409 conflict` with `reason` `project_folder_refused` otherwise); the runner moves the folder to the trash of its host once the deletion is final (09 18.15). Until `undo_until` `restoreChannel` undoes it; then `messaging.purge_deleted` deletes the content for good. A dm channel is never deleted (`409 conflict`, `reason` `dm_channel`).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /channels/{channel_id}/delete (the `DeleteChannel` operationId).
+	DeleteChannel(ctx context.Context, channelId ChannelIdPath, params *DeleteChannelParams, body DeleteChannelJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetChannelDeletion What deleting a channel removes, or the state of its deletion
+	//
+	// Before a deletion, the counts of what it removes and, for owners and a forum with a project binding, the folder and the last check of the serving runner (`project_folder`); after it, `state` `pending` until `undo_until`, then `final`, with the folder outcome. Read with `channel.read`, also for a deleted channel.
+	//
+	// Corresponds with GET /channels/{channel_id}/deletion (the `GetChannelDeletion` operationId).
+	GetChannelDeletion(ctx context.Context, channelId ChannelIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// DeleteChannelDraft Delete the draft of a new forum post
 	//
 	// Corresponds with DELETE /channels/{channel_id}/draft (the `DeleteChannelDraft` operationId).
@@ -1007,6 +1032,13 @@ type ClientInterface interface {
 	//
 	// Corresponds with PUT /channels/{channel_id}/read-only (the `SetChannelReadOnly` operationId).
 	SetChannelReadOnly(ctx context.Context, channelId ChannelIdPath, params *SetChannelReadOnlyParams, body SetChannelReadOnlyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RestoreChannel Undo the deletion of a channel
+	//
+	// Undoes a pending deletion before `undo_until`: clears `deleted_at` and the archive the deletion set, drops a folder request, as a rights change with `access.changed`, and publishes `channel.updated`. A channel that is not deleted is answered without effect; after `undo_until` `409 conflict` with `reason` `undo_window_passed`; in a deleted space `409 conflict` with `reason` `space_deleted`.
+	//
+	// Corresponds with POST /channels/{channel_id}/restore (the `RestoreChannel` operationId).
+	RestoreChannel(ctx context.Context, channelId ChannelIdPath, params *RestoreChannelParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListForumTags List forum tags
 	//
@@ -3181,6 +3213,20 @@ type ClientInterface interface {
 	// Corresponds with POST /spaces/{space_id}/channels (the `CreateChannel` operationId).
 	CreateChannel(ctx context.Context, spaceId SpaceIdPath, params *CreateChannelParams, body CreateChannelJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// DeleteSpace Delete a space
+	//
+	// Soft delete with undo (01 6.18, 07 4.5a): the space is archived and marked deleted in one rights change, leaves every list at once and its archive event carries `deleted_at`; active runs in it end. Until `undo_until` (`chat.delete_undo_window`) `restoreSpace` undoes it; after that the job `messaging.purge_deleted` deletes the content of every channel for good (tombstones, redaction, files). Deleting again while pending answers the pending deletion.
+	//
+	// Corresponds with POST /spaces/{space_id}/delete (the `DeleteSpace` operationId).
+	DeleteSpace(ctx context.Context, spaceId SpaceIdPath, params *DeleteSpaceParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetSpaceDeletion What deleting a space removes, or the state of its deletion
+	//
+	// Before a deletion, the counts of what it removes; after it, `state` `pending` until `undo_until`, then `final`. Read with `space.read`, also for a deleted space.
+	//
+	// Corresponds with GET /spaces/{space_id}/deletion (the `GetSpaceDeletion` operationId).
+	GetSpaceDeletion(ctx context.Context, spaceId SpaceIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// MoveSpaceWithBody Change the global position of a space
 	//
 	// Takes any type of body and a specified content type.
@@ -3212,6 +3258,13 @@ type ClientInterface interface {
 	//
 	// Corresponds with PUT /spaces/{space_id}/operator (the `SetSpaceOperator` operationId).
 	SetSpaceOperator(ctx context.Context, spaceId SpaceIdPath, params *SetSpaceOperatorParams, body SetSpaceOperatorJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RestoreSpace Undo the deletion of a space
+	//
+	// Undoes a pending deletion before `undo_until`: clears `deleted_at` and the archive the deletion set, as a rights change with `access.changed`, and publishes `space.updated`. A space that is not deleted is answered without effect; after `undo_until` `409 conflict` with `reason` `undo_window_passed`.
+	//
+	// Corresponds with POST /spaces/{space_id}/restore (the `RestoreSpace` operationId).
+	RestoreSpace(ctx context.Context, spaceId SpaceIdPath, params *RestoreSpaceParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetStatsBackends Backend policy view per agent
 	//
@@ -3486,6 +3539,20 @@ type ClientInterface interface {
 	// Corresponds with GET /threads/{thread_id}/costs (the `GetThreadCosts` operationId).
 	GetThreadCosts(ctx context.Context, threadId ThreadIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// DeleteThread Delete a thread
+	//
+	// Soft delete with undo (01 6.18, 07 4.5a): the chat leaves every list at once and `thread.updated` carries `deleted_at`; its history answers `404`, new messages are refused and active runs in it end. A main thread is never deleted alone (`409 conflict`, `reason` `main_thread`). Until `undo_until` `restoreThread` undoes it; then `messaging.purge_deleted` deletes its content for good.
+	//
+	// Corresponds with POST /threads/{thread_id}/delete (the `DeleteThread` operationId).
+	DeleteThread(ctx context.Context, threadId ThreadIdPath, params *DeleteThreadParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetThreadDeletion What deleting a thread removes, or the state of its deletion
+	//
+	// Before a deletion, the counts of what it removes; after it, `state` `pending` until `undo_until`, then `final`. Read with `thread.read` on its channel, also for a deleted thread.
+	//
+	// Corresponds with GET /threads/{thread_id}/deletion (the `GetThreadDeletion` operationId).
+	GetThreadDeletion(ctx context.Context, threadId ThreadIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// DeleteThreadDraft Delete the draft of a thread
 	//
 	// Corresponds with DELETE /threads/{thread_id}/draft (the `DeleteThreadDraft` operationId).
@@ -3610,6 +3677,13 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /threads/{thread_id}/reopen (the `ReopenThread` operationId).
 	ReopenThread(ctx context.Context, threadId ThreadIdPath, params *ReopenThreadParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RestoreThread Undo the deletion of a thread
+	//
+	// Undoes a pending deletion before `undo_until` and publishes `thread.updated` without `deleted_at`. A thread that is not deleted is answered without effect; after `undo_until` `409 conflict` with `reason` `undo_window_passed`.
+	//
+	// Corresponds with POST /threads/{thread_id}/restore (the `RestoreThread` operationId).
+	RestoreThread(ctx context.Context, threadId ThreadIdPath, params *RestoreThreadParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListThreadRuns List runs of a thread
 	//
@@ -5729,6 +5803,61 @@ func (c *Client) InvokeCommand(ctx context.Context, channelId ChannelIdPath, com
 	return c.Client.Do(req)
 }
 
+// DeleteChannelWithBody Delete a channel
+//
+// Soft delete with undo (01 6.18, 07 4.5a): the channel is archived and marked deleted in one rights change, leaves every list at once and `channel.archived` carries `deleted_at`; active runs in it end. With `trash_project_folder` (a forum with a project binding only) the caller also needs `channel.project.bind`, and the last folder check of the serving runner must be ok (`409 conflict` with `reason` `project_folder_refused` otherwise); the runner moves the folder to the trash of its host once the deletion is final (09 18.15). Until `undo_until` `restoreChannel` undoes it; then `messaging.purge_deleted` deletes the content for good. A dm channel is never deleted (`409 conflict`, `reason` `dm_channel`).
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /channels/{channel_id}/delete (the `DeleteChannel` operationId).
+func (c *Client) DeleteChannelWithBody(ctx context.Context, channelId ChannelIdPath, params *DeleteChannelParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteChannelRequestWithBody(c.Server, channelId, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeleteChannel Delete a channel
+//
+// Soft delete with undo (01 6.18, 07 4.5a): the channel is archived and marked deleted in one rights change, leaves every list at once and `channel.archived` carries `deleted_at`; active runs in it end. With `trash_project_folder` (a forum with a project binding only) the caller also needs `channel.project.bind`, and the last folder check of the serving runner must be ok (`409 conflict` with `reason` `project_folder_refused` otherwise); the runner moves the folder to the trash of its host once the deletion is final (09 18.15). Until `undo_until` `restoreChannel` undoes it; then `messaging.purge_deleted` deletes the content for good. A dm channel is never deleted (`409 conflict`, `reason` `dm_channel`).
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /channels/{channel_id}/delete (the `DeleteChannel` operationId).
+func (c *Client) DeleteChannel(ctx context.Context, channelId ChannelIdPath, params *DeleteChannelParams, body DeleteChannelJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteChannelRequest(c.Server, channelId, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetChannelDeletion What deleting a channel removes, or the state of its deletion
+//
+// Before a deletion, the counts of what it removes and, for owners and a forum with a project binding, the folder and the last check of the serving runner (`project_folder`); after it, `state` `pending` until `undo_until`, then `final`, with the folder outcome. Read with `channel.read`, also for a deleted channel.
+//
+// Corresponds with GET /channels/{channel_id}/deletion (the `GetChannelDeletion` operationId).
+func (c *Client) GetChannelDeletion(ctx context.Context, channelId ChannelIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetChannelDeletionRequest(c.Server, channelId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // DeleteChannelDraft Delete the draft of a new forum post
 //
 // Corresponds with DELETE /channels/{channel_id}/draft (the `DeleteChannelDraft` operationId).
@@ -6018,6 +6147,23 @@ func (c *Client) SetChannelReadOnlyWithBody(ctx context.Context, channelId Chann
 // Corresponds with PUT /channels/{channel_id}/read-only (the `SetChannelReadOnly` operationId).
 func (c *Client) SetChannelReadOnly(ctx context.Context, channelId ChannelIdPath, params *SetChannelReadOnlyParams, body SetChannelReadOnlyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewSetChannelReadOnlyRequest(c.Server, channelId, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RestoreChannel Undo the deletion of a channel
+//
+// Undoes a pending deletion before `undo_until`: clears `deleted_at` and the archive the deletion set, drops a folder request, as a rights change with `access.changed`, and publishes `channel.updated`. A channel that is not deleted is answered without effect; after `undo_until` `409 conflict` with `reason` `undo_window_passed`; in a deleted space `409 conflict` with `reason` `space_deleted`.
+//
+// Corresponds with POST /channels/{channel_id}/restore (the `RestoreChannel` operationId).
+func (c *Client) RestoreChannel(ctx context.Context, channelId ChannelIdPath, params *RestoreChannelParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRestoreChannelRequest(c.Server, channelId, params)
 	if err != nil {
 		return nil, err
 	}
@@ -10831,6 +10977,40 @@ func (c *Client) CreateChannel(ctx context.Context, spaceId SpaceIdPath, params 
 	return c.Client.Do(req)
 }
 
+// DeleteSpace Delete a space
+//
+// Soft delete with undo (01 6.18, 07 4.5a): the space is archived and marked deleted in one rights change, leaves every list at once and its archive event carries `deleted_at`; active runs in it end. Until `undo_until` (`chat.delete_undo_window`) `restoreSpace` undoes it; after that the job `messaging.purge_deleted` deletes the content of every channel for good (tombstones, redaction, files). Deleting again while pending answers the pending deletion.
+//
+// Corresponds with POST /spaces/{space_id}/delete (the `DeleteSpace` operationId).
+func (c *Client) DeleteSpace(ctx context.Context, spaceId SpaceIdPath, params *DeleteSpaceParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteSpaceRequest(c.Server, spaceId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetSpaceDeletion What deleting a space removes, or the state of its deletion
+//
+// Before a deletion, the counts of what it removes; after it, `state` `pending` until `undo_until`, then `final`. Read with `space.read`, also for a deleted space.
+//
+// Corresponds with GET /spaces/{space_id}/deletion (the `GetSpaceDeletion` operationId).
+func (c *Client) GetSpaceDeletion(ctx context.Context, spaceId SpaceIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetSpaceDeletionRequest(c.Server, spaceId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // MoveSpaceWithBody Change the global position of a space
 //
 // Takes any type of body and a specified content type.
@@ -10893,6 +11073,23 @@ func (c *Client) SetSpaceOperatorWithBody(ctx context.Context, spaceId SpaceIdPa
 // Corresponds with PUT /spaces/{space_id}/operator (the `SetSpaceOperator` operationId).
 func (c *Client) SetSpaceOperator(ctx context.Context, spaceId SpaceIdPath, params *SetSpaceOperatorParams, body SetSpaceOperatorJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewSetSpaceOperatorRequest(c.Server, spaceId, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RestoreSpace Undo the deletion of a space
+//
+// Undoes a pending deletion before `undo_until`: clears `deleted_at` and the archive the deletion set, as a rights change with `access.changed`, and publishes `space.updated`. A space that is not deleted is answered without effect; after `undo_until` `409 conflict` with `reason` `undo_window_passed`.
+//
+// Corresponds with POST /spaces/{space_id}/restore (the `RestoreSpace` operationId).
+func (c *Client) RestoreSpace(ctx context.Context, spaceId SpaceIdPath, params *RestoreSpaceParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRestoreSpaceRequest(c.Server, spaceId, params)
 	if err != nil {
 		return nil, err
 	}
@@ -11566,6 +11763,40 @@ func (c *Client) GetThreadCosts(ctx context.Context, threadId ThreadIdPath, reqE
 	return c.Client.Do(req)
 }
 
+// DeleteThread Delete a thread
+//
+// Soft delete with undo (01 6.18, 07 4.5a): the chat leaves every list at once and `thread.updated` carries `deleted_at`; its history answers `404`, new messages are refused and active runs in it end. A main thread is never deleted alone (`409 conflict`, `reason` `main_thread`). Until `undo_until` `restoreThread` undoes it; then `messaging.purge_deleted` deletes its content for good.
+//
+// Corresponds with POST /threads/{thread_id}/delete (the `DeleteThread` operationId).
+func (c *Client) DeleteThread(ctx context.Context, threadId ThreadIdPath, params *DeleteThreadParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteThreadRequest(c.Server, threadId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetThreadDeletion What deleting a thread removes, or the state of its deletion
+//
+// Before a deletion, the counts of what it removes; after it, `state` `pending` until `undo_until`, then `final`. Read with `thread.read` on its channel, also for a deleted thread.
+//
+// Corresponds with GET /threads/{thread_id}/deletion (the `GetThreadDeletion` operationId).
+func (c *Client) GetThreadDeletion(ctx context.Context, threadId ThreadIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetThreadDeletionRequest(c.Server, threadId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // DeleteThreadDraft Delete the draft of a thread
 //
 // Corresponds with DELETE /threads/{thread_id}/draft (the `DeleteThreadDraft` operationId).
@@ -11821,6 +12052,23 @@ func (c *Client) MarkThreadUnread(ctx context.Context, threadId ThreadIdPath, pa
 // Corresponds with POST /threads/{thread_id}/reopen (the `ReopenThread` operationId).
 func (c *Client) ReopenThread(ctx context.Context, threadId ThreadIdPath, params *ReopenThreadParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewReopenThreadRequest(c.Server, threadId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RestoreThread Undo the deletion of a thread
+//
+// Undoes a pending deletion before `undo_until` and publishes `thread.updated` without `deleted_at`. A thread that is not deleted is answered without effect; after `undo_until` `409 conflict` with `reason` `undo_window_passed`.
+//
+// Corresponds with POST /threads/{thread_id}/restore (the `RestoreThread` operationId).
+func (c *Client) RestoreThread(ctx context.Context, threadId ThreadIdPath, params *RestoreThreadParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRestoreThreadRequest(c.Server, threadId, params)
 	if err != nil {
 		return nil, err
 	}
@@ -15766,6 +16014,102 @@ func NewInvokeCommandRequestWithBody(server string, channelId ChannelIdPath, com
 	return req, nil
 }
 
+// NewDeleteChannelRequest calls the generic DeleteChannel builder with application/json body
+func NewDeleteChannelRequest(server string, channelId ChannelIdPath, params *DeleteChannelParams, body DeleteChannelJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewDeleteChannelRequestWithBody(server, channelId, params, "application/json", bodyReader)
+}
+
+// NewDeleteChannelRequestWithBody constructs an http.Request for the DeleteChannel method, with any body, and a specified content type
+func NewDeleteChannelRequestWithBody(server string, channelId ChannelIdPath, params *DeleteChannelParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "channel_id", channelId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/channels/%s/delete", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewGetChannelDeletionRequest constructs an http.Request for the GetChannelDeletion method
+func NewGetChannelDeletionRequest(server string, channelId ChannelIdPath) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "channel_id", channelId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/channels/%s/deletion", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewDeleteChannelDraftRequest constructs an http.Request for the DeleteChannelDraft method
 func NewDeleteChannelDraftRequest(server string, channelId ChannelIdPath) (*http.Request, error) {
 	var err error
@@ -16329,6 +16673,55 @@ func NewSetChannelReadOnlyRequestWithBody(server string, channelId ChannelIdPath
 		}
 
 		req.Header.Set("If-Match", headerParam0)
+
+	}
+
+	return req, nil
+}
+
+// NewRestoreChannelRequest constructs an http.Request for the RestoreChannel method
+func NewRestoreChannelRequest(server string, channelId ChannelIdPath, params *RestoreChannelParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "channel_id", channelId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/channels/%s/restore", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
 
 	}
 
@@ -23813,679 +24206,6 @@ func NewCreateTokenRequestWithBody(server string, principalId PrincipalIdPath, p
 		}
 
 	}
-
-	return req, nil
-}
-
-// NewGetProblemTypeRequest constructs an http.Request for the GetProblemType method
-func NewGetProblemTypeRequest(server string, code CodePath) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "code", code, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/problems/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewUnregisterPushRequest constructs an http.Request for the UnregisterPush method
-func NewUnregisterPushRequest(server string, registrationId RegistrationIdPath) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "registration_id", registrationId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/push-registrations/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewGetPushPreviewRequest constructs an http.Request for the GetPushPreview method
-func NewGetPushPreviewRequest(server string, params *GetPushPreviewParams) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/push/preview")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-		// queryValues collects non-styled parameters (passthrough, JSON)
-		// that are safe to round-trip through url.Values.Encode().
-		queryValues := queryURL.Query()
-		// rawQueryFragments collects pre-encoded query fragments from
-		// styled parameters, preserving literal commas as delimiters
-		// per the OpenAPI spec (e.g. "color=blue,black,brown").
-		var rawQueryFragments []string
-
-		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "nid", params.Nid, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
-			return nil, err
-		} else {
-			for _, qp := range strings.Split(queryFrag, "&") {
-				rawQueryFragments = append(rawQueryFragments, qp)
-			}
-		}
-
-		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "message_id", params.MessageId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
-			return nil, err
-		} else {
-			for _, qp := range strings.Split(queryFrag, "&") {
-				rawQueryFragments = append(rawQueryFragments, qp)
-			}
-		}
-
-		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "kind", params.Kind, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
-			return nil, err
-		} else {
-			for _, qp := range strings.Split(queryFrag, "&") {
-				rawQueryFragments = append(rawQueryFragments, qp)
-			}
-		}
-
-		if encoded := queryValues.Encode(); encoded != "" {
-			rawQueryFragments = append(rawQueryFragments, encoded)
-		}
-		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewListActiveRunsRequest constructs an http.Request for the ListActiveRuns method
-func NewListActiveRunsRequest(server string, params *ListActiveRunsParams) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/runs")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-		// queryValues collects non-styled parameters (passthrough, JSON)
-		// that are safe to round-trip through url.Values.Encode().
-		queryValues := queryURL.Query()
-		// rawQueryFragments collects pre-encoded query fragments from
-		// styled parameters, preserving literal commas as delimiters
-		// per the OpenAPI spec (e.g. "color=blue,black,brown").
-		var rawQueryFragments []string
-
-		if params.Cursor != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if params.Limit != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if params.AgentId != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "agent_id", *params.AgentId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if encoded := queryValues.Encode(); encoded != "" {
-			rawQueryFragments = append(rawQueryFragments, encoded)
-		}
-		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewGetRunRequest constructs an http.Request for the GetRun method
-func NewGetRunRequest(server string, runId RunIdPath) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "run_id", runId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/runs/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewPatchRunRequest calls the generic PatchRun builder with application/json body
-func NewPatchRunRequest(server string, runId RunIdPath, body PatchRunJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewPatchRunRequestWithBody(server, runId, "application/json", bodyReader)
-}
-
-// NewPatchRunRequestWithBody constructs an http.Request for the PatchRun method, with any body, and a specified content type
-func NewPatchRunRequestWithBody(server string, runId RunIdPath, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "run_id", runId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/runs/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewAwaitRunInputRequest calls the generic AwaitRunInput builder with application/json body
-func NewAwaitRunInputRequest(server string, runId RunIdPath, body AwaitRunInputJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewAwaitRunInputRequestWithBody(server, runId, "application/json", bodyReader)
-}
-
-// NewAwaitRunInputRequestWithBody constructs an http.Request for the AwaitRunInput method, with any body, and a specified content type
-func NewAwaitRunInputRequestWithBody(server string, runId RunIdPath, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "run_id", runId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/runs/%s/await-input", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewCancelRunRequest calls the generic CancelRun builder with application/json body
-func NewCancelRunRequest(server string, runId RunIdPath, params *CancelRunParams, body CancelRunJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewCancelRunRequestWithBody(server, runId, params, "application/json", bodyReader)
-}
-
-// NewCancelRunRequestWithBody constructs an http.Request for the CancelRun method, with any body, and a specified content type
-func NewCancelRunRequestWithBody(server string, runId RunIdPath, params *CancelRunParams, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "run_id", runId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/runs/%s/cancel", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
-	}
-
-	return req, nil
-}
-
-// NewGetRunContextRequest constructs an http.Request for the GetRunContext method
-func NewGetRunContextRequest(server string, runId RunIdPath) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "run_id", runId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/runs/%s/context", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewFinishRunRequest calls the generic FinishRun builder with application/json body
-func NewFinishRunRequest(server string, runId RunIdPath, body FinishRunJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewFinishRunRequestWithBody(server, runId, "application/json", bodyReader)
-}
-
-// NewFinishRunRequestWithBody constructs an http.Request for the FinishRun method, with any body, and a specified content type
-func NewFinishRunRequestWithBody(server string, runId RunIdPath, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "run_id", runId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/runs/%s/finish", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewRenewInvocationTokenRequest calls the generic RenewInvocationToken builder with application/json body
-func NewRenewInvocationTokenRequest(server string, runId RunIdPath, body RenewInvocationTokenJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewRenewInvocationTokenRequestWithBody(server, runId, "application/json", bodyReader)
-}
-
-// NewRenewInvocationTokenRequestWithBody constructs an http.Request for the RenewInvocationToken method, with any body, and a specified content type
-func NewRenewInvocationTokenRequestWithBody(server string, runId RunIdPath, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "run_id", runId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/runs/%s/invocation-token", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewResumeRunRequest calls the generic ResumeRun builder with application/json body
-func NewResumeRunRequest(server string, runId RunIdPath, body ResumeRunJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewResumeRunRequestWithBody(server, runId, "application/json", bodyReader)
-}
-
-// NewResumeRunRequestWithBody constructs an http.Request for the ResumeRun method, with any body, and a specified content type
-func NewResumeRunRequestWithBody(server string, runId RunIdPath, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "run_id", runId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/runs/%s/resume", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewRetryRunRequest constructs an http.Request for the RetryRun method
-func NewRetryRunRequest(server string, runId RunIdPath, params *RetryRunParams) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "run_id", runId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/runs/%s/retry", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
-	}
-
-	return req, nil
-}
-
-// NewStartRunRequest calls the generic StartRun builder with application/json body
-func NewStartRunRequest(server string, runId RunIdPath, body StartRunJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewStartRunRequestWithBody(server, runId, "application/json", bodyReader)
-}
-
-// NewStartRunRequestWithBody constructs an http.Request for the StartRun method, with any body, and a specified content type
-func NewStartRunRequestWithBody(server string, runId RunIdPath, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "run_id", runId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/runs/%s/start", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }

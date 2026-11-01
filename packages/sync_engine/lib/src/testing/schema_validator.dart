@@ -63,6 +63,7 @@ final class ContractOperation {
     required this.requestSchema,
     required this.responseSchemas,
     this.authzAction,
+    this.requestOptional = false,
   });
 
   /// The `operationId`.
@@ -79,6 +80,10 @@ final class ContractOperation {
 
   /// The schema name of the JSON request body, or null.
   final String? requestSchema;
+
+  /// Whether the request body is marked `required: false`, so a request may send none (for
+  /// example `deleteChannel` with its optional `ChannelDelete`).
+  final bool requestOptional;
 
   /// The schema name of the JSON body per status (`201`, `4XX`, `default`); null for a
   /// response without body.
@@ -188,7 +193,9 @@ final class ContractSchemas {
           : const [ContractViolation('', 'invalid', 'no body expected')];
     }
     if (body == null) {
-      return const [ContractViolation('', 'required', 'a JSON body')];
+      return operation(operationId).requestOptional
+          ? const []
+          : const [ContractViolation('', 'required', 'a JSON body')];
     }
     return validate(body, schema);
   }
@@ -284,6 +291,9 @@ final class ContractSchemas {
           path: path,
           secured: !(security is List && security.isEmpty),
           requestSchema: _bodySchema(op['requestBody']),
+          requestOptional:
+              (op['requestBody'] as Map<String, Object?>?)?['required'] ==
+              false,
           authzAction: op['x-authz-action'] as String?,
           responseSchemas: {
             for (final MapEntry(:key, :value)

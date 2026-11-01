@@ -125,6 +125,9 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
   /// thread is visible.
   List<(String, String)>? _removed;
 
+  /// Whether the removal was a deletion (01 6.18 item 8, D-DEL-5) rather than an access loss.
+  bool _deleted = false;
+
   String get _thread => widget.threadId.value;
 
   @override
@@ -251,13 +254,14 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
     );
     if (!hit) return;
     final waiting = ref.read(threadOutboxProvider(_thread)).value ?? const [];
-    setState(
-      () => _removed = [
+    setState(() {
+      _deleted = notice.deleted;
+      _removed = [
         for (final v in waiting)
           if (v.entry.kind == MessageOps.createMessage)
             (v.id, v.payload['content_md'] as String? ?? ''),
-      ],
-    );
+      ];
+    });
   }
 
   // ---- actions (Design note 4) ---------------------------------------------------------
@@ -466,7 +470,9 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
     ref.listen(syncNoticesProvider, (_, next) => _onNotice(next.value));
     if (thread != null) _lastThread = thread;
     final removed = _removed;
-    if (removed != null) return _NoAccess(waiting: removed);
+    if (removed != null) {
+      return _NoAccess(waiting: removed, deleted: _deleted);
+    }
     if (thread == null) {
       // 15 11: a thread this device never stored is loaded through REST, once per column.
       if (stored.hasValue && !_threadRequested) {
@@ -935,25 +941,29 @@ class _GapRow extends StatelessWidget {
   }
 }
 
-/// "No access anymore" with the waiting messages as copyable text (01 6.6; 04 8.3 item 4).
+/// "No access anymore", or "This chat was deleted." after a deletion (01 6.18 item 8), with
+/// the waiting messages as copyable text (01 6.6; 04 8.3 item 4).
 class _NoAccess extends StatelessWidget {
-  const _NoAccess({required this.waiting});
+  const _NoAccess({required this.waiting, required this.deleted});
 
   final List<(String, String)> waiting;
+
+  /// Whether the chat, its channel or its space was deleted (D-DEL-5).
+  final bool deleted;
 
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final colors = context.dsColors;
     return Padding(
-      key: const ValueKey('thread.noAccess'),
+      key: ValueKey(deleted ? 'thread.deleted' : 'thread.noAccess'),
       padding: const EdgeInsets.all(DsSpace.s24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           DsBanner(
-            tone: DsTone.warning,
-            text: l.threadNoAccess,
+            tone: deleted ? DsTone.info : DsTone.warning,
+            text: deleted ? l.threadDeleted : l.threadNoAccess,
             liveRegion: true,
           ),
           if (waiting.isNotEmpty) ...[

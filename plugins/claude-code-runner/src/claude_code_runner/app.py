@@ -46,7 +46,16 @@ from bothy_sdk.errors import InvocationTokenInvalid, NotFoundError, ProblemError
 from bothy_sdk.gateway import CloseReason
 from bothy_sdk.generated.api.me import get_me
 from bothy_sdk.generated.api.runs import get_run
-from bothy_sdk.generated.models import AgentSession, Me, Run, RunContext, ToolClass
+from bothy_sdk.generated.models import (
+    AgentSession,
+    Heartbeat,
+    HeartbeatAck,
+    Me,
+    Run,
+    RunContext,
+    ToolClass,
+)
+from bothy_sdk.generated.types import Unset
 from bothy_sdk.invocation import stored_claims
 from bothy_sdk.runs import RunHandle
 from bothy_sdk.sources import Envelope
@@ -96,6 +105,7 @@ from claude_code_runner.secrets import SecretError, resolve
 from claude_code_runner.statedir import ensure_private_dir, sweep
 from claude_code_runner.stop import stop_group
 from claude_code_runner.transcribe import Transcriber
+from claude_code_runner.trash import FolderTrash, GitRunner, TrashPlaces
 from claude_code_runner.turn import remove_turn_record
 from claude_code_runner.workspace import (
     WorkspaceError,
@@ -176,16 +186,27 @@ class RunnerHandler(AgentHandler):
         self.claude_bin = find_program(config.claude_bin, self.path_entries)
         self.adapter: Adapter | None = None
         self.channels: ChannelCache | None = None
+        git_bin = find_program(config.git_bin, self.path_entries)
         self.provisioner = Provisioner(
             projects_root=config.projects_root,
             state_dir=config.state_dir,
-            git_bin=find_program(config.git_bin, self.path_entries),
+            git_bin=git_bin,
             environ=self.environ,
             timeout=config.provision_timeout,
             retry_after=config.provision_retry_after,
             on_done=self.on_provisioned,
         )
         self.transcriber = _transcriber(config, self.environ, self.path_entries)
+        self.trash = FolderTrash(
+            projects_root=config.projects_root,
+            state_dir=config.state_dir,
+            git=GitRunner(git_bin=git_bin, environ=self.environ, timeout=config.cli_probe_timeout),
+            places=TrashPlaces.of(self.environ),
+            interval=config.trash_check_interval,
+            bound=self._workspace_refs,
+            on_done=self.on_provisioned,
+        )
+        self._trashing: asyncio.Task[None] | None = None
         self.probe = Probe()
         self.minimum = MIN_CLAUDE_CODE_VERSION
         """The lowest supported CLI version; raised when the API refuses the model (18.9)."""
@@ -231,13 +252,86 @@ class RunnerHandler(AgentHandler):
         self._probe_soon()
         cache = self.channels
         folders = project_folders(self.config.projects_root, self.config.project_folders_max)
-        status = runtime_status(
-            self.probe, cache.readiness() if cache else [], self._modes, folders
-        )
+        readiness = cache.readiness() if cache else []
+        self.trash.annotate(readiness)
+        status = runtime_status(self.probe, readiness, self._modes, folders, self.trash.results())
         return dataclasses.replace(status, active_runs=sorted(self.adopted, key=str))
 
+    def _workspace_refs(self) -> dict[UUID, str]:
+        return self.channels.workspace_refs() if self.channels is not None else {}
+
+    async def on_heartbeat_ack(self, sent: Heartbeat, ack: HeartbeatAck) -> None:
+        """An accepted heartbeat: its folder move results are sent; take new requests (18.15).
+
+        Args:
+            sent: The heartbeat the server accepted.
+            ack: Its answer with ``project_trash``.
+        """
+        results = sent.project_trash_results
+        if not isinstance(results, Unset):
+            self.trash.reported(r.channel_id for r in results)
+        requests = ack.project_trash
+        if not isinstance(requests, Unset) and requests:
+            self.trash.requested(requests, stop=self.stop_channel)
+
+    async def stop_channel(self, channel_id: UUID) -> bool:
+        """Stop every turn of a channel and wait until none runs (18.15, the stop path of 18.6).
+
+        Args:
+            channel_id: The deleted forum.
+
+        Returns:
+            True once no run of the channel is left; false when one still runs after
+            ``runner.stop_grace`` plus ``runner.kill_grace`` plus ``runner.cli_probe_timeout``.
+        """
+        reason = "channel_read_only"  # a deleted forum is archived (D-DEL-2)
+        for state in list(self._runs.values()):
+            if state.channel_id != channel_id:
+                continue
+            if state.turn is None:
+                state.stop_reason = state.stop_reason or reason
+            else:
+                await state.turn.request_stop(reason)
+        for turn in list(self.adopted.values()):
+            if turn.state.channel_id == channel_id:
+                await turn.request_stop(reason)
+        loop = asyncio.get_running_loop()
+        deadline = (
+            loop.time()
+            + self.config.stop_grace
+            + self.config.kill_grace
+            + self.config.cli_probe_timeout
+        )
+        while self._channel_busy(channel_id):
+            if loop.time() >= deadline:
+                return False
+            await asyncio.sleep(self.config.poll_interval)
+        return True
+
+    def _channel_busy(self, channel_id: UUID) -> bool:
+        return any(s.channel_id == channel_id for s in self._runs.values()) or any(
+            t.state.channel_id == channel_id for t in self.adopted.values()
+        )
+
+    async def trash_periodically(self) -> None:
+        """Check the bound folders and send a heartbeat every ``runner.trash_check_interval``.
+
+        The gateway's ``heartbeat_ack`` carries no ``project_trash``; this ``sendHeartbeat``
+        is how the runner learns of a folder move (09 18.15).
+        """
+        while True:
+            await self.trash.refresh()
+            if self.adapter is not None:
+                await self.adapter.send_heartbeat()
+            await asyncio.sleep(self.config.trash_check_interval)
+
+    def start_trash(self) -> None:
+        """Start the timer of `trash_periodically` (once); `close` cancels it."""
+        if self._trashing is None or self._trashing.done():
+            self._trashing = asyncio.get_running_loop().create_task(self.trash_periodically())
+
     async def on_provisioned(self) -> None:
-        """A folder creation of 09 18.12 ended: report the new readiness at once."""
+        """A folder creation of 09 18.12 or a folder move of 18.15 ended: report it at once."""
         if self.adapter is not None:
             await self.adapter.send_heartbeat()
 
@@ -512,16 +606,17 @@ class RunnerHandler(AgentHandler):
         return self.probe
 
     async def close(self) -> None:
-        """Cancel the version probe, the follows, the channel timer and a running folder creation.
+        """Cancel the probe, the follows, the timers, a folder creation and queued folder moves.
 
         Adopted turns keep running; what a cancelled folder creation made is removed (09 18.12).
         """
         await self.provisioner.close()
-        resyncing = self._resyncing
-        if resyncing is not None and not resyncing.done():
-            resyncing.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await resyncing
+        await self.trash.close()
+        for timer in (self._resyncing, self._trashing):
+            if timer is not None and not timer.done():
+                timer.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await timer
         for follow in list(self._adopting):
             follow.cancel()
             with contextlib.suppress(asyncio.CancelledError, Exception):
@@ -899,6 +994,7 @@ class Runner:
             # Before the first event of the inbox and the first heartbeat (design note 12 d).
             await self.handler.adopt_turns(adapter)
             self.handler.start_resync()
+            self.handler.start_trash()
             return await adapter.run()
         finally:
             await self.handler.close()

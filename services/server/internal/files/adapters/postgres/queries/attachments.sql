@@ -89,3 +89,9 @@ WHERE a.message_id = sqlc.arg(message_id);
 -- The subscriber of chat.ThreadMoved (design note 8): the copies of one thread follow it to the
 -- target channel, over the index (thread_id); no version, no event.
 UPDATE message_attachments SET channel_id = sqlc.arg(channel_id) WHERE thread_id = sqlc.arg(thread_id);
+
+-- name: CountFilesOfThreads :one
+-- The number of files attached to the messages of threads (DeletionInfo.contents.files of chat,
+-- FEAT-delete-spaces-chats): a deleted message has no attachment rows left (12 section 9.4), so
+-- this counts what a deletion removes. Never authorized: chat authorized the item.
+SELECT count(*)::bigint FROM message_attachments WHERE thread_id = ANY (@thread_ids::uuid[]);

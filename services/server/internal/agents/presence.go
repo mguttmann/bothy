@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/OWNER/bothy/services/server/internal/chat"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 )
@@ -71,6 +72,9 @@ type PresenceStatus struct {
 	BillingEvidence *BillingEvidence
 	// Warnings are the Warning codes that hold now; only while online or degraded.
 	Warnings []string
+	// ProjectTrash are the folder moves the runner owes (HeartbeatAck.project_trash, 09 18.15,
+	// D-DEL-11); set only in the answer to a heartbeat, nil otherwise.
+	ProjectTrash []chat.ProjectTrashRequest
 }
 
 // Presence is the incoming port of the heartbeat and of the presence of agents (M2-20,
