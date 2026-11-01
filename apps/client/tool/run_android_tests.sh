@@ -23,9 +23,20 @@ fi
 # and a bound Gboard rewrote the same composing state after each insert, so the test failed at
 # random. Every enabled input method is disabled for the phone tests and enabled again
 # afterwards, with the default one selected, also when they fail (API 26 has no `ime reset`).
+# `ime disable` alone does not hold: Android enables its default input methods again on its
+# own (a package event does so on API 26, and Gboard was bound again in CI during the tests).
+# So the packages of the input methods are disabled too (`pm disable-user`, which no such reset
+# undoes) and enabled again afterwards; a package the shell may not disable, or one that was
+# disabled before, stays as it is.
 imes=$(adb -s "$serial" shell ime list -s | tr -d '\r')
 default_ime=$(adb -s "$serial" shell settings get secure default_input_method | tr -d '\r')
+ime_packages=$(adb -s "$serial" shell ime list -a | tr -d '\r' | sed -n 's|^ *mId=\([^/]*\)/.*|\1|p' | sort -u)
+disabled_before=$(adb -s "$serial" shell pm list packages -d | tr -d '\r' | sed -n 's|^package:||p')
+disabled_packages=""
 restore_ime() {
+  for package in $disabled_packages; do
+    adb -s "$serial" shell pm enable --user 0 "$package" >/dev/null || true
+  done
   for ime in $imes; do
     adb -s "$serial" shell ime enable "$ime" >/dev/null || true
   done
@@ -38,7 +49,17 @@ trap restore_ime EXIT
 for ime in $imes; do
   adb -s "$serial" shell ime disable "$ime" >/dev/null
 done
+for package in $ime_packages; do
+  if printf '%s\n' "$disabled_before" | grep -qxF "$package"; then
+    continue
+  fi
+  if adb -s "$serial" shell pm disable-user --user 0 "$package" | grep -q "new state: disabled-user"; then
+    disabled_packages="$disabled_packages $package"
+  fi
+done
 flutter test integration_test/phone_suite_test.dart -d "$serial"
+# Evidence in the job log: no input method may have come back during the tests.
+echo "client android: enabled input methods after the phone tests: [$(adb -s "$serial" shell ime list -s | tr -d '\r' | tr '\n' ' ')]"
 restore_ime
 trap - EXIT
 cd android
