@@ -2640,7 +2640,7 @@ character (D-M2-34-8).
 | Rule | Content | Reason |
 |---|---|---|
 | Working folder | resolved project folder (18.1) | project context (CLAUDE.md) applies |
-| Environment | allowlist, never denylist: `HOME`, `USER`, `LOGNAME`, `SHELL`, cleaned `PATH`, `LANG`, `LC_*`, `TERM`, `TMPDIR`, `SSH_AUTH_SOCK` only with `runner.forward_ssh_agent`, plus the variables of the mode (18.3); the cleaned `PATH` keeps, in order and once each, only absolute, existing folders that neither group nor others may write. `TMPDIR` is the run's temporary directory `<runner.state_dir>/tmp/<run_id>` (18.10). | a denylist lets new secrets through; a writable folder on the path lets another account plant a program; an agent socket gives the turn the keys of the runner user (T-DEV-01) |
+| Environment | allowlist, never denylist: `HOME`, `USER`, `LOGNAME`, `SHELL`, cleaned `PATH`, `LANG`, `LC_*`, `TERM`, `TMPDIR`, `SSH_AUTH_SOCK` only with `runner.forward_ssh_agent`, plus the variables of the mode (18.3); the cleaned `PATH` keeps, in order and once each, only absolute, existing folders that neither group nor others may write. `TMPDIR` is the run's temporary directory `<runner.state_dir>/tmp/<run_id>` (18.10). Every turn also gets `CLAUDE_PRODUCT_RUN=1`, set by the runner itself (never taken from its own environment), so user-level hooks that keep a headless turn open while background tasks run let it end (18.5 "Background work"). | a denylist lets new secrets through; a writable folder on the path lets another account plant a program; an agent socket gives the turn the keys of the runner user (T-DEV-01) |
 | Process group | own (`start_new_session`) | stop and cleanup hit all children |
 | Detachment | stdout and stderr go to the files `<run_id>.stream.jsonl` and `<run_id>.stderr.log` under `<runner.state_dir>/sessions/<session>/` (mode `0600`), not to pipes; the runner reads the stream file every `runner.poll_interval`; the turn record `<runner.state_dir>/turns/<run_id>.json` holds run, thread, channel, session, PID, group, start time and file paths, never a token; turns survive a restart of the runner, and the new runner finds running turns via the record and ends orphaned ones (M2-35) | a restart never silently kills a turn |
 | Locks | `flock` per thread and per session (`<runner.state_dir>/locks/`), taken in this order with attempts every `runner.poll_interval`; wait at most `runner.session_lock_wait`, then the run ends `failed` with `adapter_error`; the turn inherits the descriptors, so a lock lives as long as the turn, also when the runner dies | a session never runs twice at the same time |
@@ -2841,6 +2841,9 @@ ends the background work. The system prompt tells Claude Code to start work long
 minute in the background, to end the turn at once with a short reply, never to wait in a turn
 for background work, to report a notification in a few sentences and to answer a status
 question from its running tasks (`prompts/runner_prompt.md`, section "Background work").
+User-level Stop hooks of personal mode that send a headless session back while background tasks
+run (so that the process does not end with the turn) skip a turn that carries
+`CLAUDE_PRODUCT_RUN`; the runner sets it in every turn's environment (18.2).
 
 ### 18.6 Stop
 

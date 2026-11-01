@@ -6,14 +6,17 @@ list lets every new secret through. Kept from the runner's own environment: ``HO
 ``USER``, ``LOGNAME``, ``SHELL``, ``LANG``, ``TERM``, ``TMPDIR``, every ``LC_*``, a cleaned
 ``PATH`` and, only with ``runner.forward_ssh_agent``, ``SSH_AUTH_SOCK``. ``TMPDIR`` of a run
 is its own temporary directory ``<runner.state_dir>/tmp/<run_id>`` (18.2, M3-12 note 3 c), so
-files a turn writes as scratch output can be attached and never mix with another run's. Mode
-``organization`` adds ``ANTHROPIC_API_KEY`` and the runner's own ``CLAUDE_CONFIG_DIR``;
-``personal`` adds nothing (10 10.2, design note 7).
+files a turn writes as scratch output can be attached and never mix with another run's. Every
+turn gets ``CLAUDE_PRODUCT_RUN=1``, set by the runner and never taken from its own environment:
+user-level stop hooks that hold a headless session's turn open while background tasks run skip
+a turn with this marker, so a turn can end and the session stays reachable
+(FIX-runner-responsive-turns). Mode ``organization`` adds ``ANTHROPIC_API_KEY`` and the runner's
+own ``CLAUDE_CONFIG_DIR``; ``personal`` adds nothing more (10 10.2, design note 7).
 
 Examples:
     >>> sorted(build_environment({"HOME": "/home/alex", "SECRET": "x"}, mode="personal",
     ...     api_key=None, config_dir=None, forward_ssh_agent=False))
-    ['HOME', 'PATH']
+    ['CLAUDE_PRODUCT_RUN', 'HOME', 'PATH']
 """
 
 from __future__ import annotations
@@ -34,6 +37,7 @@ __all__ = [
 ]
 
 _KEPT = ("HOME", "USER", "LOGNAME", "SHELL", "LANG", "TERM", "TMPDIR")
+_PRODUCT_MARKER = ("CLAUDE_PRODUCT_RUN", "1")
 _WIDE = stat.S_IWGRP | stat.S_IWOTH
 
 
@@ -140,6 +144,7 @@ def build_environment(  # noqa: PLR0913 - the parts of a run environment are exp
     if not parent.get("HOME"):
         raise RunEnvironmentError("home_missing")
     env = kept_environment(parent)
+    env[_PRODUCT_MARKER[0]] = _PRODUCT_MARKER[1]
     if tmpdir is not None:
         env["TMPDIR"] = str(tmpdir)
     if forward_ssh_agent and parent.get("SSH_AUTH_SOCK"):

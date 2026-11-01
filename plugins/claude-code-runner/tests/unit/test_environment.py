@@ -63,6 +63,7 @@ BASE_KEYS = {
     "LC_CTYPE",
     "TERM",
     "TMPDIR",
+    "CLAUDE_PRODUCT_RUN",
 }
 
 
@@ -86,6 +87,20 @@ def test_exact_key_set_per_mode(tmp_path: Path) -> None:
     for env in (org, personal):
         for name in (*FORBIDDEN, "AWS_SECRET_ACCESS_KEY", "GITHUB_TOKEN", "BOTHY_SECRET_X"):
             assert name not in env
+
+
+def test_turn_is_marked_as_product_run_even_from_a_bare_parent(tmp_path: Path) -> None:
+    # User-level stop hooks hold a headless turn open while background tasks run unless the
+    # turn carries this marker; the allow list drops the runner's own copy, so the runner sets it.
+    bare = {"HOME": str(tmp_path / "home"), "PATH": ""}
+    for mode, key, cfg in (
+        ("personal", None, None),
+        ("organization", Secret("sk-canary"), tmp_path / "cfg"),
+    ):
+        env = build_environment(
+            bare, mode=mode, api_key=key, config_dir=cfg, forward_ssh_agent=False
+        )
+        assert env["CLAUDE_PRODUCT_RUN"] == "1"
 
 
 def test_ssh_agent_only_with_switch(tmp_path: Path) -> None:
