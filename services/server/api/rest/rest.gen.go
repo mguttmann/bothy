@@ -168,7 +168,7 @@ type ServerInterface interface {
 	// CompleteStepUpWithPasskey Confirm step-up with a passkey
 	// (POST /auth/step-up/passkey)
 	CompleteStepUpWithPasskey(w http.ResponseWriter, r *http.Request, params CompleteStepUpWithPasskeyParams)
-	// StepUpWithPassword Console step-up with password and TOTP
+	// StepUpWithPassword Confirm step-up with password and TOTP
 	// (POST /auth/step-up/password)
 	StepUpWithPassword(w http.ResponseWriter, r *http.Request, params StepUpWithPasswordParams)
 	// RefreshToken Rotate the refresh token
@@ -14394,7 +14394,7 @@ type StrictServerInterface interface {
 	// CompleteStepUpWithPasskey Confirm step-up with a passkey
 	// (POST /auth/step-up/passkey)
 	CompleteStepUpWithPasskey(ctx context.Context, request CompleteStepUpWithPasskeyRequestObject) (CompleteStepUpWithPasskeyResponseObject, error)
-	// StepUpWithPassword Console step-up with password and TOTP
+	// StepUpWithPassword Confirm step-up with password and TOTP
 	// (POST /auth/step-up/password)
 	StepUpWithPassword(ctx context.Context, request StepUpWithPasswordRequestObject) (StepUpWithPasswordResponseObject, error)
 	// RefreshToken Rotate the refresh token

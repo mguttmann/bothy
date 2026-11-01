@@ -1624,6 +1624,23 @@ class AppLocalizationsDe extends AppLocalizations {
   String get stepUpContinue => 'Weiter';
 
   @override
+  String get stepUpPasswordNext =>
+      'Dieses Gerät hat keinen Schlüssel für Bestätigungen. Gib dein Passwort und den 6-stelligen Code aus deiner Authenticator-App ein.';
+
+  @override
+  String get stepUpPasswordLabel => 'Passwort';
+
+  @override
+  String get stepUpCodeLabel => '6-stelliger Code';
+
+  @override
+  String get stepUpPasswordRejected =>
+      'Passwort oder Code wurden nicht angenommen. Versuche es mit einem neuen Code noch einmal.';
+
+  @override
+  String get stepUpConfirm => 'Bestätigen';
+
+  @override
   String get selfCancel => 'Abbrechen';
 
   @override

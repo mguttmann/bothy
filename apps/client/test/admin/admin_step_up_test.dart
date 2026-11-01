@@ -27,6 +27,13 @@ class RecordingPrompt implements StepUpPrompt {
     asked.add(purposeText);
     return true;
   }
+
+  /// These tests confirm with the step-up key; a password prompt cancels.
+  @override
+  Future<StepUpCredentials?> askPassword(
+    String purposeText, {
+    bool rejected = false,
+  }) async => null;
 }
 
 /// A pending device of [userId] that logged in with [method], as the server stores it.

@@ -55,12 +55,14 @@ final class StepUpCancelled extends AuthException {
   String toString() => 'StepUpCancelled: the confirmation was cancelled';
 }
 
-/// The device has no step-up key (Windows by design, 08 6.1, D-M4-11-2), so the step-up with
-/// the device key is not possible; the other step-up methods of 08 6 are not built yet.
+/// No step-up method is left for this session: the device has no step-up key (Windows by
+/// design, 08 6.1, D-M4-11-2) and the server refuses the step-up with password and TOTP
+/// (`403 step_up_not_possible`, for example a person without a local account).
 final class StepUpUnavailable extends AuthException {
   /// Creates the error.
   const StepUpUnavailable();
 
   @override
-  String toString() => 'StepUpUnavailable: this device has no step-up key';
+  String toString() =>
+      'StepUpUnavailable: no step-up key and no password step-up for this session';
 }

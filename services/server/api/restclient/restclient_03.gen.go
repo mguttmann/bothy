@@ -5191,14 +5191,26 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with POST /auth/step-up/passkey (the `CompleteStepUpWithPasskey` operationId).
 	CompleteStepUpWithPasskeyWithResponse(ctx context.Context, params *CompleteStepUpWithPasskeyParams, body CompleteStepUpWithPasskeyJSONRequestBody, reqEditors ...RequestEditorFn) (*CompleteStepUpWithPasskeyResponse, error)
 
-	// StepUpWithPasswordWithBodyWithResponse Console step-up with password and TOTP
+	// StepUpWithPasswordWithBodyWithResponse Confirm step-up with password and TOTP
+	//
+	// For a console session, and for an app session whose device is not `cli` and has no
+	// active `step_up` key (Windows, 08 6.2); a device with a `step_up` key, a share extension
+	// session and a `cli` device get `403 forbidden` with reason `step_up_not_possible`.
+	// `X-Console-Request` applies only to a request authenticated by the console cookie; an
+	// app sends its DPoP token without it. Only a console session gets a new cookie.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /auth/step-up/password (the `StepUpWithPassword` operationId).
 	StepUpWithPasswordWithBodyWithResponse(ctx context.Context, params *StepUpWithPasswordParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*StepUpWithPasswordResponse, error)
 
-	// StepUpWithPasswordWithResponse Console step-up with password and TOTP
+	// StepUpWithPasswordWithResponse Confirm step-up with password and TOTP
+	//
+	// For a console session, and for an app session whose device is not `cli` and has no
+	// active `step_up` key (Windows, 08 6.2); a device with a `step_up` key, a share extension
+	// session and a `cli` device get `403 forbidden` with reason `step_up_not_possible`.
+	// `X-Console-Request` applies only to a request authenticated by the console cookie; an
+	// app sends its DPoP token without it. Only a console session gets a new cookie.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -22947,32 +22959,4 @@ func (r ApproveDeviceResponse) GetApplicationproblemJSON404() *NotFound {
 // GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
 func (r ApproveDeviceResponse) GetApplicationproblemJSON409() *Conflict {
 	return r.ApplicationproblemJSON409
-}
-
-// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
-func (r ApproveDeviceResponse) GetApplicationproblemJSON422() *UnprocessableEntity {
-	return r.ApplicationproblemJSON422
-}
-
-// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
-func (r ApproveDeviceResponse) GetApplicationproblemJSON429() *TooManyRequests {
-	return r.ApplicationproblemJSON429
-}
-
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r ApproveDeviceResponse) GetApplicationproblemJSONDefault() *Error {
-	return r.ApplicationproblemJSONDefault
-}
-
-// GetBody returns the raw response body bytes
-func (r ApproveDeviceResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r ApproveDeviceResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
 }

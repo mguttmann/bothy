@@ -386,6 +386,13 @@ class MemorySecretStore implements SecretStore {
 class _Prompt implements StepUpPrompt {
   @override
   Future<bool> ask(String purposeText) async => true;
+
+  /// These tests confirm with the step-up key; a password prompt cancels.
+  @override
+  Future<StepUpCredentials?> askPassword(
+    String purposeText, {
+    bool rejected = false,
+  }) async => null;
 }
 
 /// IDs of the tests.

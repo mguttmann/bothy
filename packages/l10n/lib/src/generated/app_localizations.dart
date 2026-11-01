@@ -2689,6 +2689,36 @@ abstract class AppLocalizations {
   /// **'Continue'**
   String get stepUpContinue;
 
+  /// Second line of the step-up dialog on a device without a step-up key, for example Windows (08 section 6.2).
+  ///
+  /// In en, this message translates to:
+  /// **'This device has no key for confirmations. Enter your password and the 6-digit code from your authenticator app.'**
+  String get stepUpPasswordNext;
+
+  /// Label of the password field of the step-up dialog on a device without a step-up key.
+  ///
+  /// In en, this message translates to:
+  /// **'Password'**
+  String get stepUpPasswordLabel;
+
+  /// Label of the field for the one-time code of the authenticator app in the step-up dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'6-digit code'**
+  String get stepUpCodeLabel;
+
+  /// Error line of the step-up dialog after a wrong password or one-time code.
+  ///
+  /// In en, this message translates to:
+  /// **'The password or the code was not accepted. Try again with a new code.'**
+  String get stepUpPasswordRejected;
+
+  /// Button of the step-up dialog that sends password and one-time code.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm'**
+  String get stepUpConfirm;
+
   /// Cancel button of the device, session and step-up dialogs.
   ///
   /// In en, this message translates to:

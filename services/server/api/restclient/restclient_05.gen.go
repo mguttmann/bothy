@@ -13,6 +13,29 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// ResetAgentSessionResponse409Headers the declared response headers of an HTTP 409 response for ResetAgentSession
+type ResetAgentSessionResponse409Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// ResetAgentSessionResponse422Headers the declared response headers of an HTTP 422 response for ResetAgentSession
+type ResetAgentSessionResponse422Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// ResetAgentSessionResponse429Headers the declared response headers of an HTTP 429 response for ResetAgentSession
+type ResetAgentSessionResponse429Headers struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      *int
+}
+
+// ResetAgentSessionResponseDefaultHeaders the declared response headers of an HTTP default response for ResetAgentSession
+type ResetAgentSessionResponseDefaultHeaders struct {
+	CorrelationId *CorrelationId
+}
+
 type ResetAgentSessionResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -6812,7 +6835,13 @@ func (c *ClientWithResponses) CompleteStepUpWithPasskeyWithResponse(ctx context.
 	return ParseCompleteStepUpWithPasskeyResponse(rsp)
 }
 
-// StepUpWithPasswordWithBodyWithResponse Console step-up with password and TOTP
+// StepUpWithPasswordWithBodyWithResponse Confirm step-up with password and TOTP
+//
+// For a console session, and for an app session whose device is not `cli` and has no
+// active `step_up` key (Windows, 08 6.2); a device with a `step_up` key, a share extension
+// session and a `cli` device get `403 forbidden` with reason `step_up_not_possible`.
+// `X-Console-Request` applies only to a request authenticated by the console cookie; an
+// app sends its DPoP token without it. Only a console session gets a new cookie.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -6825,7 +6854,13 @@ func (c *ClientWithResponses) StepUpWithPasswordWithBodyWithResponse(ctx context
 	return ParseStepUpWithPasswordResponse(rsp)
 }
 
-// StepUpWithPasswordWithResponse Console step-up with password and TOTP
+// StepUpWithPasswordWithResponse Confirm step-up with password and TOTP
+//
+// For a console session, and for an app session whose device is not `cli` and has no
+// active `step_up` key (Windows, 08 6.2); a device with a `step_up` key, a share extension
+// session and a `cli` device get `403 forbidden` with reason `step_up_not_possible`.
+// `X-Console-Request` applies only to a request authenticated by the console cookie; an
+// app sends its DPoP token without it. Only a console session gets a new cookie.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //

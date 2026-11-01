@@ -1611,6 +1611,23 @@ class AppLocalizationsEn extends AppLocalizations {
   String get stepUpContinue => 'Continue';
 
   @override
+  String get stepUpPasswordNext =>
+      'This device has no key for confirmations. Enter your password and the 6-digit code from your authenticator app.';
+
+  @override
+  String get stepUpPasswordLabel => 'Password';
+
+  @override
+  String get stepUpCodeLabel => '6-digit code';
+
+  @override
+  String get stepUpPasswordRejected =>
+      'The password or the code was not accepted. Try again with a new code.';
+
+  @override
+  String get stepUpConfirm => 'Confirm';
+
+  @override
   String get selfCancel => 'Cancel';
 
   @override

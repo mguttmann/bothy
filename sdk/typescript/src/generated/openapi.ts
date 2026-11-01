@@ -435,7 +435,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Console step-up with password and TOTP */
+        /**
+         * Confirm step-up with password and TOTP
+         * @description For a console session, and for an app session whose device is not `cli` and has no
+         *     active `step_up` key (Windows, 08 6.2); a device with a `step_up` key, a share extension
+         *     session and a `cli` device get `403 forbidden` with reason `step_up_not_possible`.
+         *     `X-Console-Request` applies only to a request authenticated by the console cookie; an
+         *     app sends its DPoP token without it. Only a console session gets a new cookie.
+         */
         post: operations["stepUpWithPassword"];
         delete?: never;
         options?: never;

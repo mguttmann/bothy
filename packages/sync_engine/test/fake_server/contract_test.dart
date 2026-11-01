@@ -300,8 +300,13 @@ void main() {
       isA<LoginSignedIn>(),
     );
 
-    // A waiting device of Sam, approved from Sam's first device.
-    final samPhone = h.device(login: WorldSeed.samLogin, keySeed: 3);
+    // A waiting device of Sam, approved from Sam's first device, which has no step-up key and
+    // confirms with password and TOTP (Windows, 08 6.2).
+    final samPhone = h.device(
+      login: WorldSeed.samLogin,
+      keySeed: 3,
+      stepUpKey: false,
+    );
     await signedIn(h, samPhone);
     w.sam.newDevicesPending = true;
     final samLaptop = h.device(login: WorldSeed.samLogin, keySeed: 4);

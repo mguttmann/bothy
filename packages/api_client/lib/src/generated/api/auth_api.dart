@@ -1945,8 +1945,8 @@ class AuthApi {
     );
   }
 
-  /// Console step-up with password and TOTP
-  ///
+  /// Confirm step-up with password and TOTP
+  /// For a console session, and for an app session whose device is not &#x60;cli&#x60; and has no active &#x60;step_up&#x60; key (Windows, 08 6.2); a device with a &#x60;step_up&#x60; key, a share extension session and a &#x60;cli&#x60; device get &#x60;403 forbidden&#x60; with reason &#x60;step_up_not_possible&#x60;. &#x60;X-Console-Request&#x60; applies only to a request authenticated by the console cookie; an app sends its DPoP token without it. Only a console session gets a new cookie.
   ///
   /// Parameters:
   /// * [stepUpPasswordRequest]

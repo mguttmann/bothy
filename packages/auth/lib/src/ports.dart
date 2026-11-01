@@ -43,8 +43,8 @@ final class DeviceKeys {
 
   /// The step-up key with user presence (08 6.1, 6.2), or `null` where the platform has none:
   /// Windows by design (08 6.1, D-M4-11-2), or a device whose key store cannot hold a key with
-  /// user presence. Such a device registers without `step_up_key`, and its step-up with the
-  /// device key fails with `StepUpUnavailable`.
+  /// user presence. Such a device registers without `step_up_key` and confirms a step-up with
+  /// password and TOTP (08 6.2, `StepUpPrompt.askPassword`).
   final DeviceKeySigner? stepUp;
 }
 
