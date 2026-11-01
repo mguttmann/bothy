@@ -118,7 +118,10 @@ hanging children it first checks that the container of the live run stays longer
 watchdog needs to decide. `TestWatchdogScript` runs the watchdog script against stub
 executables for `psql` and the entry point and covers a held lease, a lost lease, a server that
 becomes unreadable after the lease was taken, a lease never taken and `docker stop`.
-`TestWatchdogScriptRestartsOnUSR1` covers the in-place restart of `DB.Restart`.
+`TestWatchdogScriptRestartsOnUSR1` covers the in-place restart of `DB.Restart`. The stub server
+blocks `SIGINT` before it reports ready and waits in `sigsuspend`, so a `SIGINT` that arrives
+between the report and the wait is not lost to Perl's deferred signal handling;
+`TestWatchdogStubKeepsAnINTAfterReady` sends it in exactly that gap.
 
 Containers of older `pgtest` versions and of other test helpers that label their containers
 `org.bothy.test` but have no watchdog (such as `org.bothy.test=seaweedfs`) lack the label

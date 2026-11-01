@@ -3,11 +3,13 @@
 package pgtest
 
 import (
+	"bytes"
 	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"syscall"
 	"testing"
@@ -20,8 +22,15 @@ import (
 // records each start, records a fast shutdown request (SIGINT) and ends; perl, because a background job of a
 // non-interactive shell starts with SIGINT ignored and a shell cannot trap it again. psql
 // answers with the file "answer" and fails while it is empty; timeout runs its command.
+//
+// Perl runs a signal handler only between two operations, so a SIGINT that arrives after the
+// last check and before a blocking sleep starts is noticed only when the sleep ends: a busy
+// host that preempts the stub right after it wrote "ready" loses the SIGINT the watchdog sends
+// then. The stub therefore blocks SIGINT before it reports ready and waits in sigsuspend, which
+// unblocks and waits in one step. alarm bounds the life of a stub whose watchdog died. With
+// STUB_PAUSE it stops itself between "ready" and the wait (TestWatchdogStubKeepsAnINTAfterReady).
 var watchdogStubs = map[string]string{
-	"docker-entrypoint.sh": "#!/bin/sh\necho start >>\"$STUB_DIR/started\"\nexec perl -e '$SIG{INT} = sub { open(my $f, \">\", \"$ENV{STUB_DIR}/stopped\"); exit 0 }; open(my $r, \">>\", \"$ENV{STUB_DIR}/ready\"); print $r \"ready\\n\"; close $r; sleep 60'\n",
+	"docker-entrypoint.sh": "#!/bin/sh\necho start >>\"$STUB_DIR/started\"\nexec perl -MPOSIX -e '$SIG{INT} = sub { open(my $f, \">\", \"$ENV{STUB_DIR}/stopped\"); exit 0 }; sigprocmask(SIG_BLOCK, POSIX::SigSet->new(SIGINT)); open(my $r, \">>\", \"$ENV{STUB_DIR}/ready\"); print $r \"ready\\n\"; close $r; POSIX::raise(SIGSTOP) if $ENV{STUB_PAUSE}; alarm 60; sigsuspend(POSIX::SigSet->new()) while 1'\n",
 	"psql":                 "#!/bin/sh\n[ -s \"$STUB_DIR/answer\" ] || exit 1\ncat \"$STUB_DIR/answer\"\n",
 	"timeout":              "#!/bin/sh\nshift\nexec \"$@\"\n",
 }
@@ -218,4 +227,60 @@ func TestWatchdogScriptRestartsOnUSR1(t *testing.T) {
 	if w.ended(3 * time.Second) {
 		t.Fatal("the watchdog ended after the restart")
 	}
+}
+
+// TestWatchdogStubKeepsAnINTAfterReady: a SIGINT that reaches the stub server after it reported
+// ready and before it waits for the signal still ends it with the fast shutdown request. With
+// STUB_PAUSE the stub stops itself (SIGSTOP) in exactly that gap, so the test sends SIGINT there
+// deterministically, as a busy host does by chance when it preempts the stub between writing
+// "ready" and starting to wait while the watchdog sends SIGINT.
+func TestWatchdogStubKeepsAnINTAfterReady(t *testing.T) {
+	if *childMode != "" {
+		return
+	}
+	bin := writeWatchdogStubs(t)
+	t.Parallel()
+	if _, err := exec.LookPath("perl"); err != nil {
+		t.Skip("perl not found")
+	}
+	dir := t.TempDir()
+	cmd := exec.CommandContext(context.Background(), filepath.Join(bin, "docker-entrypoint.sh")) // #nosec G204 -- the stub
+	cmd.Env = []string{"PATH=" + bin + ":/usr/bin:/bin", "STUB_DIR=" + dir, "STUB_PAUSE=1"}
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan struct{})
+	go func() { _ = cmd.Wait(); close(done) }()
+	t.Cleanup(func() {
+		_ = cmd.Process.Kill()
+		<-done
+	})
+	testkit.Until(t, "the stub server stopping itself after ready", func() bool { return processStopped(t, cmd.Process.Pid) })
+	if err := cmd.Process.Signal(syscall.SIGINT); err != nil {
+		t.Fatal(err)
+	}
+	if err := cmd.Process.Signal(syscall.SIGCONT); err != nil {
+		t.Fatal(err)
+	}
+	// The stub ends by itself after 60 seconds; a SIGINT it only notices then is lost for the
+	// watchdog, which waits its stop wait (5 seconds here, 30 in the container) and starts the
+	// next server. Half the stub's lifetime separates the two outcomes with room for a busy host.
+	select {
+	case <-done:
+	case <-time.After(30 * time.Second):
+		t.Fatal("the stub server did not act on SIGINT")
+	}
+	if _, err := os.Stat(filepath.Join(dir, "stopped")); err != nil {
+		t.Fatal("the stub server ended without the fast shutdown request")
+	}
+}
+
+// processStopped reports whether the process pid is stopped (state T in ps).
+func processStopped(t *testing.T, pid int) bool {
+	t.Helper()
+	out, err := exec.CommandContext(context.Background(), "ps", "-o", "stat=", "-p", strconv.Itoa(pid)).Output() // #nosec G204 -- a pid
+	if err != nil {
+		return false
+	}
+	return bytes.HasPrefix(bytes.TrimSpace(out), []byte("T"))
 }
