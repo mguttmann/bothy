@@ -371,7 +371,7 @@ func nextRunUpdated(t *testing.T, c *wstest.Client, run string, d time.Duration)
 			continue
 		}
 		if ev.Seq != nil || ev.PermissionVersion != nil || ev.Resource.Kind != "run" || ev.Resource.ID != ev.Payload.RunID ||
-			ev.Resource.Version != ev.Payload.Version || bytes.Contains(raw, []byte("null")) {
+			ev.Resource.Version != ev.Payload.Version || testkit.HasJSONNull(raw) {
 			t.Fatalf("run.updated breaks the ephemeral rules: %s", raw)
 		}
 		if ev.Payload.RunID != run {

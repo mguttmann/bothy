@@ -3,7 +3,6 @@
 package app_test
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"slices"
@@ -24,6 +23,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/messaging"
 	"github.com/OWNER/bothy/services/server/internal/messaging/app"
 	"github.com/OWNER/bothy/services/server/internal/messaging/domain"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // The unit tests of M3-07 run the use cases over in-memory fakes with a fake files.Attachments,
@@ -500,7 +500,7 @@ func wantAttachments(t *testing.T, payload map[string]any, fileIDs []ids.ID) {
 		}
 	}
 	b, err := json.Marshal(payload)
-	if err != nil || bytes.Contains(b, []byte("null")) {
+	if err != nil || testkit.HasJSONNull(b) {
 		t.Errorf("payload %s has a JSON null (%v)", b, err)
 	}
 }

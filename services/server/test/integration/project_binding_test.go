@@ -18,6 +18,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver/httpservertest"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // The tests of M2-03 (project binding and readiness) run on the world of M1-54 with the additions
@@ -425,7 +426,7 @@ func (w *pbWorld) wantSettingsEvents(evs []settingsEvent, channel, operator ids.
 		}
 		var p map[string]any
 		must(w.t, json.Unmarshal([]byte(e.Payload), &p))
-		if len(p) != 2 || p["channel_id"] != channel.String() || p["settings_version"] != float64(version) || strings.Contains(e.Payload, "null") {
+		if len(p) != 2 || p["channel_id"] != channel.String() || p["settings_version"] != float64(version) || testkit.HasJSONNull([]byte(e.Payload)) {
 			w.t.Fatalf("payload %s, settings_version %d", e.Payload, version)
 		}
 		for _, c := range canaries {

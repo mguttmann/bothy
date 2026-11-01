@@ -18,6 +18,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/presence"
 	"github.com/OWNER/bothy/services/server/internal/notify/app"
 	"github.com/OWNER/bothy/services/server/internal/notify/domain"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // liveWorld returns a push world with the live routes of M3-23 over its fake scheduler and a
@@ -212,7 +213,7 @@ func TestGatewaySend_Envelope(t *testing.T) {
 		p.MessageId == nil || p.MessageId.String() != job.MessageID.String() || !p.Quiet || p.Count != 1 || p.TargetId != nil {
 		t.Fatalf("thread hint payload %s", b)
 	}
-	if bytes.Contains(b, []byte("null")) {
+	if testkit.HasJSONNull(b) {
 		t.Fatalf("payload with null: %s", b)
 	}
 

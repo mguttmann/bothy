@@ -17,6 +17,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // wantReason checks the public code and the reason of err.
@@ -77,7 +78,7 @@ func (e *sessEnv) decodeChanged(ev eventlog.Event) changed {
 		(c.AgentSession.CostBase == nil) != (c.AgentSession.Currency == "") || (c.AgentSession.CostBase != nil && *c.AgentSession.CostBase <= 0) {
 		e.t.Fatalf("payload %s", ev.Payload)
 	}
-	if strings.Contains(string(ev.Payload), "null") {
+	if testkit.HasJSONNull(ev.Payload) {
 		e.t.Fatalf("payload with null %s", ev.Payload)
 	}
 	return c

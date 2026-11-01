@@ -34,6 +34,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver/httpservertest"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg/pgtest"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/internal/wire"
 )
 
@@ -363,11 +364,12 @@ func TestDevice_NoNullMembers(t *testing.T) {
 			t.Fatalf("%s: %d %s", path, r.StatusCode, r.Body)
 		}
 		body := string(r.Body)
-		for _, absent := range []string{"null", "approved_at", "revoked_at", "revoke_reason", "last_seen_at", "step_up_key_thumbprint", "app_version", "push_registrations", "verification_code"} {
+		for _, absent := range []string{"approved_at", "revoked_at", "revoke_reason", "last_seen_at", "step_up_key_thumbprint", "app_version", "push_registrations", "verification_code"} {
 			if strings.Contains(body, absent) {
 				t.Errorf("%s: body has %q: %s", path, absent, body)
 			}
 		}
+		testkit.NoJSONNull(t, path, r.Body)
 	}
 	// The harness fails the test at the end if a handler sent JSON null (ADR 0053).
 }

@@ -17,6 +17,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver/httpservertest"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/internal/terminal/domain"
 	"github.com/OWNER/bothy/services/server/test/terminaltest"
 	"github.com/OWNER/bothy/services/server/test/terminalworld"
@@ -558,7 +559,7 @@ func assertNoContent(t *testing.T, w *tworld) {
 		if err := json.Unmarshal([]byte(raw), &details); err != nil {
 			t.Fatal(err)
 		}
-		if strings.Contains(raw, "null") || strings.Contains(raw, `"R1"`) || strings.Contains(raw, `"R2"`) || strings.Contains(raw, `"R3"`) {
+		if testkit.HasJSONNull([]byte(raw)) || strings.Contains(raw, `"R1"`) || strings.Contains(raw, `"R2"`) || strings.Contains(raw, `"R3"`) {
 			t.Errorf("%s: content in %s", action, raw)
 		}
 		delete(details, "os_user")

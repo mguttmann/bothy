@@ -3,7 +3,6 @@
 package httpserver_test
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -17,6 +16,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/authz"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // validateProblem validates body against the schema Problem of the embedded contract.
@@ -56,7 +56,7 @@ func TestProblem_I1ViolationCarriesConflicts(t *testing.T) {
 		t.Fatalf("status %d", rec.Code)
 	}
 	body := rec.Body.Bytes()
-	if bytes.Contains(body, []byte("null")) {
+	if testkit.HasJSONNull(body) {
 		t.Fatalf("null in %s", body)
 	}
 	var p struct {
@@ -102,7 +102,7 @@ func TestProblem_ExtensionsNeverOverrideOrNull(t *testing.T) {
 	}})
 	body := rec.Body.String()
 	if rec.Code != http.StatusConflict || strings.Contains(body, "hacked") || strings.Contains(body, `"hint"`) ||
-		strings.Contains(body, "null") || strings.Contains(body, `"current"`) || strings.Contains(body, `"gone"`) {
+		testkit.HasJSONNull([]byte(body)) || strings.Contains(body, `"current"`) || strings.Contains(body, `"gone"`) {
 		t.Fatalf("%d %s", rec.Code, body)
 	}
 	if !strings.Contains(body, `"extra":"ok"`) || !strings.Contains(body, `"nested":{"b":[1]}`) {

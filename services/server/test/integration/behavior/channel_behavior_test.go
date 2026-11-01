@@ -637,7 +637,7 @@ func TestBehaviorChangesAndEvents(t *testing.T) {
 			}
 			if e.SpaceID != support || e.ChannelID != allgemein || e.ResourceKind != "channel" || e.ResourceID != allgemein || e.ResourceVersion != nil ||
 				len(payload) != 2 || payload["channel_id"] != allgemein || fmt.Sprint(payload["settings_version"]) != strconv.FormatInt(d.SettingsVersion, 10) ||
-				strings.Contains(e.Payload, "null") {
+				testkit.HasJSONNull([]byte(e.Payload)) {
 				t.Fatalf("event %+v", e)
 			}
 		}

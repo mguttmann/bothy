@@ -22,6 +22,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver/httpservertest"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // TestAuditOperationsOwnerAndStepUp: all three operations refuse a person without the owner role
@@ -219,7 +220,7 @@ func TestExportStreamsNdjsonInSeqOrder(t *testing.T) {
 	if resp.StatusCode != http.StatusOK || resp.Header.Get("Content-Type") != "application/x-ndjson" {
 		t.Fatalf("export: %d %q %s", resp.StatusCode, resp.Header.Get("Content-Type"), resp.Body)
 	}
-	if bytes.Contains(resp.Body, []byte("null")) {
+	if testkit.HasJSONNull(resp.Body) {
 		t.Error("the stream holds null")
 	}
 	sc := bufio.NewScanner(bytes.NewReader(resp.Body))

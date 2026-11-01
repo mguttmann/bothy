@@ -4,10 +4,10 @@ package agentsessions_test
 
 import (
 	"net/http"
-	"strings"
 	"testing"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // TestListAgentSessions (09 9.3, design notes 4 and 6): newest first, every field of AgentSession,
@@ -26,7 +26,7 @@ func TestListAgentSessions(t *testing.T) {
 	first, _ := w.current(th)
 	second := w.a6Bind("alex", th, "sess-list-2", first.ID, false)
 	r := w.listSessions("alex", th)
-	if strings.Contains(string(r.Body), "null") {
+	if testkit.HasJSONNull(r.Body) {
 		t.Fatalf("JSON null in %s", r.Body)
 	}
 	items, _ := w.wantOK(r)["items"].([]any)

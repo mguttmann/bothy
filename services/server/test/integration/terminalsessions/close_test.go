@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/test/harness"
 	"github.com/OWNER/bothy/services/server/test/terminal/fakehost"
 )
@@ -75,7 +76,7 @@ func TestClose_EndsConnectionsAndTellsHost(t *testing.T) {
 		if err := rows.Scan(&aud, &payload); err != nil {
 			t.Fatal(err)
 		}
-		if strings.Contains(payload, "null") || strings.Contains(payload, "bothy-s-") || strings.Contains(payload, g.SessionToken) {
+		if testkit.HasJSONNull([]byte(payload)) || strings.Contains(payload, "bothy-s-") || strings.Contains(payload, g.SessionToken) {
 			t.Fatalf("payload %s", payload)
 		}
 		var p struct {

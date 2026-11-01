@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"slices"
-	"strings"
 	"testing"
 	"time"
 
@@ -166,7 +165,7 @@ func validatePayload(t *testing.T, p string) {
 		}
 		t.Fatalf("payload does not match AccessChangedPayload: %s", p)
 	}
-	if strings.Contains(p, "null") {
+	if testkit.HasJSONNull([]byte(p)) {
 		t.Fatalf("null in %s", p)
 	}
 }

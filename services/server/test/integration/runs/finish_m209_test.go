@@ -17,6 +17,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/agents/adapters/agentstest"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	runsapp "github.com/OWNER/bothy/services/server/internal/runs/app"
 	"github.com/OWNER/bothy/services/server/internal/runs/domain"
 )
@@ -488,7 +489,7 @@ func (w *world) validateEvents() {
 			w.t.Fatalf("no %s", typ)
 		}
 		for _, p := range payloads {
-			if strings.Contains(p, "null") {
+			if testkit.HasJSONNull([]byte(p)) {
 				w.t.Fatalf("null in %s", p)
 			}
 			if valid, problems := schema_validation.NewSchemaValidator().ValidateSchemaString(proxy.Schema(), p); !valid {

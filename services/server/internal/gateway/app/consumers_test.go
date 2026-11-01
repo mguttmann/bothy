@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"slices"
-	"strings"
 	gosync "sync"
 	"sync/atomic"
 	"testing"
@@ -459,7 +458,7 @@ func envelopes(t *testing.T, p agents.FeedPage) []dispatch {
 		if err := json.Unmarshal(raw, &v); err != nil {
 			t.Fatal(err)
 		}
-		if strings.Contains(string(raw), "null") {
+		if testkit.HasJSONNull(raw) {
 			t.Fatalf("JSON null in %s", raw)
 		}
 		out = append(out, dispatch{v.Seq, v.Redelivered})

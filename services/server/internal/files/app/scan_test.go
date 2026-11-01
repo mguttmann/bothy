@@ -20,6 +20,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // scanCfg is the configuration of the scan tests.
@@ -183,7 +184,7 @@ func TestScanPassReadsEachByteOnce(t *testing.T) {
 		}
 		ev := e.events.list[0]
 		if ev.ActorKind != "" || !ev.ActorPrincipalID.IsZero() || ev.ReceiveAction != "file.read" || ev.ResourceKind != "file" ||
-			ev.AudiencePrincipalID != s.File.UploadedBy || bytes.Contains(ev.Payload, []byte("null")) {
+			ev.AudiencePrincipalID != s.File.UploadedBy || testkit.HasJSONNull(ev.Payload) {
 			t.Errorf("event %+v %s", ev, ev.Payload)
 		}
 		if !strings.Contains(string(ev.Payload), `"scan_status":"clean"`) || !strings.Contains(string(ev.Payload), `"sha256":"`) {

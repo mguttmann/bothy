@@ -48,6 +48,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver/httpservertest"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg/pgtest"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	syncpg "github.com/OWNER/bothy/services/server/internal/sync/adapters/postgres"
 	"github.com/OWNER/bothy/services/server/internal/sync/adapters/telemetry"
 	syncapp "github.com/OWNER/bothy/services/server/internal/sync/app"
@@ -489,7 +490,7 @@ func (w *world) want(r *httpservertest.Response, status int, code string) map[st
 	}
 	var m map[string]any
 	if len(r.Body) > 0 {
-		if strings.Contains(string(r.Body), "null") {
+		if testkit.HasJSONNull(r.Body) {
 			w.t.Errorf("JSON null in %s", r.Body)
 		}
 		if err := json.Unmarshal(r.Body, &m); err != nil {
@@ -623,7 +624,7 @@ func (w *world) events(typ string) []event {
 		var e event
 		var raw string
 		must(w.t, rs.Scan(&e.Type, &e.ResourceID, &e.Audience, &e.Version, &raw))
-		if strings.Contains(raw, "null") {
+		if testkit.HasJSONNull([]byte(raw)) {
 			w.t.Errorf("event payload with null: %s", raw)
 		}
 		must(w.t, json.Unmarshal([]byte(raw), &e.Payload))

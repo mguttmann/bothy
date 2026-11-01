@@ -373,7 +373,7 @@ func attachedForm(t *testing.T, m message) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(string(raw), "null") {
+	if testkit.HasJSONNull(raw) {
 		t.Errorf("JSON null in %s", raw)
 	}
 }
@@ -535,7 +535,7 @@ func validateSchema(t *testing.T, name string, payload []byte) {
 	if !ok {
 		t.Fatalf("no schema %s", name)
 	}
-	if strings.Contains(string(payload), "null") {
+	if testkit.HasJSONNull(payload) {
 		t.Fatalf("JSON null in %s", payload)
 	}
 	// libopenapi renders the shared schema objects while it validates and writes into them, so

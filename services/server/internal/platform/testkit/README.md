@@ -5,10 +5,10 @@ helpers) import it, no production package does.
 
 ## Purpose
 
-One way for tests to wait, and one mark for slow integration tests. A loaded host and the race
-detector slow every step by an unknown factor, so a test that bounds a correct step by its own
-few seconds fails changes that are fine. Every wait for something that must happen uses
-`Patience` (named value `quality.test.patience`,
+One way for tests to wait, one mark for slow integration tests, and one way to find a JSON null. A
+loaded host and the race detector slow every step by an unknown factor, so a test that bounds a
+correct step by its own few seconds fails changes that are fine. Every wait for something that must
+happen uses `Patience` (named value `quality.test.patience`,
 [23-quality.md](../../../../../docs/spec/23-quality.md)); a condition that never holds still fails
 the test, only later.
 
@@ -49,6 +49,16 @@ The Semgrep rule `bothy-go-test-wall-clock-wait` (`.semgrep/`) refuses literal s
 as the bound of a wait in a `_test.go` file. A bounded give-up or a latency bound under test
 carries `// nosemgrep: bothy-go-test-wall-clock-wait -- <reason>`. The rule does not see a wait
 bounded by a constant of the test or by `time.Sleep`.
+
+## JSON null
+
+`testkit.HasJSONNull(b)` reports whether the JSON text `b` (one value or NDJSON) holds a null at
+any depth (ADR 0053); `testkit.NoJSONNull(t, what, b)` fails the test with the JSON pointer of
+the null, or when `b` is not JSON; `testkit.JSONNull(b)` returns the pointer. They decode `b`, so
+the letters null inside a string (a random base64url token) are no null: a substring check failed
+correct responses at random (issue #238). The Semgrep rule `bothy-go-test-null-substring` refuses
+`strings.Contains(x, "null")`, `bytes.Contains(x, []byte("null"))` and a banned-substring list
+with `"null"` in Go tests (docs/decisions.d/FLAKE-null-substring.md).
 
 ## Timing comparisons
 

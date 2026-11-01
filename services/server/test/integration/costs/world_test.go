@@ -9,7 +9,6 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -43,6 +42,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver/httpservertest"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg/pgtest"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	runsapp "github.com/OWNER/bothy/services/server/internal/runs/app"
 	syncpg "github.com/OWNER/bothy/services/server/internal/sync/adapters/postgres"
 	"github.com/OWNER/bothy/services/server/internal/sync/adapters/telemetry"
@@ -521,7 +521,7 @@ func (w *world) want(r *httpservertest.Response, status int, code string) map[st
 	}
 	var m map[string]any
 	if len(r.Body) > 0 {
-		if strings.Contains(string(r.Body), "null") {
+		if testkit.HasJSONNull(r.Body) {
 			w.t.Errorf("JSON null in %s", r.Body)
 		}
 		if err := json.Unmarshal(r.Body, &m); err != nil {

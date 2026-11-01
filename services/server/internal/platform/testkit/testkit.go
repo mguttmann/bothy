@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Package testkit holds how tests wait and how slow integration tests are marked. Only tests and
-// test helpers import it.
+// Package testkit holds how tests wait, how slow integration tests are marked and how a test finds
+// a JSON null (JSONNull, HasJSONNull, NoJSONNull). Only tests and test helpers import it.
 //
 // A test never bounds a wait for something that must happen by its own number of seconds: it
 // waits with Until, Receive or Context, which all use Patience. A host under load and the race

@@ -22,6 +22,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/notify/domain"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver/httpservertest"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg/pgtest"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	mw "github.com/OWNER/bothy/services/server/test/messagingworld"
 )
 
@@ -141,7 +142,7 @@ func (e *env) events(t *testing.T, typ string) []event {
 		if err := rs.Scan(&r.seq, &r.typ, &r.actor, &r.audience, &r.resourceKind, &r.resource, &r.resourceVersion, &r.scope, &r.payload); err != nil {
 			t.Fatal(err)
 		}
-		if strings.Contains(r.payload, "null") {
+		if testkit.HasJSONNull([]byte(r.payload)) {
 			t.Errorf("JSON null in %s", r.payload)
 		}
 		out = append(out, r)

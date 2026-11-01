@@ -20,6 +20,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/reqmeta"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver/httpservertest"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // problemTable parses the generated block "problems" of docs/spec/06-api.md: code and status.
@@ -115,7 +116,7 @@ func TestProblem_ShapePerCode(t *testing.T) {
 		if code == errs.CodeConflict && (body["reason"] != "one_time_secret" || body["hint"] != "Create a new one.") {
 			t.Errorf("reason/hint = %v/%v", body["reason"], body["hint"])
 		}
-		if strings.Contains(rec.Body.String(), "null") {
+		if testkit.HasJSONNull(rec.Body.Bytes()) {
 			t.Errorf("%s: null in %s", code, rec.Body)
 		}
 	}

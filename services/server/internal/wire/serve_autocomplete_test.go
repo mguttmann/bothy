@@ -218,7 +218,7 @@ func (w *acWorld) askNow(p gwPerson, ch, cmd string, body map[string]any) acRepl
 	if r.err != nil {
 		w.t.Fatal(r.err)
 	}
-	if bytes.Contains(r.body, []byte("null")) {
+	if testkit.HasJSONNull(r.body) {
 		w.t.Fatalf("autocompleteCommand answered JSON null: %s", r.body)
 	}
 	return r

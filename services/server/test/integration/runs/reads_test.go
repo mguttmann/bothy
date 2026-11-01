@@ -13,7 +13,6 @@ import (
 	"slices"
 	"sort"
 	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -409,7 +408,7 @@ func validFrame(t *testing.T, c *specschema.Contract, ev map[string]any) {
 	t.Helper()
 	raw, err := json.Marshal(map[string]any{"op": "dispatch", "d": ev})
 	must(t, err)
-	if strings.Contains(string(raw), "null") {
+	if testkit.HasJSONNull(raw) {
 		t.Fatalf("null in %s", raw)
 	}
 	if err := c.ValidateServerFrame(raw); err != nil {

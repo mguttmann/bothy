@@ -22,6 +22,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/internal/files/adapters/clamd/clamdtest"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/test/harness"
 )
 
@@ -351,7 +352,7 @@ func TestDownload(t *testing.T) {
 	t.Run("TranscriptRead", func(t *testing.T) {
 		voice := e.ready(t, "voice.m4a", []byte("not really audio"))
 		r := get(t, e.alex, "/files/"+voice+"/transcript", nil)
-		if r.Status != http.StatusOK || strings.Contains(string(r.Body), "null") || strings.TrimSpace(string(r.Body)) != `{"file_id":"`+voice+`","status":"none"}` {
+		if r.Status != http.StatusOK || testkit.HasJSONNull(r.Body) || strings.TrimSpace(string(r.Body)) != `{"file_id":"`+voice+`","status":"none"}` {
 			t.Errorf("status none: %d %s", r.Status, r.Body)
 		}
 		e.exec(t, `UPDATE files SET transcript_status = 'done', transcript_text = 'Please call Sam back.', transcript_language = 'en', transcript_source = 'agent' WHERE id = $1`, voice)

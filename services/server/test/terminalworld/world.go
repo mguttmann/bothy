@@ -46,6 +46,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver/httpservertest"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg/pgtest"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	syncpg "github.com/OWNER/bothy/services/server/internal/sync/adapters/postgres"
 	"github.com/OWNER/bothy/services/server/internal/sync/adapters/telemetry"
 	syncapp "github.com/OWNER/bothy/services/server/internal/sync/app"
@@ -479,7 +480,7 @@ func (w *World) Want(r *httpservertest.Response, status int, code string) map[st
 	}
 	var m map[string]any
 	if len(r.Body) > 0 {
-		if strings.Contains(string(r.Body), "null") {
+		if testkit.HasJSONNull(r.Body) {
 			w.t.Errorf("JSON null in %s", r.Body)
 		}
 		if err := json.Unmarshal(r.Body, &m); err != nil {
@@ -571,7 +572,7 @@ func (w *World) Events(typ string) []Event {
 		if err := rows.Scan(&e.Seq, &e.Type, &e.ResourceID, &e.ReceiveAction, &e.Actor, &e.Audience, &e.Version, &e.HasScope, &e.Raw); err != nil {
 			w.t.Fatal(err)
 		}
-		if strings.Contains(e.Raw, "null") {
+		if testkit.HasJSONNull([]byte(e.Raw)) {
 			w.t.Errorf("event payload with null: %s", e.Raw)
 		}
 		if err := json.Unmarshal([]byte(e.Raw), &e.Payload); err != nil {

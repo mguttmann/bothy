@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -18,6 +17,7 @@ import (
 	"github.com/OWNER/bothy/services/server/api/rest"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver/httpservertest"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/internal/runs"
 )
 
@@ -220,7 +220,7 @@ func ifMatchOnly(v int64) []string {
 // null (ADR 0053).
 func validateSchema(t *testing.T, name string, p []byte) {
 	t.Helper()
-	if strings.Contains(string(p), "null") {
+	if testkit.HasJSONNull(p) {
 		t.Fatalf("null in %s", p)
 	}
 	doc, err := libopenapi.NewDocument(rest.Spec)

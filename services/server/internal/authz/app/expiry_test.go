@@ -23,6 +23,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/reqmeta"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/test/terminaltest"
 )
 
@@ -117,7 +118,7 @@ func validateAgainst(t *testing.T, name, p string) {
 		}
 		t.Fatalf("payload does not match %s: %s", name, p)
 	}
-	if strings.Contains(p, "null") {
+	if testkit.HasJSONNull([]byte(p)) {
 		t.Fatalf("null in %s", p)
 	}
 }

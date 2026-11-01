@@ -21,6 +21,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/test/harness"
 )
 
@@ -380,7 +381,7 @@ func TestUploads(t *testing.T) {
 			t.Fatalf("%d %s", r.Status, r.Body)
 		}
 		if f["scope_channel_id"] != ch || f["thumbnails"] == nil || len(f["thumbnails"].([]any)) != 0 || f["sha256"] != nil ||
-			bytes.Contains(r.Body, []byte("null")) {
+			testkit.HasJSONNull(r.Body) {
 			t.Fatalf("file %s", r.Body)
 		}
 		for name, c := range map[string]*harness.Client{"Sam": sam, "Robin": robin, "owner": owner} {

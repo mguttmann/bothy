@@ -20,6 +20,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver/httpservertest"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // The tests of thread.move (brief M1-62) run in the world of 07 sections 10 and 11.1: Support with
@@ -279,7 +280,7 @@ func TestMoveThreadEvents(t *testing.T) {
 		t.Fatalf("thread.moved %+v", in)
 	}
 	for _, r := range got {
-		if strings.Contains(r.payload, "null") {
+		if testkit.HasJSONNull([]byte(r.payload)) {
 			t.Fatalf("null in %s", r.payload)
 		}
 	}

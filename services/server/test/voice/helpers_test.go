@@ -12,7 +12,6 @@ import (
 	"net/http"
 	"os"
 	"strconv"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -566,7 +565,7 @@ func wantField(t *testing.T, what string, r harness.Response, pointer, code stri
 // noNull fails when a body carries JSON null (ADR 0053).
 func noNull(t *testing.T, what string, body []byte) {
 	t.Helper()
-	if strings.Contains(string(body), "null") {
+	if testkit.HasJSONNull(body) {
 		t.Errorf("%s carries null: %s", what, body)
 	}
 }

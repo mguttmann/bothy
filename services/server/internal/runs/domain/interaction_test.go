@@ -11,6 +11,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/internal/runs/domain"
 )
 
@@ -217,7 +218,7 @@ func TestInteractionCreatedPayload(t *testing.T) {
 	if string(b) != want {
 		t.Fatalf("payload =\n%s\nwant\n%s", b, want)
 	}
-	if strings.Contains(string(b), "response") || strings.Contains(string(b), "null") {
+	if strings.Contains(string(b), "response") || testkit.HasJSONNull(b) {
 		t.Fatalf("payload carries a response or null: %s", b)
 	}
 

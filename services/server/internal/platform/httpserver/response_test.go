@@ -20,6 +20,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver/httpservertest"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // --- no null, 2^53 (ADR 0053) ---
@@ -110,7 +111,7 @@ func TestNoNull_PropertyRandomValues(t *testing.T) {
 			t.Logf("body %s: %v", body, err)
 			return false
 		}
-		if bytes.Contains(out, []byte("null")) {
+		if testkit.HasJSONNull(out) {
 			t.Logf("null in %s", out)
 			return false
 		}
@@ -215,7 +216,7 @@ func TestNoNull_ProblemBodiesClean(t *testing.T) {
 	t.Parallel()
 	h := jsonHarness(t, `{}`, false)
 	resp := h.Do(h.NewRequest(http.MethodGet, "/api/v1/things/"+thingID, "")) // header missing: 400
-	if resp.StatusCode != 400 || bytes.Contains(resp.Body, []byte("null")) {
+	if resp.StatusCode != 400 || testkit.HasJSONNull(resp.Body) {
 		t.Fatalf("%d %s", resp.StatusCode, resp.Body)
 	}
 }
