@@ -5,12 +5,12 @@
 library;
 
 import 'dart:async';
-import 'dart:typed_data';
 
 import 'package:admin_ui/admin_ui.dart' show AdminLocation, AdminSection;
 import 'package:design_system/design_system.dart';
 import 'package:domain/domain.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -278,6 +278,12 @@ enum SidebarHoldMode {
 
 /// Reports whether the pointer is over [child] or the keyboard focus is inside it (brief M4-40
 /// Design note 2): true when either starts, false when both have left.
+///
+/// A pointer that rests on [child] while the person types elsewhere does not hold (brief
+/// FIX-autoarrange-channels): a key press other than a lone modifier while the keyboard focus
+/// is outside [child] ends the hold of the pointer until the pointer moves over [child] again.
+/// Without this, a person who clicked a forum in the sidebar and then wrote into it with the
+/// keyboard saw no row move, because the resting pointer held the order.
 class _HoldRegion extends StatefulWidget {
   const _HoldRegion({required this.onHold, required this.child});
 
@@ -303,7 +309,42 @@ class _HoldRegionState extends State<_HoldRegion> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    HardwareKeyboard.instance.addHandler(_onKey);
+  }
+
+  /// A key typed outside the sidebar means the person works elsewhere: the resting pointer no
+  /// longer holds. Never handles the key.
+  bool _onKey(KeyEvent event) {
+    if (_pointer &&
+        !_focus &&
+        event is KeyDownEvent &&
+        !_modifiers.contains(event.logicalKey)) {
+      _update(pointer: false);
+    }
+    return false;
+  }
+
+  /// Keys that only modify a click or another key (Shift with a click on a row keeps the hold).
+  static final Set<LogicalKeyboardKey> _modifiers = {
+    ...LogicalKeyboardKey.expandSynonyms({
+      LogicalKeyboardKey.shift,
+      LogicalKeyboardKey.control,
+      LogicalKeyboardKey.alt,
+      LogicalKeyboardKey.meta,
+    }),
+    LogicalKeyboardKey.shift,
+    LogicalKeyboardKey.control,
+    LogicalKeyboardKey.alt,
+    LogicalKeyboardKey.meta,
+    LogicalKeyboardKey.capsLock,
+    LogicalKeyboardKey.fn,
+  };
+
+  @override
   void dispose() {
+    HardwareKeyboard.instance.removeHandler(_onKey);
     // A sidebar that leaves the screen holds nothing any more; reported after the frame that
     // removes it, because a provider must not change while widgets unmount.
     if (_held) {
@@ -316,6 +357,8 @@ class _HoldRegionState extends State<_HoldRegion> {
   @override
   Widget build(BuildContext context) => MouseRegion(
     onEnter: (_) => _update(pointer: true),
+    // A move over the sidebar holds again after a key press ended the hold.
+    onHover: (_) => _update(pointer: true),
     onExit: (_) => _update(pointer: false),
     child: Focus(
       canRequestFocus: false,

@@ -66,7 +66,11 @@ time; a space by the newest activity of its channels. Ties keep the manual order
 or the keyboard focus is in the sidebar (on a touch screen: a finger, a scroll, the screen reader)
 an automatic level keeps the order it showed last, as forum posts do since M4-46 (01 6.8 item 4), so
 no row moves under the pointer. Writing a message therefore moves its post to the top of its forum
-and the forum to the top of its space, once the person is back in the history.
+and the forum to the top of its space, once the person is back in the history. A key press outside
+the sidebar (not a lone modifier key) counts as being back, even when the pointer still rests on the
+sidebar; the hold returns when the pointer moves over the sidebar (owner report of 2026-11-01, brief
+FIX-autoarrange-channels: a forum clicked in the sidebar and then written into with the keyboard
+stayed low, because the resting pointer held the order).
 
 **D-M4-51-5 Three personal settings.** `sidebar.auto_arrange_spaces` (default `false`),
 `sidebar.auto_arrange_channels` (default `false`) and `sidebar.auto_arrange_chats` (default `true`)

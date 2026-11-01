@@ -657,7 +657,8 @@ within `ui.sidebar_thread_window`), the bound `ui.sidebar_threads_per_channel` w
 and the order by creation. The counters of the channel row and of "All posts" never show a
 number twice on screen. The `ChannelThreads` provider feeds it from the local database; while
 the pointer is over the sidebar or the focus is in it (`SidebarHold`), rows that no longer
-qualify stay in place and the rows of a forum keep their order. The threads come from the
+qualify stay in place and the rows of a forum keep their order; a key press outside the sidebar
+ends the hold of a resting pointer until it moves over the sidebar again. The threads come from the
 snapshot's `active_threads` and the events the engine applies, never from a list request per
 channel. Each group collapses with its own arrow; the state is kept per device in
 `channel_view_states` of `local_store`. The arrow keys walk the tree (arrow right expands a group
