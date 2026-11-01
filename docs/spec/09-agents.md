@@ -2842,8 +2842,14 @@ a process that had background work also while a turn of it runs and until
 Meanwhile the run stays `running`, every follow-up is written at once and becomes a turn of its
 own with its own answer, the answer of a notification turn is posted like any other (an empty
 one is not), and while a task runs the live box reports progress against `run.stall_after` once
-per `runner.progress_patch_interval`. A `result` with an error still closes stdin at once, which
-ends the background work. The system prompt tells Claude Code to start work longer than about a
+per `runner.progress_patch_interval`. A `result` with an error still closes stdin at once. The
+pinned CLI may keep the process for its background work after that (about ten minutes on
+2026-11-01, while the run refused every follow-up), so a process still alive `runner.stop_grace`
+after a `result` with an error is stopped as in 18.6 (log code `turn_stopped_after_error`; the
+end is classified as before, the stop does not make it `stopped`); task steps still open then
+end `cancelled`, and the run ends by 18.9 (addendum of 2026-11-01,
+docs/decisions.d/FIX-runner-auth-failed-held.md). Follow-ups it did not take stay `queued`, and
+the server defers them into a new run that resumes the same session (section 7). The system prompt tells Claude Code to start work longer than about a
 minute in the background, to end the turn at once with a short reply, never to wait in a turn
 for background work, to report a notification in a few sentences and to answer a status
 question from its running tasks (`prompts/runner_prompt.md`, section "Background work").
@@ -3031,7 +3037,12 @@ UUIDv7 ID and `name` one of these codes, which clients render as a translated li
 | `runtime_error` | `failed` | `{"errors": [<texts>], "exit": "<code or signal name>"}` | last step of a run that ends `runtime_error`, patched before `run.finish` |
 
 A runtime without login ends `failed` with `runtime_not_authenticated`, at the pre-check (no
-`run.start`, no process, BR-12) or at a process end, without a recovery and without a note.
+`run.start`, no process, BR-12) or at a process end, without a recovery and without a note. At a
+process end the `summary` says that Claude Code lost its login on the runner host during the
+run and that, once the login works again, the next message starts a new run that continues the
+same session; a `failed` end of a turn process after which background tasks were still running
+also names their count as stopped and lost, for `runtime_error` too (addendum of 2026-11-01,
+docs/decisions.d/FIX-runner-auth-failed-held.md). The failed turn is not repeated in the run.
 
 Crash of the runner (18.2 "Detachment", D-M2-35-11): the turn record holds run, thread, channel,
 the session reference and mode, PID, group, the identity of the process (start time and command

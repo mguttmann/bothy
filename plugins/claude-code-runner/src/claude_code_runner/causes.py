@@ -13,7 +13,7 @@ Examples:
 
 from __future__ import annotations
 
-__all__ = ["CAUSES", "cause"]
+__all__ = ["CAUSES", "cause", "turn_end_cause"]
 
 CAUSES: dict[str, str] = {
     "project_not_bound": (
@@ -113,3 +113,47 @@ def cause(code: str, *, default_workspace: bool = False) -> str:
     """
     table = _DEFAULT_CAUSES if default_workspace and code in _DEFAULT_CAUSES else CAUSES
     return f"{table.get(code, _FALLBACK)} (`{code}`)"
+
+
+_LOGIN_LOST = "Claude Code lost its login on the runner host during this run, so the run ended."
+_NEXT = "your next message starts a new run that continues the same session"
+
+
+def turn_end_cause(reason: str, lost_tasks: int) -> str | None:
+    """The summary of a run that a turn process ended with ``reason`` (FIX-runner-auth-failed-held).
+
+    A lost login at a turn names what happened and what the next message does; background
+    tasks that were still running when the process ended are named as lost, because they end
+    with it and nothing reports their result.
+
+    Args:
+        reason: The run's ``failed`` reason.
+        lost_tasks: How many background tasks of the session were still running.
+
+    Returns:
+        The text with the reason in backticks at the end, or ``None`` when there is nothing to
+        add to the reason and its box note.
+
+    Examples:
+        >>> turn_end_cause("runtime_error", 0) is None
+        True
+        >>> turn_end_cause("runtime_error", 2).endswith("same session (`runtime_error`)")
+        True
+    """
+    parts: list[str] = []
+    if reason == "runtime_not_authenticated":
+        parts.append(_LOGIN_LOST)
+    if lost_tasks == 1:
+        parts.append("1 background task was still running and was stopped; its result is lost.")
+    elif lost_tasks > 1:
+        parts.append(
+            f"{lost_tasks} background tasks were still running and were stopped; their results "
+            "are lost."
+        )
+    if not parts:
+        return None
+    if reason == "runtime_not_authenticated":
+        parts.append(f"Once the login works again, {_NEXT}")
+    else:
+        parts.append(_NEXT[0].upper() + _NEXT[1:])
+    return f"{' '.join(parts)} (`{reason}`)"

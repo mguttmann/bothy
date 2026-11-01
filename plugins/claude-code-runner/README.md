@@ -223,7 +223,12 @@ level-one switch test holds them against the installed CLI.
   or wait inside it (user instructions files loaded into every session on the host, memories,
   rules for headless sessions, summaries of the conversation, hooks) does not apply here, that
   a turn ends within about a minute and that a status question is answered at once. A
-  follow-up written during a turn reaches the model after the running tool call returns.
+  follow-up written during a turn reaches the model after the running tool call returns. A
+  turn that fails (for example a notification turn while the host's login is briefly gone) no
+  longer holds the run for the background work: a process still alive `runner.stop_grace` after
+  an error `result` is stopped (log code `turn_stopped_after_error`), its open task steps end
+  `cancelled`, and the run ends with a summary that names the lost tasks
+  (FIX-runner-auth-failed-held).
 - **Attachments of follow-ups** (09 18.5, FIX-scan-state-stale): a follow-up whose files are
   still being checked waits, without a lock, until the server reports every file final, at most
   `runner.followup_file_wait`; its line then lists each file after the text under
@@ -239,7 +244,8 @@ level-one switch test holds them against the installed CLI.
   of a process with `--resume`) and the same prompt runs again, with a retry hint in the runner
   prompt when the turn had worked; a missing session is replaced by a new one and reported (with
   `bind_failed` in mode `bind`), fail open; a session that exists at the first turn is resumed; a
-  missing login ends `runtime_not_authenticated`; a CLI too old for the model ends
+  missing login ends `runtime_not_authenticated` (at a turn with a summary that says the login
+  was lost and that the next message continues the same session); a CLI too old for the model ends
   `runtime_error` with the required version in the last step and degrades the runner (see the
   operator rules); an error `result` ends `runtime_error` with its texts in the last step. Box notes are run steps of kind `status` with the codes
   `context_compacted`, `session_missing` and `runtime_error`.

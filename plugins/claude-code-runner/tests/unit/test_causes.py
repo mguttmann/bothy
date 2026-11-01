@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import pytest
 
-from claude_code_runner.causes import CAUSES, cause
+from claude_code_runner.causes import CAUSES, cause, turn_end_cause
 
 
 def test_unbound_forum_names_what_to_do() -> None:
@@ -43,3 +43,37 @@ def test_unknown_code_still_names_it() -> None:
 def test_a_value_is_never_part_of_the_text() -> None:
     # Only codes and key names leave the runner: a path of the host would be private.
     assert all("/" not in text for text in CAUSES.values())
+
+
+def test_login_lost_at_a_turn_names_what_happened_and_what_follows() -> None:
+    # FIX-runner-auth-failed-held: the owner learns why the run ended and that his next
+    # message continues the same session.
+    text = turn_end_cause("runtime_not_authenticated", 0)
+    assert text is not None
+    assert text.startswith("Claude Code lost its login on the runner host during this run")
+    assert "next message" in text
+    assert "same session" in text
+    assert "background" not in text
+    assert text.endswith("(`runtime_not_authenticated`)")
+
+
+@pytest.mark.parametrize(
+    ("lost", "sentence"),
+    [
+        (1, "1 background task was still running and was stopped; its result is lost."),
+        (3, "3 background tasks were still running and were stopped; their results are lost."),
+    ],
+)
+def test_lost_background_tasks_are_reported(lost: int, sentence: str) -> None:
+    for reason in ("runtime_not_authenticated", "runtime_error"):
+        text = turn_end_cause(reason, lost)
+        assert text is not None
+        assert sentence in text
+        assert text.endswith(f"(`{reason}`)")
+        assert chr(0x2013) not in text
+        assert chr(0x2014) not in text
+        assert len(text.encode()) <= 400
+
+
+def test_an_error_without_lost_work_keeps_its_box_note_only() -> None:
+    assert turn_end_cause("runtime_error", 0) is None

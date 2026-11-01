@@ -98,7 +98,8 @@ async def test_followup_during_a_long_turn_is_answered_without_waiting_for_its_e
     message_id = await world.fake.deliver_followup(run.run_id, "What is the state?", author="alex")
     # Written into the running turn at once, not held for the end of the turn.
     await world.until(lambda: len(world.turns()[0]["stdin"]) == 2)
-    assert world.fake.followup_state(run.run_id, message_id) == "delivered"
+    # The patch "delivered" follows the write; the line can be read before it went out.
+    await world.until(lambda: world.fake.followup_state(run.run_id, message_id) == "delivered")
     assert texts(world) == []
     world.release(turn)  # the tool call ends: the CLI takes the follow-up, the turn answers
     await world.until(lambda: len(texts(world)) == 1)
@@ -112,3 +113,52 @@ async def test_followup_during_a_long_turn_is_answered_without_waiting_for_its_e
     assert await world.ended(run.run_id) == "completed"
     assert texts(world)[1] == "The suite passed."
     assert len(world.turns()) == 1
+
+
+async def test_login_lost_while_background_runs_ends_the_run_with_its_cause(world: World) -> None:
+    # FIX-runner-auth-failed-held, as on 2026-11-01: a turn ended and left background work
+    # running; the notification turn the CLI started by itself failed because the host's login
+    # was briefly gone. The runner closed stdin, but the CLI kept the process for its work, so
+    # the run stayed "running" and refused the owner's next message until the work ended. Now
+    # the runner stops a process that outlives a failed turn by runner.stop_grace and ends the
+    # run with a cause in the thread; the next message continues the same session.
+    job = world.gate("background_gate")  # never opened: the work would outlive the test
+    failure = world.gate("background_error_gate")
+    world.scenario(
+        fixture="plain",
+        background_gate=str(job),
+        background_error_gate=str(failure),
+        background_api_error="not_authenticated",
+        background_survives_eof=True,
+    )
+    await world.start(world.config(followup_grace="200ms"))
+    run = await world.fake.trigger("Run the suite", channel_id=world.forum_a)
+    await world.until(lambda: texts(world) == ["Done."])
+    world.release(failure)
+    await world.until(lambda: world.calls("eof_with_background"))  # stdin closed, work runs on
+    message_id = await world.fake.deliver_followup(run.run_id, "Any news?", author="alex")
+    # The owner never waits for the background work: the run ends without the job's end.
+    assert await world.ended(run.run_id) == "failed"
+    assert world.calls("background_done") == []
+    assert [c.get("signal") for c in world.calls("background_killed")] == ["SIGINT"]
+    view = world.fake.run_state(run.run_id)
+    assert view.state_reason == "runtime_not_authenticated"
+    summary = world.fake.run(run.run_id)["summary"]
+    assert "lost its login" in summary
+    assert "1 background task was still running" in summary
+    assert "lost" in summary
+    assert summary.endswith("(`runtime_not_authenticated`)")
+    # The follow-up was not taken by the failed process: it stays queued, and the server
+    # defers it into a new run of the thread (09 section 7).
+    assert world.fake.followup_state(run.run_id, message_id) == "queued"
+    # The background job's step does not stay "running" in a failed run.
+    steps = world.fake.run(run.run_id)["steps"].values()
+    jobs = [s for s in steps if s["kind"] == "background_job"]
+    assert [s["status"] for s in jobs] == ["cancelled"]
+    # The next message starts a new run that resumes the same session.
+    first_ref = world.fake.sessions(run.thread_id)[0]["external_session_ref"]
+    world.scenario(fixture="plain")
+    again = await world.fake.trigger("Any news?", thread_id=run.thread_id)
+    assert await world.ended(again.run_id) == "completed"
+    argv = world.turns()[-1]["argv"]
+    assert argv[argv.index("--resume") + 1] == first_ref

@@ -55,6 +55,7 @@ class Fake:
         self.session_id = ""
         self.model = ""
         self.stopping = threading.Event()
+        self.job_running = False
 
     def record(self, kind: str, **data: Any) -> None:
         entry = {"kind": kind, "pid": os.getpid(), "t": time.monotonic(), **data}
@@ -317,14 +318,29 @@ class Fake:
           input (``background_text``).
         * The end of stdin while the job runs stops the job (``background_killed``): the CLI
           ends its background work when its input ends.
+        * With ``background_error_gate``: once the test creates it, the CLI starts a turn by
+          itself (a task's notification) that fails with the API error of the fixture named by
+          ``background_api_error``, as on 2026-11-01 when the host's login failed briefly.
+        * With ``background_survives_eof``: the end of stdin does not stop the job; the process
+          stays until the job ends or a signal comes, as the pinned CLI did on 2026-11-01 for
+          about ten minutes after a failed turn (``eof_with_background``).
         """
         gate = Path(str(self.scenario["background_gate"]))
+        error_gate = self.scenario.get("background_error_gate")
         running = True
+        self.job_running = True
+        eof_logged = False
         deadline = time.monotonic() + 2 * GATE_PATIENCE  # only a bound for an orphaned process
         while time.monotonic() < deadline:
             if running and gate.exists():
                 running = False
+                self.job_running = False
                 self.background_done()
+            if error_gate and Path(str(error_gate)).exists():
+                error_gate = None
+                self.record("background_turn_failed")
+                self.emit(self.init_line())
+                self.emit_api_error(_meta(str(self.scenario["background_api_error"]))["error_text"])
             line, done = lines.wait(answered, 0.01)
             if line is not None:
                 answered += 1
@@ -338,6 +354,12 @@ class Fake:
                         "user_message_uuids": [_uuid_of(line)],
                     }
                 )
+                continue
+            if done and running and self.scenario.get("background_survives_eof"):
+                if not eof_logged:
+                    eof_logged = True
+                    self.record("eof_with_background")
+                self.stopping.wait(0.01)  # poll for the job's gate or a signal
                 continue
             if done:
                 break
@@ -543,6 +565,8 @@ class Fake:
                 return
 
     def on_sigint(self, *_: Any) -> None:
+        if self.job_running:
+            self.record("background_killed", signal="SIGINT")
         self.emit(
             {
                 "type": "result",

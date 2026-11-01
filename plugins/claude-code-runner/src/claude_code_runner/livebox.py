@@ -520,6 +520,17 @@ class LiveBox:
         self.steps_changed = True
         self._patch.update_step(step, status=status, finished_at=self._now())
 
+    def end_open_tasks(self) -> None:
+        """End every task step that is still open as ``cancelled`` (FIX-runner-auth-failed-held).
+
+        For a process the runner stopped after a failed turn: its background work ends with it,
+        and the CLI may not report that any more.
+        """
+        for step, _ in list(self._tasks.values()):
+            self._end(step, "cancelled")
+        for step in list(self._agents.values()):
+            self._end(step, "cancelled")
+
     def _background(self, message: Mapping[str, Any]) -> None:
         tasks = message.get("tasks")
         if not isinstance(tasks, list):

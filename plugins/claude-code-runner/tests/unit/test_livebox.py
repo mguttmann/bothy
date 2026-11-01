@@ -314,3 +314,26 @@ def test_keepalive_while_background_work_runs_reports_progress_once_per_interval
     clock[0] = NOW + timedelta(seconds=122)
     live.keepalive()
     assert patch.values == {"/metrics/progress_events": 2}
+
+
+def test_end_open_tasks_cancels_only_running_task_steps() -> None:
+    # FIX-runner-auth-failed-held: a process stopped after a failed turn takes its background
+    # work with it; those steps must not stay "running" in the ended run.
+    live, patch = box()
+    for task_id, task_type in (("a1", "local_agent"), ("b1", "local_bash"), ("b2", "local_bash")):
+        live.apply(
+            {
+                "type": "system",
+                "subtype": "task_started",
+                "task_id": task_id,
+                "description": task_id,
+                "task_type": task_type,
+            }
+        )
+    live.apply(
+        {"type": "system", "subtype": "task_notification", "task_id": "b2", "status": "completed"}
+    )
+    live.end_open_tasks()
+    status = {s["title"]: s.get("status") for s in patch.steps.values()}
+    assert status == {"a1": "cancelled", "b1": "cancelled", "b2": "completed"}
+    assert live.steps_changed
