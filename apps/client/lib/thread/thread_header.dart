@@ -5,12 +5,15 @@
 /// history the kind sentence of a text channel (01 6.8 item 11, M4-40), the operator or "No agent
 /// answers here", Done or Reopen, Move, Pin, Hide or Show session (M4-45), Hide or Show channel
 /// (M4-42) and the menu of M4-33. On the phone
-/// ([ThreadHeader.compact], 01 5.3 M3) the actions sit in one overflow menu next to the title.
+/// ([ThreadHeader.compact], 01 5.3 M3) the header is one line (brief M5-17): the page's back
+/// button, the title and one overflow menu with the operator and the actions.
 library;
 
 import 'package:design_system/design_system.dart';
 import 'package:flutter/material.dart';
 import 'package:l10n/l10n.dart';
+
+import '../phone/phone_back_scope.dart';
 
 /// What the header shows; built by the history column from the stored thread and channel.
 final class ThreadHeaderData {
@@ -58,6 +61,10 @@ final class ThreadHeaderData {
 
 /// An action of the phone header's overflow menu: its key, its label and what a tap does.
 typedef ThreadHeaderAction = ({String key, String label, VoidCallback onTap});
+
+/// The first line of the phone header's overflow menu (brief M5-17): the operator, or "No agent
+/// answers here", with its key; text, not an action.
+typedef ThreadHeaderInfo = ({String key, String text});
 
 /// The header bar.
 class ThreadHeader extends StatelessWidget {
@@ -114,10 +121,15 @@ class ThreadHeader extends StatelessWidget {
   /// the phone) in one overflow menu `thread.more`; there is no session column to toggle.
   final bool compact;
 
-  /// The one overflow menu of the phone form with these actions and the entries of [menu]
-  /// (FIX-draft-conflict-banner: never a second button beside it), or null for a menu of the
-  /// actions alone. [menu] is not shown in the phone form.
-  final Widget Function(List<ThreadHeaderAction> actions)? compactMenu;
+  /// The one overflow menu of the phone form with the operator line, these actions and the
+  /// entries of [menu] (FIX-draft-conflict-banner: never a second button beside it), or null
+  /// for a menu of the operator line and the actions alone. [menu] is not shown in the phone
+  /// form.
+  final Widget Function(
+    List<ThreadHeaderAction> actions,
+    ThreadHeaderInfo operator,
+  )?
+  compactMenu;
 
   @override
   Widget build(BuildContext context) {
@@ -291,6 +303,9 @@ class ThreadHeader extends StatelessWidget {
     );
   }
 
+  /// The phone form (01 5.3 M3, brief M5-17): one line with the back button of the page
+  /// ([PhoneHeaderBack], when the page frame hands one down), the title cut at its end and the
+  /// one overflow menu, whose first line names the operator.
   Widget _compact(BuildContext context, AppLocalizations l) {
     final colors = context.dsColors;
     final d = data;
@@ -306,13 +321,18 @@ class ThreadHeader extends StatelessWidget {
         (key: 'thread.move', label: l.threadMove, onTap: onMove),
       (key: 'thread.session', label: l.shellColumnSession, onTap: onPin),
     ];
+    final operatorLine = (
+      key: operator == null ? 'thread.noOperator' : 'thread.operator',
+      text: operator == null
+          ? l.threadNoOperator
+          : l.threadOperator(dsIsolate(operator)),
+    );
+    final back = PhoneBackScope.maybeOf(context) != null;
     return Container(
       key: const ValueKey('thread.header'),
-      padding: const EdgeInsets.fromLTRB(
-        DsSpace.s16,
-        DsSpace.s4,
-        DsSpace.s4,
-        DsSpace.s4,
+      padding: EdgeInsetsDirectional.only(
+        start: back ? 0 : DsSpace.s16,
+        end: DsSpace.s4,
       ),
       decoration: BoxDecoration(
         border: Border(
@@ -324,34 +344,21 @@ class ThreadHeader extends StatelessWidget {
       ),
       child: Row(
         children: [
+          const PhoneHeaderBack(),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Semantics(
-                  header: true,
-                  child: Text(
-                    dsIsolate(d.mainHistory ? '# ${d.title}' : d.title),
-                    key: const ValueKey('thread.title'),
-                    style: dsTextStyle(DsType.heading)
-                        .copyWith(color: colors.textPrimary),
-                  ),
-                ),
-                Text(
-                  operator == null
-                      ? l.threadNoOperator
-                      : l.threadOperator(dsIsolate(operator)),
-                  key: ValueKey(
-                    operator == null ? 'thread.noOperator' : 'thread.operator',
-                  ),
-                  style: dsTextStyle(DsType.caption)
-                      .copyWith(color: colors.textSecondary),
-                ),
-              ],
+            child: Semantics(
+              header: true,
+              child: Text(
+                dsIsolate(d.mainHistory ? '# ${d.title}' : d.title),
+                key: const ValueKey('thread.title'),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: dsTextStyle(DsType.heading)
+                    .copyWith(color: colors.textPrimary),
+              ),
             ),
           ),
-          compactMenu?.call(items) ??
+          compactMenu?.call(items, operatorLine) ??
               PopupMenuButton<VoidCallback>(
                 key: const ValueKey('thread.more'),
                 tooltip: l.phoneMoreActions,
@@ -363,6 +370,15 @@ class ThreadHeader extends StatelessWidget {
                 ),
                 onSelected: (action) => action(),
                 itemBuilder: (context) => [
+                  PopupMenuItem<VoidCallback>(
+                    key: ValueKey(operatorLine.key),
+                    enabled: false,
+                    child: Text(
+                      operatorLine.text,
+                      style: dsTextStyle(DsType.caption)
+                          .copyWith(color: colors.textSecondary),
+                    ),
+                  ),
                   for (final a in items)
                     PopupMenuItem<VoidCallback>(
                       key: ValueKey(a.key),

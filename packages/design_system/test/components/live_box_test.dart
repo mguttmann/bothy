@@ -375,9 +375,11 @@ void main() {
       ),
       density: DsDensityMode.touch,
     );
-    expect(find.text(l.liveBoxStateRunning), findsOneWidget);
-    expect(find.text('4:12'), findsOneWidget);
-    expect(find.byType(DsStatusLine), findsOneWidget);
+    // One line of text since M5-17: state, run time and status line.
+    final line = find.byKey(const ValueKey('ds-livebox-mobile-text'));
+    expect(find.textContaining(l.liveBoxStateRunning), findsOneWidget);
+    expect(find.textContaining('4:12'), findsOneWidget);
+    expect(line, findsOneWidget);
     final stop = find.bySemanticsLabel(l.liveBoxStopRun('Robin'));
     expect(
       tester.getSize(stop).height,
@@ -385,7 +387,7 @@ void main() {
     );
     await tester.tap(stop);
     expect(stops, 1);
-    await tester.tap(find.text(l.liveBoxStateRunning));
+    await tester.tap(line);
     expect(opens, 1);
   });
 

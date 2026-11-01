@@ -1411,11 +1411,15 @@ final class DsElevation extends ThemeExtension<DsElevation> {
 @immutable
 final class DsDensity extends ThemeExtension<DsDensity> {
   const DsDensity({
+    required this.composerInsetBottom,
+    required this.composerInsetX,
     required this.composerMinHeight,
+    required this.composerPadX,
     required this.controlHeight,
     required this.liveboxPad,
     required this.messageFontSize,
     required this.messageGap,
+    required this.messageGutter,
     required this.messagePadY,
     required this.rowChannel,
     required this.rowPost,
@@ -1423,11 +1427,15 @@ final class DsDensity extends ThemeExtension<DsDensity> {
     required this.targetMin,
   });
 
+  final double composerInsetBottom;
+  final double composerInsetX;
   final double composerMinHeight;
+  final double composerPadX;
   final double controlHeight;
   final double liveboxPad;
   final double messageFontSize;
   final double messageGap;
+  final double messageGutter;
   final double messagePadY;
   final double rowChannel;
   final double rowPost;
@@ -1435,11 +1443,15 @@ final class DsDensity extends ThemeExtension<DsDensity> {
   final double targetMin;
 
   static const DsDensity comfortable = DsDensity(
+    composerInsetBottom: 12.0,
+    composerInsetX: 16.0,
     composerMinHeight: 44.0,
+    composerPadX: 12.0,
     controlHeight: 32.0,
     liveboxPad: 12.0,
     messageFontSize: 15.0,
     messageGap: 16.0,
+    messageGutter: 44.0,
     messagePadY: 4.0,
     rowChannel: 32.0,
     rowPost: 52.0,
@@ -1448,11 +1460,15 @@ final class DsDensity extends ThemeExtension<DsDensity> {
   );
 
   static const DsDensity compact = DsDensity(
+    composerInsetBottom: 12.0,
+    composerInsetX: 16.0,
     composerMinHeight: 40.0,
+    composerPadX: 12.0,
     controlHeight: 28.0,
     liveboxPad: 8.0,
     messageFontSize: 15.0,
     messageGap: 8.0,
+    messageGutter: 44.0,
     messagePadY: 2.0,
     rowChannel: 28.0,
     rowPost: 44.0,
@@ -1461,11 +1477,15 @@ final class DsDensity extends ThemeExtension<DsDensity> {
   );
 
   static const DsDensity touch = DsDensity(
+    composerInsetBottom: 8.0,
+    composerInsetX: 8.0,
     composerMinHeight: 48.0,
+    composerPadX: 4.0,
     controlHeight: 44.0,
     liveboxPad: 12.0,
     messageFontSize: 16.0,
     messageGap: 16.0,
+    messageGutter: 0.0,
     messagePadY: 6.0,
     rowChannel: 44.0,
     rowPost: 64.0,
@@ -1475,11 +1495,15 @@ final class DsDensity extends ThemeExtension<DsDensity> {
 
   @override
   DsDensity copyWith({
+    double? composerInsetBottom,
+    double? composerInsetX,
     double? composerMinHeight,
+    double? composerPadX,
     double? controlHeight,
     double? liveboxPad,
     double? messageFontSize,
     double? messageGap,
+    double? messageGutter,
     double? messagePadY,
     double? rowChannel,
     double? rowPost,
@@ -1487,11 +1511,15 @@ final class DsDensity extends ThemeExtension<DsDensity> {
     double? targetMin,
   }) {
     return DsDensity(
+      composerInsetBottom: composerInsetBottom ?? this.composerInsetBottom,
+      composerInsetX: composerInsetX ?? this.composerInsetX,
       composerMinHeight: composerMinHeight ?? this.composerMinHeight,
+      composerPadX: composerPadX ?? this.composerPadX,
       controlHeight: controlHeight ?? this.controlHeight,
       liveboxPad: liveboxPad ?? this.liveboxPad,
       messageFontSize: messageFontSize ?? this.messageFontSize,
       messageGap: messageGap ?? this.messageGap,
+      messageGutter: messageGutter ?? this.messageGutter,
       messagePadY: messagePadY ?? this.messagePadY,
       rowChannel: rowChannel ?? this.rowChannel,
       rowPost: rowPost ?? this.rowPost,
@@ -1506,11 +1534,15 @@ final class DsDensity extends ThemeExtension<DsDensity> {
       return this;
     }
     return DsDensity(
+      composerInsetBottom: lerpDouble(composerInsetBottom, other.composerInsetBottom, t)!,
+      composerInsetX: lerpDouble(composerInsetX, other.composerInsetX, t)!,
       composerMinHeight: lerpDouble(composerMinHeight, other.composerMinHeight, t)!,
+      composerPadX: lerpDouble(composerPadX, other.composerPadX, t)!,
       controlHeight: lerpDouble(controlHeight, other.controlHeight, t)!,
       liveboxPad: lerpDouble(liveboxPad, other.liveboxPad, t)!,
       messageFontSize: lerpDouble(messageFontSize, other.messageFontSize, t)!,
       messageGap: lerpDouble(messageGap, other.messageGap, t)!,
+      messageGutter: lerpDouble(messageGutter, other.messageGutter, t)!,
       messagePadY: lerpDouble(messagePadY, other.messagePadY, t)!,
       rowChannel: lerpDouble(rowChannel, other.rowChannel, t)!,
       rowPost: lerpDouble(rowPost, other.rowPost, t)!,

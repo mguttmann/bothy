@@ -1,9 +1,10 @@
 button, label "Back to requests", action tap
-label "Operator: ⁨Robin⁩"
 header, label "⁨Gateway: resume after network change⁩"
 button, collapsed, tooltip "More actions", action tap
 label "Alex, 10:22, Please include expired threads."
 label "Please include expired threads."
 button, label "Run of Robin: Done, for 28:00, context 0 percent", hint "Show run details", action tap
+button, label "Attach file", action tap
 text field, label "Message to Robin", action tap
+button, label "Record voice message", action tap
 button, disabled, label "Send"

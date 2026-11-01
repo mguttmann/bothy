@@ -3,6 +3,8 @@
 /// The input with slash suggestions (components.md section 9).
 library;
 
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -17,7 +19,10 @@ import 'view_models.dart';
 ///
 /// Anatomy of components.md 9: the field on `color.surface.input` with the border
 /// `color.border.control`, `radius.lg` and at least `density.composer-min-height`, growing up to
-/// [maxLines] lines (`ui.composer_max_lines`); attach on the left, voice and send on the right;
+/// [maxLines] lines (`ui.composer_max_lines`) and then scrolling; attach on the left, the
+/// caller's [trailing] control, voice and send on the right. The text field fills the field
+/// between the buttons and is the tap target there, with `density.composer-pad-x` inside it;
+/// the text starts at the left and a single line sits on the middle of the buttons (M5-17);
 /// above it the typing line and, while [suggestions] is not empty, the [DsSuggestionList]. The
 /// placeholder and field label read "Message to {target}", during an active run "Follow-up to
 /// {agent}" ([followupAgentName]).
@@ -52,6 +57,7 @@ class DsComposer extends StatefulWidget {
     this.onEditLast,
     this.onAttach,
     this.onVoice,
+    this.trailing,
     this.hasAttachments = false,
     this.sendEnabled = true,
     this.command,
@@ -93,6 +99,10 @@ class DsComposer extends StatefulWidget {
 
   /// Starts a voice recording, or null to hide the button.
   final VoidCallback? onVoice;
+
+  /// A control of the caller inside the field, after the text and before Send (the phone's
+  /// press-and-hold microphone, brief M5-17), or null.
+  final Widget? trailing;
 
   /// Whether files are attached: then the message may be sent without text.
   final bool hasAttachments;
@@ -344,6 +354,13 @@ class DsComposerState extends State<DsComposer> {
         : l.composerFollowupTo(widget.followupAgentName!);
     final typing = widget.typingNames;
     final missing = _missingOption;
+    final text = dsTextStyle(DsType.body).copyWith(color: c.textPrimary);
+    // The decorator keeps a single line at the top of a field taller than the line (the
+    // touch target of 48), so the padding centers it on the buttons (brief M5-17); a scaled
+    // or a second line grows the field with the plain padding.
+    final line =
+        MediaQuery.textScalerOf(context).scale(text.fontSize!) * text.height!;
+    final padY = math.max(DsSpace.s8, (density.targetMin - line) / 2);
     final command = widget.command;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -407,6 +424,7 @@ class DsComposerState extends State<DsComposer> {
             ),
           ),
         Container(
+          key: const ValueKey('ds-composer-field'),
           constraints: BoxConstraints(minHeight: density.composerMinHeight),
           decoration: BoxDecoration(
             color: c.surfaceInput,
@@ -427,48 +445,47 @@ class DsComposerState extends State<DsComposer> {
                   c.textSecondary,
                 ),
               Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: DsSpace.s12),
-                  // A node of its own: without the container the field's semantics went into
-                  // the node of the column around the composer, which became one text field
-                  // with the column's content below it, a leaf for VoiceOver (brief M4-32).
-                  child: Semantics(
-                    container: true,
-                    label: fieldLabel,
-                    child: TextField(
-                      controller: _text,
-                      focusNode: _focus,
-                      onChanged: widget.onChanged,
-                      minLines: 1,
-                      maxLines: widget.maxLines,
-                      keyboardType: TextInputType.multiline,
-                      style: dsTextStyle(DsType.body)
-                          .copyWith(color: c.textPrimary),
-                      // The field itself is the tap target, so it is at least
-                      // density.target-min high; the padding sits inside it.
-                      decoration: InputDecoration(
-                        border: InputBorder.none,
-                        isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(
-                          vertical: DsSpace.s8,
-                        ),
-                        constraints: BoxConstraints(
-                          minHeight: density.targetMin,
-                        ),
-                        // The placeholder repeats the field's name, which the label above
-                        // already gives; a screen reader reads it once (brief M4-32).
-                        hint: ExcludeSemantics(
-                          child: Text(
-                            placeholder,
-                            style: dsTextStyle(DsType.body)
-                                .copyWith(color: c.textSecondary),
-                          ),
+                // A node of its own: without the container the field's semantics went into
+                // the node of the column around the composer, which became one text field
+                // with the column's content below it, a leaf for VoiceOver (brief M4-32).
+                child: Semantics(
+                  container: true,
+                  label: fieldLabel,
+                  child: TextField(
+                    controller: _text,
+                    focusNode: _focus,
+                    onChanged: widget.onChanged,
+                    minLines: 1,
+                    maxLines: widget.maxLines,
+                    keyboardType: TextInputType.multiline,
+                    // Brief M5-17: the text starts at the left of the field.
+                    textAlign: TextAlign.start,
+                    style: text,
+                    // The field itself is the tap target from button to button and at least
+                    // density.target-min high: its padding (density.composer-pad-x) lies
+                    // inside it, so a tap on the padding focuses it too (brief M5-17).
+                    decoration: InputDecoration(
+                      border: InputBorder.none,
+                      isDense: true,
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: density.composerPadX,
+                        vertical: padY,
+                      ),
+                      constraints: BoxConstraints(minHeight: density.targetMin),
+                      // The placeholder repeats the field's name, which the label above
+                      // already gives; a screen reader reads it once (brief M4-32).
+                      hint: ExcludeSemantics(
+                        child: Text(
+                          placeholder,
+                          style: dsTextStyle(DsType.body)
+                              .copyWith(color: c.textSecondary),
                         ),
                       ),
                     ),
                   ),
                 ),
               ),
+              ?widget.trailing,
               if (widget.onVoice != null)
                 _iconButton(
                   DsIcons.actionVoice,

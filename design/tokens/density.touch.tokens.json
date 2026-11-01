@@ -11,6 +11,10 @@
     "message-pad-y": {"$value": {"value": 6, "unit": "px"}},
     "message-font-size": {"$value": {"value": 16, "unit": "px"}},
     "livebox-pad": {"$value": {"value": 12, "unit": "px"}},
-    "composer-min-height": {"$value": {"value": 48, "unit": "px"}}
+    "composer-min-height": {"$value": {"value": 48, "unit": "px"}},
+    "message-gutter": {"$value": {"value": 0, "unit": "px"}},
+    "composer-pad-x": {"$value": {"value": 4, "unit": "px"}},
+    "composer-inset-x": {"$value": {"value": 8, "unit": "px"}},
+    "composer-inset-bottom": {"$value": {"value": 8, "unit": "px"}}
   }
 }

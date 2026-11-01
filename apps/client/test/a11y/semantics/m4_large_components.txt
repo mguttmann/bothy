@@ -1,5 +1,4 @@
 button, label "Back to requests", action tap
-label "Operator: ⁨Robin⁩"
 header, label "⁨Gateway: resume after network change⁩"
 button, collapsed, tooltip "More actions", action tap
 label "Request from Robin"
@@ -16,5 +15,7 @@ label "Which model, and what goes into the notes?"
 button, label "Choose", action tap
 label "Release details"
 button, label "Fill in", action tap
+button, label "Attach file", action tap
 text field, label "Message to Robin", action tap
+button, label "Record voice message", action tap
 button, disabled, label "Send"

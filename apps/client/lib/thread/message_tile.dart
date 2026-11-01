@@ -312,8 +312,8 @@ class _MessageTileState extends State<MessageTile> {
             if (widget.attachments case final files? when editing == null)
               Padding(
                 // Under the content, beside the avatar like the content itself.
-                padding: const EdgeInsets.only(
-                  left: DsSize.avatarMd + DsSpace.s12 + DsSpace.s8,
+                padding: EdgeInsets.only(
+                  left: context.dsDensity.messageGutter + DsSpace.s8,
                   right: DsSpace.s8,
                 ),
                 child: files,
@@ -349,8 +349,8 @@ class ThreadStarterLine extends StatelessWidget {
     final replies = thread.messageCount;
     final text = l.threadStarter(dsIsolate(thread.title), replies);
     return Padding(
-      padding: const EdgeInsets.only(
-        left: DsSize.avatarMd + DsSpace.s12 + DsSpace.s8,
+      padding: EdgeInsets.only(
+        left: context.dsDensity.messageGutter + DsSpace.s8,
         bottom: DsSpace.s4,
       ),
       child: Align(

@@ -48,6 +48,7 @@ import '../session_column/session_column.dart';
 import '../sidebar/chat_seen_marker.dart';
 import '../sidebar/providers.dart';
 import '../telemetry/telemetry_providers.dart';
+import 'collapsing_header.dart';
 import 'delete_confirm.dart';
 import 'history_model.dart';
 import 'message_list.dart';
@@ -92,6 +93,9 @@ class HistoryColumn extends ConsumerStatefulWidget {
 /// being edited and the removal.
 class HistoryColumnState extends ConsumerState<HistoryColumn> {
   final GlobalKey<ThreadComposerState> _composer = GlobalKey();
+
+  /// Whether the phone's header shows while the history scrolls (brief M5-17).
+  final HeaderCollapse _collapse = HeaderCollapse();
   late final VisibleThreads _visible;
   bool _loadingOlder = false;
   bool _threadRequested = false;
@@ -134,6 +138,7 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
   @override
   void dispose() {
     _visible.remove(widget.threadId);
+    _collapse.dispose();
     super.dispose();
   }
 
@@ -581,8 +586,9 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
       MessageItem(:final message) when message.kind == MessageKind.run =>
         Padding(
           key: ValueKey(item.key),
-          padding: const EdgeInsets.fromLTRB(
-            DsSize.avatarMd + DsSpace.s12 + DsSpace.s8,
+          // Beside the content, `density.message-gutter` from the row (M5-17).
+          padding: EdgeInsets.fromLTRB(
+            context.dsDensity.messageGutter + DsSpace.s8,
             DsSpace.s2,
             DsSpace.s8,
             DsSpace.s2,
@@ -691,6 +697,53 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
         enabled: !main && header.canSetDone,
       ),
     };
+    final threadHeader = ThreadHeader(
+      data: header,
+      // 01 5.3 M3: the phone has no session column; its actions sit in one menu and
+      // the session (pins, agent session, costs) opens as a sheet.
+      compact: phone,
+      onEditTitle: () => unawaited(_title(thread)),
+      onDone: () => unawaited(
+        _actions?.setDone(thread, reopen: thread.state == ThreadState.closed),
+      ),
+      onMove: () => unawaited(_move(thread, channel)),
+      onPin: phone
+          ? () => unawaited(_openSession())
+          : () => unawaited(
+              showSessionColumn(
+                ref.read(localDatabaseProvider),
+                textThread: textLayout,
+              ),
+            ),
+      // M4-45 (01 D1, D2): kept on this device per layout.
+      onColumn: () => unawaited(
+        toggleSessionColumn(
+          ref.read(localDatabaseProvider),
+          textThread: textLayout,
+        ),
+      ),
+      sessionColumnHidden: sessionHidden,
+      // M4-42 (01 D1, D2): the channel column beside the thread can be hidden.
+      onChannelColumn: channelColumn
+          ? () =>
+                unawaited(toggleChannelColumn(ref.read(localDatabaseProvider)))
+          : null,
+      channelColumnHidden: channelHidden,
+      // The level of the thread, or of the channel for its main history (M4-33).
+      menu: channel == null
+          ? null
+          : TargetMenuButton(channel: channel, thread: main ? null : thread.id),
+      // FIX-draft-conflict-banner: on the phone the menu of M4-33 joins the header's
+      // one overflow menu instead of a second button beside it.
+      compactMenu: channel == null
+          ? null
+          : (actions, operator) => TargetMenuButton(
+              channel: channel,
+              thread: main ? null : thread.id,
+              actions: actions,
+              operator: operator,
+            ),
+    );
     // 01 6.17: while the history shows, the chat's agent status is seen on this device.
     return ChatSeenMarker(
       threadId: widget.threadId,
@@ -705,59 +758,16 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
             key: ValueKey('history.$_thread'),
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              ThreadHeader(
-                data: header,
-                // 01 5.3 M3: the phone has no session column; its actions sit in one menu and
-                // the session (pins, agent session, costs) opens as a sheet.
-                compact: phone,
-                onEditTitle: () => unawaited(_title(thread)),
-                onDone: () => unawaited(
-                  _actions?.setDone(
-                    thread,
-                    reopen: thread.state == ThreadState.closed,
-                  ),
-                ),
-                onMove: () => unawaited(_move(thread, channel)),
-                onPin: phone
-                    ? () => unawaited(_openSession())
-                    : () => unawaited(
-                        showSessionColumn(
-                          ref.read(localDatabaseProvider),
-                          textThread: textLayout,
-                        ),
-                      ),
-                // M4-45 (01 D1, D2): kept on this device per layout.
-                onColumn: () => unawaited(
-                  toggleSessionColumn(
-                    ref.read(localDatabaseProvider),
-                    textThread: textLayout,
-                  ),
-                ),
-                sessionColumnHidden: sessionHidden,
-                // M4-42 (01 D1, D2): the channel column beside the thread can be hidden.
-                onChannelColumn: channelColumn
-                    ? () => unawaited(
-                        toggleChannelColumn(ref.read(localDatabaseProvider)),
-                      )
-                    : null,
-                channelColumnHidden: channelHidden,
-                // The level of the thread, or of the channel for its main history (M4-33).
-                menu: channel == null
-                    ? null
-                    : TargetMenuButton(
-                        channel: channel,
-                        thread: main ? null : thread.id,
-                      ),
-                // FIX-draft-conflict-banner: on the phone the menu of M4-33 joins the header's
-                // one overflow menu instead of a second button beside it.
-                compactMenu: channel == null
-                    ? null
-                    : (actions) => TargetMenuButton(
-                        channel: channel,
-                        thread: main ? null : thread.id,
-                        actions: actions,
-                      ),
-              ),
+              // Brief M5-17: on the phone the one-line header gives its height to the history
+              // while the person reads older messages.
+              if (phone)
+                CollapsingHeader(
+                  key: const ValueKey('thread.header.slot'),
+                  collapse: _collapse,
+                  child: threadHeader,
+                )
+              else
+                threadHeader,
               // M4-21: the live box of the active run, pinned over the history (01 6.2).
               LiveBoxSlot(
                 threadId: widget.threadId,
@@ -774,15 +784,20 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
                               .copyWith(color: context.dsColors.textSecondary),
                         ),
                       )
-                    : MessageList(
-                        items: items,
-                        itemBuilder: row,
-                        jumpTo: jumpKey,
-                        onNearTop: () => unawaited(_loadOlder(window, thread)),
-                        onNewestVisible: (visible) {
-                          _newestVisible = visible;
-                          if (visible) _markRead(window);
-                        },
+                    : NotificationListener<UserScrollNotification>(
+                        onNotification: _collapse.onScroll,
+                        child: MessageList(
+                          items: items,
+                          itemBuilder: row,
+                          jumpTo: jumpKey,
+                          onNearTop: () =>
+                              unawaited(_loadOlder(window, thread)),
+                          onNewestVisible: (visible) {
+                            _newestVisible = visible;
+                            _collapse.newestVisible(visible: visible);
+                            if (visible) _markRead(window);
+                          },
+                        ),
                       ),
               ),
               ThreadComposer(

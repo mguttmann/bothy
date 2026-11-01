@@ -123,7 +123,7 @@ the waves before it are merged; many can start earlier, as soon as their own dep
 | 39 | M4-32, M4-34, M4-36, M4-40, M4-48, M5-03, M5-04, M7-06, M7-09, M8-07 |
 | 40 | M4-38, M4-41, M4-42, M4-49, M5-05, M5-06, M5-07, M5-08, M5-09, M5-14, M6-16, M7-07, M7-08, M7-12, M7-14, M8-09 |
 | 41 | M4-43, M4-45, M4-50, M5-10, M5-11, M5-15, M5-16, M6-17, M7-18, M7-21, M7-23, M7-26, M7-27 |
-| 42 | M4-44, M4-46, M5-12, M7-13 |
+| 42 | M4-44, M4-46, M5-12, M5-17, M7-13 |
 | 43 | M4-47, M4-51, M5-13 |
 | 44 | M4-52, M7-28 |
 
@@ -362,6 +362,7 @@ names listed here.
 | 40 | M5-14 | Run graph and control room on iPhone and Android | `M5-14-run-graph-mobile.md` | M4-39, M5-03 |
 | 41 | M5-15 | Threads in the sidebar and new chat on iPhone and Android | `M5-15-sidebar-threads-mobile.md` | M4-41, M5-03 |
 | 41 | M5-16 | Several photos from the library at once on the phone | `M5-16-multi-photo-picker.md` | M5-07 |
+| 42 | M5-17 | Phone thread density | `M5-17-phone-density.md` | M5-15, M5-16 |
 | 24 | M6-02 | Console app and serving by the server (ADR 0028) | `M6-02-console-app.md` | M4-07, M4-09, M6-01 |
 | 28 | M6-03 | Content Security Policy with a headless test | `M6-03-console-csp.md` | M1-73, M6-02 |
 | 29 | M6-04 | Administration in the console | `M6-04-console-admin.md` | M4-28, M4-29, M6-03 |
@@ -1125,6 +1126,7 @@ flowchart TB
   M5_14["M5-14"]
   M5_15["M5-15"]
   M5_16["M5-16"]
+  M5_17["M5-17"]
   M4_10 --> M5_01
   M4_21 --> M5_02
   M4_23 --> M5_02
@@ -1165,6 +1167,8 @@ flowchart TB
   M4_41 --> M5_15
   M5_03 --> M5_15
   M5_07 --> M5_16
+  M5_15 --> M5_17
+  M5_16 --> M5_17
 ```
 
 Tickets of M6:

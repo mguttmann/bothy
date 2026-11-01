@@ -13,7 +13,7 @@ import 'package:l10n/l10n.dart';
 
 import '../notifications_settings/providers.dart';
 import '../sidebar/sidebar_drag.dart' show SidebarMoves, sidebarMoveMenuItems;
-import '../thread/thread_header.dart' show ThreadHeaderAction;
+import '../thread/thread_header.dart' show ThreadHeaderAction, ThreadHeaderInfo;
 import 'channel_menu.dart';
 import 'level_menu.dart';
 
@@ -90,6 +90,7 @@ class TargetMenuButton extends ConsumerWidget {
     required this.channel,
     this.thread,
     this.actions,
+    this.operator,
   });
 
   /// The channel of the history.
@@ -100,6 +101,9 @@ class TargetMenuButton extends ConsumerWidget {
 
   /// The actions of the phone header, or null for the labelled button of the wide header.
   final List<ThreadHeaderAction>? actions;
+
+  /// The operator line at the top of the phone header's menu (brief M5-17), or null.
+  final ThreadHeaderInfo? operator;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -114,6 +118,20 @@ class TargetMenuButton extends ConsumerWidget {
     if (compact != null) {
       return MenuAnchor(
         menuChildren: [
+          if (operator case final info?)
+            // Text, not an action: the operator moved here from the header (M5-17).
+            Padding(
+              key: ValueKey(info.key),
+              padding: const EdgeInsets.symmetric(
+                horizontal: DsSpace.s12,
+                vertical: DsSpace.s8,
+              ),
+              child: Text(
+                info.text,
+                style: dsTextStyle(DsType.caption)
+                    .copyWith(color: colors.textSecondary),
+              ),
+            ),
           for (final a in compact)
             DsMenuItem(
               key: ValueKey(a.key),

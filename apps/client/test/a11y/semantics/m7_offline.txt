@@ -1,6 +1,5 @@
 live region, label "Offline. 2 changes waiting"
 button, label "Back to requests", action tap
-label "Operator: ⁨Robin⁩"
 header, label "⁨Gateway: resume after network change⁩"
 button, collapsed, tooltip "More actions", action tap
 label "Alex, 10:22, Please include expired threads."
@@ -15,5 +14,7 @@ button, label "Resend", action tap
 button, label "Edit", action tap
 button, label "Discard", action tap
 label "Offline: your message waits in the queue"
+button, label "Attach file", action tap
 text field, label "Message to Robin", action tap
+button, label "Record voice message", action tap
 button, disabled, label "Send"
