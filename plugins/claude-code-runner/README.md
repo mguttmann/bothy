@@ -36,7 +36,7 @@ the title once per new session and reports the cost of the run.
 | `runturn.py` | The turn processes of one run: recovery, follow-ups on stdin, stop, answers, box notes, finish, turn record |
 | `ledger.py` | The recovery invariants of a turn (stored offset, answers, inputs, kind, decided end), part of the turn record |
 | `failures.py`, `recovery.py` | Recognised CLI texts (`ERROR_TEXTS`) and the classification of a process end; the next action and the box notes |
-| `followups.py`, `stop.py`, `adoption.py` | Follow-up check, line and stdin rule; the stop schedule; identity check and adoption decision |
+| `followups.py`, `background.py`, `stop.py`, `adoption.py` | Follow-up check, line and stdin rule; the background work that holds stdin open; the stop schedule; identity check and adoption decision |
 | `channels.py`, `workspace.py` | Cache of the served forums and their bindings, reloaded while running (09 18.1); resolution of `workspace_ref` and `runner.default_workspace`, readiness and the project folder report (09 18.13, M4-44) |
 | `causes.py` | The sentence for the thread that names the cause of a refused run (09 18.9, RUNNER-NO-GIT) |
 | `transcribe.py` | The local transcriber of audio attachments and the note without a transcript (09 18.14) |
@@ -207,6 +207,16 @@ level-one switch test holds them against the installed CLI.
   check writes nothing and never ends the run. Follow-ups of a run that has not started are held
   and written after the prompt line. After a `result` stdin stays open for
   `runner.followup_grace` while written follow-ups have no echo.
+- **Background work** (09 18.5, FIX-runner-responsive-turns): a turn may end while work it
+  started in the background (Bash or a subagent with `run_in_background`, a workflow) still
+  runs. Claude Code stops that work when its stdin ends, so the runner keeps stdin open while the
+  stream lists a background task, and for a process that had one also during a turn and for
+  `runner.followup_grace` after the last line (log code `stdin_held_for_background`). Meanwhile
+  every follow-up becomes a turn of its own with its own answer, the answer Claude Code gives
+  when the work ends is posted in the thread, and the run stays `running` with progress patches
+  against `run.stall_after`. The runner prompt asks Claude Code to start long work in the
+  background, end the turn with a short reply and never wait for background work inside a
+  turn; nothing enforces that. A stop ends the process and its background work.
 - **Attachments of follow-ups** (09 18.5, FIX-scan-state-stale): a follow-up whose files are
   still being checked waits, without a lock, until the server reports every file final, at most
   `runner.followup_file_wait`; its line then lists each file after the text under
@@ -392,7 +402,8 @@ no login of the developer is touched. The real CLI runs only behind switches:
   pinned CLI can be installed into a temporary folder from the npm package of the platform
   (`@anthropic-ai/claude-code-<platform>` at the pinned version) without a login.
 - Level two, additionally `CLAUDE_CODE_RUNNER_REAL_TURN=1` and `CLAUDE_CODE_RUNNER_REAL_KEY_FILE`:
-  `auth status` per mode and two short real turns (one `--resume`). It uses the operator's key or
+  `auth status` per mode, two short real turns (one `--resume`) and one turn with a background
+  command that checks what 09 18.5 "Background work" relies on. It uses the operator's key or
   login and costs money; running it is the owner's decision.
 - `tests/real_cli/captured/api_errors_<pinned version>.jsonl` holds the `assistant` and `result`
   lines the pinned CLI wrote against a local stand-in for the API (`ANTHROPIC_BASE_URL` on

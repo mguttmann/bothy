@@ -20,7 +20,8 @@ them to ``agent.run_update_min_interval`` and rebases on version conflicts. Read
   ``tool_uses``, ``duration_ms``; never a cost, D-RV-5).
 * ``tool_progress``: counted; ``/metrics/progress_events`` is patched only when the last change
   of the turn is older than ``runner.progress_patch_interval``, so a long tool is not stalled
-  (09 5.5, 18.4).
+  (09 5.5, 18.4); `LiveBox.keepalive` does the same while only background work runs between
+  turns and the stream is silent (18.5).
 * ``system/background_tasks_changed``: open background steps outside the set end
   ``completed``; ``/metrics/background_jobs`` is the size of the set.
 * ``system/status``: ``compacting`` sets ``/status_line``, its absence removes it.
@@ -257,6 +258,17 @@ class LiveBox:
         # (09 5.5, 18.4) without a patch per message.
         self.progress_events += 1
         if (self._now() - self._last_change).total_seconds() >= self._progress_interval:
+            self._patch.set_metric("progress_events", self.progress_events)
+
+    def keepalive(self) -> None:
+        """Progress while only background work runs and the stream is silent (09 18.5).
+
+        Like a ``tool_progress``: one patch of ``/metrics/progress_events`` once the last patch
+        of the run is older than ``runner.progress_patch_interval``, so the run is not reported
+        stalled while its background work goes on between turns.
+        """
+        if (self._now() - self._last_change).total_seconds() >= self._progress_interval:
+            self.progress_events += 1
             self._patch.set_metric("progress_events", self.progress_events)
 
     # ---- assistant and user ---------------------------------------------------------------

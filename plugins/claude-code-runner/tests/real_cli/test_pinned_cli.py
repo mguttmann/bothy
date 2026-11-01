@@ -52,6 +52,11 @@ READ_TOKENS = (
     # RUNNER-RESUME-COST: the transcript line a resume restores the session totals from.
     "cost-state",
     "totalCostUSD",
+    # FIX-runner-responsive-turns: the members of the running background set.
+    "tasks",
+    "task_id",
+    "ambient",
+    "skip_transcript",
 )
 _WRAPPER_MAX_BYTES = 1 << 20  # a launcher script, not the program; read its package instead
 

@@ -7,9 +7,11 @@ full context is compacted once and the prompt runs again, a missing session is r
 one (fail open), an existing session at the first turn is resumed, and every other end finishes
 the run once, after the process exited (design notes 5 to 11). Every process passes the pre-check
 and the counter-check of M2-34 (I3 per process). Follow-ups are written to stdin while it is
-open (`RunTurn.offer_followup`), a stop goes through `RunTurn.request_stop`, and a run that the
-server ended stops its turn without a finish. `RunTurn.adopted` follows a turn that outlived an
-earlier runner (design note 12).
+open (`RunTurn.offer_followup`); stdin stays open while the process has background work
+(`claude_code_runner.background`), so a follow-up then becomes a turn of its own and the answer
+of a background task's notification is posted. A stop goes through `RunTurn.request_stop`, and a
+run that the server ended stops its turn without a finish. `RunTurn.adopted` follows a turn that
+outlived an earlier runner (design note 12).
 
 The turn record ``turns/<run_id>.json`` is written atomically before the action that depends on
 it: the reference before its process starts, a reply's ``client_msg_id`` before the reply goes
@@ -78,6 +80,7 @@ from bothy_sdk.runs import RunHandle, is_run_ended
 
 from claude_code_runner.adoption import read_identity
 from claude_code_runner.attachments import followup_file_texts, followup_files_final
+from claude_code_runner.background import BackgroundWork
 from claude_code_runner.causes import cause
 from claude_code_runner.commandline import SessionChoice, build_argv, reported_model
 from claude_code_runner.failures import (
@@ -315,6 +318,9 @@ class RunTurn:
         self.cost_baseline = _bound_baseline(session)
         self.recovery = RecoveryState(compact_supported=COMPACT_IN_PRINT_MODE)
         self.followups = PendingFollowups()
+        self.background = BackgroundWork()
+        """The background work of the current process (09 18.5, FIX-runner-responsive-turns)."""
+        self._held_logged = False
         self.process: Turn | None = None
         self.phase = "starting"  # starting, open, closed, ended
         self.attempt = _Attempt()
@@ -610,6 +616,8 @@ class RunTurn:
             await self._fail("runtime_error", (), "start_failed")
             return None
         self.process = process
+        self.background = BackgroundWork()
+        self._held_logged = False
         # The kind is fixed here (12 f 4); the answers of earlier processes stay known (12 f 2).
         self.ledger = TurnLedger.begin(attempt.kind, stream_start, self.ledger)
         identity = await asyncio.to_thread(read_identity, process.pid, self.cfg.cli_probe_timeout)
@@ -707,6 +715,7 @@ class RunTurn:
                     await self._checkpoint(reader.offset)
                 continue
             self.ledger.line(message, reader.line_offset, reader.offset)
+            self.background.apply(message, self.monotonic())
             kind, subtype = message.get("type"), message.get("subtype")
             if kind == "system" and subtype == "init" and attempt is not None:
                 if message.get("apiKeySource") != _EXPECTED_KEY_SOURCE.get(self.state.mode):
@@ -751,6 +760,17 @@ class RunTurn:
         if (self.server_ended or self.stop_reason is not None) and self.stopping is None:
             # Also a stop that came while this process was being started (note 6 d).
             self._stop_group(process)
+            return
+        if self.phase == "open" and self.background.holds(
+            self.monotonic(), self.cfg.followup_grace
+        ):
+            # Background work outlives the turn: the CLI stops it when its input ends, so stdin
+            # stays open, and every follow-up becomes a turn of its own (09 18.5).
+            if self.background.running and self.live is not None:
+                self.live.keepalive()
+            if last_result_at is not None and not self._held_logged:
+                self._held_logged = True
+                _log("stdin_held_for_background", **self.ids)
             return
         pending = len(self.followups.pending())
         if self.phase == "open" and stdin_close_due(

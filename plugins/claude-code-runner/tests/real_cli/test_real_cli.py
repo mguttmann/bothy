@@ -160,3 +160,89 @@ def test_real_turn_streams_mapped_messages() -> None:
             usage.append(parse_model_usage(result))
         model = next(iter(usage[1]))
         assert usage[1][model].input_tokens >= usage[0][model].input_tokens
+
+
+def _user(text: str) -> str:
+    doc = {
+        "type": "user",
+        "uuid": str(uuid.uuid4()),
+        "message": {"role": "user", "content": [{"type": "text", "text": text}]},
+    }
+    return json.dumps(doc) + "\n"
+
+
+@turn
+def test_real_background_work_keeps_the_session_reachable() -> None:
+    """What 09 18.5 "Background work" relies on (FIX-runner-responsive-turns).
+
+    A turn that starts a background command ends with a ``result`` while the command runs; a
+    line written then gets a ``result`` of its own; the end of the command brings a turn the
+    CLI starts by itself (a ``result`` that names no input); the end of stdin ends the process.
+    """
+    key = Path(os.environ["CLAUDE_CODE_RUNNER_REAL_KEY_FILE"]).read_text().strip()
+    with tempfile.TemporaryDirectory() as work, tempfile.TemporaryDirectory() as config_dir:
+        env = {
+            "HOME": os.environ["HOME"],
+            "PATH": os.environ["PATH"],
+            "ANTHROPIC_API_KEY": key,
+            "CLAUDE_CONFIG_DIR": config_dir,
+        }
+        argv = [
+            claude_bin(),
+            "-p",
+            "--input-format",
+            "stream-json",
+            "--output-format",
+            "stream-json",
+            "--verbose",
+            "--replay-user-messages",
+            "--session-id",
+            str(uuid.uuid4()),
+            "--permission-mode",
+            "bypassPermissions",
+            "--permission-prompts",
+            "none",
+        ]
+        process = subprocess.Popen(
+            argv,
+            cwd=work,
+            env=env,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            text=True,
+        )
+        assert process.stdin is not None
+        assert process.stdout is not None
+        process.stdin.write(
+            _user(
+                "Run `sleep 40; echo finished` with the Bash tool and run_in_background true, "
+                "then end your turn at once with the word started."
+            )
+        )
+        process.stdin.flush()
+        results: list[dict[str, object]] = []
+        tasks_seen = False
+        try:
+            for raw in process.stdout:
+                if not raw.startswith("{"):
+                    continue
+                message = json.loads(raw)
+                if message.get("subtype") == "background_tasks_changed" and message.get("tasks"):
+                    tasks_seen = True
+                if message.get("type") != "result":
+                    continue
+                results.append(message)
+                if len(results) == 1:
+                    process.stdin.write(_user("Reply with one word: status."))
+                    process.stdin.flush()
+                if len(results) == 3:  # the first turn, the status turn, the notification
+                    process.stdin.close()
+            assert process.wait(timeout=120) == 0
+        finally:
+            if process.poll() is None:
+                process.kill()
+        assert tasks_seen
+        assert len(results) == 3
+        assert results[1].get("user_message_uuids") or results[1].get("user_message_uuid")
+        assert not results[2].get("user_message_uuids")
+        assert not results[2].get("user_message_uuid")

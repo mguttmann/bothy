@@ -46,3 +46,22 @@ def test_stdin_line_shape() -> None:
             ],
         },
     }
+
+
+def test_background_work_guidance_in_every_prompt() -> None:
+    # FIX-runner-responsive-turns: long work goes to the background and the turn ends at once,
+    # so the session stays reachable; a notification or a status question gets a short answer.
+    for text in (
+        system_prompt(title_request=True, channel_prompt=""),
+        system_prompt(title_request=False, channel_prompt="Be brief."),
+    ):
+        section = text.split("## Background work", 1)[1].split("\n## ", 1)[0]
+        for phrase in (
+            "run_in_background",
+            "end your turn",
+            "Never wait",
+            "notification",
+            "status",
+            "does not apply here",
+        ):
+            assert phrase in section, phrase

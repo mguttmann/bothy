@@ -2823,6 +2823,25 @@ once. Every `result` without error posts one answer (each answers a different in
 difference of the run comes from its last `result` (18.7), and the run finishes once, after the
 process exited (D-M2-35-4).
 
+Background work (addendum of 2026-11-01, docs/decisions.d/FIX-runner-responsive-turns.md): a
+turn may start work that outlives it (Bash with `run_in_background`, a background subagent, a
+workflow). The pinned CLI reports the running set in `system/background_tasks_changed` and stops
+that work when its stdin ends; after the last task ended it starts a turn by itself (a
+`system/init`, then a `result` that names no input) for the task's notification, and an input
+line written between turns starts a turn of its own at once. The rule above therefore holds with
+one exception: after a `result` without error, stdin stays open while the last
+`background_tasks_changed` lists a task (without `ambient` and `skip_transcript` tasks), and for
+a process that had background work also while a turn of it runs and until
+`runner.followup_grace` passed without a stream line (log code `stdin_held_for_background`).
+Meanwhile the run stays `running`, every follow-up is written at once and becomes a turn of its
+own with its own answer, the answer of a notification turn is posted like any other (an empty
+one is not), and while a task runs the live box reports progress against `run.stall_after` once
+per `runner.progress_patch_interval`. A `result` with an error still closes stdin at once, which
+ends the background work. The system prompt tells Claude Code to start work longer than about a
+minute in the background, to end the turn at once with a short reply, never to wait in a turn
+for background work, to report a notification in a few sentences and to answer a status
+question from its running tasks (`prompts/runner_prompt.md`, section "Background work").
+
 ### 18.6 Stop
 
 SIGINT to the process group ends the turn cleanly with `result`. Without an end after
