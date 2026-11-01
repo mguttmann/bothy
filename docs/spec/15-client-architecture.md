@@ -844,7 +844,7 @@ running app over `bothy/deep_links`; Flutter's own deep link handling is off. Th
 `<application ID>:/oidc/callback`, received from a Custom Tab (the default browser without a
 Custom Tabs provider).
 
-Phone thread layout, addendum of 2026-10-31 (M5-17, 01 R-PR-31, docs/decisions.d/M5-17.md).
+Phone thread layout, addendum of 2026-10-31 (M5-17, 01 R-PR-32, docs/decisions.d/M5-17.md).
 Reason: owner screenshots of the iPhone thread showed a quarter of the width lost to the avatar
 column and the input's text area as a small box in its middle, while header and live box took a
 large part of the height. The phone shell's frame draws no back bar above a thread page; it hands

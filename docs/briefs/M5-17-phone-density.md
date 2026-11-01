@@ -19,7 +19,7 @@ two-line live box ("Running 0:56" over "compacting") took a large part of the he
 ## Read first
 
 - `docs/PLAN.md`: section 11 row M5-17.
-- `docs/spec/01-product.md` 5.3 M3 (with the addendum of 2026-10-31) and 13 (R-PR-31).
+- `docs/spec/01-product.md` 5.3 M3 (with the addendum of 2026-10-31) and 13 (R-PR-32).
 - `docs/spec/15-client-architecture.md` 11 (phone thread layout, addendum of 2026-10-31).
 - `docs/design/components.md` 1, 2.3 and 9; `docs/design/spacing-radii-elevation-motion.md`.
 - Code on the base branch: `packages/design_system/lib/src/components/ds_message.dart`,

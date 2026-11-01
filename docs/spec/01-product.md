@@ -954,7 +954,7 @@ directly; a tap on the forum name opens the post list M2.
 row; tapping opens the full live box as a sheet. Approval buttons stacked at full width. The sheet
 has a button "Graph" that opens M12 (addendum of 2026-10-24).
 
-Density of the phone thread: addendum of 2026-10-31 (R-PR-31, M5-17). Reason: owner screenshots
+Density of the phone thread: addendum of 2026-10-31 (R-PR-32, M5-17). Reason: owner screenshots
 of 2026-10-31 (iPhone, a thread in a development forum while Claude Code ran): the message text
 started about a quarter of the screen width from the edge, the input's text area was a small box
 in the middle of the input with a separate "+" and microphone beside it, and the back link, the
