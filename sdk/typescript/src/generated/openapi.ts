@@ -9910,7 +9910,7 @@ export interface components {
             agent: number;
             app: number;
         };
-        /** @description Live frame (docs/spec/25-visualization.md, section 5.2). No person values and no content; the only names are the channel name and thread title of a run in `chat`, for a caller who may read the thread. */
+        /** @description Live frame (docs/spec/25-visualization.md, section 5.2). No person values and no content, except the channel name and thread title of a run in `chat`, for a caller who may read the thread, and the `label` of a task node, for a caller with `run.read` on the run (25 1 rule 3). */
         StatsLiveFrame: {
             at: components["schemas"]["Timestamp"];
             /** @example 1000 */

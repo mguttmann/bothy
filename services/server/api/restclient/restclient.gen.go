@@ -15078,7 +15078,7 @@ type StatsLiveEvent struct {
 	// OccurredAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 	OccurredAt Timestamp `json:"occurred_at"`
 
-	// Payload Live frame (docs/spec/25-visualization.md, section 5.2). No person values and no content; the only names are the channel name and thread title of a run in `chat`, for a caller who may read the thread.
+	// Payload Live frame (docs/spec/25-visualization.md, section 5.2). No person values and no content, except the channel name and thread title of a run in `chat`, for a caller who may read the thread, and the `label` of a task node, for a caller with `run.read` on the run (25 1 rule 3).
 	Payload           StatsLiveFrame `json:"payload"`
 	PermissionVersion *int64         `json:"permission_version,omitempty"`
 	Redacted          *bool          `json:"redacted,omitempty"`
@@ -15117,7 +15117,7 @@ type StatsLiveEventAudience string
 // StatsLiveEventType defines model for StatsLiveEvent.Type.
 type StatsLiveEventType string
 
-// StatsLiveFrame Live frame (docs/spec/25-visualization.md, section 5.2). No person values and no content; the only names are the channel name and thread title of a run in `chat`, for a caller who may read the thread.
+// StatsLiveFrame Live frame (docs/spec/25-visualization.md, section 5.2). No person values and no content, except the channel name and thread title of a run in `chat`, for a caller who may read the thread, and the `label` of a task node, for a caller with `run.read` on the run (25 1 rule 3).
 type StatsLiveFrame struct {
 	Agents []StatsLiveAgent `json:"agents"`
 
