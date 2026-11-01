@@ -842,6 +842,18 @@ abstract class AppLocalizations {
   /// **'More runs than shown'**
   String get vizMoreRunsThanShown;
 
+  /// Screen reader label of the agent tree below a run card of the live topology: the number of nodes shown (25 section 6.1, FEAT-topology-agent-tree).
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 agent or job started} other{{count} agents and jobs started}}'**
+  String vizTaskTree(int count);
+
+  /// Marker below the agent tree of a run card when the live frame has `tasks_truncated` for the run (25 section 5.2, FEAT-topology-agent-tree).
+  ///
+  /// In en, this message translates to:
+  /// **'More agents and jobs than shown'**
+  String get vizMoreTasksThanShown;
+
   /// State word of a run card for `waiting_input` (components.md section 2).
   ///
   /// In en, this message translates to:

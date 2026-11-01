@@ -248,6 +248,10 @@ type Repository interface {
 	// runIDs for the live frame of stats (M6-15); a run without either is absent or has empty
 	// values.
 	LiveFacts(ctx context.Context, runIDs []ids.ID) (map[ids.ID]LiveFacts, error)
+	// LiveSteps reads, per run of runIDs, the steps of its agent tree in step order: the task
+	// steps, the running tool calls and the tool calls that started a task
+	// (docs/design/topology-agent-tree.md 3); a run without any is absent.
+	LiveSteps(ctx context.Context, runIDs []ids.ID) (map[ids.ID][]runs.LiveStep, error)
 	// LockActiveRunsByStarter locks the active runs triggered by one of principalIDs in ascending
 	// id (R-SY-11, M2-09). It needs a unit of work.
 	LockActiveRunsByStarter(ctx context.Context, principalIDs []ids.ID) ([]RunRow, error)

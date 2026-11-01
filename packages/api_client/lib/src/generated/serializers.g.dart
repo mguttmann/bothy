@@ -647,6 +647,9 @@ Serializers _$serializers =
           ..add(StatsLiveSli.serializer)
           ..add(StatsLiveStep.serializer)
           ..add(StatsLiveStepKindEnum.serializer)
+          ..add(StatsLiveTask.serializer)
+          ..add(StatsLiveTaskKindEnum.serializer)
+          ..add(StatsLiveTaskStateEnum.serializer)
           ..add(StatsMetric.serializer)
           ..add(StatsScope.serializer)
           ..add(StatsScopeKindEnum.serializer)
@@ -1500,6 +1503,10 @@ Serializers _$serializers =
           ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(StatsLiveSli)]),
             () => ListBuilder<StatsLiveSli>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(StatsLiveTask)]),
+            () => ListBuilder<StatsLiveTask>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(StatsSloEntry)]),

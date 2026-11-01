@@ -433,3 +433,56 @@ func TestRepository_RunBinding(t *testing.T) {
 		t.Errorf("RunBinding of an unknown run = %+v, %v, %v; want not found", got, found, err)
 	}
 }
+
+// TestRepository_LiveSteps (FEAT-topology-agent-tree): the statement of the agent tree reads, per
+// run, the task steps with title and detail.last_tool, the running tool calls and the tool calls
+// that started a task, in step order; a finished tool call without a task child and a status
+// step stay out, and a run without such steps is absent.
+func TestRepository_LiveSteps(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t)
+	w := e.world(t)
+	ctx := context.Background()
+	t0 := time.Date(2026, 11, 1, 9, 0, 0, 0, time.UTC)
+	a := newRun(w, w.thread, w.robin, t0)
+	b := newRun(w, w.other, w.sam, t0)
+	e.insert(t, a, true)
+	e.insert(t, b, true)
+	call, flow, agent, running := ids.New(), ids.New(), ids.New(), ids.New()
+	e.do(t, func(ctx context.Context) error {
+		for _, s := range []app.StepRow{
+			{ID: call, RunID: a.ID, Kind: "tool_call", Name: "Workflow", Status: "completed", StartedAt: t0, FinishedAt: t0.Add(time.Second)},
+			{ID: flow, RunID: a.ID, ParentStepID: call, Kind: "workflow", Name: "local_workflow", Title: "Build and review", Status: "running",
+				StartedAt: t0},
+			{ID: ids.New(), RunID: a.ID, Kind: "tool_call", Name: "Read", Status: "completed", StartedAt: t0, FinishedAt: t0},
+			{ID: agent, RunID: a.ID, ParentStepID: flow, Kind: "subagent", Name: "workflow_agent", Title: "review", Status: "completed",
+				Detail: []byte(`{"type":"workflow_agent","last_tool":"Grep"}`), StartedAt: t0, FinishedAt: t0.Add(2 * time.Second)},
+			{ID: running, RunID: a.ID, Kind: "tool_call", Name: "Bash", Status: "running", StartedAt: t0},
+			{ID: ids.New(), RunID: a.ID, Kind: "status", Name: "compacting", Status: "running", StartedAt: t0},
+			{ID: ids.New(), RunID: b.ID, Kind: "tool_call", Name: "Read", Status: "completed", StartedAt: t0, FinishedAt: t0},
+		} {
+			if _, err := e.repo.AppendStep(ctx, s); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	got, err := e.repo.LiveSteps(ctx, []ids.ID{a.ID, b.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, has := got[b.ID]; has || len(got) != 1 {
+		t.Fatalf("runs %v", got)
+	}
+	s := got[a.ID]
+	if len(s) != 4 || s[0].ID != call || s[1].ID != flow || s[2].ID != agent || s[3].ID != running {
+		t.Fatalf("steps %+v", s)
+	}
+	if s[1].ParentID != call || s[1].Title != "Build and review" || s[2].LastTool != "Grep" || s[2].Status != "completed" ||
+		!s[2].FinishedAt.Equal(t0.Add(2*time.Second)) || !s[3].FinishedAt.IsZero() || !s[0].ParentID.IsZero() || s[3].Name != "Bash" {
+		t.Fatalf("steps %+v", s)
+	}
+	if none, err := e.repo.LiveSteps(ctx, nil); err != nil || len(none) != 0 {
+		t.Fatalf("no runs: %v %v", none, err)
+	}
+}

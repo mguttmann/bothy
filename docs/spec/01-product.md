@@ -585,8 +585,9 @@ Confirmation on opening and warning on a changed key (24, section 5.5):
 +------------------------------------------------------------+  +------------------------------------------------------------+
 ```
 
-**D12 Live topology.** Lanes per space, run cards with state, tool, badge and costs; a click opens
-the thread. The same data as a table via "Table". Normative:
+**D12 Live topology.** Lanes per space, run cards with state, tool, badge and costs; below each
+card the agent tree of the run (subagents, workflows with their agents, background jobs; addendum
+of 2026-11-01); a click opens the thread. The same data as a table via "Table". Normative:
 [25-visualization.md](25-visualization.md), section 6.1.
 
 ```text

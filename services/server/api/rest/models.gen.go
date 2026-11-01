@@ -4464,6 +4464,51 @@ func (e StatsLiveStepKind) Valid() bool {
 	}
 }
 
+// Defines values for StatsLiveTaskKind.
+const (
+	StatsLiveTaskKindBackgroundJob StatsLiveTaskKind = "background_job"
+	StatsLiveTaskKindSubagent      StatsLiveTaskKind = "subagent"
+	StatsLiveTaskKindWorkflow      StatsLiveTaskKind = "workflow"
+)
+
+// Valid indicates whether the value is a known member of the StatsLiveTaskKind enum.
+func (e StatsLiveTaskKind) Valid() bool {
+	switch e {
+	case StatsLiveTaskKindBackgroundJob:
+		return true
+	case StatsLiveTaskKindSubagent:
+		return true
+	case StatsLiveTaskKindWorkflow:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for StatsLiveTaskState.
+const (
+	StatsLiveTaskStateCancelled StatsLiveTaskState = "cancelled"
+	StatsLiveTaskStateCompleted StatsLiveTaskState = "completed"
+	StatsLiveTaskStateFailed    StatsLiveTaskState = "failed"
+	StatsLiveTaskStateRunning   StatsLiveTaskState = "running"
+)
+
+// Valid indicates whether the value is a known member of the StatsLiveTaskState enum.
+func (e StatsLiveTaskState) Valid() bool {
+	switch e {
+	case StatsLiveTaskStateCancelled:
+		return true
+	case StatsLiveTaskStateCompleted:
+		return true
+	case StatsLiveTaskStateFailed:
+		return true
+	case StatsLiveTaskStateRunning:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for StatsMetric.
 const (
 	ApprovalCards       StatsMetric = "approval_cards"
@@ -13997,7 +14042,7 @@ type RunStateChangedPayload struct {
 
 // RunStep defines model for RunStep.
 type RunStep struct {
-	// Detail Schema `run_step_detail.v1`, cut to `run.step_detail_max_bytes`. A step of kind `subagent`, `workflow` or `background_job` may carry the member `usage` (object with the optional integers `tokens`, `tool_uses`, `duration_ms`, `cost_micros` and the text `currency`, required with `cost_micros`), reported by the adapter for display only, never a booking (09 5.6).
+	// Detail Schema `run_step_detail.v1`, cut to `run.step_detail_max_bytes`. A step of kind `subagent`, `workflow` or `background_job` may carry the member `usage` (object with the optional integers `tokens`, `tool_uses`, `duration_ms`, `cost_micros` and the text `currency`, required with `cost_micros`), reported by the adapter for display only, never a booking (09 5.6). A workflow agent may carry the texts `last_tool` (the tool it ran last, its current tool while it runs) and `phase` (09 5.6).
 	Detail *JsonObject `json:"detail,omitempty"`
 
 	// FinishedAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
@@ -15146,6 +15191,12 @@ type StatsLiveRun struct {
 	// Step Current step of a run; only kind and name (for tools the tool name), never title or detail.
 	Step *StatsLiveStep `json:"step,omitempty"`
 
+	// Tasks Child nodes of the run (subagents, workflows and their agents, background jobs) in step order, a parent before its children; at most `stats.live_max_tasks`, no deeper than `stats.live_task_max_depth`, finished ones only for `stats.live_task_keep` after their end. Absent when the run has none (25 5.2).
+	Tasks *[]StatsLiveTask `json:"tasks,omitempty"`
+
+	// TasksTruncated Present and true when a limit or the payload bound left task nodes of this run out.
+	TasksTruncated *bool `json:"tasks_truncated,omitempty"`
+
 	// ThreadId UUIDv7 (RFC 9562), lowercase canonical form.
 	ThreadId Uuid `json:"thread_id"`
 }
@@ -15175,6 +15226,44 @@ type StatsLiveStep struct {
 
 // StatsLiveStepKind defines model for StatsLiveStep.Kind.
 type StatsLiveStepKind string
+
+// StatsLiveTask One child node of an active run in the live topology (25 5.2). Never content except `label`, which only a receiver with `run.read` on the run gets.
+type StatsLiveTask struct {
+	// FinishedAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+	FinishedAt *Timestamp `json:"finished_at,omitempty"`
+
+	// Id The step ID.
+	Id   Uuid              `json:"id"`
+	Kind StatsLiveTaskKind `json:"kind"`
+
+	// Label First line of the step title; only with `run.read` on the run.
+	//
+	// Examples: review
+	Label *string `json:"label,omitempty"`
+
+	// Name Step name, the adapter's type of the task, never content.
+	//
+	// Examples: local_agent, workflow_agent, local_workflow, local_bash
+	Name string `json:"name"`
+
+	// ParentId The task node this node hangs under; absent when it hangs under the run.
+	ParentId *Uuid `json:"parent_id,omitempty"`
+
+	// StartedAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+	StartedAt Timestamp          `json:"started_at"`
+	State     StatsLiveTaskState `json:"state"`
+
+	// Tool Name of the current tool of a running node.
+	//
+	// Examples: Bash
+	Tool *string `json:"tool,omitempty"`
+}
+
+// StatsLiveTaskKind defines model for StatsLiveTask.Kind.
+type StatsLiveTaskKind string
+
+// StatsLiveTaskState defines model for StatsLiveTask.State.
+type StatsLiveTaskState string
 
 // StatsMetric Metric of the own measurement in `stats_minutes` (docs/spec/25-visualization.md, section 3.2).
 type StatsMetric string

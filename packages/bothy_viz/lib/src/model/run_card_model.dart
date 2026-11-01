@@ -4,9 +4,11 @@
 library;
 
 import 'package:api_client/api_client.dart' as api;
+import 'package:flutter/foundation.dart';
 
 import 'costs.dart';
 import 'names.dart';
+import 'task_tree_model.dart';
 
 /// State of an active run as the card shows it, with the run state roles of the live box
 /// (components.md 2).
@@ -60,15 +62,22 @@ final class RunCardModel {
     this.stepKind,
     this.stepName,
     this.cost,
+    this.tasks = const [],
+    this.tasksTruncated = false,
   });
 
-  /// Derives the card from [run]; [names] gives the agent name.
+  /// Derives the card from [run]; [names] gives the agent name, [at] (the frame time) the
+  /// runtime of the running nodes of its agent tree.
   ///
   /// The cost appears only when `cost_micros` and `currency` are both present; in mode
   /// `organization` `cost_is_estimate` gives the "Estimate" label, in mode `personal` it carries
   /// "information only" (25 6.1, FIX-cost-display); a missing member stays missing, never zero
   /// (25 4 rule 5).
-  factory RunCardModel.fromRun(api.StatsLiveRun run, VizNames names) {
+  factory RunCardModel.fromRun(
+    api.StatsLiveRun run,
+    VizNames names, {
+    DateTime? at,
+  }) {
     final micros = run.costMicros;
     final currency = run.currency;
     final showCost = micros != null && currency != null;
@@ -95,6 +104,11 @@ final class RunCardModel {
               isEstimate: run.costIsEstimate ?? false,
             )
           : null,
+      tasks: TaskNodeModel.tree(
+        run.tasks ?? const <api.StatsLiveTask>[],
+        at ?? run.startedAt ?? run.queuedAt,
+      ),
+      tasksTruncated: run.tasksTruncated ?? false,
     );
   }
 
@@ -137,6 +151,13 @@ final class RunCardModel {
   /// Cost so far; `null` when not shown.
   final VizCost? cost;
 
+  /// The agent tree below the card: the nodes directly under the run, each with its children
+  /// (25 6.1).
+  final List<TaskNodeModel> tasks;
+
+  /// The server left nodes of the tree out ("More agents and jobs than shown").
+  final bool tasksTruncated;
+
   /// This card without its cost: TV mode without `viz.tv_show_costs` (25 6.6).
   RunCardModel withoutCost() => cost == null
       ? this
@@ -150,6 +171,8 @@ final class RunCardModel {
           approvalPending: approvalPending,
           stepKind: stepKind,
           stepName: stepName,
+          tasks: tasks,
+          tasksTruncated: tasksTruncated,
         );
 
   // Value equality lets the live topology reuse the widget of an unchanged card between two
@@ -166,7 +189,9 @@ final class RunCardModel {
       other.approvalPending == approvalPending &&
       other.stepKind == stepKind &&
       other.stepName == stepName &&
-      other.cost == cost;
+      other.cost == cost &&
+      other.tasksTruncated == tasksTruncated &&
+      listEquals(other.tasks, tasks);
 
   @override
   int get hashCode => Object.hash(
@@ -180,6 +205,8 @@ final class RunCardModel {
     stepKind,
     stepName,
     cost,
+    tasksTruncated,
+    Object.hashAll(tasks),
   );
 }
 
@@ -247,8 +274,9 @@ final class LaneModel {
   /// appears where its first run appears, and its cards keep the frame order.
   static List<LaneModel> group(
     Iterable<api.StatsLiveRun> runs,
-    VizNames names,
-  ) {
+    VizNames names, {
+    DateTime? at,
+  }) {
     final lanes = <(String, String), List<RunCardModel>>{};
     final keys = <(String, String)>[];
     for (final run in runs) {
@@ -257,7 +285,7 @@ final class LaneModel {
         keys.add(key);
         return <RunCardModel>[];
       });
-      cards.add(RunCardModel.fromRun(run, names));
+      cards.add(RunCardModel.fromRun(run, names, at: at));
     }
     return [
       for (final (space, channel) in keys)

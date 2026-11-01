@@ -18,6 +18,9 @@ const (
 	keyStatsLiveMaxRuns        = "stats.live_max_runs"
 	keyStatsLiveMaxSubscribers = "stats.live_max_subscribers"
 	keyStatsLiveSLIWindow      = "stats.live_sli_window"
+	keyStatsLiveMaxTasks       = "stats.live_max_tasks"
+	keyStatsLiveTaskMaxDepth   = "stats.live_task_max_depth"
+	keyStatsLiveTaskKeep       = "stats.live_task_keep"
 )
 
 // The keys of the views (M6-14).
@@ -67,6 +70,12 @@ func statsConfigKeys() []config.Key {
 			Doc: "Subscriptions to stats.live per api node."},
 		{Name: keyStatsLiveSLIWindow, Kind: config.KindDuration, Default: "5m", Min: "1m", Chapter: chapter25,
 			Doc: "Period of the SLI values in the live frame."},
+		{Name: keyStatsLiveMaxTasks, Kind: config.KindInt, Default: "25", Min: "0", Max: "500", Chapter: chapter25,
+			Doc: "At most this many nodes of the agent tree per run in the live frame; 0 sends no tree."},
+		{Name: keyStatsLiveTaskMaxDepth, Kind: config.KindInt, Default: "4", Min: "1", Max: "16", Chapter: chapter25,
+			Doc: "Deepest level of the agent tree in the live frame; the children of a run are level 1."},
+		{Name: keyStatsLiveTaskKeep, Kind: config.KindDuration, Default: "2m", Min: "1s", Max: "1h", Chapter: chapter25,
+			Doc: "How long a finished node of the agent tree stays in the live frame after its end."},
 		{Name: keyStatsTimelineMaxRange, Kind: config.KindDuration, Default: defaultDay, Min: "1m", Max: "31d", Chapter: chapter25,
 			Doc: "Longest period of a timeline query."},
 		{Name: keyStatsTimelineMaxRuns, Kind: config.KindInt, Default: "5000", Min: "1", Max: "100000", Chapter: chapter25,

@@ -206,6 +206,7 @@ const Map<VizViewKind, List<String>> viewStates = {
     'truncated',
     'no_cost_permission',
     'offline',
+    'agent_tree',
   ],
   VizViewKind.backend: [
     'normal',

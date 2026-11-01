@@ -304,6 +304,9 @@ type StatsLiveConfig struct {
 	MaxRuns        int           `config:"stats.live_max_runs"`
 	MaxSubscribers int           `config:"stats.live_max_subscribers"`
 	SLIWindow      time.Duration `config:"stats.live_sli_window"`
+	MaxTasks       int           `config:"stats.live_max_tasks"`
+	TaskMaxDepth   int           `config:"stats.live_task_max_depth"`
+	TaskKeep       time.Duration `config:"stats.live_task_keep"`
 	PayloadMax     int           `config:"sync.event_payload_max_bytes"`
 	ClusterMode    string        `config:"cluster.mode"`
 }
@@ -343,7 +346,8 @@ func NewStatsLive(cfg StatsLiveConfig, d StatsLiveDeps) (*statsapp.Live, error) 
 	}
 	return statsapp.NewLive(statsapp.LiveConfig{
 		Enabled: cfg.Enabled, Interval: cfg.Interval, MaxRuns: cfg.MaxRuns, MaxSubscribers: cfg.MaxSubscribers, SLIWindow: cfg.SLIWindow,
-		PayloadMax: cfg.PayloadMax, Connections: cfg.ClusterMode == clusterModeSingle,
+		PayloadMax: cfg.PayloadMax, Connections: cfg.ClusterMode == clusterModeSingle, MaxTasks: cfg.MaxTasks, TaskMaxDepth: cfg.TaskMaxDepth,
+		TaskKeep: cfg.TaskKeep,
 	}, statsapp.LiveDeps{Authorizer: d.Authorizer, Runs: d.Runs, Places: d.Places, Facts: d.Facts, Presence: d.Presence,
 		Store: statspg.NewRepository(d.Pool), Clock: d.Clock, Metrics: m, Log: d.Log})
 }

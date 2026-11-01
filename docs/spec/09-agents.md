@@ -1075,7 +1075,8 @@ Derivation of the tree:
    the start at `queued_at`).
 6. **Node content.** Kind as an icon, `name` and `title`, `status` as color, icon and word (never
    color alone), duration, current tool (the newest child `tool_call` with `status = running`,
-   counted after the merge rule), and for a node other than the root: tokens only from
+   counted after the merge rule; without one, the `detail.last_tool` of an open node, which the
+   runner reports for a workflow agent, addendum of 2026-11-01), and for a node other than the root: tokens only from
    `detail.usage.tokens` and a cost only from `detail.usage.cost_micros` with
    `detail.usage.currency`, where the adapter reported them; the cost follows the rules of the
    root: only when the run's `billing_mode_used` is `organization` (5.4, 01 6.7), and always with
@@ -1087,8 +1088,10 @@ Derivation of the tree:
 8. **Live.** While the thread of the run is in focus, the client applies `run.updated` to the
    document and computes the graph again; a finished run shows its final graph.
 
-`run_step_detail.v1` member `usage` (optional, set by an adapter for a step of kind `subagent`,
-`workflow` or `background_job`): object with the optional members `tokens` (integer),
+`run_step_detail.v1` members `last_tool` and `phase` (optional texts, set by the Claude Code
+runner for a workflow agent: the name of the tool it ran last and the title of its workflow phase;
+addendum of 2026-11-01, FEAT-topology-agent-tree). `run_step_detail.v1` member `usage` (optional,
+set by an adapter for a step of kind `subagent`, `workflow` or `background_job`): object with the optional members `tokens` (integer),
 `tool_uses` (integer), `duration_ms` (integer), `cost_micros` (integer) and `currency` (text,
 required with `cost_micros`). Display only; it is no booking and is not part of costs (10).
 
@@ -2746,6 +2749,7 @@ log line without content); all changes go through the throttled patch of the SDK
 | `user` | `message.content[]` with `tool_result` items (`tool_use_id`, `is_error`); `isReplay`, `uuid` | step `completed` or `failed` with `finished_at`; the echo of the own prompt (its `uuid`) is ignored; `isReplay` of a follow-up sets `absorbed` (18.5, M2-35) |
 | `tool_progress` | none | no visible change to the box; counts as progress against `run.stall_after`: when the last stored patch of the run is older than `runner.progress_patch_interval`, the runner sends `replace` on `/metrics/progress_events` with its count of `tool_progress` messages in the turn (5.5; addendum of 2026-10-24, M2-51) |
 | `system` `task_started`, `task_progress`, `task_updated`, `task_notification` | `task_id`, `description`, `task_type`, `ambient`, `status`, `tool_use_id`, `usage` | step kind `subagent` with detail `{"type":"local_agent"}` when `task_type` is `local_agent`, `workflow` when `task_type` is the workflow type recorded for the pinned version, else `background_job`; tasks with `ambient = true` get no step; `status` `completed`, `failed`, `stopped` end the step as `completed`, `failed`, `cancelled`. Addendum of 2026-10-24 (run visualization, M2-51): `parent_step_id` of the task step is the step of the tool call `tool_use_id` when the message carries it and that step exists, else the step has no parent; `usage` (`total_tokens`, `tool_uses`, `duration_ms`) becomes the detail member `usage` (`tokens`, `tool_uses`, `duration_ms`, 5.6). Both fields are [derived] from the SDK reference and are checked against a recording of the pinned version in M2-51; a field the recording does not show is left out of the mapping, and until the recording names the workflow type no step is `workflow`. [verified] in M2-51 against the files of the pinned CLI 2.1.259 (read without a session, `plugins/claude-code-runner/tests/fixtures/recording`, D-M2-51-1): `task_started`, `task_progress` and `task_notification` carry `tool_use_id`; `task_progress` and `task_notification` carry `usage` with `total_tokens`, `tool_uses` and `duration_ms`; the workflow type is `local_workflow`; read again in 2.1.288 on 2026-10-29: every field the mapping reads is unchanged (D-RUNNER-CLI-PIN-1) |
+| `system` `task_progress` with `workflow_progress` (addendum of 2026-11-01, FEAT-topology-agent-tree) | `workflow_progress[]` items of type `workflow_agent` with `agentId`, `index`, `label`, `phaseTitle`, `state`, `lastToolName`, `tokens`, `toolCalls`, `durationMs` (never `promptPreview` or `resultPreview`, which are content) | per agent of a known workflow task one step of kind `subagent`, name `workflow_agent`, title the `label`, under the workflow step, detail `type` `workflow_agent`, `phase`, `last_tool` and `usage` (`tokens`, `tool_uses`, `duration_ms`); `done` ends it `completed`, `failed` and `error` end it `failed`; a changed tool or usage replaces the detail; the end of the workflow ends its open agents with the workflow's status. A task with `owned_by_subagent = true` whose `tool_use_id` names no known step and with `is_backgrounded` not `true` gets no step (a foreground command of a workflow agent). [verified] against the recorded turns of the pinned CLI 2.1.288 (`plugins/claude-code-runner/tests/fixtures/recording/agent_tree_2.1.288.jsonl`): `workflow_progress` is the full list of phases and agents on every message; agent states seen: `start`, `progress`, `done` |
 | `system` `background_tasks_changed` | `tasks[]` with `task_id`, `description` | open background steps outside the set end `completed`; `/metrics/background_jobs` is the size of the set |
 | `system` `status` | `status` | `compacting` sets `/status_line` to `compacting`, its absence removes it |
 | `system` `api_retry` | `attempt`, `max_retries`, `retry_delay_ms`, `error` | `/metrics/api_retries` and `/metrics/last_api_retry` |
@@ -2753,7 +2757,7 @@ log line without content); all changes go through the throttled patch of the SDK
 
 Step title: the first non-empty line of the first string member of `input` in the order
 `command`, `file_path`, `path`, `pattern`, `url`, `query`, `description`, `prompt`, else of the
-first string member, else empty; no further step `detail` (data economy) except `type` and `usage` of a task step. Step IDs are UUIDv7
+first string member, else empty; no further step `detail` (data economy) except `type` and `usage` of a task step and `phase` and `last_tool` of a workflow agent. Step IDs are UUIDv7
 (4.7). Context in percent: input plus cache tokens of an `assistant` message divided by the
 `contextWindow` of the model stored from the last `result` of the session, left out while
 unknown. `/metrics/subagents` counts the subagent steps.

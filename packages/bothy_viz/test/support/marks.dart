@@ -14,6 +14,7 @@ class MarkModels {
     this.tiles,
     this.costTiles,
     this.usage,
+    this.agentTree,
   );
 
   /// Loads every fixture the marks show.
@@ -36,6 +37,10 @@ class MarkModels {
       costs: await fixtures.costSeries('normal'),
       names: names,
     );
+    final agentTree = LiveTopologyModel.fromFrame(
+      await fixtures.liveFrame('agent_tree'),
+      names: names,
+    );
     return MarkModels._(
       normal,
       noCost,
@@ -44,6 +49,7 @@ class MarkModels {
       executive.tiles,
       executive.costTiles!,
       executive.series,
+      agentTree,
     );
   }
 
@@ -67,4 +73,7 @@ class MarkModels {
 
   /// Series of `StatsSeries.usage.normal.json`.
   final List<SeriesModel> usage;
+
+  /// Live topology of `StatsLiveFrame.agent_tree.json`.
+  final LiveTopologyModel agentTree;
 }

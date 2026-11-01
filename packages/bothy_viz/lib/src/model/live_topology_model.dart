@@ -31,7 +31,9 @@ final class LiveTopologyModel {
     return LiveTopologyModel(
       at: frame.at,
       spaceId: frame.scope.spaceId,
-      lanes: List.unmodifiable(LaneModel.group(frame.runs, names)),
+      lanes: List.unmodifiable(
+        LaneModel.group(frame.runs, names, at: frame.at),
+      ),
       runsTruncated: frame.runsTruncated,
       rates: List.unmodifiable([
         for (var i = 0; i < rates.length; i++) RateModel.fromRate(rates[i], i),

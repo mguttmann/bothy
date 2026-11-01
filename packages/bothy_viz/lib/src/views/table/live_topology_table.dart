@@ -5,14 +5,18 @@ library;
 
 import 'package:api_client/api_client.dart' as api;
 
+import '../../marks/task_tree_mark.dart';
 import '../../marks/viz_texts.dart';
 import '../../model/run_card_model.dart';
 import '../../model/series_model.dart';
+import '../../model/task_tree_model.dart';
 import '../view_texts.dart';
 import 'viz_table.dart';
 
 /// The runs of [lanes] and the shown [rates] as tables: one row per run card with the texts
-/// of the card, one row per rate. The column "Cost" exists only when a card shows a cost.
+/// of the card, followed by one row per node of its agent tree in tree order, its agent cell
+/// indented by level (25 6.1); one row per rate. The column "Cost" exists only when a card
+/// shows a cost.
 List<VizTableData> liveTopologyTables(
   VizTexts texts, {
   required List<LaneModel> lanes,
@@ -35,7 +39,7 @@ List<VizTableData> liveTopologyTables(
       ],
       rows: [
         for (final lane in lanes)
-          for (final card in lane.cards)
+          for (final card in lane.cards) ...[
             [
               VizCell(lane.spaceName),
               VizCell(lane.channelName),
@@ -56,6 +60,33 @@ List<VizTableData> liveTopologyTables(
                   sortBy: card.cost?.micros ?? -1,
                 ),
             ],
+            for (final (node, level) in _tree(card.tasks, 1))
+              [
+                VizCell(lane.spaceName),
+                VizCell(lane.channelName),
+                VizCell(texts.taskName(node), level: level),
+                VizCell(texts.taskState(node.state)),
+                VizCell(
+                  node.tool != null && !node.state.isFinished
+                      ? l10n.vizStepToolCall(node.tool!)
+                      : l10n.vizNone,
+                ),
+                VizCell(l10n.vizNone),
+                VizCell(l10n.vizNone),
+                if (withCost) VizCell(l10n.vizNone, sortBy: -1),
+              ],
+            if (card.tasksTruncated)
+              [
+                VizCell(lane.spaceName),
+                VizCell(lane.channelName),
+                VizCell(l10n.vizMoreTasksThanShown, level: 1),
+                VizCell(l10n.vizNone),
+                VizCell(l10n.vizNone),
+                VizCell(l10n.vizNone),
+                VizCell(l10n.vizNone),
+                if (withCost) VizCell(l10n.vizNone, sortBy: -1),
+              ],
+          ],
       ],
     ),
     VizTableData(
@@ -75,4 +106,15 @@ List<VizTableData> liveTopologyTables(
       ],
     ),
   ];
+}
+
+/// The nodes of [nodes] and their descendants in tree order with their level.
+Iterable<(TaskNodeModel, int)> _tree(
+  List<TaskNodeModel> nodes,
+  int level,
+) sync* {
+  for (final n in nodes) {
+    yield (n, level);
+    yield* _tree(n.children, level + 1);
+  }
 }

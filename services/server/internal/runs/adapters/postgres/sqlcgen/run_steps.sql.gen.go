@@ -162,6 +162,73 @@ func (q *Queries) LiveFacts(ctx context.Context, runIds []pgtype.UUID) ([]LiveFa
 	return items, nil
 }
 
+const liveSteps = `-- name: LiveSteps :many
+SELECT s.run_id, s.id, s.parent_step_id, s.kind, s.name, s.title, s.status, s.started_at, s.finished_at,
+       coalesce(s.detail ->> 'last_tool', '')::text AS last_tool
+FROM run_steps s
+WHERE s.run_id = ANY ($1::uuid[])
+  AND (
+      s.kind IN ('subagent', 'workflow', 'background_job')
+      OR (s.kind = 'tool_call' AND s.status = 'running')
+      OR s.id IN (
+          SELECT t.parent_step_id FROM run_steps t
+          WHERE t.run_id = ANY ($1::uuid[])
+            AND t.kind IN ('subagent', 'workflow', 'background_job')
+            AND t.parent_step_id IS NOT NULL
+      )
+  )
+ORDER BY s.run_id, s.ordinal
+`
+
+type LiveStepsRow struct {
+	RunID        pgtype.UUID
+	ID           pgtype.UUID
+	ParentStepID pgtype.UUID
+	Kind         string
+	Name         string
+	Title        string
+	Status       string
+	StartedAt    pgtype.Timestamptz
+	FinishedAt   pgtype.Timestamptz
+	LastTool     string
+}
+
+// The agent tree of the live frame (docs/design/topology-agent-tree.md 3): per active run of the
+// batch its task steps (subagent, workflow, background_job), its running tool calls and the tool
+// calls that started a task, in step order, with the detail member last_tool. Never detail or
+// values otherwise; the title leaves the server only as the label of a receiver with run.read on
+// the run, and the live builder drops every run outside the channel set of each receiver.
+func (q *Queries) LiveSteps(ctx context.Context, runIds []pgtype.UUID) ([]LiveStepsRow, error) {
+	rows, err := q.db.Query(ctx, liveSteps, runIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []LiveStepsRow
+	for rows.Next() {
+		var i LiveStepsRow
+		if err := rows.Scan(
+			&i.RunID,
+			&i.ID,
+			&i.ParentStepID,
+			&i.Kind,
+			&i.Name,
+			&i.Title,
+			&i.Status,
+			&i.StartedAt,
+			&i.FinishedAt,
+			&i.LastTool,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const stepCounts = `-- name: StepCounts :many
 SELECT run_id, count(*)::bigint AS steps
 FROM run_steps

@@ -34,7 +34,10 @@ Rules:
 2. No values per person. No chart, no stream and no table of this level groups by people or
    names the triggering person of a run, not even with `privacy.per_person_stats_enabled`.
 3. No content: no message texts, titles, prompts, step titles or step details. Tools appear only
-   with their name (`run_steps.name`).
+   with their name (`run_steps.name`). Exception (addendum of 2026-11-01, FEAT-topology-agent-tree):
+   the label of a node of the agent tree in the live frame (5.2) is the first line of a step title;
+   the server sends it only to a receiver who holds `run.read` on the run, so it shows nothing the
+   receiver could not read in the run graph ([topology-agent-tree.md](../design/topology-agent-tree.md)).
 4. No iframes and no WebViews with Grafana in iOS, Android, macOS and Windows (section 9).
 5. Both levels use the same colors, fonts and shapes; the values are generated from
    `design/tokens/` (section 10), never copied.
@@ -243,16 +246,29 @@ Schema in [openapi.yaml](../api/openapi.yaml) (`StatsLiveFrame`); English accord
 | `at` | time of the frame (server clock) |
 | `interval_ms` | `stats.live_interval` |
 | `scope` | `instance`, or `space` with `space_id` |
-| `runs` | active runs (`queued`, `running`, `waiting_input`) in visible channels, at most `stats.live_max_runs`, newest first; per run: `run_id`, `thread_id`, `channel_id`, `space_id`, `agent_id`, `state`, `queued_at`, `started_at`, `billing_mode` (reported mode, otherwise configured mode), current step (`kind`, `name`), `approval_pending`, cost so far (`cost_micros`, `currency`, `cost_is_estimate`; only with `cost.read.aggregate`) |
+| `runs` | active runs (`queued`, `running`, `waiting_input`) in visible channels, at most `stats.live_max_runs`, newest first; per run: `run_id`, `thread_id`, `channel_id`, `space_id`, `agent_id`, `state`, `queued_at`, `started_at`, `billing_mode` (reported mode, otherwise configured mode), current step (`kind`, `name`), `approval_pending`, cost so far (`cost_micros`, `currency`, `cost_is_estimate`; only with `cost.read.aggregate`), the agent tree `tasks` and `tasks_truncated` (below) |
 | `runs_truncated` | `true` if more runs are active than `stats.live_max_runs` |
 | `agents` | per agent with a run or an operator role in visible channels: `agent_id`, presence (`online`, `degraded`, `offline`), `billing_mode` (configured mode), `reported_billing_mode` (reported mode, missing for adapters that follow per run), `rate_limit` with `state` and `resets_at` (09, section 4.8) |
 | `rates` | per metric from 3.2 without `sli.*`: sum of the last full minute and of the current minute up to `at`, in visible channels; costs only with `cost.read.aggregate` |
 | `sli` | only with instance scope: per `sli.*` metric, the good share and the count over the last `stats.live_sli_window` |
 | `connections` | gateway connections of this node by kind (`user`, `agent`, `app`); only with instance scope and `cluster.mode = single`, otherwise the field is missing |
 
+Agent tree (addendum of 2026-11-01, FEAT-topology-agent-tree, design
+[topology-agent-tree.md](../design/topology-agent-tree.md)): `tasks` lists the steps of kind
+`subagent`, `workflow` and `background_job` of the run as nodes in step order, each with `id`,
+`parent_id` (the task node above, absent under the run), `kind`, `name`, `state` (`running`,
+`completed`, `failed`, `cancelled`), `started_at`, `finished_at`, `tool` (current tool of a running
+node) and `label` (first line of the step title, at most 80 characters, only with `run.read` on
+the run). The parent is the task ancestor through the tool calls that started the tasks (merge rule
+of [09-agents.md](09-agents.md) 5.6). At most `stats.live_max_tasks` nodes, running ones first and
+then the newest finished, each with its ancestors; nodes deeper than `stats.live_task_max_depth`
+are left out; a finished node stays `stats.live_task_keep` after its end. `tasks_truncated` is
+present when a limit or the size rule left nodes out.
+
 A frame is at most `sync.event_payload_max_bytes` in size. If it would grow larger, the server
-shortens the list `runs` and sets `runs_truncated`; it never sets `truncated` (04, section 2.2),
-because there is nothing to reload.
+first drops the agent trees of the oldest runs (each with `tasks_truncated`), then shortens the
+list `runs` and sets `runs_truncated`; it never sets `truncated` (04, section 2.2), because there
+is nothing to reload.
 
 ## 6. Views (level a)
 
@@ -267,6 +283,14 @@ tool as a tool chip, badge of the backend policy, costs (mode `organization` as 
 `personal` as "information only", addendum of 2026-11-01, FIX-cost-display) and a note
 "Approval waiting" when an approval card is open. A click on a card opens the thread via deep link
 (console: "Open in the app"). Data: `stats.live`.
+
+Below each card its agent tree (addendum of 2026-11-01, FEAT-topology-agent-tree): the nodes of
+`tasks` as small cards under the run, indented by level with elbow lines from parent to child, each
+with kind icon, label (without one: kind and position, "Subagent 2"), state as color, icon and word,
+runtime (against `at`) and the current tool as a tool chip. A node with children collapses and
+expands its branch; finished nodes are faded until the server drops them after
+`stats.live_task_keep`. A click on a node opens the thread like the card. The table form lists each
+node in a row below its run, indented by level. The same tree on the phone.
 
 ```text
 +---------------------------------------------------------------------------------------------+
@@ -775,6 +799,9 @@ Column "Place": Server = configuration reference of the server; App = constant o
 | `stats.live_max_runs` | Server | `200` | at most this many active runs per frame |
 | `stats.live_max_subscribers` | Server | `200` | subscriptions to `stats.live` per api node |
 | `stats.live_sli_window` | Server | `5m` | period of the SLI values in the live frame |
+| `stats.live_max_tasks` | Server | `25` | at most this many nodes of the agent tree per run in the live frame; `0` sends no tree |
+| `stats.live_task_max_depth` | Server | `4` | deepest level of the agent tree in the live frame; the children of a run are level 1 |
+| `stats.live_task_keep` | Server | `2m` | how long a finished node of the agent tree stays in the live frame after its end |
 | `stats.flush_interval` | Server | `10s` | interval at which a process writes its counters to `stats_minutes` |
 | `stats.flush_queue_max` | Server | `20000` | counter keys in memory per process; above that, the oldest are discarded |
 | `stats.timeline_max_range` | Server | `24h` | longest period of a timeline query |

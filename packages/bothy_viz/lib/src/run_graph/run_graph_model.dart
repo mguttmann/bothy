@@ -114,6 +114,7 @@ final class RunGraphNode {
     this.cost,
     this.stalledSince,
     this.summarized,
+    this.reportedTool,
   });
 
   /// The run ID for the root, else the step ID (of the task for a merged node).
@@ -165,7 +166,12 @@ final class RunGraphNode {
   /// The `count` of a summary row ([RunGraphNodeKind.summary]).
   final int? summarized;
 
-  /// The newest child `tool_call` with `status = running`, counted after the merge rule.
+  /// `detail.last_tool`: the tool the adapter last reported for a task whose tool calls are
+  /// not steps of their own (a workflow agent, FEAT-topology-agent-tree).
+  final String? reportedTool;
+
+  /// The newest child `tool_call` with `status = running`, counted after the merge rule;
+  /// without one, [reportedTool] while the node is open.
   String? get currentTool {
     for (final c in children.reversed) {
       if (c.kind == RunGraphNodeKind.toolCall &&
@@ -173,7 +179,7 @@ final class RunGraphNode {
         return c.name;
       }
     }
-    return null;
+    return state.isOpen ? reportedTool : null;
   }
 
   /// Whether the node still works ([RunGraphState.isOpen]).
@@ -354,6 +360,7 @@ final class RunGraphModel {
       final micros = usage?['cost_micros'];
       final currency = usage?['currency'];
       final tokens = usage?['tokens'];
+      final lastTool = _member(source.detail, 'last_tool');
       final start = source.startedAt;
       final end = source.finishedAt;
       return RunGraphNode._(
@@ -370,6 +377,9 @@ final class RunGraphModel {
         children: List.unmodifiable(children),
         markers: List.unmodifiable(markers),
         tokens: tokens is int ? tokens : null,
+        reportedTool: lastTool is String && lastTool.isNotEmpty
+            ? lastTool
+            : null,
         cost: organization && micros is int && currency is String
             ? VizCost(
                 micros: micros,

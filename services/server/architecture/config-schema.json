@@ -4530,6 +4530,18 @@
       "doc": "Subscriptions to stats.live per api node."
     },
     {
+      "name": "stats.live_max_tasks",
+      "env": "BOTHY_STATS__LIVE_MAX_TASKS",
+      "kind": "int",
+      "default": "25",
+      "required": false,
+      "enum": [],
+      "min": "0",
+      "max": "500",
+      "chapter": "25-visualization.md",
+      "doc": "At most this many nodes of the agent tree per run in the live frame; 0 sends no tree."
+    },
+    {
       "name": "stats.live_sli_window",
       "env": "BOTHY_STATS__LIVE_SLI_WINDOW",
       "kind": "duration",
@@ -4540,6 +4552,30 @@
       "max": "",
       "chapter": "25-visualization.md",
       "doc": "Period of the SLI values in the live frame."
+    },
+    {
+      "name": "stats.live_task_keep",
+      "env": "BOTHY_STATS__LIVE_TASK_KEEP",
+      "kind": "duration",
+      "default": "2m",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "1h",
+      "chapter": "25-visualization.md",
+      "doc": "How long a finished node of the agent tree stays in the live frame after its end."
+    },
+    {
+      "name": "stats.live_task_max_depth",
+      "env": "BOTHY_STATS__LIVE_TASK_MAX_DEPTH",
+      "kind": "int",
+      "default": "4",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "16",
+      "chapter": "25-visualization.md",
+      "doc": "Deepest level of the agent tree in the live frame; the children of a run are level 1."
     },
     {
       "name": "stats.max_range",

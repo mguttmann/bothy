@@ -556,6 +556,19 @@
   "@vizMoreRunsThanShown": {
     "description": "Marker when the live frame or the timeline has `runs_truncated` (25 section 5.2)."
   },
+  "vizTaskTree": "{count, plural, =1{1 agent or job started} other{{count} agents and jobs started}}",
+  "@vizTaskTree": {
+    "description": "Screen reader label of the agent tree below a run card of the live topology: the number of nodes shown (25 section 6.1, FEAT-topology-agent-tree).",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "vizMoreTasksThanShown": "More agents and jobs than shown",
+  "@vizMoreTasksThanShown": {
+    "description": "Marker below the agent tree of a run card when the live frame has `tasks_truncated` for the run (25 section 5.2, FEAT-topology-agent-tree)."
+  },
   "vizRunStateWaitingInput": "Waiting for input",
   "@vizRunStateWaitingInput": {
     "description": "State word of a run card for `waiting_input` (components.md section 2)."

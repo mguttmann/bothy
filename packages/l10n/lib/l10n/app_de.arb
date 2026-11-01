@@ -124,6 +124,8 @@
   "vizBadgeOrganization": "Organisation",
   "vizApprovalWaiting": "Freigabe wartet",
   "vizMoreRunsThanShown": "Mehr Läufe als angezeigt",
+  "vizTaskTree": "{count, plural, =1{1 Agent oder Job gestartet} other{{count} Agenten und Jobs gestartet}}",
+  "vizMoreTasksThanShown": "Mehr Agenten und Jobs als angezeigt",
   "vizRunStateWaitingInput": "Wartet auf Eingabe",
   "vizRunStateUnknown": "Unbekannter Zustand",
   "vizStepToolCall": "Werkzeug {name}",

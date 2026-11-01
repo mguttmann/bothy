@@ -12,7 +12,8 @@ harness and the fake server read them instead of a server.
   `StatsLiveFrame.truncated.json` has `runs_truncated = true`; `no_cost_permission` lacks every
   cost member, as the server filters them without `cost.read.aggregate`.
 - Content: no message text and no titles; only IDs, tool names, numbers and the test world of
-  07 10. The run documents `Run.<state>.json` of the run graph (09 5.6) are run content under
+  07 10. Exception: the `label` of the task nodes in `StatsLiveFrame.agent_tree.json`, which the
+  server sends only with `run.read` (25 1 rule 3), carries short role names of the test world. The run documents `Run.<state>.json` of the run graph (09 5.6) are run content under
   `run.read`, not statistics (R-VZ-14): they carry step names and titles of the test world.
   Their states are `flat` (tool calls and a status marker), `subagents` (tasks started by tool
   calls, a background job, a failed subagent with more finished steps than
@@ -37,6 +38,7 @@ file, a file missing from the table below and a listed schema without a file. Th
 | `StatsLiveFrame.load.json` | `StatsLiveFrame` | load | live topology (performance), harness |
 | `StatsLiveFrame.truncated.json` | `StatsLiveFrame` | truncated | live topology ("more runs than shown") |
 | `StatsLiveFrame.no_cost_permission.json` | `StatsLiveFrame` | no_cost_permission | live topology, run card mark |
+| `StatsLiveFrame.agent_tree.json` | `StatsLiveFrame` | agent_tree (`tasks` of a workflow with agents, nested subagents, background jobs with and without label, `tasks_truncated`) | live topology (agent tree), task tree mark |
 | `StatsLiveFrame.offline.json` | `StatsLiveFrame` | offline | live topology, backend (presence offline, space scope) |
 | `StatsTimeline.normal.json` | `StatsTimeline` | normal (with the delivery metrics) | timeline, delivery history, area and bar marks |
 | `StatsTimeline.empty.json` | `StatsTimeline` | empty | timeline |

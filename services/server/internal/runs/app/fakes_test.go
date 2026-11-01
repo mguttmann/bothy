@@ -517,6 +517,40 @@ func (r *repo) LiveFacts(_ context.Context, runIDs []ids.ID) (map[ids.ID]app.Liv
 	return out, nil
 }
 
+// LiveSteps implements app.Repository like adapters/postgres: per run the task steps, the
+// running tool calls and the tool calls that started a task, in step order, with detail.last_tool.
+func (r *repo) LiveSteps(_ context.Context, runIDs []ids.ID) (map[ids.ID][]runs.LiveStep, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	task := func(kind string) bool { return kind == "subagent" || kind == "workflow" || kind == "background_job" }
+	out := map[ids.ID][]runs.LiveStep{}
+	for _, id := range runIDs {
+		var mine []app.StepRow
+		starters := map[ids.ID]bool{}
+		for _, st := range r.steps {
+			if st.RunID == id {
+				mine = append(mine, st)
+				if task(st.Kind) && !st.ParentStepID.IsZero() {
+					starters[st.ParentStepID] = true
+				}
+			}
+		}
+		slices.SortFunc(mine, func(a, b app.StepRow) int { return a.Ordinal - b.Ordinal })
+		for _, st := range mine {
+			if !task(st.Kind) && (st.Kind != "tool_call" || st.Status != "running") && !starters[st.ID] {
+				continue
+			}
+			var detail struct {
+				LastTool string `json:"last_tool"`
+			}
+			_ = json.Unmarshal(st.Detail, &detail)
+			out[id] = append(out[id], runs.LiveStep{ID: st.ID, ParentID: st.ParentStepID, Kind: st.Kind, Name: st.Name, Title: st.Title,
+				Status: st.Status, LastTool: detail.LastTool, StartedAt: st.StartedAt, FinishedAt: st.FinishedAt})
+		}
+	}
+	return out, nil
+}
+
 func (r *repo) PatchSteps(ctx context.Context, run ids.ID) ([]app.StepRow, error) {
 	all, err := r.AllSteps(ctx, run)
 	for i := range all {

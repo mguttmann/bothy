@@ -188,6 +188,7 @@ throttles them to `agent.run_update_min_interval`.
 | `user` | the `tool_result` ends its step `completed` or `failed`; the echo of the own prompt is ignored |
 | `tool_progress` | counted; `/metrics/progress_events` only when the last change of the turn is older than `runner.progress_patch_interval`, so a long tool is not stalled (09 5.5) |
 | `system/task_*` | a step `subagent` (`task_type` `local_agent`), `workflow` (`local_workflow`) or `background_job`, under the step of the tool call its `tool_use_id` names (at the root without one); `usage` (`total_tokens`, `tool_uses`, `duration_ms`) of `task_progress` and `task_notification` becomes `detail.usage` (`tokens`, `tool_uses`, `duration_ms`), never a cost; `completed`, `failed`, `stopped` end the step; `ambient` tasks get none |
+| `system/task_progress` `workflow_progress` | one `subagent` step `workflow_agent` per agent of the workflow, title its label, under the workflow step, `detail` `phase`, `last_tool` and `usage`; `done` ends it, the end of the workflow ends its open agents; the prompt and result previews are never sent. A foreground command of a workflow agent (`owned_by_subagent` with an unknown `tool_use_id`) gets no step |
 | `system/background_tasks_changed` | open `background_job` steps outside the set end `completed`; `/metrics/background_jobs` |
 | `system/status` | `compacting` sets `/status_line`, its absence removes it |
 | `system/api_retry` | `/metrics/api_retries`, `/metrics/last_api_retry` |
