@@ -267,7 +267,7 @@ func TestWatchdogStubKeepsAnINTAfterReady(t *testing.T) {
 	// next server. Half the stub's lifetime separates the two outcomes with room for a busy host.
 	select {
 	case <-done:
-	case <-time.After(30 * time.Second):
+	case <-time.After(30 * time.Second): // nosemgrep: bothy-go-test-wall-clock-wait -- a latency bound under test: a lost SIGINT only ends the stub after its 60-second alarm
 		t.Fatal("the stub server did not act on SIGINT")
 	}
 	if _, err := os.Stat(filepath.Join(dir, "stopped")); err != nil {
