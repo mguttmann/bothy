@@ -9,6 +9,7 @@ without one.
 
 from __future__ import annotations
 
+import datetime as dt
 import json
 import subprocess
 import sys
@@ -24,6 +25,8 @@ import yaml
 
 REPO = Path(__file__).resolve().parents[3]
 PKG = "example.com/mod/a"
+# When the runs of the issue tests finished, unless a test sets another time.
+RUN_TIME = "2026-11-01T10:00:00Z"
 
 
 def _event(action: str, test: str = "", package: str = PKG) -> str:
@@ -706,12 +709,18 @@ class FakeGh:
         # Runs whose failed jobs ran again: every flake artifact exists once per attempt, under
         # the same name (GitHub keeps the artifact of the first attempt).
         self.attempts: dict[int, int] = {}
+        # Attempts of a run that left no flake artifact of their own.
+        self.clean_attempts: dict[int, set[int]] = {}
         self.issues: list[dict[str, Any]] = []
         self.comments: list[str] = []
         self.foreign: list[str] = []
         # The issue of each comment of `comments` (issue 7 for a comment a test adds itself).
         self.comment_of: list[int] = []
         self.calls: list[list[str]] = []
+        # When each run finished (default RUN_TIME) and when each comment was written.
+        self.run_time: dict[int, str] = {}
+        self.comment_time: list[str] = []
+        self.closed: list[tuple[int, str]] = []
 
     def __call__(self, args: Sequence[str]) -> str:
         args = list(args)
@@ -724,6 +733,10 @@ class FakeGh:
                     "event": "push",
                     "head_branch": "main",
                     "head_sha": "abc",
+                    "updated_at": self.run_time.get(i, RUN_TIME),
+                    "run_attempt": self.attempts.get(i, 1),
+                    # Attempt k starts at minute k; its artifacts are written 30 seconds later.
+                    "run_started_at": f"2000-01-01T00:{self.attempts.get(i, 1):02d}:00Z",
                 }
                 for i in sorted(self.artifacts)
             ]
@@ -732,21 +745,39 @@ class FakeGh:
             state = args[args.index("--state") + 1]
             shown = [i for i in self.issues if state == "all" or i["state"] == state.upper()]
             return json.dumps(
-                [{"number": i["number"], "title": i["title"], "state": i["state"]} for i in shown]
+                [
+                    {
+                        "number": i["number"],
+                        "title": i["title"],
+                        "state": i["state"],
+                        "body": i.get("body", ""),
+                    }
+                    for i in shown
+                ]
             )
         if args[:2] == ["api", "--paginate"] and args[2].endswith("/comments"):
             number = int(args[2].split("/issues/")[1].split("/")[0])
             own = [
-                {"body": b, "user": flakes.BOT}
+                {
+                    "body": b,
+                    "user": flakes.BOT,
+                    "created_at": self.comment_time[n] if n < len(self.comment_time) else RUN_TIME,
+                }
                 for n, b in enumerate(self.comments)
                 if (self.comment_of[n] if n < len(self.comment_of) else 7) == number
             ]
-            other = [{"body": b, "user": "someone"} for b in self.foreign]
+            other = [{"body": b, "user": "someone", "created_at": RUN_TIME} for b in self.foreign]
             return "".join(json.dumps(c) + "\n" for c in [*other, *own])
         if args[:2] == ["api", "--paginate"] and "/artifacts" in args[2]:
             run = int(args[2].split("/runs/")[1].split("/")[0])
-            names = [*self.artifacts[run]] * self.attempts.get(run, 1) + ["go-shard-1"]
-            return "".join(json.dumps({"name": n}) + "\n" for n in names)
+            listed = [
+                {"name": n, "created_at": f"2000-01-01T00:{k:02d}:30Z"}
+                for k in range(1, self.attempts.get(run, 1) + 1)
+                if k not in self.clean_attempts.get(run, set())
+                for n in self.artifacts[run]
+            ]
+            listed.append({"name": "go-shard-1", "created_at": "2000-01-01T00:01:30Z"})
+            return "".join(json.dumps(a) + "\n" for a in listed)
         if args[:2] == ["run", "download"]:
             run, name, target = (
                 int(args[2]),
@@ -774,6 +805,11 @@ class FakeGh:
             [issue] = [i for i in self.issues if i["number"] == int(args[2])]
             issue["body"] = args[args.index("--body") + 1]
             return ""
+        if args[:2] == ["issue", "close"]:
+            [issue] = [i for i in self.issues if i["number"] == int(args[2])]
+            issue["state"] = "CLOSED"
+            self.closed.append((int(args[2]), args[args.index("--comment") + 1]))
+            return ""
         raise AssertionError(args)
 
 
@@ -781,9 +817,13 @@ def _flake(test: str) -> dict[str, Any]:
     return {"tool": "go", "package": PKG, "test": test, "runs": 2, "failures": 1}
 
 
-def _issue(gh: FakeGh) -> int:
+def _issue(gh: FakeGh, now: str = "2026-11-01T12:00:00Z") -> int:
     parsed = type("A", (), {"repo": "o/r", "workflow": "ci.yml", "hours": 48})()
-    return flakes._issue(parsed, gh)  # type: ignore[arg-type]
+    return flakes._issue(parsed, gh, now=_time(now))  # type: ignore[arg-type]
+
+
+def _time(text: str) -> dt.datetime:
+    return dt.datetime.fromisoformat(text.replace("Z", "+00:00"))
 
 
 def test_the_issue_gets_one_comment_per_run_with_flakes_and_the_list(
@@ -796,7 +836,7 @@ def test_the_issue_gets_one_comment_per_run_with_flakes_and_the_list(
     assert label[label.index("--color") + 1] == "d93f0b"
     [first] = gh.comments
     assert "| new | `go` | `example.com/mod/a` | `TestA` | 2 | 1 |" in first
-    assert "| 1 | 11 | `go` | `example.com/mod/a` | `TestA` |" in gh.issues[0]["body"]
+    assert "| 1 | 11 | 2026-11-01 | `go` | `example.com/mod/a` | `TestA` |" in gh.issues[0]["body"]
     # The next run sees run 11 in the comments; a new run with TestA and TestB marks only TestB new.
     gh.artifacts[13] = {"flakes-test-apps": [_flake("TestA"), _flake("Test<B>-->")]}
     assert _issue(gh) == 0
@@ -807,7 +847,7 @@ def test_the_issue_gets_one_comment_per_run_with_flakes_and_the_list(
     assert "| new | `go` | `example.com/mod/a` | `Test\u2039B\u203a--\u203a` |" in second
     assert second.count("-->") == 1
     assert flakes.parse_comments(gh.comments)[13][1]["test"] == "Test<B>-->"
-    assert "| 2 | 13 | `go` | `example.com/mod/a` | `TestA` |" in gh.issues[0]["body"]
+    assert "| 2 | 13 | 2026-11-01 | `go` | `example.com/mod/a` | `TestA` |" in gh.issues[0]["body"]
     assert len([c for c in gh.calls if c[:2] == ["issue", "create"]]) == 1
     assert _issue(gh) == 0
     assert len(gh.comments) == 2
@@ -822,8 +862,51 @@ def test_a_rerun_run_with_one_artifact_name_per_attempt_counts_once() -> None:
     assert _issue(gh) == 0
     assert len([c for c in gh.calls if c[:2] == ["run", "download"]]) == 1
     # The run counts once for its flake.
-    assert "| 1 | 41 | `go` | `example.com/mod/a` | `TestA` |" in gh.issues[0]["body"]
+    assert "| 1 | 41 | 2026-11-01 | `go` | `example.com/mod/a` | `TestA` |" in gh.issues[0]["body"]
     assert flakes.parse_comments(gh.comments)[41] == [_flake("TestA")]
+
+
+def test_a_rerun_of_a_reported_run_with_a_new_flake_artifact_is_seen_again() -> None:
+    gh = FakeGh({42: {"flakes-test-apps": [_flake("TestA")]}})
+    gh.run_time = {42: "2026-10-20T08:00:00Z"}
+    assert _issue(gh, now="2026-10-20T12:00:00Z") == 0
+    gh.issues[0]["state"] = "CLOSED"
+    # The failed jobs of run 42 ran again on 2026-10-21 and TestA flaked again in attempt 2:
+    # the same run id, a new attempt. It is reported again, with the time of the rerun.
+    gh.attempts[42] = 2
+    gh.run_time[42] = "2026-10-21T09:00:00Z"
+    assert _issue(gh, now="2026-10-21T10:00:00Z") == 0
+    assert [i["state"] for i in gh.issues] == ["CLOSED", "OPEN"]
+    assert ", attempt 2 (" in gh.comments[1]
+    assert flakes.parse_attempts(gh.comments) == {42: 2}
+    assert "| 1 | 42 | 2026-10-21 | `go` |" in gh.issues[1]["body"]
+    # Attempt 2 is reported now: no further comment.
+    assert _issue(gh, now="2026-10-21T11:00:00Z") == 0
+    assert len(gh.comments) == 2
+    # Attempt 3 left no flake artifact of its own: the run is not seen again.
+    gh.attempts[42] = 3
+    gh.clean_attempts[42] = {3}
+    gh.run_time[42] = "2026-10-22T09:00:00Z"
+    assert _issue(gh, now="2026-10-22T10:00:00Z") == 0
+    assert len(gh.comments) == 2
+    assert "| 1 | 42 | 2026-10-21 | `go` |" in gh.issues[1]["body"]
+
+
+def test_the_attempts_of_one_run_count_once_with_the_flakes_of_each() -> None:
+    first = flakes.marker(43, [_flake("TestA")])
+    second = flakes.marker(43, [_flake("TestB")], attempt=2)
+    assert flakes.parse_attempts([first, second]) == {43: 2}
+    assert sorted(f["test"] for f in flakes.parse_comments([first, second])[43]) == [
+        "TestA",
+        "TestB",
+    ]
+
+
+def test_an_open_issue_without_a_row_is_closed() -> None:
+    gh = FakeGh({})
+    gh.issues.append({"number": 7, "title": flakes.TITLE, "state": "OPEN", "body": ""})
+    assert _issue(gh) == 0
+    assert gh.issues[0]["state"] == "CLOSED"
 
 
 def test_only_the_bot_comments_count_and_their_flakes_are_checked() -> None:
@@ -835,7 +918,7 @@ def test_only_the_bot_comments_count_and_their_flakes_are_checked() -> None:
     assert len(gh.comments) == 2
     assert "TestForged" not in gh.issues[0]["body"]
     assert "`[x](https:`" in gh.comments[1]
-    assert "| 1 | 21 | `[x](https:` |" in gh.issues[0]["body"]
+    assert "| 1 | 21 | 2026-11-01 | `[x](https:` |" in gh.issues[0]["body"]
 
 
 def test_a_closed_issue_keeps_its_runs_reported() -> None:
@@ -852,7 +935,122 @@ def test_a_closed_issue_keeps_its_runs_reported() -> None:
     assert gh.comment_of == [7, 8]
     # The new issue lists only its own runs, and the flake of the closed list counts as new.
     assert "| new | `go` | `example.com/mod/a` | `TestA` |" in gh.comments[1]
-    assert "| 1 | 32 | `go` |" in gh.issues[1]["body"]
+    assert "| 1 | 32 | 2026-11-01 | `go` |" in gh.issues[1]["body"]
+
+
+def test_a_row_not_seen_for_seven_days_moves_out_of_the_table_with_its_count() -> None:
+    gh = FakeGh(
+        {
+            51: {"flakes-test-apps": [_flake("TestOld")]},
+            52: {"flakes-test-apps": [_flake("TestOld"), _flake("TestNew")]},
+            53: {"flakes-test-apps": [_flake("TestNew")]},
+        }
+    )
+    gh.run_time = {51: "2026-10-20T08:00:00Z", 52: "2026-10-24T09:00:00Z"}
+    assert _issue(gh, now="2026-11-01T12:00:00Z") == 0
+    text = gh.issues[0]["body"]
+    table, aged = text.split("<details>")
+    # The table keeps what was seen in the last 7 days, with the date it was last seen.
+    assert "| 2 | 53 | 2026-11-01 | `go` | `example.com/mod/a` | `TestNew` |" in table
+    assert "TestOld" not in table
+    # TestOld was last seen in run 52 on 2026-10-24, more than 7 days before: collapsed, counted.
+    assert "<summary>No longer seen (1)</summary>" in aged
+    assert "| 2 | 52 | 2026-10-24 | `go` | `example.com/mod/a` | `TestOld` |" in aged
+    assert aged.rstrip().endswith("</details>")
+    assert gh.issues[0]["state"] == "OPEN"
+    assert not gh.closed
+
+
+def test_the_list_ages_without_a_new_run_and_only_edits_a_changed_body() -> None:
+    gh = FakeGh(
+        {61: {"flakes-test-apps": [_flake("TestA")]}, 62: {"flakes-test-apps": [_flake("TestB")]}}
+    )
+    gh.run_time = {61: "2026-10-20T08:00:00Z", 62: "2026-10-26T08:00:00Z"}
+    assert _issue(gh, now="2026-10-26T12:00:00Z") == 0
+    assert "<details>" not in gh.issues[0]["body"]
+    edits = len([c for c in gh.calls if c[:2] == ["issue", "edit"]])
+    # An hour later nothing changed: no edit.
+    assert _issue(gh, now="2026-10-26T13:00:00Z") == 0
+    assert len([c for c in gh.calls if c[:2] == ["issue", "edit"]]) == edits
+    # TestA (2026-10-20 08:00) ages out after 7 days, without a new run.
+    assert _issue(gh, now="2026-10-27T09:00:00Z") == 0
+    table, aged = gh.issues[0]["body"].split("<details>")
+    assert "TestA" not in table
+    assert "TestB" in table
+    assert "TestA" in aged
+    assert gh.issues[0]["state"] == "OPEN"
+
+
+def test_a_recurring_row_stays_in_the_table_and_comes_back_from_the_aged_ones() -> None:
+    gh = FakeGh({71: {"flakes-test-apps": [_flake("TestA")]}})
+    gh.run_time = {71: "2026-10-01T08:00:00Z"}
+    # Two runs keep TestA in the table, the one a week after the first included.
+    gh.artifacts[72] = {"flakes-test-apps": [_flake("TestA"), _flake("TestB")]}
+    gh.run_time[72] = "2026-10-15T08:00:00Z"
+    assert _issue(gh, now="2026-10-15T12:00:00Z") == 0
+    text = gh.issues[0]["body"]
+    assert "| 2 | 72 | 2026-10-15 | `go` | `example.com/mod/a` | `TestA` |" in text
+    assert "<details>" not in text
+    # A row in the collapsed section that flakes again returns to the table with every count.
+    gh.artifacts[73] = {"flakes-test-apps": [_flake("TestB")]}
+    gh.run_time[73] = "2026-10-21T08:00:00Z"
+    assert _issue(gh, now="2026-10-23T12:00:00Z") == 0
+    assert "TestA" in gh.issues[0]["body"].split("<details>")[1]
+    gh.artifacts[74] = {"flakes-test-apps": [_flake("TestA")]}
+    gh.run_time[74] = "2026-10-23T11:00:00Z"
+    assert _issue(gh, now="2026-10-23T13:00:00Z") == 0
+    text = gh.issues[0]["body"]
+    assert "<details>" not in text
+    assert "| 3 | 74 | 2026-10-23 | `go` | `example.com/mod/a` | `TestA` |" in text
+
+
+def test_an_empty_table_closes_the_issue_and_the_next_flake_opens_a_new_one() -> None:
+    gh = FakeGh({81: {"flakes-test-apps": [_flake("TestA")]}})
+    gh.run_time = {81: "2026-10-20T08:00:00Z"}
+    assert _issue(gh, now="2026-10-20T12:00:00Z") == 0
+    assert gh.issues[0]["state"] == "OPEN"
+    # Seven days later every row is in the collapsed section: the workflow closes the issue.
+    assert _issue(gh, now="2026-10-27T09:00:00Z") == 0
+    assert gh.issues[0]["state"] == "CLOSED"
+    [(number, note)] = gh.closed
+    assert number == 7
+    assert "7 days" in note
+    assert "<summary>No longer seen (1)</summary>" in gh.issues[0]["body"]
+    [close] = [c for c in gh.calls if c[:2] == ["issue", "close"]]
+    assert close[close.index("--reason") + 1] == "completed"
+    # A closed issue is not closed again, and no run means no new issue.
+    assert _issue(gh, now="2026-10-28T09:00:00Z") == 0
+    assert len(gh.closed) == 1
+    assert len(gh.issues) == 1
+    gh.artifacts[82] = {"flakes-test-apps": [_flake("TestA")]}
+    gh.run_time[82] = "2026-10-28T08:00:00Z"
+    assert _issue(gh, now="2026-10-28T10:00:00Z") == 0
+    assert [i["state"] for i in gh.issues] == ["CLOSED", "OPEN"]
+    assert "| 1 | 82 | 2026-10-28 | `go` |" in gh.issues[1]["body"]
+
+
+def test_a_comment_without_a_seen_time_counts_from_when_it_was_written() -> None:
+    # The comments written before the list aged carry no time: the comment's own time counts.
+    gh = FakeGh({})
+    gh.issues.append({"number": 7, "title": flakes.TITLE, "state": "OPEN", "body": ""})
+    gh.comments.append(flakes.marker(91, [_flake("TestA")]))
+    gh.comment_time.append("2026-10-01T10:00:00Z")
+    assert '"seen"' not in gh.comments[0]
+    assert _issue(gh, now="2026-11-01T12:00:00Z") == 0
+    assert gh.issues[0]["state"] == "CLOSED"
+    assert "| 1 | 91 | 2026-10-01 | `go` |" in gh.issues[0]["body"]
+
+
+def test_the_comment_of_a_run_keeps_when_the_run_finished() -> None:
+    gh = FakeGh({95: {"flakes-test-apps": [_flake("TestA")]}})
+    gh.run_time = {95: "2026-10-31T23:59:00Z"}
+    assert _issue(gh, now="2026-11-01T00:30:00Z") == 0
+    # The comment itself is written later; the hidden line keeps the time of the run.
+    gh.comment_time.append("2026-11-09T00:00:00Z")
+    assert _issue(gh, now="2026-11-07T23:00:00Z") == 0
+    assert gh.issues[0]["state"] == "OPEN"
+    assert _issue(gh, now="2026-11-08T00:00:00Z") == 0
+    assert gh.issues[0]["state"] == "CLOSED"
 
 
 def test_every_flake_upload_includes_the_hidden_flake_dir() -> None:
