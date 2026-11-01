@@ -206,6 +206,7 @@ nav:
       - Sidebar ordering: design/sidebar-ordering.md
       - New project from the app: design/new-project.md
       - Deleting spaces, channels, projects and chats: design/delete.md
+      - Terminal in the owner's own account: design/terminal-owner-account.md
   - Operations:
       - Configuration: operations/configuration.md
       - Installation with Compose: operations/install-compose.md
