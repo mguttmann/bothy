@@ -108,6 +108,17 @@ bool _sharedStore(Build build) =>
     build.platform == TargetPlatform.windows ||
     (build.platform == TargetPlatform.macOS && !build.legacyDataProtection);
 
+/// Whether [build] reads the old secrets by their names (the macOS login keychain).
+bool _byName(Build build) =>
+    build.platform == TargetPlatform.macOS && !build.legacyDataProtection;
+
+/// The old items a refresh leaves: in the login keychain `app/instance`, which the move never
+/// reads (docs/decisions.d/FIX-macos-migration-denied.md FIX-MMD/1).
+Map<String, String> _afterRefresh(Build build, Map<String, String> items) => {
+  for (final MapEntry(:key, :value) in items.entries)
+    if (!_byName(build) || key != 'app/instance') key: value,
+};
+
 FlutterSecureBackend _updated(
   SharedStorage storage,
   Build build, {
@@ -219,7 +230,7 @@ void main() {
         // The first refresh with the old session succeeded, so the old place is empty.
         await eventually(
           'the old secrets removed after the first refresh',
-          () => old.legacyItems.isEmpty,
+          () => _afterRefresh(build, old.legacyItems).isEmpty,
         );
         expect(await backend.read(token), isNotNull);
       });
@@ -340,7 +351,7 @@ void main() {
 
         // The refresh with the old session adopts a new refresh token.
         await backend.write(_token, 'r-new');
-        expect(legacyOf(storage), isEmpty);
+        expect(_afterRefresh(build, legacyOf(storage)), isEmpty);
         expect(await backend.read(_token), 'r-new');
         expect(logs.join('\n'), contains('removed'));
 
@@ -375,6 +386,7 @@ void main() {
         final storage = SharedStorage(build.platform, entitled: build.entitled);
         addLegacy(storage, {
           _token: 'r',
+          'app/server_address': _origin,
           'app/instance': jsonEncode({'address': _origin, 'instance_id': _i1}),
         });
         final backend = _updated(
@@ -417,9 +429,13 @@ void main() {
           isNull,
           reason: 'the remembered instance is not one of this app',
         );
+        // The login keychain never reads `app/instance`: there the remembered server belongs to
+        // the instance of this app whose session lies under it (FIX-MMD/1).
+        final serverMoves = _byName(build);
         expect(await backend.keys(), {
           _token,
           'instance/$_i1/${FlutterSecureBackend.deviceKeyScopeKey}',
+          if (serverMoves) 'app/server_address',
         });
         await backend.write(_token, 'r-1b');
         expect(
@@ -429,7 +445,7 @@ void main() {
           },
           {
             'instance/$_i2/auth/$_origin/refresh_token': 'r-2',
-            'app/server_address': _origin,
+            if (!serverMoves) 'app/server_address': _origin,
             'app/instance': jsonEncode({
               'address': _origin,
               'instance_id': _i2,

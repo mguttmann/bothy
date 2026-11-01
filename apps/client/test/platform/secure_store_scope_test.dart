@@ -153,7 +153,14 @@ void main() {
         expect(await backend.read(_token), 'r');
         expect(left(storage), {_token: 'r', ..._remembered});
         await backend.write(_token, 'r2');
-        expect(left(storage), isEmpty);
+        // The login keychain: `app/instance` is never read, so never moved or deleted
+        // (docs/decisions.d/FIX-macos-migration-denied.md).
+        expect(
+          left(storage),
+          platform == TargetPlatform.macOS
+              ? {'app/instance': _remembered['app/instance']}
+              : isEmpty,
+        );
       });
     }
 
@@ -168,7 +175,7 @@ void main() {
         final next = _backend(storage, _oldApp, hasLocalData: true);
         expect(await next.keys(), {
           _token,
-          ..._remembered.keys,
+          'app/server_address',
           'instance/i-1/${FlutterSecureBackend.deviceKeyScopeKey}',
         });
         expect(

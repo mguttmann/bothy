@@ -55,8 +55,9 @@ guard SecKeychainOpen(path, &opened) == errSecSuccess, let keychain = opened els
 }
 let keychains = [keychain]
 
-/// The statuses `LegacyKeychain.deniedStatuses` of lib/platform/secure_store.dart treats as "not
-/// migratable".
+/// The statuses `LegacyKeychain.deniedStatuses` of lib/platform/secure_store.dart names as an item
+/// the keychain does not give out without the person (left at the old place, tried again at the
+/// next start, docs/decisions.d/FIX-macos-migration-denied.md).
 let denied: Set<OSStatus> = [-25293, -25308, -25243, -128, -25244]
 
 // The Dart side passes kSecUseAuthenticationUISkip by its value
