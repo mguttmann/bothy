@@ -69,6 +69,13 @@ void main() {
       ),
       refused('terminal_step_up_not_fresh'),
     );
+    expect(
+      () => requireStepUp(
+        request(age: stepUpMaxAge + const Duration(seconds: 1)),
+        fresh: true,
+      ),
+      refused('terminal_step_up_not_fresh'),
+    );
   });
 
   test('the fresh step-up needs the device key', () {

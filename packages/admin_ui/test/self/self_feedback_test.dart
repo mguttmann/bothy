@@ -20,6 +20,7 @@ void main() {
       selfFailure(l, const StepUpUnavailable())?.text,
       l.problemForbiddenStepUpNotPossible,
     );
+    expect(selfFailure(l, const StepUpUnavailable())?.denied, isTrue);
     final problem = loadProblem(const StepUpUnavailable())!;
     expect(
       (problem.status, problem.code, problem.reason),

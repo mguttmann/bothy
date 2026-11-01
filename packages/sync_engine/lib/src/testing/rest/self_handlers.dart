@@ -18,22 +18,24 @@ const Duration terminalStepUpMaxAge = Duration(seconds: 60);
 
 /// Throws `401 step_up_required` unless the session of [r] confirmed within [stepUpMaxAge];
 /// with [fresh] (the terminal, 08 6.3) only a confirmation with the device key within
-/// [terminalStepUpMaxAge] counts, so an older one or a step-up with password and TOTP answers
-/// `401 step_up_required` with reason `terminal_step_up_not_fresh` (07 section 4.2 step 8).
+/// [terminalStepUpMaxAge] counts, so a missing or older one or a step-up with password and TOTP
+/// answers `401 step_up_required` with reason `terminal_step_up_not_fresh` (07 section 4.2 step 8).
 void requireStepUp(FakeRequest r, {bool fresh = false}) {
   final session = r.session!;
   final at = session.stepUpAt;
   final age = at == null ? null : r.world.now().difference(at);
-  if (age == null || age > stepUpMaxAge) {
-    throw const FakeProblem(401, 'step_up_required');
-  }
   if (fresh &&
-      (session.stepUpMethod != 'device_key' || age > terminalStepUpMaxAge)) {
+      (age == null ||
+          session.stepUpMethod != 'device_key' ||
+          age > terminalStepUpMaxAge)) {
     throw const FakeProblem(
       401,
       'step_up_required',
       reason: 'terminal_step_up_not_fresh',
     );
+  }
+  if (age == null || age > stepUpMaxAge) {
+    throw const FakeProblem(401, 'step_up_required');
   }
 }
 

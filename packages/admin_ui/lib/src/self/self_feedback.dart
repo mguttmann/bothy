@@ -57,6 +57,7 @@ SelfFailure? selfFailure(AppLocalizations l, Object error, {String? notFound}) {
   if (error is StepUpUnavailable) {
     return SelfFailure(
       problemText(l, 'forbidden', reason: 'step_up_not_possible'),
+      denied: true,
     );
   }
   if (error is AuthException) return SelfFailure(l.problemSessionRevoked);
