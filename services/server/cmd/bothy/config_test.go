@@ -603,7 +603,10 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"stats.live_interval = 1s  # default\n" +
 		"stats.live_max_runs = 200  # default\n" +
 		"stats.live_max_subscribers = 200  # default\n" +
+		"stats.live_max_tasks = 25  # default\n" +
 		"stats.live_sli_window = 5m  # default\n" +
+		"stats.live_task_keep = 2m  # default\n" +
+		"stats.live_task_max_depth = 4  # default\n" +
 		"stats.max_range = 400d  # default\n" +
 		"stats.slo_min_events = 100  # default\n" +
 		"stats.slo_warn_budget_ratio = 0.25  # default\n" +
