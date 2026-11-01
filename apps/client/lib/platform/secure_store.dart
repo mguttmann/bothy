@@ -5,13 +5,14 @@
 /// each instance, and the remembered server address.
 library;
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' as developer;
 import 'dart:math';
 
 import 'package:auth/auth.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart' show PlatformException;
+import 'package:flutter/services.dart' show MethodChannel, PlatformException;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:local_store/local_store.dart';
 
@@ -74,6 +75,20 @@ abstract interface class SecureBackend {
 /// finds the old secrets by their names ([legacyAppKeys], [legacyInstanceKeys],
 /// [legacyAuthKeys]).
 ///
+/// No read of the old place ever shows a dialog or blocks the start
+/// (docs/decisions.d/FIX-macos-legacy-keychain-prompt.md). An item of the macOS login keychain
+/// whose access list trusts another app (a build signed with another bundle identifier) makes
+/// `SecItemCopyMatching` show a keychain access dialog and wait for it, also with
+/// `kSecUseAuthenticationUI`; so the old items of the login keychain are read and deleted by
+/// [LegacyKeychain], which turns the user interaction of the keychain off for the call and gets
+/// `errSecAuthFailed` instead of a dialog. Every other old read (iOS, the Data Protection
+/// keychain) carries `kSecUseAuthenticationUI` = skip ([noAuthenticationUI]). An old store that
+/// refuses an item without a dialog ([LegacyKeychain.deniedStatuses]) is not migratable: the
+/// copy takes nothing, logs it once, records the marker, and the app starts with enrollment.
+/// The copy has [legacyDeadline]; one that does not finish in time is abandoned (it writes
+/// nothing more) and the app starts without it. Every call of the backend has [callDeadline],
+/// so no start waits for the keychain without an end.
+///
 /// A macOS release build without the keychain entitlements (an ad-hoc signature, no team and no
 /// provisioning profile) cannot use the Data Protection keychain: every write fails with
 /// `errSecMissingEntitlement` (-34018) and every read finds nothing. Before its first call the
@@ -84,13 +99,17 @@ final class FlutterSecureBackend implements SecureBackend {
   /// Creates the backend of the app identity [appId]; [storage] replaces the platform store in
   /// tests, [platform] the platform, [keychainOptions] the macOS options of this build,
   /// [localInstances] the instance IDs with a folder under this app's data root (none: no
-  /// instance) and [log] the developer log.
+  /// instance), [legacyKeychain] the reader of the old items in the macOS login keychain and
+  /// [log] the developer log.
   FlutterSecureBackend({
     required this.appId,
     FlutterSecureStorage? storage,
     TargetPlatform? platform,
     MacOsOptions keychainOptions = FlutterSecureBackend.macOsOptions,
     this.localInstances,
+    this.legacyKeychain = const MethodChannelLegacyKeychain(),
+    this.legacyDeadline = const Duration(seconds: 5),
+    this.callDeadline = const Duration(seconds: 15),
     void Function(String line)? log,
   }) : _storage =
            storage ??
@@ -108,6 +127,21 @@ final class FlutterSecureBackend implements SecureBackend {
 
   /// The instance IDs that have a folder under this app's data root; null counts as none.
   final Future<Set<String>> Function()? localInstances;
+
+  /// The reader of the old items in the macOS login keychain, never with a dialog.
+  final LegacyKeychain legacyKeychain;
+
+  /// How long the start waits for the copy of the old secrets; then it goes on without them.
+  final Duration legacyDeadline;
+
+  /// How long one call ([read], [write], [delete], [keys]) may wait for the platform store;
+  /// then it fails with a [TimeoutException] instead of holding the start.
+  final Duration callDeadline;
+
+  /// The value of `kSecUseAuthenticationUI` on every old read of iOS and the Data Protection
+  /// keychain: `kSecUseAuthenticationUISkip` (`u_AuthUIS`), so an item that needs the person is
+  /// skipped instead of asked for (pinned by macos/LegacyKeychainTests).
+  static const String noAuthenticationUI = 'u_AuthUIS';
 
   /// The options of the Android store: the data in AES-GCM, its key wrapped by an RSA key of
   /// the Android Keystore, no biometric prompt (the device keys of M5-01 carry the step-up).
@@ -249,7 +283,17 @@ final class FlutterSecureBackend implements SecureBackend {
     final chosen = _chosen;
     if (chosen != null) return chosen;
     final choice = _choose().then((options) async {
-      await _adoptLegacy(options);
+      final adoption = _Adoption();
+      try {
+        await _adoptLegacy(options, adoption).timeout(legacyDeadline);
+      } on TimeoutException {
+        adoption.abandoned = true;
+        _log(
+          'the copy of the secrets of the build before the app scope did not finish '
+          'within ${legacyDeadline.inSeconds} s: the app starts without them, the next '
+          'start tries again',
+        );
+      }
       return options;
     });
     _chosen = choice;
@@ -284,33 +328,49 @@ final class FlutterSecureBackend implements SecureBackend {
     dp: options.usesDataProtectionKeychain,
   );
 
-  /// The macOS options of the old place: the old service in the keychain of this build.
+  /// The macOS options of the old place: the old service in the keychain of this build, never
+  /// with a dialog.
   MacOsOptions _legacyMac(MacOsOptions scoped) => _macOptions(
     scoped,
     AppleOptions.defaultAccountName,
     dp: scoped.usesDataProtectionKeychain,
+    authenticationUI: noAuthenticationUI,
   );
 
   static MacOsOptions _macOptions(
     MacOsOptions options,
     String? service, {
     required bool dp,
+    String? authenticationUI,
   }) => MacOsOptions(
     accountName: service,
     accessibility: options.accessibility,
     synchronizable: options.synchronizable,
     usesDataProtectionKeychain: dp,
+    authenticationUIBehavior: authenticationUI,
   );
 
   /// The iOS options of [key] under [service].
-  static IOSOptions _iosOptions(String key, String service) {
+  static IOSOptions _iosOptions(
+    String key,
+    String service, {
+    String? authenticationUI,
+  }) {
     final options = iosOptionsFor(key);
     return IOSOptions(
       accountName: service,
       accessibility: options.accessibility,
       synchronizable: options.synchronizable,
+      authenticationUIBehavior: authenticationUI,
     );
   }
+
+  /// The iOS options of the old item [key]: the old service, never with a dialog.
+  static IOSOptions _legacyIos(String key) => _iosOptions(
+    key,
+    AppleOptions.defaultAccountName,
+    authenticationUI: noAuthenticationUI,
+  );
 
   String get _prefix => _apple ? '' : '$appId/';
 
@@ -323,14 +383,25 @@ final class FlutterSecureBackend implements SecureBackend {
   }
 
   /// Copies the secrets of a build before the app scope into it (see the class comment); never
-  /// throws.
-  Future<void> _adoptLegacy(MacOsOptions scoped) async {
+  /// throws. Writes nothing once [adoption] is abandoned.
+  Future<void> _adoptLegacy(MacOsOptions scoped, _Adoption adoption) async {
     try {
       if (await _read(scopeMarkerKey, scoped) != null) return;
       final Set<String>? own = _shared(scoped)
           ? await (localInstances?.call() ?? Future.value(<String>{}))
           : null;
-      if (own == null || own.isNotEmpty) await _copyLegacy(scoped, own);
+      try {
+        if (own == null || own.isNotEmpty) {
+          await _copyLegacy(scoped, own, adoption);
+        }
+      } on _NotMigratable catch (refused) {
+        _log(
+          'the secrets of the build before the app scope are not migratable: the '
+          'keychain refuses ${refused.key} without a dialog (status ${refused.status}); '
+          'the app starts without them (enrollment)',
+        );
+      }
+      if (adoption.abandoned) return;
       await _write(scopeMarkerKey, appId, scoped);
     } on Object catch (error) {
       _log(
@@ -340,10 +411,15 @@ final class FlutterSecureBackend implements SecureBackend {
     }
   }
 
-  /// Copies the old secrets of the instances in [own] (null: every instance) into [scoped].
-  Future<void> _copyLegacy(MacOsOptions scoped, Set<String>? own) async {
+  /// Copies the old secrets of the instances in [own] (null: every instance) into [scoped];
+  /// throws [_NotMigratable] before any write when the old store refuses an item.
+  Future<void> _copyLegacy(
+    MacOsOptions scoped,
+    Set<String>? own,
+    _Adoption adoption,
+  ) async {
     final legacy = await _legacyItems(_legacyMac(scoped), own);
-    if (legacy.isEmpty) return;
+    if (legacy.isEmpty || adoption.abandoned) return;
     final current = await _scopedKeys(scoped);
     final pending = <String, List<String>>{};
     for (final key in legacy.keys) {
@@ -364,6 +440,7 @@ final class FlutterSecureBackend implements SecureBackend {
     if (pending.isEmpty) return;
     var copied = 0;
     for (final key in pending.values.expand((keys) => keys)) {
+      if (adoption.abandoned) return;
       if (current.contains(key)) continue;
       await _put(key, legacy[key]!, scoped);
       copied++;
@@ -387,13 +464,20 @@ final class FlutterSecureBackend implements SecureBackend {
     MacOsOptions legacyMac,
     Set<String>? own,
   ) async {
-    if (_indexed(legacyMac)) return _legacyByName(legacyMac, own ?? const {});
-    final all = await _storage.readAll(
-      iOptions: _apple
-          ? _iosOptions('', AppleOptions.defaultAccountName)
-          : null,
-      mOptions: legacyMac,
-    );
+    if (_indexed(legacyMac)) return _legacyByName(own ?? const {});
+    final Map<String, String> all;
+    try {
+      all = await _storage.readAll(
+        iOptions: _apple ? _legacyIos('') : null,
+        mOptions: legacyMac,
+      );
+    } on PlatformException catch (error) {
+      final status = error.details;
+      if (status is int && LegacyKeychain.deniedStatuses.contains(status)) {
+        throw _NotMigratable('the old items', status);
+      }
+      rethrow;
+    }
     return {
       for (final MapEntry(:key, :value) in all.entries)
         if (legacyPrefixes.any(key.startsWith) && !_internalKeys.contains(key))
@@ -401,16 +485,24 @@ final class FlutterSecureBackend implements SecureBackend {
     };
   }
 
-  /// The old secrets of the instances [ids] in the login keychain, read by their names: the app
-  /// keys, the instance keys and the session keys under the origin of the remembered server.
-  Future<Map<String, String>> _legacyByName(
-    MacOsOptions legacyMac,
-    Set<String> ids,
-  ) async {
+  /// The old secrets of the instances [ids] in the login keychain, read by their names without
+  /// a dialog ([LegacyKeychain]): the app keys, the instance keys and the session keys under
+  /// the origin of the remembered server. Throws [_NotMigratable] when the keychain refuses one.
+  Future<Map<String, String>> _legacyByName(Set<String> ids) async {
     final found = <String, String>{};
     Future<void> take(String key) async {
-      final value = await _storage.read(key: key, mOptions: legacyMac);
-      if (value != null) found[key] = value;
+      final (:status, :value) = await legacyKeychain.read(
+        AppleOptions.defaultAccountName,
+        key,
+      );
+      if (status == LegacyKeychain.itemNotFound) return;
+      if (LegacyKeychain.deniedStatuses.contains(status)) {
+        throw _NotMigratable(key, status);
+      }
+      if (status != LegacyKeychain.success || value == null) {
+        throw StateError('the old item $key answered status $status');
+      }
+      found[key] = value;
     }
 
     for (final key in legacyAppKeys) {
@@ -484,11 +576,20 @@ final class FlutterSecureBackend implements SecureBackend {
       final drop = [...keys, if (appKeys is List) ...appKeys];
       final legacyMac = _legacyMac(scoped);
       for (final key in drop.whereType<String>()) {
+        if (_indexed(legacyMac)) {
+          final status = await legacyKeychain.delete(
+            AppleOptions.defaultAccountName,
+            key,
+          );
+          if (status != LegacyKeychain.success &&
+              status != LegacyKeychain.itemNotFound) {
+            throw StateError('the old item $key answered status $status');
+          }
+          continue;
+        }
         await _storage.delete(
           key: key,
-          iOptions: _apple
-              ? _iosOptions(key, AppleOptions.defaultAccountName)
-              : null,
+          iOptions: _apple ? _legacyIos(key) : null,
           mOptions: legacyMac,
         );
       }
@@ -567,19 +668,36 @@ final class FlutterSecureBackend implements SecureBackend {
     }..removeAll(_internalKeys);
   }
 
-  @override
-  Future<String?> read(String key) async => _read(key, await _ready());
+  /// Runs [call] with [callDeadline]; a call the platform store does not answer in time fails
+  /// with a [TimeoutException] and is logged.
+  Future<T> _bounded<T>(
+    String what,
+    Future<T> Function() call,
+  ) => call().timeout(
+    callDeadline,
+    onTimeout: () {
+      _log(
+        'the keychain did not answer $what within ${callDeadline.inSeconds} s: '
+        'the call fails instead of holding the app',
+      );
+      throw TimeoutException('secure store $what', callDeadline);
+    },
+  );
 
   @override
-  Future<void> write(String key, String value) async {
+  Future<String?> read(String key) =>
+      _bounded('read', () async => _read(key, await _ready()));
+
+  @override
+  Future<void> write(String key, String value) => _bounded('write', () async {
     final mac = await _ready();
     await _put(key, value, mac);
     final refreshed = _refreshTokenKey.firstMatch(key)?.group(1);
     if (refreshed != null) await _retireLegacy(refreshed, mac);
-  }
+  });
 
   @override
-  Future<void> delete(String key) async {
+  Future<void> delete(String key) => _bounded('delete', () async {
     final mac = await _ready();
     await _remove(key, mac);
     if (!_indexed(mac)) return;
@@ -587,10 +705,85 @@ final class FlutterSecureBackend implements SecureBackend {
       final index = await _loadIndex(mac);
       if (index.remove(key)) await _saveIndex(index, mac);
     });
+  });
+
+  @override
+  Future<Set<String>> keys() =>
+      _bounded('keys', () async => _scopedKeys(await _ready()));
+}
+
+/// One copy of the old secrets; [abandoned] once the start stopped waiting for it.
+final class _Adoption {
+  bool abandoned = false;
+}
+
+/// The old store refused [key] without a dialog ([status]): the old secrets are not migratable.
+final class _NotMigratable implements Exception {
+  const _NotMigratable(this.key, this.status);
+
+  final String key;
+  final int status;
+}
+
+/// The answer of [LegacyKeychain.read]: the `OSStatus` of the Security framework and the value
+/// (only with [LegacyKeychain.success]).
+typedef LegacyKeychainRead = ({int status, String? value});
+
+/// The old items of the macOS login keychain, read and deleted without any user interaction
+/// (docs/decisions.d/FIX-macos-legacy-keychain-prompt.md).
+///
+/// The login keychain guards each item with an access list of the apps it trusts; a read by any
+/// other app shows a dialog and waits for it, and `kSecUseAuthenticationUI` does not stop that
+/// dialog (measured, macos/LegacyKeychainTests). The runner's `LegacyKeychain` turns the user
+/// interaction of the keychain off around the call (`SecKeychainSetUserInteractionAllowed`), so
+/// such an item answers `errSecAuthFailed` (-25293) at once.
+abstract interface class LegacyKeychain {
+  /// `errSecSuccess`.
+  static const int success = 0;
+
+  /// `errSecItemNotFound`.
+  static const int itemNotFound = -25300;
+
+  /// The answers of an item the keychain does not give out without the person:
+  /// `errSecAuthFailed` (an access list without this app, user interaction off),
+  /// `errSecInteractionNotAllowed`, `errSecNoAccessForItem`, `errSecUserCanceled`,
+  /// `errSecInvalidOwnerEdit` (a delete the access list refuses).
+  static const Set<int> deniedStatuses = {-25293, -25308, -25243, -128, -25244};
+
+  /// Reads the item [account] of the generic password service [service].
+  Future<LegacyKeychainRead> read(String service, String account);
+
+  /// Deletes the item [account] of [service]; the `OSStatus`.
+  Future<int> delete(String service, String account);
+}
+
+/// [LegacyKeychain] over the channel `bothy/legacy_keychain` of the macOS runner
+/// (macos/Runner/LegacyKeychain.swift).
+final class MethodChannelLegacyKeychain implements LegacyKeychain {
+  /// Creates the reader on the runner's channel.
+  const MethodChannelLegacyKeychain();
+
+  static const MethodChannel _channel = MethodChannel('bothy/legacy_keychain');
+
+  @override
+  Future<LegacyKeychainRead> read(String service, String account) async {
+    final answer = await _channel.invokeMapMethod<String, Object?>('read', {
+      'service': service,
+      'account': account,
+    });
+    return (
+      status: answer?['status'] as int? ?? LegacyKeychain.itemNotFound,
+      value: answer?['value'] as String?,
+    );
   }
 
   @override
-  Future<Set<String>> keys() async => _scopedKeys(await _ready());
+  Future<int> delete(String service, String account) async =>
+      await _channel.invokeMethod<int>('delete', {
+        'service': service,
+        'account': account,
+      }) ??
+      LegacyKeychain.itemNotFound;
 }
 
 /// The [SecretStore] of one instance: every key is prefixed with the instance ID, so the

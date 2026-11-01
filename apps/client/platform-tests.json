@@ -2,8 +2,10 @@
   "macos": [
     ["sh", "ios/ClientKit/run_tests.sh"],
     ["sh", "macos/AccessibilityTextInputTests/run_tests.sh"],
+    ["sh", "macos/LegacyKeychainTests/run_tests.sh"],
     ["flutter", "test", "integration_test/a11y_platform_tree_test.dart", "-d", "macos"],
     ["sh", "tool/run_composer_ax_insert_test.sh"],
+    ["sh", "tool/run_legacy_keychain_test.sh"],
     ["flutter", "test", "integration_test/admin_step_up_test.dart", "-d", "macos"],
     ["flutter", "test", "integration_test/copy_blocks_test.dart", "-d", "macos"],
     ["flutter", "test", "integration_test/devices_test.dart", "-d", "macos"],

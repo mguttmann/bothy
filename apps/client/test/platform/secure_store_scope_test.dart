@@ -45,6 +45,7 @@ FlutterSecureBackend _backend(
     keychainOptions: keychain,
     // The instance of [_token] has its folder under the app's data root.
     localInstances: () async => hasLocalData ? {'i-1'} : {},
+    legacyKeychain: storage.legacyKeychain,
     log: (_) {},
   );
 }
