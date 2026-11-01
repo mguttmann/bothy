@@ -59,6 +59,14 @@ void registerSelfHandlers(RestFake rest) {
   rest
     ..handle('createStepUpChallenge', (r) {
       final session = r.session!;
+      // A cli device has no step-up key and no user verification (08 6.4).
+      if (world.devices[session.deviceId]?.platform == 'cli') {
+        throw const FakeProblem(
+          403,
+          'forbidden',
+          reason: 'step_up_not_possible',
+        );
+      }
       final id = world.nextId();
       final challenge = 'c${id.replaceAll('-', '')}';
       world.stepUpChallenges[id] = (
