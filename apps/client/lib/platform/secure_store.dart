@@ -56,24 +56,27 @@ abstract interface class SecureBackend {
 ///
 /// The update from a build before the scope (docs/decisions.d/FIX-secure-store-migration.md):
 /// before the first call the secrets of the old place (service `flutter_secure_storage_service`,
-/// keys without prefix) are copied into the scope once, per instance and only for an instance
-/// without secrets in the scope yet. Where only this app reaches the old store (iOS, Android,
+/// keys without prefix) are copied into the scope, per instance and only for an instance without
+/// a session (a refresh token) in the scope yet; an old value replaces what a failed earlier
+/// move left there. Where only this app reaches the old store (iOS, Android,
 /// the Data Protection keychain) every instance is its own; in a shared store (the login
 /// keychain, Windows) only the instances with a folder under this app's data root
-/// ([localInstances]), and the app keys only when the remembered instance (`app/instance`) is
-/// one of them, so a new identity never takes another app's session and, without an instance
+/// ([localInstances]), and the app keys only when the remembered instance (`app/instance`, or
+/// in the login keychain the instance with an old session under the remembered server) is one
+/// of them, so a new identity never takes another app's session and, without an instance
 /// of its own, never reads the old store (no access prompt). In a shared store the copy also
 /// records the instance's device key scope as the `instance_id`, the scope the old build's keys
 /// have ([deviceKeyScopeKey]). The old items stay until the first successful refresh of their
 /// instance (a write of its refresh token, [legacyPendingKey]) and are deleted then; a failed
 /// copy is logged, leaves the old items alone and is tried again at the next start, and the app
-/// starts without them (enrollment). The marker [scopeMarkerKey] (the app identity) records the
-/// step.
+/// starts without them (enrollment). The marker [scopeMarkerKey] (the app identity) records a
+/// move that read every old item; it ends the move only while the scope holds a session.
 ///
 /// The login keychain cannot list its items with their data: `readAll` fails with -50
 /// (`errSecParam`). There the backend keeps the list of its keys in the item [indexKey] and
-/// finds the old secrets by their names ([legacyAppKeys], [legacyInstanceKeys],
-/// [legacyAuthKeys]).
+/// finds the old secrets by their names, only those the build before the scope read at every
+/// start ([legacyReadAppKeys], [legacyInstanceKeys], [legacyAuthKeys] under the origin of the
+/// remembered server address).
 ///
 /// No read of the old place ever shows a dialog or blocks the start
 /// (docs/decisions.d/FIX-macos-legacy-keychain-prompt.md). An item of the macOS login keychain
@@ -82,9 +85,11 @@ abstract interface class SecureBackend {
 /// `kSecUseAuthenticationUI`; so the old items of the login keychain are read and deleted by
 /// [LegacyKeychain], which turns the user interaction of the keychain off for the call and gets
 /// `errSecAuthFailed` instead of a dialog. Every other old read (iOS, the Data Protection
-/// keychain) carries `kSecUseAuthenticationUI` = skip ([noAuthenticationUI]). An old store that
-/// refuses an item without a dialog ([LegacyKeychain.deniedStatuses]) is not migratable: the
-/// copy takes nothing, logs it once, records the marker, and the app starts with enrollment.
+/// keychain) carries `kSecUseAuthenticationUI` = skip ([noAuthenticationUI]). An old item the
+/// store does not give out is never final (docs/decisions.d/FIX-macos-migration-denied.md): it
+/// stays at the old place, its instance is not copied (no half session), the copy of the other
+/// instances goes on, the refusal is logged, no marker is written, and the next start tries
+/// again.
 /// The copy has [legacyDeadline]; one that does not finish in time is abandoned (it writes
 /// nothing more) and the app starts without it. Every call of the backend has [callDeadline],
 /// so no start waits for the keychain without an end.
@@ -202,10 +207,14 @@ final class FlutterSecureBackend implements SecureBackend {
   /// The key prefixes of the secrets a build before the app scope wrote.
   static const List<String> legacyPrefixes = ['app/', 'instance/'];
 
-  /// The app keys a build before the app scope wrote; frozen with that build.
-  static const List<String> legacyAppKeys = [
+  /// The app keys the move reads by name in the login keychain: the ones a build before the app
+  /// scope read at every start, so the keychain gives them to this app as it gave them to that
+  /// build; frozen with that build. Not `app/instance`: that build wrote it after each discovery
+  /// and read it only when discovery failed, so its item may still trust only the app of an
+  /// older bundle identifier and the keychain refuses it
+  /// (docs/decisions.d/FIX-macos-migration-denied.md).
+  static const List<String> legacyReadAppKeys = [
     'app/server_address',
-    'app/instance',
     'app/update_notice_dismissed',
   ];
 
@@ -384,34 +393,31 @@ final class FlutterSecureBackend implements SecureBackend {
 
   /// Copies the secrets of a build before the app scope into it (see the class comment); never
   /// throws. Writes nothing once [adoption] is abandoned.
+  ///
+  /// The marker [scopeMarkerKey] ends the move only while the scope holds a session; a marker
+  /// without one (a move that took nothing, a person who signed out) does not stop a retry
+  /// (docs/decisions.d/FIX-macos-migration-denied.md).
   Future<void> _adoptLegacy(MacOsOptions scoped, _Adoption adoption) async {
     try {
-      if (await _read(scopeMarkerKey, scoped) != null) return;
+      final marked = await _read(scopeMarkerKey, scoped) != null;
+      final current = await _scopedKeys(scoped);
+      if (marked && current.any(_isRefreshToken)) return;
       final Set<String>? own = _shared(scoped)
           ? await (localInstances?.call() ?? Future.value(<String>{}))
           : null;
-      try {
-        if (own == null || own.isNotEmpty) {
-          await _copyLegacy(scoped, own, adoption);
-        }
-      } on _NotMigratable catch (refused) {
-        if (refused.status == LegacyKeychain.interactionNotAllowed) {
-          // A locked keychain or a locked device answers the same: not a lasting refusal.
-          _log(
-            'the secrets of the build before the app scope were not copied: the keychain '
-            'refuses ${refused.key} without a dialog (status ${refused.status}, also the '
-            'answer of a locked keychain or device); the app starts without them, the next '
-            'start tries again',
-          );
-          return;
-        }
+      final refused = own == null || own.isNotEmpty
+          ? await _copyLegacy(scoped, own, current, adoption)
+          : const <String, int>{};
+      if (refused.isNotEmpty) {
         _log(
-          'the secrets of the build before the app scope are not migratable: the '
-          'keychain refuses ${refused.key} without a dialog (status ${refused.status}); '
-          'the app starts without them (enrollment)',
+          'the keychain refuses ${refused.length} old secrets without a dialog '
+          '(${[for (final MapEntry(:key, :value) in refused.entries) '$key: status $value'].join(', ')}); '
+          'they stay at the old place, an instance with a refused secret starts without '
+          'its old secrets, the next start tries again',
         );
+        return;
       }
-      if (adoption.abandoned) return;
+      if (adoption.abandoned || marked) return;
       await _write(scopeMarkerKey, appId, scoped);
     } on Object catch (error) {
       _log(
@@ -421,58 +427,100 @@ final class FlutterSecureBackend implements SecureBackend {
     }
   }
 
-  /// Copies the old secrets of the instances in [own] (null: every instance) into [scoped];
-  /// throws [_NotMigratable] before any write when the old store refuses an item.
-  Future<void> _copyLegacy(
+  static bool _isRefreshToken(String key) => _refreshTokenKey.hasMatch(key);
+
+  /// Whether the scope keys [current] hold a session of [instanceId] (a refresh token).
+  static bool _settled(String instanceId, Set<String> current) => current.any(
+    (key) => _refreshTokenKey.firstMatch(key)?.group(1) == instanceId,
+  );
+
+  /// Copies the old secrets of the instances in [own] (null: every instance) that have no
+  /// session in the scope ([current]) yet; an old value replaces what a failed earlier move left
+  /// in the scope. An instance with a refused old item is not copied at all (no half session).
+  /// Returns the refused items with their status; empty when nothing was refused.
+  Future<Map<String, int>> _copyLegacy(
     MacOsOptions scoped,
     Set<String>? own,
+    Set<String> current,
     _Adoption adoption,
   ) async {
-    final legacy = await _legacyItems(_legacyMac(scoped), own);
-    if (legacy.isEmpty || adoption.abandoned) return;
-    final current = await _scopedKeys(scoped);
+    final open = own?.where((id) => !_settled(id, current)).toSet();
+    if (open != null && open.isEmpty) return const {};
+    final (:items, :refused) = await _legacyItems(_legacyMac(scoped), open);
+    if (items.isEmpty || adoption.abandoned) return refused;
+    final blocked = {for (final key in refused.keys) _instanceOf(key)};
     final pending = <String, List<String>>{};
-    for (final key in legacy.keys) {
+    for (final key in items.keys) {
       final id = _instanceOf(key);
-      if (id == null) continue;
+      if (id == null || blocked.contains(id)) continue;
       if (own != null && !own.contains(id)) continue;
-      if (current.any((k) => k.startsWith('instance/$id/'))) continue;
+      if (_settled(id, current)) continue;
       (pending[id] ??= []).add(key);
     }
     final appKeys = [
-      for (final key in legacy.keys)
+      for (final key in items.keys)
         if (key.startsWith('app/') && !_internalKeys.contains(key)) key,
     ];
-    final remembered = _instanceIdOf(legacy['app/instance']);
+    final remembered =
+        _instanceIdOf(items['app/instance']) ??
+        _sessionUnder(items, items['app/server_address']);
     if (own == null || (remembered != null && own.contains(remembered))) {
-      if (appKeys.isNotEmpty) pending[''] = appKeys;
+      // With the session of the remembered instance its server goes along; otherwise only what
+      // the scope does not have yet.
+      final withSession = remembered != null && pending.containsKey(remembered);
+      final take = [
+        for (final key in appKeys)
+          if (withSession || !current.contains(key)) key,
+      ];
+      if (take.isNotEmpty) pending[''] = take;
     }
-    if (pending.isEmpty) return;
+    if (pending.isEmpty) return refused;
     var copied = 0;
     for (final key in pending.values.expand((keys) => keys)) {
-      if (adoption.abandoned) return;
-      if (current.contains(key)) continue;
-      await _put(key, legacy[key]!, scoped);
+      if (adoption.abandoned) return refused;
+      await _put(key, items[key]!, scoped);
       copied++;
     }
     if (_shared(scoped)) {
       for (final id in pending.keys.where((id) => id.isNotEmpty)) {
-        if (adoption.abandoned) return;
+        if (adoption.abandoned) return refused;
         await _put('instance/$id/$deviceKeyScopeKey', id, scoped);
       }
     }
-    if (adoption.abandoned) return;
-    await _write(legacyPendingKey, jsonEncode(pending), scoped);
+    if (adoption.abandoned) return refused;
+    final earlier = _jsonMap(await _read(legacyPendingKey, scoped)) ?? {};
+    await _write(
+      legacyPendingKey,
+      jsonEncode({...earlier, ...pending}),
+      scoped,
+    );
     _log(
       'copied $copied secrets of the build before the app scope into the scope of '
       '$appId (instances ${pending.keys.where((id) => id.isNotEmpty).join(', ')}); '
       'the old items stay until the first refresh',
     );
+    return refused;
   }
 
-  /// The secrets a build before the app scope left, under [legacyPrefixes]: listed where the
-  /// store can list them, else read by their names for the instances in [own].
-  Future<Map<String, String>> _legacyItems(
+  /// The instance with an old session under the origin of [address] in [items], or null: the
+  /// owner of the remembered server where `app/instance` was not read.
+  static String? _sessionUnder(Map<String, String> items, String? address) {
+    final uri = address == null ? null : Uri.tryParse(address);
+    if (uri == null || !uri.hasAuthority) return null;
+    final origin = uri.origin;
+    for (final key in items.keys) {
+      final match = _refreshTokenKey.firstMatch(key);
+      if (match != null && key.contains('/auth/$origin/')) {
+        return match.group(1);
+      }
+    }
+    return null;
+  }
+
+  /// The secrets a build before the app scope left, under [legacyPrefixes], and the items the
+  /// store refused with their status: listed where the store can list them, else read by their
+  /// names for the instances in [own].
+  Future<({Map<String, String> items, Map<String, int> refused})> _legacyItems(
     MacOsOptions legacyMac,
     Set<String>? own,
   ) async {
@@ -486,59 +534,60 @@ final class FlutterSecureBackend implements SecureBackend {
     } on PlatformException catch (error) {
       final status = error.details;
       if (status is int && LegacyKeychain.deniedStatuses.contains(status)) {
-        throw _NotMigratable('the old items', status);
+        return (items: <String, String>{}, refused: {'the old items': status});
       }
       rethrow;
     }
-    return {
-      for (final MapEntry(:key, :value) in all.entries)
-        if (legacyPrefixes.any(key.startsWith) && !_internalKeys.contains(key))
-          key: value,
-    };
+    return (
+      items: {
+        for (final MapEntry(:key, :value) in all.entries)
+          if (legacyPrefixes.any(key.startsWith) &&
+              !_internalKeys.contains(key))
+            key: value,
+      },
+      refused: const <String, int>{},
+    );
   }
 
   /// The old secrets of the instances [ids] in the login keychain, read by their names without
-  /// a dialog ([LegacyKeychain]): the app keys, the instance keys and the session keys under
-  /// the origin of the remembered server. Throws [_NotMigratable] when the keychain refuses one.
-  Future<Map<String, String>> _legacyByName(Set<String> ids) async {
+  /// a dialog ([LegacyKeychain]) and only those the build before the scope read at every start:
+  /// [legacyReadAppKeys], the instance keys and the session keys under the origin of the
+  /// remembered server address. An item the keychain does not give out is returned in `refused`
+  /// with its status, never thrown.
+  Future<({Map<String, String> items, Map<String, int> refused})> _legacyByName(
+    Set<String> ids,
+  ) async {
     final found = <String, String>{};
+    final refused = <String, int>{};
     Future<void> take(String key) async {
       final (:status, :value) = await legacyKeychain.read(
         AppleOptions.defaultAccountName,
         key,
       );
       if (status == LegacyKeychain.itemNotFound) return;
-      if (LegacyKeychain.deniedStatuses.contains(status)) {
-        throw _NotMigratable(key, status);
+      if (status == LegacyKeychain.success && value != null) {
+        found[key] = value;
+      } else {
+        refused[key] = status;
       }
-      if (status != LegacyKeychain.success || value == null) {
-        throw StateError('the old item $key answered status $status');
-      }
-      found[key] = value;
     }
 
-    for (final key in legacyAppKeys) {
+    for (final key in legacyReadAppKeys) {
       await take(key);
     }
-    final origins = <String>{
-      for (final address in [
-        found['app/server_address'],
-        _addressOf(found['app/instance']),
-      ])
-        if (address != null && Uri.tryParse(address)?.hasAuthority == true)
-          Uri.parse(address).origin,
-    };
+    final address = found['app/server_address'];
+    final uri = address == null ? null : Uri.tryParse(address);
+    final origin = uri != null && uri.hasAuthority ? uri.origin : null;
     for (final id in ids) {
       for (final name in legacyInstanceKeys) {
         await take('instance/$id/$name');
       }
-      for (final origin in origins) {
-        for (final name in legacyAuthKeys) {
-          await take('instance/$id/auth/$origin/$name');
-        }
+      if (origin == null) continue;
+      for (final name in legacyAuthKeys) {
+        await take('instance/$id/auth/$origin/$name');
       }
     }
-    return found;
+    return (items: found, refused: refused);
   }
 
   static String? _instanceOf(String key) {
@@ -561,11 +610,6 @@ final class FlutterSecureBackend implements SecureBackend {
   static String? _instanceIdOf(String? instanceJson) {
     final id = _jsonMap(instanceJson)?['instance_id'];
     return id is String ? id : null;
-  }
-
-  static String? _addressOf(String? instanceJson) {
-    final address = _jsonMap(instanceJson)?['address'];
-    return address is String ? address : null;
   }
 
   /// Deletes the old items of [instanceId] after its first successful refresh (see the class
@@ -727,14 +771,6 @@ final class FlutterSecureBackend implements SecureBackend {
 /// One copy of the old secrets; [abandoned] once the start stopped waiting for it.
 final class _Adoption {
   bool abandoned = false;
-}
-
-/// The old store refused [key] without a dialog ([status]): the old secrets are not migratable.
-final class _NotMigratable implements Exception {
-  const _NotMigratable(this.key, this.status);
-
-  final String key;
-  final int status;
 }
 
 /// The answer of [LegacyKeychain.read]: the `OSStatus` of the Security framework and the value

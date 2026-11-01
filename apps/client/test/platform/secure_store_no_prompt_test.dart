@@ -85,14 +85,15 @@ void main() {
 
   for (final MapEntry(key: name, value: build) in _loginBuilds.entries) {
     group(name, () {
-      test('old items another app wrote are not migratable: no dialog, the '
-          'start goes on with enrollment and logs it once', () async {
+      test('old items another app wrote: no dialog, nothing copied, no '
+          'marker, the start goes on with enrollment, and once the scope has '
+          'a session the old place is no longer read', () async {
         final storage = SharedStorage(
           TargetPlatform.macOS,
           entitled: build.entitled,
         );
         _oldSession(storage);
-        // The live keychain: every old item trusts only the old bundle identifier.
+        // Every old item trusts only the old bundle identifier.
         storage.foreign.addAll(
           storage.at(AppleOptions.defaultAccountName).keys,
         );
@@ -112,12 +113,26 @@ void main() {
           isEmpty,
           reason: 'the plugin can show a dialog',
         );
-        expect(logs.where((l) => l.contains('not migratable')), hasLength(1));
+        expect(logs.where((l) => l.contains('refuses')), hasLength(1));
+        expect(
+          await backend.read(FlutterSecureBackend.scopeMarkerKey),
+          isNull,
+          reason: 'a refusal is never final (FIX-MMD/2)',
+        );
         // Enrollment writes the new session; nothing waits for the old items.
         await InstanceSecrets(backend, _i1).write('device_id', 'new');
-        expect(await backend.keys(), {'instance/$_i1/device_id'});
+        await InstanceSecrets(
+          backend,
+          _i1,
+        ).write('auth/$_origin/refresh_token', 'r-new');
+        expect(
+          storage.at(AppleOptions.defaultAccountName),
+          hasLength(5),
+          reason: 'nothing old deleted',
+        );
 
-        // The next start does not ask the keychain again and logs nothing.
+        // The next start finds the session in the scope: it does not ask the keychain for
+        // the old items again, logs nothing about them and records the marker.
         storage.legacyKeychain.calls.clear();
         final nextLogs = <String>[];
         final next = _backend(storage, build.keychain, logs: nextLogs);
@@ -127,6 +142,7 @@ void main() {
           nextLogs.where((l) => l.contains('build before the app scope')),
           isEmpty,
         );
+        expect(await next.read(FlutterSecureBackend.scopeMarkerKey), _app);
       });
 
       test(
@@ -189,9 +205,12 @@ void main() {
         expect(await backend.read(_dbKey), 'k');
         expect(storage.pluginLegacyCalls, isEmpty);
 
-        // The first refresh removes the old items through the reader as well.
+        // The first refresh removes the copied old items through the reader as well;
+        // `app/instance` was never read, so it stays (FIX-MMD/1).
         await backend.write(_token, 'r2');
-        expect(storage.at(AppleOptions.defaultAccountName), isEmpty);
+        expect(storage.at(AppleOptions.defaultAccountName).keys, [
+          'app/instance',
+        ]);
         expect(storage.pluginLegacyCalls, isEmpty);
       });
 

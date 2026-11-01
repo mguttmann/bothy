@@ -594,12 +594,13 @@ Therefore the secrets belong to one app identity (FIX-app-logout, docs/decisions
 on iOS and macOS they sit under the keychain service `<bundle identifier>.secrets`, on Windows and
 Android under the key prefix `<bundle identifier or application ID>/`, and a build with another
 identity never reads, lists or deletes them; a new identity starts with enrollment. Secrets of a
-build before this rule are copied into the scope once at the first start (addendum of 2026-10-31,
+build before this rule are copied into the scope at the start (addendum of 2026-10-31,
 FIX-secure-store-migration, docs/decisions.d/FIX-secure-store-migration.md; reason: the first
 version of the move failed in the macOS login keychain and signed updated installations out): per
-instance and only for an instance without secrets in the scope; where only the app reaches the old
-store every instance, in a shared store (the macOS login keychain, Windows) only the instances with
-a folder under the app's data root, and the remembered server only with its instance. The old items
+instance and only for an instance without a session in the scope (FIX-macos-migration-denied);
+where only the app reaches the old store every instance, in a shared store (the macOS login
+keychain, Windows) only the instances with a folder under the app's data root, and the remembered
+server only with its instance. The old items
 stay until the first successful refresh of their instance and are deleted then; a failed copy is
 logged, tried again at the next start, and the app starts with enrollment. The login keychain cannot
 list its items (`readAll` answers -50, `errSecParam`), so there the app keeps the list of its keys
@@ -611,9 +612,16 @@ trusts only the app of the old bundle identifier): in the macOS login keychain t
 and deletes them over the channel `bothy/legacy_keychain` with the user interaction of the keychain
 off, so such an item answers `errSecAuthFailed` at once (`kSecUseAuthenticationUI` does not stop
 that dialog); on iOS and in the Data Protection keychain the old reads pass
-`kSecUseAuthenticationUISkip`. A refused item makes the old secrets not migratable: nothing is
-copied, the app logs it once and starts with enrollment; only `errSecInteractionNotAllowed`, which
-a locked keychain or device answers as well, leaves the move to the next start. The copy has the
+`kSecUseAuthenticationUISkip`. A refused item is never final (addendum of 2026-11-01,
+FIX-macos-migration-denied, docs/decisions.d/FIX-macos-migration-denied.md; reason: one refused
+item, which the earlier build never read at a normal start, signed the owner's macOS installation
+out for good): in the login keychain the move reads only what the build before the scope read at
+every start (`app/server_address`, `app/update_notice_dismissed`, the instance keys, the session
+under the remembered server's origin; never `app/instance`), a refused item stays at the old
+place, its instance is not copied, the rest is, and no marker is written, so the next start tries
+again. An instance counts as moved only when the scope holds its session; until then its old
+secrets replace what an earlier move left, and the marker `app/secret_scope` ends the move only
+while the scope holds a session. The copy has the
 deadline `FlutterSecureBackend.legacyDeadline` and every call of the store the deadline
 `FlutterSecureBackend.callDeadline`, after which the call fails instead of holding the start.
 The database key is 32 bytes from `Random.secure()`, created at the first start of an instance;
