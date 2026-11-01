@@ -17,6 +17,7 @@ import (
 	identityjobs "github.com/OWNER/bothy/services/server/internal/identity/adapters/jobs"
 	instancejobs "github.com/OWNER/bothy/services/server/internal/instance/adapters/jobs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/retention"
+	messagingjobs "github.com/OWNER/bothy/services/server/internal/messaging/adapters/jobs"
 	notifyjobs "github.com/OWNER/bothy/services/server/internal/notify/adapters/jobs"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/jobs"
@@ -128,6 +129,10 @@ type JobModules struct {
 	FilesPurge      filesjobs.PurgeRunner
 	FilesCleanup    filesjobs.CleanupRunner
 	FilesGCInterval time.Duration
+	// MessagingPurge is the use case of messaging.purge_deleted (FEAT-delete-spaces-chats); nil in
+	// the role api. MessagingPurgeInterval is chat.delete_purge_interval, set in every role.
+	MessagingPurge         messagingjobs.PurgeRunner
+	MessagingPurgeInterval time.Duration
 	// FilesExtractText and FilesExtractRefresh are the use cases of files.extract_text and
 	// files.extract_text_refresh (M3-15); nil in the role api. FilesExtractInterval is
 	// search.extract.refresh_interval, the period of the refresh.
@@ -215,7 +220,9 @@ func TerminalSweepConfigFrom(v *config.Values) (TerminalSweepConfig, error) {
 // status.probe on the queue maintenance every status.check_interval and once at the start
 // (M7-09), and the six
 // class jobs retention.<class> on the queue maintenance, periodic every retention.job_interval
-// (M7-05); the error is the first rejected registration.
+// (M7-05), and messaging.purge_deleted on the queue maintenance, periodic every
+// chat.delete_purge_interval and once at the start (FEAT-delete-spaces-chats); the error is the
+// first rejected registration.
 func NewJobRegistry(m *JobModules) (*jobs.Registry, error) {
 	if m == nil {
 		return nil, errors.New("wire: NewJobRegistry needs the job modules")
@@ -246,6 +253,9 @@ func NewJobRegistry(m *JobModules) (*jobs.Registry, error) {
 		return nil, err
 	}
 	if err := registerFilesJobs(reg, m); err != nil {
+		return nil, err
+	}
+	if err := messagingjobs.Register(reg, m.MessagingPurge, m.MessagingPurgeInterval); err != nil {
 		return nil, err
 	}
 	if err := registerRunsJobs(reg, m); err != nil {

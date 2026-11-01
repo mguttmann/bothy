@@ -93,3 +93,10 @@ FOR SHARE OF c;
 -- Every channel of a space, archived ones included, ascending: the targets of the cleanup of
 -- notification preferences when the space is archived (M3-18).
 SELECT id FROM channels WHERE space_id = @space_id ORDER BY id;
+
+-- name: SaveChannelDeletion :exec
+-- Writes a delete or restore of channel.delete and channel.restore (D-DEL-2): the archive time,
+-- the deletion and the version.
+UPDATE channels
+SET archived_at = sqlc.narg(archived_at), deleted_at = sqlc.narg(deleted_at), deleted_by = sqlc.narg(deleted_by), version = @version
+WHERE id = @id;

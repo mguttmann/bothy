@@ -5938,6 +5938,125 @@ paths:
         default:
           $ref: '#/components/responses/Error'
 
+  /spaces/{space_id}/delete:
+    post:
+      operationId: deleteSpace
+      summary: Delete a space
+      tags: [Spaces]
+      description: 'Soft delete with undo (01 6.18, 07 4.5a): the space is archived and marked deleted in one rights change, leaves every list at once and its archive event carries `deleted_at`; active runs in it end. Until `undo_until` (`chat.delete_undo_window`) `restoreSpace` undoes it; after that the job `messaging.purge_deleted` deletes the content of every channel for good (tombstones, redaction, files). Deleting again while pending answers the pending deletion.'
+      x-authz-action: space.delete
+      x-rate-limit-class: rl.admin
+      parameters:
+      - $ref: '#/components/parameters/SpaceIdPath'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: OK, the deletion is pending until `undo_until`.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeletionInfo'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /spaces/{space_id}/restore:
+    post:
+      operationId: restoreSpace
+      summary: Undo the deletion of a space
+      tags: [Spaces]
+      description: 'Undoes a pending deletion before `undo_until`: clears `deleted_at` and the archive the deletion set, as a rights change with `access.changed`, and publishes `space.updated`. A space that is not deleted is answered without effect; after `undo_until` `409 conflict` with `reason` `undo_window_passed`.'
+      x-authz-action: space.restore
+      x-rate-limit-class: rl.admin
+      parameters:
+      - $ref: '#/components/parameters/SpaceIdPath'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: OK.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Space'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /spaces/{space_id}/deletion:
+    get:
+      operationId: getSpaceDeletion
+      summary: What deleting a space removes, or the state of its deletion
+      tags: [Spaces]
+      description: 'Before a deletion, the counts of what it removes; after it, `state` `pending` until `undo_until`, then `final`. Read with `space.read`, also for a deleted space.'
+      x-authz-action: space.read
+      x-rate-limit-class: rl.read
+      parameters:
+      - $ref: '#/components/parameters/SpaceIdPath'
+      responses:
+        '200':
+          description: OK.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeletionInfo'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
   /spaces/{space_id}/operator:
     put:
       operationId: setSpaceOperator
@@ -6553,6 +6672,136 @@ paths:
           $ref: '#/components/responses/NotFound'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /channels/{channel_id}/delete:
+    post:
+      operationId: deleteChannel
+      summary: Delete a channel
+      tags: [Channels]
+      description: 'Soft delete with undo (01 6.18, 07 4.5a): the channel is archived and marked deleted in one rights change, leaves every list at once and `channel.archived` carries `deleted_at`; active runs in it end. With `trash_project_folder` (a forum with a project binding only) the caller also needs `channel.project.bind`, and the last folder check of the serving runner must be ok (`409 conflict` with `reason` `project_folder_refused` otherwise); the runner moves the folder to the trash of its host once the deletion is final (09 18.15). Until `undo_until` `restoreChannel` undoes it; then `messaging.purge_deleted` deletes the content for good. A dm channel is never deleted (`409 conflict`, `reason` `dm_channel`).'
+      x-authz-action: channel.delete
+      x-rate-limit-class: rl.admin
+      parameters:
+      - $ref: '#/components/parameters/ChannelIdPath'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChannelDelete'
+            examples:
+              default:
+                summary: Request
+                value:
+                  trash_project_folder: false
+      responses:
+        '200':
+          description: OK, the deletion is pending until `undo_until`.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeletionInfo'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /channels/{channel_id}/restore:
+    post:
+      operationId: restoreChannel
+      summary: Undo the deletion of a channel
+      tags: [Channels]
+      description: 'Undoes a pending deletion before `undo_until`: clears `deleted_at` and the archive the deletion set, drops a folder request, as a rights change with `access.changed`, and publishes `channel.updated`. A channel that is not deleted is answered without effect; after `undo_until` `409 conflict` with `reason` `undo_window_passed`; in a deleted space `409 conflict` with `reason` `space_deleted`.'
+      x-authz-action: channel.restore
+      x-rate-limit-class: rl.admin
+      parameters:
+      - $ref: '#/components/parameters/ChannelIdPath'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: OK.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Channel'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /channels/{channel_id}/deletion:
+    get:
+      operationId: getChannelDeletion
+      summary: What deleting a channel removes, or the state of its deletion
+      tags: [Channels]
+      description: 'Before a deletion, the counts of what it removes and, for owners and a forum with a project binding, the folder and the last check of the serving runner (`project_folder`); after it, `state` `pending` until `undo_until`, then `final`, with the folder outcome. Read with `channel.read`, also for a deleted channel.'
+      x-authz-action: channel.read
+      x-rate-limit-class: rl.read
+      parameters:
+      - $ref: '#/components/parameters/ChannelIdPath'
+      responses:
+        '200':
+          description: OK.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeletionInfo'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
         '429':
           $ref: '#/components/responses/TooManyRequests'
         default:
@@ -8181,6 +8430,125 @@ paths:
                     tag_ids: [0192f4a0-7b1c-712d-8017-1dad64203598]
         '400':
           $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /threads/{thread_id}/delete:
+    post:
+      operationId: deleteThread
+      summary: Delete a thread
+      tags: [Threads]
+      description: 'Soft delete with undo (01 6.18, 07 4.5a): the chat leaves every list at once and `thread.updated` carries `deleted_at`; its history answers `404`, new messages are refused and active runs in it end. A main thread is never deleted alone (`409 conflict`, `reason` `main_thread`). Until `undo_until` `restoreThread` undoes it; then `messaging.purge_deleted` deletes its content for good.'
+      x-authz-action: thread.delete
+      x-rate-limit-class: rl.write
+      parameters:
+      - $ref: '#/components/parameters/ThreadIdPath'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: OK, the deletion is pending until `undo_until`.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeletionInfo'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /threads/{thread_id}/restore:
+    post:
+      operationId: restoreThread
+      summary: Undo the deletion of a thread
+      tags: [Threads]
+      description: 'Undoes a pending deletion before `undo_until` and publishes `thread.updated` without `deleted_at`. A thread that is not deleted is answered without effect; after `undo_until` `409 conflict` with `reason` `undo_window_passed`.'
+      x-authz-action: thread.restore
+      x-rate-limit-class: rl.write
+      parameters:
+      - $ref: '#/components/parameters/ThreadIdPath'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: OK.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Thread'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /threads/{thread_id}/deletion:
+    get:
+      operationId: getThreadDeletion
+      summary: What deleting a thread removes, or the state of its deletion
+      tags: [Threads]
+      description: 'Before a deletion, the counts of what it removes; after it, `state` `pending` until `undo_until`, then `final`. Read with `thread.read` on its channel, also for a deleted thread.'
+      x-authz-action: thread.read
+      x-rate-limit-class: rl.read
+      parameters:
+      - $ref: '#/components/parameters/ThreadIdPath'
+      responses:
+        '200':
+          description: OK.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeletionInfo'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -22475,7 +22843,7 @@ components:
       - code: conflict
         status: 409
         title: 'Conflict'
-        description: 'The state prevents the change (for example a name is taken); `reason` names the cause where one is defined.'
+        description: 'The state prevents the change (for example a name is taken); `reason` names the cause where one is defined (for example `undo_window_passed`, `main_thread`, `dm_channel`, `project_folder_refused` and `space_deleted` of deleting, 07 section 4.5a).'
         client_action: 'Reload the state; a person decides.'
       - code: request_in_progress
         status: 409
@@ -24389,6 +24757,9 @@ components:
           $ref: '#/components/schemas/Uuid'
         archived_at:
           $ref: '#/components/schemas/Timestamp'
+        deleted_at:
+          $ref: '#/components/schemas/Timestamp'
+          description: Set while the item is deleted, pending or final (01 6.18); clients remove it and its local content, and a later version without it brings it back.
         version:
           type: integer
           format: int64
@@ -24536,6 +24907,9 @@ components:
             $ref: '#/components/schemas/Uuid'
         archived_at:
           $ref: '#/components/schemas/Timestamp'
+        deleted_at:
+          $ref: '#/components/schemas/Timestamp'
+          description: Set while the item is deleted, pending or final (01 6.18); clients remove it and its local content, and a later version without it brings it back.
         version:
           type: integer
           format: int64
@@ -24680,6 +25054,137 @@ components:
           items:
             type: string
             examples: [support-triage]
+    ChannelDelete:
+      type: object
+      additionalProperties: false
+      properties:
+        trash_project_folder:
+          type: boolean
+          default: false
+          description: Also move the project folder of a forum with a project binding to the trash of the serving runner's host once the deletion is final (09 18.15). Needs `channel.project.bind` and an ok folder check.
+    DeletionInfo:
+      type: object
+      required: [target_kind, target_id, state, contents]
+      properties:
+        target_kind:
+          type: string
+          enum: [space, channel, thread]
+        target_id:
+          $ref: '#/components/schemas/Uuid'
+        state:
+          type: string
+          enum: [live, pending, final]
+          description: '`live` before a deletion (a preview), `pending` while it can be undone, `final` after `undo_until`.'
+        deleted_at:
+          $ref: '#/components/schemas/Timestamp'
+        undo_until:
+          $ref: '#/components/schemas/Timestamp'
+          description: The end of the undo window, `deleted_at` plus `chat.delete_undo_window`; absent while `live`.
+        contents:
+          $ref: '#/components/schemas/DeletionContents'
+        project_folder:
+          $ref: '#/components/schemas/ProjectFolderDeletion'
+    DeletionContents:
+      type: object
+      required: [channels, threads, messages, files, sessions]
+      description: What the deletion removes, counted when read; for a pending or final deletion what it removed or removes.
+      properties:
+        channels:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Channels and forums, not counting dm channels.
+        threads:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Chats and threads, not counting main threads.
+        messages:
+          type: integer
+          format: int64
+          minimum: 0
+        files:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Files attached to those messages.
+        sessions:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Agent sessions of those chats.
+    ProjectFolderDeletion:
+      type: object
+      required: [workspace_ref]
+      description: The project folder of a forum with a project binding; only for owners (`channel.project.bind`).
+      properties:
+        workspace_ref:
+          type: string
+          examples: [website]
+        trash_check:
+          $ref: '#/components/schemas/ProjectTrashCheck'
+        trash_state:
+          type: string
+          enum: [requested, trashed, refused]
+          description: Absent when no move was requested; `requested` until the runner reports.
+        trash_reason:
+          type: string
+          description: The refusal code of the runner with `trash_state` `refused` (09 18.15).
+          pattern: '^[a-z0-9][a-z0-9_]*$'
+          maxLength: 64
+    ProjectTrashCheck:
+      type: object
+      required: [ok]
+      description: Whether the serving runner would move the folder to the trash now (09 18.15). Absent in `ProjectFolderDeletion` before the runner's first check.
+      properties:
+        ok:
+          type: boolean
+        reason:
+          type: string
+          description: Why not, with `ok` false; a code of 09 18.15 (`outside_root`, `symlink`, `foreign_worktree`, `uncommitted_changes`, `unpushed_commits`, `contains_other_project`, `workspace_missing`, `check_failed`).
+          pattern: '^[a-z0-9][a-z0-9_]*$'
+          maxLength: 64
+        checked_at:
+          $ref: '#/components/schemas/Timestamp'
+          description: When the server received the check.
+    ProjectTrashCheckReport:
+      type: object
+      additionalProperties: false
+      required: [ok]
+      description: The folder check a runner reports in its readiness entry (09 18.15).
+      properties:
+        ok:
+          type: boolean
+        reason:
+          type: string
+          description: Why not, with `ok` false; a code of 09 18.15.
+          pattern: '^[a-z0-9][a-z0-9_]*$'
+          maxLength: 64
+    ProjectTrashRequest:
+      type: object
+      required: [channel_id, workspace_ref]
+      description: A project folder the runner moves to the trash (09 18.15).
+      properties:
+        channel_id:
+          $ref: '#/components/schemas/Uuid'
+        workspace_ref:
+          type: string
+          examples: [website]
+    ProjectTrashResult:
+      type: object
+      additionalProperties: false
+      required: [channel_id, result]
+      properties:
+        channel_id:
+          $ref: '#/components/schemas/Uuid'
+        result:
+          type: string
+          enum: [trashed, refused]
+        reason:
+          type: string
+          description: The refusal code with `result` `refused` (09 18.15).
+          pattern: '^[a-z0-9][a-z0-9_]*$'
+          maxLength: 64
     ProjectBinding:
       type: object
       required: [workspace_ref, runner_config, ready, version]
@@ -24943,6 +25448,9 @@ components:
           $ref: '#/components/schemas/Timestamp'
         moved_at:
           $ref: '#/components/schemas/Timestamp'
+        deleted_at:
+          $ref: '#/components/schemas/Timestamp'
+          description: Set while the item is deleted, pending or final (01 6.18); clients remove it and its local content, and a later version without it brings it back.
         version:
           type: integer
           format: int64
@@ -26307,6 +26815,11 @@ components:
           description: Runners only, the folder names directly under the projects root that are Git work trees, sorted, at most `runner.project_folders_max` (09 18.13, M4-44). Applied only when present and different from the last list this server process applied; absent means "unchanged". Names only, never a path.
           items:
             $ref: '#/components/schemas/ProjectFolderName'
+        project_trash_results:
+          type: array
+          description: Runners only, the outcome of each folder move of `HeartbeatAck.project_trash` the runner finished since its last heartbeat (09 18.15); the server stores it once and audits it as `channel.project.trash`.
+          items:
+            $ref: '#/components/schemas/ProjectTrashResult'
     ProjectFolderName:
       type: string
       description: One folder name directly under a runner's projects root, the one-segment form of `workspace_ref` (09 18.12 item 2).
@@ -26345,6 +26858,9 @@ components:
           description: Why the forum is not ready, a code of 09 18.12 (for example `provisioning`, `workspace_exists`, `clone_failed`); only with `ready` false. Stored as `project_bindings.ready_reason`.
           pattern: '^[a-z0-9][a-z0-9_]*$'
           maxLength: 64
+        trash_check:
+          $ref: '#/components/schemas/ProjectTrashCheckReport'
+          description: Runners only, the folder check of 09 18.15, at most every `runner.trash_check_interval`; stored on the binding. Absent means unchanged.
     HeartbeatAck:
       type: object
       required: [presence, interval_ms]
@@ -26355,6 +26871,11 @@ components:
           type: integer
           format: int64
           description: Interval the adapter should keep, `sync.heartbeat_interval`.
+        project_trash:
+          type: array
+          description: Runners only, the project folders of deleted forums this agent served whose deletion is final and whose move is not reported yet (09 18.15); absent when there are none.
+          items:
+            $ref: '#/components/schemas/ProjectTrashRequest'
     ConsumerAck:
       type: object
       additionalProperties: false

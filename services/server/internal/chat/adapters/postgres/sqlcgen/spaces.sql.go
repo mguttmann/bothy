@@ -58,7 +58,7 @@ func (q *Queries) ArchiveSpace(ctx context.Context, arg ArchiveSpaceParams) erro
 
 const getSpace = `-- name: GetSpace :one
 
-SELECT id, name, icon, color, sort_key, default_operator_agent_id, created_by, created_at, archived_at, version FROM spaces WHERE id = $1
+SELECT id, name, icon, color, sort_key, default_operator_agent_id, created_by, created_at, archived_at, version, deleted_at, deleted_by, purged_at FROM spaces WHERE id = $1
 `
 
 // SPDX-License-Identifier: Apache-2.0
@@ -81,6 +81,9 @@ func (q *Queries) GetSpace(ctx context.Context, id pgtype.UUID) (Space, error) {
 		&i.CreatedAt,
 		&i.ArchivedAt,
 		&i.Version,
+		&i.DeletedAt,
+		&i.DeletedBy,
+		&i.PurgedAt,
 	)
 	return i, err
 }
@@ -116,7 +119,7 @@ func (q *Queries) InsertSpace(ctx context.Context, arg InsertSpaceParams) error 
 }
 
 const listVisibleSpaces = `-- name: ListVisibleSpaces :many
-SELECT id, name, icon, color, sort_key, default_operator_agent_id, created_by, created_at, archived_at, version FROM spaces
+SELECT id, name, icon, color, sort_key, default_operator_agent_id, created_by, created_at, archived_at, version, deleted_at, deleted_by, purged_at FROM spaces
 WHERE archived_at IS NULL AND ($1::boolean OR id = ANY ($2::uuid[]))
 ORDER BY sort_key, id
 `
@@ -148,6 +151,9 @@ func (q *Queries) ListVisibleSpaces(ctx context.Context, arg ListVisibleSpacesPa
 			&i.CreatedAt,
 			&i.ArchivedAt,
 			&i.Version,
+			&i.DeletedAt,
+			&i.DeletedBy,
+			&i.PurgedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -186,7 +192,7 @@ func (q *Queries) LockActiveSpaces(ctx context.Context) ([]pgtype.UUID, error) {
 }
 
 const lockSpace = `-- name: LockSpace :one
-SELECT id, name, icon, color, sort_key, default_operator_agent_id, created_by, created_at, archived_at, version FROM spaces WHERE id = $1 FOR UPDATE
+SELECT id, name, icon, color, sort_key, default_operator_agent_id, created_by, created_at, archived_at, version, deleted_at, deleted_by, purged_at FROM spaces WHERE id = $1 FOR UPDATE
 `
 
 // The space locked for a change (03 section 6.3: domain rows after permission_version).
@@ -204,6 +210,9 @@ func (q *Queries) LockSpace(ctx context.Context, id pgtype.UUID) (Space, error) 
 		&i.CreatedAt,
 		&i.ArchivedAt,
 		&i.Version,
+		&i.DeletedAt,
+		&i.DeletedBy,
+		&i.PurgedAt,
 	)
 	return i, err
 }
@@ -224,8 +233,35 @@ func (q *Queries) MoveSpace(ctx context.Context, arg MoveSpaceParams) error {
 	return err
 }
 
+const saveSpaceDeletion = `-- name: SaveSpaceDeletion :exec
+UPDATE spaces
+SET archived_at = $1, deleted_at = $2, deleted_by = $3, version = $4
+WHERE id = $5
+`
+
+type SaveSpaceDeletionParams struct {
+	ArchivedAt pgtype.Timestamptz
+	DeletedAt  pgtype.Timestamptz
+	DeletedBy  pgtype.UUID
+	Version    int64
+	ID         pgtype.UUID
+}
+
+// Writes a delete or restore of space.delete and space.restore (D-DEL-2): the archive time, the
+// deletion and the version.
+func (q *Queries) SaveSpaceDeletion(ctx context.Context, arg SaveSpaceDeletionParams) error {
+	_, err := q.db.Exec(ctx, saveSpaceDeletion,
+		arg.ArchivedAt,
+		arg.DeletedAt,
+		arg.DeletedBy,
+		arg.Version,
+		arg.ID,
+	)
+	return err
+}
+
 const shareSpace = `-- name: ShareSpace :one
-SELECT id, name, icon, color, sort_key, default_operator_agent_id, created_by, created_at, archived_at, version FROM spaces WHERE id = $1 FOR SHARE
+SELECT id, name, icon, color, sort_key, default_operator_agent_id, created_by, created_at, archived_at, version, deleted_at, deleted_by, purged_at FROM spaces WHERE id = $1 FOR SHARE
 `
 
 // The space held FOR SHARE while notify writes a preference below it (M3-18): an archive holds
@@ -244,6 +280,9 @@ func (q *Queries) ShareSpace(ctx context.Context, id pgtype.UUID) (Space, error)
 		&i.CreatedAt,
 		&i.ArchivedAt,
 		&i.Version,
+		&i.DeletedAt,
+		&i.DeletedBy,
+		&i.PurgedAt,
 	)
 	return i, err
 }

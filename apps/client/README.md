@@ -21,6 +21,9 @@ logic; native code only where the system requires it.
 
 - Spaces, channels, forums and threads; agent sessions with live box, follow-ups, components
   and slash commands ([01-product.md](../../docs/spec/01-product.md)).
+- Deleting spaces, channels, project forums and chats from their menus, with a confirmation that
+  names what goes, an undo toast and, for a project, the folder optionally moved to the trash
+  (01 6.18, R-PR-33).
 - Offline reading and writing with an outbox; catch-up according to
   [04-sync-protocol.md](../../docs/spec/04-sync-protocol.md).
 - Push without content, the app fetches the text itself; sharing from other apps; voice

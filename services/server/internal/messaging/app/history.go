@@ -175,7 +175,9 @@ func (s *Service) readThread(ctx context.Context, a actor.Actor, id ids.ID) (cha
 	if err := s.check(ctx, a, authorize.ActionThreadRead, r); err != nil {
 		return chat.ThreadInfo{}, err
 	}
-	if !found {
+	if !found || info.Deleted {
+		// A deleted thread passes thread.read for its deletion state and its events; its history
+		// is gone at once (D-DEL-3).
 		return chat.ThreadInfo{}, invisible()
 	}
 	return info, nil

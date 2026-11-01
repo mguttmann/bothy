@@ -26,8 +26,14 @@ def readiness_of(beat: dict[str, Any], channel: UUID) -> dict[str, Any] | None:
     return None
 
 
+def ready_state(beat: dict[str, Any], channel: UUID) -> dict[str, Any] | None:
+    """The readiness entry without the folder check of 18.15, which the trash timer adds."""
+    entry = readiness_of(beat, channel)
+    return None if entry is None else {k: v for k, v in entry.items() if k != "trash_check"}
+
+
 def _ready_since(world: World, count: int, channel: UUID) -> bool:
-    return any(readiness_of(b, channel) == {"ready": True} for b in world.fake.heartbeats[count:])
+    return any(ready_state(b, channel) == {"ready": True} for b in world.fake.heartbeats[count:])
 
 
 def _gone_since(world: World, count: int, channel: UUID) -> bool:
@@ -74,7 +80,7 @@ async def test_new_operator_is_served_without_restart_and_unbinding_stops_it(
 async def test_operator_removed_drops_the_forum(world: World) -> None:
     fake = world.fake
     await world.start()
-    assert any(readiness_of(b, world.forum_a) == {"ready": True} for b in fake.heartbeats)
+    assert any(ready_state(b, world.forum_a) == {"ready": True} for b in fake.heartbeats)
     count = len(fake.heartbeats)
     fake.set_operator(world.forum_a, served=False)
     await world.until(lambda: _gone_since(world, count, world.forum_a))

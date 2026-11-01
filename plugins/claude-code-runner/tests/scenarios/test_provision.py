@@ -35,7 +35,7 @@ def readiness_of(beat: dict[str, object], channel: str) -> dict[str, object] | N
     assert isinstance(entries, list)
     for entry in entries:
         if entry["channel_id"] == channel:
-            return {k: v for k, v in entry.items() if k != "channel_id"}
+            return {k: v for k, v in entry.items() if k not in ("channel_id", "trash_check")}
     return None
 
 

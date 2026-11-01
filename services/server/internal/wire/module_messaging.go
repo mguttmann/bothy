@@ -28,14 +28,19 @@ func messagingWiring() moduleWiring {
 		parts:    []part{{order: 1310, step: moduleChat, start: (*server).startMessaging}},
 		handlers: func(s *server, h *Handlers) { s.messaging.fillHandlers(h) },
 		// The job retention.content deletes expired messages through the deletion path (M7-05);
-		// retention.content = none (period zero) registers it without a run.
+		// retention.content = none (period zero) registers it without a run. The job
+		// messaging.purge_deleted deletes the content of deleted spaces, channels and chats after
+		// chat.delete_undo_window through the same path, in batches of retention.batch_size
+		// (FEAT-delete-spaces-chats).
 		jobs: func(s *server, m *JobModules) error {
 			s.mu.Lock()
-			ms := s.messaging
+			ms, c := s.messaging, s.chat
 			s.mu.Unlock()
-			if ms == nil {
-				return errors.New("wire: the jobs step needs the messaging module")
+			if ms == nil || c == nil {
+				return errors.New("wire: the jobs step needs the messaging and chat modules")
 			}
+			m.MessagingPurge = ms.Service.Purge(c.Service, m.RetentionConfig.BatchSize)
+			m.MessagingPurgeInterval = s.values.Duration("chat.delete_purge_interval")
 			return m.registerRetention(ms.Service.Retention(), m.RetentionConfig.ContentPeriod())
 		},
 	}

@@ -193,6 +193,10 @@ class World:
         self.autocomplete: dict[UUID, dict[str, Any]] = {}
         self.autocomplete_answers: dict[UUID, list[dict[str, str]]] = {}
         self.heartbeats: list[dict[str, Any]] = []
+        # Folder moves of deleted forums (09 18.15): handed in every heartbeat answer until a
+        # heartbeat reports the channel's outcome, which is kept in `project_trash_results`.
+        self.project_trash: list[dict[str, str]] = []
+        self.project_trash_results: list[dict[str, Any]] = []
         # Channels Lotse serves: Allgemein first; forums with a project binding join (M2-34).
         self.channels: dict[UUID, dict[str, Any]] = {self.channel_id: self._channel("")}
         # Forums another agent operates: Lotse does not serve them and gets no event about them.
@@ -1569,6 +1573,11 @@ class World:
         if "rate_limit" in body:
             _check_rate_limit(body["rate_limit"])
         self.heartbeats.append(dict(body))
+        for result in body.get("project_trash_results") or ():
+            reported = str(result.get("channel_id"))
+            if any(r["channel_id"] == reported for r in self.project_trash):
+                self.project_trash_results.append(dict(result))
+                self.project_trash = [r for r in self.project_trash if r["channel_id"] != reported]
         presence: dict[str, Any] = {
             "state": body["state"],
             "last_heartbeat_at": self.now_iso(),
@@ -1578,10 +1587,13 @@ class World:
         for name in ("reported_billing_mode", "runtime_version", "reported_tool_class"):
             if name in body:
                 presence[name] = body[name]
-        return {
+        answer: dict[str, Any] = {
             "presence": presence,
             "interval_ms": int(self.timings["sync.heartbeat_interval"] * 1000),
         }
+        if self.project_trash:
+            answer["project_trash"] = [dict(r) for r in self.project_trash]
+        return answer
 
     # Messages, components, interactions, commands -----------------------------------------
 

@@ -11,6 +11,19 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countSessionsOfThreads = `-- name: CountSessionsOfThreads :one
+SELECT count(*)::bigint FROM agent_sessions WHERE thread_id = ANY ($1::uuid[])
+`
+
+// The number of agent sessions of threads (DeletionInfo.contents.sessions of chat,
+// FEAT-delete-spaces-chats). Never authorized: chat authorized the item.
+func (q *Queries) CountSessionsOfThreads(ctx context.Context, threadIds []pgtype.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countSessionsOfThreads, threadIds)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const currentByRef = `-- name: CurrentByRef :one
 SELECT id, thread_id, agent_id, external_session_ref, is_current, started, model, cumulative_cost_micros, cost_baseline_micros, currency, cost_is_estimate, dev_environment_id, created_at, ended_at, end_reason, version FROM agent_sessions WHERE agent_id = $1 AND external_session_ref = $2 AND is_current
 `

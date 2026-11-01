@@ -24,7 +24,10 @@ import '../notifications_settings/providers.dart';
 import '../settings/settings_providers.dart';
 
 /// Wraps [child] so that a right click, the menu key or Shift+F10 on it opens a menu of
-/// [menuChildren] at the pointer (or at the top left of [child] for the keyboard).
+/// [menuChildren] at the pointer (or at the top left of [child] for the keyboard). On a touch
+/// screen a long press opens it where the finger lifts (01 6.18 item 1): the press must end
+/// without moving, so a long press that moves stays the drag of a sidebar row (D-M4-51-6), and a
+/// tap that follows a long press does not open the row (D-DEL-UI-1).
 ///
 /// The entries are built only while the menu is open, inside a [Consumer] that watches the
 /// [levelContextProvider]: the row itself needs no provider (the sidebar and the post list
@@ -63,7 +66,57 @@ class TargetMenuRegion extends StatefulWidget {
 class _TargetMenuRegionState extends State<TargetMenuRegion> {
   final MenuController _menu = MenuController();
 
+  /// The finger of a press that may become a long press, where it went down, and whether it
+  /// has been held for [kLongPressTimeout].
+  int? _finger;
+  Offset _fingerAt = Offset.zero;
+  bool _held = false;
+  Timer? _hold;
+
+  static const Set<PointerDeviceKind> _touchKinds = {
+    PointerDeviceKind.touch,
+    PointerDeviceKind.stylus,
+    PointerDeviceKind.invertedStylus,
+  };
+
   void _open([Offset? at]) => _menu.open(position: at ?? Offset.zero);
+
+  void _down(PointerDownEvent e) {
+    if (e.buttons == kSecondaryMouseButton) {
+      _open(e.localPosition);
+      return;
+    }
+    if (!_touchKinds.contains(e.kind)) return;
+    _release();
+    _finger = e.pointer;
+    _fingerAt = e.localPosition;
+    _hold = Timer(kLongPressTimeout, () => _held = true);
+  }
+
+  void _move(PointerMoveEvent e) {
+    if (e.pointer != _finger) return;
+    if ((e.localPosition - _fingerAt).distance > kTouchSlop) _release();
+  }
+
+  void _up(PointerUpEvent e) {
+    if (e.pointer != _finger) return;
+    final open = _held;
+    _release();
+    if (open) _open(_fingerAt);
+  }
+
+  void _release() {
+    _hold?.cancel();
+    _hold = null;
+    _finger = null;
+    _held = false;
+  }
+
+  @override
+  void dispose() {
+    _hold?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) => MenuAnchor(
@@ -94,15 +147,42 @@ class _TargetMenuRegionState extends State<TargetMenuRegion> {
       },
       child: Listener(
         // Raw pointer events, outside the gesture arena: the row's own recognizer must not
-        // swallow the right click.
-        onPointerDown: (e) {
-          if (e.buttons == kSecondaryMouseButton) _open(e.localPosition);
+        // swallow the right click, and a drag that wins the long press still opens the menu
+        // when the finger lifts where it went down.
+        onPointerDown: _down,
+        onPointerMove: _move,
+        onPointerUp: _up,
+        onPointerCancel: (e) {
+          if (e.pointer == _finger) _release();
         },
-        child: widget.child,
+        child: RawGestureDetector(
+          // Takes a held touch from the row's tap, so lifting the finger opens only the menu.
+          // Later than [kLongPressTimeout], so a drag or the note of a sidebar row wins first.
+          // No node of its own: the row keeps its one labelled node (01 8).
+          excludeFromSemantics: true,
+          gestures: {
+            LongPressGestureRecognizer:
+                GestureRecognizerFactoryWithHandlers<
+                  LongPressGestureRecognizer
+                >(
+                  () => LongPressGestureRecognizer(
+                    duration: kLongPressTimeout + _holdMargin,
+                    supportedDevices: _touchKinds,
+                  ),
+                  (r) => r.onLongPress = _noop,
+                ),
+          },
+          child: widget.child,
+        ),
       ),
     ),
   );
 }
+
+/// How much later than [kLongPressTimeout] the menu region claims a held touch.
+const Duration _holdMargin = Duration(milliseconds: 50);
+
+void _noop() {}
 
 /// The times of the fixed "Mute until" choices (Design note 2; docs/DECISIONS.md D-M4-33-2):
 /// one hour from [now], and tomorrow at 08:00 in the person's [timeZone] (IANA name; an

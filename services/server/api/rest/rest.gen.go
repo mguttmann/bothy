@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -204,6 +205,12 @@ type ServerInterface interface {
 	// InvokeCommand Run a command
 	// (POST /channels/{channel_id}/commands/{command_id}/invoke)
 	InvokeCommand(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath, commandId CommandIdPath, params InvokeCommandParams)
+	// DeleteChannel Delete a channel
+	// (POST /channels/{channel_id}/delete)
+	DeleteChannel(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath, params DeleteChannelParams)
+	// GetChannelDeletion What deleting a channel removes, or the state of its deletion
+	// (GET /channels/{channel_id}/deletion)
+	GetChannelDeletion(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath)
 	// DeleteChannelDraft Delete the draft of a new forum post
 	// (DELETE /channels/{channel_id}/draft)
 	DeleteChannelDraft(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath)
@@ -234,6 +241,9 @@ type ServerInterface interface {
 	// SetChannelReadOnly Switch the read-only state of a channel
 	// (PUT /channels/{channel_id}/read-only)
 	SetChannelReadOnly(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath, params SetChannelReadOnlyParams)
+	// RestoreChannel Undo the deletion of a channel
+	// (POST /channels/{channel_id}/restore)
+	RestoreChannel(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath, params RestoreChannelParams)
 	// ListForumTags List forum tags
 	// (GET /channels/{channel_id}/tags)
 	ListForumTags(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath)
@@ -765,12 +775,21 @@ type ServerInterface interface {
 	// CreateChannel Create a channel
 	// (POST /spaces/{space_id}/channels)
 	CreateChannel(w http.ResponseWriter, r *http.Request, spaceId SpaceIdPath, params CreateChannelParams)
+	// DeleteSpace Delete a space
+	// (POST /spaces/{space_id}/delete)
+	DeleteSpace(w http.ResponseWriter, r *http.Request, spaceId SpaceIdPath, params DeleteSpaceParams)
+	// GetSpaceDeletion What deleting a space removes, or the state of its deletion
+	// (GET /spaces/{space_id}/deletion)
+	GetSpaceDeletion(w http.ResponseWriter, r *http.Request, spaceId SpaceIdPath)
 	// MoveSpace Change the global position of a space
 	// (POST /spaces/{space_id}/move)
 	MoveSpace(w http.ResponseWriter, r *http.Request, spaceId SpaceIdPath, params MoveSpaceParams)
 	// SetSpaceOperator Set the default operator of a space
 	// (PUT /spaces/{space_id}/operator)
 	SetSpaceOperator(w http.ResponseWriter, r *http.Request, spaceId SpaceIdPath, params SetSpaceOperatorParams)
+	// RestoreSpace Undo the deletion of a space
+	// (POST /spaces/{space_id}/restore)
+	RestoreSpace(w http.ResponseWriter, r *http.Request, spaceId SpaceIdPath, params RestoreSpaceParams)
 	// GetStatsBackends Backend policy view per agent
 	// (GET /stats/backends)
 	GetStatsBackends(w http.ResponseWriter, r *http.Request, params GetStatsBackendsParams)
@@ -861,6 +880,12 @@ type ServerInterface interface {
 	// GetThreadCosts Costs of a thread per run
 	// (GET /threads/{thread_id}/costs)
 	GetThreadCosts(w http.ResponseWriter, r *http.Request, threadId ThreadIdPath)
+	// DeleteThread Delete a thread
+	// (POST /threads/{thread_id}/delete)
+	DeleteThread(w http.ResponseWriter, r *http.Request, threadId ThreadIdPath, params DeleteThreadParams)
+	// GetThreadDeletion What deleting a thread removes, or the state of its deletion
+	// (GET /threads/{thread_id}/deletion)
+	GetThreadDeletion(w http.ResponseWriter, r *http.Request, threadId ThreadIdPath)
 	// DeleteThreadDraft Delete the draft of a thread
 	// (DELETE /threads/{thread_id}/draft)
 	DeleteThreadDraft(w http.ResponseWriter, r *http.Request, threadId ThreadIdPath)
@@ -888,6 +913,9 @@ type ServerInterface interface {
 	// ReopenThread Reopen a thread
 	// (POST /threads/{thread_id}/reopen)
 	ReopenThread(w http.ResponseWriter, r *http.Request, threadId ThreadIdPath, params ReopenThreadParams)
+	// RestoreThread Undo the deletion of a thread
+	// (POST /threads/{thread_id}/restore)
+	RestoreThread(w http.ResponseWriter, r *http.Request, threadId ThreadIdPath, params RestoreThreadParams)
 	// ListThreadRuns List runs of a thread
 	// (GET /threads/{thread_id}/runs)
 	ListThreadRuns(w http.ResponseWriter, r *http.Request, threadId ThreadIdPath, params ListThreadRunsParams)
@@ -3481,6 +3509,82 @@ func (siw *ServerInterfaceWrapper) InvokeCommand(w http.ResponseWriter, r *http.
 	handler.ServeHTTP(w, r)
 }
 
+// DeleteChannel operation middleware
+func (siw *ServerInterfaceWrapper) DeleteChannel(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "channel_id" -------------
+	var channelId ChannelIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "channel_id", r.PathValue("channel_id"), &channelId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "channel_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DeleteChannelParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteChannel(w, r, channelId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetChannelDeletion operation middleware
+func (siw *ServerInterfaceWrapper) GetChannelDeletion(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "channel_id" -------------
+	var channelId ChannelIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "channel_id", r.PathValue("channel_id"), &channelId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "channel_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetChannelDeletion(w, r, channelId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // DeleteChannelDraft operation middleware
 func (siw *ServerInterfaceWrapper) DeleteChannelDraft(w http.ResponseWriter, r *http.Request) {
 
@@ -3889,6 +3993,56 @@ func (siw *ServerInterfaceWrapper) SetChannelReadOnly(w http.ResponseWriter, r *
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.SetChannelReadOnly(w, r, channelId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RestoreChannel operation middleware
+func (siw *ServerInterfaceWrapper) RestoreChannel(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "channel_id" -------------
+	var channelId ChannelIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "channel_id", r.PathValue("channel_id"), &channelId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "channel_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params RestoreChannelParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RestoreChannel(w, r, channelId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -10604,6 +10758,82 @@ func (siw *ServerInterfaceWrapper) CreateChannel(w http.ResponseWriter, r *http.
 	handler.ServeHTTP(w, r)
 }
 
+// DeleteSpace operation middleware
+func (siw *ServerInterfaceWrapper) DeleteSpace(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "space_id" -------------
+	var spaceId SpaceIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "space_id", r.PathValue("space_id"), &spaceId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "space_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DeleteSpaceParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteSpace(w, r, spaceId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetSpaceDeletion operation middleware
+func (siw *ServerInterfaceWrapper) GetSpaceDeletion(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "space_id" -------------
+	var spaceId SpaceIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "space_id", r.PathValue("space_id"), &spaceId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "space_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetSpaceDeletion(w, r, spaceId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // MoveSpace operation middleware
 func (siw *ServerInterfaceWrapper) MoveSpace(w http.ResponseWriter, r *http.Request) {
 
@@ -10699,6 +10929,56 @@ func (siw *ServerInterfaceWrapper) SetSpaceOperator(w http.ResponseWriter, r *ht
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.SetSpaceOperator(w, r, spaceId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RestoreSpace operation middleware
+func (siw *ServerInterfaceWrapper) RestoreSpace(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "space_id" -------------
+	var spaceId SpaceIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "space_id", r.PathValue("space_id"), &spaceId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "space_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params RestoreSpaceParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RestoreSpace(w, r, spaceId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -12131,6 +12411,82 @@ func (siw *ServerInterfaceWrapper) GetThreadCosts(w http.ResponseWriter, r *http
 	handler.ServeHTTP(w, r)
 }
 
+// DeleteThread operation middleware
+func (siw *ServerInterfaceWrapper) DeleteThread(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "thread_id" -------------
+	var threadId ThreadIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "thread_id", r.PathValue("thread_id"), &threadId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "thread_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DeleteThreadParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteThread(w, r, threadId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetThreadDeletion operation middleware
+func (siw *ServerInterfaceWrapper) GetThreadDeletion(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "thread_id" -------------
+	var threadId ThreadIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "thread_id", r.PathValue("thread_id"), &threadId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "thread_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetThreadDeletion(w, r, threadId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // DeleteThreadDraft operation middleware
 func (siw *ServerInterfaceWrapper) DeleteThreadDraft(w http.ResponseWriter, r *http.Request) {
 
@@ -12506,6 +12862,56 @@ func (siw *ServerInterfaceWrapper) ReopenThread(w http.ResponseWriter, r *http.R
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ReopenThread(w, r, threadId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RestoreThread operation middleware
+func (siw *ServerInterfaceWrapper) RestoreThread(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "thread_id" -------------
+	var threadId ThreadIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "thread_id", r.PathValue("thread_id"), &threadId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "thread_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params RestoreThreadParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RestoreThread(w, r, threadId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -13859,6 +14265,9 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/spaces/{space_id}", wrapper.UpdateSpace)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/spaces/{space_id}/move", wrapper.MoveSpace)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/spaces/{space_id}/archive", wrapper.ArchiveSpace)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/spaces/{space_id}/delete", wrapper.DeleteSpace)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/spaces/{space_id}/restore", wrapper.RestoreSpace)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/spaces/{space_id}/deletion", wrapper.GetSpaceDeletion)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/spaces/{space_id}/operator", wrapper.SetSpaceOperator)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me/sidebar", wrapper.GetMySidebar)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/me/sidebar/spaces/{space_id}", wrapper.PutMySidebarSpace)
@@ -13869,6 +14278,9 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/channels/{channel_id}", wrapper.UpdateChannel)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/channels/{channel_id}/move", wrapper.MoveChannel)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/channels/{channel_id}/archive", wrapper.ArchiveChannel)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/channels/{channel_id}/delete", wrapper.DeleteChannel)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/channels/{channel_id}/restore", wrapper.RestoreChannel)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/channels/{channel_id}/deletion", wrapper.GetChannelDeletion)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/channels/{channel_id}/behavior", wrapper.GetChannelBehavior)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/channels/{channel_id}/behavior", wrapper.PutChannelBehavior)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/channels/{channel_id}/operator", wrapper.SetChannelOperator)
@@ -13893,6 +14305,9 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/channels/{channel_id}/threads", wrapper.ListChannelThreads)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/channels/{channel_id}/threads", wrapper.CreateThread)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/threads/{thread_id}", wrapper.GetThread)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/threads/{thread_id}/delete", wrapper.DeleteThread)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/threads/{thread_id}/restore", wrapper.RestoreThread)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/threads/{thread_id}/deletion", wrapper.GetThreadDeletion)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/threads/{thread_id}/title", wrapper.SetThreadTitle)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/threads/{thread_id}/close", wrapper.CloseThread)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/threads/{thread_id}/reopen", wrapper.ReopenThread)
@@ -14430,6 +14845,12 @@ type StrictServerInterface interface {
 	// InvokeCommand Run a command
 	// (POST /channels/{channel_id}/commands/{command_id}/invoke)
 	InvokeCommand(ctx context.Context, request InvokeCommandRequestObject) (InvokeCommandResponseObject, error)
+	// DeleteChannel Delete a channel
+	// (POST /channels/{channel_id}/delete)
+	DeleteChannel(ctx context.Context, request DeleteChannelRequestObject) (DeleteChannelResponseObject, error)
+	// GetChannelDeletion What deleting a channel removes, or the state of its deletion
+	// (GET /channels/{channel_id}/deletion)
+	GetChannelDeletion(ctx context.Context, request GetChannelDeletionRequestObject) (GetChannelDeletionResponseObject, error)
 	// DeleteChannelDraft Delete the draft of a new forum post
 	// (DELETE /channels/{channel_id}/draft)
 	DeleteChannelDraft(ctx context.Context, request DeleteChannelDraftRequestObject) (DeleteChannelDraftResponseObject, error)
@@ -14460,6 +14881,9 @@ type StrictServerInterface interface {
 	// SetChannelReadOnly Switch the read-only state of a channel
 	// (PUT /channels/{channel_id}/read-only)
 	SetChannelReadOnly(ctx context.Context, request SetChannelReadOnlyRequestObject) (SetChannelReadOnlyResponseObject, error)
+	// RestoreChannel Undo the deletion of a channel
+	// (POST /channels/{channel_id}/restore)
+	RestoreChannel(ctx context.Context, request RestoreChannelRequestObject) (RestoreChannelResponseObject, error)
 	// ListForumTags List forum tags
 	// (GET /channels/{channel_id}/tags)
 	ListForumTags(ctx context.Context, request ListForumTagsRequestObject) (ListForumTagsResponseObject, error)
@@ -14991,12 +15415,21 @@ type StrictServerInterface interface {
 	// CreateChannel Create a channel
 	// (POST /spaces/{space_id}/channels)
 	CreateChannel(ctx context.Context, request CreateChannelRequestObject) (CreateChannelResponseObject, error)
+	// DeleteSpace Delete a space
+	// (POST /spaces/{space_id}/delete)
+	DeleteSpace(ctx context.Context, request DeleteSpaceRequestObject) (DeleteSpaceResponseObject, error)
+	// GetSpaceDeletion What deleting a space removes, or the state of its deletion
+	// (GET /spaces/{space_id}/deletion)
+	GetSpaceDeletion(ctx context.Context, request GetSpaceDeletionRequestObject) (GetSpaceDeletionResponseObject, error)
 	// MoveSpace Change the global position of a space
 	// (POST /spaces/{space_id}/move)
 	MoveSpace(ctx context.Context, request MoveSpaceRequestObject) (MoveSpaceResponseObject, error)
 	// SetSpaceOperator Set the default operator of a space
 	// (PUT /spaces/{space_id}/operator)
 	SetSpaceOperator(ctx context.Context, request SetSpaceOperatorRequestObject) (SetSpaceOperatorResponseObject, error)
+	// RestoreSpace Undo the deletion of a space
+	// (POST /spaces/{space_id}/restore)
+	RestoreSpace(ctx context.Context, request RestoreSpaceRequestObject) (RestoreSpaceResponseObject, error)
 	// GetStatsBackends Backend policy view per agent
 	// (GET /stats/backends)
 	GetStatsBackends(ctx context.Context, request GetStatsBackendsRequestObject) (GetStatsBackendsResponseObject, error)
@@ -15087,6 +15520,12 @@ type StrictServerInterface interface {
 	// GetThreadCosts Costs of a thread per run
 	// (GET /threads/{thread_id}/costs)
 	GetThreadCosts(ctx context.Context, request GetThreadCostsRequestObject) (GetThreadCostsResponseObject, error)
+	// DeleteThread Delete a thread
+	// (POST /threads/{thread_id}/delete)
+	DeleteThread(ctx context.Context, request DeleteThreadRequestObject) (DeleteThreadResponseObject, error)
+	// GetThreadDeletion What deleting a thread removes, or the state of its deletion
+	// (GET /threads/{thread_id}/deletion)
+	GetThreadDeletion(ctx context.Context, request GetThreadDeletionRequestObject) (GetThreadDeletionResponseObject, error)
 	// DeleteThreadDraft Delete the draft of a thread
 	// (DELETE /threads/{thread_id}/draft)
 	DeleteThreadDraft(ctx context.Context, request DeleteThreadDraftRequestObject) (DeleteThreadDraftResponseObject, error)
@@ -15114,6 +15553,9 @@ type StrictServerInterface interface {
 	// ReopenThread Reopen a thread
 	// (POST /threads/{thread_id}/reopen)
 	ReopenThread(ctx context.Context, request ReopenThreadRequestObject) (ReopenThreadResponseObject, error)
+	// RestoreThread Undo the deletion of a thread
+	// (POST /threads/{thread_id}/restore)
+	RestoreThread(ctx context.Context, request RestoreThreadRequestObject) (RestoreThreadResponseObject, error)
 	// ListThreadRuns List runs of a thread
 	// (GET /threads/{thread_id}/runs)
 	ListThreadRuns(ctx context.Context, request ListThreadRunsRequestObject) (ListThreadRunsResponseObject, error)
@@ -17107,6 +17549,69 @@ func (sh *strictHandler) InvokeCommand(w http.ResponseWriter, r *http.Request, c
 	}
 }
 
+// DeleteChannel operation middleware
+func (sh *strictHandler) DeleteChannel(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath, params DeleteChannelParams) {
+	var request DeleteChannelRequestObject
+
+	request.ChannelId = channelId
+	request.Params = params
+
+	var body DeleteChannelJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		if !errors.Is(err, io.EOF) {
+			sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+			return
+		}
+	} else {
+		request.Body = &body
+	}
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteChannel(ctx, request.(DeleteChannelRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteChannel")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteChannelResponseObject); ok {
+		if err := validResponse.VisitDeleteChannelResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetChannelDeletion operation middleware
+func (sh *strictHandler) GetChannelDeletion(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath) {
+	var request GetChannelDeletionRequestObject
+
+	request.ChannelId = channelId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetChannelDeletion(ctx, request.(GetChannelDeletionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetChannelDeletion")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetChannelDeletionResponseObject); ok {
+		if err := validResponse.VisitGetChannelDeletionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // DeleteChannelDraft operation middleware
 func (sh *strictHandler) DeleteChannelDraft(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath) {
 	var request DeleteChannelDraftRequestObject
@@ -17408,6 +17913,33 @@ func (sh *strictHandler) SetChannelReadOnly(w http.ResponseWriter, r *http.Reque
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(SetChannelReadOnlyResponseObject); ok {
 		if err := validResponse.VisitSetChannelReadOnlyResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RestoreChannel operation middleware
+func (sh *strictHandler) RestoreChannel(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath, params RestoreChannelParams) {
+	var request RestoreChannelRequestObject
+
+	request.ChannelId = channelId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RestoreChannel(ctx, request.(RestoreChannelRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RestoreChannel")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RestoreChannelResponseObject); ok {
+		if err := validResponse.VisitRestoreChannelResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -22612,6 +23144,59 @@ func (sh *strictHandler) CreateChannel(w http.ResponseWriter, r *http.Request, s
 	}
 }
 
+// DeleteSpace operation middleware
+func (sh *strictHandler) DeleteSpace(w http.ResponseWriter, r *http.Request, spaceId SpaceIdPath, params DeleteSpaceParams) {
+	var request DeleteSpaceRequestObject
+
+	request.SpaceId = spaceId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteSpace(ctx, request.(DeleteSpaceRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteSpace")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteSpaceResponseObject); ok {
+		if err := validResponse.VisitDeleteSpaceResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetSpaceDeletion operation middleware
+func (sh *strictHandler) GetSpaceDeletion(w http.ResponseWriter, r *http.Request, spaceId SpaceIdPath) {
+	var request GetSpaceDeletionRequestObject
+
+	request.SpaceId = spaceId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetSpaceDeletion(ctx, request.(GetSpaceDeletionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetSpaceDeletion")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetSpaceDeletionResponseObject); ok {
+		if err := validResponse.VisitGetSpaceDeletionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // MoveSpace operation middleware
 func (sh *strictHandler) MoveSpace(w http.ResponseWriter, r *http.Request, spaceId SpaceIdPath, params MoveSpaceParams) {
 	var request MoveSpaceRequestObject
@@ -22673,6 +23258,33 @@ func (sh *strictHandler) SetSpaceOperator(w http.ResponseWriter, r *http.Request
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(SetSpaceOperatorResponseObject); ok {
 		if err := validResponse.VisitSetSpaceOperatorResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RestoreSpace operation middleware
+func (sh *strictHandler) RestoreSpace(w http.ResponseWriter, r *http.Request, spaceId SpaceIdPath, params RestoreSpaceParams) {
+	var request RestoreSpaceRequestObject
+
+	request.SpaceId = spaceId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RestoreSpace(ctx, request.(RestoreSpaceRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RestoreSpace")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RestoreSpaceResponseObject); ok {
+		if err := validResponse.VisitRestoreSpaceResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -23523,6 +24135,59 @@ func (sh *strictHandler) GetThreadCosts(w http.ResponseWriter, r *http.Request, 
 	}
 }
 
+// DeleteThread operation middleware
+func (sh *strictHandler) DeleteThread(w http.ResponseWriter, r *http.Request, threadId ThreadIdPath, params DeleteThreadParams) {
+	var request DeleteThreadRequestObject
+
+	request.ThreadId = threadId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteThread(ctx, request.(DeleteThreadRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteThread")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteThreadResponseObject); ok {
+		if err := validResponse.VisitDeleteThreadResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetThreadDeletion operation middleware
+func (sh *strictHandler) GetThreadDeletion(w http.ResponseWriter, r *http.Request, threadId ThreadIdPath) {
+	var request GetThreadDeletionRequestObject
+
+	request.ThreadId = threadId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetThreadDeletion(ctx, request.(GetThreadDeletionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetThreadDeletion")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetThreadDeletionResponseObject); ok {
+		if err := validResponse.VisitGetThreadDeletionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // DeleteThreadDraft operation middleware
 func (sh *strictHandler) DeleteThreadDraft(w http.ResponseWriter, r *http.Request, threadId ThreadIdPath) {
 	var request DeleteThreadDraftRequestObject
@@ -23789,6 +24454,33 @@ func (sh *strictHandler) ReopenThread(w http.ResponseWriter, r *http.Request, th
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ReopenThreadResponseObject); ok {
 		if err := validResponse.VisitReopenThreadResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RestoreThread operation middleware
+func (sh *strictHandler) RestoreThread(w http.ResponseWriter, r *http.Request, threadId ThreadIdPath, params RestoreThreadParams) {
+	var request RestoreThreadRequestObject
+
+	request.ThreadId = threadId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RestoreThread(ctx, request.(RestoreThreadRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RestoreThread")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RestoreThreadResponseObject); ok {
+		if err := validResponse.VisitRestoreThreadResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

@@ -116,10 +116,13 @@ modules:
     tables: [spaces, user_space_states, user_channel_states, channels, channel_skill_bindings,
              project_bindings, dm_participants, forum_tags, threads, thread_tags]
     actions: [space.read, space.create, space.update, space.reorder, space.archive,
+              space.delete, space.restore,
               space.operator.set, sidebar.update, channel.read, channel.create, channel.update,
               channel.reorder, channel.behavior.read, channel.behavior.update, channel.operator.set,
-              channel.project.bind, channel.read_only.set, channel.archive, forum_tag.manage,
+              channel.project.bind, channel.read_only.set, channel.archive, channel.delete,
+              channel.restore, channel.project.trash, forum_tag.manage,
               dm.create, dm.leave, thread.read, thread.title.update, thread.close, thread.reopen,
+              thread.delete, thread.restore,
               thread.move, thread.tags.set, agent.config.read]
     events: [thread.created, thread.updated, thread.closed, thread.reopened, thread.moved,
              thread.moved_out, space.created, space.updated, space.archived, channel.created,

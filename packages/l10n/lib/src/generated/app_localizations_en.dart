@@ -3826,6 +3826,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get threadNoAccess => 'No access anymore';
 
   @override
+  String get threadDeleted => 'This chat was deleted.';
+
+  @override
   String get threadNoAccessWaiting => 'Messages that were not sent, to copy:';
 
   @override
@@ -9707,4 +9710,211 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get settingsShowProjectStatusHint =>
       'Forum and project rows show the most urgent new state of their chats.';
+
+  @override
+  String get menuDeleteSpace => 'Delete space...';
+
+  @override
+  String get menuDeleteChannel => 'Delete channel...';
+
+  @override
+  String get menuDeleteProject => 'Delete project...';
+
+  @override
+  String get menuDeleteChat => 'Delete chat...';
+
+  @override
+  String deleteTitle(String name) {
+    return 'Delete $name?';
+  }
+
+  @override
+  String get deleteLoading => 'Counting what this deletes.';
+
+  @override
+  String get deleteLoadFailed => 'Could not read what this deletes.';
+
+  @override
+  String get deleteRetry => 'Try again';
+
+  @override
+  String deleteSummary(String parts) {
+    return 'This deletes $parts.';
+  }
+
+  @override
+  String get deleteSummaryEmpty => 'It is empty.';
+
+  @override
+  String deleteListAnd(String head, String last) {
+    return '$head and $last';
+  }
+
+  @override
+  String deleteCountChannels(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count channels',
+      one: '1 channel',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String deleteCountChats(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count chats',
+      one: '1 chat',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String deleteCountMessages(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count messages',
+      one: '1 message',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String deleteCountFiles(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count files',
+      one: '1 file',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String deleteCountSessions(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count agent sessions',
+      one: '1 agent session',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get deleteUndoHint => 'You can undo this for a short time.';
+
+  @override
+  String deleteFolderBox(String name) {
+    return 'Also move the project folder $name to the trash';
+  }
+
+  @override
+  String get deleteFolderUnchecked =>
+      'The runner has not checked the folder yet.';
+
+  @override
+  String get deleteFolderOutsideRoot =>
+      'The folder is outside the runner\'s projects folder.';
+
+  @override
+  String get deleteFolderSymlink => 'The folder is a link to another place.';
+
+  @override
+  String get deleteFolderForeignWorktree =>
+      'The folder is a Git work tree of another repository.';
+
+  @override
+  String get deleteFolderUncommittedChanges =>
+      'The folder has changes that are not committed.';
+
+  @override
+  String get deleteFolderUnpushedCommits =>
+      'The folder has commits that are not pushed.';
+
+  @override
+  String get deleteFolderContainsOtherProject =>
+      'The folder contains another project.';
+
+  @override
+  String get deleteFolderWorkspaceMissing =>
+      'The folder does not exist on the runner\'s host.';
+
+  @override
+  String get deleteFolderCheckFailed =>
+      'The runner could not check the folder.';
+
+  @override
+  String get deleteFolderRefusedOther =>
+      'The runner does not move this folder.';
+
+  @override
+  String get deleteCancel => 'Cancel';
+
+  @override
+  String get deleteConfirm => 'Delete';
+
+  @override
+  String deleteDone(String name) {
+    return 'Deleted $name';
+  }
+
+  @override
+  String get deleteUndo => 'Undo';
+
+  @override
+  String get deleteUndoTooLate => 'The deletion can no longer be undone.';
+
+  @override
+  String deleteUndoFailed(String name) {
+    return 'Could not undo the deletion of $name.';
+  }
+
+  @override
+  String deleteFolderTrashed(String name) {
+    return 'Moved the folder $name to the trash.';
+  }
+
+  @override
+  String deleteFolderKept(String name, String reason) {
+    return 'Kept the folder $name: $reason';
+  }
+
+  @override
+  String stepUpPurposeDeleteSpace(String name) {
+    return 'Delete the space $name';
+  }
+
+  @override
+  String stepUpPurposeDeleteChannel(String name) {
+    return 'Delete the channel $name';
+  }
+
+  @override
+  String stepUpPurposeDeleteProject(String name) {
+    return 'Delete the project $name';
+  }
+
+  @override
+  String stepUpPurposeRestoreSpace(String name) {
+    return 'Restore the space $name';
+  }
+
+  @override
+  String stepUpPurposeRestoreChannel(String name) {
+    return 'Restore the channel $name';
+  }
+
+  @override
+  String stepUpPurposeRestoreProject(String name) {
+    return 'Restore the project $name';
+  }
+
+  @override
+  String get problemConflictProjectFolderRefused =>
+      'The runner\'s last check does not allow moving the project folder to the trash.';
 }

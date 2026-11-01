@@ -78,3 +78,8 @@ UPDATE agent_sessions
 SET cumulative_cost_micros = @cumulative_cost_micros, currency = @currency, cost_is_estimate = true, version = version + 1
 WHERE id = @id AND version = @version
 RETURNING *;
+
+-- name: CountSessionsOfThreads :one
+-- The number of agent sessions of threads (DeletionInfo.contents.sessions of chat,
+-- FEAT-delete-spaces-chats). Never authorized: chat authorized the item.
+SELECT count(*)::bigint FROM agent_sessions WHERE thread_id = ANY (@thread_ids::uuid[]);

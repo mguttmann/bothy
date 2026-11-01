@@ -621,6 +621,42 @@ func (stubServer) ArchiveChannel(context.Context, rest.ArchiveChannelRequestObje
 	return nil, nil
 }
 
+func (stubServer) DeleteSpace(context.Context, rest.DeleteSpaceRequestObject) (rest.DeleteSpaceResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) RestoreSpace(context.Context, rest.RestoreSpaceRequestObject) (rest.RestoreSpaceResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) GetSpaceDeletion(context.Context, rest.GetSpaceDeletionRequestObject) (rest.GetSpaceDeletionResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) DeleteChannel(context.Context, rest.DeleteChannelRequestObject) (rest.DeleteChannelResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) RestoreChannel(context.Context, rest.RestoreChannelRequestObject) (rest.RestoreChannelResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) GetChannelDeletion(context.Context, rest.GetChannelDeletionRequestObject) (rest.GetChannelDeletionResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) DeleteThread(context.Context, rest.DeleteThreadRequestObject) (rest.DeleteThreadResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) RestoreThread(context.Context, rest.RestoreThreadRequestObject) (rest.RestoreThreadResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) GetThreadDeletion(context.Context, rest.GetThreadDeletionRequestObject) (rest.GetThreadDeletionResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) SetSpaceOperator(context.Context, rest.SetSpaceOperatorRequestObject) (rest.SetSpaceOperatorResponseObject, error) {
 	return nil, nil
 }
@@ -1647,6 +1683,16 @@ func TestRealTable_Enabled(t *testing.T) {
 		"retryRun": {"POST /api/v1/runs/{run_id}/retry", "agent.invoke", "rl.trigger"},
 		// SERVER-AGENT-TRIGGERERS
 		"getAgentTriggerers": {"GET /api/v1/agents/me/triggerers", "agent.triggerers.read", "rl.agent_runtime"},
+		// FEAT-delete-spaces-chats
+		"deleteSpace":        {"POST /api/v1/spaces/{space_id}/delete", "space.delete", "rl.admin"},
+		"restoreSpace":       {"POST /api/v1/spaces/{space_id}/restore", "space.restore", "rl.admin"},
+		"getSpaceDeletion":   {"GET /api/v1/spaces/{space_id}/deletion", "space.read", "rl.read"},
+		"deleteChannel":      {"POST /api/v1/channels/{channel_id}/delete", "channel.delete", "rl.admin"},
+		"restoreChannel":     {"POST /api/v1/channels/{channel_id}/restore", "channel.restore", "rl.admin"},
+		"getChannelDeletion": {"GET /api/v1/channels/{channel_id}/deletion", "channel.read", "rl.read"},
+		"deleteThread":       {"POST /api/v1/threads/{thread_id}/delete", "thread.delete", "rl.write"},
+		"restoreThread":      {"POST /api/v1/threads/{thread_id}/restore", "thread.restore", "rl.write"},
+		"getThreadDeletion":  {"GET /api/v1/threads/{thread_id}/deletion", "thread.read", "rl.read"},
 	}
 	ops := routes.Enabled()
 	if len(ops) != len(want) {

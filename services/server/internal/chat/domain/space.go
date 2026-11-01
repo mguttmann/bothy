@@ -43,6 +43,8 @@ type Space struct {
 	ArchivedAt time.Time
 	// Version is the ETag, 1 for a new space.
 	Version int64
+	// Deletion is the deletion state (03 R-DM-57); a deleted space is archived too.
+	Deletion Deletion
 }
 
 // NewSpace returns a new space with version 1; the arguments are checked already.

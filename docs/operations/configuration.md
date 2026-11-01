@@ -150,6 +150,8 @@ Source: [01-product.md](../spec/01-product.md), section 14.
 | `ui.new_project_wait` |  | App |  | `2m` | after this time without readiness the new project dialog says that the runner has not finished (6.9) |  |
 | `ui.new_project_poll_interval` |  | App |  | `2s` | interval at which the new project dialog reads the readiness of the binding (6.9) |  |
 | `ui.new_project_name_max_chars` |  | App |  | `40` | longest suggested and accepted name of a new project (6.9) |  |
+| `ui.delete_undo_toast` |  | App |  | `10s` | the undo toast after a deletion shows at most this long, never past `undo_until` (6.18) |  |
+| `ui.delete_folder_wait` |  | App |  | `2m` | after the undo window the client reads the outcome of a requested folder move for at most this long (6.18) |  |
 | `a11y.live_announce_min_interval` |  | App |  | `10s` | the live box announces a change at most this often |  |
 | `client.share.recent_targets` |  | App |  | `8` | recently used targets in the share sheet |  |
 
@@ -247,6 +249,8 @@ Source: [03-data-model.md](../spec/03-data-model.md), section 9.
 | `thread.title_max_chars` | `BOTHY_THREAD__TITLE_MAX_CHARS` | Server | int | `200` | length of a thread title | active |
 | `thread.max_tags` | `BOTHY_THREAD__MAX_TAGS` | Server | int | `5` | forum tags per thread | active |
 | `sidebar.order_max_items` | `BOTHY_SIDEBAR__ORDER_MAX_ITEMS` | Server | int | `1000` | items of a personal order list of the sidebar (`user_space_states.channel_order`, `user_channel_states.thread_order`) | active |
+| `chat.delete_undo_window` | `BOTHY_CHAT__DELETE_UNDO_WINDOW` | Server | duration | `30s` | a deleted space, channel or chat can be restored for this long; then `messaging.purge_deleted` removes its content (R-DM-57) | active |
+| `chat.delete_purge_interval` | `BOTHY_CHAT__DELETE_PURGE_INTERVAL` | Server | duration | `30s` | interval of the job `messaging.purge_deleted`, which also runs at worker start | active |
 | `message.max_content_bytes` | `BOTHY_MESSAGE__MAX_CONTENT_BYTES` | Server | int | `262144` | size of a message (long answers without splitting) | active |
 | `message.max_attachments` | `BOTHY_MESSAGE__MAX_ATTACHMENTS` | Server | int | `10` | attachments per message | active |
 | `message.max_mentions` | `BOTHY_MESSAGE__MAX_MENTIONS` | Server | int | `50` | distinct mention handles per message (content format, `messages`) | active |
@@ -479,6 +483,7 @@ Source: [09-agents.md](../spec/09-agents.md), section 21.
 | `runner.provision_retry_after` |  | Runner |  | `5m` | a failed folder creation is not tried again for the same binding content before this time (18.12) |  |
 | `runner.project_folders_max` |  | Runner |  | `500` | most folder names the runner reports in `project_folders` (18.13) |  |
 | `runner.channels_resync_interval` |  | Runner |  | `5m` | the served channels are loaded again at this interval, the fallback for an operator or binding change without an event (18.1); above zero |  |
+| `runner.trash_check_interval` |  | Runner |  | `60s` | the bound folders are checked for a move to the trash at most this often, and the runner sends `sendHeartbeat` at this interval to receive folder moves (18.15); above zero |  |
 | `runner.transcribe_cmd` |  | Runner |  | empty | argument list of a local transcriber; the audio file path is appended and stdout is the transcript (18.14); empty means no transcription |  |
 | `runner.transcribe_timeout` |  | Runner |  | `5m` | time limit of one transcription (18.14); above zero |  |
 | `runner.projects_root` |  | Runner |  | no default, required | root of all project folders |  |

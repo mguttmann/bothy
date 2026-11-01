@@ -5,6 +5,7 @@ package runs_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 	"testing"
@@ -357,6 +358,31 @@ func TestRevocation_Variants(t *testing.T) {
 		}
 		w.validateEvents()
 	})
+	// A deletion cancels the active runs of the item once, through chat.ContentDeleted, with
+	// channel_read_only (D-DEL-7); the rights change of a space or channel deletion adds no
+	// second cancel request.
+	for _, c := range []struct{ name, path string }{
+		{"deleteChannel", "/api/v1/channels/%s/delete"},
+		{"deleteSpace", "/api/v1/spaces/%s/delete"},
+		{"deleteThread", "/api/v1/threads/%s/delete"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			w := runsWorld(t)
+			r, _, _ := w.started()
+			target := map[string]string{"deleteChannel": w.allgemein.String(), "deleteSpace": w.support.String(), "deleteThread": r.Thread}[c.name]
+			w.wantOK(w.do("owner", http.MethodPost, fmt.Sprintf(c.path, target), "", key()...))
+			if ev := w.eventsOf("run.cancel_requested", r.ID); len(ev) != 1 || ev[0]["reason"] != "channel_read_only" || len(w.cancels.of(r.ID)) != 1 {
+				t.Fatalf("events %v", ev)
+			}
+			// The runner stops and finishes the cancelled run with the reason of the request.
+			w.wantOK(w.finish("lotse", r.ID, `"state":"cancelled","reason":"channel_read_only"`))
+			if got := w.lifecycle(r.ID); got.State != "cancelled" || got.Reason != "channel_read_only" {
+				t.Fatalf("run %+v", got)
+			}
+			w.validateEvents()
+		})
+	}
 	t.Run("capabilityOnly", func(t *testing.T) {
 		t.Parallel()
 		w := runsWorld(t)

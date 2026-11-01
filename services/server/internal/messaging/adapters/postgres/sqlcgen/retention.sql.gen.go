@@ -53,3 +53,47 @@ func (q *Queries) ExpiredMessages(ctx context.Context, arg ExpiredMessagesParams
 	}
 	return items, nil
 }
+
+const liveMessagesOfDeleted = `-- name: LiveMessagesOfDeleted :many
+SELECT id, channel_id FROM messages
+WHERE deleted_at IS NULL AND kind <> 'system'
+  AND (channel_id = ANY ($1::uuid[]) OR thread_id = ANY ($2::uuid[]))
+ORDER BY created_at, id
+LIMIT $3
+`
+
+type LiveMessagesOfDeletedParams struct {
+	ChannelIds []pgtype.UUID
+	ThreadIds  []pgtype.UUID
+	RowLimit   int32
+}
+
+type LiveMessagesOfDeletedRow struct {
+	ID        pgtype.UUID
+	ChannelID pgtype.UUID
+}
+
+// The candidates of the job messaging.purge_deleted (FEAT-delete-spaces-chats, 20 4.2a): messages
+// not deleted yet of the channels or threads of a deleted space, channel or thread whose undo
+// window passed, oldest first, with their channel. System lines carry no content. A system job
+// without a principal: no visibility predicate (tools/lint/sql_visibility.yaml); each candidate
+// is deleted through the deletion path of 4.2.
+func (q *Queries) LiveMessagesOfDeleted(ctx context.Context, arg LiveMessagesOfDeletedParams) ([]LiveMessagesOfDeletedRow, error) {
+	rows, err := q.db.Query(ctx, liveMessagesOfDeleted, arg.ChannelIds, arg.ThreadIds, arg.RowLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []LiveMessagesOfDeletedRow
+	for rows.Next() {
+		var i LiveMessagesOfDeletedRow
+		if err := rows.Scan(&i.ID, &i.ChannelID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

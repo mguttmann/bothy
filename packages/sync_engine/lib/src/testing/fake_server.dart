@@ -19,6 +19,7 @@ import 'rest/agent_handlers.dart';
 import 'rest/agent_ui_handlers.dart';
 import 'rest/audit_handlers.dart';
 import 'rest/auth_handlers.dart';
+import 'rest/deletion_handlers.dart';
 import 'rest/file_handlers.dart';
 import 'rest/hint_handlers.dart';
 import 'rest/host_handlers.dart';
@@ -187,6 +188,7 @@ final class FakeServer {
     registerNotifyHandlers(rest, actions);
     registerSearchHandlers(rest);
     registerAgentUiHandlers(rest);
+    registerDeletionHandlers(rest, actions);
     final server = FakeServer._(
       http,
       world,

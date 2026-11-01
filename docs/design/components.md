@@ -299,6 +299,19 @@ and a forum post row within its forum (01 6.16): on the desktop with the mouse a
 press; the lifted row shows its name on `color.surface.sidebar-selected`. The sidebar menus have "Move
 up" and "Move down". A level arranged by activity does not lift its rows and shows a note instead.
 
+Delete (addendum of 2026-11-01, 01 6.18): the menus of a space, a channel or forum and a chat row
+end with a divider and "Delete space...", "Delete channel...", "Delete project..." (a forum with a
+project binding) or "Delete chat...", for whoever has the right; the "More" button of a main
+history and of a chat's history and the menu of a post list row have the same entry. The entry
+opens the delete dialog (`elevation.dialog`, `color.surface.overlay`): title "Delete <name>?", one
+sentence with the counts that go, a loading state while they are read, an error sentence in
+`color.danger.fg` with "Try again", the hint about the undo window, for an owner of a project the
+box "Also move the project folder <name> to the trash" (unchecked; disabled with its reason
+sentence in `color.text.secondary`), and the buttons "Cancel" (secondary) and "Delete" (danger,
+`color.danger.bg`). After the delete a snack bar "Deleted <name>" with the button "Undo" shows until
+the undo window ends (at most `ui.delete_undo_toast`); the folder outcome later shows as a snack bar
+with one sentence.
+
 Accessibility: tree with the role "tree"; spaces are expandable nodes with the state
 "collapsed" or "expanded"; channel label "<Name>, <kind>, <n> unread, <m> mentions, run
 active"; a channel with thread rows is an expandable node of level 2, a thread row a node of level

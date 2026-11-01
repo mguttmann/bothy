@@ -151,7 +151,7 @@ func threadDTO(th domain.Thread, tags []ids.ID) chat.Thread {
 		TitleSource: string(th.TitleSource), State: string(th.State), ClosedAt: th.ClosedAt, ClosedBy: th.ClosedBy,
 		OperatorAgentID: th.OperatorAgentID, LastMessageSeq: th.LastMessageSeq, UnreadFloorSeq: th.UnreadFloorSeq,
 		MessageCount: th.MessageCount, CreatedBy: th.CreatedBy, CreatedAt: th.CreatedAt, LastActivityAt: th.LastActivityAt,
-		MovedAt: th.MovedAt, Version: th.Version, TagIDs: tags,
+		MovedAt: th.MovedAt, Version: th.Version, TagIDs: tags, DeletedAt: th.Deletion.At,
 	}
 }
 
@@ -161,6 +161,7 @@ func info(th domain.Thread, c ChannelRow) chat.ThreadInfo {
 		ID: th.ID, ChannelID: th.ChannelID, SpaceID: c.Channel.SpaceID, ChannelKind: string(c.Channel.Kind), Kind: string(th.Kind),
 		State: string(th.State), OperatorAgentID: th.OperatorAgentID, ParentMessageID: th.ParentMessageID, CreatedBy: th.CreatedBy,
 		Version: th.Version, ChannelArchived: archived(c), LastMessageSeq: th.LastMessageSeq, UnreadFloorSeq: th.UnreadFloorSeq,
+		Deleted: th.Deleted(),
 	}
 }
 
@@ -250,11 +251,14 @@ func (s *Service) ActiveThreads(ctx context.Context, a actor.Actor, q chat.Activ
 	return s.views(ctx, visible)
 }
 
-// Get implements chat.Threads: thread.read, then 404 for an unknown id.
+// Get implements chat.Threads: thread.read, then 404 for an unknown or a deleted id (D-DEL-3).
 func (s *Service) Get(ctx context.Context, a actor.Actor, threadID ids.ID) (chat.Thread, error) {
 	th, err := s.loadThread(ctx, a, authorize.ActionThreadRead, threadID)
 	if err != nil {
 		return chat.Thread{}, err
+	}
+	if th.Deleted() {
+		return chat.Thread{}, invisible()
 	}
 	return s.threadView(ctx, th)
 }
@@ -563,7 +567,7 @@ func (s *Service) createTags(ctx context.Context, a actor.Actor, c ChannelRow, s
 
 // AppendToThread implements chat.Threads (brief D2) inside the caller's unit of work: the row
 // lock, on an implicit reopen thread.reopen for a, then the single UPDATE of 03 section 6.2 and,
-// on a reopen, thread.reopened.
+// on a reopen, thread.reopened. A deleted thread takes nothing new: 404 not_found (D-DEL-3).
 func (s *Service) AppendToThread(ctx context.Context, a actor.Actor, cmd chat.AppendCmd) (chat.Appended, error) {
 	if err := inUnit(ctx, "Threads.AppendToThread"); err != nil {
 		return chat.Appended{}, err
@@ -575,6 +579,9 @@ func (s *Service) AppendToThread(ctx context.Context, a actor.Actor, cmd chat.Ap
 	th, err := s.lockThread(ctx, cmd.ThreadID)
 	if err != nil {
 		return chat.Appended{}, err
+	}
+	if th.Deleted() {
+		return chat.Appended{}, invisible()
 	}
 	reopen := cmd.ReopenIfClosed && th.State == domain.ThreadClosed
 	if reopen {
@@ -772,6 +779,7 @@ type threadJSON struct {
 	MovedAt         string   `json:"moved_at,omitempty"`
 	Version         int64    `json:"version"`
 	TagIDs          []string `json:"tag_ids"`
+	DeletedAt       string   `json:"deleted_at,omitempty"`
 }
 
 // threadBody converts a thread into the JSON form of the schema Thread.
@@ -786,6 +794,7 @@ func threadBody(v chat.Thread) threadJSON {
 		OperatorAgentID: optionalID(v.OperatorAgentID), BillingMode: v.BillingMode, LastMessageSeq: v.LastMessageSeq,
 		UnreadFloorSeq: v.UnreadFloorSeq, LastActivityAt: stamp(v.LastActivityAt), MessageCount: v.MessageCount,
 		CreatedBy: v.CreatedBy.String(), CreatedAt: stamp(v.CreatedAt), MovedAt: stamp(v.MovedAt), Version: v.Version, TagIDs: tags,
+		DeletedAt: stamp(v.DeletedAt),
 	}
 }
 

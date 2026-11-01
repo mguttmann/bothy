@@ -34,8 +34,8 @@ type BindingStore interface {
 	// DeleteBinding deletes the binding of channel.
 	DeleteBinding(ctx context.Context, channel ids.ID) error
 	// LockReportedBindings locks the bindings of channels in ascending channel id and returns
-	// their ready flags and reasons; a channel without a binding is absent.
-	LockReportedBindings(ctx context.Context, channels []ids.ID) (map[ids.ID]Readiness, error)
+	// their ready flags, reasons and folder checks; a channel without a binding is absent.
+	LockReportedBindings(ctx context.Context, channels []ids.ID) (map[ids.ID]ReportedBinding, error)
 	// SetProjectReady writes ready and ready_reason ("" is NULL) of the locked binding of channel
 	// and raises its version.
 	SetProjectReady(ctx context.Context, channel ids.ID, r Readiness) error
@@ -53,6 +53,13 @@ type BindingStore interface {
 type Readiness struct {
 	Ready  bool
 	Reason string
+}
+
+// ReportedBinding is the stored state of a binding a readiness report may change: the readiness
+// and the folder check of 09 18.15 (nil before the first one, D-DEL-10).
+type ReportedBinding struct {
+	Readiness Readiness
+	Trash     *chat.ProjectTrashCheckReport
 }
 
 // The audit details of channel.project.bind (design note 6 of M2-03): codes, IDs, the version and
@@ -367,16 +374,18 @@ func (s *Service) ApplyProjectReadiness(ctx context.Context, agentID ids.ID, rep
 	if err != nil {
 		return err
 	}
-	want, channels, err := readinessReports(reports)
+	want, trash, channels, err := readinessReports(reports)
 	if err != nil || len(channels) == 0 || agentID.IsZero() {
 		return err
 	}
-	return s.d.UoW.Do(ctx, func(ctx context.Context) error { return s.applyReports(ctx, st, agentID, want, channels) })
+	return s.d.UoW.Do(ctx, func(ctx context.Context) error { return s.applyReports(ctx, st, agentID, want, trash, channels) })
 }
 
 // applyReports is ApplyProjectReadiness inside its unit of work: the locks, then every report
-// that differs from the stored value of a bound forum agentID serves.
-func (s *Service) applyReports(ctx context.Context, st BindingStore, agentID ids.ID, want map[ids.ID]Readiness, channels []ids.ID) error {
+// that differs from the stored value of a bound forum agentID serves; a folder check that is given
+// and differs is written with the time it arrived (D-DEL-10).
+func (s *Service) applyReports(ctx context.Context, st BindingStore, agentID ids.ID, want map[ids.ID]Readiness,
+	trash map[ids.ID]chat.ProjectTrashCheckReport, channels []ids.ID) error {
 	rows, err := s.shareReported(ctx, channels)
 	if err != nil {
 		return err
@@ -388,14 +397,39 @@ func (s *Service) applyReports(ctx context.Context, st BindingStore, agentID ids
 	for _, id := range channels {
 		c, known := rows[id]
 		stored, bound := ready[id]
-		if !known || !bound || stored == want[id] || !servedBy(c, agentID) {
+		if !known || !bound || !servedBy(c, agentID) {
 			continue
 		}
-		if err := st.SetProjectReady(ctx, id, want[id]); err != nil {
+		t, given := trash[id]
+		if err := s.applyReport(ctx, st, id, stored, want[id], t, given); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// applyReport writes the readiness of one bound forum when it differs from stored, and the
+// folder check when it is given and differs.
+func (s *Service) applyReport(ctx context.Context, st BindingStore, id ids.ID, stored ReportedBinding, want Readiness,
+	t chat.ProjectTrashCheckReport, given bool) error {
+	if stored.Readiness != want {
+		if err := st.SetProjectReady(ctx, id, want); err != nil {
+			return err
+		}
+	}
+	if given && (stored.Trash == nil || *stored.Trash != t) {
+		return s.setTrashCheck(ctx, id, t)
+	}
+	return nil
+}
+
+// setTrashCheck writes a folder check received now.
+func (s *Service) setTrashCheck(ctx context.Context, channel ids.ID, t chat.ProjectTrashCheckReport) error {
+	st, err := s.deletions()
+	if err != nil {
+		return err
+	}
+	return st.SetTrashCheck(ctx, channel, t, s.now())
 }
 
 // BoundProjectFolders implements chat.ProjectBindings (M4-44): the store answers which of names a
@@ -411,14 +445,16 @@ func (s *Service) BoundProjectFolders(ctx context.Context, names []string) ([]st
 	return st.BoundProjectFolders(ctx, names)
 }
 
-// readinessReports returns the reported value per channel and the channels in ascending id.
-// Errors: validation_failed with code duplicate on /project_readiness for a channel reported twice.
-func readinessReports(reports []chat.ProjectReadiness) (map[ids.ID]Readiness, []ids.ID, error) {
+// readinessReports returns the reported value and the given folder check per channel and the
+// channels in ascending id; a check reason is kept only with ok false. Errors: validation_failed
+// with code duplicate on /project_readiness for a channel reported twice.
+func readinessReports(reports []chat.ProjectReadiness) (map[ids.ID]Readiness, map[ids.ID]chat.ProjectTrashCheckReport, []ids.ID, error) {
 	want := make(map[ids.ID]Readiness, len(reports))
+	trash := make(map[ids.ID]chat.ProjectTrashCheckReport)
 	channels := make([]ids.ID, 0, len(reports))
 	for _, r := range reports {
 		if _, dup := want[r.ChannelID]; dup {
-			return nil, nil, errs.New(errs.CodeValidationFailed, "a channel is reported twice").
+			return nil, nil, nil, errs.New(errs.CodeValidationFailed, "a channel is reported twice").
 				WithFields(errs.FieldError{Pointer: pointerProjectReadiness, Code: domain.FieldDuplicate, Detail: "a channel is reported twice"})
 		}
 		w := Readiness{Ready: r.Ready}
@@ -426,10 +462,17 @@ func readinessReports(reports []chat.ProjectReadiness) (map[ids.ID]Readiness, []
 			w.Reason = r.Reason
 		}
 		want[r.ChannelID] = w
+		if r.TrashCheck != nil {
+			t := chat.ProjectTrashCheckReport{OK: r.TrashCheck.OK}
+			if !t.OK {
+				t.Reason = r.TrashCheck.Reason
+			}
+			trash[r.ChannelID] = t
+		}
 		channels = append(channels, r.ChannelID)
 	}
 	slices.SortFunc(channels, compareIDs)
-	return want, channels, nil
+	return want, trash, channels, nil
 }
 
 // servedBy reports whether agent may report readiness for the channel row c: c is not archived

@@ -2,8 +2,11 @@
 
 /// The menu of a thread in the post list and the thread header (brief M4-33 Scope): its
 /// notification level with "Following" for a thread the server follows for the person (13 3.2)
-/// and "Mute until".
+/// and "Mute until", ending with "Delete chat..." for its creator or a person with `manage`
+/// (01 6.18 items 1 and 2, D-DEL-14).
 library;
+
+import 'dart:async';
 
 import 'package:design_system/design_system.dart';
 import 'package:domain/domain.dart';
@@ -11,8 +14,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:l10n/l10n.dart';
 
+import '../delete/delete_flow.dart';
+import '../delete/delete_port.dart';
 import '../notifications_settings/providers.dart';
+import '../sidebar/providers.dart' show storedThreadProvider;
 import '../sidebar/sidebar_drag.dart' show SidebarMoves, sidebarMoveMenuItems;
+import '../thread/providers.dart'
+    show myPrincipalIdProvider, threadPermissionsProvider;
 import '../thread/thread_header.dart' show ThreadHeaderAction, ThreadHeaderInfo;
 import 'channel_menu.dart';
 import 'level_menu.dart';
@@ -72,9 +80,54 @@ class ThreadMenu extends StatelessWidget {
         const Divider(),
         ...sidebarMoveMenuItems(context, moves),
       ],
+      ...threadDeleteItems(context, ref, thread, channel, title: title),
     ],
     child: child,
   );
+}
+
+/// The end of the menu of [thread] in [channel]: a divider and "Delete chat..." for its creator
+/// or a person with `manage`, both with `write` (01 6.18 item 2, D-DEL-4); none for a main
+/// thread and none in an archived or read only channel. [title] names it in the dialog; a
+/// blank title reads "New chat".
+List<Widget> threadDeleteItems(
+  BuildContext context,
+  WidgetRef ref,
+  ThreadId thread,
+  Channel channel, {
+  required String title,
+}) {
+  final session = DeleteSession.watch(ref);
+  if (session == null ||
+      thread == channel.mainThreadId ||
+      channel.archivedAt != null ||
+      channel.readOnly) {
+    return const [];
+  }
+  final stored = ref.watch(storedThreadProvider(thread.value)).value;
+  final permissions = ref.watch(threadPermissionsProvider(channel.id.value));
+  final me = ref.watch(myPrincipalIdProvider);
+  if (stored == null || stored.kind == ThreadKind.main) return const [];
+  final own = me != null && stored.createdBy == me;
+  if (!permissions.canWrite || !(own || permissions.canManage)) {
+    return const [];
+  }
+  final l = AppLocalizations.of(context);
+  final name = title.trim().isEmpty ? l.sidebarNewChat : title;
+  return [
+    const Divider(),
+    DsMenuItem(
+      key: const ValueKey('menu.delete'),
+      onPressed: () => unawaited(
+        startDelete(
+          context,
+          session,
+          DeleteTarget(kind: DeleteKind.chat, id: thread.value, name: name),
+        ),
+      ),
+      child: Text(l.menuDeleteChat),
+    ),
+  ];
 }
 
 /// The button "More" of the thread header: opens the menu of [thread] in [channel], or the
@@ -112,8 +165,21 @@ class TargetMenuButton extends ConsumerWidget {
     ref.watch(levelContextProvider);
     final id = thread;
     final entries = id == null
-        ? channelMenuItems(context, ref, channel)
-        : levelMenuItems(context, ref, threadMenuTarget(ref, id, channel));
+        ? [
+            ...channelMenuItems(context, ref, channel),
+            ...channelDeleteItems(context, ref, channel),
+          ]
+        : [
+            ...levelMenuItems(context, ref, threadMenuTarget(ref, id, channel)),
+            ...threadDeleteItems(
+              context,
+              ref,
+              id,
+              channel,
+              title:
+                  ref.watch(storedThreadProvider(id.value)).value?.title ?? '',
+            ),
+          ];
     final compact = actions;
     if (compact != null) {
       return MenuAnchor(

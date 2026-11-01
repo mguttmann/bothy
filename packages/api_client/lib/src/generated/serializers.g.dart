@@ -118,6 +118,7 @@ Serializers _$serializers =
           ..add(ChannelCreateKindEnum.serializer)
           ..add(ChannelCreatedEvent.serializer)
           ..add(ChannelCreatedEventTypeEnum.serializer)
+          ..add(ChannelDelete.serializer)
           ..add(ChannelKind.serializer)
           ..add(ChannelLabel.serializer)
           ..add(ChannelOperator.serializer)
@@ -184,6 +185,10 @@ Serializers _$serializers =
           ..add(CredentialHolderSet.serializer)
           ..add(CredentialOverview.serializer)
           ..add(CspReportLegacy.serializer)
+          ..add(DeletionContents.serializer)
+          ..add(DeletionInfo.serializer)
+          ..add(DeletionInfoStateEnum.serializer)
+          ..add(DeletionInfoTargetKindEnum.serializer)
           ..add(Device.serializer)
           ..add(DeviceApprove.serializer)
           ..add(DeviceKeyRegistration.serializer)
@@ -514,10 +519,17 @@ Serializers _$serializers =
           ..add(ProjectBinding.serializer)
           ..add(ProjectBindingPut.serializer)
           ..add(ProjectFolder.serializer)
+          ..add(ProjectFolderDeletion.serializer)
+          ..add(ProjectFolderDeletionTrashStateEnum.serializer)
           ..add(ProjectFolderList.serializer)
           ..add(ProjectProvision.serializer)
           ..add(ProjectReadiness.serializer)
           ..add(ProjectRunnerConfig.serializer)
+          ..add(ProjectTrashCheck.serializer)
+          ..add(ProjectTrashCheckReport.serializer)
+          ..add(ProjectTrashRequest.serializer)
+          ..add(ProjectTrashResult.serializer)
+          ..add(ProjectTrashResultResultEnum.serializer)
           ..add(PublicBranding.serializer)
           ..add(PushEnvironment.serializer)
           ..add(PushPreview.serializer)
@@ -937,6 +949,12 @@ Serializers _$serializers =
           )
           ..addBuilderFactory(
             const FullType(BuiltList, const [
+              const FullType(ProjectTrashResult),
+            ]),
+            () => ListBuilder<ProjectTrashResult>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [
               const FullType(BuiltMap, const [
                 const FullType(String),
                 const FullType.nullable(JsonObject),
@@ -1340,6 +1358,12 @@ Serializers _$serializers =
           ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(ProjectFolder)]),
             () => ListBuilder<ProjectFolder>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [
+              const FullType(ProjectTrashRequest),
+            ]),
+            () => ListBuilder<ProjectTrashRequest>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(PushRegistration)]),

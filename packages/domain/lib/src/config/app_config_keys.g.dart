@@ -44,6 +44,8 @@ const List<AppConfigKey> appConfigKeys = <AppConfigKey>[
   AppConfigKey('ui.composer_max_lines', 'App', AppConfigKind.integer, '12'),
   AppConfigKey('ui.composer_paste_file_chars', 'App', AppConfigKind.integer, '4000'),
   AppConfigKey('ui.composer_paste_file_lines', 'App', AppConfigKind.integer, '100'),
+  AppConfigKey('ui.delete_folder_wait', 'App', AppConfigKind.duration, '2m'),
+  AppConfigKey('ui.delete_undo_toast', 'App', AppConfigKind.duration, '10s'),
   AppConfigKey('ui.desktop_min_width_four_columns', 'App', AppConfigKind.pixels, '1280px'),
   AppConfigKey('ui.desktop_min_width_three_columns', 'App', AppConfigKind.pixels, '960px'),
   AppConfigKey('ui.livebox_visible_steps', 'App', AppConfigKind.integer, '6'),
@@ -157,6 +159,10 @@ extension AppConfigValues on AppConfig {
   int get composerPasteFileChars => value<int>('ui.composer_paste_file_chars');
   /// `ui.composer_paste_file_lines` (integer, default `100`).
   int get composerPasteFileLines => value<int>('ui.composer_paste_file_lines');
+  /// `ui.delete_folder_wait` (duration, default `2m`).
+  Duration get deleteFolderWait => value<Duration>('ui.delete_folder_wait');
+  /// `ui.delete_undo_toast` (duration, default `10s`).
+  Duration get deleteUndoToast => value<Duration>('ui.delete_undo_toast');
   /// `ui.desktop_min_width_four_columns` (pixels, default `1280px`).
   int get desktopMinWidthFourColumns => value<int>('ui.desktop_min_width_four_columns');
   /// `ui.desktop_min_width_three_columns` (pixels, default `960px`).

@@ -71,6 +71,16 @@ type PresenceStatus struct {
 	BillingEvidence *BillingEvidence
 	// Warnings are the Warning codes that hold now; only while online or degraded.
 	Warnings []string
+	// ProjectTrash are the folder moves the runner owes (HeartbeatAck.project_trash, 09 18.15,
+	// D-DEL-11); set only in the answer to a heartbeat, nil otherwise.
+	ProjectTrash []ProjectTrashRequest
+}
+
+// ProjectTrashRequest is a folder move the serving runner owes (schema ProjectTrashRequest,
+// 09 18.15); agents/app copies it from chat.ProjectTrashRequest.
+type ProjectTrashRequest struct {
+	ChannelID    ids.ID
+	WorkspaceRef string
 }
 
 // Presence is the incoming port of the heartbeat and of the presence of agents (M2-20,

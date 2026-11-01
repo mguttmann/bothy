@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// Removal of targets on `access.changed` with `removed` and on `thread.moved_out` (04 8.3,
-/// 15 6.3), and the wipe on `4012` (R-SY-14).
+/// Removal of targets on `access.changed` with `removed`, on `thread.moved_out` and on a
+/// deletion (04 8.3, 15 6.3, 01 6.18), and the wipe on `4012` (R-SY-14).
 library;
 
 import 'dart:io';
@@ -26,10 +26,15 @@ extension LocalStoreRemoval on LocalDatabase {
   /// and the pinned host keys (`host_key_pins`, M4-36) stay: a pin is a trust anchor that only
   /// the [wipe] deletes (15 6.1).
   ///
+  /// [keepOrder] keeps the person's synced order rows (`user_space_states` and
+  /// `user_channel_states`, M4-51) of the targets: a deleted item leaves the lists, and an
+  /// undo puts it back in its place (D-DEL-8). Access loss leaves no order behind.
+  ///
   /// Returns the paths of the deleted file cache rows; the caller deletes the bytes (M4-22).
   Future<List<String>> removeTargets(
-    List<TargetRef> removed,
-  ) => transaction(() async {
+    List<TargetRef> removed, {
+    bool keepOrder = false,
+  }) => transaction(() async {
     List<String> idsOf(RemovedTargetKind kind) => [
       for (final t in removed)
         if (t.kind == kind) t.id,
@@ -87,13 +92,15 @@ extension LocalStoreRemoval on LocalDatabase {
     await _deleteWhereIn(channels, 'channel_view_states', 'channel_id', {
       channelViewStates,
     });
-    // A removed channel leaves no personal thread order behind (04 8.3; M4-51).
-    await _deleteWhereIn(channels, 'user_channel_states', 'channel_id', {
-      userChannelStates,
-    });
-    await _deleteWhereIn(spaceIds, 'user_space_states', 'space_id', {
-      userSpaceStates,
-    });
+    if (!keepOrder) {
+      // A removed channel leaves no personal thread order behind (04 8.3; M4-51).
+      await _deleteWhereIn(channels, 'user_channel_states', 'channel_id', {
+        userChannelStates,
+      });
+      await _deleteWhereIn(spaceIds, 'user_space_states', 'space_id', {
+        userSpaceStates,
+      });
+    }
     // A removed space leaves no collapse state of this device behind (04 8.3; 01 6.7).
     await _deleteWhereIn(spaceIds, 'space_view_states', 'space_id', {
       spaceViewStates,

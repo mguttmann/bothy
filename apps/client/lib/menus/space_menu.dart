@@ -2,8 +2,11 @@
 
 /// The menu of a space in the sidebar (brief M4-33 Scope): its notification level and "Mute
 /// until" (13 3.1), headed by "New project in" and "Add forums for existing folders" for an
-/// owner (01 6.9 item 1, M4-43; 01 6.10 item 1, M4-44).
+/// owner (01 6.9 item 1, M4-43; 01 6.10 item 1, M4-44), and ending with "Delete space..." for
+/// an owner (01 6.18 item 1, D-DEL-14).
 library;
+
+import 'dart:async';
 
 import 'package:design_system/design_system.dart';
 import 'package:domain/domain.dart';
@@ -11,6 +14,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:l10n/l10n.dart';
 
+import '../delete/delete_flow.dart';
+import '../delete/delete_port.dart';
 import '../notifications_settings/providers.dart';
 import '../sidebar/sidebar_drag.dart' show SidebarMoves, sidebarMoveMenuItems;
 import 'level_menu.dart';
@@ -53,6 +58,7 @@ class SpaceMenu extends StatelessWidget {
       final label = newProjectLabel;
       final start = onNewProject;
       final sync = onAddFolderForums;
+      final session = DeleteSession.watch(ref);
       return [
         if (label != null && start != null)
           DsMenuItem(
@@ -70,6 +76,25 @@ class SpaceMenu extends StatelessWidget {
         if (moves case final moves?) ...[
           const Divider(),
           ...sidebarMoveMenuItems(context, moves),
+        ],
+        // D-DEL-4: an owner only.
+        if (session != null && session.owner) ...[
+          const Divider(),
+          DsMenuItem(
+            key: const ValueKey('menu.delete'),
+            onPressed: () => unawaited(
+              startDelete(
+                context,
+                session,
+                DeleteTarget(
+                  kind: DeleteKind.space,
+                  id: space.id.value,
+                  name: space.name,
+                ),
+              ),
+            ),
+            child: Text(AppLocalizations.of(context).menuDeleteSpace),
+          ),
         ],
       ];
     },

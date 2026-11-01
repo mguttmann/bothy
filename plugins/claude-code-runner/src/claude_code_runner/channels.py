@@ -144,6 +144,19 @@ class ChannelCache:
         binding = config.behavior.project_binding if config is not None else None
         return binding if isinstance(binding, ProjectBinding) else None
 
+    def workspace_refs(self) -> dict[UUID, str]:
+        """Return the ``workspace_ref`` of every served forum with a binding.
+
+        Returns:
+            The references by channel.
+        """
+        out = {}
+        for channel_id in self._configs:
+            binding = self.binding(channel_id)
+            if binding is not None:
+                out[channel_id] = binding.workspace_ref
+        return out
+
     def _ready(self, channel_id: UUID) -> tuple[bool, str | None] | None:
         binding = self.binding(channel_id)
         if binding is None:

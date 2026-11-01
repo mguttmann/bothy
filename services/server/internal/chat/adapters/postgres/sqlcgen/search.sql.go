@@ -82,7 +82,7 @@ func (q *Queries) ChannelsInSpaces(ctx context.Context, spaceIds []pgtype.UUID) 
 const prefixThreadTitles = `-- name: PrefixThreadTitles :many
 SELECT t.id, t.channel_id, t.title, t.last_activity_at
 FROM threads t
-WHERE t.channel_id = ANY($1::uuid[]) AND t.title_search @@ $2::text::tsquery
+WHERE t.channel_id = ANY($1::uuid[]) AND t.title_search @@ $2::text::tsquery AND t.deleted_at IS NULL
 ORDER BY t.last_activity_at DESC, t.id DESC
 LIMIT $3::integer
 `
@@ -134,7 +134,7 @@ WITH cand AS (
         ts_rank(t.title_search, $3::text::tsquery, $5::integer) AS rank
     FROM threads t
     WHERE t.title_search @@ $3::text::tsquery
-      AND t.channel_id = ANY($6::uuid[])
+      AND t.channel_id = ANY($6::uuid[]) AND t.deleted_at IS NULL
       AND t.created_at <= $7::timestamptz
       AND (NOT $8::boolean OR t.id = ANY($9::uuid[]))
       AND ($10::text IS NULL OR t.state = $10::text)
@@ -216,7 +216,7 @@ type SearchThreadTitlesRow struct {
 // SPDX-License-Identifier: Apache-2.0
 // The read operations of chat for the search coordinator (M3-14; docs/spec/14-search.md sections
 // 4.3 to 4.9 and 10). Each carries the visible set the coordinator passes (07 7.4 rule 1): threads
-// by t.channel_id, channels by c.space_id. None authorizes; the coordinator checks every delivered
+// by t.channel_id, channels by c.space_id; a deleted thread never matches (D-DEL-3). None authorizes; the coordinator checks every delivered
 // item with authorize again (14 4.3). The tsquery text comes from the search module and is cast
 // here (07 7.4 example). No read selects title_search or search_language as a column
 // (docs/DECISIONS.md D-M3-13-10).
@@ -285,7 +285,7 @@ func (q *Queries) SearchThreadTitles(ctx context.Context, arg SearchThreadTitles
 const threadTitleLabels = `-- name: ThreadTitleLabels :many
 SELECT t.id, t.title
 FROM threads t
-WHERE t.channel_id = ANY($1::uuid[]) AND t.id = ANY($2::uuid[]) AND t.title <> ''
+WHERE t.channel_id = ANY($1::uuid[]) AND t.id = ANY($2::uuid[]) AND t.title <> '' AND t.deleted_at IS NULL
 `
 
 type ThreadTitleLabelsParams struct {
@@ -322,9 +322,9 @@ func (q *Queries) ThreadTitleLabels(ctx context.Context, arg ThreadTitleLabelsPa
 const threadsIn = `-- name: ThreadsIn :many
 SELECT t.id, t.channel_id, t.kind, t.parent_message_id, t.title, t.title_source, t.state, t.closed_at, t.closed_by,
     t.operator_agent_id, t.last_message_seq, t.unread_floor_seq, t.last_activity_at, t.message_count, t.created_by, t.created_at,
-    t.moved_at, t.version
+    t.moved_at, t.version, t.deleted_at, t.deleted_by, t.purged_at
 FROM threads t
-WHERE t.channel_id = ANY($1::uuid[]) AND t.id = ANY($2::uuid[])
+WHERE t.channel_id = ANY($1::uuid[]) AND t.id = ANY($2::uuid[]) AND t.deleted_at IS NULL
 `
 
 type ThreadsInParams struct {
@@ -351,6 +351,9 @@ type ThreadsInRow struct {
 	CreatedAt       pgtype.Timestamptz
 	MovedAt         pgtype.Timestamptz
 	Version         int64
+	DeletedAt       pgtype.Timestamptz
+	DeletedBy       pgtype.UUID
+	PurgedAt        pgtype.Timestamptz
 }
 
 // The threads of the hits for HitThreads, the columns of GetThread, in the visible channels.
@@ -382,6 +385,9 @@ func (q *Queries) ThreadsIn(ctx context.Context, arg ThreadsInParams) ([]Threads
 			&i.CreatedAt,
 			&i.MovedAt,
 			&i.Version,
+			&i.DeletedAt,
+			&i.DeletedBy,
+			&i.PurgedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -396,7 +402,7 @@ func (q *Queries) ThreadsIn(ctx context.Context, arg ThreadsInParams) ([]Threads
 const threadsMatching = `-- name: ThreadsMatching :many
 SELECT t.id
 FROM threads t
-WHERE t.channel_id = ANY($1::uuid[])
+WHERE t.channel_id = ANY($1::uuid[]) AND t.deleted_at IS NULL
   AND ($2::text IS NULL OR t.state = $2::text)
   AND (cardinality($3::uuid[]) = 0
        OR EXISTS (SELECT 1 FROM thread_tags tt WHERE tt.thread_id = t.id AND tt.tag_id = ANY($3::uuid[])))

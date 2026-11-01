@@ -22,6 +22,8 @@ class _$Space extends Space {
   @override
   final DateTime? archivedAt;
   @override
+  final DateTime? deletedAt;
+  @override
   final int version;
   @override
   final DateTime createdAt;
@@ -37,6 +39,7 @@ class _$Space extends Space {
     required this.sortKey,
     this.defaultOperatorAgentId,
     this.archivedAt,
+    this.deletedAt,
     required this.version,
     required this.createdAt,
   }) : super._();
@@ -58,6 +61,7 @@ class _$Space extends Space {
         sortKey == other.sortKey &&
         defaultOperatorAgentId == other.defaultOperatorAgentId &&
         archivedAt == other.archivedAt &&
+        deletedAt == other.deletedAt &&
         version == other.version &&
         createdAt == other.createdAt;
   }
@@ -72,6 +76,7 @@ class _$Space extends Space {
     _$hash = $jc(_$hash, sortKey.hashCode);
     _$hash = $jc(_$hash, defaultOperatorAgentId.hashCode);
     _$hash = $jc(_$hash, archivedAt.hashCode);
+    _$hash = $jc(_$hash, deletedAt.hashCode);
     _$hash = $jc(_$hash, version.hashCode);
     _$hash = $jc(_$hash, createdAt.hashCode);
     _$hash = $jf(_$hash);
@@ -88,6 +93,7 @@ class _$Space extends Space {
           ..add('sortKey', sortKey)
           ..add('defaultOperatorAgentId', defaultOperatorAgentId)
           ..add('archivedAt', archivedAt)
+          ..add('deletedAt', deletedAt)
           ..add('version', version)
           ..add('createdAt', createdAt))
         .toString();
@@ -126,6 +132,10 @@ class SpaceBuilder implements Builder<Space, SpaceBuilder> {
   DateTime? get archivedAt => _$this._archivedAt;
   set archivedAt(DateTime? archivedAt) => _$this._archivedAt = archivedAt;
 
+  DateTime? _deletedAt;
+  DateTime? get deletedAt => _$this._deletedAt;
+  set deletedAt(DateTime? deletedAt) => _$this._deletedAt = deletedAt;
+
   int? _version;
   int? get version => _$this._version;
   set version(int? version) => _$this._version = version;
@@ -148,6 +158,7 @@ class SpaceBuilder implements Builder<Space, SpaceBuilder> {
       _sortKey = $v.sortKey;
       _defaultOperatorAgentId = $v.defaultOperatorAgentId;
       _archivedAt = $v.archivedAt;
+      _deletedAt = $v.deletedAt;
       _version = $v.version;
       _createdAt = $v.createdAt;
       _$v = null;
@@ -183,6 +194,7 @@ class SpaceBuilder implements Builder<Space, SpaceBuilder> {
           ),
           defaultOperatorAgentId: defaultOperatorAgentId,
           archivedAt: archivedAt,
+          deletedAt: deletedAt,
           version: BuiltValueNullFieldError.checkNotNull(
             version,
             r'Space',

@@ -92,6 +92,10 @@ type Handlers struct {
 	*chathttp.Behavior
 	// ReadOnly implements setChannelReadOnly (chat, M8-03).
 	*chathttp.ReadOnly
+	// Deletion implements deleteSpace, restoreSpace, getSpaceDeletion, deleteChannel,
+	// restoreChannel, getChannelDeletion, deleteThread, restoreThread and getThreadDeletion (chat,
+	// FEAT-delete-spaces-chats).
+	*chathttp.Deletion
 	// Imports implements listImports, createImport, getImport, listImportItems, startImport,
 	// pauseImport, cancelImport, completeImport, setImportLead, applyImportBatch and
 	// setImportCursor (importer, M8-03).

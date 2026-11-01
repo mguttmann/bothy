@@ -202,6 +202,7 @@ func toChannel(row sqlcgen.GetChannelRow) app.ChannelRow {
 			ForumDefaultSort: c.ForumDefaultSort.String, DefaultNotificationLevel: c.DefaultNotificationLevel.String, ReadOnly: c.ReadOnly,
 			MainThreadID: idOf(row.MainThreadID), CreatedBy: idOf(c.CreatedBy), CreatedAt: timeOf(c.CreatedAt), ArchivedAt: timeOf(c.ArchivedAt),
 			Version: c.Version, SettingsVersion: c.SettingsVersion,
+			Deletion: domain.Deletion{At: timeOf(c.DeletedAt), By: idOf(c.DeletedBy), PurgedAt: timeOf(c.PurgedAt)},
 		},
 		SpaceDefaultOperatorID: idOf(row.SpaceOperatorID),
 		SpaceArchived:          row.SpaceArchived,

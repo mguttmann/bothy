@@ -40,12 +40,21 @@ func TestChatSpacesMigration_Schema(t *testing.T) {
 			{"created_at", ts, false, "now()"},
 			{"archived_at", ts, true, ""},
 			{"version", "bigint", false, "1"},
+			// FEAT-delete-spaces-chats (migration 00086).
+			{"deleted_at", ts, true, ""},
+			{"deleted_by", "uuid", true, ""},
+			{"purged_at", ts, true, ""},
 		}, []string{
+			"CHECK (((deleted_at IS NULL) = (deleted_by IS NULL)))",
+			"CHECK (((deleted_at IS NULL) OR (archived_at IS NOT NULL)))",
+			"CHECK (((purged_at IS NULL) OR (deleted_at IS NOT NULL)))",
+			"FOREIGN KEY (deleted_by) REFERENCES principals(id) ON DELETE RESTRICT",
 			"FOREIGN KEY (created_by) REFERENCES principals(id) ON DELETE RESTRICT",
 			"FOREIGN KEY (default_operator_agent_id) REFERENCES agents(principal_id) ON DELETE RESTRICT",
 			"PRIMARY KEY (id)",
 		}, []string{
 			"CREATE INDEX spaces_default_operator_agent_id_idx ON public.spaces USING btree (default_operator_agent_id)",
+			"CREATE INDEX spaces_purge_pending_idx ON public.spaces USING btree (deleted_at) WHERE ((deleted_at IS NOT NULL) AND (purged_at IS NULL))",
 			"CREATE INDEX spaces_sort_key_idx ON public.spaces USING btree (sort_key) WHERE (archived_at IS NULL)",
 			"CREATE UNIQUE INDEX spaces_name_active_key ON public.spaces USING btree (lower(name)) WHERE (archived_at IS NULL)",
 			"CREATE UNIQUE INDEX spaces_pkey ON public.spaces USING btree (id)",

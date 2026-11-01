@@ -82,7 +82,7 @@ func channelDTO(c ChannelRow) chat.Channel {
 		Operator:         chat.ChannelOperator{Mode: string(op.Mode), AgentID: op.AgentID, EffectiveAgentID: op.EffectiveAgentID},
 		ForumDefaultSort: ch.ForumDefaultSort, DefaultNotificationLevel: ch.DefaultNotificationLevel, ReadOnly: ch.ReadOnly,
 		ProjectBound: c.ProjectBound, MainThreadID: ch.MainThreadID, CreatedAt: ch.CreatedAt, ArchivedAt: ch.ArchivedAt, Version: ch.Version,
-		SettingsVersion: ch.SettingsVersion,
+		SettingsVersion: ch.SettingsVersion, DeletedAt: ch.Deletion.At,
 	}
 }
 
@@ -524,6 +524,7 @@ type channelJSON struct {
 	Version                  int64        `json:"version"`
 	SettingsVersion          int64        `json:"settings_version"`
 	CreatedAt                string       `json:"created_at"`
+	DeletedAt                string       `json:"deleted_at,omitempty"`
 }
 
 // channelBody converts a channel row into the JSON form of the schema Channel.
@@ -534,7 +535,7 @@ func channelBody(c ChannelRow) channelJSON {
 		Operator:         operatorJSON{Mode: d.Operator.Mode, AgentID: optionalID(d.Operator.AgentID), EffectiveAgentID: optionalID(d.Operator.EffectiveAgentID)},
 		ForumDefaultSort: d.ForumDefaultSort, DefaultNotificationLevel: d.DefaultNotificationLevel, ReadOnly: d.ReadOnly,
 		ProjectBound: d.ProjectBound, MainThreadID: optionalID(d.MainThreadID), ArchivedAt: stamp(d.ArchivedAt), Version: d.Version,
-		SettingsVersion: d.SettingsVersion, CreatedAt: stamp(d.CreatedAt),
+		SettingsVersion: d.SettingsVersion, CreatedAt: stamp(d.CreatedAt), DeletedAt: stamp(d.DeletedAt),
 	}
 }
 

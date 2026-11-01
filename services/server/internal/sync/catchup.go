@@ -196,6 +196,9 @@ type SnapshotThread struct {
 	Version int64
 	// TagIDs are the live tags of a forum post; never nil.
 	TagIDs []ids.ID
+	// DeletedAt is always zero here: the snapshot leaves deleted threads out (D-DEL-3); the field
+	// keeps the layout equal to chat.Thread.
+	DeletedAt time.Time
 }
 
 // Money is an amount in millionths of the currency unit (schema Money).

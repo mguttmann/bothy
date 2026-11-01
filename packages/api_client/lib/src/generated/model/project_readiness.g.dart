@@ -13,6 +13,8 @@ class _$ProjectReadiness extends ProjectReadiness {
   final bool ready;
   @override
   final String? reason;
+  @override
+  final ProjectTrashCheckReport? trashCheck;
 
   factory _$ProjectReadiness([
     void Function(ProjectReadinessBuilder)? updates,
@@ -22,6 +24,7 @@ class _$ProjectReadiness extends ProjectReadiness {
     required this.channelId,
     required this.ready,
     this.reason,
+    this.trashCheck,
   }) : super._();
   @override
   ProjectReadiness rebuild(void Function(ProjectReadinessBuilder) updates) =>
@@ -37,7 +40,8 @@ class _$ProjectReadiness extends ProjectReadiness {
     return other is ProjectReadiness &&
         channelId == other.channelId &&
         ready == other.ready &&
-        reason == other.reason;
+        reason == other.reason &&
+        trashCheck == other.trashCheck;
   }
 
   @override
@@ -46,6 +50,7 @@ class _$ProjectReadiness extends ProjectReadiness {
     _$hash = $jc(_$hash, channelId.hashCode);
     _$hash = $jc(_$hash, ready.hashCode);
     _$hash = $jc(_$hash, reason.hashCode);
+    _$hash = $jc(_$hash, trashCheck.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -55,7 +60,8 @@ class _$ProjectReadiness extends ProjectReadiness {
     return (newBuiltValueToStringHelper(r'ProjectReadiness')
           ..add('channelId', channelId)
           ..add('ready', ready)
-          ..add('reason', reason))
+          ..add('reason', reason)
+          ..add('trashCheck', trashCheck))
         .toString();
   }
 }
@@ -76,6 +82,12 @@ class ProjectReadinessBuilder
   String? get reason => _$this._reason;
   set reason(String? reason) => _$this._reason = reason;
 
+  ProjectTrashCheckReportBuilder? _trashCheck;
+  ProjectTrashCheckReportBuilder get trashCheck =>
+      _$this._trashCheck ??= ProjectTrashCheckReportBuilder();
+  set trashCheck(ProjectTrashCheckReportBuilder? trashCheck) =>
+      _$this._trashCheck = trashCheck;
+
   ProjectReadinessBuilder() {
     ProjectReadiness._defaults(this);
   }
@@ -86,6 +98,7 @@ class ProjectReadinessBuilder
       _channelId = $v.channelId;
       _ready = $v.ready;
       _reason = $v.reason;
+      _trashCheck = $v.trashCheck?.toBuilder();
       _$v = null;
     }
     return this;
@@ -105,21 +118,38 @@ class ProjectReadinessBuilder
   ProjectReadiness build() => _build();
 
   _$ProjectReadiness _build() {
-    final _$result =
-        _$v ??
-        _$ProjectReadiness._(
-          channelId: BuiltValueNullFieldError.checkNotNull(
-            channelId,
-            r'ProjectReadiness',
-            'channelId',
-          ),
-          ready: BuiltValueNullFieldError.checkNotNull(
-            ready,
-            r'ProjectReadiness',
-            'ready',
-          ),
-          reason: reason,
+    _$ProjectReadiness _$result;
+    try {
+      _$result =
+          _$v ??
+          _$ProjectReadiness._(
+            channelId: BuiltValueNullFieldError.checkNotNull(
+              channelId,
+              r'ProjectReadiness',
+              'channelId',
+            ),
+            ready: BuiltValueNullFieldError.checkNotNull(
+              ready,
+              r'ProjectReadiness',
+              'ready',
+            ),
+            reason: reason,
+            trashCheck: _trashCheck?.build(),
+          );
+    } catch (_) {
+      late String _$failedField;
+      try {
+        _$failedField = 'trashCheck';
+        _trashCheck?.build();
+      } catch (e) {
+        throw BuiltValueNestedFieldError(
+          r'ProjectReadiness',
+          _$failedField,
+          e.toString(),
         );
+      }
+      rethrow;
+    }
     replace(_$result);
     return _$result;
   }

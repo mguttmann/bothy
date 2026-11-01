@@ -79,6 +79,10 @@ func (t *Tracker) Heartbeat(ctx context.Context, body json.RawMessage) (agents.P
 	if err := t.applyFolders(ctx, e, report); err != nil {
 		return agents.PresenceStatus{}, err
 	}
+	trash, err := t.applyTrash(ctx, a.ID, report)
+	if err != nil {
+		return agents.PresenceStatus{}, err
+	}
 	wrote, err := t.store(ctx, a.ID, row, report, now, takeover)
 	if err != nil {
 		return agents.PresenceStatus{}, err
@@ -103,7 +107,45 @@ func (t *Tracker) Heartbeat(ctx context.Context, body json.RawMessage) (agents.P
 	}
 	by := a.ID
 	t.publish(ctx, e, &by)
-	return t.status(e, now), nil
+	st := t.status(e, now)
+	st.ProjectTrash = trash
+	return st, nil
+}
+
+// applyTrash hands the folder move outcomes of r to chat, which stores each once and audits it
+// as channel.project.trash (09 18.15, D-DEL-11), and returns the moves the runner still owes for
+// HeartbeatAck.project_trash. Any error of the port fails the heartbeat with internal_error.
+func (t *Tracker) applyTrash(ctx context.Context, agentID ids.ID, r domain.Report) ([]agents.ProjectTrashRequest, error) {
+	_, port := t.bound()
+	if port == nil {
+		// A tracker without chat (a second node in a test, or before the chat step) owes nothing;
+		// results it cannot hand on fail the heartbeat.
+		if len(r.TrashResults) > 0 {
+			return nil, errs.New(errs.CodeInternalError, "agents: no readiness port bound")
+		}
+		return nil, nil
+	}
+	if len(r.TrashResults) > 0 {
+		results := make([]chat.ProjectTrashResult, 0, len(r.TrashResults))
+		for _, tr := range r.TrashResults {
+			results = append(results, chat.ProjectTrashResult{ChannelID: tr.ChannelID, Result: tr.Result, Reason: tr.Reason})
+		}
+		if err := port.ApplyProjectTrashResults(ctx, agentID, results); err != nil {
+			return nil, internal(err, "agents: applying folder move outcomes")
+		}
+	}
+	reqs, err := port.ProjectTrashRequests(ctx, agentID)
+	if err != nil {
+		return nil, internal(err, "agents: reading the folder moves")
+	}
+	if len(reqs) == 0 {
+		return nil, nil
+	}
+	out := make([]agents.ProjectTrashRequest, 0, len(reqs))
+	for _, req := range reqs {
+		out = append(out, agents.ProjectTrashRequest{ChannelID: req.ChannelID, WorkspaceRef: req.WorkspaceRef})
+	}
+	return out, nil
 }
 
 // takeover fills an unloaded entry from row and reports whether this heartbeat takes the agent
@@ -163,7 +205,11 @@ func (t *Tracker) applyReadiness(ctx context.Context, e *entry, r domain.Report,
 	}
 	reports := make([]chat.ProjectReadiness, 0, len(r.Readiness))
 	for _, rd := range r.Readiness {
-		reports = append(reports, chat.ProjectReadiness{ChannelID: rd.ChannelID, Ready: rd.Ready, Reason: rd.Reason})
+		pr := chat.ProjectReadiness{ChannelID: rd.ChannelID, Ready: rd.Ready, Reason: rd.Reason}
+		if rd.TrashGiven {
+			pr.TrashCheck = &chat.ProjectTrashCheckReport{OK: rd.TrashOK, Reason: rd.TrashReason}
+		}
+		reports = append(reports, pr)
 	}
 	if err := port.ApplyProjectReadiness(ctx, e.id, reports); err != nil {
 		if errs.KindOf(err) == errs.KindBadRequest {

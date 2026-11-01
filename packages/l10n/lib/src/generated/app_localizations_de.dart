@@ -3843,6 +3843,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get threadNoAccess => 'Kein Zugriff mehr';
 
   @override
+  String get threadDeleted => 'Dieser Chat wurde gelöscht.';
+
+  @override
   String get threadNoAccessWaiting =>
       'Nicht gesendete Nachrichten zum Kopieren:';
 
@@ -9754,4 +9757,214 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get settingsShowProjectStatusHint =>
       'Jedes Forum und Projekt zeigt in seiner Zeile den dringendsten neuen Status seiner Chats.';
+
+  @override
+  String get menuDeleteSpace => 'Bereich löschen...';
+
+  @override
+  String get menuDeleteChannel => 'Kanal löschen...';
+
+  @override
+  String get menuDeleteProject => 'Projekt löschen...';
+
+  @override
+  String get menuDeleteChat => 'Chat löschen...';
+
+  @override
+  String deleteTitle(String name) {
+    return '$name löschen?';
+  }
+
+  @override
+  String get deleteLoading => 'Es wird gezählt, was gelöscht wird.';
+
+  @override
+  String get deleteLoadFailed => 'Es ließ sich nicht lesen, was gelöscht wird.';
+
+  @override
+  String get deleteRetry => 'Erneut versuchen';
+
+  @override
+  String deleteSummary(String parts) {
+    return 'Gelöscht werden: $parts.';
+  }
+
+  @override
+  String get deleteSummaryEmpty => 'Es ist leer.';
+
+  @override
+  String deleteListAnd(String head, String last) {
+    return '$head und $last';
+  }
+
+  @override
+  String deleteCountChannels(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Kanäle',
+      one: '1 Kanal',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String deleteCountChats(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Chats',
+      one: '1 Chat',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String deleteCountMessages(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Nachrichten',
+      one: '1 Nachricht',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String deleteCountFiles(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Dateien',
+      one: '1 Datei',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String deleteCountSessions(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Agenten-Sitzungen',
+      one: '1 Agenten-Sitzung',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get deleteUndoHint =>
+      'Du kannst das für kurze Zeit rückgängig machen.';
+
+  @override
+  String deleteFolderBox(String name) {
+    return 'Auch den Projektordner $name in den Papierkorb verschieben';
+  }
+
+  @override
+  String get deleteFolderUnchecked =>
+      'Der Runner hat den Ordner noch nicht geprüft.';
+
+  @override
+  String get deleteFolderOutsideRoot =>
+      'Der Ordner liegt außerhalb des Projektordners des Runners.';
+
+  @override
+  String get deleteFolderSymlink =>
+      'Der Ordner ist ein Verweis auf einen anderen Ort.';
+
+  @override
+  String get deleteFolderForeignWorktree =>
+      'Der Ordner ist ein Git-Arbeitsbaum eines anderen Repositorys.';
+
+  @override
+  String get deleteFolderUncommittedChanges =>
+      'Der Ordner hat Änderungen, die nicht committet sind.';
+
+  @override
+  String get deleteFolderUnpushedCommits =>
+      'Der Ordner hat Commits, die nicht gepusht sind.';
+
+  @override
+  String get deleteFolderContainsOtherProject =>
+      'Der Ordner enthält ein anderes Projekt.';
+
+  @override
+  String get deleteFolderWorkspaceMissing =>
+      'Der Ordner existiert auf dem Rechner des Runners nicht.';
+
+  @override
+  String get deleteFolderCheckFailed =>
+      'Der Runner konnte den Ordner nicht prüfen.';
+
+  @override
+  String get deleteFolderRefusedOther =>
+      'Der Runner verschiebt diesen Ordner nicht.';
+
+  @override
+  String get deleteCancel => 'Abbrechen';
+
+  @override
+  String get deleteConfirm => 'Löschen';
+
+  @override
+  String deleteDone(String name) {
+    return '$name gelöscht';
+  }
+
+  @override
+  String get deleteUndo => 'Rückgängig';
+
+  @override
+  String get deleteUndoTooLate =>
+      'Das Löschen lässt sich nicht mehr rückgängig machen.';
+
+  @override
+  String deleteUndoFailed(String name) {
+    return 'Das Löschen von $name ließ sich nicht rückgängig machen.';
+  }
+
+  @override
+  String deleteFolderTrashed(String name) {
+    return 'Der Ordner $name wurde in den Papierkorb verschoben.';
+  }
+
+  @override
+  String deleteFolderKept(String name, String reason) {
+    return 'Der Ordner $name bleibt erhalten: $reason';
+  }
+
+  @override
+  String stepUpPurposeDeleteSpace(String name) {
+    return 'Den Bereich $name löschen';
+  }
+
+  @override
+  String stepUpPurposeDeleteChannel(String name) {
+    return 'Den Kanal $name löschen';
+  }
+
+  @override
+  String stepUpPurposeDeleteProject(String name) {
+    return 'Das Projekt $name löschen';
+  }
+
+  @override
+  String stepUpPurposeRestoreSpace(String name) {
+    return 'Den Bereich $name wiederherstellen';
+  }
+
+  @override
+  String stepUpPurposeRestoreChannel(String name) {
+    return 'Den Kanal $name wiederherstellen';
+  }
+
+  @override
+  String stepUpPurposeRestoreProject(String name) {
+    return 'Das Projekt $name wiederherstellen';
+  }
+
+  @override
+  String get problemConflictProjectFolderRefused =>
+      'Die letzte Prüfung des Runners erlaubt nicht, den Projektordner in den Papierkorb zu verschieben.';
 }

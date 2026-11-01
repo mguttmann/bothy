@@ -5,12 +5,14 @@ package wire
 import (
 	"errors"
 
+	agentspg "github.com/OWNER/bothy/services/server/internal/agents/adapters/postgres"
 	"github.com/OWNER/bothy/services/server/internal/authz"
 	authztelemetry "github.com/OWNER/bothy/services/server/internal/authz/adapters/telemetry"
 	"github.com/OWNER/bothy/services/server/internal/chat/adapters/authzsource"
 	chathttp "github.com/OWNER/bothy/services/server/internal/chat/adapters/httpapi"
 	chatpg "github.com/OWNER/bothy/services/server/internal/chat/adapters/postgres"
 	chatapp "github.com/OWNER/bothy/services/server/internal/chat/app"
+	filespg "github.com/OWNER/bothy/services/server/internal/files/adapters/postgres"
 	"github.com/OWNER/bothy/services/server/internal/identity"
 	importerpg "github.com/OWNER/bothy/services/server/internal/importer/adapters/postgres"
 	importerapp "github.com/OWNER/bothy/services/server/internal/importer/app"
@@ -82,6 +84,9 @@ type Chat struct {
 	BehaviorHandlers *chathttp.Behavior
 	// ReadOnlyHandlers are the REST handler of setChannelReadOnly (M8-03).
 	ReadOnlyHandlers *chathttp.ReadOnly
+	// DeletionHandlers are the REST handlers of deleting and restoring spaces, channels and
+	// threads (FEAT-delete-spaces-chats).
+	DeletionHandlers *chathttp.Deletion
 }
 
 // NewChat builds the chat module over pool with the unit of work uow, the Authorizer az (also the
@@ -112,12 +117,13 @@ func NewChat(cfg chatapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize
 		Store: repo, UoW: uow, Authorizer: az, Rights: rights, Audit: w.Audit, Events: w.Events,
 		RightsChanges: w.Rights, Directory: w.Directory,
 		Policies: policies, Cursors: chathttp.Cursors{}, Clock: clk, Behaviors: repo, Errors: counter, Resolver: w.Resolver, Guard: guard,
+		Files: filespg.NewRepository(pool), Sessions: agentspg.NewRepository(pool),
 	})
 	if err != nil {
 		return nil, err
 	}
 	return &Chat{Service: svc, Handlers: chathttp.New(svc), ChannelHandlers: chathttp.NewChannels(svc), ThreadHandlers: chathttp.NewThreads(svc),
-		BehaviorHandlers: chathttp.NewBehavior(svc, svc), ReadOnlyHandlers: chathttp.NewReadOnly(svc)}, nil
+		BehaviorHandlers: chathttp.NewBehavior(svc, svc), ReadOnlyHandlers: chathttp.NewReadOnly(svc), DeletionHandlers: chathttp.NewDeletion(svc)}, nil
 }
 
 // fillHandlers sets the nil chat handlers of h to the ones c built: spaces and the sidebar
@@ -138,5 +144,8 @@ func (c *Chat) fillHandlers(h *Handlers) {
 	}
 	if h.ReadOnly == nil {
 		h.ReadOnly = c.ReadOnlyHandlers
+	}
+	if h.Deletion == nil {
+		h.Deletion = c.DeletionHandlers
 	}
 }

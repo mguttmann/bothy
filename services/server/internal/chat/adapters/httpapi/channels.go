@@ -179,6 +179,7 @@ func channelREST(c chat.Channel) rest.Channel {
 			EffectiveAgentId: optionalID(c.Operator.EffectiveAgentID)},
 		ReadOnly: c.ReadOnly, ProjectBound: c.ProjectBound, MainThreadId: optionalID(c.MainThreadID), ArchivedAt: optionalTime(c.ArchivedAt),
 		CreatedAt: c.CreatedAt.UTC().Truncate(time.Millisecond), Version: c.Version, SettingsVersion: c.SettingsVersion,
+		DeletedAt: optionalTime(c.DeletedAt),
 	}
 	if c.ForumDefaultSort != "" {
 		s := rest.ForumSort(c.ForumDefaultSort)

@@ -4,6 +4,7 @@ package app
 
 import (
 	"context"
+	"slices"
 
 	"github.com/OWNER/bothy/services/server/internal/agents"
 	"github.com/OWNER/bothy/services/server/internal/chat"
@@ -45,9 +46,11 @@ func (a *Acceptor) OnAgentDisabled(ctx context.Context, ev agents.AgentDisabled)
 	return s.onAgentDisabled(ctx, ev)
 }
 
-// onAccessChanged is OnAccessChanged with the bound use cases.
+// onAccessChanged is OnAccessChanged with the bound use cases. The rights change of a deleted
+// space or channel cancels nothing here: chat.ContentDeleted of the same transaction cancels
+// every active run of the item once (OnContentDeleted, D-DEL-7).
 func (s *Service) onAccessChanged(ctx context.Context, ev authorize.AccessChanged) error {
-	if len(ev.Changes) == 0 {
+	if len(ev.Changes) == 0 || ev.Action == authorize.ActionSpaceDelete || ev.Action == authorize.ActionChannelDelete {
 		return nil
 	}
 	principals := make([]ids.ID, 0, len(ev.Changes))
@@ -136,6 +139,48 @@ func (a *Acceptor) OnChannelReadOnlySet(ctx context.Context, ev chat.ChannelRead
 		return nil
 	}
 	return s.onChannelReadOnly(ctx, ev.ChannelID)
+}
+
+// OnContentDeleted is the in-transaction subscriber of chat.ContentDeleted (05 space.delete,
+// channel.delete, thread.delete; D-DEL-7): every active run in the threads of the deleted channels
+// and in the deleted thread is locked in ascending id and gets run.cancel_requested with reason
+// channel_read_only and the job runs.cancel_timeout through requestCancel, so the runner stops the
+// process. Until Bind it does nothing. Errors: those of the database and the scheduler, which
+// roll the deletion back.
+func (a *Acceptor) OnContentDeleted(ctx context.Context, ev chat.ContentDeleted) error {
+	s := a.svc.Load()
+	if s == nil {
+		return nil
+	}
+	return s.onContentDeleted(ctx, ev)
+}
+
+// onContentDeleted requests the cancellation of the active runs of the deleted content.
+func (s *Service) onContentDeleted(ctx context.Context, ev chat.ContentDeleted) error {
+	threads := slices.Clone(ev.ThreadIDs)
+	if len(ev.ChannelIDs) > 0 {
+		if s.d.ChannelThreads == nil {
+			return errs.New(errs.CodeInternalError, "runs: the subscriber of chat.ContentDeleted needs the threads of chat")
+		}
+		more, err := s.d.ChannelThreads.ThreadIDsOfChannels(ctx, ev.ChannelIDs)
+		if err != nil {
+			return err
+		}
+		threads = append(threads, more...)
+	}
+	if len(threads) == 0 {
+		return nil
+	}
+	rows, err := s.d.Repo.LockActiveRunsByThreads(ctx, threads)
+	if err != nil {
+		return err
+	}
+	for _, row := range rows {
+		if err := s.requestCancel(ctx, row, domain.RunReasonChannelReadOnly, ids.ID{}, false); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // onChannelReadOnly requests the cancellation of the active runs of the channel.

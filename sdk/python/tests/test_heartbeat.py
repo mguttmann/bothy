@@ -23,6 +23,9 @@ from bothy_sdk.generated.models import (
     BillingEvidence,
     Heartbeat,
     ProjectReadiness,
+    ProjectTrashCheckReport,
+    ProjectTrashResult,
+    ProjectTrashResultResult,
 )
 from bothy_sdk.heartbeat import build_heartbeat
 from bothy_sdk.ids import uuid7
@@ -317,3 +320,63 @@ def test_project_folders() -> None:
     raises_naming("project_folders", lambda: build_heartbeat(project_folders=["a", "a"]))
     for bad in (".git", "a/b", "-x", "", "my project", "x" * 256):
         raises_naming("project_folders", lambda bad=bad: build_heartbeat(project_folders=[bad]))
+
+
+def test_project_trash_results() -> None:
+    """``project_trash_results`` carries one outcome per forum with a code (09 18.15)."""
+    other = uuid7()
+    beat = build_heartbeat(
+        project_trash_results=[
+            ProjectTrashResult(channel_id=CHANNEL, result=ProjectTrashResultResult.TRASHED),
+            ProjectTrashResult(
+                channel_id=other, result=ProjectTrashResultResult.REFUSED, reason="symlink"
+            ),
+        ]
+    )
+    assert beat.to_dict()["project_trash_results"] == [
+        {"channel_id": str(CHANNEL), "result": "trashed"},
+        {"channel_id": str(other), "result": "refused", "reason": "symlink"},
+    ]
+    assert "project_trash_results" not in build_heartbeat().to_dict()
+    done = ProjectTrashResult(channel_id=CHANNEL, result=ProjectTrashResultResult.TRASHED)
+    raises_naming(
+        "project_trash_results", lambda: build_heartbeat(project_trash_results=[done, done])
+    )
+    raises_naming(
+        "project_trash_results",
+        lambda: build_heartbeat(project_trash_results=[{"channel_id": str(CHANNEL)}]),  # type: ignore[list-item]
+    )
+    for bad in ("/home/alex/website", "Symlink", "x" * 65, ""):
+        refused = ProjectTrashResult(
+            channel_id=CHANNEL, result=ProjectTrashResultResult.REFUSED, reason=bad
+        )
+        raises_naming(
+            "project_trash_results.reason",
+            lambda refused=refused: build_heartbeat(project_trash_results=[refused]),
+            bad,
+        )
+
+
+def test_project_readiness_trash_check() -> None:
+    """A readiness entry carries the folder check; its reason is a code (09 18.15)."""
+    entry = ProjectReadiness(
+        channel_id=CHANNEL,
+        ready=True,
+        trash_check=ProjectTrashCheckReport(ok=False, reason="uncommitted_changes"),
+    )
+    assert build_heartbeat(project_readiness=[entry]).to_dict()["project_readiness"] == [
+        {
+            "channel_id": str(CHANNEL),
+            "ready": True,
+            "trash_check": {"ok": False, "reason": "uncommitted_changes"},
+        }
+    ]
+    bad = "/srv/projects/website"
+    entry = ProjectReadiness(
+        channel_id=CHANNEL, ready=True, trash_check=ProjectTrashCheckReport(ok=False, reason=bad)
+    )
+    raises_naming(
+        "project_readiness.trash_check.reason",
+        lambda: build_heartbeat(project_readiness=[entry]),
+        bad,
+    )

@@ -296,6 +296,9 @@ type threadRow struct {
 	CreatedAt       pgtype.Timestamptz
 	MovedAt         pgtype.Timestamptz
 	Version         int64
+	DeletedAt       pgtype.Timestamptz
+	DeletedBy       pgtype.UUID
+	PurgedAt        pgtype.Timestamptz
 }
 
 // oneThread converts the result of a single-thread query; no rows is found false.
@@ -318,5 +321,6 @@ func toThread(row threadRow) domain.Thread {
 		LastMessageSeq: row.LastMessageSeq, UnreadFloorSeq: row.UnreadFloorSeq, MessageCount: int(row.MessageCount),
 		CreatedBy: idOf(row.CreatedBy), CreatedAt: timeOf(row.CreatedAt), LastActivityAt: timeOf(row.LastActivityAt),
 		MovedAt: timeOf(row.MovedAt), Version: row.Version,
+		Deletion: domain.Deletion{At: timeOf(row.DeletedAt), By: idOf(row.DeletedBy), PurgedAt: timeOf(row.PurgedAt)},
 	}
 }

@@ -207,6 +207,30 @@ generated column, redact the payloads of the related events (forms in 04, sectio
   processed, the provider deletes according to its periods (section 6).
 - Entry in the deletion journal (4.6), from the event `message.deleted`.
 
+### 4.2a Deleting a space, channel or chat
+
+Addendum of 2026-11-01 ([delete.md](../design/delete.md), D-DEL-1, D-DEL-7 to D-DEL-9; 03
+R-DM-57). A person with the right deletes a space, a channel or forum, or a chat
+(`space.delete`, `channel.delete`, `thread.delete`); it leaves every list at once and can be
+restored until `chat.delete_undo_window` has passed. Then the job `messaging.purge_deleted`
+(every `chat.delete_purge_interval` and at worker start) deletes every message of the item that
+is not deleted yet through the path of 4.2, without an actor and without an audit entry (as
+`retention.content`, 4.1): tombstone, revisions, mentions, reactions, pin, attachments (4.3),
+event redaction, `message.deleted` without `deleted_by`, deletion journal. It then clears the
+thread titles and channel topics of the item and sets `purged_at`; the rows stay (03 principle
+7). The job works in batches of `retention.batch_size` messages, each message in its own
+transaction, and a run that stops anywhere is resumed by the next.
+
+- A delete ends the active runs of the item (`run.cancel_requested` with `channel_read_only`);
+  agent session rows stay with their thread (retention `content`); the runtime's own transcripts
+  on the host are not touched.
+- Synced personal order rows stay, so an undo restores the person's arrangement.
+- Not covered by the purge: the stored payloads of `thread.created` and `thread.updated` keep the
+  former title until `sync.event_retention`, and drafts of the item stay until their owner
+  deletes them or the account is erased (recorded in the decisions of the ticket).
+- A project folder is never removed: on request the serving runner moves it to the trash of its
+  host once the deletion is final ([09-agents.md](09-agents.md) 18.15).
+
 ### 4.3 Files
 
 A file is deleted with its message or through `file.delete`: row `deleted_at`; the deleting

@@ -43,8 +43,9 @@ func CancelDecision(current State) CancelOutcome {
 
 // CancelReasonFor returns the reason of the cancel requests that a rights change with the audit
 // action action causes (brief M2-09 note 8c): user.disable gives user_disabled (08 11 point 7,
-// 02 4.3), channel.archive and space.archive give channel_read_only (09 5.2 "read-only or
-// archived"), every other action gives access_revoked.
+// 02 4.3), channel.archive, space.archive and their deletions give channel_read_only (09 5.2
+// "read-only or archived"; a deleted channel or space is archived, D-DEL-2), every other action
+// gives access_revoked.
 //
 // Example:
 //
@@ -53,7 +54,7 @@ func CancelReasonFor(action string) string {
 	switch action {
 	case "user.disable":
 		return RunReasonUserDisabled
-	case "channel.archive", "space.archive":
+	case "channel.archive", "space.archive", "channel.delete", "space.delete":
 		return RunReasonChannelReadOnly
 	}
 	return RunReasonAccessRevoked

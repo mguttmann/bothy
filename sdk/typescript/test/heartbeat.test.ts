@@ -19,6 +19,7 @@ import {
   HEARTBEAT_MEMBERS,
   HeartbeatSender,
   NAME_FORM,
+  REASON_FORM,
   VERSION_FORM,
   buildHeartbeat,
   restHeartbeatSend,
@@ -354,6 +355,101 @@ describe("buildHeartbeat", () => {
     expect(new Set(top)).toEqual(new Set(DETAILS_KEYS));
     const members = [...beat.matchAll(/^ {8}([a-z_]+):$/gm)].map((m) => m[1]);
     expect(new Set(members)).toEqual(new Set(HEARTBEAT_MEMBERS));
+  });
+});
+
+describe("buildHeartbeat folder trash (09 18.15)", () => {
+  it("keeps the readiness reason and the folder check", () => {
+    expect(
+      buildHeartbeat("online", {
+        projectReadiness: [
+          {
+            channel_id: CHANNEL,
+            ready: false,
+            reason: "provisioning",
+            trash_check: { ok: false, reason: "uncommitted_changes" },
+          },
+        ],
+      }).project_readiness,
+    ).toEqual([
+      {
+        channel_id: CHANNEL,
+        ready: false,
+        reason: "provisioning",
+        trash_check: { ok: false, reason: "uncommitted_changes" },
+      },
+    ]);
+    const bad = "/srv/projects/website";
+    raisesNaming(
+      "project_readiness.trash_check.reason",
+      () =>
+        buildHeartbeat("online", {
+          projectReadiness: [
+            {
+              channel_id: CHANNEL,
+              ready: true,
+              trash_check: { ok: false, reason: bad },
+            },
+          ],
+        }),
+      bad,
+    );
+    raisesNaming("project_readiness.trash_check", () =>
+      buildHeartbeat("online", {
+        projectReadiness: [
+          {
+            channel_id: CHANNEL,
+            ready: true,
+            trash_check: { ok: true, path: "x" } as unknown as { ok: boolean },
+          },
+        ],
+      }),
+    );
+  });
+
+  it("carries the outcomes of folder moves", () => {
+    const other = uuidv7();
+    expect(
+      buildHeartbeat("online", {
+        projectTrashResults: [
+          { channel_id: CHANNEL, result: "trashed" },
+          { channel_id: other, result: "refused", reason: "symlink" },
+        ],
+      }).project_trash_results,
+    ).toEqual([
+      { channel_id: CHANNEL, result: "trashed" },
+      { channel_id: other, result: "refused", reason: "symlink" },
+    ]);
+    expect(buildHeartbeat("online")).not.toHaveProperty(
+      "project_trash_results",
+    );
+    raisesNaming("project_trash_results", () =>
+      buildHeartbeat("online", {
+        projectTrashResults: [
+          { channel_id: CHANNEL, result: "trashed" },
+          { channel_id: CHANNEL, result: "refused", reason: "symlink" },
+        ],
+      }),
+    );
+    raisesNaming("project_trash_results.result", () =>
+      buildHeartbeat("online", {
+        projectTrashResults: [
+          { channel_id: CHANNEL, result: "removed" as "trashed" },
+        ],
+      }),
+    );
+    for (const bad of ["/home/alex/website", "Symlink", "x".repeat(65), ""])
+      raisesNaming(
+        "project_trash_results.reason",
+        () =>
+          buildHeartbeat("online", {
+            projectTrashResults: [
+              { channel_id: CHANNEL, result: "refused", reason: bad },
+            ],
+          }),
+        bad,
+      );
+    expect(REASON_FORM).toBe("^[a-z0-9][a-z0-9_]*$");
   });
 });
 

@@ -74,6 +74,7 @@ milestones from the [plan](../PLAN.md).
 | Fixed thread ID, auto title with source, edit title | core | D, M | `thread.title.update` | a manual title is never overwritten automatically |
 | Set Done, a new message reopens | core | D, M | `thread.close`, `thread.reopen` | section 6.1 |
 | Move a thread (only channels with the same operator) | core | D | `thread.move` | the dialog shows only valid targets |
+| Delete a space, channel, project or chat, with undo; optionally the project folder to the trash | core | D, M | `space.delete`, `channel.delete`, `thread.delete` and their restores | section 6.18; not in the web console (addendum of 2026-11-01) |
 | Direct messages between people | later | D, M | `dm.create` | switch `dm.enabled`; without an agent |
 | Threads in threads | never | | | one level is enough; deeper trees fragment agent sessions |
 | Voice and video channels, screen sharing | never | | | not core to the product; large operational effort (Baseline 4) |
@@ -1561,8 +1562,9 @@ a second interaction.
   answers here"; so an agent never answers in the wrong channel unnoticed.
 - **Costs:** in Organization mode with "Estimate" until reconciled; in Personal mode with
   "Information only".
-- **Destructive actions** (delete a message, revoke a grant, revoke a device) ask for confirmation
-  once; administration actions with step-up ask for the confirmation of the device.
+- **Destructive actions** (delete a message, a space, a channel or a chat (6.18), revoke a grant,
+  revoke a device) ask for confirmation once; administration actions with step-up ask for the
+  confirmation of the device.
 - **Move:** The dialog shows only channels with the same operator; the thread ID stays.
 - **Each device navigates on its own** (addendum of 2026-10-29, R-PR-24). What a device shows
   is its own: the route (open space, channel, thread or view), the selected sidebar row, the open
@@ -1952,6 +1954,74 @@ and Android.
    text channel row shows only the status of its main history, which is its own chat. Space rows
    show no status.
 
+### 6.18 Deleting
+
+Addendum of 2026-11-01 (R-PR-33, rulings D-DEL-1 to D-DEL-16,
+[design note](../design/delete.md)). Reason: owner request of 2026-11-01; nothing could be deleted
+in the app, neither a space, a channel, a project nor a chat. Applies to macOS, Windows, iOS and
+Android; the server side is in 05 (`space.delete`, `channel.delete`, `thread.delete` and their
+restores), 07 4.5a and 20 4.2a.
+
+1. **Entries.** "Delete space..." in the space menu of the sidebar; "Delete channel..." in the
+   menu of a channel or forum in the sidebar and of the "More" button of its main history;
+   "Delete project..." in the same menus of a forum with a project binding; "Delete chat..." in
+   the menu of a chat row in the sidebar, of a row of the post list and of the "More" button of a
+   chat's history. The entry stands at the end of its menu after a divider. On the phone the same
+   menus open with a long press on the row, and the overflow menu of the header is the "More"
+   button. The web console has no spaces, channels or chats and no entry (D-DEL-14).
+2. **Who sees them.** A space: its owner. A channel or a forum: whoever has `manage` on it. A
+   chat: its creator or whoever has `manage` on its channel, never for a main thread and never in
+   an archived or read only channel. Without the right the entry does not show.
+3. **Confirmation.** A dialog with the title "Delete <name>?" reads `getSpaceDeletion`,
+   `getChannelDeletion` or `getThreadDeletion` when it opens and says in one sentence what goes,
+   naming only the counts that are not zero: channels, chats, messages, files and agent sessions
+   ("This deletes 2 chats, 140 messages, 3 files and 2 agent sessions."); with every count zero it
+   says that the item is empty. While the counts load it shows a loading state; a failed read
+   shows an error sentence with "Try again". A hint says that the deletion can be undone for a
+   short time. The buttons are "Cancel" and "Delete" in the destructive style; "Delete" is enabled
+   once the counts show.
+4. **Project folder.** For an owner the dialog of a forum with a project binding has the box
+   "Also move the project folder <name> to the trash", unchecked by default (`trash_project_folder`
+   of `deleteChannel`; the runner moves it to the trash of its host once the deletion is final,
+   never removes it, [09](09-agents.md) 18.15). The box is disabled with one sentence when the
+   runner has not checked the folder yet ("The runner has not checked the folder yet.") or its
+   check refused it, one sentence per reason code:
+
+   | Reason code | Sentence |
+   |---|---|
+   | `outside_root` | The folder is outside the runner's projects folder. |
+   | `symlink` | The folder is a link to another place. |
+   | `foreign_worktree` | The folder is a Git work tree of another repository. |
+   | `uncommitted_changes` | The folder has changes that are not committed. |
+   | `unpushed_commits` | The folder has commits that are not pushed. |
+   | `contains_other_project` | The folder contains another project. |
+   | `workspace_missing` | The folder does not exist on the runner's host. |
+   | `check_failed` | The runner could not check the folder. |
+   | any other code | The runner does not move this folder. |
+
+5. **Step-up.** Deleting and restoring a space or a channel asks for the step-up of the device
+   (05 4.5); deleting and restoring a chat does not.
+6. **Undo.** After the delete the item leaves the sidebar at once, and a toast "Deleted <name>"
+   with "Undo" shows until `undo_until` of the answer minus 2 seconds, at most
+   `ui.delete_undo_toast`. "Undo" calls `restoreSpace`, `restoreChannel` or `restoreThread`; when
+   the server answers that the window has passed (`409 conflict`, `undo_window_passed`), the toast
+   says in one sentence that the deletion can no longer be undone.
+7. **Folder outcome.** When the box was checked, the client reads `getChannelDeletion` every 2
+   seconds after `undo_until`, for at most `ui.delete_folder_wait`, and shows the outcome once:
+   "Moved the folder <name> to the trash." or "Kept the folder <name>: <reason>", the reason
+   being the sentence of item 4. Without an outcome in that time it shows nothing.
+8. **Every client.** A `space.archived` or `channel.archived` whose object carries `deleted_at`,
+   and a `thread.updated` with `deleted_at`, remove the item and its local content as a removed
+   target ([04](04-sync-protocol.md) 8.3): the sidebar drops it at once and its open views close
+   with "This chat was deleted." instead of "No access anymore" (waiting messages stay as text, as
+   in 6.6), on every device of every reader. A later version without `deleted_at` brings it back into the
+   sidebar and its history loads again from the server. The person's order of 6.16 stays, so a
+   restored item returns to its place.
+9. **No separate new chat entry.** No code builds a sidebar entry with the channel sign that starts
+   a new chat; "+" of a forum row, "New chat in <forum>" of the forum menu and Cmd+N (Ctrl+N) start
+   a chat (6.8 item 8). Such an entry is a text channel in the instance's data and goes with this
+   delete (D-DEL-16).
+
 ## 7. Keyboard shortcuts
 
 Shortcuts apply on desktop. They avoid system assignments (Cmd+H, Cmd+M, Cmd+Q, Alt+F4,
@@ -2217,6 +2287,7 @@ Rules:
 | R-PR-30 | Spaces, the channels and forums of a space and the open posts of a forum are dragged into the person's own order (a line shows the drop on the desktop, a long press lifts the row on the phone, "Move up" and "Move down" in the row menu), kept per person across devices and never visible to others; three personal settings arrange each level by last activity instead (spaces and channels off, chats on by default), and an automatic level cannot be dragged (6.16, addendum of 2026-10-31). | Owner request 2026-10-31: nothing in the sidebar could be moved, not five imported spaces, not 25 project forums of a dev space, not the chats of a forum; the sidebar order is data that follows the person (R-PR-24), and chats by activity is the order of R-PR-23 (docs/decisions.d/M4-51.md). |
 | R-PR-31 | A chat row in the sidebar shows a status mark (green done, yellow working, blue waiting for the person, red failed, each with its own shape, tooltip and label) only for an agent state the person has not seen since they last had the chat open; opening the chat clears it, a new change brings it back, seen follows the person's read state, the mark replaces the unread bar on rows with agent runs, and forum and project rows show the most urgent unseen state behind the setting `sidebar.show_project_status` (6.17, addendum of 2026-10-31). | Owner request and amendment 2026-10-31: with many agent chats the person could not tell where something had happened without opening each one; only news the person has not seen is worth a mark, and two markers on one row would compete (docs/decisions.d/M4-52.md). |
 | R-PR-32 | On iPhone and Android the thread uses the screen: message content at the full width with a small avatar in the header line of a group, a one-line header (back, title, overflow menu with the operator) that collapses while older messages are read and never with a screen reader, a one-line live box, and an input whose text field fills it from the attachment button to the microphone inside it, starts at the left and grows to `ui.composer_max_lines` lines (5.3 M3, addendum of 2026-10-31). | Owner screenshots 2026-10-31 (iPhone): about a quarter of the width went to an avatar column, the input's text area was a small box in its middle, and header, operator line and live box took a large part of the height (docs/decisions.d/M5-17.md). |
+| R-PR-33 | Spaces, channels, project forums and chats are deleted from "Delete..." at the end of their menus (owner for a space, `manage` for a channel or forum, the creator or `manage` for a chat, never a main thread) after a dialog that names the non-zero counts of what goes; an owner may also move the project folder to the trash of the runner's host when the runner's check allows it; a toast offers "Undo" within the undo window, and every client removes a deleted item at once and brings it back on undo (6.18, addendum of 2026-11-01). | Owner request 2026-11-01: nothing could be deleted in the app; the confirmation must name what goes, a slip needs a quick undo, and a project folder must never be lost (docs/decisions.d/FEAT-delete-spaces-chats.md). |
 
 ## 14. Configuration values of this chapter
 
@@ -2239,5 +2310,7 @@ Rules:
 | `ui.new_project_wait` | `2m` | after this time without readiness the new project dialog says that the runner has not finished (6.9) |
 | `ui.new_project_poll_interval` | `2s` | interval at which the new project dialog reads the readiness of the binding (6.9) |
 | `ui.new_project_name_max_chars` | `40` | longest suggested and accepted name of a new project (6.9) |
+| `ui.delete_undo_toast` | `10s` | the undo toast after a deletion shows at most this long, never past `undo_until` (6.18) |
+| `ui.delete_folder_wait` | `2m` | after the undo window the client reads the outcome of a requested folder move for at most this long (6.18) |
 | `a11y.live_announce_min_interval` | `10s` | the live box announces a change at most this often |
 | `client.share.recent_targets` | `8` | recently used targets in the share sheet |

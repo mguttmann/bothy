@@ -148,6 +148,9 @@ class RunnerConfig:
             path of an audio file is appended and the text on stdout is the transcript (09
             18.14). Empty: no transcription.
         transcribe_timeout: ``runner.transcribe_timeout``: time limit of one transcription.
+        trash_check_interval: ``runner.trash_check_interval``: the bound folders are checked for
+            a move to the trash at most this often, and a heartbeat that can carry a folder move
+            request is sent at this interval (09 18.15); above zero.
         default_workspace: ``runner.default_workspace``: the folder of a forum without a binding
             (RUNNER-NO-GIT), ``.`` for the projects root or a reference under it; ``None`` (the
             default, empty in the file) leaves such a forum without a folder.
@@ -189,6 +192,7 @@ class RunnerConfig:
     transcribe_cmd: tuple[str, ...] = ()
     transcribe_timeout: float = 300.0
     default_workspace: str | None = None
+    trash_check_interval: float = 60.0
 
 
 _Parse = Callable[[Any], Any]
@@ -459,6 +463,7 @@ def load_config(path: Path) -> RunnerConfig:
         transcribe_cmd=_transcribe_cmd(r),
         transcribe_timeout=_positive(r, "transcribe_timeout", "5m"),
         default_workspace=_default_workspace(r, projects_root),
+        trash_check_interval=_positive(r, "trash_check_interval", "60s"),
     )
     r.unknown()
     return config

@@ -145,7 +145,9 @@ func (s *Source) Thread(ctx context.Context, id ids.ID) (authz.ThreadFacts, bool
 	if err != nil || !found {
 		return authz.ThreadFacts{}, false, err
 	}
-	return authz.ThreadFacts{ID: th.ID, ChannelID: th.ChannelID, Main: th.Main(), OperatorAgentID: th.OperatorAgentID, CreatedBy: th.CreatedBy}, true, nil
+	return authz.ThreadFacts{
+		ID: th.ID, ChannelID: th.ChannelID, Main: th.Main(), OperatorAgentID: th.OperatorAgentID, CreatedBy: th.CreatedBy, Deleted: th.Deleted(),
+	}, true, nil
 }
 
 // facts converts a channel row into the facts of authorize: ProjectBound and ProjectReady come

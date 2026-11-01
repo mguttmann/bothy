@@ -290,7 +290,7 @@ all texts of the YAML files (R-API-15); every response component names its statu
 | `invocation_token_invalid` | 403 | The invocation token is not accepted by `startRun`, `resumeRun` or `renewInvocationToken`; `reason` is `expired` (valid and current, only `exp` passed), `superseded` (valid, but no longer current: a newer delivery or renewal replaced its `jti`, or a start consumed it while the run waits for input) or `invalid` (signature, `kid`, `typ`, audience or run wrong). Also every request with the header `Invocation-Token` (07 guard rule SR9): `reason` is `invalid` (signature, audience, run, agent or triggering person wrong, or the header is repeated, empty or sent by a principal that is not an agent) or `run_inactive` (the token is valid, but its run has ended). | `expired`: renew the token (`renewInvocationToken`) and start again. `superseded`: start nothing, keep the run; start with the newer token of the redelivery or, for a waiting run, of the answer. `invalid`: start nothing and report the run as `failed` with `invalid_invocation_token`; on any other request with `Invocation-Token`, stop using the token, the request is refused. `run_inactive`: the run has ended; end the work on it. |
 | `not_found` | 404 | The resource does not exist or is not visible; both answer the same (R-AZ-01). | Mark the outbox entry as failed. |
 | `method_not_allowed` | 405 | The method is not defined on this path. | Programming error. |
-| `conflict` | 409 | The state prevents the change (for example a name is taken); `reason` names the cause where one is defined. | Reload the state; a person decides. |
+| `conflict` | 409 | The state prevents the change (for example a name is taken); `reason` names the cause where one is defined (for example `undo_window_passed`, `main_thread`, `dm_channel`, `project_folder_refused` and `space_deleted` of deleting, 07 section 4.5a). | Reload the state; a person decides. |
 | `request_in_progress` | 409 | The first request with this `Idempotency-Key` is still running. | Retry with backoff. |
 | `i1_violation` | 409 | The change would violate I1; `hint` names the way out. | Switch to `organization` first. |
 | `i6_violation` | 409 | The change would let someone other than the holder of a personal LLM login open a terminal on the host (I6); `hint` names the way out. | Revoke the other grants or declare `organization` first. |
@@ -900,6 +900,9 @@ Generated from openapi.yaml.
 | PATCH | `/api/v1/spaces/{space_id}` | `updateSpace` | `space.update` | Change name, icon or color |
 | POST | `/api/v1/spaces/{space_id}/move` | `moveSpace` | `space.reorder` | Change the global position of a space |
 | POST | `/api/v1/spaces/{space_id}/archive` | `archiveSpace` | `space.archive` | Archive a space |
+| POST | `/api/v1/spaces/{space_id}/delete` | `deleteSpace` | `space.delete` | Delete a space |
+| POST | `/api/v1/spaces/{space_id}/restore` | `restoreSpace` | `space.restore` | Undo the deletion of a space |
+| GET | `/api/v1/spaces/{space_id}/deletion` | `getSpaceDeletion` | `space.read` | What deleting a space removes, or the state of its deletion |
 | PUT | `/api/v1/spaces/{space_id}/operator` | `setSpaceOperator` | `space.operator.set` | Set the default operator of a space |
 
 #### Channels
@@ -912,6 +915,9 @@ Generated from openapi.yaml.
 | PATCH | `/api/v1/channels/{channel_id}` | `updateChannel` | `channel.update` | Change name or topic |
 | POST | `/api/v1/channels/{channel_id}/move` | `moveChannel` | `channel.reorder` | Change the position of a channel in its space |
 | POST | `/api/v1/channels/{channel_id}/archive` | `archiveChannel` | `channel.archive` | Archive a channel |
+| POST | `/api/v1/channels/{channel_id}/delete` | `deleteChannel` | `channel.delete` | Delete a channel |
+| POST | `/api/v1/channels/{channel_id}/restore` | `restoreChannel` | `channel.restore` | Undo the deletion of a channel |
+| GET | `/api/v1/channels/{channel_id}/deletion` | `getChannelDeletion` | `channel.read` | What deleting a channel removes, or the state of its deletion |
 | GET | `/api/v1/channels/{channel_id}/behavior` | `getChannelBehavior` | `channel.behavior.read` | Read prompt, skills and mention rules |
 | PUT | `/api/v1/channels/{channel_id}/behavior` | `putChannelBehavior` | `channel.behavior.update` | Change prompt, skills and mention rules |
 | PUT | `/api/v1/channels/{channel_id}/operator` | `setChannelOperator` | `channel.operator.set` | Set or inherit the operator of a channel |
@@ -938,6 +944,9 @@ Generated from openapi.yaml.
 | GET | `/api/v1/channels/{channel_id}/threads` | `listChannelThreads` | `thread.read` | List threads or forum posts of a channel |
 | POST | `/api/v1/channels/{channel_id}/threads` | `createThread` | `thread.create` | Create a forum post or a thread from a message |
 | GET | `/api/v1/threads/{thread_id}` | `getThread` | `thread.read` | Read a thread |
+| POST | `/api/v1/threads/{thread_id}/delete` | `deleteThread` | `thread.delete` | Delete a thread |
+| POST | `/api/v1/threads/{thread_id}/restore` | `restoreThread` | `thread.restore` | Undo the deletion of a thread |
+| GET | `/api/v1/threads/{thread_id}/deletion` | `getThreadDeletion` | `thread.read` | What deleting a thread removes, or the state of its deletion |
 | PUT | `/api/v1/threads/{thread_id}/title` | `setThreadTitle` | `thread.title.update` | Set the title |
 | POST | `/api/v1/threads/{thread_id}/close` | `closeThread` | `thread.close` | Mark a thread as done |
 | POST | `/api/v1/threads/{thread_id}/reopen` | `reopenThread` | `thread.reopen` | Reopen a thread |

@@ -35,7 +35,7 @@ FOR UPDATE OF c;
 -- name: ServedChannels :many
 -- The channels agent_id serves for I1 (10 section 5.2 points 1 and 2, BR-02): channels that are
 -- not archived in a space that is not archived whose effective operator is the agent, and those
--- with a thread of kind thread whose fixed operator is the agent, open or closed (the index
+-- with a thread of kind thread that is not deleted whose fixed operator is the agent, open or closed (the index
 -- threads (operator_agent_id, channel_id) without a condition on state). dm channels have no
 -- space and never match.
 SELECT c.id, c.space_id
@@ -49,7 +49,7 @@ SELECT c.id, c.space_id
 FROM threads t
 JOIN channels c ON c.id = t.channel_id
 JOIN spaces s ON s.id = c.space_id
-WHERE t.kind = 'thread' AND t.operator_agent_id = @agent_id
+WHERE t.kind = 'thread' AND t.operator_agent_id = @agent_id AND t.deleted_at IS NULL
   AND c.archived_at IS NULL AND s.archived_at IS NULL;
 
 -- name: DefaultOperatedSpaces :many

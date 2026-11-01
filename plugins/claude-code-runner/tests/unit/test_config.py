@@ -222,6 +222,15 @@ def test_channels_resync_interval(tmp_path: Path) -> None:
         load_config(write(tmp_path, 'channels_resync_interval = "0s"\n'))
 
 
+def test_trash_check_interval(tmp_path: Path) -> None:
+    """``runner.trash_check_interval`` (09 18.15): default 60s, above zero."""
+    assert load_config(write(tmp_path)).trash_check_interval == 60.0
+    cfg = load_config(write(tmp_path, 'trash_check_interval = "5m"\n'))
+    assert cfg.trash_check_interval == 300.0
+    with pytest.raises(ConfigError, match="trash_check_interval"):
+        load_config(write(tmp_path, 'trash_check_interval = "0s"\n'))
+
+
 def test_transcribe_keys(tmp_path: Path) -> None:
     """``runner.transcribe_cmd`` (off by default) and ``runner.transcribe_timeout``."""
     cfg = load_config(write(tmp_path))

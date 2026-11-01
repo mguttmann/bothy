@@ -18,6 +18,7 @@ part 'space.g.dart';
 /// * [sortKey] - Fractional index, compared bytewise.
 /// * [defaultOperatorAgentId] - UUIDv7 (RFC 9562), lowercase canonical form.
 /// * [archivedAt] - RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+/// * [deletedAt] - Set while the item is deleted, pending or final (01 6.18); clients remove it and its local content, and a later version without it brings it back.
 /// * [version]
 /// * [createdAt] - RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 @BuiltValue()
@@ -48,6 +49,10 @@ abstract class Space implements Built<Space, SpaceBuilder> {
   /// RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
   @BuiltValueField(wireName: r'archived_at')
   DateTime? get archivedAt;
+
+  /// Set while the item is deleted, pending or final (01 6.18); clients remove it and its local content, and a later version without it brings it back.
+  @BuiltValueField(wireName: r'deleted_at')
+  DateTime? get deletedAt;
 
   @BuiltValueField(wireName: r'version')
   int get version;
@@ -119,6 +124,13 @@ class _$SpaceSerializer implements PrimitiveSerializer<Space> {
       yield r'archived_at';
       yield serializers.serialize(
         object.archivedAt,
+        specifiedType: const FullType(DateTime),
+      );
+    }
+    if (object.deletedAt != null) {
+      yield r'deleted_at';
+      yield serializers.serialize(
+        object.deletedAt,
         specifiedType: const FullType(DateTime),
       );
     }
@@ -211,6 +223,14 @@ class _$SpaceSerializer implements PrimitiveSerializer<Space> {
           ) as DateTime?;
           if (valueDes == null) continue;
           result.archivedAt = valueDes;
+          break;
+        case r'deleted_at':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(DateTime),
+          ) as DateTime?;
+          if (valueDes == null) continue;
+          result.deletedAt = valueDes;
           break;
         case r'version':
           final valueDes = serializers.deserialize(

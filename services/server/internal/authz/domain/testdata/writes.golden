@@ -29,10 +29,13 @@ auth.token.refresh
 channel.archive
 channel.behavior.update
 channel.create
+channel.delete
 channel.operator.set
 channel.project.bind
+channel.project.trash
 channel.read_only.set
 channel.reorder
+channel.restore
 channel.update
 client_metrics.submit
 command.autocomplete
@@ -121,8 +124,10 @@ signing_key.rotate
 signing_key.transition
 space.archive
 space.create
+space.delete
 space.operator.set
 space.reorder
+space.restore
 space.update
 status.manage
 template.manage
@@ -133,8 +138,10 @@ terminal.stream
 terminal.terminate
 thread.close
 thread.create
+thread.delete
 thread.move
 thread.reopen
+thread.restore
 thread.tags.set
 thread.title.update
 token.create

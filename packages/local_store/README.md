@@ -84,7 +84,9 @@ whether it applied (04 9); reactions and pins carry absolute values and leave
   ranges, search rows, file cache rows, recently visited rows, the collapsed thread group and
   the personal thread order of a channel) in one transaction and returns the file cache paths, so
   the caller deletes the bytes (04 8.3). Outbox entries stay; they fail with `404`. Host targets
-  are ignored and the pins of `host_key_pins` stay.
+  are ignored and the pins of `host_key_pins` stay. `keepOrder: true` (a deletion, D-DEL-8)
+  keeps the person's synced order rows (`user_space_states`, `user_channel_states`), so an undo
+  puts the item back in its place.
 - `wipe()` closes the database and deletes the file with its `-wal` and `-shm` files (`4012`,
   R-SY-14); the app deletes keys and tokens.
 - `CacheCleaner` (limits `client.cache_max_age` and `client.cache_max_bytes` from `AppConfig`)

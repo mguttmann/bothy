@@ -87,6 +87,8 @@ type Channel struct {
 	ArchivedAt time.Time
 	// Version is the ETag; SettingsVersion the counter of behaviour and prompt (M2-02).
 	Version, SettingsVersion int64
+	// Deletion is the deletion state (03 R-DM-57); a deleted channel is archived too.
+	Deletion Deletion
 }
 
 // NewChannel returns a new channel with the defaults of 03: version and settings version 1,

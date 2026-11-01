@@ -54,7 +54,15 @@ func TestChatChannelsMigration_Schema(t *testing.T) {
 			{"archived_at", ts, true, ""},
 			{"version", "bigint", false, "1"},
 			{"settings_version", "bigint", false, "1"},
+			// FEAT-delete-spaces-chats (migration 00086).
+			{"deleted_at", ts, true, ""},
+			{"deleted_by", "uuid", true, ""},
+			{"purged_at", ts, true, ""},
 		}, []string{
+			"CHECK (((deleted_at IS NULL) = (deleted_by IS NULL)))",
+			"CHECK (((deleted_at IS NULL) OR (archived_at IS NOT NULL)))",
+			"CHECK (((purged_at IS NULL) OR (deleted_at IS NOT NULL)))",
+			"FOREIGN KEY (deleted_by) REFERENCES principals(id) ON DELETE RESTRICT",
 			"CHECK (((kind <> 'dm'::text) OR ((NOT operator_inherit) AND (operator_agent_id IS NULL) AND (NOT read_only))))",
 			"CHECK (((kind = 'dm'::text) = (space_id IS NULL)))",
 			"CHECK (((NOT operator_inherit) OR (operator_agent_id IS NULL)))",
@@ -66,6 +74,7 @@ func TestChatChannelsMigration_Schema(t *testing.T) {
 			"FOREIGN KEY (space_id) REFERENCES spaces(id) ON DELETE RESTRICT",
 			"PRIMARY KEY (id)",
 		}, []string{
+			"CREATE INDEX channels_purge_pending_idx ON public.channels USING btree (deleted_at) WHERE ((deleted_at IS NOT NULL) AND (purged_at IS NULL))",
 			"CREATE INDEX channels_operator_agent_id_idx ON public.channels USING btree (operator_agent_id) WHERE (operator_agent_id IS NOT NULL)",
 			"CREATE INDEX channels_space_sort_key_idx ON public.channels USING btree (space_id, sort_key) WHERE (archived_at IS NULL)",
 			"CREATE UNIQUE INDEX channels_pkey ON public.channels USING btree (id)",
@@ -120,7 +129,15 @@ func TestChatChannelsMigration_Schema(t *testing.T) {
 			// Added by 00035 (M3-13); the vector is a stored generated column without a default.
 			{"search_language", "regconfig", false, "'simple'::regconfig"},
 			{"title_search", "tsvector", false, ""},
+			// FEAT-delete-spaces-chats (migration 00086).
+			{"deleted_at", ts, true, ""},
+			{"deleted_by", "uuid", true, ""},
+			{"purged_at", ts, true, ""},
 		}, []string{
+			"CHECK (((deleted_at IS NULL) = (deleted_by IS NULL)))",
+			"CHECK (((deleted_at IS NULL) OR (kind <> 'main'::text)))",
+			"CHECK (((purged_at IS NULL) OR (deleted_at IS NOT NULL)))",
+			"FOREIGN KEY (deleted_by) REFERENCES principals(id) ON DELETE RESTRICT",
 			"CHECK (((kind <> 'main'::text) OR ((parent_message_id IS NULL) AND (operator_agent_id IS NULL))))",
 			"CHECK (((state = 'closed'::text) = (closed_at IS NOT NULL)))",
 			"CHECK ((kind = ANY (ARRAY['main'::text, 'thread'::text])))",
@@ -135,6 +152,7 @@ func TestChatChannelsMigration_Schema(t *testing.T) {
 			"PRIMARY KEY (id)",
 		}, []string{
 			"CREATE INDEX threads_channel_state_activity_idx ON public.threads USING btree (channel_id, state, last_activity_at DESC)",
+			"CREATE INDEX threads_purge_pending_idx ON public.threads USING btree (deleted_at) WHERE ((deleted_at IS NOT NULL) AND (purged_at IS NULL))",
 			"CREATE INDEX threads_operator_agent_channel_idx ON public.threads USING btree (operator_agent_id, channel_id) WHERE (operator_agent_id IS NOT NULL)",
 			// Added by 00036 (M3-13).
 			"CREATE INDEX threads_title_search_idx ON public.threads USING gin (title_search)",

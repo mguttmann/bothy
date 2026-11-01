@@ -58,7 +58,9 @@ void registerStructureHandlers(RestFake rest) {
       final items =
           [
             for (final t in world.threads.values)
+              // A deleted thread leaves the list at once (D-DEL-3).
               if (t['channel_id'] == channel &&
+                  t['deleted_at'] == null &&
                   (state == null || t['state'] == state) &&
                   (tag == null ||
                       (t['tag_ids']! as List<Object?>).contains(tag)))

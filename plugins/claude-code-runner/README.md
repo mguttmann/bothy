@@ -41,6 +41,7 @@ the title once per new session and reports the cost of the run.
 | `causes.py` | The sentence for the thread that names the cause of a refused run (09 18.9, RUNNER-NO-GIT) |
 | `transcribe.py` | The local transcriber of audio attachments and the note without a transcript (09 18.14) |
 | `provision.py` | Folder creation of a binding with `provision` `init` or `clone`, its creation record and the readiness reasons (09 18.12, M4-43) |
+| `trash.py` | The folder check of the bound forums, the move of a deleted forum's folder to the host trash and its record (09 18.15) |
 | `toolclass.py`, `commandline.py`, `environment.py` | Tool class order, the argument list of a turn, the allow-list environment |
 | `authcheck.py`, `heartbeat.py` | Pre-check `claude auth status`; version probe and the run-time heartbeat members |
 | `prompt.py`, `prompts/runner_prompt.md`, `attachments.py` | System prompt file and first stdin line; attachments as local files |
@@ -332,6 +333,34 @@ under the root and it holds `.git`. The names go out in code point order, at mos
 count, and a root that cannot be read sends the empty list and logs `project_folders_unreadable`.
 Only names leave the runner. The app lists those without a forum under "Add forums for existing
 folders" and binds the chosen ones with `provision` `none`.
+
+## Moving a project folder to the trash (09 18.15)
+
+When a person deletes a project forum with "Also move the project folder to the trash", the
+server hands the folder to its runner once the deletion is final. The runner never removes
+anything: it moves the folder with one rename into the trash of its host (`~/.Trash` on macOS,
+the freedesktop trash `$XDG_DATA_HOME/Trash` or `~/.local/share/Trash` elsewhere, with a
+`.trashinfo`), or into `.bothy-trash/<name>-<UTC time stamp>` under `runner.projects_root` when
+that trash is on another file system or not writable. A person restores it from there.
+
+- Every `runner.trash_check_interval` (default `60s`) the runner checks each bound folder and
+  reports `trash_check` in the readiness entry; the app disables the box with the reason when the
+  check is not ok. Refused are a reference outside the root (`outside_root`), a symbolic link as
+  the bound path or a component of it (`symlink`), a missing folder (`workspace_missing`), a
+  folder holding another bound folder or the state directory (`contains_other_project`), a linked
+  work tree, submodule or folder of another repository (`foreign_worktree`), uncommitted or
+  untracked changes or stashes (`uncommitted_changes`), commits on a local branch no remote branch
+  contains (`unpushed_commits`) and any Git error or time out (`check_failed`). A folder without
+  Git has no Git rule. `git` runs with the time limit `runner.cli_probe_timeout`.
+- The request arrives in the answer of `sendHeartbeat`, which the runner sends every
+  `runner.trash_check_interval`. The runner stops a turn still running in the forum, checks again,
+  moves the folder and reports `trashed` or `refused` with the code in its next heartbeat. On
+  Windows the folder always goes to `.bothy-trash` under the projects root, never to the recycle
+  bin. A move is also refused with `move_failed` (the rename failed, or `.bothy-trash` is a link).
+- `<runner.state_dir>/trash.json` remembers each handled request and its result, so a restart
+  neither repeats a move nor loses a result. Log codes: `project_trash_moved`,
+  `project_trash_refused`, `project_trash_deferred` (a turn did not end in time; the request
+  waits for the next answer) and `project_trash_failed`; never a path or a folder name.
 
 ## Long answers (M4-47)
 

@@ -145,6 +145,12 @@ final class SyncContext {
   /// M4-14). An `access.changed` with `added` and a snapshot that lists a target take it out.
   final Set<String> removedTargets = {};
 
+  /// The version of the deletion of every space, channel and thread this process removed
+  /// because its object carried `deleted_at` (D-DEL-5), by ID. The row is gone, so the version
+  /// rule compares with this: only a greater version without `deleted_at` brings the item back
+  /// (the undo), an older one is stale.
+  final Map<String, ResourceVersion> deletedVersions = {};
+
   /// The threads whose `getThread` load after a `message.created` is queued or running (04 6.3
   /// item 4, R-SY-28; brief M4-40 Design note 5): a further message of such a thread queues no
   /// second load. An ID enters after the commit of its event, so a page that rolls back leaves

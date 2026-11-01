@@ -356,7 +356,7 @@ func build(t *testing.T, subscribe Subscribe, personal bool, so *SyncOptions, no
 		t.Fatal(err)
 	}
 	w.Svc, w.Threads, w.Authorizer, w.audit, w.UoW = m.Service, c.Service, az, rec, uow
-	handlers := wire.Handlers{Spaces: c.Handlers, Channels: c.ChannelHandlers, Threads: c.ThreadHandlers, Messages: m.Handlers}
+	handlers := wire.Handlers{Spaces: c.Handlers, Channels: c.ChannelHandlers, Threads: c.ThreadHandlers, Deletion: c.DeletionHandlers, Messages: m.Handlers}
 	if subs != nil {
 		w.personal(subs, pool, uow, az, appender, c, m, &handlers)
 	}

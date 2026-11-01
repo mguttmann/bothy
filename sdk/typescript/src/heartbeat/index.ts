@@ -23,6 +23,7 @@ export {
   DETAILS_KEYS,
   HEARTBEAT_MEMBERS,
   NAME_FORM,
+  REASON_FORM,
   VERSION_FORM,
   buildHeartbeat,
   type BuildHeartbeatOptions,

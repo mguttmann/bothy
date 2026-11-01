@@ -198,6 +198,27 @@ exceptions:
   - query: files.LockSessionForShare
     category: after_authorize
     reason: "holds the caller's own upload session by file id and uploader while a part is confirmed (M3-03)"
+  - query: agents.CountSessionsOfThreads
+    category: after_authorize
+    reason: "counts the agent sessions of the threads of one space, channel or thread whose read action authorize allowed, for DeletionInfo.contents.sessions; only the count leaves (FEAT-delete-spaces-chats)"
+  - query: files.CountFilesOfThreads
+    category: after_authorize
+    reason: "counts the files attached to the messages of the threads of one space, channel or thread whose read action authorize allowed, for DeletionInfo.contents.files; only the count leaves (FEAT-delete-spaces-chats)"
+  - query: chat.ScopeChannelsOfSpace
+    category: after_authorize
+    reason: "the channels of the one space whose space.read or space.delete authorize allowed, for the counts of DeletionInfo; only counts leave (FEAT-delete-spaces-chats)"
+  - query: chat.BindingTrash
+    category: after_authorize
+    reason: "the folder part of the binding of the one forum whose channel.read (DeletionInfo, shown to owners only) or channel.delete with channel.project.bind authorize allowed (FEAT-delete-spaces-chats)"
+  - query: chat.LockBindingTrash
+    category: after_authorize
+    reason: "the folder part of the binding of the one forum, locked inside channel.delete or channel.restore after authorize allowed them (FEAT-delete-spaces-chats)"
+  - query: chat.DuePurges
+    category: system_job
+    reason: "the job messaging.purge_deleted reads the deleted spaces, channels and threads whose undo window passed, without a principal; it serves nothing to a reader and only removes their content (FEAT-delete-spaces-chats)"
+  - query: chat.PendingTrash
+    category: system_job
+    reason: "the heartbeat of a runner reads the folder moves of purged forums it was asked to make, by its own agent id after agent.heartbeat allowed it; only the channel id and workspace_ref of these requests leave, to that runner (09 18.15, FEAT-delete-spaces-chats)"
   - query: messaging.ExpiredMessages
     category: system_job
     reason: "the job retention.content reads the ids and channels of messages created before the cutoff, without a principal; it serves nothing to a reader, each candidate is deleted through the deletion path with its channel (M7-05)"

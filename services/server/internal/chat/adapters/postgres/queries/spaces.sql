@@ -50,3 +50,10 @@ UPDATE spaces SET archived_at = @archived_at, version = @version WHERE id = @id;
 -- The space held FOR SHARE while notify writes a preference below it (M3-18): an archive holds
 -- the row FOR UPDATE, so the write either commits before it or sees the archive.
 SELECT * FROM spaces WHERE id = @id FOR SHARE;
+
+-- name: SaveSpaceDeletion :exec
+-- Writes a delete or restore of space.delete and space.restore (D-DEL-2): the archive time, the
+-- deletion and the version.
+UPDATE spaces
+SET archived_at = sqlc.narg(archived_at), deleted_at = sqlc.narg(deleted_at), deleted_by = sqlc.narg(deleted_by), version = @version
+WHERE id = @id;

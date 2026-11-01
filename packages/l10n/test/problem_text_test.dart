@@ -105,6 +105,18 @@ void main() {
       );
     });
 
+    test('a refused project folder of a delete has its own text ($locale)', () {
+      // 01 6.18 item 4: the runner's last folder check does not allow the move.
+      expect(
+        problemText(l, 'conflict', reason: 'project_folder_refused'),
+        l.problemConflictProjectFolderRefused,
+      );
+      expect(
+        problemText(l, 'conflict', reason: 'project_folder_refused'),
+        isNot(l.problemConflict),
+      );
+    });
+
     test('the refusals of a step-up have their own texts ($locale)', () {
       // SEC-STEPUP-LOCKOUT (08 6.2 and 13): a locked password path and a password changed during
       // the attempt; a session that cannot confirm at all (07 4.1 step_up_not_possible).

@@ -446,9 +446,9 @@ internal/wire, HTTP through the chain with response validation).
 ## Port (root package `internal/chat`)
 
 - Inbound: `Structure` (spaces, channels, read-only), `ImportStructure` and `ReadOnlySwitch` (M8-03), `Threads` (create for `messaging`, `AppendToThread`, message count on deletion, close, open, move, info, locate), `ThreadsByParent` (M2-27), `AgentConfig`, `TriggerFacts`, `ProjectBindings`, `SearchReads` (M3-14).
-- Emits in-tx events: `ThreadMoved`, `ChannelArchived`, `ChannelReadOnlySet`, `SpaceArchived`.
+- Emits in-tx events: `ThreadMoved`, `ChannelArchived`, `ChannelReadOnlySet`, `SpaceArchived`, `ContentDeleted` (FEAT-delete-spaces-chats).
 - Subscribes to in-tx events: none.
-- Implements source ports and cross-cutting ports: `authz.StructureSource`, kernel `personaldata.Participant`; declares `ReadOnlyGuard` (implemented by `importer`, bound by `internal/wire`, M8-03).
+- Implements source ports and cross-cutting ports: `authz.StructureSource`, kernel `personaldata.Participant`; declares `ReadOnlyGuard` (implemented by `importer`, bound by `internal/wire`, M8-03), `FileCounter` and `SessionCounter` (implemented by `files` and `agents`, FEAT-delete-spaces-chats).
 
 ## Dependencies
 
@@ -601,10 +601,43 @@ canary scenario `test/canary/scenario_project.go`.
   `queries/import_threads.sql` behind the store port `app.ImportThreadStore`
   (`Deps.ImportThreads`, nil means `Store` when it implements it).
 
+## Deleting and restoring (FEAT-delete-spaces-chats)
+
+Design: [delete.md](../../../../docs/design/delete.md); rulings D-DEL-1 to D-DEL-16 and the
+server rulings D-DEL-SRV-* in `docs/decisions.d/FEAT-delete-spaces-chats.md`; normative 03
+R-DM-57, 07 4.5a, 20 4.2a.
+
+| Operation | Action | Rights change | Event |
+|---|---|---|---|
+| `deleteSpace`, `restoreSpace` | `space.delete`, `space.restore` (owner, step-up) | yes | `space.archived` with `deleted_at`; `space.updated` |
+| `deleteChannel`, `restoreChannel` | `channel.delete`, `channel.restore` (manage, step-up) | yes | `channel.archived` with `deleted_at`; `channel.updated` |
+| `deleteThread`, `restoreThread` | `thread.delete`, `thread.restore` (write and creator or manage) | no | `thread.updated` with and without `deleted_at` |
+| `getSpaceDeletion`, `getChannelDeletion`, `getThreadDeletion` | `space.read`, `channel.read`, `thread.read` | no | none |
+
+- `app/deletion.go`: a space or channel delete runs like an archive in two units, the second
+  declared as the rights change; it archives the item unless it is archived (same time stamp),
+  marks it deleted and publishes `ContentDeleted` (runs end). A deleted item answers its deletion
+  without effect; a restore of a live item answers without effect. A restore is allowed strictly
+  before `deleted_at` plus `chat.delete_undo_window` and before the purge, and it clears the
+  archive only when the delete set it. `deleteChannel` with `trash_project_folder` needs a binding
+  (`validation_failed` on `/trash_project_folder`), `channel.project.bind` and an ok folder check
+  (`409 conflict`, reason `project_folder_refused`); it asks the forum's effective operator (`trash_agent_id`).
+- A deleted thread: `Get` and `AppendToThread` answer 404; `Info` reports `Deleted`, so the
+  purge and the run lifecycle still reach it; every thread list query filters `deleted_at IS
+  NULL`; authz answers `not_found` for it except `thread.read`, `thread.delete`,
+  `thread.restore` (`authzsource` reports `ThreadFacts.Deleted`).
+- `DeletionInfo` counts in `DeletionScope` (channels and threads not deleted on their own, the
+  sum of `message_count`), files through `FileCounter` and sessions through `SessionCounter`; the
+  folder part only for an owner (identity's owner list, the source of `getMe` `is_owner`).
+- `Purges` (`DuePurges`, `FinishPurge`) serves the job `messaging.purge_deleted`; `ProjectTrash`
+  serves the heartbeat: requests of a purged forum for its runner, outcomes stored once with the
+  audit entry `channel.project.trash` (actor the runner). `ApplyProjectReadiness` stores a given
+  `trash_check` that differs, without a binding version; a binding or operator change clears it.
+
 ## Port (root package `internal/chat`)
 
-- Inbound: `Structure` (spaces, channels, read-only), `ImportThreads` (M8-11), `Threads` (create for `messaging`, `AppendToThread`, message count on deletion, close, open, move, info, locate, UnreadCandidates), `ThreadsByParent` (M2-27), `AgentConfig`, `TriggerFacts`, `ProjectBindings`.
-- Emits in-tx events: `ThreadMoved`, `ChannelArchived`, `ChannelReadOnlySet`, `SpaceArchived`.
+- Inbound: `Structure` (spaces, channels, read-only), `ImportThreads` (M8-11), `Threads` (create for `messaging`, `AppendToThread`, message count on deletion, close, open, move, info, locate, UnreadCandidates), `ThreadsByParent` (M2-27), `AgentConfig`, `TriggerFacts`, `ProjectBindings`, `Deletions`, `Purges` and `ProjectTrash` (FEAT-delete-spaces-chats); declares `FileCounter` (implemented by `files`) and `SessionCounter` (implemented by `agents`), bound by `internal/wire`.
+- Emits in-tx events: `ThreadMoved`, `ChannelArchived`, `ChannelReadOnlySet`, `SpaceArchived`, `ContentDeleted`.
 - Subscribes to in-tx events: none.
 - Implements source ports and cross-cutting ports: `authz.StructureSource`, kernel `personaldata.Participant`.
 
@@ -619,7 +652,7 @@ Only this module writes and reads these tables by SQL (03-data-model.md, princip
 
 ## Actions (05-actions.md)
 
-`space.read`, `space.create`, `space.update`, `space.reorder`, `space.archive`, `space.operator.set`, `sidebar.update`, `channel.read`, `channel.create`, `channel.update`, `channel.reorder`, `channel.behavior.read`, `channel.behavior.update`, `channel.operator.set`, `channel.project.bind`, `channel.read_only.set`, `channel.archive`, `forum_tag.manage`, `dm.create`, `dm.leave`, `thread.read`, `thread.title.update`, `thread.close`, `thread.reopen`, `thread.move`, `thread.tags.set`, `agent.config.read`.
+`space.read`, `space.create`, `space.update`, `space.reorder`, `space.archive`, `space.delete`, `space.restore`, `space.operator.set`, `sidebar.update`, `channel.read`, `channel.create`, `channel.update`, `channel.reorder`, `channel.behavior.read`, `channel.behavior.update`, `channel.operator.set`, `channel.project.bind`, `channel.read_only.set`, `channel.archive`, `channel.delete`, `channel.restore`, `channel.project.trash`, `forum_tag.manage`, `dm.create`, `dm.leave`, `thread.read`, `thread.title.update`, `thread.close`, `thread.reopen`, `thread.delete`, `thread.restore`, `thread.move`, `thread.tags.set`, `agent.config.read`.
 
 ## Events and WebSocket ops
 

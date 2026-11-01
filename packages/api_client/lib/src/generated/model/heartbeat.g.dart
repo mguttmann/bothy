@@ -92,6 +92,8 @@ class _$Heartbeat extends Heartbeat {
   final BuiltList<ProjectReadiness>? projectReadiness;
   @override
   final BuiltSet<String>? projectFolders;
+  @override
+  final BuiltList<ProjectTrashResult>? projectTrashResults;
 
   factory _$Heartbeat([void Function(HeartbeatBuilder)? updates]) =>
       (HeartbeatBuilder()..update(updates))._build();
@@ -107,6 +109,7 @@ class _$Heartbeat extends Heartbeat {
     this.details,
     this.projectReadiness,
     this.projectFolders,
+    this.projectTrashResults,
   }) : super._();
   @override
   Heartbeat rebuild(void Function(HeartbeatBuilder) updates) =>
@@ -128,7 +131,8 @@ class _$Heartbeat extends Heartbeat {
         rateLimit == other.rateLimit &&
         details == other.details &&
         projectReadiness == other.projectReadiness &&
-        projectFolders == other.projectFolders;
+        projectFolders == other.projectFolders &&
+        projectTrashResults == other.projectTrashResults;
   }
 
   @override
@@ -144,6 +148,7 @@ class _$Heartbeat extends Heartbeat {
     _$hash = $jc(_$hash, details.hashCode);
     _$hash = $jc(_$hash, projectReadiness.hashCode);
     _$hash = $jc(_$hash, projectFolders.hashCode);
+    _$hash = $jc(_$hash, projectTrashResults.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -160,7 +165,8 @@ class _$Heartbeat extends Heartbeat {
           ..add('rateLimit', rateLimit)
           ..add('details', details)
           ..add('projectReadiness', projectReadiness)
-          ..add('projectFolders', projectFolders))
+          ..add('projectFolders', projectFolders)
+          ..add('projectTrashResults', projectTrashResults))
         .toString();
   }
 }
@@ -223,6 +229,13 @@ class HeartbeatBuilder implements Builder<Heartbeat, HeartbeatBuilder> {
   set projectFolders(SetBuilder<String>? projectFolders) =>
       _$this._projectFolders = projectFolders;
 
+  ListBuilder<ProjectTrashResult>? _projectTrashResults;
+  ListBuilder<ProjectTrashResult> get projectTrashResults =>
+      _$this._projectTrashResults ??= ListBuilder<ProjectTrashResult>();
+  set projectTrashResults(
+    ListBuilder<ProjectTrashResult>? projectTrashResults,
+  ) => _$this._projectTrashResults = projectTrashResults;
+
   HeartbeatBuilder() {
     Heartbeat._defaults(this);
   }
@@ -240,6 +253,7 @@ class HeartbeatBuilder implements Builder<Heartbeat, HeartbeatBuilder> {
       _details = $v.details?.toBuilder();
       _projectReadiness = $v.projectReadiness?.toBuilder();
       _projectFolders = $v.projectFolders?.toBuilder();
+      _projectTrashResults = $v.projectTrashResults?.toBuilder();
       _$v = null;
     }
     return this;
@@ -278,6 +292,7 @@ class HeartbeatBuilder implements Builder<Heartbeat, HeartbeatBuilder> {
             details: _details?.build(),
             projectReadiness: _projectReadiness?.build(),
             projectFolders: _projectFolders?.build(),
+            projectTrashResults: _projectTrashResults?.build(),
           );
     } catch (_) {
       late String _$failedField;
@@ -295,6 +310,8 @@ class HeartbeatBuilder implements Builder<Heartbeat, HeartbeatBuilder> {
         _projectReadiness?.build();
         _$failedField = 'projectFolders';
         _projectFolders?.build();
+        _$failedField = 'projectTrashResults';
+        _projectTrashResults?.build();
       } catch (e) {
         throw BuiltValueNestedFieldError(
           r'Heartbeat',

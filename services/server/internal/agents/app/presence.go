@@ -61,6 +61,10 @@ type Readiness interface {
 	// BoundProjectFolders returns the entries of names that the workspace_ref of a binding
 	// names, compared without case (M4-44).
 	BoundProjectFolders(ctx context.Context, names []string) ([]string, error)
+	// ProjectTrashRequests and ApplyProjectTrashResults are chat.ProjectTrash: the folder moves
+	// of deleted forums the runner owes, and the outcomes it reports (09 18.15, D-DEL-11).
+	ProjectTrashRequests(ctx context.Context, agentID ids.ID) ([]chat.ProjectTrashRequest, error)
+	ApplyProjectTrashResults(ctx context.Context, agentID ids.ID, results []chat.ProjectTrashResult) error
 }
 
 // Principals is the part of identity.Directory the tracker reads handle and status with.

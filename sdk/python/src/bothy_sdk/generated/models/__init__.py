@@ -111,6 +111,7 @@ from .channel_create import ChannelCreate
 from .channel_create_kind import ChannelCreateKind
 from .channel_created_event import ChannelCreatedEvent
 from .channel_created_event_type import ChannelCreatedEventType
+from .channel_delete import ChannelDelete
 from .channel_kind import ChannelKind
 from .channel_label import ChannelLabel
 from .channel_operator import ChannelOperator
@@ -193,6 +194,10 @@ from .csp_report_legacy import CspReportLegacy
 from .delete_notification_preference_target_kind import (
     DeleteNotificationPreferenceTargetKind,
 )
+from .deletion_contents import DeletionContents
+from .deletion_info import DeletionInfo
+from .deletion_info_state import DeletionInfoState
+from .deletion_info_target_kind import DeletionInfoTargetKind
 from .device import Device
 from .device_approve import DeviceApprove
 from .device_key_registration import DeviceKeyRegistration
@@ -542,10 +547,17 @@ from .profile_update import ProfileUpdate
 from .project_binding import ProjectBinding
 from .project_binding_put import ProjectBindingPut
 from .project_folder import ProjectFolder
+from .project_folder_deletion import ProjectFolderDeletion
+from .project_folder_deletion_trash_state import ProjectFolderDeletionTrashState
 from .project_folder_list import ProjectFolderList
 from .project_provision import ProjectProvision
 from .project_readiness import ProjectReadiness
 from .project_runner_config import ProjectRunnerConfig
+from .project_trash_check import ProjectTrashCheck
+from .project_trash_check_report import ProjectTrashCheckReport
+from .project_trash_request import ProjectTrashRequest
+from .project_trash_result import ProjectTrashResult
+from .project_trash_result_result import ProjectTrashResultResult
 from .public_branding import PublicBranding
 from .push_environment import PushEnvironment
 from .push_preview import PushPreview
@@ -933,6 +945,7 @@ __all__ = (
     "ChannelCreateKind",
     "ChannelCreatedEvent",
     "ChannelCreatedEventType",
+    "ChannelDelete",
     "ChannelKind",
     "ChannelLabel",
     "ChannelOperator",
@@ -1003,6 +1016,10 @@ __all__ = (
     "CredentialOverview",
     "CspReportLegacy",
     "DeleteNotificationPreferenceTargetKind",
+    "DeletionContents",
+    "DeletionInfo",
+    "DeletionInfoState",
+    "DeletionInfoTargetKind",
     "Device",
     "DeviceApprove",
     "DeviceKeyRegistration",
@@ -1340,10 +1357,17 @@ __all__ = (
     "ProjectBinding",
     "ProjectBindingPut",
     "ProjectFolder",
+    "ProjectFolderDeletion",
+    "ProjectFolderDeletionTrashState",
     "ProjectFolderList",
     "ProjectProvision",
     "ProjectReadiness",
     "ProjectRunnerConfig",
+    "ProjectTrashCheck",
+    "ProjectTrashCheckReport",
+    "ProjectTrashRequest",
+    "ProjectTrashResult",
+    "ProjectTrashResultResult",
     "PublicBranding",
     "PushEnvironment",
     "PushPreview",

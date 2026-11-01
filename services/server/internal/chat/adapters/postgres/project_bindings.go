@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
+	"github.com/OWNER/bothy/services/server/internal/chat"
 	"github.com/OWNER/bothy/services/server/internal/chat/adapters/postgres/sqlcgen"
 	"github.com/OWNER/bothy/services/server/internal/chat/app"
 	"github.com/OWNER/bothy/services/server/internal/chat/domain"
@@ -156,7 +157,7 @@ func (r *Repository) DeleteBinding(ctx context.Context, channel ids.ID) error {
 }
 
 // LockReportedBindings implements app.BindingStore.
-func (r *Repository) LockReportedBindings(ctx context.Context, channels []ids.ID) (map[ids.ID]app.Readiness, error) {
+func (r *Repository) LockReportedBindings(ctx context.Context, channels []ids.ID) (map[ids.ID]app.ReportedBinding, error) {
 	q, err := r.write(ctx)
 	if err != nil {
 		return nil, err
@@ -165,9 +166,13 @@ func (r *Repository) LockReportedBindings(ctx context.Context, channels []ids.ID
 	if err != nil {
 		return nil, mapError(err, "locking reported project bindings")
 	}
-	out := make(map[ids.ID]app.Readiness, len(rows))
+	out := make(map[ids.ID]app.ReportedBinding, len(rows))
 	for _, row := range rows {
-		out[idOf(row.ChannelID)] = app.Readiness{Ready: row.Ready, Reason: row.ReadyReason.String}
+		b := app.ReportedBinding{Readiness: app.Readiness{Ready: row.Ready, Reason: row.ReadyReason.String}}
+		if row.TrashCheckOk.Valid {
+			b.Trash = &chat.ProjectTrashCheckReport{OK: row.TrashCheckOk.Bool, Reason: row.TrashCheckReason.String}
+		}
+		out[idOf(row.ChannelID)] = b
 	}
 	return out, nil
 }

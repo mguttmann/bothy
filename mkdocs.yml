@@ -205,6 +205,7 @@ nav:
       - Sessions in the sidebar: design/sidebar-sessions.md
       - Sidebar ordering: design/sidebar-ordering.md
       - New project from the app: design/new-project.md
+      - Deleting spaces, channels, projects and chats: design/delete.md
   - Operations:
       - Configuration: operations/configuration.md
       - Installation with Compose: operations/install-compose.md
