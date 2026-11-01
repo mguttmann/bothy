@@ -8,6 +8,8 @@ from uuid import UUID
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
+from ..types import UNSET, Unset
+
 T = TypeVar("T", bound="HostSessionUser")
 
 
@@ -19,11 +21,14 @@ class HostSessionUser:
         user_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         os_user (str):
         created_at (datetime.datetime): RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+        owner_account (bool | Unset): Present and `true` for an assignment of the owner account (ADR 0073): sessions run
+            in the owner's own account with administrator rights; clients warn before the step-up.
     """
 
     user_id: UUID
     os_user: str
     created_at: datetime.datetime
+    owner_account: bool | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -32,6 +37,8 @@ class HostSessionUser:
         os_user = self.os_user
 
         created_at = self.created_at.isoformat()
+
+        owner_account = self.owner_account
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
@@ -42,6 +49,8 @@ class HostSessionUser:
                 "created_at": created_at,
             }
         )
+        if owner_account is not UNSET:
+            field_dict["owner_account"] = owner_account
 
         return field_dict
 
@@ -54,10 +63,13 @@ class HostSessionUser:
 
         created_at = datetime.datetime.fromisoformat(d.pop("created_at"))
 
+        owner_account = d.pop("owner_account", UNSET)
+
         host_session_user = cls(
             user_id=user_id,
             os_user=os_user,
             created_at=created_at,
+            owner_account=owner_account,
         )
 
         host_session_user.additional_properties = d

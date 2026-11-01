@@ -82,7 +82,7 @@ Code names are English and apply in API, database and code.
 | Host assignee | `hosts.assigned_user_id` | Person to whom a host is assigned; as a non-owner, only they get a terminal there (SR10). |
 | Host fingerprint | `key_fingerprint` | Check value over the Noise key and the authentication key of a host; the owner types its beginning during pairing ([24-terminal.md](24-terminal.md), section 4.3). |
 | Host pairing code | `host pairing code` | One-time code `bothy_hpc_...` of the owner with which the host service registers its public keys with the server. |
-| Host service | `bothy-host` | Separate program on a host that holds the keys of the host as a service user without administrator rights and talks to the server only outbound; for each person a PTY helper starts the PTYs as their session user. |
+| Host service | `bothy-host` | Separate program on a host that holds the keys of the host as a service user without administrator rights and talks to the server only outbound; for each person a PTY helper starts the PTYs as their session user. In the owner account mode (24 section 2.4) it runs as the instance owner's own account instead. |
 | Idempotency key | `Idempotency-Key` | UUIDv7 in the header of write requests without their own client ID; a repetition returns the stored response. |
 | Identity | `user_identity` | Link of a person to a subject at an identity provider. |
 | Identity provider | `identity_provider` | Login driver: OIDC, trusted proxy header or local account (passkey, enrollment code, device pairing, password with TOTP as a fallback) (B9). |

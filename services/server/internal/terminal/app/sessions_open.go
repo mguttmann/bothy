@@ -198,7 +198,7 @@ func (s *Service) openUnit(ctx context.Context, p actor.Actor, h domain.Host, se
 	if err != nil {
 		return terminal.Grant{}, err
 	}
-	if err := s.recordGrant(ctx, authorize.ActionTerminalOpen, h, ses, pinChanged, owner); err != nil {
+	if err := s.recordGrant(ctx, authorize.ActionTerminalOpen, h, ses, pinChanged, owner, f.assignment.OwnerAccount); err != nil {
 		return terminal.Grant{}, err
 	}
 	if err := s.emitSessionChangedBy(ctx, ses, p.ID); err != nil {
@@ -269,14 +269,16 @@ func (s *Service) grant(ctx context.Context, h domain.Host, ses domain.Session, 
 }
 
 // recordGrant writes the allow entry of terminal.open or terminal.attach (24 section 10.1):
-// host_id, session_id, profile, device_id, pin_changed and foreign_assignee (an active owner on a
-// host assigned to another person, 24 section 8.4); never the token or a name.
-func (s *Service) recordGrant(ctx context.Context, act authorize.Action, h domain.Host, ses domain.Session, pinChanged, owner bool) error {
+// host_id, session_id, profile, device_id, pin_changed, foreign_assignee (an active owner on a
+// host assigned to another person, 24 section 8.4) and owner_account (a session in the owner
+// account of the host, ADR 0073); never the token or a name.
+func (s *Service) recordGrant(ctx context.Context, act authorize.Action, h domain.Host, ses domain.Session, pinChanged, owner, ownerAccount bool) error {
 	foreign := owner && !h.AssignedUserID.IsZero() && h.AssignedUserID != ses.UserID
 	return s.d.Audit.Record(ctx, auditing.Entry{
 		Action: string(act), Decision: auditing.DecisionAllow, ResourceKind: resourceSession, ResourceID: ses.ID,
 		Attrs: auditing.Attrs{attrHostID: auditing.ID(h.ID), attrSessionID: auditing.ID(ses.ID), attrProfile: auditing.Code(ses.Profile),
-			attrDeviceID: auditing.ID(ses.DeviceID), attrPinChanged: auditing.Bool(pinChanged), attrForeignAssignee: auditing.Bool(foreign)},
+			attrDeviceID: auditing.ID(ses.DeviceID), attrPinChanged: auditing.Bool(pinChanged), attrForeignAssignee: auditing.Bool(foreign),
+			attrOwnerAccount: auditing.Bool(ownerAccount)},
 	})
 }
 

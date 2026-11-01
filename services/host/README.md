@@ -7,7 +7,8 @@ Installation and operation: [16 Operations, 4.4](../../docs/spec/16-operations.m
 
 It runs as users without administrator rights, connects only outwards to the server, is the
 Noise peer of the device and, per terminal session, starts a PTY in the helper of the person's
-own session user.
+own session user. The owner account mode (ADR 0073, below) is the opt-in exception: the host
+service and its one session user are the instance owner's own administrator account.
 
 ## State
 
@@ -143,6 +144,29 @@ checks this at the connection and before every request and logs `confirm_peer_re
 | confirmation endpoint | `/run/bothy-host-confirm/confirm.sock` (`RuntimeDirectory=bothy-host-confirm`) | `/Library/Application Support/bothy-host/confirm/confirm.sock` (folder by `install`) | pipe `\\.\pipe\bothy-host-confirm` (`PIPE_REJECT_REMOTE_CLIENTS`) |
 | console owner | user of the active `seat0` session (`loginctl`) | owner of `/dev/console` | user of the active console session |
 
+## Owner account mode (ADR 0073)
+
+`host_service.owner_account: <name>` makes the host service and its only session user the
+existing account `<name>` of the instance owner, with administrator rights (docs/spec/24-terminal.md
+2.4). `bothy-host install --owner-account`, run as that account, writes everything below its home
+and starts a per-user service; nothing needs root:
+
+| | macOS | Linux |
+|---|---|---|
+| program | `<home>/Library/Application Support/bothy-host/bin/bothy-host` (ad hoc signed, hardened runtime) | `<home>/.local/lib/bothy-host/bothy-host` |
+| configuration | `<home>/Library/Application Support/bothy-host/config.yaml` | `<home>/.config/bothy-host/config.yaml` |
+| state directory | `<home>/Library/Application Support/bothy-host/state` | `<home>/.local/state/bothy-host` |
+| service | LaunchAgent `bothy-host` in `gui/<uid>` (`<home>/Library/LaunchAgents/bothy-host.plist`) | systemd user unit `bothy-host.service` (`Delegate=yes`) |
+| PTY helper | child process `pty-helper --owner-account` on `<state>/run/helper-<name>.sock` (fd 3), ends when its standard input closes | same |
+
+Without `--config` the commands find this configuration when the system file does not exist. The
+self-checks pass with warnings where they would refuse the mode by design (HD1
+`owner_account_mode`, HD2, HD3, HD9, the helper part of HD8, the HD10 codes
+`peer_check_unavailable`, `ptrace_scope_low`, `helper_unprotected`, HD6 in the owner account);
+HD1 fails with `owner_account_mismatch` when the service runs as another account. A token for
+the account needs `own = true` (step 10a of 24 5.3). `require_local_confirm` and
+`session-user` are not available in the mode; Windows does not support it.
+
 ## Platform specifics and limits
 
 - Linux: the helper unit has `Delegate=yes`; the helper moves into the leaf `helper` of its
@@ -165,8 +189,9 @@ checks this at the connection and before every request and logs `confirm_peer_re
 | Command | Who runs it | Exit codes |
 |---|---|---|
 | `install [--session-user <name>] [--drive-root <drive>] [--drive-root-confirm yes\|no] [--config <path>]` | administrator | `0`, `1`, `2` |
+| `install --owner-account` | the owner's own account, never root (macOS, Linux) | `0`, `1`, `2` |
 | `session-user add <name>`, `session-user remove <name>` | administrator | `0`, `1` (bound name), `2` |
-| `restart` | administrator | `0`, `1`, `2` |
+| `restart [--config <path>]` | administrator, or the owner account in its mode | `0`, `1`, `2` |
 | `pair --server <url> --code <code> [--ca-file <pem>]` | service user, or an administrator through the service | `0`, `1`, `2` |
 | `doctor` | service user, or an administrator through the service | `0` passed, `1` a check failed, `2` |
 | `run` | the service manager, as the service user | `0`, `1`, `78` refused start |

@@ -126,8 +126,11 @@ def sync_detailed(
     host (ruling T12, 24 section 2.2); a name that belongs or belonged to another person on this host,
     or a second valid assignment of one person, gives `409 conflict` with `reason: session_user_taken`;
     a name the host did not report (`reported_session_users`) gives `400 validation_failed` with
-    `errors[].code` `session_user_not_on_host`, and nothing is stored. Without an assignment a person
-    gets no terminal there (SR12). Needs step-up.
+    `errors[].code` `session_user_not_on_host`, and nothing is stored. The owner account of the host
+    (`owner_account` in `reported_session_users`, ADR 0073) needs `owner_account: true` and only an
+    active owner may assign it, only to himself (`403 forbidden` with `reason:
+    owner_account_owner_only`). Without an assignment a person gets no terminal there (SR12). Needs
+    step-up.
 
     Args:
         host_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -179,8 +182,11 @@ def sync(
     host (ruling T12, 24 section 2.2); a name that belongs or belonged to another person on this host,
     or a second valid assignment of one person, gives `409 conflict` with `reason: session_user_taken`;
     a name the host did not report (`reported_session_users`) gives `400 validation_failed` with
-    `errors[].code` `session_user_not_on_host`, and nothing is stored. Without an assignment a person
-    gets no terminal there (SR12). Needs step-up.
+    `errors[].code` `session_user_not_on_host`, and nothing is stored. The owner account of the host
+    (`owner_account` in `reported_session_users`, ADR 0073) needs `owner_account: true` and only an
+    active owner may assign it, only to himself (`403 forbidden` with `reason:
+    owner_account_owner_only`). Without an assignment a person gets no terminal there (SR12). Needs
+    step-up.
 
     Args:
         host_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -227,8 +233,11 @@ async def asyncio_detailed(
     host (ruling T12, 24 section 2.2); a name that belongs or belonged to another person on this host,
     or a second valid assignment of one person, gives `409 conflict` with `reason: session_user_taken`;
     a name the host did not report (`reported_session_users`) gives `400 validation_failed` with
-    `errors[].code` `session_user_not_on_host`, and nothing is stored. Without an assignment a person
-    gets no terminal there (SR12). Needs step-up.
+    `errors[].code` `session_user_not_on_host`, and nothing is stored. The owner account of the host
+    (`owner_account` in `reported_session_users`, ADR 0073) needs `owner_account: true` and only an
+    active owner may assign it, only to himself (`403 forbidden` with `reason:
+    owner_account_owner_only`). Without an assignment a person gets no terminal there (SR12). Needs
+    step-up.
 
     Args:
         host_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -278,8 +287,11 @@ async def asyncio(
     host (ruling T12, 24 section 2.2); a name that belongs or belonged to another person on this host,
     or a second valid assignment of one person, gives `409 conflict` with `reason: session_user_taken`;
     a name the host did not report (`reported_session_users`) gives `400 validation_failed` with
-    `errors[].code` `session_user_not_on_host`, and nothing is stored. Without an assignment a person
-    gets no terminal there (SR12). Needs step-up.
+    `errors[].code` `session_user_not_on_host`, and nothing is stored. The owner account of the host
+    (`owner_account` in `reported_session_users`, ADR 0073) needs `owner_account: true` and only an
+    active owner may assign it, only to himself (`403 forbidden` with `reason:
+    owner_account_owner_only`). Without an assignment a person gets no terminal there (SR12). Needs
+    step-up.
 
     Args:
         host_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.

@@ -183,7 +183,7 @@ var ErrUnsupported = errors.New("install: unsupported platform")
 func hostUnit(t Target) (path, content string) {
 	if t.GOOS == hostos.Darwin {
 		return filepath.Join(LaunchDaemonsDir, "bothy-host.plist"), render("host.plist.tmpl",
-			map[string]string{"Label": hostLabel, keyServiceUser: t.ServiceUser, keyBinary: t.Binary(), "Config": t.ConfigPath})
+			map[string]string{keyLabel: hostLabel, keyServiceUser: t.ServiceUser, keyBinary: t.Binary(), keyConfig: t.ConfigPath})
 	}
 	return filepath.Join(SystemdDir, "bothy-host.service"), render("host.service.tmpl",
 		map[string]string{keyServiceUser: t.ServiceUser, keyBinary: t.Binary(), "Config": t.ConfigPath})
@@ -227,15 +227,20 @@ const (
 	keyBinary      = "Binary"
 	keyName        = "Name"
 	keyServiceUser = "ServiceUser"
+	keyConfig      = "Config"
+	keyLabel       = "Label"
 )
+
+// launchctl is the program of every launchd step.
+const launchctl = "/bin/launchctl"
 
 func run(argv ...string) Step { return Step{Kind: KindRun, Argv: argv} }
 
 // load bootstraps a LaunchDaemon; a label loaded by an earlier install is unloaded first, so a
 // repeated install does not fail.
 func load(label, plist string) []Step {
-	return []Step{{Kind: KindRunTolerant, Argv: []string{"/bin/launchctl", "bootout", "system/" + label}},
-		run("/bin/launchctl", "bootstrap", "system", plist)}
+	return []Step{{Kind: KindRunTolerant, Argv: []string{launchctl, "bootout", "system/" + label}},
+		run(launchctl, "bootstrap", "system", plist)}
 }
 
 func configStep(t Target, users []string) []Step {
@@ -358,7 +363,7 @@ func darwinHelper(t Target, u string, id, svcGID int) []Step {
 		steps = append(steps, run("/usr/sbin/createhomedir", "-c", "-u", u))
 	}
 	label := hostos.HelperServiceName(hostos.Darwin, u)
-	data := map[string]string{keyName: u, "Label": label, keyBinary: t.Binary(), "Endpoint": localchan.HelperEndpoint(hostos.Darwin, u), "ServiceGID": strconv.Itoa(svcGID)}
+	data := map[string]string{keyName: u, keyLabel: label, keyBinary: t.Binary(), "Endpoint": localchan.HelperEndpoint(hostos.Darwin, u), "ServiceGID": strconv.Itoa(svcGID)}
 	return append(steps,
 		Step{Kind: KindChmod, Path: "~" + u, Mode: 0o700, Owner: u},
 		Step{Kind: KindWrite, Path: filepath.Join(LaunchDaemonsDir, label+".plist"), Mode: 0o644, Owner: ownerRoot, Content: render("helper.plist.tmpl", data)},
@@ -399,7 +404,7 @@ func darwinInstall(t Target, users []string) ([]Step, error) {
 		steps = append(steps, load(label, filepath.Join(LaunchDaemonsDir, label+".plist"))...)
 	}
 	steps = append(steps, load(hostLabel, host)...)
-	return append(steps, run("/bin/launchctl", "kickstart", "-k", "system/bothy-host")), nil
+	return append(steps, run(launchctl, "kickstart", "-k", "system/bothy-host")), nil
 }
 
 // Windows SDDL of the state directory and of the helper services (D-M2-42-13, -14).
@@ -463,7 +468,7 @@ func Restart(t Target) ([]Step, error) {
 	case hostos.Linux:
 		return []Step{run("/usr/bin/systemctl", "reset-failed", "bothy-host.service"), run("/usr/bin/systemctl", "restart", "bothy-host.service")}, nil
 	case hostos.Darwin:
-		return []Step{run("/bin/launchctl", "kickstart", "-k", "system/bothy-host")}, nil
+		return []Step{run(launchctl, "kickstart", "-k", "system/bothy-host")}, nil
 	case hostos.Windows:
 		return []Step{{Kind: KindWinRestart, Name: hostLabel}}, nil
 	}

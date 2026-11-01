@@ -8,9 +8,26 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/OWNER/bothy/services/host/internal/config"
 	"github.com/OWNER/bothy/services/host/internal/install"
 	"github.com/OWNER/bothy/services/host/internal/state"
 )
+
+// sessionUserConfig loads the configuration of session-user; the owner account mode has exactly
+// one session user and no session-user command (ADR 0073). A nil configuration comes with the
+// exit code.
+func sessionUserConfig(path string, stderr io.Writer) (*config.Config, int) {
+	c, err := sys.loadConfig(path)
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "bothy-host session-user: %v\n", err)
+		return nil, exitUsage
+	}
+	if c.OwnerAccount != "" {
+		_, _ = fmt.Fprintln(stderr, "bothy-host session-user: not available with host_service.owner_account (ADR 0073)")
+		return nil, exitUsage
+	}
+	return c, exitOK
+}
 
 // cmdSessionUser is "session-user add <name>" and "session-user remove <name>" (D-M2-42-13).
 func cmdSessionUser(ctx context.Context, args []string, stdout, stderr io.Writer) int {
@@ -23,10 +40,9 @@ func cmdSessionUser(ctx context.Context, args []string, stdout, stderr io.Writer
 	if !sys.isAdmin() {
 		return adminRequired(stderr, "session-user")
 	}
-	c, err := sys.loadConfig(*cfgPath)
-	if err != nil {
-		_, _ = fmt.Fprintf(stderr, "bothy-host session-user: %v\n", err)
-		return exitUsage
+	c, code := sessionUserConfig(*cfgPath, stderr)
+	if c == nil {
+		return code
 	}
 	tg, err := sys.target(c, true)
 	if err != nil {
@@ -71,10 +87,15 @@ func cmdSessionUser(ctx context.Context, args []string, stdout, stderr io.Writer
 // cmdRestart is "restart": the host service only, so a changed configuration takes effect.
 func cmdRestart(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	fl := newFlags("restart", stderr)
+	cfgPath := fl.String("config", "", "path of the configuration file")
 	if err := fl.Parse(args); err != nil || fl.NArg() != 0 {
 		return exitUsage
 	}
 	if !sys.isAdmin() {
+		// The owner account restarts its own per-user service (ADR 0073).
+		if c, err := sys.loadConfig(*cfgPath); err == nil && sys.isOwnerCaller(c) {
+			return restartOwnerAccount(ctx, stdout, stderr)
+		}
 		return adminRequired(stderr, "restart")
 	}
 	steps, err := install.Restart(install.Target{GOOS: sys.goos})

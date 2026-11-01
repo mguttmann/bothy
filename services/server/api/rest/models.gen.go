@@ -10673,6 +10673,11 @@ type HostReportedSessionUser struct {
 	// Examples: bothy-s-robin
 	OsUser string `json:"os_user"`
 
+	// OwnerAccount Present and `true` for the owner account of the host (`host_service.owner_account`, ADR 0073, 24 section 2.4): the account the host service itself runs as, with administrator rights. An assignment of this name needs `owner_account = true`.
+	//
+	// Examples: true
+	OwnerAccount *bool `json:"owner_account,omitempty"`
+
 	// Workdirs Display names of the working directories of this session user in `host_service.claude_workdirs` after check HD7, in their order (a directory listed under two session users is dropped from both lists); empty means no `claude` profile for this session user. A client sends the index into its own list, never a path; the host service resolves the index in exactly this list (24, 2.2 and 5.3).
 	Workdirs []string `json:"workdirs"`
 }
@@ -10725,6 +10730,11 @@ type HostSessionUser struct {
 	// OsUser Examples: bothy-s-robin
 	OsUser string `json:"os_user"`
 
+	// OwnerAccount Present and `true` for an assignment of the owner account (ADR 0073): sessions run in the owner's own account with administrator rights; clients warn before the step-up.
+	//
+	// Examples: true
+	OwnerAccount *bool `json:"owner_account,omitempty"`
+
 	// UserId UUIDv7 (RFC 9562), lowercase canonical form.
 	UserId Uuid `json:"user_id"`
 }
@@ -10735,6 +10745,11 @@ type HostSessionUserAssign struct {
 	//
 	// Examples: bothy-s-robin
 	OsUser string `json:"os_user"`
+
+	// OwnerAccount Explicit opt-in for the owner account of the host (ADR 0073, 24 section 2.4): the existing account of the instance owner with administrator rights that the host service runs as. Must be `true` exactly when the host reports the name with `owner_account = true` (otherwise `400 validation_failed` with `errors[].code` `owner_account_opt_in_required` or `owner_account_not_on_host` at `owner_account`), and only an active owner may assign it, only to himself (otherwise `403 forbidden` with `reason: owner_account_owner_only`).
+	//
+	// Examples: false
+	OwnerAccount *bool `json:"owner_account,omitempty"`
 
 	// UserId UUIDv7 (RFC 9562), lowercase canonical form.
 	UserId Uuid `json:"user_id"`

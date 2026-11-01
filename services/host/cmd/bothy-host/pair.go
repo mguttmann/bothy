@@ -56,7 +56,7 @@ func cmdPair(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 			return exitFailed
 		}
 		printPaired(stdout, a.Fingerprint, a.HostID)
-		return restartAfterPair(ctx, stderr)
+		return restartAfterPair(ctx, c, stderr)
 	case wayChild:
 		if sys.goos == hostos.Windows {
 			_, _ = fmt.Fprintln(stderr, "bothy-host pair: the host service must run; start it with bothy-host restart")
@@ -69,7 +69,7 @@ func cmdPair(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		if code := sys.childRun(ctx, childArgs, ca, stdout, stderr); code != exitOK {
 			return code
 		}
-		return restartAfterPair(ctx, stderr)
+		return restartAfterPair(ctx, c, stderr)
 	case wayDirect:
 	}
 	return directPair(ctx, c, *server, *code, ca, stdout, stderr)
@@ -93,7 +93,10 @@ func printPaired(stdout io.Writer, fp, host string) {
 }
 
 // restartAfterPair restarts the host service, so M2-43 logs in with the new keys.
-func restartAfterPair(ctx context.Context, stderr io.Writer) int {
+func restartAfterPair(ctx context.Context, c *config.Config, stderr io.Writer) int {
+	if c.OwnerAccount != "" {
+		return restartOwnerAccount(ctx, io.Discard, stderr)
+	}
 	steps, err := install.Restart(install.Target{GOOS: sys.goos})
 	if err != nil {
 		return exitFailed
@@ -106,6 +109,7 @@ func restartAfterPair(ctx context.Context, stderr io.Writer) int {
 func directPair(ctx context.Context, c *config.Config, server, code string, ca []byte, stdout, stderr io.Writer) int {
 	st := state.Open(c.StateDir, sys.protector)
 	env := sys.doctorEnv(c, st)
+	defer closeHelpers(env)
 	env.Declaration, _ = st.ReadDeclaration()
 	res := doctor.RunService(ctx, env)
 	for _, e := range res.Check(doctor.HD10).Entries {

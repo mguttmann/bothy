@@ -106,8 +106,8 @@ func SessionUserRemove(t Target, name string, configured []string) ([]Step, erro
 		// kickstart of Restart. The kill is tolerant: a host service that is not running (a
 		// refused start exits 78 and stays down) has no process to signal, and launchctl exits 3.
 		steps = append(steps,
-			Step{Kind: KindRunTolerant, Argv: []string{"/bin/launchctl", "kill", "SIGTERM", "system/bothy-host"}},
-			run("/bin/launchctl", "bootout", "system/"+label),
+			Step{Kind: KindRunTolerant, Argv: []string{launchctl, "kill", "SIGTERM", "system/bothy-host"}},
+			run(launchctl, "bootout", "system/"+label),
 			Step{Kind: KindRemove, Path: filepath.Join(LaunchDaemonsDir, label+".plist")},
 			Step{Kind: KindChmod, Path: "~" + name, Mode: 0o700, Owner: name})
 	case hostos.Windows:

@@ -28,6 +28,11 @@ const (
 	FieldMutuallyExclusive = "mutually_exclusive"
 	// FieldSessionUserNotOnHost marks a session user name the host does not report (24 2.2).
 	FieldSessionUserNotOnHost = "session_user_not_on_host"
+	// FieldOwnerAccountOptIn marks an assignment of the owner account without owner_account = true,
+	// FieldOwnerAccountNotOnHost owner_account = true for a name the host does not report as its
+	// owner account (ADR 0073, D-OA-6).
+	FieldOwnerAccountOptIn     = "owner_account_opt_in_required"
+	FieldOwnerAccountNotOnHost = "owner_account_not_on_host"
 )
 
 // osUserPattern is the check of host_session_users.os_user (03 section 4.14): letters, digits,

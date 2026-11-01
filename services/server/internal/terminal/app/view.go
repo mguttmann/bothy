@@ -70,11 +70,11 @@ func (s *Service) view(ctx context.Context, h hostState) terminal.HostView {
 	if r.Paired() {
 		v.ReportedSessionUsers = []terminal.ReportedSessionUser{}
 		for _, u := range r.ReportedUsers {
-			v.ReportedSessionUsers = append(v.ReportedSessionUsers, terminal.ReportedSessionUser{OSUser: u.OSUser, Workdirs: u.Workdirs})
+			v.ReportedSessionUsers = append(v.ReportedSessionUsers, terminal.ReportedSessionUser{OSUser: u.OSUser, Workdirs: u.Workdirs, OwnerAccount: u.OwnerAccount})
 		}
 	}
 	for _, u := range h.users {
-		v.SessionUsers = append(v.SessionUsers, terminal.SessionUser{UserID: u.UserID, OSUser: u.OSUser, CreatedAt: u.CreatedAt})
+		v.SessionUsers = append(v.SessionUsers, terminal.SessionUser{UserID: u.UserID, OSUser: u.OSUser, CreatedAt: u.CreatedAt, OwnerAccount: u.OwnerAccount})
 	}
 	return v
 }

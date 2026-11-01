@@ -443,7 +443,7 @@ Installation of the host service on a host:
    checks HD1 to HD11 before every start and on command, on the host with the names of the
    affected session users and an exit code other than 0 as soon as a check fails
    (24, section 2.2).
-4. Do not install on the server host. Where it is necessary after all, the owner declares the host as
+4. Do not install on the server host, except in the owner account mode below. Where it is necessary after all, the owner declares the host as
    a server host; then only owners get a terminal there (07, SR10).
 5. For the profile `claude`, with `organization`, the instance operator puts the API key as a file with
    mode `0600` into the state folder. With `personal`, the holder of the login logs in themselves in the account
@@ -562,6 +562,30 @@ reasons):
   service again with its default command line, it runs `bothy-host install --config <file>` with
   the configuration file in use, which restores the service configuration; the host service names this route in its log when
   the server refuses its version with `4114` ([18-release.md](18-release.md) 9.1).
+
+Owner account mode ([24-terminal.md](24-terminal.md) section 2.4, ADR 0073): on the owner's own
+machine the instance operator may instead run the host service as the owner's existing account,
+with administrator rights, without root and without new users. Steps, all as that account (for
+example over ssh), nothing at the keyboard of the machine:
+
+1. `bothy-host install --owner-account` with the release binary: it writes the binary, the
+   configuration (`host_service.owner_account` with the account's name) and the state directory
+   below the account's home and starts the per-user service (macOS: LaunchAgent `bothy-host` in
+   the GUI domain of the account, which needs a logged-in GUI session of the account; Linux: a
+   systemd user unit, which needs `loginctl enable-linger` for the account to run without a
+   login). It refuses root and Windows.
+2. `bothy-host pair --config <file> --server <url> --code <code>` with a pairing code of an owner.
+3. The owner confirms the host in the console or an app and assigns the reported owner account to
+   himself with the explicit checkbox (`owner_account: true`); nobody else can be assigned it.
+4. `bothy-host doctor --config <file>` shows the warnings of the mode (HD1 `owner_account_mode`,
+   HD2, HD3, HD9 and others) and no failure.
+
+`bothy-host restart` restarts the service as the account. Rollback: the owner ends the
+assignment (`host.manage`), the operator stops and removes the per-user service (macOS
+`launchctl bootout gui/<uid>/bothy-host` and the plist in `~/Library/LaunchAgents`; Linux
+`systemctl --user disable --now bothy-host.service` and the unit) and the owner retires the host.
+Item 4 above does not forbid the mode on the server host: SR10 already allows only owners there,
+and the owner account mode is meant for the owner's own server machine (D-OA-12).
 
 ### 4.5 Several api nodes (M7-17)
 

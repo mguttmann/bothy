@@ -1,0 +1,17 @@
+# Host service bothy-host in the owner account mode (ADR 0073), written by bothy-host install
+# --owner-account as a systemd user unit of the account itself, without administrator rights.
+# A refused start exits 78 (EX_CONFIG) and is not restarted. Delegate=yes gives the PTY helper its
+# cgroup subtree for the session trees.
+[Unit]
+Description=bothy-host service (owner account)
+
+[Service]
+Type=simple
+ExecStart={{.Binary}} run --config {{.Config}}
+Restart=on-failure
+RestartPreventExitStatus=78
+UMask=0077
+Delegate=yes
+
+[Install]
+WantedBy=default.target

@@ -35,7 +35,7 @@ func (q *Queries) UpdateReportedSessionUsers(ctx context.Context, arg UpdateRepo
 }
 
 const validSessionUsersOfUser = `-- name: ValidSessionUsersOfUser :many
-SELECT su.id, su.host_id, su.os_user, h.reported_session_users
+SELECT su.id, su.host_id, su.os_user, su.owner_account, h.reported_session_users
 FROM host_session_users su
 JOIN hosts h ON h.id = su.host_id
 WHERE su.user_id = $1 AND su.revoked_at IS NULL
@@ -46,6 +46,7 @@ type ValidSessionUsersOfUserRow struct {
 	ID                   pgtype.UUID
 	HostID               pgtype.UUID
 	OsUser               string
+	OwnerAccount         bool
 	ReportedSessionUsers []byte
 }
 
@@ -64,6 +65,7 @@ func (q *Queries) ValidSessionUsersOfUser(ctx context.Context, userID pgtype.UUI
 			&i.ID,
 			&i.HostID,
 			&i.OsUser,
+			&i.OwnerAccount,
 			&i.ReportedSessionUsers,
 		); err != nil {
 			return nil, err

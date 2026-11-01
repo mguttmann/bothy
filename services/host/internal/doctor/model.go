@@ -41,6 +41,11 @@ const (
 	CodePrivilegedUser         = "privileged_user"
 	CodeUserMissing            = "user_missing"
 	CodeSessionUserNameInvalid = "session_user_name_invalid"
+	// CodeOwnerAccountMode is the warning of the owner account mode (ADR 0073, D-OA-9);
+	// CodeOwnerAccountMismatch fails it when the service does not run as host_service.owner_account
+	// or host_service.session_users names anything else.
+	CodeOwnerAccountMode     = "owner_account_mode"
+	CodeOwnerAccountMismatch = "owner_account_mismatch"
 
 	CodeForbiddenGroup       = "forbidden_group"
 	CodeDockerSocketWritable = "docker_socket_writable"
@@ -85,7 +90,7 @@ const (
 // precedence lists the codes of each check from the most important; one entry per check (and per
 // named account) carries the first code that applies.
 var precedence = map[string][]string{
-	HD1:  {CodeSessionUsersEmpty, CodeSessionUserDuplicate, CodeSessionUserIsService, CodePrivilegedUser, CodeUserMissing, CodeSessionUserNameInvalid},
+	HD1:  {CodeSessionUsersEmpty, CodeSessionUserDuplicate, CodeSessionUserIsService, CodePrivilegedUser, CodeUserMissing, CodeSessionUserNameInvalid, CodeOwnerAccountMismatch, CodeOwnerAccountMode},
 	HD2:  {CodeForbiddenGroup, CodeDockerSocketWritable},
 	HD3:  {CodePasswordlessSudo},
 	HD4:  {CodeStateDirOwner, CodeStateDirMode, CodeKeyFileUnprotected},
@@ -171,10 +176,12 @@ type Profile struct {
 	Kind        string `json:"kind"`
 }
 
-// ReportedSessionUser is HostReportedSessionUser.
+// ReportedSessionUser is HostReportedSessionUser. OwnerAccount marks the account of the owner
+// account mode (ADR 0073); the server needs an explicit opt-in to assign it.
 type ReportedSessionUser struct {
-	OSUser   string   `json:"os_user"`
-	Workdirs []string `json:"workdirs"`
+	OSUser       string   `json:"os_user"`
+	Workdirs     []string `json:"workdirs"`
+	OwnerAccount bool     `json:"owner_account,omitempty"`
 }
 
 // Workdir is a working directory after HD7: its display name and resolved path (host only).

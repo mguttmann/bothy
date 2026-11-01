@@ -67,12 +67,16 @@ type SessionUser struct {
 	UserID    ids.ID
 	OSUser    string
 	CreatedAt time.Time
+	// OwnerAccount marks an assignment of the owner account mode (ADR 0073).
+	OwnerAccount bool
 }
 
-// ReportedSessionUser is a session user the host reported (schema HostReportedSessionUser).
+// ReportedSessionUser is a session user the host reported (schema HostReportedSessionUser);
+// OwnerAccount marks the owner account of the host (ADR 0073).
 type ReportedSessionUser struct {
-	OSUser   string
-	Workdirs []string
+	OSUser       string
+	Workdirs     []string
+	OwnerAccount bool
 }
 
 // HostView is a host as the API shows it (schema Host), field by field; zero values and nil lists
@@ -138,6 +142,8 @@ type CreateHost struct {
 type SessionUserAssign struct {
 	UserID ids.ID
 	OSUser string
+	// OwnerAccount is the explicit opt-in for the owner account of the host (ADR 0073).
+	OwnerAccount bool
 }
 
 // UpdateHost is the body of updateHost (schema HostUpdate) with the host and its precondition.
