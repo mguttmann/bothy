@@ -30,6 +30,10 @@ abstract interface class StepUpPrompt {
   });
 }
 
+/// The `reason` of `401 step_up_required` from `stepUpWithPassword` while the password path of
+/// the account is locked after too many wrong logins (08 6.2 and 13); the step-up stops asking.
+const String passwordLockedReason = 'password_locked';
+
 /// The password and the one-time code a person typed for a step-up without a step-up key.
 typedef StepUpCredentials = ({String password, String totpCode});
 
@@ -45,7 +49,9 @@ typedef StepUpCredentials = ({String password, String totpCode});
 /// 6.2): `createStepUpChallenge`, [StepUpPrompt.askPassword], then `stepUpWithPassword`. A
 /// wrong password or code (`401 step_up_required`, counted by the server) asks again with a new
 /// challenge until the person cancels or the server ends the session at
-/// `auth.step_up_fail_limit`. Such a step-up never counts as fresh for the terminal (08 6.3).
+/// `auth.step_up_fail_limit`; a password changed during the attempt (reason `password_changed`,
+/// not counted) asks again too. A locked password path (reason [passwordLockedReason], not
+/// counted) stops asking and throws the answer. Such a step-up never counts as fresh for the terminal (08 6.3).
 ///
 /// Example:
 /// ```dart
@@ -66,8 +72,8 @@ final class StepUpService {
   /// cancelled confirmation, [StepUpUnavailable] when a device without a step-up key gets
   /// `403 step_up_not_possible` (no local account) or `404` (local passwords switched off) for
   /// the password, [NotSignedIn] without a session, and the `DioException` of a rejected
-  /// challenge or confirmation otherwise (`401 step_up_required` of the device key,
-  /// `401 session_revoked`, `403 forbidden`).
+  /// challenge or confirmation otherwise (`401 step_up_required` of the device key or with
+  /// reason [passwordLockedReason], `401 session_revoked`, `403 forbidden`).
   Future<void> confirm({required String purposeText}) async {
     final key = _core.keys.stepUp;
     if (key == null) return _confirmWithPassword(purposeText);
@@ -146,7 +152,12 @@ final class StepUpService {
             problem?.status == 404) {
           throw const StepUpUnavailable();
         }
-        if (problem?.status != 401 || problem?.code != 'step_up_required') {
+        // A locked password path (reason password_locked) is no wrong confirmation: the server
+        // counts nothing, and asking again would only repeat the refusal, so the reason goes to
+        // the caller, whose screen says to try later or use another device (08 13, R-ID-10).
+        if (problem?.status != 401 ||
+            problem?.code != 'step_up_required' ||
+            problem?.reason == passwordLockedReason) {
           rethrow;
         }
         _core.log('step-up with password rejected');

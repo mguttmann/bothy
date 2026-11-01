@@ -577,7 +577,12 @@ provider for `prompt=login` and `max_age=0`; the identity must be one of the per
 identities (same issuer and subject) and its `auth_time` must not lie before the second in which
 the challenge was created (`auth_time` has whole seconds); then `step_up_method = oidc_reauth`. A
 wrong password, code, identity or `auth_time` fails the challenge and counts toward
-`auth.step_up_fail_limit`. The OIDC re-login stays console-only, because its redirect is the
+`auth.step_up_fail_limit`. A locked password path (section 13) answers `401 step_up_required`
+with reason `password_locked`, and a password changed during the attempt with reason
+`password_changed`; both count nothing, neither toward `auth.step_up_fail_limit` nor toward
+`auth.login_fail_limit`, and leave the challenge issued (R-ID-10, SEC-STEPUP-LOCKOUT). The app stops
+asking on `password_locked` and says to try again later or to confirm on another device. The
+OIDC re-login stays console-only, because its redirect is the
 console callback: from any other session its two operations answer `403 forbidden` with reason
 `step_up_not_possible`. Every successful step-up of a console session sets a new cookie value
 (section 7.5); an app session has no cookie and gets none.
@@ -966,7 +971,9 @@ Rules:
 - The client IP comes only from headers of a proxy in `server.trusted_proxies`; otherwise it is the
   peer of the connection. Reason: a forged `X-Forwarded-For` would bypass IP limits.
 - An account lockout affects only the password path. Passkey, device pairing and OIDC stay open,
-  so that an attacker cannot lock anyone out.
+  so that an attacker cannot lock anyone out. A step-up with password and TOTP during the
+  lockout is refused without counting (section 6.2), so a lockout can never revoke a session
+  through `auth.step_up_fail_limit`.
 - No information about accounts: an unknown login name and a wrong password give the same response
   in the same time (the server computes an Argon2id hash even for an unknown name).
 - Every lockout and every accumulation creates an audit entry; the owner sees them in the console.
@@ -983,6 +990,7 @@ Responses that this chapter defines:
 | Case | Response | Reason |
 |---|---|---|
 | Step-up confirmation wrong, challenge unknown, used or expired | `401 step_up_required` | The right reaction is a new step-up, not a new login |
+| Step-up with password and TOTP while the password path is locked, or the password changed during the attempt (6.2) | `401 step_up_required`, reason `password_locked` or `password_changed`, nothing counted | The lockout is a rule of the login, not a wrong confirmation; counting it would let anyone who knows the login name revoke the session |
 | Step-up impossible for this caller or this device (token without session, device without step-up key) | `403 forbidden`, reason `step_up_not_possible` | a new attempt does not help |
 | Refresh with a DPoP key other than the family's | `401 invalid_dpop_proof`, family remains | whoever does not have the key must not be able to end someone else's session |
 | DPoP-bound token as `Bearer` | `401 invalid_dpop_proof` | RFC 9449, section 7.2 |
@@ -1102,6 +1110,7 @@ sequenceDiagram
 | ID-T28 | Terminal: step-up with password and TOTP, older than `terminal.step_up_max_age`, twice for two openings, in the console with a passkey without `userVerification = required`, reattach in the console within `terminal.quick_reattach_window` without passkey, simultaneous openings with one confirmation | each `401 step_up_required` (in the console with `reason: passkey_required`); for simultaneous openings exactly one session |
 | ID-T29 | Registration with `platform = 'cli'` and `step_up_jwk`; challenge and confirmation with device key and with passkey from a `cli` session; action with step-up from a `cli` session | `400 validation_failed`; `403 forbidden` with audit `step_up_not_possible`; `401 step_up_required` |
 | ID-T30 | `stepUpWithPassword` from an `app` session on a device without an active `step_up` key; from a device with one; from a `cli` device | `200`, `step_up_method = password_totp`, audit `auth.step_up` confirm with method `password_totp`, no cookie; `403 forbidden` with `step_up_not_possible` (cause `step_up_key_present`), nothing counted; `403 forbidden` with `step_up_not_possible` |
+| ID-T31 | `stepUpWithPassword` with the right password and code while the password path is locked, more often than `auth.step_up_fail_limit`; then after the lockout; a password changed during the attempt | each `401 step_up_required` with reason `password_locked`, no failed challenge, session not revoked, audit cause `locked`; then `200`; `401 step_up_required` with reason `password_changed`, nothing counted |
 
 ## 16. Decisions of this chapter
 

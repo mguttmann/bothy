@@ -148,6 +148,20 @@ func required(cause string, sid ids.ID) *stepUpDeniedError {
 	return denyStepUp(errs.New(errs.CodeStepUpRequired, ""), auditing.ReasonStepUpRequired, cause, sid)
 }
 
+// The reasons of a password step-up refused by the login rules (08 sections 6.2 and 13): the
+// password path of the account is locked, or the password changed during the attempt.
+const (
+	reasonPasswordLocked  = "password_locked"
+	reasonPasswordChanged = "password_changed"
+)
+
+// refusedRow is the 401 step_up_required with reason of a password step-up whose row the login
+// rules refuse (locked or changed); like required it counts nothing.
+func refusedRow(reason, cause string, sid ids.ID) *stepUpDeniedError {
+	answer := errs.New(errs.CodeStepUpRequired, "").WithReason(reason)
+	return denyStepUp(answer, auditing.ReasonStepUpRequired, cause, sid)
+}
+
 // finish writes the audit entry of a denial and returns its answer; any other error passes.
 func (s *StepUps) finish(ctx context.Context, err error) error {
 	var denial *stepUpDeniedError

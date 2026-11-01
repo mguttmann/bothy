@@ -81,7 +81,11 @@ def sync_detailed(
     active `step_up` key (Windows, 08 6.2); a device with a `step_up` key, a share extension
     session and a `cli` device get `403 forbidden` with reason `step_up_not_possible`.
     `X-Console-Request` applies only to a request authenticated by the console cookie; an
-    app sends its DPoP token without it. Only a console session gets a new cookie.
+    app sends its DPoP token without it. Only a console session gets a new cookie. A wrong
+    password or code is `401 step_up_required` and counts toward `auth.step_up_fail_limit`;
+    while the password path of the account is locked the answer is `401 step_up_required`
+    with reason `password_locked`, and for a password changed during the attempt with
+    reason `password_changed`; neither counts (08 6.2 and 13).
 
     Args:
         x_console_request (StepUpWithPasswordXConsoleRequest | Unset):
@@ -119,7 +123,11 @@ def sync(
     active `step_up` key (Windows, 08 6.2); a device with a `step_up` key, a share extension
     session and a `cli` device get `403 forbidden` with reason `step_up_not_possible`.
     `X-Console-Request` applies only to a request authenticated by the console cookie; an
-    app sends its DPoP token without it. Only a console session gets a new cookie.
+    app sends its DPoP token without it. Only a console session gets a new cookie. A wrong
+    password or code is `401 step_up_required` and counts toward `auth.step_up_fail_limit`;
+    while the password path of the account is locked the answer is `401 step_up_required`
+    with reason `password_locked`, and for a password changed during the attempt with
+    reason `password_changed`; neither counts (08 6.2 and 13).
 
     Args:
         x_console_request (StepUpWithPasswordXConsoleRequest | Unset):
@@ -152,7 +160,11 @@ async def asyncio_detailed(
     active `step_up` key (Windows, 08 6.2); a device with a `step_up` key, a share extension
     session and a `cli` device get `403 forbidden` with reason `step_up_not_possible`.
     `X-Console-Request` applies only to a request authenticated by the console cookie; an
-    app sends its DPoP token without it. Only a console session gets a new cookie.
+    app sends its DPoP token without it. Only a console session gets a new cookie. A wrong
+    password or code is `401 step_up_required` and counts toward `auth.step_up_fail_limit`;
+    while the password path of the account is locked the answer is `401 step_up_required`
+    with reason `password_locked`, and for a password changed during the attempt with
+    reason `password_changed`; neither counts (08 6.2 and 13).
 
     Args:
         x_console_request (StepUpWithPasswordXConsoleRequest | Unset):
@@ -188,7 +200,11 @@ async def asyncio(
     active `step_up` key (Windows, 08 6.2); a device with a `step_up` key, a share extension
     session and a `cli` device get `403 forbidden` with reason `step_up_not_possible`.
     `X-Console-Request` applies only to a request authenticated by the console cookie; an
-    app sends its DPoP token without it. Only a console session gets a new cookie.
+    app sends its DPoP token without it. Only a console session gets a new cookie. A wrong
+    password or code is `401 step_up_required` and counts toward `auth.step_up_fail_limit`;
+    while the password path of the account is locked the answer is `401 step_up_required`
+    with reason `password_locked`, and for a password changed during the attempt with
+    reason `password_changed`; neither counts (08 6.2 and 13).
 
     Args:
         x_console_request (StepUpWithPasswordXConsoleRequest | Unset):

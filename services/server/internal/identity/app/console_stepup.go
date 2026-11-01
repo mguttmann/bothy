@@ -91,7 +91,9 @@ func (c *Console) begin(ctx context.Context, a actor.Actor, allowed func(context
 // FIX-stepup-macos); the password and the TOTP code are verified by the rules of the login (one
 // Argon2id computation, the lockout of auth.login_fail_limit counted and committed); then one unit
 // of work locks session and challenge and confirms with method password_totp, or fails the
-// challenge, which counts toward auth.step_up_fail_limit. Only a console session gets a new
+// challenge, which counts toward auth.step_up_fail_limit. A locked password path or a password
+// changed during the attempt answers 401 step_up_required with reason password_locked or
+// password_changed and counts nothing (SEC-STEPUP-LOCKOUT). Only a console session gets a new
 // cookie (confirmed).
 func (c *Console) StepUpWithPassword(ctx context.Context, a actor.Actor, challengeID ids.ID, password, totpCode string) (identity.StepUpResult, error) {
 	if c.local == nil || !c.local.enabled {
@@ -104,6 +106,15 @@ func (c *Console) StepUpWithPassword(ctx context.Context, a actor.Actor, challen
 	cause, err := c.local.stepUpPassword(ctx, a.ID, password, totpCode)
 	if err != nil {
 		return identity.StepUpResult{}, c.stepUps.finish(ctx, err)
+	}
+	// A locked or changed row is a refusal of the login rules, not a wrong confirmation: it
+	// counts nothing (08 sections 6.2 and 13, R-ID-10), so a lockout that anyone who knows the
+	// login name can cause never revokes the session. The challenge stays issued.
+	switch cause {
+	case causeLocked:
+		return identity.StepUpResult{}, c.stepUps.finish(ctx, refusedRow(reasonPasswordLocked, cause, a.SessionID))
+	case causeChanged:
+		return identity.StepUpResult{}, c.stepUps.finish(ctx, refusedRow(reasonPasswordChanged, cause, a.SessionID))
 	}
 	return c.stepUps.completeWith(ctx, a, challengeID, identity.StepUpMethodPasswordTOTP,
 		func(context.Context, ChallengeRecord) (stepup.Cause, error) { return stepup.Cause(cause), nil })

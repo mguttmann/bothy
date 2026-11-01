@@ -16,6 +16,79 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// NewListRunStepsRequest constructs an http.Request for the ListRunSteps method
+func NewListRunStepsRequest(server string, runId RunIdPath, params *ListRunStepsParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "run_id", runId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/runs/%s/steps", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Cursor != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewSearchRequest constructs an http.Request for the Search method
 func NewSearchRequest(server string, params *SearchParams) (*http.Request, error) {
 	var err error
@@ -5197,7 +5270,11 @@ type ClientWithResponsesInterface interface {
 	// active `step_up` key (Windows, 08 6.2); a device with a `step_up` key, a share extension
 	// session and a `cli` device get `403 forbidden` with reason `step_up_not_possible`.
 	// `X-Console-Request` applies only to a request authenticated by the console cookie; an
-	// app sends its DPoP token without it. Only a console session gets a new cookie.
+	// app sends its DPoP token without it. Only a console session gets a new cookie. A wrong
+	// password or code is `401 step_up_required` and counts toward `auth.step_up_fail_limit`;
+	// while the password path of the account is locked the answer is `401 step_up_required`
+	// with reason `password_locked`, and for a password changed during the attempt with
+	// reason `password_changed`; neither counts (08 6.2 and 13).
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -5210,7 +5287,11 @@ type ClientWithResponsesInterface interface {
 	// active `step_up` key (Windows, 08 6.2); a device with a `step_up` key, a share extension
 	// session and a `cli` device get `403 forbidden` with reason `step_up_not_possible`.
 	// `X-Console-Request` applies only to a request authenticated by the console cookie; an
-	// app sends its DPoP token without it. Only a console session gets a new cookie.
+	// app sends its DPoP token without it. Only a console session gets a new cookie. A wrong
+	// password or code is `401 step_up_required` and counts toward `auth.step_up_fail_limit`;
+	// while the password path of the account is locked the answer is `401 step_up_required`
+	// with reason `password_locked`, and for a password changed during the attempt with
+	// reason `password_changed`; neither counts (08 6.2 and 13).
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -22888,75 +22969,4 @@ type ApproveDeviceResponse429Headers struct {
 // ApproveDeviceResponseDefaultHeaders the declared response headers of an HTTP default response for ApproveDevice
 type ApproveDeviceResponseDefaultHeaders struct {
 	CorrelationId *CorrelationId
-}
-
-type ApproveDeviceResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *Device
-	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
-	ApplicationproblemJSON400 *BadRequest
-	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
-	ApplicationproblemJSON401 *Unauthorized
-	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
-	ApplicationproblemJSON403 *Forbidden
-	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
-	ApplicationproblemJSON404 *NotFound
-	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
-	ApplicationproblemJSON409 *Conflict
-	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
-	ApplicationproblemJSON422 *UnprocessableEntity
-	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
-	ApplicationproblemJSON429 *TooManyRequests
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *Error
-	// Headers200 the parsed response headers for an HTTP 200 response
-	Headers200 *ApproveDeviceResponse200Headers
-	// Headers400 the parsed response headers for an HTTP 400 response
-	Headers400 *ApproveDeviceResponse400Headers
-	// Headers401 the parsed response headers for an HTTP 401 response
-	Headers401 *ApproveDeviceResponse401Headers
-	// Headers403 the parsed response headers for an HTTP 403 response
-	Headers403 *ApproveDeviceResponse403Headers
-	// Headers404 the parsed response headers for an HTTP 404 response
-	Headers404 *ApproveDeviceResponse404Headers
-	// Headers409 the parsed response headers for an HTTP 409 response
-	Headers409 *ApproveDeviceResponse409Headers
-	// Headers422 the parsed response headers for an HTTP 422 response
-	Headers422 *ApproveDeviceResponse422Headers
-	// Headers429 the parsed response headers for an HTTP 429 response
-	Headers429 *ApproveDeviceResponse429Headers
-	// HeadersDefault the parsed response headers for an HTTP default response
-	HeadersDefault *ApproveDeviceResponseDefaultHeaders
-}
-
-// GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r ApproveDeviceResponse) GetJSON200() *Device {
-	return r.JSON200
-}
-
-// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
-func (r ApproveDeviceResponse) GetApplicationproblemJSON400() *BadRequest {
-	return r.ApplicationproblemJSON400
-}
-
-// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
-func (r ApproveDeviceResponse) GetApplicationproblemJSON401() *Unauthorized {
-	return r.ApplicationproblemJSON401
-}
-
-// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
-func (r ApproveDeviceResponse) GetApplicationproblemJSON403() *Forbidden {
-	return r.ApplicationproblemJSON403
-}
-
-// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
-func (r ApproveDeviceResponse) GetApplicationproblemJSON404() *NotFound {
-	return r.ApplicationproblemJSON404
-}
-
-// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
-func (r ApproveDeviceResponse) GetApplicationproblemJSON409() *Conflict {
-	return r.ApplicationproblemJSON409
 }

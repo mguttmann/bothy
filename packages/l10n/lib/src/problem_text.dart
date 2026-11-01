@@ -28,6 +28,14 @@ String problemText(AppLocalizations l, String code, {String? reason}) {
     ('forbidden', 'delegation_exceeds_own_capabilities') =>
       l.problemForbiddenDelegationCapabilities,
     ('forbidden', 'subject_kind_not_allowed') => l.problemForbiddenSubjectKind,
+    ('forbidden', 'step_up_not_possible') =>
+      l.problemForbiddenStepUpNotPossible,
+    // The password step-up refused by the login rules, counted nothing (08 6.2 and 13).
+    ('step_up_required', 'password_locked') =>
+      l.problemStepUpRequiredPasswordLocked,
+    ('step_up_required', 'password_changed') =>
+      l.problemStepUpRequiredPasswordChanged,
+
     ('channel_read_only', 'channel_archived') =>
       l.problemChannelReadOnlyChannelArchived,
     ('agent_invocation_denied', 'project_not_ready') =>

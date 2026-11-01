@@ -661,7 +661,11 @@ type ClientInterface interface {
 	// active `step_up` key (Windows, 08 6.2); a device with a `step_up` key, a share extension
 	// session and a `cli` device get `403 forbidden` with reason `step_up_not_possible`.
 	// `X-Console-Request` applies only to a request authenticated by the console cookie; an
-	// app sends its DPoP token without it. Only a console session gets a new cookie.
+	// app sends its DPoP token without it. Only a console session gets a new cookie. A wrong
+	// password or code is `401 step_up_required` and counts toward `auth.step_up_fail_limit`;
+	// while the password path of the account is locked the answer is `401 step_up_required`
+	// with reason `password_locked`, and for a password changed during the attempt with
+	// reason `password_changed`; neither counts (08 6.2 and 13).
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -674,7 +678,11 @@ type ClientInterface interface {
 	// active `step_up` key (Windows, 08 6.2); a device with a `step_up` key, a share extension
 	// session and a `cli` device get `403 forbidden` with reason `step_up_not_possible`.
 	// `X-Console-Request` applies only to a request authenticated by the console cookie; an
-	// app sends its DPoP token without it. Only a console session gets a new cookie.
+	// app sends its DPoP token without it. Only a console session gets a new cookie. A wrong
+	// password or code is `401 step_up_required` and counts toward `auth.step_up_fail_limit`;
+	// while the password path of the account is locked the answer is `401 step_up_required`
+	// with reason `password_locked`, and for a password changed during the attempt with
+	// reason `password_changed`; neither counts (08 6.2 and 13).
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -5303,7 +5311,11 @@ func (c *Client) CompleteStepUpWithPasskey(ctx context.Context, params *Complete
 // active `step_up` key (Windows, 08 6.2); a device with a `step_up` key, a share extension
 // session and a `cli` device get `403 forbidden` with reason `step_up_not_possible`.
 // `X-Console-Request` applies only to a request authenticated by the console cookie; an
-// app sends its DPoP token without it. Only a console session gets a new cookie.
+// app sends its DPoP token without it. Only a console session gets a new cookie. A wrong
+// password or code is `401 step_up_required` and counts toward `auth.step_up_fail_limit`;
+// while the password path of the account is locked the answer is `401 step_up_required`
+// with reason `password_locked`, and for a password changed during the attempt with
+// reason `password_changed`; neither counts (08 6.2 and 13).
 //
 // Takes any type of body and a specified content type.
 //
@@ -5326,7 +5338,11 @@ func (c *Client) StepUpWithPasswordWithBody(ctx context.Context, params *StepUpW
 // active `step_up` key (Windows, 08 6.2); a device with a `step_up` key, a share extension
 // session and a `cli` device get `403 forbidden` with reason `step_up_not_possible`.
 // `X-Console-Request` applies only to a request authenticated by the console cookie; an
-// app sends its DPoP token without it. Only a console session gets a new cookie.
+// app sends its DPoP token without it. Only a console session gets a new cookie. A wrong
+// password or code is `401 step_up_required` and counts toward `auth.step_up_fail_limit`;
+// while the password path of the account is locked the answer is `401 step_up_required`
+// with reason `password_locked`, and for a password changed during the attempt with
+// reason `password_changed`; neither counts (08 6.2 and 13).
 //
 // Takes a body of the `application/json` content type.
 //
@@ -24470,79 +24486,6 @@ func NewStartRunRequestWithBody(server string, runId RunIdPath, contentType stri
 	}
 
 	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewListRunStepsRequest constructs an http.Request for the ListRunSteps method
-func NewListRunStepsRequest(server string, runId RunIdPath, params *ListRunStepsParams) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "run_id", runId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/runs/%s/steps", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-		// queryValues collects non-styled parameters (passthrough, JSON)
-		// that are safe to round-trip through url.Values.Encode().
-		queryValues := queryURL.Query()
-		// rawQueryFragments collects pre-encoded query fragments from
-		// styled parameters, preserving literal commas as delimiters
-		// per the OpenAPI spec (e.g. "color=blue,black,brown").
-		var rawQueryFragments []string
-
-		if params.Cursor != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if params.Limit != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if encoded := queryValues.Encode(); encoded != "" {
-			rawQueryFragments = append(rawQueryFragments, encoded)
-		}
-		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
 
 	return req, nil
 }
