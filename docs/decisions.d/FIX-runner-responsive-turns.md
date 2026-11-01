@@ -35,6 +35,10 @@ itself.
 | D-FIX-runner-responsive-turns-6 | 2026-11-01 | A `result` with an error still closes stdin at once (the recovery of 18.9 stays as it is), which ends running background work. | Keeping the process after an error would need a recovery that cannot restart the CLI; out of the scope of this fix. |
 | D-FIX-runner-responsive-turns-7 | 2026-11-01 | `build_environment` sets `CLAUDE_PRODUCT_RUN=1` in every turn's environment, in both modes, independent of the runner's own environment. Place: `environment.py`; normative text 09 18.2 "Environment". | It is the marker by which user-level hooks recognise a product conversation and let its turn end; set by the runner, it needs no deploy step and survives the allow list. It is no secret and widens nothing a turn may do. |
 
+Addendum of 2026-11-01 to D-FIX-runner-responsive-turns-6: live, the pinned CLI kept a process
+with background work for about ten minutes after its stdin ended, so a failed turn held the run
+and its follow-ups that long. docs/decisions.d/FIX-runner-auth-failed-held.md bounds that wait.
+
 Limits (not built, recorded for a later ticket):
 
 - The prompt asks Claude Code not to wait in the foreground, but nothing enforces it: a turn that

@@ -81,7 +81,7 @@ from bothy_sdk.runs import RunHandle, is_run_ended
 from claude_code_runner.adoption import read_identity
 from claude_code_runner.attachments import followup_file_texts, followup_files_final
 from claude_code_runner.background import BackgroundWork
-from claude_code_runner.causes import cause
+from claude_code_runner.causes import cause, turn_end_cause
 from claude_code_runner.commandline import SessionChoice, build_argv, reported_model
 from claude_code_runner.failures import (
     ErrorKind,
@@ -286,6 +286,8 @@ class _Outcome:
     handled: bool = False
     compacted: bool = False
     """The process wrote ``system/compact_boundary`` (a compaction that reduced the context)."""
+    lost_tasks: int = 0
+    """Background tasks still running when the process ended after a failed turn."""
 
 
 class RunTurn:
@@ -323,6 +325,11 @@ class RunTurn:
         self.background = BackgroundWork()
         """The background work of the current process (09 18.5, FIX-runner-responsive-turns)."""
         self._held_logged = False
+        self._failed_at: float | None = None
+        """When the current process wrote a ``result`` with an error (FIX-runner-auth-failed-held).
+
+        From then on the process gets ``runner.stop_grace`` to end before it is stopped."""
+        self._lost_tasks = 0
         self.process: Turn | None = None
         self.phase = "starting"  # starting, open, closed, ended
         self.attempt = _Attempt()
@@ -428,7 +435,10 @@ class RunTurn:
                 if isinstance(action, Fail):
                     if attempt.kind == "compaction":
                         await self._box_note("context_compacted", "failed", None)
-                    await self._fail(action.reason, action.errors, end.exit_label)
+                    summary = None
+                    if attempt.kind == "turn":
+                        summary = turn_end_cause(action.reason, outcome.lost_tasks)
+                    await self._fail(action.reason, action.errors, end.exit_label, summary=summary)
                     return
                 next_attempt = await self._recover(action, outcome)
                 if next_attempt is None:
@@ -621,8 +631,7 @@ class RunTurn:
             await self._fail("runtime_error", (), "start_failed")
             return None
         self.process = process
-        self.background = BackgroundWork()
-        self._held_logged = False
+        self._reset_process_state()
         # The kind is fixed here (12 f 4); the answers of earlier processes stay known (12 f 2).
         self.ledger = TurnLedger.begin(attempt.kind, stream_start, self.ledger)
         identity = await asyncio.to_thread(read_identity, process.pid, self.cfg.cli_probe_timeout)
@@ -664,11 +673,28 @@ class RunTurn:
                 stderr=_read_from(process.paths.stderr, stderr_start),
                 exit_label=process.exit_label(),
             )
-            return _Outcome(evidence, self._worked, compacted=ledger.compacted)
+            return _Outcome(
+                evidence, self._worked, compacted=ledger.compacted, lost_tasks=self._lost_work()
+            )
         finally:
             self.process = None
             if self.phase != "ended":
                 self.phase = "starting"
+
+    def _reset_process_state(self) -> None:
+        """The per-process state of a new turn process (background work, failed turn)."""
+        self.background = BackgroundWork()
+        self._held_logged = False
+        self._failed_at = None
+        self._lost_tasks = 0
+
+    def _lost_work(self) -> int:
+        """The background tasks a process ended with after a failed turn; their steps end."""
+        if self._failed_at is None:
+            return 0
+        if self.live is not None and self.ledger.kind == "turn":
+            self.live.end_open_tasks()  # its background work ended with the process
+        return self._lost_tasks
 
     async def _write_inputs(self, process: Turn) -> None:
         """The inputs of a turn process, then the held follow-ups (notes 4 c and d, 8 b).
@@ -755,6 +781,9 @@ class RunTurn:
             if own and kind == "result" and not is_success(message):
                 # A failed turn absorbs nothing more: stdin closes now, and the follow-ups
                 # without echo go to the next process of a recovery (notes 4 d and 5).
+                if self._failed_at is None:
+                    self._failed_at = self.monotonic()
+                    self._lost_tasks = len(self.background.running)
                 await self._close_stdin(group)
             elif own and kind == "result":
                 await self._idle(group, last_result_at)
@@ -767,6 +796,17 @@ class RunTurn:
             _log("run_ended_by_server", **self.ids)
         if (self.server_ended or self.stop_reason is not None) and self.stopping is None:
             # Also a stop that came while this process was being started (note 6 d).
+            self._stop_group(process)
+            return
+        if (
+            self._failed_at is not None
+            and self.stopping is None
+            and self.monotonic() - self._failed_at >= self.cfg.stop_grace
+        ):
+            # The CLI keeps a process with background work after its stdin ended; a failed turn
+            # must not hold the run open for that work (FIX-runner-auth-failed-held).
+            self._lost_tasks = len(self.background.running)
+            _log("turn_stopped_after_error", background_tasks=self._lost_tasks, **self.ids)
             self._stop_group(process)
             return
         if self.phase == "open" and self.background.holds(

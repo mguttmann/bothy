@@ -13,6 +13,11 @@ open: while a task runs, while a turn of a process that had background work runs
 quiet window after its last line, so the notification turn that follows the end of the last task
 is not lost.
 
+The end of stdin does not always end the process at once: on 2026-11-01 the pinned CLI kept one
+with running background work for about ten minutes after a failed turn closed its stdin, so
+`claude_code_runner.runturn` stops a process that outlives an error ``result`` by
+``runner.stop_grace`` (FIX-runner-auth-failed-held).
+
 Examples:
     >>> work = BackgroundWork()
     >>> work.apply({"type": "system", "subtype": "background_tasks_changed",
