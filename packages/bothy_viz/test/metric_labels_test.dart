@@ -209,6 +209,7 @@ void main() {
     const de = Locale('de');
     final texts = VizTexts(await AppLocalizations.delegate.load(de), de);
     String rate(api.StatsMetric m, String d) => texts.metricLabel(m, d);
+    // language-check: off
     expect(
       rate(api.StatsMetric.toolCalls, 'completed'),
       'Werkzeugaufrufe, abgeschlossen',
@@ -229,5 +230,6 @@ void main() {
       rate(api.StatsMetric.messagesCreated, 'human'),
       'Nachrichten, Mensch',
     );
+    // language-check: on
   });
 }

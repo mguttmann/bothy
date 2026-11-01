@@ -14,7 +14,7 @@ import 'viz_texts.dart';
 ///
 /// Each line is cut to one line with an ellipsis; the full text of both is the tooltip, which
 /// shows on hover (desktop, web) and on long press (touch). The label carries no semantics of
-/// its own: the card or row around it says the text once ([VizRunLabelText.semantics]).
+/// its own: the card or row around it says the text once ([VizRunLabelText.parts]).
 class VizRunLabelText extends StatelessWidget {
   /// Creates the label of [label]; [titleStyle] replaces the style of the main text.
   const VizRunLabelText({super.key, required this.label, this.titleStyle});
