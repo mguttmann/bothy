@@ -13,5 +13,4 @@ instance="legacy-keychain-foreign-$$-$(date +%s)"
 account="instance/$instance/database_key"
 trap 'security delete-generic-password -s flutter_secure_storage_service -a "$account" >/dev/null 2>&1 || true' EXIT
 security add-generic-password -s flutter_secure_storage_service -a "$account" -w old -T /usr/bin/true
-flutter test integration_test/legacy_keychain_test.dart -d macos \
-  --dart-define=BOTHY_FOREIGN_INSTANCE="$instance"
+flutter test integration_test/legacy_keychain_test.dart -d macos --dart-define=BOTHY_FOREIGN_INSTANCE="$instance"
