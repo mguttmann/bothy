@@ -273,7 +273,7 @@ func pairReport(cmd terminal.PairHost) domain.PairReport {
 		if dirs == nil {
 			dirs = []string{}
 		}
-		r.SessionUsers = append(r.SessionUsers, domain.ReportedSessionUser{OSUser: u.OSUser, Workdirs: dirs})
+		r.SessionUsers = append(r.SessionUsers, domain.ReportedSessionUser{OSUser: u.OSUser, Workdirs: dirs, OwnerAccount: u.OwnerAccount})
 	}
 	return r
 }
@@ -351,7 +351,7 @@ func (s *Service) checkConfirm(cmd terminal.ConfirmHost) (confirmBody, error) {
 		if err != nil {
 			return confirmBody{}, err
 		}
-		b.add = append(b.add, domain.SessionUserAssign{UserID: u.UserID, OSUser: name})
+		b.add = append(b.add, domain.SessionUserAssign{UserID: u.UserID, OSUser: name, OwnerAccount: u.OwnerAccount})
 	}
 	return b, nil
 }
@@ -393,6 +393,9 @@ func (s *Service) Confirm(ctx context.Context, a actor.Actor, cmd terminal.Confi
 		}
 		var err error
 		if b, err = s.checkConfirm(cmd); err != nil {
+			return err
+		}
+		if err := s.checkOwnerAccounts(ctx, a, b.add); err != nil {
 			return err
 		}
 		st, err := s.loadFor(ctx, cmd.HostID, cmd.IfMatch)
@@ -503,7 +506,7 @@ func (s *Service) confirmPlan(ctx context.Context, h domain.Host, b confirmBody)
 	if err != nil {
 		return domain.Plan{}, err
 	}
-	return domain.PlanAssignmentsAt(pointerSessionUsers, domain.ReportedNames(h.ReportedUsers), rows, nil, b.add)
+	return domain.PlanAssignmentsAt(pointerSessionUsers, h.ReportedUsers, rows, nil, b.add)
 }
 
 // confirmAttrs are the common details of the allow entry confirm (24 section 10.1).

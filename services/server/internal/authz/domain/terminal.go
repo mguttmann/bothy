@@ -173,6 +173,9 @@ type SessionUserFact struct {
 	HostID, HostSessionUserID ids.ID
 	OSUser                    string
 	Reported                  bool
+	// OwnerAccount marks an assignment of the owner account of the host (ADR 0073); Reported then
+	// also requires the host to report the name as its owner account.
+	OwnerAccount bool
 }
 
 // TerminalGuardFacts are the facts of the guards of terminal.open and terminal.attach: the
@@ -195,7 +198,8 @@ type TerminalGuardFacts struct {
 //  3. SR11 (I6): on a host with a personal LLM login only its holder passes, other owners
 //     included, else i6_holder_only;
 //  4. SR12: without a valid assignment to a session user the host reports, owners included,
-//     terminal_no_session_user.
+//     terminal_no_session_user; an assignment of the owner account (ADR 0073) only for an
+//     effective owner, else terminal_owner_account_owner_only.
 //
 // The guards after SR12 are TerminalLiveGuard: terminal_session_limit (M2-46), host_not_active and
 // terminal_profile_unknown (M2-44), in the order of 24 section 6.1 step 2.
@@ -213,6 +217,9 @@ func TerminalGuard(f TerminalGuardFacts) (Reason, bool) {
 	}
 	if f.SessionUser == nil || !f.SessionUser.Reported || f.SessionUser.HostID != h.ID {
 		return ReasonTerminalNoSessionUser, false
+	}
+	if f.SessionUser.OwnerAccount && !f.Owner {
+		return ReasonTerminalOwnerAccountOwnerOnly, false
 	}
 	return "", true
 }

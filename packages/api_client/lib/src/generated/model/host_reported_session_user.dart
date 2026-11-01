@@ -14,6 +14,7 @@ part 'host_reported_session_user.g.dart';
 /// Properties:
 /// * [osUser] - Operating system user name from `host_service.session_users`.
 /// * [workdirs] - Display names of the working directories of this session user in `host_service.claude_workdirs` after check HD7, in their order (a directory listed under two session users is dropped from both lists); empty means no `claude` profile for this session user. A client sends the index into its own list, never a path; the host service resolves the index in exactly this list (24, 2.2 and 5.3).
+/// * [ownerAccount] - Present and `true` for the owner account of the host (`host_service.owner_account`, ADR 0073, 24 section 2.4): the account the host service itself runs as, with administrator rights. An assignment of this name needs `owner_account = true`.
 @BuiltValue()
 abstract class HostReportedSessionUser
     implements Built<HostReportedSessionUser, HostReportedSessionUserBuilder> {
@@ -24,6 +25,10 @@ abstract class HostReportedSessionUser
   /// Display names of the working directories of this session user in `host_service.claude_workdirs` after check HD7, in their order (a directory listed under two session users is dropped from both lists); empty means no `claude` profile for this session user. A client sends the index into its own list, never a path; the host service resolves the index in exactly this list (24, 2.2 and 5.3).
   @BuiltValueField(wireName: r'workdirs')
   BuiltList<String> get workdirs;
+
+  /// Present and `true` for the owner account of the host (`host_service.owner_account`, ADR 0073, 24 section 2.4): the account the host service itself runs as, with administrator rights. An assignment of this name needs `owner_account = true`.
+  @BuiltValueField(wireName: r'owner_account')
+  bool? get ownerAccount;
 
   HostReportedSessionUser._();
 
@@ -65,6 +70,13 @@ class _$HostReportedSessionUserSerializer
       object.workdirs,
       specifiedType: const FullType(BuiltList, [FullType(String)]),
     );
+    if (object.ownerAccount != null) {
+      yield r'owner_account';
+      yield serializers.serialize(
+        object.ownerAccount,
+        specifiedType: const FullType(bool),
+      );
+    }
   }
 
   @override
@@ -105,6 +117,14 @@ class _$HostReportedSessionUserSerializer
             specifiedType: const FullType(BuiltList, [FullType(String)]),
           ) as BuiltList<String>;
           result.workdirs.replace(valueDes);
+          break;
+        case r'owner_account':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(bool),
+          ) as bool?;
+          if (valueDes == null) continue;
+          result.ownerAccount = valueDes;
           break;
         default:
           unhandled.add(key);

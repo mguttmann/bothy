@@ -81,6 +81,26 @@ func revCases() []revCase {
 			w.must(w.robin, http.MethodPost, "/owners/"+w.sam.PrincipalID+"/revoke", revBody(), http.StatusNoContent)
 			return l, []live{keep}
 		}},
+		{name: "owner_removed_owner_account", reason: domain.CloseAccessRevoked, action: "owner.remove", run: func(w *world) (live, []live) {
+			// ADR 0073, D-OA-7: Sam, a second owner, binds himself to the owner account of R4, which is
+			// assigned to him and on which he keeps a grant; losing the owner role ends that session
+			// although SR10 still allows it, and Robin's separate session stays.
+			w.revAddOwner(w.sam)
+			reported := []any{map[string]any{"os_user": "term-owner", "workdirs": []string{}, "owner_account": true},
+				map[string]any{"os_user": "term-robin", "workdirs": []string{}}}
+			k4, r4 := w.pairedHost("r4", w.sam.PrincipalID, reported, map[string]string{w.robin.PrincipalID: "term-robin"})
+			w.grant("user", w.sam.PrincipalID, r4.String(), "")
+			get := w.must(w.sam, http.MethodGet, "/hosts/"+r4.String(), nil, http.StatusOK)
+			w.syncClock()
+			harness.MustDo(w.t, w.sam, harness.Request{Method: http.MethodPatch, Path: "/hosts/" + r4.String(),
+				Header: http.Header{"If-Match": []string{get.Header.Get("ETag")}},
+				Body:   revBody("add_session_users", []any{map[string]any{"user_id": w.sam.PrincipalID, "os_user": "term-owner", "owner_account": true}})},
+				http.StatusOK)
+			h4 := w.connect(r4, k4, reported)
+			l, keep := w.start(w.sam, r4, h4), w.start(w.robin, r4, h4)
+			w.must(w.robin, http.MethodPost, "/owners/"+w.sam.PrincipalID+"/revoke", revBody(), http.StatusNoContent)
+			return l, []live{keep}
+		}},
 		{name: "user_disabled", reason: domain.CloseUserDisabled, action: "user.disable", run: func(w *world) (live, []live) {
 			l, keep := w.start(w.alex, w.r1, w.h1), w.start(w.robin, w.r1, w.h1)
 			w.must(w.robin, http.MethodPost, "/users/"+w.alex.PrincipalID+"/disable", revBody(), http.StatusOK)

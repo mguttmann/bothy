@@ -312,6 +312,7 @@ reveals nothing (never with `404`).
 | `i6_holder_only` | `forbidden` | SR11: host with a personal LLM login, the principal is not its holder; problem code `terminal_denied` with `reason: i6_holder_only` |
 | `i6_violation` | `invariant_violation` | the change would violate I6; problem code `i6_violation` (`409`) |
 | `terminal_no_session_user` | `forbidden` | SR12: the person has no valid mapping on the host to an own session user that the host reports, even as an owner; problem code `terminal_denied` with `reason: no_session_user` |
+| `terminal_owner_account_owner_only` | `forbidden` | SR12 with ADR 0073: the person's session user on the host is the owner account (the instance owner's own account with administrator rights), and the person is no active owner; problem code `terminal_denied` with `reason: owner_account_owner_only` |
 | `terminal_profile_unknown` | `forbidden` | profile not in `hosts.reported_profiles`, or an index of no working directory of the own session user (`hosts.reported_session_users`); problem code `terminal_denied` with `reason: profile_unknown` |
 | `terminal_session_limit` | `forbidden` | `terminal.max_sessions_per_person` or `terminal.max_sessions_per_host` reached; problem code `terminal_denied` with `reason: session_limit` |
 | `terminal_step_up_not_fresh` | `step_up_required` | step-up older than `terminal.step_up_max_age`, already consumed or (console) not by passkey; in the console the quick reattach without step-up never applies |
@@ -424,7 +425,7 @@ Order and reason:
 
 Guard rules of the terminal in step 9 (M2-40), in this order, the first violation decides: SR10
 server host (`terminal_server_host_owner_only`), SR10 assignee (`terminal_not_host_assignee`), SR11
-(`i6_holder_only`), SR12 (`terminal_no_session_user`). Reason: the order of section 5 and
+(`i6_holder_only`), SR12 (`terminal_no_session_user`, then `terminal_owner_account_owner_only`). Reason: the order of section 5 and
 [24-terminal.md](24-terminal.md), section 6.1 step 2; a server host is closed to every non-owner,
 assigned or not, so its reason names what would help (docs/DECISIONS.md D-M2-40-3). The guard rules
 run after the step-up: whoever has no fresh step-up learns `step_up_required` first. The atom
@@ -776,6 +777,16 @@ assignment that would violate this (`409 conflict` with `reason: session_user_ta
 and every end of one raises the permission version; the end terminates the person's sessions on the host
 in the same transaction (`access_revoked`), and so does a report of the host that no longer lists
 that name. SR12 replaces neither SR10 nor SR11 and applies in addition.
+
+Owner account (ADR 0073, FEAT-terminal-admin-user): a host in the owner account mode reports its
+one session user with `owner_account = true`; it is the instance owner's own account with
+administrator rights. An assignment of it carries `host_session_users.owner_account = true`; only an
+active owner creates one, only for himself (`403 forbidden` with `reason: owner_account_owner_only`),
+and the flag must equal the report (`400 validation_failed`). The assignment counts only while the
+host reports the name with the same flag (a report with another flag ends its sessions like a
+vanished name), and `terminal.open` and `terminal.attach` with it additionally require an active
+owner, otherwise `terminal_owner_account_owner_only`. Losing the owner role ends the sessions in the
+owner account (`access_revoked`).
 Reason: this way the credentials of a session user belong to exactly one person; a shared
 session user would make every subscription login in it usable for all terminal users of the host
 ([24-terminal.md](24-terminal.md), sections 2.2 and 7.4; ADR 0068).

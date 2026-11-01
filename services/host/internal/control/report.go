@@ -39,7 +39,7 @@ func (s *ReportSource) Get() (startup.Report, bool) {
 // sameReport compares two reports member by member.
 func sameReport(a, b startup.Report) bool {
 	return slices.Equal(a.Profiles, b.Profiles) && slices.EqualFunc(a.SessionUsers, b.SessionUsers, func(x, y startupUser) bool {
-		return x.OSUser == y.OSUser && slices.Equal(x.Workdirs, y.Workdirs)
+		return x.OSUser == y.OSUser && x.OwnerAccount == y.OwnerAccount && slices.Equal(x.Workdirs, y.Workdirs)
 	}) && slices.Equal(a.Doctor, b.Doctor) && a.IsServerHost == b.IsServerHost && a.RequireLocalConfirm == b.RequireLocalConfirm &&
 		a.OSVersion == b.OSVersion
 }

@@ -623,6 +623,8 @@ var notEffectiveCauses = map[domain.Reason]string{
 	domain.ReasonTerminalServerHostOwnerOnly: previewtext.CauseServerHost,
 	domain.ReasonTerminalNotHostAssignee:     previewtext.CauseNotAssignee,
 	domain.ReasonTerminalNoSessionUser:       previewtext.CauseNoSessionUser,
+	// The owner account of a host is no usable session user for a person who is no owner (ADR 0073).
+	domain.ReasonTerminalOwnerAccountOwnerOnly: previewtext.CauseNoSessionUser,
 }
 
 // denied returns the guard of SR10 or SR12 that would deny person on the host h (an active owner
@@ -640,7 +642,8 @@ func (p *previewer) denied(ctx context.Context, person ids.ID, h authz.HostFacts
 		Host: hostGuardFacts(h)}
 	for _, u := range users {
 		if u.HostID == h.ID {
-			f.SessionUser = &domain.SessionUserFact{HostID: u.HostID, HostSessionUserID: u.HostSessionUserID, OSUser: u.OSUser, Reported: u.Reported}
+			f.SessionUser = &domain.SessionUserFact{HostID: u.HostID, HostSessionUserID: u.HostSessionUserID, OSUser: u.OSUser, Reported: u.Reported,
+				OwnerAccount: u.OwnerAccount}
 		}
 	}
 	return domain.TerminalNotEffective(f), nil

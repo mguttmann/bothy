@@ -51,6 +51,9 @@ type Request struct {
 	SearchList []string `json:"search_list"`
 	// Declaration is the declaration in use (none, personal, organization or unknown).
 	Declaration string `json:"declaration"`
+	// OwnerAccount marks the owner account mode (ADR 0073): the session user is the only one, so
+	// the walks of HD11 that look for entries of other session users are skipped.
+	OwnerAccount bool `json:"owner_account,omitempty"`
 	// Workdirs are the configured working directories of the session user, in order.
 	Workdirs     []string    `json:"workdirs"`
 	ForeignHomes []NamedHome `json:"foreign_homes"`
@@ -252,15 +255,19 @@ func checkPlaces(env HelperEnv, req Request, others []hostos.Subject) (string, [
 	if _, err := env.Resolver.Resolve(env.Self.Home); err != nil {
 		return CodeHomeUnresolvable, codes
 	}
+	// In the owner account mode there is no other session user, so no chain entry can belong to
+	// or be writable by one; walking a real ~/.claude (hundreds of thousands of entries) would only
+	// make the helper miss its bound.
+	walk := !noOtherSessionUser(req, others)
 	code := ""
 	for _, p := range []string{env.Self.Home, env.orgConfigDir()} {
-		if !placeOK(env, p, others) {
+		if !placeOK(env, p, others, walk) {
 			code = CodeSharedLocation
 			break
 		}
 	}
 	for i, w := range req.Workdirs {
-		if !placeOK(env, w, others) {
+		if !placeOK(env, w, others, walk) {
 			codes[i] = CodeSharedLocation
 		}
 	}
@@ -269,19 +276,25 @@ func checkPlaces(env HelperEnv, req Request, others []hostos.Subject) (string, [
 
 // placeOK applies the rule of a place of a session user to p; a missing folder passes (it is not
 // offered, HD7).
-func placeOK(env HelperEnv, p string, others []hostos.Subject) bool {
+func placeOK(env HelperEnv, p string, others []hostos.Subject, walk bool) bool {
 	r, err := env.Resolver.Resolve(p)
 	if err != nil {
 		return true
 	}
-	return placeOfSessionUserOK(env, r, others)
+	return placeOfSessionUserOK(env, r, others, walk)
+}
+
+// noOtherSessionUser reports the owner account mode with no other session user: the walks for
+// entries of other session users cannot find anything.
+func noOtherSessionUser(req Request, others []hostos.Subject) bool {
+	return req.OwnerAccount && len(req.Others) == 0 && len(others) == 0
 }
 
 // placeOfSessionUserOK applies the rule of a place of a session user (24 2.2 point 6): the
 // place, every folder on the way, every configured component, every link with its folder and the
 // chain files in those folders belong to no other session user and are writable by none; the
-// place itself is not readable by another.
-func placeOfSessionUserOK(env HelperEnv, r hostos.Resolved, others []hostos.Subject) bool {
+// place itself is not readable by another. walk false skips the chain files (owner account mode).
+func placeOfSessionUserOK(env HelperEnv, r hostos.Resolved, others []hostos.Subject, walk bool) bool {
 	objects := slices.Concat(r.Chain, r.Components, []string{r.Final})
 	folders := slices.Concat(r.Chain, []string{r.Final})
 	for _, l := range r.Links {
@@ -294,12 +307,8 @@ func placeOfSessionUserOK(env HelperEnv, r hostos.Resolved, others []hostos.Subj
 			return false
 		}
 	}
-	for _, d := range folders {
-		for _, name := range ChainFiles {
-			if !chainEntryOK(env, filepath.Join(d, name), others, 0) {
-				return false
-			}
-		}
+	if walk && !chainFilesOK(env, folders, others) {
+		return false
 	}
 	final, err := env.Security.Lstat(r.Final)
 	if err != nil {
@@ -308,6 +317,18 @@ func placeOfSessionUserOK(env HelperEnv, r hostos.Resolved, others []hostos.Subj
 	for _, s := range others {
 		if hostos.Readable(final, s) {
 			return false
+		}
+	}
+	return true
+}
+
+// chainFilesOK checks the chain files in each of folders.
+func chainFilesOK(env HelperEnv, folders []string, others []hostos.Subject) bool {
+	for _, d := range folders {
+		for _, name := range ChainFiles {
+			if !chainEntryOK(env, filepath.Join(d, name), others, 0) {
+				return false
+			}
 		}
 	}
 	return true
@@ -380,6 +401,10 @@ func linkTargetOK(env HelperEnv, p string, others []hostos.Subject, depth int) b
 // entry_scan_timeout when req.EntryScanTimeout passes first (24 2.2 "Check of the entries").
 func ScanEntries(ctx context.Context, env HelperEnv, req Request) string {
 	others := subjects(env.Users, req.Others)
+	if noOtherSessionUser(req, others) {
+		// No entry can belong to another session user (owner account mode, ADR 0073).
+		return ""
+	}
 	ids := map[string]bool{}
 	for _, s := range others {
 		ids[s.ID] = true

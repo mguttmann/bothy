@@ -43,6 +43,8 @@ type tw struct {
 	starts  []string
 	cmds    []hostos.Cmd
 	mu      sync.Mutex
+	// wrapHelper, when set, changes the operating system the helper sees (a counting fake).
+	wrapHelper func(HelperEnv) HelperEnv
 }
 
 func (x *tw) setPeer(user string, err error) {
@@ -113,13 +115,17 @@ func (x *tw) helperEnv(user string) HelperEnv {
 	if err != nil {
 		x.t.Fatal(err)
 	}
-	return HelperEnv{
+	env := HelperEnv{
 		GOOS: x.env.GOOS, Self: a, Users: x.w.Users(), Security: x.w.Security(), Resolver: x.w.As(user), Files: x.w.As(user),
 		Probe: x.w.As(user).Probe(), Clock: x.clk, Runner: &hostostest.Runner{Answer: func(c hostos.Cmd) (hostos.Output, error) {
 			return x.fakeClaude(user, c), nil
 		}},
 		LoginEnv: func(context.Context, time.Duration) (bool, string, error) { return x.token[user], x.confDir[user], nil },
 	}
+	if x.wrapHelper != nil {
+		env = x.wrapHelper(env)
+	}
+	return env
 }
 
 // fakeClaude answers claude auth status like testdata/fakeclaude with the fixture configured

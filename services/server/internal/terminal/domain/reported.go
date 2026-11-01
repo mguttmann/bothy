@@ -14,10 +14,12 @@ type Profile struct {
 
 // ReportedSessionUser is one entry of hosts.reported_session_users (schema
 // host_reported_session_users.v1): a name of host_service.session_users with the display names of
-// its working directories of the profile claude; never a path.
+// its working directories of the profile claude; never a path. OwnerAccount marks the account of
+// the owner account mode (ADR 0073), absent otherwise.
 type ReportedSessionUser struct {
-	OSUser   string   `json:"os_user"`
-	Workdirs []string `json:"workdirs"`
+	OSUser       string   `json:"os_user"`
+	Workdirs     []string `json:"workdirs"`
+	OwnerAccount bool     `json:"owner_account,omitempty"`
 }
 
 // DoctorCheck is one entry of hosts.reported_doctor (schema host_doctor.v1): the result and code

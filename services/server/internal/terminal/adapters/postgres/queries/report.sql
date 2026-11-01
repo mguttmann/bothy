@@ -9,7 +9,7 @@ UPDATE hosts SET reported_session_users = @reported_session_users::jsonb, versio
 -- name: ValidSessionUsersOfUser :many
 -- The valid assignments of one person with the names their hosts report, ascending by host
 -- (SR12 in the rights state).
-SELECT su.id, su.host_id, su.os_user, h.reported_session_users
+SELECT su.id, su.host_id, su.os_user, su.owner_account, h.reported_session_users
 FROM host_session_users su
 JOIN hosts h ON h.id = su.host_id
 WHERE su.user_id = @user_id AND su.revoked_at IS NULL

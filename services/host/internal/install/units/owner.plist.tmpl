@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Host service bothy-host in the owner account mode (ADR 0073), written by bothy-host install
+     --owner-account as a LaunchAgent of the account itself, without administrator rights.
+     KeepAlive restarts only a crash; an exit with a code, 78 included, stays. -->
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>{{.Label}}</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>{{.Binary}}</string>
+		<string>run</string>
+		<string>--config</string>
+		<string>{{.Config}}</string>
+	</array>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>KeepAlive</key>
+	<dict>
+		<key>Crashed</key>
+		<true/>
+	</dict>
+	<key>ProcessType</key>
+	<string>Background</string>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>GOTRACEBACK</key>
+		<string>crash</string>
+	</dict>
+	<key>Umask</key>
+	<integer>63</integer>
+</dict>
+</plist>

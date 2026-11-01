@@ -13,6 +13,7 @@ part 'host_session_user_assign.g.dart';
 /// Properties:
 /// * [userId] - UUIDv7 (RFC 9562), lowercase canonical form.
 /// * [osUser] - Operating system user name from `host_service.session_users`; at most `host.os_user_max_chars` characters; never a path.
+/// * [ownerAccount] - Explicit opt-in for the owner account of the host (ADR 0073, 24 section 2.4): the existing account of the instance owner with administrator rights that the host service runs as. Must be `true` exactly when the host reports the name with `owner_account = true` (otherwise `400 validation_failed` with `errors[].code` `owner_account_opt_in_required` or `owner_account_not_on_host` at `owner_account`), and only an active owner may assign it, only to himself (otherwise `403 forbidden` with `reason: owner_account_owner_only`).
 @BuiltValue()
 abstract class HostSessionUserAssign
     implements Built<HostSessionUserAssign, HostSessionUserAssignBuilder> {
@@ -24,6 +25,10 @@ abstract class HostSessionUserAssign
   @BuiltValueField(wireName: r'os_user')
   String get osUser;
 
+  /// Explicit opt-in for the owner account of the host (ADR 0073, 24 section 2.4): the existing account of the instance owner with administrator rights that the host service runs as. Must be `true` exactly when the host reports the name with `owner_account = true` (otherwise `400 validation_failed` with `errors[].code` `owner_account_opt_in_required` or `owner_account_not_on_host` at `owner_account`), and only an active owner may assign it, only to himself (otherwise `403 forbidden` with `reason: owner_account_owner_only`).
+  @BuiltValueField(wireName: r'owner_account')
+  bool? get ownerAccount;
+
   HostSessionUserAssign._();
 
   factory HostSessionUserAssign([
@@ -31,7 +36,8 @@ abstract class HostSessionUserAssign
   ]) = _$HostSessionUserAssign;
 
   @BuiltValueHook(initializeBuilder: true)
-  static void _defaults(HostSessionUserAssignBuilder b) => b;
+  static void _defaults(HostSessionUserAssignBuilder b) =>
+      b..ownerAccount = false;
 
   @BuiltValueSerializer(custom: true)
   static Serializer<HostSessionUserAssign> get serializer =>
@@ -64,6 +70,13 @@ class _$HostSessionUserAssignSerializer
       object.osUser,
       specifiedType: const FullType(String),
     );
+    if (object.ownerAccount != null) {
+      yield r'owner_account';
+      yield serializers.serialize(
+        object.ownerAccount,
+        specifiedType: const FullType(bool),
+      );
+    }
   }
 
   @override
@@ -104,6 +117,14 @@ class _$HostSessionUserAssignSerializer
             specifiedType: const FullType(String),
           ) as String;
           result.osUser = valueDes;
+          break;
+        case r'owner_account':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(bool),
+          ) as bool?;
+          if (valueDes == null) continue;
+          result.ownerAccount = valueDes;
           break;
         default:
           unhandled.add(key);

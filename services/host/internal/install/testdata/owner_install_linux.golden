@@ -1,0 +1,11 @@
+mkdir /home/alex/.config/bothy-host 0700 alex
+mkdir /home/alex/.local/lib/bothy-host 0755 alex
+copy /tmp/download/bothy-host -> /home/alex/.local/lib/bothy-host/bothy-host 0755 alex
+mkdir /home/alex/.local/state/bothy-host 0700 alex
+mkdir /home/alex/.local/state/bothy-host/run 0700 alex
+write /home/alex/.config/bothy-host/config.yaml 0600 alex (204 bytes)
+mkdir /home/alex/.config/systemd/user 0755 alex
+write /home/alex/.config/systemd/user/bothy-host.service 0644 alex (619 bytes)
+run /usr/bin/systemctl --user daemon-reload
+run /usr/bin/systemctl --user enable bothy-host.service
+run /usr/bin/systemctl --user restart bothy-host.service

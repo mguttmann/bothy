@@ -47,7 +47,7 @@ func (h *Hosts) PairHost(ctx context.Context, req rest.PairHostRequestObject) (r
 			cmd.Profiles = append(cmd.Profiles, terminal.Profile{Name: p.Name, DisplayName: p.DisplayName, Kind: string(p.Kind)})
 		}
 		for _, u := range b.SessionUsers {
-			cmd.SessionUsers = append(cmd.SessionUsers, terminal.ReportedSessionUser{OSUser: u.OsUser, Workdirs: u.Workdirs})
+			cmd.SessionUsers = append(cmd.SessionUsers, terminal.ReportedSessionUser{OSUser: u.OsUser, Workdirs: u.Workdirs, OwnerAccount: isTrue(u.OwnerAccount)})
 		}
 	}
 	out, err := h.hosts.Pair(ctx, cmd)
@@ -73,7 +73,7 @@ func (h *Hosts) ConfirmHost(ctx context.Context, req rest.ConfirmHostRequestObje
 		}
 		if b.SessionUsers != nil {
 			for _, u := range *b.SessionUsers {
-				cmd.SessionUsers = append(cmd.SessionUsers, terminal.SessionUserAssign{UserID: ids.ID(u.UserId), OSUser: u.OsUser})
+				cmd.SessionUsers = append(cmd.SessionUsers, terminal.SessionUserAssign{UserID: ids.ID(u.UserId), OSUser: u.OsUser, OwnerAccount: isTrue(u.OwnerAccount)})
 			}
 		}
 	}

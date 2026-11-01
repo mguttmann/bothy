@@ -89,7 +89,14 @@ type Env struct {
 	// InterfaceAddrs and LookupIP serve HD5.
 	InterfaceAddrs func() ([]net.IP, error)
 	LookupIP       func(ctx context.Context, host string) ([]net.IP, error)
+	// OwnerAccount is host_service.owner_account (ADR 0073), empty in the separate-user setup;
+	// CallerID is the uid of the running process, compared with that account (empty: not checked).
+	OwnerAccount string
+	CallerID     string
 }
+
+// ownerMode reports the owner account mode.
+func (e Env) ownerMode() bool { return e.OwnerAccount != "" }
 
 // helperGrace is the default HelperGrace, a protocol constant of the channel, not a product
 // window; it also covers the sudo probe of the helper.
@@ -121,6 +128,8 @@ var osUserPattern = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9_.-]*$`)
 
 // facts are the inputs that a new declaration re-evaluates without a new run.
 type facts struct {
+	// ownerAccount is host_service.owner_account: HD6 counts a login there as the owner's own.
+	ownerAccount   string
 	llm            map[string]LLMFacts
 	claudeBinEmpty bool
 	profiles       []config.Profile
@@ -150,7 +159,7 @@ func RunService(ctx context.Context, env Env) *Result {
 		r.res.Checks = append(r.res.Checks, CheckResult{Check: name})
 	}
 	r.hd1()
-	r.subjects = subjects(env.Users, r.users)
+	r.subjects = r.writers()
 	r.hd2()
 	r.hd4()
 	r.hd5(ctx)
@@ -160,6 +169,8 @@ func RunService(ctx context.Context, env Env) *Result {
 	r.placesForAll()
 	results := r.askHelpers(ctx)
 	r.aggregate(results)
+	r.ownerAccountWarnings()
+	r.facts.ownerAccount = env.OwnerAccount
 	r.res.facts = r.facts
 	r.res.ClaudeBin, r.res.SearchList = r.claudeBin, slices.Clone(r.search)
 	r.res.evaluate(env.Declaration)
@@ -208,6 +219,9 @@ func (r *run) hd1() {
 	} else if a.ID == "0" {
 		r.fail(HD1, CodePrivilegedUser)
 	}
+	if r.env.ownerMode() {
+		r.hd1OwnerAccount()
+	}
 	for i, u := range c.SessionUsers {
 		codes := r.sessionUserCodes(u, c.SessionUsers[:i])
 		for _, code := range codes {
@@ -225,7 +239,7 @@ func (r *run) sessionUserCodes(u string, earlier []string) []string {
 	if slices.ContainsFunc(earlier, func(o string) bool { return foldEq(u, o) }) {
 		codes = append(codes, CodeSessionUserDuplicate)
 	}
-	if foldEq(u, r.env.ServiceUser) {
+	if foldEq(u, r.env.ServiceUser) && !r.isOwnerAccount(u) {
 		codes = append(codes, CodeSessionUserIsService)
 	}
 	if slices.ContainsFunc(privilegedNames, func(n string) bool { return foldEq(n, u) }) {
@@ -242,6 +256,69 @@ func (r *run) sessionUserCodes(u string, earlier []string) []string {
 		codes = append(codes, CodePrivilegedUser)
 	}
 	return codes
+}
+
+// hd1OwnerAccount checks the owner account mode (ADR 0073, D-OA-9): the service runs as
+// host_service.owner_account and host_service.session_users is exactly that name. The mode itself
+// is a warning, so the console shows that sessions run in an administrator account.
+func (r *run) hd1OwnerAccount() {
+	c, name := r.env.Config, r.env.OwnerAccount
+	a, err := r.env.Users.Lookup(name)
+	switch {
+	case len(c.SessionUsers) != 1 || c.SessionUsers[0] != name, r.env.ServiceUser != name:
+		r.fail(HD1, CodeOwnerAccountMismatch)
+	case err == nil && r.env.CallerID != "" && a.ID != r.env.CallerID:
+		r.fail(HD1, CodeOwnerAccountMismatch)
+	}
+	r.add(HD1, Entry{Status: Warn, Code: CodeOwnerAccountMode})
+}
+
+// isOwnerAccount reports whether u is the account of the owner account mode.
+func (r *run) isOwnerAccount(u string) bool { return r.env.ownerMode() && u == r.env.OwnerAccount }
+
+// writers returns the accounts that must not write a place for all, the state directory or the
+// Docker socket: the session users, and in the owner account mode, where the only session user is
+// the owner of these places, every other person account of the host and everyone (D-OA-9).
+func (r *run) writers() []hostos.Subject {
+	if !r.env.ownerMode() {
+		return subjects(r.env.Users, r.users)
+	}
+	var names []string
+	if accs, err := r.env.Users.Accounts(); err == nil {
+		for _, a := range accs {
+			if a.Person && a.Name != r.env.OwnerAccount {
+				names = append(names, a.Name)
+			}
+		}
+	}
+	return append(subjects(r.env.Users, names), hostos.Subject{Name: "everyone", ID: "everyone"})
+}
+
+// ownerAccountWarnings turns the findings that refuse the owner account mode by design into
+// warnings with the same code (D-OA-9): administrator groups and sudo (HD2, HD3), the helper
+// reading the state of its own account (HD8), listable homes (HD9) and the protections of the helper
+// against its own account (HD10). HD4, the service part of HD8, the trust of the programs and the
+// peer check itself stay failures.
+func (r *run) ownerAccountWarnings() {
+	if !r.env.ownerMode() {
+		return
+	}
+	soft := map[string][]string{
+		HD2: nil, HD3: nil, HD9: nil, HD8: {CodeHelperReadsState},
+		HD10: {CodePeerCheckUnavailable, CodePtraceScopeLow, CodeHelperUnprotected},
+	}
+	for i := range r.res.Checks {
+		c := &r.res.Checks[i]
+		only, ok := soft[c.Check]
+		if !ok {
+			continue
+		}
+		for j := range c.Entries {
+			if only == nil || slices.Contains(only, c.Entries[j].Code) {
+				c.Entries[j].Status = Warn
+			}
+		}
+	}
 }
 
 func (r *run) hd2() {
@@ -393,7 +470,7 @@ func (r *run) trusted(p string) bool {
 	}
 	for _, o := range objects {
 		sec, err := r.env.Security.Lstat(o)
-		if err != nil || !hostos.TrustedOwner(r.env.GOOS, sec) {
+		if err != nil || !r.trustedOwner(sec) {
 			return false
 		}
 		for _, s := range r.subjects {
@@ -403,6 +480,19 @@ func (r *run) trusted(p string) bool {
 		}
 	}
 	return true
+}
+
+// trustedOwner is hostos.TrustedOwner plus, in the owner account mode, the owner account itself
+// (D-OA-9): it is the only session user and already an administrator.
+func (r *run) trustedOwner(sec hostos.FileSec) bool {
+	if hostos.TrustedOwner(r.env.GOOS, sec) {
+		return true
+	}
+	if !r.env.ownerMode() {
+		return false
+	}
+	a, err := r.env.Users.Lookup(r.env.OwnerAccount)
+	return err == nil && a.ID != "0" && sec.OwnerID == a.ID
 }
 
 // helperIntegrity checks the helper binary (also for setuid and setgid), every service
@@ -617,7 +707,7 @@ func (r *run) request(u string) Request {
 	return Request{
 		Mode: mode, SessionUser: u, Others: slices.DeleteFunc(slices.Clone(r.users), func(s string) bool { return s == u }),
 		ServiceUser: r.env.ServiceUser, ClaudeBin: r.claudeBin, SearchList: r.search, Declaration: r.env.Declaration,
-		Workdirs: dirs, ForeignHomes: r.foreignHomes(), StateDir: r.env.StateDir, KeyFile: r.env.KeyFile,
+		OwnerAccount: r.env.ownerMode(), Workdirs: dirs, ForeignHomes: r.foreignHomes(), StateDir: r.env.StateDir, KeyFile: r.env.KeyFile,
 		AuthStatusTimeout: r.env.Config.AuthStatusTimeout, EntryScanTimeout: r.env.Config.EntryScanTimeout,
 	}
 }
@@ -824,6 +914,9 @@ func (res *Result) evaluate(decl string) {
 		}
 		switch {
 		case code == "" || decl == state.DeclPersonal:
+		case f.ownerAccount != "" && u == f.ownerAccount:
+			// The owner's own account (ADR 0073): his login is his own, only he reaches it.
+			hd6.Entries = append(hd6.Entries, Entry{Status: Warn, Code: code, SessionUser: u})
 		case decl == state.DeclUnknown:
 			hd6.Entries = append(hd6.Entries, Entry{Status: Warn, Code: CodeDeclarationUnknown, SessionUser: u})
 		default:
@@ -867,7 +960,7 @@ func (res *Result) evalProfiles(decl string) {
 		for _, w := range res.Workdirs[u] {
 			names = append(names, w.DisplayName)
 		}
-		res.SessionUsers = append(res.SessionUsers, ReportedSessionUser{OSUser: u, Workdirs: names})
+		res.SessionUsers = append(res.SessionUsers, ReportedSessionUser{OSUser: u, Workdirs: names, OwnerAccount: f.ownerAccount != "" && u == f.ownerAccount})
 	}
 }
 

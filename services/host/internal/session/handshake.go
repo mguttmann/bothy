@@ -75,7 +75,7 @@ func (h *handshake) run(ctx context.Context) {
 				return 0
 			}
 			return len(res.Workdirs[osu])
-		}, ServerHost: m.d.ServerHost != nil && m.d.ServerHost()})
+		}, ServerHost: m.d.ServerHost != nil && m.d.ServerHost(), OwnerAccount: m.d.Config.OwnerAccount})
 	clear(tok)
 	if detail != "" {
 		h.refuse(detail)

@@ -12,17 +12,18 @@ import (
 )
 
 const insertSessionUser = `-- name: InsertSessionUser :exec
-INSERT INTO host_session_users (id, host_id, user_id, os_user, created_by, created_at)
-VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO host_session_users (id, host_id, user_id, os_user, created_by, created_at, owner_account)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
 `
 
 type InsertSessionUserParams struct {
-	ID        pgtype.UUID
-	HostID    pgtype.UUID
-	UserID    pgtype.UUID
-	OsUser    string
-	CreatedBy pgtype.UUID
-	CreatedAt pgtype.Timestamptz
+	ID           pgtype.UUID
+	HostID       pgtype.UUID
+	UserID       pgtype.UUID
+	OsUser       string
+	CreatedBy    pgtype.UUID
+	CreatedAt    pgtype.Timestamptz
+	OwnerAccount bool
 }
 
 func (q *Queries) InsertSessionUser(ctx context.Context, arg InsertSessionUserParams) error {
@@ -33,13 +34,14 @@ func (q *Queries) InsertSessionUser(ctx context.Context, arg InsertSessionUserPa
 		arg.OsUser,
 		arg.CreatedBy,
 		arg.CreatedAt,
+		arg.OwnerAccount,
 	)
 	return err
 }
 
 const lockSessionUsersOfHost = `-- name: LockSessionUsersOfHost :many
 
-SELECT id, host_id, user_id, os_user, created_by, created_at, revoked_by, revoked_at FROM host_session_users WHERE host_id = $1 ORDER BY id FOR UPDATE
+SELECT id, host_id, user_id, os_user, created_by, created_at, revoked_by, revoked_at, owner_account FROM host_session_users WHERE host_id = $1 ORDER BY id FOR UPDATE
 `
 
 // SPDX-License-Identifier: Apache-2.0
@@ -63,6 +65,7 @@ func (q *Queries) LockSessionUsersOfHost(ctx context.Context, hostID pgtype.UUID
 			&i.CreatedAt,
 			&i.RevokedBy,
 			&i.RevokedAt,
+			&i.OwnerAccount,
 		); err != nil {
 			return nil, err
 		}
@@ -95,7 +98,7 @@ func (q *Queries) RevokeSessionUser(ctx context.Context, arg RevokeSessionUserPa
 }
 
 const sessionUsersOfHost = `-- name: SessionUsersOfHost :many
-SELECT id, host_id, user_id, os_user, created_by, created_at, revoked_by, revoked_at FROM host_session_users WHERE host_id = $1 ORDER BY id
+SELECT id, host_id, user_id, os_user, created_by, created_at, revoked_by, revoked_at, owner_account FROM host_session_users WHERE host_id = $1 ORDER BY id
 `
 
 // Every row of a host, valid and ended, ascending id, without a lock (the check before the
@@ -118,6 +121,7 @@ func (q *Queries) SessionUsersOfHost(ctx context.Context, hostID pgtype.UUID) ([
 			&i.CreatedAt,
 			&i.RevokedBy,
 			&i.RevokedAt,
+			&i.OwnerAccount,
 		); err != nil {
 			return nil, err
 		}
@@ -130,7 +134,7 @@ func (q *Queries) SessionUsersOfHost(ctx context.Context, hostID pgtype.UUID) ([
 }
 
 const validSessionUsersOfHosts = `-- name: ValidSessionUsersOfHosts :many
-SELECT id, host_id, user_id, os_user, created_by, created_at, revoked_by, revoked_at FROM host_session_users
+SELECT id, host_id, user_id, os_user, created_by, created_at, revoked_by, revoked_at, owner_account FROM host_session_users
 WHERE host_id = ANY ($1::uuid[]) AND revoked_at IS NULL
 ORDER BY host_id, created_at, id
 `
@@ -154,6 +158,7 @@ func (q *Queries) ValidSessionUsersOfHosts(ctx context.Context, hostIds []pgtype
 			&i.CreatedAt,
 			&i.RevokedBy,
 			&i.RevokedAt,
+			&i.OwnerAccount,
 		); err != nil {
 			return nil, err
 		}

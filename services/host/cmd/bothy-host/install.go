@@ -36,6 +36,7 @@ func newFlags(name string, stderr io.Writer) *flag.FlagSet {
 type installFlags struct {
 	users                       listFlag
 	driveRoot, confirm, cfgPath string
+	ownerAccount                bool
 }
 
 func parseInstall(args []string, stderr io.Writer) (installFlags, bool) {
@@ -45,6 +46,7 @@ func parseInstall(args []string, stderr io.Writer) (installFlags, bool) {
 	fl.StringVar(&f.driveRoot, "drive-root", "", "only the drive root step for this drive (Windows)")
 	fl.StringVar(&f.confirm, "drive-root-confirm", "", "answer the drive root prompt: yes or no")
 	fl.StringVar(&f.cfgPath, "config", "", "path of the configuration file")
+	fl.BoolVar(&f.ownerAccount, "owner-account", false, "install for the calling account itself, without administrator rights (ADR 0073)")
 	if err := fl.Parse(args); err != nil || fl.NArg() != 0 || (f.confirm != "" && f.confirm != "yes" && f.confirm != "no") {
 		return f, false
 	}
@@ -52,11 +54,14 @@ func parseInstall(args []string, stderr io.Writer) (installFlags, bool) {
 }
 
 // cmdInstall is "install [--session-user <name>] [--drive-root <drive>] [--drive-root-confirm
-// yes|no] [--config <path>]".
+// yes|no] [--config <path>]" or "install --owner-account" (ADR 0073).
 func cmdInstall(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	f, ok := parseInstall(args, stderr)
 	if !ok {
 		return exitUsage
+	}
+	if f.ownerAccount {
+		return installOwnerAccount(ctx, f, stdout, stderr)
 	}
 	if !sys.isAdmin() {
 		return adminRequired(stderr, "install")

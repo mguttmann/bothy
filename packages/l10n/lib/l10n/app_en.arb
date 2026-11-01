@@ -5259,6 +5259,48 @@
   "@hostSessionUsersSr12": {
     "description": "Note under the session users (07 SR12)."
   },
+  "hostOwnerAccountBadge": "Owner account with administrator rights",
+  "@hostOwnerAccountBadge": {
+    "description": "Badge of the owner account of a host in the host settings (ADR 0073)."
+  },
+  "hostOwnerAccountWarning": "Sessions as {osUser} use the owner's own account with administrator rights: full access to the host, its keys and the host service. Only an active owner opens them, with a step-up on every opening, and every opening is logged.",
+  "@hostOwnerAccountWarning": {
+    "description": "Warning at the owner account of a host in the host settings and in the assign dialog (ADR 0073).",
+    "placeholders": {
+      "osUser": {
+        "type": "String",
+        "example": "admin"
+      }
+    }
+  },
+  "hostOwnerAccountOptIn": "Bind my own administrator account {osUser} to me",
+  "@hostOwnerAccountOptIn": {
+    "description": "Checkbox of the explicit opt-in for the owner account of a host (ADR 0073).",
+    "placeholders": {
+      "osUser": {
+        "type": "String",
+        "example": "admin"
+      }
+    }
+  },
+  "hostOwnerAccountOwnerOnly": "Only an owner can bind the owner account of a host, and only to himself.",
+  "@hostOwnerAccountOwnerOnly": {
+    "description": "Refusal of an assignment of the owner account (403 owner_account_owner_only, ADR 0073)."
+  },
+  "hostOwnerAccountMismatch": "The host reports this name differently; reload the host and check the owner account.",
+  "@hostOwnerAccountMismatch": {
+    "description": "Refusal of an assignment whose owner account flag differs from the report (owner_account_opt_in_required, owner_account_not_on_host)."
+  },
+  "terminalOwnerAccountWarning": "This session uses {osUser}, your own account with administrator rights on this host. Everything you type has full rights.",
+  "@terminalOwnerAccountWarning": {
+    "description": "Warning in the dialog Open terminal when the own session user is the owner account of the host (ADR 0073).",
+    "placeholders": {
+      "osUser": {
+        "type": "String",
+        "example": "admin"
+      }
+    }
+  },
   "hostSessionUsersOnlyReported": "Only names that the host reported during pairing or in its last report.",
   "@hostSessionUsersOnlyReported": {
     "description": "Note of the session user pickers (24 section 3.2)."
@@ -13290,6 +13332,10 @@
   "problemTerminalDeniedNoSessionUser": "You have no own session user on this host",
   "@problemTerminalDeniedNoSessionUser": {
     "description": "Text of the problem code `terminal_denied` with the reason `no_session_user` (SR12, 24 section 13, docs/api/openapi.yaml)."
+  },
+  "problemTerminalDeniedOwnerAccountOwnerOnly": "Only an active owner can open a terminal in the owner account of this host",
+  "@problemTerminalDeniedOwnerAccountOwnerOnly": {
+    "description": "Problem text of terminal_denied with reason owner_account_owner_only (07 SR12, ADR 0073)."
   },
   "problemTerminalDeniedSessionLimit": "The limit of open terminal sessions is reached",
   "@problemTerminalDeniedSessionLimit": {

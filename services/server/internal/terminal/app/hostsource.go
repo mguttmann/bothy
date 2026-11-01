@@ -69,7 +69,8 @@ func (s HostSource) SessionUsersOf(ctx context.Context, userID ids.ID) ([]authz.
 	out := make([]authz.SessionUserFact, 0, len(list))
 	for _, u := range list {
 		out = append(out, authz.SessionUserFact{
-			HostID: u.HostID, HostSessionUserID: u.ID, OSUser: u.OSUser, Reported: domain.Reports(u.HostReport, u.OSUser),
+			HostID: u.HostID, HostSessionUserID: u.ID, OSUser: u.OSUser, Reported: domain.ReportsAssignment(u.HostReport, u.OSUser, u.OwnerAccount),
+			OwnerAccount: u.OwnerAccount,
 		})
 	}
 	return out, nil

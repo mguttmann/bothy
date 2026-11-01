@@ -169,6 +169,7 @@ func sessionUserRows(rows []sqlcgen.HostSessionUser) []domain.SessionUserRow {
 	for _, row := range rows {
 		out = append(out, domain.SessionUserRow{
 			ID: idOf(row.ID), UserID: idOf(row.UserID), OSUser: row.OsUser, CreatedAt: timeOf(row.CreatedAt), Revoked: row.RevokedAt.Valid,
+			OwnerAccount: row.OwnerAccount,
 		})
 	}
 	return out
@@ -186,7 +187,7 @@ func (r *Repository) ValidSessionUsers(ctx context.Context, hostIDs []ids.ID) (m
 	}
 	for _, row := range rows {
 		h := idOf(row.HostID)
-		out[h] = append(out[h], domain.SessionUser{UserID: idOf(row.UserID), OSUser: row.OsUser, CreatedAt: timeOf(row.CreatedAt)})
+		out[h] = append(out[h], domain.SessionUser{UserID: idOf(row.UserID), OSUser: row.OsUser, CreatedAt: timeOf(row.CreatedAt), OwnerAccount: row.OwnerAccount})
 	}
 	return out, nil
 }
@@ -201,6 +202,7 @@ func (r *Repository) InsertSessionUser(ctx context.Context, id, hostID ids.ID, a
 	}
 	err = q.InsertSessionUser(ctx, sqlcgen.InsertSessionUserParams{
 		ID: uuid(id), HostID: uuid(hostID), UserID: uuid(a.UserID), OsUser: a.OSUser, CreatedBy: uuid(by), CreatedAt: optionalTime(at),
+		OwnerAccount: a.OwnerAccount,
 	})
 	if isUnique(err, constraintSessionUserName) || isUnique(err, constraintSessionUserValid) {
 		return errs.New(errs.CodeConflict, "The session user is taken on this host.").WithReason(domain.ReasonSessionUserTaken)
@@ -426,7 +428,8 @@ func (r *Repository) OwnSessionUsers(ctx context.Context, userID ids.ID) ([]doma
 	out := make([]domain.OwnSessionUser, 0, len(rows))
 	for _, row := range rows {
 		out = append(out, domain.OwnSessionUser{
-			ID: idOf(row.ID), HostID: idOf(row.HostID), OSUser: row.OsUser, HostReport: domain.DecodeReportedSessionUsers(row.ReportedSessionUsers),
+			ID: idOf(row.ID), HostID: idOf(row.HostID), OSUser: row.OsUser, OwnerAccount: row.OwnerAccount,
+			HostReport: domain.DecodeReportedSessionUsers(row.ReportedSessionUsers),
 		})
 	}
 	return out, nil

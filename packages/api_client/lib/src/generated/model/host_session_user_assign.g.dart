@@ -11,13 +11,18 @@ class _$HostSessionUserAssign extends HostSessionUserAssign {
   final String userId;
   @override
   final String osUser;
+  @override
+  final bool? ownerAccount;
 
   factory _$HostSessionUserAssign([
     void Function(HostSessionUserAssignBuilder)? updates,
   ]) => (HostSessionUserAssignBuilder()..update(updates))._build();
 
-  _$HostSessionUserAssign._({required this.userId, required this.osUser})
-    : super._();
+  _$HostSessionUserAssign._({
+    required this.userId,
+    required this.osUser,
+    this.ownerAccount,
+  }) : super._();
   @override
   HostSessionUserAssign rebuild(
     void Function(HostSessionUserAssignBuilder) updates,
@@ -32,7 +37,8 @@ class _$HostSessionUserAssign extends HostSessionUserAssign {
     if (identical(other, this)) return true;
     return other is HostSessionUserAssign &&
         userId == other.userId &&
-        osUser == other.osUser;
+        osUser == other.osUser &&
+        ownerAccount == other.ownerAccount;
   }
 
   @override
@@ -40,6 +46,7 @@ class _$HostSessionUserAssign extends HostSessionUserAssign {
     var _$hash = 0;
     _$hash = $jc(_$hash, userId.hashCode);
     _$hash = $jc(_$hash, osUser.hashCode);
+    _$hash = $jc(_$hash, ownerAccount.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -48,7 +55,8 @@ class _$HostSessionUserAssign extends HostSessionUserAssign {
   String toString() {
     return (newBuiltValueToStringHelper(r'HostSessionUserAssign')
           ..add('userId', userId)
-          ..add('osUser', osUser))
+          ..add('osUser', osUser)
+          ..add('ownerAccount', ownerAccount))
         .toString();
   }
 }
@@ -65,6 +73,10 @@ class HostSessionUserAssignBuilder
   String? get osUser => _$this._osUser;
   set osUser(String? osUser) => _$this._osUser = osUser;
 
+  bool? _ownerAccount;
+  bool? get ownerAccount => _$this._ownerAccount;
+  set ownerAccount(bool? ownerAccount) => _$this._ownerAccount = ownerAccount;
+
   HostSessionUserAssignBuilder() {
     HostSessionUserAssign._defaults(this);
   }
@@ -74,6 +86,7 @@ class HostSessionUserAssignBuilder
     if ($v != null) {
       _userId = $v.userId;
       _osUser = $v.osUser;
+      _ownerAccount = $v.ownerAccount;
       _$v = null;
     }
     return this;
@@ -106,6 +119,7 @@ class HostSessionUserAssignBuilder
             r'HostSessionUserAssign',
             'osUser',
           ),
+          ownerAccount: ownerAccount,
         );
     replace(_$result);
     return _$result;

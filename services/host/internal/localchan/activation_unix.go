@@ -31,3 +31,19 @@ func ActivatedListener(goos, listenPID, listenFDs string) (net.Listener, error) 
 	}
 	return l, nil
 }
+
+// InheritedListener returns the listening socket a parent passed as fd 3 (os/exec ExtraFiles): the
+// PTY helper of the owner account mode is a child of the host service (ADR 0073, D-OA-4), which
+// creates the socket in its state directory.
+func InheritedListener() (net.Listener, error) {
+	f := os.NewFile(3, "inherited")
+	if f == nil {
+		return nil, errors.New("localchan: no inherited socket")
+	}
+	defer func() { _ = f.Close() }()
+	l, err := net.FileListener(f)
+	if err != nil {
+		return nil, errors.New("localchan: no inherited socket")
+	}
+	return l, nil
+}

@@ -304,6 +304,8 @@ const (
 	attrDeviceID        = "device_id"
 	attrPinChanged      = "pin_changed"
 	attrForeignAssignee = "foreign_assignee"
+	// attrOwnerAccount marks an opening, attach or assignment of the owner account (ADR 0073).
+	attrOwnerAccount    = "owner_account"
 	attrClosedBy        = "closed_by"
 	opCreate            = "create"
 	opUpdate            = "update"

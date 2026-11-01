@@ -110,6 +110,7 @@ final class HostSessionUserInfo {
     required this.userId,
     required this.osUser,
     required this.createdAt,
+    this.ownerAccount = false,
   });
 
   /// The person.
@@ -120,15 +121,27 @@ final class HostSessionUserInfo {
 
   /// Since when.
   final DateTime createdAt;
+
+  /// The assignment of the owner account of the host (ADR 0073): sessions run with
+  /// administrator rights.
+  final bool ownerAccount;
 }
 
 /// A session user the host service reported (`HostReportedSessionUser`).
 final class HostReportedName {
   /// Creates the name.
-  const HostReportedName(this.osUser, {this.workdirs = const []});
+  const HostReportedName(
+    this.osUser, {
+    this.workdirs = const [],
+    this.ownerAccount = false,
+  });
 
   /// The name.
   final String osUser;
+
+  /// The owner account of the host (`host_service.owner_account`, ADR 0073): the account with
+  /// administrator rights the host service runs as; it needs the explicit opt-in.
+  final bool ownerAccount;
 
   /// The display names of its working directories of the profile `claude` (ruling T13).
   final List<String> workdirs;
@@ -268,13 +281,20 @@ final class HostPairingCodeInfo {
 /// One assignment of a person to a reported name (`HostSessionUserAssign`).
 final class HostAssignment {
   /// Creates the assignment.
-  const HostAssignment({required this.userId, required this.osUser});
+  const HostAssignment({
+    required this.userId,
+    required this.osUser,
+    this.ownerAccount = false,
+  });
 
   /// The person.
   final String userId;
 
   /// The reported name.
   final String osUser;
+
+  /// The explicit opt-in for the owner account of the host (ADR 0073).
+  final bool ownerAccount;
 }
 
 /// The body of `confirmHost` (`HostConfirm`).
@@ -663,7 +683,8 @@ final class ApiHostsRepository implements HostsRepository {
       HostSessionUserAssign(
         (b) => b
           ..userId = a.userId
-          ..osUser = a.osUser,
+          ..osUser = a.osUser
+          ..ownerAccount = a.ownerAccount ? true : null,
       );
 
   static LlmCredentials _wireLogin(HostLlmLogin login) => switch (login) {
@@ -740,13 +761,18 @@ final class ApiHostsRepository implements HostsRepository {
           userId: s.userId,
           osUser: s.osUser,
           createdAt: s.createdAt,
+          ownerAccount: s.ownerAccount ?? false,
         ),
     ],
     reportedSessionUsers: h.reportedSessionUsers == null
         ? null
         : [
             for (final r in h.reportedSessionUsers!)
-              HostReportedName(r.osUser, workdirs: r.workdirs.toList()),
+              HostReportedName(
+                r.osUser,
+                workdirs: r.workdirs.toList(),
+                ownerAccount: r.ownerAccount ?? false,
+              ),
           ],
     connected: h.connected,
     hostVersion: h.hostVersion,

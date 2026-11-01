@@ -84,4 +84,5 @@ if it is out of date. Do not edit it by hand.
 | [0070](0070-terminal-in-the-web-console.md) | Terminal in the web console | accepted | 2026-10-10 |
 | [0071](0071-in-process-test-seams-of-serve.md) | In-process test seams of serve | accepted | 2026-10-18 |
 | [0072](0072-firebase-messaging-only-in-builds-with-a-firebase-configuration.md) | Firebase messaging only in builds with a Firebase configuration | accepted | 2026-10-25 |
+| [0073](0073-terminal-in-the-owners-own-account.md) | Terminal in the owner's own account (owner account mode) | accepted | 2026-11-01 |
 <!-- adr-index:end -->

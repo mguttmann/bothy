@@ -27,7 +27,8 @@ func terminalState(ctx context.Context, hosts authz.HostSource, snap *domain.Sna
 	}
 	snap.SessionUsers = make(map[ids.ID]domain.SessionUserFact, len(users))
 	for _, u := range users {
-		snap.SessionUsers[u.HostID] = domain.SessionUserFact{HostID: u.HostID, HostSessionUserID: u.HostSessionUserID, OSUser: u.OSUser, Reported: u.Reported}
+		snap.SessionUsers[u.HostID] = domain.SessionUserFact{HostID: u.HostID, HostSessionUserID: u.HostSessionUserID, OSUser: u.OSUser, Reported: u.Reported,
+			OwnerAccount: u.OwnerAccount}
 	}
 	if !snap.Owner {
 		return nil

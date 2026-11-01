@@ -233,7 +233,36 @@ mixin FakeHosts {
       for (final r in h.reportedSessionUsers ?? const <HostReportedName>[])
         r.osUser,
     };
+    final ownerAccounts = {
+      for (final r in h.reportedSessionUsers ?? const <HostReportedName>[])
+        if (r.ownerAccount) r.osUser,
+    };
     for (final a in add) {
+      // The owner account (ADR 0073): only the owner Alex, the caller of the fake, for himself.
+      if (a.ownerAccount && a.userId != 'alex') {
+        throw const SelfActionFailed(
+          ApiProblem(
+            status: 403,
+            code: 'forbidden',
+            reason: 'owner_account_owner_only',
+          ),
+        );
+      }
+      if (reported.contains(a.osUser) &&
+          a.ownerAccount != ownerAccounts.contains(a.osUser)) {
+        throw const SelfActionFailed(
+          ApiProblem(
+            status: 400,
+            code: 'validation_failed',
+            errors: [
+              ProblemFieldError(
+                pointer: '/add_session_users/0/owner_account',
+                code: 'owner_account_opt_in_required',
+              ),
+            ],
+          ),
+        );
+      }
       if (!reported.contains(a.osUser)) {
         throw const SelfActionFailed(
           ApiProblem(
@@ -274,6 +303,7 @@ mixin FakeHosts {
           userId: a.userId,
           osUser: a.osUser,
           createdAt: DateTime.utc(2026, 10, 17, 9),
+          ownerAccount: a.ownerAccount,
         ),
     ];
   }
@@ -431,7 +461,7 @@ mixin FakeHosts {
     await change(
       'updateHost',
       '${host.id} ${assigneeId ?? '-'} $clearAssignee '
-          '${[for (final a in add) '${a.userId}=${a.osUser}'].join(',')} '
+          '${[for (final a in add) '${a.userId}=${a.osUser}${a.ownerAccount ? '!owner_account' : ''}'].join(',')} '
           '${revoke.join(',')} $reason',
       purpose,
     );

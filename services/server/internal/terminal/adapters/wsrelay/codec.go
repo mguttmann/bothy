@@ -148,7 +148,7 @@ func reportOf(f *rest.HostReport) domain.Report {
 		if dirs == nil {
 			dirs = []string{}
 		}
-		r.SessionUsers = append(r.SessionUsers, domain.ReportedSessionUser{OSUser: u.OsUser, Workdirs: dirs})
+		r.SessionUsers = append(r.SessionUsers, domain.ReportedSessionUser{OSUser: u.OsUser, Workdirs: dirs, OwnerAccount: u.OwnerAccount != nil && *u.OwnerAccount})
 	}
 	for _, c := range f.Doctor {
 		e := domain.DoctorCheck{Check: string(c.Check), OK: c.Ok}

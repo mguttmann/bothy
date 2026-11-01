@@ -74,14 +74,33 @@ func (s *Service) endSR10Lost(ctx context.Context, action authorize.Action, user
 }
 
 // endIfSR10Lost ends ses of a person who is no longer an active owner when SR10 no longer allows
-// it on its host, read fresh in the transaction (domain.SR10Lost).
+// it on its host, read fresh in the transaction (domain.SR10Lost), or when it runs in the owner
+// account of the host (SR12 with ADR 0073, D-OA-7).
 func (s *Service) endIfSR10Lost(ctx context.Context, action authorize.Action, ses domain.Session) error {
 	h, found, err := s.d.Store.Host(ctx, ses.HostID)
-	if err != nil || !found || !domain.SR10Lost(false, ses.UserID, h) {
+	if err != nil || !found {
+		return err
+	}
+	inOwnerAccount, err := s.inOwnerAccount(ctx, ses)
+	if err != nil || (!domain.SR10Lost(false, ses.UserID, h) && !inOwnerAccount) {
 		return err
 	}
 	_, err = s.endSessions(ctx, SessionSelector{SessionID: ses.ID}, domain.ServerEnd(domain.ReasonForLostHost(string(action), h, ses.UserID)))
 	return err
+}
+
+// inOwnerAccount reports whether ses runs in an assignment of the owner account of its host.
+func (s *Service) inOwnerAccount(ctx context.Context, ses domain.Session) (bool, error) {
+	rows, err := s.d.Store.SessionUsers(ctx, ses.HostID)
+	if err != nil {
+		return false, err
+	}
+	for _, r := range rows {
+		if r.ID == ses.HostSessionUserID {
+			return r.OwnerAccount, nil
+		}
+	}
+	return false, nil
 }
 
 // OnDeviceRevoked ends the open sessions whose current device (terminal_sessions.device_id, the

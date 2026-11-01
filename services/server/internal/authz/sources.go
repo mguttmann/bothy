@@ -343,6 +343,8 @@ type SessionUserFact struct {
 	OSUser string
 	// Reported reports the name among the reported session users of the host.
 	Reported bool
+	// OwnerAccount marks an assignment of the owner account of the host (ADR 0073).
+	OwnerAccount bool
 }
 
 // HostRetired is the state of a retired host (24 section 3.1): final, no grant can work on it.
