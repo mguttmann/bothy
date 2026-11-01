@@ -35,7 +35,10 @@ iOS simulator) and runs once more (PL/44). After such a line the shorter
 waits up to ANDROID_READY_SECONDS until the one device is listed in state `device` and reports
 `sys.boot_completed` 1; otherwise that attempt fails with the reason and the command does not run
 (PL/51); the device log is cleared then, and a failed Android attempt prints its last
-ANDROID_LOG_LINES lines. A failed test never runs again.
+ANDROID_LOG_LINES lines. A command that keeps failing before any test ran in one of these ways
+(native assets, load, stalled start) starts at most `START_ATTEMPTS` times in all, an Android
+command `ANDROID_START_ATTEMPTS` times, because the adb connection to the emulator drops now and
+then while the app starts (FAPS/1). A failed test never runs again.
 
 Usage: apps_platform.py [--root <repository>] [--system macos|windows|android|ios]
 Exit 0 when every command that was to run passed (or nothing was to run), 1 when one failed or
@@ -219,6 +222,13 @@ APP_STARTING = re.compile(rb"^(?:Xcode build done\.|\xe2\x9c\x93 Built |Installi
 # the main runs 40574981313 to 40631541184 printed their next line after at most 212 s on iOS;
 # a start that stalls never prints again (five of seven iOS runs before stalled once).
 APP_START_SILENCE_SECONDS = 8 * 60
+# How many times a command starts in all when no test of it ran in the attempts before (a failed
+# native assets build, a test file that failed to load, a stall while the app started; PL/44).
+START_ATTEMPTS = 2
+# Android starts once more (FAPS/1): the adb connection to the emulator drops now and then while
+# the app starts (main runs 41314844744 and 41308492022), and in main run 41308492022 it did so in
+# two starts in a row. Three stalled starts of APP_START_SILENCE_SECONDS fit in the 60 minute jobs.
+ANDROID_START_ATTEMPTS = 3
 # Where the hooks runner keeps the output of each hook run of the workspace.
 HOOK_LOGS = ".dart_tool/hooks_runner"
 # The lines of each hook log that are printed.
@@ -361,7 +371,21 @@ def _print_hook_logs(root: Path) -> None:
             _emit(header.encode() + b"\n".join(lines[-HOOK_LOG_LINES:]) + b"\n")
 
 
+def _before_any_test(outcome: Outcome) -> str | None:
+    """Why a failed attempt ran no test, so it may start again; None when a test may have run."""
+    if outcome.code == 0:
+        return None
+    if outcome.native_failed:
+        return "the native assets build failed before any test ran; building once more"
+    if outcome.load_failed:
+        return "a test file failed to load before any test ran; running once more"
+    if outcome.stalled and APP_STARTING.match(outcome.last_line):
+        return "it stalled while the app started, before its test file ran; running once more"
+    return None
+
+
 def _run(name: str, folder: Path, system: str, commands: list[list[str]], root: Path) -> bool:
+    attempts = ANDROID_START_ATTEMPTS if system == ANDROID else START_ATTEMPTS
     for command in commands:
         # Without a shell, Windows does not resolve `flutter` to `flutter.bat`; which does.
         program = shutil.which(command[0])
@@ -369,29 +393,17 @@ def _run(name: str, folder: Path, system: str, commands: list[list[str]], root: 
             print(f"apps-platform {name} {system}: {command[0]} is not on PATH", file=sys.stderr)
             return False
         outcome = _attempt(name, system, command, program, folder)
+        attempt = 1
+        while attempt < attempts and (reason := _before_any_test(outcome)) is not None:
+            if outcome.native_failed:
+                _print_hook_logs(root)
+            attempt += 1
+            print(
+                f"apps-platform {name} {system}: {reason} (attempt {attempt} of {attempts})",
+                file=sys.stderr,
+            )
+            outcome = _attempt(name, system, command, program, folder)
         code = outcome.code
-        if code != 0 and outcome.native_failed:
-            _print_hook_logs(root)
-            print(
-                f"apps-platform {name} {system}: the native assets build failed before any test"
-                " ran; building once more",
-                file=sys.stderr,
-            )
-            code = _attempt(name, system, command, program, folder).code
-        elif code != 0 and outcome.load_failed:
-            print(
-                f"apps-platform {name} {system}: a test file failed to load before any test ran;"
-                " running once more",
-                file=sys.stderr,
-            )
-            code = _attempt(name, system, command, program, folder).code
-        elif outcome.stalled and APP_STARTING.match(outcome.last_line):
-            print(
-                f"apps-platform {name} {system}: it stalled while the app started, before its"
-                " test file ran; running once more",
-                file=sys.stderr,
-            )
-            code = _attempt(name, system, command, program, folder).code
         if code != 0:
             print(
                 f"apps-platform {name} {system}: {' '.join(command)} failed with exit code {code}",
