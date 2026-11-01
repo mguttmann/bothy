@@ -120,6 +120,7 @@ FlutterSecureBackend _updated(
   platform: build.platform,
   keychainOptions: build.keychain,
   localInstances: localInstances,
+  legacyKeychain: storage.legacyKeychain,
   log: logs == null ? (_) {} : logs.add,
 );
 

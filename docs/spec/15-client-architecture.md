@@ -530,8 +530,10 @@ source `lib/src/flutter_secure_storage_windows_ffi.dart` (https://pub.dev/packag
 retrieved 2026-10-31 [verified]). On macOS the file-based keychain (the login keychain) controls
 access with access control lists, while only the Data Protection keychain uses keychain access
 groups (Apple TN3137, https://developer.apple.com/documentation/technotes/tn3137-on-mac-keychains,
-retrieved 2026-10-31 [verified]); that an app outside an item's list gets an access prompt is
-[assumed] from the observed incident.
+retrieved 2026-10-31 [verified]); that an app outside an item's list gets an access prompt, also
+with `kSecUseAuthenticationUI` skip or fail, and an immediate `errSecAuthFailed` with the user
+interaction of the keychain off, is measured by `apps/client/macos/LegacyKeychainTests` against a
+real keychain (2026-11-01 [verified]).
 
 `packages/device_key` is one Flutter plugin package with a folder per platform and a typed
 Pigeon (flutter.dev) interface as its boundary, not a set of federated packages (docs/DECISIONS.md
@@ -602,6 +604,18 @@ stay until the first successful refresh of their instance and are deleted then; 
 logged, tried again at the next start, and the app starts with enrollment. The login keychain cannot
 list its items (`readAll` answers -50, `errSecParam`), so there the app keeps the list of its keys
 in the item `app/secret_index` and reads the old secrets by their names.
+No read of the old secrets shows a dialog or holds the start (addendum of 2026-11-01,
+FIX-macos-legacy-keychain-prompt, docs/decisions.d/FIX-macos-legacy-keychain-prompt.md; reason: an
+updated macOS app waited at its start for a keychain access dialog for old items whose access list
+trusts only the app of the old bundle identifier): in the macOS login keychain the runner reads
+and deletes them over the channel `bothy/legacy_keychain` with the user interaction of the keychain
+off, so such an item answers `errSecAuthFailed` at once (`kSecUseAuthenticationUI` does not stop
+that dialog); on iOS and in the Data Protection keychain the old reads pass
+`kSecUseAuthenticationUISkip`. A refused item makes the old secrets not migratable: nothing is
+copied, the app logs it once and starts with enrollment; only `errSecInteractionNotAllowed`, which
+a locked keychain or device answers as well, leaves the move to the next start. The copy has the
+deadline `FlutterSecureBackend.legacyDeadline` and every call of the store the deadline
+`FlutterSecureBackend.callDeadline`, after which the call fails instead of holding the start.
 The database key is 32 bytes from `Random.secure()`, created at the first start of an instance;
 the database is `<application support>/instances/<instance_id>/local.db`, the file cache lives
 in the same folder, and the device keys of `packages/device_key` use the `instance_id` as scope.

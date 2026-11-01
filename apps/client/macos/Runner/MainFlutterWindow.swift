@@ -6,9 +6,10 @@ import FlutterMacOS
 /// The main window: the Flutter view, the accessibility writes into text fields
 /// (`AccessibilityTextInput`), the plugins, the deep link channel, the channel of
 /// "Start at login" (`LoginItemChannel`), the clipboard of block copies
-/// (`RichClipboardChannel`), the push channel (`PushApple`), the sharing channel
-/// (`ShareApple`) and the updater of the Developer ID edition (`AppUpdater`, only when the
-/// build carries Sparkle; its channel `bothy/updater` answers in every build).
+/// (`RichClipboardChannel`), the old login keychain items (`LegacyKeychainChannel`), the push
+/// channel (`PushApple`), the sharing channel (`ShareApple`) and the updater of the Developer ID
+/// edition (`AppUpdater`, only when the build carries Sparkle; its channel `bothy/updater` answers
+/// in every build).
 class MainFlutterWindow: NSWindow {
   override func awakeFromNib() {
     let flutterViewController = FlutterViewController()
@@ -24,6 +25,8 @@ class MainFlutterWindow: NSWindow {
     DeepLinkChannel.shared.attach(messenger: flutterViewController.engine.binaryMessenger)
     LoginItemChannel.attach(messenger: flutterViewController.engine.binaryMessenger)
     RichClipboardChannel.attach(messenger: flutterViewController.engine.binaryMessenger)
+    // The old items of the login keychain without a dialog (FIX-macos-legacy-keychain-prompt).
+    LegacyKeychainChannel.attach(messenger: flutterViewController.engine.binaryMessenger)
     // Push (M5-04): the notification center's delegate before launch finishes, so a tap that
     // started the app reaches Dart through `takePendingTaps`. It keeps the delegate that
     // flutter_local_notifications set while registering and forwards it every local

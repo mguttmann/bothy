@@ -821,6 +821,14 @@ Operations and rules of the console session (M6-01, docs/DECISIONS.md D-M6-01-1 
   session and the device key of an instance; the old items are removed only after the first
   successful refresh with them, and an app of another identity never takes them. Details:
   [15-client-architecture.md](15-client-architecture.md) section 9.
+- Storage addendum of 2026-11-01 (FIX-macos-legacy-keychain-prompt; reason: an updated macOS app
+  stopped at its start on a keychain access dialog for old items another app had written, and
+  never reached the server): reading the stored secrets of an earlier build never shows a dialog
+  and never holds the start. An item the platform store does not give out without the person
+  counts as not migratable, the app starts with enrollment instead, and every call to secure
+  storage during the start has a time limit. Details:
+  [15-client-architecture.md](15-client-architecture.md) section 9,
+  docs/decisions.d/FIX-macos-legacy-keychain-prompt.md.
 - The owner can require the lock instance-wide (`security.app_lock_required`). The server cannot
   check it; it is protection against curiosity at the unlocked device, not a server control.
   What the server checks is step-up.

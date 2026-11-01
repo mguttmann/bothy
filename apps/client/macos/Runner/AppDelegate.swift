@@ -107,6 +107,41 @@ enum LoginItemChannel {
   }
 }
 
+/// The old items of the login keychain over the method channel `bothy/legacy_keychain`
+/// (`MethodChannelLegacyKeychain` in lib/platform/secure_store.dart,
+/// docs/decisions.d/FIX-macos-legacy-keychain-prompt.md): `read` answers `status` and `value`,
+/// `delete` the status; both run on `LegacyKeychain.queue` and never show a dialog.
+enum LegacyKeychainChannel {
+  /// Connects the channel to the engine of the main window.
+  static func attach(messenger: FlutterBinaryMessenger) {
+    let channel = FlutterMethodChannel(name: "bothy/legacy_keychain", binaryMessenger: messenger)
+    channel.setMethodCallHandler { call, result in
+      guard let args = call.arguments as? [String: Any],
+        let service = args["service"] as? String, let account = args["account"] as? String
+      else {
+        result(FlutterError(code: "legacy_keychain", message: "service and account expected", details: nil))
+        return
+      }
+      switch call.method {
+      case "read":
+        LegacyKeychain.queue.async {
+          let (status, value) = LegacyKeychain.read(service: service, account: account)
+          DispatchQueue.main.async {
+            result(["status": Int(status), "value": value as Any])
+          }
+        }
+      case "delete":
+        LegacyKeychain.queue.async {
+          let status = LegacyKeychain.delete(service: service, account: account)
+          DispatchQueue.main.async { result(Int(status)) }
+        }
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
+  }
+}
+
 /// The clipboard of the block copies over the method channel `bothy/clipboard` (docs/spec/
 /// 01-product.md 6.12 item 4, brief M4-48; `PlatformRichClipboard` in
 /// lib/app/rich_clipboard.dart): `write` puts the plain text and the HTML form of a quote on the
