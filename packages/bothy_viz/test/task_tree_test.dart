@@ -33,11 +33,10 @@ void main() {
     test('the frame list becomes a tree: a parent above its children, '
         'in frame order', () {
       final roots = card(_treeRun).tasks;
-      expect([for (final r in roots) r.label], [
-        'Build and review',
-        'Check the tests',
-        null,
-      ]);
+      expect(
+        [for (final r in roots) r.label],
+        ['Build and review', 'Check the tests', null],
+      );
       final [flow, check, job] = roots;
       expect(flow.kind, TaskNodeKind.workflow);
       expect([for (final c in flow.children) c.label], ['build', 'review']);
@@ -64,7 +63,10 @@ void main() {
     });
 
     test('tasks_truncated reaches the card; a run without tasks has none', () {
-      expect(card('0192f4a0-7b1c-7000-8a00-000000000402').tasksTruncated, isTrue);
+      expect(
+        card('0192f4a0-7b1c-7000-8a00-000000000402').tasksTruncated,
+        isTrue,
+      );
       expect(card(_treeRun).tasksTruncated, isFalse);
       final plain = model.cards.where(
         (c) => c.runId.endsWith('403') || c.runId.endsWith('404'),
@@ -143,7 +145,10 @@ void main() {
     testWidgets('a branch collapses and expands, and stays collapsed across '
         'frames', (tester) async {
       final first = card(_treeRun);
-      await pump(tester, RunCardTreeMark(key: const ValueKey('r'), model: first));
+      await pump(
+        tester,
+        RunCardTreeMark(key: const ValueKey('r'), model: first),
+      );
       const flowId = '0192f4a0-7b1c-7000-8a00-000000000501';
       await tester.tap(find.byKey(const ValueKey('taskTree.toggle.$flowId')));
       await tester.pump();
@@ -185,7 +190,9 @@ void main() {
       );
       expect(
         find.bySemanticsLabel(
-          RegExp(r'^review, Subagent, Running, .+, Tool Grep, level 2, 2 of 2$'),
+          RegExp(
+            r'^review, Subagent, Running, .+, Tool Grep, level 2, 2 of 2$',
+          ),
         ),
         findsOneWidget,
       );
@@ -209,10 +216,7 @@ void main() {
 
     testWidgets('German texts', (tester) async {
       await tester.pumpWidget(
-        app(
-          RunCardTreeMark(model: card(_treeRun)),
-          locale: const Locale('de'),
-        ),
+        app(RunCardTreeMark(model: card(_treeRun)), locale: const Locale('de')),
       );
       await dsPumpIcons(tester);
       expect(find.text('Hintergrundjob 1'), findsOneWidget);
@@ -256,11 +260,11 @@ void main() {
       ]);
       final review = rows[runRow + 3];
       expect(review[tables.first.columns.indexOf('State')].text, 'Running');
-      expect(review[tables.first.columns.indexOf('Current step')].text, 'Tool Grep');
       expect(
-        tables.first.texts,
-        contains('More agents and jobs than shown'),
+        review[tables.first.columns.indexOf('Current step')].text,
+        'Tool Grep',
       );
+      expect(tables.first.texts, contains('More agents and jobs than shown'));
     });
   });
 
