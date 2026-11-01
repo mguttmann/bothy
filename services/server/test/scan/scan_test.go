@@ -161,7 +161,7 @@ func TestScan(t *testing.T) {
 			Scan(&payload, &actorKind); err != nil {
 			t.Fatal(err)
 		}
-		if bytes.Contains(payload, []byte("null")) || actorKind != nil || !bytes.Contains(payload, []byte(`"scan_status": "clean"`)) && !bytes.Contains(payload, []byte(`"scan_status":"clean"`)) {
+		if testkit.HasJSONNull(payload) || actorKind != nil || !bytes.Contains(payload, []byte(`"scan_status": "clean"`)) && !bytes.Contains(payload, []byte(`"scan_status":"clean"`)) {
 			t.Errorf("event %s actor %v", payload, actorKind)
 		}
 		if n := audits(u.FileID); n != 0 {

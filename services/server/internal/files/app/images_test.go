@@ -207,7 +207,7 @@ func TestProcessImageCommitsOriginalBeforeThumbnails(t *testing.T) {
 		t.Errorf("view thumbnails %+v", view.Thumbnails)
 	}
 	for _, ev := range e.events.list {
-		if bytes.Contains(ev.Payload, []byte("null")) || bytes.Contains(ev.Payload, []byte(cleanedPrefix)) {
+		if testkit.HasJSONNull(ev.Payload) || bytes.Contains(ev.Payload, []byte(cleanedPrefix)) {
 			t.Errorf("payload %s", ev.Payload)
 		}
 	}

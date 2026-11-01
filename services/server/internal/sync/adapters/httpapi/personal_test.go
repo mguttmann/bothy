@@ -19,6 +19,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/messaging"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver/httpservertest"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg/pgtest"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	mw "github.com/OWNER/bothy/services/server/test/messagingworld"
 )
 
@@ -119,7 +120,7 @@ func (e *env) personalEvents(t *testing.T, typ string) []eventRow {
 			&r.truncated, &r.payload, &r.correlation); err != nil {
 			t.Fatal(err)
 		}
-		if strings.Contains(r.payload, "null") {
+		if testkit.HasJSONNull([]byte(r.payload)) {
 			t.Errorf("JSON null in %s", r.payload)
 		}
 		out = append(out, r)

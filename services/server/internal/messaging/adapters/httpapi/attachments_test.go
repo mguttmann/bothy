@@ -3,7 +3,6 @@
 package httpapi_test
 
 import (
-	"bytes"
 	"encoding/json"
 	"testing"
 	"time"
@@ -11,6 +10,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/messaging"
 	"github.com/OWNER/bothy/services/server/internal/messaging/adapters/httpapi"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // TestMessageREST_Attachments (brief M3-07 design note 6, requirement 19): the REST form lists the
@@ -52,7 +52,7 @@ func TestMessageREST_Attachments(t *testing.T) {
 		t.Errorf("file %+v", first)
 	}
 	b, err := json.Marshal(out)
-	if err != nil || bytes.Contains(b, []byte("null")) {
+	if err != nil || testkit.HasJSONNull(b) {
 		t.Fatalf("REST message %s has a JSON null (%v)", b, err)
 	}
 	m.Attachments, m.HasAttachments = []messaging.Attachment{}, false

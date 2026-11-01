@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/internal/runs/domain"
 )
 
@@ -76,7 +77,7 @@ func TestAppCommandPayload(t *testing.T) {
 		if err := json.Unmarshal(p, &m); err != nil {
 			t.Fatal(err)
 		}
-		if _, ok := m["run_id"]; ok || m["control"] != control || strings.Contains(string(p), "null") {
+		if _, ok := m["run_id"]; ok || m["control"] != control || testkit.HasJSONNull(p) {
 			t.Fatalf("payload %s", p)
 		}
 	}

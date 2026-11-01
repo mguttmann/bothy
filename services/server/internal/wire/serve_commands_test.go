@@ -152,7 +152,7 @@ func (w *cmdWorld) do(s send) (int, []byte, http.Header) {
 	}
 	defer func() { _ = resp.Body.Close() }()
 	b, _ := io.ReadAll(resp.Body)
-	if bytes.Contains(b, []byte("null")) {
+	if testkit.HasJSONNull(b) {
 		w.t.Fatalf("%s %s answered JSON null: %s", s.method, s.path, b)
 	}
 	return resp.StatusCode, b, resp.Header
@@ -1305,7 +1305,7 @@ var (
 
 // validateSchema validates p against the schema name of docs/api/openapi.yaml; null is refused.
 func validateSchema(name string, p []byte) error {
-	if bytes.Contains(p, []byte("null")) {
+	if testkit.HasJSONNull(p) {
 		return errors.New("null in the payload")
 	}
 	model, err := contractModel()

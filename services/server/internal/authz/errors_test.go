@@ -12,6 +12,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/authz"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // sortedIDs returns n new ids in ascending order.
@@ -58,7 +59,7 @@ func TestInvariantError_I1(t *testing.T) {
 	if string(body) != want {
 		t.Fatalf("extensions\n%s\nwant\n%s", body, want)
 	}
-	if strings.Contains(string(body), "null") {
+	if testkit.HasJSONNull(body) {
 		t.Fatal("null in the extensions")
 	}
 }

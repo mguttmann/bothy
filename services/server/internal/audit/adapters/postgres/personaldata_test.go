@@ -20,6 +20,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/audit/domain"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/personaldata"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // chainBuilder appends chained rows: every row links the hash of the one before it.
@@ -144,10 +145,13 @@ func TestPersonalDataExport(t *testing.T) {
 	schema := auditSchema(t)
 	allowed := []string{"seq", "occurred_at", "action", "decision", "reason_code", "resource_kind", "resource_id", "actor_kind", "actor_id"}
 	for i, raw := range lines {
-		for _, banned := range []string{"hash", "ip_", "signature", "details", "Sam wrote", "about Robin", "device", "session", "correlation", "null"} {
+		for _, banned := range []string{"hash", "ip_", "signature", "details", "Sam wrote", "about Robin", "device", "session", "correlation"} {
 			if bytes.Contains(raw, []byte(banned)) {
 				t.Fatalf("line %d holds %q: %s", i, banned, raw)
 			}
+		}
+		if testkit.HasJSONNull(raw) {
+			t.Fatalf("line %d holds JSON null: %s", i, raw)
 		}
 		v, err := jsonschema.UnmarshalJSON(bytes.NewReader(raw))
 		if err != nil {

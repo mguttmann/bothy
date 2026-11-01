@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
-	"strings"
 	"testing"
 	"time"
 
@@ -35,6 +34,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver/httpservertest"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg/pgtest"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	syncpg "github.com/OWNER/bothy/services/server/internal/sync/adapters/postgres"
 	"github.com/OWNER/bothy/services/server/internal/sync/adapters/telemetry"
 	syncapp "github.com/OWNER/bothy/services/server/internal/sync/app"
@@ -342,7 +342,7 @@ func (w *world) events(typ string) []event {
 		if err := rows.Scan(&e.Type, &e.ResourceKind, &e.ResourceID, &e.ReceiveAction, &e.Actor, &e.Audience, &raw, &e.HasScope); err != nil {
 			w.t.Fatal(err)
 		}
-		if strings.Contains(raw, "null") {
+		if testkit.HasJSONNull([]byte(raw)) {
 			w.t.Errorf("event payload with null: %s", raw)
 		}
 		if err := json.Unmarshal([]byte(raw), &e.Payload); err != nil {

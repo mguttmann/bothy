@@ -139,7 +139,7 @@ func presencePayload(t *testing.T, raw json.RawMessage) rest.AgentPresencePayloa
 	}
 	var env map[string]json.RawMessage
 	_ = json.Unmarshal(raw, &env)
-	if _, ok := env["seq"]; ok || bytes.Contains(raw, []byte("permission_version")) || bytes.Contains(raw, []byte("null")) {
+	if _, ok := env["seq"]; ok || bytes.Contains(raw, []byte("permission_version")) || testkit.HasJSONNull(raw) {
 		t.Fatalf("ephemeral envelope with seq, permission_version or null: %s", raw)
 	}
 	var p rest.AgentPresencePayload

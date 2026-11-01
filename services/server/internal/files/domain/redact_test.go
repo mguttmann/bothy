@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/OWNER/bothy/services/server/internal/files/domain"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // fullFileUpdated is a stored file.updated v1 payload with every member of File set.
@@ -49,10 +50,13 @@ func TestRedactFileEvent(t *testing.T) {
 			t.Fatalf("%s = %s", k, gv)
 		}
 	}
-	for _, leak := range []string{"quarterly", "ab12", "image/png", "0002", "server", `"de"`, "null"} {
+	for _, leak := range []string{"quarterly", "ab12", "image/png", "0002", "server", `"de"`} {
 		if strings.Contains(string(out), leak) {
 			t.Fatalf("redacted payload holds %q: %s", leak, out)
 		}
+	}
+	if testkit.HasJSONNull(out) {
+		t.Fatalf("redacted payload holds JSON null: %s", out)
 	}
 	again, err := domain.RedactFileEvent("file.updated", 1, out)
 	if err != nil || !bytes.Equal(again, out) {

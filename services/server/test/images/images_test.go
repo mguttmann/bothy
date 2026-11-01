@@ -26,6 +26,7 @@ import (
 	filesapp "github.com/OWNER/bothy/services/server/internal/files/app"
 	"github.com/OWNER/bothy/services/server/internal/files/domain"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // TestImages runs every case on one shared server: the hooks act per file ID, so cases that hold
@@ -609,7 +610,7 @@ func checkImageEvents(t *testing.T, e *env, id string) {
 	t.Helper()
 	evs := e.events(t, id)
 	for i, ev := range evs {
-		if bytes.Contains(ev.Raw, []byte("null")) || ev.Payload.File.ID != id {
+		if testkit.HasJSONNull(ev.Raw) || ev.Payload.File.ID != id {
 			t.Errorf("event %d: %s", i, ev.Raw)
 		}
 		noMetadata(t, "a file.updated payload", ev.Raw)

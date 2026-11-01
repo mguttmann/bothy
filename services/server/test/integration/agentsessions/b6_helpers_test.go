@@ -8,7 +8,6 @@ import (
 	"log/slog"
 	"net/http"
 	"path/filepath"
-	"strings"
 	"sync"
 	"testing"
 
@@ -16,6 +15,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/agents/adapters/agentstest"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver/httpservertest"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	gosync "github.com/OWNER/bothy/services/server/internal/sync"
 	syncpg "github.com/OWNER/bothy/services/server/internal/sync/adapters/postgres"
 )
@@ -183,7 +183,7 @@ func b6ValidFrame(t *testing.T, c *specschema.Contract, env gosync.Envelope) {
 	t.Helper()
 	raw, err := json.Marshal(map[string]any{"op": "dispatch", "d": env})
 	must(t, err)
-	if strings.Contains(string(raw), "null") {
+	if testkit.HasJSONNull(raw) {
 		t.Fatalf("null in %s", raw)
 	}
 	if err := c.ValidateServerFrame(raw); err != nil {

@@ -21,6 +21,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/personaldata"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // personalFixture is the pgWorld plus the access history of Alex (the subject) and Sam (another
@@ -113,7 +114,7 @@ func section(t *testing.T, w *personaldata.MemoryWriter, key string) []map[strin
 	if err := exportSchema(t, "access."+key).Validate(v); err != nil {
 		t.Fatalf("section %s does not match its schema: %v\n%s", key, err, raw)
 	}
-	if strings.Contains(string(raw), "null") {
+	if testkit.HasJSONNull(raw) {
 		t.Fatalf("null in section %s: %s", key, raw)
 	}
 	var out []map[string]any

@@ -118,7 +118,7 @@ func (w *consumerWorld) call(base string, a consumerAgent, method, path string, 
 	}
 	defer func() { _ = resp.Body.Close() }()
 	b, _ := io.ReadAll(resp.Body)
-	if bytes.Contains(b, []byte("null")) {
+	if testkit.HasJSONNull(b) {
 		w.t.Fatalf("%s %s answered JSON null: %s", method, path, b)
 	}
 	return resp.StatusCode, b
@@ -415,7 +415,7 @@ func TestAgentConsumers(t *testing.T) {
 				var f redeliveredFrame
 				_ = json.Unmarshal(raw, &f)
 				var ev rest.Event
-				if err := ev.UnmarshalJSON(raw); err != nil || bytes.Contains(raw, []byte("null")) {
+				if err := ev.UnmarshalJSON(raw); err != nil || testkit.HasJSONNull(raw) {
 					t.Fatalf("dispatch %s: %v", raw, err)
 				}
 				flags = append(flags, f)

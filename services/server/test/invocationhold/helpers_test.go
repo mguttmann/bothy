@@ -592,7 +592,7 @@ func validInvocationPayload(t *testing.T, payload string) {
 	if !ok {
 		t.Fatal("no schema AgentInvocationPayload")
 	}
-	if strings.Contains(payload, "null") || strings.Contains(payload, "invocation_token") {
+	if testkit.HasJSONNull([]byte(payload)) || strings.Contains(payload, "invocation_token") {
 		t.Fatalf("payload %s", payload)
 	}
 	if valid, problems := schema_validation.NewSchemaValidator().ValidateSchemaString(proxy.Schema(), payload); !valid {

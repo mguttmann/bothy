@@ -14,6 +14,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/internal/audit/domain"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // goldenFile is the chain the tests recompute; its hashes were computed independently (see the
@@ -166,10 +167,13 @@ func TestCanonicalRow_OmitsNull(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, col := range []string{"actor_principal_id", "actor_device_id", "actor_session_id", "deny_reason",
-		"resource_kind", "resource_id", "correlation_id", `"hash"`, "null"} {
+		"resource_kind", "resource_id", "correlation_id", `"hash"`} {
 		if strings.Contains(string(c), col) {
 			t.Errorf("canonical form contains %s: %s", col, c)
 		}
+	}
+	if testkit.HasJSONNull(c) {
+		t.Errorf("canonical form holds JSON null: %s", c)
 	}
 	for _, col := range []string{`"details":{}`, `"seq":7`, `"decision":"allow"`} {
 		if !strings.Contains(string(c), col) {

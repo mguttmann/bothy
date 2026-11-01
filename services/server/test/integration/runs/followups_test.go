@@ -21,6 +21,7 @@ import (
 	"github.com/OWNER/bothy/services/server/api/specschema"
 	"github.com/OWNER/bothy/services/server/internal/agents/adapters/agentstest"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // TestFollowupStatesForwardOnly: absorbed -> delivered gives 409 invalid_state_transition and
@@ -504,7 +505,7 @@ func (w *world) validateFollowupPayloads() {
 		w.t.Fatal("no agent.followup")
 	}
 	for _, p := range payloads {
-		if strings.Contains(p, "null") {
+		if testkit.HasJSONNull([]byte(p)) {
 			w.t.Fatalf("null in %s", p)
 		}
 		if valid, problems := schema_validation.NewSchemaValidator().ValidateSchemaString(proxy.Schema(), p); !valid {

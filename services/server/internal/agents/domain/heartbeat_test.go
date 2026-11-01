@@ -13,6 +13,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/agents/domain"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // runA and runB are run ids of the form of R-DM-01 (UUID version 7).
@@ -221,7 +222,7 @@ func TestStoredDetails(t *testing.T) {
 		t.Fatal(fes)
 	}
 	raw := r.StoredDetails()
-	if bytes.Contains(raw, []byte("null")) || !bytes.Contains(raw, []byte(`"active_runs":[]`)) || bytes.Contains(raw, []byte("capabilities")) {
+	if testkit.HasJSONNull(raw) || !bytes.Contains(raw, []byte(`"active_runs":[]`)) || bytes.Contains(raw, []byte("capabilities")) {
 		t.Fatalf("stored %s", raw)
 	}
 	back, err := domain.ReportFromStore(domain.RuntimeOnline, "2.0", domain.Organization, domain.ToolChat, raw)

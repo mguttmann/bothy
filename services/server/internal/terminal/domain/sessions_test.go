@@ -14,6 +14,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/internal/terminal/domain"
 )
 
@@ -85,7 +86,7 @@ func members(t *testing.T, c domain.SessionClaims) []string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(string(b), "null") {
+	if testkit.HasJSONNull(b) {
 		t.Fatalf("null in %s", b)
 	}
 	dec := json.NewDecoder(strings.NewReader(string(b)))

@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: Apache-2.0
+rules:
+  - id: bothy-go-test-null-substring
+    languages: [go]
+    severity: ERROR
+    paths:
+      include: ["*_test.go", "services/*/test/**"]
+      # The one place that finds a JSON null by decoding.
+      exclude: ["services/*/internal/platform/testkit/*"]
+    message: >-
+      A test looks for a JSON null (ADR 0053) as the text null. A random token, a name or an ID in
+      a string can hold those letters, so the check fails correct responses at random (issue
+      #238). Decode the JSON and walk it: testkit.HasJSONNull or testkit.NoJSONNull
+      (services/server/internal/platform/testkit). A check of text that is not JSON carries
+      `// nosemgrep: bothy-go-test-null-substring -- <reason>`.
+    pattern-either:
+      - pattern: strings.Contains($X, "null")
+      - pattern: bytes.Contains($X, []byte("null"))
+      - patterns:
+          - pattern-inside: |
+              for $I, $V := range []string{..., "null", ...} { ... }
+          - pattern-either:
+              - pattern: strings.Contains($X, $V)
+              - pattern: bytes.Contains($X, []byte($V))

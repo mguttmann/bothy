@@ -60,6 +60,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg/pgtest"
 	"github.com/OWNER/bothy/services/server/internal/platform/secrets"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/internal/sync"
 	syncpg "github.com/OWNER/bothy/services/server/internal/sync/adapters/postgres"
 	"github.com/OWNER/bothy/services/server/internal/sync/adapters/telemetry"
@@ -488,7 +489,7 @@ func (w *World) Want(r *httpservertest.Response, status int, code string) map[st
 		return m
 	}
 	if len(r.Body) > 0 {
-		if strings.Contains(string(r.Body), "null") {
+		if testkit.HasJSONNull(r.Body) {
 			w.t.Errorf("JSON null in %s", r.Body)
 		}
 		Must(w.t, json.Unmarshal(r.Body, &m))

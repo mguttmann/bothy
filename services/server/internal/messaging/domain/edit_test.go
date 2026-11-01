@@ -15,6 +15,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/messaging/domain"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // TestEditRules (M1-58): an edit with the same content and the same mention set (in any order) is
@@ -98,7 +99,7 @@ func validate(t *testing.T, name string, p json.RawMessage) {
 		}
 		t.Fatalf("payload does not match %s: %s", name, p)
 	}
-	if strings.Contains(string(p), "null") {
+	if testkit.HasJSONNull(p) {
 		t.Fatalf("null in %s", p)
 	}
 }

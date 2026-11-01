@@ -28,6 +28,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/platform/buildinfo"
 	"github.com/OWNER/bothy/services/server/internal/platform/egress"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // subscribed installs Tracker with G-6 and subscribes it; it returns the world, the owner client,
@@ -156,7 +157,7 @@ func ScenarioWebhookDeliveryG10(t *testing.T) {
 	if err != nil || time.Since(time.Unix(ts, 0)) > time.Minute {
 		t.Fatalf("timestamp %s", req.Header.Get("webhook-timestamp"))
 	}
-	if strings.Contains(string(req.Body), "null") {
+	if testkit.HasJSONNull(req.Body) {
 		t.Fatalf("JSON null in %s", req.Body)
 	}
 	var env map[string]any

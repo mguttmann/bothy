@@ -84,6 +84,10 @@ and makes changes unambiguous. Normative in
   integration tests) in [06-api.md](../spec/06-api.md), section 15.
 - Tolerance test G5: the hand-written layer of every SDK skips a received `null` without an error.
 - Test: a request with `null` in an optional field returns `400` with `validation_failed`.
+- Tests look for `null` in a body or payload by decoding it (`testkit.HasJSONNull` and
+  `testkit.NoJSONNull` in `services/server/internal/platform/testkit`), never as text: a random
+  token can hold the letters `null`. The Semgrep rule `bothy-go-test-null-substring` refuses the
+  text check in Go tests (docs/decisions.d/FLAKE-null-substring.md).
 
 ## Pros and Cons of the Options
 
