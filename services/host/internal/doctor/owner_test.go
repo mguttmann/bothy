@@ -3,7 +3,11 @@
 package doctor
 
 import (
+	"fmt"
+	"path/filepath"
 	"slices"
+	"strings"
+	"sync"
 	"testing"
 
 	"github.com/OWNER/bothy/services/host/internal/hostos"
@@ -177,5 +181,84 @@ func TestSeparateModeUnchanged(t *testing.T) {
 	y.cfg.SessionUsers = []string{alex, svc}
 	if r := y.run(); !has(codes(r, HD1), CodeSessionUserIsService) || !r.StartRefused() {
 		t.Fatalf("service user as session user passes: %v", codes(r, HD1))
+	}
+}
+
+// countingOS counts the Lstat and ReadDir calls of the helper below one folder, except the look
+// for the login file of HD6.
+type countingOS struct {
+	hostos.Security
+	hostos.Lister
+	below string
+	mu    *sync.Mutex
+	n     *int
+}
+
+func (c countingOS) count(p string) {
+	if (strings.HasPrefix(p, c.below+"/") || p == c.below) && filepath.Base(p) != ".credentials.json" {
+		c.mu.Lock()
+		*c.n++
+		c.mu.Unlock()
+	}
+}
+
+func (c countingOS) Lstat(p string) (hostos.FileSec, error) {
+	c.count(p)
+	return c.Security.Lstat(p)
+}
+
+func (c countingOS) ReadDir(p string) ([]string, error) {
+	c.count(p)
+	return c.Lister.ReadDir(p)
+}
+
+// countBelow makes the helpers of x count their Lstat and ReadDir calls below dir.
+func countBelow(x *tw, dir string) *int {
+	n := new(int)
+	mu := &sync.Mutex{}
+	x.wrapHelper = func(env HelperEnv) HelperEnv {
+		c := countingOS{Security: env.Security, Lister: env.Files, below: dir, mu: mu, n: n}
+		env.Security, env.Files = c, c
+		return env
+	}
+	return n
+}
+
+// fillTree creates a tree of folders and files below dir owned by id.
+func fillTree(x *tw, dir, id string) {
+	x.w.Dir(dir, id, 0o700)
+	for i := range 5 {
+		d := fmt.Sprintf("%s/projects/p%d", dir, i)
+		x.w.Dir(dir+"/projects", id, 0o700)
+		x.w.Dir(d, id, 0o700)
+		for j := range 5 {
+			x.w.File(fmt.Sprintf("%s/s%d.jsonl", d, j), id, 0o600, "{}")
+		}
+	}
+}
+
+// TestOwnerAccountModeDoesNotWalkTheHome: in the owner account mode there is no other session
+// user, so neither the chain walk of HD11 nor the entry scan can find anything; the helper must
+// not walk the owner's home (red team of FEAT-terminal-admin-user: a real home with a big
+// ~/.claude ran into helper_unreachable and entry_scan_timeout). The separate mode still walks.
+func TestOwnerAccountModeDoesNotWalkTheHome(t *testing.T) {
+	x := newOwnerTW(t)
+	x.auth[owner] = map[string]string{"": "claude.ai"}
+	fillTree(x, ownerHome+"/.claude", "1000")
+	n := countBelow(x, ownerHome+"/.claude")
+	r := x.run()
+	if f := failed(r); len(f) > 0 || r.StartRefused() || !r.SessionUserReady(owner) {
+		t.Fatalf("owner account mode refused: %v", f)
+	}
+	if *n != 0 {
+		t.Errorf("the helper touched %d entries of the owner's ~/.claude", *n)
+	}
+
+	y := newTW(t)
+	fillTree(y, "/home/"+alex+"/.claude", y.w.UID(alex))
+	m := countBelow(y, "/home/"+alex+"/.claude")
+	y.run()
+	if *m == 0 {
+		t.Errorf("the separate mode no longer walks ~/.claude")
 	}
 }

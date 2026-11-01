@@ -35,7 +35,7 @@ else.
 | HD8 | helper must not read the state directory | helper part not applicable (warning); the service part still keeps every other person account out |
 | HD9 | foreign homes must not be listable | warning (an administrator can read them anyway) |
 | HD10 | programs owned by `root`, peer check proven per platform | owner account counts as trusted owner; unproven peer check, `ptrace_scope`, codesign flags are warnings; the peer check itself still runs |
-| HD11 | places for all owned by `root`, writable by no session user | owner account counts as trusted owner; still refused when another person account or everyone can write |
+| HD11 | places for all owned by `root`, writable by no session user | owner account counts as trusted owner; still refused when another person account or everyone can write; the chain walk and the entry scan, which only look for entries of other session users, are skipped (D-OA-13) |
 | Local confirmation | optional | refused (nobody sits at the machine) |
 | SR12 | own assignment whose name the host reports | plus: the flag of the report equals the flag of the assignment, and the person is an active owner |
 

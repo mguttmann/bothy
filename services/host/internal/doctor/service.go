@@ -707,7 +707,7 @@ func (r *run) request(u string) Request {
 	return Request{
 		Mode: mode, SessionUser: u, Others: slices.DeleteFunc(slices.Clone(r.users), func(s string) bool { return s == u }),
 		ServiceUser: r.env.ServiceUser, ClaudeBin: r.claudeBin, SearchList: r.search, Declaration: r.env.Declaration,
-		Workdirs: dirs, ForeignHomes: r.foreignHomes(), StateDir: r.env.StateDir, KeyFile: r.env.KeyFile,
+		OwnerAccount: r.env.ownerMode(), Workdirs: dirs, ForeignHomes: r.foreignHomes(), StateDir: r.env.StateDir, KeyFile: r.env.KeyFile,
 		AuthStatusTimeout: r.env.Config.AuthStatusTimeout, EntryScanTimeout: r.env.Config.EntryScanTimeout,
 	}
 }
