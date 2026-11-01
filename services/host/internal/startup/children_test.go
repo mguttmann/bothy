@@ -20,6 +20,7 @@ import (
 	"github.com/OWNER/bothy/services/host/internal/hostos"
 	"github.com/OWNER/bothy/services/host/internal/hostos/hostostest"
 	"github.com/OWNER/bothy/services/host/internal/localchan"
+	"github.com/OWNER/bothy/services/host/internal/platform/testkit"
 )
 
 // childArg marks the test binary started as the stand-in PTY helper of TestChildHelperProcess;
@@ -76,8 +77,7 @@ func TestChildHelpers(t *testing.T) {
 	}}
 	defer kids.Close()
 	h := ChannelHelpers{GOOS: "linux", Users: w.Users(), Services: kids, Endpoint: kids.Endpoint}
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
+	ctx := testkit.Context(t)
 	res, err := h.Check(ctx, alex, doctor.Request{})
 	if err != nil {
 		t.Fatal(err)
@@ -101,7 +101,7 @@ func TestChildHelpers(t *testing.T) {
 	// The child is started again after it ended.
 	p, _ := os.FindProcess(pid)
 	_ = p.Kill()
-	deadline := time.Now().Add(10 * time.Second)
+	deadline := testkit.Deadline()
 	for {
 		res, err = h.Check(ctx, alex, doctor.Request{})
 		if err == nil && res.PlaceCode != "child-"+strconv.Itoa(pid) {
@@ -115,14 +115,14 @@ func TestChildHelpers(t *testing.T) {
 	// Close ends the child through its standard input.
 	pid2, _ := kids.MainPID(ctx, hostos.HelperServiceName("linux", alex))
 	kids.Close()
-	if !waitGone(pid2, 10*time.Second) {
+	if !waitGone(pid2) {
 		t.Error("the child outlived Close")
 	}
 }
 
 // waitGone waits until no process pid exists any more.
-func waitGone(pid int, d time.Duration) bool {
-	deadline := time.Now().Add(d)
+func waitGone(pid int) bool {
+	deadline := testkit.Deadline()
 	for time.Now().Before(deadline) {
 		p, err := os.FindProcess(pid)
 		if err != nil || p.Signal(sigZero) != nil {
