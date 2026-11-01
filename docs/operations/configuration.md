@@ -500,7 +500,7 @@ Source: [10-backend-policy.md](../spec/10-backend-policy.md), section 17.
 
 | Key | Environment | Place | Type | Default | Meaning | Status |
 |---|---|---|---|---|---|---|
-| `billing.show_personal_estimates` | `BOTHY_BILLING__SHOW_PERSONAL_ESTIMATES` | Server | bool | `false` | Show amounts in mode `personal` too, as information | active |
+| `billing.show_personal_estimates` | `BOTHY_BILLING__SHOW_PERSONAL_ESTIMATES` | Server | bool | `true` | Show amounts in mode `personal` too, as information | active |
 | `billing.mismatch_alert_after` | `BOTHY_BILLING__MISMATCH_ALERT_AFTER` | Server | duration | `5m` | how long the reported mode may deviate from the configured mode before an alert goes out | active |
 | `reconciler.min_request_interval` |  | Reconciliation app |  | `60s` | Interval between requests to the Cost API |  |
 | `reconciler.lookback` |  | Reconciliation app |  | `3d` | this many days back are reconciled |  |

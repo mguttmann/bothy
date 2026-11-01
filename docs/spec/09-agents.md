@@ -979,7 +979,7 @@ Rules of `patchRun` and the gateway op `run.update` (both call the same use case
 | State | `state` | yes, as icon and word | yes |
 | Duration | `started_at` until now, or `duration_ms` | yes, counted up locally | yes |
 | Context in percent | `metrics.context_pct` | yes | no |
-| Costs | `cost`, with "Estimate" as long as `is_estimate` | only for `organization` | only for `organization` |
+| Costs | `cost`, with "Estimate" as long as `is_estimate` for `organization`, "information only" for `personal` (10 12.2, addendum of 2026-11-01) | yes, growing with the adapter's `/cost` patches | yes |
 | Backend badge | `billing_mode_used`, otherwise the configured mode | yes | yes |
 | Current tool | latest step `tool_call` with `status = running` | yes | no |
 | Last text | `last_text_excerpt` as a quote | yes | no |
@@ -2886,6 +2886,18 @@ runner writes the new values and a pending record (`run_id`, the reports) atomic
 repeated `run.finish` of the same run sends the stored reports and a delta is reported at most
 once (D-M2-34-11). The amounts are estimates of the CLI ("client-side estimates", [verified]); the
 server marks them as an estimate.
+
+Cost while the run works (addendum of 2026-11-01, FIX-cost-display): the pinned CLI states amounts
+only in a `result`, at the end of a turn, so a turn of an hour showed `0` until `run.finish`. The
+runner patches `/cost` (4.10) during the run: every `assistant` message adds its
+`message.usage` (`input_tokens`, `output_tokens`, `cache_read_input_tokens`,
+`cache_creation_input_tokens`, the 1-hour part of `cache_creation` at the 1-hour price) priced with
+the start prices of the server (10 12.3), which the runner ships as a byte copy that a test holds
+equal; the model name loses a `[...]` and a `-YYYYMMDD` suffix, a model without a price adds
+nothing, and one message counts once with its newest usage. Every `result` settles the value on
+the amount the run would book at that moment (the difference below, after the baseline). The value
+is an estimate for display; `run.finish` books from `costUSD` as below and the server replaces the
+run's cost with the booked sum (10 12.1 step 6).
 
 Session totals before a resume (RUNNER-RESUME-COST): the pinned CLI restores the cumulative values
 of a resumed session from the last `cost-state` line of the session's transcript

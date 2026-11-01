@@ -10,7 +10,8 @@ import 'package:client/running/running_now_view.dart';
 import 'package:client/running/running_sum.dart';
 import 'package:client/sidebar/providers.dart';
 import 'package:client/sync/message_ops_app.dart';
-import 'package:design_system/design_system.dart' show dsIsolate;
+import 'package:design_system/design_system.dart'
+    show DsBillingMode, DsCostText, dsIsolate;
 import 'package:domain/domain.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -228,6 +229,51 @@ void main() {
         find.text(
           '${en.runningSumOrganization('USD 0.80', en.costEstimate)} '
           '${en.runningPersonalNote}',
+        ),
+        findsOneWidget,
+      );
+      await host.dispose(tester);
+    },
+  );
+
+  testWidgets(
+    'a personal run shows its growing cost labelled "for information only" '
+    '(FIX-cost-display)',
+    (tester) async {
+      final host = await pumpView(tester);
+      // The run grows while it works: the runner patches /cost, the server sends the run.
+      await tester.runAsync(
+        () => host.db.runsDao.upsertIfNewer(
+          active(
+            3,
+            RunState.running,
+            channelN: 2,
+            agent: scout,
+            mode: BillingMode.personal,
+            micros: 1250000,
+          ).copyWith(version: const ResourceVersion(2)),
+        ),
+      );
+      await host.settle(tester);
+      final cost = find.descendant(
+        of: row(3),
+        matching: find.byKey(ValueKey('running.cost.${uuid(0x703)}')),
+      );
+      await pumpUntil(
+        tester,
+        () => cost.evaluate().isNotEmpty,
+        what: 'cost of the personal run',
+      );
+      final text = tester.widget<DsCostText>(cost);
+      expect(text.cost.money.amount, 1.25);
+      expect(text.cost.mode, DsBillingMode.personal);
+      expect(
+        find.descendant(
+          of: cost,
+          matching: find.textContaining(
+            en.costInformationOnly,
+            findRichText: true,
+          ),
         ),
         findsOneWidget,
       );

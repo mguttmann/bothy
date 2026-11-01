@@ -68,26 +68,28 @@ void main() {
   });
 
   testWidgets(
-    'a personal run card and a card without permission show no cost',
+    'a personal run card shows its cost labelled "information only" (FIX-cost-display)',
     (tester) async {
       final handle = tester.ensureSemantics();
       final personal = models.normal.cards.firstWhere(
         (c) => c.agentName == 'support-agent',
       );
-      await pump(
-        tester,
-        Column(
-          children: [
-            RunCardMark(model: personal),
-            RunCardMark(model: models.noCost.cards.first),
-          ],
-        ),
+      await pump(tester, RunCardMark(model: personal));
+      expect(
+        find.textContaining(RegExp(r'USD.*information only')),
+        findsOneWidget,
       );
-      expect(find.textContaining('USD'), findsNothing);
-      expect(find.textContaining('0.00'), findsNothing);
       handle.dispose();
     },
   );
+
+  testWidgets('a card without permission shows no cost', (tester) async {
+    final handle = tester.ensureSemantics();
+    await pump(tester, RunCardMark(model: models.noCost.cards.first));
+    expect(find.textContaining('USD'), findsNothing);
+    expect(find.textContaining('0.00'), findsNothing);
+    handle.dispose();
+  });
 
   testWidgets(
     'grouped series of one metric read differently, not by color alone',

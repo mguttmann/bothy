@@ -318,7 +318,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"backup.restore_test.sample_threads = 200  # default\n" +
 		"backup.restore_test.schedule = 0 5 * * 6  # default\n" +
 		"billing.mismatch_alert_after = 5m  # default\n" +
-		"billing.show_personal_estimates = false  # default\n" +
+		"billing.show_personal_estimates = true  # default\n" +
 		"branding.product_name_max_chars = 64  # default\n" +
 		"channel.history_backfill_limit_default = 20  # default\n" +
 		"channel.history_backfill_limit_max = 200  # default\n" +

@@ -571,11 +571,13 @@ Booking details (M2-22):
 | Agent card, console | Sums per agent, per space, per period | `cost.read.aggregate` |
 | Statistics | History per space, agent, model | `cost.read.aggregate`, [01-product.md](01-product.md) |
 
-Rules: amounts appear only in mode `organization`. Until reconciliation, every number carries the
-suffix "Estimate". In mode `personal` the interface shows the badge "Personal" and tokens,
-no amounts; there, amounts are only information, never an invoice (03). The switch
-`billing.show_personal_estimates` shows them anyway, labeled "Information, not
-billed".
+Rules: in mode `organization`, until reconciliation, every number carries the suffix "Estimate".
+In mode `personal` the interface shows the badge "Personal", the tokens and the amount at API
+prices labeled "Information, not billed"; there, amounts are only information, never an invoice
+(03). The switch `billing.show_personal_estimates` (on by default, addendum of 2026-11-01,
+FIX-cost-display) hides the `personal` amounts of the server answers when an operator turns it
+off; the badge and the tokens stay. The cost of a running run grows during the run from the
+adapter's `/cost` patches (09 4.10, 18.7) and becomes the booked sum at `run.finish`.
 
 Server side of the display rule (M2-22):
 
@@ -589,11 +591,11 @@ Server side of the display rule (M2-22):
   never names a person: in threads only costs per run ([20-privacy.md](20-privacy.md)
   section 9).
 - `Run.cost`, `RunSummary.cost`, the member `/cost` of the run document and `AgentSession.cost`
-  carry the stored values in both modes. Clients show amounts from them only for `organization`
-  ([09-agents.md](09-agents.md) 5.4, row "Costs"). Amounts that the switch may reveal for
-  `personal` come only from `getThreadCosts` (later also `getCostStats`), where the server applies
-  the switch, because `billing.show_personal_estimates` is a server key that clients cannot read
-  (spec gap).
+  carry the stored values in both modes. Clients show them in both modes, `personal` labeled
+  "information only" (addendum of 2026-11-01, FIX-cost-display; before, only `organization`,
+  [09-agents.md](09-agents.md) 5.4, row "Costs"). `getThreadCosts`, `getCostStats` and
+  `getStatsBackends` apply the switch on the server, because `billing.show_personal_estimates` is
+  a server key that clients cannot read (spec gap); the run members do not follow it.
 
 ### 12.3 Price table
 
@@ -793,7 +795,7 @@ The additions requested during drafting are decided (integration of 2026-10-10):
 
 | Name | Place | Default | Meaning |
 |---|---|---|---|
-| `billing.show_personal_estimates` | Server | `false` | Show amounts in mode `personal` too, as information |
+| `billing.show_personal_estimates` | Server | `true` | Show amounts in mode `personal` too, as information |
 | `billing.mismatch_alert_after` | Server | `5m` | how long the reported mode may deviate from the configured mode before an alert goes out |
 | `reconciler.min_request_interval` | Reconciliation app | `60s` | Interval between requests to the Cost API |
 | `reconciler.lookback` | Reconciliation app | `3d` | this many days back are reconciled |

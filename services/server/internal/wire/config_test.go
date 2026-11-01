@@ -433,7 +433,7 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"agent.presence_timeout":           {Kind: config.KindDuration, Default: "90s", Min: "1ms", Chapter: "04-sync-protocol.md"},
 		"agent.heartbeat_persist_interval": {Kind: config.KindDuration, Default: "60s", Min: "1ms", Chapter: "03-data-model.md"},
 		"billing.mismatch_alert_after":     {Kind: config.KindDuration, Default: "5m", Min: "1ms", Chapter: "10-backend-policy.md"},
-		"billing.show_personal_estimates":  {Kind: config.KindBool, Default: "false", Chapter: "10-backend-policy.md"},
+		"billing.show_personal_estimates":  {Kind: config.KindBool, Default: "true", Chapter: "10-backend-policy.md"},
 		// The statistics queries (M6-05).
 		"stats.cache_ttl":                  {Kind: config.KindDuration, Default: "5m", Min: "1s", Max: "1h", Chapter: "17-observability.md"},
 		"stats.cache_max_entries":          {Kind: config.KindInt, Default: "1000", Min: "1", Max: "1000000", Chapter: "17-observability.md"},

@@ -263,7 +263,8 @@ Every view has a table view with the same data as an alternative for screen read
 
 Shows the channels with running agents in lanes per space. A run is a card with agent, state
 (color and icon like the live box, [components.md](../design/components.md) section 2), current
-tool as a tool chip, badge of the backend policy, costs in the mode `organization` and a note
+tool as a tool chip, badge of the backend policy, costs (mode `organization` as "Estimate", mode
+`personal` as "information only", addendum of 2026-11-01, FIX-cost-display) and a note
 "Approval waiting" when an approval card is open. A click on a card opens the thread via deep link
 (console: "Open in the app"). Data: `stats.live`.
 
@@ -300,8 +301,9 @@ Modes and supported modes come from the agent record, `rate_limit` from the last
 (absent when the adapter never reported one). Denials and costs count only rows of the visible
 channels; `billing_mode_switches` has no channel and counts for the agents of the result, whose
 configured mode the caller sees anyway. Costs come from the own measurement, which is no billing
-record (3.4 item 4), so every amount carries `is_estimate`; amounts in mode `personal` appear only
-with `billing.show_personal_estimates` ([10-backend-policy.md](10-backend-policy.md), section 12.2).
+record (3.4 item 4), so every amount carries `is_estimate`; amounts in mode `personal` appear
+while `billing.show_personal_estimates` is on, its default ([10-backend-policy.md](10-backend-policy.md),
+section 12.2).
 The range must not start before `now - retention.stats_minutes`; a row counts when its minute
 starts in the range.
 
