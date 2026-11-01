@@ -73,3 +73,42 @@ async def test_stop_during_background_work_ends_everything(world: World) -> None
     assert await world.ended(run_id) == "cancelled"
     assert texts(world) == ["Done."]
     await world.until(lambda: world.calls("turn_end"))
+
+
+async def test_followup_during_a_long_turn_is_answered_without_waiting_for_its_end(
+    world: World,
+) -> None:
+    # FIX-runner-reachable-2: Alex asks for the state while a turn still runs a tool call and
+    # background work runs. The runner writes the follow-up at once (it never holds it until the
+    # turn ends); the pinned CLI takes it at the next tool boundary into the running turn, whose
+    # answer then covers it. The answer is posted while the background job still runs.
+    job = world.gate("background_gate")
+    turn = world.gate("turn_gate")
+    world.scenario(
+        fixture="plain",
+        turn_gate=str(turn),
+        gate_after_lines=1,  # the turn is inside a tool call
+        fold_queued=1,  # like the CLI: a queued line is taken at the next tool boundary
+        background_gate=str(job),
+        result_override={"result": "Started the suite. State: the form is fixed, the suite runs."},
+    )
+    await world.start(world.config(followup_grace="200ms"))
+    run = await world.fake.trigger("Fix the form, then run the suite", channel_id=world.forum_a)
+    await world.until(lambda: len(world.calls("gate_wait")) == 1)
+    message_id = await world.fake.deliver_followup(run.run_id, "What is the state?", author="alex")
+    # Written into the running turn at once, not held for the end of the turn.
+    await world.until(lambda: len(world.turns()[0]["stdin"]) == 2)
+    assert world.fake.followup_state(run.run_id, message_id) == "delivered"
+    assert texts(world) == []
+    world.release(turn)  # the tool call ends: the CLI takes the follow-up, the turn answers
+    await world.until(lambda: len(texts(world)) == 1)
+    assert texts(world) == ["Started the suite. State: the form is fixed, the suite runs."]
+    assert world.fake.followup_state(run.run_id, message_id) == "absorbed"
+    assert len(world.calls("folded")) == 1
+    # Nothing waited for the background job: it still runs, and so does the run.
+    assert world.calls("background_done") == []
+    assert world.state_of(run.run_id) == "running"
+    world.release(job)
+    assert await world.ended(run.run_id) == "completed"
+    assert texts(world)[1] == "The suite passed."
+    assert len(world.turns()) == 1

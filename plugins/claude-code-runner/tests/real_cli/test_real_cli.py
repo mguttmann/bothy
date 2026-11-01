@@ -246,3 +246,90 @@ def test_real_background_work_keeps_the_session_reachable() -> None:
         assert results[1].get("user_message_uuids") or results[1].get("user_message_uuid")
         assert not results[2].get("user_message_uuids")
         assert not results[2].get("user_message_uuid")
+
+
+@turn
+def test_real_line_written_during_a_turn_is_taken_at_the_next_tool_boundary() -> None:
+    """When a follow-up written during a turn reaches the model (FIX-runner-reachable-2).
+
+    The runner writes a follow-up at once, also while a turn runs. The pinned CLI takes such a
+    line into the running turn after the tool call that runs when it arrives (its echo comes
+    before the next tool call), not only when the turn ends; the turn's reply covers it.
+    """
+    key = Path(os.environ["CLAUDE_CODE_RUNNER_REAL_KEY_FILE"]).read_text().strip()
+    with tempfile.TemporaryDirectory() as work, tempfile.TemporaryDirectory() as config_dir:
+        env = {
+            "HOME": os.environ["HOME"],
+            "PATH": os.environ["PATH"],
+            "ANTHROPIC_API_KEY": key,
+            "CLAUDE_CONFIG_DIR": config_dir,
+        }
+        argv = [
+            claude_bin(),
+            "-p",
+            "--input-format",
+            "stream-json",
+            "--output-format",
+            "stream-json",
+            "--verbose",
+            "--replay-user-messages",
+            "--session-id",
+            str(uuid.uuid4()),
+            "--permission-mode",
+            "bypassPermissions",
+            "--permission-prompts",
+            "none",
+            "--tools",
+            "Bash",
+        ]
+        process = subprocess.Popen(
+            argv,
+            cwd=work,
+            env=env,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            text=True,
+        )
+        assert process.stdin is not None
+        assert process.stdout is not None
+        process.stdin.write(
+            _user(
+                "Run `sleep 15; echo one` and then `sleep 15; echo two`, each as its own "
+                "foreground Bash call. Then reply with the word done."
+            )
+        )
+        process.stdin.flush()
+        followup = _user("Reply also with the word status.")
+        followup_id = json.loads(followup)["uuid"]
+        events: list[str] = []
+        try:
+            for raw in process.stdout:
+                if not raw.startswith("{"):
+                    continue
+                message = json.loads(raw)
+                kind = message.get("type")
+                if kind == "assistant":
+                    for block in message["message"]["content"]:
+                        if block.get("type") == "tool_use":
+                            events.append("tool_use")
+                            if events.count("tool_use") == 1:
+                                process.stdin.write(followup)
+                                process.stdin.flush()
+                elif (
+                    kind == "user"
+                    and message.get("isReplay")
+                    and message.get("uuid") == followup_id
+                ):
+                    events.append("followup_echo")
+                elif kind == "result":
+                    events.append("result")
+                    process.stdin.close()
+                    break
+            process.wait(timeout=120)
+        finally:
+            if process.poll() is None:
+                process.kill()
+        assert "followup_echo" in events
+        echo = events.index("followup_echo")
+        assert events.index("result") > echo  # taken into the running turn
+        assert "tool_use" in events[echo:]  # before the second tool call, not at the turn's end
