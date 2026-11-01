@@ -43,7 +43,8 @@ void main() {
       world.stats['getStatsBackends'] = await _fixture(
         'StatsBackendReport.normal.json',
       );
-      // The first run of the frame belongs to a thread Alex sees, so its card opens it.
+      // The first run of the frame belongs to a thread Alex sees, and the server named its chat,
+      // so its card opens it.
       final frame = await _fixture('StatsLiveFrame.normal.json');
       final runs = (frame['runs']! as List<Object?>)
           .cast<Map<String, Object?>>();
@@ -53,6 +54,10 @@ void main() {
           'thread_id': seed.releaseNotes,
           'channel_id': seed.general,
           'space_id': seed.space,
+          'chat': {
+            ...(runs.first['chat']! as Map<String, Object?>),
+            'thread_id': seed.releaseNotes,
+          },
         },
       ];
       bool subscribed() =>
