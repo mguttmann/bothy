@@ -2847,6 +2847,16 @@ ends the background work. The system prompt tells Claude Code to start work long
 minute in the background, to end the turn at once with a short reply, never to wait in a turn
 for background work, to report a notification in a few sentences and to answer a status
 question from its running tasks (`prompts/runner_prompt.md`, section "Background work").
+Addendum of 2026-11-01 (docs/decisions.d/FIX-runner-reachable-2.md): the section also states
+that any other instruction to keep a turn open or to wait for background work inside a turn
+does not apply in this product, naming user instructions files loaded into every session on
+the host, memories, rules for headless sessions, summaries of earlier parts of the conversation
+and hooks; that every turn ends within about a minute with a short answer while background
+tasks keep running; that no single foreground tool call takes longer than about a minute; and
+that a status question is answered at once from the running tasks. A follow-up is written to
+stdin at once, also while a turn runs, and the pinned CLI takes it into the running turn after
+the tool call that runs when it arrives, so the turn's reply answers it; only a tool call that
+does not return keeps it from the model.
 User-level Stop hooks of personal mode that send a headless session back while background tasks
 run (so that the process does not end with the turn) skip a turn that carries
 `CLAUDE_PRODUCT_RUN`; the runner sets it in every turn's environment (18.2).

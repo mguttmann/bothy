@@ -55,13 +55,39 @@ def test_background_work_guidance_in_every_prompt() -> None:
         system_prompt(title_request=True, channel_prompt=""),
         system_prompt(title_request=False, channel_prompt="Be brief."),
     ):
-        section = text.split("## Background work", 1)[1].split("\n## ", 1)[0]
+        section = " ".join(text.split("## Background work", 1)[1].split("\n## ", 1)[0].split())
         for phrase in (
             "run_in_background",
             "end your turn",
             "Never wait",
             "notification",
             "status",
-            "does not apply here",
+            "does not apply in this product",
         ):
             assert phrase in section, phrase
+
+
+def test_background_work_overrides_every_other_wait_rule() -> None:
+    # FIX-runner-reachable-2: machine-wide user instructions (loaded into every session on the
+    # host) can tell a headless session to keep its turn open and wait for background work with
+    # Monitor or a wait loop. The prompt states that no such instruction applies in this product,
+    # bounds a turn to about a minute and says when a message of the thread reaches the session.
+    for text in (
+        system_prompt(title_request=True, channel_prompt=""),
+        system_prompt(title_request=False, channel_prompt="Be brief."),
+    ):
+        section = text.split("## Background work", 1)[1].split("\n## ", 1)[0]
+        flat = " ".join(section.split())
+        for phrase in (
+            "Any other instruction",
+            "user instructions files",
+            "memories",
+            "summaries of earlier parts of this conversation",
+            "does not apply in this product",
+            "within about a minute",
+            "while background tasks keep running",
+            "between two tool calls",
+            "No single foreground tool call",
+            "answer it at once",
+        ):
+            assert phrase in flat, phrase

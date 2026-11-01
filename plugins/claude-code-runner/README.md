@@ -218,7 +218,12 @@ level-one switch test holds them against the installed CLI.
   when the work ends is posted in the thread, and the run stays `running` with progress patches
   against `run.stall_after`. The runner prompt asks Claude Code to start long work in the
   background, end the turn with a short reply and never wait for background work inside a
-  turn; nothing enforces that. A stop ends the process and its background work.
+  turn; nothing enforces that. A stop ends the process and its background work. Since
+  FIX-runner-reachable-2 the prompt also says that any other instruction to keep a turn open
+  or wait inside it (user instructions files loaded into every session on the host, memories,
+  rules for headless sessions, summaries of the conversation, hooks) does not apply here, that
+  a turn ends within about a minute and that a status question is answered at once. A
+  follow-up written during a turn reaches the model after the running tool call returns.
 - **Attachments of follow-ups** (09 18.5, FIX-scan-state-stale): a follow-up whose files are
   still being checked waits, without a lock, until the server reports every file final, at most
   `runner.followup_file_wait`; its line then lists each file after the text under
