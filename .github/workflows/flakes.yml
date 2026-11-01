@@ -4,8 +4,10 @@
 # again (tools/ci/flakes.py); each one that then passed is a flake, which its job uploads as the
 # artifact flakes-<job>. Every hour this workflow reads the flake artifacts of the CI runs of the
 # last two days and adds one comment per run with flakes to the open issue labelled `flake`
-# (created when there is none), whose body lists every flaky test, the most frequent first.
-# Only the default GITHUB_TOKEN: read the runs and their artifacts, write the issue.
+# (created when there is none), whose body lists the flaky tests, the most frequent first. A
+# test not seen for 7 days moves to a collapsed section "No longer seen"; when the table is
+# empty, the workflow closes the issue with a comment, and the next flake opens a new one.
+# Only the default GITHUB_TOKEN: read the runs and their artifacts, write and close the issue.
 
 name: flakes
 
@@ -30,7 +32,7 @@ jobs:
     permissions:
       contents: read
       actions: read # the CI runs and their flake artifacts
-      issues: write # the tracking issue, its comments and its label
+      issues: write # the tracking issue, its comments, its label and its closing
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

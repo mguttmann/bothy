@@ -28,7 +28,9 @@ failure (`retry: 1` of the preset `ci` in each member's dart_test.yaml, switched
 DART_TEST_CONFIG); `flakes.py dart` reads its JSON report: a test that reported an error and
 passed. Both write the flakes to DIR/<tool>-<id>.json (FLAKE_DIR of the Makefile; the CI jobs
 upload it as the artifact flakes-<job>) and as a table to the job summary (GITHUB_STEP_SUMMARY).
-`flakes.py issue` (workflow flakes.yml) adds the flakes of finished CI runs to the tracking issue.
+`flakes.py issue` (workflow flakes.yml) adds the flakes of finished CI runs to the tracking issue;
+a test not seen for AGE moves to its collapsed section "No longer seen", and an issue without a
+test seen within AGE is closed.
 
 Usage:
   flakes.py go --dir DIR --gotestsum PATH --packages "PKG..." [--budget] -- FLAGS
@@ -38,7 +40,8 @@ Usage:
   flakes.py dart --dir DIR --package NAME REPORT
       record the flakes of a JSON report of `flutter test --file-reporter json:REPORT`
   flakes.py issue --repo OWNER/NAME [--workflow ci.yml] [--hours H]
-      add the flakes of the runs finished in the last H hours to the open issue labelled `flake`
+      add the flakes of the runs finished in the last H hours to the open issue labelled `flake`,
+      age its list and close it when no test is left in its table
 
 Exit codes: `go` returns the exit code of gotestsum; the others 0 done, 1 an error (on stderr).
 """
@@ -70,6 +73,9 @@ SCHEMA = 1
 # The tracking issue: one open issue with this label and title.
 LABEL = "flake"
 TITLE = "Flaky tests (reruns that passed in CI)"
+# A row of the issue list not seen for this long moves to the collapsed section "No longer seen";
+# when no row is left in the table, `issue` closes the issue.
+AGE = dt.timedelta(days=7)
 # The author of the comments `issue` writes with the GITHUB_TOKEN.
 BOT = "github-actions[bot]"
 # The hidden line of a comment of `issue` with the run and its flakes (JSON).
@@ -545,9 +551,12 @@ def _key(flake: Flake) -> str:
     return f"{flake['tool']} {flake['package']} {flake['test']}"
 
 
-def marker(run: int, flakes: Sequence[Flake]) -> str:
-    """The hidden line of a comment: the run and its flakes, safe inside an HTML comment."""
-    payload = json.dumps({"flakes": list(flakes)}, sort_keys=True)
+def marker(run: int, flakes: Sequence[Flake], seen: str | None = None) -> str:
+    """The hidden line of a comment: run, flakes and finish time, safe in an HTML comment."""
+    data: dict[str, Any] = {"flakes": list(flakes)}
+    if seen:
+        data["seen"] = seen
+    payload = json.dumps(data, sort_keys=True)
     payload = payload.replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
     return f"<!-- flakes run={run} {payload} -->"
 
@@ -563,6 +572,35 @@ def parse_comments(bodies: Iterable[str]) -> dict[int, list[Flake]]:
                 continue
             if isinstance(payload, dict):
                 seen[int(match[1])] = clean(payload.get("flakes"))
+    return seen
+
+
+def _parse_time(text: Any) -> dt.datetime | None:
+    try:
+        when = dt.datetime.fromisoformat(str(text).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return when if when.tzinfo else when.replace(tzinfo=dt.UTC)
+
+
+def parse_seen(comments: Iterable[tuple[str, str]]) -> dict[int, dt.datetime]:
+    """When each run of the comments (body, created_at) was seen.
+
+    That is the `seen` of its hidden line, or the time of its comment for a comment written
+    before the hidden line had one.
+    """
+    seen: dict[int, dt.datetime] = {}
+    for text, created in comments:
+        for match in _MARKER.finditer(text or ""):
+            try:
+                payload = json.loads(match[2])
+            except ValueError:
+                continue
+            if not isinstance(payload, dict):
+                continue
+            when = _parse_time(payload.get("seen")) or _parse_time(created)
+            if when:
+                seen[int(match[1])] = when
     return seen
 
 
@@ -585,38 +623,83 @@ def comment(run: dict[str, Any], flakes: Sequence[Flake], known: set[str]) -> st
         f"{_cell(run.get('head_branch') or '')}, {str(run.get('head_sha', ''))[:12]}): "
         f"{len(flakes)} flaky test(s)\n\n"
     )
-    return head + "\n".join(rows) + "\n\n" + marker(int(run["id"]), flakes) + "\n"
+    seen = _parse_time(run.get("updated_at"))
+    stamp = seen.strftime("%Y-%m-%dT%H:%M:%SZ") if seen else None
+    return head + "\n".join(rows) + "\n\n" + marker(int(run["id"]), flakes, stamp) + "\n"
 
 
-def body(seen: dict[int, list[Flake]]) -> str:
-    """The issue body: every flaky test of the comments, the most frequent first."""
+def rows(
+    seen: dict[int, list[Flake]], when: dict[int, dt.datetime], now: dt.datetime
+) -> tuple[list[str], list[str]]:
+    """The rows of the issue list, the most frequent first: (seen within AGE, not seen since).
+
+    A run without a time counts as seen `now`.
+    """
     count: dict[str, int] = {}
     last: dict[str, int] = {}
+    last_seen: dict[str, dt.datetime] = {}
     sample: dict[str, Flake] = {}
     for run, flakes in sorted(seen.items()):
+        at = when.get(run, now)
         for f in flakes:
             key = _key(f)
             count[key] = count.get(key, 0) + 1
-            last[key] = run
+            if key not in last_seen or at >= last_seen[key]:
+                last[key] = run
+                last_seen[key] = at
             sample[key] = f
-    rows = ["| Runs with the flake | Last run | Tool | Package | Test |", "|---|---|---|---|---|"]
+    recent: list[str] = []
+    aged: list[str] = []
     for key in sorted(count, key=lambda k: (-count[k], k)):
         f = sample[key]
-        cells = [str(count[key]), str(last[key]), _cell(f["tool"]), _cell(f["package"])]
-        rows.append("| " + " | ".join([*cells, _cell(_test_name(f))]) + " |")
-    return (
+        cells = [
+            str(count[key]),
+            str(last[key]),
+            last_seen[key].strftime("%Y-%m-%d"),
+            _cell(f["tool"]),
+            _cell(f["package"]),
+            _cell(_test_name(f)),
+        ]
+        row = "| " + " | ".join(cells) + " |"
+        (aged if now - last_seen[key] > AGE else recent).append(row)
+    return recent, aged
+
+
+_HEADER = [
+    "| Runs with the flake | Last run | Last seen | Tool | Package | Test |",
+    "|---|---|---|---|---|---|",
+]
+
+
+def body(
+    seen: dict[int, list[Flake]],
+    when: dict[int, dt.datetime] | None = None,
+    now: dt.datetime | None = None,
+) -> str:
+    """The issue body: the flaky tests seen within AGE, then the older ones collapsed.
+
+    Both lists put the most frequent first; the collapsed one is "No longer seen".
+    """
+    recent, aged = rows(seen, when or {}, now or dt.datetime.now(dt.UTC))
+    text = (
         "Tests that failed and then passed in a rerun of CI (docs/quality/gates.md, section "
         "Flakes). The workflow flakes.yml adds one comment per CI run with flakes and keeps this "
-        "list current; close the issue when the list is fixed, the next flake opens a new one.\n\n"
-        + "\n".join(rows)
-        + "\n"
+        f'list current. A test not seen for {AGE.days} days moves to "No longer seen"; when '
+        "none is left in the table, the workflow closes the issue, and the next flake opens a "
+        "new one.\n\n" + "\n".join([*_HEADER, *recent]) + "\n"
     )
+    if aged:
+        text += (
+            f"\n<details>\n<summary>No longer seen ({len(aged)})</summary>\n\n"
+            + "\n".join([*_HEADER, *aged])
+            + "\n\n</details>\n"
+        )
+    return text
 
 
-def _issue(args: argparse.Namespace, gh: Gh = _gh) -> int:
-    since = (dt.datetime.now(dt.UTC) - dt.timedelta(hours=args.hours)).strftime(
-        "%Y-%m-%dT%H:%M:%SZ"
-    )
+def _issue(args: argparse.Namespace, gh: Gh = _gh, now: dt.datetime | None = None) -> int:
+    now = now or dt.datetime.now(dt.UTC)
+    since = (now - dt.timedelta(hours=args.hours)).strftime("%Y-%m-%dT%H:%M:%SZ")
     runs: list[dict[str, Any]] = _json_lines(
         gh(
             [
@@ -625,7 +708,7 @@ def _issue(args: argparse.Namespace, gh: Gh = _gh) -> int:
                 f"repos/{args.repo}/actions/workflows/{args.workflow}/runs"
                 f"?status=completed&created=>={since}&per_page=100",
                 "--jq",
-                ".workflow_runs[] | {id, html_url, event, head_branch, head_sha}",
+                ".workflow_runs[] | {id, html_url, event, head_branch, head_sha, updated_at}",
             ]
         )
     )
@@ -641,14 +724,16 @@ def _issue(args: argparse.Namespace, gh: Gh = _gh) -> int:
                 "--state",
                 "all",
                 "--json",
-                "number,title,state",
+                "number,title,state,body",
             ]
         )
     )
     issues = [i for i in issues if i.get("title") == TITLE]
     number = next((int(i["number"]) for i in issues if i.get("state") == "OPEN"), 0)
+    current = next((str(i.get("body") or "") for i in issues if int(i["number"]) == number), "")
     # The runs of every issue, also of a closed one, are reported; the open one lists its own.
     seen: dict[int, list[Flake]] = {}
+    when: dict[int, dt.datetime] = {}
     reported: set[int] = set()
     for issue in issues:
         listed = gh(
@@ -657,15 +742,16 @@ def _issue(args: argparse.Namespace, gh: Gh = _gh) -> int:
                 "--paginate",
                 f"repos/{args.repo}/issues/{issue['number']}/comments",
                 "--jq",
-                ".[] | {body, user: .user.login}",
+                ".[] | {body, user: .user.login, created_at}",
             ]
         )
         # Only the comments of this workflow: anyone can comment on the public issue.
-        bodies = [str(c.get("body") or "") for c in _json_lines(listed) if c.get("user") == BOT]
-        parsed = parse_comments(bodies)
+        own = [c for c in _json_lines(listed) if c.get("user") == BOT]
+        parsed = parse_comments(str(c.get("body") or "") for c in own)
         reported |= set(parsed)
         if int(issue["number"]) == number:
             seen = parsed
+            when = parse_seen((str(c.get("body") or ""), str(c.get("created_at"))) for c in own)
     known = {_key(f) for flakes in seen.values() for f in flakes}
     added = 0
     for run in sorted(runs, key=lambda r: int(r["id"])):
@@ -725,16 +811,53 @@ def _issue(args: argparse.Namespace, gh: Gh = _gh) -> int:
         text = comment(run, flakes, known)
         gh(["issue", "comment", str(number), "-R", args.repo, "--body", text])
         seen[int(run["id"])] = flakes
+        when.update(parse_seen([(text, "")]))
         known |= {_key(f) for f in flakes}
         added += 1
-    if added:
-        gh(["issue", "edit", str(number), "-R", args.repo, "--body", body(seen)])
     print(
         f"flakes: {added} run(s) with flakes added to issue #{number}"
         if added
         else "flakes: no new flakes"
     )
+    if number:
+        _age(args.repo, number, current, seen, when, now, gh)
     return 0
+
+
+def _age(
+    repo: str,
+    number: int,
+    current: str,
+    seen: dict[int, list[Flake]],
+    when: dict[int, dt.datetime],
+    now: dt.datetime,
+    gh: Gh,
+) -> None:
+    """Keep the body of the open issue current and close it when its table is empty."""
+    # The list ages every hour, also without a new run: edit the body when it changed.
+    text = body(seen, when, now)
+    if text != current:
+        gh(["issue", "edit", str(number), "-R", repo, "--body", text])
+    recent, aged = rows(seen, when, now)
+    if aged and not recent:
+        note = (
+            f"No flaky test of this list was seen in the last {AGE.days} days, so the workflow "
+            "flakes.yml closes the issue. The next flake opens a new one."
+        )
+        gh(
+            [
+                "issue",
+                "close",
+                str(number),
+                "-R",
+                repo,
+                "--reason",
+                "completed",
+                "--comment",
+                note,
+            ]
+        )
+        print(f"flakes: issue #{number} closed, no flake in the last {AGE.days} days")
 
 
 def _json_lines(text: str) -> list[Any]:

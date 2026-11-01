@@ -376,9 +376,20 @@ Where the list is:
 * the scheduled workflow `flakes.yml` reads the flake artifacts of the CI runs that finished in
   the window its `--hours` names: it adds one comment per run with flakes to the open issue labelled `flake`
   (title "Flaky tests (reruns that passed in CI)", created with the label when there is none) and
-  keeps the issue body as the list of every flaky test, the most frequent first. It uses only
-  the `GITHUB_TOKEN` (`actions: read`, `issues: write`). Close the issue when its list is fixed;
-  the runs it reported stay reported, and the next run with a flake opens a new issue.
+  keeps the issue body as the list of the flaky tests, the most frequent first. It uses only
+  the `GITHUB_TOKEN` (`actions: read`, `issues: write`).
+* each row of the list names how many runs had the flake, the last of them and the day it was
+  last seen (when the run finished; the hidden line of each comment keeps that time, and a
+  comment written before it did counts from the time of the comment). A row not seen for 7 days
+  (`AGE` in `flakes.py`) moves out of the table into the collapsed section "No longer seen",
+  with its counts; a row that flakes again returns to the table with all its runs. The workflow
+  edits the body every hour the list changes, also without a new run.
+* when no row is left in the table, the workflow closes the issue itself with a comment (reason
+  completed). The runs it reported stay reported, and the next run with a flake opens a new
+  issue, as before. Closing the issue by hand ends the list the same way.
+  Tests: `test_a_row_not_seen_for_seven_days_moves_out_of_the_table_with_its_count`,
+  `test_a_recurring_row_stays_in_the_table_and_comes_back_from_the_aged_ones`,
+  `test_an_empty_table_closes_the_issue_and_the_next_flake_opens_a_new_one`.
 
 ## Advisories
 

@@ -1,0 +1,7 @@
+# FLAKE-list-aging The flake list ages and closes itself
+
+| No | Date | Ruling | Reason |
+|---|---|---|---|
+| FLAKE-AGE/1 | 2026-11-01 | A row of the flake issue not seen for 7 days moves out of the table into a collapsed section "No longer seen" with its counts; it is not dropped. A row that flakes again returns to the table with every run counted. When no row is left in the table, `flakes.py issue` closes the issue with a comment (reason completed); the next flake opens a new issue as before. | The list only grew, so the issue was never done. Keeping the aged rows with their counts shows what a fix achieved and lets a returning flake keep its history; a collapsed section keeps them out of the way. Recorded in [quality gates, "Flakes"](../quality/gates.md#flakes). |
+| FLAKE-AGE/2 | 2026-11-01 | "Last seen" is when the CI run finished (`updated_at` of the run), kept as `seen` in the hidden line of its comment; a comment written before that field counts from the time of the comment. The workflow edits the body only when it changed, every hour, also without a new run. | The comments are the only state of the workflow; the comment time is at most the workflow interval after the run for the existing comments, so the old list ages without a rewrite. |
+| FLAKE-AGE/3 | 2026-11-01 | The section is titled in English ("No longer seen"), like the rest of the issue and the repository. | The issue is public and every other text of it is English. |
