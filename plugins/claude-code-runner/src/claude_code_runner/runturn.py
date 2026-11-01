@@ -1284,14 +1284,16 @@ class RunTurn:
         if result is None:
             return
         store = UsageStore(self.cfg.state_dir / "sessions" / self.session.ref)
-        reports, _, _ = self._run_reports(store, result)
+        reports, _, _ = self._run_reports(store, result, warn=False)
         self.live_cost.settle(sum(_n(r.amount_micros) for r in reports))
         self._report_cost()
 
     def _run_reports(
-        self, store: UsageStore, result: dict[str, Any]
+        self, store: UsageStore, result: dict[str, Any], *, warn: bool = True
     ) -> tuple[list[CostReport], dict[str, ModelUsage], int | None]:
         """The run's reports from ``result`` against the stored session values (09 18.7).
+
+        ``warn`` logs an ignored baseline; the live preview leaves that to the finish.
 
         Returns:
             The reports, the session values of ``result`` and the remaining baseline.
@@ -1301,7 +1303,7 @@ class RunTurn:
         reports = cost_reports(difference(stored.values, current))
         remaining = stored.baseline_remaining
         if remaining is None and not stored.values:
-            remaining = self._start_baseline()
+            remaining = self._start_baseline(warn=warn)
         if remaining is not None:
             if counters_reset(stored.values, current):
                 # The runtime counts again: the old amounts are no longer in its sums.
@@ -1352,7 +1354,7 @@ class RunTurn:
         UsageStore(self.cfg.state_dir / "sessions" / self.session.ref).rebase(totals)
         _log("session_totals_taken", models=len(totals), **self.ids)
 
-    def _start_baseline(self) -> int | None:
+    def _start_baseline(self, *, warn: bool = True) -> int | None:
         """The baseline of a session whose values the runner never stored (09 18.7, RK-75).
 
         ``cost_baseline_micros`` of the bound session row when it is above 0 and the run still
@@ -1364,7 +1366,8 @@ class RunTurn:
         if baseline is None or baseline["ref"] != self.session.ref:
             return None
         if baseline["currency"] != _RUNTIME_CURRENCY:
-            _warn("cost_baseline_currency_ignored", **self.ids)
+            if warn:
+                _warn("cost_baseline_currency_ignored", **self.ids)
             return 0
         return int(baseline["micros"])
 
