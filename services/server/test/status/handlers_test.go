@@ -240,13 +240,17 @@ func TestProbe_RealSources(t *testing.T) {
 		t.Fatalf("the storage probe left %d objects", len(entries))
 	}
 
-	// Five minutes of requests with most answers 5xx, as every api process measures them.
+	// Five minutes of requests with most answers 5xx, as every api process measures them. The rows
+	// are added with the additive upsert of the flush (UpsertMinutes): the server measures its own
+	// requests of this test into the same minutes, and its flush may have written a row first.
 	now := w.clk.Now()
 	w.exec(`SELECT stats_minutes_ensure_partition($1::date)`, now.UTC())
 	w.exec(`SELECT stats_minutes_ensure_partition($1::date)`, now.UTC().Add(24*time.Hour))
 	for i := range 10 {
 		minute := now.Truncate(time.Minute).Add(time.Duration(i) * time.Minute)
-		w.exec(`INSERT INTO stats_minutes (bucket_start, metric, count, sum, good) VALUES ($1, 'sli.api_availability', 100, 0, 10)`, minute)
+		w.exec(`INSERT INTO stats_minutes (bucket_start, metric, count, sum, good) VALUES ($1, 'sli.api_availability', 100, 0, 10)
+			ON CONFLICT (bucket_start, metric, channel_id, agent_id, dimension, currency) DO UPDATE
+			SET count = stats_minutes.count + excluded.count, sum = stats_minutes.sum + excluded.sum, good = stats_minutes.good + excluded.good`, minute)
 	}
 	w.rounds(degradeRounds + 3)
 	if st := w.read(w.s.Owner).bySource(t, domain.GroupAPI).State; st != "major_outage" {
