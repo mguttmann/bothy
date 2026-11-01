@@ -380,6 +380,50 @@ class Mutex {
   }
 }
 
+/** Wakes every task waiting for the next {@link Notice.notify}. */
+class Notice {
+  private wake: () => void = () => undefined;
+  private pending = this.fresh();
+
+  /** Resolves at the next {@link Notice.notify}; take it before looking for what it announces. */
+  get next(): Promise<void> {
+    return this.pending;
+  }
+
+  notify(): void {
+    const wake = this.wake;
+    this.pending = this.fresh();
+    wake();
+  }
+
+  private fresh(): Promise<void> {
+    return new Promise<void>((resolve) => {
+      this.wake = resolve;
+    });
+  }
+}
+
+/** Waits for `promise`; `false` when one of `signals` aborts first. */
+async function unlessAborted(
+  promise: Promise<void>,
+  signals: readonly AbortSignal[],
+): Promise<boolean> {
+  if (signals.some((s) => s.aborted)) return false;
+  let detach: () => void = () => undefined;
+  const aborted = new Promise<false>((resolve) => {
+    const on = (): void => resolve(false);
+    for (const s of signals) s.addEventListener("abort", on, { once: true });
+    detach = () => {
+      for (const s of signals) s.removeEventListener("abort", on);
+    };
+  });
+  try {
+    return await Promise.race([promise.then(() => true), aborted]);
+  } finally {
+    detach();
+  }
+}
+
 /** What the adapter keeps in memory about one run of this process. */
 interface RunState {
   readonly runId: string;
@@ -389,6 +433,8 @@ interface RunState {
   task: Task | undefined;
   readonly renewing: Mutex;
   readonly resuming: Mutex;
+  /** Notified when a follow-up or interaction of the run is stored in the inbox. */
+  readonly answers: Notice;
   waitingForToken: boolean;
   cancelReason: string | undefined;
   /** Aborted by `run.cancel_requested`: handler work of the run stops being awaited. */
@@ -1039,6 +1085,7 @@ export class Adapter {
       task: undefined,
       renewing: new Mutex(),
       resuming: new Mutex(),
+      answers: new Notice(),
       waitingForToken: false,
       cancelReason: undefined,
       interrupt: new AbortController(),
@@ -1068,6 +1115,7 @@ export class Adapter {
         await this.inbox.setState(entry.eventId, EntryState.CLOSED);
         return;
       }
+      state.answers.notify();
       this.spawn(() => this.continueRun(state, entry, inv));
       return;
     }
@@ -1489,7 +1537,7 @@ export class Adapter {
             continue;
           }
           if (attempt === 0 && error.reason === "superseded") {
-            token = await this.newerAnswer(state, entry);
+            token = await this.awaitNewerAnswer(state, entry);
             continue;
           }
           if (error.reason === "invalid")
@@ -1517,6 +1565,32 @@ export class Adapter {
       return token;
     }
     return undefined;
+  }
+
+  /**
+   * The token of a later answer of the same run, waiting for its delivery if none is stored.
+   *
+   * `superseded` on a resume means the server issued a newer token for the run: a newer answer
+   * is on its way (09 4.5), and it may reach this process only after the refusal. This answer is
+   * handed over once the run resumes with the newer token, so no answer is lost. `undefined` when
+   * the run is cancelled or the adapter stops first.
+   */
+  private async awaitNewerAnswer(
+    state: RunState,
+    entry: InboxEntry,
+  ): Promise<Secret | undefined> {
+    const signals = [
+      this.stopper.signal,
+      state.interrupt.signal,
+      state.handle.cancelled,
+    ];
+    for (;;) {
+      // Taken before the look, so an answer stored during the look still wakes this wait.
+      const stored = state.answers.next;
+      const token = await this.newerAnswer(state, entry);
+      if (token !== undefined) return token;
+      if (!(await unlessAborted(stored, signals))) return undefined;
+    }
   }
 
   /** The token of a later accepted follow-up or interaction of the same run, if any. */

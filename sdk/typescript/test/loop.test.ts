@@ -85,6 +85,52 @@ class Gate {
   }
 }
 
+/** The FakeServer's world, for a step the FakeServer has no helper for. */
+function worldOf(server: FakeServer): {
+  followup(runId: string, text: string): string;
+} {
+  return (
+    server as unknown as {
+      world: { followup(runId: string, text: string): string };
+    }
+  ).world;
+}
+
+/**
+ * Lets Alex post a second answer while the first answer's `resumeRun` is on its way, so the
+ * server answers it `superseded`; `posted` runs right after.
+ */
+function answerDuringResume(
+  runId: () => string,
+  posted?: () => void,
+): Override {
+  let done = false;
+  return (request) => {
+    if (
+      !done &&
+      request.method === "POST" &&
+      new URL(request.url).pathname.endsWith("/resume")
+    ) {
+      done = true;
+      worldOf(fake).followup(runId(), "no, the second");
+      posted?.();
+    }
+    return undefined;
+  };
+}
+
+/** Holds back every `agent.followup` after the first one until `gate` opens, or drops it. */
+function secondAnswer(gate: Gate | "drop"): Hold {
+  let first: string | undefined;
+  return (delivery) => {
+    if (!(delivery instanceof Envelope) || delivery.type !== "agent.followup")
+      return undefined;
+    first ??= delivery.id;
+    if (delivery.id === first) return undefined;
+    return gate === "drop" ? "drop" : gate.opened;
+  };
+}
+
 /** Records every call; can block in `prepare` or `execute`. */
 class RecordingHandler extends AgentHandler {
   readonly calls: [string, string | undefined][] = [];
@@ -165,6 +211,36 @@ class RecordingHandler extends AgentHandler {
   }
 }
 
+/** Asks once; records the event of every answer it gets. */
+class Answering extends RecordingHandler {
+  readonly answered: string[] = [];
+
+  override async execute(inv: Invocation, run: RunHandle): Promise<void> {
+    await super.execute(inv, run);
+    await run.awaitInput("Which file?");
+  }
+
+  override async onFollowup(inv: Invocation, run: RunHandle): Promise<void> {
+    await super.onFollowup(inv, run);
+    this.answered.push(inv.eventId);
+  }
+}
+
+/** Calls `watch` once, after the first `forRun` that follows its setting. */
+class WatchedInbox extends MemoryInboxStore {
+  watch: (() => void) | undefined;
+  private watched = false;
+
+  override async forRun(runId: string): Promise<InboxEntry[]> {
+    const entries = await super.forRun(runId);
+    if (this.watch !== undefined && !this.watched) {
+      this.watched = true;
+      this.watch();
+    }
+    return entries;
+  }
+}
+
 /** Logs `prepare` and `execute` into a shared log. */
 class LoggingHandler extends RecordingHandler {
   constructor(readonly log: Log) {
@@ -187,9 +263,17 @@ class LoggingHandler extends RecordingHandler {
 
 type Rewrite = (env: Envelope) => Secret | null | undefined;
 
-/** Records every delivery; may rewrite (`Secret`) or remove (`null`) a token. */
+/**
+ * Returns a promise a delivery waits on before the adapter sees it, `"drop"` to never pass it
+ * on (a delivery the server skips), or `undefined`.
+ */
+type Hold = (delivery: Delivery) => Promise<void> | "drop" | undefined;
+
+/** Records every delivery; may rewrite (`Secret`) or remove (`null`) a token, or hold it back. */
 class RecordingSource implements EventSource {
   readonly deliveries: Delivery[] = [];
+  /** Opens on `close`: a held delivery is then dropped and the iteration ends. */
+  private readonly closing = new Gate();
 
   constructor(
     readonly inner: EventSource,
@@ -197,6 +281,7 @@ class RecordingSource implements EventSource {
     private readonly log?: Log,
     /** Never acknowledge, so `FakeServer.redeliver` brings every event again. */
     private readonly holdAcks = false,
+    private readonly hold?: Hold,
   ) {}
 
   get closeReason(): EventSource["closeReason"] {
@@ -214,6 +299,18 @@ class RecordingSource implements EventSource {
         const token = this.rewrite(delivery);
         if (token !== undefined)
           out = new Envelope({ ...delivery, token: token ?? undefined });
+      }
+      const held = this.hold?.(out);
+      if (held === "drop") continue;
+      if (held !== undefined) {
+        let dropped = false;
+        await Promise.race([
+          held,
+          this.closing.opened.then(() => {
+            dropped = true;
+          }),
+        ]);
+        if (dropped) return;
       }
       this.deliveries.push(out);
       yield out;
@@ -262,6 +359,7 @@ class RecordingSource implements EventSource {
   }
 
   close(): Promise<void> {
+    this.closing.open();
     return this.inner.close();
   }
 }
@@ -403,23 +501,43 @@ interface Running {
   readonly done: Promise<unknown>;
 }
 
-/** Runs `adapter` with a recording source until `body` returns, then stops it. */
+/** Whether the FakeServer holds a cursor of `consumer`, so it delivers events after now. */
+function knowsConsumer(consumer: string): boolean {
+  try {
+    fake.consumerState(consumer);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Runs `adapter` with a recording source until `body` returns, then stops it.
+ *
+ * `body` starts once the source is ready and the server holds the consumer's cursor: the first
+ * poll creates the cursor at the head (09 4.2), and a polling source is ready before that poll,
+ * so an event of the body before it would never be delivered.
+ */
 async function running<T>(
   adapter: Adapter,
   body: (run: Running) => Promise<T>,
-  wrap: { rewrite?: Rewrite; log?: Log; holdAcks?: boolean } = {},
+  wrap: { rewrite?: Rewrite; log?: Log; holdAcks?: boolean; hold?: Hold } = {},
 ): Promise<T> {
   const source = new RecordingSource(
     await adapter.makeSource(),
     wrap.rewrite,
     wrap.log,
     wrap.holdAcks,
+    wrap.hold,
   );
   adapter.source = source;
   const done = adapter.run();
   done.catch(() => undefined);
   try {
-    await until(fake, () => source.ready);
+    await until(
+      fake,
+      () => source.ready && knowsConsumer(adapter.config.consumer),
+    );
     return await body({ source, done });
   } finally {
     await adapter.stop();
@@ -850,6 +968,118 @@ describe("runs in progress", () => {
   );
 
   it(
+    "hands both answers over in order when the first resume is superseded before the second arrives",
+    async () => {
+      const handler = new Answering();
+      const inbox = new WatchedInbox();
+      const second = new Gate();
+      const recording = new RecordingFetch();
+      const adapter = makeAdapter(
+        handler,
+        "superseded-answer",
+        {},
+        { inbox, fetch: recording.fetch },
+      );
+      let runId = "";
+      // The second answer is posted while the first one's resumeRun is on its way, and the
+      // adapter sees it only after it looked for a newer answer in the inbox and found none.
+      recording.override = answerDuringResume(
+        () => runId,
+        () => {
+          inbox.watch = () => second.open();
+        },
+      );
+      await running(
+        adapter,
+        async ({ source }) => {
+          runId = (await fake.trigger()).runId;
+          await until(
+            fake,
+            async () => (await stateOf(runId)) === "waiting_input",
+          );
+          await fake.deliverFollowup(runId, "the first file");
+          await until(fake, () => handler.answered.length === 2);
+          await until(fake, async () => (await stateOf(runId)) === "completed");
+          expect(handler.answered).toEqual(
+            source.envelopes("agent.followup").map((e) => e.id),
+          );
+        },
+        { hold: secondAnswer(second) },
+      );
+      expect(recording.count("POST", "/resume")).toBe(2); // superseded, then the newer token
+      expect((await fake.runState(runId)).starts).toBe(2); // the start and one resume
+    },
+    TEST_TIMEOUT,
+  );
+
+  it(
+    "stops while a superseded answer waits for the newer one",
+    async () => {
+      const handler = new Answering();
+      const recording = new RecordingFetch();
+      const adapter = makeAdapter(
+        handler,
+        "superseded-stop",
+        {},
+        { fetch: recording.fetch },
+      );
+      let runId = "";
+      recording.override = answerDuringResume(() => runId);
+      await running(
+        adapter,
+        async () => {
+          runId = (await fake.trigger()).runId;
+          await until(
+            fake,
+            async () => (await stateOf(runId)) === "waiting_input",
+          );
+          await fake.deliverFollowup(runId, "the first file");
+          await until(fake, () => recording.count("POST", "/resume") === 1);
+        },
+        // The second answer never reaches the adapter.
+        { hold: secondAnswer("drop") },
+      );
+      expect(handler.answered).toEqual([]);
+      expect((await fake.runState(runId)).state).toBe("waiting_input");
+    },
+    TEST_TIMEOUT,
+  );
+
+  it(
+    "closes a superseded answer waiting for the newer one when the run is cancelled",
+    async () => {
+      const handler = new Answering();
+      const recording = new RecordingFetch();
+      const adapter = makeAdapter(
+        handler,
+        "superseded-cancel",
+        {},
+        { fetch: recording.fetch },
+      );
+      let runId = "";
+      recording.override = answerDuringResume(() => runId);
+      await running(
+        adapter,
+        async () => {
+          runId = (await fake.trigger()).runId;
+          await until(
+            fake,
+            async () => (await stateOf(runId)) === "waiting_input",
+          );
+          await fake.deliverFollowup(runId, "the first file");
+          await until(fake, () => recording.count("POST", "/resume") === 1);
+          await fake.cancel(runId);
+          await until(fake, async () => (await stateOf(runId)) === "cancelled");
+          await until(fake, () => closed(adapter, runId));
+          expect(handler.answered).toEqual([]);
+        },
+        { hold: secondAnswer("drop") },
+      );
+    },
+    TEST_TIMEOUT,
+  );
+
+  it(
     "calls the cancel callbacks on run.cancel_requested and ends the run cancelled",
     async () => {
       const gate = new Gate();
@@ -968,9 +1198,35 @@ describe("runs in progress", () => {
     "runs over REST polling",
     async () => {
       const handler = new RecordingHandler();
-      const adapter = makeAdapter(handler, "polling", { transport: "polling" });
+      // The first poll creates the cursor at the head; it reaches the server only after the
+      // trigger unless the test waits for the cursor, which moves the fake time meanwhile.
+      let triggered = false;
+      let firstPoll = true;
+      const fetch = async (request: Request): Promise<Response> => {
+        if (
+          firstPoll &&
+          request.method === "GET" &&
+          new URL(request.url).pathname.endsWith("/consumers/polling/events")
+        ) {
+          firstPoll = false;
+          const from = fake.clock.monotonic();
+          await patiently(
+            () => triggered || fake.clock.monotonic() >= from + 3 * STEP_MS,
+            "the trigger or the wait for the cursor",
+          );
+        }
+        return globalThis.fetch(request);
+      };
+      const adapter = makeAdapter(
+        handler,
+        "polling",
+        { transport: "polling" },
+        { fetch },
+      );
       await running(adapter, async () => {
-        const { runId } = await fake.trigger();
+        const trigger = fake.trigger();
+        triggered = true;
+        const { runId } = await trigger;
         await until(fake, async () => (await stateOf(runId)) === "completed");
       });
       expect(handler.count("execute")).toBe(1);
