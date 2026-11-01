@@ -145,6 +145,37 @@ void main() {
         },
       );
 
+      test('a locked keychain (errSecInteractionNotAllowed) keeps the move '
+          'for the next start: no marker', () async {
+        final storage = SharedStorage(
+          TargetPlatform.macOS,
+          entitled: build.entitled,
+        );
+        _oldSession(storage);
+        storage.foreign.addAll(
+          storage.at(AppleOptions.defaultAccountName).keys,
+        );
+        storage.legacyKeychain.foreignReadStatus =
+            LegacyKeychain.interactionNotAllowed;
+        final logs = <String>[];
+
+        final backend = _backend(storage, build.keychain, logs: logs);
+        expect(await _firstRead(backend), isNull);
+        expect(await backend.keys(), isEmpty);
+        expect(
+          await backend.read(FlutterSecureBackend.scopeMarkerKey),
+          isNull,
+          reason: 'the next start tries again',
+        );
+        expect(logs.join('\n'), contains('the next start tries again'));
+
+        // Unlocked at the next start: the old session moves.
+        storage.foreign.clear();
+        final next = _backend(storage, build.keychain);
+        expect(await _firstRead(next), _origin);
+        expect(await next.read(_token), 'r');
+      });
+
       test('old items this app may read move without the plugin', () async {
         final storage = SharedStorage(
           TargetPlatform.macOS,

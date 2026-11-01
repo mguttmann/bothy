@@ -214,6 +214,10 @@ final class SharedLegacyKeychain implements LegacyKeychain {
   /// When set, no call ever answers (a channel that hangs).
   bool hang = false;
 
+  /// The answer of a read of a [SharedStorage.foreign] item: `errSecAuthFailed`, or
+  /// `errSecInteractionNotAllowed` (-25308) for a locked keychain.
+  int foreignReadStatus = -25293;
+
   Map<String, String> _items(String service) => storage.at(service);
 
   @override
@@ -221,7 +225,7 @@ final class SharedLegacyKeychain implements LegacyKeychain {
     calls.add(account);
     if (hang) await Completer<Never>().future;
     if (storage.foreign.contains(account)) {
-      return (status: -25293, value: null);
+      return (status: foreignReadStatus, value: null);
     }
     final value = _items(service)[account];
     return value == null

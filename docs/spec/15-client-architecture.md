@@ -612,8 +612,10 @@ and deletes them over the channel `bothy/legacy_keychain` with the user interact
 off, so such an item answers `errSecAuthFailed` at once (`kSecUseAuthenticationUI` does not stop
 that dialog); on iOS and in the Data Protection keychain the old reads pass
 `kSecUseAuthenticationUISkip`. A refused item makes the old secrets not migratable: nothing is
-copied, the app logs it once and starts with enrollment. The copy has a deadline of 5 s and every
-call of the store one of 15 s, after which the call fails instead of holding the start.
+copied, the app logs it once and starts with enrollment; only `errSecInteractionNotAllowed`, which
+a locked keychain or device answers as well, leaves the move to the next start. The copy has the
+deadline `FlutterSecureBackend.legacyDeadline` and every call of the store the deadline
+`FlutterSecureBackend.callDeadline`, after which the call fails instead of holding the start.
 The database key is 32 bytes from `Random.secure()`, created at the first start of an instance;
 the database is `<application support>/instances/<instance_id>/local.db`, the file cache lives
 in the same folder, and the device keys of `packages/device_key` use the `instance_id` as scope.

@@ -395,6 +395,16 @@ final class FlutterSecureBackend implements SecureBackend {
           await _copyLegacy(scoped, own, adoption);
         }
       } on _NotMigratable catch (refused) {
+        if (refused.status == LegacyKeychain.interactionNotAllowed) {
+          // A locked keychain or a locked device answers the same: not a lasting refusal.
+          _log(
+            'the secrets of the build before the app scope were not copied: the keychain '
+            'refuses ${refused.key} without a dialog (status ${refused.status}, also the '
+            'answer of a locked keychain or device); the app starts without them, the next '
+            'start tries again',
+          );
+          return;
+        }
         _log(
           'the secrets of the build before the app scope are not migratable: the '
           'keychain refuses ${refused.key} without a dialog (status ${refused.status}); '
@@ -447,9 +457,11 @@ final class FlutterSecureBackend implements SecureBackend {
     }
     if (_shared(scoped)) {
       for (final id in pending.keys.where((id) => id.isNotEmpty)) {
+        if (adoption.abandoned) return;
         await _put('instance/$id/$deviceKeyScopeKey', id, scoped);
       }
     }
+    if (adoption.abandoned) return;
     await _write(legacyPendingKey, jsonEncode(pending), scoped);
     _log(
       'copied $copied secrets of the build before the app scope into the scope of '
@@ -744,11 +756,21 @@ abstract interface class LegacyKeychain {
   /// `errSecItemNotFound`.
   static const int itemNotFound = -25300;
 
+  /// `errSecInteractionNotAllowed`: also the answer of a locked keychain or a locked device,
+  /// so the move tries again at the next start instead of marking the old secrets lost.
+  static const int interactionNotAllowed = -25308;
+
   /// The answers of an item the keychain does not give out without the person:
   /// `errSecAuthFailed` (an access list without this app, user interaction off),
   /// `errSecInteractionNotAllowed`, `errSecNoAccessForItem`, `errSecUserCanceled`,
   /// `errSecInvalidOwnerEdit` (a delete the access list refuses).
-  static const Set<int> deniedStatuses = {-25293, -25308, -25243, -128, -25244};
+  static const Set<int> deniedStatuses = {
+    -25293,
+    interactionNotAllowed,
+    -25243,
+    -128,
+    -25244,
+  };
 
   /// Reads the item [account] of the generic password service [service].
   Future<LegacyKeychainRead> read(String service, String account);
