@@ -13,7 +13,7 @@
 // local-only table `space_view_states`, filled from `user_space_states.collapsed`, and version
 // 11 (M4-49) the column `shell_view_state.code_blocks_unwrapped`, version 12 (M4-51) the
 // column `user_space_states.channel_order` and the mirror table `user_channel_states` with a
-// cleared cursor; each keeps every row of the mirror. The preserved
+// cleared cursor, version 13 (M4-52) the local-only table `thread_seen_states`; each keeps every row of the mirror. The preserved
 // tables are checked by
 // `survival_test.dart`.
 
@@ -27,6 +27,7 @@ import 'generated/schema_v1.dart' as v1;
 import 'generated/schema_v10.dart' as v10;
 import 'generated/schema_v11.dart' as v11;
 import 'generated/schema_v12.dart' as v12;
+import 'generated/schema_v13.dart' as v13;
 import 'generated/schema_v2.dart' as v2;
 import 'generated/schema_v3.dart' as v3;
 import 'generated/schema_v4.dart' as v4;
@@ -441,6 +442,43 @@ void main() {
           expect(await newDb.select(newDb.syncState).get(), [
             const v12.SyncStateData(
               id: 1,
+              headSeq: 812,
+              permissionVersion: 7,
+              lastSnapshotAt: 40,
+            ),
+          ]);
+        },
+      );
+    },
+  );
+
+  test(
+    'the migration 12 to 13 adds an empty seen table and keeps the cursor',
+    () async {
+      const state = v12.SyncStateData(
+        id: 1,
+        cursor: 812,
+        syncEpoch: 'epoch-3',
+        headSeq: 812,
+        permissionVersion: 7,
+        lastSnapshotAt: 40,
+      );
+      await verifier.testWithDataIntegrity(
+        oldVersion: 12,
+        newVersion: 13,
+        createOld: v12.DatabaseAtV12.new,
+        createNew: v13.DatabaseAtV13.new,
+        openTestedDatabase: LocalDatabase.new,
+        createItems: (batch, oldDb) =>
+            batch.insertAll(oldDb.syncState, [state]),
+        validateItems: (newDb) async {
+          expect(await newDb.select(newDb.threadSeenStates).get(), isEmpty);
+          // Local-only view state: the mirror and the cursor stay (no snapshot needed).
+          expect(await newDb.select(newDb.syncState).get(), [
+            const v13.SyncStateData(
+              id: 1,
+              cursor: 812,
+              syncEpoch: 'epoch-3',
               headSeq: 812,
               permissionVersion: 7,
               lastSnapshotAt: 40,

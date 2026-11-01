@@ -19773,6 +19773,279 @@ class SpaceViewStatesCompanion extends UpdateCompanion<SpaceViewStateRow> {
   }
 }
 
+class $ThreadSeenStatesTable extends ThreadSeenStates
+    with TableInfo<$ThreadSeenStatesTable, ThreadSeenStateRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ThreadSeenStatesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _threadIdMeta = const VerificationMeta(
+    'threadId',
+  );
+  @override
+  late final GeneratedColumn<String> threadId = GeneratedColumn<String>(
+    'thread_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _runIdMeta = const VerificationMeta('runId');
+  @override
+  late final GeneratedColumn<String> runId = GeneratedColumn<String>(
+    'run_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _runStateMeta = const VerificationMeta(
+    'runState',
+  );
+  @override
+  late final GeneratedColumn<String> runState = GeneratedColumn<String>(
+    'run_state',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [threadId, runId, runState];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'thread_seen_states';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ThreadSeenStateRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('thread_id')) {
+      context.handle(
+        _threadIdMeta,
+        threadId.isAcceptableOrUnknown(data['thread_id']!, _threadIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_threadIdMeta);
+    }
+    if (data.containsKey('run_id')) {
+      context.handle(
+        _runIdMeta,
+        runId.isAcceptableOrUnknown(data['run_id']!, _runIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_runIdMeta);
+    }
+    if (data.containsKey('run_state')) {
+      context.handle(
+        _runStateMeta,
+        runState.isAcceptableOrUnknown(data['run_state']!, _runStateMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_runStateMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {threadId};
+  @override
+  ThreadSeenStateRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ThreadSeenStateRow(
+      threadId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}thread_id'],
+      )!,
+      runId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}run_id'],
+      )!,
+      runState: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}run_state'],
+      )!,
+    );
+  }
+
+  @override
+  $ThreadSeenStatesTable createAlias(String alias) {
+    return $ThreadSeenStatesTable(attachedDatabase, alias);
+  }
+}
+
+class ThreadSeenStateRow extends DataClass
+    implements Insertable<ThreadSeenStateRow> {
+  /// The thread, canonical UUID text.
+  final String threadId;
+
+  /// The newest run of the thread when the person last saw it, canonical UUID text.
+  final String runId;
+
+  /// The state of that run then (`RunState.code`).
+  final String runState;
+  const ThreadSeenStateRow({
+    required this.threadId,
+    required this.runId,
+    required this.runState,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['thread_id'] = Variable<String>(threadId);
+    map['run_id'] = Variable<String>(runId);
+    map['run_state'] = Variable<String>(runState);
+    return map;
+  }
+
+  ThreadSeenStatesCompanion toCompanion(bool nullToAbsent) {
+    return ThreadSeenStatesCompanion(
+      threadId: Value(threadId),
+      runId: Value(runId),
+      runState: Value(runState),
+    );
+  }
+
+  factory ThreadSeenStateRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ThreadSeenStateRow(
+      threadId: serializer.fromJson<String>(json['threadId']),
+      runId: serializer.fromJson<String>(json['runId']),
+      runState: serializer.fromJson<String>(json['runState']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'threadId': serializer.toJson<String>(threadId),
+      'runId': serializer.toJson<String>(runId),
+      'runState': serializer.toJson<String>(runState),
+    };
+  }
+
+  ThreadSeenStateRow copyWith({
+    String? threadId,
+    String? runId,
+    String? runState,
+  }) => ThreadSeenStateRow(
+    threadId: threadId ?? this.threadId,
+    runId: runId ?? this.runId,
+    runState: runState ?? this.runState,
+  );
+  ThreadSeenStateRow copyWithCompanion(ThreadSeenStatesCompanion data) {
+    return ThreadSeenStateRow(
+      threadId: data.threadId.present ? data.threadId.value : this.threadId,
+      runId: data.runId.present ? data.runId.value : this.runId,
+      runState: data.runState.present ? data.runState.value : this.runState,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ThreadSeenStateRow(')
+          ..write('threadId: $threadId, ')
+          ..write('runId: $runId, ')
+          ..write('runState: $runState')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(threadId, runId, runState);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ThreadSeenStateRow &&
+          other.threadId == this.threadId &&
+          other.runId == this.runId &&
+          other.runState == this.runState);
+}
+
+class ThreadSeenStatesCompanion extends UpdateCompanion<ThreadSeenStateRow> {
+  final Value<String> threadId;
+  final Value<String> runId;
+  final Value<String> runState;
+  final Value<int> rowid;
+  const ThreadSeenStatesCompanion({
+    this.threadId = const Value.absent(),
+    this.runId = const Value.absent(),
+    this.runState = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ThreadSeenStatesCompanion.insert({
+    required String threadId,
+    required String runId,
+    required String runState,
+    this.rowid = const Value.absent(),
+  }) : threadId = Value(threadId),
+       runId = Value(runId),
+       runState = Value(runState);
+  static Insertable<ThreadSeenStateRow> custom({
+    Expression<String>? threadId,
+    Expression<String>? runId,
+    Expression<String>? runState,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (threadId != null) 'thread_id': threadId,
+      if (runId != null) 'run_id': runId,
+      if (runState != null) 'run_state': runState,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ThreadSeenStatesCompanion copyWith({
+    Value<String>? threadId,
+    Value<String>? runId,
+    Value<String>? runState,
+    Value<int>? rowid,
+  }) {
+    return ThreadSeenStatesCompanion(
+      threadId: threadId ?? this.threadId,
+      runId: runId ?? this.runId,
+      runState: runState ?? this.runState,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (threadId.present) {
+      map['thread_id'] = Variable<String>(threadId.value);
+    }
+    if (runId.present) {
+      map['run_id'] = Variable<String>(runId.value);
+    }
+    if (runState.present) {
+      map['run_state'] = Variable<String>(runState.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ThreadSeenStatesCompanion(')
+          ..write('threadId: $threadId, ')
+          ..write('runId: $runId, ')
+          ..write('runState: $runState, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$LocalDatabase extends GeneratedDatabase {
   _$LocalDatabase(QueryExecutor e) : super(e);
   late final SearchIndex searchIndex = SearchIndex(this);
@@ -19829,6 +20102,9 @@ abstract class _$LocalDatabase extends GeneratedDatabase {
     this,
   );
   late final $SpaceViewStatesTable spaceViewStates = $SpaceViewStatesTable(
+    this,
+  );
+  late final $ThreadSeenStatesTable threadSeenStates = $ThreadSeenStatesTable(
     this,
   );
   late final Index channelsSpace = Index(
@@ -19924,6 +20200,7 @@ abstract class _$LocalDatabase extends GeneratedDatabase {
     channelViewStates,
     shellViewStates,
     spaceViewStates,
+    threadSeenStates,
     channelsSpace,
     forumTagsChannel,
     threadsChannel,

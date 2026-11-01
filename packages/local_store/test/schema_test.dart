@@ -299,6 +299,9 @@ const Map<String, List<String>> expected = {
   ],
   // Local only (FIX-device-mirroring-2): the collapsed spaces of this device (01 6.7).
   'space_view_states': ['space_id', 'collapsed'],
+  // Local only (M4-52): the run and state of each chat the person last had open on this device,
+  // for the status dots of the sidebar (01 6.17).
+  'thread_seen_states': ['thread_id', 'run_id', 'run_state'],
   // Local only (M4-40, M4-42, M4-45): the pinned forum overview, the hidden channel column next
   // to an open thread and the session column of both layouts on this device, one row (01 D1,
   // D2, D15).
@@ -322,8 +325,8 @@ void main() {
     return [for (final r in rows) r.read<String>('name')];
   }
 
-  test('schema version 12 has exactly the tables of 15 6.1', () async {
-    expect(db.schemaVersion, 12);
+  test('schema version 13 has exactly the tables of 15 6.1', () async {
+    expect(db.schemaVersion, 13);
     final rows = await db
         .customSelect(
           "SELECT name FROM sqlite_master WHERE type = 'table' "

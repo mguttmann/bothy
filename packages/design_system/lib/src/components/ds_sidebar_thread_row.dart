@@ -10,6 +10,7 @@ import '../generated/design_tokens.g.dart';
 import '../icons/ds_icon.dart';
 import '../theme/ds_theme.dart';
 import 'ds_channel_row.dart';
+import 'ds_chat_status.dart';
 import 'ds_common.dart';
 import 'view_models.dart';
 
@@ -72,9 +73,13 @@ Widget _mentionBadge(BuildContext context, int count) {
 /// `color.focus.ring-on-sidebar`); a done thread, shown only while selected, reads in
 /// `color.text.on-sidebar-muted`.
 ///
+/// A chat whose agent state changed since the person last had it open ([DsSidebarThreadRowData.status],
+/// 01 6.17) shows the [DsChatStatusMark] at the trailing edge before the mention counter, and no
+/// unread bar while it does (the title stays bold while unread).
+///
 /// One screen reader node with the label "{Title}, {State}, {n} unread, {m} mentions" (the
 /// state is the run state word while the icon shows, else "Open" or "Done"; counts only above
-/// 0; "muted" at the end like the channel row) and the selected flag; Flutter has no tree role
+/// 0; "muted" and then the words of the status mark at the end) and the selected flag; Flutter has no tree role
 /// or level, so the tree is the order of the rows below their channel. Enter or a tap calls
 /// [onOpen]. The row cannot be dragged (01 6.8 item 10).
 ///
@@ -125,9 +130,14 @@ class DsSidebarThreadRowState extends State<DsSidebarThreadRow> {
     return c.textOnSidebarSecondary;
   }
 
-  /// Whether the unread bar on the left shows.
+  /// Whether the title is bold: unread and not muted, also while the status mark replaces the
+  /// unread bar (01 6.17 item 4).
   @visibleForTesting
-  bool get unreadBar => !widget.data.muted && widget.data.unreadCount > 0;
+  bool get boldTitle => !widget.data.muted && widget.data.unreadCount > 0;
+
+  /// Whether the unread bar on the left shows; the status mark replaces it (01 6.17 item 4).
+  @visibleForTesting
+  bool get unreadBar => boldTitle && widget.data.status == null;
 
   /// The row background of the selected state, or null.
   @visibleForTesting
@@ -139,6 +149,7 @@ class DsSidebarThreadRowState extends State<DsSidebarThreadRow> {
     final l = dsL10n(context);
     final c = context.dsColors;
     final d = widget.data;
+    final status = d.status;
     final marker = _runMarker(context, d.runState);
     final untitled = d.title.trim().isEmpty;
     final title = untitled ? l.sidebarNewChat : d.title;
@@ -159,6 +170,7 @@ class DsSidebarThreadRowState extends State<DsSidebarThreadRow> {
       if (d.unreadCount > 0) l.threadRowUnread(d.unreadCount),
       if (d.mentionCount > 0) l.threadRowMentions(d.mentionCount),
       if (d.muted) l.channelRowMuted,
+      if (status != null) dsChatStatusLabel(l, status),
     ].join(', ');
     final color = nameColor;
     return _SidebarTreeRow(
@@ -192,7 +204,7 @@ class DsSidebarThreadRowState extends State<DsSidebarThreadRow> {
                     overflow: TextOverflow.ellipsis,
                     style: dsTextStyle(DsType.bodySm).copyWith(
                       color: color,
-                      fontWeight: unreadBar ? FontWeight.w700 : null,
+                      fontWeight: boldTitle ? FontWeight.w700 : null,
                     ),
                   ),
                 ),
@@ -214,6 +226,10 @@ class DsSidebarThreadRowState extends State<DsSidebarThreadRow> {
             ],
           ),
         ),
+        if (status != null) ...[
+          const SizedBox(width: DsSpace.s6),
+          DsChatStatusMark(status),
+        ],
         if (d.mentionCount > 0) ...[
           const SizedBox(width: DsSpace.s6),
           _mentionBadge(context, d.mentionCount),

@@ -84,8 +84,9 @@ final Map<String, List<Map<String, Object?>>> _rowsV1 = {
 /// `shell_view_state.channel_column_hidden`), version 8 (M4-45, the session column state of
 /// `shell_view_state`), version 9 (M4-46, `channel_view_states.posts_shown_in_full`), version
 /// 10 (FIX-device-mirroring-2, `space_view_states`), version 11 (M4-49,
-/// `shell_view_state.code_blocks_unwrapped`) and version 12 (M4-51, the personal channel and
-/// thread orders) left the preserved tables as they were.
+/// `shell_view_state.code_blocks_unwrapped`), version 12 (M4-51, the personal channel and
+/// thread orders) and version 13 (M4-52, `thread_seen_states`) left the preserved tables as they
+/// were.
 final Map<String, List<Map<String, Object?>>> _rowsV4 = {
   ..._rowsV1,
   'host_key_pins': [
@@ -135,6 +136,7 @@ final Map<int, Map<String, List<Map<String, Object?>>>> _fixtureRows = {
   10: _rowsV4,
   11: _rowsV4,
   12: _rowsV4,
+  13: _rowsV4,
 };
 
 void _insert(Database raw, Map<String, List<Map<String, Object?>>> rows) {

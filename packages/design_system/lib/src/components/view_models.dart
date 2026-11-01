@@ -11,6 +11,8 @@ library;
 
 import 'package:flutter/foundation.dart';
 
+import 'ds_chat_status.dart';
+
 /// An enum value with the code of docs/spec/03.
 abstract interface class DsCode {
   /// The code as the server sends it, for example `waiting_input`; empty for `unknown`.
@@ -999,6 +1001,7 @@ final class DsChannelRowData {
     this.runActive = false,
     this.muted = false,
     this.projectBound = false,
+    this.status,
   });
 
   /// The channel ID.
@@ -1026,6 +1029,10 @@ final class DsChannelRowData {
 
   /// Whether the reader muted the channel.
   final bool muted;
+
+  /// The most urgent unseen agent state of the channel's chats, or null for none (01 6.17
+  /// item 6); while it is set the row shows its mark instead of the unread bar.
+  final DsChatStatus? status;
 }
 
 /// A thread row of the sidebar, nested below its channel (components.md section 7, 01 6.8).
@@ -1043,6 +1050,7 @@ final class DsSidebarThreadRowData {
     this.mentionCount = 0,
     this.muted = false,
     this.done = false,
+    this.status,
   });
 
   /// The thread ID.
@@ -1067,6 +1075,10 @@ final class DsSidebarThreadRowData {
 
   /// Whether the thread is done (`state = closed`).
   final bool done;
+
+  /// The agent state of the thread the person has not seen yet, or null for none (01 6.17);
+  /// while it is set the row shows its mark instead of the unread bar.
+  final DsChatStatus? status;
 }
 
 /// A space row of the sidebar (components.md section 7).

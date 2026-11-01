@@ -889,6 +889,216 @@ abstract class _$SidebarHold extends $Notifier<bool> {
   }
 }
 
+/// The seen marks of this device (01 6.17 item 3, `thread_seen_states`): the run and its state
+/// each chat showed when the person last had it open here.
+
+@ProviderFor(seenStates)
+final seenStatesProvider = SeenStatesProvider._();
+
+/// The seen marks of this device (01 6.17 item 3, `thread_seen_states`): the run and its state
+/// each chat showed when the person last had it open here.
+
+final class SeenStatesProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<Map<ThreadId, ThreadSeenState>>,
+          Map<ThreadId, ThreadSeenState>,
+          Stream<Map<ThreadId, ThreadSeenState>>
+        >
+    with
+        $FutureModifier<Map<ThreadId, ThreadSeenState>>,
+        $StreamProvider<Map<ThreadId, ThreadSeenState>> {
+  /// The seen marks of this device (01 6.17 item 3, `thread_seen_states`): the run and its state
+  /// each chat showed when the person last had it open here.
+  SeenStatesProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'seenStatesProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$seenStatesHash();
+
+  @$internal
+  @override
+  $StreamProviderElement<Map<ThreadId, ThreadSeenState>> $createElement(
+    $ProviderPointer pointer,
+  ) => $StreamProviderElement(pointer);
+
+  @override
+  Stream<Map<ThreadId, ThreadSeenState>> create(Ref ref) {
+    return seenStates(ref);
+  }
+}
+
+String _$seenStatesHash() => r'eba8fcffbed5c4c7fb99d2bd5379f52d608c9a5b';
+
+/// Writes the seen mark of a chat on screen ([ChatSeenMarker]): the newest run and its state;
+/// null before the login. A failed write leaves the dot, which the next open clears.
+
+@ProviderFor(chatSeenWriter)
+final chatSeenWriterProvider = ChatSeenWriterProvider._();
+
+/// Writes the seen mark of a chat on screen ([ChatSeenMarker]): the newest run and its state;
+/// null before the login. A failed write leaves the dot, which the next open clears.
+
+final class ChatSeenWriterProvider
+    extends
+        $FunctionalProvider<
+          void Function(ThreadId thread, RunSummary run)?,
+          void Function(ThreadId thread, RunSummary run)?,
+          void Function(ThreadId thread, RunSummary run)?
+        >
+    with $Provider<void Function(ThreadId thread, RunSummary run)?> {
+  /// Writes the seen mark of a chat on screen ([ChatSeenMarker]): the newest run and its state;
+  /// null before the login. A failed write leaves the dot, which the next open clears.
+  ChatSeenWriterProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'chatSeenWriterProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$chatSeenWriterHash();
+
+  @$internal
+  @override
+  $ProviderElement<void Function(ThreadId thread, RunSummary run)?>
+  $createElement($ProviderPointer pointer) => $ProviderElement(pointer);
+
+  @override
+  void Function(ThreadId thread, RunSummary run)? create(Ref ref) {
+    return chatSeenWriter(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(
+    void Function(ThreadId thread, RunSummary run)? value,
+  ) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride:
+          $SyncValueProvider<void Function(ThreadId thread, RunSummary run)?>(
+            value,
+          ),
+    );
+  }
+}
+
+String _$chatSeenWriterHash() => r'dc496934bf7c9f7356d37eb255ff98499e6d9224';
+
+/// The unseen status of every chat of [channelId] that has one (01 6.17; `unseenStatuses`): its
+/// stored runs, the chats open on this device, the seen marks of this device, the person's read
+/// states and the counters per chat.
+
+@ProviderFor(channelStatuses)
+final channelStatusesProvider = ChannelStatusesFamily._();
+
+/// The unseen status of every chat of [channelId] that has one (01 6.17; `unseenStatuses`): its
+/// stored runs, the chats open on this device, the seen marks of this device, the person's read
+/// states and the counters per chat.
+
+final class ChannelStatusesProvider
+    extends
+        $FunctionalProvider<
+          Map<ThreadId, DsChatStatus>,
+          Map<ThreadId, DsChatStatus>,
+          Map<ThreadId, DsChatStatus>
+        >
+    with $Provider<Map<ThreadId, DsChatStatus>> {
+  /// The unseen status of every chat of [channelId] that has one (01 6.17; `unseenStatuses`): its
+  /// stored runs, the chats open on this device, the seen marks of this device, the person's read
+  /// states and the counters per chat.
+  ChannelStatusesProvider._({
+    required ChannelStatusesFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'channelStatusesProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$channelStatusesHash();
+
+  @override
+  String toString() {
+    return r'channelStatusesProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $ProviderElement<Map<ThreadId, DsChatStatus>> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  Map<ThreadId, DsChatStatus> create(Ref ref) {
+    final argument = this.argument as String;
+    return channelStatuses(ref, argument);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(Map<ThreadId, DsChatStatus> value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<Map<ThreadId, DsChatStatus>>(value),
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is ChannelStatusesProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$channelStatusesHash() => r'5891646ef1477b5960d6166594080224e3d4010f';
+
+/// The unseen status of every chat of [channelId] that has one (01 6.17; `unseenStatuses`): its
+/// stored runs, the chats open on this device, the seen marks of this device, the person's read
+/// states and the counters per chat.
+
+final class ChannelStatusesFamily extends $Family
+    with $FunctionalFamilyOverride<Map<ThreadId, DsChatStatus>, String> {
+  ChannelStatusesFamily._()
+    : super(
+        retry: null,
+        name: r'channelStatusesProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// The unseen status of every chat of [channelId] that has one (01 6.17; `unseenStatuses`): its
+  /// stored runs, the chats open on this device, the seen marks of this device, the person's read
+  /// states and the counters per chat.
+
+  ChannelStatusesProvider call(String channelId) =>
+      ChannelStatusesProvider._(argument: channelId, from: this);
+
+  @override
+  String toString() => r'channelStatusesProvider';
+}
+
 /// The thread group of [channelId] (01 6.8 items 2 to 6; `selectSidebarThreads`): its stored
 /// threads, the counters per thread, its runs, the selected thread of the route, the person,
 /// the clock, the limits of `AppConfig` and the "Show more" state of this device. While
@@ -957,7 +1167,7 @@ final class ChannelThreadsProvider
   }
 }
 
-String _$channelThreadsHash() => r'aef2524fee080a0c227b4de3388661d13a141574';
+String _$channelThreadsHash() => r'dd89b01506c78e59d6e760e079cb14b92224cef9';
 
 /// The thread group of [channelId] (01 6.8 items 2 to 6; `selectSidebarThreads`): its stored
 /// threads, the counters per thread, its runs, the selected thread of the route, the person,
@@ -1138,9 +1348,11 @@ final class NewChatRowsFamily extends $Family
   String toString() => r'newChatRowsProvider';
 }
 
-/// The channel rows of [spaceId]: counters ([channelCounts]), active run, muted state and the
-/// thread group with its collapse state on this device (01 6.8); direct messages and archived
-/// channels are not part of the tree.
+/// The channel rows of [spaceId]: counters ([channelCounts]), active run, muted state, the
+/// thread group with its collapse state on this device (01 6.8) and the status mark (01 6.17
+/// item 6: the most urgent unseen status of its chats while "Show status on projects" is on,
+/// else that of its main history); direct messages and archived channels are not part of the
+/// tree.
 ///
 /// The order is the global one in the person's `channel_order` (rows not in it first, 01 6.16
 /// item 3), or, with "Arrange channels and projects automatically", the newest activity first
@@ -1149,18 +1361,22 @@ final class NewChatRowsFamily extends $Family
 @ProviderFor(ChannelsOfSpace)
 final channelsOfSpaceProvider = ChannelsOfSpaceFamily._();
 
-/// The channel rows of [spaceId]: counters ([channelCounts]), active run, muted state and the
-/// thread group with its collapse state on this device (01 6.8); direct messages and archived
-/// channels are not part of the tree.
+/// The channel rows of [spaceId]: counters ([channelCounts]), active run, muted state, the
+/// thread group with its collapse state on this device (01 6.8) and the status mark (01 6.17
+/// item 6: the most urgent unseen status of its chats while "Show status on projects" is on,
+/// else that of its main history); direct messages and archived channels are not part of the
+/// tree.
 ///
 /// The order is the global one in the person's `channel_order` (rows not in it first, 01 6.16
 /// item 3), or, with "Arrange channels and projects automatically", the newest activity first
 /// with that order breaking ties, held while [sidebarHoldProvider] holds (D-M4-51-4).
 final class ChannelsOfSpaceProvider
     extends $NotifierProvider<ChannelsOfSpace, List<SidebarChannel>> {
-  /// The channel rows of [spaceId]: counters ([channelCounts]), active run, muted state and the
-  /// thread group with its collapse state on this device (01 6.8); direct messages and archived
-  /// channels are not part of the tree.
+  /// The channel rows of [spaceId]: counters ([channelCounts]), active run, muted state, the
+  /// thread group with its collapse state on this device (01 6.8) and the status mark (01 6.17
+  /// item 6: the most urgent unseen status of its chats while "Show status on projects" is on,
+  /// else that of its main history); direct messages and archived channels are not part of the
+  /// tree.
   ///
   /// The order is the global one in the person's `channel_order` (rows not in it first, 01 6.16
   /// item 3), or, with "Arrange channels and projects automatically", the newest activity first
@@ -1209,11 +1425,13 @@ final class ChannelsOfSpaceProvider
   }
 }
 
-String _$channelsOfSpaceHash() => r'680367bf20456d5e40c43d185f5e84820bf21817';
+String _$channelsOfSpaceHash() => r'fa4f7e527eb150af786270dcad86734e41e575e7';
 
-/// The channel rows of [spaceId]: counters ([channelCounts]), active run, muted state and the
-/// thread group with its collapse state on this device (01 6.8); direct messages and archived
-/// channels are not part of the tree.
+/// The channel rows of [spaceId]: counters ([channelCounts]), active run, muted state, the
+/// thread group with its collapse state on this device (01 6.8) and the status mark (01 6.17
+/// item 6: the most urgent unseen status of its chats while "Show status on projects" is on,
+/// else that of its main history); direct messages and archived channels are not part of the
+/// tree.
 ///
 /// The order is the global one in the person's `channel_order` (rows not in it first, 01 6.16
 /// item 3), or, with "Arrange channels and projects automatically", the newest activity first
@@ -1237,9 +1455,11 @@ final class ChannelsOfSpaceFamily extends $Family
         isAutoDispose: true,
       );
 
-  /// The channel rows of [spaceId]: counters ([channelCounts]), active run, muted state and the
-  /// thread group with its collapse state on this device (01 6.8); direct messages and archived
-  /// channels are not part of the tree.
+  /// The channel rows of [spaceId]: counters ([channelCounts]), active run, muted state, the
+  /// thread group with its collapse state on this device (01 6.8) and the status mark (01 6.17
+  /// item 6: the most urgent unseen status of its chats while "Show status on projects" is on,
+  /// else that of its main history); direct messages and archived channels are not part of the
+  /// tree.
   ///
   /// The order is the global one in the person's `channel_order` (rows not in it first, 01 6.16
   /// item 3), or, with "Arrange channels and projects automatically", the newest activity first
@@ -1252,9 +1472,11 @@ final class ChannelsOfSpaceFamily extends $Family
   String toString() => r'channelsOfSpaceProvider';
 }
 
-/// The channel rows of [spaceId]: counters ([channelCounts]), active run, muted state and the
-/// thread group with its collapse state on this device (01 6.8); direct messages and archived
-/// channels are not part of the tree.
+/// The channel rows of [spaceId]: counters ([channelCounts]), active run, muted state, the
+/// thread group with its collapse state on this device (01 6.8) and the status mark (01 6.17
+/// item 6: the most urgent unseen status of its chats while "Show status on projects" is on,
+/// else that of its main history); direct messages and archived channels are not part of the
+/// tree.
 ///
 /// The order is the global one in the person's `channel_order` (rows not in it first, 01 6.16
 /// item 3), or, with "Arrange channels and projects automatically", the newest activity first

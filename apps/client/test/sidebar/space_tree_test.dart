@@ -166,7 +166,9 @@ void main() {
     expect(
       find.bySemanticsLabel(
         'general, ${en.channelKindNameText}, ${en.threadRowUnread(3)}, '
-        '${en.threadRowMentions(1)}, ${en.channelRowRunActive}',
+        '${en.threadRowMentions(1)}, ${en.channelRowRunActive}, '
+        // The running run of thread 1 is news the person has not seen (01 6.17, M4-52).
+        '${en.chatStatusWorking}',
       ),
       findsOneWidget,
     );

@@ -6,13 +6,15 @@
 /// D1, D2; M4-42), whether the session column shows (01 D1, D2; M4-45) and whether a forum group
 /// shows every open post (01 6.8 item 3; M4-46) and whether a space is collapsed (01 6.7,
 /// R-PR-24; FIX-device-mirroring-2) and whether code blocks wrap their long lines (01 6.14;
-/// M4-49). Nothing of it is synchronized: 01 11 has no key for it.
+/// M4-49), and the seen marks of the sidebar status dots (`thread_seen_states`, 01 6.17; M4-52).
+/// Nothing of it is synchronized: 01 11 has no key for it.
 library;
 
 import 'package:domain/domain.dart';
 import 'package:drift/drift.dart';
 
 import '../database.dart';
+import '../models.dart';
 
 /// Data access object of the local view state of forums, channel groups and the forum overview.
 ///
@@ -34,6 +36,8 @@ import '../database.dart';
 /// print(await db.forumViewDao.sessionColumnHidden(textThread: false)); // true
 /// await db.forumViewDao.setCodeBlocksUnwrapped(unwrapped: true);
 /// print(await db.forumViewDao.codeBlocksUnwrapped()); // true
+/// await db.forumViewDao.markSeen(thread, run, RunState.completed);
+/// db.forumViewDao.watchSeenStates().listen(print); // {thread: ThreadSeenState(...)}
 /// ```
 final class ForumViewDao {
   /// Creates the DAO on a database; use `LocalDatabase.forumViewDao`.
@@ -279,4 +283,35 @@ final class ForumViewDao {
     ShellViewStateRow row, {
     required bool textThread,
   }) => textThread ? !row.textThreadSessionShown : row.sessionColumnHidden;
+
+  /// The seen mark of every chat on this device (01 6.17): the run and its state the chat
+  /// showed when the person last had it open, emitted on every change; a chat without a mark is
+  /// not in the map.
+  Stream<Map<ThreadId, ThreadSeenState>> watchSeenStates() => _db
+      .select(_db.threadSeenStates)
+      .watch()
+      .map(
+        (rows) => {
+          for (final r in rows)
+            ThreadId.parse(r.threadId): ThreadSeenState(
+              threadId: ThreadId.parse(r.threadId),
+              runId: RunId.parse(r.runId),
+              runState: RunState.fromCode(r.runState),
+            ),
+        },
+      );
+
+  /// Stores that the person saw [run] of [thread] in [state] on this device; replaces the
+  /// mark before it.
+  Future<void> markSeen(ThreadId thread, RunId run, RunState state) async {
+    await _db
+        .into(_db.threadSeenStates)
+        .insertOnConflictUpdate(
+          ThreadSeenStatesCompanion.insert(
+            threadId: thread.value,
+            runId: run.value,
+            runState: state.code,
+          ),
+        );
+  }
 }

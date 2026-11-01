@@ -10,6 +10,7 @@ import 'package:l10n/l10n.dart';
 import '../generated/design_tokens.g.dart';
 import '../icons/ds_icon.dart';
 import '../theme/ds_theme.dart';
+import 'ds_chat_status.dart';
 import 'ds_common.dart';
 import 'view_models.dart';
 
@@ -96,8 +97,10 @@ bool _touch(BuildContext context) =>
 /// `motion.duration.pulse`, still in reduced motion), muted (`color.text.on-sidebar-muted` and
 /// the `action.mute` icon), selected (`color.surface.sidebar-selected`), hover
 /// (`color.surface.sidebar-hover`, over the whole row) and focus (ring
-/// `color.focus.ring-on-sidebar`). The label reads "{Name}, {kind}, {n} unread, {m} mentions,
-/// run active, muted"; Enter or a tap calls [onOpen].
+/// `color.focus.ring-on-sidebar`). The most urgent unseen agent state of the channel's chats
+/// ([DsChannelRowData.status], 01 6.17 item 6) shows as a [DsChatStatusMark] before the mention
+/// counter and replaces the unread bar. The label reads "{Name}, {kind}, {n} unread, {m}
+/// mentions, run active, muted, {status words}"; Enter or a tap calls [onOpen].
 ///
 /// A channel with thread rows passes [groupExpanded]: the leading slot
 /// ([dsChannelArrowSlot]) then holds its own arrow (`action.expand` when expanded,
@@ -197,9 +200,14 @@ class DsChannelRowState extends State<DsChannelRow> {
     return c.textOnSidebarSecondary;
   }
 
-  /// Whether the unread bar on the left shows.
+  /// Whether the title is bold: unread and not muted, also while the status mark replaces the
+  /// unread bar (01 6.17 item 4).
   @visibleForTesting
-  bool get unreadBar => !widget.data.muted && widget.data.unreadCount > 0;
+  bool get boldTitle => !widget.data.muted && widget.data.unreadCount > 0;
+
+  /// Whether the unread bar on the left shows; the status mark replaces it (01 6.17 item 4).
+  @visibleForTesting
+  bool get unreadBar => boldTitle && widget.data.status == null;
 
   /// The row background of the selected state, or null.
   @visibleForTesting
@@ -223,6 +231,7 @@ class DsChannelRowState extends State<DsChannelRow> {
     final l = dsL10n(context);
     final c = context.dsColors;
     final d = widget.data;
+    final status = d.status;
     final label = [
       d.name,
       dsChannelKindName(l, d.kind, projectBound: d.projectBound),
@@ -230,6 +239,7 @@ class DsChannelRowState extends State<DsChannelRow> {
       if (d.mentionCount > 0) l.threadRowMentions(d.mentionCount),
       if (d.runActive) l.channelRowRunActive,
       if (d.muted) l.channelRowMuted,
+      if (status != null) dsChatStatusLabel(l, status),
     ].join(', ');
     final color = nameColor;
     final rowHeight = context.dsDensity.rowChannel;
@@ -285,7 +295,7 @@ class DsChannelRowState extends State<DsChannelRow> {
                   overflow: TextOverflow.ellipsis,
                   style: dsTextStyle(DsType.bodySm).copyWith(
                     color: color,
-                    fontWeight: unreadBar ? FontWeight.w700 : null,
+                    fontWeight: boldTitle ? FontWeight.w700 : null,
                   ),
                 ),
               ),
@@ -293,6 +303,10 @@ class DsChannelRowState extends State<DsChannelRow> {
             if (d.runActive) ...[
               const SizedBox(width: DsSpace.s6),
               _RunDot(color: c.categorySpruceOnSidebar),
+            ],
+            if (status != null) ...[
+              const SizedBox(width: DsSpace.s6),
+              DsChatStatusMark(status),
             ],
             if (d.mentionCount > 0) ...[
               const SizedBox(width: DsSpace.s6),

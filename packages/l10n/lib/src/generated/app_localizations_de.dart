@@ -9608,4 +9608,23 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get renameProjectChanged =>
       'Das Forum wurde inzwischen geändert. Prüfe den Namen und tippe erneut auf Umbenennen.';
+
+  @override
+  String get chatStatusDone => 'Neu: Lauf beendet';
+
+  @override
+  String get chatStatusWorking => 'Neu: Agent arbeitet';
+
+  @override
+  String get chatStatusWaiting => 'Neu: wartet auf dich';
+
+  @override
+  String get chatStatusFailed => 'Neu: Lauf fehlgeschlagen';
+
+  @override
+  String get settingsShowProjectStatus => 'Status auf Projekten anzeigen';
+
+  @override
+  String get settingsShowProjectStatusHint =>
+      'Jedes Forum und Projekt zeigt in seiner Zeile den dringendsten neuen Status seiner Chats.';
 }

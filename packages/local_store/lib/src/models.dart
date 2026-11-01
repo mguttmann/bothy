@@ -2,7 +2,7 @@
 
 /// Value types of the local store that `domain` (M4-08) does not have: the caller's access to a
 /// space or channel, removed targets, outbox entries, the sync state, file cache rows, share
-/// entries, search hits, pending transcripts and recent targets. They describe local storage only and hold no rules of the server.
+/// entries, search hits, pending transcripts, recent targets and the seen marks of the sidebar status dots. They describe local storage only and hold no rules of the server.
 library;
 
 import 'package:domain/domain.dart';
@@ -574,6 +574,40 @@ final class RecentTarget {
 
   @override
   int get hashCode => Object.hash(kind, targetId, visitedAt);
+}
+
+/// The run and its state a chat showed when the person last had it open on this device
+/// (`thread_seen_states`, 01 6.17).
+final class ThreadSeenState {
+  /// Creates a [ThreadSeenState].
+  const ThreadSeenState({
+    required this.threadId,
+    required this.runId,
+    required this.runState,
+  });
+
+  /// The chat.
+  final ThreadId threadId;
+
+  /// Its newest run when the person last saw it.
+  final RunId runId;
+
+  /// The state of that run then; a code of a newer app reads [RunState.unknown].
+  final RunState runState;
+
+  @override
+  bool operator ==(Object other) =>
+      other is ThreadSeenState &&
+      other.threadId == threadId &&
+      other.runId == runId &&
+      other.runState == runState;
+
+  @override
+  int get hashCode => Object.hash(threadId, runId, runState);
+
+  @override
+  String toString() =>
+      'ThreadSeenState(${threadId.value}, ${runId.value}, ${runState.code})';
 }
 
 /// The pinned key of one host on this device (`host_key_pins`, 15 6.1 and 23.3).

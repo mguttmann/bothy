@@ -51,6 +51,7 @@ var registry = []SettingSpec{
 	{Key: "sidebar.auto_arrange_spaces", Kind: SettingBool},
 	{Key: "sidebar.auto_arrange_channels", Kind: SettingBool},
 	{Key: "sidebar.auto_arrange_chats", Kind: SettingBool},
+	{Key: "sidebar.show_project_status", Kind: SettingBool},
 	{Key: "notify.default_level", Kind: SettingEnum, Values: []string{"all", "mentions", "mute"}},
 	{Key: "notify.preview_mode", Kind: SettingEnum, Values: []string{"full", "names", "none"}},
 	{Key: "notify.input_needed_breaks_quiet_hours", Kind: SettingBool},

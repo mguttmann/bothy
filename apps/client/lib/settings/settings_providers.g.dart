@@ -118,6 +118,55 @@ final class SidebarArrangementProvider
 String _$sidebarArrangementHash() =>
     r'fde1545679e66caa4dfeca682368be0b4a9a70bf';
 
+/// Whether forum and project rows show the most urgent unseen status of their chats (01 6.17
+/// item 6, `sidebar.show_project_status`); synchronized like every personal setting.
+
+@ProviderFor(showProjectStatus)
+final showProjectStatusProvider = ShowProjectStatusProvider._();
+
+/// Whether forum and project rows show the most urgent unseen status of their chats (01 6.17
+/// item 6, `sidebar.show_project_status`); synchronized like every personal setting.
+
+final class ShowProjectStatusProvider
+    extends $FunctionalProvider<bool, bool, bool>
+    with $Provider<bool> {
+  /// Whether forum and project rows show the most urgent unseen status of their chats (01 6.17
+  /// item 6, `sidebar.show_project_status`); synchronized like every personal setting.
+  ShowProjectStatusProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'showProjectStatusProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$showProjectStatusHash();
+
+  @$internal
+  @override
+  $ProviderElement<bool> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  bool create(Ref ref) {
+    return showProjectStatus(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(bool value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<bool>(value),
+    );
+  }
+}
+
+String _$showProjectStatusHash() => r'cdf1d631bd926a76c904abff4295e0d3b34f6c04';
+
 /// The settings writer of the signed-in instance, or null before the login.
 
 @ProviderFor(settingsRepository)

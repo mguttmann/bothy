@@ -77,7 +77,11 @@ final class SidebarThread {
     this.lastRun,
     this.waitingForMe = false,
     this.muted = false,
+    this.status,
   });
+
+  /// The agent status the person has not seen yet (01 6.17), or null.
+  final DsChatStatus? status;
 
   /// The thread (a forum post or a thread of a text channel).
   final Thread thread;
@@ -114,6 +118,7 @@ final class SidebarThread {
       mentionCount: counts.mentions,
       muted: muted,
       done: thread.state == ThreadState.closed,
+      status: status,
     );
   }
 }
@@ -192,8 +197,8 @@ const Set<RunState> _activeStates = {
 /// the sidebar, 01 6.8 item 4); they stay while stored. In a forum [heldOrder] is the order of
 /// the rows shown last while the sidebar holds them: those rows keep it, and rows new to the
 /// group come first, so no row moves under the pointer. [expanded] is the state of the group,
-/// [mutedThreads] the threads the person muted (a muted channel mutes its threads). Never
-/// throws.
+/// [mutedThreads] the threads the person muted (a muted channel mutes its threads), [statuses]
+/// the unseen status of each chat (01 6.17, `unseenStatuses`). Never throws.
 ///
 /// Example:
 /// ```dart
@@ -217,6 +222,7 @@ SidebarThreadGroup selectSidebarThreads({
   bool showAllPosts = false,
   List<ThreadId> heldOrder = const [],
   List<ThreadId>? manualOrder,
+  Map<ThreadId, DsChatStatus> statuses = const {},
 }) {
   final active = <ThreadId, RunSummary>{};
   final last = <ThreadId, RunSummary>{};
@@ -246,6 +252,7 @@ SidebarThreadGroup selectSidebarThreads({
               run.triggeredBy == me) ||
           c.mentions > 0,
       muted: channelMuted || mutedThreads.contains(t.id),
+      status: statuses[t.id],
     );
   }
 

@@ -10,7 +10,7 @@ import 'daos/upsert.dart';
 import 'database.dart';
 
 /// Deletes the threads [threadIds] with their messages, reactions, mentions, components,
-/// attachments, runs, tags, read states, loaded ranges, thread notification preferences and
+/// attachments, runs, tags, read states, seen marks of the status dots, loaded ranges, thread notification preferences and
 /// search rows, the metadata of files no other message attaches, and their file cache rows;
 /// drafts of the threads only with [withDrafts]. Runs in the caller's transaction and returns
 /// the paths of the deleted file cache rows.
@@ -55,6 +55,9 @@ Future<List<String>> deleteThreads(
   await run('DELETE FROM messages WHERE thread_id IN $ids', {db.messages});
   await run('DELETE FROM thread_tags WHERE thread_id IN $ids', {db.threadTags});
   await run('DELETE FROM read_states WHERE thread_id IN $ids', {db.readStates});
+  await run('DELETE FROM thread_seen_states WHERE thread_id IN $ids', {
+    db.threadSeenStates,
+  });
   await run('DELETE FROM loaded_ranges WHERE thread_id IN $ids', {
     db.loadedRangesTable,
   });

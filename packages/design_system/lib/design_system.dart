@@ -21,6 +21,7 @@ library;
 export 'src/components/ds_banner.dart';
 export 'src/components/ds_billing_badge.dart';
 export 'src/components/ds_channel_row.dart';
+export 'src/components/ds_chat_status.dart';
 export 'src/components/ds_common.dart';
 export 'src/components/ds_composer.dart';
 export 'src/components/ds_dropdown_field.dart';

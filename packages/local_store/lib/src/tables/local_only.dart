@@ -2,7 +2,7 @@
 
 /// Local-only tables (15 6.1): `outbox`, `sync_state`, `loaded_ranges`, `file_cache`,
 /// `share_inbox`, `forum_view_states`, `recent_targets`, `host_key_pins`, `channel_view_states`,
-/// `space_view_states` and `shell_view_state`. Times are milliseconds since the epoch in UTC, so ordering and the
+/// `space_view_states`, `shell_view_state` and `thread_seen_states`. Times are milliseconds since the epoch in UTC, so ordering and the
 /// cleanup compare plain integers.
 library;
 
@@ -228,6 +228,28 @@ class SpaceViewStates extends Table {
 
   @override
   Set<Column<Object>> get primaryKey => {spaceId};
+}
+
+/// The run and its state a chat showed when the person last had it open on this device (01 6.17,
+/// brief M4-52 Design note 3): the sidebar shows no status dot for a run state the person has seen.
+/// Kept per device and never synchronized; the person's read state carries "seen" to the other
+/// devices. A thread without a row has no mark. The removal of a thread deletes its row (04 8.3).
+@DataClassName('ThreadSeenStateRow')
+class ThreadSeenStates extends Table {
+  @override
+  String get tableName => 'thread_seen_states';
+
+  /// The thread, canonical UUID text.
+  TextColumn get threadId => text()();
+
+  /// The newest run of the thread when the person last saw it, canonical UUID text.
+  TextColumn get runId => text()();
+
+  /// The state of that run then (`RunState.code`).
+  TextColumn get runState => text()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {threadId};
 }
 
 /// How the desktop shell looks on this device (01 6.8 item 7, D-SB-6; 01 D1, D15): whether the

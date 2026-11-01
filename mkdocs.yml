@@ -456,6 +456,7 @@ nav:
           - "M4-49: Readable code blocks": briefs/M4-49-readable-code-blocks.md
           - "M4-50: Free text selection in the history": briefs/M4-50-text-selection.md
           - "M4-51: Sidebar ordering": briefs/M4-51-sidebar-ordering.md
+          - "M4-52: Status dots in the sidebar": briefs/M4-52-status-dots.md
       - Milestone M6:
           - "M6-01: Console session following the BFF pattern": briefs/M6-01-console-session.md
           - "M6-05: Statistics in the server": briefs/M6-05-stats-server.md

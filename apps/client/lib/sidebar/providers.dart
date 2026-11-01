@@ -7,7 +7,9 @@ library;
 
 import 'dart:async';
 
+import 'package:design_system/design_system.dart' show DsChatStatus;
 import 'package:domain/domain.dart';
+import 'package:local_store/local_store.dart' show ThreadSeenState;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../app/providers/ports.dart';
@@ -21,10 +23,12 @@ import '../forum/providers.dart'
         PendingPost,
         pendingPostsProvider,
         unsentChannelDraftProvider;
-import '../settings/settings_providers.dart' show sidebarArrangementProvider;
+import '../settings/settings_providers.dart'
+    show showProjectStatusProvider, sidebarArrangementProvider;
 import 'sidebar_arrange.dart';
 import 'sidebar_model.dart';
 import 'sidebar_order.dart';
+import 'sidebar_status.dart';
 import 'sidebar_threads.dart';
 
 part 'providers.g.dart';
@@ -227,6 +231,58 @@ class SidebarHold extends _$SidebarHold {
   }
 }
 
+/// The seen marks of this device (01 6.17 item 3, `thread_seen_states`): the run and its state
+/// each chat showed when the person last had it open here.
+@riverpod
+Stream<Map<ThreadId, ThreadSeenState>> seenStates(Ref ref) {
+  final db = ref.watch(localDatabaseProvider);
+  return db == null
+      ? Stream.value(const {})
+      : db.forumViewDao.watchSeenStates();
+}
+
+/// Writes the seen mark of a chat on screen ([ChatSeenMarker]): the newest run and its state;
+/// null before the login. A failed write leaves the dot, which the next open clears.
+@riverpod
+void Function(ThreadId thread, RunSummary run)? chatSeenWriter(Ref ref) {
+  final db = ref.watch(localDatabaseProvider);
+  if (db == null) return null;
+  return (thread, run) {
+    db.forumViewDao.markSeen(thread, run.id, run.state).ignore();
+  };
+}
+
+/// The chats of [channel] open on this device by [route] (01 6.17 item 2): the thread of the
+/// route, or the main history of a text channel its own route shows.
+Set<ThreadId> openChatsOf(RouteSelection route, Channel channel) => {
+  ?route.thread,
+  if (route.thread == null &&
+      route.channel == channel.id &&
+      !route.newChat &&
+      channel.mainThreadId != null)
+    channel.mainThreadId!,
+};
+
+/// The unseen status of every chat of [channelId] that has one (01 6.17; `unseenStatuses`): its
+/// stored runs, the chats open on this device, the seen marks of this device, the person's read
+/// states and the counters per chat.
+@riverpod
+Map<ThreadId, DsChatStatus> channelStatuses(Ref ref, String channelId) {
+  final channel = ref.watch(storedChannelOfRouteProvider(channelId)).value;
+  if (channel == null) return const {};
+  return unseenStatuses(
+    runs: ref.watch(channelRunsProvider(channelId)).value ?? const [],
+    open: openChatsOf(ref.watch(lastRouteSelectionProvider), channel),
+    seen: ref.watch(seenStatesProvider).value ?? const {},
+    readStates: [
+      for (final r
+          in ref.watch(allReadStatesProvider).value ?? const <ReadState>[])
+        if (r.channelId == channel.id) r,
+    ],
+    counts: ref.watch(threadCountsOfProvider(channelId)),
+  );
+}
+
 /// The thread group of [channelId] (01 6.8 items 2 to 6; `selectSidebarThreads`): its stored
 /// threads, the counters per thread, its runs, the selected thread of the route, the person,
 /// the clock, the limits of `AppConfig` and the "Show more" state of this device. While
@@ -280,6 +336,7 @@ class ChannelThreads extends _$ChannelThreads {
             ThreadId.parse(p.targetId),
       },
       channelMuted: isMuted(channel.id, prefs, now: now),
+      statuses: ref.watch(channelStatusesProvider(channelId)),
     );
     _shown = [for (final r in group.rows) r.thread.id];
     return group;
@@ -317,9 +374,11 @@ List<SidebarNewChatRow> newChatRows(Ref ref, String channelId) {
   ];
 }
 
-/// The channel rows of [spaceId]: counters ([channelCounts]), active run, muted state and the
-/// thread group with its collapse state on this device (01 6.8); direct messages and archived
-/// channels are not part of the tree.
+/// The channel rows of [spaceId]: counters ([channelCounts]), active run, muted state, the
+/// thread group with its collapse state on this device (01 6.8) and the status mark (01 6.17
+/// item 6: the most urgent unseen status of its chats while "Show status on projects" is on,
+/// else that of its main history); direct messages and archived channels are not part of the
+/// tree.
 ///
 /// The order is the global one in the person's `channel_order` (rows not in it first, 01 6.16
 /// item 3), or, with "Arrange channels and projects automatically", the newest activity first
@@ -366,6 +425,15 @@ class ChannelsOfSpace extends _$ChannelsOfSpace {
     } else {
       _shown = const [];
     }
+    final showProjects = ref.watch(showProjectStatusProvider);
+    DsChatStatus? statusOf(Channel c) {
+      final statuses = ref.watch(channelStatusesProvider(c.id.value));
+      // Off, a row shows only the status of its own chat: the main history of a text channel.
+      return showProjects
+          ? aggregateStatus(statuses.values)
+          : statuses[c.mainThreadId];
+    }
+
     return [
       for (final c in ordered)
         SidebarChannel(
@@ -380,6 +448,7 @@ class ChannelsOfSpace extends _$ChannelsOfSpace {
           group: ref.watch(channelThreadsProvider(c.id.value)),
           expanded: !collapsed.contains(c.id),
           newChatRows: ref.watch(newChatRowsProvider(c.id.value)),
+          status: statusOf(c),
         ),
     ];
   }
