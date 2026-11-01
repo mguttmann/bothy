@@ -115,7 +115,7 @@ func (t *Tracker) Heartbeat(ctx context.Context, body json.RawMessage) (agents.P
 // applyTrash hands the folder move outcomes of r to chat, which stores each once and audits it
 // as channel.project.trash (09 18.15, D-DEL-11), and returns the moves the runner still owes for
 // HeartbeatAck.project_trash. Any error of the port fails the heartbeat with internal_error.
-func (t *Tracker) applyTrash(ctx context.Context, agentID ids.ID, r domain.Report) ([]chat.ProjectTrashRequest, error) {
+func (t *Tracker) applyTrash(ctx context.Context, agentID ids.ID, r domain.Report) ([]agents.ProjectTrashRequest, error) {
 	_, port := t.bound()
 	if port == nil {
 		// A tracker without chat (a second node in a test, or before the chat step) owes nothing;
@@ -134,9 +134,16 @@ func (t *Tracker) applyTrash(ctx context.Context, agentID ids.ID, r domain.Repor
 			return nil, internal(err, "agents: applying folder move outcomes")
 		}
 	}
-	out, err := port.ProjectTrashRequests(ctx, agentID)
+	reqs, err := port.ProjectTrashRequests(ctx, agentID)
 	if err != nil {
 		return nil, internal(err, "agents: reading the folder moves")
+	}
+	if len(reqs) == 0 {
+		return nil, nil
+	}
+	out := make([]agents.ProjectTrashRequest, 0, len(reqs))
+	for _, req := range reqs {
+		out = append(out, agents.ProjectTrashRequest{ChannelID: req.ChannelID, WorkspaceRef: req.WorkspaceRef})
 	}
 	return out, nil
 }

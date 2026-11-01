@@ -38,10 +38,12 @@ void main() {
       deletionSummary(l, const DeletionView(messages: 7)),
       'This deletes 7 messages.',
     );
+    // language-check: off
     expect(
       deletionSummary(de, const DeletionView(channels: 3, chats: 1)),
       'Gelöscht werden: 3 Kanäle und 1 Chat.',
     );
+    // language-check: on
   });
 
   test('an item with every count zero reads as empty', () {

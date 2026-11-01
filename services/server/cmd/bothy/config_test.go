@@ -325,6 +325,8 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"channel.name_max_chars = 100  # default\n" +
 		"channel.prompt_max_bytes = 32768  # default\n" +
 		"channel.topic_max_chars = 1024  # default\n" +
+		"chat.delete_purge_interval = 30s  # default\n" +
+		"chat.delete_undo_window = 30s  # default\n" +
 		"client.app_lock_after = 5m  # default\n" +
 		"client.cache_max_age = 30d  # default\n" +
 		"client.min_version.android =   # default\n" +

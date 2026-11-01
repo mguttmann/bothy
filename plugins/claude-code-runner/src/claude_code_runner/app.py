@@ -317,13 +317,16 @@ class RunnerHandler(AgentHandler):
         """Check the bound folders and send a heartbeat every ``runner.trash_check_interval``.
 
         The gateway's ``heartbeat_ack`` carries no ``project_trash``; this ``sendHeartbeat``
-        is how the runner learns of a folder move (09 18.15).
+        is how the runner learns of a folder move (09 18.15). The first check goes out with the
+        adapter's own first heartbeat: an extra heartbeat before the adapter listens would
+        report the runner present before it can take an event.
         """
+        await self.trash.refresh()
         while True:
+            await asyncio.sleep(self.config.trash_check_interval)
             await self.trash.refresh()
             if self.adapter is not None:
                 await self.adapter.send_heartbeat()
-            await asyncio.sleep(self.config.trash_check_interval)
 
     def start_trash(self) -> None:
         """Start the timer of `trash_periodically` (once); `close` cancels it."""

@@ -621,7 +621,7 @@ R-DM-57, 07 4.5a, 20 4.2a.
   before `deleted_at` plus `chat.delete_undo_window` and before the purge, and it clears the
   archive only when the delete set it. `deleteChannel` with `trash_project_folder` needs a binding
   (`validation_failed` on `/trash_project_folder`), `channel.project.bind` and an ok folder check
-  (`409 project_folder_refused`); it asks the forum's effective operator (`trash_agent_id`).
+  (`409 conflict`, reason `project_folder_refused`); it asks the forum's effective operator (`trash_agent_id`).
 - A deleted thread: `Get` and `AppendToThread` answer 404; `Info` reports `Deleted`, so the
   purge and the run lifecycle still reach it; every thread list query filters `deleted_at IS
   NULL`; authz answers `not_found` for it except `thread.read`, `thread.delete`,

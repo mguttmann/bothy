@@ -13,7 +13,7 @@ from uuid import UUID
 import pytest
 
 from .conftest import World
-from .test_live_reload import readiness_of
+from .test_live_reload import readiness_of, ready_state
 
 pytestmark = pytest.mark.anyio
 
@@ -24,7 +24,7 @@ def summary_of(world: World, run_id: UUID) -> str:
 
 
 def _ready(world: World, channel: UUID) -> bool:
-    return any(readiness_of(b, channel) == {"ready": True} for b in world.fake.heartbeats)
+    return any(ready_state(b, channel) == {"ready": True} for b in world.fake.heartbeats)
 
 
 async def test_bound_folder_without_git_is_ready_and_runs(world: World) -> None:

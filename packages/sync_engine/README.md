@@ -647,7 +647,7 @@ above it (the app under test in the macOS app sandbox, M4-18), it uses the copy 
   `requested`) and `deleteThread` (`write` and creator or `manage`; not a main thread, not in an
   archived or read only channel) with their restores and `get*Deletion`; the step-up follows the
   action catalogue. Deleted items leave the lists and the snapshot, a deleted thread answers
-  `404`, and the restore after `world.deleteUndoWindow` answers `409 undo_window_passed`.
+  `404`, and the restore after `world.deleteUndoWindow` answers `409 conflict` with reason `undo_window_passed`.
   Simplified: no purge after the window, no `access.changed` for the rights change, no run
   cancellation, no runner hand-off of the folder.
 - Events: `agent.invocation` and the agent consumer side are not modelled; `device.pending` is

@@ -140,6 +140,7 @@ erDiagram
   agents |o--o{ channels : "operates"
   channels ||--o{ channel_skill_bindings : "loads"
   channels ||--o| project_bindings : "bound to"
+  agents |o--o{ project_bindings : "folder move by"
   channels ||--o{ dm_participants : "participants"
   users ||--o{ dm_participants : "takes part"
   channels ||--o{ forum_tags : "has"

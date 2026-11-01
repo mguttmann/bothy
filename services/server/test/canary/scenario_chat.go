@@ -156,8 +156,33 @@ func (sc *Scenario) content() {
 	sc.del(alex, "/messages/"+msgID, none...)
 	sc.post(o, "/channels/"+chID+"/archive", map[string]any{"reason": sc.Reg.New(ClassAdminReason, chID, "channel archive reason")}, ok...)
 	sc.post(o, "/spaces/"+space+"/archive", map[string]any{"reason": sc.Reg.New(ClassAdminReason, space, "space archive reason")}, ok...)
+	sc.deletion()
 	sc.threads = append(sc.threads, thread)
 	sc.messages = append(sc.messages, parent)
+}
+
+// deletion drives the deletion with undo (01 6.18): a chat, a channel and a space of their own
+// are looked at, deleted and restored by the owner, with canary text in each name.
+func (sc *Scenario) deletion() {
+	t := sc.T
+	t.Helper()
+	o := sc.W.Owner
+	spaceName := sc.Reg.New(ClassContent, "", "space name (deleted)")
+	space := id(sc.post(o, "/spaces", map[string]any{"name": spaceName, "icon": designkeys.SpaceIcons()[0], "color": designkeys.CategoryColors()[0]}, created...))
+	sc.Reg.Rescope(spaceName, space)
+	chName := sc.Reg.New(ClassContent, "", "channel name (deleted)")
+	ch := sc.post(o, "/spaces/"+space+"/channels", map[string]any{"kind": "text", "name": chName}, created...)
+	chID, chMain := id(ch), str(obj(ch), "main_thread_id")
+	sc.Reg.Rescope(chName, chID)
+	thread := str(obj(sc.post(o, "/channels/"+chID+"/threads", map[string]any{
+		"title": sc.Reg.New(ClassContent, chID, "thread title (deleted)"), "parent_message_id": id(sc.post(o, "/threads/"+chMain+"/messages",
+			map[string]any{"client_msg_id": newID(), "content_md": sc.Reg.New(ClassContent, chID, "message text (deleted)")}, created...)),
+	}, created...)), "thread.id")
+	for _, path := range []string{"/threads/" + thread, "/channels/" + chID, "/spaces/" + space} {
+		sc.get(o, path+"/deletion", ok...)
+		sc.post(o, path+"/delete", nil, ok...)
+		sc.post(o, path+"/restore", nil, ok...)
+	}
 }
 
 // export drives exportChannel (M3-11) as the owner, who has export on every channel: the export

@@ -3315,55 +3315,60 @@ D-DEL-13). Whoever deletes a project forum may also have its folder moved to the
 moves it and never trusts the server or an older check for its own file system.
 
 1. **Check.** For every bound forum it serves, the runner computes at most every
-   `runner.trash_check_interval` whether the folder may go and sends `trash_check` `{ok, reason}`
-   in the forum's readiness entry (4.8). The rules apply in this order:
+    `runner.trash_check_interval` whether the folder may go and sends `trash_check` `{ok, reason}`
+    in the forum's readiness entry (4.8). The rules apply in this order:
 
-   | Code | The folder is refused when |
-   |---|---|
-   | `outside_root` | `workspace_ref` does not resolve by 18.1 to a strict descendant of the projects root (also the root itself) |
-   | `symlink` | the bound path or one of its components below the root is a symbolic link, also one whose target stays under the root |
-   | `workspace_missing` | it does not exist or is no folder |
-   | `contains_other_project` | it is or holds the folder of another bound forum the runner serves, or holds `runner.state_dir` |
-   | `foreign_worktree` | it lies in a Git work tree whose common Git directory (`git rev-parse --git-common-dir`) is not inside it: a linked work tree, a submodule or a folder of another repository |
-   | `uncommitted_changes` | `git status --porcelain --untracked-files=normal` or `git stash list` prints anything |
-   | `unpushed_commits` | `git log --branches --not --remotes -1` prints a commit |
-   | `check_failed` | a `git` call fails or exceeds `runner.cli_probe_timeout`, or Git refuses a folder below a `.git` |
+    | Code | The folder is refused when |
+    |---|---|
+    | `outside_root` | `workspace_ref` does not resolve by 18.1 to a strict descendant of the projects root (also the root itself) |
+    | `symlink` | the bound path or one of its components below the root is a symbolic link, also one whose target stays under the root |
+    | `workspace_missing` | it does not exist or is no folder |
+    | `contains_other_project` | it is or holds the folder of another bound forum the runner serves, or holds `runner.state_dir` |
+    | `foreign_worktree` | it lies in a Git work tree whose common Git directory (`git rev-parse --git-common-dir`) is not inside it: a linked work tree, a submodule or a folder of another repository |
+    | `uncommitted_changes` | `git status --porcelain --untracked-files=normal` or `git stash list` prints anything |
+    | `unpushed_commits` | `git log --branches --not --remotes -1` prints a commit |
+    | `check_failed` | a `git` call fails or exceeds `runner.cli_probe_timeout`, or Git refuses a folder below a `.git` |
 
-   A folder outside any Git work tree has no Git rule. `git` runs as in 18.12: `runner.git_bin`,
-   an argument list, the allow list environment, no prompt, `core.fsmonitor` off.
+    A folder outside any Git work tree has no Git rule. `git` runs as in 18.12: `runner.git_bin`,
+    an argument list, the allow list environment, no prompt, `core.fsmonitor` off.
+
 2. **Request.** Once the deletion is final, the server answers every `sendHeartbeat` of the
-   runner with `HeartbeatAck.project_trash` `{channel_id, workspace_ref}` until the runner
-   reported an outcome. The gateway's `heartbeat_ack` has no such member, so the runner also sends
-   `sendHeartbeat` every `runner.trash_check_interval`. The folder is resolved from
-   `workspace_ref` by item 1; the server never names a path.
-3. **Move.** For a request it has not handled yet, the runner stops the turns of the channel by
-   the stop path of 18.6 with the reason `channel_read_only` and waits until none runs (at most
-   `runner.stop_grace` plus `runner.kill_grace` plus `runner.cli_probe_timeout`, otherwise the
-   request waits for the next answer), checks again by item 1 and moves the folder with one
-   rename, never a copy and never a removal:
-   - macOS: `~/.Trash/<name>`;
-   - Linux and other POSIX systems: the freedesktop trash `$XDG_DATA_HOME/Trash` (default
-     `~/.local/share/Trash`), `files/<name>` with `info/<name>.trashinfo` (`Path=` the percent
-     encoded real path, `DeletionDate=` the local time);
-   - Windows: always `.bothy-trash` under the projects root (below), because the shell's recycle
-     bin deletes for good when it is off, full or the path is too long, without telling a
-     process that has no window.
+    runner with `HeartbeatAck.project_trash` `{channel_id, workspace_ref}` until the runner
+    reported an outcome. The gateway's `heartbeat_ack` has no such member, so the runner also sends
+    `sendHeartbeat` every `runner.trash_check_interval`. The folder is resolved from
+    `workspace_ref` by item 1; the server never names a path.
 
-   A taken name gets `-2`, `-3` and so on. When the host trash is on another file system than the
-   folder, or the runner may not create or write it, the folder goes to
-   `.bothy-trash/<name>-<UTC time stamp>` directly under the projects root instead; a
-   `.bothy-trash` that is a symbolic link or not a folder is refused with `move_failed`, and a
-   `workspace_ref` inside `.bothy-trash` is never a project (`outside_root`). A rename that fails
-   otherwise is refused with `move_failed`.
+3. **Move.** For a request it has not handled yet, the runner stops the turns of the channel by
+    the stop path of 18.6 with the reason `channel_read_only` and waits until none runs (at most
+    `runner.stop_grace` plus `runner.kill_grace` plus `runner.cli_probe_timeout`, otherwise the
+    request waits for the next answer), checks again by item 1 and moves the folder with one
+    rename, never a copy and never a removal:
+
+    - macOS: `~/.Trash/<name>`;
+    - Linux and other POSIX systems: the freedesktop trash `$XDG_DATA_HOME/Trash` (default
+      `~/.local/share/Trash`), `files/<name>` with `info/<name>.trashinfo` (`Path=` the percent
+      encoded real path, `DeletionDate=` the local time);
+    - Windows: always `.bothy-trash` under the projects root (below), because the shell's recycle
+      bin deletes for good when it is off, full or the path is too long, without telling a
+      process that has no window.
+
+    A taken name gets `-2`, `-3` and so on. When the host trash is on another file system than the
+    folder, or the runner may not create or write it, the folder goes to
+    `.bothy-trash/<name>-<UTC time stamp>` directly under the projects root instead; a
+    `.bothy-trash` that is a symbolic link or not a folder is refused with `move_failed`, and a
+    `workspace_ref` inside `.bothy-trash` is never a project (`outside_root`). A rename that fails
+    otherwise is refused with `move_failed`.
+
 4. **Result.** The runner sends `{channel_id, result, reason}` (`trashed`, or `refused` with a code
-   of item 1 or 3) in `project_trash_results` of a heartbeat at once and in every heartbeat until
-   an accepted `sendHeartbeat` carried it. It keeps each handled request with its result in
-   `<runner.state_dir>/trash.json` (a move in progress with its target), so a restart neither
-   repeats a move nor loses a result; a request the server repeats after the result was sent gets
-   the same result again and moves nothing.
+    of item 1 or 3) in `project_trash_results` of a heartbeat at once and in every heartbeat until
+    an accepted `sendHeartbeat` carried it. It keeps each handled request with its result in
+    `<runner.state_dir>/trash.json` (a move in progress with its target), so a restart neither
+    repeats a move nor loses a result; a request the server repeats after the result was sent gets
+    the same result again and moves nothing.
+
 5. **Logs.** `project_trash_moved` (place `trash`, `fallback` or `recovered` after
-   a restart), `project_trash_refused` (code), `project_trash_deferred` and `project_trash_failed`
-   carry codes and channel IDs, never a path or a folder name.
+    a restart), `project_trash_refused` (code), `project_trash_deferred` and `project_trash_failed`
+    carry codes and channel IDs, never a path or a folder name.
 
 ## 19. Decisions of this chapter
 
