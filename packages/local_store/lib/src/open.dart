@@ -75,8 +75,21 @@ Future<LocalDatabase> openLocalStore({
 
 /// Opens an empty in-memory database in the calling isolate for tests, with the same feature
 /// checks as [openLocalStore] but without a key; [clock] replaces the time source.
-LocalDatabase openInMemoryForTests({DateTime Function()? clock}) =>
-    LocalDatabase(NativeDatabase.memory(setup: _checkFeatures), clock: clock);
+///
+/// With [closeStreamsSynchronously] a query stream that loses its last listener stops at once
+/// instead of on a timer of the next event loop turn. Tests that share one database across
+/// widget tests set it: a timer made in the fake time of a widget test fires only while that
+/// test advances it, and the close of the database waits for it.
+LocalDatabase openInMemoryForTests({
+  DateTime Function()? clock,
+  bool closeStreamsSynchronously = false,
+}) => LocalDatabase(
+  DatabaseConnection(
+    NativeDatabase.memory(setup: _checkFeatures),
+    closeStreamsSynchronously: closeStreamsSynchronously,
+  ),
+  clock: clock,
+);
 
 /// Runs on the database connection before drift uses it.
 void _setUp(Database database, Uint8List key) {
