@@ -74,16 +74,26 @@ func TestGateway_SpaceDefaultOperatorGetsNewChannelLive(t *testing.T) {
 	c, r := w.ready(t, params)
 	ch := w.newChannel(space, "tickets")
 	cm := w.post(ch.thread, "for the operator")
+	var seq int64
+	if err := w.gwWorld.owner.QueryRow(context.Background(),
+		`SELECT seq FROM event_log WHERE type = 'message.created' AND client_msg_id = $1`, cm).Scan(&seq); err != nil {
+		t.Fatalf("seq of message.created %s: %v", cm, err)
+	}
 	// A second, later event the agent sees anyway is not needed: with cursor_advance_every=1 the
-	// hub sends cursor frames to the agent's live connection for every processed event.
+	// hub sends cursor frames to the agent's live connection for every processed event. The live
+	// part ends with the message or with a cursor at or past its seq (processed, not delivered).
+	// It does not read on after the message: the agent never acknowledges, so the server
+	// redelivers it while the connection is open, and reading on spent the whole Patience on
+	// every run before the control part started (FLAKE-wire-operator-live).
 	ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
 	defer cancel()
 	var live []frame
 	gotMsg := false
 	var maxCursor int64
-	for {
+	for !gotMsg && maxCursor < seq {
 		op, d, err := c.Next(ctx)
 		if err != nil {
+			t.Logf("live part ended without the message: %v", err)
 			break
 		}
 		f := frame{op: op}
