@@ -152,7 +152,9 @@ final Map<String, Widget Function()> forms = {
 void main() {
   setUpAll(() async {
     root = Directory.systemTemp.createTempSync('new_chat_golden');
-    db = openInMemoryForTests(clock: () => t0);
+    // A stream that ends in the fake time of a test stops at once: drift's timer for it would
+    // never fire, and the close in tearDownAll would wait for it.
+    db = openInMemoryForTests(clock: () => t0, closeStreamsSynchronously: true);
     final idle = idleEngine(db);
     engine = idle.engine;
     closeAuth = idle.auth.dispose;
@@ -164,6 +166,26 @@ void main() {
     await db.close();
     root.deleteSync(recursive: true);
   });
+
+  // The goldens share one database, closed in tearDownAll. A query stream of it that ends in
+  // the fake time of a test must not leave a timer behind: drift's close waits for that timer,
+  // which never fires once the fake time of its test is gone, so the close of tearDownAll hung
+  // for the 12 minutes of the test timeout (issue #238, run 40975481761).
+  testWidgets(
+    'a database stream that ends in fake time leaves no timer for the close',
+    (tester) async {
+      await tester.pumpWidget(
+        StreamBuilder<List<OutboxEntryView>>(
+          stream: engine.outbox.watchThread(null),
+          builder: (context, snapshot) => const SizedBox(),
+        ),
+      );
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 5)),
+      );
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
 
   for (final MapEntry(key: name, value: form) in forms.entries) {
     for (final theme in DsThemeMode.values) {
