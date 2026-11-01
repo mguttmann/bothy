@@ -52,3 +52,25 @@ LEFT JOIN LATERAL (
     ORDER BY ordinal DESC
     LIMIT 1
 ) s ON true;
+
+-- name: LiveSteps :many
+-- The agent tree of the live frame (docs/design/topology-agent-tree.md 3): per active run of the
+-- batch its task steps (subagent, workflow, background_job), its running tool calls and the tool
+-- calls that started a task, in step order, with the detail member last_tool. Never detail or
+-- values otherwise; the title leaves the server only as the label of a receiver with run.read on
+-- the run, and the live builder drops every run outside the channel set of each receiver.
+SELECT s.run_id, s.id, s.parent_step_id, s.kind, s.name, s.title, s.status, s.started_at, s.finished_at,
+       coalesce(s.detail ->> 'last_tool', '')::text AS last_tool
+FROM run_steps s
+WHERE s.run_id = ANY (sqlc.arg(run_ids)::uuid[])
+  AND (
+      s.kind IN ('subagent', 'workflow', 'background_job')
+      OR (s.kind = 'tool_call' AND s.status = 'running')
+      OR s.id IN (
+          SELECT t.parent_step_id FROM run_steps t
+          WHERE t.run_id = ANY (sqlc.arg(run_ids)::uuid[])
+            AND t.kind IN ('subagent', 'workflow', 'background_job')
+            AND t.parent_step_id IS NOT NULL
+      )
+  )
+ORDER BY s.run_id, s.ordinal;

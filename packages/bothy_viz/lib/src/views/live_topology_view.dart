@@ -9,7 +9,7 @@ import 'package:design_system/design_system.dart';
 import 'package:flutter/material.dart';
 
 import '../marks/lane_mark.dart';
-import '../marks/run_card_mark.dart';
+import '../marks/task_tree_mark.dart';
 import '../marks/viz_texts.dart';
 import '../model/live_topology_model.dart';
 import '../model/run_card_model.dart';
@@ -117,7 +117,7 @@ class _LiveTopologyViewState extends State<LiveTopologyView>
   Widget _card(RunCardModel card) {
     final cached = _cards[card.runId];
     if (cached != null && cached.$1 == card) return cached.$2;
-    final built = RunCardMark(
+    final built = RunCardTreeMark(
       key: ValueKey(card.runId),
       model: card,
       onTap: _open,

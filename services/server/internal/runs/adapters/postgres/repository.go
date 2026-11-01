@@ -345,6 +345,29 @@ func (r *Repository) LiveFacts(ctx context.Context, runIDs []ids.ID) (map[ids.ID
 	return out, nil
 }
 
+// LiveSteps implements app.Repository: one statement for the whole batch
+// (docs/design/topology-agent-tree.md 3).
+func (r *Repository) LiveSteps(ctx context.Context, runIDs []ids.ID) (map[ids.ID][]runsport.LiveStep, error) {
+	out := make(map[ids.ID][]runsport.LiveStep, len(runIDs))
+	if len(runIDs) == 0 {
+		return out, nil
+	}
+	keys := make([]pgtype.UUID, len(runIDs))
+	for i, id := range runIDs {
+		keys[i] = uuid(id)
+	}
+	rows, err := r.read(ctx).LiveSteps(ctx, keys)
+	if err != nil {
+		return nil, mapError(err, "reading the live steps of runs")
+	}
+	for _, row := range rows {
+		run := idOf(row.RunID)
+		out[run] = append(out[run], runsport.LiveStep{ID: idOf(row.ID), ParentID: idOf(row.ParentStepID), Kind: row.Kind, Name: row.Name,
+			Title: row.Title, Status: row.Status, LastTool: row.LastTool, StartedAt: timeOf(row.StartedAt), FinishedAt: timeOf(row.FinishedAt)})
+	}
+	return out, nil
+}
+
 // Steps implements app.Repository.
 func (r *Repository) Steps(ctx context.Context, s app.StepsRead) ([]app.StepRow, error) {
 	limit, err := rowLimit(s.Limit)

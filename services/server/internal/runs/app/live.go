@@ -15,7 +15,8 @@ var _ runs.LiveSource = (*Service)(nil)
 // LiveRuns implements runs.LiveSource (docs/spec/25-visualization.md 5.2, M6-15): every active
 // run in batches of api.page_size_max in keyset order (newest first), the place of its thread
 // through chat.Threads.Locate, at most perChannel per channel, then the step kind and name and the
-// approval flag of the kept runs in one read. It does not authorize; stats filters per receiver.
+// approval flag of the kept runs in one read and the steps of their agent trees in another. It
+// does not authorize; stats filters per receiver.
 // Errors: those of the reads.
 func (s *Service) LiveRuns(ctx context.Context, perChannel int) ([]runs.LiveRun, error) {
 	var rows []RunRow
@@ -59,13 +60,27 @@ func (s *Service) LiveRuns(ctx context.Context, perChannel int) ([]runs.LiveRun,
 		})
 		kept = append(kept, r.ID)
 	}
+	if err := s.liveDetails(ctx, out, kept); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// liveDetails sets the current step, the approval flag and the steps of the agent tree of each
+// run of out; kept are their IDs.
+func (s *Service) liveDetails(ctx context.Context, out []runs.LiveRun, kept []ids.ID) error {
 	facts, err := s.d.Repo.LiveFacts(ctx, kept)
 	if err != nil {
-		return nil, err
+		return err
+	}
+	steps, err := s.d.Repo.LiveSteps(ctx, kept)
+	if err != nil {
+		return err
 	}
 	for i := range out {
 		f := facts[out[i].ID]
 		out[i].StepKind, out[i].StepName, out[i].ApprovalPending = f.StepKind, f.StepName, f.ApprovalPending
+		out[i].Steps = steps[out[i].ID]
 	}
-	return out, nil
+	return nil
 }

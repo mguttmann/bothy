@@ -436,6 +436,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get vizMoreRunsThanShown => 'More runs than shown';
 
   @override
+  String vizTaskTree(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count agents and jobs started',
+      one: '1 agent or job started',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get vizMoreTasksThanShown => 'More agents and jobs than shown';
+
+  @override
   String get vizRunStateWaitingInput => 'Waiting for input';
 
   @override

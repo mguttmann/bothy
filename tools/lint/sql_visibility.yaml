@@ -426,6 +426,9 @@ exceptions:
   - query: runs.LiveFacts
     category: thread_scope
     reason: "the step kind and name and the approval flag of the active runs of the base frame of the live stream (M6-15), never title, detail or values; the frame keeps only the runs of the channels of each receiver's Scope after stats.read, so nothing reaches a receiver outside its channels; run_steps and message_components are read by run id (docs/decisions.d/M6-15.md)"
+  - query: runs.LiveSteps
+    category: thread_scope
+    reason: "the steps of the agent tree of the active runs of the base frame of the live stream (FEAT-topology-agent-tree): kind, name, status, times, detail.last_tool and the title; the frame keeps only the runs of the channels of each receiver's Scope after stats.read, and the title leaves as a label only for the channels of the receiver's Scope of run.read; run_steps are read by run id (docs/design/topology-agent-tree.md 5)"
   - query: runs.StepCounts
     category: after_authorize
     reason: "step_count of the runs of one page, each of which run.read allowed; run_steps has no channel_id (D-M2-05-9)"

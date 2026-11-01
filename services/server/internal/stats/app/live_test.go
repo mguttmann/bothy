@@ -29,6 +29,8 @@ import (
 // to the manager.
 type liveAuthz struct {
 	owner, manager, support, supportCh, devCh ids.ID
+	// noRunRead lists principals whose run.read scope is empty (they see channels, not runs).
+	noRunRead map[ids.ID]bool
 }
 
 func (a *liveAuthz) Authorize(_ context.Context, p authorize.Principal, _ authorize.Action, r authorize.Resource) (authorize.Decision, error) {
@@ -44,7 +46,10 @@ func (a *liveAuthz) Authorize(_ context.Context, p authorize.Principal, _ author
 	return authorize.Decision{Outcome: authorize.OutcomeForbidden}, nil
 }
 
-func (a *liveAuthz) Scope(_ context.Context, p authorize.Principal, _ authorize.Action) (authorize.Scope, error) {
+func (a *liveAuthz) Scope(_ context.Context, p authorize.Principal, act authorize.Action) (authorize.Scope, error) {
+	if act == authorize.ActionRunRead && a.noRunRead[p.PrincipalID()] {
+		return authorize.Scope{}, nil
+	}
 	switch p.PrincipalID() {
 	case a.owner:
 		return authorize.Scope{ChannelIDs: []ids.ID{a.supportCh, a.devCh}}, nil
@@ -398,5 +403,67 @@ func TestLive_CurrentSingleFlight(t *testing.T) {
 	}
 	if _, err := e.live.Current(actor.WithActor(context.Background(), e.person(e.az.manager)), stats.LiveQuery{}); err == nil {
 		t.Fatal("the manager polls the instance")
+	}
+}
+
+// TestLive_TaskTree (FEAT-topology-agent-tree): the builder derives the agent tree of each run
+// from its steps with stats.live_max_tasks, stats.live_task_max_depth and stats.live_task_keep;
+// the label of a node reaches a receiver only with run.read on the run's channel.
+func TestLive_TaskTree(t *testing.T) {
+	t.Parallel()
+	cfg := app.LiveConfig{Enabled: true, Interval: liveInterval, MaxRuns: 200, MaxSubscribers: 3, SLIWindow: 5 * time.Minute,
+		PayloadMax: 1 << 20, MaxTasks: 25, TaskMaxDepth: 4, TaskKeep: 2 * time.Minute}
+	e := newLiveEnv(t, cfg)
+	now := e.clk.Now()
+	call, flow, agent := ids.New(), ids.New(), ids.New()
+	e.src.runs[0].Steps = []runs.LiveStep{
+		{ID: call, Kind: "tool_call", Name: "Workflow", Status: "completed", StartedAt: now.Add(-time.Minute), FinishedAt: now},
+		{ID: flow, ParentID: call, Kind: "workflow", Name: "local_workflow", Title: "Build and review", Status: "running",
+			StartedAt: now.Add(-time.Minute)},
+		{ID: agent, ParentID: flow, Kind: "subagent", Name: "workflow_agent", Title: "review", Status: "running", LastTool: "Grep",
+			StartedAt: now.Add(-time.Minute)},
+		{ID: ids.New(), Kind: "background_job", Name: "local_bash", Title: "old job", Status: "completed",
+			StartedAt: now.Add(-time.Hour), FinishedAt: now.Add(-10 * time.Minute)},
+	}
+	e.az.noRunRead = map[ids.ID]bool{e.az.manager: true}
+	if err := e.live.Acquire(); err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	e.live.Tick(ctx)
+	r := testkit.Receive(t, "the round", e.sink.rounds)
+	type frame struct {
+		Runs []struct {
+			Tasks []struct {
+				ID       string  `json:"id"`
+				ParentID *string `json:"parent_id"`
+				Tool     *string `json:"tool"`
+				Label    *string `json:"label"`
+			} `json:"tasks"`
+		} `json:"runs"`
+	}
+	owner, err := r.For(ctx, e.person(e.az.owner), stats.LiveQuery{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var of frame
+	if err := json.Unmarshal(owner.Payload, &of); err != nil {
+		t.Fatal(err)
+	}
+	tasks := of.Runs[0].Tasks
+	if len(tasks) != 2 || tasks[0].ID != flow.String() || tasks[0].ParentID != nil || *tasks[0].Label != "Build and review" ||
+		tasks[1].ID != agent.String() || *tasks[1].ParentID != flow.String() || *tasks[1].Tool != "Grep" || *tasks[1].Label != "review" {
+		t.Fatalf("owner frame %s", owner.Payload)
+	}
+	mgr, err := r.For(ctx, e.person(e.az.manager), stats.LiveQuery{SpaceID: e.az.support})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var mf frame
+	if err := json.Unmarshal(mgr.Payload, &mf); err != nil {
+		t.Fatal(err)
+	}
+	if len(mf.Runs[0].Tasks) != 2 || mf.Runs[0].Tasks[0].Label != nil || mf.Runs[0].Tasks[1].Label != nil {
+		t.Fatalf("manager without run.read got labels: %s", mgr.Payload)
 	}
 }

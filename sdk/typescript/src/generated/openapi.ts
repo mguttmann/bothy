@@ -8290,7 +8290,7 @@ export interface components {
             title: string;
             /** @enum {string} */
             status: "pending" | "running" | "completed" | "failed" | "cancelled";
-            /** @description Schema `run_step_detail.v1`, cut to `run.step_detail_max_bytes`. A step of kind `subagent`, `workflow` or `background_job` may carry the member `usage` (object with the optional integers `tokens`, `tool_uses`, `duration_ms`, `cost_micros` and the text `currency`, required with `cost_micros`), reported by the adapter for display only, never a booking (09 5.6). */
+            /** @description Schema `run_step_detail.v1`, cut to `run.step_detail_max_bytes`. A step of kind `subagent`, `workflow` or `background_job` may carry the member `usage` (object with the optional integers `tokens`, `tool_uses`, `duration_ms`, `cost_micros` and the text `currency`, required with `cost_micros`), reported by the adapter for display only, never a booking (09 5.6). A workflow agent may carry the texts `last_tool` (the tool it ran last, its current tool while it runs) and `phase` (09 5.6). */
             detail?: components["schemas"]["JsonObject"];
             started_at: components["schemas"]["Timestamp"];
             finished_at?: components["schemas"]["Timestamp"];
@@ -9818,6 +9818,41 @@ export interface components {
             /** @example USD */
             currency?: string;
             cost_is_estimate?: boolean;
+            /** @description Child nodes of the run (subagents, workflows and their agents, background jobs) in step order, a parent before its children; at most `stats.live_max_tasks`, no deeper than `stats.live_task_max_depth`, finished ones only for `stats.live_task_keep` after their end. Absent when the run has none (25 5.2). */
+            tasks?: components["schemas"]["StatsLiveTask"][];
+            /** @description Present and true when a limit or the payload bound left task nodes of this run out. */
+            tasks_truncated?: boolean;
+        };
+        /** @description One child node of an active run in the live topology (25 5.2). Never content except `label`, which only a receiver with `run.read` on the run gets. */
+        StatsLiveTask: {
+            /** @description The step ID. */
+            id: components["schemas"]["Uuid"];
+            /** @description The task node this node hangs under; absent when it hangs under the run. */
+            parent_id?: components["schemas"]["Uuid"];
+            /** @enum {string} */
+            kind: "subagent" | "workflow" | "background_job";
+            /**
+             * @description Step name, the adapter's type of the task, never content.
+             * @example local_agent
+             * @example workflow_agent
+             * @example local_workflow
+             * @example local_bash
+             */
+            name: string;
+            /** @enum {string} */
+            state: "running" | "completed" | "failed" | "cancelled";
+            started_at: components["schemas"]["Timestamp"];
+            finished_at?: components["schemas"]["Timestamp"];
+            /**
+             * @description Name of the current tool of a running node.
+             * @example Bash
+             */
+            tool?: string;
+            /**
+             * @description First line of the step title; only with `run.read` on the run.
+             * @example review
+             */
+            label?: string;
         };
         StatsLiveAgent: {
             agent_id: components["schemas"]["Uuid"];

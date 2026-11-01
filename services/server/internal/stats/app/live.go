@@ -40,6 +40,12 @@ type LiveConfig struct {
 	PayloadMax int
 	// Connections reports cluster.mode = single: only then the frame carries connections.
 	Connections bool
+	// MaxTasks is stats.live_max_tasks: task nodes per run; 0 sends no agent tree.
+	MaxTasks int
+	// TaskMaxDepth is stats.live_task_max_depth; TaskKeep is stats.live_task_keep
+	// (docs/design/topology-agent-tree.md 3).
+	TaskMaxDepth int
+	TaskKeep     time.Duration
 }
 
 // validate names every invalid value.
@@ -47,6 +53,10 @@ func (c LiveConfig) validate() error {
 	if c.Interval <= 0 || c.SLIWindow <= 0 || c.MaxRuns < 1 || c.MaxSubscribers < 1 || c.PayloadMax < 1 {
 		return errors.New("stats: stats.live_interval, stats.live_sli_window, stats.live_max_runs, stats.live_max_subscribers " +
 			"and sync.event_payload_max_bytes must be positive")
+	}
+	if c.MaxTasks < 0 || c.TaskKeep < 0 || (c.MaxTasks > 0 && c.TaskMaxDepth < 1) {
+		return errors.New("stats: stats.live_max_tasks and stats.live_task_keep must not be negative, " +
+			"stats.live_task_max_depth must be positive")
 	}
 	return nil
 }
@@ -410,7 +420,7 @@ func (l *Live) build(ctx context.Context) (*domain.BaseFrame, error) {
 			// requires space_id) and no space manager may see it.
 			continue
 		}
-		base.Runs = append(base.Runs, liveRun(r))
+		base.Runs = append(base.Runs, l.liveRun(r, at))
 		want[r.AgentID] = struct{}{}
 	}
 	base.ChannelRates, base.InstanceRates = rateCells(rows, current)
@@ -428,11 +438,22 @@ func (l *Live) build(ctx context.Context) (*domain.BaseFrame, error) {
 	return base, nil
 }
 
-// liveRun converts a run of the source.
-func liveRun(r runs.LiveRun) domain.LiveRun {
-	return domain.LiveRun{RunID: r.ID, ThreadID: r.ThreadID, ChannelID: r.ChannelID, SpaceID: r.SpaceID, AgentID: r.AgentID, State: r.State,
+// liveRun converts a run of the source with its agent tree at the build time at.
+func (l *Live) liveRun(r runs.LiveRun, at time.Time) domain.LiveRun {
+	out := domain.LiveRun{RunID: r.ID, ThreadID: r.ThreadID, ChannelID: r.ChannelID, SpaceID: r.SpaceID, AgentID: r.AgentID, State: r.State,
 		QueuedAt: r.QueuedAt, StartedAt: r.StartedAt, BillingMode: r.BillingMode, StepKind: r.StepKind, StepName: r.StepName,
 		ApprovalPending: r.ApprovalPending, CostMicros: r.Cost.AmountMicros, Currency: r.Cost.Currency, CostIsEstimate: r.Cost.IsEstimate}
+	if len(r.Steps) == 0 {
+		return out
+	}
+	steps := make([]domain.LiveStep, len(r.Steps))
+	for i, s := range r.Steps {
+		steps[i] = domain.LiveStep{ID: s.ID, ParentID: s.ParentID, Kind: s.Kind, Name: s.Name, Title: s.Title, Status: s.Status,
+			LastTool: s.LastTool, StartedAt: s.StartedAt, FinishedAt: s.FinishedAt}
+	}
+	out.Tasks, out.TasksTruncated = domain.TaskTree(steps, at,
+		domain.TaskLimits{Max: l.cfg.MaxTasks, MaxDepth: l.cfg.TaskMaxDepth, Keep: l.cfg.TaskKeep})
+	return out
 }
 
 // rateCells splits rows into the cells per channel and the cells without a channel, with the
@@ -534,8 +555,10 @@ type liveRound struct {
 func (r liveRound) At() time.Time { return r.base.At }
 
 // For implements stats.LiveRound (M6-15 design note 4): Scope of channel.read for the visible
-// channels and cost.read.aggregate on the target, both in the mode of ctx, then the filter and the
-// size cut of the domain.
+// channels, Scope of run.read for the channels whose task labels the receiver gets (only when a
+// run of the frame has a labelled task node, docs/design/topology-agent-tree.md 5) and
+// cost.read.aggregate on the target, all in the mode of ctx, then the filter and the size cut of
+// the domain.
 func (r liveRound) For(ctx context.Context, a actor.Actor, q stats.LiveQuery) (stats.LiveFrame, error) {
 	sc, err := r.l.d.Authorizer.Scope(ctx, a, authorize.ActionChannelRead)
 	if err != nil {
@@ -545,14 +568,40 @@ func (r liveRound) For(ctx context.Context, a actor.Actor, q stats.LiveQuery) (s
 	if err != nil {
 		return stats.LiveFrame{}, err
 	}
-	visible := make(map[ids.ID]struct{}, len(sc.ChannelIDs))
-	for _, id := range sc.ChannelIDs {
-		visible[id] = struct{}{}
+	visible := channelSet(sc.ChannelIDs)
+	var readable map[ids.ID]struct{}
+	if r.labelled() {
+		rs, err := r.l.d.Authorizer.Scope(ctx, a, authorize.ActionRunRead)
+		if err != nil {
+			return stats.LiveFrame{}, err
+		}
+		readable = channelSet(rs.ChannelIDs)
 	}
-	b, _, err := domain.FilterLive(r.base, domain.Receiver{SpaceID: q.SpaceID, Visible: visible, Costs: d.Allowed()},
+	b, _, err := domain.FilterLive(r.base, domain.Receiver{SpaceID: q.SpaceID, Visible: visible, Readable: readable, Costs: d.Allowed()},
 		domain.LiveLimits{MaxRuns: r.l.cfg.MaxRuns, PayloadMax: r.l.cfg.PayloadMax, Interval: r.l.cfg.Interval})
 	if err != nil {
 		return stats.LiveFrame{}, errs.Wrap(errs.CodeInternalError, err, "stats: the live frame cannot be filtered")
 	}
 	return stats.LiveFrame{At: r.base.At, Payload: b}, nil
+}
+
+// labelled reports whether a run of the round has a task node with a label.
+func (r liveRound) labelled() bool {
+	for _, run := range r.base.Runs {
+		for _, x := range run.Tasks {
+			if x.Label != "" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// channelSet returns the set of list.
+func channelSet(list []ids.ID) map[ids.ID]struct{} {
+	out := make(map[ids.ID]struct{}, len(list))
+	for _, id := range list {
+		out[id] = struct{}{}
+	}
+	return out
 }

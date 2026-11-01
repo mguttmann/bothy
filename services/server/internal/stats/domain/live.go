@@ -74,6 +74,9 @@ type LiveRun struct {
 	CostMicros     int64
 	Currency       string
 	CostIsEstimate bool
+	// Tasks are the nodes of the agent tree (TaskTree); TasksTruncated reports a limit cut.
+	Tasks          []LiveTask
+	TasksTruncated bool
 }
 
 // LiveAgent is the state of one agent (schema StatsLiveAgent).
@@ -112,6 +115,9 @@ type Receiver struct {
 	SpaceID ids.ID
 	// Visible are the channels the receiver may read (Scope of channel.read).
 	Visible map[ids.ID]struct{}
+	// Readable are the channels whose runs the receiver may read (Scope of run.read): only their
+	// task nodes carry a label (docs/design/topology-agent-tree.md 5).
+	Readable map[ids.ID]struct{}
 	// Costs reports cost.read.aggregate on the target.
 	Costs bool
 }
@@ -149,20 +155,33 @@ type (
 		Name string `json:"name"`
 	}
 	runJSON struct {
-		RunID           string    `json:"run_id"`
-		ThreadID        string    `json:"thread_id"`
-		ChannelID       string    `json:"channel_id"`
-		SpaceID         string    `json:"space_id"`
-		AgentID         string    `json:"agent_id"`
-		State           string    `json:"state"`
-		QueuedAt        string    `json:"queued_at"`
-		StartedAt       string    `json:"started_at,omitempty"`
-		BillingMode     string    `json:"billing_mode"`
-		Step            *stepJSON `json:"step,omitempty"`
-		ApprovalPending bool      `json:"approval_pending"`
-		CostMicros      *int64    `json:"cost_micros,omitempty"`
-		Currency        string    `json:"currency,omitempty"`
-		CostIsEstimate  *bool     `json:"cost_is_estimate,omitempty"`
+		RunID           string     `json:"run_id"`
+		ThreadID        string     `json:"thread_id"`
+		ChannelID       string     `json:"channel_id"`
+		SpaceID         string     `json:"space_id"`
+		AgentID         string     `json:"agent_id"`
+		State           string     `json:"state"`
+		QueuedAt        string     `json:"queued_at"`
+		StartedAt       string     `json:"started_at,omitempty"`
+		BillingMode     string     `json:"billing_mode"`
+		Step            *stepJSON  `json:"step,omitempty"`
+		ApprovalPending bool       `json:"approval_pending"`
+		CostMicros      *int64     `json:"cost_micros,omitempty"`
+		Currency        string     `json:"currency,omitempty"`
+		CostIsEstimate  *bool      `json:"cost_is_estimate,omitempty"`
+		Tasks           []taskJSON `json:"tasks,omitempty"`
+		TasksTruncated  bool       `json:"tasks_truncated,omitempty"`
+	}
+	taskJSON struct {
+		ID         string `json:"id"`
+		ParentID   string `json:"parent_id,omitempty"`
+		Kind       string `json:"kind"`
+		Name       string `json:"name"`
+		State      string `json:"state"`
+		StartedAt  string `json:"started_at"`
+		FinishedAt string `json:"finished_at,omitempty"`
+		Tool       string `json:"tool,omitempty"`
+		Label      string `json:"label,omitempty"`
 	}
 	agentJSON struct {
 		AgentID             string `json:"agent_id"`
@@ -200,8 +219,10 @@ var summedMetrics = map[string]bool{"runs_finished": true, "tool_calls": true, M
 //   - rates sum the channel cells of the set, plus the cells without a channel for the instance;
 //     cost cells and the cost members of runs only with r.Costs;
 //   - sli and connections only for the instance;
-//   - when the payload reaches limits.PayloadMax the oldest runs drop out until it fits, with
-//     runs_truncated; the envelope's truncated is never involved.
+//   - every run carries its task nodes; their labels only when the run's channel is in r.Readable;
+//   - when the payload reaches limits.PayloadMax the task nodes of the oldest runs drop out first
+//     (tasks_truncated on each), then the oldest runs until it fits, with runs_truncated; the
+//     envelope's truncated is never involved.
 //
 // Errors: ErrFrameTooLarge when even no run fits, or an encoding error.
 //
@@ -221,7 +242,7 @@ func FilterLive(base *BaseFrame, r Receiver, limits LiveLimits) ([]byte, bool, e
 	if !instance {
 		f.Scope = scopeJSON{Kind: ScopeSpace, SpaceID: r.SpaceID.String()}
 	}
-	runs, truncated, agentIDs, err := visibleRuns(base, r, inSet, limits.MaxRuns)
+	runs, light, truncated, agentIDs, err := visibleRuns(base, r, inSet, limits.MaxRuns)
 	if err != nil {
 		return nil, false, err
 	}
@@ -237,14 +258,16 @@ func FilterLive(base *BaseFrame, r Receiver, limits LiveLimits) ([]byte, bool, e
 		f.SLI = slis(base.SLI)
 		f.Connections = base.Connections
 	}
-	return cut(f, runs, limits.PayloadMax)
+	return cut(f, runs, light, limits.PayloadMax)
 }
 
 // visibleRuns encodes the newest maxRuns runs of base in the channel set (and the subscribed
-// space) and returns them, whether more were visible, and the agents of every visible run.
-func visibleRuns(base *BaseFrame, r Receiver, inSet func(ids.ID) bool, maxRuns int) ([]json.RawMessage, bool, map[ids.ID]struct{}, error) {
-	agentIDs := map[ids.ID]struct{}{}
-	out := []json.RawMessage{}
+// space) and returns them, the same runs without their task nodes (the light form the size cut
+// falls back to), whether more were visible, and the agents of every visible run.
+func visibleRuns(base *BaseFrame, r Receiver, inSet func(ids.ID) bool, maxRuns int) (full, light []json.RawMessage, more bool,
+	agentIDs map[ids.ID]struct{}, err error) {
+	agentIDs = map[ids.ID]struct{}{}
+	full, light = []json.RawMessage{}, []json.RawMessage{}
 	visible := 0
 	for _, run := range base.Runs {
 		if !inSet(run.ChannelID) || (!r.SpaceID.IsZero() && run.SpaceID != r.SpaceID) {
@@ -252,20 +275,52 @@ func visibleRuns(base *BaseFrame, r Receiver, inSet func(ids.ID) bool, maxRuns i
 		}
 		visible++
 		agentIDs[run.AgentID] = struct{}{}
-		if len(out) >= maxRuns {
+		if len(full) >= maxRuns {
 			continue
 		}
-		b, err := json.Marshal(encodeRun(run, r.Costs))
+		_, labels := r.Readable[run.ChannelID]
+		enc := encodeRun(run, r.Costs, labels)
+		b, err := json.Marshal(enc)
 		if err != nil {
-			return nil, false, nil, err
+			return nil, nil, false, nil, err
 		}
-		out = append(out, b)
+		full = append(full, b)
+		if len(enc.Tasks) > 0 {
+			enc.Tasks, enc.TasksTruncated = nil, true
+			if b, err = json.Marshal(enc); err != nil {
+				return nil, nil, false, nil, err
+			}
+		}
+		light = append(light, b)
 	}
-	return out, visible > len(out), agentIDs, nil
+	return full, light, visible > len(full), agentIDs, nil
 }
 
-// encodeRun returns the wire form of run, with the cost members only when costs.
-func encodeRun(run LiveRun, costs bool) runJSON {
+// encodeTasks returns the wire form of the task nodes, the labels only when labels.
+func encodeTasks(tasks []LiveTask, labels bool) []taskJSON {
+	if len(tasks) == 0 {
+		return nil
+	}
+	out := make([]taskJSON, len(tasks))
+	for i, x := range tasks {
+		out[i] = taskJSON{ID: x.ID.String(), Kind: x.Kind, Name: x.Name, State: x.State, StartedAt: clock.FormatAPI(x.StartedAt),
+			Tool: x.Tool}
+		if !x.ParentID.IsZero() {
+			out[i].ParentID = x.ParentID.String()
+		}
+		if !x.FinishedAt.IsZero() {
+			out[i].FinishedAt = clock.FormatAPI(x.FinishedAt)
+		}
+		if labels {
+			out[i].Label = x.Label
+		}
+	}
+	return out
+}
+
+// encodeRun returns the wire form of run, with the cost members only when costs and the labels
+// of its task nodes only when labels.
+func encodeRun(run LiveRun, costs, labels bool) runJSON {
 	out := runJSON{RunID: run.RunID.String(), ThreadID: run.ThreadID.String(), ChannelID: run.ChannelID.String(),
 		SpaceID: run.SpaceID.String(), AgentID: run.AgentID.String(), State: run.State, QueuedAt: clock.FormatAPI(run.QueuedAt),
 		BillingMode: run.BillingMode, ApprovalPending: run.ApprovalPending}
@@ -279,6 +334,7 @@ func encodeRun(run LiveRun, costs bool) runJSON {
 		micros, estimate := run.CostMicros, run.CostIsEstimate
 		out.CostMicros, out.Currency, out.CostIsEstimate = &micros, run.Currency, &estimate
 	}
+	out.Tasks, out.TasksTruncated = encodeTasks(run.Tasks, labels), run.TasksTruncated
 	return out
 }
 
@@ -374,16 +430,18 @@ func slis(cells []SLICell) []sliJSON {
 	return out
 }
 
-// cut encodes f with the newest runs that keep the payload below max (25 5.2 size rule): the
-// length of every run is known, so the number of runs is computed once and checked by one
-// encoding; runs_truncated is set when runs drop out. It returns the payload and whether the
-// size bound cut runs.
-func cut(f frameJSON, runs []json.RawMessage, max int) ([]byte, bool, error) {
-	if runs == nil {
+// cut encodes f with the newest runs that keep the payload below max (25 5.2 size rule): first
+// every run with its task nodes; when that is too large, the light form of each run (without
+// its task nodes) and back the full form for the newest runs while it fits; when even the light
+// forms are too large, the newest light runs that fit. The length of every run is known, so each
+// choice is computed once and checked by one encoding; runs_truncated is set when runs drop out.
+// It returns the payload and whether the size bound cut runs.
+func cut(f frameJSON, full, light []json.RawMessage, max int) ([]byte, bool, error) {
+	if full == nil {
 		// A nil list encodes as JSON null, which no frame may carry (ADR 0053) and the hub refuses.
-		runs = []json.RawMessage{}
+		full, light = []json.RawMessage{}, []json.RawMessage{}
 	}
-	f.Runs = runs
+	f.Runs = full
 	b, err := json.Marshal(f)
 	if err != nil {
 		return nil, false, err
@@ -391,6 +449,41 @@ func cut(f frameJSON, runs []json.RawMessage, max int) ([]byte, bool, error) {
 	if len(b) < max {
 		return b, false, nil
 	}
+	if b, ok, err := withoutTrees(f, full, light, max); err != nil || ok {
+		return b, false, err
+	}
+	return cutRuns(f, light, max)
+}
+
+// withoutTrees encodes every run of f, the newest ones with their task nodes as long as the
+// payload stays below max; false when even every run without its nodes reaches max.
+func withoutTrees(f frameJSON, full, light []json.RawMessage, max int) ([]byte, bool, error) {
+	f.Runs = slices.Clone(light)
+	b, err := json.Marshal(f)
+	if err != nil || len(b) >= max {
+		return nil, false, err
+	}
+	size := len(b)
+	for i := range full {
+		grow := len(full[i]) - len(light[i])
+		if grow == 0 {
+			continue
+		}
+		if size+grow >= max {
+			break
+		}
+		f.Runs[i], size = full[i], size+grow
+	}
+	if b, err = json.Marshal(f); err != nil {
+		return nil, false, err
+	}
+	return b, len(b) < max, nil
+}
+
+// cutRuns encodes f with the newest of runs that keep the payload below max, with
+// runs_truncated.
+func cutRuns(f frameJSON, runs []json.RawMessage, max int) ([]byte, bool, error) {
+	var b []byte
 	f.Runs, f.RunsTruncated = []json.RawMessage{}, true
 	empty, err := json.Marshal(f)
 	if err != nil {

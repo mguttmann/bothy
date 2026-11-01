@@ -201,6 +201,7 @@ nav:
       - Components: design/components.md
       - Name: design/naming.md
       - Run visualization: design/run-visualization.md
+      - Agent tree of the live topology: design/topology-agent-tree.md
       - Sessions in the sidebar: design/sidebar-sessions.md
       - Sidebar ordering: design/sidebar-ordering.md
       - New project from the app: design/new-project.md

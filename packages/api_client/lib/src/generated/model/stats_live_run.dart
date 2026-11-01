@@ -5,6 +5,7 @@
 // ignore_for_file: unused_element
 import 'package:built_collection/built_collection.dart';
 import 'package:api_client/src/generated/model/stats_live_step.dart';
+import 'package:api_client/src/generated/model/stats_live_task.dart';
 import 'package:api_client/src/generated/model/billing_mode.dart';
 import 'package:built_value/built_value.dart';
 import 'package:built_value/serializer.dart';
@@ -28,6 +29,8 @@ part 'stats_live_run.g.dart';
 /// * [costMicros] - Cost so far; only with `cost.read.aggregate`.
 /// * [currency]
 /// * [costIsEstimate]
+/// * [tasks] - Child nodes of the run (subagents, workflows and their agents, background jobs) in step order, a parent before its children; at most `stats.live_max_tasks`, no deeper than `stats.live_task_max_depth`, finished ones only for `stats.live_task_keep` after their end. Absent when the run has none (25 5.2).
+/// * [tasksTruncated] - Present and true when a limit or the payload bound left task nodes of this run out.
 @BuiltValue()
 abstract class StatsLiveRun
     implements Built<StatsLiveRun, StatsLiveRunBuilder> {
@@ -84,6 +87,14 @@ abstract class StatsLiveRun
 
   @BuiltValueField(wireName: r'cost_is_estimate')
   bool? get costIsEstimate;
+
+  /// Child nodes of the run (subagents, workflows and their agents, background jobs) in step order, a parent before its children; at most `stats.live_max_tasks`, no deeper than `stats.live_task_max_depth`, finished ones only for `stats.live_task_keep` after their end. Absent when the run has none (25 5.2).
+  @BuiltValueField(wireName: r'tasks')
+  BuiltList<StatsLiveTask>? get tasks;
+
+  /// Present and true when a limit or the payload bound left task nodes of this run out.
+  @BuiltValueField(wireName: r'tasks_truncated')
+  bool? get tasksTruncated;
 
   StatsLiveRun._();
 
@@ -185,6 +196,20 @@ class _$StatsLiveRunSerializer implements PrimitiveSerializer<StatsLiveRun> {
       yield r'cost_is_estimate';
       yield serializers.serialize(
         object.costIsEstimate,
+        specifiedType: const FullType(bool),
+      );
+    }
+    if (object.tasks != null) {
+      yield r'tasks';
+      yield serializers.serialize(
+        object.tasks,
+        specifiedType: const FullType(BuiltList, [FullType(StatsLiveTask)]),
+      );
+    }
+    if (object.tasksTruncated != null) {
+      yield r'tasks_truncated';
+      yield serializers.serialize(
+        object.tasksTruncated,
         specifiedType: const FullType(bool),
       );
     }
@@ -317,6 +342,24 @@ class _$StatsLiveRunSerializer implements PrimitiveSerializer<StatsLiveRun> {
           ) as bool?;
           if (valueDes == null) continue;
           result.costIsEstimate = valueDes;
+          break;
+        case r'tasks':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(BuiltList, [
+              FullType(StatsLiveTask),
+            ]),
+          ) as BuiltList<StatsLiveTask>?;
+          if (valueDes == null) continue;
+          result.tasks.replace(valueDes);
+          break;
+        case r'tasks_truncated':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(bool),
+          ) as bool?;
+          if (valueDes == null) continue;
+          result.tasksTruncated = valueDes;
           break;
         default:
           unhandled.add(key);

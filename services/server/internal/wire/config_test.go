@@ -484,7 +484,11 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"stats.live_max_runs":        {Kind: config.KindInt, Default: "200", Min: "1", Max: "10000", Chapter: "25-visualization.md"},
 		"stats.live_max_subscribers": {Kind: config.KindInt, Default: "200", Min: "1", Max: "100000", Chapter: "25-visualization.md"},
 		"stats.live_sli_window":      {Kind: config.KindDuration, Default: "5m", Min: "1m", Chapter: "25-visualization.md"},
-		"retention.stats_minutes":    {Kind: config.KindDuration, Default: "90d", Min: "1d", Chapter: "20-privacy.md"},
+		// FEAT-topology-agent-tree
+		"stats.live_max_tasks":      {Kind: config.KindInt, Default: "25", Min: "0", Max: "500", Chapter: "25-visualization.md"},
+		"stats.live_task_max_depth": {Kind: config.KindInt, Default: "4", Min: "1", Max: "16", Chapter: "25-visualization.md"},
+		"stats.live_task_keep":      {Kind: config.KindDuration, Default: "2m", Min: "1s", Max: "1h", Chapter: "25-visualization.md"},
+		"retention.stats_minutes":   {Kind: config.KindDuration, Default: "90d", Min: "1d", Chapter: "20-privacy.md"},
 		// M6-14
 		"stats.timeline_max_range":    {Kind: config.KindDuration, Default: "24h", Min: "1m", Max: "31d", Chapter: "25-visualization.md"},
 		"stats.timeline_max_runs":     {Kind: config.KindInt, Default: "5000", Min: "1", Max: "100000", Chapter: "25-visualization.md"},

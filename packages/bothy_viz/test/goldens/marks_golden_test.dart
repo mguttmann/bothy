@@ -71,6 +71,22 @@ void main() {
   );
 
   goldenTest(
+    'run card with its agent tree',
+    fileName: 'task_tree_mark',
+    pumpBeforeTest: dsPumpIcons,
+    builder: () => matrix(
+      'agent tree',
+      () => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (final card in models.agentTree.cards)
+            if (card.tasks.isNotEmpty) RunCardTreeMark(model: card),
+        ],
+      ),
+    ),
+  );
+
+  goldenTest(
     'area mark with the usage series',
     fileName: 'area_mark',
     builder: () => matrix(

@@ -14,6 +14,7 @@ from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
     from ..models.stats_live_step import StatsLiveStep
+    from ..models.stats_live_task import StatsLiveTask
 
 
 T = TypeVar("T", bound="StatsLiveRun")
@@ -39,6 +40,12 @@ class StatsLiveRun:
         cost_micros (int | Unset): Cost so far; only with `cost.read.aggregate`.
         currency (str | Unset):
         cost_is_estimate (bool | Unset):
+        tasks (list[StatsLiveTask] | Unset): Child nodes of the run (subagents, workflows and their agents, background
+            jobs) in step order, a parent before its children; at most `stats.live_max_tasks`, no deeper than
+            `stats.live_task_max_depth`, finished ones only for `stats.live_task_keep` after their end. Absent when the run
+            has none (25 5.2).
+        tasks_truncated (bool | Unset): Present and true when a limit or the payload bound left task nodes of this run
+            out.
     """
 
     run_id: UUID
@@ -55,6 +62,8 @@ class StatsLiveRun:
     cost_micros: int | Unset = UNSET
     currency: str | Unset = UNSET
     cost_is_estimate: bool | Unset = UNSET
+    tasks: list[StatsLiveTask] | Unset = UNSET
+    tasks_truncated: bool | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -90,6 +99,15 @@ class StatsLiveRun:
 
         cost_is_estimate = self.cost_is_estimate
 
+        tasks: list[dict[str, Any]] | Unset = UNSET
+        if not isinstance(self.tasks, Unset):
+            tasks = []
+            for tasks_item_data in self.tasks:
+                tasks_item = tasks_item_data.to_dict()
+                tasks.append(tasks_item)
+
+        tasks_truncated = self.tasks_truncated
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -115,12 +133,17 @@ class StatsLiveRun:
             field_dict["currency"] = currency
         if cost_is_estimate is not UNSET:
             field_dict["cost_is_estimate"] = cost_is_estimate
+        if tasks is not UNSET:
+            field_dict["tasks"] = tasks
+        if tasks_truncated is not UNSET:
+            field_dict["tasks_truncated"] = tasks_truncated
 
         return field_dict
 
     @classmethod
     def from_dict(cls, src_dict: Mapping[str, Any]) -> Self:
         from ..models.stats_live_step import StatsLiveStep
+        from ..models.stats_live_task import StatsLiveTask
 
         d = dict(src_dict)
         run_id = UUID(d.pop("run_id"))
@@ -161,6 +184,17 @@ class StatsLiveRun:
 
         cost_is_estimate = d.pop("cost_is_estimate", UNSET)
 
+        _tasks = d.pop("tasks", UNSET)
+        tasks: list[StatsLiveTask] | Unset = UNSET
+        if _tasks is not UNSET:
+            tasks = []
+            for tasks_item_data in _tasks:
+                tasks_item = StatsLiveTask.from_dict(tasks_item_data)
+
+                tasks.append(tasks_item)
+
+        tasks_truncated = d.pop("tasks_truncated", UNSET)
+
         stats_live_run = cls(
             run_id=run_id,
             thread_id=thread_id,
@@ -176,6 +210,8 @@ class StatsLiveRun:
             cost_micros=cost_micros,
             currency=currency,
             cost_is_estimate=cost_is_estimate,
+            tasks=tasks,
+            tasks_truncated=tasks_truncated,
         )
 
         stats_live_run.additional_properties = d

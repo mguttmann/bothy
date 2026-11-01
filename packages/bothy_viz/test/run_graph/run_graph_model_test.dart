@@ -225,6 +225,44 @@ void main() {
       expect(m.openBackgroundJobs, 0);
     });
 
+    test('a running workflow agent shows the last tool the adapter reported '
+        '(FEAT-topology-agent-tree)', () {
+      final m = graph([
+        step('wf', 1, kind: 'workflow', status: 'running'),
+        step(
+          'a1',
+          2,
+          kind: 'subagent',
+          name: 'workflow_agent',
+          status: 'running',
+          parent: 'wf',
+          detail: {'type': 'workflow_agent', 'last_tool': 'Bash'},
+        ),
+        step(
+          'a2',
+          3,
+          kind: 'subagent',
+          name: 'workflow_agent',
+          status: 'completed',
+          parent: 'wf',
+          detail: {'type': 'workflow_agent', 'last_tool': 'Read'},
+        ),
+        step(
+          'a3',
+          4,
+          kind: 'subagent',
+          status: 'running',
+          parent: 'wf',
+          detail: {'last_tool': 'Read'},
+        ),
+        step('t', 5, name: 'Grep', status: 'running', parent: 'a3'),
+      ]);
+      final [a1, a2, a3] = m.root.children.single.children;
+      expect(a1.currentTool, 'Bash');
+      expect(a2.currentTool, isNull, reason: 'a finished node has no tool');
+      expect(a3.currentTool, 'Grep', reason: 'a running tool call wins');
+    });
+
     test('tokens and cost of a child come only from detail.usage', () {
       final m = graph([
         step(

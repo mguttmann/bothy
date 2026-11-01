@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 
 import '../model/run_card_model.dart';
 import 'run_card_mark.dart';
+import 'task_tree_mark.dart';
 import 'viz_texts.dart';
 
 /// One channel of one space with its run cards in the order of the frame.
@@ -31,7 +32,7 @@ class LaneMark extends StatelessWidget {
 
   /// Builds the widget of one card; the live topology passes the widget it kept from the
   /// previous frame for an unchanged card, so only changed cards rebuild (25 7.3). `null`
-  /// builds a [RunCardMark] with [onTapRun].
+  /// builds a [RunCardTreeMark] (the card with its agent tree) with [onTapRun].
   final Widget Function(RunCardModel card)? cardBuilder;
 
   @override
@@ -69,7 +70,7 @@ class LaneMark extends StatelessWidget {
                 children: [
                   for (final card in model.cards)
                     cardBuilder?.call(card) ??
-                        RunCardMark(model: card, onTap: onTapRun),
+                        RunCardTreeMark(model: card, onTap: onTapRun),
                 ],
               ),
             ],

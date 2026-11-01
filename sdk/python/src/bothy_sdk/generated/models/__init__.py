@@ -682,6 +682,9 @@ from .stats_live_run_state import StatsLiveRunState
 from .stats_live_sli import StatsLiveSli
 from .stats_live_step import StatsLiveStep
 from .stats_live_step_kind import StatsLiveStepKind
+from .stats_live_task import StatsLiveTask
+from .stats_live_task_kind import StatsLiveTaskKind
+from .stats_live_task_state import StatsLiveTaskState
 from .stats_metric import StatsMetric
 from .stats_scope import StatsScope
 from .stats_scope_kind import StatsScopeKind
@@ -1476,6 +1479,9 @@ __all__ = (
     "StatsLiveSli",
     "StatsLiveStep",
     "StatsLiveStepKind",
+    "StatsLiveTask",
+    "StatsLiveTaskKind",
+    "StatsLiveTaskState",
     "StatsMetric",
     "StatsScope",
     "StatsScopeKind",

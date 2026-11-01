@@ -465,7 +465,9 @@ type LiveBox interface {
 
 // LiveRun is one active run as the live frame stats.live shows it (docs/spec/25-visualization.md
 // 5.2, M6-15): IDs, place, state, times, billing mode, current step kind and name, the approval
-// flag and the cost so far. It carries no person, no trigger and no content (SEC-VZ-3).
+// flag, the cost so far and the steps of its agent tree. It carries no person and no trigger
+// (SEC-VZ-3); the only content is the title of a tree step, which stats sends as a label only to
+// a receiver with run.read on the run (docs/design/topology-agent-tree.md 5).
 type LiveRun struct {
 	ID, ThreadID, AgentID ids.ID
 	// ChannelID and SpaceID are the place of the run's thread now (a run follows its thread).
@@ -485,6 +487,19 @@ type LiveRun struct {
 	ApprovalPending bool
 	// Cost is the cost so far stored on the run (runs.cost_micros, currency, cost_is_estimate).
 	Cost Money
+	// Steps are the steps the agent tree is derived from, in step order: the task steps, the
+	// running tool calls and the tool calls that started a task (LiveStep).
+	Steps []LiveStep
+}
+
+// LiveStep is one step of an active run for the agent tree of the live frame
+// (docs/design/topology-agent-tree.md 3).
+type LiveStep struct {
+	ID, ParentID ids.ID
+	// Kind, Name, Title and Status are the step columns; LastTool is the detail member last_tool.
+	Kind, Name, Title, Status, LastTool string
+	// FinishedAt is zero while the step runs.
+	StartedAt, FinishedAt time.Time
 }
 
 // LiveSource is the source port of the active runs for the live frame of stats (M6-15). It does

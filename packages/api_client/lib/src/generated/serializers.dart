@@ -514,6 +514,7 @@ import 'package:api_client/src/generated/model/stats_live_rate.dart';
 import 'package:api_client/src/generated/model/stats_live_run.dart';
 import 'package:api_client/src/generated/model/stats_live_sli.dart';
 import 'package:api_client/src/generated/model/stats_live_step.dart';
+import 'package:api_client/src/generated/model/stats_live_task.dart';
 import 'package:api_client/src/generated/model/stats_metric.dart';
 import 'package:api_client/src/generated/model/stats_scope.dart';
 import 'package:api_client/src/generated/model/stats_series.dart';
@@ -1128,6 +1129,7 @@ part 'serializers.g.dart';
   StatsLiveRun,
   StatsLiveSli,
   StatsLiveStep,
+  StatsLiveTask,
   StatsMetric,
   StatsScope,
   StatsSeries,
@@ -1362,6 +1364,10 @@ Serializers serializers =
           ..addBuilderFactory(
             const FullType(BuiltList, [FullType(BuiltMap)]),
             () => ListBuilder<BuiltMap>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(StatsLiveTask)]),
+            () => ListBuilder<StatsLiveTask>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, [FullType(PrincipalRef)]),

@@ -17,7 +17,14 @@ them to ``agent.run_update_min_interval`` and rebases on version conflicts. Read
   ``completed``, ``failed`` and ``stopped`` end it. The step hangs under the step of the tool
   call its ``tool_use_id`` names, when that step exists (M2-51, D-RV-3); the ``usage`` of
   ``task_progress`` and ``task_notification`` becomes the detail member ``usage`` (``tokens``,
-  ``tool_uses``, ``duration_ms``; never a cost, D-RV-5).
+  ``tool_uses``, ``duration_ms``; never a cost, D-RV-5). A task with ``owned_by_subagent`` whose
+  ``tool_use_id`` names no known step and that is not backgrounded gets no step: it is a
+  foreground command of a workflow agent (FEAT-topology-agent-tree).
+* ``workflow_progress`` of a workflow's ``task_progress``: one ``subagent`` step per
+  ``workflow_agent`` under the workflow step, name ``workflow_agent``, title the ``label``,
+  detail ``type``, ``phase``, ``last_tool`` and ``usage``; ``done`` ends it ``completed``,
+  ``failed`` and ``error`` end it ``failed``; the end of the workflow ends its open agents. The
+  content previews (``promptPreview``, ``resultPreview``) are never sent.
 * ``tool_progress``: counted; ``/metrics/progress_events`` is patched only when the last change
   of the turn is older than ``runner.progress_patch_interval``, so a long tool is not stalled
   (09 5.5, 18.4); `LiveBox.keepalive` does the same while only background work runs between
@@ -63,6 +70,8 @@ _TASK_KINDS = ("subagent", "workflow", "background_job")
 _TITLE_KEYS = ("command", "file_path", "path", "pattern", "url", "query", "description", "prompt")
 _TASK_END = {"completed": "completed", "failed": "failed", "stopped": "cancelled"}
 _TASKS = frozenset({"task_started", "task_progress", "task_updated", "task_notification"})
+_AGENT_END = {"done": "completed", "failed": "failed", "error": "failed"}
+_AGENT_USAGE = (("tokens", "tokens"), ("toolCalls", "tool_uses"), ("durationMs", "duration_ms"))
 
 
 def _first_line(text: str) -> str:
@@ -100,6 +109,18 @@ def _uuid(value: object) -> UUID | None:
         return UUID(str(value))
     except ValueError:
         return None
+
+
+def _known_steps(raw: object, known: Mapping[str, str]) -> dict[str, UUID]:
+    # The step ids of a stored map that the server's run has; anything malformed is skipped.
+    if not isinstance(raw, Mapping):
+        return {}
+    out: dict[str, UUID] = {}
+    for key, value in raw.items():
+        step = _uuid(value)
+        if isinstance(key, str) and step is not None and str(step) in known:
+            out[key] = step
+    return out
 
 
 def _items(message: Mapping[str, Any]) -> list[Mapping[str, Any]]:
@@ -166,6 +187,9 @@ class LiveBox:
         self._model: str | None = None
         self._tools: dict[str, UUID] = {}
         self._tasks: dict[str, tuple[UUID, str]] = {}
+        # Workflow agents by "<task_id>/<agent key>" and the detail last sent for each.
+        self._agents: dict[str, UUID] = {}
+        self._agent_detail: dict[UUID, dict[str, Any]] = {}
         self._ambient: set[str] = set()
         self._ended: set[UUID] = set()
         self.subagents = 0
@@ -186,6 +210,7 @@ class LiveBox:
         return {
             "tools": {k: str(v) for k, v in self._tools.items()},
             "tasks": {k: [str(v), kind] for k, (v, kind) in self._tasks.items()},
+            "agents": {k: str(v) for k, v in self._agents.items()},
             "ambient": sorted(self._ambient),
             "ended": sorted(str(v) for v in self._ended),
             "subagents": self.subagents,
@@ -207,12 +232,9 @@ class LiveBox:
         """
         if not isinstance(raw, Mapping):
             return
-        tools, tasks = raw.get("tools"), raw.get("tasks")
-        if isinstance(tools, Mapping):
-            for key, value in tools.items():
-                step = _uuid(value)
-                if isinstance(key, str) and step is not None and str(step) in known:
-                    self._tools[key] = step
+        tasks = raw.get("tasks")
+        self._tools.update(_known_steps(raw.get("tools"), known))
+        self._agents.update(_known_steps(raw.get("agents"), known))
         if isinstance(tasks, Mapping):
             for key, value in tasks.items():
                 if isinstance(key, str) and isinstance(value, list) and len(value) == 2:
@@ -361,14 +383,89 @@ class LiveBox:
         if message.get("ambient") is True and task_id not in self._ambient:
             self._ambient.add(task_id)
             self.steps_changed = True
+        if task_id not in self._tasks and self._agent_command(message):
+            # A foreground command of a workflow agent: its tool call is not in this stream, so
+            # the step would land at the root of the run; the agent's node shows it as its tool.
+            self._ambient.add(task_id)
+            self.steps_changed = True
         if task_id in self._ambient:
             return
         if task_id not in self._tasks:
             self._add_task(task_id, message)
         self._task_usage(task_id, message)
+        progress = message.get("workflow_progress")
+        if isinstance(progress, list) and self._tasks[task_id][1] == "workflow":
+            self._workflow_agents(task_id, progress)
         end = _TASK_END.get(str(message.get("status")))
         if end is not None:
             self._end(self._tasks[task_id][0], end)
+            prefix = f"{task_id}/"
+            for key, step in self._agents.items():
+                if key.startswith(prefix):
+                    self._end(step, end)
+
+    def _agent_command(self, message: Mapping[str, Any]) -> bool:
+        ref = message.get("tool_use_id")
+        return (
+            message.get("owned_by_subagent") is True
+            and message.get("is_backgrounded") is not True
+            and not (isinstance(ref, str) and ref in self._tools)
+        )
+
+    def _workflow_agents(self, task_id: str, progress: list[Any]) -> None:
+        # workflow_progress is the full list of the workflow's phases and agents on every message.
+        parent = self._tasks[task_id][0]
+        for entry in progress:
+            if not isinstance(entry, Mapping) or entry.get("type") != "workflow_agent":
+                continue
+            ref = entry.get("agentId")
+            if not isinstance(ref, str) or not ref:
+                ref = entry.get("index")
+            if not isinstance(ref, (str, int)) or isinstance(ref, bool):
+                continue
+            key = f"{task_id}/{ref}"
+            detail = self._agent_detail_of(entry)
+            step = self._agents.get(key)
+            if step is None:
+                label = entry.get("label")
+                step = self._patch.add_step(
+                    "subagent",
+                    "workflow_agent",
+                    title=_first_line(label) if isinstance(label, str) else "",
+                    status="running",
+                    detail=detail,
+                    parent_step_id=parent,
+                )
+                self._agents[key] = step
+                self._agent_detail[step] = detail
+                self.steps_changed = True
+            elif step not in self._ended and self._agent_detail.get(step) != detail:
+                self._agent_detail[step] = detail
+                self._patch.update_step(step, detail=detail)
+            end = _AGENT_END.get(str(entry.get("state")))
+            if end is not None:
+                self._end(step, end)
+
+    @staticmethod
+    def _agent_detail_of(entry: Mapping[str, Any]) -> dict[str, Any]:
+        # Only the type, the phase, the tool name and the counts; never the previews (content).
+        detail: dict[str, Any] = {"type": "workflow_agent"}
+        phase = entry.get("phaseTitle")
+        if isinstance(phase, str) and phase:
+            detail["phase"] = _first_line(phase)
+        tool = entry.get("lastToolName")
+        if isinstance(tool, str) and tool:
+            detail["last_tool"] = tool
+        usage = {
+            out: value
+            for key, out in _AGENT_USAGE
+            if isinstance(value := entry.get(key), int)
+            and not isinstance(value, bool)
+            and value >= 0
+        }
+        if usage:
+            detail["usage"] = usage
+        return detail
 
     def _add_task(self, task_id: str, message: Mapping[str, Any]) -> None:
         description = message.get("description")

@@ -9,13 +9,17 @@ import 'package:flutter/semantics.dart';
 
 import '../../marks/viz_texts.dart';
 
-/// One cell: its text and the key it sorts by (a number for numeric columns).
+/// One cell: its text, the key it sorts by (a number for numeric columns) and its level.
 final class VizCell {
   /// Creates a cell; the sort key defaults to [text].
-  const VizCell(this.text, {this.sortBy});
+  const VizCell(this.text, {this.sortBy, this.level = 0});
 
   /// The text, the same the view shows.
   final String text;
+
+  /// The level of a row of a tree (the agent tree of the live topology): the cell is
+  /// indented by it, 0 for a top row.
+  final int level;
 
   /// The key of the sort, for example the number behind a formatted count.
   final Comparable<Object>? sortBy;
@@ -181,7 +185,11 @@ class _VizTableState extends State<VizTable> {
                       label: '${data.columns[i]}: ${row[i].text}',
                       child: ExcludeSemantics(
                         child: Padding(
-                          padding: pad,
+                          padding: pad.add(
+                            EdgeInsetsDirectional.only(
+                              start: row[i].level * DsSpace.s16,
+                            ),
+                          ),
                           child: Text(row[i].text, style: cellStyle),
                         ),
                       ),

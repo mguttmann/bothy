@@ -956,6 +956,9 @@ Source: [25-visualization.md](../spec/25-visualization.md), section 15.
 | `stats.live_max_runs` | `BOTHY_STATS__LIVE_MAX_RUNS` | Server | int | `200` | at most this many active runs per frame | active |
 | `stats.live_max_subscribers` | `BOTHY_STATS__LIVE_MAX_SUBSCRIBERS` | Server | int | `200` | subscriptions to `stats.live` per api node | active |
 | `stats.live_sli_window` | `BOTHY_STATS__LIVE_SLI_WINDOW` | Server | duration | `5m` | period of the SLI values in the live frame | active |
+| `stats.live_max_tasks` | `BOTHY_STATS__LIVE_MAX_TASKS` | Server | int | `25` | at most this many nodes of the agent tree per run in the live frame; `0` sends no tree | active |
+| `stats.live_task_max_depth` | `BOTHY_STATS__LIVE_TASK_MAX_DEPTH` | Server | int | `4` | deepest level of the agent tree in the live frame; the children of a run are level 1 | active |
+| `stats.live_task_keep` | `BOTHY_STATS__LIVE_TASK_KEEP` | Server | duration | `2m` | how long a finished node of the agent tree stays in the live frame after its end | active |
 | `stats.flush_interval` | `BOTHY_STATS__FLUSH_INTERVAL` | Server | duration | `10s` | interval at which a process writes its counters to `stats_minutes` | active |
 | `stats.flush_queue_max` | `BOTHY_STATS__FLUSH_QUEUE_MAX` | Server | int | `20000` | counter keys in memory per process; above that, the oldest are discarded | active |
 | `stats.timeline_max_range` | `BOTHY_STATS__TIMELINE_MAX_RANGE` | Server | duration | `24h` | longest period of a timeline query | active |
