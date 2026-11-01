@@ -9,7 +9,7 @@ import 'dart:typed_data';
 import 'package:auth/auth.dart';
 import 'package:device_key/device_key.dart' as dk;
 
-import 'secure_store.dart' show InstanceSecrets;
+import 'secure_store.dart' show FlutterSecureBackend, InstanceSecrets;
 
 /// The device keys of one instance, created on demand and deleted on a wipe.
 ///
@@ -30,9 +30,10 @@ abstract interface class DeviceKeyStore {
 /// Where the keys lie in a store every app of the person reaches (the macOS login keychain of a
 /// debug or profile build, the Windows key storage of the user; [shared] says so, none: always),
 /// [appId] is the app identity and a new enrollment gets the scope `<appId>/<instance_id>`, so another bundle identifier never
-/// signs with, or deletes, this app's keys. An instance that already has secrets (a session from
-/// a build before this rule, moved into the app's scope) keeps its keys under the `instance_id`,
-/// so an update signs no one out. The choice is stored with the instance's secrets and goes with
+/// signs with, or deletes, this app's keys. An instance copied from a build before this rule
+/// keeps its keys under the `instance_id`, which the copy records as its scope
+/// (docs/decisions.d/FIX-secure-store-migration.md FIX-SSM/2), so an update signs no one out; an
+/// instance that already has other secrets keeps the `instance_id` as well. The choice is stored with the instance's secrets and goes with
 /// them on a wipe. Without [appId] or in a store of the app's own (iOS, Android, the macOS Data
 /// Protection keychain with its access group; there the app extensions open the keys by the
 /// `instance_id`) the scope is the `instance_id`.
@@ -43,7 +44,7 @@ final class DeviceKeyScopes {
   const DeviceKeyScopes({this.appId, this.shared});
 
   /// The name of the stored scope in the instance's secrets.
-  static const String keyName = 'device_key_scope';
+  static const String keyName = FlutterSecureBackend.deviceKeyScopeKey;
 
   /// The app identity of a shared key store, or null.
   final String? appId;
