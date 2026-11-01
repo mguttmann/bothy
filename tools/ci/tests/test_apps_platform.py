@@ -527,6 +527,94 @@ def test_a_command_that_stalls_twice_fails(
     assert "flutter test first failed" in capsys.readouterr().err
 
 
+def _android_start_failures(monkeypatch: pytest.MonkeyPatch, root: Path) -> None:
+    _member(root, "apps/client", {"android": [["flutter", "test", "first"]]})
+    monkeypatch.setattr(apps_platform, "android_devices", lambda: 1)
+    monkeypatch.setattr(apps_platform, "android_ready", lambda: None)
+    monkeypatch.setattr(apps_platform, "print_android_log", lambda label: None)
+    monkeypatch.setattr(apps_platform, "SILENCE_SECONDS", 30)
+    monkeypatch.setattr(apps_platform, "APP_START_SILENCE_SECONDS", 0.2)
+
+
+def test_android_start_that_fails_twice_runs_a_third_time(
+    tmp_path: Path,
+    fake_flutter: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Main run 41308492022 (apps (Android API 36)): the first start of the app stalled after the
+    # install, the second failed to load the test file ("Failed to start Dart Development
+    # Service", adbd dropped the host connection 0.5 s after the VM service listened). No test
+    # ran in either, so an Android command whose start failed runs up to ANDROID_START_ATTEMPTS
+    # times (PL/44, FAPS/1).
+    root = tmp_path / "repo"
+    _android_start_failures(monkeypatch, root)
+    # Call 1 stalls after its build line, call 2 fails to load, call 3 passes.
+    monkeypatch.setenv("FAKE_HANG_CALLS", "1")
+    monkeypatch.setenv("FAKE_LOAD_FAILURES", "2")
+    assert apps_platform.main(["--root", str(root), "--system", "android"]) == 0
+    assert [c["args"] for c in _calls(fake_flutter)] == [["test", "first"]] * 3
+    captured = capsys.readouterr()
+    assert "running once more (attempt 2 of 3)" in captured.err
+    assert "a test file failed to load before any test ran; running once more (attempt 3 of 3)" in (
+        captured.err
+    )
+    assert "apps-platform apps/client android: 1 commands ok" in captured.out
+
+
+def test_android_start_that_fails_three_times_fails(
+    tmp_path: Path,
+    fake_flutter: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "repo"
+    _android_start_failures(monkeypatch, root)
+    monkeypatch.setenv("FAKE_LOAD_FAILURES", "3")
+    assert apps_platform.main(["--root", str(root), "--system", "android"]) == 1
+    assert [c["args"] for c in _calls(fake_flutter)] == [["test", "first"]] * 3
+    assert "flutter test first failed with exit code 1" in capsys.readouterr().err
+
+
+def test_android_failed_test_after_a_failed_start_is_not_repeated(
+    tmp_path: Path,
+    fake_flutter: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # The second attempt loads its test file and a test fails: it never runs again.
+    root = tmp_path / "repo"
+    _android_start_failures(monkeypatch, root)
+    monkeypatch.setenv("FAKE_LOAD_FAILURES", "1")
+    monkeypatch.setenv("FAKE_EXIT_ON_FIRST", "1")
+    assert apps_platform.main(["--root", str(root), "--system", "android"]) == 1
+    assert [c["args"] for c in _calls(fake_flutter)] == [["test", "first"]] * 2
+    err = capsys.readouterr().err
+    assert "(attempt 3 of 3)" not in err
+    assert "flutter test first failed with exit code 1" in err
+
+
+def test_android_failed_test_is_not_repeated(
+    tmp_path: Path,
+    fake_flutter: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "repo"
+    _android_start_failures(monkeypatch, root)
+    monkeypatch.setenv("FAKE_EXIT_ON_FIRST", "1")
+    assert apps_platform.main(["--root", str(root), "--system", "android"]) == 1
+    assert [c["args"] for c in _calls(fake_flutter)] == [["test", "first"]]
+    assert "once more" not in capsys.readouterr().err
+
+
+def test_start_attempts_are_the_documented_ones() -> None:
+    # Two starts on the desktop systems and the iOS simulator (PL/44), three on Android (FAPS/1):
+    # three stalled starts of APP_START_SILENCE_SECONDS fit in the 60 minute Android jobs.
+    assert apps_platform.START_ATTEMPTS == 2
+    assert apps_platform.ANDROID_START_ATTEMPTS == 3
+
+
 def test_ios_runs_in_its_own_job(
     tmp_path: Path,
     fake_flutter: Path,
