@@ -1611,7 +1611,10 @@ none of them.
    arranges the forum's posts by hand (6.16); in a text channel by creation time, newest first. A row that no longer qualifies disappears, and the rows of a forum
    change their order, only while the pointer is outside the sidebar and the keyboard focus is
    not in it; until then the rows stay in place, and a post new to the group appears at the top.
-   "Show more" and "Show less" apply at once.
+   "Show more" and "Show less" apply at once. A pointer that rests on the sidebar while the person
+   types outside it does not hold: a key press other than a lone modifier key, with the keyboard
+   focus outside the sidebar, ends its hold until the pointer moves over the sidebar again
+   (addendum of 2026-11-01, brief FIX-autoarrange-channels).
 5. **"All posts".** An expanded forum group ends with the row "All posts", which opens the forum
    overview D15; it carries the unread mark and the mention counter of the posts not shown in the
    group, never a total. Text channels have no such row.
@@ -1908,7 +1911,9 @@ channels and forum posts.
    therefore moves the chat to the top of its forum and the forum to the top of its space when
    those levels are arranged by activity. As in 6.8 item 4 the rows of an automatic level keep
    their order while the pointer or the keyboard focus is in the sidebar (on a touch screen: a
-   finger, a scroll or the screen reader) and change it once the person has left.
+   finger, a scroll or the screen reader) and change it once the person has left; a resting
+   pointer stops holding at the first key press outside the sidebar (6.8 item 4), so a message
+   written with the pointer left on the sidebar moves its forum up at once.
 5. **Switched off dragging.** At a level arranged by activity a row does not lift; a note says that
    the level is arranged by activity and names the switch to turn off. "Move up" and "Move down"
    in its menu are disabled below the entry "Arranged by activity".

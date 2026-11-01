@@ -12,6 +12,7 @@ import 'package:client/sidebar/sidebar_column.dart';
 import 'package:domain/domain.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:local_store/local_store.dart';
 
@@ -281,6 +282,62 @@ void main() {
     await mouse.moveTo(Offset(size.width - 2, size.height - 2));
     await host.settle(tester);
     expect(onScreen(tester, channels([1, 2, 3])), [1, 3, 2]);
+    await mouse.removePointer();
+    await host.dispose(tester);
+  });
+  // Owner report of 2026-11-01 (brief FIX-autoarrange-channels): the pointer rested on the
+  // sidebar after a click on a forum while the person wrote into the post with the keyboard, so
+  // the sidebar held its order and the forum never moved up. A key press outside the sidebar
+  // ends the hold of a resting pointer; a move of the pointer in the sidebar holds again.
+  testWidgets('a forum jumps to the top of its space after a message in one of '
+      'its posts while the pointer rests on the sidebar and the person '
+      'types elsewhere', (tester) async {
+    final host = await ColumnHost.open(tester);
+    await tester.runAsync(
+      () => fill(host.db, settings: {'sidebar.auto_arrange_channels': true}),
+    );
+    await host.pump(tester, sidebar);
+    expect(onScreen(tester, channels([1, 2, 3])), [3, 1, 2]);
+    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await mouse.addPointer(location: tester.getCenter(channelRow(2)));
+    await host.settle(tester);
+
+    // The person types in the composer (the keyboard focus is outside the sidebar) and sends:
+    // the message moves the activity of post 1 as `storeMessage` does.
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyA);
+    await host.run(
+      tester,
+      () => host.db.threadsDao.advanceActivity(
+        threadId(1),
+        t0.add(const Duration(minutes: 60)),
+      ),
+    );
+    await host.settle(tester);
+    expect(onScreen(tester, channels([1, 2, 3])), [
+      1,
+      3,
+      2,
+    ], reason: 'the forum of the message is on top at once');
+
+    // The pointer moves in the sidebar again: the order holds until the next key press.
+    await mouse.moveBy(const Offset(0, 1));
+    await host.settle(tester);
+    await host.run(
+      tester,
+      () => host.db.threadsDao.advanceActivity(
+        threadId(12),
+        t0.add(const Duration(minutes: 70)),
+      ),
+    );
+    await host.settle(tester);
+    expect(onScreen(tester, channels([1, 2, 3])), [1, 3, 2], reason: 'held');
+    // A modifier alone (Shift for a click) keeps the hold.
+    await tester.sendKeyEvent(LogicalKeyboardKey.shiftLeft);
+    await host.settle(tester);
+    expect(onScreen(tester, channels([1, 2, 3])), [1, 3, 2], reason: 'held');
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyB);
+    await host.settle(tester);
+    expect(onScreen(tester, channels([1, 2, 3])), [2, 1, 3]);
     await mouse.removePointer();
     await host.dispose(tester);
   });
