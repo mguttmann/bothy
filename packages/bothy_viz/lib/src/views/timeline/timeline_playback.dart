@@ -166,6 +166,7 @@ TimelineModel timelineAt(TimelineModel model, DateTime at) => TimelineModel(
         if (row.segments.any((s) => !s.start.isAfter(at)))
           BarRow(
             label: row.label,
+            run: row.run,
             segments: [
               for (final s in row.segments)
                 if (!s.start.isAfter(at))

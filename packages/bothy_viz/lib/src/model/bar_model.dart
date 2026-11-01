@@ -5,6 +5,8 @@ library;
 
 import 'package:api_client/api_client.dart' as api;
 
+import 'run_label.dart';
+
 /// One bar from [start] to [end], colored by its run state or by a series role.
 final class BarSegment {
   /// Creates a segment; exactly one of [runState] and [colorIndex] colors it.
@@ -28,13 +30,17 @@ final class BarSegment {
   final int? colorIndex;
 }
 
-/// One row: a label and its bars.
+/// One row: its label and its bars.
 final class BarRow {
-  /// Creates a row.
-  const BarRow({required this.label, required this.segments});
+  /// Creates a row: a row of runs passes [run], any other row its [label].
+  const BarRow({required this.segments, this.label = '', this.run});
 
-  /// Row label, for example `dev-runner, #backend`.
+  /// Row label of a row that is no run, for example a tool of the statistics page.
   final String label;
+
+  /// The run label of a row of runs (the timeline): project and chat, agent and short ID, the
+  /// chat to open; `null` for another row.
+  final VizRunLabel? run;
 
   /// Bars in time order.
   final List<BarSegment> segments;

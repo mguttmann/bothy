@@ -38,7 +38,7 @@ Done means:
 | Claude Code runner (09 18.4) | `tool_call` steps get `parent_step_id` from `parent_tool_use_id`; tasks become steps `subagent` or `background_job` | task steps have no parent, so a subagent and the tools it calls are not connected; no step is ever `workflow`; no usage per task |
 | Hermes adapter (09 17.3) | `tool_call` steps from status sentences | no signal about subagents in the pinned version: the graph of a Hermes run is flat |
 | Running now (01 D10, M4-23) | rows from `listActiveRuns` and `run.state_changed` | no current tool, no stall, no way into the structure of a run |
-| Live topology (01 D12, 25 6.1) | run cards for owners and managers from `stats.live` | by rule without content (no titles) and only with `stats.read`; not a view for every person |
+| Live topology (01 D12, 25 6.1) | run cards for owners and managers from `stats.live` | by rule without content and only with `stats.read`; the one name a card shows is its chat (channel name and thread title) for a person who may read the thread (25 4 rule 6); not a view for every person |
 | Stall "no progress" (09 5.5) | not built: no time of the last progress is kept (D-M2-09-19) | the control room cannot say "stalled" |
 
 ## 3. Decisions

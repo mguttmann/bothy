@@ -1,23 +1,20 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// Texts the views share: rates, clock times and cost cells.
+/// Texts the views share: rates, clock times, cost cells and the chat cell of a run.
 library;
 
 import 'package:api_client/api_client.dart' as api;
 
 import '../marks/viz_texts.dart';
 import '../model/costs.dart';
+import '../model/run_label.dart';
 import '../model/series_model.dart';
+import 'table/viz_table.dart';
 
-/// The label of [rate]: its metric, with the billing mode of a cost rate or the dimension
-/// code (for example the reason of `resyncs`).
-String vizRateLabel(VizTexts texts, RateModel rate) {
-  final name = texts.metric(rate.metric);
-  final dimension = rate.dimension;
-  if (dimension == null || dimension.isEmpty) return name;
-  final mode = _mode(dimension);
-  return mode == null ? '$name $dimension' : '$name, ${texts.badge(mode)}';
-}
+/// The label of [rate]: its metric with the translated dimension ([VizTexts.metricLabel]), for
+/// example "Tool calls, Failed" or "Runs started, Personal".
+String vizRateLabel(VizTexts texts, RateModel rate) =>
+    texts.metricLabel(rate.metric, rate.dimension);
 
 /// The value of [rate] over the last full minute: the amount of a cost rate (with
 /// "information only" in mode `personal`), else the count.
@@ -77,4 +74,20 @@ String _zone(VizTexts texts, String timeZone) {
   } on ArgumentError {
     return 'UTC';
   }
+}
+
+/// The table cell of the chat of [label]: its main text, a button that opens the chat when the
+/// server named it and [onOpenThread] is given.
+VizCell vizChatCell(
+  VizTexts texts,
+  VizRunLabel label,
+  void Function(String threadId)? onOpenThread,
+) {
+  final thread = label.threadId;
+  return VizCell(
+    texts.runTitle(label),
+    onTap: thread == null || onOpenThread == null
+        ? null
+        : () => onOpenThread(thread),
+  );
 }

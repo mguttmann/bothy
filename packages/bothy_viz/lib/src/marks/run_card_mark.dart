@@ -7,6 +7,7 @@ import 'package:design_system/design_system.dart';
 import 'package:flutter/material.dart';
 
 import '../model/run_card_model.dart';
+import 'run_label_mark.dart';
 import 'viz_colors.dart';
 import 'viz_texts.dart';
 
@@ -14,12 +15,14 @@ import 'viz_texts.dart';
 /// "Open in the app". The package never navigates.
 typedef RunTapCallback = void Function(String threadId);
 
-/// One active run: agent, state with icon and text, tool chip, billing mode badge, "Approval
-/// waiting" and the cost when shown; never content (25 1 rule 3).
+/// One active run: its label (project and chat, agent and short ID, [VizRunLabelText]), state
+/// with icon and text, tool chip, billing mode badge, "Approval waiting" and the cost when shown;
+/// no other content (25 1 rule 3, 4 rule 6).
 ///
-/// The semantics label is built from the model, for example "dev-runner, Running, Tool Bash,
-/// Organization, US$0.62, Estimate"; the parts below it are excluded so a screen reader reads
-/// the card once.
+/// The semantics label is built from the model, for example "backend / Payment integration,
+/// dev-runner · 0a77f1, Running, Tool Bash, Organization, US$0.62, Estimate"; the parts below it
+/// are excluded so a screen reader reads the card once. Only a card whose chat the server named
+/// is a button: a tap reports [VizRunLabel.threadId].
 class RunCardMark extends StatelessWidget {
   /// Creates the card of [model]; [onTap] makes it a button.
   const RunCardMark({super.key, required this.model, this.onTap});
@@ -27,12 +30,13 @@ class RunCardMark extends StatelessWidget {
   /// The card.
   final RunCardModel model;
 
-  /// Called with [RunCardModel.threadId] on a tap.
+  /// Called with the [VizRunLabel.threadId] of the card on a tap; a card without one is no
+  /// button.
   final RunTapCallback? onTap;
 
   /// The texts of the card in reading order.
   static List<String> parts(VizTexts texts, RunCardModel model) => [
-    model.agentName,
+    ...VizRunLabelText.parts(texts, model.label),
     texts.runState(model.state),
     if (model.stepKind != null && model.stepName != null)
       texts.step(model.stepKind!, model.stepName!),
@@ -49,7 +53,9 @@ class RunCardMark extends StatelessWidget {
     final stateColor = runCardStateColor(colors, model.state);
     final secondary = dsTextStyle(DsType.bodySm)
         .copyWith(color: colors.textSecondary);
-    final callback = onTap;
+    final thread = model.label.threadId;
+    final tap = onTap;
+    final callback = tap == null || thread == null ? null : () => tap(thread);
     final card = CustomPaint(
       painter: RunCardPainter(
         fill: colors.surfaceRaised,
@@ -73,11 +79,7 @@ class RunCardMark extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                model.agentName,
-                style: dsTextStyle(DsType.label)
-                    .copyWith(color: colors.textPrimary),
-              ),
+              VizRunLabelText(label: model.label),
               const SizedBox(height: DsSpace.s4),
               Row(
                 mainAxisSize: MainAxisSize.min,
@@ -121,13 +123,14 @@ class RunCardMark extends StatelessWidget {
       container: true,
       button: callback != null,
       label: parts(texts, model).join(', '),
-      onTap: callback == null ? null : () => callback(model.threadId),
+      hint: callback == null ? null : texts.l10n.vizRunOpenChat,
+      onTap: callback,
       child: ExcludeSemantics(
         child: callback == null
             ? card
             : GestureDetector(
                 behavior: HitTestBehavior.opaque,
-                onTap: () => callback(model.threadId),
+                onTap: callback,
                 child: card,
               ),
       ),

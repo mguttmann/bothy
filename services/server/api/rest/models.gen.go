@@ -15077,7 +15077,7 @@ type StatsLiveEvent struct {
 	// OccurredAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 	OccurredAt Timestamp `json:"occurred_at"`
 
-	// Payload Live frame (docs/spec/25-visualization.md, section 5.2). No person values, no content.
+	// Payload Live frame (docs/spec/25-visualization.md, section 5.2). No person values and no content, except the channel name and thread title of a run in `chat`, for a caller who may read the thread, and the `label` of a task node, for a caller with `run.read` on the run (25 1 rule 3).
 	Payload           StatsLiveFrame `json:"payload"`
 	PermissionVersion *int64         `json:"permission_version,omitempty"`
 	Redacted          *bool          `json:"redacted,omitempty"`
@@ -15116,7 +15116,7 @@ type StatsLiveEventAudience string
 // StatsLiveEventType defines model for StatsLiveEvent.Type.
 type StatsLiveEventType string
 
-// StatsLiveFrame Live frame (docs/spec/25-visualization.md, section 5.2). No person values, no content.
+// StatsLiveFrame Live frame (docs/spec/25-visualization.md, section 5.2). No person values and no content, except the channel name and thread title of a run in `chat`, for a caller who may read the thread, and the `label` of a task node, for a caller with `run.read` on the run (25 1 rule 3).
 type StatsLiveFrame struct {
 	Agents []StatsLiveAgent `json:"agents"`
 
@@ -15166,8 +15166,11 @@ type StatsLiveRun struct {
 	BillingMode BillingMode `json:"billing_mode"`
 
 	// ChannelId UUIDv7 (RFC 9562), lowercase canonical form.
-	ChannelId      Uuid  `json:"channel_id"`
-	CostIsEstimate *bool `json:"cost_is_estimate,omitempty"`
+	ChannelId Uuid `json:"channel_id"`
+
+	// Chat The chat a run belongs to, as the sidebar names it: the name of its channel (the project) and the title of its thread. Present only when the caller may read the thread (`thread.read`, the same rule as the sidebar); absent otherwise, and then a client shows neither a name nor a link (docs/spec/25-visualization.md, section 4, rule 6).
+	Chat           *StatsRunChat `json:"chat,omitempty"`
+	CostIsEstimate *bool         `json:"cost_is_estimate,omitempty"`
 
 	// CostMicros Cost so far; only with `cost.read.aggregate`.
 	CostMicros *int64 `json:"cost_micros,omitempty"`
@@ -15267,6 +15270,20 @@ type StatsLiveTaskState string
 
 // StatsMetric Metric of the own measurement in `stats_minutes` (docs/spec/25-visualization.md, section 3.2).
 type StatsMetric string
+
+// StatsRunChat The chat a run belongs to, as the sidebar names it: the name of its channel (the project) and the title of its thread. Present only when the caller may read the thread (`thread.read`, the same rule as the sidebar); absent otherwise, and then a client shows neither a name nor a link (docs/spec/25-visualization.md, section 4, rule 6).
+type StatsRunChat struct {
+	// ChannelName Examples: backend
+	ChannelName string `json:"channel_name"`
+
+	// ThreadId Target of the deep link that opens the chat.
+	ThreadId Uuid `json:"thread_id"`
+
+	// ThreadTitle Title of the thread; absent for the main thread of a channel and for an empty title.
+	//
+	// Examples: Payment integration
+	ThreadTitle *string `json:"thread_title,omitempty"`
+}
 
 // StatsScope defines model for StatsScope.
 type StatsScope struct {
@@ -15376,6 +15393,9 @@ type StatsTimelineRun struct {
 
 	// ChannelId UUIDv7 (RFC 9562), lowercase canonical form.
 	ChannelId Uuid `json:"channel_id"`
+
+	// Chat The chat a run belongs to, as the sidebar names it: the name of its channel (the project) and the title of its thread. Present only when the caller may read the thread (`thread.read`, the same rule as the sidebar); absent otherwise, and then a client shows neither a name nor a link (docs/spec/25-visualization.md, section 4, rule 6).
+	Chat *StatsRunChat `json:"chat,omitempty"`
 
 	// FinishedAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 	FinishedAt *Timestamp `json:"finished_at,omitempty"`

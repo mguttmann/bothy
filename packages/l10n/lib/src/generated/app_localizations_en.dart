@@ -1309,7 +1309,91 @@ class AppLocalizationsEn extends AppLocalizations {
       'Values can differ from Prometheus: the own measurement counts in the process and can lose one flush interval in a crash.';
 
   @override
-  String get vizColRun => 'Agent and channel';
+  String get vizColRun => 'Run';
+
+  @override
+  String get vizColChat => 'Chat';
+
+  @override
+  String vizRunTitle(String project, String chat) {
+    return '$project / $chat';
+  }
+
+  @override
+  String vizRunDetail(String agent, String id) {
+    return '$agent · $id';
+  }
+
+  @override
+  String get vizRunOpenChat => 'Open chat';
+
+  @override
+  String get vizDimHuman => 'Human';
+
+  @override
+  String get vizDimAgent => 'Agent';
+
+  @override
+  String get vizDimApp => 'App';
+
+  @override
+  String get vizDimImport => 'Import';
+
+  @override
+  String get vizDimCompleted => 'Completed';
+
+  @override
+  String get vizDimFailed => 'Failed';
+
+  @override
+  String get vizDimCancelled => 'Cancelled';
+
+  @override
+  String get vizDimRequested => 'Requested';
+
+  @override
+  String get vizDimApproved => 'Approved';
+
+  @override
+  String get vizDimDenied => 'Denied';
+
+  @override
+  String get vizDimExpired => 'Expired';
+
+  @override
+  String get vizDimI2Denied => 'Refused before delivery (I2)';
+
+  @override
+  String get vizDimBillingModeMismatch => 'Billing mode mismatch';
+
+  @override
+  String get vizDimEpochChanged => 'Epoch changed';
+
+  @override
+  String get vizDimRetention => 'Cursor too old';
+
+  @override
+  String get vizDimTooFarBehind => 'Too far behind';
+
+  @override
+  String get vizDimCursorAhead => 'Cursor ahead';
+
+  @override
+  String get vizDimApns => 'APNs';
+
+  @override
+  String get vizDimFcm => 'FCM';
+
+  @override
+  String get vizDimUnifiedPush => 'UnifiedPush';
+
+  @override
+  String get vizDimWns => 'WNS';
+
+  @override
+  String vizMetricWithDimension(String metric, String dimension) {
+    return '$metric, $dimension';
+  }
 
   @override
   String get vizColStart => 'Start';

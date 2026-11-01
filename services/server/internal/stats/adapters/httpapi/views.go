@@ -70,7 +70,8 @@ func (h *Views) GetStatsBackends(ctx context.Context, req rest.GetStatsBackendsR
 }
 
 // TimelineREST converts a timeline to the schema StatsTimeline: channel_id, agent_id, currency,
-// started_at and finished_at absent when empty.
+// started_at and finished_at absent when empty, chat absent without one and its thread_title
+// absent when empty.
 func TimelineREST(tl stats.Timeline) rest.StatsTimeline {
 	out := rest.StatsTimeline{From: timestamp(tl.From), To: timestamp(tl.To), Buckets: make([]rest.StatsTimelineBucket, len(tl.Buckets)),
 		Runs: make([]rest.StatsTimelineRun, len(tl.Runs)), RunsTruncated: tl.RunsTruncated}
@@ -81,6 +82,10 @@ func TimelineREST(tl stats.Timeline) rest.StatsTimeline {
 	for i, r := range tl.Runs {
 		out.Runs[i] = rest.StatsTimelineRun{RunId: rest.Uuid(r.RunID), ChannelId: rest.Uuid(r.ChannelID), AgentId: rest.Uuid(r.AgentID),
 			QueuedAt: timestamp(r.QueuedAt), StartedAt: optionalTime(r.StartedAt), FinishedAt: optionalTime(r.FinishedAt), State: rest.RunState(r.State)}
+		if r.Chat != nil {
+			out.Runs[i].Chat = &rest.StatsRunChat{ThreadId: rest.Uuid(r.Chat.ThreadID), ChannelName: r.Chat.ChannelName,
+				ThreadTitle: optionalString(r.Chat.ThreadTitle)}
+		}
 	}
 	return out
 }

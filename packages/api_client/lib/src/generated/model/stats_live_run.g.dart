@@ -111,6 +111,8 @@ class _$StatsLiveRun extends StatsLiveRun {
   final BuiltList<StatsLiveTask>? tasks;
   @override
   final bool? tasksTruncated;
+  @override
+  final StatsRunChat? chat;
 
   factory _$StatsLiveRun([void Function(StatsLiveRunBuilder)? updates]) =>
       (StatsLiveRunBuilder()..update(updates))._build();
@@ -132,6 +134,7 @@ class _$StatsLiveRun extends StatsLiveRun {
     this.costIsEstimate,
     this.tasks,
     this.tasksTruncated,
+    this.chat,
   }) : super._();
   @override
   StatsLiveRun rebuild(void Function(StatsLiveRunBuilder) updates) =>
@@ -159,7 +162,8 @@ class _$StatsLiveRun extends StatsLiveRun {
         currency == other.currency &&
         costIsEstimate == other.costIsEstimate &&
         tasks == other.tasks &&
-        tasksTruncated == other.tasksTruncated;
+        tasksTruncated == other.tasksTruncated &&
+        chat == other.chat;
   }
 
   @override
@@ -181,6 +185,7 @@ class _$StatsLiveRun extends StatsLiveRun {
     _$hash = $jc(_$hash, costIsEstimate.hashCode);
     _$hash = $jc(_$hash, tasks.hashCode);
     _$hash = $jc(_$hash, tasksTruncated.hashCode);
+    _$hash = $jc(_$hash, chat.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -203,7 +208,8 @@ class _$StatsLiveRun extends StatsLiveRun {
           ..add('currency', currency)
           ..add('costIsEstimate', costIsEstimate)
           ..add('tasks', tasks)
-          ..add('tasksTruncated', tasksTruncated))
+          ..add('tasksTruncated', tasksTruncated)
+          ..add('chat', chat))
         .toString();
   }
 }
@@ -281,6 +287,10 @@ class StatsLiveRunBuilder
   set tasksTruncated(bool? tasksTruncated) =>
       _$this._tasksTruncated = tasksTruncated;
 
+  StatsRunChatBuilder? _chat;
+  StatsRunChatBuilder get chat => _$this._chat ??= StatsRunChatBuilder();
+  set chat(StatsRunChatBuilder? chat) => _$this._chat = chat;
+
   StatsLiveRunBuilder() {
     StatsLiveRun._defaults(this);
   }
@@ -304,6 +314,7 @@ class StatsLiveRunBuilder
       _costIsEstimate = $v.costIsEstimate;
       _tasks = $v.tasks?.toBuilder();
       _tasksTruncated = $v.tasksTruncated;
+      _chat = $v.chat?.toBuilder();
       _$v = null;
     }
     return this;
@@ -380,6 +391,7 @@ class StatsLiveRunBuilder
             costIsEstimate: costIsEstimate,
             tasks: _tasks?.build(),
             tasksTruncated: tasksTruncated,
+            chat: _chat?.build(),
           );
     } catch (_) {
       late String _$failedField;
@@ -389,6 +401,9 @@ class StatsLiveRunBuilder
 
         _$failedField = 'tasks';
         _tasks?.build();
+
+        _$failedField = 'chat';
+        _chat?.build();
       } catch (e) {
         throw BuiltValueNestedFieldError(
           r'StatsLiveRun',

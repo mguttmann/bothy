@@ -23,18 +23,20 @@ T = TypeVar("T", bound="StatsLiveFrame")
 
 @_attrs_define
 class StatsLiveFrame:
-    """Live frame (docs/spec/25-visualization.md, section 5.2). No person values, no content.
+    """Live frame (docs/spec/25-visualization.md, section 5.2). No person values and no content, except the channel name
+    and thread title of a run in `chat`, for a caller who may read the thread, and the `label` of a task node, for a
+    caller with `run.read` on the run (25 1 rule 3).
 
-    Attributes:
-        at (datetime.datetime): RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
-        interval_ms (int):
-        scope (StatsScope):
-        runs (list[StatsLiveRun]):
-        runs_truncated (bool):
-        agents (list[StatsLiveAgent]):
-        rates (list[StatsLiveRate]):
-        sli (list[StatsLiveSli] | Unset): Only for the instance scope.
-        connections (StatsLiveConnections | Unset): Gateway connections of this node; only with `cluster.mode = single`.
+        Attributes:
+            at (datetime.datetime): RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+            interval_ms (int):
+            scope (StatsScope):
+            runs (list[StatsLiveRun]):
+            runs_truncated (bool):
+            agents (list[StatsLiveAgent]):
+            rates (list[StatsLiveRate]):
+            sli (list[StatsLiveSli] | Unset): Only for the instance scope.
+            connections (StatsLiveConnections | Unset): Gateway connections of this node; only with `cluster.mode = single`.
     """
 
     at: datetime.datetime

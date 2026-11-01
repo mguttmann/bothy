@@ -22,7 +22,9 @@ import (
 )
 
 // viewsCanary is the canary of VZ-T07 for the views: the title of a thread with a run in the
-// timeline range; the prompt, step title and step detail of statsWorld are the other canaries.
+// timeline range, allowed only as the thread title of the run's chat for a person who may read the
+// thread (25 4 rule 6); the prompt, step title and step detail of statsWorld are the other
+// canaries.
 const viewsCanary = "canary-views-7e2a"
 
 // viewsWorld is the statistics world of M6-05 with the fixtures of the views (M6-14): minute rows
@@ -388,17 +390,23 @@ func TestStatsViews(t *testing.T) {
 		if len(w.bodies) < 10 {
 			t.Fatalf("only %d answers were read", len(w.bodies))
 		}
+		named := false
 		for _, b := range w.bodies {
 			for _, p := range w.people {
 				if strings.Contains(b, p) {
 					t.Fatalf("an answer names the person %s: %s", p, b)
 				}
 			}
+			rest, titles := withoutChatTitles(t, []byte(b))
+			named = named || slices.Contains(titles, viewsCanary)
 			for _, c := range []string{viewsCanary, w.stepTitle, w.stepDetail, w.prompt} {
-				if strings.Contains(b, c) {
-					t.Fatalf("an answer carries the content %q: %s", c, b)
+				if strings.Contains(string(rest), c) {
+					t.Fatalf("an answer carries the content %q outside the chat of a run: %s", c, b)
 				}
 			}
+		}
+		if !named {
+			t.Fatal("no timeline names the chat of the titled thread for a person who may read it")
 		}
 	})
 }

@@ -9,10 +9,11 @@ import 'package:flutter/semantics.dart';
 
 import '../../marks/viz_texts.dart';
 
-/// One cell: its text, the key it sorts by (a number for numeric columns) and its level.
+/// One cell: its text, the key it sorts by (a number for numeric columns), its level and, for
+/// the chat of a run, what a tap opens.
 final class VizCell {
   /// Creates a cell; the sort key defaults to [text].
-  const VizCell(this.text, {this.sortBy, this.level = 0});
+  const VizCell(this.text, {this.sortBy, this.level = 0, this.onTap});
 
   /// The text, the same the view shows.
   final String text;
@@ -20,6 +21,10 @@ final class VizCell {
   /// The level of a row of a tree (the agent tree of the live topology): the cell is
   /// indented by it, 0 for a top row.
   final int level;
+
+  /// Called on a tap: the cell is a button (the chat of a run opens its thread); `null` for
+  /// a plain cell.
+  final VoidCallback? onTap;
 
   /// The key of the sort, for example the number behind a formatted count.
   final Comparable<Object>? sortBy;
@@ -182,16 +187,41 @@ class _VizTableState extends State<VizTable> {
                   for (var i = 0; i < row.length; i++)
                     Semantics(
                       container: true,
+                      button: row[i].onTap != null,
+                      onTap: row[i].onTap,
                       label: '${data.columns[i]}: ${row[i].text}',
                       child: ExcludeSemantics(
-                        child: Padding(
-                          padding: pad.add(
-                            EdgeInsetsDirectional.only(
-                              start: row[i].level * DsSpace.s16,
-                            ),
-                          ),
-                          child: Text(row[i].text, style: cellStyle),
-                        ),
+                        child: row[i].onTap == null
+                            ? Padding(
+                                padding: pad.add(
+                                  EdgeInsetsDirectional.only(
+                                    start: row[i].level * DsSpace.s16,
+                                  ),
+                                ),
+                                child: Text(row[i].text, style: cellStyle),
+                              )
+                            : InkWell(
+                                onTap: row[i].onTap,
+                                child: ConstrainedBox(
+                                  constraints: BoxConstraints(
+                                    minHeight: context.dsDensity.targetMin,
+                                  ),
+                                  child: Padding(
+                                    padding: pad.add(
+                                      EdgeInsetsDirectional.only(
+                                        start: row[i].level * DsSpace.s16,
+                                      ),
+                                    ),
+                                    child: Text(
+                                      row[i].text,
+                                      style: cellStyle.copyWith(
+                                        color: colors.textLink,
+                                        decoration: TextDecoration.underline,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
                       ),
                     ),
                 ],

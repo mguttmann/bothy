@@ -21,12 +21,13 @@ import 'view_scaffold.dart';
 import 'view_texts.dart';
 import 'viz_host_options.dart';
 
-/// Lanes per space and channel with a card per active run, the rates of the last minute,
-/// the time of the frame, the stale marker and "More runs than shown".
+/// Lanes per space and channel with a card per active run (labelled by project and chat,
+/// [VizRunLabel]), the rates of the last minute, the time of the frame, the stale marker and
+/// "More runs than shown".
 ///
 /// Reads `stats.live` through [live]; without a live source (a host without stream) it reads
-/// the frame once through `getStatsLive` of [queries]. A tap on a card reports its thread to
-/// [onOpenThread]. Costs appear only where the frame carries them and, in TV mode, only with
+/// the frame once through `getStatsLive` of [queries]. A tap on a card (or on the chat in its
+/// table) reports its thread to [onOpenThread], only where the server named the chat. Costs appear only where the frame carries them and, in TV mode, only with
 /// `viz.tv_show_costs`. An unchanged lane keeps its widget between frames and paints in its
 /// own layer, so a frame rebuilds only the changed lanes (25 7.3).
 class LiveTopologyView extends StatefulWidget {
@@ -178,7 +179,12 @@ class _LiveTopologyViewState extends State<LiveTopologyView>
         stale: liveStale,
         truncated: model?.runsTruncated ?? false,
       ),
-      tables: (texts) => liveTopologyTables(texts, lanes: lanes, rates: rates),
+      tables: (texts) => liveTopologyTables(
+        texts,
+        lanes: lanes,
+        rates: rates,
+        onOpenThread: _open,
+      ),
       chart: (context) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,

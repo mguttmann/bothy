@@ -200,7 +200,8 @@ final class StatsTexts {
     'scan_errors' => l10n.statsErrorScanErrors,
     'scan_infected' => l10n.statsErrorScanInfected,
     _ when name.startsWith('push_failure_rate_') => l10n.statsErrorPushFailure(
-      name.substring('push_failure_rate_'.length),
+      vizPushProvider(l10n, name.substring('push_failure_rate_'.length)) ??
+          name.substring('push_failure_rate_'.length),
     ),
     _ => l10n.vizMetricUnknown(name),
   };

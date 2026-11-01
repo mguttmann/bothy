@@ -21,6 +21,8 @@ class _$StatsTimelineRun extends StatsTimelineRun {
   final DateTime? finishedAt;
   @override
   final RunState state;
+  @override
+  final StatsRunChat? chat;
 
   factory _$StatsTimelineRun([
     void Function(StatsTimelineRunBuilder)? updates,
@@ -34,6 +36,7 @@ class _$StatsTimelineRun extends StatsTimelineRun {
     this.startedAt,
     this.finishedAt,
     required this.state,
+    this.chat,
   }) : super._();
   @override
   StatsTimelineRun rebuild(void Function(StatsTimelineRunBuilder) updates) =>
@@ -53,7 +56,8 @@ class _$StatsTimelineRun extends StatsTimelineRun {
         queuedAt == other.queuedAt &&
         startedAt == other.startedAt &&
         finishedAt == other.finishedAt &&
-        state == other.state;
+        state == other.state &&
+        chat == other.chat;
   }
 
   @override
@@ -66,6 +70,7 @@ class _$StatsTimelineRun extends StatsTimelineRun {
     _$hash = $jc(_$hash, startedAt.hashCode);
     _$hash = $jc(_$hash, finishedAt.hashCode);
     _$hash = $jc(_$hash, state.hashCode);
+    _$hash = $jc(_$hash, chat.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -79,7 +84,8 @@ class _$StatsTimelineRun extends StatsTimelineRun {
           ..add('queuedAt', queuedAt)
           ..add('startedAt', startedAt)
           ..add('finishedAt', finishedAt)
-          ..add('state', state))
+          ..add('state', state)
+          ..add('chat', chat))
         .toString();
   }
 }
@@ -116,6 +122,10 @@ class StatsTimelineRunBuilder
   RunState? get state => _$this._state;
   set state(RunState? state) => _$this._state = state;
 
+  StatsRunChatBuilder? _chat;
+  StatsRunChatBuilder get chat => _$this._chat ??= StatsRunChatBuilder();
+  set chat(StatsRunChatBuilder? chat) => _$this._chat = chat;
+
   StatsTimelineRunBuilder() {
     StatsTimelineRun._defaults(this);
   }
@@ -130,6 +140,7 @@ class StatsTimelineRunBuilder
       _startedAt = $v.startedAt;
       _finishedAt = $v.finishedAt;
       _state = $v.state;
+      _chat = $v.chat?.toBuilder();
       _$v = null;
     }
     return this;
@@ -149,37 +160,54 @@ class StatsTimelineRunBuilder
   StatsTimelineRun build() => _build();
 
   _$StatsTimelineRun _build() {
-    final _$result =
-        _$v ??
-        _$StatsTimelineRun._(
-          runId: BuiltValueNullFieldError.checkNotNull(
-            runId,
-            r'StatsTimelineRun',
-            'runId',
-          ),
-          channelId: BuiltValueNullFieldError.checkNotNull(
-            channelId,
-            r'StatsTimelineRun',
-            'channelId',
-          ),
-          agentId: BuiltValueNullFieldError.checkNotNull(
-            agentId,
-            r'StatsTimelineRun',
-            'agentId',
-          ),
-          queuedAt: BuiltValueNullFieldError.checkNotNull(
-            queuedAt,
-            r'StatsTimelineRun',
-            'queuedAt',
-          ),
-          startedAt: startedAt,
-          finishedAt: finishedAt,
-          state: BuiltValueNullFieldError.checkNotNull(
-            state,
-            r'StatsTimelineRun',
-            'state',
-          ),
+    _$StatsTimelineRun _$result;
+    try {
+      _$result =
+          _$v ??
+          _$StatsTimelineRun._(
+            runId: BuiltValueNullFieldError.checkNotNull(
+              runId,
+              r'StatsTimelineRun',
+              'runId',
+            ),
+            channelId: BuiltValueNullFieldError.checkNotNull(
+              channelId,
+              r'StatsTimelineRun',
+              'channelId',
+            ),
+            agentId: BuiltValueNullFieldError.checkNotNull(
+              agentId,
+              r'StatsTimelineRun',
+              'agentId',
+            ),
+            queuedAt: BuiltValueNullFieldError.checkNotNull(
+              queuedAt,
+              r'StatsTimelineRun',
+              'queuedAt',
+            ),
+            startedAt: startedAt,
+            finishedAt: finishedAt,
+            state: BuiltValueNullFieldError.checkNotNull(
+              state,
+              r'StatsTimelineRun',
+              'state',
+            ),
+            chat: _chat?.build(),
+          );
+    } catch (_) {
+      late String _$failedField;
+      try {
+        _$failedField = 'chat';
+        _chat?.build();
+      } catch (e) {
+        throw BuiltValueNestedFieldError(
+          r'StatsTimelineRun',
+          _$failedField,
+          e.toString(),
         );
+      }
+      rethrow;
+    }
     replace(_$result);
     return _$result;
   }

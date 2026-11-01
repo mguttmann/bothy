@@ -396,3 +396,94 @@ func BenchmarkFilterLive(b *testing.B) {
 		}
 	}
 }
+
+// TestFilterChatNames (owner request 2026-11-01, 25 4 rule 6): the chat of a run (channel name
+// and thread title, the deep link target) is in the frame only for a receiver who may read its
+// thread; a run the receiver sees in the topology without that right carries no chat, and none
+// of its names appears anywhere in the payload.
+func TestFilterChatNames(t *testing.T) {
+	t.Parallel()
+	w := newLiveWorld()
+	supportThread := w.base.Runs[1].ThreadID
+	w.base.Runs[0].ChannelName, w.base.Runs[0].ThreadTitle = "secret-dev-project", "Secret dev chat"
+	w.base.Runs[1].ChannelName, w.base.Runs[1].ThreadTitle = "support", "Refund for order 7"
+	type chatJSON struct {
+		ThreadID    string  `json:"thread_id"`
+		ChannelName string  `json:"channel_name"`
+		ThreadTitle *string `json:"thread_title"`
+	}
+	chats := func(t *testing.T, r domain.Receiver) (map[string]*chatJSON, []byte) {
+		t.Helper()
+		_, b := filter(t, w.base, r, limits())
+		var f struct {
+			Runs []struct {
+				RunID string    `json:"run_id"`
+				Chat  *chatJSON `json:"chat"`
+			} `json:"runs"`
+		}
+		if err := json.Unmarshal(b, &f); err != nil {
+			t.Fatal(err)
+		}
+		out := map[string]*chatJSON{}
+		for _, r := range f.Runs {
+			out[r.RunID] = r.Chat
+		}
+		return out, b
+	}
+
+	t.Run("named only where the thread is readable", func(t *testing.T) {
+		t.Parallel()
+		got, b := chats(t, domain.Receiver{Visible: set(w.supportCh, w.devCh), Named: set(w.supportCh)})
+		if len(got) != 2 {
+			t.Fatalf("runs = %v, want both", got)
+		}
+		c := got[w.supportRun.String()]
+		if c == nil || c.ThreadID != supportThread.String() || c.ChannelName != "support" || c.ThreadTitle == nil ||
+			*c.ThreadTitle != "Refund for order 7" {
+			t.Fatalf("support chat = %+v", c)
+		}
+		if c := got[w.devRun.String()]; c != nil {
+			t.Fatalf("dev chat = %+v, want none", c)
+		}
+		for _, leak := range []string{"secret-dev-project", "Secret dev chat"} {
+			if strings.Contains(string(b), leak) {
+				t.Fatalf("the payload names %q of a chat the receiver cannot read: %s", leak, b)
+			}
+		}
+	})
+
+	t.Run("no right, no names", func(t *testing.T) {
+		t.Parallel()
+		got, b := chats(t, domain.Receiver{Visible: set(w.supportCh, w.devCh)})
+		for id, c := range got {
+			if c != nil {
+				t.Fatalf("run %s has chat %+v without thread.read", id, c)
+			}
+		}
+		if strings.Contains(string(b), "Refund") || strings.Contains(string(b), "secret-dev") {
+			t.Fatalf("names in the payload: %s", b)
+		}
+	})
+
+	t.Run("main thread without title", func(t *testing.T) {
+		t.Parallel()
+		base := *w.base
+		base.Runs = slices.Clone(w.base.Runs)
+		base.Runs[1].ThreadTitle = ""
+		_, b := filter(t, &base, domain.Receiver{Visible: set(w.supportCh), Named: set(w.supportCh)}, limits())
+		if !strings.Contains(string(b), `"channel_name":"support"`) || strings.Contains(string(b), "thread_title") {
+			t.Fatalf("chat of a main thread: %s", b)
+		}
+	})
+
+	t.Run("unknown channel name, no chat", func(t *testing.T) {
+		t.Parallel()
+		base := *w.base
+		base.Runs = slices.Clone(w.base.Runs)
+		base.Runs[1].ChannelName = ""
+		_, b := filter(t, &base, domain.Receiver{Visible: set(w.supportCh), Named: set(w.supportCh)}, limits())
+		if strings.Contains(string(b), `"chat"`) {
+			t.Fatalf("chat without a channel name: %s", b)
+		}
+	})
+}

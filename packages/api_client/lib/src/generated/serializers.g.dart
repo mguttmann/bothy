@@ -651,6 +651,7 @@ Serializers _$serializers =
           ..add(StatsLiveTaskKindEnum.serializer)
           ..add(StatsLiveTaskStateEnum.serializer)
           ..add(StatsMetric.serializer)
+          ..add(StatsRunChat.serializer)
           ..add(StatsScope.serializer)
           ..add(StatsScopeKindEnum.serializer)
           ..add(StatsSeries.serializer)

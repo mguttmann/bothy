@@ -155,11 +155,12 @@ void main() {
     tester,
   ) async {
     await pumpView(tester, VizViewKind.timeline);
+    final texts = VizTexts.of(tester.element(find.byType(TimelineView)));
     final bars = tester.widget<BarMark>(find.byType(BarMark)).model;
     await toTable(tester);
     final table = cells(tester);
     for (final row in bars.rows) {
-      expect(table, contains(row.label));
+      expect(table, containsAll(VizRunLabelText.parts(texts, row.run!)));
     }
   });
 

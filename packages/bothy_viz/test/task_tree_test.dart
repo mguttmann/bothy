@@ -242,9 +242,9 @@ void main() {
         ),
       );
       final rows = tables.first.rows;
-      final agent = tables.first.columns.indexOf('Agent');
+      final agent = tables.first.columns.indexOf('Run');
       final runRow = rows.indexWhere(
-        (r) => r[agent].text == 'dev-runner' && r[agent].level == 0,
+        (r) => r[agent].text.startsWith('dev-runner') && r[agent].level == 0,
       );
       final below = [
         for (final r in rows.skip(runRow + 1).take(6))

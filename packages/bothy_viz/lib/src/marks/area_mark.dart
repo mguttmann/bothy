@@ -31,10 +31,9 @@ class AreaMark extends StatelessWidget {
   /// The label of [s]: the metric of the own measurement or the query metric name, with its
   /// dimension and its group, so two series never differ by color alone.
   static String seriesLabel(VizTexts texts, SeriesModel s) {
-    final name = s.metric != null
-        ? texts.metric(s.metric!)
+    final withDimension = s.metric != null
+        ? texts.metricLabel(s.metric!, s.dimension)
         : texts.queryMetric(s.queryMetric!);
-    final withDimension = s.dimension == null ? name : '$name ${s.dimension}';
     final group = s.groupLabel ?? s.groupKey;
     return group == null ? withDimension : '$withDimension, $group';
   }

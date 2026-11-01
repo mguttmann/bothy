@@ -7,9 +7,10 @@ import 'package:api_client/api_client.dart' as api;
 
 import 'bar_model.dart';
 import 'names.dart';
+import 'run_label.dart';
 import 'series_model.dart';
 
-/// Runs as bars per agent and channel and the minute counts as series, over one range.
+/// Runs as bars per chat and agent and the minute counts as series, over one range.
 final class TimelineModel {
   /// Creates the model; [TimelineModel.fromTimeline] is the normal way.
   const TimelineModel({
@@ -20,9 +21,11 @@ final class TimelineModel {
     required this.runsTruncated,
   });
 
-  /// Derives the model from [timeline]; [names] gives the row labels. Never calls the network.
+  /// Derives the model from [timeline]; [names] gives the agent names. Never calls the network.
   ///
-  /// Bars: one row per agent and channel in the order of the first run; a run without
+  /// Bars: one row per chat and agent in the order of the first run, labelled by the chat the
+  /// server named ([VizRunLabel]); runs without a chat (the person may not read the thread) form
+  /// one row per agent and channel with the agent as the main text and no link. A run without
   /// `started_at` starts at `queued_at`, a run without `finished_at` ends at [to]. Series: one
   /// per metric and dimension in the order of the first bucket, the counts summed over channel
   /// and agent per minute.
@@ -31,14 +34,20 @@ final class TimelineModel {
     VizNames names = const VizNames(),
   }) {
     final rows = <(String, String), List<BarSegment>>{};
-    final order = <(String, String)>[];
+    final labels = <(String, String), VizRunLabel>{};
     for (final run in timeline.runs) {
-      final key = (run.agentId, run.channelId);
+      final chat = run.chat;
+      final key = (chat?.threadId ?? 'channel:${run.channelId}', run.agentId);
+      labels.putIfAbsent(
+        key,
+        () => VizRunLabel.of(
+          chat,
+          agent: names.agent(run.agentId),
+          id: chat?.threadId ?? run.channelId,
+        ),
+      );
       rows
-          .putIfAbsent(key, () {
-            order.add(key);
-            return <BarSegment>[];
-          })
+          .putIfAbsent(key, () => <BarSegment>[])
           .add(
             BarSegment(
               start: run.startedAt ?? run.queuedAt,
@@ -64,12 +73,11 @@ final class TimelineModel {
         from: timeline.from,
         to: timeline.to,
         rows: List.unmodifiable([
-          for (final (agent, channel) in order)
+          for (final MapEntry(:key, value: segments) in rows.entries)
             BarRow(
-              label: '${names.agent(agent)}, ${names.channel(channel)}',
+              run: labels[key],
               segments: List.unmodifiable(
-                rows[(agent, channel)]!
-                  ..sort((a, b) => a.start.compareTo(b.start)),
+                segments..sort((a, b) => a.start.compareTo(b.start)),
               ),
             ),
         ]),

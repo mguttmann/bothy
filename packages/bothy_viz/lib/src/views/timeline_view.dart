@@ -22,8 +22,9 @@ import 'view_scaffold.dart';
 import 'view_texts.dart';
 import 'viz_host_options.dart';
 
-/// The rates as areas and the runs as bars per agent and channel, played back minute by
-/// minute with play, pause, a jump slider and the speeds of `viz.timeline_speeds`.
+/// The rates as areas and the runs as bars per chat and agent, played back minute by minute
+/// with play, pause, a jump slider and the speeds of `viz.timeline_speeds`. A tap on a row whose
+/// chat the server named reports its thread to [onOpenThread].
 ///
 /// Reads `getStatsTimeline` once for the host's range and plays locally on the clock of the
 /// options. Day boundaries come from the response (the server applies `stats.time_zone`);
@@ -49,7 +50,7 @@ class TimelineView extends StatefulWidget {
   /// What the host knows (range, clock, `viz.timeline_speeds`).
   final VizHostOptions options;
 
-  /// Not used by this view; the view contract is the same for all six views.
+  /// Opens the chat of a tapped row (and of its table row).
   final void Function(String threadId) onOpenThread;
 
   @override
@@ -146,8 +147,13 @@ class _TimelineViewState extends State<TimelineView> {
           (tone: DsTone.info, text: l10n.vizMoreRunsThanShown),
       ],
       controls: playback == null ? null : _Controls(playback: playback),
-      tables: (texts) =>
-          timelineTables(texts, shown!, now: now, timeZone: zone),
+      tables: (texts) => timelineTables(
+        texts,
+        shown!,
+        now: now,
+        timeZone: zone,
+        onOpenThread: widget.onOpenThread,
+      ),
       chart: (context) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
@@ -161,7 +167,7 @@ class _TimelineViewState extends State<TimelineView> {
           ),
           const SizedBox(height: DsSpace.s8),
           _Playhead(model: model!, at: playback!.position),
-          BarMark(model: shown.bars),
+          BarMark(model: shown.bars, onTapRow: widget.onOpenThread),
         ],
       ),
     );

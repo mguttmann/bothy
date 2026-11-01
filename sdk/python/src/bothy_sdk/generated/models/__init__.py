@@ -686,6 +686,7 @@ from .stats_live_task import StatsLiveTask
 from .stats_live_task_kind import StatsLiveTaskKind
 from .stats_live_task_state import StatsLiveTaskState
 from .stats_metric import StatsMetric
+from .stats_run_chat import StatsRunChat
 from .stats_scope import StatsScope
 from .stats_scope_kind import StatsScopeKind
 from .stats_series import StatsSeries
@@ -1483,6 +1484,7 @@ __all__ = (
     "StatsLiveTaskKind",
     "StatsLiveTaskState",
     "StatsMetric",
+    "StatsRunChat",
     "StatsScope",
     "StatsScopeKind",
     "StatsSeries",

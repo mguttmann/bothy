@@ -22,7 +22,8 @@ import (
 )
 
 // slCanary is the canary of VZ-T07: it is the text of messages, the title of the run's thread,
-// the step title and the step detail, and must appear in no frame and no getStatsLive answer.
+// the step title and the step detail, and must appear in no frame and no getStatsLive answer, except
+// as the thread title of the run's chat for a person who may read the thread (25 4 rule 6).
 const slCanary = "canary-live-5d1c"
 
 // slWorld is the live-box world (Support with the Owner Alex, Sam, Robin) of a process in role
@@ -510,15 +511,21 @@ func TestStatsLive(t *testing.T) {
 			t.Fatalf("only %d frames collected", len(w.frames))
 		}
 		people := []string{w.owner.user.String(), w.sam.user.String(), w.robin.user.String()}
+		named := false
 		for _, f := range w.frames {
-			if bytes.Contains(f, []byte(slCanary)) {
-				t.Fatalf("the canary in a frame: %s", f)
+			rest, titles := withoutChatTitles(t, f)
+			named = named || slices.Contains(titles, slCanary)
+			if bytes.Contains(rest, []byte(slCanary)) {
+				t.Fatalf("the canary outside the chat of a run in a frame: %s", f)
 			}
 			for _, p := range people {
 				if bytes.Contains(f, []byte(p)) {
 					t.Fatalf("the id of a person in a frame: %s", f)
 				}
 			}
+		}
+		if !named {
+			t.Fatal("no frame names the chat of the support run for a person who may read it")
 		}
 	})
 }

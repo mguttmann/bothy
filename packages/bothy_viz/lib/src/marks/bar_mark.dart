@@ -7,20 +7,27 @@ import 'package:design_system/design_system.dart';
 import 'package:flutter/material.dart';
 
 import '../model/bar_model.dart';
+import 'run_card_mark.dart';
+import 'run_label_mark.dart';
 import 'viz_colors.dart';
 import 'viz_texts.dart';
 
-/// One row per label with its bars between [BarModel.from] and [BarModel.to].
+/// One row per run label ([VizRunLabelText]) with its bars between [BarModel.from] and
+/// [BarModel.to].
 ///
 /// Run bars take the run state roles and start with the icon of their state, so the state is
 /// never color alone; the semantics label of a row names the row, the number of runs and every
-/// state as text ("dev-runner, #backend, 2 runs, Done, Failed").
+/// state as text ("backend / Payment integration, dev-runner · 0a77f1, 2 runs, Done, Failed").
+/// A row whose chat the server named is a button that reports the thread to [onTapRow].
 class BarMark extends StatelessWidget {
   /// Creates the mark of [model].
-  const BarMark({super.key, required this.model});
+  const BarMark({super.key, required this.model, this.onTapRow});
 
   /// The rows.
   final BarModel model;
+
+  /// Called with the thread of a tapped row; only rows with a named chat are buttons.
+  final RunTapCallback? onTapRow;
 
   @override
   Widget build(BuildContext context) {
@@ -31,40 +38,78 @@ class BarMark extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         for (final row in model.rows)
-          Semantics(
-            container: true,
-            label: [
-              texts.l10n.vizBarRowLabel(row.label, row.segments.length),
-              for (final s in row.segments)
-                if (s.runState != null) texts.timelineState(s.runState!),
-            ].join(', '),
-            child: ExcludeSemantics(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: DsSpace.s2),
-                child: Row(
-                  children: [
-                    SizedBox(
-                      width: DsLayout.columnMin,
-                      child: Text(
-                        row.label,
-                        overflow: TextOverflow.ellipsis,
-                        style: dsTextStyle(DsType.bodySm)
-                            .copyWith(color: colors.textSecondary),
+          _row(texts, colors, context.dsDensity.targetMin, row),
+      ],
+    );
+  }
+
+  Widget _row(VizTexts texts, DsColors colors, double minHeight, BarRow row) {
+    final run = row.run;
+    final thread = run?.threadId;
+    final tap = onTapRow;
+    final callback = tap == null || thread == null ? null : () => tap(thread);
+    // A row of runs is as high as a tap target, so a row that opens its chat meets the tap
+    // target guidelines and the rows of the timeline stay aligned; other rows keep their
+    // compact height.
+    final content = Padding(
+      padding: const EdgeInsets.symmetric(vertical: DsSpace.s2),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(minHeight: run == null ? 0 : minHeight),
+        child: Row(
+          children: [
+            SizedBox(
+              width: DsLayout.columnMin,
+              child: run == null
+                  ? Text(
+                      row.label,
+                      overflow: TextOverflow.ellipsis,
+                      style: dsTextStyle(DsType.bodySm)
+                          .copyWith(color: colors.textSecondary),
+                    )
+                  : VizRunLabelText(
+                      label: run,
+                      titleStyle: dsTextStyle(DsType.bodySm).copyWith(
+                        color: callback == null
+                            ? colors.textSecondary
+                            : colors.textPrimary,
                       ),
                     ),
-                    const SizedBox(width: DsSpace.s8),
-                    Expanded(
-                      child: SizedBox(
-                        height: DsIconSize.sizeSm,
-                        child: _BarTrack(model: model, row: row),
-                      ),
-                    ),
-                  ],
-                ),
+            ),
+            const SizedBox(width: DsSpace.s8),
+            Expanded(
+              child: SizedBox(
+                height: DsIconSize.sizeSm,
+                child: _BarTrack(model: model, row: row),
               ),
             ),
-          ),
-      ],
+          ],
+        ),
+      ),
+    );
+    return Semantics(
+      container: true,
+      button: callback != null,
+      hint: callback == null ? null : texts.l10n.vizRunOpenChat,
+      onTap: callback,
+      label: [
+        texts.l10n.vizBarRowLabel(
+          run == null
+              ? row.label
+              : VizRunLabelText.parts(texts, run).join(', '),
+          row.segments.length,
+        ),
+        for (final s in row.segments)
+          if (s.runState != null) texts.timelineState(s.runState!),
+      ].join(', '),
+      child: ExcludeSemantics(
+        child: callback == null
+            ? content
+            : GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: callback,
+                child: content,
+              ),
+      ),
     );
   }
 }

@@ -14,13 +14,14 @@ import '../view_texts.dart';
 import 'viz_table.dart';
 
 /// The runs of [lanes] and the shown [rates] as tables: one row per run card with the texts
-/// of the card, followed by one row per node of its agent tree in tree order, its agent cell
-/// indented by level (25 6.1); one row per rate. The column "Cost" exists only when a card
-/// shows a cost.
+/// of the card (the chat opens through [onOpenThread] where the server named it), followed by
+/// one row per node of its agent tree in tree order, its agent cell indented by level (25 6.1);
+/// one row per rate. The column "Cost" exists only when a card shows a cost.
 List<VizTableData> liveTopologyTables(
   VizTexts texts, {
   required List<LaneModel> lanes,
   required List<RateModel> rates,
+  void Function(String threadId)? onOpenThread,
 }) {
   final l10n = texts.l10n;
   final withCost = lanes.any((l) => l.cards.any((c) => c.cost != null));
@@ -29,8 +30,8 @@ List<VizTableData> liveTopologyTables(
       caption: l10n.vizViewLiveTopology,
       columns: [
         l10n.vizColSpace,
-        l10n.vizColChannel,
-        l10n.vizColAgent,
+        l10n.vizColChat,
+        l10n.vizColRun,
         l10n.vizColState,
         l10n.vizColStep,
         l10n.vizColMode,
@@ -42,8 +43,8 @@ List<VizTableData> liveTopologyTables(
           for (final card in lane.cards) ...[
             [
               VizCell(lane.spaceName),
-              VizCell(lane.channelName),
-              VizCell(card.agentName),
+              vizChatCell(texts, card.label, onOpenThread),
+              VizCell(texts.runDetail(card.label)),
               VizCell(texts.runState(card.state)),
               VizCell(
                 card.stepKind != null && card.stepName != null
@@ -63,7 +64,7 @@ List<VizTableData> liveTopologyTables(
             for (final (node, level) in _tree(card.tasks, 1))
               [
                 VizCell(lane.spaceName),
-                VizCell(lane.channelName),
+                VizCell(texts.runTitle(card.label)),
                 VizCell(texts.taskName(node), level: level),
                 VizCell(texts.taskState(node.state)),
                 VizCell(
@@ -78,7 +79,7 @@ List<VizTableData> liveTopologyTables(
             if (card.tasksTruncated)
               [
                 VizCell(lane.spaceName),
-                VizCell(lane.channelName),
+                VizCell(texts.runTitle(card.label)),
                 VizCell(l10n.vizMoreTasksThanShown, level: 1),
                 VizCell(l10n.vizNone),
                 VizCell(l10n.vizNone),

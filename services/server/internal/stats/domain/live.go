@@ -77,6 +77,10 @@ type LiveRun struct {
 	// Tasks are the nodes of the agent tree (TaskTree); TasksTruncated reports a limit cut.
 	Tasks          []LiveTask
 	TasksTruncated bool
+	// ChannelName and ThreadTitle name the chat of the run as the sidebar does; "" when unknown
+	// (no chat without a channel name) and ThreadTitle "" for a main thread or an empty title.
+	// The filter sends them only to a receiver who may read the thread (Receiver.Named).
+	ChannelName, ThreadTitle string
 }
 
 // LiveAgent is the state of one agent (schema StatsLiveAgent).
@@ -120,6 +124,9 @@ type Receiver struct {
 	Readable map[ids.ID]struct{}
 	// Costs reports cost.read.aggregate on the target.
 	Costs bool
+	// Named are the channels whose threads the receiver may read (Scope of thread.read, the rule
+	// of the sidebar): only runs there carry their chat (25 4 rule 6). nil names nothing.
+	Named map[ids.ID]struct{}
 }
 
 // LiveLimits are the configuration values of the filter.
@@ -171,6 +178,7 @@ type (
 		CostIsEstimate  *bool      `json:"cost_is_estimate,omitempty"`
 		Tasks           []taskJSON `json:"tasks,omitempty"`
 		TasksTruncated  bool       `json:"tasks_truncated,omitempty"`
+		Chat            *chatJSON  `json:"chat,omitempty"`
 	}
 	taskJSON struct {
 		ID         string `json:"id"`
@@ -182,6 +190,11 @@ type (
 		FinishedAt string `json:"finished_at,omitempty"`
 		Tool       string `json:"tool,omitempty"`
 		Label      string `json:"label,omitempty"`
+	}
+	chatJSON struct {
+		ThreadID    string `json:"thread_id"`
+		ChannelName string `json:"channel_name"`
+		ThreadTitle string `json:"thread_title,omitempty"`
 	}
 	agentJSON struct {
 		AgentID             string `json:"agent_id"`
@@ -214,7 +227,8 @@ var summedMetrics = map[string]bool{"runs_finished": true, "tool_calls": true, M
 //
 //   - the channel set is r.Visible, for a space only the channels of that space;
 //   - runs outside the set drop out, the newest stats.live_max_runs stay (runs_truncated when more
-//     were visible);
+//     were visible); a run carries its chat (channel name, thread title) only when its channel is
+//     in r.Named;
 //   - agents stay when they have a run or are the effective operator of a channel of the set;
 //   - rates sum the channel cells of the set, plus the cells without a channel for the instance;
 //     cost cells and the cost members of runs only with r.Costs;
@@ -279,7 +293,8 @@ func visibleRuns(base *BaseFrame, r Receiver, inSet func(ids.ID) bool, maxRuns i
 			continue
 		}
 		_, labels := r.Readable[run.ChannelID]
-		enc := encodeRun(run, r.Costs, labels)
+		_, named := r.Named[run.ChannelID]
+		enc := encodeRun(run, r.Costs, labels, named)
 		b, err := json.Marshal(enc)
 		if err != nil {
 			return nil, nil, false, nil, err
@@ -318,9 +333,9 @@ func encodeTasks(tasks []LiveTask, labels bool) []taskJSON {
 	return out
 }
 
-// encodeRun returns the wire form of run, with the cost members only when costs and the labels
-// of its task nodes only when labels.
-func encodeRun(run LiveRun, costs, labels bool) runJSON {
+// encodeRun returns the wire form of run, with the cost members only when costs, the labels of
+// its task nodes only when labels and the chat only when named.
+func encodeRun(run LiveRun, costs, labels, named bool) runJSON {
 	out := runJSON{RunID: run.RunID.String(), ThreadID: run.ThreadID.String(), ChannelID: run.ChannelID.String(),
 		SpaceID: run.SpaceID.String(), AgentID: run.AgentID.String(), State: run.State, QueuedAt: clock.FormatAPI(run.QueuedAt),
 		BillingMode: run.BillingMode, ApprovalPending: run.ApprovalPending}
@@ -335,6 +350,9 @@ func encodeRun(run LiveRun, costs, labels bool) runJSON {
 		out.CostMicros, out.Currency, out.CostIsEstimate = &micros, run.Currency, &estimate
 	}
 	out.Tasks, out.TasksTruncated = encodeTasks(run.Tasks, labels), run.TasksTruncated
+	if named && run.ChannelName != "" {
+		out.Chat = &chatJSON{ThreadID: run.ThreadID.String(), ChannelName: run.ChannelName, ThreadTitle: run.ThreadTitle}
+	}
 	return out
 }
 

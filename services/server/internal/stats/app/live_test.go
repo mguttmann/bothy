@@ -5,6 +5,8 @@ package app_test
 import (
 	"context"
 	"encoding/json"
+	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -31,6 +33,8 @@ type liveAuthz struct {
 	owner, manager, support, supportCh, devCh ids.ID
 	// noRunRead lists principals whose run.read scope is empty (they see channels, not runs).
 	noRunRead map[ids.ID]bool
+	// noThreadRead leaves this channel out of the owner's Scope of thread.read only.
+	noThreadRead ids.ID
 }
 
 func (a *liveAuthz) Authorize(_ context.Context, p authorize.Principal, _ authorize.Action, r authorize.Resource) (authorize.Decision, error) {
@@ -52,7 +56,13 @@ func (a *liveAuthz) Scope(_ context.Context, p authorize.Principal, act authoriz
 	}
 	switch p.PrincipalID() {
 	case a.owner:
-		return authorize.Scope{ChannelIDs: []ids.ID{a.supportCh, a.devCh}}, nil
+		out := []ids.ID{}
+		for _, c := range []ids.ID{a.supportCh, a.devCh} {
+			if act != authorize.ActionThreadRead || c != a.noThreadRead {
+				out = append(out, c)
+			}
+		}
+		return authorize.Scope{ChannelIDs: out}, nil
 	case a.manager:
 		return authorize.Scope{ChannelIDs: []ids.ID{a.supportCh}}, nil
 	}
@@ -69,6 +79,22 @@ type liveSources struct {
 	runs       []runs.LiveRun
 	place      []chat.ChannelPlace
 	rates      []app.LiveRateRow
+	chats      []chat.StatsRunChat
+	chatReads  [][]ids.ID
+}
+
+// StatsRunChats returns the chats of threadIDs in channelIDs and records the thread lists asked.
+func (s *liveSources) StatsRunChats(_ context.Context, channelIDs, threadIDs []ids.ID) ([]chat.StatsRunChat, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.chatReads = append(s.chatReads, threadIDs)
+	var out []chat.StatsRunChat
+	for _, c := range s.chats {
+		if slices.Contains(channelIDs, c.ChannelID) && slices.Contains(threadIDs, c.ThreadID) {
+			out = append(out, c)
+		}
+	}
+	return out, nil
 }
 
 func (s *liveSources) LiveRuns(_ context.Context, perChannel int) ([]runs.LiveRun, error) {
@@ -189,7 +215,7 @@ func newLiveEnv(t *testing.T, cfg app.LiveConfig) *liveEnv {
 			PayloadMax: 1 << 20, Connections: true}
 	}
 	e := &liveEnv{clk: clk, az: az, src: src, ticker: newFakeTicker(), sink: &sinkRecorder{rounds: make(chan stats.LiveRound, 16)}, gauge: &gauge{}}
-	l, err := app.NewLive(cfg, app.LiveDeps{Authorizer: az, Runs: src, Places: src, Facts: src, Presence: src, Store: src, Clock: clk,
+	l, err := app.NewLive(cfg, app.LiveDeps{Authorizer: az, Runs: src, Places: src, Chats: src, Facts: src, Presence: src, Store: src, Clock: clk,
 		Ticker: e.ticker.ticker, Metrics: e.gauge})
 	if err != nil {
 		t.Fatal(err)
@@ -465,5 +491,76 @@ func TestLive_TaskTree(t *testing.T) {
 	}
 	if len(mf.Runs[0].Tasks) != 2 || mf.Runs[0].Tasks[0].Label != nil || mf.Runs[0].Tasks[1].Label != nil {
 		t.Fatalf("manager without run.read got labels: %s", mgr.Payload)
+	}
+}
+
+// TestLive_ChatNames (owner request 2026-11-01, 25 4 rule 6): the builder reads the chats of the
+// active runs once per base frame; the filter gives a run its chat (channel name, thread title,
+// deep link target) only for a receiver whose Scope of thread.read holds the channel. A run the
+// receiver sees without that right carries no chat, and its names appear nowhere in the frame.
+func TestLive_ChatNames(t *testing.T) {
+	t.Parallel()
+	e := newLiveEnv(t, app.LiveConfig{})
+	support := e.src.runs[0]
+	dev := runs.LiveRun{ID: ids.New(), ThreadID: ids.New(), AgentID: support.AgentID, ChannelID: e.az.devCh, SpaceID: e.src.place[1].SpaceID,
+		State: "queued", QueuedAt: support.QueuedAt.Add(time.Second), BillingMode: "personal"}
+	e.src.runs = append(e.src.runs, dev)
+	e.src.chats = []chat.StatsRunChat{
+		{ThreadID: support.ThreadID, ChannelID: e.az.supportCh, ChannelName: "payments-service", ThreadTitle: "Payment integration"},
+		{ThreadID: dev.ThreadID, ChannelID: e.az.devCh, ChannelName: "hidden-project", ThreadTitle: "Hidden chat"},
+	}
+	e.az.noThreadRead = e.az.devCh
+	ctx := context.Background()
+	if err := e.live.Acquire(); err != nil {
+		t.Fatal(err)
+	}
+	e.live.Tick(ctx)
+	r := testkit.Receive(t, "the round", e.sink.rounds)
+	if len(e.src.chatReads) != 1 || len(e.src.chatReads[0]) != 2 {
+		t.Fatalf("chat reads = %v, want one read of both threads", e.src.chatReads)
+	}
+	type frame struct {
+		Runs []struct {
+			RunID string `json:"run_id"`
+			Chat  *struct {
+				ThreadID    string `json:"thread_id"`
+				ChannelName string `json:"channel_name"`
+				ThreadTitle string `json:"thread_title"`
+			} `json:"chat"`
+		} `json:"runs"`
+	}
+	owner, err := r.For(ctx, e.person(e.az.owner), stats.LiveQuery{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var of frame
+	if err := json.Unmarshal(owner.Payload, &of); err != nil {
+		t.Fatal(err)
+	}
+	if len(of.Runs) != 2 {
+		t.Fatalf("owner runs %s", owner.Payload)
+	}
+	for _, run := range of.Runs {
+		switch run.RunID {
+		case support.ID.String():
+			if run.Chat == nil || run.Chat.ThreadID != support.ThreadID.String() || run.Chat.ChannelName != "payments-service" ||
+				run.Chat.ThreadTitle != "Payment integration" {
+				t.Fatalf("support chat %+v", run.Chat)
+			}
+		case dev.ID.String():
+			if run.Chat != nil {
+				t.Fatalf("dev run has chat %+v without thread.read", run.Chat)
+			}
+		}
+	}
+	if strings.Contains(string(owner.Payload), "hidden-project") || strings.Contains(string(owner.Payload), "Hidden chat") {
+		t.Fatalf("names of an unreadable chat in %s", owner.Payload)
+	}
+	mgr, err := r.For(ctx, e.person(e.az.manager), stats.LiveQuery{SpaceID: e.az.support})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(mgr.Payload), "hidden-project") || !strings.Contains(string(mgr.Payload), "payments-service") {
+		t.Fatalf("manager frame %s", mgr.Payload)
 	}
 }

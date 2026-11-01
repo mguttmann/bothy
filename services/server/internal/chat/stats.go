@@ -50,6 +50,15 @@ type StatsThread struct {
 	ThreadID, ChannelID ids.ID
 }
 
+// StatsRunChat names the chat of a thread for the run labels of the statistics views (owner request
+// 2026-11-01, docs/spec/25-visualization.md 4 rule 6): the name of its channel and its title, ""
+// for a main thread or an empty title. These are the names the sidebar shows; the stats use cases
+// pass them on only to a caller who may read the thread.
+type StatsRunChat struct {
+	ThreadID, ChannelID      ids.ID
+	ChannelName, ThreadTitle string
+}
+
 // StatsSource is the statistics port of chat (M6-05): the structure the statistics group by and
 // the thread counts. It never authorizes: the stats use cases authorize first and pass only the
 // channels the caller may read.
@@ -64,6 +73,13 @@ type StatsSource interface {
 	// StatsThreads returns the threads of channelIDs created before before, with their channel,
 	// ascending by thread.
 	StatsThreads(ctx context.Context, channelIDs []ids.ID, before time.Time) ([]StatsThread, error)
+	// StatsRunChats returns the chats of threadIDs whose channel is in channelIDs, ascending by
+	// thread; other threads and unknown IDs are left out.
+	//
+	// Example:
+	//
+	//	chats, err := src.StatsRunChats(ctx, scope.ChannelIDs, []ids.ID{run.ThreadID})
+	StatsRunChats(ctx context.Context, channelIDs, threadIDs []ids.ID) ([]StatsRunChat, error)
 	// ThreadStats returns MetricThreadsCreated and MetricThreadsDone per bucket and group. Errors:
 	// validation_failed for an unknown granularity or time zone, a database error.
 	ThreadStats(ctx context.Context, q StatsQuery) ([]StatsValue, error)

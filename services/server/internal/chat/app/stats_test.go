@@ -24,6 +24,11 @@ func (r *statsReader) StatsThreads(context.Context, []ids.ID, time.Time) ([]chat
 	return []chat.StatsThread{{}}, nil
 }
 
+func (r *statsReader) StatsRunChats(context.Context, []ids.ID, []ids.ID) ([]chat.StatsRunChat, error) {
+	r.calls++
+	return []chat.StatsRunChat{{}}, nil
+}
+
 func (r *statsReader) ThreadStats(context.Context, chat.StatsQuery) ([]chat.StatsValue, error) {
 	r.calls++
 	return []chat.StatsValue{{}}, nil
@@ -48,6 +53,12 @@ func TestStats(t *testing.T) {
 	if got, err := s.StatsThreads(ctx, nil, time.Time{}); err != nil || got != nil {
 		t.Errorf("StatsThreads(empty) = %v, %v", got, err)
 	}
+	if got, err := s.StatsRunChats(ctx, nil, one); err != nil || got != nil {
+		t.Errorf("StatsRunChats(no channel) = %v, %v", got, err)
+	}
+	if got, err := s.StatsRunChats(ctx, one, nil); err != nil || got != nil {
+		t.Errorf("StatsRunChats(no thread) = %v, %v", got, err)
+	}
 	if _, err := s.ThreadStats(ctx, chat.StatsQuery{Granularity: "year", TimeZone: "UTC"}); err == nil {
 		t.Error("ThreadStats with an unknown granularity = nil error")
 	}
@@ -60,7 +71,8 @@ func TestStats(t *testing.T) {
 	_, _ = s.StatsChannels(ctx, one)
 	_, _ = s.StatsThreads(ctx, one, time.Time{})
 	_, _ = s.ThreadStats(ctx, chat.StatsQuery{Granularity: "day", TimeZone: "UTC", ChannelIDs: one, GroupIDs: one})
-	if r.calls != 3 {
-		t.Errorf("reader calls = %d, want 3", r.calls)
+	_, _ = s.StatsRunChats(ctx, one, one)
+	if r.calls != 4 {
+		t.Errorf("reader calls = %d, want 4", r.calls)
 	}
 }

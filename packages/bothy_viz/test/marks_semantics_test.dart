@@ -38,7 +38,8 @@ void main() {
       find.bySemanticsLabel(
         // The money format puts a no-break space after the currency code.
         RegExp(
-          r'^dev-runner, Running, Tool Bash, Organization, USD\s0\.62, Estimate$',
+          r'^backend / Payment integration, dev-runner · 000401, Running, '
+          r'Tool Bash, Organization, USD\s0\.62, Estimate$',
         ),
       ),
       findsOneWidget,
@@ -49,7 +50,9 @@ void main() {
     );
     expect(find.bySemanticsLabel(RegExp(r'^Rates, ')), findsOneWidget);
     expect(
-      find.bySemanticsLabel(RegExp(r'^dev-runner, #\w+, \d+ runs?')),
+      find.bySemanticsLabel(
+        RegExp(r'^\w+ / [^,]+, dev-runner · \w{6}, \d+ runs?'),
+      ),
       findsWidgets,
     );
     expect(
@@ -113,8 +116,8 @@ void main() {
           ),
       ];
       expect(rows.toSet(), hasLength(rows.length));
-      expect(rows, contains('Metric messages, Engineering'));
-      expect(rows, contains('Metric runs, dev-runner'));
+      expect(rows, contains('Messages, Engineering'));
+      expect(rows, contains('Runs, dev-runner'));
       handle.dispose();
     },
   );

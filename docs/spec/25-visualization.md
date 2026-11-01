@@ -34,10 +34,12 @@ Rules:
 2. No values per person. No chart, no stream and no table of this level groups by people or
    names the triggering person of a run, not even with `privacy.per_person_stats_enabled`.
 3. No content: no message texts, titles, prompts, step titles or step details. Tools appear only
-   with their name (`run_steps.name`). Exception (addendum of 2026-11-01, FEAT-topology-agent-tree):
-   the label of a node of the agent tree in the live frame (5.2) is the first line of a step title;
-   the server sends it only to a receiver who holds `run.read` on the run, so it shows nothing the
-   receiver could not read in the run graph ([topology-agent-tree.md](../design/topology-agent-tree.md)).
+   with their name (`run_steps.name`). Exceptions: the chat of a run (section 4, rule 6), the
+   channel name and the thread title, which the sidebar shows the same person anyway; and
+   (addendum of 2026-11-01, FEAT-topology-agent-tree) the label of a node of the agent tree in the
+   live frame (5.2), the first line of a step title, which the server sends only to a receiver who
+   holds `run.read` on the run, so it shows nothing the receiver could not read in the run graph
+   ([topology-agent-tree.md](../design/topology-agent-tree.md)).
 4. No iframes and no WebViews with Grafana in iOS, Android, macOS and Windows (section 9).
 5. Both levels use the same colors, fonts and shapes; the values are generated from
    `design/tokens/` (section 10), never copied.
@@ -197,6 +199,16 @@ Rules:
    name the triggering person; the owner can switch off the live stream with `stats.live_enabled`
    (codetermination, [20-privacy.md](20-privacy.md), section 9).
 5. Clients contain no permission logic (15, principle 1): they show what the server delivers.
+6. Run labels (owner request of 2026-11-01, R-VZ-15). A run of the live frame and of the timeline
+   carries its chat (`StatsRunChat`: `thread_id`, `channel_name`, `thread_title` except for a main
+   thread) only when the receiver may read the thread (`thread.read`, the rule by which the
+   sidebar lists threads); the server decides per receiver, for the stream and for every endpoint.
+   Without it the run has no name and no link. Every view labels a run with the shared run label
+   of `bothy_viz` (`VizRunLabel`): project (the channel or forum name) and chat (the thread title)
+   as the main text, shortened with the full text on hover and long press, the agent and the short
+   ID only as secondary text; a click or tap on a card, a timeline row or the chat cell of a table
+   opens the chat. Dimension codes and metric names never appear raw: `VizTexts` translates every
+   code of the closed lists of 3.2 and every metric name of the query responses through `l10n`.
 
 ## 5. Live stream `stats.live`
 
@@ -246,7 +258,7 @@ Schema in [openapi.yaml](../api/openapi.yaml) (`StatsLiveFrame`); English accord
 | `at` | time of the frame (server clock) |
 | `interval_ms` | `stats.live_interval` |
 | `scope` | `instance`, or `space` with `space_id` |
-| `runs` | active runs (`queued`, `running`, `waiting_input`) in visible channels, at most `stats.live_max_runs`, newest first; per run: `run_id`, `thread_id`, `channel_id`, `space_id`, `agent_id`, `state`, `queued_at`, `started_at`, `billing_mode` (reported mode, otherwise configured mode), current step (`kind`, `name`), `approval_pending`, cost so far (`cost_micros`, `currency`, `cost_is_estimate`; only with `cost.read.aggregate`), the agent tree `tasks` and `tasks_truncated` (below) |
+| `runs` | active runs (`queued`, `running`, `waiting_input`) in visible channels, at most `stats.live_max_runs`, newest first; per run: `run_id`, `thread_id`, `channel_id`, `space_id`, `agent_id`, `state`, `queued_at`, `started_at`, `billing_mode` (reported mode, otherwise configured mode), current step (`kind`, `name`), `approval_pending`, cost so far (`cost_micros`, `currency`, `cost_is_estimate`; only with `cost.read.aggregate`), the agent tree `tasks` and `tasks_truncated` (below), the chat of the run (`chat`; only when the receiver may read the thread, section 4 rule 6) |
 | `runs_truncated` | `true` if more runs are active than `stats.live_max_runs` |
 | `agents` | per agent with a run or an operator role in visible channels: `agent_id`, presence (`online`, `degraded`, `offline`), `billing_mode` (configured mode), `reported_billing_mode` (reported mode, missing for adapters that follow per run), `rate_limit` with `state` and `resets_at` (09, section 4.8) |
 | `rates` | per metric from 3.2 without `sli.*`: sum of the last full minute and of the current minute up to `at`, in visible channels; costs only with `cost.read.aggregate` |
@@ -277,12 +289,13 @@ Every view has a table view with the same data as an alternative for screen read
 
 ### 6.1 Live topology
 
-Shows the channels with running agents in lanes per space. A run is a card with agent, state
-(color and icon like the live box, [components.md](../design/components.md) section 2), current
-tool as a tool chip, badge of the backend policy, costs (mode `organization` as "Estimate", mode
-`personal` as "information only", addendum of 2026-11-01, FIX-cost-display) and a note
-"Approval waiting" when an approval card is open. A click on a card opens the thread via deep link
-(console: "Open in the app"). Data: `stats.live`.
+Shows the channels with running agents in lanes per space. A run is a card with its run label
+(project and chat, agent and short ID, section 4 rule 6), state (color and icon like the live
+box, [components.md](../design/components.md) section 2), current tool as a tool chip, badge of
+the backend policy, costs (mode `organization` as "Estimate", mode `personal` as "information
+only", addendum of 2026-11-01, FIX-cost-display) and a note "Approval waiting" when an approval
+card is open. A click on a card whose chat the server named opens the thread via deep link
+(console: "Open in the app"); a card without a chat is no button. Data: `stats.live`.
 
 Below each card its agent tree (addendum of 2026-11-01, FEAT-topology-agent-tree): the nodes of
 `tasks` as small cards under the run, indented by level with elbow lines from parent to child, each
@@ -378,8 +391,9 @@ Burn-rate alerts stay in Prometheus (17, section 6); the traffic light does not 
 ### 6.5 Replayable daily timeline
 
 Replays a selected period of up to `stats.timeline_max_range` with minute precision: rates from
-`stats_minutes` as areas, above them the runs as bars per channel and agent (start, end,
-final state). Controls: play, pause, jump, speed from `viz.timeline_speeds`. Data:
+`stats_minutes` as areas, above them the runs as bars per chat and agent (start, end, final
+state), each row labelled by the run label and opening its chat (section 4 rule 6); runs without
+a chat form one row per channel and agent without a name and without a link. Controls: play, pause, jump, speed from `viz.timeline_speeds`. Data:
 `getStatsTimeline`; the client loads once and plays locally. Limits: at most
 `stats.timeline_max_runs` runs (`runs_truncated`), period within `retention.stats_minutes`;
 day boundaries according to `stats.time_zone`
@@ -786,6 +800,7 @@ auth proxy is [grafana-embedding.md](../operations/grafana-embedding.md).
 | R-VZ-12 | No iframes or WebViews with Grafana in apps; embedding in the console optional, off by default, with an auth proxy, `frame-ancestors`, COEP/CORP and `frame-src` of exactly this origin. | Grafana's clickjacking protection falls away with `allow_embedding`; the console is cross-origin isolated. |
 | R-VZ-13 | Tokens for the plugin as a further output of `tools/design-tokens`. | Same design language without a copy (ADR 0030). |
 | R-VZ-14 | The run graph and the control room are drawn by `bothy_viz` but are not views of level a; they follow `run.read` and `run.overview.read` instead of `stats.read` (addendum of 2026-10-24). | One design language and one package for drawing; the statistics rules (no content, no names) stay unchanged for the statistics views. |
+| R-VZ-15 | Runs carry their chat (channel name, thread title, thread) for a receiver who may read the thread; every view labels runs with one shared run label and translates every dimension code through `l10n` (owner request of 2026-11-01, [FIX-topology-session-names](../decisions.d/FIX-topology-session-names.md)). | Agent and short ID alone did not tell anyone which project and chat a run belongs to; the names are those the sidebar already shows the same person. |
 
 ## 15. Configuration values of this chapter
 

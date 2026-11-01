@@ -22,7 +22,12 @@
       "approval_pending": false,
       "cost_micros": 620000,
       "currency": "USD",
-      "cost_is_estimate": true
+      "cost_is_estimate": true,
+      "chat": {
+        "thread_id": "0192f4a0-7b1c-7000-8a00-000000000301",
+        "channel_name": "backend",
+        "thread_title": "Payment integration"
+      }
     },
     {
       "run_id": "0192f4a0-7b1c-7000-8a00-000000000402",
@@ -41,7 +46,12 @@
       "approval_pending": true,
       "cost_micros": 120000,
       "currency": "USD",
-      "cost_is_estimate": false
+      "cost_is_estimate": false,
+      "chat": {
+        "thread_id": "0192f4a0-7b1c-7000-8a00-000000000302",
+        "channel_name": "release",
+        "thread_title": "Release notes 2.4"
+      }
     },
     {
       "run_id": "0192f4a0-7b1c-7000-8a00-000000000403",
@@ -55,7 +65,12 @@
       "approval_pending": false,
       "cost_micros": 50000,
       "currency": "USD",
-      "cost_is_estimate": true
+      "cost_is_estimate": true,
+      "chat": {
+        "thread_id": "0192f4a0-7b1c-7000-8a00-000000000303",
+        "channel_name": "tickets",
+        "thread_title": "Login fails after update"
+      }
     },
     {
       "run_id": "0192f4a0-7b1c-7000-8a00-000000000404",

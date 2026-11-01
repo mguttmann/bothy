@@ -82,6 +82,12 @@ type LiveStore interface {
 	LiveSLI(ctx context.Context, from, to time.Time) ([]domain.SLICell, error)
 }
 
+// RunChats is the part of chat.StatsSource that names the chats of runs (owner request 2026-11-01).
+type RunChats interface {
+	// StatsRunChats returns the chats of threadIDs whose channel is in channelIDs.
+	StatsRunChats(ctx context.Context, channelIDs, threadIDs []ids.ID) ([]chat.StatsRunChat, error)
+}
+
 // LiveMetrics records bothy.stats.live.subscribers (signals.md 4.3b).
 type LiveMetrics interface {
 	// Subscribers adds delta (+1 or -1) to the subscriptions of the node.
@@ -112,6 +118,8 @@ type LiveDeps struct {
 	Runs runs.LiveSource
 	// Places are the spaces and operators of the channels (chat.ChannelPlaces).
 	Places chat.ChannelPlaces
+	// Chats name the chats of the active runs (chat.StatsSource.StatsRunChats); nil names none.
+	Chats RunChats
 	// Facts give the configured billing mode of agents; Presence their presence and reported mode.
 	Facts    agents.Facts
 	Presence agents.Presence
@@ -423,6 +431,9 @@ func (l *Live) build(ctx context.Context) (*domain.BaseFrame, error) {
 		base.Runs = append(base.Runs, l.liveRun(r, at))
 		want[r.AgentID] = struct{}{}
 	}
+	if err := l.nameRuns(ctx, base); err != nil {
+		return nil, err
+	}
 	base.ChannelRates, base.InstanceRates = rateCells(rows, current)
 	if base.Agents, err = l.agentStates(ctx, want); err != nil {
 		return nil, err
@@ -436,6 +447,37 @@ func (l *Live) build(ctx context.Context) (*domain.BaseFrame, error) {
 	l.builds++
 	l.mu.Unlock()
 	return base, nil
+}
+
+// nameRuns sets the channel name and thread title of every run of base from the chats source, in
+// one read for all runs; the filter sends them only to receivers who may read the thread.
+func (l *Live) nameRuns(ctx context.Context, base *domain.BaseFrame) error {
+	if l.d.Chats == nil || len(base.Runs) == 0 {
+		return nil
+	}
+	channels := make([]ids.ID, 0, len(base.Channels))
+	for ch := range base.Channels {
+		channels = append(channels, ch)
+	}
+	threads := make([]ids.ID, len(base.Runs))
+	for i, r := range base.Runs {
+		threads[i] = r.ThreadID
+	}
+	chats, err := l.d.Chats.StatsRunChats(ctx, channels, threads)
+	if err != nil {
+		return err
+	}
+	byThread := make(map[ids.ID]chat.StatsRunChat, len(chats))
+	for _, c := range chats {
+		byThread[c.ThreadID] = c
+	}
+	for i, r := range base.Runs {
+		// A chat names the run only while its thread is still in the run's channel.
+		if c, ok := byThread[r.ThreadID]; ok && c.ChannelID == r.ChannelID {
+			base.Runs[i].ChannelName, base.Runs[i].ThreadTitle = c.ChannelName, c.ThreadTitle
+		}
+	}
+	return nil
 }
 
 // liveRun converts a run of the source with its agent tree at the build time at.
@@ -556,11 +598,16 @@ func (r liveRound) At() time.Time { return r.base.At }
 
 // For implements stats.LiveRound (M6-15 design note 4): Scope of channel.read for the visible
 // channels, Scope of run.read for the channels whose task labels the receiver gets (only when a
-// run of the frame has a labelled task node, docs/design/topology-agent-tree.md 5) and
+// run of the frame has a labelled task node, docs/design/topology-agent-tree.md 5), Scope of
+// thread.read for the channels whose chats may be named (25 4 rule 6) and
 // cost.read.aggregate on the target, all in the mode of ctx, then the filter and the size cut of
 // the domain.
 func (r liveRound) For(ctx context.Context, a actor.Actor, q stats.LiveQuery) (stats.LiveFrame, error) {
 	sc, err := r.l.d.Authorizer.Scope(ctx, a, authorize.ActionChannelRead)
+	if err != nil {
+		return stats.LiveFrame{}, err
+	}
+	named, err := namedChannels(ctx, r.l.d.Authorizer, a)
 	if err != nil {
 		return stats.LiveFrame{}, err
 	}
@@ -577,7 +624,8 @@ func (r liveRound) For(ctx context.Context, a actor.Actor, q stats.LiveQuery) (s
 		}
 		readable = channelSet(rs.ChannelIDs)
 	}
-	b, _, err := domain.FilterLive(r.base, domain.Receiver{SpaceID: q.SpaceID, Visible: visible, Readable: readable, Costs: d.Allowed()},
+	b, _, err := domain.FilterLive(r.base, domain.Receiver{SpaceID: q.SpaceID, Visible: visible, Readable: readable, Costs: d.Allowed(),
+		Named: named},
 		domain.LiveLimits{MaxRuns: r.l.cfg.MaxRuns, PayloadMax: r.l.cfg.PayloadMax, Interval: r.l.cfg.Interval})
 	if err != nil {
 		return stats.LiveFrame{}, errs.Wrap(errs.CodeInternalError, err, "stats: the live frame cannot be filtered")
@@ -604,4 +652,14 @@ func channelSet(list []ids.ID) map[ids.ID]struct{} {
 		out[id] = struct{}{}
 	}
 	return out
+}
+
+// namedChannels returns the channels whose threads a may read (Scope of thread.read, the rule the
+// sidebar lists threads by): only runs there carry the names of their chat (25 4 rule 6).
+func namedChannels(ctx context.Context, az authorize.Authorizer, a actor.Actor) (map[ids.ID]struct{}, error) {
+	sc, err := az.Scope(ctx, a, authorize.ActionThreadRead)
+	if err != nil {
+		return nil, err
+	}
+	return channelSet(sc.ChannelIDs), nil
 }
