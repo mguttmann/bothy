@@ -373,7 +373,7 @@
   "github.com/OWNER/bothy/services/server/internal/wire#TestGatewayTokenExpiry": 45.47,
   "github.com/OWNER/bothy/services/server/internal/wire#TestGatewayWorldTokenOutlivesTheRun": 6.06,
   "github.com/OWNER/bothy/services/server/internal/wire#TestGateway_OperatorNewChannelWhileCatchingUp": 221.62,
-  "github.com/OWNER/bothy/services/server/internal/wire#TestGateway_SpaceDefaultOperatorGetsNewChannelLive": 188.78,
+  "github.com/OWNER/bothy/services/server/internal/wire#TestGateway_SpaceDefaultOperatorGetsNewChannelLive": 4.88,
   "github.com/OWNER/bothy/services/server/internal/wire#TestGateway_TokenRevokeRacingAMessageCommit": 13.11,
   "github.com/OWNER/bothy/services/server/internal/wire#TestGateway_TokenRevokedDuringCatchUpCloses4012": 61.16,
   "github.com/OWNER/bothy/services/server/internal/wire#TestGateway_TypingEndToEnd": 16.14,
