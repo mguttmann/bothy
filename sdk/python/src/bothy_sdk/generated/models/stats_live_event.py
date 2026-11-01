@@ -33,7 +33,9 @@ class StatsLiveEvent:
         scope (EventScope): Location of the event. Members are absent where not applicable.
         resource (EventResource):
         type_ (StatsLiveEventType):
-        payload (StatsLiveFrame): Live frame (docs/spec/25-visualization.md, section 5.2). No person values, no content.
+        payload (StatsLiveFrame): Live frame (docs/spec/25-visualization.md, section 5.2). No person values and no
+            content; the only names are the channel name and thread title of a run in `chat`, for a caller who may read the
+            thread.
         seq (int | Unset): Global commit-ordered sequence; absent for ephemeral events.
         actor (EventActor | Unset):
         audience (EventEnvelopeAudience | Unset):

@@ -18,6 +18,17 @@ FROM threads t
 WHERE t.channel_id = ANY (sqlc.arg(channel_ids)::uuid[]) AND t.created_at < sqlc.arg(before_at)
 ORDER BY t.id;
 
+-- name: StatsRunChats :many
+-- The chats of the threads of runs in the channel set: the channel name and the thread title the
+-- sidebar shows (run labels of the live topology and the timeline, 25 4 rule 6); the main thread
+-- has no title of its own. The stats use cases pass the names only to a caller who may read the
+-- thread.
+SELECT t.id, t.channel_id, c.name AS channel_name, (CASE WHEN t.kind = 'main' THEN '' ELSE t.title END)::text AS thread_title
+FROM threads t
+JOIN channels c ON c.id = t.channel_id
+WHERE t.channel_id = ANY (sqlc.arg(channel_ids)::uuid[]) AND t.id = ANY (sqlc.arg(thread_ids)::uuid[])
+ORDER BY t.id;
+
 -- name: ThreadStats :many
 -- threads_created (threads of kind thread by created_at) and threads_done (threads still closed, by
 -- closed_at) per bucket and group; group_ids is parallel to channel_ids. date_trunc with a time

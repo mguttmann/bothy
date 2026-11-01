@@ -9,19 +9,22 @@ import '../view_texts.dart';
 import 'delivery_table.dart';
 import 'viz_table.dart';
 
-/// The timeline at the playhead: one row per run bar (row, start, end, state) and the series
-/// with their value at the playhead, the same the legend of the area shows.
+/// The timeline at the playhead: one row per run bar (chat, run, start, end, state) and the
+/// series with their value at the playhead, the same the legend of the area shows. The chat of a
+/// row the server named opens it through [onOpenThread].
 List<VizTableData> timelineTables(
   VizTexts texts,
   TimelineModel model, {
   required DateTime now,
   required String timeZone,
+  void Function(String threadId)? onOpenThread,
 }) {
   final l10n = texts.l10n;
   return [
     VizTableData(
       caption: l10n.vizChartRuns,
       columns: [
+        l10n.vizColChat,
         l10n.vizColRun,
         l10n.vizColStart,
         l10n.vizColEnd,
@@ -31,7 +34,13 @@ List<VizTableData> timelineTables(
         for (final row in model.bars.rows)
           for (final s in row.segments)
             [
-              VizCell(row.label),
+              if (row.run case final run?) ...[
+                vizChatCell(texts, run, onOpenThread),
+                VizCell(texts.runDetail(run)),
+              ] else ...[
+                VizCell(row.label),
+                VizCell(l10n.vizNone),
+              ],
               VizCell(
                 vizDayTime(texts, s.start, now, timeZone),
                 sortBy: s.start.millisecondsSinceEpoch,

@@ -16273,6 +16273,10 @@ paths:
                       cost_micros: 420000
                       currency: USD
                       cost_is_estimate: true
+                      chat:
+                        thread_id: 0192f4a0-7b1c-7000-8a00-000000000301
+                        channel_name: backend
+                        thread_title: Payment integration
                     runs_truncated: false
                     agents:
                     - agent_id: 0192f4a0-7b1c-7000-8a00-000000000401
@@ -16376,6 +16380,10 @@ paths:
                       started_at: '2026-10-10T09:29:11.000Z'
                       finished_at: '2026-10-10T09:30:35.000Z'
                       state: completed
+                      chat:
+                        thread_id: 0192f4a0-7b1c-7000-8a00-000000000301
+                        channel_name: backend
+                        thread_title: Payment integration
                     runs_truncated: false
         '400':
           $ref: '#/components/responses/BadRequest'
@@ -29534,6 +29542,8 @@ components:
         tasks_truncated:
           type: boolean
           description: Present and true when a limit or the payload bound left task nodes of this run out.
+        chat:
+          $ref: '#/components/schemas/StatsRunChat'
     StatsLiveTask:
       type: object
       description: One child node of an active run in the live topology (25 5.2). Never content except `label`, which only a receiver with `run.read` on the run gets.
@@ -29568,6 +29578,23 @@ components:
           maxLength: 80
           description: First line of the step title; only with `run.read` on the run.
           examples: ['review']
+    StatsRunChat:
+      type: object
+      additionalProperties: false
+      description: |-
+        The chat a run belongs to, as the sidebar names it: the name of its channel (the project) and the title of its thread. Present only when the caller may read the thread (`thread.read`, the same rule as the sidebar); absent otherwise, and then a client shows neither a name nor a link (docs/spec/25-visualization.md, section 4, rule 6).
+      required: [thread_id, channel_name]
+      properties:
+        thread_id:
+          $ref: '#/components/schemas/Uuid'
+          description: Target of the deep link that opens the chat.
+        channel_name:
+          type: string
+          examples: [backend]
+        thread_title:
+          type: string
+          description: Title of the thread; absent for the main thread of a channel and for an empty title.
+          examples: [Payment integration]
     StatsLiveAgent:
       type: object
       required: [agent_id, presence, billing_mode]
@@ -29635,7 +29662,7 @@ components:
           type: integer
     StatsLiveFrame:
       type: object
-      description: Live frame (docs/spec/25-visualization.md, section 5.2). No person values, no content.
+      description: Live frame (docs/spec/25-visualization.md, section 5.2). No person values and no content; the only names are the channel name and thread title of a run in `chat`, for a caller who may read the thread.
       required: [at, interval_ms, scope, runs, runs_truncated, agents, rates]
       properties:
         at:
@@ -29711,6 +29738,8 @@ components:
           $ref: '#/components/schemas/Timestamp'
         state:
           $ref: '#/components/schemas/RunState'
+        chat:
+          $ref: '#/components/schemas/StatsRunChat'
     StatsTimeline:
       type: object
       required: [from, to, buckets, runs, runs_truncated]

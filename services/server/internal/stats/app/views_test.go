@@ -36,6 +36,21 @@ func (c viewsChat) StatsThreads(_ context.Context, chans []ids.ID, _ time.Time) 
 	return out, nil
 }
 
+// StatsRunChats names every thread of the map "chat of <channel>" in channel "project of <channel>",
+// within channelIDs only.
+func (c viewsChat) StatsRunChats(_ context.Context, channelIDs, threadIDs []ids.ID) ([]chat.StatsRunChat, error) {
+	var out []chat.StatsRunChat
+	for _, ch := range channelIDs {
+		for _, th := range c.threads[ch] {
+			if slices.Contains(threadIDs, th) {
+				out = append(out, chat.StatsRunChat{ThreadID: th, ChannelID: ch, ChannelName: "project of " + ch.String(),
+					ThreadTitle: "chat of " + ch.String()})
+			}
+		}
+	}
+	return out, nil
+}
+
 // viewsFakes are the outgoing ports of the views: the rows and sums of stats_minutes, the SLI
 // sums, the runs, the agents and the channel places, with the queries they received.
 type viewsFakes struct {
@@ -206,6 +221,36 @@ func TestTimeline_Owner(t *testing.T) {
 	tl, err := w.views.Timeline(statsCtx(), stats.TimelineQuery{From: viewsFrom, To: viewsFrom.Add(time.Hour)})
 	if err != nil || !w.fakes.rowsQuery.WithInstance || len(tl.Buckets) != 1 || tl.RunsTruncated || tl.Runs == nil {
 		t.Fatalf("%+v %v query %+v", tl, err, w.fakes.rowsQuery)
+	}
+}
+
+// TestTimeline_ChatNames (owner request 2026-11-01, 25 4 rule 6): a run carries the chat of its
+// thread (channel name, thread title, deep link target) only when the caller may read the thread
+// (Scope of thread.read); a run of a channel outside that scope comes without any name.
+func TestTimeline_ChatNames(t *testing.T) {
+	t.Parallel()
+	w := newViewsWorld(t, app.ViewsConfig{TimelineMaxRange: 24 * time.Hour, TimelineMaxRuns: 10, SLOWarnBudgetRatio: 0.25,
+		SLOMinEvents: 100, Retention: 90 * 24 * time.Hour}, 2)
+	named, hidden := w.visible[0], w.visible[1]
+	w.az.threadScope = &authorize.Scope{ChannelIDs: []ids.ID{named}}
+	agent := ids.New()
+	w.fakes.runs = []runs.TimelineRun{
+		{ID: ids.New(), ThreadID: w.thread[named], AgentID: agent, State: "completed", QueuedAt: viewsFrom},
+		{ID: ids.New(), ThreadID: w.thread[hidden], AgentID: agent, State: "completed", QueuedAt: viewsFrom.Add(time.Minute)},
+	}
+	tl, err := w.views.Timeline(statsCtx(), stats.TimelineQuery{From: viewsFrom, To: viewsFrom.Add(time.Hour), SpaceID: w.space})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(tl.Runs) != 2 {
+		t.Fatalf("runs %+v", tl.Runs)
+	}
+	c := tl.Runs[0].Chat
+	if c == nil || c.ThreadID != w.thread[named] || c.ChannelName != "project of "+named.String() || c.ThreadTitle != "chat of "+named.String() {
+		t.Fatalf("chat of the readable thread %+v", c)
+	}
+	if tl.Runs[1].Chat != nil {
+		t.Fatalf("chat of an unreadable thread %+v", tl.Runs[1].Chat)
 	}
 }
 

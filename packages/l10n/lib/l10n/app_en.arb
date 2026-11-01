@@ -1878,9 +1878,143 @@
   "@vizOwnMeasurementNote": {
     "description": "Note under the SLO traffic lights (25 section 6.4)."
   },
-  "vizColRun": "Agent and channel",
+  "vizColRun": "Run",
   "@vizColRun": {
-    "description": "Column header: row of a run bar of the timeline."
+    "description": "Column header: the run of a row (operator and short ID) in the tables of the live topology and the timeline."
+  },
+  "vizColChat": "Chat",
+  "@vizColChat": {
+    "description": "Column header: the chat of a run (project and chat title) in the tables of the live topology and the timeline."
+  },
+  "vizRunTitle": "{project} / {chat}",
+  "@vizRunTitle": {
+    "description": "Main text of a run label: the project (channel or forum name) and the chat (thread title) of the run, as the sidebar names them (25 4 rule 6).",
+    "placeholders": {
+      "project": {
+        "type": "String",
+        "example": "payments-service"
+      },
+      "chat": {
+        "type": "String",
+        "example": "Payment integration"
+      }
+    }
+  },
+  "vizRunDetail": "{agent} · {id}",
+  "@vizRunDetail": {
+    "description": "Secondary text of a run label: the agent and the short ID of the run or chat.",
+    "placeholders": {
+      "agent": {
+        "type": "String",
+        "example": "dev-runner"
+      },
+      "id": {
+        "type": "String",
+        "example": "c29a71"
+      }
+    }
+  },
+  "vizRunOpenChat": "Open chat",
+  "@vizRunOpenChat": {
+    "description": "Semantics hint of a run card or a timeline row whose chat the person may open."
+  },
+  "vizDimHuman": "Human",
+  "@vizDimHuman": {
+    "description": "Dimension of messages_created: written by a person."
+  },
+  "vizDimAgent": "Agent",
+  "@vizDimAgent": {
+    "description": "Dimension of messages_created: written by an agent."
+  },
+  "vizDimApp": "App",
+  "@vizDimApp": {
+    "description": "Dimension of messages_created: written by an app."
+  },
+  "vizDimImport": "Import",
+  "@vizDimImport": {
+    "description": "Dimension of messages_created: taken over by an import."
+  },
+  "vizDimCompleted": "Completed",
+  "@vizDimCompleted": {
+    "description": "Dimension of runs_finished and tool_calls: ended successfully."
+  },
+  "vizDimFailed": "Failed",
+  "@vizDimFailed": {
+    "description": "Dimension of runs_finished and tool_calls: ended with an error."
+  },
+  "vizDimCancelled": "Cancelled",
+  "@vizDimCancelled": {
+    "description": "Dimension of runs_finished: stopped before the end."
+  },
+  "vizDimRequested": "Requested",
+  "@vizDimRequested": {
+    "description": "Dimension of approval_cards: a decision was requested."
+  },
+  "vizDimApproved": "Approved",
+  "@vizDimApproved": {
+    "description": "Dimension of approval_cards: approved."
+  },
+  "vizDimDenied": "Denied",
+  "@vizDimDenied": {
+    "description": "Dimension of approval_cards: denied."
+  },
+  "vizDimExpired": "Expired",
+  "@vizDimExpired": {
+    "description": "Dimension of approval_cards: no decision in time."
+  },
+  "vizDimI2Denied": "Refused before delivery (I2)",
+  "@vizDimI2Denied": {
+    "description": "Dimension of invocations_denied: the personal mode of the agent refused the trigger (I2)."
+  },
+  "vizDimBillingModeMismatch": "Billing mode mismatch",
+  "@vizDimBillingModeMismatch": {
+    "description": "Dimension of invocations_denied: the run failed because the reported billing mode differed (I3)."
+  },
+  "vizDimEpochChanged": "Epoch changed",
+  "@vizDimEpochChanged": {
+    "description": "Dimension of resyncs: the time line of the event log changed."
+  },
+  "vizDimRetention": "Cursor too old",
+  "@vizDimRetention": {
+    "description": "Dimension of resyncs: the cursor lies before the retained events."
+  },
+  "vizDimTooFarBehind": "Too far behind",
+  "@vizDimTooFarBehind": {
+    "description": "Dimension of resyncs: the client is too many events behind."
+  },
+  "vizDimCursorAhead": "Cursor ahead",
+  "@vizDimCursorAhead": {
+    "description": "Dimension of resyncs: the cursor lies after the newest event."
+  },
+  "vizDimApns": "APNs",
+  "@vizDimApns": {
+    "description": "Dimension of sli.push_acceptance: the push provider of Apple (a product name)."
+  },
+  "vizDimFcm": "FCM",
+  "@vizDimFcm": {
+    "description": "Dimension of sli.push_acceptance: the push provider of Google (a product name)."
+  },
+  "vizDimUnifiedPush": "UnifiedPush",
+  "@vizDimUnifiedPush": {
+    "description": "Dimension of sli.push_acceptance: the open push provider (a product name)."
+  },
+  "vizDimWns": "WNS",
+  "@vizDimWns": {
+    "description": "Dimension of sli.push_acceptance: the push provider of Windows (a product name)."
+  },
+  "vizMetricWithDimension": "{metric}, {dimension}",
+  "@vizMetricWithDimension": {
+    "description": "Label of a rate or series of one dimension of a metric, for example \"Tool calls, Failed\".",
+    "placeholders": {
+      "metric": {
+        "type": "String",
+        "example": "Tool calls"
+      },
+      "dimension": {
+        "type": "String",
+        "example": "Failed"
+      }
+    }
   },
   "vizColStart": "Start",
   "@vizColStart": {

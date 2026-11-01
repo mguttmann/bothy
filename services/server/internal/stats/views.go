@@ -41,6 +41,16 @@ type TimelineRun struct {
 	// QueuedAt is never zero; StartedAt and FinishedAt are zero until the run starts or ends.
 	QueuedAt, StartedAt, FinishedAt time.Time
 	State                           string
+	// Chat names the chat of the run; nil when the caller may not read its thread (schema
+	// StatsRunChat, 25 4 rule 6).
+	Chat *RunChat
+}
+
+// RunChat is the chat of a run as the sidebar names it (schema StatsRunChat): the thread, the name
+// of its channel and its title ("" for a main thread or an empty title).
+type RunChat struct {
+	ThreadID                 ids.ID
+	ChannelName, ThreadTitle string
 }
 
 // Timeline is the result of getStatsTimeline (schema StatsTimeline): the rows ordered by start,

@@ -7,6 +7,7 @@ import 'package:built_collection/built_collection.dart';
 import 'package:api_client/src/generated/model/stats_live_step.dart';
 import 'package:api_client/src/generated/model/stats_live_task.dart';
 import 'package:api_client/src/generated/model/billing_mode.dart';
+import 'package:api_client/src/generated/model/stats_run_chat.dart';
 import 'package:built_value/built_value.dart';
 import 'package:built_value/serializer.dart';
 
@@ -31,6 +32,7 @@ part 'stats_live_run.g.dart';
 /// * [costIsEstimate]
 /// * [tasks] - Child nodes of the run (subagents, workflows and their agents, background jobs) in step order, a parent before its children; at most `stats.live_max_tasks`, no deeper than `stats.live_task_max_depth`, finished ones only for `stats.live_task_keep` after their end. Absent when the run has none (25 5.2).
 /// * [tasksTruncated] - Present and true when a limit or the payload bound left task nodes of this run out.
+/// * [chat]
 @BuiltValue()
 abstract class StatsLiveRun
     implements Built<StatsLiveRun, StatsLiveRunBuilder> {
@@ -95,6 +97,9 @@ abstract class StatsLiveRun
   /// Present and true when a limit or the payload bound left task nodes of this run out.
   @BuiltValueField(wireName: r'tasks_truncated')
   bool? get tasksTruncated;
+
+  @BuiltValueField(wireName: r'chat')
+  StatsRunChat? get chat;
 
   StatsLiveRun._();
 
@@ -211,6 +216,13 @@ class _$StatsLiveRunSerializer implements PrimitiveSerializer<StatsLiveRun> {
       yield serializers.serialize(
         object.tasksTruncated,
         specifiedType: const FullType(bool),
+      );
+    }
+    if (object.chat != null) {
+      yield r'chat';
+      yield serializers.serialize(
+        object.chat,
+        specifiedType: const FullType(StatsRunChat),
       );
     }
   }
@@ -360,6 +372,14 @@ class _$StatsLiveRunSerializer implements PrimitiveSerializer<StatsLiveRun> {
           ) as bool?;
           if (valueDes == null) continue;
           result.tasksTruncated = valueDes;
+          break;
+        case r'chat':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(StatsRunChat),
+          ) as StatsRunChat?;
+          if (valueDes == null) continue;
+          result.chat.replace(valueDes);
           break;
         default:
           unhandled.add(key);

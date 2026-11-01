@@ -98,6 +98,17 @@ void main() {
     },
   );
 
+  testWidgets('a push provider shows its product name, never its code', (
+    tester,
+  ) async {
+    // Owner request 2026-11-01: no raw enum value in a metric label.
+    await _pump(tester, _repository());
+    await _table(tester, 'errors');
+    final cells = _cells(tester, 'errors');
+    expect(cells, contains('Disabled push registrations (APNs)'));
+    expect(cells.where((c) => c.contains('(apns)')), isEmpty);
+  });
+
   testWidgets('withheld active people read "fewer than"', (tester) async {
     await _pump(tester, _repository());
     await _table(tester, 'usage');

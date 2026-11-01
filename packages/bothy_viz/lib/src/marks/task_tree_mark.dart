@@ -506,7 +506,8 @@ class RunCardTreeMark extends StatelessWidget {
   /// The card and its tree.
   final RunCardModel model;
 
-  /// Called with [RunCardModel.threadId] on a tap on the card or a node.
+  /// Called with the thread of [RunCardModel.label] on a tap on the card or a node; a run
+  /// whose chat the server did not name opens nothing (25 4 rule 6).
   final RunTapCallback? onTap;
 
   @override
@@ -521,9 +522,9 @@ class RunCardTreeMark extends StatelessWidget {
         TaskTreeMark(
           key: ValueKey('taskTree.run.${model.runId}'),
           tasks: model.tasks,
-          threadId: model.threadId,
+          threadId: model.label.threadId ?? model.threadId,
           truncated: model.tasksTruncated,
-          onTap: onTap,
+          onTap: model.label.threadId == null ? null : onTap,
         ),
       ],
     );

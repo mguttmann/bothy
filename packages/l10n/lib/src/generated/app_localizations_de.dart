@@ -1320,7 +1320,91 @@ class AppLocalizationsDe extends AppLocalizations {
       'Werte können von Prometheus abweichen: die eigene Messung zählt im Prozess und kann bei einem Absturz ein Schreibintervall verlieren.';
 
   @override
-  String get vizColRun => 'Agent und Kanal';
+  String get vizColRun => 'Lauf';
+
+  @override
+  String get vizColChat => 'Chat';
+
+  @override
+  String vizRunTitle(String project, String chat) {
+    return '$project / $chat';
+  }
+
+  @override
+  String vizRunDetail(String agent, String id) {
+    return '$agent · $id';
+  }
+
+  @override
+  String get vizRunOpenChat => 'Chat öffnen';
+
+  @override
+  String get vizDimHuman => 'Mensch';
+
+  @override
+  String get vizDimAgent => 'Agent';
+
+  @override
+  String get vizDimApp => 'App';
+
+  @override
+  String get vizDimImport => 'Import';
+
+  @override
+  String get vizDimCompleted => 'abgeschlossen';
+
+  @override
+  String get vizDimFailed => 'fehlgeschlagen';
+
+  @override
+  String get vizDimCancelled => 'abgebrochen';
+
+  @override
+  String get vizDimRequested => 'angefragt';
+
+  @override
+  String get vizDimApproved => 'genehmigt';
+
+  @override
+  String get vizDimDenied => 'abgelehnt';
+
+  @override
+  String get vizDimExpired => 'abgelaufen';
+
+  @override
+  String get vizDimI2Denied => 'vor der Zustellung abgewiesen (I2)';
+
+  @override
+  String get vizDimBillingModeMismatch => 'Abrechnungsmodus passt nicht';
+
+  @override
+  String get vizDimEpochChanged => 'Epoche gewechselt';
+
+  @override
+  String get vizDimRetention => 'Cursor zu alt';
+
+  @override
+  String get vizDimTooFarBehind => 'zu weit zurück';
+
+  @override
+  String get vizDimCursorAhead => 'Cursor voraus';
+
+  @override
+  String get vizDimApns => 'APNs';
+
+  @override
+  String get vizDimFcm => 'FCM';
+
+  @override
+  String get vizDimUnifiedPush => 'UnifiedPush';
+
+  @override
+  String get vizDimWns => 'WNS';
+
+  @override
+  String vizMetricWithDimension(String metric, String dimension) {
+    return '$metric, $dimension';
+  }
 
   @override
   String get vizColStart => 'Beginn';

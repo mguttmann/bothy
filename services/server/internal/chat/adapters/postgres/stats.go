@@ -43,6 +43,21 @@ func (r *Repository) StatsThreads(ctx context.Context, channelIDs []ids.ID, befo
 	return out, nil
 }
 
+// StatsRunChats implements app.StatsReader with the statement StatsRunChats (owner request
+// 2026-11-01).
+func (r *Repository) StatsRunChats(ctx context.Context, channelIDs, threadIDs []ids.ID) ([]chat.StatsRunChat, error) {
+	rows, err := r.read(ctx).StatsRunChats(ctx, sqlcgen.StatsRunChatsParams{ChannelIds: pg.UUIDs(channelIDs), ThreadIds: pg.UUIDs(threadIDs)})
+	if err != nil {
+		return nil, statskit.ReadError(err, "reading the chats of the statistics")
+	}
+	out := make([]chat.StatsRunChat, len(rows))
+	for i, row := range rows {
+		out[i] = chat.StatsRunChat{ThreadID: ids.ID(row.ID.Bytes), ChannelID: ids.ID(row.ChannelID.Bytes), ChannelName: row.ChannelName,
+			ThreadTitle: row.ThreadTitle}
+	}
+	return out, nil
+}
+
 // ThreadStats implements app.StatsReader with the statement ThreadStats (M6-05).
 func (r *Repository) ThreadStats(ctx context.Context, q chat.StatsQuery) ([]chat.StatsValue, error) {
 	rows, err := r.read(ctx).ThreadStats(ctx, sqlcgen.ThreadStatsParams{Granularity: q.Granularity, TimeZone: q.TimeZone,

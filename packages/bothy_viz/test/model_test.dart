@@ -202,7 +202,7 @@ void main() {
 
   group('TimelineModel', () {
     test(
-      'runs become bars per agent and channel, buckets series per metric',
+      'runs become bars per chat and agent, buckets series per metric',
       () async {
         final timeline = await fixtures.timeline('normal');
         final model = TimelineModel.fromTimeline(timeline, names: names);
@@ -211,7 +211,7 @@ void main() {
           model.bars.rows.expand((r) => r.segments),
           hasLength(timeline.runs.length),
         );
-        expect(model.bars.rows.first.label, contains(', '));
+        expect(model.bars.rows.first.run!.named, isTrue);
         expect(model.series.map((s) => s.colorIndex), [
           for (var i = 0; i < model.series.length; i++) i,
         ]);

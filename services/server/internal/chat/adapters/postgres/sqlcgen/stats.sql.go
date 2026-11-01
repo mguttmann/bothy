@@ -49,6 +49,55 @@ func (q *Queries) StatsChannels(ctx context.Context, channelIds []pgtype.UUID) (
 	return items, nil
 }
 
+const statsRunChats = `-- name: StatsRunChats :many
+SELECT t.id, t.channel_id, c.name AS channel_name, (CASE WHEN t.kind = 'main' THEN '' ELSE t.title END)::text AS thread_title
+FROM threads t
+JOIN channels c ON c.id = t.channel_id
+WHERE t.channel_id = ANY ($1::uuid[]) AND t.id = ANY ($2::uuid[])
+ORDER BY t.id
+`
+
+type StatsRunChatsParams struct {
+	ChannelIds []pgtype.UUID
+	ThreadIds  []pgtype.UUID
+}
+
+type StatsRunChatsRow struct {
+	ID          pgtype.UUID
+	ChannelID   pgtype.UUID
+	ChannelName string
+	ThreadTitle string
+}
+
+// The chats of the threads of runs in the channel set: the channel name and the thread title the
+// sidebar shows (run labels of the live topology and the timeline, 25 4 rule 6); the main thread
+// has no title of its own. The stats use cases pass the names only to a caller who may read the
+// thread.
+func (q *Queries) StatsRunChats(ctx context.Context, arg StatsRunChatsParams) ([]StatsRunChatsRow, error) {
+	rows, err := q.db.Query(ctx, statsRunChats, arg.ChannelIds, arg.ThreadIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []StatsRunChatsRow
+	for rows.Next() {
+		var i StatsRunChatsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ChannelID,
+			&i.ChannelName,
+			&i.ThreadTitle,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const statsThreads = `-- name: StatsThreads :many
 SELECT t.id, t.channel_id
 FROM threads t

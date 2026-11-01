@@ -1835,7 +1835,12 @@
       "queued_at": "2026-10-15T10:00:00.000Z",
       "started_at": "2026-10-15T10:00:03.000Z",
       "state": "completed",
-      "finished_at": "2026-10-15T10:04:00.000Z"
+      "finished_at": "2026-10-15T10:04:00.000Z",
+      "chat": {
+        "thread_id": "0192f4a0-7b1c-7000-8a00-000000000303",
+        "channel_name": "tickets",
+        "thread_title": "Login fails after update"
+      }
     },
     {
       "run_id": "0192f4a0-7b1c-7000-8a00-000000005001",
@@ -1844,7 +1849,12 @@
       "queued_at": "2026-10-15T10:07:00.000Z",
       "started_at": "2026-10-15T10:07:03.000Z",
       "state": "failed",
-      "finished_at": "2026-10-15T10:12:00.000Z"
+      "finished_at": "2026-10-15T10:12:00.000Z",
+      "chat": {
+        "thread_id": "0192f4a0-7b1c-7000-8a00-000000000301",
+        "channel_name": "backend",
+        "thread_title": "Payment integration"
+      }
     },
     {
       "run_id": "0192f4a0-7b1c-7000-8a00-000000005002",
@@ -1853,7 +1863,12 @@
       "queued_at": "2026-10-15T10:15:00.000Z",
       "started_at": "2026-10-15T10:15:03.000Z",
       "state": "cancelled",
-      "finished_at": "2026-10-15T10:21:00.000Z"
+      "finished_at": "2026-10-15T10:21:00.000Z",
+      "chat": {
+        "thread_id": "0192f4a0-7b1c-7000-8a00-000000000302",
+        "channel_name": "release",
+        "thread_title": "Release notes 2.4"
+      }
     },
     {
       "run_id": "0192f4a0-7b1c-7000-8a00-000000005003",
@@ -1862,7 +1877,12 @@
       "queued_at": "2026-10-15T10:22:00.000Z",
       "started_at": "2026-10-15T10:22:03.000Z",
       "state": "completed",
-      "finished_at": "2026-10-15T10:29:00.000Z"
+      "finished_at": "2026-10-15T10:29:00.000Z",
+      "chat": {
+        "thread_id": "0192f4a0-7b1c-7000-8a00-000000000303",
+        "channel_name": "tickets",
+        "thread_title": "Login fails after update"
+      }
     },
     {
       "run_id": "0192f4a0-7b1c-7000-8a00-000000005004",
@@ -1870,7 +1890,12 @@
       "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
       "queued_at": "2026-10-15T10:30:00.000Z",
       "started_at": "2026-10-15T10:30:03.000Z",
-      "state": "running"
+      "state": "running",
+      "chat": {
+        "thread_id": "0192f4a0-7b1c-7000-8a00-000000000301",
+        "channel_name": "backend",
+        "thread_title": "Payment integration"
+      }
     },
     {
       "run_id": "0192f4a0-7b1c-7000-8a00-000000005005",
@@ -1879,7 +1904,12 @@
       "queued_at": "2026-10-15T10:37:00.000Z",
       "started_at": "2026-10-15T10:37:03.000Z",
       "state": "completed",
-      "finished_at": "2026-10-15T10:46:00.000Z"
+      "finished_at": "2026-10-15T10:46:00.000Z",
+      "chat": {
+        "thread_id": "0192f4a0-7b1c-7000-8a00-000000000302",
+        "channel_name": "release",
+        "thread_title": "Release notes 2.4"
+      }
     },
     {
       "run_id": "0192f4a0-7b1c-7000-8a00-000000005006",
@@ -1897,7 +1927,12 @@
       "queued_at": "2026-10-15T10:52:00.000Z",
       "started_at": "2026-10-15T10:52:03.000Z",
       "state": "cancelled",
-      "finished_at": "2026-10-15T10:57:00.000Z"
+      "finished_at": "2026-10-15T10:57:00.000Z",
+      "chat": {
+        "thread_id": "0192f4a0-7b1c-7000-8a00-000000000301",
+        "channel_name": "backend",
+        "thread_title": "Payment integration"
+      }
     }
   ],
   "runs_truncated": false

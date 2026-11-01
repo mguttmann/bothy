@@ -17,6 +17,7 @@ import (
 type StatsReader interface {
 	StatsChannels(ctx context.Context, channelIDs []ids.ID) ([]chat.StatsChannel, error)
 	StatsThreads(ctx context.Context, channelIDs []ids.ID, before time.Time) ([]chat.StatsThread, error)
+	StatsRunChats(ctx context.Context, channelIDs, threadIDs []ids.ID) ([]chat.StatsRunChat, error)
 	ThreadStats(ctx context.Context, q chat.StatsQuery) ([]chat.StatsValue, error)
 }
 
@@ -52,6 +53,14 @@ func (s *Stats) StatsThreads(ctx context.Context, channelIDs []ids.ID, before ti
 		return nil, nil
 	}
 	return s.r.StatsThreads(ctx, channelIDs, before)
+}
+
+// StatsRunChats implements chat.StatsSource.
+func (s *Stats) StatsRunChats(ctx context.Context, channelIDs, threadIDs []ids.ID) ([]chat.StatsRunChat, error) {
+	if len(channelIDs) == 0 || len(threadIDs) == 0 {
+		return nil, nil
+	}
+	return s.r.StatsRunChats(ctx, channelIDs, threadIDs)
 }
 
 // ThreadStats implements chat.StatsSource.

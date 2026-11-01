@@ -344,11 +344,17 @@ func NewStatsLive(cfg StatsLiveConfig, d StatsLiveDeps) (*statsapp.Live, error) 
 	if err != nil {
 		return nil, err
 	}
+	// The chats of the active runs: channel name and thread title, filtered per receiver by
+	// thread.read (25 4 rule 6).
+	chats, err := chatapp.NewStats(chatpg.NewRepository(d.Pool))
+	if err != nil {
+		return nil, err
+	}
 	return statsapp.NewLive(statsapp.LiveConfig{
 		Enabled: cfg.Enabled, Interval: cfg.Interval, MaxRuns: cfg.MaxRuns, MaxSubscribers: cfg.MaxSubscribers, SLIWindow: cfg.SLIWindow,
 		PayloadMax: cfg.PayloadMax, Connections: cfg.ClusterMode == clusterModeSingle, MaxTasks: cfg.MaxTasks, TaskMaxDepth: cfg.TaskMaxDepth,
 		TaskKeep: cfg.TaskKeep,
-	}, statsapp.LiveDeps{Authorizer: d.Authorizer, Runs: d.Runs, Places: d.Places, Facts: d.Facts, Presence: d.Presence,
+	}, statsapp.LiveDeps{Authorizer: d.Authorizer, Runs: d.Runs, Places: d.Places, Chats: chats, Facts: d.Facts, Presence: d.Presence,
 		Store: statspg.NewRepository(d.Pool), Clock: d.Clock, Metrics: m, Log: d.Log})
 }
 

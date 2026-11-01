@@ -15,6 +15,7 @@ from ..types import UNSET, Unset
 if TYPE_CHECKING:
     from ..models.stats_live_step import StatsLiveStep
     from ..models.stats_live_task import StatsLiveTask
+    from ..models.stats_run_chat import StatsRunChat
 
 
 T = TypeVar("T", bound="StatsLiveRun")
@@ -46,6 +47,10 @@ class StatsLiveRun:
             has none (25 5.2).
         tasks_truncated (bool | Unset): Present and true when a limit or the payload bound left task nodes of this run
             out.
+        chat (StatsRunChat | Unset): The chat a run belongs to, as the sidebar names it: the name of its channel (the
+            project) and the title of its thread. Present only when the caller may read the thread (`thread.read`, the same
+            rule as the sidebar); absent otherwise, and then a client shows neither a name nor a link
+            (docs/spec/25-visualization.md, section 4, rule 6).
     """
 
     run_id: UUID
@@ -64,6 +69,7 @@ class StatsLiveRun:
     cost_is_estimate: bool | Unset = UNSET
     tasks: list[StatsLiveTask] | Unset = UNSET
     tasks_truncated: bool | Unset = UNSET
+    chat: StatsRunChat | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -108,6 +114,10 @@ class StatsLiveRun:
 
         tasks_truncated = self.tasks_truncated
 
+        chat: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.chat, Unset):
+            chat = self.chat.to_dict()
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -137,6 +147,8 @@ class StatsLiveRun:
             field_dict["tasks"] = tasks
         if tasks_truncated is not UNSET:
             field_dict["tasks_truncated"] = tasks_truncated
+        if chat is not UNSET:
+            field_dict["chat"] = chat
 
         return field_dict
 
@@ -144,6 +156,7 @@ class StatsLiveRun:
     def from_dict(cls, src_dict: Mapping[str, Any]) -> Self:
         from ..models.stats_live_step import StatsLiveStep
         from ..models.stats_live_task import StatsLiveTask
+        from ..models.stats_run_chat import StatsRunChat
 
         d = dict(src_dict)
         run_id = UUID(d.pop("run_id"))
@@ -195,6 +208,13 @@ class StatsLiveRun:
 
         tasks_truncated = d.pop("tasks_truncated", UNSET)
 
+        _chat = d.pop("chat", UNSET)
+        chat: StatsRunChat | Unset
+        if isinstance(_chat, Unset):
+            chat = UNSET
+        else:
+            chat = StatsRunChat.from_dict(_chat)
+
         stats_live_run = cls(
             run_id=run_id,
             thread_id=thread_id,
@@ -212,6 +232,7 @@ class StatsLiveRun:
             cost_is_estimate=cost_is_estimate,
             tasks=tasks,
             tasks_truncated=tasks_truncated,
+            chat=chat,
         )
 
         stats_live_run.additional_properties = d

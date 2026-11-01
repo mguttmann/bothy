@@ -544,6 +544,7 @@ export 'package:api_client/src/generated/model/stats_live_sli.dart';
 export 'package:api_client/src/generated/model/stats_live_step.dart';
 export 'package:api_client/src/generated/model/stats_live_task.dart';
 export 'package:api_client/src/generated/model/stats_metric.dart';
+export 'package:api_client/src/generated/model/stats_run_chat.dart';
 export 'package:api_client/src/generated/model/stats_scope.dart';
 export 'package:api_client/src/generated/model/stats_series.dart';
 export 'package:api_client/src/generated/model/stats_slo_entry.dart';

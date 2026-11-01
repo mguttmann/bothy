@@ -12,9 +12,14 @@ harness and the fake server read them instead of a server.
   `StatsLiveFrame.truncated.json` has `runs_truncated = true`; `no_cost_permission` lacks every
   cost member, as the server filters them without `cost.read.aggregate`.
 - Content: no message text and no titles; only IDs, tool names, numbers and the test world of
-  07 10. Exception: the `label` of the task nodes in `StatsLiveFrame.agent_tree.json`, which the
-  server sends only with `run.read` (25 1 rule 3), carries short role names of the test world. The run documents `Run.<state>.json` of the run graph (09 5.6) are run content under
-  `run.read`, not statistics (R-VZ-14): they carry step names and titles of the test world.
+  07 10. Exceptions: the `label` of the task nodes in `StatsLiveFrame.agent_tree.json`, which the
+  server sends only with `run.read` (25 1 rule 3), carries short role names of the test world; and
+  the chat of a run (`chat` of `StatsLiveRun` and `StatsTimelineRun`, 25 4 rule 6): the `normal`,
+  `no_cost_permission`, `truncated` and `agent_tree` live frames and the `normal` timeline name
+  the chats of most runs with the channel names of the test world (`tickets`, `backend`,
+  `release`) and neutral thread titles; one run of each has no chat, as for a person who may not
+  read its thread. The run documents `Run.<state>.json` of the run graph (09 5.6) are run content
+  under `run.read`, not statistics (R-VZ-14): they carry step names and titles of the test world.
   Their states are `flat` (tool calls and a status marker), `subagents` (tasks started by tool
   calls, a background job, a failed subagent with more finished steps than
   `ui.livebox_visible_steps`, `usage` on the tasks), `summary` (summary steps at the root and

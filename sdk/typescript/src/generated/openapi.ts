@@ -9822,6 +9822,7 @@ export interface components {
             tasks?: components["schemas"]["StatsLiveTask"][];
             /** @description Present and true when a limit or the payload bound left task nodes of this run out. */
             tasks_truncated?: boolean;
+            chat?: components["schemas"]["StatsRunChat"];
         };
         /** @description One child node of an active run in the live topology (25 5.2). Never content except `label`, which only a receiver with `run.read` on the run gets. */
         StatsLiveTask: {
@@ -9853,6 +9854,18 @@ export interface components {
              * @example review
              */
             label?: string;
+        };
+        /** @description The chat a run belongs to, as the sidebar names it: the name of its channel (the project) and the title of its thread. Present only when the caller may read the thread (`thread.read`, the same rule as the sidebar); absent otherwise, and then a client shows neither a name nor a link (docs/spec/25-visualization.md, section 4, rule 6). */
+        StatsRunChat: {
+            /** @description Target of the deep link that opens the chat. */
+            thread_id: components["schemas"]["Uuid"];
+            /** @example backend */
+            channel_name: string;
+            /**
+             * @description Title of the thread; absent for the main thread of a channel and for an empty title.
+             * @example Payment integration
+             */
+            thread_title?: string;
         };
         StatsLiveAgent: {
             agent_id: components["schemas"]["Uuid"];
@@ -9897,7 +9910,7 @@ export interface components {
             agent: number;
             app: number;
         };
-        /** @description Live frame (docs/spec/25-visualization.md, section 5.2). No person values, no content. */
+        /** @description Live frame (docs/spec/25-visualization.md, section 5.2). No person values and no content; the only names are the channel name and thread title of a run in `chat`, for a caller who may read the thread. */
         StatsLiveFrame: {
             at: components["schemas"]["Timestamp"];
             /** @example 1000 */
@@ -9935,6 +9948,7 @@ export interface components {
             started_at?: components["schemas"]["Timestamp"];
             finished_at?: components["schemas"]["Timestamp"];
             state: components["schemas"]["RunState"];
+            chat?: components["schemas"]["StatsRunChat"];
         };
         StatsTimeline: {
             from: components["schemas"]["Timestamp"];

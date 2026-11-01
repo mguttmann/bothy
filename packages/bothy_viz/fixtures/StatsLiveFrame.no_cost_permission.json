@@ -19,7 +19,12 @@
         "kind": "tool_call",
         "name": "Bash"
       },
-      "approval_pending": false
+      "approval_pending": false,
+      "chat": {
+        "thread_id": "0192f4a0-7b1c-7000-8a00-000000000301",
+        "channel_name": "backend",
+        "thread_title": "Payment integration"
+      }
     },
     {
       "run_id": "0192f4a0-7b1c-7000-8a00-000000000402",
@@ -35,7 +40,12 @@
         "kind": "tool_call",
         "name": "Edit"
       },
-      "approval_pending": true
+      "approval_pending": true,
+      "chat": {
+        "thread_id": "0192f4a0-7b1c-7000-8a00-000000000302",
+        "channel_name": "release",
+        "thread_title": "Release notes 2.4"
+      }
     },
     {
       "run_id": "0192f4a0-7b1c-7000-8a00-000000000403",
@@ -46,7 +56,12 @@
       "state": "queued",
       "queued_at": "2026-10-15T09:59:56.000Z",
       "billing_mode": "personal",
-      "approval_pending": false
+      "approval_pending": false,
+      "chat": {
+        "thread_id": "0192f4a0-7b1c-7000-8a00-000000000303",
+        "channel_name": "tickets",
+        "thread_title": "Login fails after update"
+      }
     },
     {
       "run_id": "0192f4a0-7b1c-7000-8a00-000000000404",

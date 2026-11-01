@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart';
 
 import 'costs.dart';
 import 'names.dart';
+import 'run_label.dart';
 import 'task_tree_model.dart';
 
 /// State of an active run as the card shows it, with the run state roles of the live box
@@ -47,8 +48,8 @@ enum RunStepKind {
   unknown,
 }
 
-/// One active run of a live frame as a card: agent, state, tool chip, badge, approval note
-/// and cost; never content (25 1 rule 3).
+/// One active run of a live frame as a card: its label (project, chat, agent, short ID), state,
+/// tool chip, badge, approval note and cost; no other content (25 1 rule 3, 4 rule 6).
 final class RunCardModel {
   /// Creates a card model; [RunCardModel.fromRun] is the normal way.
   const RunCardModel({
@@ -56,6 +57,7 @@ final class RunCardModel {
     required this.threadId,
     required this.agentId,
     required this.agentName,
+    required this.label,
     required this.state,
     required this.billingMode,
     required this.approvalPending,
@@ -86,6 +88,11 @@ final class RunCardModel {
       threadId: run.threadId,
       agentId: run.agentId,
       agentName: names.agent(run.agentId),
+      label: VizRunLabel.of(
+        run.chat,
+        agent: names.agent(run.agentId),
+        id: run.runId,
+      ),
       state: switch (run.state) {
         api.StatsLiveRunStateEnum.queued => RunCardState.queued,
         api.StatsLiveRunStateEnum.running => RunCardState.running,
@@ -124,7 +131,8 @@ final class RunCardModel {
   /// Run ID.
   final String runId;
 
-  /// Thread of the run; a tap on the card reports it (the apps open the deep link).
+  /// Thread of the run. A tap opens [VizRunLabel.threadId] instead, which the server names
+  /// only for a person who may read the thread.
   final String threadId;
 
   /// Agent ID.
@@ -132,6 +140,9 @@ final class RunCardModel {
 
   /// Display name of the agent.
   final String agentName;
+
+  /// The label of the run: project and chat, agent and short ID, the chat to open.
+  final VizRunLabel label;
 
   /// State of the run.
   final RunCardState state;
@@ -166,6 +177,7 @@ final class RunCardModel {
           threadId: threadId,
           agentId: agentId,
           agentName: agentName,
+          label: label,
           state: state,
           billingMode: billingMode,
           approvalPending: approvalPending,
@@ -184,6 +196,7 @@ final class RunCardModel {
       other.threadId == threadId &&
       other.agentId == agentId &&
       other.agentName == agentName &&
+      other.label == label &&
       other.state == state &&
       other.billingMode == billingMode &&
       other.approvalPending == approvalPending &&
@@ -199,6 +212,7 @@ final class RunCardModel {
     threadId,
     agentId,
     agentName,
+    label,
     state,
     billingMode,
     approvalPending,
@@ -271,7 +285,9 @@ final class LaneModel {
   );
 
   /// Groups [runs] into lanes by space and channel, in the order the frame gives: a lane
-  /// appears where its first run appears, and its cards keep the frame order.
+  /// appears where its first run appears, and its cards keep the frame order. The channel name
+  /// comes from [names], else from the chat the server named for a run of the lane, else it is
+  /// the short ID.
   static List<LaneModel> group(
     Iterable<api.StatsLiveRun> runs,
     VizNames names, {
@@ -293,7 +309,13 @@ final class LaneModel {
           spaceId: space,
           spaceName: names.space(space),
           channelId: channel,
-          channelName: names.channel(channel),
+          channelName:
+              names.channels[channel] ??
+              lanes[(space, channel)]!
+                  .map((c) => c.label.project)
+                  .nonNulls
+                  .firstOrNull ??
+              names.channel(channel),
           cards: List.unmodifiable(lanes[(space, channel)]!),
         ),
     ];

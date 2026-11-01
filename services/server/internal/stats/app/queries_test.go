@@ -28,6 +28,8 @@ import (
 type statsAuthorizer struct {
 	outcomes map[authorize.Action]authorize.Outcome
 	scope    authorize.Scope
+	// threadScope, when set, is the Scope of thread.read instead of scope.
+	threadScope *authorize.Scope
 }
 
 func (a *statsAuthorizer) Authorize(_ context.Context, _ authorize.Principal, act authorize.Action, _ authorize.Resource) (authorize.Decision, error) {
@@ -37,7 +39,10 @@ func (a *statsAuthorizer) Authorize(_ context.Context, _ authorize.Principal, ac
 	return authorize.Decision{Outcome: authorize.OutcomeAllow}, nil
 }
 
-func (a *statsAuthorizer) Scope(context.Context, authorize.Principal, authorize.Action) (authorize.Scope, error) {
+func (a *statsAuthorizer) Scope(_ context.Context, _ authorize.Principal, act authorize.Action) (authorize.Scope, error) {
+	if act == authorize.ActionThreadRead && a.threadScope != nil {
+		return *a.threadScope, nil
+	}
 	return a.scope, nil
 }
 
@@ -62,6 +67,10 @@ func (f *fakeSources) StatsChannels(_ context.Context, cs []ids.ID) ([]chat.Stat
 }
 
 func (f *fakeSources) StatsThreads(context.Context, []ids.ID, time.Time) ([]chat.StatsThread, error) {
+	return nil, nil
+}
+
+func (f *fakeSources) StatsRunChats(context.Context, []ids.ID, []ids.ID) ([]chat.StatsRunChat, error) {
 	return nil, nil
 }
 

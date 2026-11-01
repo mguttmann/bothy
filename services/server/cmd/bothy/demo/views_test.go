@@ -102,12 +102,31 @@ func TestDemoViews(t *testing.T) {
 
 	// The views of 25: each query has data.
 	var live struct {
-		Runs   []any `json:"runs"`
+		Runs []struct {
+			ThreadID string `json:"thread_id"`
+			Chat     *struct {
+				ThreadID    string `json:"thread_id"`
+				ChannelName string `json:"channel_name"`
+				ThreadTitle string `json:"thread_title"`
+			} `json:"chat"`
+		} `json:"runs"`
 		Agents []any `json:"agents"`
 	}
 	harness.MustDo(t, owner, harness.Request{Method: http.MethodGet, Path: "/stats/live"}, http.StatusOK).JSON(t, &live)
 	if len(live.Runs) == 0 || len(live.Agents) == 0 {
 		t.Fatalf("getStatsLive: %d runs, %d agents", len(live.Runs), len(live.Agents))
+	}
+	// The run labels of the topology (25 4 rule 6): the owner reads every thread, so each run names
+	// its chat; the watcher run names its thread by the title the data set gave it.
+	named := false
+	for _, r := range live.Runs {
+		if r.Chat == nil || r.Chat.ThreadID != r.ThreadID || r.Chat.ChannelName == "" {
+			t.Fatalf("getStatsLive: run of thread %s without its chat: %+v", r.ThreadID, r.Chat)
+		}
+		named = named || (r.ThreadID == watch && r.Chat.ThreadTitle == "Watch the nightly build")
+	}
+	if !named {
+		t.Fatal("getStatsLive: the watcher run does not name its thread")
 	}
 	now := time.Now().UTC()
 	from, to := now.Truncate(time.Hour).Add(-time.Hour), now.Truncate(time.Minute).Add(2*time.Minute)

@@ -2173,11 +2173,167 @@ abstract class AppLocalizations {
   /// **'Values can differ from Prometheus: the own measurement counts in the process and can lose one flush interval in a crash.'**
   String get vizOwnMeasurementNote;
 
-  /// Column header: row of a run bar of the timeline.
+  /// Column header: the run of a row (operator and short ID) in the tables of the live topology and the timeline.
   ///
   /// In en, this message translates to:
-  /// **'Agent and channel'**
+  /// **'Run'**
   String get vizColRun;
+
+  /// Column header: the chat of a run (project and chat title) in the tables of the live topology and the timeline.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat'**
+  String get vizColChat;
+
+  /// Main text of a run label: the project (channel or forum name) and the chat (thread title) of the run, as the sidebar names them (25 4 rule 6).
+  ///
+  /// In en, this message translates to:
+  /// **'{project} / {chat}'**
+  String vizRunTitle(String project, String chat);
+
+  /// Secondary text of a run label: the agent and the short ID of the run or chat.
+  ///
+  /// In en, this message translates to:
+  /// **'{agent} · {id}'**
+  String vizRunDetail(String agent, String id);
+
+  /// Semantics hint of a run card or a timeline row whose chat the person may open.
+  ///
+  /// In en, this message translates to:
+  /// **'Open chat'**
+  String get vizRunOpenChat;
+
+  /// Dimension of messages_created: written by a person.
+  ///
+  /// In en, this message translates to:
+  /// **'Human'**
+  String get vizDimHuman;
+
+  /// Dimension of messages_created: written by an agent.
+  ///
+  /// In en, this message translates to:
+  /// **'Agent'**
+  String get vizDimAgent;
+
+  /// Dimension of messages_created: written by an app.
+  ///
+  /// In en, this message translates to:
+  /// **'App'**
+  String get vizDimApp;
+
+  /// Dimension of messages_created: taken over by an import.
+  ///
+  /// In en, this message translates to:
+  /// **'Import'**
+  String get vizDimImport;
+
+  /// Dimension of runs_finished and tool_calls: ended successfully.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed'**
+  String get vizDimCompleted;
+
+  /// Dimension of runs_finished and tool_calls: ended with an error.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed'**
+  String get vizDimFailed;
+
+  /// Dimension of runs_finished: stopped before the end.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled'**
+  String get vizDimCancelled;
+
+  /// Dimension of approval_cards: a decision was requested.
+  ///
+  /// In en, this message translates to:
+  /// **'Requested'**
+  String get vizDimRequested;
+
+  /// Dimension of approval_cards: approved.
+  ///
+  /// In en, this message translates to:
+  /// **'Approved'**
+  String get vizDimApproved;
+
+  /// Dimension of approval_cards: denied.
+  ///
+  /// In en, this message translates to:
+  /// **'Denied'**
+  String get vizDimDenied;
+
+  /// Dimension of approval_cards: no decision in time.
+  ///
+  /// In en, this message translates to:
+  /// **'Expired'**
+  String get vizDimExpired;
+
+  /// Dimension of invocations_denied: the personal mode of the agent refused the trigger (I2).
+  ///
+  /// In en, this message translates to:
+  /// **'Refused before delivery (I2)'**
+  String get vizDimI2Denied;
+
+  /// Dimension of invocations_denied: the run failed because the reported billing mode differed (I3).
+  ///
+  /// In en, this message translates to:
+  /// **'Billing mode mismatch'**
+  String get vizDimBillingModeMismatch;
+
+  /// Dimension of resyncs: the time line of the event log changed.
+  ///
+  /// In en, this message translates to:
+  /// **'Epoch changed'**
+  String get vizDimEpochChanged;
+
+  /// Dimension of resyncs: the cursor lies before the retained events.
+  ///
+  /// In en, this message translates to:
+  /// **'Cursor too old'**
+  String get vizDimRetention;
+
+  /// Dimension of resyncs: the client is too many events behind.
+  ///
+  /// In en, this message translates to:
+  /// **'Too far behind'**
+  String get vizDimTooFarBehind;
+
+  /// Dimension of resyncs: the cursor lies after the newest event.
+  ///
+  /// In en, this message translates to:
+  /// **'Cursor ahead'**
+  String get vizDimCursorAhead;
+
+  /// Dimension of sli.push_acceptance: the push provider of Apple (a product name).
+  ///
+  /// In en, this message translates to:
+  /// **'APNs'**
+  String get vizDimApns;
+
+  /// Dimension of sli.push_acceptance: the push provider of Google (a product name).
+  ///
+  /// In en, this message translates to:
+  /// **'FCM'**
+  String get vizDimFcm;
+
+  /// Dimension of sli.push_acceptance: the open push provider (a product name).
+  ///
+  /// In en, this message translates to:
+  /// **'UnifiedPush'**
+  String get vizDimUnifiedPush;
+
+  /// Dimension of sli.push_acceptance: the push provider of Windows (a product name).
+  ///
+  /// In en, this message translates to:
+  /// **'WNS'**
+  String get vizDimWns;
+
+  /// Label of a rate or series of one dimension of a metric, for example "Tool calls, Failed".
+  ///
+  /// In en, this message translates to:
+  /// **'{metric}, {dimension}'**
+  String vizMetricWithDimension(String metric, String dimension);
 
   /// Column header: start of a run.
   ///

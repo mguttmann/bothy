@@ -4,6 +4,7 @@
 
 // ignore_for_file: unused_element
 import 'package:api_client/src/generated/model/run_state.dart';
+import 'package:api_client/src/generated/model/stats_run_chat.dart';
 import 'package:built_value/built_value.dart';
 import 'package:built_value/serializer.dart';
 
@@ -19,6 +20,7 @@ part 'stats_timeline_run.g.dart';
 /// * [startedAt] - RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 /// * [finishedAt] - RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 /// * [state]
+/// * [chat]
 @BuiltValue()
 abstract class StatsTimelineRun
     implements Built<StatsTimelineRun, StatsTimelineRunBuilder> {
@@ -49,6 +51,9 @@ abstract class StatsTimelineRun
   @BuiltValueField(wireName: r'state')
   RunState get state;
   // enum stateEnum {  queued,  running,  waiting_input,  completed,  failed,  cancelled,  };
+
+  @BuiltValueField(wireName: r'chat')
+  StatsRunChat? get chat;
 
   StatsTimelineRun._();
 
@@ -115,6 +120,13 @@ class _$StatsTimelineRunSerializer
       object.state,
       specifiedType: const FullType(RunState),
     );
+    if (object.chat != null) {
+      yield r'chat';
+      yield serializers.serialize(
+        object.chat,
+        specifiedType: const FullType(StatsRunChat),
+      );
+    }
   }
 
   @override
@@ -192,6 +204,14 @@ class _$StatsTimelineRunSerializer
             specifiedType: const FullType(RunState),
           ) as RunState;
           result.state = valueDes;
+          break;
+        case r'chat':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(StatsRunChat),
+          ) as StatsRunChat?;
+          if (valueDes == null) continue;
+          result.chat.replace(valueDes);
           break;
         default:
           unhandled.add(key);
