@@ -90,6 +90,22 @@ final class ThreadsDao {
         ];
       });
 
+  /// Moves the `last_activity_at` of the stored thread [id] forward to [at] when [at] is later;
+  /// returns whether it changed. A new message advances its thread's activity on the server
+  /// (04 3.2) without a `thread.updated`, so the client applies the time of the message itself
+  /// (04 6.3 item 4); the version stays, so the next thread change of the server still applies.
+  /// A thread that is not stored, or whose activity is not older, is left alone.
+  Future<bool> advanceActivity(ThreadId id, DateTime at) =>
+      _db.transaction(() async {
+        final row = await (_db.select(
+          _db.threads,
+        )..where((t) => t.id.equals(id.value))).getSingleOrNull();
+        if (row == null || !at.isAfter(row.lastActivityAt)) return false;
+        await (_db.update(_db.threads)..where((t) => t.id.equals(id.value)))
+            .write(ThreadsCompanion(lastActivityAt: Value(at)));
+        return true;
+      });
+
   /// Records that the person opened thread [id] now; the cleanup keeps recently opened threads
   /// (15 6.3).
   Future<void> touch(ThreadId id) async {

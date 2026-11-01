@@ -306,7 +306,12 @@ the problem code from [06-api.md](06-api.md) (for example `rate_limited`, `forbi
    `sync.snapshot_threads_per_channel` entries; threads with an active run and unread threads count
    toward this bound but are never left out, so every thread the sidebar must rank first (01 6.8
    items 2 and 3) is held by the client without a further request. The client keeps them current through `thread.*` and `message.created`
-   and fills the sidebar from them (01 6.8) without one list request per channel; only after
+   and fills the sidebar from them (01 6.8) without one list request per channel. A message moves
+   `threads.last_activity_at` on the server (section 3.2) without a `thread.*` event, so the
+   client moves the stored `last_activity_at` of the thread forward to the `created_at` of every
+   message it stores (the event, the `201` of its own message, a loaded page), never back, and
+   without changing the thread's `version` (addendum of 2026-11-01, brief FIX-autoarrange-delay);
+   the sidebar order by activity (01 6.8 item 4, 6.16) follows at once. Only after
    a full snapshot does it list the open posts of each forum (`listChannelThreads` with
    `state=open`), because a forum lists every open post (01 6.8 item 2, D-M4-46-5).
    Thread contents are not included; the client loads them via REST.
