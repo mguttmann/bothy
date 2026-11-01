@@ -18,7 +18,29 @@ if [ -z "$serial" ]; then
   echo "client android: no device in state 'device' (adb devices)" >&2
   exit 1
 fi
+# The phone tests run without a system keyboard (FIX-main-red-2026-10-31): the text input probe
+# of integration_test/phone/dictation_test.dart edits the composer as a dictation keyboard does,
+# and a bound Gboard rewrote the same composing state after each insert, so the test failed at
+# random. Every enabled input method is disabled for the phone tests and enabled again
+# afterwards, with the default one selected, also when they fail (API 26 has no `ime reset`).
+imes=$(adb -s "$serial" shell ime list -s | tr -d '\r')
+default_ime=$(adb -s "$serial" shell settings get secure default_input_method | tr -d '\r')
+restore_ime() {
+  for ime in $imes; do
+    adb -s "$serial" shell ime enable "$ime" >/dev/null || true
+  done
+  case "$default_ime" in
+    "" | null) ;;
+    *) adb -s "$serial" shell ime set "$default_ime" >/dev/null || true ;;
+  esac
+}
+trap restore_ime EXIT
+for ime in $imes; do
+  adb -s "$serial" shell ime disable "$ime" >/dev/null
+done
 flutter test integration_test/phone_suite_test.dart -d "$serial"
+restore_ime
+trap - EXIT
 cd android
 # MainActivityTest is the bridge of the patrol device tests and runs only under `patrol test`;
 # AccessibilityChecksTest needs the build of the audit entry (tool/run_android_a11y_checks.sh).

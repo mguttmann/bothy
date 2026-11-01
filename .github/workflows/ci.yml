@@ -168,6 +168,10 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      # The runner image ships toolchains no job uses; without them the disk ran full
+      # (tools/ci/free_disk.sh).
+      - name: Free disk space
+        run: sh tools/ci/free_disk.sh --keep-android
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           enable-cache: true
@@ -230,6 +234,10 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      # The runner image ships toolchains no job uses; without them the disk ran full
+      # (tools/ci/free_disk.sh).
+      - name: Free disk space
+        run: sh tools/ci/free_disk.sh --keep-android
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           enable-cache: true
@@ -288,6 +296,10 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      # The runner image ships toolchains no job uses; without them the disk ran full
+      # (tools/ci/free_disk.sh).
+      - name: Free disk space
+        run: sh tools/ci/free_disk.sh --keep-android
       # Every tracked gradle-wrapper.jar must match a checksum that Gradle publishes, before any
       # step can run it; the count is the number of tracked wrappers, so none drops out unseen
       # (tools/ci/tests/test_gradle_wrapper_validation.py; docs/decisions.d/SEC-ALERTS-2026-10-31.md).
@@ -356,6 +368,10 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      # The runner image ships toolchains no job uses; without them the disk ran full
+      # (tools/ci/free_disk.sh).
+      - name: Free disk space
+        run: sh tools/ci/free_disk.sh --keep-android
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           enable-cache: true
@@ -429,6 +445,10 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      # The runner image ships toolchains no job uses; without them the disk ran full
+      # (tools/ci/free_disk.sh).
+      - name: Free disk space
+        run: sh tools/ci/free_disk.sh --keep-android
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           enable-cache: true
@@ -515,6 +535,10 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      # The runner image ships toolchains no job uses; without them the disk ran full
+      # (tools/ci/free_disk.sh).
+      - name: Free disk space
+        run: sh tools/ci/free_disk.sh --keep-android
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           enable-cache: true
@@ -667,6 +691,10 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      # The runner image ships toolchains no job uses; without them the disk ran full
+      # (tools/ci/free_disk.sh).
+      - name: Free disk space
+        run: sh tools/ci/free_disk.sh --keep-android
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           enable-cache: true
@@ -775,6 +803,10 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      # The runner image ships toolchains no job uses; without them the disk ran full
+      # (tools/ci/free_disk.sh).
+      - name: Free disk space
+        run: sh tools/ci/free_disk.sh --keep-android
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           enable-cache: true
@@ -883,6 +915,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # The runner image ships toolchains no job uses; without them the disk ran full
+      # (tools/ci/free_disk.sh).
+      - name: Free disk space
+        run: sh tools/ci/free_disk.sh
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           enable-cache: true
@@ -1039,6 +1075,10 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      # The runner image ships toolchains no job uses; without them the disk ran full
+      # (tools/ci/free_disk.sh).
+      - name: Free disk space
+        run: sh tools/ci/free_disk.sh
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           enable-cache: true
@@ -1074,6 +1114,10 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      # The runner image ships toolchains no job uses; without them the disk ran full
+      # (tools/ci/free_disk.sh).
+      - name: Free disk space
+        run: sh tools/ci/free_disk.sh
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           enable-cache: true
@@ -1118,6 +1162,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # The runner image ships toolchains no job uses; without them the disk ran full
+      # (tools/ci/free_disk.sh).
+      - name: Free disk space
+        run: sh tools/ci/free_disk.sh
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           enable-cache: true
@@ -1334,6 +1382,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # The runner image ships toolchains no job uses; without them the disk ran full
+      # (tools/ci/free_disk.sh).
+      - name: Free disk space
+        run: sh tools/ci/free_disk.sh --keep-android
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
@@ -1420,6 +1472,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # The runner image ships toolchains no job uses; without them the disk ran full
+      # (tools/ci/free_disk.sh).
+      - name: Free disk space
+        run: sh tools/ci/free_disk.sh --keep-android
       - name: Enable hardware acceleration (kvm)
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -1470,6 +1526,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # The runner image ships toolchains no job uses; without them the disk ran full
+      # (tools/ci/free_disk.sh).
+      - name: Free disk space
+        run: sh tools/ci/free_disk.sh --keep-android
       - name: Enable hardware acceleration (kvm)
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
