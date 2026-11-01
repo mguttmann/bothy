@@ -551,11 +551,13 @@ def _key(flake: Flake) -> str:
     return f"{flake['tool']} {flake['package']} {flake['test']}"
 
 
-def marker(run: int, flakes: Sequence[Flake], seen: str | None = None) -> str:
-    """The hidden line of a comment: run, flakes and finish time, safe in an HTML comment."""
+def marker(run: int, flakes: Sequence[Flake], seen: str | None = None, attempt: int = 1) -> str:
+    """The hidden line of a comment: run, flakes, finish time, attempt; safe in an HTML comment."""
     data: dict[str, Any] = {"flakes": list(flakes)}
     if seen:
         data["seen"] = seen
+    if attempt > 1:
+        data["attempt"] = attempt
     payload = json.dumps(data, sort_keys=True)
     payload = payload.replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
     return f"<!-- flakes run={run} {payload} -->"
@@ -571,8 +573,32 @@ def parse_comments(bodies: Iterable[str]) -> dict[int, list[Flake]]:
             except ValueError:
                 continue
             if isinstance(payload, dict):
-                seen[int(match[1])] = clean(payload.get("flakes"))
+                run = int(match[1])
+                seen[run] = _merge(seen.get(run, []), clean(payload.get("flakes")))
     return seen
+
+
+def _merge(old: Sequence[Flake], new: Sequence[Flake]) -> list[Flake]:
+    """The flakes of every attempt of one run, each test once (the later attempt wins)."""
+    merged = {_key(f): f for f in old}
+    merged.update({_key(f): f for f in new})
+    return list(merged.values())
+
+
+def parse_attempts(bodies: Iterable[str]) -> dict[int, int]:
+    """The last reported attempt of each run in the comments (1 for a hidden line without one)."""
+    done: dict[int, int] = {}
+    for body in bodies:
+        for match in _MARKER.finditer(body or ""):
+            try:
+                payload = json.loads(match[2])
+            except ValueError:
+                continue
+            if isinstance(payload, dict):
+                attempt = payload.get("attempt", 1)
+                attempt = attempt if isinstance(attempt, int) and attempt > 1 else 1
+                done[int(match[1])] = max(done.get(int(match[1]), 0), attempt)
+    return done
 
 
 def _parse_time(text: Any) -> dt.datetime | None:
@@ -618,14 +644,21 @@ def comment(run: dict[str, Any], flakes: Sequence[Flake], known: set[str]) -> st
             str(f["failures"]),
         ]
         rows.append("| " + " | ".join(cells) + " |")
+    attempt = _attempt(run)
+    again = f", attempt {attempt}" if attempt > 1 else ""
     head = (
-        f"Run [{run['id']}]({run['html_url']}) ({run.get('event', '')}, "
+        f"Run [{run['id']}]({run['html_url']}){again} ({run.get('event', '')}, "
         f"{_cell(run.get('head_branch') or '')}, {str(run.get('head_sha', ''))[:12]}): "
         f"{len(flakes)} flaky test(s)\n\n"
     )
     seen = _parse_time(run.get("updated_at"))
     stamp = seen.strftime("%Y-%m-%dT%H:%M:%SZ") if seen else None
-    return head + "\n".join(rows) + "\n\n" + marker(int(run["id"]), flakes, stamp) + "\n"
+    return head + "\n".join(rows) + "\n\n" + marker(int(run["id"]), flakes, stamp, attempt) + "\n"
+
+
+def _attempt(run: dict[str, Any]) -> int:
+    attempt = run.get("run_attempt")
+    return attempt if isinstance(attempt, int) and attempt > 1 else 1
 
 
 def rows(
@@ -708,7 +741,8 @@ def _issue(args: argparse.Namespace, gh: Gh = _gh, now: dt.datetime | None = Non
                 f"repos/{args.repo}/actions/workflows/{args.workflow}/runs"
                 f"?status=completed&created=>={since}&per_page=100",
                 "--jq",
-                ".workflow_runs[] | {id, html_url, event, head_branch, head_sha, updated_at}",
+                ".workflow_runs[] | {id, html_url, event, head_branch, head_sha, updated_at,"
+                " run_attempt, run_started_at}",
             ]
         )
     )
@@ -734,7 +768,8 @@ def _issue(args: argparse.Namespace, gh: Gh = _gh, now: dt.datetime | None = Non
     # The runs of every issue, also of a closed one, are reported; the open one lists its own.
     seen: dict[int, list[Flake]] = {}
     when: dict[int, dt.datetime] = {}
-    reported: set[int] = set()
+    # The last reported attempt of each run: a rerun of its failed jobs is a new attempt.
+    reported: dict[int, int] = {}
     for issue in issues:
         listed = gh(
             [
@@ -748,14 +783,16 @@ def _issue(args: argparse.Namespace, gh: Gh = _gh, now: dt.datetime | None = Non
         # Only the comments of this workflow: anyone can comment on the public issue.
         own = [c for c in _json_lines(listed) if c.get("user") == BOT]
         parsed = parse_comments(str(c.get("body") or "") for c in own)
-        reported |= set(parsed)
+        for run_id, attempt in parse_attempts(str(c.get("body") or "") for c in own).items():
+            reported[run_id] = max(reported.get(run_id, 0), attempt)
         if int(issue["number"]) == number:
             seen = parsed
             when = parse_seen((str(c.get("body") or ""), str(c.get("created_at"))) for c in own)
     known = {_key(f) for flakes in seen.values() for f in flakes}
     added = 0
     for run in sorted(runs, key=lambda r: int(r["id"])):
-        if int(run["id"]) in reported:
+        before = reported.get(int(run["id"]), 0)
+        if _attempt(run) <= before:
             continue
         listed = gh(
             [
@@ -763,14 +800,21 @@ def _issue(args: argparse.Namespace, gh: Gh = _gh, now: dt.datetime | None = Non
                 "--paginate",
                 f"repos/{args.repo}/actions/runs/{run['id']}/artifacts?per_page=100",
                 "--jq",
-                ".artifacts[] | select(.expired | not) | {name}",
+                ".artifacts[] | select(.expired | not) | {name, created_at}",
             ]
         )
+        artifacts = _json_lines(listed)
+        if before:
+            # A rerun of a reported run: only the artifacts of its new attempt are news.
+            started = _parse_time(run.get("run_started_at"))
+            artifacts = [
+                a
+                for a in artifacts
+                if started is None or (_parse_time(a.get("created_at")) or started) >= started
+            ]
         # A rerun of failed jobs keeps the artifact of each attempt under the same name, and a
         # second download of a name into its directory fails (file exists): each name once.
-        names = sorted(
-            {str(a["name"]) for a in _json_lines(listed) if str(a["name"]).startswith("flakes-")}
-        )
+        names = sorted({str(a["name"]) for a in artifacts if str(a["name"]).startswith("flakes-")})
         if not names:
             continue
         with tempfile.TemporaryDirectory() as tmp:
@@ -810,7 +854,7 @@ def _issue(args: argparse.Namespace, gh: Gh = _gh, now: dt.datetime | None = Non
             number = int(url.strip().rstrip("/").rsplit("/", 1)[1])
         text = comment(run, flakes, known)
         gh(["issue", "comment", str(number), "-R", args.repo, "--body", text])
-        seen[int(run["id"])] = flakes
+        seen[int(run["id"])] = _merge(seen.get(int(run["id"]), []), flakes)
         when.update(parse_seen([(text, "")]))
         known |= {_key(f) for f in flakes}
         added += 1
@@ -838,8 +882,8 @@ def _age(
     text = body(seen, when, now)
     if text != current:
         gh(["issue", "edit", str(number), "-R", repo, "--body", text])
-    recent, aged = rows(seen, when, now)
-    if aged and not recent:
+    recent, _ = rows(seen, when, now)
+    if not recent:
         note = (
             f"No flaky test of this list was seen in the last {AGE.days} days, so the workflow "
             "flakes.yml closes the issue. The next flake opens a new one."

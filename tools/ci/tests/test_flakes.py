@@ -709,6 +709,8 @@ class FakeGh:
         # Runs whose failed jobs ran again: every flake artifact exists once per attempt, under
         # the same name (GitHub keeps the artifact of the first attempt).
         self.attempts: dict[int, int] = {}
+        # Attempts of a run that left no flake artifact of their own.
+        self.clean_attempts: dict[int, set[int]] = {}
         self.issues: list[dict[str, Any]] = []
         self.comments: list[str] = []
         self.foreign: list[str] = []
@@ -732,6 +734,9 @@ class FakeGh:
                     "head_branch": "main",
                     "head_sha": "abc",
                     "updated_at": self.run_time.get(i, RUN_TIME),
+                    "run_attempt": self.attempts.get(i, 1),
+                    # Attempt k starts at minute k; its artifacts are written 30 seconds later.
+                    "run_started_at": f"2000-01-01T00:{self.attempts.get(i, 1):02d}:00Z",
                 }
                 for i in sorted(self.artifacts)
             ]
@@ -765,8 +770,14 @@ class FakeGh:
             return "".join(json.dumps(c) + "\n" for c in [*other, *own])
         if args[:2] == ["api", "--paginate"] and "/artifacts" in args[2]:
             run = int(args[2].split("/runs/")[1].split("/")[0])
-            names = [*self.artifacts[run]] * self.attempts.get(run, 1) + ["go-shard-1"]
-            return "".join(json.dumps({"name": n}) + "\n" for n in names)
+            listed = [
+                {"name": n, "created_at": f"2000-01-01T00:{k:02d}:30Z"}
+                for k in range(1, self.attempts.get(run, 1) + 1)
+                if k not in self.clean_attempts.get(run, set())
+                for n in self.artifacts[run]
+            ]
+            listed.append({"name": "go-shard-1", "created_at": "2000-01-01T00:01:30Z"})
+            return "".join(json.dumps(a) + "\n" for a in listed)
         if args[:2] == ["run", "download"]:
             run, name, target = (
                 int(args[2]),
@@ -853,6 +864,49 @@ def test_a_rerun_run_with_one_artifact_name_per_attempt_counts_once() -> None:
     # The run counts once for its flake.
     assert "| 1 | 41 | 2026-11-01 | `go` | `example.com/mod/a` | `TestA` |" in gh.issues[0]["body"]
     assert flakes.parse_comments(gh.comments)[41] == [_flake("TestA")]
+
+
+def test_a_rerun_of_a_reported_run_with_a_new_flake_artifact_is_seen_again() -> None:
+    gh = FakeGh({42: {"flakes-test-apps": [_flake("TestA")]}})
+    gh.run_time = {42: "2026-10-20T08:00:00Z"}
+    assert _issue(gh, now="2026-10-20T12:00:00Z") == 0
+    gh.issues[0]["state"] = "CLOSED"
+    # The failed jobs of run 42 ran again on 2026-10-21 and TestA flaked again in attempt 2:
+    # the same run id, a new attempt. It is reported again, with the time of the rerun.
+    gh.attempts[42] = 2
+    gh.run_time[42] = "2026-10-21T09:00:00Z"
+    assert _issue(gh, now="2026-10-21T10:00:00Z") == 0
+    assert [i["state"] for i in gh.issues] == ["CLOSED", "OPEN"]
+    assert ", attempt 2 (" in gh.comments[1]
+    assert flakes.parse_attempts(gh.comments) == {42: 2}
+    assert "| 1 | 42 | 2026-10-21 | `go` |" in gh.issues[1]["body"]
+    # Attempt 2 is reported now: no further comment.
+    assert _issue(gh, now="2026-10-21T11:00:00Z") == 0
+    assert len(gh.comments) == 2
+    # Attempt 3 left no flake artifact of its own: the run is not seen again.
+    gh.attempts[42] = 3
+    gh.clean_attempts[42] = {3}
+    gh.run_time[42] = "2026-10-22T09:00:00Z"
+    assert _issue(gh, now="2026-10-22T10:00:00Z") == 0
+    assert len(gh.comments) == 2
+    assert "| 1 | 42 | 2026-10-21 | `go` |" in gh.issues[1]["body"]
+
+
+def test_the_attempts_of_one_run_count_once_with_the_flakes_of_each() -> None:
+    first = flakes.marker(43, [_flake("TestA")])
+    second = flakes.marker(43, [_flake("TestB")], attempt=2)
+    assert flakes.parse_attempts([first, second]) == {43: 2}
+    assert sorted(f["test"] for f in flakes.parse_comments([first, second])[43]) == [
+        "TestA",
+        "TestB",
+    ]
+
+
+def test_an_open_issue_without_a_row_is_closed() -> None:
+    gh = FakeGh({})
+    gh.issues.append({"number": 7, "title": flakes.TITLE, "state": "OPEN", "body": ""})
+    assert _issue(gh) == 0
+    assert gh.issues[0]["state"] == "CLOSED"
 
 
 def test_only_the_bot_comments_count_and_their_flakes_are_checked() -> None:
