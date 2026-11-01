@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -288,3 +288,29 @@ def test_restore_keeps_only_the_steps_the_server_has() -> None:
     assert after.steps[open_]["status"] == "completed"
     assert after.steps[unended]["status"] == "completed"
     assert after.steps[done] == {}
+
+
+def test_keepalive_while_background_work_runs_reports_progress_once_per_interval() -> None:
+    # Between turns the stream can stay silent while background work runs; the run must not
+    # look stalled (09 5.5, 18.5), so the box reports progress once per interval.
+    clock = [NOW]
+    patch = Patch()
+    live = LiveBox(
+        patch,  # type: ignore[arg-type]
+        own_uuid=OWN,
+        title_requested=False,
+        context_windows={},
+        now=lambda: clock[0],
+        progress_interval=60.0,
+    )
+    live.keepalive()
+    assert patch.values == {}
+    clock[0] = NOW + timedelta(seconds=61)
+    live.keepalive()
+    assert patch.values == {"/metrics/progress_events": 1}
+    clock[0] = NOW + timedelta(seconds=90)
+    live.keepalive()
+    assert patch.values == {"/metrics/progress_events": 1}
+    clock[0] = NOW + timedelta(seconds=122)
+    live.keepalive()
+    assert patch.values == {"/metrics/progress_events": 2}

@@ -12,6 +12,8 @@ environment of a turn drops every control variable. Commands:
 * ``-p``: records argv, cwd, environment, the system prompt file and every stdin line, emits
   ``system/init``, echoes the first stdin line with ``isReplay``, plays the fixture, emits the
   ``result`` and exits after stdin EOF. SIGINT ends it with ``error_during_execution``.
+  With ``background_gate`` the turn starts a background job that runs until the test creates
+  the gate file, and the process stays between turns meanwhile (`Fake.background_phase`).
   ``{{tmpdir}}`` and ``{{add_dir}}`` in a fixture, in ``result_override`` or in
   ``meta_result_text`` become the turn's ``TMPDIR`` and its ``--add-dir``.
 
@@ -41,6 +43,8 @@ FIXTURES = Path(__file__).resolve().parent / "fixtures"
 PINNED = "2.1.288"
 # quality.test.patience (bothy_sdk.testing._patience.PATIENCE); standard library only here.
 GATE_PATIENCE = 180.0
+BACKGROUND_TASK = "bgjob01"
+"""The task ID of the scripted background job (``background_gate``)."""
 
 
 class Fake:
@@ -98,7 +102,7 @@ class Fake:
         print(json.dumps({"loggedIn": method != "none", "authMethod": method}))
         return int(self.scenario.get("auth_exit", 1 if method == "none" else 0))
 
-    def turn(self) -> int:  # noqa: PLR0912 - one branch per scripted behaviour
+    def turn(self) -> int:  # noqa: PLR0911, PLR0912 - one branch per scripted behaviour
         argv = sys.argv[1:]
         prompt_file = _after(argv, "--append-system-prompt-file")
         system_prompt = (
@@ -201,6 +205,8 @@ class Fake:
                 for line in lines.lines[:folded]:
                     self.echo(line)
         consumed = [_uuid_of(x) for x in [first, *lines.lines[:folded]]]
+        if self.scenario.get("background_gate"):
+            self.start_background()
         if not self.scenario.get("no_result"):
             final = dict(
                 result or {"type": "result", "subtype": "success", "is_error": False, "result": ""}
@@ -226,6 +232,8 @@ class Fake:
                 }
             )
         exit_code = int(self.scenario.get("exit_code", 0))
+        if self.scenario.get("background_gate"):
+            return self.background_phase(lines, folded, exit_code)
         if self.scenario.get("exit_without_eof"):
             self.record("turn_end", code=exit_code)
             return exit_code
@@ -256,6 +264,129 @@ class Fake:
         self.gate("end_gate")  # stdin is closed: the process still runs until the gate opens
         self.record("turn_end", code=exit_code)
         return exit_code
+
+    # ---- FIX-runner-responsive-turns: a background job outlives the turn ---------------------
+
+    def init_line(self) -> dict[str, Any]:
+        return {
+            "type": "system",
+            "subtype": "init",
+            "session_id": self.session_id,
+            "model": self.model,
+            "apiKeySource": "ANTHROPIC_API_KEY" if os.environ.get("ANTHROPIC_API_KEY") else "none",
+            "tools": [],
+            "cwd": os.getcwd(),
+        }
+
+    def start_background(self) -> None:
+        """The turn starts a background job (Bash with ``run_in_background``) before its result."""
+        self.record("background_started")
+        self.emit(
+            {
+                "type": "system",
+                "subtype": "task_started",
+                "session_id": self.session_id,
+                "task_id": BACKGROUND_TASK,
+                "tool_use_id": "toolu_bg",
+                "task_type": "local_bash",
+                "description": "Run the test suite",
+            }
+        )
+        self.emit(
+            {
+                "type": "system",
+                "subtype": "background_tasks_changed",
+                "session_id": self.session_id,
+                "tasks": [
+                    {
+                        "task_id": BACKGROUND_TASK,
+                        "task_type": "local_bash",
+                        "description": "Run the test suite",
+                    }
+                ],
+            }
+        )
+
+    def background_phase(self, lines: _StdinLines, answered: int, exit_code: int) -> int:
+        """Between turns while the background job runs, like the pinned CLI (09 18.5).
+
+        * A further stdin line starts a turn of its own at once (``system/init``, echo,
+          ``result`` naming the line); its answer says whether the job still runs.
+        * The job ends when the test creates ``background_gate``: the task list empties, the
+          notification comes and the CLI starts a turn by itself whose ``result`` names no
+          input (``background_text``).
+        * The end of stdin while the job runs stops the job (``background_killed``): the CLI
+          ends its background work when its input ends.
+        """
+        gate = Path(str(self.scenario["background_gate"]))
+        running = True
+        deadline = time.monotonic() + 2 * GATE_PATIENCE  # only a bound for an orphaned process
+        while time.monotonic() < deadline:
+            if running and gate.exists():
+                running = False
+                self.background_done()
+            line, done = lines.wait(answered, 0.01)
+            if line is not None:
+                answered += 1
+                self.emit(self.init_line())
+                self.echo(line)
+                state = "still running" if running else "finished"
+                self.emit(
+                    {
+                        **self.followup_result(answered, None),
+                        "result": f"Status: the background job is {state}.",
+                        "user_message_uuids": [_uuid_of(line)],
+                    }
+                )
+                continue
+            if done:
+                break
+        if running:
+            self.record("background_killed")
+            self.emit(
+                {
+                    "type": "system",
+                    "subtype": "task_notification",
+                    "session_id": self.session_id,
+                    "task_id": BACKGROUND_TASK,
+                    "status": "stopped",
+                    "summary": "Run the test suite",
+                }
+            )
+        self.gate("end_gate")
+        self.record("turn_end", code=exit_code)
+        return exit_code
+
+    def background_done(self) -> None:
+        self.record("background_done")
+        self.emit(
+            {
+                "type": "system",
+                "subtype": "background_tasks_changed",
+                "session_id": self.session_id,
+                "tasks": [],
+            }
+        )
+        self.emit(
+            {
+                "type": "system",
+                "subtype": "task_notification",
+                "session_id": self.session_id,
+                "task_id": BACKGROUND_TASK,
+                "status": "completed",
+                "summary": 'Background command "Run the test suite" completed (exit code 0)',
+            }
+        )
+        self.emit(self.init_line())
+        self.emit(
+            {
+                "type": "result",
+                "subtype": "success",
+                "is_error": False,
+                "session_id": self.session_id,
+                "result": str(self.scenario.get("background_text", "The suite passed.")),
+            }
+        )
 
     # ---- M2-35: sessions, compaction, errors and follow-ups ----------------------------------
 
@@ -471,6 +602,14 @@ class _StdinLines:
         with self.changed:
             self.changed.wait_for(lambda: self.done or len(self.lines) > index, GATE_PATIENCE)
             return self.lines[index] if len(self.lines) > index else None
+
+    def wait(self, index: int, timeout: float) -> tuple[str | None, bool]:
+        """The further line number ``index`` if it comes within ``timeout``, and the end flag."""
+        with self.changed:
+            self.changed.wait_for(lambda: self.done or len(self.lines) > index, timeout)
+            if len(self.lines) > index:
+                return self.lines[index], False
+            return None, self.done
 
     def read_all(self) -> list[str]:
         """Wait for the end of stdin (the runner closes it) and return every further line."""
