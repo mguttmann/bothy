@@ -1045,7 +1045,12 @@ cookie writer and the handlers of `getConsoleSession`, `endViewAs`, `stepUpWithP
   `step_up` key, the Windows app (`Console.passwordCaller`, docs/decisions.d/FIX-stepup-macos.md);
   a device with a `step_up` key gets `403 forbidden` with reason `step_up_not_possible` (cause
   `step_up_key_present`), and only a console session gets a new cookie. The OIDC re-login stays
-  console-only.
+  console-only. A locked password path or a password changed during the attempt is refused
+  with `401 step_up_required` and reason `password_locked` or `password_changed`
+  (`refusedRow`) and counts nothing toward `auth.step_up_fail_limit`, so a lockout cannot revoke
+  the session (docs/decisions.d/SEC-STEPUP-LOCKOUT.md; tests
+  `TestConsoleStepUpWithPasswordRefusedRowCountsNothing`,
+  `TestStepUpWithPassword_LockedAccountDoesNotCount`).
 - Idle rule: `last_seen_at` is written only when older than one hundredth of
   `auth.console_session_idle_timeout`; a session is idle from `last_seen_at` plus the timeout plus
   that hundredth on. The request that finds an idle or expired session and the job

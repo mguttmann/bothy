@@ -273,6 +273,79 @@ void main() {
       expect(h.server.to(passwordPath), hasLength(1));
     });
 
+    test(
+      'a locked password path stops asking and hands the reason on',
+      () async {
+        // SEC-STEPUP-LOCKOUT: the server answers password_locked without counting; asking again
+        // would only repeat it, so the person gets the reason instead of "not accepted".
+        h.prompt.passwordAnswers
+          ..add((password: 'correct horse', totpCode: '111111'))
+          ..add((password: 'correct horse', totpCode: '222222'));
+        h.server.routes['POST $passwordPath'] = (_) => FakeReply.problem(
+          401,
+          'step_up_required',
+          reason: 'password_locked',
+        );
+        final error = await h.session.stepUp
+            .confirm(purposeText: 'x')
+            .then<Object?>((_) => null, onError: (Object e) => e);
+        expect(error, isA<DioException>());
+        final problem = ApiProblem.of(error!);
+        expect(
+          (problem?.code, problem?.reason),
+          ('step_up_required', 'password_locked'),
+        );
+        expect(h.server.to(passwordPath), hasLength(1));
+        expect(h.prompt.askedPassword, hasLength(1));
+      },
+    );
+
+    test('an action whose password step-up is locked fails with the reason and is not repeated', () async {
+      h.prompt.passwordAnswers.add((
+        password: 'correct horse',
+        totpCode: '123456',
+      ));
+      h.server.routes['POST /devices/${h.deviceId}/revoke'] = (_) =>
+          FakeReply.problem(401, 'step_up_required');
+      h.server.routes['POST $passwordPath'] = (_) =>
+          FakeReply.problem(401, 'step_up_required', reason: 'password_locked');
+      final error = await revoke().then<Object?>(
+        (_) => null,
+        onError: (Object e) => e,
+      );
+      expect(ApiProblem.of(error!)?.reason, 'password_locked');
+      expect(h.server.requests.map((r) => r.path), [
+        '/devices/${h.deviceId}/revoke',
+        '/auth/step-up/challenge',
+        passwordPath,
+      ]);
+    });
+
+    test(
+      'a password changed during the attempt asks again (nothing was counted)',
+      () async {
+        h.prompt.passwordAnswers
+          ..add((password: 'old', totpCode: '111111'))
+          ..add((password: 'new', totpCode: '222222'));
+        var calls = 0;
+        h.server.routes['POST $passwordPath'] = (_) {
+          calls++;
+          return calls == 1
+              ? FakeReply.problem(
+                  401,
+                  'step_up_required',
+                  reason: 'password_changed',
+                )
+              : const FakeReply(200, {
+                  'step_up_at': '2026-10-15T10:00:00.000Z',
+                  'valid_until': '2026-10-15T10:05:00.000Z',
+                });
+        };
+        await h.session.stepUp.confirm(purposeText: 'x');
+        expect(h.prompt.askedPassword.map((a) => a.rejected), [false, true]);
+      },
+    );
+
     test('a session revoked at the fail limit ends the step-up without asking again', () async {
       h.prompt.passwordAnswers
         ..add((password: 'wrong', totpCode: '111111'))

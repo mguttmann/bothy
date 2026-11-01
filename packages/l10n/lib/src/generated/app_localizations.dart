@@ -608,6 +608,24 @@ abstract class AppLocalizations {
   /// **'Only an owner can do this'**
   String get problemForbiddenOwnerOnly;
 
+  /// Text of the problem code `forbidden` with the reason `step_up_not_possible` (07 section 4.1): this session or device has no step-up method, for example a Windows device without a local account.
+  ///
+  /// In en, this message translates to:
+  /// **'This action cannot be confirmed in this session. Use another device.'**
+  String get problemForbiddenStepUpNotPossible;
+
+  /// Text of the problem code `step_up_required` with the reason `password_locked` (08 sections 6.2 and 13): the password step-up is refused while the password path of the account is locked; it counts nothing.
+  ///
+  /// In en, this message translates to:
+  /// **'Password sign-in is locked for your account after too many wrong attempts. Try again later or confirm on another device.'**
+  String get problemStepUpRequiredPasswordLocked;
+
+  /// Text of the problem code `step_up_required` with the reason `password_changed` (08 section 6.2): the password changed while the step-up was checked; it counts nothing.
+  ///
+  /// In en, this message translates to:
+  /// **'Your password was changed in the meantime. Confirm again with the current password.'**
+  String get problemStepUpRequiredPasswordChanged;
+
   /// Text of the problem code `forbidden` with the reason `view_as_read_only` (07 section 4.1, docs/api/openapi.yaml).
   ///
   /// In en, this message translates to:

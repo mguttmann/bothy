@@ -164,6 +164,51 @@ func TestConsoleStepUpWithPasswordWithoutLocalAccount(t *testing.T) {
 	}
 }
 
+// TestConsoleStepUpWithPasswordRefusedRowCountsNothing (08 6.2 and 13, R-ID-10,
+// SEC-STEPUP-LOCKOUT): a locked password path and a password changed during the attempt are
+// refusals of the login rules, not wrong confirmations: 401 step_up_required with reason
+// password_locked or password_changed, audited with cause locked or credential_changed, the
+// challenge is neither locked nor failed and the session is never revoked, even with
+// auth.step_up_fail_limit failures already in the window.
+func TestConsoleStepUpWithPasswordRefusedRowCountsNothing(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name, reason, cause string
+		change              func(*fakeCredentials)
+	}{
+		{"locked", reasonPasswordLocked, causeLocked, func(c *fakeCredentials) {
+			c.rec.Lockout.LockedUntil = consoleNow.Add(time.Minute)
+		}},
+		{"changed", reasonPasswordChanged, causeChanged, func(c *fakeCredentials) {
+			c.lockSame = false
+			c.locked = c.rec
+			c.locked.PasswordHash = "$argon2id$new"
+		}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			c, f := newTestStepUpConsole(t)
+			l, creds := localForStepUp()
+			tc.change(creds)
+			c.local = l
+			f.challenges.found = true
+			f.challenges.failures = []time.Time{consoleNow, consoleNow, consoleNow}
+			_, err := c.StepUpWithPassword(context.Background(), consoleActor(), ids.New(), "password", validTOTP())
+			if e := problemOf(t, err, errs.CodeStepUpRequired); e.Reason != tc.reason {
+				t.Fatalf("reason = %q, want %q", e.Reason, tc.reason)
+			}
+			if len(f.challenges.finished) != 0 || len(f.auth.revoked) != 0 {
+				t.Fatalf("finished %v, revoked %v: a refused row must count nothing", f.challenges.finished, f.auth.revoked)
+			}
+			if len(f.audit.denials) != 1 || f.audit.denials[0].Attrs[attrCause].Data() != tc.cause ||
+				f.audit.denials[0].Reason != auditing.ReasonStepUpRequired {
+				t.Fatalf("denials = %+v", f.audit.denials)
+			}
+		})
+	}
+}
+
 // TestConsoleBeginStepUpOIDCErrors: the start of a re-login refuses a failing admit, another
 // redirect and a challenge that cannot be read.
 func TestConsoleBeginStepUpOIDCErrors(t *testing.T) {

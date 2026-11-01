@@ -105,6 +105,30 @@ void main() {
       );
     });
 
+    test('the refusals of a step-up have their own texts ($locale)', () {
+      // SEC-STEPUP-LOCKOUT (08 6.2 and 13): a locked password path and a password changed during
+      // the attempt; a session that cannot confirm at all (07 4.1 step_up_not_possible).
+      final texts = {
+        problemText(l, 'step_up_required', reason: 'password_locked'),
+        problemText(l, 'step_up_required', reason: 'password_changed'),
+        problemText(l, 'forbidden', reason: 'step_up_not_possible'),
+      };
+      expect(texts, hasLength(3));
+      expect(
+        texts,
+        isNot(
+          anyOf(
+            contains(l.problemStepUpRequired),
+            contains(l.problemForbidden),
+          ),
+        ),
+      );
+      expect(
+        problemText(l, 'step_up_required', reason: 'password_locked'),
+        l.problemStepUpRequiredPasswordLocked,
+      );
+    });
+
     test('every reason of terminal_denied has its own text ($locale)', () {
       final reasons = terminalDeniedReasons();
       final texts = {

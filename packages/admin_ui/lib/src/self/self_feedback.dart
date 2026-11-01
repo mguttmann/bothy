@@ -38,7 +38,10 @@ final class SelfFailure {
 /// The failure for [error], or null when the person cancelled the step-up (nothing to say).
 ///
 /// A `404` reads as [notFound] when given; a `403` is [SelfFailure.denied] with the translated
-/// reason; no answer is the offline text; every other problem is its translated code.
+/// reason; no answer is the offline text; every other problem is its translated code (with its
+/// reason, for example a locked password step-up). A session without any step-up method
+/// ([StepUpUnavailable]) reads as `step_up_not_possible`, another error of the login layer as a
+/// revoked session.
 SelfFailure? selfFailure(AppLocalizations l, Object error, {String? notFound}) {
   if (error is StepUpCancelled) return null;
   if (error is SelfActionFailed) {
@@ -48,6 +51,13 @@ SelfFailure? selfFailure(AppLocalizations l, Object error, {String? notFound}) {
     return SelfFailure(
       problemText(l, problem.code, reason: problem.reason),
       denied: problem.status == 403,
+    );
+  }
+  // A session without any step-up method is not a revoked one (SEC-STEPUP-LOCKOUT).
+  if (error is StepUpUnavailable) {
+    return SelfFailure(
+      problemText(l, 'forbidden', reason: 'step_up_not_possible'),
+      denied: true,
     );
   }
   if (error is AuthException) return SelfFailure(l.problemSessionRevoked);

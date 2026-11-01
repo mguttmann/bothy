@@ -27,7 +27,7 @@ Further rules checked by `make arch`:
 | Port | Purpose | Implemented by |
 |---|---|---|
 | `DeviceKeySigner` | ES256 key that returns the JOSE `R \|\| S` signature (64 bytes) | M4-10 (Apple), M4-11 (Windows), M5-01 (Android) |
-| `DeviceKeys` | `dpop` (no confirmation) and `stepUp` (user presence); `stepUp` is `null` where the platform has none (Windows, D-M4-11-2): the device registers without `step_up_key` and `StepUpService.confirm` confirms with password and TOTP (`StepUpPrompt.askPassword`, `stepUpWithPassword`, docs/decisions.d/FIX-stepup-macos.md); it throws `StepUpUnavailable` when the server refuses that too | same |
+| `DeviceKeys` | `dpop` (no confirmation) and `stepUp` (user presence); `stepUp` is `null` where the platform has none (Windows, D-M4-11-2): the device registers without `step_up_key` and `StepUpService.confirm` confirms with password and TOTP (`StepUpPrompt.askPassword`, `stepUpWithPassword`, docs/decisions.d/FIX-stepup-macos.md); it throws `StepUpUnavailable` when the server refuses that too, and stops asking with the server's answer while the password path is locked (reason `password_locked`, docs/decisions.d/SEC-STEPUP-LOCKOUT.md) | same |
 | `SecretStore` | refresh token and device ID by key; a write is durable when its future completes | M4-18 |
 | `BrowserLauncher` | opens the OIDC URL in the system browser, never a web view | M4-18 |
 | `RedirectReceiver` | the `app_redirect_uri` (loopback `127.0.0.1` on desktop) and the redirect back | M4-18 |

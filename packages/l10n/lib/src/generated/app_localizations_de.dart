@@ -313,6 +313,18 @@ class AppLocalizationsDe extends AppLocalizations {
   String get problemForbiddenOwnerOnly => 'Das kann nur ein Owner';
 
   @override
+  String get problemForbiddenStepUpNotPossible =>
+      'Diese Aktion kann in dieser Sitzung nicht bestätigt werden. Verwende ein anderes Gerät.';
+
+  @override
+  String get problemStepUpRequiredPasswordLocked =>
+      'Die Anmeldung mit Passwort ist für dein Konto nach zu vielen Fehlversuchen gesperrt. Versuche es später erneut oder bestätige auf einem anderen Gerät.';
+
+  @override
+  String get problemStepUpRequiredPasswordChanged =>
+      'Dein Passwort wurde inzwischen geändert. Bestätige erneut mit dem aktuellen Passwort.';
+
+  @override
   String get problemForbiddenViewAsReadOnly =>
       'Nur Lesen, solange du als andere Person ansiehst';
 

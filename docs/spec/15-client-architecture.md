@@ -478,7 +478,8 @@ are in docs/DECISIONS.md D-M4-15-1.
   `auth.webauthn_origins` ([08](08-identity.md) 18).
 - **Step-up:** native apps sign a server challenge with a second device key that
   requires user confirmation (biometrics or PIN); a device without that key (Windows, section 9)
-  sends password and TOTP instead (`StepUpPrompt.askPassword`, [08](08-identity.md) 6.2); the web
+  sends password and TOTP instead (`StepUpPrompt.askPassword`, [08](08-identity.md) 6.2) and
+  stops asking when the password path is locked (reason `password_locked`); the web
   console uses WebAuthn passkeys. For
   `terminal.open` and `terminal.attach` the step-up is fresh and is consumed (08, section
   6.3); for this the console uses only a passkey with `userVerification = required`.

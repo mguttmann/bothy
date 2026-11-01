@@ -10,7 +10,8 @@
 library;
 
 import 'package:api_client/api_client.dart';
-import 'package:auth/auth.dart' show AuthException, stepUpPurposeExtra;
+import 'package:auth/auth.dart'
+    show AuthException, StepUpUnavailable, stepUpPurposeExtra;
 import 'package:dio/dio.dart';
 import 'package:domain/domain.dart' as d;
 import 'package:local_store/local_store.dart' show OutboxDao;
@@ -177,22 +178,37 @@ final class ApiNewProjectPort implements NewProjectPort, ProjectFolderSource {
     return entry.id;
   }
 
-  /// Runs [call] and turns its errors into [NewProjectFailure]: a cancelled step-up or a lost
-  /// session, no answer, or the server's problem.
+  /// Runs [call] and turns its errors into [NewProjectFailure] ([newProjectFailureOf]).
   static Future<T> _guard<T>(Future<T> Function() call) async {
     try {
       return await call();
-    } on DioException catch (e) {
-      if (e.error is AuthException) {
-        throw const NewProjectFailure.stepUpCancelled();
-      }
-      final problem = e.response == null ? null : ApiProblem.of(e);
-      if (problem == null) throw const NewProjectFailure.offline();
-      throw NewProjectFailure.problem(problem.code, reason: problem.reason);
-    } on AuthException {
-      throw const NewProjectFailure.stepUpCancelled();
+    } on Object catch (e) {
+      final failure = newProjectFailureOf(e);
+      if (failure == null) rethrow;
+      throw failure;
     }
   }
+}
+
+/// The [NewProjectFailure] of [error] of a port call, or null for an error that is no answer
+/// of the server or the login layer: a session without any step-up method
+/// ([StepUpUnavailable], for example a Windows device without a local account) is the server's
+/// `403 forbidden` with reason `step_up_not_possible`; another error of the login layer (a
+/// cancelled step-up, a lost session) is a cancel; a `DioException` without an answer is
+/// offline; otherwise the server's problem with its code and reason.
+NewProjectFailure? newProjectFailureOf(Object error) {
+  final own = error is DioException ? error.error : error;
+  if (own is StepUpUnavailable) {
+    return const NewProjectFailure.problem(
+      'forbidden',
+      reason: 'step_up_not_possible',
+    );
+  }
+  if (own is AuthException) return const NewProjectFailure.stepUpCancelled();
+  if (error is! DioException) return null;
+  final problem = error.response == null ? null : ApiProblem.of(error);
+  if (problem == null) return const NewProjectFailure.offline();
+  return NewProjectFailure.problem(problem.code, reason: problem.reason);
 }
 
 /// The server side of "Rename project" (01 6.11; D-M4-44-6); every method throws
