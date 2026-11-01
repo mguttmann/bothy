@@ -396,13 +396,15 @@ final class FlutterSecureBackend implements SecureBackend {
   ///
   /// The marker [scopeMarkerKey] ends the move only while the scope holds a session; a marker
   /// without one (a move that took nothing, a person who signed out) does not stop a retry
-  /// (docs/decisions.d/FIX-macos-migration-denied.md).
+  /// (docs/decisions.d/FIX-macos-migration-denied.md). In a shared store the move is done per
+  /// own instance: one whose session is not in the scope yet is still tried, marker or not.
   Future<void> _adoptLegacy(MacOsOptions scoped, _Adoption adoption) async {
     try {
       final marked = await _read(scopeMarkerKey, scoped) != null;
       final current = await _scopedKeys(scoped);
-      if (marked && current.any(_isRefreshToken)) return;
-      final Set<String>? own = _shared(scoped)
+      final shared = _shared(scoped);
+      if (marked && !shared && current.any(_isRefreshToken)) return;
+      final Set<String>? own = shared
           ? await (localInstances?.call() ?? Future.value(<String>{}))
           : null;
       final refused = own == null || own.isNotEmpty

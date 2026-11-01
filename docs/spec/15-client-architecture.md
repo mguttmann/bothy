@@ -621,7 +621,8 @@ under the remembered server's origin; never `app/instance`), a refused item stay
 place, its instance is not copied, the rest is, and no marker is written, so the next start tries
 again. An instance counts as moved only when the scope holds its session; until then its old
 secrets replace what an earlier move left, and the marker `app/secret_scope` ends the move only
-while the scope holds a session. The copy has the
+while the scope holds a session; in a shared store (login keychain, Windows file) it ends it for
+no own instance whose session is not in the scope yet. The copy has the
 deadline `FlutterSecureBackend.legacyDeadline` and every call of the store the deadline
 `FlutterSecureBackend.callDeadline`, after which the call fails instead of holding the start.
 The database key is 32 bytes from `Random.secure()`, created at the first start of an instance;

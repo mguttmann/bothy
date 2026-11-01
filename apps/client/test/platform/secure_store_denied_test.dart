@@ -334,6 +334,33 @@ void main() {
         expect(_old(storage), isNot(contains(_token)));
         expect(_old(storage), contains(token2), reason: 'i2 not refreshed');
       });
+
+      test('a marker and the session of one instance in the scope: another '
+          'own instance with a refused session still moves at a later '
+          'start', () async {
+        const i2 = '0193f2a7-0000-7000-8000-0000000000a2';
+        const token2 = 'instance/$i2/auth/$_origin/refresh_token';
+        final storage = SharedStorage(
+          TargetPlatform.macOS,
+          entitled: build.entitled,
+        );
+        _ownerOldItems(storage);
+        _failedMoveLeftovers(storage);
+        _old(storage)['instance/$i2/database_key'] = 'k2';
+        _old(storage)[token2] = 'r2';
+        storage.foreign.add(token2);
+        Future<Set<String>> both() async => {_i1, i2};
+
+        final first = _backend(storage, build.keychain, localInstances: both);
+        expect(await first.read(_token), 'r-old');
+        expect(await first.read(token2), isNull);
+        expect(await first.read(_marker), _app, reason: 'the old marker');
+
+        storage.foreign.remove(token2);
+        final second = _backend(storage, build.keychain, localInstances: both);
+        expect(await second.read(token2), 'r2');
+        expect(await second.read('instance/$i2/database_key'), 'k2');
+      });
     });
   }
 
