@@ -45,6 +45,7 @@ __all__ = [
     "check_set",
     "denied_match",
     "display_name",
+    "notice_language",
     "split_attach_lines",
     "with_notice",
 ]
@@ -493,10 +494,13 @@ class Limits:
     Attributes:
         max_attachments: ``message_max_attachments``.
         max_upload_bytes: ``file_max_upload_bytes``.
+        locale: ``locale_default`` of the same read, the language of the notice
+            (FIX-operator-upload-grant); ``None`` when unknown.
     """
 
     max_attachments: int
     max_upload_bytes: int
+    locale: str | None = None
 
 
 @dataclass(frozen=True)
@@ -605,37 +609,125 @@ def display_name(announced: str) -> str:
     return name or EMPTY_NAME
 
 
-def build_notice(outcomes: Sequence[Outcome], limit: int | None) -> str:
+# language-check: off
+_NOTICE_HEADING = {"en": "Attachments not sent:", "de": "Anhänge nicht gesendet:"}
+_NOTICE_MORE = {"en": "- and {n} more", "de": "- und {n} weitere"}
+_GERMAN_REASONS = {
+    "not_found": "nicht gefunden",
+    "outside_allowed_roots": "liegt außerhalb der erlaubten Ordner",
+    "denied_pattern": "gesperrter Dateiname",
+    "not_a_regular_file": "keine normale Datei",
+    "hard_link": "Datei mit mehreren harten Links",
+    "empty_file": "leere Datei",
+    "changed_during_check": "während der Prüfung geändert",
+    "too_large": "zu groß",
+    "too_many": "zu viele Dateien",
+    "limits_unavailable": "Grenzen des Servers nicht lesbar",
+    "upload_refused": "Hochladen abgelehnt",
+    "upload_failed": "Hochladen fehlgeschlagen",
+    "not_attached": "nicht angehängt",
+    "set_not_sent": "nicht gesendet, weil eine andere Datei nicht gesendet werden konnte",
+}
+"""The German text of every code of `REASONS` (FIX-operator-upload-grant)."""
+_GERMAN_PROBLEMS: dict[tuple[str, str | None, str | None], str] = {
+    ("upload_refused", "forbidden", "capability_missing"): "Hochladen nicht erlaubt (Recht fehlt)",
+    ("upload_refused", "forbidden", "acting_for_insufficient"): (
+        "Hochladen nicht erlaubt (der auslösenden Person fehlt das Recht)"
+    ),
+    ("upload_refused", "channel_read_only", None): (
+        "Hochladen abgelehnt (Kanal ist schreibgeschützt)"
+    ),
+    ("upload_refused", "conflict", "quota_exceeded"): (
+        "Hochladen abgelehnt (Speicherkontingent erschöpft)"
+    ),
+    ("upload_refused", "payload_too_large", None): "Hochladen abgelehnt (Datei zu groß)",
+    ("upload_refused", "unsupported_media_type", "file_type_denied"): (
+        "Hochladen abgelehnt (Dateityp nicht erlaubt)"
+    ),
+    ("upload_refused", "unavailable", "storage_full"): (
+        "Hochladen abgelehnt (Speicher des Servers voll)"
+    ),
+    ("not_attached", "feature_disabled", None): (
+        "nicht angehängt (Senden von Dateien ist ausgeschaltet)"
+    ),
+}
+"""Readable German texts of the server problems people meet most, by (code, problem, reason);
+a reason of ``None`` matches any reason of that problem."""
+# language-check: on
+
+
+def notice_language(locale: str | None) -> str:
+    """The language of the notice for the instance's ``locale.default``.
+
+    Args:
+        locale: A BCP 47 tag such as ``de`` or ``de-AT``, or ``None`` when unknown.
+
+    Returns:
+        ``de`` for German, ``en`` for anything else.
+
+    Examples:
+        >>> notice_language("de-AT"), notice_language("fr"), notice_language(None)
+        ('de', 'en', 'en')
+    """
+    primary = (locale or "").replace("_", "-").split("-", 1)[0].lower()
+    return primary if primary in _NOTICE_HEADING else "en"
+
+
+def _detail(rejection: Rejection) -> str:
+    """`` (<problem>, <reason>)`` for ``upload_refused`` and ``not_attached``, else ``""``."""
+    if rejection.code not in _PROBLEM_REASONS or not rejection.problem:
+        return ""
+    detail = rejection.problem
+    if rejection.reason:
+        detail += f", {rejection.reason}"
+    return f" ({detail})"
+
+
+def _reason_text(rejection: Rejection, language: str) -> str:
+    """The reason of one line: the code with its problem in English, readable text in German."""
+    if language != "de":
+        return rejection.code + _detail(rejection)
+    known = _GERMAN_PROBLEMS.get((rejection.code, rejection.problem, rejection.reason))
+    if known is None:
+        known = _GERMAN_PROBLEMS.get((rejection.code, rejection.problem, None))
+    if known is not None and rejection.problem:
+        return known
+    return _GERMAN_REASONS.get(rejection.code, rejection.code) + _detail(rejection)
+
+
+def build_notice(outcomes: Sequence[Outcome], limit: int | None, locale: str | None = None) -> str:
     r"""The notice of a set that was not sent (note 8); empty when every file was sent.
+
+    The notice follows the instance's ``locale.default`` (FIX-operator-upload-grant): German
+    gets a German heading and readable reasons, every other or unknown locale the English
+    heading and the codes of `REASONS`.
 
     Args:
         outcomes: The outcomes in position order.
         limit: ``message_max_attachments``: at most this many lines name files, the rest is
             summed up in one line; ``None`` (limits unknown) names every file.
+        locale: ``locale_default`` of ``getInstance``; ``None`` when unknown.
 
     Returns:
-        ``Attachments not sent:`` and one line per file, or ``""``.
+        The heading and one line per file, or ``""``.
 
     Examples:
         >>> build_notice([Outcome("a/.env", Rejection("denied_pattern"))], 3)
         'Attachments not sent:\n- `.env`: denied_pattern'
+        >>> build_notice([Outcome("a/.env", Rejection("denied_pattern"))], 3, "de").count("\n")
+        1
     """
     if all(o.rejection is None for o in outcomes):
         return ""
-    lines = ["Attachments not sent:"]
+    language = notice_language(locale)
+    lines = [_NOTICE_HEADING[language]]
     shown = outcomes if limit is None else outcomes[: max(limit, 0)]
     for outcome in shown:
         rejection = outcome.rejection or Rejection("set_not_sent")
-        line = f"- `{display_name(outcome.announced)}`: {rejection.code}"
-        if rejection.code in _PROBLEM_REASONS and rejection.problem:
-            detail = rejection.problem
-            if rejection.reason:
-                detail += f", {rejection.reason}"
-            line += f" ({detail})"
-        lines.append(line)
+        lines.append(f"- `{display_name(outcome.announced)}`: {_reason_text(rejection, language)}")
     rest = len(outcomes) - len(shown)
     if rest > 0:
-        lines.append(f"- and {rest} more")
+        lines.append(_NOTICE_MORE[language].format(n=rest))
     return "\n".join(lines)
 
 

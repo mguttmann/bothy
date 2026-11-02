@@ -3165,11 +3165,23 @@ it is.
 **Notice.** After one blank line, the line `Attachments not sent:` and one line per announced file
 `` - `<name>`: <code> `` (with `(<problem code>, <reason>)` for `upload_refused` and
 `not_attached`), at most `message_max_attachments` named lines and then `- and <n> more`. The
-closed set of codes: `not_found`, `outside_allowed_roots`, `denied_pattern`,
+notice follows `locale_default` of `getInstance` (read for the limits anyway; addendum of
+2026-11-02): for German (`de`, `de-*`) the heading, the last line and each code are German texts,
+with fixed texts for the common problems of `upload_refused` and `not_attached` and the problem
+code and reason in brackets for any other; any other or unknown locale keeps the English form
+above. The closed set of codes: `not_found`, `outside_allowed_roots`, `denied_pattern`,
 `not_a_regular_file`, `hard_link`, `empty_file`, `changed_during_check`, `too_large`, `too_many`,
 `limits_unavailable`, `upload_refused`, `upload_failed`, `not_attached`, `set_not_sent`. `<name>`
 is the last component of the announced path without control, bidi and backtick characters, never a
-folder or a real path.
+folder or a real path. The German texts:
+
+<!-- language-check: off -->
+- heading `Anhänge nicht gesendet:`, last line `- und <n> weitere`;
+- `upload_refused` with `forbidden`, `capability_missing`: `Hochladen nicht erlaubt (Recht fehlt)`;
+  with `forbidden`, `acting_for_insufficient`:
+  `Hochladen nicht erlaubt (der auslösenden Person fehlt das Recht)`;
+- the remaining texts are those of `reply_attachments.build_notice` in the Claude Code runner.
+<!-- language-check: on -->
 
 **Persistence and stop.** The progress of a set is stored before each request that depends on it
 (`Idempotency-Key` values, `file_id`, confirmed parts, the `client_msg_id` of a fallback), so a

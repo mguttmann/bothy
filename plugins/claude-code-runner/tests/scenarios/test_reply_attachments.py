@@ -297,6 +297,21 @@ async def test_acting_for_insufficient_refuses_upload(world: World) -> None:
     ]
 
 
+async def test_notice_in_the_instance_language(world: World) -> None:
+    """FIX-operator-upload-grant: the live case on a German instance. ``createUpload`` answers
+    ``403 forbidden`` with ``capability_missing``; the answer carries the German notice."""
+    world.fake.uploads.locale_default = "de"
+    world.fake.inject("createUpload", Fault.problem("forbidden", reason="capability_missing"))
+    run_id = await _answer(world, "Fertig.\nATTACH: dist/report.md", {"dist/report.md": REPORT})
+    assert await world.ended(run_id) == "completed"
+    (message,) = world.fake.messages
+    # language-check: off
+    assert message["content_md"] == (
+        "Fertig.\n\nAnhänge nicht gesendet:\n- `report.md`: Hochladen nicht erlaubt (Recht fehlt)"
+    )
+    # language-check: on
+
+
 @pytest.mark.parametrize(
     ("code", "reason"), [("feature_disabled", None), ("conflict", "file_not_attachable")]
 )

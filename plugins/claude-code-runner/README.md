@@ -410,7 +410,8 @@ true`, and the owner's switch `supports_files_out` is enforced by the server at 
 - All or none: one rejected file, a failed upload or a refused attachment
   (`403 feature_disabled`, `403 forbidden`, `409 conflict` with `file_not_attachable`) sends the
   answer without any attachment and with the notice `Attachments not sent:` and one line per
-  file, its base name and a code of the closed set `not_found`, `outside_allowed_roots`, `denied_pattern`,
+  file (a German heading and readable German reasons when the instance's `locale_default` is
+  German), its base name and a code of the closed set `not_found`, `outside_allowed_roots`, `denied_pattern`,
   `not_a_regular_file`, `hard_link`, `empty_file`, `changed_during_check`, `too_large`,
   `too_many`, `limits_unavailable`, `upload_refused`, `upload_failed`, `not_attached`,
   `set_not_sent`. A failed set never fails the run.

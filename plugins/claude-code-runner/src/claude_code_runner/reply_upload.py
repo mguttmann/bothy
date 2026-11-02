@@ -327,6 +327,8 @@ class AttachmentSetRecord:
         outcomes: The outcome per announced file of a failed set (announced path, code,
             problem, reason).
         limit: ``message_max_attachments`` for the notice (``None`` when unknown).
+        locale: The instance's ``locale_default``, the language of the notice (``None`` when
+            unknown; a record of an older runner has none and keeps the English notice).
         client_msg_id: The answer's ``client_msg_id`` (of the turn record).
         fallback_msg_id: The ``client_msg_id`` of the answer without attachments, stored before
             it is sent.
@@ -338,6 +340,7 @@ class AttachmentSetRecord:
     files: list[_FileState] = field(default_factory=list)
     outcomes: list[dict[str, Any]] = field(default_factory=list)
     limit: int | None = None
+    locale: str | None = None
     client_msg_id: str = ""
     fallback_msg_id: str | None = None
 
@@ -365,6 +368,7 @@ class AttachmentSetRecord:
             "files": [vars(f) for f in self.files],
             "outcomes": self.outcomes,
             "limit": self.limit,
+            "locale": self.locale,
             "client_msg_id": self.client_msg_id,
             "fallback_msg_id": self.fallback_msg_id,
         }
@@ -384,6 +388,7 @@ class AttachmentSetRecord:
             doc = json.loads(path.read_text(encoding="utf-8"))
             files = [_FileState(**f) for f in doc.get("files", [])]
             limit = doc.get("limit")
+            locale = doc.get("locale")
             return cls(
                 path=path,
                 answer=int(doc["answer"]),
@@ -391,6 +396,7 @@ class AttachmentSetRecord:
                 files=files,
                 outcomes=list(doc.get("outcomes", [])),
                 limit=limit if isinstance(limit, int) else None,
+                locale=locale if isinstance(locale, str) else None,
                 client_msg_id=str(doc.get("client_msg_id", "")),
                 fallback_msg_id=doc.get("fallback_msg_id"),
             )
@@ -418,7 +424,7 @@ class AttachmentSetRecord:
             )
             for o in self.outcomes
         ]
-        return build_notice(outcomes, self.limit)
+        return build_notice(outcomes, self.limit, self.locale)
 
 
 # ---- the context of one answer -------------------------------------------------------------
@@ -498,7 +504,8 @@ async def _limits(ctx: ReplyContext) -> Limits | None:
     except (httpx.TransportError, TypeError):
         _log("attachments_limits_unavailable", code="transport_error", **ctx.ids)
         return None
-    return Limits(info.limits.message_max_attachments, info.limits.file_max_upload_bytes)
+    locale = info.locale_default if isinstance(info.locale_default, str) else None
+    return Limits(info.limits.message_max_attachments, info.limits.file_max_upload_bytes, locale)
 
 
 async def read_content_limit(client: Client, ids: Mapping[str, Any]) -> int | None:
@@ -586,13 +593,14 @@ async def _prepare(
     limits = await _limits(ctx)
     room = limits
     if limits is not None and overflow is not None:
-        room = Limits(limits.max_attachments - 1, limits.max_upload_bytes)
+        room = Limits(limits.max_attachments - 1, limits.max_upload_bytes, limits.locale)
     verdict = _check(ctx, paths, room)
     record = AttachmentSetRecord(
         path=path,
         answer=answer,
         state="staged",
         limit=limits.max_attachments if limits is not None else None,
+        locale=limits.locale if limits is not None else None,
         client_msg_id=str(client_msg_id),
     )
     if not verdict.ok or limits is None:
