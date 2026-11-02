@@ -90,6 +90,8 @@ _IDEMPOTENT_KEY_OPS = frozenset(
         "createUpload",
         "completeUpload",
         "createThread",
+        "closeThread",
+        "reopenThread",
     }
 )
 _ROUTES: tuple[tuple[str, str, str], ...] = (
@@ -127,6 +129,8 @@ _ROUTES: tuple[tuple[str, str, str], ...] = (
     ("GET", "/channels/{channel_id}", "getChannel"),
     ("POST", "/channels/{channel_id}/threads", "createThread"),
     ("PUT", "/threads/{thread_id}/title", "setThreadTitle"),
+    ("POST", "/threads/{thread_id}/close", "closeThread"),
+    ("POST", "/threads/{thread_id}/reopen", "reopenThread"),
     ("POST", "/threads/{thread_id}/agent-sessions/report", "reportAgentSession"),
     ("PATCH", "/messages/{message_id}", "updateMessage"),
     ("GET", "/instance", "getInstance"),
@@ -717,6 +721,19 @@ class FakeServer:
         meta = self.world.thread_meta[thread_id]
         meta["title"], meta["title_source"] = title, "manual"
         meta["version"] += 1
+
+    def close_thread(self, thread_id: UUID) -> None:
+        """A person marks the thread done (the app's Done button, ``thread.close``).
+
+        Args:
+            thread_id: The thread.
+        """
+        self.world.close_thread(str(thread_id))
+
+    @property
+    def reopened_by_message(self) -> list[UUID]:
+        """The done threads a new message reopened (01 6.1), in order."""
+        return list(self.world.reopened_by_message)
 
     @property
     def titles(self) -> list[dict[str, Any]]:
@@ -1411,6 +1428,10 @@ class FakeServer:
         if op == "setThreadTitle":
             doc = world.set_title(p["thread_id"], body, request.headers.get("If-Match"))
             return 200, doc, {"ETag": f'"{doc["version"]}"'}
+        if op == "closeThread":
+            return 200, world.close_thread(p["thread_id"]), {}
+        if op == "reopenThread":
+            return 200, world.reopen_thread(p["thread_id"]), {}
         if op == "reportAgentSession":
             row = world.report_session(p["thread_id"], body, request.headers.get("If-Match"))
             return 200, row, {"ETag": f'"{row["version"]}"'}

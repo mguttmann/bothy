@@ -204,6 +204,8 @@ class World:
         self.thread_meta: dict[UUID, dict[str, Any]] = {}
         # Threads Lotse opened itself (``createThread``, a forum post of a report, 09 14).
         self.created_threads: list[UUID] = []
+        # Done threads a new message reopened (01 6.1), in order.
+        self.reopened_by_message: list[UUID] = []
         self.files: dict[UUID, dict[str, Any]] = {}
         self.context_attachments: dict[UUID, list[UUID]] = {}
         # The files of a follow-up message by message ID, read live by getMessage.
@@ -450,6 +452,7 @@ class World:
         if thread_id not in self.thread_meta:
             self.thread_meta[thread_id] = self._thread(thread_id, channel, person)
         channel = self.thread_meta[thread_id]["channel_id"]
+        self._reopen_by_message(thread_id)
         for item in history:
             self.post_context(thread_id, item)
         message = self._message(thread_id, person, text)
@@ -1390,6 +1393,46 @@ class World:
             raise FakeProblem("not_found")
         return meta
 
+    def close_thread(self, thread_id: str) -> dict[str, Any]:
+        """``closeThread`` by Lotse: the thread is done; a done thread stays as it is (01 6.1).
+
+        A main thread is never done (``invalid_state_transition``).
+        """
+        meta = self._thread_or_404(thread_id)
+        if meta["kind"] == "main":
+            raise FakeProblem("invalid_state_transition")
+        if meta["state"] != "closed":
+            meta["state"], meta["closed_at"], meta["closed_by"] = (
+                "closed",
+                self.now_iso(),
+                str(self.lotse.id),
+            )
+            meta["version"] += 1
+        return self.thread_doc(thread_id)
+
+    def reopen_thread(self, thread_id: str) -> dict[str, Any]:
+        """``reopenThread`` by Lotse: a done thread is open again; an open one stays as it is."""
+        meta = self._thread_or_404(thread_id)
+        if self._reopen(meta):
+            meta["version"] += 1
+        return self.thread_doc(thread_id)
+
+    @staticmethod
+    def _reopen(meta: dict[str, Any]) -> bool:
+        if meta["state"] != "closed":
+            return False
+        meta["state"] = "open"
+        meta.pop("closed_at", None)
+        meta.pop("closed_by", None)
+        return True
+
+    def _reopen_by_message(self, thread_id: UUID) -> None:
+        """A new message in a done thread reopens it (01 6.1, an implicit ``thread.reopen``)."""
+        meta = self.thread_meta.get(thread_id)
+        if meta is not None and self._reopen(meta):
+            meta["version"] += 1
+            self.reopened_by_message.append(thread_id)
+
     def set_title(self, thread_id: str, body: Any, if_match: str | None) -> dict[str, Any]:
         """``setThreadTitle`` with ``If-Match``; a manual title is never replaced."""
         meta = self._thread_or_404(thread_id)
@@ -1615,6 +1658,7 @@ class World:
         existing = self.by_client_msg_id.get(client_msg_id)
         if existing is not None:
             return self.messages[existing], False
+        self._reopen_by_message(thread)
         run_id = UUID(body["run_id"]) if body.get("run_id") else None
         message = self._message(
             thread,

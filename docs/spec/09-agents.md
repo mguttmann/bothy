@@ -2395,6 +2395,16 @@ attachments:
    messages only inside data blocks after a fixed notice line, opened and closed by markers with
    a random boundary of this turn, so no content can close a block or pose as a header line.
 
+Profile bindings (FEAT-hermes-channel-skills): the profile's own `channel_skill_bindings` and
+`channel_prompts` in the platform section (`PlatformConfig.extra`) apply as on Hermes' Discord
+platform, keyed by Bothy channel or thread ID; a thread inherits the entry of its channel, and
+Hermes' own resolvers (`resolve_channel_skills`, `resolve_channel_prompt`) read them. The profile's
+channel prompt follows the context above in the same ephemeral channel prompt, never in its place.
+The bound skills are loaded at the start of a thread's Hermes session (session mode `new`, or no
+current session and no session to bind), each with Hermes' own skill payload and auto-load note
+before the person's text, as Hermes' gateway loads a Discord channel's skills; a continued session
+holds them already. The server's channel skills of item 2 stay as they are.
+
 Voice input (HERMES-MEDIA, 13): after `run.start` and before the turn, every attachment of the
 triggering message with an `audio/*` type, no `transcript` (a transcript of the server, mode
 `service`, is used as it is) and `scan_status` `clean` or `skipped` is loaded whole
@@ -2533,6 +2543,19 @@ as a failure result with the problem code, and nothing is stored. A report with 
 by the normal rules (section 14 item 5). Evidence: the Fake-Hermes test
 `test_reports_from_hermes_send_and_cron` (home forum, text channel, fixed thread, a refused target,
 a cron job in a process without the gateway and one fired by the gateway's own scheduler).
+
+Thread actions (FEAT-hermes-channel-skills): the agent sets a thread's title, marks a thread done
+and reopens it without a run, with the same client from the platform section and the `User-Agent`
+adapter name `hermes-adapter-thread`: `bothy_hermes_adapter.threads.thread_action` for a process
+of the profile, and `python -m bothy_hermes_adapter thread close|reopen|title <thread ID>
+[--title <text>] --profile-home <home>` for a skill or a shell, which prints one JSON line
+(`ok`, `state`, `title`, `title_source`, or `error` with the server's `code`). The calls are
+`thread.set_title` (with `If-Match` of a fresh `thread.get`; section 12), `thread.close` (the
+state of the app's Done button) and `thread.reopen`, checked with the agent's rights (`write` on
+the thread, which the channel's operator holds by the operator rule, 07 2.9). Closing never blocks
+writing: a new message of a person or of the agent reopens a done thread (01 6.1), and a person's
+message there triggers the agent like in an open thread, so a skill decides whether the answer
+needs work. Evidence: `test_ticket_flow.py` (Fake-Hermes) and `operator_done_test.go` (server).
 
 ### 17.10 To check before building
 

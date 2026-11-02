@@ -612,10 +612,22 @@ class HermesHandler(AgentHandler):
             user_text=turn.built.user_text,
             system_part=turn.built.system_part,
             media=turn.media,
+            new_session=self._starts_session(turn),
         )
         switched = await self._before_turn(turn, request)
         outcome = await self.runtime.start_turn(request)
         await self._end_turn(turn, outcome, switched)
+
+    def _starts_session(self, turn: _Turn) -> bool:
+        """Whether the turn runs on a new Hermes session of the thread (`_before_turn`).
+
+        ``new`` always does (the adapter resets a current session first); without a current
+        session and without a session to bind, Hermes opens a new one as well. A ``resume`` or a
+        ``bind`` continues a session.
+        """
+        if turn.session_mode == "new":
+            return True
+        return self.runtime.current_session(turn.thread_id) is None and turn.session_ref is None
 
     async def _before_turn(self, turn: _Turn, request: TurnRequest) -> SessionSwitch | None:
         """Bring the thread's Hermes session in line with ``session_mode`` (09 9.1, 9.5)."""
