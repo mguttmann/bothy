@@ -16562,6 +16562,9 @@ type ThreadTitleHitList struct {
 
 // ThreadTitlePut defines model for ThreadTitlePut.
 type ThreadTitlePut struct {
+	// Auto An automatic title (09 section 12 point 5) that never replaces a meaningful title, such as one an agent or a person set on purpose.
+	Auto *bool `json:"auto,omitempty"`
+
 	// Title Examples: Invoice export fails for March
 	Title string `json:"title"`
 }

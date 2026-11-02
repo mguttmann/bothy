@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 from uuid import UUID
 
@@ -21,11 +22,12 @@ from bothy_sdk.inbox import EntryState
 from bothy_sdk.sources import Envelope
 from bothy_sdk.testing import fingerprint
 from bothy_sdk.testing.doubles import KEEP
-from bothy_sdk.testing.fakeserver import ContextFile, ContextMessage
+from bothy_sdk.testing.fakeserver import ContextFile, ContextMessage, FakeServer
 from bothy_sdk.testing.faults import Fault
 
 import bothy_hermes_adapter
 from bothy_hermes_adapter.defaults import NO_SPLIT_LENGTH
+from bothy_hermes_adapter.reports import standalone_send
 from bothy_hermes_adapter.runtime import (
     CardKind,
     CardRequest,
@@ -35,6 +37,7 @@ from bothy_hermes_adapter.runtime import (
     TurnRequest,
     Usage,
 )
+from bothy_hermes_adapter.threads import thread_action
 
 pytestmark = pytest.mark.anyio
 
@@ -210,6 +213,35 @@ async def test_title_after_first_completed_new_session(tmp_path: Path) -> None:
     assert puts[0].headers["if-match"]
     # A manual title is never touched: the adapter reads the thread and stops.
     assert all(str(manual.thread_id) not in q.path for q in puts)
+
+
+async def test_agent_title_stays_after_the_owners_answer(tmp_path: Path) -> None:
+    # The ticket flow (FIX-auto-title-overwrites-agent-title): the agent's thread action puts the
+    # status into the title, the owner answers "ja" in the post, and the run's new session would
+    # be titled "ja". The automatic title only fills a thread without a meaningful title, so the
+    # status title stays.
+    rt = FakeRuntime()
+    # The thread action runs as a separate process without DPoP, like test_threads.
+    async with FakeServer(dpop=False) as fake, rig(tmp_path, runtime=rt, fake=fake) as r:
+        extra = {
+            "hermes_adapter.server_url": r.fake.base_url,
+            "hermes_adapter.instance_id": str(r.fake.instance_id),
+            "hermes_adapter.token_file": str(tmp_path / "token"),
+        }
+        forum = r.fake.add_forum("tickets", None)
+        posted = await standalone_send(SimpleNamespace(extra=extra), str(forum), "Probe\nBody")
+        assert "error" not in posted, posted
+        thread = UUID(posted["message_id"])
+        status = await thread_action(extra, "title", str(thread), "[WAITING FOR APPROVAL] Probe")
+        assert status["ok"] is True, status
+        answer = await r.fake.trigger(
+            "ja", channel_id=forum, thread_id=thread, author="robin", session_mode="new"
+        )
+        rt.titles[thread] = "ja"
+        await r.until(lambda: r.finished(answer.run_id))
+    assert r.fake.thread(thread)["title"] == "[WAITING FOR APPROVAL] Probe"
+    puts = [q for q in r.requests("setThreadTitle") if q.json.get("auto")]
+    assert [q.json["title"] for q in puts] == ["ja"]
 
 
 # ---- intake, start, restart -----------------------------------------------------------------

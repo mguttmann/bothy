@@ -4,8 +4,10 @@ r"""The title proposal of a new session (09 12 point 5, 18.4, AG-19).
 The runner prompt asks for a first line ``TITLE: <title>`` in the first reply of a new or
 unstarted session. The runner removes it from the reply and, after the first completed run,
 proposes it once: ``getThread``, and when ``title_source`` is ``auto``, ``setThreadTitle`` with
-``If-Match``. ``409 title_manual``, ``412 version_conflict`` and every other failure are logged
-by code and never retried; the run still completes.
+``If-Match`` and ``auto`` (an automatic title, which the server only lets fill a thread without
+a meaningful title, so a title an agent or a person set on purpose stays). ``409 title_manual``,
+``412 version_conflict`` and every other failure are logged by code and never retried; the run
+still completes.
 
 Examples:
     >>> split_title("TITLE: Fix the login form\\nDone.", True)
@@ -73,7 +75,7 @@ async def propose_title(client: Client, thread_id: UUID, title: str) -> str:
             Thread,
             set_thread_title.asyncio_detailed,
             thread_id=thread_id,
-            body=ThreadTitlePut(title=title),
+            body=ThreadTitlePut(title=title, auto=True),
             if_match=f'"{thread.version}"',
         )
     except ProblemError as exc:

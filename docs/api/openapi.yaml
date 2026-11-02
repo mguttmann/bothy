@@ -8565,7 +8565,7 @@ paths:
       operationId: setThreadTitle
       summary: Set the title
       tags: [Threads]
-      description: Every principal except the thread's operator agent sets `title_source = manual`. The operator agent may only replace an `auto` title, which stays `auto`; on a `manual` title it gets `409 title_manual`.
+      description: Every principal except the thread's operator agent sets `title_source = manual`. The operator agent may only replace an `auto` title, which stays `auto`; on a `manual` title it gets `409 title_manual`. With `auto = true` the title is an automatic one (a reference adapter after the first run of a new session) and only fills a thread without a meaningful title, that is `title_source = auto` and a title that is empty or a placeholder; otherwise the answer is `200` with the thread unchanged.
       x-authz-action: thread.title.update
       x-rate-limit-class: rl.write
       parameters:
@@ -25496,6 +25496,10 @@ components:
           type: string
           minLength: 1
           examples: [Invoice export fails for March]
+        auto:
+          type: boolean
+          default: false
+          description: An automatic title (09 section 12 point 5) that never replaces a meaningful title, such as one an agent or a person set on purpose.
     ThreadMove:
       type: object
       additionalProperties: false

@@ -170,7 +170,7 @@ Code names are English and apply in API, database and code.
 | Thread | `thread` | Unit of a conversation and of an agent session with a fixed ID, title, title source and state. |
 | Thread sequence | `thread_seq` | Gapless number of every message in its thread; determines the display order. |
 | Thumbnail | `file_thumbnail` | Reduced representation of a file in a fixed variant. |
-| Title source | `title_source` | `auto` or `manual`; a manually set title is never overwritten automatically. |
+| Title source | `title_source` | `auto` or `manual`; a manually set title is never overwritten automatically, and an automatic title only fills an empty or placeholder title (09 section 12 point 5). |
 | Tombstone | `tombstone` | Kept row of a deleted message without content; keeps the thread sequence gapless. |
 | Tool class | `tool_class` | What the runtime of an agent may do: `chat` < `scoped` < `host`; configured on the agent, reported in the heartbeat. |
 | Transcript | `transcript` | Text of a voice message, created by the agent or a transcription service. |

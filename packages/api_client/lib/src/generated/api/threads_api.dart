@@ -1392,7 +1392,7 @@ class ThreadsApi {
   }
 
   /// Set the title
-  /// Every principal except the thread&#39;s operator agent sets &#x60;title_source &#x3D; manual&#x60;. The operator agent may only replace an &#x60;auto&#x60; title, which stays &#x60;auto&#x60;; on a &#x60;manual&#x60; title it gets &#x60;409 title_manual&#x60;.
+  /// Every principal except the thread&#39;s operator agent sets &#x60;title_source &#x3D; manual&#x60;. The operator agent may only replace an &#x60;auto&#x60; title, which stays &#x60;auto&#x60;; on a &#x60;manual&#x60; title it gets &#x60;409 title_manual&#x60;. With &#x60;auto &#x3D; true&#x60; the title is an automatic one (a reference adapter after the first run of a new session) and only fills a thread without a meaningful title, that is &#x60;title_source &#x3D; auto&#x60; and a title that is empty or a placeholder; otherwise the answer is &#x60;200&#x60; with the thread unchanged.
   ///
   /// Parameters:
   /// * [threadId]

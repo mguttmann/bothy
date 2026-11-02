@@ -1435,14 +1435,22 @@ class World:
             self.reopened_by_message.append(thread_id)
 
     def set_title(self, thread_id: str, body: Any, if_match: str | None) -> dict[str, Any]:
-        """``setThreadTitle`` with ``If-Match``; a manual title is never replaced."""
+        """``setThreadTitle`` with ``If-Match``; a manual title is never replaced.
+
+        With ``auto`` the title only fills a thread without a meaningful title (an empty or
+        placeholder title, 09 12 point 5); otherwise the thread stays as it is.
+        """
         meta = self._thread_or_404(thread_id)
-        _closed(body, required=("title",))
+        _closed(body, required=("title",), optional=("auto",))
         _check_if_match(if_match, meta["version"])
         if meta["title_source"] == "manual":
             raise FakeProblem("title_manual")
         if not isinstance(body["title"], str) or text_error(body["title"]):
             raise field_error("/title", "invalid")
+        if not isinstance(body.get("auto", False), bool):
+            raise field_error("/auto", "invalid")
+        if body.get("auto") and not _placeholder(str(meta["title"])):
+            return self.thread_doc(thread_id)
         meta["title"] = body["title"]
         meta["version"] += 1
         self.extra.titles_set.append({"thread_id": meta["id"], "title": meta["title"]})
@@ -1800,6 +1808,19 @@ def _check_if_match(if_match: str | None, version: int) -> None:
         raise FakeProblem("precondition_required")
     if if_match.strip() not in (f'"{version}"', f'W/"{version}"'):
         raise FakeProblem("version_conflict")
+
+
+# The default placeholder titles of the server (09 12 point 2, thread.placeholder_titles).
+_PLACEHOLDERS = frozenset({"new chat", "neuer chat", "chat", "untitled", "ohne titel", "test"})
+
+
+def _placeholder(title: str) -> bool:
+    """Whether ``title`` is empty or a placeholder, also with an appended number ("New chat 3")."""
+    words = title.split()
+    if len(words) > 1 and words[-1].isascii() and words[-1].isdigit():
+        words = words[:-1]
+    normal = " ".join(words).casefold()
+    return not normal or normal in _PLACEHOLDERS
 
 
 def _closed(

@@ -611,7 +611,7 @@ triggering person ([07-permissions.md](07-permissions.md), SR9; [06-api.md](06-a
 | Question, approval | `message.create` with `kind = card` and components | `client_msg_id` | then `run.finish` with `waiting_input` (section 11) |
 | Change components | `component.update` | `version` | only own messages |
 | Answer interaction | `interaction.respond` | state only forward | Section 11.4 |
-| Suggest title | `thread.title.update` | `If-Match` | only with `title_source = auto`; the source stays `auto` (section 12) |
+| Suggest title | `thread.title.update` | `If-Match` | only with `title_source = auto`; the source stays `auto`; with `auto = true` it only fills an empty or placeholder title (section 12) |
 | Close thread | `thread.close` | idempotent | only at the explicit request of a person |
 | Report session | `agent_session.report` | `If-Match` (CAS over `agent_sessions.version`) | Section 9. Only for the session of the agent's own active run in the thread. `If-Match` absent means "this run has no session row yet": the report creates it; where a row exists, an absent or different `If-Match` gives `412 version_conflict` with `current`. `started` only moves forward; a different reference replaces the stored one (9.5 point 3). Reasons of `409 conflict`: `session_bound_elsewhere`, `session_changed`, `session_not_bound` (9.5). |
 | Maintain commands | `command.register`, `command.remove` | bulk reconciliation | Section 10 |
@@ -2045,7 +2045,14 @@ Rules:
    source stays `auto`. With `manual` the server answers `409 title_manual`.
 4. Guest agents do not set titles.
 5. Reference adapters set the title once after the first completed run of a new
-   session (17.3, 18.4).
+   session (17.3, 18.4), as an automatic title (`auto = true` in `setThreadTitle`). An
+   automatic title only fills a thread without a meaningful title: `title_source = auto` and a
+   title that is empty or a placeholder (point 2). On any other title the server answers `200`
+   with the thread unchanged, so a title the operator agent set on purpose (for example a status
+   in the title through its thread action, 14) survives the owner's answer in a new session, and
+   on a `manual` title the operator agent still gets `409 title_manual`. A title the agent sets
+   on purpose is sent without `auto` and replaces an `auto` title as in point 3
+   (FIX-auto-title-overwrites-agent-title).
 
 ## 13. Voice messages
 
@@ -2277,7 +2284,7 @@ compatibility test runs against the pinned and the newest version (16.1, fake He
 | `on_processing_complete(event, outcome)` | `run.finish` with `completed`, `failed` or `cancelled`, `costs`. Measured: after `/stop` comes `ProcessingOutcome.CANCELLED` |
 | `get_chat_info(chat_id)` | read thread and channel (`thread.read`) |
 | Hermes commands | Built (HERMES-CRON-COMMANDS). At connect the adapter declares its complete command list and the SDK reconciles it (10.2, D-M2-29-12). The Hermes commands that the server has as built-in commands (10.1) stay the server's and are never registered: `/stop` is the stop of section 8 (`/stop` via `handle_message`, item 3), `/new` a new session (`session.mode = new` after a reset, `/new` via `handle_message`; Hermes asks via `send_slash_confirm`, and the adapter answers through `tools.slash_confirm.resolve(session_key, confirm_id, "once")`, because the server has already checked the reset), `/resume` the rebinding (`bind`, `/resume <session ID> --all`, 17.4, 9.5), `/title` and `/status` the server's. A follow-up without configuration also works with `/steer <text>` (17.5), which the adapter does not use. The adapter's command table (`hermes_commands.COMMAND_CLASSES`) names every gateway command of the pinned version with its class and reason; a test fails when a pin update brings a command the table does not name, and commands of other Hermes plugins are never offered. Control commands (`control = true`, instance-wide, no options): `/context` and `/version`, which read the thread's Hermes session or Hermes itself and call no model. On `command.invoked` the adapter sends the bare `/<name>` (never an option value) via `handle_message` from its control sender (17.4) in the thread's session; Hermes answers an idle session through its normal processing and a busy one inline, both with `reply_to` = the command's message, and each text Hermes answers becomes a message of the agent in the thread without a run (`message.create` without `run_id` and without an invocation token, 10.4), also during a run of the thread. Every other gateway command is refused: it calls the model outside a run, changes the thread's session outside the server's session record, bypasses the server's follow-up, approval or card rules, reaches the host, or acts on the whole profile. Skill commands: every skill Hermes offers for the platform (its skill scan without the skills `skills.platform_disabled` turns off for the platform key) becomes a model command (`control = false`, instance-wide) with the optional `string` option `input`; a name that is no valid command name or that a built-in, a table row or a control command uses is left out, and the list never exceeds `command.max_per_principal`. A run with `trigger_kind = command` of such a skill is a turn whose text is Hermes' own skill invocation message for the skill and the `input` (`build_skill_invocation_message`, as Hermes' gateway builds it for `/<skill>`), with the fixed note and the channel instructions as the system part and no reply anchor: a command run has no run context (4.6 defines it for a triggering message, and the server answers `run.context.read` of any other trigger kind with `500 internal_error`), so the adapter does not read it (addendum of 2026-10-30, found by the end-to-end suite of HERMES-E2E-REAL-SERVER); any other command run is refused before the start (`failed`, `adapter_error`). Skills installed after the gateway start are declared at the next start. Evidence: the Fake-Hermes tests `test_commands_and_reports.py` and `test_command_table_covers_pinned_commands` against the pinned version, and the end-to-end suite `plugins/hermes-adapter/tests/realserver` against the server of this tree |
-| Title | after the first completed run of a new session, the Hermes session title as a suggestion (section 12) |
+| Title | after the first completed run of a new session, the Hermes session title as an automatic suggestion (`auto = true`, section 12 point 5) |
 
 Long replies stay one message (Baseline section 4; addendum of 2026-10-29, 01 6.13, D-M4-47-5):
 the adapter gives Hermes `MAX_MESSAGE_LENGTH` = `NO_SPLIT_LENGTH` (as a class attribute and as
@@ -2827,7 +2834,8 @@ with `adapter_error`.
 Title: the runner prompt asks for a line `TITLE: <title>` in the first reply of a new or
 unstarted session. The runner removes the line from the excerpt and the reply and, after the
 first completed run of such a session and only when the line was present and not empty, reads the
-thread and, when `title_source` is `auto`, proposes the title with `If-Match` (section 12);
+thread and, when `title_source` is `auto`, proposes the title with `If-Match` as an automatic
+title (`auto = true`, section 12 point 5);
 `409 title_manual`, `412 version_conflict` and every other failure are logged by code and never
 retried, and the run still completes (AG-19).
 
