@@ -12,7 +12,10 @@ of 17.3 to `bothy_hermes_adapter.handler.HermesHandler` on the adapter's event l
   reconnect. ``disconnect`` stops the loop.
 * A turn is ``handle_message`` with a ``MessageEvent`` whose source is built with
   ``build_source`` and the thread ID (one Hermes session per thread, 17.4) and whose ephemeral
-  ``channel_prompt`` is the context's system part; it ends with ``on_processing_complete``.
+  ``channel_prompt`` is the context's system part; it ends with ``on_processing_complete``. The
+  profile's ``channel_skill_bindings`` and ``channel_prompts`` of the platform section apply with
+  Hermes' Discord semantics, keyed by channel or thread ID: the bound skills are loaded at the
+  start of a thread's session and the channel prompt follows the context.
 * Steering, stop and session switches are the commands and busy inputs the M2-32 record proved:
   a follow-up as busy input (``display.busy_input_mode``), ``/stop``, ``/new`` with its
   confirmation answered through ``tools.slash_confirm.resolve``, and ``/resume <id> --all`` from
@@ -67,6 +70,8 @@ from gateway.platforms.base import (
     cache_audio_from_bytes_async,
     cache_media_bytes_async,
     get_inbound_media_max_bytes,
+    resolve_channel_prompt,
+    resolve_channel_skills,
 )
 from gateway.platforms.event import MessageEvent, MessageType, ProcessingOutcome
 from gateway.session_context import get_session_env
@@ -124,6 +129,17 @@ _READY_POLL_S: Final = 0.1
 _PLATFORMS: dict[str, ServerPlatform] = {}
 
 
+def _session_known(session_id: str) -> bool:
+    """Whether Hermes's session store has ``session_id`` (``True`` when it cannot be read)."""
+    try:
+        from hermes_state import SessionDB  # noqa: PLC0415 - only for a bind
+
+        return SessionDB().get_session(session_id) is not None
+    except Exception as exc:  # unreadable: let Hermes's /resume decide as before
+        _LOG.info("session store not readable: %s", type(exc).__name__)
+        return True
+
+
 class ServerPlatform(BasePlatformAdapter):
     """The platform adapter of one Hermes profile (one agent principal).
 
@@ -144,8 +160,10 @@ class ServerPlatform(BasePlatformAdapter):
         self.platform_key = platform_key
         self.settings: AdapterSettings | None = None
         self.config_error: str | None = None
+        # The platform section's ``extra`` as Hermes handed it over (channel bindings and prompts).
+        self._platform_extra: dict[str, Any] = dict(getattr(config, "extra", None) or {})
         try:
-            extra = dict(getattr(config, "extra", None) or {})
+            extra = dict(self._platform_extra)
             self.settings = load_settings(extra)
         except ConfigError as exc:
             self.config_error = str(exc)
@@ -389,11 +407,76 @@ class ServerPlatform(BasePlatformAdapter):
         event = self._event(
             turn.thread_id, turn.user_text, message_id=str(turn.message_id), control=False
         )
-        event.channel_prompt = turn.system_part
+        event.channel_prompt = self._channel_prompt(turn)
+        if turn.new_session:
+            event.text = self._with_bound_skills(turn, event)
         self._attach(event, turn.media)
         event.user_id = str(turn.user_id)
         event.user_name = turn.user_name
         return await self._dispatch(event)
+
+    def _channel_prompt(self, turn: TurnRequest) -> str:
+        """The server's context, then the profile's ``channel_prompts`` entry of the thread.
+
+        Hermes' own reader resolves the entry as for Discord: the thread's ID first, then its
+        channel's, so every thread of a bound channel inherits the channel's prompt. The entry is
+        appended to the context of the server, never put in its place.
+        """
+        prompt = resolve_channel_prompt(self._extra(), str(turn.thread_id), str(turn.channel_id))
+        return f"{turn.system_part}\n\n{prompt}" if prompt else turn.system_part
+
+    def _with_bound_skills(self, turn: TurnRequest, event: MessageEvent) -> str:
+        """The turn's text after the skills ``channel_skill_bindings`` binds to the thread.
+
+        Hermes' own reader resolves the binding as for Discord (the thread's ID first, then its
+        channel's), and the skills are loaded as Hermes' gateway auto-loads a Discord channel's
+        skills: each one with Hermes' own payload and note, before the person's text, once at the
+        start of the thread's session. The adapter loads them itself instead of setting the
+        event's ``auto_skill``, because Hermes' check for a new session never holds for a turn of
+        this platform: its admission registers the session's route before the turn touches it
+        (docs/decisions.d/FEAT-hermes-channel-skills.md).
+        """
+        from agent.skill_commands import (  # noqa: PLC0415 - Hermes' skill loader
+            _build_skill_message,
+            _load_skill_payload,
+        )
+        from agent.skill_utils import get_disabled_skill_names  # noqa: PLC0415
+
+        names = resolve_channel_skills(self._extra(), str(turn.thread_id), str(turn.channel_id))
+        # The load runs before Hermes sets the turn's session platform, so its loader cannot
+        # apply ``skills.platform_disabled`` of this platform itself: the adapter does.
+        disabled = get_disabled_skill_names(platform=self.platform_key) if names else set()
+        parts: list[str] = []
+        task = self._event_session_key(event)
+        for name in names or ():
+            if name in disabled:
+                _LOG.warning("bound skill disabled on this platform: %s", name)
+                continue
+            try:
+                loaded = _load_skill_payload(name, task_id=task)
+            except Exception as exc:  # an unreadable skill is skipped like a missing one
+                _LOG.warning("bound skill not readable: %s", type(exc).__name__)
+                loaded = None
+            if not loaded:
+                _LOG.warning("bound skill not found: %s", name)
+                continue
+            skill, skill_dir, display = loaded
+            if str(skill.get("name") or display) in disabled:
+                _LOG.warning("bound skill disabled on this platform: %s", name)
+                continue
+            part = _build_skill_message(
+                skill,
+                skill_dir,
+                f'[IMPORTANT: The "{display}" skill is auto-loaded. '
+                "Follow its instructions for this session.]",
+            )
+            if part:
+                parts.append(part)
+        return "\n\n".join([*parts, event.text]) if parts else event.text
+
+    def _extra(self) -> dict[str, Any]:
+        """The platform section's ``extra`` as Hermes handed it to the adapter."""
+        return self._platform_extra
 
     async def steer(self, thread_id: uuid.UUID, text: str, message_id: uuid.UUID) -> None:
         """Pass a follow-up into the running turn as busy input (17.5)."""
@@ -489,6 +572,11 @@ class ServerPlatform(BasePlatformAdapter):
             # Hermes does not move it off the other thread's live route, and the turn of this
             # thread stalls on it (an admission conflict): fail open with the new session (9.5).
             _LOG.info("bind refused: the session is live in another thread until a restart")
+            return SessionSwitch.NEW
+        if not _session_known(external_session_ref):
+            # Hermes keeps the new session for an unknown ID: say so before the turn, so the
+            # turn loads the channel's bound skills like any new session (9.5).
+            _LOG.info("bind refused: the session is not in Hermes's store")
             return SessionSwitch.NEW
         await self._control_command(thread_id, f"/resume {external_session_ref} --all")
         return SessionSwitch.BOUND

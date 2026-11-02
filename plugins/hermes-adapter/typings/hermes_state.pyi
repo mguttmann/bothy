@@ -3,7 +3,9 @@
 # adapter uses; test_hermes_stubs_match_pinned_version holds the signatures equal.
 
 from pathlib import Path
+from typing import Any
 
 class SessionDB:
     def __init__(self, db_path: Path | None = ..., read_only: bool = ...) -> None: ...
+    def get_session(self, session_id: str) -> dict[str, Any] | None: ...
     def get_session_title(self, session_id: str) -> str | None: ...

@@ -139,6 +139,8 @@ class TurnRequest:
         user_text: The person's text plus the transcripts of the voice attachments.
         system_part: The run context as the fixed system part (09 4.6, 17.6).
         media: The attachments of the triggering message in Hermes's media cache.
+        new_session: Whether the turn starts a new Hermes session of the thread (the channel's
+            bound skills are loaded then, never again in the same session).
     """
 
     run_id: UUID
@@ -150,6 +152,7 @@ class TurnRequest:
     user_text: str = field(repr=False)
     system_part: str = field(repr=False)
     media: tuple[InboundMedia, ...] = ()
+    new_session: bool = False
 
 
 @dataclass(frozen=True)

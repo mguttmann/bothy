@@ -131,6 +131,59 @@ the gateway with a client of its own from the platform section (`User-Agent`
 `hermes-adapter-standalone`). Reports with attachments are refused (a report carries text only;
 files go with a turn's answer).
 
+## Channel skills and prompts
+
+The profile binds skills and an extra prompt to Bothy channels with the keys Hermes uses for a
+Discord channel, in the platform section's `extra` (`gateway.platforms.<platform key>.extra`, or
+a root-level `<platform key>:` block, which Hermes promotes into `extra`):
+
+```yaml
+gateway:
+  platforms:
+    bothy:
+      extra:
+        channel_skill_bindings:
+          - id: "<channel or thread ID>"
+            skills: ["<skill name>", "<skill name>"]
+        channel_prompts:
+          "<channel or thread ID>": "<extra instructions for this channel>"
+```
+
+Keys are Bothy channel or thread IDs (UUIDs). A thread uses its own entry, else its channel's, so
+every post of a bound forum inherits the forum's binding (Hermes' `resolve_channel_skills` and
+`resolve_channel_prompt`, the Discord semantics). The bound skills are loaded at the start of the
+thread's Hermes session, each with Hermes' skill payload and auto-load note before the person's
+text, and stay in the session; a skill Hermes cannot find is skipped with a warning. The channel
+prompt is appended to the context the server delivers (09 17.6), never put in its place. Hermes
+copies `platforms.<key>.channel_skill_bindings` outside `extra` only for Discord and Slack, so
+write the bindings into `extra` for this platform. The adapter reads them at the gateway start;
+restart the gateway after a change.
+
+## Thread actions
+
+The agent sets a thread's title, marks it done (the state of the app's Done button) and reopens
+it, without a run and with the agent's own rights (the operator of a channel may do all three in
+its channel):
+
+```
+python -m bothy_hermes_adapter thread title <thread ID> --title "<text>" --profile-home <home>
+python -m bothy_hermes_adapter thread close <thread ID> --profile-home <home>
+python -m bothy_hermes_adapter thread reopen <thread ID> --profile-home <home>
+```
+
+Run it with the Python of the profile and the `PYTHONPATH` of `install` (above);
+`--platform-key` names another platform section than `bothy`. It prints one JSON line with
+the keys `ok`, `thread_id`, `state`, `title` and `title_source` on success, for example
+`{"ok": true, "thread_id": "<ID>", "state": "closed", "title": "Done", "title_source": "auto"}`,
+and `ok` and `error` otherwise, plus `code` and `status` when the server refused the action,
+for example `{"ok": false, "error": "...", "code": "forbidden", "status": 403}`; it exits with
+`1` on any failure.
+A process of the profile calls `bothy_hermes_adapter.threads.thread_action(extra, action,
+thread_id, title)` with the platform section's `extra` instead. A title a person set is never
+replaced (`title_manual`). Closing never blocks writing: a new message of a person or of the
+agent reopens a done thread on the server, and a person's message there reaches Hermes like any
+message, so a bound skill decides whether the answer needs work (`thread reopen`) or not.
+
 ## Configuration keys
 
 In `gateway.platforms.<platform key>.extra`, written by the installer (09 21):
@@ -220,7 +273,9 @@ connects only after Hermes finished its startup restore.
   reaches the model as an image part, a PDF reaches it as Hermes' document note with the cached
   file, and an image whose scan is pending reaches it as the adapter's note; a control command idle and during a turn, a skill
   command, and reports through `hermes send`, a cron job in a process without the gateway and one
-  the gateway's own scheduler fires. They need the network for the pinned downloads and fail without it; they never skip.
+  the gateway's own scheduler fires; the profile's channel skill bindings and channel prompts of a bound forum (and none in another
+  channel), and the ticket flow of a forum post: title, done, an answer in the done post that
+  reaches Hermes, reopen and a refused title a person set. They need the network for the pinned downloads and fail without it; they never skip.
 - `tests/realserver` (pytest marker `e2e`, left out of `uv run pytest`; `make adapters-e2e`): the
   adapter's handler and SDK loop with the fake runtime against the server of this tree
   (`services/server/test/sdkserver`, `bothy_sdk.testing.sdkserver`): a mention in the main

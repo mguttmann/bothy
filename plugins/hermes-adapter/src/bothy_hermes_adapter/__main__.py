@@ -1,9 +1,11 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Command line of the installer: ``python -m bothy_hermes_adapter install|switch-mode|check``.
+"""Command line: ``python -m bothy_hermes_adapter install|switch-mode|check|thread``.
 
 Run it with the Python of the Hermes profile (the one that runs the gateway), so Hermes's own
-reader and writer see the profile (09 17.2, 17.5, 17.7). It prints a summary without values and
-names the restart the operator must do; it never restarts a process (Design note 17).
+reader and writer see the profile (09 17.2, 17.5, 17.7). The installer commands print a summary
+without values and name the restart the operator must do; they never restart a process (Design
+note 17). ``thread close|reopen|title`` runs one thread action as the profile's agent
+(`bothy_hermes_adapter.threads`) and prints its result as one JSON line.
 
 Examples:
     >>> build_parser().parse_args(["check", "--profile-home", "/srv/hermes"]).command
@@ -13,7 +15,9 @@ Examples:
 from __future__ import annotations
 
 import argparse
+import asyncio
 import importlib.util
+import json
 import shutil
 import sys
 from collections.abc import Sequence
@@ -31,11 +35,19 @@ from bothy_hermes_adapter.installer import (
     switch_mode,
 )
 
-__all__ = ["build_parser", "copy_package", "locate", "main", "place_file"]
+__all__ = [
+    "build_parser",
+    "copy_package",
+    "locate",
+    "main",
+    "place_file",
+    "platform_extra",
+    "run_thread_action",
+]
 
 
 def build_parser() -> argparse.ArgumentParser:
-    """The argument parser of the three commands.
+    """The argument parser of the four commands.
 
     Returns:
         The parser.
@@ -60,6 +72,12 @@ def build_parser() -> argparse.ArgumentParser:
     switch.add_argument("--credential-holder", type=UUID)
     chk = sub.add_parser("check", help="show the profile's state and the predicted mode")
     chk.add_argument("--profile-home", type=Path, required=True)
+    thread = sub.add_parser("thread", help="set a thread's title, mark it done or reopen it")
+    thread.add_argument("action", choices=("close", "reopen", "title"))
+    thread.add_argument("thread_id")
+    thread.add_argument("--title")
+    thread.add_argument("--profile-home", type=Path, required=True)
+    thread.add_argument("--platform-key", default="bothy")
     return parser
 
 
@@ -126,6 +144,39 @@ def locate(name: str) -> Path | None:
     return Path(next(iter(spec.submodule_search_locations)))
 
 
+def platform_extra(config: Any, platform_key: str) -> dict[str, Any]:
+    """The ``extra`` mapping of ``gateway.platforms.<platform_key>`` (empty when missing).
+
+    Examples:
+        >>> platform_extra({"gateway": {"platforms": {"bothy": {"extra": {"a": 1}}}}}, "bothy")
+        {'a': 1}
+    """
+    node: Any = config
+    for key in ("gateway", "platforms", platform_key, "extra"):
+        node = node.get(key) if isinstance(node, dict) else None
+    return dict(node) if isinstance(node, dict) else {}
+
+
+def run_thread_action(bridge: Any, args: argparse.Namespace) -> int:
+    """``thread``: one action with the profile's platform section; prints one JSON line.
+
+    Returns:
+        ``0`` when the server accepted it, ``1`` otherwise.
+    """
+    from bothy_hermes_adapter.threads import thread_action  # noqa: PLC0415 - SDK only here
+
+    try:
+        config = bridge.read_config()
+    except Exception:  # any reader error of Hermes (its YAML library varies)
+        # An unreadable config.yaml is an unusable configuration: thread_action answers it with
+        # its own error, so the command still prints one JSON line.
+        config = {}
+    extra = platform_extra(config, args.platform_key)
+    result = asyncio.run(thread_action(extra, args.action, args.thread_id, args.title))
+    sys.stdout.write(json.dumps(result) + "\n")
+    return 0 if result.get("ok") else 1
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run one command.
 
@@ -133,12 +184,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         argv: The arguments (default ``sys.argv[1:]``).
 
     Returns:
-        ``0`` on success, ``1`` when ``check`` finds an adapter the gateway cannot load,
-        ``2`` on a refusal.
+        ``0`` on success, ``1`` when ``check`` finds an adapter the gateway cannot load or the
+        server refuses a ``thread`` action, ``2`` on a refusal.
     """
     args = build_parser().parse_args(argv)
     home = args.profile_home.resolve()
     bridge = _Bridge(home)
+    if args.command == "thread":
+        return run_thread_action(bridge, args)
     try:
         if args.command == "install":
             if args.create_dpop_key:

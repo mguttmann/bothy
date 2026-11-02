@@ -21,6 +21,7 @@ import pytest
 
 from bothy_sdk.auth import DpopAuth
 from bothy_sdk.generated import models
+from bothy_sdk.ids import uuid7
 from bothy_sdk.testing.fakeserver import FakeServer
 from bothy_sdk.testing.faults import Fault
 
@@ -227,6 +228,41 @@ async def test_thread_title_rules(fake: FakeServer) -> None:
         )
         assert (manual.status_code, manual.json()["code"]) == (409, "title_manual")
     assert fake.thread(run.thread_id)["title"] == "A"
+
+
+async def test_thread_done_and_reopen(fake: FakeServer) -> None:
+    """``closeThread``, ``reopenThread`` and the reopen by a new message (01 6.1)."""
+    run = await fake.trigger()
+    thread_id = run.thread_id
+    async with _api(fake) as api:
+        event = await _invocation(api, run.run_id)
+        bound = {"Invocation-Token": event["invocation_token"]}
+        closed = await api.post(f"/threads/{thread_id}/close", headers=bound)
+        assert closed.status_code == 200, closed.text
+        doc = models.Thread.from_dict(closed.json())
+        assert (str(doc.state), fake.thread(thread_id)["closed_by"]) == (
+            "closed",
+            str(fake.world.lotse.id),
+        )
+        again = await api.post(f"/threads/{thread_id}/close", headers=bound)
+        assert again.json()["version"] == closed.json()["version"]
+        opened = await api.post(f"/threads/{thread_id}/reopen", headers=bound)
+        assert str(models.Thread.from_dict(opened.json()).state) == "open"
+        same = await api.post(f"/threads/{thread_id}/reopen", headers=bound)
+        assert same.json()["version"] == opened.json()["version"]
+        main = await api.post(f"/threads/{fake.main_thread()}/close", headers=bound)
+        assert main.json()["code"] == "invalid_state_transition"
+        fake.close_thread(thread_id)
+        assert fake.thread(thread_id)["closed_by"] == str(fake.world.robin.id)
+        body = {"client_msg_id": str(uuid7()), "content_md": "Back", "run_id": str(run.run_id)}
+        posted = await api.post(f"/threads/{thread_id}/messages", json=body, headers=bound)
+        assert posted.status_code == 201, posted.text
+    assert fake.thread(thread_id)["state"] == "open"
+    assert fake.reopened_by_message == [thread_id]
+    fake.close_thread(thread_id, "alex")
+    await fake.trigger("again", thread_id=thread_id)
+    assert fake.thread(thread_id)["state"] == "open"
+    assert fake.reopened_by_message == [thread_id, thread_id]
 
 
 async def test_costs_behind_the_switch(fake: FakeServer) -> None:
