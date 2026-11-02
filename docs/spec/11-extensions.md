@@ -768,8 +768,9 @@ server (`services/server/test/guide`, M2-37), which fails when a step differs fr
 2. **Create a token.** Have the agent token shown once, bound to an adapter key (DPoP), required
    while `agent` is in `auth.dpop_required_for` (default,
    [08-identity.md](08-identity.md) section 12).
-3. **Grants and operator.** `write` (and `+upload`) on the targets; set the agent as operator of a
-   channel or space; choose the channel switches.
+3. **Grants and operator.** Set the agent as operator of a channel or space (it then has `write`
+   and `upload` there by the operator rule); `write` (and `+upload`) grants only on further
+   targets; choose the channel switches.
 4. **Install the SDK and connect.** Gateway with `consumer`; the SDK handles reconnecting and
    `ack`.
 5. **Report adapter features.** Heartbeat with `capabilities`, reported mode and evidence source.

@@ -114,7 +114,7 @@ Code names are English and apply in API, database and code.
 | Notification | `notification` | Push or ephemeral `notification.created` to a person; never carries content in the push. |
 | Notification preference | `notification_preference` | Level `all`, `mentions` or `mute` of a person per space, channel or thread; without an own preference, the channel default, the personal default and the instance default apply. |
 | Operator | `operator` | Exactly one agent or none per channel (inherited from the space, can be overridden); without an operator no agent answers. A thread keeps its operator from its creation, the main thread uses the effective operator. |
-| Operator rule | `operator rule` | The effective operator of a channel and the fixed operator of a thread have at least `write` there, without a grant row. |
+| Operator rule | `operator rule` | The effective operator of a channel and the fixed operator of a thread have at least `write` and `upload` there, without a grant row. |
 | Origin | `origin` | Source of a message: `human`, `agent`, `app`, `import`, `system`; only `human` triggers agents. |
 | Outbox | `outbox` | Local queue of a client for write operations, each with its own client ID, strictly in order per thread. |
 | Outgoing webhook | `webhook_subscription` | Subscription of an app or an agent to receive events, signed (`v1a`, optionally HMAC `v1`), at an allowed HTTPS address. |

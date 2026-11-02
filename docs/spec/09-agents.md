@@ -56,7 +56,7 @@ keys of the column "Reported" below; any other key is refused.
 | Components | `supports_components` | `components: true` | Section 11; otherwise text only |
 | Voice input | `supports_voice` | `voice_input: true` | Section 13 |
 | Title suggestion | `supports_title` | `title: true` | Section 12 |
-| Sending files | `supports_files_out` | `files_out: true` | Agent additionally needs `+upload`. If `supports_files_out` is off, the server rejects messages of an agent with attachments with `403 feature_disabled`. |
+| Sending files | `supports_files_out` | `files_out: true` | Agent additionally needs `+upload` (an operator holds it by the operator rule, 2.3). If `supports_files_out` is off, the server rejects messages of an agent with attachments with `403 feature_disabled`. |
 
 Schema `agent_operator_config.v1` (03, `agents`): a JSON object without further keys
 (`additionalProperties: false`); every key is optional. `operator_config` never contains
@@ -85,10 +85,14 @@ whose owner allows components is accepted whatever the adapter reports.
 
 An agent has at most `write` and, as a capability, at most `upload` (R-DM-08, R-DM-20). On
 every channel that it operates, and in every thread with it as the fixed operator, it has `write`
-without a grant row (operator rule, 05 section 2.3, R-AZ-13). For files it additionally needs a
-grant with `upload`; as a guest agent or in report channels it needs a grant with `write`.
-Reason for the operator rule: an operator that must not write only produces failing
-runs, and a second, separately maintained grant would remain after a change of operator.
+and `upload` without a grant row (operator rule, 05 section 2.3, R-AZ-13). Whether it may send
+files there is the owner's switch `supports_files_out` (2.2), checked when the message is accepted.
+As a guest agent or in report channels it needs a grant with `write`, and for files one with
+`upload`. Reason for the operator rule: an operator that must not write only produces failing
+runs, and a second, separately maintained grant would remain after a change of operator. `upload`
+belongs to the rule since the addendum of 2026-11-02: before, every operator that sends files
+(answer attachments of a runner, media of an adapter) needed a grant added by hand, and its
+answers lost their files with `403 forbidden` and `capability_missing` until then.
 
 ### 2.4 Tool class
 

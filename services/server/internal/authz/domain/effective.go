@@ -88,8 +88,8 @@ var botCaps = CapsOf(CapUpload)
 //  2. owner: trigger and every capability;
 //  3. otherwise the highest level of the instance, space and channel grants and the union of
 //     their capabilities;
-//  4. agents: at least write as the channel's effective operator or as the fixed operator of a
-//     non-main thread (07 section 2.9);
+//  4. agents: at least write and upload as the channel's effective operator or as the fixed
+//     operator of a non-main thread (07 section 2.9; upload since FIX-operator-upload-grant);
 //  5. agents and apps: at most write and upload (07 section 2.1), which also neutralises a grant
 //     row whose subject kind does not match the real kind;
 //  6. an archived space or channel: at most read for everyone, owners included (07 section 4.5
@@ -117,11 +117,10 @@ func Effective(s Snapshot, kind string, principal ids.ID, path Path) Rights {
 		r = r.union(s.Channels[path.ChannelID])
 	}
 	r.Owner = false
-	if kind == KindAgent && path.Kind == PathChannel && path.ThreadOperator() == principal && !principal.IsZero() {
+	if kind == KindAgent && path.Kind == PathChannel && !principal.IsZero() &&
+		(path.ThreadOperator() == principal || path.ChannelOperatorID == principal) {
 		r.Level = MaxLevel(r.Level, LevelWrite)
-	}
-	if kind == KindAgent && path.Kind == PathChannel && path.ChannelOperatorID == principal && !principal.IsZero() {
-		r.Level = MaxLevel(r.Level, LevelWrite)
+		r.Caps = r.Caps.Union(botCaps)
 	}
 	if kind != KindUser {
 		r.Level = MinLevel(r.Level, LevelWrite)

@@ -137,9 +137,10 @@ An attached file always follows its message, also after the thread is moved;
    principal and its valid groups on the path. Capabilities: union of the
    capabilities of the same grants.
 3. DM participants: level `write` and capability `upload` in the DM channel.
-4. Operator rule: an agent has at least `write` on every channel whose effective operator it
-   is, and on every thread with `threads.operator_agent_id` equal to it, without a grant row.
-   The rule follows the operator; on a change nothing remains (R-AZ-13).
+4. Operator rule: an agent has at least `write` and the capability `upload` on every channel
+   whose effective operator it is, and on every thread with `threads.operator_agent_id` equal to
+   it, without a grant row. The rule follows the operator; on a change nothing remains (R-AZ-13;
+   `upload` addendum of 2026-11-02).
 5. Agents and apps: at most `write` and as a capability at most `upload` (R-DM-08, R-DM-20).
    Apps additionally need the scope from 2.6.
 6. If an agent acts within a run, the acting-for binding applies in addition: at most the
@@ -839,7 +840,7 @@ Terminal channels ([24-terminal.md](24-terminal.md); [asyncapi.yaml](../api/asyn
 | R-AZ-10 | Only owners set the operator, the project binding and the tool class. | All three affect I1 or the tool power of the agent. |
 | R-AZ-11 | Internal delivery checks (`push.deliver`, `webhook_out.deliver`) are actions of their own. | Rule 1.1: deliveries too run through the catalogue and are testable. |
 | R-AZ-12 | The read-only setting of a channel blocks all `write` and `trigger` actions for all principals, including owners; only `import.apply` writes. | A read mirror has exactly one leading location; no agent may be triggered in the mirror. Grants cannot restrict owners. |
-| R-AZ-13 | Operator rule: the effective operator has `write` implicitly; `space.operator.set` and `channel.operator.set` require no grant of its own for the agent. | Follows the operator without a second, easily forgotten grant; on a change no remnant stays. Replaces the proposal to require a grant when setting the operator. |
+| R-AZ-13 | Operator rule: the effective operator has `write` and `upload` implicitly; `space.operator.set` and `channel.operator.set` require no grant of its own for the agent. Whether the agent may send files stays the owner's switch `supports_files_out` (09 2.2), checked at acceptance (`403 feature_disabled`). | Follows the operator without a second, easily forgotten grant; on a change no remnant stays. Replaces the proposal to require a grant when setting the operator. `upload` since the addendum of 2026-11-02: live use showed every file-sending operator failing with `capability_missing` until the owner added a grant by hand. |
 | R-AZ-14 | Owner permissions only in a session, never through a personal API token; the exception is the check without a request (R-AZ-29). | A stolen token without device binding must never open the whole instance. |
 | R-AZ-15 | Expirations, the first installation, the recovery on the host, the sync of claim groups, the automatic revocation of devices and scheduled key rotations are system actions in the catalogue (`grant.expire`, `group.member.expire`, `group.member.sync`, `instance.bootstrap`, `owner.recover`, `device.expire`, `signing_key.transition`). | Every audit entry names a known action; expirations reach clients and runs via `access.changed`; these operations are security relevant and belong in the audit, without faking an action by a person. |
 | R-AZ-16 | A waiting device gets tokens, but may only read itself (`403 device_pending`). | The app can wait for the approval without a new login; it reaches contents only after that. |

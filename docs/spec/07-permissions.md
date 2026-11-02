@@ -157,8 +157,9 @@ in DM channels.
 ### 2.9 Agents as principals
 
 1. Agents receive grants like people, at most `write` and only `upload` as a capability.
-2. **Operator rule.** An agent has at least `write` on every channel whose effective operator it
-   is, and on every thread with `threads.operator_agent_id` equal to it, without a grant row.
+2. **Operator rule.** An agent has at least `write` and the capability `upload` on every channel
+   whose effective operator it is, and on every thread with `threads.operator_agent_id` equal to
+   it, without a grant row (`upload` addendum of 2026-11-02).
    Reason: without this rule, every operator change would have to entail a second, easily forgotten
    grant; on a change, the old grant would remain in place. The rule follows the operator
    automatically (05, section 2.3 item 4; R-AZ-13).
@@ -1335,7 +1336,7 @@ DM between Alex and Sam. The clock is controllable in tests.
 | R-RE-01 | Permission cache with a global version counter and `valid_until`; no materialized view. | One truth (R-DM-19); expiry by time is correct without a write. |
 | R-RE-02 | Every REST request reads the current permission version. | Revocation takes effect across processes without a time window; the cost is one row per request. |
 | R-RE-03 | Agents and apps get only `upload` as a capability. | No self-approval, no administration, no mass export by bots. |
-| R-RE-04 | Operator rule: the effective operator implicitly has `write`. | Follows the operator without a second grant; nothing is left over after a change. |
+| R-RE-04 | Operator rule: the effective operator implicitly has `write` and `upload` (`upload` addendum of 2026-11-02). | Follows the operator without a second grant; nothing is left over after a change. |
 | R-RE-05 | Tool class `host` only for owners or an own ready dev environment, checked at invocation. | Study C P6(b); readiness changes without a permission transaction. |
 | R-RE-06 | Acting-for binding: an agent in a run has at most the permissions of the triggering person. | Closes the confused deputy through the server API. |
 | R-RE-07 | Read horizon as a hint, not as a block. | A block would make `channel.create` fail unexpectedly; only the instance operator knows the memory of a runtime. |

@@ -81,6 +81,17 @@ func TestExplainSources(t *testing.T) {
 	if _, ok := space[w.sam]; ok {
 		t.Errorf("a channel grant does not explain the space: %+v", space[w.sam])
 	}
+	// Texter operates Marketing/Kampagnen without a grant: write and upload by the operator rule
+	// (FIX-operator-upload-grant), on the channel and, as the default operator, on the space.
+	if e := w.explain(t, "channel", w.kampagnen)[w.texter]; e.Level != "write" || !slices.Equal(sourceKinds(e), []string{"operator"}) ||
+		!slices.Equal(e.Capabilities, []string{"upload"}) {
+		t.Errorf("texter on Kampagnen %+v", e)
+	}
+	w.structure.PutSpaceDetail(authz.SpaceDetail{ID: w.marketing, Name: "Marketing", SortKey: "a1", DefaultOperatorID: w.texter, Version: 1, CreatedAt: pgStart})
+	if e := w.explain(t, "space", w.marketing)[w.texter]; e.Level != "write" || !slices.Equal(sourceKinds(e), []string{"operator"}) ||
+		!slices.Equal(e.Capabilities, []string{"upload"}) {
+		t.Errorf("texter on Marketing %+v", e)
+	}
 }
 
 // TestExplainReadHorizonEntry: Texter reads Marketing/Intern by a grant and Sam has trigger on

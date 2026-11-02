@@ -95,6 +95,52 @@ func TestAZ_M29_OperatorRuleGivesWrite(t *testing.T) {
 	}
 }
 
+// uploadAs decides file.upload on the channel for the principal registered under name.
+func (w *world) uploadAs(name string, channel ids.ID) authorize.Decision {
+	w.t.Helper()
+	a := w.actor(name)
+	d, err := w.az.Authorize(actor.WithActor(context.Background(), a), a, authorize.ActionFileUpload, authorize.Resource{Kind: authorize.ResourceChannel, ID: channel})
+	must(w.t, err)
+	return d
+}
+
+// TestOperatorRuleGivesUpload (FIX-operator-upload-grant): the operator rule gives upload with
+// write, so an agent that sends files needs no extra grant. Texter uploads to Marketing/Kampagnen
+// without a grant; after channel.operator.set to Runner, Texter has nothing there, Runner uploads
+// at once and its access.changed lists the channel with write and upload.
+func TestOperatorRuleGivesUpload(t *testing.T) {
+	t.Parallel()
+	w := newWorld(t)
+	if d := w.uploadAs("texter", w.kampagnen); !d.Allowed() {
+		t.Fatalf("Texter uploads on Kampagnen: %+v", d)
+	}
+	n := len(w.events("access.changed"))
+	w.wantOK(w.setChannelOperator(w.kampagnen, agentBody(w.runner)))
+	if d := w.uploadAs("texter", w.kampagnen); d.Allowed() {
+		t.Fatalf("Texter keeps upload after the change: %+v", d)
+	}
+	if d := w.uploadAs("runner", w.kampagnen); !d.Allowed() {
+		t.Fatalf("Runner as new operator: %+v", d)
+	}
+	for _, e := range w.events("access.changed")[n:] {
+		if e.Audience != w.runner.String() {
+			continue
+		}
+		for _, k := range []string{"added", "changed"} {
+			list, _ := e.Payload[k].([]any)
+			for _, x := range list {
+				if m, _ := x.(map[string]any); m["id"] == w.kampagnen.String() {
+					if caps, _ := m["capabilities"].([]any); !slices.Equal(caps, []any{"upload"}) || m["level"] != "write" {
+						t.Fatalf("access.changed of Runner %v", m)
+					}
+					return
+				}
+			}
+		}
+	}
+	t.Fatal("no access.changed of Runner names Kampagnen")
+}
+
 // TestBR_01_OperatorActions: a violating change of either operator action answers 409, leaves
 // every row unchanged and leaves one deny entry after the rollback.
 func TestBR_01_OperatorActions(t *testing.T) {
