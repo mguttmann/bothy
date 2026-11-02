@@ -154,6 +154,7 @@ class DsComposerState extends State<DsComposer> {
   void initState() {
     super.initState();
     _text.addListener(_changed);
+    _focus.addListener(_changed);
   }
 
   @override
@@ -362,150 +363,164 @@ class DsComposerState extends State<DsComposer> {
         MediaQuery.textScalerOf(context).scale(text.fontSize!) * text.height!;
     final padY = math.max(DsSpace.s8, (density.targetMin - line) / 2);
     final command = widget.command;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (typing.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(bottom: DsSpace.s4),
-            child: Semantics(
-              liveRegion: true,
-              child: Text(
-                typing.length == 1
-                    ? l.composerTyping(dsIsolate(typing.single))
-                    : l.composerTypingSeveral,
-                style: dsTextStyle(DsType.caption)
-                    .copyWith(color: c.textSecondary),
+    // The whole composer belongs to its text field: a tap on attach, send, the caller's control
+    // or a suggestion is no tap outside, so the keyboard stays open (DsKeyboardDismiss).
+    return TextFieldTapRegion(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (typing.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: DsSpace.s4),
+              child: Semantics(
+                liveRegion: true,
+                child: Text(
+                  typing.length == 1
+                      ? l.composerTyping(dsIsolate(typing.single))
+                      : l.composerTypingSeveral,
+                  style: dsTextStyle(DsType.caption)
+                      .copyWith(color: c.textSecondary),
+                ),
               ),
             ),
-          ),
-        if (widget.suggestions.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(bottom: DsSpace.s4),
-            child: DsSuggestionList(
-              widget.suggestions,
-              activeIndex: _active,
-              onAccept: (s) => widget.onAcceptSuggestion?.call(s),
+          if (widget.suggestions.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: DsSpace.s4),
+              child: DsSuggestionList(
+                widget.suggestions,
+                activeIndex: _active,
+                onAccept: (s) => widget.onAcceptSuggestion?.call(s),
+              ),
             ),
-          ),
-        if (widget.offline)
-          _note(DsIcons.stateOffline, l.composerOffline, c.warningFg),
-        if (missing != null)
-          _note(
-            DsIcons.stateWarning,
-            l.composerOptionMissing(missing),
-            c.warningFg,
-          ),
-        if (command != null && command.options.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(bottom: DsSpace.s4),
-            child: Wrap(
-              spacing: DsSpace.s6,
-              runSpacing: DsSpace.s4,
-              children: [
-                Text(
-                  command.name,
-                  style: dsTextStyle(DsType.codeSm)
-                      .copyWith(color: c.textPrimary),
-                ),
-                for (final o in command.options)
+          if (widget.offline)
+            _note(DsIcons.stateOffline, l.composerOffline, c.warningFg),
+          if (missing != null)
+            _note(
+              DsIcons.stateWarning,
+              l.composerOptionMissing(missing),
+              c.warningFg,
+            ),
+          if (command != null && command.options.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: DsSpace.s4),
+              child: Wrap(
+                spacing: DsSpace.s6,
+                runSpacing: DsSpace.s4,
+                children: [
                   Text(
-                    o.value == null || o.value!.isEmpty
-                        ? o.name
-                        : '${o.name}: ${o.value}',
-                    style: dsTextStyle(DsType.codeSm).copyWith(
-                      color: o.value == null || o.value!.isEmpty
-                          ? c.textSecondary
-                          : c.textPrimary,
-                    ),
+                    command.name,
+                    style: dsTextStyle(DsType.codeSm)
+                        .copyWith(color: c.textPrimary),
                   ),
-              ],
-            ),
-          ),
-        Container(
-          key: const ValueKey('ds-composer-field'),
-          constraints: BoxConstraints(minHeight: density.composerMinHeight),
-          decoration: BoxDecoration(
-            color: c.surfaceInput,
-            borderRadius: shape,
-            border: Border.all(
-              color: c.borderControl,
-              width: DsBorderWidth.hairline,
-            ),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              if (widget.onAttach != null)
-                _iconButton(
-                  DsIcons.actionAttach,
-                  l.composerAttach,
-                  widget.onAttach,
-                  c.textSecondary,
-                ),
-              Expanded(
-                // A node of its own: without the container the field's semantics went into
-                // the node of the column around the composer, which became one text field
-                // with the column's content below it, a leaf for VoiceOver (brief M4-32).
-                child: Semantics(
-                  container: true,
-                  label: fieldLabel,
-                  child: TextField(
-                    controller: _text,
-                    focusNode: _focus,
-                    onChanged: widget.onChanged,
-                    minLines: 1,
-                    maxLines: widget.maxLines,
-                    keyboardType: TextInputType.multiline,
-                    // Brief M5-17: the text starts at the left of the field.
-                    textAlign: TextAlign.start,
-                    style: text,
-                    // The field itself is the tap target from button to button and at least
-                    // density.target-min high: its padding (density.composer-pad-x) lies
-                    // inside it, so a tap on the padding focuses it too (brief M5-17).
-                    decoration: InputDecoration(
-                      border: InputBorder.none,
-                      isDense: true,
-                      contentPadding: EdgeInsets.symmetric(
-                        horizontal: density.composerPadX,
-                        vertical: padY,
+                  for (final o in command.options)
+                    Text(
+                      o.value == null || o.value!.isEmpty
+                          ? o.name
+                          : '${o.name}: ${o.value}',
+                      style: dsTextStyle(DsType.codeSm).copyWith(
+                        color: o.value == null || o.value!.isEmpty
+                            ? c.textSecondary
+                            : c.textPrimary,
                       ),
-                      constraints: BoxConstraints(minHeight: density.targetMin),
-                      // The placeholder repeats the field's name, which the label above
-                      // already gives; a screen reader reads it once (brief M4-32).
-                      hint: ExcludeSemantics(
-                        child: Text(
-                          placeholder,
-                          style: dsTextStyle(DsType.body)
-                              .copyWith(color: c.textSecondary),
+                    ),
+                ],
+              ),
+            ),
+          Container(
+            key: const ValueKey('ds-composer-field'),
+            constraints: BoxConstraints(minHeight: density.composerMinHeight),
+            decoration: BoxDecoration(
+              color: c.surfaceInput,
+              borderRadius: shape,
+              // Focused: the hairline takes the focus color; the caret shows the rest
+              // (FIX-keyboard-dismiss-focus-ring).
+              border: Border.all(
+                color: _focus.hasFocus
+                    ? context.dsAccent.focusRing
+                    : c.borderControl,
+                width: DsBorderWidth.hairline,
+              ),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                if (widget.onAttach != null)
+                  _iconButton(
+                    DsIcons.actionAttach,
+                    l.composerAttach,
+                    widget.onAttach,
+                    c.textSecondary,
+                  ),
+                Expanded(
+                  // A node of its own: without the container the field's semantics went into
+                  // the node of the column around the composer, which became one text field
+                  // with the column's content below it, a leaf for VoiceOver (brief M4-32).
+                  child: Semantics(
+                    container: true,
+                    label: fieldLabel,
+                    child: TextField(
+                      controller: _text,
+                      focusNode: _focus,
+                      onChanged: widget.onChanged,
+                      minLines: 1,
+                      maxLines: widget.maxLines,
+                      keyboardType: TextInputType.multiline,
+                      // Brief M5-17: the text starts at the left of the field.
+                      textAlign: TextAlign.start,
+                      style: text,
+                      // The field itself is the tap target from button to button and at least
+                      // density.target-min high: its padding (density.composer-pad-x) lies
+                      // inside it, so a tap on the padding focuses it too (brief M5-17).
+                      decoration: InputDecoration(
+                        // The field around draws the border, also the focused one.
+                        border: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        isDense: true,
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: density.composerPadX,
+                          vertical: padY,
+                        ),
+                        constraints: BoxConstraints(
+                          minHeight: density.targetMin,
+                        ),
+                        // The placeholder repeats the field's name, which the label above
+                        // already gives; a screen reader reads it once (brief M4-32).
+                        hint: ExcludeSemantics(
+                          child: Text(
+                            placeholder,
+                            style: dsTextStyle(DsType.body)
+                                .copyWith(color: c.textSecondary),
+                          ),
                         ),
                       ),
                     ),
                   ),
                 ),
-              ),
-              ?widget.trailing,
-              if (widget.onVoice != null)
-                _iconButton(
-                  DsIcons.actionVoice,
-                  l.composerVoice,
-                  widget.onVoice,
-                  c.textSecondary,
+                ?widget.trailing,
+                if (widget.onVoice != null)
+                  _iconButton(
+                    DsIcons.actionVoice,
+                    l.composerVoice,
+                    widget.onVoice,
+                    c.textSecondary,
+                  ),
+                Semantics(
+                  hint: missing == null
+                      ? null
+                      : l.composerOptionMissing(missing),
+                  child: _iconButton(
+                    DsIcons.actionSend,
+                    l.composerSend,
+                    _canSend ? _send : null,
+                    _canSend ? context.dsAccent.accentBg : c.textMuted,
+                  ),
                 ),
-              Semantics(
-                hint: missing == null ? null : l.composerOptionMissing(missing),
-                child: _iconButton(
-                  DsIcons.actionSend,
-                  l.composerSend,
-                  _canSend ? _send : null,
-                  _canSend ? context.dsAccent.accentBg : c.textMuted,
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

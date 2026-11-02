@@ -221,10 +221,34 @@ void main() {
       expect(theme.filledButtonTheme.style!.side!.resolve({}), isNull);
       final outlined = theme.outlinedButtonTheme.style!.side!.resolve({});
       expect(outlined!.color, DsColors.light.borderControl);
-      final input = theme.inputDecorationTheme.focusedBorder!.borderSide;
-      expect(input.color, DsAccent.lightSpruce.focusRing);
-      expect(input.width, DsBorderWidth.focus);
       expect(theme.focusColor, DsAccent.lightSpruce.focusRing);
+    });
+
+    test(
+      'a focused text field shows a hairline in the focus color, not the ring',
+      () {
+        // A text field shows its focus by the caret; the thick ring was ugly there
+        // (FIX-keyboard-dismiss-focus-ring).
+        for (final mode in DsThemeMode.values) {
+          final theme = buildDsTheme(_base.copyWith(theme: mode));
+          final accent = theme.extension<DsAccent>()!;
+          final input = theme.inputDecorationTheme.focusedBorder!.borderSide;
+          expect(input.color, accent.focusRing, reason: mode.name);
+          expect(input.width, DsBorderWidth.hairline, reason: mode.name);
+        }
+      },
+    );
+
+    test('the focus ring is in the accent, not yellow, in light and dark', () {
+      for (final key in ['spruce', 'loch', 'heather', 'rowan', 'moss']) {
+        for (final brightness in Brightness.values) {
+          final accent = DsAccent.of(key, brightness);
+          expect(accent.focusRing, isNot(DsPalette.gorse300), reason: key);
+        }
+      }
+      expect(DsAccent.darkSpruce.focusRing, DsAccent.darkSpruce.accentFg);
+      expect(DsColors.dark.focusRingOnSidebar, isNot(DsPalette.gorse300));
+      expect(DsColors.light.focusRingOnSidebar, isNot(DsPalette.gorse300));
     });
   });
 }

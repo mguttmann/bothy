@@ -36,8 +36,8 @@
     },
     "focus": {
       "$description": "Focus ring. Always visible, never color alone: in addition, two pixels wide.",
-      "ring": {"$value": "{palette.gorse.300}", "$description": "Focus on all content surfaces."},
-      "ring-on-sidebar": {"$value": "{palette.gorse.300}", "$description": "Focus in the sidebar."}
+      "ring": {"$value": "{palette.spruce.300}", "$description": "Focus on all content surfaces."},
+      "ring-on-sidebar": {"$value": "{palette.spruce.300}", "$description": "Focus in the sidebar."}
     },
     "accent": {
       "$description": "Brand accent: primary action, selection, running agent.",

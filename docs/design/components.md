@@ -18,7 +18,15 @@ Common rules for all components:
   tiles, drop-down and segmented buttons, filled buttons, whose fill has the ring's color) gets
   the app-wide ring of `DsFocusRing`, drawn with a gap of `border-width.focus` around the control
   while the person works with the keyboard (after a key press, until the next pointer press;
-  brief M4-32).
+  brief M4-32). A text field is the exception: it shows its focus by the caret and a hairline
+  (`border-width.hairline`) in `color.focus.ring` around the field, never the thick ring; the
+  ring is in the theme's accent in light and dark, on the sidebar `color.focus.ring-on-sidebar`
+  (FIX-keyboard-dismiss-focus-ring).
+- **Keyboard on touch screens:** a tap anywhere outside the focused text field unfocuses it and
+  hides the on-screen keyboard, and on iOS and Android dragging a list hides it too; the text
+  stays. `DsKeyboardDismiss` does this once for the whole app; controls that belong to a field
+  (the composer's buttons and suggestion list) sit in its `TextFieldTapRegion`, so they work
+  with the keyboard open (FIX-keyboard-dismiss-focus-ring).
 - **Menus:** every entry of a menu is a `DsMenuItem`: a button for screen readers, and the chosen
   entry of a choice says "selected"; a check mark alone is not read. A state line inside a menu
   is text in `color.text.secondary`, not a disabled entry (brief M4-32). A text field with a
@@ -394,9 +402,11 @@ placeholders; options with `autocomplete` fetch suggestions through `command.aut
 throttled by `ui.autocomplete_debounce`. Mention suggestions show only people and agents that
 the person may see.
 
-States: empty, text, command selected, options incomplete (send disabled with a reason),
+States: empty, text, focused (the field's border becomes a hairline in `color.focus.ring`; no
+ring inside it), command selected, options incomplete (send disabled with a reason),
 offline (sending goes to the outbox), no write permission (field replaced by the note "Read
-only in this channel").
+only in this channel"). A tap on attach, microphone, send or a suggestion keeps the focus and
+the keyboard; a tap anywhere else closes the keyboard and keeps the draft.
 
 Long texts (M4-47, 01 6.13): a paste over `ui.composer_paste_file_chars` characters or
 `ui.composer_paste_file_lines` lines becomes a file chip (`paste.txt`, or `paste.<extension>`

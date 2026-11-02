@@ -61,6 +61,7 @@ the apps pass them from the app configuration (M4-08), this package holds no num
 | `DsBillingBadge`, `DsCostText` | `DsBillingMode`, `DsCost` | none | 10 |
 | `DsBanner` | `DsTone` and text | none | 2.1, 6.6 of 01 |
 | `DsTappable`, `DsBadge`, `dsIsolate` | shared building blocks | none | "Common rules" |
+| `DsFocusRing`, `DsKeyboardDismiss` | installed once around the app's navigator: the focus ring of controls without one, and the keyboard closing on a tap outside a text field and, on iOS and Android, on a drag of a list | none | "Common rules" |
 
 Security rules held here: Markdown renders no HTML, loads no image and activates only `https`,
 `http`, `mailto` and internal links (SEC-OUT-1, SEC-OUT-2; D-M4-07-2); foreign names are wrapped
@@ -118,9 +119,10 @@ accent roles come from `DsAccent` of the context's accent and brightness, all ot
 
 Further theme fields: `scaffoldBackgroundColor` and `canvasColor` `color.surface.canvas`,
 `dividerColor` `color.border.subtle`, `hoverColor` `color.surface.hover`, `focusColor` and the
-focus ring of filled, elevated, text and outlined buttons and of focused inputs
-`color.focus.ring` (`DsAccent.focusRing`) with `border-width.focus` (focus is always visible,
-docs/design/components.md); outlined buttons otherwise `color.border.control` with
+focus ring of filled, elevated, text and outlined buttons `color.focus.ring`
+(`DsAccent.focusRing`) with `border-width.focus` (focus is always visible,
+docs/design/components.md); a focused input shows the caret and an outline of
+`border-width.hairline` in `color.focus.ring`, not the thick ring; outlined buttons otherwise `color.border.control` with
 `border-width.hairline`. `visualDensity`: `comfortable` gives `VisualDensity.comfortable`,
 `compact` `VisualDensity.compact`, `touch` `VisualDensity.standard`. Text theme: display roles
 `type.display`; headline and `titleLarge` `type.title`; `titleMedium` `type.heading`;

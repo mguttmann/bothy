@@ -452,7 +452,7 @@ final class DsColors extends ThemeExtension<DsColors> {
     dangerOnBg: Color(0xFFFBFEFF),
     dangerSubtle: Color(0xFFFEF2F0),
     focusRing: Color(0xFF1B8A83),
-    focusRingOnSidebar: Color(0xFFD9C42B),
+    focusRingOnSidebar: Color(0xFF7CD5CD),
     infoBg: Color(0xFF12659D),
     infoBorder: Color(0xFF197FC3),
     infoFg: Color(0xFF12659D),
@@ -593,8 +593,8 @@ final class DsColors extends ThemeExtension<DsColors> {
     dangerFg: Color(0xFFFB827A),
     dangerOnBg: Color(0xFF430307),
     dangerSubtle: Color(0xFF430307),
-    focusRing: Color(0xFFD9C42B),
-    focusRingOnSidebar: Color(0xFFD9C42B),
+    focusRing: Color(0xFF7CD5CD),
+    focusRingOnSidebar: Color(0xFF7CD5CD),
     infoBg: Color(0xFF58B3FA),
     infoBorder: Color(0xFF58B3FA),
     infoFg: Color(0xFF8EC9FB),
@@ -1157,7 +1157,7 @@ final class DsAccent extends ThemeExtension<DsAccent> {
     accentFg: Color(0xFF7CD5CD),
     accentSubtle: Color(0xFF032624),
     textLink: Color(0xFF7CD5CD),
-    focusRing: Color(0xFFD9C42B),
+    focusRing: Color(0xFF7CD5CD),
     runRunning: Color(0xFF49C0B7),
   );
 
@@ -1179,7 +1179,7 @@ final class DsAccent extends ThemeExtension<DsAccent> {
     accentFg: Color(0xFF8EC9FB),
     accentSubtle: Color(0xFF02223A),
     textLink: Color(0xFF8EC9FB),
-    focusRing: Color(0xFFD9C42B),
+    focusRing: Color(0xFF8EC9FB),
     runRunning: Color(0xFF58B3FA),
   );
 
@@ -1201,7 +1201,7 @@ final class DsAccent extends ThemeExtension<DsAccent> {
     accentFg: Color(0xFFFCA3CD),
     accentSubtle: Color(0xFF3E0327),
     textLink: Color(0xFFFCA3CD),
-    focusRing: Color(0xFFD9C42B),
+    focusRing: Color(0xFFFCA3CD),
     runRunning: Color(0xFFF878BA),
   );
 
@@ -1223,7 +1223,7 @@ final class DsAccent extends ThemeExtension<DsAccent> {
     accentFg: Color(0xFFFCAAA3),
     accentSubtle: Color(0xFF430307),
     textLink: Color(0xFFFCAAA3),
-    focusRing: Color(0xFFD9C42B),
+    focusRing: Color(0xFFFCAAA3),
     runRunning: Color(0xFFFB827A),
   );
 
@@ -1245,7 +1245,7 @@ final class DsAccent extends ThemeExtension<DsAccent> {
     accentFg: Color(0xFFFCAF6F),
     accentSubtle: Color(0xFF331902),
     textLink: Color(0xFFFCAF6F),
-    focusRing: Color(0xFFD9C42B),
+    focusRing: Color(0xFFFCAF6F),
     runRunning: Color(0xFFEC9340),
   );
 
@@ -1289,7 +1289,7 @@ final class DsAccent extends ThemeExtension<DsAccent> {
     accentFg: Color(0xFF89D89A),
     accentSubtle: Color(0xFF03280F),
     textLink: Color(0xFF89D89A),
-    focusRing: Color(0xFFD9C42B),
+    focusRing: Color(0xFF89D89A),
     runRunning: Color(0xFF62C37A),
   );
 

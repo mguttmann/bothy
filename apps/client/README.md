@@ -1033,6 +1033,11 @@ thread cost, runs and earlier sessions (docs/decisions.d/M4-21.md).
 
 ## Keyboard shortcuts and focus
 
+On a touch screen the on-screen keyboard closes on a tap outside the focused text field and, on
+iOS and Android, when a list is dragged; the text stays (FIX-keyboard-dismiss-focus-ring).
+`ClientApp` installs `DsKeyboardDismiss` once in `MaterialApp.builder`, next to `DsFocusRing`, so
+every screen and dialog behaves the same; `test/phone/keyboard_dismiss_test.dart` covers it.
+
 The desktop app is usable by keyboard alone (01 7 and 8, M4-24). `lib/keyboard/bindings.dart`
 holds the first table of 01 7 as data; `AppShortcuts` binds it above the columns of the shell
 and the views offer their targets with `KeyboardActions` (Stop and the live box toggle only with

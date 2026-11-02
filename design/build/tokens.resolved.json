@@ -1285,7 +1285,7 @@
         },
         "color.focus.ring-on-sidebar": {
           "type": "color",
-          "value": "#d9c42b"
+          "value": "#7cd5cd"
         },
         "color.info.bg": {
           "type": "color",
@@ -1963,11 +1963,11 @@
         },
         "color.focus.ring": {
           "type": "color",
-          "value": "#d9c42b"
+          "value": "#7cd5cd"
         },
         "color.focus.ring-on-sidebar": {
           "type": "color",
-          "value": "#d9c42b"
+          "value": "#7cd5cd"
         },
         "color.info.bg": {
           "type": "color",
@@ -3252,10 +3252,10 @@
             "swapped": true
           },
           "color.focus.ring": {
-            "hex": "#d9c42b",
-            "alias": "palette.gorse.300",
+            "hex": "#7cd5cd",
+            "alias": "palette.spruce.300",
             "moved_from": null,
-            "swapped": false
+            "swapped": true
           },
           "color.run.running": {
             "hex": "#49c0b7",
@@ -3354,10 +3354,10 @@
             "swapped": true
           },
           "color.focus.ring": {
-            "hex": "#d9c42b",
-            "alias": "palette.gorse.300",
+            "hex": "#8ec9fb",
+            "alias": "palette.loch.300",
             "moved_from": null,
-            "swapped": false
+            "swapped": true
           },
           "color.run.running": {
             "hex": "#58b3fa",
@@ -3456,10 +3456,10 @@
             "swapped": true
           },
           "color.focus.ring": {
-            "hex": "#d9c42b",
-            "alias": "palette.gorse.300",
+            "hex": "#fca3cd",
+            "alias": "palette.heather.300",
             "moved_from": null,
-            "swapped": false
+            "swapped": true
           },
           "color.run.running": {
             "hex": "#f878ba",
@@ -3558,10 +3558,10 @@
             "swapped": true
           },
           "color.focus.ring": {
-            "hex": "#d9c42b",
-            "alias": "palette.gorse.300",
+            "hex": "#fcaaa3",
+            "alias": "palette.rowan.300",
             "moved_from": null,
-            "swapped": false
+            "swapped": true
           },
           "color.run.running": {
             "hex": "#fb827a",
@@ -3660,10 +3660,10 @@
             "swapped": true
           },
           "color.focus.ring": {
-            "hex": "#d9c42b",
-            "alias": "palette.gorse.300",
+            "hex": "#fcaf6f",
+            "alias": "palette.amber.300",
             "moved_from": null,
-            "swapped": false
+            "swapped": true
           },
           "color.run.running": {
             "hex": "#ec9340",
@@ -3765,7 +3765,7 @@
             "hex": "#d9c42b",
             "alias": "palette.gorse.300",
             "moved_from": null,
-            "swapped": false
+            "swapped": true
           },
           "color.run.running": {
             "hex": "#c2ab24",
@@ -3864,10 +3864,10 @@
             "swapped": true
           },
           "color.focus.ring": {
-            "hex": "#d9c42b",
-            "alias": "palette.gorse.300",
+            "hex": "#89d89a",
+            "alias": "palette.moss.300",
             "moved_from": null,
-            "swapped": false
+            "swapped": true
           },
           "color.run.running": {
             "hex": "#62c37a",

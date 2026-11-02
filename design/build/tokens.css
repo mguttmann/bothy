@@ -272,8 +272,8 @@
   --ds-color-danger-fg: #fb827a;
   --ds-color-danger-on-bg: #430307;
   --ds-color-danger-subtle: #430307;
-  --ds-color-focus-ring: #d9c42b;
-  --ds-color-focus-ring-on-sidebar: #d9c42b;
+  --ds-color-focus-ring: #7cd5cd;
+  --ds-color-focus-ring-on-sidebar: #7cd5cd;
   --ds-color-info-bg: #58b3fa;
   --ds-color-info-border: #58b3fa;
   --ds-color-info-fg: #8ec9fb;
@@ -417,7 +417,7 @@
   --ds-color-danger-on-bg: #fbfeff;
   --ds-color-danger-subtle: #fef2f0;
   --ds-color-focus-ring: #1b8a83;
-  --ds-color-focus-ring-on-sidebar: #d9c42b;
+  --ds-color-focus-ring-on-sidebar: #7cd5cd;
   --ds-color-info-bg: #12659d;
   --ds-color-info-border: #197fc3;
   --ds-color-info-fg: #12659d;
@@ -562,7 +562,7 @@
     --ds-color-danger-on-bg: #fbfeff;
     --ds-color-danger-subtle: #fef2f0;
     --ds-color-focus-ring: #1b8a83;
-    --ds-color-focus-ring-on-sidebar: #d9c42b;
+    --ds-color-focus-ring-on-sidebar: #7cd5cd;
     --ds-color-info-bg: #12659d;
     --ds-color-info-border: #197fc3;
     --ds-color-info-fg: #12659d;
@@ -654,6 +654,7 @@
   --ds-color-accent-bg-pressed: #bbdefd;
   --ds-color-accent-fg: #8ec9fb;
   --ds-color-accent-subtle: #02223a;
+  --ds-color-focus-ring: #8ec9fb;
   --ds-color-run-running: #58b3fa;
   --ds-color-text-link: #8ec9fb;
 }
@@ -688,6 +689,7 @@
   --ds-color-accent-bg-pressed: #fdc8df;
   --ds-color-accent-fg: #fca3cd;
   --ds-color-accent-subtle: #3e0327;
+  --ds-color-focus-ring: #fca3cd;
   --ds-color-run-running: #f878ba;
   --ds-color-text-link: #fca3cd;
 }
@@ -722,6 +724,7 @@
   --ds-color-accent-bg-pressed: #fdcbc6;
   --ds-color-accent-fg: #fcaaa3;
   --ds-color-accent-subtle: #430307;
+  --ds-color-focus-ring: #fcaaa3;
   --ds-color-run-running: #fb827a;
   --ds-color-text-link: #fcaaa3;
 }
@@ -756,6 +759,7 @@
   --ds-color-accent-bg-pressed: #fdcfaa;
   --ds-color-accent-fg: #fcaf6f;
   --ds-color-accent-subtle: #331902;
+  --ds-color-focus-ring: #fcaf6f;
   --ds-color-run-running: #ec9340;
   --ds-color-text-link: #fcaf6f;
 }
@@ -790,6 +794,7 @@
   --ds-color-accent-bg-pressed: #eddc59;
   --ds-color-accent-fg: #d9c42b;
   --ds-color-accent-subtle: #291f02;
+  --ds-color-focus-ring: #d9c42b;
   --ds-color-run-running: #c2ab24;
   --ds-color-text-link: #d9c42b;
 }
@@ -824,6 +829,7 @@
   --ds-color-accent-bg-pressed: #afeaba;
   --ds-color-accent-fg: #89d89a;
   --ds-color-accent-subtle: #03280f;
+  --ds-color-focus-ring: #89d89a;
   --ds-color-run-running: #62c37a;
   --ds-color-text-link: #89d89a;
 }

@@ -86,15 +86,27 @@ class DeriveTest(unittest.TestCase):
         self.assertEqual(out[("dark", "loch")]["color.accent.bg"].step, "800")
 
     def test_role_not_aliasing_spruce_is_kept(self):
+        greys = {**_GREYS, "300": "#c6c6c6"}
+        themes = self._themes({"spruce": greys, "loch": greys, "gorse": greys}, dark_role="palette.gorse.300")
+        out = accents.derive(themes, _rules(["spruce", "loch"], ["color.accent.bg"], []))
+        variant = out[("dark", "loch")]["color.accent.bg"]
+        self.assertFalse(variant.swapped)
+        self.assertEqual((variant.scale, variant.step), ("gorse", "300"))
+
+    def test_focus_ring_follows_the_accent_in_both_themes(self):
+        # The focus ring is in the theme's accent, not a fixed yellow (FIX-keyboard-dismiss-focus-ring).
         model_ = model.build(ROOT / "design" / "tokens" / "theme.resolver.json")
         data = json.loads((ROOT / "design" / "design-rules.json").read_text(encoding="utf-8"))
         out = accents.derive(model_.full["theme"], data)
-        base = model_.full["theme"]["dark"]["color.focus.ring"]
-        self.assertEqual(base.alias_of, "palette.gorse.300")
-        for accent in data["accent_variants"]["accents"]:
-            variant = out[("dark", accent)]["color.focus.ring"]
-            self.assertFalse(variant.swapped)
-            self.assertEqual((variant.scale, variant.step, variant.hex), ("gorse", "300", base.hex))
+        for theme in ("light", "dark"):
+            base = model_.full["theme"][theme]["color.focus.ring"]
+            self.assertTrue(base.alias_of.startswith("palette.spruce."), theme)
+            for accent in data["accent_variants"]["accents"]:
+                variant = out[(theme, accent)]["color.focus.ring"]
+                self.assertEqual(variant.scale, accent, (theme, accent))
+        for theme in ("light", "dark"):
+            ring = model_.full["theme"][theme]["color.focus.ring-on-sidebar"]
+            self.assertFalse(ring.alias_of.startswith("palette.gorse."), theme)
 
     def test_default_accent_equals_base_roles(self):
         model_ = model.build(ROOT / "design" / "tokens" / "theme.resolver.json")

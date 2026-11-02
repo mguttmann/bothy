@@ -152,9 +152,9 @@ The generator builds these variants (M4-03). The member `accent_variants` of
 `amber`, `gorse`, `moss`; default `spruce`) and the swapped roles. Per theme a role is swapped only
 where it aliases a step of `palette.spruce`; it then takes the same step of the chosen scale, or
 the nearest step by number when the scale lacks it (a tie goes darker in light, lighter in dark).
-Every other role keeps its value: in dark, `color.focus.ring` aliases `gorse` and stays, and so do
-the sidebar, the text on the accent and the category colours. If a variant fails a contrast
-pairing of the rules file, it moves one step at a time along its scale towards more contrast until
+Every other role keeps its value: the sidebar (and with it `color.focus.ring-on-sidebar`), the
+text on the accent and the category colours. If a variant fails a contrast pairing of the rules
+file, it moves one step at a time along its scale towards more contrast until
 every pairing passes; if no step passes, `build` and `check` fail. Every pairing that contains a
 swapped role is checked for every accent in light and dark and listed in
 [contrast.md](contrast.md), moved steps marked. The outputs: the Dart extension `DsAccent` (one

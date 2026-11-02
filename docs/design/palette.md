@@ -210,8 +210,8 @@ Each role points to a step of the palette per theme. Translucent roles carry the
 | `color.danger.fg` | `#63080e` rowan.900 | `#fb827a` rowan.400 |
 | `color.danger.on-bg` | `#fbfeff` granite.0 | `#430307` rowan.950 |
 | `color.danger.subtle` | `#fef2f0` rowan.50 | `#430307` rowan.950 |
-| `color.focus.ring` | `#1b8a83` spruce.600 | `#d9c42b` gorse.300 |
-| `color.focus.ring-on-sidebar` | `#d9c42b` gorse.300 | `#d9c42b` gorse.300 |
+| `color.focus.ring` | `#1b8a83` spruce.600 | `#7cd5cd` spruce.300 |
+| `color.focus.ring-on-sidebar` | `#7cd5cd` spruce.300 | `#7cd5cd` spruce.300 |
 | `color.info.bg` | `#12659d` loch.700 | `#58b3fa` loch.400 |
 | `color.info.border` | `#197fc3` loch.600 | `#58b3fa` loch.400 |
 | `color.info.fg` | `#12659d` loch.700 | `#8ec9fb` loch.300 |

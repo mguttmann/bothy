@@ -367,11 +367,14 @@ class _ClientAppState extends ConsumerState<ClientApp> {
       routerConfig: _router,
       // M4-24: one menu bar of macOS for the whole app; its items run in the shell on screen.
       builder: (context, child) {
-        // One visible focus ring for every control at one place (01 8, WCAG 2.4.7).
+        // One visible focus ring for every control at one place (01 8, WCAG 2.4.7), and the
+        // keyboard closes on a tap outside a text field on every screen, dialogs included.
         final content = DsFocusRing(
-          child: AppMenuBar(
-            appName: instance?.productName ?? branding.appName,
-            child: child ?? const SizedBox.shrink(),
+          child: DsKeyboardDismiss(
+            child: AppMenuBar(
+              appName: instance?.productName ?? branding.appName,
+              child: child ?? const SizedBox.shrink(),
+            ),
           ),
         );
         final cover = _cover;
