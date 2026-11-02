@@ -345,7 +345,9 @@ func (s *Service) Reopen(ctx context.Context, a actor.Actor, threadID ids.ID) (c
 // SetTitle implements chat.Threads (brief D4): thread.title.update decides who may call; If-Match
 // is required; a main thread has no title. Then package title decides the source on the locked
 // row (M2-18): the thread's operator agent keeps auto and gets 409 title_manual on a manual title
-// (09 section 12, AG-19); every other principal sets manual (05 thread.title.update).
+// (09 section 12, AG-19); every other principal sets manual (05 thread.title.update). An automatic
+// title (cmd.Auto) only fills a thread without a meaningful title and otherwise changes nothing,
+// so a title an agent or a person set on purpose stays (09 section 12 point 5).
 func (s *Service) SetTitle(ctx context.Context, a actor.Actor, cmd chat.SetTitleCmd) (chat.Thread, error) {
 	return s.threadUnit(ctx, a, authorize.ActionThreadTitleUpdate, cmd.ThreadID, authorize.EventThreadUpdated,
 		func(ctx context.Context, th *domain.Thread, _ ChannelRow) (bool, error) {
@@ -361,6 +363,9 @@ func (s *Service) SetTitle(ctx context.Context, a actor.Actor, cmd chat.SetTitle
 			source, err := title.SourceOnUpdate(titleBy(a, *th), title.Source(th.TitleSource))
 			if err != nil {
 				return false, err
+			}
+			if cmd.Auto && !s.placeholders.Fillable(title.Source(th.TitleSource), th.Title) {
+				return false, nil
 			}
 			return th.SetTitle(cmd.Title, domain.TitleSource(source)), nil
 		})

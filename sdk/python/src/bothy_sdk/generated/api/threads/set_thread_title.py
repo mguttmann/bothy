@@ -111,7 +111,10 @@ def sync_detailed(
 
      Every principal except the thread's operator agent sets `title_source = manual`. The operator agent
     may only replace an `auto` title, which stays `auto`; on a `manual` title it gets `409
-    title_manual`.
+    title_manual`. With `auto = true` the title is an automatic one (a reference adapter after the first
+    run of a new session) and only fills a thread without a meaningful title, that is `title_source =
+    auto` and a title that is empty or a placeholder; otherwise the answer is `200` with the thread
+    unchanged.
 
     Args:
         thread_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -150,7 +153,10 @@ def sync(
 
      Every principal except the thread's operator agent sets `title_source = manual`. The operator agent
     may only replace an `auto` title, which stays `auto`; on a `manual` title it gets `409
-    title_manual`.
+    title_manual`. With `auto = true` the title is an automatic one (a reference adapter after the first
+    run of a new session) and only fills a thread without a meaningful title, that is `title_source =
+    auto` and a title that is empty or a placeholder; otherwise the answer is `200` with the thread
+    unchanged.
 
     Args:
         thread_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -184,7 +190,10 @@ async def asyncio_detailed(
 
      Every principal except the thread's operator agent sets `title_source = manual`. The operator agent
     may only replace an `auto` title, which stays `auto`; on a `manual` title it gets `409
-    title_manual`.
+    title_manual`. With `auto = true` the title is an automatic one (a reference adapter after the first
+    run of a new session) and only fills a thread without a meaningful title, that is `title_source =
+    auto` and a title that is empty or a placeholder; otherwise the answer is `200` with the thread
+    unchanged.
 
     Args:
         thread_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -221,7 +230,10 @@ async def asyncio(
 
      Every principal except the thread's operator agent sets `title_source = manual`. The operator agent
     may only replace an `auto` title, which stays `auto`; on a `manual` title it gets `409
-    title_manual`.
+    title_manual`. With `auto = true` the title is an automatic one (a reference adapter after the first
+    run of a new session) and only fills a thread without a meaningful title, that is `title_source =
+    auto` and a title that is empty or a placeholder; otherwise the answer is `200` with the thread
+    unchanged.
 
     Args:
         thread_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.

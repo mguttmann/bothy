@@ -16,6 +16,90 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// NewListTokensRequest constructs an http.Request for the ListTokens method
+func NewListTokensRequest(server string, principalId PrincipalIdPath, params *ListTokensParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "principal_id", principalId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/principals/%s/tokens", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Cursor != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateTokenRequest calls the generic CreateToken builder with application/json body
+func NewCreateTokenRequest(server string, principalId PrincipalIdPath, params *CreateTokenParams, body CreateTokenJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateTokenRequestWithBody(server, principalId, params, "application/json", bodyReader)
+}
+
 // NewCreateTokenRequestWithBody constructs an http.Request for the CreateToken method, with any body, and a specified content type
 func NewCreateTokenRequestWithBody(server string, principalId PrincipalIdPath, params *CreateTokenParams, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
@@ -9573,7 +9657,7 @@ type ClientWithResponsesInterface interface {
 
 	// SetThreadTitleWithBodyWithResponse Set the title
 	//
-	// Every principal except the thread's operator agent sets `title_source = manual`. The operator agent may only replace an `auto` title, which stays `auto`; on a `manual` title it gets `409 title_manual`.
+	// Every principal except the thread's operator agent sets `title_source = manual`. The operator agent may only replace an `auto` title, which stays `auto`; on a `manual` title it gets `409 title_manual`. With `auto = true` the title is an automatic one (a reference adapter after the first run of a new session) and only fills a thread without a meaningful title, that is `title_source = auto` and a title that is empty or a placeholder; otherwise the answer is `200` with the thread unchanged.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -9582,7 +9666,7 @@ type ClientWithResponsesInterface interface {
 
 	// SetThreadTitleWithResponse Set the title
 	//
-	// Every principal except the thread's operator agent sets `title_source = manual`. The operator agent may only replace an `auto` title, which stays `auto`; on a `manual` title it gets `409 title_manual`.
+	// Every principal except the thread's operator agent sets `title_source = manual`. The operator agent may only replace an `auto` title, which stays `auto`; on a `manual` title it gets `409 title_manual`. With `auto = true` the title is an automatic one (a reference adapter after the first run of a new session) and only fills a thread without a meaningful title, that is `title_source = auto` and a title that is empty or a placeholder; otherwise the answer is `200` with the thread unchanged.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -23066,73 +23150,4 @@ type UpdateCommandResponse403Headers struct {
 // UpdateCommandResponse404Headers the declared response headers of an HTTP 404 response for UpdateCommand
 type UpdateCommandResponse404Headers struct {
 	CorrelationId *CorrelationId
-}
-
-// UpdateCommandResponse412Headers the declared response headers of an HTTP 412 response for UpdateCommand
-type UpdateCommandResponse412Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// UpdateCommandResponse428Headers the declared response headers of an HTTP 428 response for UpdateCommand
-type UpdateCommandResponse428Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// UpdateCommandResponse429Headers the declared response headers of an HTTP 429 response for UpdateCommand
-type UpdateCommandResponse429Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      *int
-}
-
-// UpdateCommandResponseDefaultHeaders the declared response headers of an HTTP default response for UpdateCommand
-type UpdateCommandResponseDefaultHeaders struct {
-	CorrelationId *CorrelationId
-}
-
-type UpdateCommandResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *Command
-	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
-	ApplicationproblemJSON400 *BadRequest
-	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
-	ApplicationproblemJSON401 *Unauthorized
-	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
-	ApplicationproblemJSON403 *Forbidden
-	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
-	ApplicationproblemJSON404 *NotFound
-	// ApplicationproblemJSON412 the response for an HTTP 412 `application/problem+json` response
-	ApplicationproblemJSON412 *PreconditionFailed
-	// ApplicationproblemJSON428 the response for an HTTP 428 `application/problem+json` response
-	ApplicationproblemJSON428 *PreconditionRequired
-	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
-	ApplicationproblemJSON429 *TooManyRequests
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *Error
-	// Headers200 the parsed response headers for an HTTP 200 response
-	Headers200 *UpdateCommandResponse200Headers
-	// Headers400 the parsed response headers for an HTTP 400 response
-	Headers400 *UpdateCommandResponse400Headers
-	// Headers401 the parsed response headers for an HTTP 401 response
-	Headers401 *UpdateCommandResponse401Headers
-	// Headers403 the parsed response headers for an HTTP 403 response
-	Headers403 *UpdateCommandResponse403Headers
-	// Headers404 the parsed response headers for an HTTP 404 response
-	Headers404 *UpdateCommandResponse404Headers
-	// Headers412 the parsed response headers for an HTTP 412 response
-	Headers412 *UpdateCommandResponse412Headers
-	// Headers428 the parsed response headers for an HTTP 428 response
-	Headers428 *UpdateCommandResponse428Headers
-	// Headers429 the parsed response headers for an HTTP 429 response
-	Headers429 *UpdateCommandResponse429Headers
-	// HeadersDefault the parsed response headers for an HTTP default response
-	HeadersDefault *UpdateCommandResponseDefaultHeaders
-}
-
-// GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r UpdateCommandResponse) GetJSON200() *Command {
-	return r.JSON200
 }

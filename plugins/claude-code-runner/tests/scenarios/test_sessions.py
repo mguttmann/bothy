@@ -101,6 +101,27 @@ async def test_ag_19_title_manual_keeps_run_completed(world: World) -> None:
     assert fake.thread(run.thread_id)["title"] == ""
 
 
+async def test_title_line_keeps_an_agent_title(world: World) -> None:
+    # FIX-auto-title-overwrites-agent-title: the TITLE: line is an automatic title; it only fills
+    # a thread without a meaningful title, so a title an agent set on purpose stays.
+    fake = world.fake
+    await world.start()
+    original = fake.world.thread_meta
+
+    class AgentTitled(dict):  # every new thread starts with an agent's status title
+        def __setitem__(self, key: Any, value: Any) -> None:
+            value["title"] = "[WAITING FOR APPROVAL] Probe"
+            super().__setitem__(key, value)
+
+    fake.world.thread_meta = AgentTitled(original)
+    run = await fake.trigger("ja", channel_id=world.forum_a)
+    assert await world.ended(run.run_id) == "completed"
+    assert [r.json for r in world.requests("setThreadTitle")] == [
+        {"title": "Fix the login form", "auto": True}
+    ]
+    assert fake.thread(run.thread_id)["title"] == "[WAITING FOR APPROVAL] Probe"
+
+
 async def test_ag_19_title_conflict_not_retried(world: World) -> None:
     fake = world.fake
     fake.inject("setThreadTitle", Fault.problem("title_manual"))

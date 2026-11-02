@@ -62,3 +62,30 @@ func TestSourceOnUpdate(t *testing.T) {
 		t.Fatalf("operator agent on manual: %q, %v", got, err)
 	}
 }
+
+// TestFillable (09 section 12 point 5, FIX-auto-title-overwrites-agent-title): an automatic title
+// only fills a thread without a meaningful title, that is source auto and an empty or placeholder
+// title; a title an agent set on purpose and every manual title stay.
+func TestFillable(t *testing.T) {
+	t.Parallel()
+	p := title.NewPlaceholders(title.DefaultEntries())
+	for _, c := range []struct {
+		current title.Source
+		title   string
+		want    bool
+	}{
+		{title.Auto, "", true},
+		{title.Auto, "  ", true},
+		{title.Auto, "New chat", true},
+		{title.Auto, "Neuer Chat 2", true},
+		{title.Auto, "[WAITING FOR APPROVAL] Printer in room 2", false},
+		{title.Auto, "Lake trip", false},
+		{title.Manual, "", false},
+		{title.Manual, "New chat", false},
+		{title.Manual, "Invoice export", false},
+	} {
+		if got := p.Fillable(c.current, c.title); got != c.want {
+			t.Errorf("%s %q: %v, want %v", c.current, c.title, got, c.want)
+		}
+	}
+}

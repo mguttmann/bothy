@@ -379,3 +379,61 @@ func TestSetTitle_ByOther(t *testing.T) {
 		IfMatch: chat.Precondition{Present: true, Valid: true, Version: got.Version}})
 	wantCode(t, err, errs.CodeTitleManual)
 }
+
+// TestSetTitle_AutoFillsOnly (FIX-auto-title-overwrites-agent-title, 09 section 12 point 5): an
+// automatic title (Auto) fills only a thread without a meaningful title. A title the operator agent
+// set on purpose stays when the adapter's automatic title follows the owner's answer; an empty or
+// placeholder title is filled once; on a manual title the operator agent still gets title_manual.
+func TestSetTitle_AutoFillsOnly(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t)
+	ctx := context.Background()
+	sp := e.create(t, "Support", ids.ID{})
+	forum := e.channel(t, sp.ID, "forum", "forum")
+	agent := actor.Actor{ID: ids.New(), Kind: actor.KindAgent}
+	match := func(v int64) chat.Precondition { return chat.Precondition{Present: true, Valid: true, Version: v} }
+
+	post, err := e.newThread(agent, chat.CreateThreadCmd{ChannelID: forum.ID, Title: ptr("Probe")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.setThreadOperator(post.ID, agent.ID)
+	status, err := e.svc.SetTitle(ctx, agent, chat.SetTitleCmd{ThreadID: post.ID, Title: "[WAITING FOR APPROVAL] Probe", IfMatch: match(post.Version)})
+	if err != nil || status.TitleSource != "auto" {
+		t.Fatalf("status title %+v, %v", status, err)
+	}
+	events := e.eventCount("thread.updated")
+	got, err := e.svc.SetTitle(ctx, agent, chat.SetTitleCmd{ThreadID: post.ID, Title: "ja", Auto: true, IfMatch: match(status.Version)})
+	if err != nil || got.Title != "[WAITING FOR APPROVAL] Probe" || got.Version != status.Version || e.eventCount("thread.updated") != events {
+		t.Fatalf("automatic title replaced the agent's title: %+v, %v", got, err)
+	}
+	// The agent's own thread action still replaces its status title.
+	if got, err := e.svc.SetTitle(ctx, agent, chat.SetTitleCmd{ThreadID: post.ID, Title: "[DONE] Probe", IfMatch: match(status.Version)}); err != nil ||
+		got.Title != "[DONE] Probe" {
+		t.Fatalf("explicit title %+v, %v", got, err)
+	}
+
+	for _, initial := range []string{"", "  "} { // the env has no placeholder words; TestFillable covers them
+		th, err := e.newThread(e.owner, chat.CreateThreadCmd{ChannelID: forum.ID, Title: ptr(initial)})
+		if err != nil || th.TitleSource != "auto" {
+			t.Fatalf("thread %q %+v, %v", initial, th, err)
+		}
+		e.setThreadOperator(th.ID, agent.ID)
+		filled, err := e.svc.SetTitle(ctx, agent, chat.SetTitleCmd{ThreadID: th.ID, Title: "Lake trip", Auto: true, IfMatch: match(th.Version)})
+		if err != nil || filled.Title != "Lake trip" || filled.TitleSource != "auto" || filled.Version != th.Version+1 {
+			t.Fatalf("fill %q: %+v, %v", initial, filled, err)
+		}
+		again, err := e.svc.SetTitle(ctx, agent, chat.SetTitleCmd{ThreadID: th.ID, Title: "Other", Auto: true, IfMatch: match(filled.Version)})
+		if err != nil || again.Title != "Lake trip" || again.Version != filled.Version {
+			t.Fatalf("second fill %q: %+v, %v", initial, again, err)
+		}
+	}
+
+	manual, err := e.newThread(e.owner, chat.CreateThreadCmd{ChannelID: forum.ID, Title: ptr("Release plan")})
+	if err != nil || manual.TitleSource != "manual" {
+		t.Fatalf("manual %+v, %v", manual, err)
+	}
+	e.setThreadOperator(manual.ID, agent.ID)
+	_, err = e.svc.SetTitle(ctx, agent, chat.SetTitleCmd{ThreadID: manual.ID, Title: "ja", Auto: true, IfMatch: match(manual.Version)})
+	wantCode(t, err, errs.CodeTitleManual)
+}

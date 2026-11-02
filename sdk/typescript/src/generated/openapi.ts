@@ -2471,7 +2471,7 @@ export interface paths {
         get?: never;
         /**
          * Set the title
-         * @description Every principal except the thread's operator agent sets `title_source = manual`. The operator agent may only replace an `auto` title, which stays `auto`; on a `manual` title it gets `409 title_manual`.
+         * @description Every principal except the thread's operator agent sets `title_source = manual`. The operator agent may only replace an `auto` title, which stays `auto`; on a `manual` title it gets `409 title_manual`. With `auto = true` the title is an automatic one (a reference adapter after the first run of a new session) and only fills a thread without a meaningful title, that is `title_source = auto` and a title that is empty or a placeholder; otherwise the answer is `200` with the thread unchanged.
          */
         put: operations["setThreadTitle"];
         post?: never;
@@ -7592,6 +7592,11 @@ export interface components {
         ThreadTitlePut: {
             /** @example Invoice export fails for March */
             title: string;
+            /**
+             * @description An automatic title (09 section 12 point 5) that never replaces a meaningful title, such as one an agent or a person set on purpose.
+             * @default false
+             */
+            auto: boolean;
         };
         ThreadMove: {
             target_channel_id: components["schemas"]["Uuid"];

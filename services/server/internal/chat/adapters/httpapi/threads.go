@@ -85,7 +85,8 @@ func (h *Threads) GetThread(ctx context.Context, req rest.GetThreadRequestObject
 // SetThreadTitle implements rest.StrictServerInterface (PUT /threads/{thread_id}/title).
 func (h *Threads) SetThreadTitle(ctx context.Context, req rest.SetThreadTitleRequestObject) (rest.SetThreadTitleResponseObject, error) {
 	th, err := h.threads.SetTitle(ctx, principal(ctx), chat.SetTitleCmd{
-		ThreadID: ids.ID(req.ThreadId), Title: req.Body.Title, IfMatch: precondition(req.Params.IfMatch),
+		ThreadID: ids.ID(req.ThreadId), Title: req.Body.Title, Auto: req.Body.Auto != nil && *req.Body.Auto,
+		IfMatch: precondition(req.Params.IfMatch),
 	})
 	if err != nil {
 		return nil, err

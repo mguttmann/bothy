@@ -414,7 +414,7 @@ make sure that clients clear their cache and runs end (R-AZ-15).
 |---|---|---|---|---|---|---|---|---|
 | `thread.read` | read a thread and its history | thread | read | no | no | no | no | `rl.read` |
 | `thread.create` | create a thread from a message or forum post; tags at creation are treated as with `thread.tags.set` (tags with `restricted` need `manage`) | channel | write | no | no | no | no | `rl.message` |
-| `thread.title.update` | change the title; sets `title_source = manual`. The operator agent may set it only with `auto`; the source then stays `auto` | thread | write and (creator or manage or operator agent) | no | no | no | no | `rl.write` |
+| `thread.title.update` | change the title; sets `title_source = manual`. The operator agent may set it only with `auto`; the source then stays `auto`. An automatic title (`auto = true`) only fills an empty or placeholder `auto` title (09 section 12 point 5) | thread | write and (creator or manage or operator agent) | no | no | no | no | `rl.write` |
 | `thread.close` | set a thread to "Done" | thread | write | no | no | no | no | `rl.write` |
 | `thread.delete` | delete a chat or thread with its content; soft with undo until `chat.delete_undo_window`, then purged; never a main thread (01 6.18) | thread | write and (creator or manage) | no | no | yes | no | `rl.write` |
 | `thread.restore` | undo the deletion of a chat before `undo_until` | thread | write and (creator or manage) | no | no | yes | no | `rl.write` |

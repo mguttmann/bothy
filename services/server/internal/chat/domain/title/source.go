@@ -50,6 +50,14 @@ func (p Placeholders) SourceAtCreation(by By, title string) Source {
 	return Auto
 }
 
+// Fillable reports whether an automatic title may fill a thread whose title has the source current
+// (09 section 12 point 5): only while the thread has no meaningful title, that is the source is
+// auto and the title is empty or a placeholder. A title an agent set on purpose (auto, but a real
+// title) and every manual title stay.
+func (p Placeholders) Fillable(current Source, title string) bool {
+	return current == Auto && p.IsPlaceholder(title)
+}
+
 // SourceOnUpdate returns the source after by changes the title of a thread with the source
 // current (09 section 12 point 3, 05 thread.title.update): the operator agent keeps auto, every
 // other principal sets manual, also with a placeholder text (placeholder detection runs only at

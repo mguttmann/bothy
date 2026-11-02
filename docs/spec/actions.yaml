@@ -1135,7 +1135,8 @@ actions:
 - id: thread.title.update
   section: threads
   description: change the title; sets `title_source = manual`. The operator agent may set it only with
-    `auto`; the source then stays `auto`
+    `auto`; the source then stays `auto`. An automatic title (`auto = true`) only fills an empty or
+    placeholder `auto` title (09 section 12 point 5)
   resource: thread
   right: write and (creator or manage or operator agent)
   owner: false

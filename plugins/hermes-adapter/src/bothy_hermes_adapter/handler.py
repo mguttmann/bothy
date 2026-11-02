@@ -747,7 +747,12 @@ class HermesHandler(AgentHandler):
             _LOG.info("run %s: session report refused code=%s", turn.run_id, exc.code)
 
     async def _set_title(self, turn: _Turn) -> None:
-        """The title after the first completed run of a new session (09 12 points 3 to 5)."""
+        """The title after the first completed run of a new session (09 12 points 3 to 5).
+
+        It is an automatic title (``auto``): the server only lets it fill a thread without a
+        meaningful title, so a status title the agent set with its thread action, or one a
+        person set, stays when the owner answers in a new session.
+        """
         title = self.runtime.session_title(turn.thread_id)
         if not title or not title.strip():
             return
@@ -761,7 +766,7 @@ class HermesHandler(AgentHandler):
             await client.call(
                 set_thread_title.asyncio_detailed,
                 thread_id=turn.thread_id,
-                body=ThreadTitlePut(title=title.strip()),
+                body=ThreadTitlePut(title=title.strip(), auto=True),
                 if_match=f'"{thread.version}"',
             )
         except ProblemError as exc:

@@ -191,6 +191,9 @@ type ThreadPage struct {
 type SetTitleCmd struct {
 	ThreadID ids.ID
 	Title    string
+	// Auto marks an automatic title (09 section 12 point 5): it only fills a thread without a
+	// meaningful title and otherwise leaves the thread unchanged.
+	Auto bool
 	// IfMatch is the required precondition.
 	IfMatch Precondition
 }

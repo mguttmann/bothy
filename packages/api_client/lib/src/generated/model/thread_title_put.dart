@@ -12,11 +12,16 @@ part 'thread_title_put.g.dart';
 ///
 /// Properties:
 /// * [title]
+/// * [auto] - An automatic title (09 section 12 point 5) that never replaces a meaningful title, such as one an agent or a person set on purpose.
 @BuiltValue()
 abstract class ThreadTitlePut
     implements Built<ThreadTitlePut, ThreadTitlePutBuilder> {
   @BuiltValueField(wireName: r'title')
   String get title;
+
+  /// An automatic title (09 section 12 point 5) that never replaces a meaningful title, such as one an agent or a person set on purpose.
+  @BuiltValueField(wireName: r'auto')
+  bool? get auto;
 
   ThreadTitlePut._();
 
@@ -24,7 +29,7 @@ abstract class ThreadTitlePut
       _$ThreadTitlePut;
 
   @BuiltValueHook(initializeBuilder: true)
-  static void _defaults(ThreadTitlePutBuilder b) => b;
+  static void _defaults(ThreadTitlePutBuilder b) => b..auto = false;
 
   @BuiltValueSerializer(custom: true)
   static Serializer<ThreadTitlePut> get serializer =>
@@ -49,6 +54,13 @@ class _$ThreadTitlePutSerializer
       object.title,
       specifiedType: const FullType(String),
     );
+    if (object.auto != null) {
+      yield r'auto';
+      yield serializers.serialize(
+        object.auto,
+        specifiedType: const FullType(bool),
+      );
+    }
   }
 
   @override
@@ -82,6 +94,14 @@ class _$ThreadTitlePutSerializer
             specifiedType: const FullType(String),
           ) as String;
           result.title = valueDes;
+          break;
+        case r'auto':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(bool),
+          ) as bool?;
+          if (valueDes == null) continue;
+          result.auto = valueDes;
           break;
         default:
           unhandled.add(key);

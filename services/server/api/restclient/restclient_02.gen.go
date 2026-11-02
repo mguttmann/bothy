@@ -3706,7 +3706,7 @@ type ClientInterface interface {
 
 	// SetThreadTitleWithBody Set the title
 	//
-	// Every principal except the thread's operator agent sets `title_source = manual`. The operator agent may only replace an `auto` title, which stays `auto`; on a `manual` title it gets `409 title_manual`.
+	// Every principal except the thread's operator agent sets `title_source = manual`. The operator agent may only replace an `auto` title, which stays `auto`; on a `manual` title it gets `409 title_manual`. With `auto = true` the title is an automatic one (a reference adapter after the first run of a new session) and only fills a thread without a meaningful title, that is `title_source = auto` and a title that is empty or a placeholder; otherwise the answer is `200` with the thread unchanged.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -3715,7 +3715,7 @@ type ClientInterface interface {
 
 	// SetThreadTitle Set the title
 	//
-	// Every principal except the thread's operator agent sets `title_source = manual`. The operator agent may only replace an `auto` title, which stays `auto`; on a `manual` title it gets `409 title_manual`.
+	// Every principal except the thread's operator agent sets `title_source = manual`. The operator agent may only replace an `auto` title, which stays `auto`; on a `manual` title it gets `409 title_manual`. With `auto = true` the title is an automatic one (a reference adapter after the first run of a new session) and only fills a thread without a meaningful title, that is `title_source = auto` and a title that is empty or a placeholder; otherwise the answer is `200` with the thread unchanged.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -12130,7 +12130,7 @@ func (c *Client) SetThreadTags(ctx context.Context, threadId ThreadIdPath, param
 
 // SetThreadTitleWithBody Set the title
 //
-// Every principal except the thread's operator agent sets `title_source = manual`. The operator agent may only replace an `auto` title, which stays `auto`; on a `manual` title it gets `409 title_manual`.
+// Every principal except the thread's operator agent sets `title_source = manual`. The operator agent may only replace an `auto` title, which stays `auto`; on a `manual` title it gets `409 title_manual`. With `auto = true` the title is an automatic one (a reference adapter after the first run of a new session) and only fills a thread without a meaningful title, that is `title_source = auto` and a title that is empty or a placeholder; otherwise the answer is `200` with the thread unchanged.
 //
 // Takes any type of body and a specified content type.
 //
@@ -12149,7 +12149,7 @@ func (c *Client) SetThreadTitleWithBody(ctx context.Context, threadId ThreadIdPa
 
 // SetThreadTitle Set the title
 //
-// Every principal except the thread's operator agent sets `title_source = manual`. The operator agent may only replace an `auto` title, which stays `auto`; on a `manual` title it gets `409 title_manual`.
+// Every principal except the thread's operator agent sets `title_source = manual`. The operator agent may only replace an `auto` title, which stays `auto`; on a `manual` title it gets `409 title_manual`. With `auto = true` the title is an automatic one (a reference adapter after the first run of a new session) and only fills a thread without a meaningful title, that is `title_source = auto` and a title that is empty or a placeholder; otherwise the answer is `200` with the thread unchanged.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -24073,88 +24073,4 @@ func NewClosePriceRequestWithBody(server string, priceId PriceIdPath, params *Cl
 	}
 
 	return req, nil
-}
-
-// NewListTokensRequest constructs an http.Request for the ListTokens method
-func NewListTokensRequest(server string, principalId PrincipalIdPath, params *ListTokensParams) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "principal_id", principalId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/principals/%s/tokens", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-		// queryValues collects non-styled parameters (passthrough, JSON)
-		// that are safe to round-trip through url.Values.Encode().
-		queryValues := queryURL.Query()
-		// rawQueryFragments collects pre-encoded query fragments from
-		// styled parameters, preserving literal commas as delimiters
-		// per the OpenAPI spec (e.g. "color=blue,black,brown").
-		var rawQueryFragments []string
-
-		if params.Cursor != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if params.Limit != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if encoded := queryValues.Encode(); encoded != "" {
-			rawQueryFragments = append(rawQueryFragments, encoded)
-		}
-		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewCreateTokenRequest calls the generic CreateToken builder with application/json body
-func NewCreateTokenRequest(server string, principalId PrincipalIdPath, params *CreateTokenParams, body CreateTokenJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewCreateTokenRequestWithBody(server, principalId, params, "application/json", bodyReader)
 }

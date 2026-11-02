@@ -765,3 +765,31 @@ func wantField(t *testing.T, err error, pointer, code string) {
 		t.Fatalf("error %v, want validation_failed %s on %s", err, code, pointer)
 	}
 }
+
+// TestSetThreadTitle_AutoKeepsAgentTitle (FIX-auto-title-overwrites-agent-title, 09 section 12
+// point 5): the operator agent sets a status title with its thread action, the owner answers and
+// the adapter's automatic title ("auto": true) follows; the status title stays and nothing is
+// written. The same automatic title fills a thread whose title is still empty.
+func TestSetThreadTitle_AutoKeepsAgentTitle(t *testing.T) {
+	t.Parallel()
+	w := newWorld(t)
+	space := w.create("Support")
+	forum := w.channel(space, "forum", "tickets")
+	lotse := w.operatorAgent("lotse", "organization")
+	w.setOperator(forum, lotse)
+	th := w.post(forum, "")
+	path := threadPath(th.ID) + "/title"
+	w.want(w.do("lotse", http.MethodPut, path, `{"title":"[WAIT] Probe"}`, ifMatch(1)...), http.StatusOK, "")
+	m := w.want(w.do("lotse", http.MethodPut, path, `{"title":"ja","auto":true}`, ifMatch(2)...), http.StatusOK, "")
+	if m["title"] != "[WAIT] Probe" || m["title_source"] != "auto" {
+		t.Fatalf("automatic title replaced the agent's title: %v", m)
+	}
+	if w.count(`SELECT count(*)::int FROM threads WHERE id = $1 AND title = '[WAIT] Probe' AND version = 2`, th.ID.String()) != 1 {
+		t.Fatal("the agent's title was replaced")
+	}
+	empty := w.post(forum, "")
+	m = w.want(w.do("lotse", http.MethodPut, threadPath(empty.ID)+"/title", `{"title":"Lake trip","auto":true}`, ifMatch(1)...), http.StatusOK, "")
+	if m["title"] != "Lake trip" || m["title_source"] != "auto" {
+		t.Fatalf("automatic title on an empty thread %v", m)
+	}
+}

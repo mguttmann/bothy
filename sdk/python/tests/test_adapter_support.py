@@ -220,6 +220,25 @@ async def test_fake_me_thread_title_and_message_update(fake: FakeServer) -> None
         )
         assert ok.status_code == 200
         assert fake.titles == [{"thread_id": str(triggered.thread_id), "title": "Trip"}]
+        # An automatic title only fills a thread without a meaningful title (09 12 point 5).
+        version = ok.json()["version"]
+        kept = await api.put(
+            path, json={"title": "ja", "auto": True}, headers={"If-Match": f'"{version}"'}
+        )
+        assert (kept.status_code, kept.json()["title"], kept.json()["version"]) == (
+            200,
+            "Trip",
+            version,
+        )
+        other = await fake.trigger()
+        fake.world.thread_meta[other.thread_id]["title"] = "Neuer Chat 2"
+        fresh = (await api.get(f"/threads/{other.thread_id}")).json()
+        filled = await api.put(
+            f"/threads/{other.thread_id}/title",
+            json={"title": "Lake trip", "auto": True},
+            headers={"If-Match": f'"{fresh["version"]}"'},
+        )
+        assert filled.json()["title"] == "Lake trip"
         fake.set_manual_title(triggered.thread_id, "Mine")
         current = (await api.get(f"/threads/{triggered.thread_id}")).json()
         manual = await api.put(
