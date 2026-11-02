@@ -248,8 +248,10 @@ func (x *explainer) entry(ctx context.Context, tg explainTarget, p ids.ID) (*dom
 		Sources: domain.Provenance(st.in, kind, tg.path),
 	}
 	if kind == domain.KindAgent && p == tg.defaultOperator && tg.path.Kind == domain.PathSpace {
-		// The default operator of a space operates its inheriting channels: write (R-AZ-13).
+		// The default operator of a space operates its inheriting channels: write and upload
+		// (R-AZ-13, FIX-operator-upload-grant).
 		e.Rights.Level = domain.MaxLevel(e.Rights.Level, domain.LevelWrite)
+		e.Rights.Caps = e.Rights.Caps.Union(domain.CapsOf(domain.CapUpload))
 		e.Sources = append(e.Sources, domain.Source{Kind: domain.SourceOperator, AgentID: p})
 	}
 	if kind == domain.KindUser && e.Rights.Level == domain.LevelTrigger && !e.Rights.Owner {

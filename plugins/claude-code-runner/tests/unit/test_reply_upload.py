@@ -114,6 +114,31 @@ def test_part_slices() -> None:
     assert content_digest(data) == expected
 
 
+def test_record_keeps_the_locale_of_the_notice(tmp_path: Path) -> None:
+    """FIX-operator-upload-grant: the record stores the instance locale, so a notice rebuilt after
+    a restart speaks the same language; a record of an older runner has none and stays English."""
+    path = AttachmentSetRecord.path_for(tmp_path / "state", "ref", RUN, 1)
+    record = AttachmentSetRecord(path=path, answer=1, state="staged", limit=3, locale="de")
+    record.set_outcomes(
+        [Outcome("out/review.md", Rejection("upload_refused", "forbidden", "capability_missing"))]
+    )
+    record.save()
+    loaded = AttachmentSetRecord.load(path)
+    assert loaded is not None
+    assert loaded.locale == "de"
+    # language-check: off
+    assert loaded.notice() == (
+        "Anhänge nicht gesendet:\n- `review.md`: Hochladen nicht erlaubt (Recht fehlt)"
+    )
+    # language-check: on
+    doc = json.loads(path.read_text())
+    del doc["locale"]
+    path.write_text(json.dumps(doc))
+    old = AttachmentSetRecord.load(path)
+    assert old is not None
+    assert old.notice().startswith("Attachments not sent:\n")
+
+
 def test_record_roundtrip(tmp_path: Path) -> None:
     path = AttachmentSetRecord.path_for(tmp_path / "state", "ref", RUN, 2)
     assert path == tmp_path / "state" / "sessions" / "ref" / f"{RUN}.attach-2.json"
@@ -166,6 +191,7 @@ def test_record_roundtrip(tmp_path: Path) -> None:
         "files",
         "outcomes",
         "limit",
+        "locale",
         "client_msg_id",
         "fallback_msg_id",
     }

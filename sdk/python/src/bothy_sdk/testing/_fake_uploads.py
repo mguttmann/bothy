@@ -117,6 +117,8 @@ class FakeUploads:
         self.uploader = uploader
         self.limits: dict[str, int] = dict(DEFAULT_LIMITS)
         self.part_size = _DEFAULT_PART_SIZE
+        # ``locale_default`` of ``getInstance``; a test sets ``de`` for a German instance.
+        self.locale_default = "en"
         self.sessions: dict[UUID, Upload] = {}
 
     def instance(self, instance_id: UUID) -> dict[str, Any]:
@@ -124,7 +126,7 @@ class FakeUploads:
         return {
             "instance_id": str(instance_id),
             "branding": {"product_name": "Team Chat", "version": 1},
-            "locale_default": "en",
+            "locale_default": self.locale_default,
             "spec_version": "1.0.0",
             "features": [],
             "limits": dict(self.limits),

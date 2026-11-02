@@ -138,7 +138,7 @@ func (m *refWorld) rights(p *refPrincipal, space ids.ID, c *refChannel) (level i
 		upload, manage, export = upload || g.upload, manage || g.manage, export || g.ex
 	}
 	if p.kind == domain.KindAgent && c != nil && c.operator == p.id {
-		level = max(level, 2)
+		level, upload = max(level, 2), true // the operator rule with upload (FIX-operator-upload-grant)
 	}
 	if p.kind != domain.KindUser {
 		level, manage, export = min(level, 2), false, false

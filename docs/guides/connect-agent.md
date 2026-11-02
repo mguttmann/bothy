@@ -235,8 +235,9 @@ Content-Type: application/json
 ```
 
 Then the owner makes the agent the operator of the channel: the agent that answers there by
-default. The operator has `write` without a grant ([chapter 09 section 2.3](../spec/09-agents.md));
-the grant above adds `upload`. The change needs the channel's version in `If-Match`
+default. The operator has `write` and `upload` without a grant
+([chapter 09 section 2.3](../spec/09-agents.md)); the grant above matters where the agent answers
+without being the operator. The change needs the channel's version in `If-Match`
 ([chapter 06 section 8](../spec/06-api.md)):
 
 ```http title="Owner: getChannel"

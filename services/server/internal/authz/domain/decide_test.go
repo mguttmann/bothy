@@ -78,18 +78,19 @@ func TestEffectiveRules(t *testing.T) {
 	if r := domain.Effective(s, domain.KindAgent, agentID, path); r.Level != domain.LevelWrite || r.Caps != domain.CapsOf(domain.CapUpload) {
 		t.Fatalf("agent %+v", r)
 	}
-	// Operator rule on the channel and on a fixed-operator thread (07 section 2.9).
+	// Operator rule on the channel and on a fixed-operator thread (07 section 2.9): write and upload
+	// without a grant row (FIX-operator-upload-grant).
 	other := domain.Path{Kind: domain.PathChannel, SpaceID: ids.New(), ChannelID: ids.New(), ChannelOperatorID: agentID}
-	if r := domain.Effective(domain.Snapshot{}, domain.KindAgent, agentID, other); r.Level != domain.LevelWrite {
+	if r := domain.Effective(domain.Snapshot{}, domain.KindAgent, agentID, other); r.Level != domain.LevelWrite || r.Caps != domain.CapsOf(domain.CapUpload) {
 		t.Fatalf("channel operator %+v", r)
 	}
 	thread := domain.Path{Kind: domain.PathChannel, SpaceID: ids.New(), ChannelID: ids.New(), ChannelOperatorID: ids.New(),
 		ThreadID: ids.New(), ThreadOperatorID: agentID}
-	if r := domain.Effective(domain.Snapshot{}, domain.KindAgent, agentID, thread); r.Level != domain.LevelWrite {
+	if r := domain.Effective(domain.Snapshot{}, domain.KindAgent, agentID, thread); r.Level != domain.LevelWrite || r.Caps != domain.CapsOf(domain.CapUpload) {
 		t.Fatalf("thread operator %+v", r)
 	}
 	thread.ThreadMain = true
-	if r := domain.Effective(domain.Snapshot{}, domain.KindAgent, agentID, thread); r.Level != domain.LevelNone {
+	if r := domain.Effective(domain.Snapshot{}, domain.KindAgent, agentID, thread); r.Level != domain.LevelNone || r.Caps != 0 {
 		t.Fatalf("main thread follows the channel's operator, got %+v", r)
 	}
 	// Owners have everything except DMs (SR6); participants have write and upload.

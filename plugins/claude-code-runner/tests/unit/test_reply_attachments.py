@@ -465,3 +465,49 @@ def test_build_notice() -> None:
     assert with_notice("Done.", "N") == "Done.\n\nN"
     assert with_notice("", "N") == "N"
     assert set(REASONS) >= {o.rejection.code for o in outcomes if o.rejection}
+
+
+def test_build_notice_follows_the_instance_language() -> None:
+    """FIX-operator-upload-grant: the notice speaks the instance's ``locale.default``.
+
+    German (``de`` or a ``de-*`` tag) gets a German heading and readable reasons; English and
+    any other or unknown locale keep the English notice with its codes.
+    """
+    outcomes = [
+        Outcome(
+            "docs/review-model-proposal.md",
+            Rejection("upload_refused", "forbidden", "capability_missing"),
+        ),
+        Outcome("b.md", Rejection("upload_refused", "forbidden", "acting_for_insufficient")),
+        Outcome("c.md", Rejection("upload_refused", "conflict", "something_new")),
+        Outcome("d.md", Rejection("set_not_sent")),
+        Outcome("e.md", Rejection("not_attached", "feature_disabled")),
+    ]
+    german = build_notice(outcomes, 4, "de")
+    # language-check: off
+    assert german == (
+        "Anhänge nicht gesendet:\n"
+        "- `review-model-proposal.md`: Hochladen nicht erlaubt (Recht fehlt)\n"
+        "- `b.md`: Hochladen nicht erlaubt (der auslösenden Person fehlt das Recht)\n"
+        "- `c.md`: Hochladen abgelehnt (conflict, something_new)\n"
+        "- `d.md`: nicht gesendet, weil eine andere Datei nicht gesendet werden konnte\n"
+        "- und 1 weitere"
+    )
+    # language-check: on
+    assert build_notice(outcomes, 4, "de-AT") == german
+    english = build_notice(outcomes[:1], 4)
+    assert english == (
+        "Attachments not sent:\n"
+        "- `review-model-proposal.md`: upload_refused (forbidden, capability_missing)"
+    )
+    for other in ("en", "fr", "", None):
+        assert build_notice(outcomes[:1], 4, other) == english
+    assert build_notice([Outcome("a.md")], 3, "de") == ""
+
+
+def test_german_reason_for_every_code() -> None:
+    """Every code of `REASONS` has a German text; none of them leaks the English code."""
+    for code in REASONS:
+        line = build_notice([Outcome("a.md", Rejection(code))], 3, "de").splitlines()[1]
+        assert code not in line, line
+        assert line.startswith("- `a.md`: "), line
