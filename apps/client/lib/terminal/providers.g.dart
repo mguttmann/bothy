@@ -58,16 +58,18 @@ final class TerminalServicesProvider
   }
 }
 
-String _$terminalServicesHash() => r'097734151ea129986925563b9091282508095a7a';
+String _$terminalServicesHash() => r'e590fc56c0b24d830df8637c0fc4bf100fc3065b';
 
 /// Attaches the dropped streams of every host's tabs again when the app is online again or in
-/// front (FIX-terminal-session-lifecycle, D-TSL-5); null before the login.
+/// front (FIX-terminal-session-lifecycle, D-TSL-5), never while the app lock holds the content;
+/// null before the login.
 
 @ProviderFor(terminalReconnector)
 final terminalReconnectorProvider = TerminalReconnectorProvider._();
 
 /// Attaches the dropped streams of every host's tabs again when the app is online again or in
-/// front (FIX-terminal-session-lifecycle, D-TSL-5); null before the login.
+/// front (FIX-terminal-session-lifecycle, D-TSL-5), never while the app lock holds the content;
+/// null before the login.
 
 final class TerminalReconnectorProvider
     extends
@@ -78,7 +80,8 @@ final class TerminalReconnectorProvider
         >
     with $Provider<TerminalReconnector?> {
   /// Attaches the dropped streams of every host's tabs again when the app is online again or in
-  /// front (FIX-terminal-session-lifecycle, D-TSL-5); null before the login.
+  /// front (FIX-terminal-session-lifecycle, D-TSL-5), never while the app lock holds the content;
+  /// null before the login.
   TerminalReconnectorProvider._()
     : super(
         from: null,
@@ -114,7 +117,7 @@ final class TerminalReconnectorProvider
 }
 
 String _$terminalReconnectorHash() =>
-    r'a5d0fcbb222385c665047b38bbd7d5895f9264e3';
+    r'aed21fc73beb101f527141879c03e3be9fcb60c4';
 
 /// The person's own user ID as the engine's last snapshot named it; null before it.
 

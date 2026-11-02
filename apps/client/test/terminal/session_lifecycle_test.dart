@@ -20,6 +20,17 @@ import 'package:terminal_ui/testing.dart';
 
 import 'support.dart';
 
+/// An app lock that holds the content until [set] opens it.
+final class _Lock extends ChangeNotifier implements TerminalReconnectLock {
+  @override
+  bool holdsContent = false;
+
+  void set({required bool holds}) {
+    holdsContent = holds;
+    notifyListeners();
+  }
+}
+
 /// Counts the reconnect calls.
 final class _Target implements TerminalReconnectTarget {
   int calls = 0;
@@ -183,6 +194,38 @@ void main() {
       expect(t.calls, 2);
     },
   );
+
+  test('the reconnector waits while the app lock holds the content and '
+      'reattaches once it opens', () async {
+    final online = StreamController<bool>.broadcast(sync: true);
+    addTearDown(online.close);
+    final lifecycle = _Lifecycle();
+    final lock = _Lock();
+    final r = TerminalReconnector(
+      online: online.stream,
+      lifecycle: lifecycle,
+      lock: lock,
+    );
+    addTearDown(r.dispose);
+    final t = _Target();
+    r.register(t);
+    lock.set(holds: true);
+    lifecycle
+      ..set(AppActivity.background)
+      ..set(AppActivity.foreground);
+    online
+      ..add(false)
+      ..add(true);
+    expect(t.calls, 0, reason: 'nothing attaches behind the lock');
+    lock.set(holds: true);
+    expect(t.calls, 0);
+    lock.set(holds: false);
+    expect(t.calls, 1, reason: 'one reattach when the lock opens');
+    lock
+      ..set(holds: true)
+      ..set(holds: false);
+    expect(t.calls, 1, reason: 'opening again without a change asks nothing');
+  });
 
   testWidgets('Sessions lists the own sessions with start, detach time and '
       'Reattach', (tester) async {

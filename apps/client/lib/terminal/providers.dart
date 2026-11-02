@@ -27,6 +27,8 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../app/providers/ports.dart';
 import '../app/providers/session.dart';
+import '../lock/app_lock_controller.dart';
+import '../lock/providers.dart';
 import 'host_events_adapter.dart';
 import 'pin_store_adapter.dart';
 import 'reconnect.dart';
@@ -70,6 +72,7 @@ final class TerminalServices {
     required this.context,
     this.online = const Stream.empty(),
     this.lifecycle,
+    this.lock,
   });
 
   /// The REST side (without the interceptor that answers step-ups itself).
@@ -108,6 +111,9 @@ final class TerminalServices {
 
   /// The app's life cycle: coming to the front attaches dropped streams again; null without.
   final AppLifecycle? lifecycle;
+
+  /// The app lock: no dropped stream attaches again while it holds the content; null without.
+  final TerminalReconnectLock? lock;
 }
 
 /// The terminal ports of the signed-in instance, or null before the login.
@@ -139,11 +145,16 @@ TerminalServices? terminalServices(Ref ref) {
     context: () => ports.navigatorKey.currentContext,
     online: services.engine.states.map((s) => s.phase == ConnectionPhase.live),
     lifecycle: ports.lifecycle,
+    lock: switch (ref.watch(appLockProvider)) {
+      final lock? => _AppLockHold(lock),
+      null => null,
+    },
   );
 }
 
 /// Attaches the dropped streams of every host's tabs again when the app is online again or in
-/// front (FIX-terminal-session-lifecycle, D-TSL-5); null before the login.
+/// front (FIX-terminal-session-lifecycle, D-TSL-5), never while the app lock holds the content;
+/// null before the login.
 @Riverpod(keepAlive: true)
 TerminalReconnector? terminalReconnector(Ref ref) {
   final services = ref.watch(terminalServicesProvider);
@@ -151,9 +162,26 @@ TerminalReconnector? terminalReconnector(Ref ref) {
   final r = TerminalReconnector(
     online: services.online,
     lifecycle: services.lifecycle,
+    lock: services.lock,
   );
   ref.onDispose(r.dispose);
   return r;
+}
+
+/// [TerminalReconnectLock] over the app lock controller.
+final class _AppLockHold implements TerminalReconnectLock {
+  _AppLockHold(this._lock);
+
+  final AppLockController _lock;
+
+  @override
+  bool get holdsContent => _lock.closed || _lock.deciding;
+
+  @override
+  void addListener(VoidCallback listener) => _lock.addListener(listener);
+
+  @override
+  void removeListener(VoidCallback listener) => _lock.removeListener(listener);
 }
 
 /// The person's own user ID as the engine's last snapshot named it; null before it.

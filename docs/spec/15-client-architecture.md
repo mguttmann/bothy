@@ -1241,7 +1241,8 @@ itself (D-M4-36-5); the step-up is `session.stepUp.confirm` with the step-up dev
    the view follows the response `401 step_up_required`. When the stream broke while the tab
    was attached (no close code of the server, `1001`, `4013`, `4014` or `4102`), the apps
    reattach once by themselves when the connection of the engine is live again or the app
-   returns to the front (D-TSL-5 of FIX-terminal-session-lifecycle); a detach by the person stays.
+   returns to the front (D-TSL-5 of FIX-terminal-session-lifecycle), and not before the app lock
+   is open; a detach by the person stays.
 7. On mobile the app detaches when it moves to the background and covers the view in the
    app switcher (R-PR-12 in 01); in the foreground it reattaches.
 8. The view shows close codes of the stream (asyncapi.yaml, channel `terminalStream`) with a reason:

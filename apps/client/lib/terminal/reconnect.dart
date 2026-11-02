@@ -9,11 +9,20 @@
 /// |---|---|
 /// | the connection of the engine becomes live after it was not | `reconnectLost` of every tab group |
 /// | the app comes to the front after it was in the background | the same |
+/// | either while the app lock hides the content or decides | nothing yet; once when the lock opens |
 library;
 
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:sync_engine/sync_engine.dart' show AppActivity, AppLifecycle;
+
+/// The app lock as the reconnector sees it: no session attaches while it hides the content or
+/// decides (docs/spec/01-product.md 5.6 E6; docs/decisions.d/M5-12.md D-M5-12-4).
+abstract interface class TerminalReconnectLock implements Listenable {
+  /// Whether the lock hides the content now or is still deciding on a return.
+  bool get holdsContent;
+}
 
 /// What the reconnector asks of a group of tabs ([TerminalTabs] of one host).
 abstract interface class TerminalReconnectTarget {
@@ -29,11 +38,20 @@ abstract interface class TerminalReconnectTarget {
 /// r.register(tabs);
 /// ```
 final class TerminalReconnector {
-  /// Creates the reconnector; [lifecycle] null watches only [online].
-  TerminalReconnector({required Stream<bool> online, AppLifecycle? lifecycle}) {
+  /// Creates the reconnector; [lifecycle] null watches only [online]; [lock] null: the app has
+  /// no lock.
+  TerminalReconnector({
+    required Stream<bool> online,
+    AppLifecycle? lifecycle,
+    TerminalReconnectLock? lock,
+  }) : _lock = lock {
     _online = online.listen(_onOnline);
     _activity = lifecycle?.changes.listen(_onActivity);
+    lock?.addListener(_onLock);
   }
+
+  final TerminalReconnectLock? _lock;
+  bool _held = false;
 
   late final StreamSubscription<bool> _online;
   StreamSubscription<AppActivity>? _activity;
@@ -63,7 +81,17 @@ final class TerminalReconnector {
     _reconnect();
   }
 
+  void _onLock() {
+    if (!_held || (_lock?.holdsContent ?? false)) return;
+    _held = false;
+    _reconnect();
+  }
+
   void _reconnect() {
+    if (_lock?.holdsContent ?? false) {
+      _held = true;
+      return;
+    }
     for (final t in List.of(_targets)) {
       t.reconnectLost();
     }
@@ -71,6 +99,7 @@ final class TerminalReconnector {
 
   /// Stops listening.
   void dispose() {
+    _lock?.removeListener(_onLock);
     unawaited(_online.cancel());
     unawaited(_activity?.cancel());
     _targets.clear();
