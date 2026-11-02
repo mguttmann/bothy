@@ -58,6 +58,40 @@ const _suggestions = [
 ];
 
 void main() {
+  for (final theme in DsThemeMode.values) {
+    testWidgets('the focused field shows a hairline in the focus color and no ring inside, '
+        'in ${theme.name}', (tester) async {
+      // FIX-keyboard-dismiss-focus-ring: the input decoration theme drew its thick focused
+      // border (yellow in dark) inside the composer's field.
+      await pumpDs(tester, _composer(), theme: theme);
+      await _focus(tester);
+      final decorator = tester.widget<InputDecorator>(
+        find.byType(InputDecorator),
+      );
+      expect(decorator.isFocused, isTrue);
+      final focused = decorator.decoration.focusedBorder;
+      expect(focused == null || focused == InputBorder.none, isTrue);
+      final field = tester.widget<Container>(
+        find.byKey(const ValueKey('ds-composer-field')),
+      );
+      final border = (field.decoration! as BoxDecoration).border! as Border;
+      final ring = tester.element(find.byType(DsComposer)).dsAccent.focusRing;
+      expect(border.top.color, ring);
+      expect(border.top.width, DsBorderWidth.hairline);
+
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pump();
+      final rest = tester.widget<Container>(
+        find.byKey(const ValueKey('ds-composer-field')),
+      );
+      final restBorder = (rest.decoration! as BoxDecoration).border! as Border;
+      expect(
+        restBorder.top.color,
+        tester.element(find.byType(DsComposer)).dsColors.borderControl,
+      );
+    });
+  }
+
   testWidgets('Enter sends, Shift+Enter makes a new line', (tester) async {
     final sent = <String>[];
     final text = TextEditingController();

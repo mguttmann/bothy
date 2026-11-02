@@ -92,7 +92,7 @@ export const light = {
   },
   focus: {
     ring: "#1b8a83",
-    ringOnSidebar: "#d9c42b",
+    ringOnSidebar: "#7cd5cd",
   },
   info: {
     bg: "#12659d",
@@ -298,8 +298,8 @@ export const dark = {
     subtle: "#430307",
   },
   focus: {
-    ring: "#d9c42b",
-    ringOnSidebar: "#d9c42b",
+    ring: "#7cd5cd",
+    ringOnSidebar: "#7cd5cd",
   },
   info: {
     bg: "#58b3fa",

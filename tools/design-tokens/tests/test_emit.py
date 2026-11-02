@@ -208,9 +208,7 @@ class AccentOutputTest(unittest.TestCase):
                 names = set(re.findall(r"(--ds-[a-z0-9-]+):", match.group(1)))
                 self.assertEqual(names, swapped, f"{accent} {theme}")
         self.assertIn('[data-accent="loch"]:not([data-theme])', text)
-        self.assertNotIn(
-            "--ds-color-focus-ring:", text.split('[data-accent="loch"][data-theme="dark"]')[1].split("}")[0]
-        )
+        self.assertIn("--ds-color-focus-ring:", text.split('[data-accent="loch"][data-theme="dark"]')[1].split("}")[0])
 
     def test_resolved_json_accents(self):
         data = json.loads(tokens._resolved_json(self.model, self.variants, "spruce"))
@@ -220,8 +218,8 @@ class AccentOutputTest(unittest.TestCase):
         loch = section["variants"]["loch"]["light"]["color.accent.bg"]
         self.assertEqual(set(loch), {"hex", "alias", "moved_from", "swapped"})
         self.assertTrue(loch["alias"].startswith("palette.loch."))
-        kept = section["variants"]["loch"]["dark"]["color.focus.ring"]
-        self.assertEqual((kept["alias"], kept["swapped"]), ("palette.gorse.300", False))
+        ring = section["variants"]["loch"]["dark"]["color.focus.ring"]
+        self.assertEqual((ring["alias"], ring["swapped"]), ("palette.loch.300", True))
         base = data["contexts"]["theme"]["light"]["color.accent.bg"]["value"]
         self.assertEqual(section["variants"]["spruce"]["light"]["color.accent.bg"]["hex"], base)
 

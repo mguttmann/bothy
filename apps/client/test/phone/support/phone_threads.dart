@@ -137,8 +137,11 @@ Future<void> pumpPhone(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         routerConfig: router,
-        builder: (context, child) =>
-            DsThemeScope(dsContext: ds, child: child ?? const SizedBox()),
+        // As the app: the keyboard closes on a tap outside a text field.
+        builder: (context, child) => DsThemeScope(
+          dsContext: ds,
+          child: DsKeyboardDismiss(child: child ?? const SizedBox()),
+        ),
       ),
     ),
   );

@@ -170,8 +170,16 @@ ThemeData buildDsTheme(DsContext context) {
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: ButtonStyle(side: WidgetStateProperty.resolveWith(outlinedSide)),
     ),
+    // A text field shows its focus by the caret and a hairline in the focus color; the thick
+    // ring of `border-width.focus` stays with buttons and other controls
+    // (FIX-keyboard-dismiss-focus-ring).
     inputDecorationTheme: InputDecorationThemeData(
-      focusedBorder: OutlineInputBorder(borderSide: focusSide),
+      focusedBorder: OutlineInputBorder(
+        borderSide: BorderSide(
+          color: accent.focusRing,
+          width: DsBorderWidth.hairline,
+        ),
+      ),
     ),
     extensions: [colors, accent, elevation, density, motion],
   );

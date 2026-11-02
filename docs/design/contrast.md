@@ -7,7 +7,7 @@ for every theme. Thresholds: `text` 4.5:1 (SC 1.4.3), `large-text` 3:1 (SC 1.4.3
 `ui` 3:1 (SC 1.4.11), source https://www.w3.org/TR/WCAG22/ (retrieved 2026-10-10).
 The tool stops if a pairing falls below its threshold; this page is written only on success.
 
-Result: 806 pairings checked, 0 below the threshold (288 of them in the accent variants).
+Result: 842 pairings checked, 0 below the threshold (324 of them in the accent variants).
 
 Palette guards (ban list as a test): all met.
 
@@ -117,9 +117,9 @@ Palette guards (ban list as a test): all met.
 | `color.focus.ring` | `color.surface.overlay` | ui | `#1b8a83` on `#fbfeff` | 4.14 | 3 | passed | Focus ring |
 | `color.focus.ring` | `color.surface.input` | ui | `#1b8a83` on `#f5fbfc` | 4.01 | 3 | passed | Focus ring |
 | `color.focus.ring` | `color.surface.selected` | ui | `#1b8a83` on `#ccf5f0` | 3.57 | 3 | passed | Focus ring |
-| `color.focus.ring-on-sidebar` | `color.surface.sidebar` | ui | `#d9c42b` on `#063b38` | 7.03 | 3 | passed | Focus ring in the sidebar |
-| `color.focus.ring-on-sidebar` | `color.surface.sidebar-hover` | ui | `#d9c42b` on `#0f4643` | 6.01 | 3 | passed | Focus ring in the sidebar |
-| `color.focus.ring-on-sidebar` | `color.surface.sidebar-selected` | ui | `#d9c42b` on `#0c5450` | 4.95 | 3 | passed | Focus ring in the sidebar |
+| `color.focus.ring-on-sidebar` | `color.surface.sidebar` | ui | `#7cd5cd` on `#063b38` | 7.25 | 3 | passed | Focus ring in the sidebar |
+| `color.focus.ring-on-sidebar` | `color.surface.sidebar-hover` | ui | `#7cd5cd` on `#0f4643` | 6.20 | 3 | passed | Focus ring in the sidebar |
+| `color.focus.ring-on-sidebar` | `color.surface.sidebar-selected` | ui | `#7cd5cd` on `#0c5450` | 5.11 | 3 | passed | Focus ring in the sidebar |
 | `color.accent.bg` | `color.surface.canvas` | ui | `#136f69` on `#fbfeff` | 5.91 | 3 | passed | Primary button and approval buttons against the surface |
 | `color.accent.bg` | `color.surface.raised` | ui | `#136f69` on `#f5fbfc` | 5.73 | 3 | passed | Primary button and approval buttons against the surface |
 | `color.accent.bg` | `color.surface.overlay` | ui | `#136f69` on `#fbfeff` | 5.91 | 3 | passed | Primary button and approval buttons against the surface |
@@ -375,15 +375,15 @@ Palette guards (ban list as a test): all met.
 | `color.border.control` | `color.surface.list` | ui | `#748486` on `#102326` | 4.17 | 3 | passed | Border of input fields and secondary buttons |
 | `color.border.control` | `color.surface.raised` | ui | `#748486` on `#1b2e31` | 3.64 | 3 | passed | Border of input fields and secondary buttons |
 | `color.border.control` | `color.surface.overlay` | ui | `#748486` on `#24363a` | 3.24 | 3 | passed | Border of input fields and secondary buttons |
-| `color.focus.ring` | `color.surface.canvas` | ui | `#d9c42b` on `#15282b` | 8.67 | 3 | passed | Focus ring |
-| `color.focus.ring` | `color.surface.list` | ui | `#d9c42b` on `#102326` | 9.21 | 3 | passed | Focus ring |
-| `color.focus.ring` | `color.surface.raised` | ui | `#d9c42b` on `#1b2e31` | 8.02 | 3 | passed | Focus ring |
-| `color.focus.ring` | `color.surface.overlay` | ui | `#d9c42b` on `#24363a` | 7.14 | 3 | passed | Focus ring |
-| `color.focus.ring` | `color.surface.input` | ui | `#d9c42b` on `#1b2e31` | 8.02 | 3 | passed | Focus ring |
-| `color.focus.ring` | `color.surface.selected` | ui | `#d9c42b` on `#08312e` | 7.98 | 3 | passed | Focus ring |
-| `color.focus.ring-on-sidebar` | `color.surface.sidebar` | ui | `#d9c42b` on `#032624` | 9.09 | 3 | passed | Focus ring in the sidebar |
-| `color.focus.ring-on-sidebar` | `color.surface.sidebar-hover` | ui | `#d9c42b` on `#08312e` | 7.98 | 3 | passed | Focus ring in the sidebar |
-| `color.focus.ring-on-sidebar` | `color.surface.sidebar-selected` | ui | `#d9c42b` on `#063b38` | 7.03 | 3 | passed | Focus ring in the sidebar |
+| `color.focus.ring` | `color.surface.canvas` | ui | `#7cd5cd` on `#15282b` | 8.94 | 3 | passed | Focus ring |
+| `color.focus.ring` | `color.surface.list` | ui | `#7cd5cd` on `#102326` | 9.50 | 3 | passed | Focus ring |
+| `color.focus.ring` | `color.surface.raised` | ui | `#7cd5cd` on `#1b2e31` | 8.27 | 3 | passed | Focus ring |
+| `color.focus.ring` | `color.surface.overlay` | ui | `#7cd5cd` on `#24363a` | 7.37 | 3 | passed | Focus ring |
+| `color.focus.ring` | `color.surface.input` | ui | `#7cd5cd` on `#1b2e31` | 8.27 | 3 | passed | Focus ring |
+| `color.focus.ring` | `color.surface.selected` | ui | `#7cd5cd` on `#08312e` | 8.23 | 3 | passed | Focus ring |
+| `color.focus.ring-on-sidebar` | `color.surface.sidebar` | ui | `#7cd5cd` on `#032624` | 9.38 | 3 | passed | Focus ring in the sidebar |
+| `color.focus.ring-on-sidebar` | `color.surface.sidebar-hover` | ui | `#7cd5cd` on `#08312e` | 8.23 | 3 | passed | Focus ring in the sidebar |
+| `color.focus.ring-on-sidebar` | `color.surface.sidebar-selected` | ui | `#7cd5cd` on `#063b38` | 7.25 | 3 | passed | Focus ring in the sidebar |
 | `color.accent.bg` | `color.surface.canvas` | ui | `#49c0b7` on `#15282b` | 6.94 | 3 | passed | Primary button and approval buttons against the surface |
 | `color.accent.bg` | `color.surface.raised` | ui | `#49c0b7` on `#1b2e31` | 6.42 | 3 | passed | Primary button and approval buttons against the surface |
 | `color.accent.bg` | `color.surface.overlay` | ui | `#49c0b7` on `#24363a` | 5.71 | 3 | passed | Primary button and approval buttons against the surface |
@@ -603,7 +603,7 @@ Accent `spruce` is the default: its variants are the base roles of the theme sec
 | `color.accent.fg` | loch.300 | `#8ec9fb` |
 | `color.accent.subtle` | loch.950 | `#02223a` |
 | `color.text.link` | loch.300 | `#8ec9fb` |
-| `color.focus.ring` | gorse.300, not swapped | `#d9c42b` |
+| `color.focus.ring` | loch.300 | `#8ec9fb` |
 | `color.run.running` | loch.400 | `#58b3fa` |
 
 | Foreground | Background | Kind | Values | Ratio | Threshold | Result | Usage |
@@ -622,6 +622,12 @@ Accent `spruce` is the default: its variants are the base roles of the theme sec
 | `color.accent.fg` (loch.300) | `color.surface.list` | text | `#8ec9fb` on `#102326` | 9.22 | 4.5 | passed | Accent as text (text buttons) |
 | `color.accent.fg` (loch.300) | `color.surface.raised` | text | `#8ec9fb` on `#1b2e31` | 8.03 | 4.5 | passed | Accent as text (text buttons) |
 | `color.accent.fg` (loch.300) | `color.surface.overlay` | text | `#8ec9fb` on `#24363a` | 7.15 | 4.5 | passed | Accent as text (text buttons) |
+| `color.focus.ring` (loch.300) | `color.surface.canvas` | ui | `#8ec9fb` on `#15282b` | 8.68 | 3 | passed | Focus ring |
+| `color.focus.ring` (loch.300) | `color.surface.list` | ui | `#8ec9fb` on `#102326` | 9.22 | 3 | passed | Focus ring |
+| `color.focus.ring` (loch.300) | `color.surface.raised` | ui | `#8ec9fb` on `#1b2e31` | 8.03 | 3 | passed | Focus ring |
+| `color.focus.ring` (loch.300) | `color.surface.overlay` | ui | `#8ec9fb` on `#24363a` | 7.15 | 3 | passed | Focus ring |
+| `color.focus.ring` (loch.300) | `color.surface.input` | ui | `#8ec9fb` on `#1b2e31` | 8.03 | 3 | passed | Focus ring |
+| `color.focus.ring` (loch.300) | `color.surface.selected` | ui | `#8ec9fb` on `#08312e` | 7.99 | 3 | passed | Focus ring |
 | `color.accent.bg` (loch.400) | `color.surface.canvas` | ui | `#58b3fa` on `#15282b` | 6.75 | 3 | passed | Primary button and approval buttons against the surface |
 | `color.accent.bg` (loch.400) | `color.surface.raised` | ui | `#58b3fa` on `#1b2e31` | 6.24 | 3 | passed | Primary button and approval buttons against the surface |
 | `color.accent.bg` (loch.400) | `color.surface.overlay` | ui | `#58b3fa` on `#24363a` | 5.56 | 3 | passed | Primary button and approval buttons against the surface |
@@ -683,7 +689,7 @@ Accent `spruce` is the default: its variants are the base roles of the theme sec
 | `color.accent.fg` | heather.300 | `#fca3cd` |
 | `color.accent.subtle` | heather.950 | `#3e0327` |
 | `color.text.link` | heather.300 | `#fca3cd` |
-| `color.focus.ring` | gorse.300, not swapped | `#d9c42b` |
+| `color.focus.ring` | heather.300 | `#fca3cd` |
 | `color.run.running` | heather.400 | `#f878ba` |
 
 | Foreground | Background | Kind | Values | Ratio | Threshold | Result | Usage |
@@ -702,6 +708,12 @@ Accent `spruce` is the default: its variants are the base roles of the theme sec
 | `color.accent.fg` (heather.300) | `color.surface.list` | text | `#fca3cd` on `#102326` | 8.73 | 4.5 | passed | Accent as text (text buttons) |
 | `color.accent.fg` (heather.300) | `color.surface.raised` | text | `#fca3cd` on `#1b2e31` | 7.60 | 4.5 | passed | Accent as text (text buttons) |
 | `color.accent.fg` (heather.300) | `color.surface.overlay` | text | `#fca3cd` on `#24363a` | 6.77 | 4.5 | passed | Accent as text (text buttons) |
+| `color.focus.ring` (heather.300) | `color.surface.canvas` | ui | `#fca3cd` on `#15282b` | 8.22 | 3 | passed | Focus ring |
+| `color.focus.ring` (heather.300) | `color.surface.list` | ui | `#fca3cd` on `#102326` | 8.73 | 3 | passed | Focus ring |
+| `color.focus.ring` (heather.300) | `color.surface.raised` | ui | `#fca3cd` on `#1b2e31` | 7.60 | 3 | passed | Focus ring |
+| `color.focus.ring` (heather.300) | `color.surface.overlay` | ui | `#fca3cd` on `#24363a` | 6.77 | 3 | passed | Focus ring |
+| `color.focus.ring` (heather.300) | `color.surface.input` | ui | `#fca3cd` on `#1b2e31` | 7.60 | 3 | passed | Focus ring |
+| `color.focus.ring` (heather.300) | `color.surface.selected` | ui | `#fca3cd` on `#08312e` | 7.56 | 3 | passed | Focus ring |
 | `color.accent.bg` (heather.400) | `color.surface.canvas` | ui | `#f878ba` on `#15282b` | 6.12 | 3 | passed | Primary button and approval buttons against the surface |
 | `color.accent.bg` (heather.400) | `color.surface.raised` | ui | `#f878ba` on `#1b2e31` | 5.66 | 3 | passed | Primary button and approval buttons against the surface |
 | `color.accent.bg` (heather.400) | `color.surface.overlay` | ui | `#f878ba` on `#24363a` | 5.04 | 3 | passed | Primary button and approval buttons against the surface |
@@ -763,7 +775,7 @@ Accent `spruce` is the default: its variants are the base roles of the theme sec
 | `color.accent.fg` | rowan.300 | `#fcaaa3` |
 | `color.accent.subtle` | rowan.950 | `#430307` |
 | `color.text.link` | rowan.300 | `#fcaaa3` |
-| `color.focus.ring` | gorse.300, not swapped | `#d9c42b` |
+| `color.focus.ring` | rowan.300 | `#fcaaa3` |
 | `color.run.running` | rowan.400 | `#fb827a` |
 
 | Foreground | Background | Kind | Values | Ratio | Threshold | Result | Usage |
@@ -782,6 +794,12 @@ Accent `spruce` is the default: its variants are the base roles of the theme sec
 | `color.accent.fg` (rowan.300) | `color.surface.list` | text | `#fcaaa3` on `#102326` | 8.85 | 4.5 | passed | Accent as text (text buttons) |
 | `color.accent.fg` (rowan.300) | `color.surface.raised` | text | `#fcaaa3` on `#1b2e31` | 7.71 | 4.5 | passed | Accent as text (text buttons) |
 | `color.accent.fg` (rowan.300) | `color.surface.overlay` | text | `#fcaaa3` on `#24363a` | 6.86 | 4.5 | passed | Accent as text (text buttons) |
+| `color.focus.ring` (rowan.300) | `color.surface.canvas` | ui | `#fcaaa3` on `#15282b` | 8.33 | 3 | passed | Focus ring |
+| `color.focus.ring` (rowan.300) | `color.surface.list` | ui | `#fcaaa3` on `#102326` | 8.85 | 3 | passed | Focus ring |
+| `color.focus.ring` (rowan.300) | `color.surface.raised` | ui | `#fcaaa3` on `#1b2e31` | 7.71 | 3 | passed | Focus ring |
+| `color.focus.ring` (rowan.300) | `color.surface.overlay` | ui | `#fcaaa3` on `#24363a` | 6.86 | 3 | passed | Focus ring |
+| `color.focus.ring` (rowan.300) | `color.surface.input` | ui | `#fcaaa3` on `#1b2e31` | 7.71 | 3 | passed | Focus ring |
+| `color.focus.ring` (rowan.300) | `color.surface.selected` | ui | `#fcaaa3` on `#08312e` | 7.67 | 3 | passed | Focus ring |
 | `color.accent.bg` (rowan.400) | `color.surface.canvas` | ui | `#fb827a` on `#15282b` | 6.26 | 3 | passed | Primary button and approval buttons against the surface |
 | `color.accent.bg` (rowan.400) | `color.surface.raised` | ui | `#fb827a` on `#1b2e31` | 5.79 | 3 | passed | Primary button and approval buttons against the surface |
 | `color.accent.bg` (rowan.400) | `color.surface.overlay` | ui | `#fb827a` on `#24363a` | 5.15 | 3 | passed | Primary button and approval buttons against the surface |
@@ -843,7 +861,7 @@ Accent `spruce` is the default: its variants are the base roles of the theme sec
 | `color.accent.fg` | amber.300 | `#fcaf6f` |
 | `color.accent.subtle` | amber.950 | `#331902` |
 | `color.text.link` | amber.300 | `#fcaf6f` |
-| `color.focus.ring` | gorse.300, not swapped | `#d9c42b` |
+| `color.focus.ring` | amber.300 | `#fcaf6f` |
 | `color.run.running` | amber.400 | `#ec9340` |
 
 | Foreground | Background | Kind | Values | Ratio | Threshold | Result | Usage |
@@ -862,6 +880,12 @@ Accent `spruce` is the default: its variants are the base roles of the theme sec
 | `color.accent.fg` (amber.300) | `color.surface.list` | text | `#fcaf6f` on `#102326` | 8.91 | 4.5 | passed | Accent as text (text buttons) |
 | `color.accent.fg` (amber.300) | `color.surface.raised` | text | `#fcaf6f` on `#1b2e31` | 7.76 | 4.5 | passed | Accent as text (text buttons) |
 | `color.accent.fg` (amber.300) | `color.surface.overlay` | text | `#fcaf6f` on `#24363a` | 6.91 | 4.5 | passed | Accent as text (text buttons) |
+| `color.focus.ring` (amber.300) | `color.surface.canvas` | ui | `#fcaf6f` on `#15282b` | 8.39 | 3 | passed | Focus ring |
+| `color.focus.ring` (amber.300) | `color.surface.list` | ui | `#fcaf6f` on `#102326` | 8.91 | 3 | passed | Focus ring |
+| `color.focus.ring` (amber.300) | `color.surface.raised` | ui | `#fcaf6f` on `#1b2e31` | 7.76 | 3 | passed | Focus ring |
+| `color.focus.ring` (amber.300) | `color.surface.overlay` | ui | `#fcaf6f` on `#24363a` | 6.91 | 3 | passed | Focus ring |
+| `color.focus.ring` (amber.300) | `color.surface.input` | ui | `#fcaf6f` on `#1b2e31` | 7.76 | 3 | passed | Focus ring |
+| `color.focus.ring` (amber.300) | `color.surface.selected` | ui | `#fcaf6f` on `#08312e` | 7.72 | 3 | passed | Focus ring |
 | `color.accent.bg` (amber.400) | `color.surface.canvas` | ui | `#ec9340` on `#15282b` | 6.43 | 3 | passed | Primary button and approval buttons against the surface |
 | `color.accent.bg` (amber.400) | `color.surface.raised` | ui | `#ec9340` on `#1b2e31` | 5.95 | 3 | passed | Primary button and approval buttons against the surface |
 | `color.accent.bg` (amber.400) | `color.surface.overlay` | ui | `#ec9340` on `#24363a` | 5.30 | 3 | passed | Primary button and approval buttons against the surface |
@@ -923,7 +947,7 @@ Accent `spruce` is the default: its variants are the base roles of the theme sec
 | `color.accent.fg` | gorse.300 | `#d9c42b` |
 | `color.accent.subtle` | gorse.950 | `#291f02` |
 | `color.text.link` | gorse.300 | `#d9c42b` |
-| `color.focus.ring` | gorse.300, not swapped | `#d9c42b` |
+| `color.focus.ring` | gorse.300 | `#d9c42b` |
 | `color.run.running` | gorse.400 | `#c2ab24` |
 
 | Foreground | Background | Kind | Values | Ratio | Threshold | Result | Usage |
@@ -942,6 +966,12 @@ Accent `spruce` is the default: its variants are the base roles of the theme sec
 | `color.accent.fg` (gorse.300) | `color.surface.list` | text | `#d9c42b` on `#102326` | 9.21 | 4.5 | passed | Accent as text (text buttons) |
 | `color.accent.fg` (gorse.300) | `color.surface.raised` | text | `#d9c42b` on `#1b2e31` | 8.02 | 4.5 | passed | Accent as text (text buttons) |
 | `color.accent.fg` (gorse.300) | `color.surface.overlay` | text | `#d9c42b` on `#24363a` | 7.14 | 4.5 | passed | Accent as text (text buttons) |
+| `color.focus.ring` (gorse.300) | `color.surface.canvas` | ui | `#d9c42b` on `#15282b` | 8.67 | 3 | passed | Focus ring |
+| `color.focus.ring` (gorse.300) | `color.surface.list` | ui | `#d9c42b` on `#102326` | 9.21 | 3 | passed | Focus ring |
+| `color.focus.ring` (gorse.300) | `color.surface.raised` | ui | `#d9c42b` on `#1b2e31` | 8.02 | 3 | passed | Focus ring |
+| `color.focus.ring` (gorse.300) | `color.surface.overlay` | ui | `#d9c42b` on `#24363a` | 7.14 | 3 | passed | Focus ring |
+| `color.focus.ring` (gorse.300) | `color.surface.input` | ui | `#d9c42b` on `#1b2e31` | 8.02 | 3 | passed | Focus ring |
+| `color.focus.ring` (gorse.300) | `color.surface.selected` | ui | `#d9c42b` on `#08312e` | 7.98 | 3 | passed | Focus ring |
 | `color.accent.bg` (gorse.400) | `color.surface.canvas` | ui | `#c2ab24` on `#15282b` | 6.67 | 3 | passed | Primary button and approval buttons against the surface |
 | `color.accent.bg` (gorse.400) | `color.surface.raised` | ui | `#c2ab24` on `#1b2e31` | 6.17 | 3 | passed | Primary button and approval buttons against the surface |
 | `color.accent.bg` (gorse.400) | `color.surface.overlay` | ui | `#c2ab24` on `#24363a` | 5.50 | 3 | passed | Primary button and approval buttons against the surface |
@@ -1003,7 +1033,7 @@ Accent `spruce` is the default: its variants are the base roles of the theme sec
 | `color.accent.fg` | moss.300 | `#89d89a` |
 | `color.accent.subtle` | moss.950 | `#03280f` |
 | `color.text.link` | moss.300 | `#89d89a` |
-| `color.focus.ring` | gorse.300, not swapped | `#d9c42b` |
+| `color.focus.ring` | moss.300 | `#89d89a` |
 | `color.run.running` | moss.400 | `#62c37a` |
 
 | Foreground | Background | Kind | Values | Ratio | Threshold | Result | Usage |
@@ -1022,6 +1052,12 @@ Accent `spruce` is the default: its variants are the base roles of the theme sec
 | `color.accent.fg` (moss.300) | `color.surface.list` | text | `#89d89a` on `#102326` | 9.57 | 4.5 | passed | Accent as text (text buttons) |
 | `color.accent.fg` (moss.300) | `color.surface.raised` | text | `#89d89a` on `#1b2e31` | 8.34 | 4.5 | passed | Accent as text (text buttons) |
 | `color.accent.fg` (moss.300) | `color.surface.overlay` | text | `#89d89a` on `#24363a` | 7.42 | 4.5 | passed | Accent as text (text buttons) |
+| `color.focus.ring` (moss.300) | `color.surface.canvas` | ui | `#89d89a` on `#15282b` | 9.01 | 3 | passed | Focus ring |
+| `color.focus.ring` (moss.300) | `color.surface.list` | ui | `#89d89a` on `#102326` | 9.57 | 3 | passed | Focus ring |
+| `color.focus.ring` (moss.300) | `color.surface.raised` | ui | `#89d89a` on `#1b2e31` | 8.34 | 3 | passed | Focus ring |
+| `color.focus.ring` (moss.300) | `color.surface.overlay` | ui | `#89d89a` on `#24363a` | 7.42 | 3 | passed | Focus ring |
+| `color.focus.ring` (moss.300) | `color.surface.input` | ui | `#89d89a` on `#1b2e31` | 8.34 | 3 | passed | Focus ring |
+| `color.focus.ring` (moss.300) | `color.surface.selected` | ui | `#89d89a` on `#08312e` | 8.30 | 3 | passed | Focus ring |
 | `color.accent.bg` (moss.400) | `color.surface.canvas` | ui | `#62c37a` on `#15282b` | 7.01 | 3 | passed | Primary button and approval buttons against the surface |
 | `color.accent.bg` (moss.400) | `color.surface.raised` | ui | `#62c37a` on `#1b2e31` | 6.48 | 3 | passed | Primary button and approval buttons against the surface |
 | `color.accent.bg` (moss.400) | `color.surface.overlay` | ui | `#62c37a` on `#24363a` | 5.77 | 3 | passed | Primary button and approval buttons against the surface |
