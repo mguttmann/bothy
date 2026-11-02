@@ -65,6 +65,9 @@ done
 # no connection from the host to the app; Gradle reports each Dart test as a JUnit test.
 report=build/app/outputs/androidTest-results/connected/debug
 rm -rf "$report"
+# Gradle reads flutter.sdk from android/local.properties, which git ignores and only a flutter
+# command writes (`flutter test -d` did so before); a fresh checkout has none.
+flutter build apk --debug --config-only
 (
   cd android
   ANDROID_SERIAL="$serial" ./gradlew --no-daemon --console=plain :app:connectedDebugAndroidTest \

@@ -158,3 +158,19 @@ def test_the_phone_suite_creates_its_binding_before_its_groups() -> None:
     binding = body.find("IntegrationTestWidgetsFlutterBinding.ensureInitialized();")
     assert binding != -1
     assert binding < body.find("group(")
+
+
+def test_the_phone_suite_script_generates_the_flutter_build_files_before_gradle() -> None:
+    # Gradle reads flutter.sdk from android/local.properties, which only a flutter command writes
+    # and git ignores; on a fresh CI checkout the first Gradle run failed without it (PR run
+    # 41461997134), where `flutter test -d` had written it before.
+    script = CLIENT / "tool" / "run_android_tests.sh"
+    lines = [line for _, line in _code_lines(script)]
+    gradle = next(i for i, line in enumerate(lines) if "./gradlew" in line)
+    config = [
+        i
+        for i, line in enumerate(lines)
+        if re.search(r"\bflutter\s+build\s+apk\b.*--config-only", line)
+    ]
+    assert config
+    assert config[0] < gradle

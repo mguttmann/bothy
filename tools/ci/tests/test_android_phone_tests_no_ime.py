@@ -194,7 +194,10 @@ def test_a_failed_phone_run_enables_the_input_method_packages_again(tmp_path: Pa
 def test_the_phone_run_names_how_many_tests_reported(tmp_path: Path) -> None:
     calls, done = _run(tmp_path, 0, GROUPS + 3)
     assert done.returncode == 0, done.stderr
-    assert not any(call.startswith("flutter ") for call in calls)
+    # The only flutter call writes the build files Gradle reads; nothing runs attached.
+    assert [call for call in calls if call.startswith("flutter ")] == [
+        "flutter build apk --debug --config-only"
+    ]
     assert (
         f"client android: the phone suite reported {GROUPS + 3} tests for {GROUPS} groups"
         in done.stdout
