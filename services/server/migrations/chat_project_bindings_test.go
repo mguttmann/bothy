@@ -13,7 +13,8 @@ import (
 // TestChatProjectBindingsMigration_Schema holds project_bindings against
 // docs/spec/03-data-model.md section 4.5 column by column, with the primary key, both foreign
 // keys and the unique index on lower(workspace_ref) (M2-03), and the columns provision and
-// ready_reason with the check of provision (M4-43, R-DM-55).
+// ready_reason with the check of provision (M4-43, R-DM-55); the unique index leaves released
+// bindings out (FIX-delete-releases-binding).
 func TestChatProjectBindingsMigration_Schema(t *testing.T) {
 	t.Parallel()
 	conn := pgtest.New(t).SuperConn(t)
@@ -38,6 +39,8 @@ func TestChatProjectBindingsMigration_Schema(t *testing.T) {
 		{"trash_reason", "text", true, ""},
 		{"trash_agent_id", "uuid", true, ""},
 		{"trash_requested_at", ts, true, ""},
+		// FIX-delete-releases-binding (migration 00090).
+		{"released_at", ts, true, ""},
 	}
 	constraints := []string{
 		"CHECK ((provision = ANY (ARRAY['none'::text, 'init'::text, 'clone'::text])))",
@@ -54,7 +57,7 @@ func TestChatProjectBindingsMigration_Schema(t *testing.T) {
 	idx := []string{
 		"CREATE UNIQUE INDEX project_bindings_pkey ON public.project_bindings USING btree (channel_id)",
 		"CREATE INDEX project_bindings_trash_requested_idx ON public.project_bindings USING btree (trash_agent_id) WHERE (trash_state = 'requested'::text)",
-		"CREATE UNIQUE INDEX project_bindings_workspace_ref_key ON public.project_bindings USING btree (lower(workspace_ref))",
+		"CREATE UNIQUE INDEX project_bindings_workspace_ref_key ON public.project_bindings USING btree (lower(workspace_ref)) WHERE (released_at IS NULL)",
 	}
 	if got := principalColumns(t, conn, "project_bindings"); !reflect.DeepEqual(got, columns) {
 		t.Errorf("columns:\n got %+v\nwant %+v", got, columns)

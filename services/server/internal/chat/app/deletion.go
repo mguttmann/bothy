@@ -57,6 +57,10 @@ type DeletionStore interface {
 	// SetTrashResult writes the outcome of a requested move: trash_state result and the reason
 	// ("" is NULL, only with refused).
 	SetTrashResult(ctx context.Context, channel ids.ID, result, reason string) error
+	// ReleaseFinalBindings sets released_at at on every binding that is not released, whose forum
+	// or space is purged and whose folder move is not requested, and returns how many it released
+	// (FIX-delete-releases-binding).
+	ReleaseFinalBindings(ctx context.Context, at time.Time) (int64, error)
 }
 
 // Scope are the counts of DeletionStore.DeletionScope and the threads they cover, main threads
@@ -742,13 +746,39 @@ func (s *Service) DuePurges(ctx context.Context, limit int) ([]chat.PurgeTarget,
 
 // FinishPurge implements chat.Purges in its own unit of work without an actor: the thread titles
 // (title_source stays) and channel topics of the item go and purged_at is set; no event and no
-// audit entry (D-DEL-9).
+// audit entry (D-DEL-9). The purge of a channel or space also releases the project bindings it
+// made final (D-DEL-REL-1).
 func (s *Service) FinishPurge(ctx context.Context, t chat.PurgeTarget) error {
 	st, err := s.deletions()
 	if err != nil {
 		return err
 	}
-	return s.d.UoW.Do(ctx, func(ctx context.Context) error { return st.FinishPurge(ctx, t.Kind, t.ID, s.now()) })
+	return s.d.UoW.Do(ctx, func(ctx context.Context) error {
+		if err := st.FinishPurge(ctx, t.Kind, t.ID, s.now()); err != nil || t.Kind == chat.TargetThread {
+			return err
+		}
+		_, err := st.ReleaseFinalBindings(ctx, s.now())
+		return err
+	})
+}
+
+// ReleaseFinalBindings implements chat.Purges in its own unit of work without an actor
+// (D-DEL-REL-1, D-DEL-REL-4): every binding of a purged forum or of a forum of a purged space that
+// no folder move waits for is released, also one purged before the release existed. The row
+// stays; no event and no audit entry, as the purge itself: the forum left every list and every
+// runner when it was deleted.
+func (s *Service) ReleaseFinalBindings(ctx context.Context) (int, error) {
+	st, err := s.deletions()
+	if err != nil {
+		return 0, err
+	}
+	var n int64
+	err = s.d.UoW.Do(ctx, func(ctx context.Context) error {
+		var err error
+		n, err = st.ReleaseFinalBindings(ctx, s.now())
+		return err
+	})
+	return int(n), err
 }
 
 // ProjectTrashRequests implements chat.ProjectTrash (D-DEL-11).
@@ -763,7 +793,8 @@ func (s *Service) ProjectTrashRequests(ctx context.Context, agentID ids.ID) ([]c
 // ApplyProjectTrashResults implements chat.ProjectTrash (D-DEL-11) in one unit of work: the
 // requests of agentID among the reported channels are locked in ascending id; each still
 // requested one takes its result once, after channel.project.trash allowed the agent on it, with
-// an audit entry (result, reason). Every other result is ignored.
+// an audit entry (result, reason), and the bindings of purged forums whose move ended are
+// released (D-DEL-REL-2). Every other result is ignored.
 func (s *Service) ApplyProjectTrashResults(ctx context.Context, agentID ids.ID, results []chat.ProjectTrashResult) error {
 	if len(results) == 0 || agentID.IsZero() {
 		return nil
@@ -776,7 +807,7 @@ func (s *Service) ApplyProjectTrashResults(ctx context.Context, agentID ids.ID, 
 	a, _ := actor.FromContext(ctx)
 	return s.d.UoW.Do(ctx, func(ctx context.Context) error {
 		open, err := st.LockTrashRequests(ctx, agentID, channels)
-		if err != nil {
+		if err != nil || len(open) == 0 {
 			return err
 		}
 		for _, id := range open {
@@ -784,7 +815,9 @@ func (s *Service) ApplyProjectTrashResults(ctx context.Context, agentID ids.ID, 
 				return err
 			}
 		}
-		return nil
+		// An outcome ends the wait of a purged forum for its folder (D-DEL-REL-2).
+		_, err = st.ReleaseFinalBindings(ctx, s.now())
+		return err
 	})
 }
 

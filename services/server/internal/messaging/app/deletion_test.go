@@ -158,3 +158,30 @@ func TestPurgeDeleted_ChannelAndSpace(t *testing.T) {
 		t.Fatalf("a second run purged %d messages", n)
 	}
 }
+
+// TestPurgeDeleted_ReleasesBindingsOfPurgedForums (FIX-delete-releases-binding, D-DEL-REL-4): every
+// run of the job releases the project bindings of purged forums that no folder move waits for,
+// also those purged before the release existed, and leaves live forums and requested moves alone.
+func TestPurgeDeleted_ReleasesBindingsOfPurgedForums(t *testing.T) {
+	t.Parallel()
+	w := mw.New(t, subscribe)
+	space := w.Space("Projects")
+	gone, live := w.Channel(space, "forum", "gone"), w.Channel(space, "forum", "live")
+	w.Want(w.Do("owner", http.MethodPost, "/api/v1/channels/"+gone.String()+"/delete", "", mw.Key()...), http.StatusOK, "")
+	w.Clock.Advance(31 * time.Second)
+	purge(t, w)
+	// The state an earlier server left: a purged forum whose binding was never released.
+	owner := w.Actor("owner").ID.String()
+	w.SQL(`INSERT INTO project_bindings (channel_id, workspace_ref, created_by) VALUES ($1, 'site', $2), ($3, 'docs', $2)`,
+		gone.String(), owner, live.String())
+	if n := w.Count(`SELECT count(*)::int FROM project_bindings WHERE released_at IS NOT NULL`); n != 0 {
+		t.Fatalf("released before the run: %d", n)
+	}
+	purge(t, w)
+	if n := w.Count(`SELECT count(*)::int FROM project_bindings WHERE channel_id = $1 AND released_at IS NOT NULL`, gone.String()); n != 1 {
+		t.Error("the run did not release the binding of the purged forum")
+	}
+	if n := w.Count(`SELECT count(*)::int FROM project_bindings WHERE channel_id = $1 AND released_at IS NULL`, live.String()); n != 1 {
+		t.Error("the run released the binding of a live forum")
+	}
+}

@@ -213,6 +213,16 @@ func (r *Repository) FinishPurge(ctx context.Context, kind string, id ids.ID, at
 	return errs.New(errs.CodeInternalError, "chat: an unknown purge target")
 }
 
+// ReleaseFinalBindings implements app.DeletionStore.
+func (r *Repository) ReleaseFinalBindings(ctx context.Context, at time.Time) (int64, error) {
+	q, err := r.write(ctx)
+	if err != nil {
+		return 0, err
+	}
+	n, err := q.ReleaseFinalBindings(ctx, optionalTime(at))
+	return n, mapError(err, "releasing the bindings of purged forums")
+}
+
 // PendingTrash implements app.DeletionStore.
 func (r *Repository) PendingTrash(ctx context.Context, agent ids.ID) ([]chat.ProjectTrashRequest, error) {
 	rows, err := r.read(ctx).PendingTrash(ctx, uuid(agent))

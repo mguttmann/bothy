@@ -60,8 +60,8 @@ WHERE channel_id = ANY (@channel_ids::uuid[]) AND (ready OR ready_reason IS NOT 
 
 -- name: BoundProjectFolders :many
 -- The entries of names that the workspace_ref of a binding names, compared without case as the
--- unique index does; only these names leave, no channel and no row (listAgentProjectFolders,
--- M4-44).
+-- unique index does and, like it, without released bindings (FIX-delete-releases-binding); only
+-- these names leave, no channel and no row (listAgentProjectFolders, M4-44).
 SELECT n::text AS name
 FROM unnest(@names::text[]) AS n
-WHERE EXISTS (SELECT 1 FROM project_bindings WHERE lower(workspace_ref) = lower(n));
+WHERE EXISTS (SELECT 1 FROM project_bindings WHERE lower(workspace_ref) = lower(n) AND released_at IS NULL);

@@ -885,6 +885,7 @@ type ProjectBinding struct {
 	TrashReason      pgtype.Text
 	TrashAgentID     pgtype.UUID
 	TrashRequestedAt pgtype.Timestamptz
+	ReleasedAt       pgtype.Timestamptz
 }
 
 type PushRegistration struct {

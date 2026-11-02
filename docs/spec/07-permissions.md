@@ -526,7 +526,9 @@ for retention and export.
    (HTTP `403 channel_read_only` with `reason`). Reading stays possible for everyone who could read
    before.
 2. Administrative changes to an archived space or channel (rename, move,
-   operator, tags) pass `authorize`, but `chat` rejects them with `409 conflict`.
+   operator, tags) pass `authorize`, but `chat` rejects them with `409 conflict`. Removing the
+   project binding of an archived forum (`deleteProjectBinding`) is the exception: it gives the
+   folder free and changes no history (addendum of 2026-11-02, FIX-delete-releases-binding).
 3. Archiving is a permission change (column "Permissions" in 05): increase the permission version,
    and `access.changed` with an entry in `changed` (level `read`) for everyone whose level was
    above it.
@@ -566,6 +568,10 @@ Addendum of 2026-11-01 ([delete.md](../design/delete.md), D-DEL-1 to D-DEL-11; 0
    (`agent-self` on the channel); other runners' results are ignored.
 6. Every delete and restore is audited with `trash_project_folder` (D-DEL-9); the purge after the
    undo window has no actor and writes no entry.
+7. A deleted forum keeps its project binding while the deletion can be undone; once it is final
+   the binding is released without an actor and its folder can be bound to another forum. The
+   owner may remove the binding of a deleted forum at any time with `channel.project.bind`
+   (addendum of 2026-11-02, FIX-delete-releases-binding).
 
 Reason: deletion follows the right that creates and archives the item; the archive state brings
 every list, write path and I1 rule along without a second hidden state.

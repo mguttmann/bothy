@@ -243,20 +243,19 @@ func TestPutProjectBinding_NotAForum(t *testing.T) {
 }
 
 // TestPutProjectBinding_ArchivedForum409: an archived forum and a forum of an archived space are
-// frozen (07 section 4.5).
+// frozen for a new or changed binding (07 section 4.5); removing it stays open to the owner
+// (TestDeleteProjectBinding_ArchivedOrDeletedForum).
 func TestPutProjectBinding_ArchivedForum409(t *testing.T) {
 	t.Parallel()
 	w := newPBWorld(t)
 	w.bind(w.projektB, "website")
 	w.wantOK(w.do("owner", http.MethodPost, "/api/v1/channels/"+w.projektB.String()+"/archive", `{"reason":"Done"}`, key()...))
 	w.want(w.put("owner", w.projektB, bindBody("other")), http.StatusConflict, "conflict")
-	w.want(w.del("owner", w.projektB), http.StatusConflict, "conflict")
 	archive := w.space("Archiv")
 	forum := w.channel(archive, "forum", "Alt")
 	w.bind(forum, "old-site")
 	w.wantOK(w.do("owner", http.MethodPost, "/api/v1/spaces/"+archive.String()+"/archive", `{"reason":"Done"}`, key()...))
 	w.want(w.put("owner", forum, bindBody("other")), http.StatusConflict, "conflict")
-	w.want(w.del("owner", forum), http.StatusConflict, "conflict")
 }
 
 // TestPutProjectBinding_WorkspaceRefTakenCaseInsensitive409: workspace_ref is unique without
