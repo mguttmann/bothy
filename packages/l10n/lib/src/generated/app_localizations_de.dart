@@ -9998,4 +9998,71 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get problemConflictProjectFolderRefused =>
       'Die letzte Prüfung des Runners erlaubt nicht, den Projektordner in den Papierkorb zu verschieben.';
+
+  @override
+  String documentViewerTitle(String name) {
+    return 'Dokument $name';
+  }
+
+  @override
+  String get documentLoading => 'Dokument wird geladen';
+
+  @override
+  String get documentShowRaw => 'Rohtext';
+
+  @override
+  String get documentShowRendered => 'Formatiert';
+
+  @override
+  String get documentCopyAll => 'Alles kopieren';
+
+  @override
+  String get documentOpenExternally => 'In anderer App öffnen';
+
+  @override
+  String get documentContents => 'Inhalt';
+
+  @override
+  String get documentSearch => 'Suchen';
+
+  @override
+  String get documentSearchHint => 'Im Dokument suchen';
+
+  @override
+  String documentSearchCount(int current, int total) {
+    return '$current von $total';
+  }
+
+  @override
+  String get documentSearchNone => 'Keine Treffer';
+
+  @override
+  String get documentSearchNext => 'Nächster Treffer';
+
+  @override
+  String get documentSearchPrevious => 'Vorheriger Treffer';
+
+  @override
+  String get documentSearchClose => 'Suche schließen';
+
+  @override
+  String get documentClose => 'Schließen';
+
+  @override
+  String documentLarge(String size) {
+    return 'Diese Datei ist groß ($size) und öffnet daher als Rohtext.';
+  }
+
+  @override
+  String get documentRenderAnyway => 'Formatiert anzeigen';
+
+  @override
+  String documentTruncated(String size) {
+    return 'Nur die ersten $size werden angezeigt. Speichere die Datei, um alles zu sehen.';
+  }
+
+  @override
+  String documentRemoteImage(String domain) {
+    return 'Bild von $domain laden';
+  }
 }

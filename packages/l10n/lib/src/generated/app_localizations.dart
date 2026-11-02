@@ -15995,6 +15995,120 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The runner\'s last check does not allow moving the project folder to the trash.'**
   String get problemConflictProjectFolderRefused;
+
+  /// Screen reader label of the document viewer of an attachment (ticket FEAT-markdown-viewer).
+  ///
+  /// In en, this message translates to:
+  /// **'Document {name}'**
+  String documentViewerTitle(String name);
+
+  /// Placeholder while the document viewer loads the file.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading document'**
+  String get documentLoading;
+
+  /// Toolbar toggle of the document viewer: show the file as plain text.
+  ///
+  /// In en, this message translates to:
+  /// **'Raw text'**
+  String get documentShowRaw;
+
+  /// Toolbar toggle of the document viewer: show the rendered document.
+  ///
+  /// In en, this message translates to:
+  /// **'Formatted'**
+  String get documentShowRendered;
+
+  /// Toolbar action of the document viewer: copy the whole text.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy all'**
+  String get documentCopyAll;
+
+  /// Toolbar action of the document viewer: hand the file to the system's app.
+  ///
+  /// In en, this message translates to:
+  /// **'Open in another app'**
+  String get documentOpenExternally;
+
+  /// Toolbar action and title of the table of contents of the document viewer.
+  ///
+  /// In en, this message translates to:
+  /// **'Contents'**
+  String get documentContents;
+
+  /// Toolbar action of the document viewer that opens the search field (Cmd or Ctrl+F).
+  ///
+  /// In en, this message translates to:
+  /// **'Search'**
+  String get documentSearch;
+
+  /// Hint of the search field of the document viewer.
+  ///
+  /// In en, this message translates to:
+  /// **'Search in document'**
+  String get documentSearchHint;
+
+  /// Position of the current match among all matches of the search in the document viewer.
+  ///
+  /// In en, this message translates to:
+  /// **'{current} of {total}'**
+  String documentSearchCount(int current, int total);
+
+  /// Shown when the search of the document viewer finds nothing.
+  ///
+  /// In en, this message translates to:
+  /// **'No matches'**
+  String get documentSearchNone;
+
+  /// Button of the document viewer search: go to the next match (Enter).
+  ///
+  /// In en, this message translates to:
+  /// **'Next match'**
+  String get documentSearchNext;
+
+  /// Button of the document viewer search: go to the previous match (Shift+Enter).
+  ///
+  /// In en, this message translates to:
+  /// **'Previous match'**
+  String get documentSearchPrevious;
+
+  /// Button that closes the search of the document viewer (Esc).
+  ///
+  /// In en, this message translates to:
+  /// **'Close search'**
+  String get documentSearchClose;
+
+  /// Closes the document viewer (Esc).
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get documentClose;
+
+  /// Notice of the document viewer above the render limit.
+  ///
+  /// In en, this message translates to:
+  /// **'This file is large ({size}), so it opens as raw text.'**
+  String documentLarge(String size);
+
+  /// Action of the large file notice: render the document anyway.
+  ///
+  /// In en, this message translates to:
+  /// **'Show formatted'**
+  String get documentRenderAnyway;
+
+  /// Notice of the document viewer when the file is longer than what it reads.
+  ///
+  /// In en, this message translates to:
+  /// **'Only the first {size} are shown. Save the file to see all of it.'**
+  String documentTruncated(String size);
+
+  /// Button in the document viewer that loads an image from the web only on a click.
+  ///
+  /// In en, this message translates to:
+  /// **'Load image from {domain}'**
+  String documentRemoteImage(String domain);
 }
 
 class _AppLocalizationsDelegate

@@ -43,10 +43,15 @@ class DsListSelection extends StatefulWidget {
     super.key,
     required this.child,
     this.onSelectionChanged,
+    this.separator = '\n\n',
   });
 
   /// The scroll view whose rows are selectable.
   final Widget child;
+
+  /// What a copy puts between the selected content of two rows: an empty line between
+  /// messages; a line break for rows that are pieces of one text (the raw view of a document).
+  final String separator;
 
   /// Hears the selected text, empty when nothing is selected.
   final ValueChanged<String>? onSelectionChanged;
@@ -56,7 +61,7 @@ class DsListSelection extends StatefulWidget {
 }
 
 class _DsListSelectionState extends State<DsListSelection> {
-  final _ContentGroup _group = _ContentGroup();
+  late final _ContentGroup _group = _ContentGroup(widget.separator);
 
   @override
   Widget build(BuildContext context) => SelectionArea(
@@ -159,6 +164,9 @@ class _RowScope extends InheritedWidget {
 
 /// The contents of the rows of one list selection, for the separators between them.
 class _ContentGroup {
+  _ContentGroup(this.separator);
+
+  final String separator;
   final Set<_ContentDelegate> members = {};
 }
 
@@ -171,8 +179,6 @@ class _ContentDelegate extends StaticSelectionContainerDelegate {
   }
 
   final _ContentGroup _group;
-
-  static const String separator = '\n\n';
 
   @override
   void dispose() {
@@ -239,6 +245,6 @@ class _ContentDelegate extends StaticSelectionContainerDelegate {
               (other._top() ?? double.negativeInfinity) > top &&
               other._own() != null,
         );
-    return SelectedContent(plainText: later ? '$own$separator' : own);
+    return SelectedContent(plainText: later ? '$own${_group.separator}' : own);
   }
 }

@@ -23,14 +23,28 @@ import 'download_service.dart';
 import 'image_preview.dart';
 import 'providers.dart';
 import 'ticket_player.dart';
+import 'viewer/document_viewer.dart';
 
 /// One stored file of a message.
+///
+/// A servable text file (Markdown, text, log, JSON, YAML, CSV; [opensInDocumentViewer]) opens in
+/// the in-app document viewer on a tap of the tile or on Open (ticket FEAT-markdown-viewer); the
+/// viewer offers Open in another app. Every other file opens with the system.
 class AttachmentTile extends ConsumerStatefulWidget {
-  /// Creates the tile of [file]; [compact] for the files section (small thumbnail).
-  const AttachmentTile({super.key, required this.file, this.compact = false});
+  /// Creates the tile of [file]; [compact] for the files section (small thumbnail); [siblings]
+  /// are the files of the same message, which a document's relative links and images name.
+  const AttachmentTile({
+    super.key,
+    required this.file,
+    this.compact = false,
+    this.siblings = const [],
+  });
 
   /// The file.
   final FileMeta file;
+
+  /// The files of the same message (with [file]).
+  final List<FileMeta> siblings;
 
   /// Whether the tile is the short form of a list.
   final bool compact;
@@ -88,8 +102,17 @@ class _AttachmentTileState extends ConsumerState<AttachmentTile> {
     });
   }
 
-  Future<void> _open() =>
-      _run((d) => d.open(widget.file, ref.read(filePortsProvider).opener));
+  Future<void> _open() {
+    if (opensInDocumentViewer(widget.file)) {
+      return showDocumentViewer(
+        context,
+        ref,
+        widget.file,
+        siblings: widget.siblings,
+      );
+    }
+    return _run((d) => d.open(widget.file, ref.read(filePortsProvider).opener));
+  }
 
   Future<void> _save() => _run(
     (d) => d.saveAs(widget.file, ref.read(filePortsProvider).picker),
@@ -155,6 +178,7 @@ class _AttachmentTileState extends ConsumerState<AttachmentTile> {
     final ready = state == AttachmentState.ready;
     final image = ready && isImage(file);
     final media = ready && (isAudio(file) || isVideo(file));
+    final document = opensInDocumentViewer(file);
     Widget button(String suffix, String label, VoidCallback onTap) => DsButton(
       key: ValueKey('$key.$suffix'),
       label: label,
@@ -210,25 +234,30 @@ class _AttachmentTileState extends ConsumerState<AttachmentTile> {
               ),
               const SizedBox(height: DsSpace.s4),
             ],
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                DsIcon(
-                  state == AttachmentState.blocked ||
-                          state == AttachmentState.checkFailed
-                      ? DsIcons.stateWarning
-                      : state == AttachmentState.failed
-                      ? DsIcons.stateError
-                      : DsIcons.actionAttach,
-                  size: DsIconSizeRole.sm,
-                  color: colors.textSecondary,
-                  decorative: true,
-                ),
-                const SizedBox(width: DsSpace.s6),
-                // The label of the tile already reads name, size and state; the texts are not
-                // read a second time (brief M4-32).
-                Flexible(child: ExcludeSemantics(child: details)),
-              ],
+            _openOnTap(
+              enabled: document,
+              label: l.fileOpen,
+              onTap: () => unawaited(_open()),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  DsIcon(
+                    state == AttachmentState.blocked ||
+                            state == AttachmentState.checkFailed
+                        ? DsIcons.stateWarning
+                        : state == AttachmentState.failed
+                        ? DsIcons.stateError
+                        : DsIcons.actionAttach,
+                    size: DsIconSizeRole.sm,
+                    color: colors.textSecondary,
+                    decorative: true,
+                  ),
+                  const SizedBox(width: DsSpace.s6),
+                  // The label of the tile already reads name, size and state; the texts are not
+                  // read a second time (brief M4-32).
+                  Flexible(child: ExcludeSemantics(child: details)),
+                ],
+              ),
             ),
             // The actions wrap below the name, so 200 percent text never overflows (01 8).
             if (media || (ready && !widget.compact))
@@ -266,6 +295,21 @@ class _AttachmentTileState extends ConsumerState<AttachmentTile> {
   }
 }
 
+/// [child] as a surface that runs [onTap] (named [label]) when [enabled], else as it is.
+Widget _openOnTap({
+  required bool enabled,
+  required String label,
+  required VoidCallback onTap,
+  required Widget child,
+}) => enabled
+    ? DsTappable(
+        label: label,
+        excludeChildSemantics: true,
+        onTap: onTap,
+        child: child,
+      )
+    : child;
+
 /// The files of the message [messageId]: a voice message ([voice]) shows its player with the
 /// transcript, every other message one [AttachmentTile] per file.
 class MessageAttachmentsView extends ConsumerWidget {
@@ -295,7 +339,9 @@ class MessageAttachmentsView extends ConsumerWidget {
       child: Wrap(
         spacing: DsSpace.s6,
         runSpacing: DsSpace.s6,
-        children: [for (final f in files) AttachmentTile(file: f)],
+        children: [
+          for (final f in files) AttachmentTile(file: f, siblings: files),
+        ],
       ),
     );
   }
