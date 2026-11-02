@@ -4,6 +4,7 @@ package app_test
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"testing"
 	"time"
@@ -183,5 +184,36 @@ func TestPurgeDeleted_ReleasesBindingsOfPurgedForums(t *testing.T) {
 	}
 	if n := w.Count(`SELECT count(*)::int FROM project_bindings WHERE channel_id = $1 AND released_at IS NULL`, live.String()); n != 1 {
 		t.Error("the run released the binding of a live forum")
+	}
+}
+
+// releaseFails is a purge port whose release of bindings fails and that records whether the run
+// went on to the due items.
+type releaseFails struct {
+	chat.Purges
+	err    error
+	listed bool
+}
+
+func (r *releaseFails) ReleaseFinalBindings(context.Context) (int, error) { return 0, r.err }
+
+func (r *releaseFails) DuePurges(context.Context, int) ([]chat.PurgeTarget, error) {
+	r.listed = true
+	return nil, nil
+}
+
+// TestPurgeDeleted_ReleaseErrorStopsTheRun (FIX-delete-releases-binding, D-DEL-REL-4): an error of
+// the release ends the run with that error before any item is purged, so the next run tries
+// both again.
+func TestPurgeDeleted_ReleaseErrorStopsTheRun(t *testing.T) {
+	t.Parallel()
+	w := mw.New(t, subscribe)
+	p := &releaseFails{err: errors.New("database down")}
+	n, err := w.Svc.Purge(p, 2).Run(context.Background())
+	if !errors.Is(err, p.err) || n != 0 {
+		t.Fatalf("Run = %d, %v; want 0 and the release error", n, err)
+	}
+	if p.listed {
+		t.Error("the run listed due items after the release failed")
 	}
 }
