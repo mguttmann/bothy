@@ -187,8 +187,9 @@ attachments only reaches Hermes as `(The user sent a message with no text conten
 files, never as an empty message. An attachment that cannot be passed on reaches the turn as a
 note with its name, type and reason: the virus scan has not finished, the scan blocked it, it is
 larger than Hermes' `gateway.max_inbound_media_bytes`, Hermes refused the bytes, or the server
-did not hand it out. Attachments of earlier messages and of follow-ups stay lines of the
-context.
+did not hand it out. Attachments of earlier messages stay lines of the context. A follow-up
+with a file other than audio is not steered into the running turn; the server's follow-on run
+takes it, so its files reach Hermes as above.
 
 ## Inbox, state and restart
 

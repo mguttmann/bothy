@@ -425,3 +425,37 @@ async def test_file_hermes_refuses_to_cache_reaches_hermes_as_a_note(tmp_path: P
         assert turn.media == ()
         assert "'fake.jpg'" in turn.user_text
         assert "could not be read" in turn.user_text
+
+
+@pytest.mark.parametrize("text", ["", "and this one"])
+async def test_followup_with_an_image_is_left_to_the_follow_on_run(
+    tmp_path: Path, text: str
+) -> None:
+    """A follow-up with a file is never steered as bare text (D-FIX-HIMG-3).
+
+    Hermes steers text only and queues a message with media as a turn of its own; here the
+    follow-up stays ``queued`` so the server's follow-on run takes it as its triggering message,
+    where its file reaches Hermes as media. A text follow-up after it is still steered.
+    """
+
+    async def script(turn: TurnRequest, rt: FakeRuntime) -> TurnOutcome:
+        rt.events.on_model_reply(turn.thread_id, 1)
+        await rt.events.on_answer(turn.thread_id, "Let me check.", None)
+        await rt.stop_event(turn.thread_id).wait()
+        return TurnOutcome.COMPLETED
+
+    rt = FakeRuntime(script=script)
+    async with rig(tmp_path, runtime=rt, busy_mode="steer") as r:
+        triggered = await r.fake.trigger("first")
+        await r.until(lambda: r.fake.messages)
+        fid = r.fake.add_file(
+            b"\xff\xd8\xff\xe0 a pasted screenshot", name="shot.jpg", mime="image/jpeg"
+        )
+        image = await r.fake.deliver_followup(triggered.run_id, text, files=[fid])
+        plain = await r.fake.deliver_followup(triggered.run_id, "only text")
+        await r.until(lambda: any(m == plain for _, _, m in rt.steered), "the text follow-up")
+        rt.stop_event(triggered.thread_id).set()
+        await r.until(lambda: r.finished(triggered.run_id))
+        assert [m for _, _, m in rt.steered] == [plain]
+        assert r.fake.followup_state(triggered.run_id, plain) == "absorbed"
+        assert r.fake.followup_state(triggered.run_id, image) == "queued"

@@ -2417,8 +2417,11 @@ file_not_ready`), the scan blocked it (any other state, `409 file_blocked`), it 
 Hermes' own limit for incoming media (`gateway.max_inbound_media_bytes`, nothing is loaded),
 Hermes refused the bytes (an image that is none), or the server did not hand it out. A message
 with attachments and no text is never an empty message: its text is Hermes' Discord wording
-`(The user sent a message with no text content)`. Attachments of context messages and of
-follow-ups are not passed on; they stay lines of the context.
+`(The user sent a message with no text content)`. Attachments of context messages are not
+passed on; they stay lines of the context. A follow-up with an attachment that is not `audio/*`
+is not steered into the running turn (Hermes steers text only and gives a message with media a
+turn of its own): it stays `queued`, and the follow-on run of section 7 takes it as its
+triggering message with its files.
 
 Elements with `already_delivered` are left out (the continued session holds them). Attachments
 with `scan_status` `clean` or `skipped` and a `text/*` or `application/json` type are loaded

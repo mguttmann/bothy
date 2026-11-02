@@ -816,8 +816,14 @@ class HermesHandler(AgentHandler):
                 await self.runtime.answer_card(card, text)
             await self._until_settled(turn)
             return
-        text = await self._followup_text(run, message_id)
-        if text is not None and await self._into_turn(turn, text, message_id):
+        message = await self._followup_message(run, message_id)
+        if message is None or _has_media(message):
+            # Hermes steers text only and queues a message with media as a turn of its own; left
+            # undelivered, the server's follow-on run takes it as its triggering message, whose
+            # files reach Hermes as media (09 7; D-FIX-HIMG-3).
+            return
+        text = _content(message)
+        if await self._into_turn(turn, text, message_id):
             with contextlib.suppress(ValueError):
                 run.patch.followup_delivered(message_id)
             turn.steered.append(message_id)
@@ -848,6 +854,11 @@ class HermesHandler(AgentHandler):
         ``thread_context``), never a follow-up, which comes after it; transcripts of follow-ups
         are not made (17.6). A message the server refuses passes nothing.
         """
+        message = await self._followup_message(run, message_id)
+        return None if message is None else _content(message)
+
+    async def _followup_message(self, run: RunHandle, message_id: UUID) -> Message | None:
+        """A follow-up message read with the run's token, or ``None`` when the server refuses."""
         try:
             message = await run.client.call_as(
                 Message, get_message.asyncio_detailed, message_id=message_id
@@ -858,8 +869,7 @@ class HermesHandler(AgentHandler):
         except httpx.TransportError:
             _LOG.info("run %s: follow-up not read code=transport_error", run.run_id)
             return None
-        text = message.content_md if isinstance(message.content_md, str) else ""
-        return text
+        return message
 
     async def _disable_card(self, turn: _Turn) -> None:
         card = turn.card
@@ -1372,6 +1382,15 @@ def _utcnow() -> datetime:
     from datetime import UTC  # noqa: PLC0415 - keeps the module header short
 
     return datetime.now(UTC)
+
+
+def _content(message: Message) -> str:
+    return message.content_md if isinstance(message.content_md, str) else ""
+
+
+def _has_media(message: Message) -> bool:
+    """Whether a message carries a file Hermes takes as media (every type but ``audio/*``)."""
+    return any(not str(a.file.mime_type).startswith("audio/") for a in message.attachments)
 
 
 def _log_task_failure(task: asyncio.Task[Any]) -> None:
