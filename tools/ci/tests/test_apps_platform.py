@@ -833,3 +833,57 @@ def test_android_prints_the_device_log_of_a_failed_attempt(
     out = capsys.readouterr().out
     assert out.count("F libc    : Fatal signal 6 (SIGABRT)") == 1
     assert "apps-platform apps/client android: device log of the failed attempt" in out
+
+
+def test_android_prints_the_adb_server_log_of_a_failed_attempt(
+    tmp_path: Path,
+    fake_adb: Path,
+    fake_clock: FakeClock,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Main runs 41308492022 and 41443318002 (apps (Android API 36)): adbd on the device logged
+    # `host-18: connection terminated: write failed`, so the host side ended the connection, and
+    # the job log showed nothing of the host side. A failed attempt also prints the end of the
+    # log of the adb server, before the next attempt restarts the server (FIX-android36-dds-start).
+    root = tmp_path / "repo"
+    _member(root, "apps/client", {"android": [["flutter", "test", "first"]]})
+    monkeypatch.setenv("FAKE_ADB_DEVICES", "emulator-5554")
+    monkeypatch.setenv("FAKE_LOAD_FAILURES", "1")
+    server_log = tmp_path / "adb-server.log"
+    lines = [f"line {n}" for n in range(apps_platform.ADB_SERVER_LOG_LINES + 5)]
+    server_log.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    monkeypatch.setenv("ANDROID_ADB_LOG_PATH", str(server_log))
+    assert apps_platform.main(["--root", str(root), "--system", "android"]) == 0
+    out = capsys.readouterr().out
+    header = (
+        f"apps-platform apps/client android: adb server log of the failed attempt ({server_log}):"
+    )
+    # Only the failed first attempt prints it, with its last ADB_SERVER_LOG_LINES lines.
+    assert out.count(header) == 1
+    assert f"line {len(lines) - 1}\n" in out
+    assert "line 4\n" not in out
+    assert "line 5\n" in out
+
+
+def test_adb_server_log_path_follows_adb(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("ANDROID_ADB_LOG_PATH", raising=False)
+    monkeypatch.setenv("TMPDIR", "/var/tmp/x")
+    expected = f"/var/tmp/x/adb.{os.getuid()}.log" if hasattr(os, "getuid") else None
+    assert apps_platform.adb_server_log_path() == (Path(expected) if expected else None)
+    monkeypatch.delenv("TMPDIR")
+    if hasattr(os, "getuid"):
+        assert apps_platform.adb_server_log_path() == Path(f"/tmp/adb.{os.getuid()}.log")
+    monkeypatch.setenv("ANDROID_ADB_LOG_PATH", "/some/adb.log")
+    assert apps_platform.adb_server_log_path() == Path("/some/adb.log")
+
+
+def test_a_missing_adb_server_log_is_named(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    missing = tmp_path / "none.log"
+    monkeypatch.setenv("ANDROID_ADB_LOG_PATH", str(missing))
+    apps_platform.print_adb_server_log("apps/client android")
+    assert f"apps-platform apps/client android: no adb server log at {missing}" in (
+        capsys.readouterr().err
+    )

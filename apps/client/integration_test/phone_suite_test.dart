@@ -5,6 +5,7 @@
 // runs every file of integration_test/phone/ in one build. Each file also runs alone.
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:integration_test/integration_test.dart';
 
 import 'phone/app_lock_test.dart' as app_lock;
 import 'phone/background_test.dart' as background;
@@ -19,6 +20,10 @@ import 'phone/viz_test.dart' as viz;
 import 'phone/voice_test.dart' as voice;
 
 void main() {
+  // The binding registers the report of all results to the Android runner (PhoneSuiteTest,
+  // FIX-android36-dds-start) as a tearDownAll where it is first created: here, so the report
+  // comes after every group, not after the first one.
+  IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   group('login flow', login_flow.main);
   group('navigation flow', navigation_flow.main);
   group('threads and new chat', phone_threads.main);

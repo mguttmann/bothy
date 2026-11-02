@@ -35,7 +35,8 @@ iOS simulator) and runs once more (PL/44). After such a line the shorter
 waits up to ANDROID_READY_SECONDS until the one device is listed in state `device` and reports
 `sys.boot_completed` 1; otherwise that attempt fails with the reason and the command does not run
 (PL/51); the device log is cleared then, and a failed Android attempt prints its last
-ANDROID_LOG_LINES lines. A command that keeps failing before any test ran in one of these ways
+ANDROID_LOG_LINES lines and the last ADB_SERVER_LOG_LINES lines of the adb server log
+(FIX-android36-dds-start). A command that keeps failing before any test ran in one of these ways
 (native assets, load, stalled start) starts at most `START_ATTEMPTS` times in all, an Android
 command `ANDROID_START_ATTEMPTS` times, because the adb connection to the emulator drops now and
 then while the app starts (FAPS/1). A failed test never runs again.
@@ -205,6 +206,43 @@ def print_android_log(label: str) -> None:
     _emit(header.encode() + dump.stdout)
 
 
+# The lines of the adb server log printed after a failed Android attempt (FIX-android36-dds-start):
+# adbd on the device logs only that the host ended its connection; why, the host side tells.
+ADB_SERVER_LOG_LINES = 200
+
+
+def adb_server_log_path() -> Path | None:
+    """Where the adb server writes its log: $ANDROID_ADB_LOG_PATH, else $TMPDIR/adb.<uid>.log.
+
+    None on a host without user IDs (Windows), where adb keeps it elsewhere.
+    """
+    explicit = os.environ.get("ANDROID_ADB_LOG_PATH")
+    if explicit:
+        return Path(explicit)
+    if not hasattr(os, "getuid"):
+        return None
+    # Only read: the default place where adb itself writes the log.
+    tmp = os.environ.get("TMPDIR") or "/tmp"  # noqa: S108  # nosec B108
+    return Path(tmp) / f"adb.{os.getuid()}.log"
+
+
+def print_adb_server_log(label: str) -> None:
+    """Print the end of the adb server log after a failed Android attempt (or why it is missing).
+
+    The next attempt restarts the adb server (android_ready), so this runs before it.
+    """
+    path = adb_server_log_path()
+    if path is None:
+        return
+    try:
+        lines = path.read_bytes().splitlines(keepends=True)
+    except OSError:
+        print(f"apps-platform {label}: no adb server log at {path}", file=sys.stderr)
+        return
+    header = f"apps-platform {label}: adb server log of the failed attempt ({path}):\n"
+    _emit(header.encode() + b"".join(lines[-ADB_SERVER_LOG_LINES:]))
+
+
 # The line flutter prints when a build hook of a package (native assets: sqlite3, sodium) failed.
 # The build runs before the test file loads, so no test ran and one more build is safe.
 NATIVE_ASSETS_FAILED = b"Building native assets failed"
@@ -353,6 +391,7 @@ def _attempt(name: str, system: str, command: list[str], program: str, folder: P
     outcome = _execute([program, *command[1:]], folder)
     if system == ANDROID and outcome.code != 0:
         print_android_log(label)
+        print_adb_server_log(label)
     if outcome.stalled:
         print(
             f"apps-platform {label}: {' '.join(command)} printed nothing for"
