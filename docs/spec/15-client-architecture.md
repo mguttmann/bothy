@@ -1308,7 +1308,15 @@ itself (D-M4-36-5); the step-up is `session.stepUp.confirm` with the step-up dev
   15 (SGR 97) resolves to white instead of bright white; selection and block cursor are painted
   over the text, underline and bar cursor in row 0 (the view paints its own);
   `TerminalView.onTapUp` is never called (the view detects link clicks with its
-  own pointer listener); the sequences listed above make it throw or hang.
+  own pointer listener); a mouse drag keeps its start as a position on the screen, so the
+  selection loses its start once the view scrolls, and it never scrolls while the pointer is
+  held at an edge (the view keeps the start as a cell of the buffer and scrolls itself, ticket
+  FIX-drag-select-autoscroll); the sequences listed above make it throw or hang.
+- Mouse selection on the desktop: a drag held near or beyond the top or bottom edge of the
+  screen scrolls the scrollback, faster the farther the pointer is out, and the selection grows
+  over the lines that come into view; shift with a click extends a selection; the copy is plain
+  text with a line break between lines. A press of the mouse focuses the screen, so the copy
+  keys reach it.
 - Copying only by the person (selection and shortcut or menu); pasting more than one line
   shows the text beforehand ("Paste with line breaks?").
 - Mobile: extra keys bar according to 01, screen M8; Ctrl and Alt as one-shot or held
