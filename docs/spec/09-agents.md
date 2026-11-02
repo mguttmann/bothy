@@ -2409,6 +2409,26 @@ text, as on its other platforms. Attachments of context messages and of follow-u
 transcribed. The adapter reports `voice_input` while Hermes' speech to text is on and finds a
 provider (`stt.enabled`, `stt.provider`, read at connect and at every heartbeat).
 
+Other attachments (FIX-hermes-inbound-images): after `run.start` and before the turn, every
+attachment of the triggering message without an `audio/*` type is loaded whole (`file.read`) and
+placed in Hermes' media cache of the profile with Hermes' own `cache_media_bytes_async` (images
+in the image cache, video and other files in theirs). The turn's event carries them as Hermes'
+Discord platform passes attachments: `media_urls` (the cached paths), `media_types` (per file),
+`media_text_inlined` false, and the message type of the first file (`photo`, `video` or
+`document`); so images reach Hermes' vision (native image parts or its pre-analysis, as the
+profile's `agent.image_input_mode` decides) and every other file Hermes' own note with its
+cached path. An attachment that is not passed on stands as a note before the person's text,
+with its name and type and the reason: the scan is pending (`scan_status` `pending`, `409
+file_not_ready`), the scan blocked it (any other state, `409 file_blocked`), it is larger than
+Hermes' own limit for incoming media (`gateway.max_inbound_media_bytes`, nothing is loaded),
+Hermes refused the bytes (an image that is none), or the server did not hand it out. A message
+with attachments and no text is never an empty message: its text is Hermes' Discord wording
+`(The user sent a message with no text content)`. Attachments of context messages are not
+passed on; they stay lines of the context. A follow-up with an attachment that is not `audio/*`
+is not steered into the running turn (Hermes steers text only and gives a message with media a
+turn of its own): it stays `queued`, and the follow-on run of section 7 takes it as its
+triggering message with its files.
+
 Elements with `already_delivered` are left out (the continued session holds them). Attachments
 with `scan_status` `clean` or `skipped` and a `text/*` or `application/json` type are loaded
 (`file.read`, at most `hermes_adapter.attachment_text_max_bytes` bytes, cut at a UTF-8 boundary and
@@ -3445,7 +3465,7 @@ moves it and never trusts the server or an older check for its own file system.
 | R-AG-30 | The Claude Code runner reports the names of the Git work trees directly under `runner.projects_root` in the heartbeat member `project_folders`; the server shows the owner those without a binding (18.13, addendum of 2026-10-29). | The app adds forums for existing folders as the owner's former setup did; only the runner sees the folders, and names carry no path or content (D-M4-44-1 to D-M4-44-4). |
 | R-AG-31 | The Claude Code runner reloads its served channels on `access.changed` and the channel and space structure events, and on a timer as a fallback, not only at start (18.1, addendum of 2026-10-29). | An operator change sends no `agent.config_changed`, so a forum that got the runner as operator stayed not ready until a restart (docs/decisions.d/RUNNER-LIVE-RELOAD.md). |
 | R-AG-32 | The Claude Code runner transcribes audio attachments without a transcript with an optional local program and reports `voice_input` only when one is configured; without it the person gets a note in the thread (18.14, addendum of 2026-10-29). | Claude Code cannot hear audio; a local program keeps the audio on the host, and a note replaces a silent loss (R-AG-16). |
-| R-AG-33 | The Hermes adapter sends the files of Hermes' answer as attachments through the public upload sessions, each within the server's upload limit and after Hermes' own delivery policy, and transcribes voice input with Hermes' own speech to text, delivering the transcript to the server (17.3, 17.6, HERMES-MEDIA). | Hermes behaves in a thread as on its other platforms; the server keeps scanning, limits and the owner switch `supports_files_out`, and other people see the transcript (13). |
+| R-AG-33 | The Hermes adapter sends the files of Hermes' answer as attachments through the public upload sessions, each within the server's upload limit and after Hermes' own delivery policy, and transcribes voice input with Hermes' own speech to text, delivering the transcript to the server; it passes every other attachment of the triggering message to Hermes as Hermes' own platforms do (images to its vision, files as cached paths) and a note for one it cannot pass on (17.3, 17.6, HERMES-MEDIA, FIX-hermes-inbound-images). | Hermes behaves in a thread as on its other platforms; the server keeps scanning, limits and the owner switch `supports_files_out`, and other people see the transcript (13). |
 | R-AG-34 | Hermes: its built-in-like commands stay the server's built-ins, a closed table offers only control commands without a model call, skills become model commands, and reports without a run go to the report channel, a forum getting one post per report (17.3, 17.9, addendum of 2026-10-29). | A command sent as the adapter's admin sender must never widen what a person may do, and an unknown command of a later Hermes version is refused until the table names it (docs/decisions.d/HERMES-CRON-COMMANDS.md). |
 | R-AG-35 | The Claude Code runner treats Git as optional: a bound folder without `.git` is ready, a forum without a binding works in `runner.default_workspace` when it is set (default off), and every run the runner ends without a turn or with `adapter_error` names its cause in the `summary` of `finishRun`, which the app shows next to the reason (18.1, 18.9, addendum of 2026-10-30). | Owner expectation 2026-10-30: every development forum is a Claude Code chat; forums bound to folders without Git stayed "not ready" and a forum without a binding failed at once with a bare "Error in the adapter" (docs/decisions.d/RUNNER-NO-GIT.md). |
 | R-AG-36 | A fixed thread operator triggers only while it is allowed in the channel: it is the channel's effective operator, has `write` of its own on the channel, has the active run of the thread, or completed a run in the thread; otherwise a message that would trigger it gets `operator_not_in_channel` and no run (3.4 step 4a, addendum of 2026-10-30). | Live use 2026-10-30: imported threads carry `planned_operator` (R-IM-08), and a switch-over that left the channel without that operator made every message start a run that failed at once; a thread its operator has worked in keeps its session after an operator change (R-DM-12). |

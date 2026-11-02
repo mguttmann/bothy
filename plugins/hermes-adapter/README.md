@@ -1,7 +1,8 @@
 # hermes-adapter
 
 Status: built (M2-33) on the recording of M2-32; files, images, voice and video from Hermes and
-voice input to Hermes since HERMES-MEDIA; Hermes commands and the reports of Hermes cron jobs
+voice input to Hermes since HERMES-MEDIA; images and files to Hermes since
+FIX-hermes-inbound-images; Hermes commands and the reports of Hermes cron jobs
 since HERMES-CRON-COMMANDS (09 17.3, 17.9).
 
 ## Purpose
@@ -35,7 +36,7 @@ installation.
 | `src/bothy_hermes_adapter/runtime.py` | the protocol between the logic and Hermes (`Runtime`, `RuntimeEvents`) |
 | `src/bothy_hermes_adapter/handler.py` | the runtime side of the SDK loop: start, turn, end, follow-ups, interactions |
 | `src/bothy_hermes_adapter/actual_mode.py`, `tool_class.py` | the actual billing mode (17.8) and the tool class (17.11) |
-| `src/bothy_hermes_adapter/media.py` | files of the answer (check, upload session, message kind) and the audio attachments to transcribe (17.3, 17.6) |
+| `src/bothy_hermes_adapter/media.py` | files of the answer (check, upload session, message kind), the audio attachments to transcribe and the other attachments for Hermes' media cache with the note for one not passed on (17.3, 17.6) |
 | `src/bothy_hermes_adapter/context_format.py` | the run context as the fixed system part (17.6) |
 | `src/bothy_hermes_adapter/hermes_commands.py` | the command table of the pinned version, the control and skill commands the adapter declares (17.3) |
 | `src/bothy_hermes_adapter/reports.py` | reports without a run: targets, a new forum post or the main thread, the standalone sender (17.9) |
@@ -177,6 +178,19 @@ reaches the turn. The adapter reports `voice_input` only while speech to text is
 provider, so in the server's mode `agent` a voice message reaches it only then (09 13). An
 external speech to text provider receives the audio; choose it as for Hermes' other platforms.
 
+Every other attachment of the triggering message (images, PDFs, text files, videos, anything)
+is loaded after the run started and placed in the profile's media cache with Hermes' own
+caching function, and the turn gets it the way Hermes' Discord platform passes attachments:
+images reach Hermes' vision (`agent.image_input_mode` of the profile decides between native image
+parts and its pre-analysis), other files Hermes' own note with the cached path. A message of
+attachments only reaches Hermes as `(The user sent a message with no text content)` with the
+files, never as an empty message. An attachment that cannot be passed on reaches the turn as a
+note with its name, type and reason: the virus scan has not finished, the scan blocked it, it is
+larger than Hermes' `gateway.max_inbound_media_bytes`, Hermes refused the bytes, or the server
+did not hand it out. Attachments of earlier messages stay lines of the context. A follow-up
+with a file other than audio is not steered into the running turn; the server's follow-on run
+takes it, so its files reach Hermes as above.
+
 ## Inbox, state and restart
 
 The state directory `<home>/<platform key>` (mode `0700`) holds the SDK's inbox and outbox and the
@@ -202,7 +216,9 @@ connects only after Hermes finished its startup restore.
   answer (`MEDIA:` tags for a document, an MP3 voice, a video and an image) arrive as attachments
   with the uploaded bytes, the profile's `.env` stays out, and a voice message reaches Hermes'
   speech to text (a command provider of the profile) and its transcript the model and the server,
-  or Hermes' note when speech to text is off; a control command idle and during a turn, a skill
+  or Hermes' note when speech to text is off; an image of the trigger, with and without text,
+  reaches the model as an image part, a PDF reaches it as Hermes' document note with the cached
+  file, and an image whose scan is pending reaches it as the adapter's note; a control command idle and during a turn, a skill
   command, and reports through `hermes send`, a cron job in a process without the gateway and one
   the gateway's own scheduler fires. They need the network for the pinned downloads and fail without it; they never skip.
 - `tests/realserver` (pytest marker `e2e`, left out of `uv run pytest`; `make adapters-e2e`): the
@@ -216,7 +232,9 @@ connects only after Hermes finished its startup restore.
   and a copy from Hermes' delivery ledger that is not posted again. A request the server refuses or does not serve fails a test there, which the
   FakeServer cannot show. They need the Go tool chain and a container runtime and never skip.
 - `tests/unit/test_media.py`: upload in parts, voice kind, size and file type refusals, an
-  aborted upload, a refused attachment, the capabilities, transcripts and their submission.
+  aborted upload, a refused attachment, the capabilities, transcripts and their submission,
+  attachments of every kind passed to Hermes after the start, and the note for a pending or
+  blocked scan, a refused download, a file over Hermes' limit and one Hermes refuses to cache.
 - The recording of M2-32 has no scenario for files and voice: Hermes' calls are proven by the
   Fake-Hermes tests against the same pin (D-HERMES-MEDIA-5).
 - Not proven: the newest Hermes release (`pytest --hermes-version=latest` is a manual switch with

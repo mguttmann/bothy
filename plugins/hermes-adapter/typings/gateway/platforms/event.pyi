@@ -7,6 +7,9 @@ from typing import Any
 
 class MessageType(Enum):
     TEXT = "text"
+    PHOTO = "photo"
+    VIDEO = "video"
+    DOCUMENT = "document"
 
 class ProcessingOutcome(Enum):
     SUCCESS = "success"
@@ -15,6 +18,10 @@ class ProcessingOutcome(Enum):
 
 class MessageEvent:
     text: str
+    message_type: MessageType
+    media_urls: list[str]
+    media_types: list[str]
+    media_text_inlined: list[bool | None]
     message_id: str | None
     user_id: str | None
     user_name: str | None

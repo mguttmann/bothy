@@ -5,8 +5,9 @@ Two directions, both without a Hermes import:
 
 * `Runtime` is what the logic asks of Hermes: start a turn, steer it, interrupt it, resolve a
   card's callback, switch or read the session of a thread, run a control command in a thread,
-  name the skill commands and build a skill's turn text, and tell which credential and which
-  toolsets the next turn uses. ``platform.py`` implements it on the pinned Hermes version; unit
+  name the skill commands and build a skill's turn text, tell which credential and which
+  toolsets the next turn uses, transcribe audio and put an attachment into Hermes's media
+  cache. ``platform.py`` implements it on the pinned Hermes version; unit
   tests fake it.
 * `RuntimeEvents` is what Hermes tells the logic during a turn (status sentences, drafts, the
   answer, edits, cards, usage, session IDs). ``platform.py`` forwards the Hermes callbacks to it on
@@ -34,6 +35,7 @@ __all__ = [
     "CardRequest",
     "CommandRequest",
     "FileSent",
+    "InboundMedia",
     "MediaKind",
     "OpenCard",
     "ResolvedCredential",
@@ -111,6 +113,19 @@ class Transcription:
 
 
 @dataclass(frozen=True)
+class InboundMedia:
+    """An attachment of the triggering message in Hermes's media cache (09 17.6).
+
+    Attributes:
+        path: The cached file, as Hermes's own platforms put it into ``media_urls``.
+        media_type: Its MIME type (``media_types``); ``image/*`` reaches Hermes's vision.
+    """
+
+    path: str = field(repr=False)
+    media_type: str
+
+
+@dataclass(frozen=True)
 class TurnRequest:
     """One Hermes turn for a run.
 
@@ -123,6 +138,7 @@ class TurnRequest:
         message_id: The triggering message.
         user_text: The person's text plus the transcripts of the voice attachments.
         system_part: The run context as the fixed system part (09 4.6, 17.6).
+        media: The attachments of the triggering message in Hermes's media cache.
     """
 
     run_id: UUID
@@ -133,6 +149,7 @@ class TurnRequest:
     message_id: UUID
     user_text: str = field(repr=False)
     system_part: str = field(repr=False)
+    media: tuple[InboundMedia, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -408,6 +425,27 @@ class Runtime(Protocol):
 
         Returns:
             The transcript, or Hermes's note when there is none.
+        """
+        ...
+
+    def media_limit(self) -> int:
+        """Return Hermes's limit for an incoming attachment in bytes (``0``: none).
+
+        Returns:
+            ``gateway.max_inbound_media_bytes`` of the profile, as its other platforms read it.
+        """
+        ...
+
+    async def cache_media(self, data: bytes, name: str, mime_type: str) -> InboundMedia | None:
+        """Put one attachment into Hermes's media cache, as its other platforms do (09 17.6).
+
+        Args:
+            data: The file's bytes.
+            name: The attachment's original name.
+            mime_type: The attachment's MIME type.
+
+        Returns:
+            The cached file, or ``None`` when Hermes refuses the bytes (an image that is none).
         """
         ...
 

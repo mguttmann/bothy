@@ -8,6 +8,21 @@ from gateway.config import Platform, PlatformConfig
 from gateway.platforms.event import MessageEvent, ProcessingOutcome
 
 async def cache_audio_from_bytes_async(data: bytes, ext: str = ...) -> str: ...
+def get_inbound_media_max_bytes() -> int: ...
+
+class CachedMedia:
+    path: str
+    media_type: str
+    kind: str
+    display_name: str
+
+async def cache_media_bytes_async(
+    data: bytes,
+    *,
+    filename: str = ...,
+    mime_type: str = ...,
+    default_kind: str | None = ...,
+) -> CachedMedia | None: ...
 
 class SendResult:
     success: bool

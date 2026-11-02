@@ -27,7 +27,10 @@ SDK's (M2-29); this module decides what Hermes does:
   uploaded and sent as a message with that file attached, 09 17.3).
 * Before the turn, the audio attachments of the triggering message without a transcript are
   transcribed with Hermes's own speech to text and the transcripts delivered to the server (09
-  13, 17.6).
+  13, 17.6); every other attachment of it is loaded and put into Hermes's media cache, so the
+  turn gets it as Hermes's own platforms pass one (images to its vision, files as paths), and
+  one that cannot be passed on (scan pending or blocked, over Hermes's limit, refused) as a
+  note in the person's text.
 
 Logs (logger ``bothy_hermes_adapter``) carry run, thread and event IDs, reasons and codes only.
 
@@ -107,9 +110,14 @@ from bothy_hermes_adapter.hermes_commands import (
 )
 from bothy_hermes_adapter.live_box import LiveBox
 from bothy_hermes_adapter.media import (
+    NO_TEXT,
     FileRefused,
     audio_to_transcribe,
+    files_for_hermes,
+    problem_reason,
     read_local_file,
+    scan_refusal,
+    undelivered_note,
     upload,
     with_transcripts,
 )
@@ -125,6 +133,7 @@ from bothy_hermes_adapter.runtime import (
     CardRequest,
     CommandRequest,
     FileSent,
+    InboundMedia,
     MediaKind,
     OpenCard,
     Runtime,
@@ -168,6 +177,7 @@ class _Turn:
     channel_id: UUID
     handle: RunHandle
     built: BuiltContext
+    media: tuple[InboundMedia, ...]
     session_mode: str | None
     session_ref: str | None
     session_version: int | None
@@ -220,7 +230,7 @@ class HermesHandler(AgentHandler):
         self._by_run: dict[UUID, _Turn] = {}
         self._prepared: dict[UUID, BuiltContext] = {}
         self._anchors: dict[UUID, bool] = {}
-        self._voice: dict[UUID, tuple[RunContext, ChannelBehavior | None]] = {}
+        self._inbound: dict[UUID, tuple[RunContext, ChannelBehavior | None]] = {}
         self._channels: dict[UUID, tuple[int, ChannelBehavior]] = {}
         self._tool_class = self._read_tool_class()
         self._voice_input = self._read_voice_input()
@@ -353,9 +363,10 @@ class HermesHandler(AgentHandler):
             fetch=self._fetcher(run),
             attachment_limit=self.settings.attachment_text_max_bytes,
         )
-        if audio_to_transcribe(ctx):
-            # Transcribed after the start, before the turn (09 13): the run is running meanwhile.
-            self._voice[run.run_id] = (ctx, channel)
+        if audio_to_transcribe(ctx) or files_for_hermes(ctx):
+            # Transcribed and loaded after the start, before the turn (09 13): the run is
+            # running meanwhile.
+            self._inbound[run.run_id] = (ctx, channel)
         actual = self.actual_mode()
         return StartOptions(billing_evidence=BillingEvidence.from_dict(actual.evidence))
 
@@ -428,15 +439,21 @@ class HermesHandler(AgentHandler):
         if built is None:  # prepare ran in a process that no longer exists
             raise PrepareRefused("context")
         session = getattr(payload, "agent_session", None)
-        voice = self._voice.pop(run.run_id, None)
-        if voice is not None:
-            built = await self._transcribed(run, *voice) or built
+        inbound = self._inbound.pop(run.run_id, None)
+        media: tuple[InboundMedia, ...] = ()
+        if inbound is not None:
+            ctx, channel = inbound
+            if audio_to_transcribe(ctx):
+                built = await self._transcribed(run, ctx, channel) or built
+            media, notes = await self._media(run, ctx)
+            built = _with_media(built, media, notes)
         turn = _Turn(
             run_id=run.run_id,
             thread_id=run.thread_id,
             channel_id=payload.channel_id,
             handle=run,
             built=built,
+            media=media,
             session_mode=_text_or_none(getattr(payload, "session_mode", None)),
             session_ref=_text_or_none(getattr(session, "external_session_ref", None)),
             session_version=_int_or_none(getattr(session, "version", None)),
@@ -501,6 +518,54 @@ class HermesHandler(AgentHandler):
         text = f"{prefix}\n\n{built.user_text}" if built.user_text.strip() else prefix
         return BuiltContext(system_part=built.system_part, user_text=text)
 
+    async def _media(
+        self, run: RunHandle, ctx: RunContext
+    ) -> tuple[tuple[InboundMedia, ...], list[str]]:
+        """The trigger's attachments in Hermes's media cache, and a note for each one that is not.
+
+        An attachment the server does not serve, one over Hermes's limit, one the server refuses
+        to hand out and one Hermes refuses to cache become a note; nothing is loaded for the
+        first two. Logs carry codes only (SEC-LOG-2).
+        """
+        try:
+            limit = int(self.runtime.media_limit())
+        except Exception as exc:  # an unreadable limit is none; the server's upload limit holds
+            _LOG.warning("media limit not readable: %s", type(exc).__name__)
+            limit = 0
+        media: list[InboundMedia] = []
+        notes: list[str] = []
+        for item in files_for_hermes(ctx):
+            reason = scan_refusal(item)
+            if reason is None and limit > 0 and int(item.size_bytes) > limit:
+                reason = "too_large"
+            if reason is None:
+                cached, reason = await self._cache(run, item)
+                if cached is not None:
+                    media.append(cached)
+                    continue
+            _LOG.info("run %s: attachment not passed on code=%s", run.run_id, reason)
+            notes.append(undelivered_note(item, reason or "unavailable"))
+        return tuple(media), notes
+
+    async def _cache(self, run: RunHandle, item: Any) -> tuple[InboundMedia | None, str | None]:
+        """Load one attachment whole and put it into Hermes's media cache."""
+        try:
+            result = await run.client.call(download_file.asyncio_detailed, file_id=item.file_id)
+        except ProblemError as exc:
+            return None, problem_reason(exc.code)
+        except httpx.TransportError:
+            return None, "unavailable"
+        if not isinstance(result, File):
+            return None, "unavailable"
+        try:
+            cached = await self.runtime.cache_media(
+                bytes(result.payload.read()), str(item.original_name), str(item.mime_type)
+            )
+        except Exception as exc:  # Hermes refused the bytes (its size cap, a path it rejects)
+            _LOG.info("run %s: attachment not cached: %s", run.run_id, type(exc).__name__)
+            return None, "unreadable"
+        return (cached, None) if cached is not None else (None, "unreadable")
+
     async def _download(self, run: RunHandle, file_id: UUID) -> bytes | None:
         try:
             result = await run.client.call(download_file.asyncio_detailed, file_id=file_id)
@@ -546,6 +611,7 @@ class HermesHandler(AgentHandler):
             message_id=payload.message_id if turn.anchored else turn.run_id,
             user_text=turn.built.user_text,
             system_part=turn.built.system_part,
+            media=turn.media,
         )
         switched = await self._before_turn(turn, request)
         outcome = await self.runtime.start_turn(request)
@@ -715,7 +781,7 @@ class HermesHandler(AgentHandler):
         self._by_run.pop(turn.run_id, None)
         self._prepared.pop(turn.run_id, None)
         self._anchors.pop(turn.run_id, None)
-        self._voice.pop(turn.run_id, None)
+        self._inbound.pop(turn.run_id, None)
         self._spawn(self.store.drop_card(turn.run_id))
 
     def _spawn(self, coro: Any) -> None:
@@ -750,8 +816,14 @@ class HermesHandler(AgentHandler):
                 await self.runtime.answer_card(card, text)
             await self._until_settled(turn)
             return
-        text = await self._followup_text(run, message_id)
-        if text is not None and await self._into_turn(turn, text, message_id):
+        message = await self._followup_message(run, message_id)
+        if message is None or _has_media(message):
+            # Hermes steers text only and queues a message with media as a turn of its own; left
+            # undelivered, the server's follow-on run takes it as its triggering message, whose
+            # files reach Hermes as media (09 7; D-FIX-HIMG-3).
+            return
+        text = _content(message)
+        if await self._into_turn(turn, text, message_id):
             with contextlib.suppress(ValueError):
                 run.patch.followup_delivered(message_id)
             turn.steered.append(message_id)
@@ -782,6 +854,11 @@ class HermesHandler(AgentHandler):
         ``thread_context``), never a follow-up, which comes after it; transcripts of follow-ups
         are not made (17.6). A message the server refuses passes nothing.
         """
+        message = await self._followup_message(run, message_id)
+        return None if message is None else _content(message)
+
+    async def _followup_message(self, run: RunHandle, message_id: UUID) -> Message | None:
+        """A follow-up message read with the run's token, or ``None`` when the server refuses."""
         try:
             message = await run.client.call_as(
                 Message, get_message.asyncio_detailed, message_id=message_id
@@ -792,8 +869,7 @@ class HermesHandler(AgentHandler):
         except httpx.TransportError:
             _LOG.info("run %s: follow-up not read code=transport_error", run.run_id)
             return None
-        text = message.content_md if isinstance(message.content_md, str) else ""
-        return text
+        return message
 
     async def _disable_card(self, turn: _Turn) -> None:
         card = turn.card
@@ -1308,9 +1384,35 @@ def _utcnow() -> datetime:
     return datetime.now(UTC)
 
 
+def _content(message: Message) -> str:
+    return message.content_md if isinstance(message.content_md, str) else ""
+
+
+def _has_media(message: Message) -> bool:
+    """Whether a message carries a file Hermes takes as media (every type but ``audio/*``)."""
+    return any(not str(a.file.mime_type).startswith("audio/") for a in message.attachments)
+
+
 def _log_task_failure(task: asyncio.Task[Any]) -> None:
     if task.cancelled():
         return
     exc = task.exception()
     if exc is not None:
         _LOG.warning("handler task failed: %s", type(exc).__name__)
+
+
+def _with_media(
+    built: BuiltContext, media: tuple[InboundMedia, ...], notes: list[str]
+) -> BuiltContext:
+    """The person's text with the notes of undelivered attachments before it.
+
+    A message whose only content is attachments gets Hermes's own wording for it (`NO_TEXT`),
+    so it never reaches Hermes as an empty message.
+    """
+    text = built.user_text if built.user_text.strip() else ""
+    if not text and media:
+        text = NO_TEXT
+    if not notes and text == built.user_text:
+        return built
+    joined = "\n\n".join([*notes, text] if text else notes)
+    return BuiltContext(system_part=built.system_part, user_text=joined)
