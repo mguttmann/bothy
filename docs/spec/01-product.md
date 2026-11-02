@@ -1838,6 +1838,12 @@ Android).
 4. **Display only.** Wrapping, the horizontal scroll and the collapse change only the display: the
    copy of a block is its raw content as 6.12 item 3 defines, also while it is collapsed, and a
    system selection over a wrapped block keeps its line breaks and indentation (6.12 item 6).
+5. **Syntax colors** (addendum of 2026-11-02, ticket FEAT-markdown-viewer). A block whose fence
+   names a known language (the C family, Dart, JavaScript and TypeScript, Go, Rust, Swift,
+   Kotlin, Java, Python, Ruby, shell, SQL, JSON, YAML) colors keywords, strings, numbers,
+   comments and type names, and a `diff` block its added and removed lines, in the design
+   tokens of both themes; a block without a known language stays one color. The colors are
+   display only, like item 4.
 
 ### 6.15 Text selection in the history
 
@@ -2034,6 +2040,48 @@ restores), 07 4.5a and 20 4.2a.
    a new chat; "+" of a forum row, "New chat in <forum>" of the forum menu and Cmd+N (Ctrl+N) start
    a chat (6.8 item 8). Such an entry is a text channel in the instance's data and goes with this
    delete (D-DEL-16).
+
+### 6.19 Document viewer of attachments
+
+Addendum of 2026-11-02 (R-PR-34, rulings D-FEAT-MDV-1 to D-FEAT-MDV-8 in
+[docs/decisions.d/FEAT-markdown-viewer.md](../decisions.d/FEAT-markdown-viewer.md)). Reason:
+owner request of 2026-11-02: most of what agents send are Markdown files, and a `.md`
+attachment (also an `answer.txt` of a long answer, 6.13) could only be saved or opened in
+another app. Applies to the desktop (macOS, Windows) and the phone (iOS, Android); the admin
+console shows no attachments.
+
+1. **What opens.** A servable attachment (12 2 "ready") named `.md`, `.markdown`, `.txt`,
+   `.log`, `.json`, `.yaml`, `.yml` or `.csv`, or of the MIME type `text/markdown`,
+   `text/plain`, `application/json`, `text/csv` or a YAML type, opens in the document viewer on
+   a tap or click of its tile and on "Open". A file being checked, blocked, failed or deleted
+   never opens (`scan_status` is respected); every other file keeps "Open" with the system.
+2. **Rendering.** Markdown renders with the renderer of messages (one renderer, 6.12, 6.14):
+   headings, nested lists, task lists, tables with a horizontal scroll, code blocks with syntax
+   colors and the copy, wrap and collapse of 6.14, inline code, quotes, links and horizontal
+   rules; raw HTML shows as text. JSON shows pretty-printed, a CSV of at most 500 rows and 40
+   columns as a table, YAML, text and logs as monospaced text. The text keeps a readable line
+   length on a wide screen (`layout.message-max-width`), in light and dark.
+3. **Links and images.** A web link opens in the browser and an internal path in the app, after
+   the viewer closes; a relative link that names another attachment of the same message opens
+   that file (a text file in a second viewer above, any other with the system); a link to
+   `#heading` jumps to that heading. An image that names another image attachment of the message
+   (by its file name or `attachment:<id>`) shows its thumbnail from the server; an image from the
+   web shows a button "Load image from <domain>" and loads only on that click.
+4. **Toolbar.** "Contents" (with two headings or more), "Raw text" / "Formatted" (where a
+   formatted form exists), "Search", "Copy all" (the whole text), "Save as" and "Open in another
+   app". Search (Cmd+F, Ctrl+F) marks every match, the current one stronger, shows "n of m",
+   steps with Enter, Shift+Enter and the buttons, scrolls the current match into view and
+   expands a collapsed code block that holds it; Esc closes the search, a second Esc the viewer.
+5. **Contents.** The headings of the document as a list indented by level: a side panel on a
+   wide screen (shown by default from three headings, hidden and shown with "Contents"), a sheet
+   on a narrow screen; a heading jumps to its place.
+6. **Reading.** Text is selectable: on the desktop with the mouse selection of 6.15, which
+   scrolls while a drag is held beyond the edge; on the phone with the system selection.
+   Arrow keys, Space and Shift+Space, Page up and down, Home and End scroll. The viewer is a
+   large dialog on the desktop and full screen on the phone.
+7. **Large files.** The viewer reads at most 8 MB of a file and says so when it shows only the
+   beginning. A file above 1 MB opens as raw text with a notice and "Show formatted"; both forms
+   build lazily, block by block, so a long file opens without freezing.
 
 ## 7. Keyboard shortcuts
 
@@ -2301,6 +2349,7 @@ Rules:
 | R-PR-31 | A chat row in the sidebar shows a status mark (green done, yellow working, blue waiting for the person, red failed, each with its own shape, tooltip and label) only for an agent state the person has not seen since they last had the chat open; opening the chat clears it, a new change brings it back, seen follows the person's read state, the mark replaces the unread bar on rows with agent runs, and forum and project rows show the most urgent unseen state behind the setting `sidebar.show_project_status` (6.17, addendum of 2026-10-31). | Owner request and amendment 2026-10-31: with many agent chats the person could not tell where something had happened without opening each one; only news the person has not seen is worth a mark, and two markers on one row would compete (docs/decisions.d/M4-52.md). |
 | R-PR-32 | On iPhone and Android the thread uses the screen: message content at the full width with a small avatar in the header line of a group, a one-line header (back, title, overflow menu with the operator) that collapses while older messages are read and never with a screen reader, a one-line live box, and an input whose text field fills it from the attachment button to the microphone inside it, starts at the left and grows to `ui.composer_max_lines` lines (5.3 M3, addendum of 2026-10-31). | Owner screenshots 2026-10-31 (iPhone): about a quarter of the width went to an avatar column, the input's text area was a small box in its middle, and header, operator line and live box took a large part of the height (docs/decisions.d/M5-17.md). |
 | R-PR-33 | Spaces, channels, project forums and chats are deleted from "Delete..." at the end of their menus (owner for a space, `manage` for a channel or forum, the creator or `manage` for a chat, never a main thread) after a dialog that names the non-zero counts of what goes; an owner may also move the project folder to the trash of the runner's host when the runner's check allows it; a toast offers "Undo" within the undo window, and every client removes a deleted item at once and brings it back on undo (6.18, addendum of 2026-11-01). | Owner request 2026-11-01: nothing could be deleted in the app; the confirmation must name what goes, a slip needs a quick undo, and a project folder must never be lost (docs/decisions.d/FEAT-delete-spaces-chats.md). |
+| R-PR-34 | A servable Markdown, text, log, JSON, YAML or CSV attachment opens in an in-app document viewer instead of the system app: Markdown rendered by the renderer of messages, JSON pretty, a small CSV as a table, text raw, with raw and formatted view, search with marks, copy all, Save as, Open in another app, a table of contents, the mouse selection of the desktop and reading keys; a file that is not servable never opens, and web images load only on a click (6.19, addendum of 2026-11-02). | Owner request 2026-11-02: most of what agents send are Markdown files and had to be viewed outside the app (docs/decisions.d/FEAT-markdown-viewer.md). |
 
 ## 14. Configuration values of this chapter
 

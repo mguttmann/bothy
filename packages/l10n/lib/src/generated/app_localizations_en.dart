@@ -9972,4 +9972,71 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get problemConflictProjectFolderRefused =>
       'The runner\'s last check does not allow moving the project folder to the trash.';
+
+  @override
+  String documentViewerTitle(String name) {
+    return 'Document $name';
+  }
+
+  @override
+  String get documentLoading => 'Loading document';
+
+  @override
+  String get documentShowRaw => 'Raw text';
+
+  @override
+  String get documentShowRendered => 'Formatted';
+
+  @override
+  String get documentCopyAll => 'Copy all';
+
+  @override
+  String get documentOpenExternally => 'Open in another app';
+
+  @override
+  String get documentContents => 'Contents';
+
+  @override
+  String get documentSearch => 'Search';
+
+  @override
+  String get documentSearchHint => 'Search in document';
+
+  @override
+  String documentSearchCount(int current, int total) {
+    return '$current of $total';
+  }
+
+  @override
+  String get documentSearchNone => 'No matches';
+
+  @override
+  String get documentSearchNext => 'Next match';
+
+  @override
+  String get documentSearchPrevious => 'Previous match';
+
+  @override
+  String get documentSearchClose => 'Close search';
+
+  @override
+  String get documentClose => 'Close';
+
+  @override
+  String documentLarge(String size) {
+    return 'This file is large ($size), so it opens as raw text.';
+  }
+
+  @override
+  String get documentRenderAnyway => 'Show formatted';
+
+  @override
+  String documentTruncated(String size) {
+    return 'Only the first $size are shown. Save the file to see all of it.';
+  }
+
+  @override
+  String documentRemoteImage(String domain) {
+    return 'Load image from $domain';
+  }
 }

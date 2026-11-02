@@ -51,7 +51,14 @@ class FilesSection extends ConsumerWidget {
         for (final f in files)
           Padding(
             padding: const EdgeInsets.only(bottom: DsSpace.s6),
-            child: AttachmentTile(file: f.file, compact: true),
+            child: AttachmentTile(
+              file: f.file,
+              compact: true,
+              siblings: [
+                for (final g in files)
+                  if (g.messageId == f.messageId) g.file,
+              ],
+            ),
           ),
       ],
     );

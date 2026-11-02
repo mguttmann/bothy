@@ -17,12 +17,16 @@ import 'code_block_scope.dart';
 import 'code_lines.dart';
 import 'link_policy.dart';
 import 'selection_join.dart';
+import 'syntax_highlight.dart';
+import 'text_search.dart';
 
 export 'block_copy.dart';
 export 'code_block_scope.dart';
 export 'code_lines.dart';
 export 'link_policy.dart';
 export 'selection_join.dart';
+export 'syntax_highlight.dart';
+export 'text_search.dart';
 
 /// Resolves an image reference of a message to a widget, or returns null for the text form.
 ///
@@ -54,6 +58,12 @@ typedef DsAttachmentResolver = Widget? Function(Uri reference);
 ///
 /// [style] is the body style, by default `type.body` in `color.text.primary`.
 ///
+/// The document viewer of attachments (ticket FEAT-markdown-viewer) uses the same renderer:
+/// [DsMarkdown.block] draws one top-level block of a parsed [DsMarkdownDocument], so a long
+/// document builds lazily block by block; [search] marks the matches of a search
+/// ([countMatches] counts them the same way), and [resolveLink] activates links that the
+/// policy of messages leaves inactive (a relative link to another attachment, an anchor).
+///
 /// ```dart
 /// DsMarkdown(message.content, onOpenLink: (uri) => router.open(uri));
 /// ```
@@ -66,10 +76,36 @@ class DsMarkdown extends StatelessWidget {
     this.attachments,
     this.style,
     this.mentionHandles = const {},
-  });
+    this.search,
+    this.resolveLink,
+  }) : _nodes = null;
+
+  /// Creates the renderer of the top-level block [index] of [document].
+  DsMarkdown.block(
+    DsMarkdownDocument document,
+    int index, {
+    super.key,
+    required this.onOpenLink,
+    this.attachments,
+    this.style,
+    this.mentionHandles = const {},
+    this.search,
+    this.resolveLink,
+  }) : source = '',
+       _nodes = [document._blocks[index]];
 
   /// The Markdown text, unchanged content of the message.
   final String source;
+
+  /// The parsed nodes of [DsMarkdown.block], or null to parse [source].
+  final List<md.Node>? _nodes;
+
+  /// The search whose matches are marked, or null.
+  final DsTextSearch? search;
+
+  /// Activates a link that [dsClassifyLink] leaves inactive, or null: returns its target, or
+  /// null to keep it plain text. Never called for an active link.
+  final DsLinkTarget? Function(String href)? resolveLink;
 
   /// Called with the target of an active link when the person activates it.
   final void Function(Uri) onOpenLink;
@@ -126,6 +162,28 @@ class DsMarkdown extends StatelessWidget {
     return document.parse(source.replaceAll('\r\n', '\n'));
   }
 
+  /// The number of matches of [query] that [DsMarkdown.block] marks in block [index] of
+  /// [document] (the renderer counts while it builds, so both always agree).
+  static int countMatches(
+    BuildContext context,
+    DsMarkdownDocument document,
+    int index,
+    String query,
+  ) {
+    if (query.isEmpty) return 0;
+    final builder = _Builder(
+      context,
+      dsTextStyle(DsType.body),
+      (_) {},
+      null,
+      const {},
+      DsTextSearch(query),
+      null,
+    );
+    builder.blocks([document._blocks[index]]);
+    return builder.matches;
+  }
+
   @override
   Widget build(BuildContext context) {
     final base =
@@ -137,17 +195,104 @@ class DsMarkdown extends StatelessWidget {
       onOpenLink,
       attachments,
       mentionHandles,
+      search,
+      resolveLink,
     );
     return builder.join(
       '\n\n',
       Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
-        children: builder.blocks(parse(source)),
+        children: builder.blocks(_nodes ?? parse(source)),
       ),
     );
   }
 }
+
+/// A heading of a [DsMarkdownDocument]: its [level] (1 to 6), its plain [text], the
+/// top-level [block] it is and its [anchor] (the slug a link `#anchor` names).
+@immutable
+final class DsMarkdownHeading {
+  /// Creates the heading.
+  const DsMarkdownHeading({
+    required this.level,
+    required this.text,
+    required this.block,
+    required this.anchor,
+  });
+
+  /// The level, 1 for `#`.
+  final int level;
+
+  /// The text without Markdown.
+  final String text;
+
+  /// The index of its top-level block.
+  final int block;
+
+  /// The anchor: lower case, punctuation removed, spaces as `-`, and `-1`, `-2` for repeats.
+  final String anchor;
+}
+
+/// A Markdown text parsed once into its top-level blocks, for a viewer that renders a long
+/// document lazily with [DsMarkdown.block] (ticket FEAT-markdown-viewer).
+///
+/// ```dart
+/// final doc = DsMarkdownDocument.parse(text);
+/// ListView.builder(
+///   itemCount: doc.length,
+///   itemBuilder: (_, i) => DsMarkdown.block(doc, i, onOpenLink: open),
+/// );
+/// ```
+final class DsMarkdownDocument {
+  /// Parses [source] with the rules of [DsMarkdown.parse].
+  DsMarkdownDocument.parse(String source) : _blocks = DsMarkdown.parse(source);
+
+  final List<md.Node> _blocks;
+
+  /// The number of top-level blocks.
+  int get length => _blocks.length;
+
+  /// The headings in order.
+  late final List<DsMarkdownHeading> headings = () {
+    final out = <DsMarkdownHeading>[];
+    final seen = <String, int>{};
+    for (var i = 0; i < _blocks.length; i++) {
+      final node = _blocks[i];
+      if (node is! md.Element) continue;
+      final level = switch (node.tag) {
+        'h1' => 1,
+        'h2' => 2,
+        'h3' => 3,
+        'h4' => 4,
+        'h5' => 5,
+        'h6' => 6,
+        _ => 0,
+      };
+      if (level == 0) continue;
+      final text = node.textContent.trim();
+      final slug = dsHeadingAnchor(text);
+      final n = seen[slug] ?? 0;
+      seen[slug] = n + 1;
+      out.add(
+        DsMarkdownHeading(
+          level: level,
+          text: text,
+          block: i,
+          anchor: n == 0 ? slug : '$slug-$n',
+        ),
+      );
+    }
+    return out;
+  }();
+}
+
+/// The anchor of a heading [text] as GitHub writes it: lower case, every character that is no
+/// letter, digit, space, `-` or `_` removed, spaces as `-`.
+String dsHeadingAnchor(String text) => text
+    .toLowerCase()
+    .replaceAll(RegExp(r'[^\p{L}\p{N} _-]', unicode: true), '')
+    .replaceAll(' ', '-');
 
 /// Builds the widgets of the AST.
 class _Builder {
@@ -157,13 +302,47 @@ class _Builder {
     this.onOpenLink,
     this.attachments,
     this.mentionHandles,
-  );
+    this.search,
+    this.resolveLink,
+  ) : _next = search?.first ?? 0;
 
   final BuildContext context;
   final TextStyle base;
   final void Function(Uri) onOpenLink;
   final DsAttachmentResolver? attachments;
   final Set<String> mentionHandles;
+  final DsTextSearch? search;
+  final DsLinkTarget? Function(String href)? resolveLink;
+
+  /// The number of the next match of [search].
+  int _next;
+
+  /// The matches of [search] built so far.
+  int get matches => _next - (search?.first ?? 0);
+
+  /// The search active for the queries; null without one or with an empty query.
+  late final DsTextSearch? _search = (search?.query.isEmpty ?? true)
+      ? null
+      : search;
+
+  /// [text] in the styled [ranges], with the matches of the search marked and counted.
+  List<TextSpan> _mark(String text, List<DsStyledRange> ranges) {
+    final s = _search;
+    if (s == null) {
+      return [
+        for (final (a, b, st) in ranges)
+          if (b > a) TextSpan(text: text.substring(a, b), style: st),
+      ];
+    }
+    final (spans, n) = dsMarkMatches(
+      text,
+      ranges,
+      s.from(_next),
+      context.dsColors,
+    );
+    _next += n;
+    return spans;
+  }
 
   /// Whether a system selection is above the renderer (01 6.15): only then do the containers
   /// join their selected text with the separators of [DsSelectionJoin].
@@ -176,29 +355,26 @@ class _Builder {
   /// [text] as spans in [style], with the tokens of [mentionHandles] in the mention style.
   void _text(String text, TextStyle style, List<InlineSpan> out) {
     if (mentionHandles.isEmpty) {
-      out.add(TextSpan(text: text, style: style));
+      out.addAll(_mark(text, [(0, text.length, style)]));
       return;
     }
+    final ranges = <DsStyledRange>[];
     var at = 0;
     for (final m in DsMarkdown.mentionToken.allMatches(text)) {
       if (!mentionHandles.contains(m[1]!.toLowerCase())) continue;
-      if (m.start > at) {
-        out.add(TextSpan(text: text.substring(at, m.start), style: style));
-      }
-      out.add(
-        TextSpan(
-          text: m[0],
-          style: style.copyWith(
-            fontWeight: FontWeight.w600,
-            color: context.dsAccent.textLink,
-          ),
+      if (m.start > at) ranges.add((at, m.start, style));
+      ranges.add((
+        m.start,
+        m.end,
+        style.copyWith(
+          fontWeight: FontWeight.w600,
+          color: context.dsAccent.textLink,
         ),
-      );
+      ));
       at = m.end;
     }
-    if (at < text.length) {
-      out.add(TextSpan(text: text.substring(at), style: style));
-    }
+    if (at < text.length) ranges.add((at, text.length, style));
+    out.addAll(_mark(text, ranges));
   }
 
   static const _blockTags = {
@@ -246,7 +422,10 @@ class _Builder {
     final nests = e.tag == 'blockquote' || e.tag == 'ul' || e.tag == 'ol';
     if (!nests) return _blockAt(e);
     if (_depth >= DsMarkdown.maxNesting) {
-      return Text(e.textContent, style: base);
+      final text = e.textContent;
+      return Text.rich(
+        TextSpan(style: base, children: _mark(text, [(0, text.length, base)])),
+      );
     }
     _depth++;
     try {
@@ -307,7 +486,15 @@ class _Builder {
     final language = cls != null && cls.startsWith('language-')
         ? cls.substring('language-'.length)
         : null;
-    return DsMarkdownCodeBlock(code: text, language: language);
+    final s = _search;
+    if (s == null) return DsMarkdownCodeBlock(code: text, language: language);
+    final first = _next;
+    _next += dsMatchRanges(text, s.query).length;
+    return DsMarkdownCodeBlock(
+      code: text,
+      language: language,
+      search: s.from(first),
+    );
   }
 
   Widget _list(md.Element list) {
@@ -513,12 +700,17 @@ class _Builder {
       case 'del':
         children(style.copyWith(decoration: TextDecoration.lineThrough));
       case 'code':
-        out.add(
-          TextSpan(
-            text: node.textContent,
-            style: dsTextStyle(DsType.code)
-                .copyWith(color: colors.codeFg, backgroundColor: colors.codeBg),
-          ),
+        final text = node.textContent;
+        out.addAll(
+          _mark(text, [
+            (
+              0,
+              text.length,
+              dsTextStyle(
+                DsType.code,
+              ).copyWith(color: colors.codeFg, backgroundColor: colors.codeBg),
+            ),
+          ]),
         );
       case 'br':
         out.add(TextSpan(text: '\n', style: style));
@@ -533,13 +725,20 @@ class _Builder {
 
   void _link(md.Element node, TextStyle style, List<InlineSpan> out) {
     final href = node.attributes['href'] ?? '';
-    final target = dsClassifyLink(href);
+    final target = dsClassifyLink(href) ?? resolveLink?.call(href);
     // An image inside a link keeps its text form, so the link never ends up empty.
     final text = _linkText(node);
     if (target == null) {
-      out.add(TextSpan(text: text, style: style));
+      out.addAll(_mark(text, [(0, text.length, style)]));
       return;
     }
+    final linkStyle = style.copyWith(
+      color: context.dsAccent.textLink,
+      decoration: TextDecoration.underline,
+      decorationColor: context.dsAccent.textLink,
+    );
+    final first = _next;
+    final marked = _mark(text, [(0, text.length, linkStyle)]);
     out.add(
       WidgetSpan(
         alignment: PlaceholderAlignment.baseline,
@@ -548,12 +747,9 @@ class _Builder {
           text: text,
           uri: target.uri,
           target: target.display,
-          style: style.copyWith(
-            color: context.dsAccent.textLink,
-            decoration: TextDecoration.underline,
-            decorationColor: context.dsAccent.textLink,
-          ),
+          style: linkStyle,
           onOpen: onOpenLink,
+          spans: _next > first ? marked : null,
         ),
       ),
     );
@@ -613,10 +809,14 @@ class DsMarkdownLink extends StatefulWidget {
     required this.target,
     required this.style,
     required this.onOpen,
+    this.spans,
   });
 
   /// The link text as the message wrote it.
   final String text;
+
+  /// The link text in styled pieces (the marks of a search), or null for [text] in [style].
+  final List<TextSpan>? spans;
 
   /// The target handed to [onOpen].
   final Uri uri;
@@ -685,7 +885,11 @@ class _DsMarkdownLinkState extends State<DsMarkdownLink> {
                       : null,
                   borderRadius: BorderRadius.circular(DsRadius.xs),
                 ),
-                child: Text(widget.text, style: widget.style),
+                child: widget.spans == null
+                    ? Text(widget.text, style: widget.style)
+                    : Text.rich(
+                        TextSpan(style: widget.style, children: widget.spans),
+                      ),
               ),
             ),
           ),
@@ -849,7 +1053,12 @@ class DsMarkdownQuoteBlock extends StatelessWidget {
 /// Wrapping, scrolling and collapsing are display only: the copy is [code] as it is.
 class DsMarkdownCodeBlock extends StatefulWidget {
   /// Creates the block.
-  const DsMarkdownCodeBlock({super.key, required this.code, this.language});
+  const DsMarkdownCodeBlock({
+    super.key,
+    required this.code,
+    this.language,
+    this.search,
+  });
 
   /// The key of the fade over the bottom of a collapsed block (01 6.14 item 2).
   static const Key fadeKey = ValueKey('ds-code-block-fade');
@@ -857,8 +1066,13 @@ class DsMarkdownCodeBlock extends StatefulWidget {
   /// The raw code, as [dsCodeBlockText] gives it.
   final String code;
 
-  /// The language of the fence, or null.
+  /// The language of the fence, or null; a known language colors the code
+  /// ([dsCodeTokens]).
   final String? language;
+
+  /// The search whose matches the block marks, or null; a block that holds the current match
+  /// shows expanded.
+  final DsTextSearch? search;
 
   @override
   State<DsMarkdownCodeBlock> createState() => _DsMarkdownCodeBlockState();
@@ -876,6 +1090,18 @@ class _DsMarkdownCodeBlockState extends State<DsMarkdownCodeBlock> {
 
   /// Whether the content is higher than the limit, from the last layout.
   bool _overflows = false;
+
+  /// The syntax runs of the code, computed once per code and language.
+  List<DsCodeRun>? _runs;
+
+  @override
+  void didUpdateWidget(DsMarkdownCodeBlock oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.code != widget.code ||
+        oldWidget.language != widget.language) {
+      _runs = null;
+    }
+  }
 
   @override
   void dispose() {
@@ -959,16 +1185,33 @@ class _DsMarkdownCodeBlockState extends State<DsMarkdownCodeBlock> {
             ),
           );
 
-    final collapsed = _overflows && !_expanded;
+    final runs = _runs ??= dsCodeTokens(code, widget.language);
+    final (spans, matches) = dsMarkMatches(
+      code,
+      [
+        for (final r in runs)
+          (r.start, r.end, dsCodeTokenStyle(r.token, style, colors)),
+      ],
+      widget.search,
+      colors,
+    );
+    final search = widget.search;
+    // The current match of a search is never hidden in the collapsed part.
+    final holdsActive =
+        search != null &&
+        search.active >= search.first &&
+        search.active < search.first + matches;
+    final expanded = _expanded || holdsActive;
+    final collapsed = _overflows && !expanded;
     Widget text = DsClipToHeight(
       maxHeight:
           lineHeight *
           (scope?.collapseLines ?? DsCodeBlockScope.defaultCollapseLines),
-      clip: !_expanded,
+      clip: !expanded,
       onOverflow: _reportOverflow,
       child: wrap
-          ? DsCodeLines(code: code, style: style)
-          : Text(code, softWrap: false, style: style),
+          ? DsCodeLines(code: code, style: style, spans: spans)
+          : Text.rich(TextSpan(children: spans), style: style, softWrap: false),
     );
     if (collapsed) {
       text = Stack(

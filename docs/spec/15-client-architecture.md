@@ -1002,6 +1002,13 @@ The photos become the attachments of one message in the order the picker returns
 none: one photo that cannot be read or converted refuses the whole set, and no temporary file of
 it stays. The camera takes one photo per opening (M5-16).
 
+Text attachments open in the document viewer of the client (addendum of 2026-11-02, ticket
+FEAT-markdown-viewer; [01](01-product.md) 6.19): the viewer reads the checked original from the
+file cache through the same download as "Open" and "Save as" (section 6 `file_cache`,
+[12](12-files.md) 9), at most 8 MB of it, and renders it with the one Markdown renderer of the
+design system (`DsMarkdownDocument`, `DsMarkdown.block`), lazily block by block; nothing of a
+document is fetched from elsewhere except a web image after a click.
+
 ## 15. Auto-update
 
 | Platform | Mechanism | Channels |

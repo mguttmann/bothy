@@ -14904,5 +14904,115 @@
   "problemConflictProjectFolderRefused": "The runner's last check does not allow moving the project folder to the trash.",
   "@problemConflictProjectFolderRefused": {
     "description": "Problem conflict with reason project_folder_refused: a delete asked to move a project folder whose last check is not ok (01 6.18 item 4)."
+  },
+  "documentViewerTitle": "Document {name}",
+  "@documentViewerTitle": {
+    "description": "Screen reader label of the document viewer of an attachment (ticket FEAT-markdown-viewer).",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "notes.md"
+      }
+    }
+  },
+  "documentLoading": "Loading document",
+  "@documentLoading": {
+    "description": "Placeholder while the document viewer loads the file."
+  },
+  "documentShowRaw": "Raw text",
+  "@documentShowRaw": {
+    "description": "Toolbar toggle of the document viewer: show the file as plain text."
+  },
+  "documentShowRendered": "Formatted",
+  "@documentShowRendered": {
+    "description": "Toolbar toggle of the document viewer: show the rendered document."
+  },
+  "documentCopyAll": "Copy all",
+  "@documentCopyAll": {
+    "description": "Toolbar action of the document viewer: copy the whole text."
+  },
+  "documentOpenExternally": "Open in another app",
+  "@documentOpenExternally": {
+    "description": "Toolbar action of the document viewer: hand the file to the system's app."
+  },
+  "documentContents": "Contents",
+  "@documentContents": {
+    "description": "Toolbar action and title of the table of contents of the document viewer."
+  },
+  "documentSearch": "Search",
+  "@documentSearch": {
+    "description": "Toolbar action of the document viewer that opens the search field (Cmd or Ctrl+F)."
+  },
+  "documentSearchHint": "Search in document",
+  "@documentSearchHint": {
+    "description": "Hint of the search field of the document viewer."
+  },
+  "documentSearchCount": "{current} of {total}",
+  "@documentSearchCount": {
+    "description": "Position of the current match among all matches of the search in the document viewer.",
+    "placeholders": {
+      "current": {
+        "type": "int",
+        "example": "2"
+      },
+      "total": {
+        "type": "int",
+        "example": "12"
+      }
+    }
+  },
+  "documentSearchNone": "No matches",
+  "@documentSearchNone": {
+    "description": "Shown when the search of the document viewer finds nothing."
+  },
+  "documentSearchNext": "Next match",
+  "@documentSearchNext": {
+    "description": "Button of the document viewer search: go to the next match (Enter)."
+  },
+  "documentSearchPrevious": "Previous match",
+  "@documentSearchPrevious": {
+    "description": "Button of the document viewer search: go to the previous match (Shift+Enter)."
+  },
+  "documentSearchClose": "Close search",
+  "@documentSearchClose": {
+    "description": "Button that closes the search of the document viewer (Esc)."
+  },
+  "documentClose": "Close",
+  "@documentClose": {
+    "description": "Closes the document viewer (Esc)."
+  },
+  "documentLarge": "This file is large ({size}), so it opens as raw text.",
+  "@documentLarge": {
+    "description": "Notice of the document viewer above the render limit.",
+    "placeholders": {
+      "size": {
+        "type": "String",
+        "example": "3.2 MB"
+      }
+    }
+  },
+  "documentRenderAnyway": "Show formatted",
+  "@documentRenderAnyway": {
+    "description": "Action of the large file notice: render the document anyway."
+  },
+  "documentTruncated": "Only the first {size} are shown. Save the file to see all of it.",
+  "@documentTruncated": {
+    "description": "Notice of the document viewer when the file is longer than what it reads.",
+    "placeholders": {
+      "size": {
+        "type": "String",
+        "example": "8.0 MB"
+      }
+    }
+  },
+  "documentRemoteImage": "Load image from {domain}",
+  "@documentRemoteImage": {
+    "description": "Button in the document viewer that loads an image from the web only on a click.",
+    "placeholders": {
+      "domain": {
+        "type": "String",
+        "example": "example.com"
+      }
+    }
   }
 }
