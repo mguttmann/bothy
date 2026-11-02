@@ -511,12 +511,17 @@ final RegExp _number = RegExp(
 );
 final RegExp _word = RegExp(r'[A-Za-z_$][\w$]*\??');
 
+/// The longest code [dsCodeTokens] colors; a longer one stays one plain run, because the
+/// layout of one paragraph of that many colored spans grows faster than its length.
+const int dsCodeHighlightMaxChars = 32 * 1024;
+
 /// The colored pieces of [code] in [language] (the label of a fenced block), in order and
 /// without gaps; a language without colors (or none) is one plain run.
 ///
 /// A small lexer, not a parser: keywords, strings, numbers, comments and capitalized type names
 /// of the common languages of agent answers, and the added and removed lines of a diff. It
-/// never fails; text it does not understand stays plain. The runs index [code] as it is, so a
+/// never fails; text it does not understand stays plain, and so does a code longer than
+/// [dsCodeHighlightMaxChars]. The runs index [code] as it is, so a
 /// copy is never touched by the colors.
 ///
 /// ```dart
@@ -524,6 +529,9 @@ final RegExp _word = RegExp(r'[A-Za-z_$][\w$]*\??');
 /// ```
 List<DsCodeRun> dsCodeTokens(String code, String? language) {
   if (code.isEmpty) return const [];
+  if (code.length > dsCodeHighlightMaxChars) {
+    return [DsCodeRun(0, code.length, DsCodeToken.plain)];
+  }
   if (_isDiff(language)) return _diffRuns(code);
   final lexicon = _lexiconOf(language);
   if (lexicon == null) return [DsCodeRun(0, code.length, DsCodeToken.plain)];

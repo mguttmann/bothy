@@ -174,7 +174,9 @@ class _DocumentViewerState extends ConsumerState<DocumentViewer> {
     if (uri == null) return null;
     final id = attachmentReference(uri);
     if (id != null) {
-      return widget.siblings.where((f) => f.id == id).firstOrNull;
+      return widget.siblings
+          .where((f) => f.id == id && stateOfFile(f) == AttachmentState.ready)
+          .firstOrNull;
     }
     if (uri.hasScheme || uri.hasAuthority || uri.path.isEmpty) return null;
     final segments = uri.pathSegments.where((s) => s.isNotEmpty);

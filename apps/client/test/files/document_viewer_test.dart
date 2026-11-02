@@ -460,6 +460,40 @@ void main() {
       expect(_key('document.large'), findsNothing);
     });
 
+    testWidgets('a large single-line JSON opens raw within a frame budget, '
+        'cut into short rows', (tester) async {
+      // A minified file of more than the render limit is one line; as one
+      // highlighted row its layout took tens of seconds.
+      final buffer = StringBuffer('[');
+      for (var i = 0; buffer.length < documentRenderLimitBytes + 200000; i++) {
+        if (i > 0) buffer.write(',');
+        buffer.write('{"id":$i,"name":"item $i","ok":true}');
+      }
+      buffer.write(']');
+      final text = buffer.toString();
+      final watch = Stopwatch()..start();
+      await pumpView(
+        tester,
+        DocumentContent.prepare(
+          text,
+          DocumentKind.json,
+          totalBytes: text.length,
+        ),
+        name: 'data.json',
+      );
+      watch.stop();
+      expect(_key('document.raw'), findsOneWidget);
+      expect(_key('document.large'), findsOneWidget);
+      for (final rich in tester.widgetList<RichText>(find.byType(RichText))) {
+        expect(
+          rich.text.toPlainText().length,
+          lessThanOrEqualTo(documentRowMaxChars),
+        );
+      }
+      expect(find.textContaining('{"id":0,"name":"item 0"'), findsOneWidget);
+      expect(watch.elapsedMilliseconds, lessThan(5000));
+    });
+
     testWidgets('JSON is pretty-printed, raw shows the file', (tester) async {
       await pumpView(
         tester,

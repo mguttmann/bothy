@@ -22,6 +22,10 @@ import 'document_content.dart';
 /// The lines of raw text one row of the lazy list holds.
 const int documentLinesPerRow = 100;
 
+/// The most characters one row of raw text holds; a longer line is cut over several rows, so
+/// no row of a minified file lays out megabytes at once.
+const int documentRowMaxChars = 16 * 1024;
+
 /// The width from which the table of contents is a side panel; below it is a sheet.
 const double documentWidePanelMinWidth = 900;
 
@@ -142,14 +146,38 @@ class _DocumentViewState extends State<DocumentView> {
     return _rawRows ??= _chunk(_content.text);
   }
 
+  /// Cuts [text] into rows of at most [documentLinesPerRow] lines and [documentRowMaxChars]
+  /// characters; a longer line spans several rows.
   static List<String> _chunk(String text) {
-    final lines = text.split('\n');
-    return [
-      for (var i = 0; i < lines.length; i += documentLinesPerRow)
-        lines
-            .sublist(i, math.min(i + documentLinesPerRow, lines.length))
-            .join('\n'),
-    ];
+    final rows = <String>[];
+    final row = <String>[];
+    var chars = 0;
+    void flush() {
+      if (row.isEmpty) return;
+      rows.add(row.join('\n'));
+      row.clear();
+      chars = 0;
+    }
+
+    for (final line in text.split('\n')) {
+      if (line.length > documentRowMaxChars) {
+        flush();
+        for (var at = 0; at < line.length; at += documentRowMaxChars) {
+          rows.add(
+            line.substring(at, math.min(at + documentRowMaxChars, line.length)),
+          );
+        }
+        continue;
+      }
+      if (row.length == documentLinesPerRow ||
+          chars + line.length + row.length > documentRowMaxChars) {
+        flush();
+      }
+      row.add(line);
+      chars += line.length;
+    }
+    if (row.isNotEmpty || rows.isEmpty) rows.add(row.join('\n'));
+    return rows;
   }
 
   int get _itemCount => _markdown?.length ?? _lines.length;

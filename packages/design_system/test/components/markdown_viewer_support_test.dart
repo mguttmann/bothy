@@ -76,6 +76,16 @@ void main() {
         expect(at, code.length);
       }
     });
+
+    test('a code longer than the bound stays one plain run', () {
+      final big = '{"k":1,' * (dsCodeHighlightMaxChars ~/ 7 + 1);
+      expect(big.length, greaterThan(dsCodeHighlightMaxChars));
+      expect(dsCodeTokens(big, 'json'), [
+        DsCodeRun(0, big.length, DsCodeToken.plain),
+      ]);
+      final small = big.substring(0, dsCodeHighlightMaxChars);
+      expect(dsCodeTokens(small, 'json').length, greaterThan(1));
+    });
   });
 
   testWidgets('a code block of a known language is colored, the copy is not', (
