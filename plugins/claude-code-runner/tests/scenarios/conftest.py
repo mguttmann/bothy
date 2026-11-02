@@ -18,9 +18,10 @@ import json
 import logging
 import os
 import signal
+import stat
 import subprocess
 import sys
-from collections.abc import AsyncIterator, Callable, Iterator
+from collections.abc import AsyncIterator, Callable, Iterable, Iterator
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -39,6 +40,49 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "fake_claude"))
 import helper
 
 API_KEY = "sk-ant-canary-0123456789"
+
+
+def live_entries(paths: Iterable[Path]) -> Iterator[tuple[Path, os.stat_result]]:
+    """Yield each listed entry with its ``lstat``; skip one that is gone by then.
+
+    A scenario looks at ``runner.state_dir`` while the runner still works: SQLite creates and
+    removes the rollback journal of the inbox (``inbox.sqlite3-journal``) around every
+    transaction, so an entry of a listing can vanish before it is looked at. What still exists
+    is always returned, so a check over it misses nothing that is on disk.
+    """
+    for path in paths:
+        try:
+            info = path.lstat()
+        except FileNotFoundError:
+            continue
+        yield path, info
+
+
+def live_files(paths: Iterable[Path]) -> list[tuple[Path, bytes]]:
+    """The content of each listed regular file that still exists (see `live_entries`)."""
+    found: list[tuple[Path, bytes]] = []
+    for path, info in live_entries(paths):
+        if not stat.S_ISREG(info.st_mode):
+            continue
+        try:
+            found.append((path, path.read_bytes()))
+        except FileNotFoundError:
+            continue
+    return found
+
+
+def assert_private(root: Path) -> set[str]:
+    """Assert mode ``0700`` for every directory and ``0600`` for every file under ``root``.
+
+    Returns:
+        The checked entries, relative to ``root``.
+    """
+    checked: set[str] = set()
+    for path, info in live_entries(root.rglob("*")):
+        want = 0o700 if stat.S_ISDIR(info.st_mode) else 0o600
+        assert stat.S_IMODE(info.st_mode) == want, path
+        checked.add(str(path.relative_to(root)))
+    return checked
 
 
 @dataclasses.dataclass

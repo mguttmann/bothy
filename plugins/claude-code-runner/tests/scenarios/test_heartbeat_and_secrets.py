@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import os
-import stat
 import time
 from pathlib import Path
 
@@ -12,7 +11,7 @@ import pytest
 
 from claude_code_runner.heartbeat import PINNED_CLAUDE_CODE_VERSION
 
-from .conftest import API_KEY, LogLines, World
+from .conftest import API_KEY, LogLines, World, assert_private, live_files
 
 pytestmark = pytest.mark.anyio
 
@@ -89,11 +88,7 @@ async def test_br_13_no_secret_values_leak(world: World, logs: LogLines) -> None
         message = record.getMessage()
         assert API_KEY not in message
         assert token not in message
-    for path in _files(world.state):
-        try:
-            data = path.read_bytes()
-        except FileNotFoundError:  # a SQLite journal that was just removed
-            continue
+    for path, data in live_files(world.state.rglob("*")):
         assert API_KEY.encode() not in data, path
         assert token.encode() not in data, path
     for turn in world.turns():
@@ -114,9 +109,7 @@ async def test_state_files_private_and_retention(world: World) -> None:
     await world.start(world.config(stream_log_retention="1h"))
     first = await fake.trigger("One", channel_id=world.forum_a, attachments=[attachment])
     assert await world.ended(first.run_id) == "completed"
-    for path in world.state.rglob("*"):
-        mode = stat.S_IMODE(path.lstat().st_mode)
-        assert mode == (0o700 if path.is_dir() else 0o600), path
+    assert "inbox.sqlite3" in assert_private(world.state)
     old = [p for p in _files(world.state / "sessions") if p.name != "usage.json"]
     old += _files(world.state / "files")
     past = time.time() - 7200
