@@ -4,7 +4,8 @@
 # Runs the Android tests of the app on the one attached device or emulator (platform-tests.json,
 # briefs M5-03 and M5-05 Tests; tools/ci/apps_platform.py has already checked that `adb devices`
 # lists exactly one): the phone integration tests (integration_test/phone_suite_test.dart, the
-# same files as on the iOS simulator) against the fake server inside the app, then the JVM tests
+# same files as on the iOS simulator) against the fake server inside the app, as the instrumented
+# test PhoneSuiteTest in a build with the suite as its entry point, then the JVM tests
 # and the instrumented tests of the runner (android/app/src/test and src/androidTest: channels,
 # backup rules, recent apps, the push service with its TLS fake server on the device's
 # loopback). The push tests run a second time in a build with the fake Firebase configuration of
@@ -57,16 +58,42 @@ for package in $ime_packages; do
     disabled_packages="$disabled_packages $package"
   fi
 done
-flutter test integration_test/phone_suite_test.dart -d "$serial"
+# The phone suite runs as an instrumented test, not with `flutter test -d` (FIX-android36-dds-start):
+# on the API 36 emulator of the CI the adb connection dropped 0.3 to 1 s after the VM service of
+# the app listened, while flutter talked to it through `adb forward` and the Dart Development
+# Service, so the suite did not load (main runs 41308492022 and 41443318002). PhoneSuiteTest needs
+# no connection from the host to the app; Gradle reports each Dart test as a JUnit test.
+report=build/app/outputs/androidTest-results/connected/debug
+rm -rf "$report"
+# Gradle reads flutter.sdk from android/local.properties, which git ignores and only a flutter
+# command writes (`flutter test -d` did so before); a fresh checkout has none.
+flutter build apk --debug --config-only
+(
+  cd android
+  ANDROID_SERIAL="$serial" ./gradlew --no-daemon --console=plain :app:connectedDebugAndroidTest \
+    -Ptarget="$(cd .. && pwd)/integration_test/phone_suite_test.dart" \
+    -Pandroid.testInstrumentationRunnerArguments.class=com.example.client.PhoneSuiteTest
+)
+# The runner passes with the results the app reported, and a binding first created inside a group
+# reports after that group (one result of 14 tests in a local run). Every group of the suite has a
+# test, so fewer results than groups fail.
+groups=$(grep -c '^  group(' integration_test/phone_suite_test.dart)
+reported=$(cat "$report"/TEST-*.xml 2>/dev/null | grep -o '<testcase ' | wc -l | tr -d ' ')
+if [ "$reported" -lt "$groups" ]; then
+  echo "client android: the phone suite reported $reported tests for $groups groups" >&2
+  exit 1
+fi
+echo "client android: the phone suite reported $reported tests for $groups groups"
 # Evidence in the job log: no input method may have come back during the tests.
 echo "client android: enabled input methods after the phone tests: [$(adb -s "$serial" shell ime list -s | tr -d '\r' | tr '\n' ' ')]"
 restore_ime
 trap - EXIT
 cd android
 # MainActivityTest is the bridge of the patrol device tests and runs only under `patrol test`;
-# AccessibilityChecksTest needs the build of the audit entry (tool/run_android_a11y_checks.sh).
+# AccessibilityChecksTest needs the build of the audit entry (tool/run_android_a11y_checks.sh) and
+# PhoneSuiteTest the build of the phone suite above.
 ANDROID_SERIAL="$serial" ./gradlew --no-daemon --console=plain :app:testDebugUnitTest :app:connectedDebugAndroidTest \
-  -Pandroid.testInstrumentationRunnerArguments.notClass=com.example.client.MainActivityTest,com.example.client.AccessibilityChecksTest
+  -Pandroid.testInstrumentationRunnerArguments.notClass=com.example.client.MainActivityTest,com.example.client.AccessibilityChecksTest,com.example.client.PhoneSuiteTest
 # A build configuration with its own Firebase file was tested above; never replace that file.
 if [ -e app/google-services.json ]; then
   exit 0

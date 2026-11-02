@@ -17,8 +17,9 @@ after the rebase onto #499. The script therefore also disables the packages of t
 (`pm disable-user`), which no package event undoes, and enables them again afterwards; a package
 the shell may not disable, or one that was disabled before, is left as it is.
 
-The test runs a copy of the real script with fake `adb`, `flutter` and `gradlew` that log their
-calls.
+The phone tests run as an instrumented test through Gradle (FIX-android36-dds-start), so the
+first Gradle run of the script is the phone suite. The test runs a copy of the real script with
+fake `adb`, `flutter` and `gradlew` that log their calls.
 """
 
 from __future__ import annotations
@@ -30,6 +31,8 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[3]
 SCRIPT = REPO / "apps" / "client" / "tool" / "run_android_tests.sh"
+SUITE = REPO / "apps" / "client" / "integration_test" / "phone_suite_test.dart"
+GROUPS = SUITE.read_text(encoding="utf-8").count("\n  group(")
 IMES = (
     "com.google.android.inputmethod.latin/com.android.inputmethod.latin.LatinIME",
     "com.google.android.googlequicksearchbox/com.google.android.voicesearch.ime.VoiceInputMethodService",
@@ -51,15 +54,39 @@ def _fake(path: Path, body: str) -> None:
     path.chmod(0o755)
 
 
-def _run(tmp_path: Path, flutter_code: int) -> tuple[list[str], subprocess.CompletedProcess[str]]:
+# The Gradle run of the phone suite and the later run of the plain instrumented tests.
+PHONE = "class=com.example.client.PhoneSuiteTest"
+PLAIN = ":app:testDebugUnitTest"
+
+
+def _run(
+    tmp_path: Path, phone_code: int, phone_results: int = GROUPS
+) -> tuple[list[str], subprocess.CompletedProcess[str]]:
     client = tmp_path / "apps" / "client"
     (client / "tool").mkdir(parents=True)
     shutil.copy(SCRIPT, client / "tool" / "run_android_tests.sh")
+    (client / "integration_test").mkdir()
+    shutil.copy(SUITE, client / "integration_test" / "phone_suite_test.dart")
+    # A report of an earlier run that the script must not count.
+    stale = client / "build/app/outputs/androidTest-results/connected/debug"
+    stale.mkdir(parents=True)
+    (stale / "TEST-old.xml").write_text('<testcase name="old" />' * 100, encoding="utf-8")
     (client / "android" / "app").mkdir(parents=True)
     # A build configuration with its own Firebase file: the script ends after the first Gradle run.
     (client / "android" / "app" / "google-services.json").write_text("{}", encoding="utf-8")
     log = tmp_path / "calls.log"
-    _fake(client / "android" / "gradlew", f'echo "gradlew $*" >> {log}\n')
+    _fake(
+        client / "android" / "gradlew",
+        f'echo "gradlew $*" >> {log}\n'
+        f'case "$*" in *{PHONE}*)\n'
+        "  report=../build/app/outputs/androidTest-results/connected/debug\n"
+        '  mkdir -p "$report"\n'
+        f"  for i in $(seq 1 {phone_results}); do\n"
+        '    printf \'<testcase name="t%s" classname="PhoneSuiteTest" />\\n\' "$i"\n'
+        '  done > "$report/TEST-emulator.xml"\n'
+        f"  exit {phone_code} ;;\n"
+        "esac\n",
+    )
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     listing = "\\n".join(IMES)
@@ -81,7 +108,7 @@ def _run(tmp_path: Path, flutter_code: int) -> tuple[list[str], subprocess.Compl
         '  *"pm disable-user --user 0 "*) echo "Package ${8} new state: disabled-user" ;;\n'
         "esac\n",
     )
-    _fake(bin_dir / "flutter", f'echo "flutter $*" >> {log}\nexit {flutter_code}\n')
+    _fake(bin_dir / "flutter", f'echo "flutter $*" >> {log}\n')
     env = {**os.environ, "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}"}
     done = subprocess.run(
         ["sh", str(client / "tool" / "run_android_tests.sh")],
@@ -98,13 +125,18 @@ def _index(calls: list[str], prefix: str) -> int:
     return next(i for i, call in enumerate(calls) if call.startswith(prefix))
 
 
+def _gradle(calls: list[str], marker: str) -> int:
+    """The index of the Gradle run whose arguments hold marker."""
+    return next(i for i, call in enumerate(calls) if call.startswith("gradlew ") and marker in call)
+
+
 def test_the_phone_tests_run_with_every_input_method_disabled(tmp_path: Path) -> None:
     calls, done = _run(tmp_path, 0)
     assert done.returncode == 0, done.stderr
-    phone = _index(calls, "flutter test integration_test/phone_suite_test.dart")
+    phone = _gradle(calls, PHONE)
     for ime in IMES:
         assert _index(calls, f"adb -s emulator-5554 shell ime disable {ime}") < phone
-    gradle = _index(calls, "gradlew ")
+    gradle = _gradle(calls, PLAIN)
     for ime in IMES:
         assert phone < _index(calls, f"adb -s emulator-5554 shell ime enable {ime}") < gradle
     assert phone < _index(calls, f"adb -s emulator-5554 shell ime set {IMES[0]}") < gradle
@@ -113,18 +145,18 @@ def test_the_phone_tests_run_with_every_input_method_disabled(tmp_path: Path) ->
 def test_a_failed_phone_run_enables_the_input_methods_again(tmp_path: Path) -> None:
     calls, done = _run(tmp_path, 1)
     assert done.returncode != 0
-    phone = _index(calls, "flutter test integration_test/phone_suite_test.dart")
+    phone = _gradle(calls, PHONE)
     for ime in IMES:
         assert _index(calls, f"adb -s emulator-5554 shell ime enable {ime}") > phone
     assert _index(calls, f"adb -s emulator-5554 shell ime set {IMES[0]}") > phone
-    assert not any(call.startswith("gradlew ") for call in calls)
+    assert not any(PLAIN in call for call in calls)
 
 
 def test_the_input_method_packages_are_disabled_for_the_phone_tests(tmp_path: Path) -> None:
     calls, done = _run(tmp_path, 0)
     assert done.returncode == 0, done.stderr
-    phone = _index(calls, "flutter test integration_test/phone_suite_test.dart")
-    gradle = _index(calls, "gradlew ")
+    phone = _gradle(calls, PHONE)
+    gradle = _gradle(calls, PLAIN)
     for package in ALL_PACKAGES:
         if package == "jp.co.omronsoft.openwnn":
             # Disabled before the run: neither disabled nor enabled by the script.
@@ -151,9 +183,34 @@ def test_the_input_method_packages_are_disabled_for_the_phone_tests(tmp_path: Pa
 def test_a_failed_phone_run_enables_the_input_method_packages_again(tmp_path: Path) -> None:
     calls, done = _run(tmp_path, 1)
     assert done.returncode != 0
-    phone = _index(calls, "flutter test integration_test/phone_suite_test.dart")
+    phone = _gradle(calls, PHONE)
     for package in DISABLED_BY_US:
         enable = _index(calls, f"adb -s emulator-5554 shell pm enable --user 0 {package}")
         assert enable > phone
         # The packages are enabled before their input methods are, which needs them installed.
         assert enable < _index(calls, f"adb -s emulator-5554 shell ime enable {IMES[0]}")
+
+
+def test_the_phone_run_names_how_many_tests_reported(tmp_path: Path) -> None:
+    calls, done = _run(tmp_path, 0, GROUPS + 3)
+    assert done.returncode == 0, done.stderr
+    # The only flutter call writes the build files Gradle reads; nothing runs attached.
+    assert [call for call in calls if call.startswith("flutter ")] == [
+        "flutter build apk --debug --config-only"
+    ]
+    assert (
+        f"client android: the phone suite reported {GROUPS + 3} tests for {GROUPS} groups"
+        in done.stdout
+    )
+
+
+def test_a_phone_run_that_reports_fewer_tests_than_groups_fails(tmp_path: Path) -> None:
+    # The runner of the integration_test plugin passes with the results the app reported; a
+    # binding created inside the first group reported after that group, one result of 14 tests
+    # (FIX-android36-dds-start, local run on an API 36 emulator). Every group has a test.
+    calls, done = _run(tmp_path, 0, 1)
+    assert done.returncode != 0
+    assert f"the phone suite reported 1 tests for {GROUPS} groups" in done.stderr
+    assert not any(PLAIN in call for call in calls)
+    # The input methods come back also then.
+    assert _index(calls, f"adb -s emulator-5554 shell ime enable {IMES[0]}") > _gradle(calls, PHONE)

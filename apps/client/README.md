@@ -337,7 +337,10 @@ Tests (D-M5-03-7): the widget and golden tests of `test/phone/` (system back, th
 adapters, the Android tap target guideline) and `test/goldens/phone/android_*` run on every host.
 With exactly one device or emulator attached, `make apps-platform` runs
 `tool/run_android_tests.sh`: the phone integration tests (`integration_test/phone_suite_test.dart`,
-the same files as on the iPhone simulator, system back instead of the edge swipe; every input
+the same files as on the iPhone simulator, system back instead of the edge swipe; they run as the
+instrumented test `PhoneSuiteTest` in a build with the suite as its entry point, not with
+`flutter test -d`, so no connection from the host to the app's VM service is needed,
+FIX-android36-dds-start; every input
 method of the device and its package are disabled while they run and enabled again afterwards,
 so no system keyboard edits the composer beside the dictation test's probe, not even after Android
 enabled its default keyboard again on its own, FIX-main-red-2026-10-31) and the

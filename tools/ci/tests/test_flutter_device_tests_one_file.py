@@ -67,7 +67,6 @@ def test_the_scan_finds_the_device_tests() -> None:
     places = {place.split(":", 1)[0] for place, _ in device_test_commands()}
     assert {
         "apps/client/platform-tests.json",
-        "apps/client/tool/run_android_tests.sh",
         "apps/client/tool/run_ios_integration_tests.sh",
     } <= places
 
