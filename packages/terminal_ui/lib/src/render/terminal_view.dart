@@ -10,11 +10,12 @@ import 'dart:async';
 
 import 'package:design_system/design_system.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/gestures.dart' show kTouchSlop;
+import 'package:flutter/gestures.dart' show PointerDeviceKind, kTouchSlop;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:terminal_ui/src/controller/terminal_controller.dart';
 import 'package:terminal_ui/src/perf/perf_hooks.dart';
+import 'package:terminal_ui/src/render/mouse_selection.dart';
 import 'package:terminal_ui/src/render/paste_guard.dart';
 import 'package:terminal_ui/src/render/semantics.dart';
 import 'package:terminal_ui/src/render/terminal_marks.dart';
@@ -103,7 +104,8 @@ class TerminalScreenView extends StatefulWidget {
   State<TerminalScreenView> createState() => _TerminalScreenViewState();
 }
 
-class _TerminalScreenViewState extends State<TerminalScreenView> {
+class _TerminalScreenViewState extends State<TerminalScreenView>
+    with SingleTickerProviderStateMixin {
   final GlobalKey<TerminalViewState> _view = GlobalKey();
   // The selection, the focus and the scroll position of the view; the marks painter follows
   // them (D-M4-35-18).
@@ -115,6 +117,16 @@ class _TerminalScreenViewState extends State<TerminalScreenView> {
   Terminal? _watched;
   String? _hoverTarget;
   Offset? _down;
+
+  // The drag of the mouse that scrolls at the edges and the shift click (ticket
+  // FIX-drag-select-autoscroll).
+  late final TerminalMouseSelection _mouse = TerminalMouseSelection(
+    view: _view,
+    controller: _selection,
+    scroll: _scroll,
+    terminal: () => _c.screen.terminal,
+    vsync: this,
+  );
 
   TerminalController get _c => widget.controller;
 
@@ -148,6 +160,7 @@ class _TerminalScreenViewState extends State<TerminalScreenView> {
     _drawn?.detach();
     _watched?.removeListener(_terminalChanged.fire);
     _terminalChanged.dispose();
+    _mouse.dispose();
     _selection.dispose();
     _focus.dispose();
     _scroll.dispose();
@@ -207,8 +220,21 @@ class _TerminalScreenViewState extends State<TerminalScreenView> {
                   // the callback), so a click on a link is detected here, outside the gesture
                   // arena, without taking anything from the renderer.
                   child: Listener(
-                    onPointerDown: (e) => _down = e.localPosition,
-                    onPointerUp: _up,
+                    onPointerDown: (e) {
+                      _down = e.localPosition;
+                      // A drag with the mouse is no tap, so xterm would not focus the screen,
+                      // and the copy keys of the selection would go elsewhere.
+                      if (e.kind == PointerDeviceKind.mouse) {
+                        _focus.requestFocus();
+                      }
+                      _mouse.down(e);
+                    },
+                    onPointerMove: _mouse.move,
+                    onPointerUp: (e) {
+                      _mouse.up();
+                      _up(e);
+                    },
+                    onPointerCancel: (_) => _mouse.up(),
                     child: TerminalScreenSemantics(
                       screen: _c.screen,
                       child: _privateInput(

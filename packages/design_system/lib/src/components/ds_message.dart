@@ -12,6 +12,7 @@ import '../theme/ds_theme.dart';
 import 'ds_clip_to_height.dart';
 import 'ds_common.dart';
 import 'ds_focus_ring.dart';
+import 'ds_list_selection.dart';
 import 'ds_trigger_state.dart';
 import 'markdown/ds_markdown.dart';
 import 'view_models.dart';
@@ -79,7 +80,7 @@ class DsMessage extends StatefulWidget {
     this.onDiscard,
     this.onPlayVoice,
     this.onTriggerTap,
-    this.onSelectionChanged,
+    this.selectable = false,
   });
 
   /// The message.
@@ -121,15 +122,16 @@ class DsMessage extends StatefulWidget {
   /// Tap on the trigger state (jumps to the live box).
   final VoidCallback? onTriggerTap;
 
-  /// Makes the content selectable with the mouse and hears the selected text, empty when
-  /// nothing is selected (01 6.15, R-PR-29; brief M4-50); null leaves the content without a
-  /// selection, as on the phone, where a long press opens the message menu instead.
+  /// Whether the content joins the mouse selection of the list the message is a row of (a
+  /// [DsListSelection] above, the message inside a [DsSelectableRow]; 01 6.15, R-PR-29;
+  /// brief M4-50, ticket FIX-drag-select-autoscroll). False, or without such a list, the
+  /// content is not selectable, as on the phone, where a long press opens the message menu.
   ///
   /// Only the rendered content is selectable: the header, the reply line, "Show more",
   /// reactions and the hover bar are not. The selection shows no menu of its own on a right
   /// click; the caller's message menu offers the copy of the selected text, and Cmd+C (Ctrl+C)
   /// copies it as plain text in the structure of the message.
-  final ValueChanged<String>? onSelectionChanged;
+  final bool selectable;
 
   @override
   State<DsMessage> createState() => DsMessageState();
@@ -524,16 +526,10 @@ class DsMessageState extends State<DsMessage> {
         style: style,
         mentionHandles: d.mentionHandles,
       );
-      if (widget.onSelectionChanged case final heard?) {
-        // One selection per message (01 6.15 item 4): a list item of the virtualized history
-        // may be dropped while it is off screen, which a selection across items would lose.
-        markdown = SelectionArea(
-          // The message menu of the app is the menu of a right click; the selection draws
-          // none of its own.
-          contextMenuBuilder: (_, _) => const SizedBox.shrink(),
-          onSelectionChanged: (content) => heard(content?.plainText ?? ''),
-          child: markdown,
-        );
+      if (widget.selectable) {
+        // The selection of the list above (01 6.15 item 1): it spans messages and scrolls
+        // the list while a drag is held beyond its edge.
+        markdown = DsSelectableContent(child: markdown);
       }
       out.add(
         _expanded

@@ -10,6 +10,7 @@ import 'dart:async';
 
 import 'package:design_system/design_system.dart';
 import 'package:domain/domain.dart';
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -84,8 +85,9 @@ String excerpt(String text) => text.trim().split('\n').first.trim();
 /// tap on a code or quote block copies that block and there is no hover (01 6.12 item 2). While
 /// [editing], an inline editor replaces the content.
 ///
-/// Text selection (01 6.15, R-PR-29; brief M4-50): on the desktop the content is selectable
-/// with the mouse, and while text is selected the menu starts with "Copy", which copies it; on
+/// Text selection (01 6.15, R-PR-29; brief M4-50, ticket FIX-drag-select-autoscroll): on the
+/// desktop the content joins the mouse selection of the history ([selection]), which spans
+/// messages, and while text is selected the menu starts with "Copy", which copies it; on
 /// the phone the menu has "Select text" after "Copy text", which opens the message in a view
 /// with the system selection ([showSelectText]). The tile runs both itself; [onAction] never
 /// hears them.
@@ -106,6 +108,7 @@ class MessageTile extends StatefulWidget {
     this.resolver,
     this.components,
     this.longPressMenu = false,
+    this.selection,
   });
 
   /// The message.
@@ -150,13 +153,18 @@ class MessageTile extends StatefulWidget {
   /// (the desktop) the content is selectable with the mouse (01 6.15).
   final bool longPressMenu;
 
+  /// The text of the history's mouse selection (the desktop): with it, the content joins the
+  /// selection of the history, which spans messages (01 6.15; ticket
+  /// FIX-drag-select-autoscroll); null leaves the content without a selection.
+  final ValueListenable<String>? selection;
+
   @override
   State<MessageTile> createState() => _MessageTileState();
 }
 
 class _MessageTileState extends State<MessageTile> {
-  /// The text selected in the content now, empty without a selection (the desktop).
-  String _selected = '';
+  /// The text selected in the history now, empty without a selection (the desktop).
+  String get _selected => widget.selection?.value ?? '';
 
   /// Whether a right click is down; the menu opens when it is released (see [build]).
   Offset? _rightClick;
@@ -232,7 +240,7 @@ class _MessageTileState extends State<MessageTile> {
           onOpenLink: widget.onOpenLink,
           attachments: widget.resolver,
           components: widget.components,
-          onSelectionChanged: longPressMenu ? null : (text) => _selected = text,
+          selectable: !longPressMenu && widget.selection != null,
           actions: [
             for (final a in actions)
               if (messageActionGlyph(a) case final glyph?)

@@ -10,6 +10,7 @@ import 'dart:async';
 
 import 'package:design_system/design_system.dart';
 import 'package:domain/domain.dart';
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -128,6 +129,10 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
   /// Whether the removal was a deletion (01 6.18 item 8, D-DEL-5) rather than an access loss.
   bool _deleted = false;
 
+  /// The text of the mouse selection over the history on the desktop, empty without one
+  /// (01 6.15; ticket FIX-drag-select-autoscroll).
+  final ValueNotifier<String> _selected = ValueNotifier('');
+
   String get _thread => widget.threadId.value;
 
   @override
@@ -142,6 +147,7 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
   void dispose() {
     _visible.remove(widget.threadId);
     _collapse.dispose();
+    _selected.dispose();
     super.dispose();
   }
 
@@ -632,6 +638,7 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
           onAction: (a) => _onAction(a, message, thread, principals),
           onOpenLink: _openLink,
           onOpenThread: (t) => context.go('/t/${t.id.value}'),
+          selection: phone ? null : _selected,
           card: message.kind == MessageKind.card && message.deletedAt == null
               ? MessageCard(
                   message: message,
@@ -795,6 +802,9 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
                         child: MessageList(
                           items: items,
                           itemBuilder: row,
+                          // The desktop's mouse selection spans the messages of the history
+                          // and scrolls it while a drag is held over an edge (01 6.15).
+                          selection: phone ? null : _selected,
                           jumpTo: jumpKey,
                           onNearTop: () =>
                               unawaited(_loadOlder(window, thread)),
@@ -843,6 +853,7 @@ class _MessageRow extends ConsumerWidget {
     required this.onOpenLink,
     required this.onOpenThread,
     this.card,
+    this.selection,
   });
 
   final Message message;
@@ -859,6 +870,9 @@ class _MessageRow extends ConsumerWidget {
   final void Function(Uri) onOpenLink;
   final ValueChanged<Thread> onOpenThread;
   final Widget? card;
+
+  /// The text of the history's selection on the desktop, null on the phone.
+  final ValueListenable<String>? selection;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -897,6 +911,7 @@ class _MessageRow extends ConsumerWidget {
       resolver: files.isEmpty ? null : attachmentResolver(files),
       components: card,
       longPressMenu: ref.watch(appPortsProvider).formFactor.isPhone,
+      selection: selection,
       started: [
         for (final t in started)
           ThreadStarterLine(thread: t, onOpen: () => onOpenThread(t)),

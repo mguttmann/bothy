@@ -196,6 +196,17 @@ Future<void> _click(WidgetTester tester, Offset at, {int times = 1}) async {
 }
 
 /// The paragraph whose plain text is [text].
+/// [rows] in a list below a list selection, as the history builds them.
+Widget _list(List<Widget> rows, {ValueChanged<String>? heard}) => SizedBox(
+  height: 500,
+  child: DsListSelection(
+    onSelectionChanged: heard,
+    child: ListView(
+      children: [for (final row in rows) DsSelectableRow(child: row)],
+    ),
+  ),
+);
+
 Finder _text(String text) => find.byWidgetPredicate(
   (w) => w is RichText && w.text.toPlainText() == text,
 );
@@ -408,23 +419,26 @@ void main() {
       content: 'The build is green.\n\nSecond paragraph.',
     );
 
-    testWidgets('with a selection callback only the content is selectable and '
-        'the callback hears the selected text', (tester) async {
+    testWidgets('in a list selection only the content is selectable and the '
+        'selection hears the selected text', (tester) async {
       final copied = _clipboard(tester);
       final heard = <String>[];
       await pumpDs(
         tester,
-        DsMessage(
-          data,
-          collapseLines: 20,
-          onOpenLink: (_) {},
-          onSelectionChanged: heard.add,
-        ),
+        _list([
+          DsMessage(
+            data,
+            collapseLines: 20,
+            onOpenLink: (_) {},
+            selectable: true,
+          ),
+        ], heard: heard.add),
       );
       expect(find.byType(SelectionArea), findsOneWidget);
       await _click(tester, _at(tester, _text('The build is green.'), 2));
       await _shortcut(tester, LogicalKeyboardKey.keyA);
       await _shortcut(tester, LogicalKeyboardKey.keyC);
+      // Select all reaches the author's name and the time, which never join the copy.
       expect(copied, ['The build is green.\n\nSecond paragraph.']);
       expect(heard.last, 'The build is green.\n\nSecond paragraph.');
       // A right click shows no system menu of its own: the message menu is the app's.
@@ -437,14 +451,83 @@ void main() {
       expect(find.byType(AdaptiveTextSelectionToolbar), findsNothing);
     }, variant: _desktop);
 
-    testWidgets('without a selection callback nothing is selectable', (
+    testWidgets(
+      'a selection over several messages copies them in order, one '
+      'apart from the next by an empty line, and skips the rows around them',
+      (tester) async {
+        final copied = _clipboard(tester);
+        await pumpDs(
+          tester,
+          _list([
+            for (final (id, text) in [
+              ('m1', 'First one.'),
+              ('m2', 'Second one.\n\nWith two blocks.'),
+              ('m3', 'Third one.'),
+            ])
+              DsMessage(
+                DsMessageData(
+                  id: id,
+                  authorName: 'Robin',
+                  origin: DsMessageOrigin.human,
+                  kind: DsMessageKind.text,
+                  timeLabel: '10:42',
+                  content: text,
+                ),
+                collapseLines: 20,
+                onOpenLink: (_) {},
+                selectable: true,
+              ),
+            const Text('Today'),
+            DsMessage(
+              const DsMessageData(
+                id: 'm4',
+                authorName: 'Sam',
+                origin: DsMessageOrigin.human,
+                kind: DsMessageKind.text,
+                timeLabel: '10:43',
+                content: 'Not selectable.',
+              ),
+              collapseLines: 20,
+              onOpenLink: (_) {},
+            ),
+          ]),
+        );
+        final gesture = await tester.startGesture(
+          _at(tester, _text('First one.'), 6),
+          kind: PointerDeviceKind.mouse,
+        );
+        await tester.pump();
+        await gesture.moveTo(_at(tester, _text('Third one.'), 5));
+        await tester.pump();
+        await gesture.up();
+        await tester.pump();
+        await _shortcut(tester, LogicalKeyboardKey.keyC);
+        expect(copied, ['one.\n\nSecond one.\n\nWith two blocks.\n\nThird']);
+
+        await _shortcut(tester, LogicalKeyboardKey.keyA);
+        await _shortcut(tester, LogicalKeyboardKey.keyC);
+        expect(
+          copied.last,
+          'First one.\n\nSecond one.\n\nWith two blocks.\n\nThird one.',
+        );
+      },
+      variant: _desktop,
+    );
+
+    testWidgets('without a list selection nothing is selectable', (
       tester,
     ) async {
       await pumpDs(
         tester,
-        DsMessage(data, collapseLines: 20, onOpenLink: (_) {}),
+        DsMessage(
+          data,
+          collapseLines: 20,
+          onOpenLink: (_) {},
+          selectable: true,
+        ),
       );
       expect(find.byType(SelectionArea), findsNothing);
+      expect(find.byType(SelectionContainer), findsNothing);
     }, variant: _desktop);
 
     testWidgets('Show more stays outside the selection', (tester) async {
@@ -452,19 +535,21 @@ void main() {
       final l = await en();
       await pumpDs(
         tester,
-        DsMessage(
-          DsMessageData(
-            id: 'm1',
-            authorName: 'Robin',
-            origin: DsMessageOrigin.human,
-            kind: DsMessageKind.text,
-            timeLabel: '10:42',
-            content: [for (var i = 1; i <= 8; i++) 'row $i'].join('\n\n'),
+        _list([
+          DsMessage(
+            DsMessageData(
+              id: 'm1',
+              authorName: 'Robin',
+              origin: DsMessageOrigin.human,
+              kind: DsMessageKind.text,
+              timeLabel: '10:42',
+              content: [for (var i = 1; i <= 8; i++) 'row $i'].join('\n\n'),
+            ),
+            collapseLines: 3,
+            onOpenLink: (_) {},
+            selectable: true,
           ),
-          collapseLines: 3,
-          onOpenLink: (_) {},
-          onSelectionChanged: (_) {},
-        ),
+        ]),
       );
       expect(find.text(l.messageShowMore), findsOneWidget);
       await _click(tester, _at(tester, _text('row 1'), 1));

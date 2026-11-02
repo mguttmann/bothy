@@ -74,7 +74,9 @@ the desktop a text button "Copy code" or "Copy quote" in `type.label`, `color.te
 top right of the block; on the phone (density `touch`) the whole block is the tap target, with a
 snack bar "Copied" and a light haptic, and a long press on the message opens the message menu.
 On the desktop the content of a message is selectable with the mouse in the system selection
-colors (01 6.15, M4-50); while text is selected the message menu starts with "Copy". On the phone
+colors (01 6.15, M4-50); the selection spans messages, and a drag held above or below the
+history scrolls it (FIX-drag-select-autoscroll); while text is selected the message menu starts
+with "Copy". On the phone
 the message menu has "Select text", which opens the message in a sheet with the title "Select
 text" in `type.heading`, a close button and the content with the system selection handles.
 
