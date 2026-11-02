@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 from bothy_sdk.testing._patience import PATIENCE
 
-from .conftest import API_KEY, LogLines, World
+from .conftest import API_KEY, LogLines, World, live_files
 
 pytestmark = pytest.mark.anyio
 
@@ -74,9 +74,5 @@ async def test_no_secret_or_content_in_runner_output(world: World, logs: LogLine
     assert logs.records
     for canary in (API_KEY, FOLLOWUP, STDERR):
         assert canary not in text, canary
-    for path in _written_by_runner(world.state):
-        try:
-            data = path.read_bytes()
-        except FileNotFoundError:  # a SQLite journal that was just removed
-            continue
+    for path, data in live_files(_written_by_runner(world.state)):
         assert API_KEY.encode() not in data, path.name
