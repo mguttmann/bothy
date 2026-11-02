@@ -9,7 +9,6 @@
 
 import 'package:client/thread/history_column.dart';
 import 'package:design_system/design_system.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -86,7 +85,6 @@ void main() {
 
   group('iOS floating cursor', () {
     testWidgets('moving left puts the cursor into the text', (tester) async {
-      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
       final host = await open(tester, 'ios');
       const text = 'Please restart the gateway';
       platformValue(tester, text, text.length);
@@ -97,11 +95,9 @@ void main() {
       expect(selection.baseOffset, inExclusiveRange(0, text.length));
       expect(fieldValue(tester).text, text);
       await host.dispose(tester);
-      debugDefaultTargetPlatformOverride = null;
-    });
+    }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
 
     testWidgets('moving up goes to the line above', (tester) async {
-      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
       final host = await open(tester, 'ios');
       const text = 'first line\nsecond line';
       platformValue(tester, text, text.length);
@@ -112,15 +108,46 @@ void main() {
       expect(selection.baseOffset, lessThanOrEqualTo('first line'.length));
       expect(fieldValue(tester).text, text);
       await host.dispose(tester);
-      debugDefaultTargetPlatformOverride = null;
-    });
+    }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
+
+    // FIX-IFC/2: the upstream limit, kept as a test so the ruling stays checkable. Flutter
+    // (`RenderEditable.calculateBoundedFloatingCursorOffset`) bounds the floating cursor to the
+    // visible lines of a field that scrolls, so the trackpad does not scroll the composer up to
+    // its first line. Fails once Flutter scrolls there; then the ruling is out of date.
+    testWidgets(
+      'moving up in a scrolling composer stops at the first visible line',
+      (tester) async {
+        final host = await open(tester, 'ios');
+        final lines = [for (var i = 1; i <= 30; i++) 'line $i'];
+        final text = lines.join('\n');
+        platformValue(tester, text, text.length);
+        await tester.pumpAndSettle();
+        final scroll = tester.state<ScrollableState>(
+          find.descendant(of: composerField, matching: find.byType(Scrollable)),
+        );
+        expect(
+          scroll.position.pixels,
+          greaterThan(0),
+          reason: 'the composer scrolls',
+        );
+        await trackpad(tester, const Offset(0, -800));
+        final selection = fieldValue(tester).selection;
+        expect(selection.isCollapsed, isTrue);
+        // The cursor left the last line, so the trackpad works, but it did not reach the
+        // lines above the visible part.
+        expect(selection.baseOffset, lessThan(text.length - lines.last.length));
+        expect(selection.baseOffset, greaterThan(lines.first.length));
+        expect(fieldValue(tester).text, text);
+        await host.dispose(tester);
+      },
+      variant: TargetPlatformVariant.only(TargetPlatform.iOS),
+    );
   });
 
   group('Android space bar slide', () {
     testWidgets('selection-only updates move the cursor and it stays', (
       tester,
     ) async {
-      debugDefaultTargetPlatformOverride = TargetPlatform.android;
       final host = await open(tester, 'android');
       const text = 'Please restart the gateway';
       platformValue(tester, text, text.length);
@@ -137,7 +164,6 @@ void main() {
       );
       expect(fieldValue(tester).text, text);
       await host.dispose(tester);
-      debugDefaultTargetPlatformOverride = null;
-    });
+    }, variant: TargetPlatformVariant.only(TargetPlatform.android));
   });
 }
