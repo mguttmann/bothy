@@ -4673,6 +4673,31 @@ class AppLocalizationsEn extends AppLocalizations {
   String get terminalReattach => 'Reattach';
 
   @override
+  String get terminalCloseTab => 'Close';
+
+  @override
+  String get terminalSessions => 'Sessions';
+
+  @override
+  String get terminalSessionsTitle => 'Running sessions';
+
+  @override
+  String get terminalSessionsNone => 'No running sessions.';
+
+  @override
+  String terminalSessionStarted(String time) {
+    return 'Started $time';
+  }
+
+  @override
+  String terminalSessionDetachedSince(String time) {
+    return 'Detached since $time';
+  }
+
+  @override
+  String get terminalSessionConnected => 'Connected';
+
+  @override
   String get terminalStateConnecting =>
       'Opening the encrypted connection to the host';
 

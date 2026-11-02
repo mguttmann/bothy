@@ -76,10 +76,13 @@ type TerminalStreamsConfig struct {
 	IdleGrace          time.Duration `config:"terminal.idle_grace"`
 	MaxSessionDuration time.Duration `config:"terminal.max_session_duration"`
 	DetachGrace        time.Duration `config:"terminal.detach_grace"`
-	BufferMaxBytes     int           `config:"terminal.relay_buffer_max_bytes"`
-	StallTimeout       time.Duration `config:"terminal.relay_stall_timeout"`
-	MaxFrameBytes      int           `config:"sync.ws_max_frame_bytes"`
-	MaxJSONDepth       int           `config:"http.max_json_depth"`
+	// The windows of a session in the owner account mode (D-TSL-1).
+	OwnerAccountDetachGrace        time.Duration `config:"terminal.owner_account_detach_grace"`
+	OwnerAccountMaxSessionDuration time.Duration `config:"terminal.owner_account_max_session_duration"`
+	BufferMaxBytes                 int           `config:"terminal.relay_buffer_max_bytes"`
+	StallTimeout                   time.Duration `config:"terminal.relay_stall_timeout"`
+	MaxFrameBytes                  int           `config:"sync.ws_max_frame_bytes"`
+	MaxJSONDepth                   int           `config:"http.max_json_depth"`
 }
 
 // TerminalStreamsConfigFrom binds TerminalStreamsConfig from v; the error names the key, never a
@@ -149,7 +152,7 @@ func NewTerminalStreams(cfg TerminalStreamsConfig, t *Terminal, hc *HostControl,
 		m = om
 	}
 	windows := domain.Windows{Idle: cfg.IdleTimeout, IdleGrace: cfg.IdleGrace, MaxDuration: cfg.MaxSessionDuration, DetachGrace: cfg.DetachGrace,
-		OpenTimeout: cfg.OpenTimeout}
+		OpenTimeout: cfg.OpenTimeout, OwnerDetachGrace: cfg.OwnerAccountDetachGrace, OwnerMaxDuration: cfg.OwnerAccountMaxSessionDuration}
 	relay, err := wsrelay.NewRelay(wsrelay.RelayConfig{BufferMaxBytes: cfg.BufferMaxBytes, StallTimeout: cfg.StallTimeout, OpenTimeout: cfg.OpenTimeout, Multi: d.Multi,
 		Windows: windows, Metrics: t.Service.Instruments()}, t.Service, hc.Links, d.Timers, d.Clock, d.Log)
 	if err != nil {

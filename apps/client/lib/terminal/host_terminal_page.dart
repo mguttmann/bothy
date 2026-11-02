@@ -15,7 +15,6 @@ import 'dart:async';
 
 import 'package:api_client/api_client.dart' show Host, HostProfile;
 import 'package:design_system/design_system.dart';
-import 'package:domain/domain.dart' show AppConfigValues;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:l10n/l10n.dart';
@@ -168,7 +167,7 @@ class _HostTerminalPageState extends ConsumerState<HostTerminalPage> {
                     _search.clear();
                   }),
                 ),
-              Expanded(child: _view(context, tabs, hostId)),
+              Expanded(child: _view(context, tabs, host)),
             ],
           ),
         ),
@@ -177,7 +176,8 @@ class _HostTerminalPageState extends ConsumerState<HostTerminalPage> {
   }
 
   /// The pane of the selected tab, or the empty state without a tab.
-  Widget _view(BuildContext context, TerminalTabs tabs, String hostId) {
+  Widget _view(BuildContext context, TerminalTabs tabs, Host host) {
+    final hostId = host.id;
     final l = AppLocalizations.of(context);
     final current = tabs.current;
     if (current == null) {
@@ -193,7 +193,10 @@ class _HostTerminalPageState extends ConsumerState<HostTerminalPage> {
       ],
       selected: tabs.selected,
       onSelect: tabs.select,
-      maxSessionDuration: tabs.services.config.maxSessionDuration,
+      onEnd: () => unawaited(tabs.end(current)),
+      onClose: () => tabs.close(current),
+      sessions: tabs.entries(l.terminalTabLabel),
+      maxSessionDuration: tabs.maxSessionDuration(host),
       shortcuts: terminalActivators(
         widget.platform ?? ShortcutPlatform.current,
       ),

@@ -17,7 +17,40 @@ final class SessionTabData {
   final String label;
 }
 
-/// The row of tabs and the two actions; a null callback disables its button.
+/// The actions of the selected session: "Close" alone for an ended one ([onClose] set), else
+/// "Detach" and "End" (a null callback disables its button).
+List<Widget> sessionActions(
+  BuildContext context,
+  VoidCallback? onDetach,
+  VoidCallback? onEnd,
+  VoidCallback? onClose,
+) {
+  final l = dsL10n(context);
+  final c = context.dsColors;
+  if (onClose != null) {
+    return [
+      OutlinedButton(
+        key: const ValueKey('terminal.close'),
+        onPressed: onClose,
+        child: Text(l.terminalCloseTab),
+      ),
+    ];
+  }
+  return [
+    OutlinedButton(onPressed: onDetach, child: Text(l.terminalDetach)),
+    const SizedBox(width: DsSpace.s8),
+    OutlinedButton(
+      style: OutlinedButton.styleFrom(
+        foregroundColor: c.dangerFg,
+        side: BorderSide(color: c.dangerBorder),
+      ),
+      onPressed: onEnd,
+      child: Text(l.terminalEnd),
+    ),
+  ];
+}
+
+/// The row of tabs and the actions; a null callback disables its button.
 ///
 /// ```dart
 /// SessionTabs(tabs: const [SessionTabData(label: 'shell 1')], selected: 0,
@@ -32,6 +65,8 @@ class SessionTabs extends StatelessWidget {
     this.onSelect,
     this.onDetach,
     this.onEnd,
+    this.onClose,
+    this.onSessions,
   });
 
   /// The tabs, in order.
@@ -48,6 +83,13 @@ class SessionTabs extends StatelessWidget {
 
   /// Ends the selected session; null disables "End".
   final VoidCallback? onEnd;
+
+  /// Closes the tab of the selected session, which ended; when set, "Close" replaces "Detach"
+  /// and "End" (FIX-terminal-session-lifecycle).
+  final VoidCallback? onClose;
+
+  /// Shows the list of the running sessions; null hides "Sessions".
+  final VoidCallback? onSessions;
 
   @override
   Widget build(BuildContext context) {
@@ -95,17 +137,16 @@ class SessionTabs extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(width: DsSpace.s8),
-          OutlinedButton(onPressed: onDetach, child: Text(l.terminalDetach)),
-          const SizedBox(width: DsSpace.s8),
-          OutlinedButton(
-            style: OutlinedButton.styleFrom(
-              foregroundColor: c.dangerFg,
-              side: BorderSide(color: c.dangerBorder),
+          if (onSessions case final sessions?) ...[
+            const SizedBox(width: DsSpace.s8),
+            TextButton(
+              key: const ValueKey('terminal.sessions'),
+              onPressed: sessions,
+              child: Text(l.terminalSessions),
             ),
-            onPressed: onEnd,
-            child: Text(l.terminalEnd),
-          ),
+          ],
+          const SizedBox(width: DsSpace.s8),
+          ...sessionActions(context, onDetach, onEnd, onClose),
         ],
       ),
     );

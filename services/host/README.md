@@ -64,7 +64,8 @@ sees a key of the host or a session token. Between them runs only the local chan
 Per `session.open` the manager opens one outgoing data connection to
 `/api/v1/hosts/sessions/{session_id}/stream` with the TLS settings of the control connection,
 reads `hello` (its `clock_leeway_ms`, `idle_timeout_ms` and `detach_grace_ms` are the server
-values of that session), sends `identify` with `session_id`, answers Noise message 1 as responder
+values of that session; in the owner account mode idle pauses while the session is detached and
+an attach starts it again, docs/decisions.d/FIX-terminal-session-lifecycle.md D-TSL-2), sends `identify` with `session_id`, answers Noise message 1 as responder
 and checks the token in the order of 24 5.3 (steps 0 to 13). A refusal closes the data connection
 with `4101` or `4104` and the `close_detail` as close reason. Then it sends message 2, waits for
 `start` until `HostSessionOpen.expires_at`, runs the gate and the local confirmation, starts the

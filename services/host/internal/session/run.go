@@ -31,8 +31,9 @@ type session struct {
 	attaching bool
 	attachBuf []byte
 	ring      *Ring
-	// lastInput is the time of the last input frame of the device (idle, also across a detach);
-	// detachedAt the start of the current detach.
+	// lastInput is the time of the last input frame of the device (idle, also across a detach,
+	// except in the owner account mode, where an attach starts it again); detachedAt the start of
+	// the current detach.
 	lastInput, detachedAt time.Time
 	idle, detach          time.Duration
 	ended                 bool
@@ -244,6 +245,10 @@ func (s *session) attach(dc *dataConn, tr *noise.Transport, snap []byte, window 
 	old := s.dc
 	s.dc, s.tr, s.window = dc, tr, window
 	s.idle, s.detach = dc.idle(), dc.detach()
+	if s.ownerAccount() {
+		// Idle paused while detached (D-TSL-2): the attach starts it again.
+		s.lastInput = s.m.d.Clock.Now()
+	}
 	s.sendLocked(frame.ReplayBegin())
 	for len(snap) > 0 {
 		n := min(len(snap), localchan.MaxData)
@@ -359,22 +364,28 @@ func (s *session) end(e endSpec) {
 	}
 }
 
+// ownerAccount reports whether the host service runs in the owner account mode (24 section 2.4).
+func (s *session) ownerAccount() bool { return s.m.d.Config.OwnerAccount != "" }
+
 // watch ends the session after the idle value without input, or the detach value while detached.
+// In the owner account mode idle pauses while detached (D-TSL-2 of FIX-terminal-session-lifecycle):
+// the owner detaches on purpose and picks the session up later, bounded by the detach value.
 func (s *session) watch() {
 	for {
 		s.mu.Lock()
 		now := s.m.d.Clock.Now()
 		next := s.lastInput.Add(s.idle)
 		detached := s.dc == nil
+		idleCounts := !detached || !s.ownerAccount()
 		if detached {
-			if d := s.detachedAt.Add(s.detach); d.Before(next) {
+			if d := s.detachedAt.Add(s.detach); d.Before(next) || !idleCounts {
 				next = d
 			}
 		}
 		idleAt, detachAt := s.lastInput.Add(s.idle), s.detachedAt.Add(s.detach)
 		s.mu.Unlock()
 		switch {
-		case !now.Before(idleAt):
+		case idleCounts && !now.Before(idleAt):
 			s.end(endSpec{reason: ReasonIdleTimeout})
 			return
 		case detached && !now.Before(detachAt):

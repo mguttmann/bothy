@@ -672,6 +672,8 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"terminal.max_sessions_per_host = 10  # default\n" +
 		"terminal.max_sessions_per_person = 5  # default\n" +
 		"terminal.open_timeout = 20s  # default\n" +
+		"terminal.owner_account_detach_grace = 1d  # default\n" +
+		"terminal.owner_account_max_session_duration = 7d  # default\n" +
 		"terminal.pairing_code_ttl = 15m  # default\n" +
 		"terminal.quick_reattach_window = 1m  # default\n" +
 		"terminal.relay_buffer_max_bytes = 262144  # default\n" +

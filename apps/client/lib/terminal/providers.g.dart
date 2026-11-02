@@ -58,7 +58,63 @@ final class TerminalServicesProvider
   }
 }
 
-String _$terminalServicesHash() => r'1168c4dd371daac9fd04ca6977857d7443ec1c8b';
+String _$terminalServicesHash() => r'097734151ea129986925563b9091282508095a7a';
+
+/// Attaches the dropped streams of every host's tabs again when the app is online again or in
+/// front (FIX-terminal-session-lifecycle, D-TSL-5); null before the login.
+
+@ProviderFor(terminalReconnector)
+final terminalReconnectorProvider = TerminalReconnectorProvider._();
+
+/// Attaches the dropped streams of every host's tabs again when the app is online again or in
+/// front (FIX-terminal-session-lifecycle, D-TSL-5); null before the login.
+
+final class TerminalReconnectorProvider
+    extends
+        $FunctionalProvider<
+          TerminalReconnector?,
+          TerminalReconnector?,
+          TerminalReconnector?
+        >
+    with $Provider<TerminalReconnector?> {
+  /// Attaches the dropped streams of every host's tabs again when the app is online again or in
+  /// front (FIX-terminal-session-lifecycle, D-TSL-5); null before the login.
+  TerminalReconnectorProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'terminalReconnectorProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$terminalReconnectorHash();
+
+  @$internal
+  @override
+  $ProviderElement<TerminalReconnector?> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  TerminalReconnector? create(Ref ref) {
+    return terminalReconnector(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(TerminalReconnector? value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<TerminalReconnector?>(value),
+    );
+  }
+}
+
+String _$terminalReconnectorHash() =>
+    r'a5d0fcbb222385c665047b38bbd7d5895f9264e3';
 
 /// The person's own user ID as the engine's last snapshot named it; null before it.
 
@@ -226,7 +282,7 @@ final class TerminalTabsProvider
   }
 }
 
-String _$terminalTabsHash() => r'd4ad188074d706f92a1c0772fefa0d6ed7e85e65';
+String _$terminalTabsHash() => r'c2f4867eef1fed44cc0606db08f479516308df3e';
 
 /// The tabs of host [hostId], kept for the login; null before the login or before the engine
 /// named the person.

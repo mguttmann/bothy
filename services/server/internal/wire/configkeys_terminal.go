@@ -126,6 +126,19 @@ func terminalConfigKeys() []config.Key {
 			Doc:     "Longest duration of a session from its opening, also across reattaching.",
 			Chapter: chapter24,
 		},
+		// The windows of a session in the owner account mode (24 section 2.4, ADR 0073; D-TSL-1 of
+		// FIX-terminal-session-lifecycle): a detached session of the owner's own host keeps running
+		// long enough to be picked up again later from any of his devices.
+		{
+			Name: "terminal.owner_account_detach_grace", Kind: config.KindDuration, Default: defaultDay, Min: "1s",
+			Doc:     "This long a detached session in the owner account mode stays attachable; announced to the host service in the hello of its data connection.",
+			Chapter: chapter24,
+		},
+		{
+			Name: "terminal.owner_account_max_session_duration", Kind: config.KindDuration, Default: "168h", Min: "1s",
+			Doc:     "Longest duration of a session in the owner account mode from its opening, also across reattaching.",
+			Chapter: chapter24,
+		},
 		{
 			Name: "terminal.max_sessions_per_person", Kind: config.KindInt, Default: "5", Min: "1",
 			Doc:     "Open sessions of one person; terminal.open is refused with session_limit at this count.",

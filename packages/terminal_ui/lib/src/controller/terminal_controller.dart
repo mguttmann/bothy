@@ -234,10 +234,36 @@ final class TerminalController extends ChangeNotifier {
         sessionId: session.id,
         profile: session.profile,
         openedAt: session.openedAt,
+        detachedAt: session.detachedAt,
       ),
     );
     _watchHost(host.id);
   }
+
+  /// Takes the state the server lists for this tab's session (`listTerminalSessions`, for
+  /// example after the app slept and missed the host event): a session the server closed ends a
+  /// detached or idle tab with its `close_reason`, as `terminal_session.changed` would
+  /// (FIX-terminal-session-lifecycle). Does nothing for another session, a running flow, or a
+  /// session that still runs.
+  void reconcile(TerminalSession session) {
+    if (_disposed || _busy || session.id != _state.sessionId) return;
+    if (session.state != TerminalSessionState.closed) return;
+    final phase = _state.phase;
+    if (phase != TerminalPhase.detached && phase != TerminalPhase.idle) return;
+    final epoch = _supersede();
+    _endWith(
+      epoch,
+      closeReactionFor(
+        StreamCloseCode.terminalClosed,
+        _wireReason(session.closeReason?.name),
+      ),
+    );
+  }
+
+  /// The wire value of a `close_reason` from its Dart name (`detachExpired` gives
+  /// `detach_expired`); null stays null.
+  static String? _wireReason(String? name) =>
+      name?.replaceAllMapped(RegExp('[A-Z]'), (m) => '_${m[0]!.toLowerCase()}');
 
   /// Attaches to the detached session again (15 23.2 item 6): pin check against `getHost`,
   /// the warning of 24 8.4, a new ephemeral key, a step-up only when the server answers
@@ -324,6 +350,7 @@ final class TerminalController extends ChangeNotifier {
       _state.copyWith(
         phase: TerminalPhase.detached,
         detachCause: DetachCause.person,
+        detachedAt: _clock.now(),
         replaying: false,
       ),
     );
@@ -477,6 +504,7 @@ final class TerminalController extends ChangeNotifier {
         _state.copyWith(
           phase: TerminalPhase.detached,
           detachCause: DetachCause.connectionLost,
+          detachedAt: _state.detachedAt ?? _clock.now(),
         ),
       );
     }
@@ -594,6 +622,7 @@ final class TerminalController extends ChangeNotifier {
               _state.copyWith(
                 phase: TerminalPhase.connected,
                 clearCauses: true,
+                clearDetachedAt: true,
                 replaying: false,
               ),
             );
@@ -659,6 +688,7 @@ final class TerminalController extends ChangeNotifier {
         _state.copyWith(
           phase: TerminalPhase.detached,
           detachCause: lost,
+          detachedAt: _clock.now(),
           replaying: false,
         ),
       );
@@ -730,6 +760,9 @@ final class TerminalController extends ChangeNotifier {
         detachCause: reaction.detachCause,
         blockCause: reaction.blockCause,
         closeReason: reaction.closeReason,
+        detachedAt: reaction.phase == TerminalPhase.detached
+            ? _clock.now()
+            : null,
         replaying: false,
       ),
     );
@@ -819,6 +852,9 @@ final class TerminalController extends ChangeNotifier {
         detachCause: _state.sessionId == null
             ? null
             : DetachCause.connectionLost,
+        detachedAt: _state.sessionId == null
+            ? null
+            : (_state.detachedAt ?? _clock.now()),
         problemCode: problem?.code ?? 'open_failed',
         problemReason: problem?.reason,
       ),

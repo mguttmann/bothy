@@ -475,7 +475,7 @@ Purpose: shows a terminal session on a connected host
 | Part | Appearance | Tokens |
 |---|---|---|
 | Header | icon `terminal-window`, host name (`type.heading`), connection as a dot with text, LLM login badge (section 10), start of the fingerprint in mono, remaining time as text | `color.text.*`, `color.badge.*`, `font.family.mono` |
-| Tabs | one tab per own session on the host; selected like a selected row; on the right "Detach" (secondary) and "End" (danger, outlined) | `color.surface.selected`, buttons |
+| Tabs | one tab per own session on the host; selected like a selected row; on the right "Sessions" (text button, the list of the own sessions with start, "detached since" and "Reattach"), "Detach" (secondary) and "End" (danger, outlined); an ended or blocked tab shows only "Close" (secondary) instead of "Detach" and "End" | `color.surface.selected`, buttons |
 | Screen | surface `color.terminal.bg`, text `color.terminal.fg` in the bundled terminal font JetBrains Mono (typography.md) with the size from `type.code`, adjustable separately (01, section 8); cursor as a block `color.terminal.cursor` with the character in `color.terminal.cursor-text`; selection `color.terminal.selection-bg` | `color.terminal.*` |
 | ANSI colors | SGR 30 to 37 and 90 to 97 map to `color.terminal.ansi.<name>` and `color.terminal.ansi.bright-<name>`; the renderer shows 256 colors and truecolor unchanged, because the program chooses them | `color.terminal.ansi.*` |
 | Footer | "End-to-end encrypted" with a lock icon, profile, "Idle timeout active" | `type.caption`, `color.text.secondary` |

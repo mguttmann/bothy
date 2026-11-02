@@ -63,6 +63,8 @@ void main() {
       'auth.device_pending_ttl',
       // D-W-116, M4-36: the header of the terminal counts down to it (display only).
       'terminal.max_session_duration',
+      // FIX-terminal-session-lifecycle: the same for a session in the owner account mode.
+      'terminal.owner_account_max_session_duration',
     ];
     expect(serverKeysReadByApp, unorderedEquals(listed));
     for (final key in listed) {

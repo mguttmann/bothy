@@ -148,3 +148,10 @@ user on the host, and it keeps the server as the decision point.
 
 * Owner decisions of 2026-11-01 (quoted above), changing the requirement of 2026-10-10.
 * Related: ADR 0068, ADR 0070, threat model T-TM-16.
+* Amended on 2026-11-02 by the rulings D-TSL-1 to D-TSL-6 of
+  [decisions.d/FIX-terminal-session-lifecycle.md](../decisions.d/FIX-terminal-session-lifecycle.md):
+  a session in this mode stays attachable for `terminal.owner_account_detach_grace` (default 24
+  hours) after a detach, idle pauses while it is detached, and its maximum is
+  `terminal.owner_account_max_session_duration`; the idle timeout of an attached session and the
+  step-up on every reattach stay. Owner report of 2026-11-02: he detached on purpose and expected
+  to pick the shell up later from another device.

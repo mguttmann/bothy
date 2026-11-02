@@ -17,7 +17,6 @@ import 'dart:async';
 
 import 'package:api_client/api_client.dart' show Host, HostProfile;
 import 'package:design_system/design_system.dart';
-import 'package:domain/domain.dart' show AppConfigValues;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:l10n/l10n.dart';
@@ -169,7 +168,10 @@ class _TerminalSessionScreenState extends ConsumerState<TerminalSessionScreen>
       ],
       selected: tabs.selected,
       onSelect: tabs.select,
-      maxSessionDuration: tabs.services.config.maxSessionDuration,
+      onEnd: () => unawaited(tabs.end(current)),
+      onClose: () => tabs.close(current),
+      sessions: tabs.entries(l.terminalTabLabel),
+      maxSessionDuration: tabs.maxSessionDuration(host),
       now: tabs.services.clock.now,
       phone: true,
       showExtraKeys: true,

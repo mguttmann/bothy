@@ -6,18 +6,50 @@ import "time"
 
 // Windows are the time limits of a terminal session, each a configuration key: Idle is
 // terminal.idle_timeout, IdleGrace terminal.idle_grace, MaxDuration terminal.max_session_duration,
-// DetachGrace terminal.detach_grace and OpenTimeout terminal.open_timeout.
+// DetachGrace terminal.detach_grace and OpenTimeout terminal.open_timeout. OwnerDetachGrace and
+// OwnerMaxDuration are terminal.owner_account_detach_grace and
+// terminal.owner_account_max_session_duration, the detach lifetime and the maximum of a session in
+// the owner account mode (24 section 2.4, D-TSL-1 to D-TSL-3 of FIX-terminal-session-lifecycle); a
+// zero value falls back to DetachGrace or MaxDuration.
 type Windows struct {
 	Idle, IdleGrace, MaxDuration, DetachGrace, OpenTimeout time.Duration
+	OwnerDetachGrace, OwnerMaxDuration                     time.Duration
+}
+
+// detachGrace returns the detach lifetime of s: OwnerDetachGrace for a session in the owner
+// account mode when set, else DetachGrace.
+func (w Windows) detachGrace(s SessionTimes) time.Duration {
+	if s.OwnerAccount && w.OwnerDetachGrace > 0 {
+		return w.OwnerDetachGrace
+	}
+	return w.DetachGrace
+}
+
+// maxDuration returns the maximum duration of s: OwnerMaxDuration for a session in the owner
+// account mode when set, else MaxDuration.
+func (w Windows) maxDuration(s SessionTimes) time.Duration {
+	if s.OwnerAccount && w.OwnerMaxDuration > 0 {
+		return w.OwnerMaxDuration
+	}
+	return w.MaxDuration
+}
+
+// idleCounts reports whether idleness ends s now: always, except for a detached session in the owner
+// account mode, whose idle time pauses while no device is attached (D-TSL-2); its detach lifetime
+// bounds it instead.
+func idleCounts(s SessionTimes) bool {
+	return !s.OwnerAccount || s.State != SessionDetached
 }
 
 // SessionTimes are the instants of a terminal session the deadlines are measured from; a zero time
 // is a value not set. State is terminal_sessions.state. GrantedAt is the time of the last grant,
 // not opened_at, because an attach to an opening session restarts the opening while opened_at
-// never changes (Design note 8 a of M2-46).
+// never changes (Design note 8 a of M2-46). OwnerAccount marks a session in the owner account of its
+// host (ADR 0073), which gets the owner windows of Windows.
 type SessionTimes struct {
 	State                                                   string
 	OpenedAt, GrantedAt, StartedAt, DetachedAt, LastInputAt time.Time
+	OwnerAccount                                            bool
 }
 
 // latest returns the latest of ts; zero times never win over a set one.
@@ -34,11 +66,16 @@ func latest(ts ...time.Time) time.Time {
 // IdleReference returns the instant idleness is measured from (Design note 7 a of M2-46): the
 // latest of the last device input this process saw, the stored last_input_at, started_at and
 // opened_at. Only device input counts, because the server cannot see frame types (24 section 6.3).
+// For a session in the owner account mode the last grant counts too: its idle time pauses while it
+// is detached, so a reattach after hours starts it again (D-TSL-2).
 //
 // Parameters: s are the session times, lastDeviceInput the last binary message from the device
 // after identify seen by this process (zero when none).
 // Returns the reference instant.
 func IdleReference(s SessionTimes, lastDeviceInput time.Time) time.Time {
+	if s.OwnerAccount {
+		return latest(lastDeviceInput, s.LastInputAt, s.StartedAt, s.OpenedAt, s.GrantedAt)
+	}
 	return latest(lastDeviceInput, s.LastInputAt, s.StartedAt, s.OpenedAt)
 }
 
@@ -56,18 +93,22 @@ func Reached(at, now time.Time) bool {
 // never moves; in state detached with a detached_at, the detach grace from it; and the idle limit
 // from IdleReference plus the idle grace, so a lagging stored last_input_at never ends a session
 // early. On a tie max_duration wins over detach_expired and detach_expired over idle_timeout, the
-// order of SweepVerdict, so relay and sweep name the same reason. The caller ends the session when
-// Reached(at, now) holds.
+// order of SweepVerdict, so relay and sweep name the same reason. A session in the owner account mode
+// uses the owner windows and has no idle limit while detached (D-TSL-1, D-TSL-2). The caller ends
+// the session when Reached(at, now) holds.
 //
 // Parameters: s are the session times, lastDeviceInput the last device input this process saw
 // (zero when none), w the windows.
 // Returns the deadline and its close reason.
 func RelayDeadline(s SessionTimes, lastDeviceInput time.Time, w Windows) (at time.Time, reason CloseReason) {
-	at, reason = s.OpenedAt.Add(w.MaxDuration), CloseMaxDuration
+	at, reason = s.OpenedAt.Add(w.maxDuration(s)), CloseMaxDuration
 	if s.State == SessionDetached && !s.DetachedAt.IsZero() {
-		if d := s.DetachedAt.Add(w.DetachGrace); d.Before(at) {
+		if d := s.DetachedAt.Add(w.detachGrace(s)); d.Before(at) {
 			at, reason = d, CloseDetachExpired
 		}
+	}
+	if !idleCounts(s) {
+		return at, reason
 	}
 	if d := IdleReference(s, lastDeviceInput).Add(w.Idle + w.IdleGrace); d.Before(at) {
 		at, reason = d, CloseIdleTimeout
@@ -82,7 +123,8 @@ func RelayDeadline(s SessionTimes, lastDeviceInput time.Time, w Windows) (at tim
 // confirmation, because there the pairing meets the open deadline and the host service bounds
 // start and consent; the maximum duration; the detach grace; the idle limit from the stored
 // last_input_at. A zero GrantedAt falls back to opened_at, so a session without a recorded grant
-// still meets its open deadline.
+// still meets its open deadline. A session in the owner account mode uses the owner windows and has
+// no idle limit while detached (D-TSL-1, D-TSL-2).
 //
 // Parameters: hostState is hosts.state, hostLocalConfirm hosts.reported_require_local_confirm,
 // authSessionEnded whether the login session is revoked or expired, s the stored session times,
@@ -109,13 +151,13 @@ func SweepVerdict(hostState string, hostLocalConfirm, authSessionEnded bool, s S
 			return CloseOpenFailed, DetailOpenTimeout, true
 		}
 	}
-	if Reached(s.OpenedAt.Add(w.MaxDuration), now) {
+	if Reached(s.OpenedAt.Add(w.maxDuration(s)), now) {
 		return CloseMaxDuration, "", true
 	}
-	if s.State == SessionDetached && !s.DetachedAt.IsZero() && Reached(s.DetachedAt.Add(w.DetachGrace), now) {
+	if s.State == SessionDetached && !s.DetachedAt.IsZero() && Reached(s.DetachedAt.Add(w.detachGrace(s)), now) {
 		return CloseDetachExpired, "", true
 	}
-	if Reached(IdleReference(s, time.Time{}).Add(w.Idle+w.IdleGrace), now) {
+	if idleCounts(s) && Reached(IdleReference(s, time.Time{}).Add(w.Idle+w.IdleGrace), now) {
 		return CloseIdleTimeout, "", true
 	}
 	return "", "", false

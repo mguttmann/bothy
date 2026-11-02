@@ -34,7 +34,7 @@ const List<TermPair> termTable = <TermPair>[
   TermPair('Fingerabdruck', 'Fingerprint', 'key_fingerprint'),
   TermPair('Terminal-Sitzung', 'Terminal session', 'terminal_session'),
   TermPair('Trennen', 'Detach', 'detached'),
-  TermPair('Wiederanhängen', 'reattach', 'terminal.attach'),
+  TermPair('Wieder verbinden', 'reattach', 'terminal.attach'),
   TermPair('Sondertasten-Leiste', 'Extra keys bar', null),
   TermPair('LLM-Anmeldung', 'LLM login', 'llm_credentials'),
   TermPair('Live-Topologie', 'Live topology', null),

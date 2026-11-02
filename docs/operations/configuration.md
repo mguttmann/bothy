@@ -926,6 +926,8 @@ Source: [24-terminal.md](../spec/24-terminal.md), section 17.
 | `terminal.idle_timeout` | `BOTHY_TERMINAL__IDLE_TIMEOUT` | Server | duration | `30m` | without input from the device for this long, the session ends | active |
 | `terminal.idle_grace` | `BOTHY_TERMINAL__IDLE_GRACE` | Server | duration | `2m` | Extra time after which the server itself ends the session because of idleness | active |
 | `terminal.max_session_duration` | `BOTHY_TERMINAL__MAX_SESSION_DURATION` | Server | duration | `12h` | Maximum duration of a session | active |
+| `terminal.owner_account_detach_grace` | `BOTHY_TERMINAL__OWNER_ACCOUNT_DETACH_GRACE` | Server | duration | `24h` | this long a detached session in the owner account mode stays attachable; the hello of its data connection carries it as `detach_grace_ms` (2.4, 6.2) | active |
+| `terminal.owner_account_max_session_duration` | `BOTHY_TERMINAL__OWNER_ACCOUNT_MAX_SESSION_DURATION` | Server | duration | `168h` | Maximum duration of a session in the owner account mode (2.4, 6.3) | active |
 | `terminal.max_sessions_per_person` | `BOTHY_TERMINAL__MAX_SESSIONS_PER_PERSON` | Server | int | `5` | open sessions per person | active |
 | `terminal.max_sessions_per_host` | `BOTHY_TERMINAL__MAX_SESSIONS_PER_HOST` | Server | int | `10` | open sessions per host | active |
 | `terminal.relay_buffer_max_bytes` | `BOTHY_TERMINAL__RELAY_BUFFER_MAX_BYTES` | Server | int | `262144` | Buffer of the relay per direction and session | active |

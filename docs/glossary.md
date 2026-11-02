@@ -202,7 +202,7 @@ Rules:
 | Tippen-Anzeige | typing indicator | `typing` | |
 | Titelquelle | title source | `title_source` | |
 | Transkript | transcript | `transcript` | |
-| Trennen, Wiederanhängen | detach, reattach | `detached`, `terminal.attach` | |
+| Trennen, Wieder verbinden | detach, reattach | `detached`, `terminal.attach` | |
 | TV-Modus | TV mode | `tv mode` | |
 | Upload-Sitzung | upload session | `file_upload_session` | |
 | Verbraucher | consumer | `consumer` | |
