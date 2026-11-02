@@ -92,6 +92,12 @@ font file has no license text, a manifest entry names another license, or a file
 its recorded SHA-256. `NOTICE` names both fonts with their copyright (docs/DECISIONS.md
 D-M4-04-4).
 
+The terminal font JetBrains Mono (OFL-1.1) follows the same rule under
+`packages/terminal_ui/fonts/`: its OFL text `JetBrainsMono.OFL.txt` lies next to the files,
+`fonts/MANIFEST.json` records source, commit, SHA-256 and `"license": "OFL-1.1"` per file,
+`packages/terminal_ui/test/terminal_font_test.dart` fails on a changed, missing or extra file
+or another license, and `NOTICE` names it (docs/decisions.d/FIX-terminal-font.md).
+
 ## Bundled native code
 
 The apps load SQLite3MultipleCiphers as their encrypted SQLite (docs/spec/15-client-architecture.md

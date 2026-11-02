@@ -29,6 +29,27 @@ dependencies:
 
 dev_dependencies:
   alchemist: ^0.14.1
+  # Checks the sha256 of the bundled font files against fonts/MANIFEST.json.
+  crypto: ^3.0.7
   flutter_lints: ^6.0.0
   flutter_test:
     sdk: flutter
+
+# The terminal font JetBrains Mono (OFL-1.1) with its license text: the static files of the
+# four styles xterm draws; fonts/MANIFEST.json records source, commit and sha256, and
+# test/terminal_font_test.dart checks them (docs/decisions.d/FIX-terminal-font.md). Apps reach
+# the family as `packages/terminal_ui/JetBrains Mono` (terminalFontFamily).
+flutter:
+  assets:
+    - fonts/JetBrainsMono.OFL.txt
+  fonts:
+    - family: JetBrains Mono
+      fonts:
+        - asset: fonts/JetBrainsMono-Regular.ttf
+        - asset: fonts/JetBrainsMono-Bold.ttf
+          weight: 700
+        - asset: fonts/JetBrainsMono-Italic.ttf
+          style: italic
+        - asset: fonts/JetBrainsMono-BoldItalic.ttf
+          weight: 700
+          style: italic
