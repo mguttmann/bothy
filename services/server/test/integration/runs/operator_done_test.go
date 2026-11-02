@@ -28,12 +28,11 @@ func (w *titleWorld) operatorPost(forum string, title string) map[string]any {
 	return m["thread"].(map[string]any)
 }
 
-// threadState reads the state, closed_by and title of a thread.
-func (w *titleWorld) threadState(id string) (state, closedBy, title string) {
+// threadState reads the state and closed_by of a thread.
+func (w *titleWorld) threadState(id string) (state, closedBy string) {
 	w.t.Helper()
 	return w.text(`SELECT state FROM threads WHERE id = $1`, id),
-		w.text(`SELECT coalesce(closed_by::text, '') FROM threads WHERE id = $1`, id),
-		w.text(`SELECT title FROM threads WHERE id = $1`, id)
+		w.text(`SELECT coalesce(closed_by::text, '') FROM threads WHERE id = $1`, id)
 }
 
 // TestOperatorAgentTicketFlow (FEAT-hermes-channel-skills): the support desk flow of an
@@ -64,7 +63,7 @@ func TestOperatorAgentTicketFlow(t *testing.T) {
 	if closed["state"] != "closed" {
 		t.Fatalf("close %v", closed)
 	}
-	if state, by, _ := w.threadState(id); state != "closed" || by != w.texter.String() {
+	if state, by := w.threadState(id); state != "closed" || by != w.texter.String() {
 		t.Fatalf("after close %s %s", state, by)
 	}
 	if n := len(w.threadEvents("thread.closed", id)); n != 1 {
@@ -73,7 +72,7 @@ func TestOperatorAgentTicketFlow(t *testing.T) {
 
 	// A person's answer in the done post: accepted, the post reopens, and the agent gets a run.
 	answer := w.post("sam", ids.MustParse(id), "It fails again")["id"].(string)
-	if state, _, _ := w.threadState(id); state != "open" {
+	if state, _ := w.threadState(id); state != "open" {
 		t.Fatalf("after the answer %s", state)
 	}
 	if r, ok := w.runOf(answer); !ok || r.Agent != w.texter.String() {
@@ -91,7 +90,7 @@ func TestOperatorAgentWritesAndReopensDonePost(t *testing.T) {
 
 	w.wantOK(w.do("texter", http.MethodPost, "/api/v1/threads/"+id+"/close", "", key()...))
 	w.post("texter", ids.MustParse(id), "The requester answered: it works again")
-	if state, _, _ := w.threadState(id); state != "open" {
+	if state, _ := w.threadState(id); state != "open" {
 		t.Fatalf("after the agent's message %s", state)
 	}
 
