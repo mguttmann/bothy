@@ -25,6 +25,7 @@ import 'package:terminal_ui/terminal_ui.dart';
 import '../../app/providers/ports.dart';
 import '../../platform/terminal_guard.dart';
 import '../../terminal/providers.dart';
+import '../../terminal/tabs_pane.dart';
 import 'providers.dart';
 
 /// M8 of [hostId].
@@ -158,25 +159,15 @@ class _TerminalSessionScreenState extends ConsumerState<TerminalSessionScreen>
         ],
       );
     }
-    return TerminalPane(
+    return tabsPane(
       key: ValueKey('phone.terminal.pane.${widget.hostId}'),
-      controller: current,
-      fontSize: tabs.fontSize,
-      tabs: [
-        for (final (profile, n) in tabs.labels)
-          SessionTabData(label: l.terminalTabLabel(profile, n)),
-      ],
-      selected: tabs.selected,
-      onSelect: tabs.select,
-      onEnd: () => unawaited(tabs.end(current)),
-      onClose: () => tabs.close(current),
-      sessions: tabs.entries(l.terminalTabLabel),
-      maxSessionDuration: tabs.maxSessionDuration(host),
+      tabs: tabs,
+      current: current,
+      host: host,
+      l: l,
       now: tabs.services.clock.now,
       phone: true,
-      showExtraKeys: true,
       hardwareKeyboard: _keyboard,
-      autofocus: true,
     );
   }
 }

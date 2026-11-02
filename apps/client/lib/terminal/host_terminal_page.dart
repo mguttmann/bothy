@@ -23,6 +23,7 @@ import 'package:terminal_ui/terminal_ui.dart';
 import '../keyboard/bindings.dart' show ShortcutPlatform;
 import '../switcher/quick_switcher.dart' show showQuickSwitcher;
 import 'providers.dart';
+import 'tabs_pane.dart';
 import 'terminal_shortcuts.dart';
 
 /// The lines of the scrollback of [controller] that contain [query] (case-insensitive), in
@@ -183,24 +184,15 @@ class _HostTerminalPageState extends ConsumerState<HostTerminalPage> {
     if (current == null) {
       return _Note(noteKey: 'terminal.empty', text: l.terminalNoSessions);
     }
-    return TerminalPane(
+    return tabsPane(
       key: ValueKey('terminal.pane.$hostId'),
-      controller: current,
-      fontSize: tabs.fontSize,
-      tabs: [
-        for (final (profile, n) in tabs.labels)
-          SessionTabData(label: l.terminalTabLabel(profile, n)),
-      ],
-      selected: tabs.selected,
-      onSelect: tabs.select,
-      onEnd: () => unawaited(tabs.end(current)),
-      onClose: () => tabs.close(current),
-      sessions: tabs.entries(l.terminalTabLabel),
-      maxSessionDuration: tabs.maxSessionDuration(host),
+      tabs: tabs,
+      current: current,
+      host: host,
+      l: l,
       shortcuts: terminalActivators(
         widget.platform ?? ShortcutPlatform.current,
       ),
-      autofocus: true,
     );
   }
 
