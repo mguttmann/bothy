@@ -402,19 +402,25 @@ true`, and the owner's switch `supports_files_out` is enforced by the server at 
   name.
 - Checks per file, in order: `realpath` (links followed), strictly below a root, no denied
   pattern, a regular file with one link and at least one byte. Then the set: the limits of
-  `getInstance` (`message_max_attachments`, `file_max_upload_bytes`); any rejection sends no
-  file. Accepted files are copied with `O_NOFOLLOW` and an inode check into
+  `getInstance` (`message_max_attachments`, `file_max_upload_bytes`; only files that pass count,
+  the first ones go). Accepted files are copied with `O_NOFOLLOW` and an inode check into
   `<runner.state_dir>/outgoing/<run_id>/` (mode `0600`) and uploaded from the copies, one after
   the other, through `createUpload`, `uploadPart` and `completeUpload` inside the run binding
   (07 SR9); `/status_line` is `uploading_attachments` meanwhile.
-- All or none: one rejected file, a failed upload or a refused attachment
-  (`403 feature_disabled`, `403 forbidden`, `409 conflict` with `file_not_attachable`) sends the
-  answer without any attachment and with the notice `Attachments not sent:` and one line per
-  file (a German heading and readable German reasons when the instance's `locale_default` is
-  German), its base name and a code of the closed set `not_found`, `outside_allowed_roots`, `denied_pattern`,
-  `not_a_regular_file`, `hard_link`, `empty_file`, `changed_during_check`, `too_large`,
-  `too_many`, `limits_unavailable`, `upload_refused`, `upload_failed`, `not_attached`,
-  `set_not_sent`. A failed set never fails the run.
+- Best effort (FIX-attach-partial-and-roots): every file that passes its checks and uploads goes
+  with the answer; a refused file never stops the others. The answer then ends with the notice
+  `Attachments not sent:` and one line per refused file in line order (a German heading and
+  readable German reasons when the instance's `locale_default` is German), its base name and a
+  code of the closed set `not_found`, `outside_allowed_roots` (with the hint to copy the file
+  into `TMPDIR` and attach the copy), `denied_pattern`, `not_a_regular_file`, `hard_link`,
+  `empty_file`, `changed_during_check`, `too_large`, `too_many`, `limits_unavailable`,
+  `upload_refused`, `upload_failed`, `not_attached` (and `set_not_sent` in records of an older
+  runner). When no file is left, or the server refuses the attachments (`403 feature_disabled`,
+  `403 forbidden`, `409 conflict` with `file_not_attachable`), the answer goes out without
+  attachments and with the notice. A refused file never fails the run.
+- Files from elsewhere: the roots stay narrow; the runner prompt tells Claude to write files for
+  the person into the project directory or `$TMPDIR` and to copy a non-secret file from anywhere
+  else into `$TMPDIR` before it attaches the copy.
 - Crash and stop: the progress of a set is kept in
   `sessions/<ref>/<run_id>.attach-<answer>.json` (keys before their requests, file IDs right
   after their `201`), so an adopting runner resumes it without a second upload session or a

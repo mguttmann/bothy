@@ -59,40 +59,38 @@ def test_stage_files_detects_swap(tmp_path: Path) -> None:
     path.symlink_to(outside)  # swapped for a link between the check and the open
     target = tmp_path / "state" / "outgoing" / RUN / "1"
     result = stage_files([kept, swapped], 1000, target)
-    assert isinstance(result, tuple)
-    assert [o.rejection.code for o in result if o.rejection] == [
-        "set_not_sent",
-        "changed_during_check",
-    ]
-    assert not target.exists()  # nothing staged
+    # Best effort (FIX-attach-partial-and-roots): the changed file is refused, the other staged.
+    staged_kept, refused = result
+    assert isinstance(staged_kept, StagedFile)
+    assert staged_kept.path.read_bytes() == b"notes"
+    assert refused == Rejection("changed_during_check")
+    assert [p.name for p in target.iterdir()] == ["1"]  # nothing of the changed file is left
     # Replaced by another regular file (another inode).
     other, other_path = _candidate(tmp_path, "other.md", b"other")
     # The old file keeps its inode under another name, so the new one gets another inode (a
     # file system such as ext4 hands a freed inode number straight to the next file).
     other_path.rename(tmp_path / "old-other")
     other_path.write_bytes(b"other")
-    result = stage_files([other], 1000, target)
-    assert isinstance(result, tuple)
+    assert stage_files([other], 1000, target) == [Rejection("changed_during_check")]
     # Grown beyond its checked size, or beyond the server's limit.
     grown, grown_path = _candidate(tmp_path, "grown.md", b"12345")
     with grown_path.open("ab") as fh:
         fh.write(b"678")
-    assert isinstance(stage_files([grown], 1000, target), tuple)
+    assert stage_files([grown], 1000, target) == [Rejection("changed_during_check")]
     big, _ = _candidate(tmp_path, "big.md", b"x" * 20)
-    assert isinstance(stage_files([big], 10, target), tuple)
+    assert stage_files([big], 10, target) == [Rejection("changed_during_check")]
     # A second link added after the check.
     linked, linked_path = _candidate(tmp_path, "linked.md", b"linked")
     os.link(linked_path, tmp_path / "second-name")
-    assert isinstance(stage_files([linked], 1000, target), tuple)
+    assert stage_files([linked], 1000, target) == [Rejection("changed_during_check")]
 
 
 def test_stage_files_copy(tmp_path: Path) -> None:
     data = b"line one\nline two\n"
     candidate, path = _candidate(tmp_path, "report.md", data)
     target = tmp_path / "state" / "outgoing" / RUN / "1"
-    staged = stage_files([candidate], 1000, target)
-    assert isinstance(staged, list)
-    (copy,) = staged
+    (copy,) = stage_files([candidate], 1000, target)
+    assert isinstance(copy, StagedFile)
     assert copy == StagedFile(
         "report.md", "report.md", target / "1", len(data), hashlib.sha256(data).hexdigest()
     )
@@ -119,8 +117,8 @@ def test_record_keeps_the_locale_of_the_notice(tmp_path: Path) -> None:
     a restart speaks the same language; a record of an older runner has none and stays English."""
     path = AttachmentSetRecord.path_for(tmp_path / "state", "ref", RUN, 1)
     record = AttachmentSetRecord(path=path, answer=1, state="staged", limit=3, locale="de")
-    record.set_outcomes(
-        [Outcome("out/review.md", Rejection("upload_refused", "forbidden", "capability_missing"))]
+    record.refuse(
+        1, Outcome("out/review.md", Rejection("upload_refused", "forbidden", "capability_missing"))
     )
     record.save()
     loaded = AttachmentSetRecord.load(path)
@@ -172,16 +170,21 @@ def test_record_roundtrip(tmp_path: Path) -> None:
         3,
         "m",
     )
-    loaded.set_outcomes(
-        [Outcome("out/report.md", Rejection("upload_refused", "conflict", "quota_exceeded"))]
+    loaded.refuse(
+        2, Outcome("out/report.md", Rejection("upload_refused", "conflict", "quota_exceeded"))
     )
+    loaded.refuse(1, Outcome("elsewhere/plan.md", Rejection("outside_allowed_roots")))
+    loaded.state = "failed"
     loaded.fallback_msg_id = "fb"
     loaded.save()
     again = AttachmentSetRecord.load(path)
     assert again is not None
     assert again.state == "failed"
+    # The notice names the refused files in the order of their ATTACH lines.
     assert again.notice() == (
-        "Attachments not sent:\n- `report.md`: upload_refused (conflict, quota_exceeded)"
+        "Attachments not sent:\n"
+        "- `plan.md`: outside_allowed_roots (copy it into TMPDIR and attach the copy)\n"
+        "- `report.md`: upload_refused (conflict, quota_exceeded)"
     )
     raw = path.read_text()
     doc = json.loads(raw)

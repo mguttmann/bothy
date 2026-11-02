@@ -4,8 +4,9 @@ r"""The checks of answer attachments (docs/spec/09-agents.md 18.10, brief M3-12 
 Claude announces a file with a line ``ATTACH: <path>`` in its answer. Every decision about such
 a file lives here: which lines are ``ATTACH:`` lines (`split_attach_lines`), which directories
 may hold an attachment (`allowed_roots`), which names are secrets (`DeniedPatterns`), whether
-one file passes (`check_candidate`), whether the whole set may go out (`check_set`, all or
-none) and the notice that names the files that were not sent (`build_notice`). Only
+one file passes (`check_candidate`), which files of the set may go out (`check_set`, best
+effort: every file that passes, FIX-attach-partial-and-roots) and the notice that names the
+files that were not sent (`build_notice`). Only
 `allowed_roots` and `check_candidate` read the file system (``realpath`` and ``stat``); the
 other functions are pure. Staging and network I/O live in `claude_code_runner.reply_upload`.
 
@@ -85,7 +86,8 @@ REASONS = (
     "not_attached",
     "set_not_sent",
 )
-"""The closed set of reason codes of the notice (note 8)."""
+"""The closed set of reason codes of the notice (note 8). ``set_not_sent`` belongs to the former
+all-or-none rule: no check gives it any more, only a record of an older runner holds it."""
 
 EMPTY_NAME = "(empty)"
 """The name of an ``ATTACH:`` line without a path in the notice."""
@@ -521,8 +523,10 @@ class SetVerdict:
     """The decision on the whole set of one answer (note 6).
 
     Attributes:
-        outcomes: One per distinct announced file, in position order.
-        accepted: The candidates in position order when the set may go out, else empty.
+        outcomes: One per distinct announced file, in position order; ``rejection`` is
+            ``None`` for an accepted file.
+        accepted: The accepted candidates in position order (best effort: every file that
+            passed, within the limits).
     """
 
     outcomes: tuple[Outcome, ...]
@@ -537,13 +541,13 @@ class SetVerdict:
 def check_set(
     checked: Sequence[tuple[str, Candidate | Rejection]], limits: Limits | None
 ) -> SetVerdict:
-    """Decide on the whole set before any upload: all or none (note 6).
+    """Decide on the set before any upload: best effort (FIX-attach-partial-and-roots).
 
-    The same real path announced twice counts once, at its first position. Without limits
-    every file that passed its own checks gets ``limits_unavailable``; more distinct files than
-    ``max_attachments`` give every such file ``too_many``; a file above ``max_upload_bytes``
-    gets ``too_large``. A file rejected by its own checks keeps that reason. When any file is
-    rejected, every other file gets ``set_not_sent`` and nothing is accepted.
+    The same real path announced twice counts once, at its first position. A file rejected by
+    its own checks keeps that reason. Without limits every file that passed its own checks gets
+    ``limits_unavailable``; a file above ``max_upload_bytes`` gets ``too_large``; once
+    ``max_attachments`` files are accepted, every later file that passed gets ``too_many``.
+    Every other file is accepted, whatever happened to the rest of the set.
 
     Args:
         checked: The announced path and the result of `check_candidate` per ``ATTACH:`` line,
@@ -561,26 +565,22 @@ def check_set(
                 continue
             seen.add(result.real_path)
         entries.append((announced, result))
-    reasons: list[Rejection | None] = []
-    for _, result in entries:
+    outcomes: list[Outcome] = []
+    accepted: list[Candidate] = []
+    for announced, result in entries:
         if isinstance(result, Rejection):
-            reasons.append(result)
+            reason: Rejection | None = result
         elif limits is None:
-            reasons.append(Rejection("limits_unavailable"))
-        elif len(entries) > limits.max_attachments:
-            reasons.append(Rejection("too_many"))
+            reason = Rejection("limits_unavailable")
         elif result.size > limits.max_upload_bytes:
-            reasons.append(Rejection("too_large"))
+            reason = Rejection("too_large")
+        elif len(accepted) >= limits.max_attachments:
+            reason = Rejection("too_many")
         else:
-            reasons.append(None)
-    if any(r is not None for r in reasons):
-        outcomes = tuple(
-            Outcome(a, r or Rejection("set_not_sent"))
-            for (a, _), r in zip(entries, reasons, strict=True)
-        )
-        return SetVerdict(outcomes, ())
-    accepted = tuple(r for _, r in entries if isinstance(r, Candidate))
-    return SetVerdict(tuple(Outcome(a) for a, _ in entries), accepted)
+            reason = None
+            accepted.append(result)
+        outcomes.append(Outcome(announced, reason))
+    return SetVerdict(tuple(outcomes), tuple(accepted))
 
 
 # ---- note 8: the notice --------------------------------------------------------------------
@@ -614,7 +614,10 @@ _NOTICE_HEADING = {"en": "Attachments not sent:", "de": "Anhänge nicht gesendet
 _NOTICE_MORE = {"en": "- and {n} more", "de": "- und {n} weitere"}
 _GERMAN_REASONS = {
     "not_found": "nicht gefunden",
-    "outside_allowed_roots": "liegt außerhalb der erlaubten Ordner",
+    "outside_allowed_roots": (
+        "liegt außerhalb der erlaubten Ordner"
+        " (der Agent kann die Datei nach TMPDIR kopieren und die Kopie anhängen)"
+    ),
     "denied_pattern": "gesperrter Dateiname",
     "not_a_regular_file": "keine normale Datei",
     "hard_link": "Datei mit mehreren harten Links",
@@ -628,7 +631,11 @@ _GERMAN_REASONS = {
     "not_attached": "nicht angehängt",
     "set_not_sent": "nicht gesendet, weil eine andere Datei nicht gesendet werden konnte",
 }
-"""The German text of every code of `REASONS` (FIX-operator-upload-grant)."""
+"""The German text of every code of `REASONS` (FIX-operator-upload-grant); the text of
+``outside_allowed_roots`` says how to send such a file (FIX-attach-partial-and-roots)."""
+_ENGLISH_HINTS = {"outside_allowed_roots": " (copy it into TMPDIR and attach the copy)"}
+"""What the English notice adds to a code: the way to send a file that lies elsewhere
+(FIX-attach-partial-and-roots)."""
 _GERMAN_PROBLEMS: dict[tuple[str, str | None, str | None], str] = {
     ("upload_refused", "forbidden", "capability_missing"): "Hochladen nicht erlaubt (Recht fehlt)",
     ("upload_refused", "forbidden", "acting_for_insufficient"): (
@@ -686,7 +693,7 @@ def _detail(rejection: Rejection) -> str:
 def _reason_text(rejection: Rejection, language: str) -> str:
     """The reason of one line: the code with its problem in English, readable text in German."""
     if language != "de":
-        return rejection.code + _detail(rejection)
+        return rejection.code + _detail(rejection) + _ENGLISH_HINTS.get(rejection.code, "")
     known = _GERMAN_PROBLEMS.get((rejection.code, rejection.problem, rejection.reason))
     if known is None:
         known = _GERMAN_PROBLEMS.get((rejection.code, rejection.problem, None))
@@ -696,16 +703,18 @@ def _reason_text(rejection: Rejection, language: str) -> str:
 
 
 def build_notice(outcomes: Sequence[Outcome], limit: int | None, locale: str | None = None) -> str:
-    r"""The notice of a set that was not sent (note 8); empty when every file was sent.
+    r"""The notice of the files that were not sent (note 8); empty when every file was sent.
 
     The notice follows the instance's ``locale.default`` (FIX-operator-upload-grant): German
     gets a German heading and readable reasons, every other or unknown locale the English
     heading and the codes of `REASONS`.
 
+    Only refused files are named (an outcome without rejection was sent, best effort).
+
     Args:
         outcomes: The outcomes in position order.
-        limit: ``message_max_attachments``: at most this many lines name files, the rest is
-            summed up in one line; ``None`` (limits unknown) names every file.
+        limit: ``message_max_attachments``: at most this many lines name refused files, the
+            rest is summed up in one line; ``None`` (limits unknown) names every one.
         locale: ``locale_default`` of ``getInstance``; ``None`` when unknown.
 
     Returns:
@@ -717,15 +726,15 @@ def build_notice(outcomes: Sequence[Outcome], limit: int | None, locale: str | N
         >>> build_notice([Outcome("a/.env", Rejection("denied_pattern"))], 3, "de").count("\n")
         1
     """
-    if all(o.rejection is None for o in outcomes):
+    refused = [(o.announced, o.rejection) for o in outcomes if o.rejection is not None]
+    if not refused:
         return ""
     language = notice_language(locale)
     lines = [_NOTICE_HEADING[language]]
-    shown = outcomes if limit is None else outcomes[: max(limit, 0)]
-    for outcome in shown:
-        rejection = outcome.rejection or Rejection("set_not_sent")
-        lines.append(f"- `{display_name(outcome.announced)}`: {_reason_text(rejection, language)}")
-    rest = len(outcomes) - len(shown)
+    shown = refused if limit is None else refused[: max(limit, 0)]
+    for announced, rejection in shown:
+        lines.append(f"- `{display_name(announced)}`: {_reason_text(rejection, language)}")
+    rest = len(refused) - len(shown)
     if rest > 0:
         lines.append(_NOTICE_MORE[language].format(n=rest))
     return "\n".join(lines)

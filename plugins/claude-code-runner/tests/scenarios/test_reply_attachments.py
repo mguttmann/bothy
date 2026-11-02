@@ -177,25 +177,25 @@ async def test_reply_with_attachments_uploaded_and_attached(world: World, logs: 
     _no_leak(world, logs, REPORT, SUMMARY, sent=(REPORT, SUMMARY))
 
 
-async def test_symlink_escape_rejected_nothing_uploaded(world: World, logs: LogLines) -> None:
+async def test_symlink_escape_refused_the_other_file_sent(world: World, logs: LogLines) -> None:
     outside = world.root / "home-of-alex" / "secret.txt"
     outside.parent.mkdir()
     outside.write_bytes(SECRET)
     (_project(world) / "link.txt").symlink_to(outside)
     run_id = await _answer(world, "Done.\nATTACH: notes.md\nATTACH: link.txt", {"notes.md": NOTES})
     assert await world.ended(run_id) == "completed"
-    assert world.requests("createUpload") == []
+    assert [b["name"] for b in _bodies(world, "createUpload")] == ["notes.md"]
     (message,) = world.fake.messages
-    assert "attachment_file_ids" not in _bodies(world, "createMessage")[0]
+    (session,) = world.fake.uploads.sessions.values()
+    assert message["attachment_file_ids"] == [str(session.file_id)]
     assert message["content_md"].startswith("Done.\n\nAttachments not sent:\n")
     assert _notice_lines(message["content_md"]) == [
-        "- `notes.md`: set_not_sent",
-        "- `link.txt`: outside_allowed_roots",
+        "- `link.txt`: outside_allowed_roots (copy it into TMPDIR and attach the copy)",
     ]
-    _no_leak(world, logs, SECRET, NOTES, str(outside.parent).encode())
+    _no_leak(world, logs, SECRET, str(outside.parent).encode(), sent=(NOTES,))
 
 
-async def test_secret_patterns_rejected_nothing_uploaded(world: World, logs: LogLines) -> None:
+async def test_secret_patterns_refused_the_other_file_sent(world: World, logs: LogLines) -> None:
     files = {"README.md": b"read me", ".env": SECRET, ".ssh/id_ed25519": SECRET}
     run_id = await _answer(world, "Here.\nATTACH: README.md\nATTACH: .env", files)
     assert await world.ended(run_id) == "completed"
@@ -205,36 +205,35 @@ async def test_secret_patterns_rejected_nothing_uploaded(world: World, logs: Log
     (_project(world) / "config").mkdir()
     second = await world.fake.trigger("And the key", channel_id=world.forum_a)
     assert await world.ended(second.run_id) == "completed"
-    assert world.requests("createUpload") == []
+    assert [b["name"] for b in _bodies(world, "createUpload")] == ["README.md"]
     first, again = world.fake.messages
-    assert _notice_lines(first["content_md"]) == [
-        "- `README.md`: set_not_sent",
-        "- `.env`: denied_pattern",
-    ]
+    assert len(first["attachment_file_ids"]) == 1
+    assert _notice_lines(first["content_md"]) == ["- `.env`: denied_pattern"]
+    assert "attachment_file_ids" not in again
     assert _notice_lines(again["content_md"]) == ["- `id_ed25519`: denied_pattern"]
     _no_leak(world, logs, SECRET)
 
 
-async def test_all_or_none_upload_failure_attaches_none(world: World, logs: LogLines) -> None:
+async def test_upload_refusal_of_one_file_sends_the_others(world: World, logs: LogLines) -> None:
     files = {"a.md": REPORT, "b.md": SUMMARY, "c.md": NOTES}
     world.fake.inject("createUpload", Fault.passthrough())
     world.fake.inject("createUpload", Fault.problem("conflict", reason="quota_exceeded"))
     run_id = await _answer(world, "Three.\nATTACH: a.md\nATTACH: b.md\nATTACH: c.md", files)
     assert await world.ended(run_id) == "completed"
-    assert [b["name"] for b in _bodies(world, "createUpload")] == ["a.md", "b.md"]
-    assert all("attachment_file_ids" not in b for b in _bodies(world, "createMessage"))
+    assert [b["name"] for b in _bodies(world, "createUpload")] == ["a.md", "b.md", "c.md"]
     (message,) = world.fake.messages
-    assert _notice_lines(message["content_md"]) == [
-        "- `a.md`: set_not_sent",
-        "- `b.md`: upload_refused (conflict, quota_exceeded)",
-        "- `c.md`: set_not_sent",
+    contents = [
+        world.fake.uploads.sessions[UUID(i)].content() for i in message["attachment_file_ids"]
     ]
-    # The completed first file is not aborted (it stays unattached for M3-08's cleanup).
-    assert world.requests("abortUpload") == []
-    _no_leak(world, logs, SUMMARY, NOTES, sent=(REPORT,))
+    assert contents == [REPORT, NOTES]
+    assert _notice_lines(message["content_md"]) == [
+        "- `b.md`: upload_refused (conflict, quota_exceeded)",
+    ]
+    assert world.requests("abortUpload") == []  # the refused file never had a session
+    _no_leak(world, logs, SUMMARY, sent=(REPORT, NOTES))
 
 
-async def test_all_or_none_transport_failure_aborts_open_session(
+async def test_transport_failure_aborts_its_session_the_others_go(
     world: World, logs: LogLines
 ) -> None:
     files = {"a.md": REPORT, "b.md": SUMMARY, "c.md": NOTES}
@@ -247,33 +246,26 @@ async def test_all_or_none_transport_failure_aborts_open_session(
     )
     run_id = await _answer(world, "Three.\nATTACH: a.md\nATTACH: b.md\nATTACH: c.md", files)
     assert await world.ended(run_id) == "completed"
-    assert [b["name"] for b in _bodies(world, "createUpload")] == ["a.md", "b.md"]
+    assert [b["name"] for b in _bodies(world, "createUpload")] == ["a.md", "b.md", "c.md"]
     sessions = list(world.fake.uploads.sessions.values())
     aborted = [r.path.rsplit("/", 1)[-1] for r in world.requests("abortUpload")]
     assert aborted == [str(sessions[1].file_id)]
-    assert sessions[0].state == "complete"
-    assert sessions[1].state == "aborted"
+    assert [s.state for s in sessions] == ["complete", "aborted", "complete"]
     (message,) = world.fake.messages
-    assert _notice_lines(message["content_md"]) == [
-        "- `a.md`: set_not_sent",
-        "- `b.md`: upload_failed",
-        "- `c.md`: set_not_sent",
-    ]
-    _no_leak(world, logs, NOTES, sent=(REPORT, SUMMARY))
+    assert message["attachment_file_ids"] == [str(sessions[0].file_id), str(sessions[2].file_id)]
+    assert _notice_lines(message["content_md"]) == ["- `b.md`: upload_failed"]
+    _no_leak(world, logs, sent=(REPORT, SUMMARY, NOTES))
 
 
-async def test_all_or_none_limits_from_instance(world: World) -> None:
+async def test_limits_from_instance(world: World) -> None:
     files = {f"{n}.md": REPORT for n in "abcd"}
     files["big.bin"] = b"x" * (MAX_BYTES + 1)
     four = "\n".join(f"ATTACH: {n}.md" for n in "abcd")
     run_id = await _answer(world, f"Four.\n{four}", files)
     assert await world.ended(run_id) == "completed"
-    assert _notice_lines(world.fake.messages[0]["content_md"]) == [
-        "- `a.md`: too_many",
-        "- `b.md`: too_many",
-        "- `c.md`: too_many",
-        "- and 1 more",
-    ]
+    # The first three go; the fourth is named.
+    assert len(world.fake.messages[0]["attachment_file_ids"]) == 3
+    assert _notice_lines(world.fake.messages[0]["content_md"]) == ["- `d.md`: too_many"]
     world.scenario(fixture="plain", result_override={"result": "Big.\nATTACH: big.bin"})
     second = await world.fake.trigger("Big", channel_id=world.forum_a)
     assert await world.ended(second.run_id) == "completed"
@@ -283,7 +275,7 @@ async def test_all_or_none_limits_from_instance(world: World) -> None:
     third = await world.fake.trigger("Again", channel_id=world.forum_a)
     assert await world.ended(third.run_id) == "completed"
     assert _notice_lines(world.fake.messages[2]["content_md"]) == ["- `a.md`: limits_unavailable"]
-    assert world.requests("createUpload") == []
+    assert len(world.requests("createUpload")) == 3  # the three of the first answer only
 
 
 async def test_acting_for_insufficient_refuses_upload(world: World) -> None:
@@ -312,6 +304,56 @@ async def test_notice_in_the_instance_language(world: World) -> None:
     # language-check: on
 
 
+@pytest.mark.parametrize("locale", ["en", "de"])
+async def test_one_file_outside_the_roots_the_valid_one_is_sent(
+    world: World, logs: LogLines, locale: str
+) -> None:
+    """FIX-attach-partial-and-roots, the live case of 2026-11-02: one announced file lies
+    outside the roots; the valid one is sent with the answer and only the refused one is named,
+    with the hint how to send it (09 18.10, best effort)."""
+    world.fake.uploads.locale_default = locale
+    outside = world.root / "elsewhere" / "2026-11-04-ai-enablement-brief.md"
+    outside.parent.mkdir()
+    outside.write_bytes(SECRET)
+    text = f"Done.\nATTACH: review-model-proposal.md\nATTACH: {outside}"
+    run_id = await _answer(world, text, {"review-model-proposal.md": REPORT})
+    assert await world.ended(run_id) == "completed"
+    (message,) = world.fake.messages
+    (session,) = world.fake.uploads.sessions.values()
+    assert session.name == "review-model-proposal.md"
+    assert session.content() == REPORT
+    assert message["attachment_file_ids"] == [str(session.file_id)]
+    assert session.attached is not None
+    # language-check: off
+    expected = {
+        "en": (
+            "Done.\n\nAttachments not sent:\n- `2026-11-04-ai-enablement-brief.md`:"
+            " outside_allowed_roots (copy it into TMPDIR and attach the copy)"
+        ),
+        "de": (
+            "Done.\n\nAnhänge nicht gesendet:\n- `2026-11-04-ai-enablement-brief.md`:"
+            " liegt außerhalb der erlaubten Ordner"
+            " (der Agent kann die Datei nach TMPDIR kopieren und die Kopie anhängen)"
+        ),
+    }
+    # language-check: on
+    assert message["content_md"] == expected[locale]
+    _no_leak(world, logs, SECRET, str(outside.parent).encode(), sent=(REPORT,))
+
+
+async def test_every_file_refused_sends_the_answer_with_the_notice(world: World) -> None:
+    """Best effort with nothing left: the answer goes out without files, with the notice."""
+    run_id = await _answer(world, "Done.\nATTACH: missing.md\nATTACH: .env", {".env": SECRET})
+    assert await world.ended(run_id) == "completed"
+    assert world.requests("createUpload") == []
+    (message,) = world.fake.messages
+    assert "attachment_file_ids" not in _bodies(world, "createMessage")[0]
+    assert _notice_lines(message["content_md"]) == [
+        "- `missing.md`: not_found",
+        "- `.env`: denied_pattern",
+    ]
+
+
 @pytest.mark.parametrize(
     ("code", "reason"), [("feature_disabled", None), ("conflict", "file_not_attachable")]
 )
@@ -330,6 +372,24 @@ async def test_message_refused_falls_back_without_attachments(
     assert _notice_lines(message["content_md"]) == [f"- `report.md`: not_attached ({detail})"]
     assert "attachment_file_ids" not in message
     assert all(s.attached is None for s in world.fake.uploads.sessions.values())
+
+
+async def test_message_refused_keeps_the_line_order_of_the_notice(world: World) -> None:
+    """A partial set whose attachments the server refuses: every file is named, in the order
+    of the ATTACH lines (the refused one with its own reason)."""
+    world.fake.inject("createMessage", Fault.problem("feature_disabled"))
+    text = "Done.\nATTACH: missing.md\nATTACH: dist/report.md"
+    run_id = await _answer(world, text, {"dist/report.md": REPORT})
+    assert await world.ended(run_id) == "completed"
+    first, retry = _bodies(world, "createMessage")
+    assert len(first["attachment_file_ids"]) == 1
+    assert "attachment_file_ids" not in retry
+    assert first["content_md"] == "Done.\n\nAttachments not sent:\n- `missing.md`: not_found"
+    (message,) = world.fake.messages
+    assert _notice_lines(message["content_md"]) == [
+        "- `missing.md`: not_found",
+        "- `report.md`: not_attached (feature_disabled)",
+    ]
 
 
 async def test_message_stored_then_502_attaches_once(world: World) -> None:
@@ -394,7 +454,7 @@ async def test_thread_inbox_file_reattached(world: World) -> None:
     second = await world.fake.trigger("Other", channel_id=world.forum_a)
     assert await world.ended(second.run_id) == "completed"
     assert _notice_lines(world.fake.messages[1]["content_md"]) == [
-        "- `x.md`: outside_allowed_roots"
+        "- `x.md`: outside_allowed_roots (copy it into TMPDIR and attach the copy)"
     ]
     _no_leak(world, None, SECRET, sent=(REPORT,))
 
