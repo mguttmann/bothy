@@ -43,6 +43,7 @@
 !packages/l10n/lib/
 !packages/bothy_noise/lib/
 !packages/terminal_ui/lib/
+!packages/terminal_ui/fonts/
 !docs/api/openapi.yaml
 apps/console/test/
 apps/console/build/

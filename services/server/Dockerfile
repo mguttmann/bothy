@@ -117,6 +117,7 @@ COPY packages/l10n/lib packages/l10n/lib
 # The terminal of the console (M6-18): terminal_ui and its Noise package.
 COPY packages/bothy_noise/lib packages/bothy_noise/lib
 COPY packages/terminal_ui/lib packages/terminal_ui/lib
+COPY packages/terminal_ui/fonts packages/terminal_ui/fonts
 COPY apps/console ./apps/console
 COPY docs/api/openapi.yaml docs/api/
 COPY services/server/VERSION services/server/
