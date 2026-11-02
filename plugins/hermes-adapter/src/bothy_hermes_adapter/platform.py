@@ -129,6 +129,17 @@ _READY_POLL_S: Final = 0.1
 _PLATFORMS: dict[str, ServerPlatform] = {}
 
 
+def _session_known(session_id: str) -> bool:
+    """Whether Hermes's session store has ``session_id`` (``True`` when it cannot be read)."""
+    try:
+        from hermes_state import SessionDB  # noqa: PLC0415 - only for a bind
+
+        return SessionDB().get_session(session_id) is not None
+    except Exception as exc:  # unreadable: let Hermes's /resume decide as before
+        _LOG.info("session store not readable: %s", type(exc).__name__)
+        return True
+
+
 class ServerPlatform(BasePlatformAdapter):
     """The platform adapter of one Hermes profile (one agent principal).
 
@@ -429,11 +440,18 @@ class ServerPlatform(BasePlatformAdapter):
             _build_skill_message,
             _load_skill_payload,
         )
+        from agent.skill_utils import get_disabled_skill_names  # noqa: PLC0415
 
         names = resolve_channel_skills(self._extra(), str(turn.thread_id), str(turn.channel_id))
+        # The load runs before Hermes sets the turn's session platform, so its loader cannot
+        # apply ``skills.platform_disabled`` of this platform itself: the adapter does.
+        disabled = get_disabled_skill_names(platform=self.platform_key) if names else set()
         parts: list[str] = []
         task = self._event_session_key(event)
         for name in names or ():
+            if name in disabled:
+                _LOG.warning("bound skill disabled on this platform: %s", name)
+                continue
             try:
                 loaded = _load_skill_payload(name, task_id=task)
             except Exception as exc:  # an unreadable skill is skipped like a missing one
@@ -443,6 +461,9 @@ class ServerPlatform(BasePlatformAdapter):
                 _LOG.warning("bound skill not found: %s", name)
                 continue
             skill, skill_dir, display = loaded
+            if str(skill.get("name") or display) in disabled:
+                _LOG.warning("bound skill disabled on this platform: %s", name)
+                continue
             part = _build_skill_message(
                 skill,
                 skill_dir,
@@ -551,6 +572,11 @@ class ServerPlatform(BasePlatformAdapter):
             # Hermes does not move it off the other thread's live route, and the turn of this
             # thread stalls on it (an admission conflict): fail open with the new session (9.5).
             _LOG.info("bind refused: the session is live in another thread until a restart")
+            return SessionSwitch.NEW
+        if not _session_known(external_session_ref):
+            # Hermes keeps the new session for an unknown ID: say so before the turn, so the
+            # turn loads the channel's bound skills like any new session (9.5).
+            _LOG.info("bind refused: the session is not in Hermes's store")
             return SessionSwitch.NEW
         await self._control_command(thread_id, f"/resume {external_session_ref} --all")
         return SessionSwitch.BOUND

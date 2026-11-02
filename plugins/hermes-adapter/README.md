@@ -171,9 +171,10 @@ python -m bothy_hermes_adapter thread close <thread ID> --profile-home <home>
 python -m bothy_hermes_adapter thread reopen <thread ID> --profile-home <home>
 ```
 
-Run it with the Python of the profile (as `install`); `--platform-key` names another platform
-section than `bothy`. It prints one JSON line, `{"ok": true, "thread_id", "state", "title",
-"title_source"}` or `{"ok": false, "error", "code", "status"}`, and exits with `1` on a refusal.
+Run it with the Python of the profile and the `PYTHONPATH` of `install` (above);
+`--platform-key` names another platform section than `bothy`. It prints one JSON line,
+`{"ok": true, "thread_id", "state", "title", "title_source"}` or `{"ok": false, "error",
+"code", "status"}`, and exits with `1` on a refusal.
 A process of the profile calls `bothy_hermes_adapter.threads.thread_action(extra, action,
 thread_id, title)` with the platform section's `extra` instead. A title a person set is never
 replaced (`title_manual`). Closing never blocks writing: a new message of a person or of the

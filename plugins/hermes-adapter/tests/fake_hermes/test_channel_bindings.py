@@ -31,10 +31,20 @@ description: Handle an answer in a ticket thread
 
 Follow the {SKILL_MARKER} rule: treat yes or no as the decision on the ticket.
 """
+HIDDEN_MARKER = "TICKET-HIDDEN-SKILL-MARKER"
+HIDDEN_SKILL = f"""---
+name: ticket-hidden
+description: A skill the profile disables on this platform
+---
+# Hidden
+
+Follow the {HIDDEN_MARKER} rule.
+"""
 PROMPT_MARKER = "TICKET-CHANNEL-PROMPT-MARKER"
 CHANNEL_PROMPT = f"{PROMPT_MARKER}: every thread of this forum is exactly one ticket."
 BOUND_ASK = "yes, go ahead"
 UNBOUND_ASK = "Please plan the trip to the lake."
+BIND_ASK = "and the next ticket?"
 AUTO_LOADED = 'The "ticket-answer" skill is auto-loaded'
 
 
@@ -66,11 +76,18 @@ def _system_and_user(body: dict[str, Any]) -> tuple[str, str]:
 
 
 def _bind(rig: HermesRig, channel: str) -> None:
-    """Bind the skill and the prompt to ``channel`` in the profile's platform section."""
+    """Bind the skills and the prompt to ``channel`` in the profile's platform section.
+
+    ``ticket-hidden`` is bound too but disabled for the platform (``skills.platform_disabled``).
+    """
     path = rig.home / "config.yaml"
     config = yaml.safe_load(path.read_text(encoding="utf-8"))
     extra = config["gateway"]["platforms"][PLATFORM_KEY]["extra"]
-    extra["channel_skill_bindings"] = [{"id": channel, "skills": ["ticket-answer"]}]
+    extra["channel_skill_bindings"] = [
+        {"id": channel, "skills": ["ticket-answer", "ticket-hidden"]}
+    ]
+    skills = config.setdefault("skills", {})
+    skills.setdefault("platform_disabled", {})[PLATFORM_KEY] = ["ticket-hidden"]
     extra["channel_prompts"] = {channel: CHANNEL_PROMPT}
     path.write_text(yaml.safe_dump(config, sort_keys=True), encoding="utf-8")
 
@@ -96,11 +113,15 @@ async def _done(rig: HermesRig, run_id: Any) -> None:
 async def test_bound_channel_loads_skills_and_combines_the_prompt(world: HermesWorld) -> None:
     from fake_hermes_kit import _start_gateway
 
-    script = [ScriptTurn(text=(f"Answer {n}.",), paced=True) for n in range(2)]
-    async with hermes_rig(world, script, texts=[BOUND_ASK, UNBOUND_ASK], start=False) as rig:
+    script = [ScriptTurn(text=(f"Answer {n}.",), paced=True) for n in range(3)]
+    texts = [BOUND_ASK, UNBOUND_ASK, BIND_ASK]
+    async with hermes_rig(world, script, texts=texts, start=False) as rig:
         skill = rig.home / "skills" / "ticket-answer" / "SKILL.md"
         skill.parent.mkdir(parents=True, exist_ok=True)
         skill.write_text(SKILL, encoding="utf-8")
+        hidden = rig.home / "skills" / "ticket-hidden" / "SKILL.md"
+        hidden.parent.mkdir(parents=True, exist_ok=True)
+        hidden.write_text(HIDDEN_SKILL, encoding="utf-8")
         forum = rig.fake.add_forum("tickets", None)
         _bind(rig, str(forum))
         await _start_gateway(rig)
@@ -113,6 +134,8 @@ async def test_bound_channel_loads_skills_and_combines_the_prompt(world: HermesW
         assert SKILL_MARKER in user, gateway_log(rig)
         assert AUTO_LOADED in user
         assert user.index(SKILL_MARKER) < user.index(BOUND_ASK)
+        # A bound skill the profile disables on this platform stays out (as in Hermes' gateway).
+        assert HIDDEN_MARKER not in user
         # Combined with the context of the server, never replacing it.
         assert PROMPT_MARKER in system, gateway_log(rig)
         assert SYSTEM_NOTE in system
@@ -126,3 +149,11 @@ async def test_bound_channel_loads_skills_and_combines_the_prompt(world: HermesW
         assert PROMPT_MARKER not in system
         assert SYSTEM_NOTE in system
         assert json.dumps(rig.model.raw).count(PROMPT_MARKER) >= 1
+
+        # A bind to a session Hermes does not know keeps the new session of the switch: it
+        # loads the bound skill like any new session.
+        rig.fake.start_session(bound.thread_id, "20260101_000000_deadbeef", started=True)
+        missing = await rig.fake.trigger(BIND_ASK, thread_id=bound.thread_id, session_mode="bind")
+        await _done(rig, missing.run_id)
+        _, user = _body_for(rig, BIND_ASK)
+        assert SKILL_MARKER in user, gateway_log(rig)
