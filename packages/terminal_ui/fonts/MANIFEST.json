@@ -1,0 +1,44 @@
+{
+  "$comment": "Bundled terminal font of packages/terminal_ui: source, commit and sha256 of every file; test/terminal_font_test.dart checks them (docs/decisions.d/FIX-terminal-font.md). JetBrains Mono 2.304, release tag v2.304 of the source repository; the static files of the four styles the terminal draws (regular, bold, italic, bold italic), because xterm selects bold and italic through FontWeight and FontStyle only. sha256 is taken over the stored bytes: the hygiene hook of the repository removed the trailing space of one line in the OFL text; the text is otherwise as published.",
+  "files": {
+    "JetBrainsMono-Bold.ttf": {
+      "source": "https://github.com/JetBrains/JetBrainsMono/blob/cd5227bd1f61dff3bbd6c814ceaf7ffd95e947d9/fonts/ttf/JetBrainsMono-Bold.ttf",
+      "commit": "cd5227bd1f61dff3bbd6c814ceaf7ffd95e947d9",
+      "sha256": "5590990c82e097397517f275f430af4546e1c45cff408bde4255dad142479dcb",
+      "license": "OFL-1.1",
+      "license_file": "JetBrainsMono.OFL.txt",
+      "bytes": 277828
+    },
+    "JetBrainsMono-BoldItalic.ttf": {
+      "source": "https://github.com/JetBrains/JetBrainsMono/blob/cd5227bd1f61dff3bbd6c814ceaf7ffd95e947d9/fonts/ttf/JetBrainsMono-BoldItalic.ttf",
+      "commit": "cd5227bd1f61dff3bbd6c814ceaf7ffd95e947d9",
+      "sha256": "4039d5ce0ed225bf9c8b2c8c6436290ae2f356b7e90d70fa666227238324aa3b",
+      "license": "OFL-1.1",
+      "license_file": "JetBrainsMono.OFL.txt",
+      "bytes": 279832
+    },
+    "JetBrainsMono-Italic.ttf": {
+      "source": "https://github.com/JetBrains/JetBrainsMono/blob/cd5227bd1f61dff3bbd6c814ceaf7ffd95e947d9/fonts/ttf/JetBrainsMono-Italic.ttf",
+      "commit": "cd5227bd1f61dff3bbd6c814ceaf7ffd95e947d9",
+      "sha256": "9d0a1f7a708e6af183f1193b7e81d40da294f5c67682c085d8401c60aac8ded4",
+      "license": "OFL-1.1",
+      "license_file": "JetBrainsMono.OFL.txt",
+      "bytes": 276840
+    },
+    "JetBrainsMono-Regular.ttf": {
+      "source": "https://github.com/JetBrains/JetBrainsMono/blob/cd5227bd1f61dff3bbd6c814ceaf7ffd95e947d9/fonts/ttf/JetBrainsMono-Regular.ttf",
+      "commit": "cd5227bd1f61dff3bbd6c814ceaf7ffd95e947d9",
+      "sha256": "a0bf60ef0f83c5ed4d7a75d45838548b1f6873372dfac88f71804491898d138f",
+      "license": "OFL-1.1",
+      "license_file": "JetBrainsMono.OFL.txt",
+      "bytes": 273900
+    },
+    "JetBrainsMono.OFL.txt": {
+      "source": "https://github.com/JetBrains/JetBrainsMono/blob/cd5227bd1f61dff3bbd6c814ceaf7ffd95e947d9/OFL.txt",
+      "commit": "cd5227bd1f61dff3bbd6c814ceaf7ffd95e947d9",
+      "sha256": "60d55f23c6ce05a81099a762cb67ca2c9b6ea251c7912720998b4c89ebfd4faa",
+      "license": "OFL-1.1",
+      "bytes": 4398
+    }
+  }
+}

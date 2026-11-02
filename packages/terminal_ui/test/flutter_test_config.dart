@@ -15,7 +15,8 @@ import 'package:flutter_test/flutter_test.dart';
 /// CI goldens (text as blocks, Ahem) run on every machine and are compared everywhere with
 /// [DsGoldenFileComparator] (tolerance for anti-aliasing between hosts, docs/DECISIONS.md PL/5);
 /// platform goldens with the real fonts run only on macOS. The bundled fonts are loaded once
-/// so platform goldens and widget tests render Atkinson Hyperlegible.
+/// so platform goldens and widget tests render Atkinson Hyperlegible and the terminal
+/// font JetBrains Mono.
 Future<void> testExecutable(FutureOr<void> Function() testMain) async {
   TestWidgetsFlutterBinding.ensureInitialized();
   await _loadBundledFonts();
@@ -43,17 +44,31 @@ String _goldenPath(String fileName, String environmentName) =>
     '${environmentName.toLowerCase()}/$fileName.png';
 
 /// Loads every family of the asset font manifest of this package.
+///
+/// The families of this package itself (the terminal font) are listed under their plain name
+/// here, while the apps register them as `packages/terminal_ui/<family>`, the name
+/// `terminalFontFamily` uses; they are loaded under both names, so the tests resolve the font
+/// the way the apps do.
 Future<void> _loadBundledFonts() async {
   final manifest = jsonDecode(
     await rootBundle.loadString('FontManifest.json'),
   ) as List<dynamic>;
   for (final entry in manifest.cast<Map<String, dynamic>>()) {
-    final loader = FontLoader(entry['family'] as String);
-    for (final font
-        in (entry['fonts'] as List<dynamic>).cast<Map<String, dynamic>>()) {
-      // The font manifest stores asset keys URL-encoded; the bundle expects them decoded.
-      loader.addFont(rootBundle.load(Uri.decodeFull(font['asset'] as String)));
+    final family = entry['family'] as String;
+    final fonts = (entry['fonts'] as List<dynamic>)
+        .cast<Map<String, dynamic>>();
+    for (final name in [
+      family,
+      if (!family.startsWith('packages/')) 'packages/terminal_ui/$family',
+    ]) {
+      final loader = FontLoader(name);
+      for (final font in fonts) {
+        // The font manifest stores asset keys URL-encoded; the bundle expects them decoded.
+        loader.addFont(
+          rootBundle.load(Uri.decodeFull(font['asset'] as String)),
+        );
+      }
+      await loader.load();
     }
-    await loader.load();
   }
 }

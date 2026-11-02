@@ -61,6 +61,43 @@ Map<ShortcutActivator, Intent> terminalShortcuts(TargetPlatform platform) {
 bool hardwareKeyboardOnlyOn(TargetPlatform platform) =>
     platform == TargetPlatform.windows;
 
+/// The family of the terminal font: JetBrains Mono, bundled with this package (`fonts/`,
+/// `fonts/MANIFEST.json`, docs/decisions.d/FIX-terminal-font.md).
+///
+/// Flutter registers the fonts of a dependency as `packages/<package>/<family>`, the name the
+/// apps (desktop, phone, web console) resolve. xterm measures its cell from the first family
+/// that resolves (the width of `m`), so this name must resolve on every platform: a name that
+/// does not (the plain `Atkinson Hyperlegible Mono` of `DsType.code`) let macOS fall back to
+/// the proportional system font, and the cell of its wide `m` spread every line apart.
+const String terminalFontFamily = 'packages/terminal_ui/JetBrains Mono';
+
+/// The fallbacks behind [terminalFontFamily], only for characters the bundled font lacks
+/// (CJK, emoji): system monospace fonts of macOS and iOS, Windows, Android and Linux, then the
+/// emoji fonts. The cell width never comes from them.
+const List<String> terminalFontFallback = [
+  'Menlo',
+  'Cascadia Mono',
+  'Consolas',
+  'Noto Sans Mono',
+  'Droid Sans Mono',
+  'monospace',
+  'Apple Color Emoji',
+  'Segoe UI Emoji',
+  'Noto Color Emoji',
+];
+
+/// The text style of the grid at [fontSize]: the bundled [terminalFontFamily] with the line
+/// height of xterm (1.2) and no letter spacing, so a cell is one glyph advance wide.
+///
+/// ```dart
+/// TerminalView(terminal, textStyle: terminalTextStyle(14));
+/// ```
+TerminalStyle terminalTextStyle(double fontSize) => TerminalStyle(
+  fontSize: fontSize,
+  fontFamily: terminalFontFamily,
+  fontFamilyFallback: terminalFontFallback,
+);
+
 /// The screen of [controller] with the renderer, the semantics and the link handling.
 ///
 /// [fontSize] is `client.terminal.font_size_default` or the size the person chose
@@ -178,7 +215,6 @@ class _TerminalScreenViewState extends State<TerminalScreenView> {
   Widget build(BuildContext context) {
     final l = dsL10n(context);
     final c = context.dsColors;
-    final mono = DsType.code;
     final platform = defaultTargetPlatform;
     final private = privateTextInputOn(platform);
     return ListenableBuilder(
@@ -186,11 +222,7 @@ class _TerminalScreenViewState extends State<TerminalScreenView> {
       builder: (context, _) {
         final terminal = _c.screen.terminal;
         _watch(terminal);
-        final textStyle = TerminalStyle(
-          fontSize: widget.fontSize,
-          fontFamily: mono.fontFamily!,
-          fontFamilyFallback: mono.fontFamilyFallback!,
-        );
+        final textStyle = terminalTextStyle(widget.fontSize);
         return Actions(
           actions: {
             GuardedPasteIntent: CallbackAction<GuardedPasteIntent>(

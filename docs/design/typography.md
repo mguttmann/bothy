@@ -10,6 +10,13 @@ system setting (iOS Dynamic Type, Android font size, Windows text size) through
 |---|---|---|---|
 | Interface, messages | Atkinson Hyperlegible Next | SIL Open Font License 1.1 | variable, weight 200 to 800, with italic |
 | Code, tool names, IDs, metrics | Atkinson Hyperlegible Mono | SIL Open Font License 1.1 | variable, weight 200 to 800, with italic |
+| Terminal screen (the grid of `terminal_ui`) | JetBrains Mono 2.304 | SIL Open Font License 1.1 | static, regular and bold, with italic |
+
+The terminal screen uses its own font: a terminal draws box drawing, block elements and
+powerline symbols, which Atkinson Hyperlegible Mono lacks, and its cell must come from the font
+it draws with. JetBrains Mono covers U+2500 to U+259F and the powerline symbols U+E0A0 to
+U+E0A2 and U+E0B0 to U+E0B3, every glyph has the same advance, and it is bundled, so every
+platform measures the same cell (docs/decisions.d/FIX-terminal-font.md).
 
 Evidence: package data of `@fontsource-variable/atkinson-hyperlegible-next@5.3.0` and
 `@fontsource-variable/atkinson-hyperlegible-mono@5.3.0` (license OFL-1.1, axis `wght` 200 to
@@ -76,7 +83,7 @@ from `type.body`, so that the iPhone does not read smaller than the system defau
 - **Markdown.** Headings in messages use at most `type.heading`; an agent cannot fill the
   history with display sizes.
 - **Fallback.** If a character is missing in Atkinson (for example CJK), the fallback list from
-  `font.family.*` applies; the apps bundle no further fonts.
+  `font.family.*` applies; the apps bundle no further fonts besides the terminal font above.
 
 ## Integration
 
@@ -93,6 +100,13 @@ from `type.body`, so that the iPhone does not read smaller than the system defau
   (apps that depend on the package register the fonts under that name) and drives the `wght`
   axis from the weight. The theme (`buildDsTheme`) takes its text theme from the roles through
   `dsTextStyle`; the fallback list of `font.family.*` stays behind it.
+- Terminal: `packages/terminal_ui` bundles the four static files of JetBrains Mono 2.304
+  (regular, bold, italic, bold italic) and its OFL text under `packages/terminal_ui/fonts/`, with
+  `fonts/MANIFEST.json` (source, commit, SHA-256, license) checked by
+  `test/terminal_font_test.dart`. `terminalTextStyle` names the family as
+  `packages/terminal_ui/JetBrains Mono`, the name under which every app (desktop, phone, web
+  console) registers it, with the line height 1.2 of the renderer and no letter spacing;
+  system monospace and emoji fonts follow only for characters the font lacks.
 - Web console and docs site: WOFF2 from the same version; `tokens.css` provides the variables
   `--ds-type-*`.
 - Preview: the WOFF2 files are under `tools/design-tokens/vendor/fonts/` and are

@@ -135,6 +135,19 @@ paints both over the view, opaque in the pairings of components.md 12: the curso
 `cursor` with its character in `cursor-text`, a selected cell in `selection-bg` with its
 character in `fg`, and a frame in `cursor` without the focus (15 23.4, D-M4-35-18).
 
+The font is JetBrains Mono 2.304 (OFL-1.1), bundled in `fonts/` with its license text and
+`fonts/MANIFEST.json` (source, commit, SHA-256). `terminalTextStyle` names it as
+`packages/terminal_ui/JetBrains Mono`, the name every app registers, with xterm's line height
+1.2 and no letter spacing. xterm measures its cell from the first family that resolves (the
+width of `m`) and sets the PTY size from it, so the cell is one advance of the bundled font on
+every platform and the columns follow from the view width. Before, the view named the plain
+`Atkinson Hyperlegible Mono`, which no app resolves; on macOS the grid fell back to the
+proportional system font and spread every line apart (docs/decisions.d/FIX-terminal-font.md).
+`test/terminal_font_test.dart` holds the manifest, the cell width against the advance read from
+the font file and the `resize` columns; `test/goldens/terminal_line_golden_test.dart` a line with
+box drawing and powerline symbols. The test setup loads the package's own fonts under the
+package name too, as the apps see them.
+
 ## Layout
 
 | Path | Content |
@@ -145,6 +158,7 @@ character in `fg`, and a frame in `cursor` without the focus (15 23.4, D-M4-35-1
 | `lib/src/ports.dart` | the ports of 15 23.1 |
 | `lib/src/controller/` | `TerminalController`, the tab state, the close reactions, the frame pump (`data` and coalesced `resize`), the prompts interface |
 | `lib/src/pinning/` | the pin check of 15 23.3 |
+| `fonts/` | the terminal font JetBrains Mono, its OFL text and `MANIFEST.json` |
 | `lib/src/render/` | the escape filter, the screen (xterm model behind the filter, link records, replay swap), the view (on a touch screen with "Copy" and "Paste" over a selection), the theme, the paste guard, the semantics, the phone's text input client `TerminalTextInput` (no suggestions, no autocorrection, no smart punctuation, no learning; D-M5-12-2) |
 | `lib/src/extra_keys/` | the extra keys bar of the phone (M5-12): the key mapping (`extraKeySequence`, `controlByte`), the modifiers off, one-shot and latched (`ExtraKeysController`), the bar (`ExtraKeysBar`) and the hardware keyboard watch that hides it (`HardwareKeyboardWatch` over a `HardwareKeyboardProbe` of the app) |
 | `lib/src/widgets/` | pane (with `phone: true` the layout of screen M8), header, tabs, the phone's session switcher, states and the dialogs (open, key changed, foreign host, link, the `TerminalPrompts` with dialogs) |
