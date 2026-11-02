@@ -14,6 +14,7 @@ part 'host_session_user.g.dart';
 /// * [userId] - UUIDv7 (RFC 9562), lowercase canonical form.
 /// * [osUser]
 /// * [createdAt] - RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+/// * [ownerAccount] - Present and `true` for an assignment of the owner account (ADR 0073): sessions run in the owner's own account with administrator rights; clients warn before the step-up.
 @BuiltValue()
 abstract class HostSessionUser
     implements Built<HostSessionUser, HostSessionUserBuilder> {
@@ -27,6 +28,10 @@ abstract class HostSessionUser
   /// RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
   @BuiltValueField(wireName: r'created_at')
   DateTime get createdAt;
+
+  /// Present and `true` for an assignment of the owner account (ADR 0073): sessions run in the owner's own account with administrator rights; clients warn before the step-up.
+  @BuiltValueField(wireName: r'owner_account')
+  bool? get ownerAccount;
 
   HostSessionUser._();
 
@@ -69,6 +74,13 @@ class _$HostSessionUserSerializer
       object.createdAt,
       specifiedType: const FullType(DateTime),
     );
+    if (object.ownerAccount != null) {
+      yield r'owner_account';
+      yield serializers.serialize(
+        object.ownerAccount,
+        specifiedType: const FullType(bool),
+      );
+    }
   }
 
   @override
@@ -116,6 +128,14 @@ class _$HostSessionUserSerializer
             specifiedType: const FullType(DateTime),
           ) as DateTime;
           result.createdAt = valueDes;
+          break;
+        case r'owner_account':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(bool),
+          ) as bool?;
+          if (valueDes == null) continue;
+          result.ownerAccount = valueDes;
           break;
         default:
           unhandled.add(key);

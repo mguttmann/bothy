@@ -13,6 +13,8 @@ class _$HostSessionUser extends HostSessionUser {
   final String osUser;
   @override
   final DateTime createdAt;
+  @override
+  final bool? ownerAccount;
 
   factory _$HostSessionUser([void Function(HostSessionUserBuilder)? updates]) =>
       (HostSessionUserBuilder()..update(updates))._build();
@@ -21,6 +23,7 @@ class _$HostSessionUser extends HostSessionUser {
     required this.userId,
     required this.osUser,
     required this.createdAt,
+    this.ownerAccount,
   }) : super._();
   @override
   HostSessionUser rebuild(void Function(HostSessionUserBuilder) updates) =>
@@ -35,7 +38,8 @@ class _$HostSessionUser extends HostSessionUser {
     return other is HostSessionUser &&
         userId == other.userId &&
         osUser == other.osUser &&
-        createdAt == other.createdAt;
+        createdAt == other.createdAt &&
+        ownerAccount == other.ownerAccount;
   }
 
   @override
@@ -44,6 +48,7 @@ class _$HostSessionUser extends HostSessionUser {
     _$hash = $jc(_$hash, userId.hashCode);
     _$hash = $jc(_$hash, osUser.hashCode);
     _$hash = $jc(_$hash, createdAt.hashCode);
+    _$hash = $jc(_$hash, ownerAccount.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -53,7 +58,8 @@ class _$HostSessionUser extends HostSessionUser {
     return (newBuiltValueToStringHelper(r'HostSessionUser')
           ..add('userId', userId)
           ..add('osUser', osUser)
-          ..add('createdAt', createdAt))
+          ..add('createdAt', createdAt)
+          ..add('ownerAccount', ownerAccount))
         .toString();
   }
 }
@@ -74,6 +80,10 @@ class HostSessionUserBuilder
   DateTime? get createdAt => _$this._createdAt;
   set createdAt(DateTime? createdAt) => _$this._createdAt = createdAt;
 
+  bool? _ownerAccount;
+  bool? get ownerAccount => _$this._ownerAccount;
+  set ownerAccount(bool? ownerAccount) => _$this._ownerAccount = ownerAccount;
+
   HostSessionUserBuilder() {
     HostSessionUser._defaults(this);
   }
@@ -84,6 +94,7 @@ class HostSessionUserBuilder
       _userId = $v.userId;
       _osUser = $v.osUser;
       _createdAt = $v.createdAt;
+      _ownerAccount = $v.ownerAccount;
       _$v = null;
     }
     return this;
@@ -121,6 +132,7 @@ class HostSessionUserBuilder
             r'HostSessionUser',
             'createdAt',
           ),
+          ownerAccount: ownerAccount,
         );
     replace(_$result);
     return _$result;

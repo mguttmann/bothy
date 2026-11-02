@@ -157,7 +157,7 @@ func updateBody(cmd *terminal.UpdateHost, b rest.HostUpdate) {
 	}
 	if b.AddSessionUsers != nil {
 		for _, a := range *b.AddSessionUsers {
-			cmd.Add = append(cmd.Add, terminal.SessionUserAssign{UserID: ids.ID(a.UserId), OSUser: a.OsUser})
+			cmd.Add = append(cmd.Add, terminal.SessionUserAssign{UserID: ids.ID(a.UserId), OSUser: a.OsUser, OwnerAccount: isTrue(a.OwnerAccount)})
 		}
 	}
 	if b.RevokeSessionUsers != nil {
@@ -214,7 +214,8 @@ func toREST(v terminal.HostView) rest.Host {
 	if len(v.SessionUsers) > 0 {
 		list := make([]rest.HostSessionUser, 0, len(v.SessionUsers))
 		for _, u := range v.SessionUsers {
-			list = append(list, rest.HostSessionUser{UserId: rest.Uuid(u.UserID), OsUser: u.OSUser, CreatedAt: u.CreatedAt.UTC().Truncate(time.Millisecond)})
+			list = append(list, rest.HostSessionUser{UserId: rest.Uuid(u.UserID), OsUser: u.OSUser, CreatedAt: u.CreatedAt.UTC().Truncate(time.Millisecond),
+				OwnerAccount: trueOnly(u.OwnerAccount)})
 		}
 		out.SessionUsers = &list
 	}
@@ -225,7 +226,7 @@ func toREST(v terminal.HostView) rest.Host {
 			if workdirs == nil {
 				workdirs = []string{}
 			}
-			list = append(list, rest.HostReportedSessionUser{OsUser: u.OSUser, Workdirs: workdirs})
+			list = append(list, rest.HostReportedSessionUser{OsUser: u.OSUser, Workdirs: workdirs, OwnerAccount: trueOnly(u.OwnerAccount)})
 		}
 		out.ReportedSessionUsers = &list
 	}
@@ -253,4 +254,15 @@ func optionalTime(t time.Time) *time.Time {
 	}
 	v := t.UTC().Truncate(time.Millisecond)
 	return &v
+}
+
+// isTrue reads an optional boolean of a body; absent is false.
+func isTrue(b *bool) bool { return b != nil && *b }
+
+// trueOnly renders a flag that is present only when true (owner_account, ADR 0073).
+func trueOnly(b bool) *bool {
+	if !b {
+		return nil
+	}
+	return &b
 }

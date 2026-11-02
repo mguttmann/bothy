@@ -5193,7 +5193,7 @@ export interface paths {
         head?: never;
         /**
          * Change name or assignee of a host
-         * @description A new `assigned_user_id` ends the sessions of people who no longer qualify under SR10 (`access_revoked`). `add_session_users` assigns own session users (ruling T12; a taken name gives `409 conflict` with `reason: session_user_taken`, a name the host does not report in `reported_session_users` gives `400 validation_failed` with `errors[].code` `session_user_not_on_host`); `revoke_session_users` ends the assignment of the listed people, ends their sessions on the host (`access_revoked`) and keeps the name taken (24 section 2.2). Needs step-up.
+         * @description A new `assigned_user_id` ends the sessions of people who no longer qualify under SR10 (`access_revoked`). `add_session_users` assigns own session users (ruling T12; a taken name gives `409 conflict` with `reason: session_user_taken`, a name the host does not report in `reported_session_users` gives `400 validation_failed` with `errors[].code` `session_user_not_on_host`; the owner account of the host needs `owner_account: true` and only an active owner may assign it, only to himself, otherwise `403 forbidden` with `reason: owner_account_owner_only`, ADR 0073); `revoke_session_users` ends the assignment of the listed people, ends their sessions on the host (`access_revoked`) and keeps the name taken (24 section 2.2). Needs step-up.
          */
         patch: operations["updateHost"];
         trace?: never;
@@ -5229,7 +5229,7 @@ export interface paths {
         put?: never;
         /**
          * Confirm the fingerprint and declare the LLM login
-         * @description The owner types the first `terminal.fingerprint_confirm_chars` characters shown by `bothy-host pair`, without separators, case-insensitive; a prefix of another length or with a character outside the Crockford alphabet (also `I`, `L`, `O`, `U`) gives `400 validation_failed` with `errors[].code` `invalid_format` and does not count. A mismatch gives `409 fingerprint_mismatch` with `attempts_remaining`; the failure counter is not part of `Host`, so `version` and the `If-Match` stay. After `terminal.fingerprint_max_attempts` failures the host falls back to `pairing` without keys (`attempts_remaining` `0`), and a new pairing code is needed. A failed attempt counts also under an `Idempotency-Key`; its replay returns the stored `409`. I6 is checked in the same transaction (`409 i6_violation`). `session_users` assigns each person their own session user on this host (ruling T12, 24 section 2.2); a name that belongs or belonged to another person on this host, or a second valid assignment of one person, gives `409 conflict` with `reason: session_user_taken`; a name the host did not report (`reported_session_users`) gives `400 validation_failed` with `errors[].code` `session_user_not_on_host`, and nothing is stored. Without an assignment a person gets no terminal there (SR12). Needs step-up.
+         * @description The owner types the first `terminal.fingerprint_confirm_chars` characters shown by `bothy-host pair`, without separators, case-insensitive; a prefix of another length or with a character outside the Crockford alphabet (also `I`, `L`, `O`, `U`) gives `400 validation_failed` with `errors[].code` `invalid_format` and does not count. A mismatch gives `409 fingerprint_mismatch` with `attempts_remaining`; the failure counter is not part of `Host`, so `version` and the `If-Match` stay. After `terminal.fingerprint_max_attempts` failures the host falls back to `pairing` without keys (`attempts_remaining` `0`), and a new pairing code is needed. A failed attempt counts also under an `Idempotency-Key`; its replay returns the stored `409`. I6 is checked in the same transaction (`409 i6_violation`). `session_users` assigns each person their own session user on this host (ruling T12, 24 section 2.2); a name that belongs or belonged to another person on this host, or a second valid assignment of one person, gives `409 conflict` with `reason: session_user_taken`; a name the host did not report (`reported_session_users`) gives `400 validation_failed` with `errors[].code` `session_user_not_on_host`, and nothing is stored. The owner account of the host (`owner_account` in `reported_session_users`, ADR 0073) needs `owner_account: true` and only an active owner may assign it, only to himself (`403 forbidden` with `reason: owner_account_owner_only`). Without an assignment a person gets no terminal there (SR12). Needs step-up.
          */
         post: operations["confirmHost"];
         delete?: never;
@@ -11524,6 +11524,12 @@ export interface components {
              * @example bothy-s-robin
              */
             os_user: string;
+            /**
+             * @description Explicit opt-in for the owner account of the host (ADR 0073, 24 section 2.4): the existing account of the instance owner with administrator rights that the host service runs as. Must be `true` exactly when the host reports the name with `owner_account = true` (otherwise `400 validation_failed` with `errors[].code` `owner_account_opt_in_required` or `owner_account_not_on_host` at `owner_account`), and only an active owner may assign it, only to himself (otherwise `403 forbidden` with `reason: owner_account_owner_only`).
+             * @default false
+             * @example false
+             */
+            owner_account: boolean;
         };
         /** @description A valid assignment of a person to their own session user on the host (ruling T12, 24 section 2.2). */
         HostSessionUser: {
@@ -11531,6 +11537,11 @@ export interface components {
             /** @example bothy-s-robin */
             os_user: string;
             created_at: components["schemas"]["Timestamp"];
+            /**
+             * @description Present and `true` for an assignment of the owner account (ADR 0073): sessions run in the owner's own account with administrator rights; clients warn before the step-up.
+             * @example true
+             */
+            owner_account?: boolean;
         };
         /** @description A session user the host service reports (`host_reported_session_users.v1`, 24 section 2.2), with the display names of its own working directories of the `claude` profile (ruling T13). Names only, never paths. */
         HostReportedSessionUser: {
@@ -11541,6 +11552,11 @@ export interface components {
             os_user: string;
             /** @description Display names of the working directories of this session user in `host_service.claude_workdirs` after check HD7, in their order (a directory listed under two session users is dropped from both lists); empty means no `claude` profile for this session user. A client sends the index into its own list, never a path; the host service resolves the index in exactly this list (24, 2.2 and 5.3). */
             workdirs: string[];
+            /**
+             * @description Present and `true` for the owner account of the host (`host_service.owner_account`, ADR 0073, 24 section 2.4): the account the host service itself runs as, with administrator rights. An assignment of this name needs `owner_account = true`.
+             * @example true
+             */
+            owner_account?: boolean;
         };
         /** @description A connected host. Keys are public; the client pins `noise_public_key` per device (24, 5.5). */
         Host: {

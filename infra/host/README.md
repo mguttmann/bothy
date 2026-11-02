@@ -41,3 +41,10 @@ uninstaller: remove `/Library/Application Support/bothy-host/bin` and `share` an
 Update: install the newer package of the same kind, then `bothy-host restart` (after an MSI
 upgrade `bothy-host install --config "<file>"` with the configuration file in use). The host service names this route when the server refuses its
 version with `4114`.
+
+## Owner account mode
+
+The packages install the system setup of `bothy-host install`. For the owner account mode (ADR
+0073, docs/spec/24-terminal.md 2.4) the instance operator uses the release binary instead and runs
+`bothy-host install --owner-account` as the owner's own account; it needs no package and no root
+([services/host/README.md](../../services/host/README.md), "Owner account mode").

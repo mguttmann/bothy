@@ -30,21 +30,50 @@ List<String> offeredNames(AdminHost host, {Set<String> chosen = const {}}) {
   ];
 }
 
+/// Whether [host] reports [osUser] as its owner account (ADR 0073): the account with
+/// administrator rights the host service runs as, assigned only with the explicit opt-in.
+bool isOwnerAccount(AdminHost host, String? osUser) =>
+    osUser != null &&
+    (host.reportedSessionUsers ?? const <HostReportedName>[]).any(
+      (r) => r.osUser == osUser && r.ownerAccount,
+    );
+
 /// The explanation of a refused assignment: `409 conflict` with `session_user_taken` (a name
-/// stays bound to its person on the host, T12) and `400 validation_failed` with
-/// `session_user_not_on_host` (the host must report the name first); null for any other
+/// stays bound to its person on the host, T12), `400 validation_failed` with
+/// `session_user_not_on_host` (the host must report the name first) or with an owner account
+/// code, and `403 forbidden` with `owner_account_owner_only` (ADR 0073); null for any other
 /// problem.
 String? sessionUserProblemText(AppLocalizations l, ApiProblem? problem) {
   if (problem == null) return null;
   if (problem.code == 'conflict' && problem.reason == 'session_user_taken') {
     return l.hostSessionUserTaken;
   }
+  if (problem.code == 'forbidden' &&
+      problem.reason == 'owner_account_owner_only') {
+    return l.hostOwnerAccountOwnerOnly;
+  }
   if (problem.code == 'validation_failed' &&
       problem.errors.any((e) => e.code == 'session_user_not_on_host')) {
     return l.hostSessionUserNotOnHost;
   }
+  if (problem.code == 'validation_failed' &&
+      problem.errors.any(
+        (e) =>
+            e.code == 'owner_account_opt_in_required' ||
+            e.code == 'owner_account_not_on_host',
+      )) {
+    return l.hostOwnerAccountMismatch;
+  }
   return null;
 }
+
+/// The warning of the owner account [osUser] (ADR 0073, D-OA-11).
+Widget ownerAccountWarning(BuildContext context, String osUser, {Key? key}) =>
+    DsBanner(
+      key: key,
+      tone: DsTone.warning,
+      text: AppLocalizations.of(context).hostOwnerAccountWarning(osUser),
+    );
 
 /// One row of [SessionUserRows]: a person and a reported name, either still unset. The
 /// wizard owns the rows, so they survive leaving step 3 and are exactly what it sends.
@@ -55,9 +84,16 @@ final class SessionUserRow {
   /// The reported name, or null.
   String? osUser;
 
-  /// The assignment of a complete row, or null.
+  /// The name is the owner account of the host (ADR 0073); the row then needs [ownerAccount].
+  bool ownerAccountName = false;
+
+  /// The explicit opt-in for the owner account.
+  bool ownerAccount = false;
+
+  /// The assignment of a complete row, or null; a row with the owner account needs the opt-in.
   HostAssignment? get assignment => switch ((userId, osUser)) {
-    (final u?, final n?) => HostAssignment(userId: u, osUser: n),
+    (final u?, final n?) when !ownerAccountName || ownerAccount =>
+      HostAssignment(userId: u, osUser: n, ownerAccount: ownerAccountName),
     _ => null,
   };
 }
@@ -136,6 +172,35 @@ class SessionUserRows extends StatelessWidget {
           if (j != i) ?rows[j].osUser,
       },
     );
+    final picker = _picker(l, i, row, names);
+    if (!row.ownerAccountName) return picker;
+    return Builder(
+      builder: (context) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          picker,
+          ownerAccountWarning(context, row.osUser!),
+          CheckboxListTile(
+            key: ValueKey('sessionRow.$i.ownerAccount'),
+            value: row.ownerAccount,
+            title: Text(l.hostOwnerAccountOptIn(row.osUser!)),
+            onChanged: (v) {
+              row.ownerAccount = v ?? false;
+              onChanged();
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _picker(
+    AppLocalizations l,
+    int i,
+    SessionUserRow row,
+    List<String> names,
+  ) {
     return Row(
       key: ValueKey('sessionRow.$i'),
       children: [
@@ -165,6 +230,8 @@ class SessionUserRows extends StatelessWidget {
             ],
             onChanged: (v) {
               row.osUser = v;
+              row.ownerAccountName = isOwnerAccount(host, v);
+              row.ownerAccount = false;
               onChanged();
             },
           ),
@@ -323,6 +390,7 @@ class _SessionUsersSectionState extends State<SessionUsersSection>
                           : l.hostWorkdirs(workdirs[s.osUser]!.join(', ')),
                       style: secondary,
                     ),
+                    if (s.ownerAccount) ownerAccountWarning(context, s.osUser),
                   ],
                 ),
               ),
@@ -339,7 +407,18 @@ class _SessionUsersSectionState extends State<SessionUsersSection>
             key: ValueKey('reported.$n'),
             children: [
               Expanded(
-                child: Text(l.hostSessionUsersUnassigned(n), style: secondary),
+                child: isOwnerAccount(h, n)
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            l.hostSessionUsersUnassigned(n),
+                            style: secondary,
+                          ),
+                          Text(l.hostOwnerAccountBadge, style: secondary),
+                        ],
+                      )
+                    : Text(l.hostSessionUsersUnassigned(n), style: secondary),
               ),
               if (editable)
                 TextButton(
@@ -389,6 +468,7 @@ class _AssignDialogState extends State<_AssignDialog> {
   final TextEditingController _reason = TextEditingController();
   String? _person;
   late String? _name = widget.name;
+  bool _optIn = false;
 
   @override
   void initState() {
@@ -406,6 +486,7 @@ class _AssignDialogState extends State<_AssignDialog> {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final names = offeredNames(widget.host);
+    final owner = names.contains(_name) && isOwnerAccount(widget.host, _name);
     return ConfirmChange(
       title: l.hostSessionUserAssignTitle,
       body: l.hostSessionUserAssignBody,
@@ -431,8 +512,24 @@ class _AssignDialogState extends State<_AssignDialog> {
             items: [
               for (final n in names) DropdownMenuItem(value: n, child: Text(n)),
             ],
-            onChanged: (v) => setState(() => _name = v),
+            onChanged: (v) => setState(() {
+              _name = v;
+              _optIn = false;
+            }),
           ),
+          if (owner) ...[
+            ownerAccountWarning(
+              context,
+              _name!,
+              key: const ValueKey('assign.ownerAccountWarning'),
+            ),
+            CheckboxListTile(
+              key: const ValueKey('assign.ownerAccount'),
+              value: _optIn,
+              title: Text(l.hostOwnerAccountOptIn(_name!)),
+              onChanged: (v) => setState(() => _optIn = v ?? false),
+            ),
+          ],
           TextField(
             key: const ValueKey('confirm.reason'),
             controller: _reason,
@@ -441,9 +538,12 @@ class _AssignDialogState extends State<_AssignDialog> {
         ],
       ),
       canConfirm:
-          _person != null && _name != null && _reason.text.trim().isNotEmpty,
+          _person != null &&
+          _name != null &&
+          (!owner || _optIn) &&
+          _reason.text.trim().isNotEmpty,
       onConfirm: (_) => Navigator.of(context).pop((
-        HostAssignment(userId: _person!, osUser: _name!),
+        HostAssignment(userId: _person!, osUser: _name!, ownerAccount: owner),
         _reason.text.trim(),
       )),
     );

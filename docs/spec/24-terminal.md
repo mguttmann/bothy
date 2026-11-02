@@ -35,7 +35,10 @@ Security is built in and cannot be switched off:
    other person ever gets (ruling T12), and no location with code, settings or logins
    is writable for one session user and readable for another (ruling T13). The
    sessions cannot reach the keys of the host and cannot replace the PTY helper
-   (section 2.2).
+   (section 2.2). Exception by explicit opt-in of the owner: the owner account mode
+   (section 2.4, ADR 0073), in which the host service and its one session user are the
+   instance owner's own account with administrator rights and only an active owner opens a
+   session; items 1 to 4 apply unchanged.
 
 Not in this version: file transfer and clipboard over the channel, recording of
 content, shared sessions of several people, terminal for agents or apps, taking over a
@@ -635,7 +638,7 @@ check passed.
 
 | Check | Codes |
 |---|---|
-| HD1 | `session_users_empty`, `session_user_duplicate` (names compared without case), `session_user_is_service_user`, `privileged_user`, `user_missing`, `session_user_name_invalid` |
+| HD1 | `session_users_empty`, `session_user_duplicate` (names compared without case), `session_user_is_service_user`, `privileged_user`, `user_missing`, `session_user_name_invalid`, `owner_account_mismatch`, warning `owner_account_mode` (2.4) |
 | HD2 | `forbidden_group`, `docker_socket_writable` |
 | HD3 | `passwordless_sudo` (Windows: no probe, passes without code) |
 | HD4 | `state_dir_owner`, `state_dir_mode`, `key_file_unprotected` |
@@ -669,6 +672,68 @@ Then the following applies:
 
 If the host service does not detect the server host, SR10 still protects: non-owners only get
 hosts whose assignee they are, and the owner assigns the server host to nobody.
+
+### 2.4 Owner account mode (ADR 0073)
+
+Owner decision of 2026-11-01 (ADR 0073): the owner opens a terminal from the apps on his own
+machine as his normal administrator account, and the setup must be completable remotely without
+root, without a new local user and without anyone at the machine. Design note:
+[terminal-owner-account.md](../design/terminal-owner-account.md); rulings `D-OA-1` to `D-OA-12`
+in [decisions.d/FEAT-terminal-admin-user.md](../decisions.d/FEAT-terminal-admin-user.md).
+
+- **Opt-in on the host.** `host_service.owner_account` names an existing account of the host. The
+  host service runs as this account, and `host_service.session_users` is exactly this name (an
+  empty list is filled in, any other list is a configuration error). The default is empty: the
+  separate users of section 2.2 stay the rule. `host_service.require_local_confirm = true` is a
+  configuration error in this mode (nobody sits at the machine); Windows does not support the
+  mode in this version (configuration error).
+- **Installation without root.** `bothy-host install --owner-account`, run as the account itself
+  and refused as root, copies the binary (macOS: ad hoc signed with the hardened runtime) and
+  writes the configuration and the state directory below the account's home and one per-user
+  service: macOS a LaunchAgent `bothy-host` in the GUI domain of the account
+  (`<home>/Library/LaunchAgents/bothy-host.plist`, files below
+  `<home>/Library/Application Support/bothy-host`), Linux a systemd user unit
+  (`<home>/.config/systemd/user/bothy-host.service`, files below `<home>/.local` and
+  `<home>/.config/bothy-host`). It creates no user, no group and no system service.
+  `bothy-host restart` restarts this service as the account; `bothy-host session-user` is not
+  available in the mode.
+- **PTY helper as a child.** The host service starts the PTY helper of the account as its own
+  child process (`bothy-host pty-helper --owner-account`) on a socket in `<state>/run` (mode
+  `0700`), passed as file descriptor 3; the helper ends when its standard input closes. The peer
+  check of 2.2 compares the uid of the account and the PID of exactly this child. The admin
+  endpoint admits the account itself.
+- **Report.** The host reports the account with `owner_account: true` in `session_users`
+  (`HostReportedSessionUser`).
+- **Assignment.** The owner assigns the account only with `owner_account: true`, equal to the
+  report (otherwise `400 validation_failed` with `owner_account_opt_in_required` or
+  `owner_account_not_on_host`); only an active owner may make such an assignment, and only to
+  himself (`403 forbidden`, `reason: owner_account_owner_only`). The flag is stored in
+  `host_session_users.owner_account`; the audit entry of the assignment carries it.
+- **Opening.** SR12 ([07-permissions.md](07-permissions.md)) counts the assignment only while the
+  host reports the name with the same flag, and `terminal.open` and `terminal.attach` with it need
+  an active owner (`403 terminal_denied`, `reason: owner_account_owner_only`). Step-up on every
+  opening, SR10, SR11, the Noise stream, the idle timeout and the limits are unchanged. Losing the
+  owner role ends the session (`access_revoked`, 8.3). The allow entry of every opening and attach
+  carries `owner_account = true` (10.1).
+- **Host check of the token.** Step 10a of 5.3: a token for the owner account without
+  `own = true` fails with `session_user_mismatch` (`4104`) before step 11 binds the account, so
+  a faulty server cannot give the account to a person who is no owner.
+- **Self-checks** (D-OA-9). HD1 passes with the warning `owner_account_mode` and fails with
+  `owner_account_mismatch` when the service runs as another account or names another session
+  user; `root` stays `privileged_user`. The findings of HD2, HD3, HD9, the helper part of HD8
+  (`helper_reads_state`) and the HD10 codes `peer_check_unavailable`, `ptrace_scope_low` and
+  `helper_unprotected` are warnings with the same code. HD6: a subscription login or an unknown
+  status in the owner account is a warning, because the login is the owner's own and only he
+  reaches the account; with separate session users HD6 is unchanged. HD10 and HD11 accept the
+  owner account as a trusted owner of the programs, the service definition and the folders on
+  the way; "writable by a session user" there means writable by any other person account of the
+  host or by everyone. HD4, the service part of HD8 and HD11 at the places of the account are
+  unchanged.
+- **What the mode gives up, honestly.** A session runs with administrator rights and reaches the
+  keys of the host, the host service and every file of the machine; whoever has the owner's
+  password and second factor and a device of the owner has the machine. The separation of people
+  (T12, T13) does not exist on such a host: it is a host for exactly one owner. A subscription
+  login in the owner's account is not checked against the declaration. Threat model T-TM-16.
 
 ## 3. Hosts and lifecycle
 
@@ -1148,6 +1213,7 @@ the host service runs these steps; the first failure wins and nothing after it r
 | 8 | `att = open` needs a session ID without a live PTY; `att = attach` needs a session ID with a live PTY whose `sub`, `osu` and `prf` equal the claims | `token_invalid` |
 | 9 | `prf` names a profile the host service offers now | `profile_unknown` |
 | 10 | `osu` in `host_service.session_users` | `session_user_unknown` |
+| 10a | `osu` is not `host_service.owner_account`, or `own = true` (2.4, ADR 0073) | `session_user_mismatch` |
 | 11 | `osu` unbound (it is bound to `sub` now) or bound to `sub` | `session_user_mismatch` |
 | 12 | `wdi` present exactly for a profile of kind `claude` with `att = open`, and an index into the list of `osu` after HD7 that the host service reported | `profile_unknown` |
 | 13 | `own = true` when this host detected that it is the server host (HD5 or the server of the control connection is this machine) | `server_host_owner_only` |
@@ -2070,10 +2136,10 @@ consistent hashing over `{session_id}` to one node, with the timeouts of
 
 | Action | When | Details (`audit_details.v1`) |
 |---|---|---|
-| `host.manage` | every change | `host_id` (resource), `operation` (`create`, `update`, `pairing_code`, `confirm`, `llm_credentials`, `state`, `session_user`), old and new values as codes (`from_assigned_user_id`, `to_assigned_user_id`, `name_changed`, `from_state`, `to_state`, `disabled_reason`), with `session_user` one entry per assignment or end with `change` (`assigned`, `revoked`), `user_id` and the name of the session user in the reserved field `os_user`; with `pairing_code` `from_state`, `to_state`, `old_fingerprint` (when keys were discarded), `key_generation`, `sessions_ended`; with `confirm` `result` (`confirmed`, `fingerprint_mismatch`, `fingerprint_max_attempts`), `fingerprint`, `key_generation`, `attempts_remaining` (on failed attempts), `llm_credentials`, `credential_holder_id`, `declared_server_host`; `reason`; without effect `no_change`; never the name of the host, the code, its HMAC or a key; fingerprints in lower case without hyphens |
+| `host.manage` | every change | `host_id` (resource), `operation` (`create`, `update`, `pairing_code`, `confirm`, `llm_credentials`, `state`, `session_user`), old and new values as codes (`from_assigned_user_id`, `to_assigned_user_id`, `name_changed`, `from_state`, `to_state`, `disabled_reason`), with `session_user` one entry per assignment or end with `change` (`assigned`, `revoked`), `user_id`, the name of the session user in the reserved field `os_user` and `owner_account = true` for the owner account (2.4); with `pairing_code` `from_state`, `to_state`, `old_fingerprint` (when keys were discarded), `key_generation`, `sessions_ended`; with `confirm` `result` (`confirmed`, `fingerprint_mismatch`, `fingerprint_max_attempts`), `fingerprint`, `key_generation`, `attempts_remaining` (on failed attempts), `llm_credentials`, `credential_holder_id`, `declared_server_host`; `reason`; without effect `no_change`; never the name of the host, the code, its HMAC or a key; fingerprints in lower case without hyphens |
 | `host.pair` | allow and deny | `host_id`, `fingerprint`, `old_fingerprint` (when one was stored), `key_generation`, `platform`; refusals aggregated with `unauthenticated` |
 | `host.connect` | denials; allow only on a change of `reported_is_server_host`, `reported_doctor` or `reported_session_users`; second control connection (3.4) | `host_id`, check codes, with the name of every account that the message names (rule for names, 2.2: for HD6, HD10 and HD11 session users, for HD9 former ones), added and removed names of the session users, code `duplicate_connection` |
-| `terminal.open`, `terminal.attach` | allow and deny | `host_id`, `session_id`, `profile`, `device_id`, `pin_changed`, `foreign_assignee` |
+| `terminal.open`, `terminal.attach` | allow and deny | `host_id`, `session_id`, `profile`, `device_id`, `pin_changed`, `foreign_assignee`, `owner_account` (a session in the owner account of the host, 2.4) |
 | `terminal.close` | allow and deny | `session_id`, who closed |
 | `terminal.stream` | denials (for example `identify` from a device that does not belong to the current token) | `session_id`, `device_id`, reason code |
 | `terminal.terminate` | every end by the server or the host | actor `system`; `session_id`, `close_reason`, `close_detail` (when set), `bytes_in`, `bytes_out`, `duration_ms` |
@@ -2428,6 +2494,7 @@ Column "Place": Server = configuration reference of the server; Host service = c
 | `host_service.claude_workdirs` | Host service | empty | Working directories of the profile `claude` per session user (name from `host_service.session_users` -> list of folders with display names; only the display names are reported); each folder belongs to exactly this session user (Ruling T13, HD7, HD11); a folder with two session users drops out of both lists, the list after that is reported and used for `wdi`; read only at start, a change takes effect after `bothy-host restart`; without an entry no profile `claude` for this session user, empty means no profile `claude` |
 | `host_service.scrollback_bytes` | Host service | `1048576` | Scrollback buffer per session, only in memory |
 | `host_service.require_local_confirm` | Host service | `false` | every PTY only after consent on the host (6.4) |
+| `host_service.owner_account` | Host service | empty | the existing account of the instance owner that the host service and its one session user run as (owner account mode, 2.4, ADR 0073); empty means separate users (2.2) |
 | `host_service.local_confirm_timeout` | Host service | `60s` | Deadline for the consent on the host |
 | `host_service.reconnect_backoff_base` | Host service | `1s` | first delay of the exponential backoff with full jitter before a new control connection (3.5) |
 | `host_service.reconnect_backoff_cap` | Host service | `5m` | largest delay of that backoff; also the total time the login of a refused start keeps trying (3.5) |

@@ -1901,7 +1901,7 @@ type ClientInterface interface {
 
 	// UpdateHostWithBody Change name or assignee of a host
 	//
-	// A new `assigned_user_id` ends the sessions of people who no longer qualify under SR10 (`access_revoked`). `add_session_users` assigns own session users (ruling T12; a taken name gives `409 conflict` with `reason: session_user_taken`, a name the host does not report in `reported_session_users` gives `400 validation_failed` with `errors[].code` `session_user_not_on_host`); `revoke_session_users` ends the assignment of the listed people, ends their sessions on the host (`access_revoked`) and keeps the name taken (24 section 2.2). Needs step-up.
+	// A new `assigned_user_id` ends the sessions of people who no longer qualify under SR10 (`access_revoked`). `add_session_users` assigns own session users (ruling T12; a taken name gives `409 conflict` with `reason: session_user_taken`, a name the host does not report in `reported_session_users` gives `400 validation_failed` with `errors[].code` `session_user_not_on_host`; the owner account of the host needs `owner_account: true` and only an active owner may assign it, only to himself, otherwise `403 forbidden` with `reason: owner_account_owner_only`, ADR 0073); `revoke_session_users` ends the assignment of the listed people, ends their sessions on the host (`access_revoked`) and keeps the name taken (24 section 2.2). Needs step-up.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -1910,7 +1910,7 @@ type ClientInterface interface {
 
 	// UpdateHost Change name or assignee of a host
 	//
-	// A new `assigned_user_id` ends the sessions of people who no longer qualify under SR10 (`access_revoked`). `add_session_users` assigns own session users (ruling T12; a taken name gives `409 conflict` with `reason: session_user_taken`, a name the host does not report in `reported_session_users` gives `400 validation_failed` with `errors[].code` `session_user_not_on_host`); `revoke_session_users` ends the assignment of the listed people, ends their sessions on the host (`access_revoked`) and keeps the name taken (24 section 2.2). Needs step-up.
+	// A new `assigned_user_id` ends the sessions of people who no longer qualify under SR10 (`access_revoked`). `add_session_users` assigns own session users (ruling T12; a taken name gives `409 conflict` with `reason: session_user_taken`, a name the host does not report in `reported_session_users` gives `400 validation_failed` with `errors[].code` `session_user_not_on_host`; the owner account of the host needs `owner_account: true` and only an active owner may assign it, only to himself, otherwise `403 forbidden` with `reason: owner_account_owner_only`, ADR 0073); `revoke_session_users` ends the assignment of the listed people, ends their sessions on the host (`access_revoked`) and keeps the name taken (24 section 2.2). Needs step-up.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -1919,7 +1919,7 @@ type ClientInterface interface {
 
 	// ConfirmHostWithBody Confirm the fingerprint and declare the LLM login
 	//
-	// The owner types the first `terminal.fingerprint_confirm_chars` characters shown by `bothy-host pair`, without separators, case-insensitive; a prefix of another length or with a character outside the Crockford alphabet (also `I`, `L`, `O`, `U`) gives `400 validation_failed` with `errors[].code` `invalid_format` and does not count. A mismatch gives `409 fingerprint_mismatch` with `attempts_remaining`; the failure counter is not part of `Host`, so `version` and the `If-Match` stay. After `terminal.fingerprint_max_attempts` failures the host falls back to `pairing` without keys (`attempts_remaining` `0`), and a new pairing code is needed. A failed attempt counts also under an `Idempotency-Key`; its replay returns the stored `409`. I6 is checked in the same transaction (`409 i6_violation`). `session_users` assigns each person their own session user on this host (ruling T12, 24 section 2.2); a name that belongs or belonged to another person on this host, or a second valid assignment of one person, gives `409 conflict` with `reason: session_user_taken`; a name the host did not report (`reported_session_users`) gives `400 validation_failed` with `errors[].code` `session_user_not_on_host`, and nothing is stored. Without an assignment a person gets no terminal there (SR12). Needs step-up.
+	// The owner types the first `terminal.fingerprint_confirm_chars` characters shown by `bothy-host pair`, without separators, case-insensitive; a prefix of another length or with a character outside the Crockford alphabet (also `I`, `L`, `O`, `U`) gives `400 validation_failed` with `errors[].code` `invalid_format` and does not count. A mismatch gives `409 fingerprint_mismatch` with `attempts_remaining`; the failure counter is not part of `Host`, so `version` and the `If-Match` stay. After `terminal.fingerprint_max_attempts` failures the host falls back to `pairing` without keys (`attempts_remaining` `0`), and a new pairing code is needed. A failed attempt counts also under an `Idempotency-Key`; its replay returns the stored `409`. I6 is checked in the same transaction (`409 i6_violation`). `session_users` assigns each person their own session user on this host (ruling T12, 24 section 2.2); a name that belongs or belonged to another person on this host, or a second valid assignment of one person, gives `409 conflict` with `reason: session_user_taken`; a name the host did not report (`reported_session_users`) gives `400 validation_failed` with `errors[].code` `session_user_not_on_host`, and nothing is stored. The owner account of the host (`owner_account` in `reported_session_users`, ADR 0073) needs `owner_account: true` and only an active owner may assign it, only to himself (`403 forbidden` with `reason: owner_account_owner_only`). Without an assignment a person gets no terminal there (SR12). Needs step-up.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -1928,7 +1928,7 @@ type ClientInterface interface {
 
 	// ConfirmHost Confirm the fingerprint and declare the LLM login
 	//
-	// The owner types the first `terminal.fingerprint_confirm_chars` characters shown by `bothy-host pair`, without separators, case-insensitive; a prefix of another length or with a character outside the Crockford alphabet (also `I`, `L`, `O`, `U`) gives `400 validation_failed` with `errors[].code` `invalid_format` and does not count. A mismatch gives `409 fingerprint_mismatch` with `attempts_remaining`; the failure counter is not part of `Host`, so `version` and the `If-Match` stay. After `terminal.fingerprint_max_attempts` failures the host falls back to `pairing` without keys (`attempts_remaining` `0`), and a new pairing code is needed. A failed attempt counts also under an `Idempotency-Key`; its replay returns the stored `409`. I6 is checked in the same transaction (`409 i6_violation`). `session_users` assigns each person their own session user on this host (ruling T12, 24 section 2.2); a name that belongs or belonged to another person on this host, or a second valid assignment of one person, gives `409 conflict` with `reason: session_user_taken`; a name the host did not report (`reported_session_users`) gives `400 validation_failed` with `errors[].code` `session_user_not_on_host`, and nothing is stored. Without an assignment a person gets no terminal there (SR12). Needs step-up.
+	// The owner types the first `terminal.fingerprint_confirm_chars` characters shown by `bothy-host pair`, without separators, case-insensitive; a prefix of another length or with a character outside the Crockford alphabet (also `I`, `L`, `O`, `U`) gives `400 validation_failed` with `errors[].code` `invalid_format` and does not count. A mismatch gives `409 fingerprint_mismatch` with `attempts_remaining`; the failure counter is not part of `Host`, so `version` and the `If-Match` stay. After `terminal.fingerprint_max_attempts` failures the host falls back to `pairing` without keys (`attempts_remaining` `0`), and a new pairing code is needed. A failed attempt counts also under an `Idempotency-Key`; its replay returns the stored `409`. I6 is checked in the same transaction (`409 i6_violation`). `session_users` assigns each person their own session user on this host (ruling T12, 24 section 2.2); a name that belongs or belonged to another person on this host, or a second valid assignment of one person, gives `409 conflict` with `reason: session_user_taken`; a name the host did not report (`reported_session_users`) gives `400 validation_failed` with `errors[].code` `session_user_not_on_host`, and nothing is stored. The owner account of the host (`owner_account` in `reported_session_users`, ADR 0073) needs `owner_account: true` and only an active owner may assign it, only to himself (`403 forbidden` with `reason: owner_account_owner_only`). Without an assignment a person gets no terminal there (SR12). Needs step-up.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -7995,7 +7995,7 @@ func (c *Client) GetHost(ctx context.Context, hostId HostIdPath, reqEditors ...R
 
 // UpdateHostWithBody Change name or assignee of a host
 //
-// A new `assigned_user_id` ends the sessions of people who no longer qualify under SR10 (`access_revoked`). `add_session_users` assigns own session users (ruling T12; a taken name gives `409 conflict` with `reason: session_user_taken`, a name the host does not report in `reported_session_users` gives `400 validation_failed` with `errors[].code` `session_user_not_on_host`); `revoke_session_users` ends the assignment of the listed people, ends their sessions on the host (`access_revoked`) and keeps the name taken (24 section 2.2). Needs step-up.
+// A new `assigned_user_id` ends the sessions of people who no longer qualify under SR10 (`access_revoked`). `add_session_users` assigns own session users (ruling T12; a taken name gives `409 conflict` with `reason: session_user_taken`, a name the host does not report in `reported_session_users` gives `400 validation_failed` with `errors[].code` `session_user_not_on_host`; the owner account of the host needs `owner_account: true` and only an active owner may assign it, only to himself, otherwise `403 forbidden` with `reason: owner_account_owner_only`, ADR 0073); `revoke_session_users` ends the assignment of the listed people, ends their sessions on the host (`access_revoked`) and keeps the name taken (24 section 2.2). Needs step-up.
 //
 // Takes any type of body and a specified content type.
 //
@@ -8014,7 +8014,7 @@ func (c *Client) UpdateHostWithBody(ctx context.Context, hostId HostIdPath, para
 
 // UpdateHost Change name or assignee of a host
 //
-// A new `assigned_user_id` ends the sessions of people who no longer qualify under SR10 (`access_revoked`). `add_session_users` assigns own session users (ruling T12; a taken name gives `409 conflict` with `reason: session_user_taken`, a name the host does not report in `reported_session_users` gives `400 validation_failed` with `errors[].code` `session_user_not_on_host`); `revoke_session_users` ends the assignment of the listed people, ends their sessions on the host (`access_revoked`) and keeps the name taken (24 section 2.2). Needs step-up.
+// A new `assigned_user_id` ends the sessions of people who no longer qualify under SR10 (`access_revoked`). `add_session_users` assigns own session users (ruling T12; a taken name gives `409 conflict` with `reason: session_user_taken`, a name the host does not report in `reported_session_users` gives `400 validation_failed` with `errors[].code` `session_user_not_on_host`; the owner account of the host needs `owner_account: true` and only an active owner may assign it, only to himself, otherwise `403 forbidden` with `reason: owner_account_owner_only`, ADR 0073); `revoke_session_users` ends the assignment of the listed people, ends their sessions on the host (`access_revoked`) and keeps the name taken (24 section 2.2). Needs step-up.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -8033,7 +8033,7 @@ func (c *Client) UpdateHost(ctx context.Context, hostId HostIdPath, params *Upda
 
 // ConfirmHostWithBody Confirm the fingerprint and declare the LLM login
 //
-// The owner types the first `terminal.fingerprint_confirm_chars` characters shown by `bothy-host pair`, without separators, case-insensitive; a prefix of another length or with a character outside the Crockford alphabet (also `I`, `L`, `O`, `U`) gives `400 validation_failed` with `errors[].code` `invalid_format` and does not count. A mismatch gives `409 fingerprint_mismatch` with `attempts_remaining`; the failure counter is not part of `Host`, so `version` and the `If-Match` stay. After `terminal.fingerprint_max_attempts` failures the host falls back to `pairing` without keys (`attempts_remaining` `0`), and a new pairing code is needed. A failed attempt counts also under an `Idempotency-Key`; its replay returns the stored `409`. I6 is checked in the same transaction (`409 i6_violation`). `session_users` assigns each person their own session user on this host (ruling T12, 24 section 2.2); a name that belongs or belonged to another person on this host, or a second valid assignment of one person, gives `409 conflict` with `reason: session_user_taken`; a name the host did not report (`reported_session_users`) gives `400 validation_failed` with `errors[].code` `session_user_not_on_host`, and nothing is stored. Without an assignment a person gets no terminal there (SR12). Needs step-up.
+// The owner types the first `terminal.fingerprint_confirm_chars` characters shown by `bothy-host pair`, without separators, case-insensitive; a prefix of another length or with a character outside the Crockford alphabet (also `I`, `L`, `O`, `U`) gives `400 validation_failed` with `errors[].code` `invalid_format` and does not count. A mismatch gives `409 fingerprint_mismatch` with `attempts_remaining`; the failure counter is not part of `Host`, so `version` and the `If-Match` stay. After `terminal.fingerprint_max_attempts` failures the host falls back to `pairing` without keys (`attempts_remaining` `0`), and a new pairing code is needed. A failed attempt counts also under an `Idempotency-Key`; its replay returns the stored `409`. I6 is checked in the same transaction (`409 i6_violation`). `session_users` assigns each person their own session user on this host (ruling T12, 24 section 2.2); a name that belongs or belonged to another person on this host, or a second valid assignment of one person, gives `409 conflict` with `reason: session_user_taken`; a name the host did not report (`reported_session_users`) gives `400 validation_failed` with `errors[].code` `session_user_not_on_host`, and nothing is stored. The owner account of the host (`owner_account` in `reported_session_users`, ADR 0073) needs `owner_account: true` and only an active owner may assign it, only to himself (`403 forbidden` with `reason: owner_account_owner_only`). Without an assignment a person gets no terminal there (SR12). Needs step-up.
 //
 // Takes any type of body and a specified content type.
 //
@@ -8052,7 +8052,7 @@ func (c *Client) ConfirmHostWithBody(ctx context.Context, hostId HostIdPath, par
 
 // ConfirmHost Confirm the fingerprint and declare the LLM login
 //
-// The owner types the first `terminal.fingerprint_confirm_chars` characters shown by `bothy-host pair`, without separators, case-insensitive; a prefix of another length or with a character outside the Crockford alphabet (also `I`, `L`, `O`, `U`) gives `400 validation_failed` with `errors[].code` `invalid_format` and does not count. A mismatch gives `409 fingerprint_mismatch` with `attempts_remaining`; the failure counter is not part of `Host`, so `version` and the `If-Match` stay. After `terminal.fingerprint_max_attempts` failures the host falls back to `pairing` without keys (`attempts_remaining` `0`), and a new pairing code is needed. A failed attempt counts also under an `Idempotency-Key`; its replay returns the stored `409`. I6 is checked in the same transaction (`409 i6_violation`). `session_users` assigns each person their own session user on this host (ruling T12, 24 section 2.2); a name that belongs or belonged to another person on this host, or a second valid assignment of one person, gives `409 conflict` with `reason: session_user_taken`; a name the host did not report (`reported_session_users`) gives `400 validation_failed` with `errors[].code` `session_user_not_on_host`, and nothing is stored. Without an assignment a person gets no terminal there (SR12). Needs step-up.
+// The owner types the first `terminal.fingerprint_confirm_chars` characters shown by `bothy-host pair`, without separators, case-insensitive; a prefix of another length or with a character outside the Crockford alphabet (also `I`, `L`, `O`, `U`) gives `400 validation_failed` with `errors[].code` `invalid_format` and does not count. A mismatch gives `409 fingerprint_mismatch` with `attempts_remaining`; the failure counter is not part of `Host`, so `version` and the `If-Match` stay. After `terminal.fingerprint_max_attempts` failures the host falls back to `pairing` without keys (`attempts_remaining` `0`), and a new pairing code is needed. A failed attempt counts also under an `Idempotency-Key`; its replay returns the stored `409`. I6 is checked in the same transaction (`409 i6_violation`). `session_users` assigns each person their own session user on this host (ruling T12, 24 section 2.2); a name that belongs or belonged to another person on this host, or a second valid assignment of one person, gives `409 conflict` with `reason: session_user_taken`; a name the host did not report (`reported_session_users`) gives `400 validation_failed` with `errors[].code` `session_user_not_on_host`, and nothing is stored. The owner account of the host (`owner_account` in `reported_session_users`, ADR 0073) needs `owner_account: true` and only an active owner may assign it, only to himself (`403 forbidden` with `reason: owner_account_owner_only`). Without an assignment a person gets no terminal there (SR12). Needs step-up.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -24157,55 +24157,4 @@ func NewCreateTokenRequest(server string, principalId PrincipalIdPath, params *C
 	}
 	bodyReader = bytes.NewReader(buf)
 	return NewCreateTokenRequestWithBody(server, principalId, params, "application/json", bodyReader)
-}
-
-// NewCreateTokenRequestWithBody constructs an http.Request for the CreateToken method, with any body, and a specified content type
-func NewCreateTokenRequestWithBody(server string, principalId PrincipalIdPath, params *CreateTokenParams, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "principal_id", principalId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/principals/%s/tokens", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
-	}
-
-	return req, nil
 }

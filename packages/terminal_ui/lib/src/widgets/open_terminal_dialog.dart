@@ -38,6 +38,16 @@ List<String> ownWorkdirs(Host host, String selfUserId) {
   return reported.first.workdirs.toList();
 }
 
+/// The session user assigned to [selfUserId] on [host] when it is the owner account of the host
+/// (ADR 0073): the owner's own account with administrator rights; null otherwise.
+String? ownOwnerAccount(Host host, String selfUserId) {
+  final own = host.sessionUsers?.where(
+    (u) => u.userId == selfUserId && (u.ownerAccount ?? false),
+  );
+  if (own == null || own.isEmpty) return null;
+  return own.first.osUser;
+}
+
 /// Pops the chosen [OpenChoice], or null on "Cancel".
 ///
 /// ```dart
@@ -81,6 +91,7 @@ class _OpenTerminalDialogState extends State<OpenTerminalDialog> {
     final c = context.dsColors;
     final label = dsTextStyle(DsType.label).copyWith(color: c.textSecondary);
     final workdirs = ownWorkdirs(widget.host, widget.selfUserId);
+    final ownerAccount = ownOwnerAccount(widget.host, widget.selfUserId);
     final needsWorkdir = _isClaude;
     final canConfirm =
         widget.host.profiles.any((p) => p.name == _profile) &&
@@ -94,6 +105,14 @@ class _OpenTerminalDialogState extends State<OpenTerminalDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (ownerAccount != null) ...[
+                DsBanner(
+                  key: const ValueKey('terminalOpen.ownerAccount'),
+                  tone: DsTone.warning,
+                  text: l.terminalOwnerAccountWarning(ownerAccount),
+                ),
+                const SizedBox(height: DsSpace.s12),
+              ],
               Text(l.terminalOpenHost, style: label),
               Text(widget.host.name, style: dsTextStyle(DsType.bodyStrong)),
               const SizedBox(height: DsSpace.s12),

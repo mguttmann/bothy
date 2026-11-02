@@ -117,7 +117,12 @@ func runService(ctx context.Context, cfgPath string, once bool, stderr io.Writer
 	}
 	defer func() { _ = admin.Close() }()
 	denv := sys.doctorEnv(c, st)
-	d := startup.Deps{Config: c, State: st, Doctor: denv, Log: log, Admin: admin, AdminUID: adminUID(), OSVersion: sys.osVersion(),
+	defer closeHelpers(denv)
+	adminID := adminUID()
+	if c.OwnerAccount != "" {
+		adminID = sys.callerID() // the account itself administers its own service (ADR 0073)
+	}
+	d := startup.Deps{Config: c, State: st, Doctor: denv, Log: log, Admin: admin, AdminUID: adminID, OSVersion: sys.osVersion(),
 		Platform: buildinfo.Platform(), HostVersion: buildinfo.Version, Offered: profiles.Offered}
 	if once {
 		d.Control = startup.NoControl{}

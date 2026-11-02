@@ -86,12 +86,13 @@ const ReasonPasskeyRequired = "passkey_required"
 // terminalReasons are the reasons of forbidden that answer 403 terminal_denied, with the reason of
 // the problem body (07 section 4.1, 24 section 13; M2-40).
 var terminalReasons = map[Reason]string{
-	"terminal_not_host_assignee":      "not_host_assignee",
-	"terminal_server_host_owner_only": "server_host_owner_only",
-	"i6_holder_only":                  "i6_holder_only",
-	"terminal_no_session_user":        "no_session_user",
-	"terminal_profile_unknown":        "profile_unknown",
-	"terminal_session_limit":          "session_limit",
+	"terminal_not_host_assignee":        "not_host_assignee",
+	"terminal_server_host_owner_only":   "server_host_owner_only",
+	"i6_holder_only":                    "i6_holder_only",
+	"terminal_no_session_user":          "no_session_user",
+	"terminal_owner_account_owner_only": "owner_account_owner_only",
+	"terminal_profile_unknown":          "profile_unknown",
+	"terminal_session_limit":            "session_limit",
 }
 
 // Err returns nil for allow and otherwise a kernel/errs error that the problem writer renders

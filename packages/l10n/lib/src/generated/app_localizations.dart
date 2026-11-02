@@ -5749,6 +5749,42 @@ abstract class AppLocalizations {
   /// **'Without a session user no terminal (SR12).'**
   String get hostSessionUsersSr12;
 
+  /// Badge of the owner account of a host in the host settings (ADR 0073).
+  ///
+  /// In en, this message translates to:
+  /// **'Owner account with administrator rights'**
+  String get hostOwnerAccountBadge;
+
+  /// Warning at the owner account of a host in the host settings and in the assign dialog (ADR 0073).
+  ///
+  /// In en, this message translates to:
+  /// **'Sessions as {osUser} use the owner\'s own account with administrator rights: full access to the host, its keys and the host service. Only an active owner opens them, with a step-up on every opening, and every opening is logged.'**
+  String hostOwnerAccountWarning(String osUser);
+
+  /// Checkbox of the explicit opt-in for the owner account of a host (ADR 0073).
+  ///
+  /// In en, this message translates to:
+  /// **'Bind my own administrator account {osUser} to me'**
+  String hostOwnerAccountOptIn(String osUser);
+
+  /// Refusal of an assignment of the owner account (403 owner_account_owner_only, ADR 0073).
+  ///
+  /// In en, this message translates to:
+  /// **'Only an owner can bind the owner account of a host, and only to himself.'**
+  String get hostOwnerAccountOwnerOnly;
+
+  /// Refusal of an assignment whose owner account flag differs from the report (owner_account_opt_in_required, owner_account_not_on_host).
+  ///
+  /// In en, this message translates to:
+  /// **'The host reports this name differently; reload the host and check the owner account.'**
+  String get hostOwnerAccountMismatch;
+
+  /// Warning in the dialog Open terminal when the own session user is the owner account of the host (ADR 0073).
+  ///
+  /// In en, this message translates to:
+  /// **'This session uses {osUser}, your own account with administrator rights on this host. Everything you type has full rights.'**
+  String terminalOwnerAccountWarning(String osUser);
+
   /// Note of the session user pickers (24 section 3.2).
   ///
   /// In en, this message translates to:
@@ -14219,6 +14255,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'You have no own session user on this host'**
   String get problemTerminalDeniedNoSessionUser;
+
+  /// Problem text of terminal_denied with reason owner_account_owner_only (07 SR12, ADR 0073).
+  ///
+  /// In en, this message translates to:
+  /// **'Only an active owner can open a terminal in the owner account of this host'**
+  String get problemTerminalDeniedOwnerAccountOwnerOnly;
 
   /// Text of the problem code `terminal_denied` with the reason `session_limit` (24 section 13, docs/api/openapi.yaml).
   ///

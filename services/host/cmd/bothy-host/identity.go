@@ -38,6 +38,14 @@ func (a *app) serviceAccount() string {
 // identity decides the way for the state directory of c; conn is the open admin connection of
 // wayService.
 func (a *app) identity(ctx context.Context, c *config.Config) (way, *localchan.Conn) {
+	if a.isOwnerCaller(c) {
+		// The owner account mode (ADR 0073): the running service is the caller's own, so its admin
+		// endpoint admits the caller; without it the caller works directly.
+		if conn, err := a.dialAdmin(ctx, c.StateDir, a.callerID()); err == nil {
+			return wayService, conn
+		}
+		return wayDirect, nil
+	}
 	users, sec, _ := a.platform(a.runner)
 	if f, err := sec.Lstat(c.StateDir); err == nil && f.OwnerID == a.callerID() {
 		return wayDirect, nil

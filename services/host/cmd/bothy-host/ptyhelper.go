@@ -5,6 +5,7 @@ package main
 import (
 	"context"
 	"io"
+	"net"
 	"os"
 	"path/filepath"
 
@@ -47,8 +48,12 @@ func ptyParts(self hostos.Account, env doctor.HelperEnv) (*pty.Supervisor, profi
 func cmdPtyHelper(ctx context.Context, args []string, _, stderr io.Writer) int {
 	fl := newFlags("pty-helper", stderr)
 	name := fl.String("session-user", "", "the session user this helper serves")
+	owner := fl.Bool("owner-account", false, "a child of the host service in the owner account mode (ADR 0073)")
 	if err := fl.Parse(args); err != nil || fl.NArg() != 0 || *name == "" {
 		return exitUsage
+	}
+	if *owner {
+		return serveOwnerPtyHelper(ctx, *name, stderr)
 	}
 	body := func(ctx context.Context, _ bool) int { return servePtyHelper(ctx, *name, stderr) }
 	if code, ok := serviceMode(body); ok {
@@ -58,22 +63,44 @@ func cmdPtyHelper(ctx context.Context, args []string, _, stderr io.Writer) int {
 }
 
 func servePtyHelper(ctx context.Context, name string, stderr io.Writer) int {
+	users, _, _ := sys.platform(sys.runner)
+	svc, err := users.Lookup(sys.serviceAccount())
+	if err != nil {
+		_, _ = io.WriteString(stderr, "bothy-host pty-helper: service user missing\n")
+		return exitFailed
+	}
+	return serveHelperAs(ctx, name, svc, func() (net.Listener, error) { return helperListener(name, svc.ID) }, stderr)
+}
+
+// serveOwnerPtyHelper is the PTY helper of the owner account mode (ADR 0073, D-OA-4): a child of
+// the host service running as the same account, on the socket the parent passed as fd 3; it ends
+// when its standard input closes, so it never outlives the host service.
+func serveOwnerPtyHelper(ctx context.Context, name string, stderr io.Writer) int {
+	users, _, _ := sys.platform(sys.runner)
+	self, err := users.Lookup(name)
+	if err != nil || self.ID != sys.callerID() {
+		_, _ = io.WriteString(stderr, "bothy-host pty-helper: must run as its session user\n")
+		return exitUsage
+	}
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	go func() { _, _ = io.Copy(io.Discard, sys.stdin); cancel() }()
+	return serveHelperAs(ctx, name, self, inheritedListener, stderr)
+}
+
+// serveHelperAs serves the helper of the session user name for the service account svc.
+func serveHelperAs(ctx context.Context, name string, svc hostos.Account, listen func() (net.Listener, error), stderr io.Writer) int {
 	users, sec, probe := sys.platform(sys.runner)
 	self, err := users.Lookup(name)
 	if err != nil || self.ID != sys.callerID() {
 		_, _ = io.WriteString(stderr, "bothy-host pty-helper: must run as its session user\n")
 		return exitUsage
 	}
-	svc, err := users.Lookup(sys.serviceAccount())
-	if err != nil {
-		_, _ = io.WriteString(stderr, "bothy-host pty-helper: service user missing\n")
-		return exitFailed
-	}
 	if err := helper.Protect(svc.ID); err != nil {
 		_, _ = io.WriteString(stderr, "bothy-host pty-helper: memory protection failed\n")
 		return exitFailed
 	}
-	l, err := helperListener(name, svc.ID)
+	l, err := listen()
 	if err != nil {
 		_, _ = io.WriteString(stderr, "bothy-host pty-helper: no channel endpoint\n")
 		return exitFailed

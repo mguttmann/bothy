@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"log/slog"
 	"net"
 	"os"
@@ -92,6 +93,8 @@ type app struct {
 	protector     state.Protector
 	osVersion     func() string
 	log           func(w io.Writer) *slog.Logger
+	// account returns the account of the calling process (the owner account mode, ADR 0073).
+	account func() (hostos.Account, error)
 }
 
 var sys = realApp()
@@ -108,6 +111,7 @@ func realApp() *app {
 		asServiceUser: asServiceUser, listenAdmin: localchan.ListenAdmin, random: rand.Reader, protector: state.PlatformProtector(),
 		osVersion: osVersion,
 		log:       func(w io.Writer) *slog.Logger { return slog.New(slog.NewJSONHandler(w, nil)) },
+		account:   currentAccount,
 	}
 	a.apply = func(ctx context.Context, steps []install.Step) error {
 		users, _, _ := a.platform(a.runner)
@@ -123,10 +127,18 @@ func (a *app) cfgPlatform() config.Platform {
 // errUsage marks an error that exits 2.
 var errUsage = errors.New("usage")
 
-// loadConfig reads the configuration of --config or the default path; any error exits 2.
+// loadConfig reads the configuration of --config or the default path, and without a file there
+// the file of the owner account mode of the caller (ADR 0073); any error exits 2.
 func (a *app) loadConfig(path string) (*config.Config, error) {
 	if path == "" {
 		path = config.DefaultPath(a.cfgPlatform())
+		if _, err := os.Stat(path); errors.Is(err, fs.ErrNotExist) {
+			if own := a.ownerConfigPath(); own != "" {
+				if _, err := os.Stat(own); err == nil {
+					path = own
+				}
+			}
+		}
 	}
 	c, err := config.Load(path, a.cfgPlatform())
 	if err != nil {
@@ -196,5 +208,25 @@ func (a *app) doctorEnv(c *config.Config, st *state.Dir) doctor.Env {
 		env.SystemDrive = a.getenv("SystemDrive")
 		env.ServiceUser = install.HostAccountWindows
 	}
+	if c.OwnerAccount != "" {
+		a.ownerDoctorEnv(c, &env, users)
+	}
 	return env
+}
+
+// ownerDoctorEnv sets the parts of env that differ in the owner account mode (ADR 0073): the
+// account is the service user, the PTY helper is a child process on a socket in <state>/run, and
+// the program and the service definition lie under the account's home (D-OA-4, D-OA-9).
+func (a *app) ownerDoctorEnv(c *config.Config, env *doctor.Env, users hostos.Users) {
+	env.ServiceUser, env.OwnerAccount, env.CallerID = c.OwnerAccount, c.OwnerAccount, a.callerID()
+	run := filepath.Join(c.StateDir, "run")
+	exe, _ := a.executable()
+	if t, err := a.ownerTarget(); err == nil {
+		files, def := install.OwnerPaths(t)
+		env.HelperBinary, env.ServiceDefinitions = files.Binary, []string{def.Path}
+		exe = files.Binary
+	}
+	kids := &startup.ChildHelpers{GOOS: a.goos, Dir: run, Command: ownerHelperCommand(exe)}
+	env.Helpers = startup.ChannelHelpers{GOOS: a.goos, Users: users, Services: kids, Endpoint: kids.Endpoint}
+	env.EndpointDirs = []string{run}
 }

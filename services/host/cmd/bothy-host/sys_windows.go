@@ -63,6 +63,12 @@ func asServiceUser(context.Context, int, int, []string, []byte, io.Writer, io.Wr
 
 // helperListener creates the pipe of the helper with FILE_FLAG_FIRST_PIPE_INSTANCE and a DACL for
 // the service account only.
+// inheritedListener does not exist on Windows: the configuration refuses the owner account mode
+// there (ADR 0073, D-OA-3).
+func inheritedListener() (net.Listener, error) {
+	return nil, errors.New("pty-helper: no owner account mode on Windows")
+}
+
 func helperListener(name, serviceSID string) (net.Listener, error) {
 	return localchan.ListenPipe(localchan.HelperEndpoint(hostos.Windows, name), localchan.HelperPipeSDDL(serviceSID))
 }

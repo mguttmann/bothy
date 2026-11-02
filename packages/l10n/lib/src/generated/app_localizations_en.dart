@@ -3485,6 +3485,32 @@ class AppLocalizationsEn extends AppLocalizations {
       'Without a session user no terminal (SR12).';
 
   @override
+  String get hostOwnerAccountBadge => 'Owner account with administrator rights';
+
+  @override
+  String hostOwnerAccountWarning(String osUser) {
+    return 'Sessions as $osUser use the owner\'s own account with administrator rights: full access to the host, its keys and the host service. Only an active owner opens them, with a step-up on every opening, and every opening is logged.';
+  }
+
+  @override
+  String hostOwnerAccountOptIn(String osUser) {
+    return 'Bind my own administrator account $osUser to me';
+  }
+
+  @override
+  String get hostOwnerAccountOwnerOnly =>
+      'Only an owner can bind the owner account of a host, and only to himself.';
+
+  @override
+  String get hostOwnerAccountMismatch =>
+      'The host reports this name differently; reload the host and check the owner account.';
+
+  @override
+  String terminalOwnerAccountWarning(String osUser) {
+    return 'This session uses $osUser, your own account with administrator rights on this host. Everything you type has full rights.';
+  }
+
+  @override
   String get hostSessionUsersOnlyReported =>
       'Only names that the host reported during pairing or in its last report.';
 
@@ -8802,6 +8828,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get problemTerminalDeniedNoSessionUser =>
       'You have no own session user on this host';
+
+  @override
+  String get problemTerminalDeniedOwnerAccountOwnerOnly =>
+      'Only an active owner can open a terminal in the owner account of this host';
 
   @override
   String get problemTerminalDeniedSessionLimit =>

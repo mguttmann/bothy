@@ -118,9 +118,11 @@ def sync_detailed(
     (`access_revoked`). `add_session_users` assigns own session users (ruling T12; a taken name gives
     `409 conflict` with `reason: session_user_taken`, a name the host does not report in
     `reported_session_users` gives `400 validation_failed` with `errors[].code`
-    `session_user_not_on_host`); `revoke_session_users` ends the assignment of the listed people, ends
-    their sessions on the host (`access_revoked`) and keeps the name taken (24 section 2.2). Needs step-
-    up.
+    `session_user_not_on_host`; the owner account of the host needs `owner_account: true` and only an
+    active owner may assign it, only to himself, otherwise `403 forbidden` with `reason:
+    owner_account_owner_only`, ADR 0073); `revoke_session_users` ends the assignment of the listed
+    people, ends their sessions on the host (`access_revoked`) and keeps the name taken (24 section
+    2.2). Needs step-up.
 
     Args:
         host_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -165,9 +167,11 @@ def sync(
     (`access_revoked`). `add_session_users` assigns own session users (ruling T12; a taken name gives
     `409 conflict` with `reason: session_user_taken`, a name the host does not report in
     `reported_session_users` gives `400 validation_failed` with `errors[].code`
-    `session_user_not_on_host`); `revoke_session_users` ends the assignment of the listed people, ends
-    their sessions on the host (`access_revoked`) and keeps the name taken (24 section 2.2). Needs step-
-    up.
+    `session_user_not_on_host`; the owner account of the host needs `owner_account: true` and only an
+    active owner may assign it, only to himself, otherwise `403 forbidden` with `reason:
+    owner_account_owner_only`, ADR 0073); `revoke_session_users` ends the assignment of the listed
+    people, ends their sessions on the host (`access_revoked`) and keeps the name taken (24 section
+    2.2). Needs step-up.
 
     Args:
         host_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -207,9 +211,11 @@ async def asyncio_detailed(
     (`access_revoked`). `add_session_users` assigns own session users (ruling T12; a taken name gives
     `409 conflict` with `reason: session_user_taken`, a name the host does not report in
     `reported_session_users` gives `400 validation_failed` with `errors[].code`
-    `session_user_not_on_host`); `revoke_session_users` ends the assignment of the listed people, ends
-    their sessions on the host (`access_revoked`) and keeps the name taken (24 section 2.2). Needs step-
-    up.
+    `session_user_not_on_host`; the owner account of the host needs `owner_account: true` and only an
+    active owner may assign it, only to himself, otherwise `403 forbidden` with `reason:
+    owner_account_owner_only`, ADR 0073); `revoke_session_users` ends the assignment of the listed
+    people, ends their sessions on the host (`access_revoked`) and keeps the name taken (24 section
+    2.2). Needs step-up.
 
     Args:
         host_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -252,9 +258,11 @@ async def asyncio(
     (`access_revoked`). `add_session_users` assigns own session users (ruling T12; a taken name gives
     `409 conflict` with `reason: session_user_taken`, a name the host does not report in
     `reported_session_users` gives `400 validation_failed` with `errors[].code`
-    `session_user_not_on_host`); `revoke_session_users` ends the assignment of the listed people, ends
-    their sessions on the host (`access_revoked`) and keeps the name taken (24 section 2.2). Needs step-
-    up.
+    `session_user_not_on_host`; the owner account of the host needs `owner_account: true` and only an
+    active owner may assign it, only to himself, otherwise `403 forbidden` with `reason:
+    owner_account_owner_only`, ADR 0073); `revoke_session_users` ends the assignment of the listed
+    people, ends their sessions on the host (`access_revoked`) and keeps the name taken (24 section
+    2.2). Needs step-up.
 
     Args:
         host_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.

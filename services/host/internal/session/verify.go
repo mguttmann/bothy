@@ -67,6 +67,9 @@ type Check struct {
 	Workdirs     func(osu string) int
 	// ServerHost is HD5 or-ed with PeerIsLocal of the control connection.
 	ServerHost bool
+	// OwnerAccount is host_service.owner_account (ADR 0073), empty in the separate-user setup: a
+	// token for this session user needs own = true.
+	OwnerAccount string
 }
 
 // Verifier runs the check order of Design note 5 of M2-45 with the jti memory and the bindings.
@@ -79,7 +82,8 @@ type Verifier struct {
 // first failure; it returns the claims and "" when every step passed, else the close_detail of the
 // failing step. Steps (1) signature, (2) typ, (3) aud, (4) sid, (5) exp plus leeway, (6) jti never
 // seen (remembered from here on, so a replay of a token that failed later is still token_replayed),
-// (7) cek, (8) att, (9) prf offered, (10) osu configured, (11) osu bound to sub (bound now when
+// (7) cek, (8) att, (9) prf offered, (10) osu configured, (10a) own for the owner account
+// (ADR 0073), (11) osu bound to sub (bound now when
 // unbound), (12) wdi exactly for claude with att open and inside the list of osu, (13) own on the
 // server host. Step 0, message 1 itself, runs before Verify (handshake_failed).
 func (v *Verifier) Verify(c Check) (Claims, string) {
@@ -124,6 +128,9 @@ func (v *Verifier) verifyAccess(c Check, cl Claims) string {
 		return DetailProfileUnknown
 	case !slices.Contains(c.SessionUsers, cl.Osu):
 		return DetailSessionUserUnknown
+	case c.OwnerAccount != "" && cl.Osu == c.OwnerAccount && !cl.Own:
+		// Step 10a (D-OA-5): only an owner reaches the owner account, checked before the binding.
+		return DetailSessionUserMismatch
 	case !v.Bindings.Bind(cl.Osu, cl.Sub):
 		return DetailSessionUserMismatch
 	}

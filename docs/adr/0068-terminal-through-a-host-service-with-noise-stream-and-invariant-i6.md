@@ -8,6 +8,11 @@ informed: all teams
 
 # Terminal through a host service with a Noise end-to-end stream and invariant I6
 
+Status note (2026-11-01): Partly superseded by
+[ADR 0073](0073-terminal-in-the-owners-own-account.md): on a host in the owner account mode, the
+host service and its one session user are the instance owner's own account with administrator
+rights (items 1 and 7 and ruling T12 do not apply there). Everything else still applies.
+
 ## Context and Problem Statement
 
 The owner requires a terminal as a mandatory component (follow-up of 2026-10-10): shell and

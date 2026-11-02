@@ -17,8 +17,8 @@ WHERE host_id = ANY (@host_ids::uuid[]) AND revoked_at IS NULL
 ORDER BY host_id, created_at, id;
 
 -- name: InsertSessionUser :exec
-INSERT INTO host_session_users (id, host_id, user_id, os_user, created_by, created_at)
-VALUES (@id, @host_id, @user_id, @os_user, @created_by, @created_at);
+INSERT INTO host_session_users (id, host_id, user_id, os_user, created_by, created_at, owner_account)
+VALUES (@id, @host_id, @user_id, @os_user, @created_by, @created_at, @owner_account);
 
 -- name: RevokeSessionUser :execrows
 -- Ends a valid assignment; the row stays and its name stays taken.

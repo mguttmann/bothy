@@ -7,6 +7,67 @@ import (
 	"net/http"
 )
 
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r UpdateCommandResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r UpdateCommandResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r UpdateCommandResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r UpdateCommandResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
+func (r UpdateCommandResponse) GetApplicationproblemJSON412() *PreconditionFailed {
+	return r.ApplicationproblemJSON412
+}
+
+// GetApplicationproblemJSON428 returns the response for an HTTP 428 `application/problem+json` response
+func (r UpdateCommandResponse) GetApplicationproblemJSON428() *PreconditionRequired {
+	return r.ApplicationproblemJSON428
+}
+
+// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
+func (r UpdateCommandResponse) GetApplicationproblemJSON429() *TooManyRequests {
+	return r.ApplicationproblemJSON429
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r UpdateCommandResponse) GetApplicationproblemJSONDefault() *Error {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r UpdateCommandResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateCommandResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateCommandResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r UpdateCommandResponse) ContentType() string {
 	if r.HTTPResponse != nil {
@@ -26024,28 +26085,5 @@ type AddStatusIncidentUpdateResponse401Headers struct {
 
 // AddStatusIncidentUpdateResponse403Headers the declared response headers of an HTTP 403 response for AddStatusIncidentUpdate
 type AddStatusIncidentUpdateResponse403Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// AddStatusIncidentUpdateResponse404Headers the declared response headers of an HTTP 404 response for AddStatusIncidentUpdate
-type AddStatusIncidentUpdateResponse404Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// AddStatusIncidentUpdateResponse422Headers the declared response headers of an HTTP 422 response for AddStatusIncidentUpdate
-type AddStatusIncidentUpdateResponse422Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// AddStatusIncidentUpdateResponse429Headers the declared response headers of an HTTP 429 response for AddStatusIncidentUpdate
-type AddStatusIncidentUpdateResponse429Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      *int
-}
-
-// AddStatusIncidentUpdateResponseDefaultHeaders the declared response headers of an HTTP default response for AddStatusIncidentUpdate
-type AddStatusIncidentUpdateResponseDefaultHeaders struct {
 	CorrelationId *CorrelationId
 }

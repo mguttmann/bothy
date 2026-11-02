@@ -128,7 +128,7 @@ func (s *Service) attachUnit(ctx context.Context, p actor.Actor, h domain.Host, 
 	if err != nil {
 		return terminal.Grant{}, err
 	}
-	if err := s.recordGrant(ctx, authorize.ActionTerminalAttach, h, ses, cmd.PinChanged, owner); err != nil {
+	if err := s.recordGrant(ctx, authorize.ActionTerminalAttach, h, ses, cmd.PinChanged, owner, u.OwnerAccount); err != nil {
 		return terminal.Grant{}, err
 	}
 	if err := s.emitSessionChangedBy(ctx, ses, p.ID); err != nil {

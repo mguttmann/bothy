@@ -149,7 +149,10 @@ func wantField(t *testing.T, name string, err error, pointer, code string) {
 func TestPlanAssignments(t *testing.T) {
 	t.Parallel()
 	alex, sam, robin := ids.New(), ids.New(), ids.New()
-	reported := []string{"bothy-s-alex", "bothy-s-robin", "bothy-s-sam", "bothy-s-shared", "BOTHY-S-SHARED"}
+	var reported []domain.ReportedSessionUser
+	for _, n := range []string{"bothy-s-alex", "bothy-s-robin", "bothy-s-sam", "bothy-s-shared", "BOTHY-S-SHARED"} {
+		reported = append(reported, domain.ReportedSessionUser{OSUser: n})
+	}
 	row := func(user ids.ID, name string, ended bool) domain.SessionUserRow {
 		return domain.SessionUserRow{ID: ids.New(), UserID: user, OSUser: name, Revoked: ended}
 	}

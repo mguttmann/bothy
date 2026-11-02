@@ -3502,6 +3502,33 @@ class AppLocalizationsDe extends AppLocalizations {
       'Ohne Sitzungsbenutzer kein Terminal (SR12).';
 
   @override
+  String get hostOwnerAccountBadge =>
+      'Eigenes Konto des Owners mit Administratorrechten';
+
+  @override
+  String hostOwnerAccountWarning(String osUser) {
+    return 'Sitzungen als $osUser nutzen das eigene Konto des Owners mit Administratorrechten: voller Zugriff auf den Rechner, seine Schlüssel und den Host-Dienst. Nur ein aktiver Owner öffnet sie, mit Bestätigung bei jedem Öffnen, und jedes Öffnen wird protokolliert.';
+  }
+
+  @override
+  String hostOwnerAccountOptIn(String osUser) {
+    return 'Mein eigenes Administratorkonto $osUser an mich binden';
+  }
+
+  @override
+  String get hostOwnerAccountOwnerOnly =>
+      'Nur ein Owner kann das eigene Konto eines Rechners binden, und nur an sich selbst.';
+
+  @override
+  String get hostOwnerAccountMismatch =>
+      'Der Rechner meldet diesen Namen anders; lade den Rechner neu und prüfe das eigene Konto.';
+
+  @override
+  String terminalOwnerAccountWarning(String osUser) {
+    return 'Diese Sitzung nutzt $osUser, dein eigenes Konto mit Administratorrechten auf diesem Rechner. Alles, was du eingibst, hat volle Rechte.';
+  }
+
+  @override
   String get hostSessionUsersOnlyReported =>
       'Nur Namen, die der Rechner bei der Kopplung oder in seiner letzten Meldung gemeldet hat.';
 
@@ -8838,6 +8865,10 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get problemTerminalDeniedNoSessionUser =>
       'Du hast auf diesem Rechner keinen eigenen Sitzungsbenutzer';
+
+  @override
+  String get problemTerminalDeniedOwnerAccountOwnerOnly =>
+      'Nur ein aktiver Owner kann im eigenen Konto dieses Rechners ein Terminal öffnen';
 
   @override
   String get problemTerminalDeniedSessionLimit =>

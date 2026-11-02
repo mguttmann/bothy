@@ -195,7 +195,7 @@ func (s *Service) checkAdd(ctx context.Context, add []terminal.SessionUserAssign
 		if err != nil {
 			return nil, err
 		}
-		out = append(out, domain.SessionUserAssign{UserID: a.UserID, OSUser: name})
+		out = append(out, domain.SessionUserAssign{UserID: a.UserID, OSUser: name, OwnerAccount: a.OwnerAccount})
 	}
 	return out, nil
 }
@@ -232,7 +232,7 @@ func (s *Service) planFor(ctx context.Context, h domain.Host, b updateBody, lock
 	if err != nil {
 		return domain.Plan{}, err
 	}
-	plan, err := domain.PlanAssignments(domain.ReportedNames(h.ReportedUsers), rows, b.revoke, b.add)
+	plan, err := domain.PlanAssignments(h.ReportedUsers, rows, b.revoke, b.add)
 	if e, ok := errs.As(err); ok && e.Code == errs.CodeValidationFailed {
 		return domain.Plan{}, err
 	}
@@ -291,6 +291,9 @@ func (s *Service) updateCheck(ctx context.Context, a actor.Actor, cmd terminal.U
 	}
 	b, err := s.checkUpdate(ctx, cmd)
 	if err != nil {
+		return updateBody{}, ids.ID{}, false, terminal.HostView{}, err
+	}
+	if err := s.checkOwnerAccounts(ctx, a, b.add); err != nil {
 		return updateBody{}, ids.ID{}, false, terminal.HostView{}, err
 	}
 	st, err := s.loadFor(ctx, cmd.HostID, cmd.IfMatch)
@@ -400,7 +403,7 @@ func (s *Service) applyPlan(ctx context.Context, a actor.Actor, hostID ids.ID, p
 		if _, err := s.EndSessions(ctx, SessionSelector{HostID: hostID, UserID: r.UserID}, domain.ServerEnd(domain.CloseAccessRevoked)); err != nil {
 			return err
 		}
-		if err := s.recordSessionUser(ctx, hostID, changeRevoked, r.UserID, r.OSUser, reason); err != nil {
+		if err := s.recordSessionUser(ctx, hostID, changeRevoked, r.UserID, r.OSUser, r.OwnerAccount, reason); err != nil {
 			return err
 		}
 	}
@@ -408,7 +411,7 @@ func (s *Service) applyPlan(ctx context.Context, a actor.Actor, hostID ids.ID, p
 		if err := s.d.Store.InsertSessionUser(ctx, ids.New(), hostID, x, a.ID, t); err != nil {
 			return err
 		}
-		if err := s.recordSessionUser(ctx, hostID, changeAssigned, x.UserID, x.OSUser, reason); err != nil {
+		if err := s.recordSessionUser(ctx, hostID, changeAssigned, x.UserID, x.OSUser, x.OwnerAccount, reason); err != nil {
 			return err
 		}
 	}
@@ -432,12 +435,37 @@ func updateAttrs(h domain.Host, name string, holder ids.ID, reason string) audit
 }
 
 // recordSessionUser records one assignment or end of a session user (24 section 10.1: per
-// assignment or end, with the person and the name under the reserved member os_user).
-func (s *Service) recordSessionUser(ctx context.Context, hostID ids.ID, change string, user ids.ID, osUser, reason string) error {
-	return s.record(ctx, hostID, auditing.Attrs{
+// assignment or end, with the person and the name under the reserved member os_user); an
+// assignment of the owner account carries owner_account = true (ADR 0073, D-OA-8).
+func (s *Service) recordSessionUser(ctx context.Context, hostID ids.ID, change string, user ids.ID, osUser string, ownerAccount bool, reason string) error {
+	attrs := auditing.Attrs{
 		attrOperation: auditing.Code(opSessionUser), attrReason: auditing.ReasonText(reason), attrChange: auditing.Code(change),
 		attrUserID: auditing.ID(user), attrOSUser: auditing.OSUserName(osUser),
-	})
+	}
+	if ownerAccount {
+		attrs[attrOwnerAccount] = auditing.Bool(true)
+	}
+	return s.record(ctx, hostID, attrs)
+}
+
+// checkOwnerAccounts refuses an assignment of the owner account (ADR 0073, D-OA-6) unless the
+// actor is an active owner and assigns it to himself: 403 forbidden with reason
+// owner_account_owner_only. Whether the host reports the name as its owner account is checked by
+// domain.PlanAssignmentsAt.
+func (s *Service) checkOwnerAccounts(ctx context.Context, a actor.Actor, add []domain.SessionUserAssign) error {
+	for _, x := range add {
+		if !x.OwnerAccount {
+			continue
+		}
+		owner, err := s.d.People.IsActiveOwner(ctx, a.ID)
+		if err != nil {
+			return err
+		}
+		if !owner || x.UserID != a.ID {
+			return errs.New(errs.CodeForbidden, "Only an owner assigns the owner account, and only to himself.").WithReason(domain.ReasonOwnerAccountOwnerOnly)
+		}
+	}
+	return nil
 }
 
 // causes maps the requested state of setHostState to its cause (24 section 3.1).

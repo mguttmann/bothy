@@ -11,13 +11,18 @@ class _$HostReportedSessionUser extends HostReportedSessionUser {
   final String osUser;
   @override
   final BuiltList<String> workdirs;
+  @override
+  final bool? ownerAccount;
 
   factory _$HostReportedSessionUser([
     void Function(HostReportedSessionUserBuilder)? updates,
   ]) => (HostReportedSessionUserBuilder()..update(updates))._build();
 
-  _$HostReportedSessionUser._({required this.osUser, required this.workdirs})
-    : super._();
+  _$HostReportedSessionUser._({
+    required this.osUser,
+    required this.workdirs,
+    this.ownerAccount,
+  }) : super._();
   @override
   HostReportedSessionUser rebuild(
     void Function(HostReportedSessionUserBuilder) updates,
@@ -32,7 +37,8 @@ class _$HostReportedSessionUser extends HostReportedSessionUser {
     if (identical(other, this)) return true;
     return other is HostReportedSessionUser &&
         osUser == other.osUser &&
-        workdirs == other.workdirs;
+        workdirs == other.workdirs &&
+        ownerAccount == other.ownerAccount;
   }
 
   @override
@@ -40,6 +46,7 @@ class _$HostReportedSessionUser extends HostReportedSessionUser {
     var _$hash = 0;
     _$hash = $jc(_$hash, osUser.hashCode);
     _$hash = $jc(_$hash, workdirs.hashCode);
+    _$hash = $jc(_$hash, ownerAccount.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -48,7 +55,8 @@ class _$HostReportedSessionUser extends HostReportedSessionUser {
   String toString() {
     return (newBuiltValueToStringHelper(r'HostReportedSessionUser')
           ..add('osUser', osUser)
-          ..add('workdirs', workdirs))
+          ..add('workdirs', workdirs)
+          ..add('ownerAccount', ownerAccount))
         .toString();
   }
 }
@@ -67,6 +75,10 @@ class HostReportedSessionUserBuilder
       _$this._workdirs ??= ListBuilder<String>();
   set workdirs(ListBuilder<String>? workdirs) => _$this._workdirs = workdirs;
 
+  bool? _ownerAccount;
+  bool? get ownerAccount => _$this._ownerAccount;
+  set ownerAccount(bool? ownerAccount) => _$this._ownerAccount = ownerAccount;
+
   HostReportedSessionUserBuilder() {
     HostReportedSessionUser._defaults(this);
   }
@@ -76,6 +88,7 @@ class HostReportedSessionUserBuilder
     if ($v != null) {
       _osUser = $v.osUser;
       _workdirs = $v.workdirs.toBuilder();
+      _ownerAccount = $v.ownerAccount;
       _$v = null;
     }
     return this;
@@ -106,6 +119,7 @@ class HostReportedSessionUserBuilder
               'osUser',
             ),
             workdirs: workdirs.build(),
+            ownerAccount: ownerAccount,
           );
     } catch (_) {
       late String _$failedField;

@@ -590,14 +590,15 @@ type Host struct {
 }
 
 type HostSessionUser struct {
-	ID        pgtype.UUID
-	HostID    pgtype.UUID
-	UserID    pgtype.UUID
-	OsUser    string
-	CreatedBy pgtype.UUID
-	CreatedAt pgtype.Timestamptz
-	RevokedBy pgtype.UUID
-	RevokedAt pgtype.Timestamptz
+	ID           pgtype.UUID
+	HostID       pgtype.UUID
+	UserID       pgtype.UUID
+	OsUser       string
+	CreatedBy    pgtype.UUID
+	CreatedAt    pgtype.Timestamptz
+	RevokedBy    pgtype.UUID
+	RevokedAt    pgtype.Timestamptz
+	OwnerAccount bool
 }
 
 type IdempotencyKey struct {

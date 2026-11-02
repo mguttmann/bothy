@@ -2468,7 +2468,7 @@ LLM login (I6) and its reported state. Module: `terminal`.
 | `confirmed_by` | `uuid` | yes | | owner who confirmed the fingerprint |
 | `confirmed_at` | `timestamptz` | yes | | |
 | `reported_profiles` | `jsonb` | no | `'[]'` | schema `host_profiles.v1`: per profile `name`, `display_name`, `kind` (`shell`, `claude`, `command`); never command lines, paths or environment |
-| `reported_session_users` | `jsonb` | no | `'[]'` | schema `host_reported_session_users.v1`: per name from `host_service.session_users`, `os_user` and `workdirs`, the display names of its working folders of the profile `claude` from `host_service.claude_workdirs` after HD7 (a folder shared by two session users is missing from both lists), in their order; the host service resolves `wdi` in exactly this list; reported at `host.pair` and with every `report` (24, section 2.2); never paths |
+| `reported_session_users` | `jsonb` | no | `'[]'` | schema `host_reported_session_users.v1`: per name from `host_service.session_users`, `os_user`, `workdirs` and, only for the owner account of the host (24 section 2.4), `owner_account: true`, the display names of its working folders of the profile `claude` from `host_service.claude_workdirs` after HD7 (a folder shared by two session users is missing from both lists), in their order; the host service resolves `wdi` in exactly this list; reported at `host.pair` and with every `report` (24, section 2.2); never paths |
 | `reported_doctor` | `jsonb` | no | `'[]'` | schema `host_doctor.v1`: list with result and code per check HD1 to HD11 (24, section 2.2); per account that the rule for names from 24, section 2.2 names, a separate entry with its name (`session_user`): for HD6, HD10 (wrong peer) and HD11 the affected session user, for HD9 every former session user with a readable home, for other users an entry without a name; check and name together are unique; never content, paths or values |
 | `reported_is_server_host` | `boolean` | yes | | report of the host service (24, section 2.3) |
 | `reported_require_local_confirm` | `boolean` | yes | | report whether `host_service.require_local_confirm` is on |
@@ -2515,6 +2515,7 @@ belongs to at most one person, also after the assignment has ended. Module: `ter
 | `created_at` | `timestamptz` | no | `now()` | |
 | `revoked_by` | `uuid` | yes | | owner who ended the assignment |
 | `revoked_at` | `timestamptz` | yes | | end of the assignment; the row stays, the name stays taken for this host |
+| `owner_account` | `boolean` | no | `false` | the explicit opt-in for the owner account of the host (24 section 2.4, ADR 0073); only an active owner sets it, only for himself, and only for a name that `hosts.reported_session_users` marks with `owner_account`; SR12 counts the row only while the report carries the same flag (migration 00089) |
 
 PK: `id`. FK: `host_id` -> `hosts(id)` ON DELETE RESTRICT; `user_id` -> `users(principal_id)` ON
 DELETE RESTRICT; `created_by`, `revoked_by` -> `principals(id)` ON DELETE RESTRICT.

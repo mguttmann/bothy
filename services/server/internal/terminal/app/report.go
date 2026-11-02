@@ -138,7 +138,7 @@ func (s *Service) checkReport(report []domain.ReportedSessionUser) ([]domain.Rep
 			}
 			dirs = append(dirs, d)
 		}
-		out = append(out, domain.ReportedSessionUser{OSUser: u.OSUser, Workdirs: dirs})
+		out = append(out, domain.ReportedSessionUser{OSUser: u.OSUser, Workdirs: dirs, OwnerAccount: u.OwnerAccount})
 	}
 	return out, nil
 }

@@ -52,6 +52,8 @@ String problemText(AppLocalizations l, String code, {String? reason}) {
       l.problemTerminalDeniedI6HolderOnly,
     ('terminal_denied', 'no_session_user') =>
       l.problemTerminalDeniedNoSessionUser,
+    ('terminal_denied', 'owner_account_owner_only') =>
+      l.problemTerminalDeniedOwnerAccountOwnerOnly,
     ('terminal_denied', 'session_limit') => l.problemTerminalDeniedSessionLimit,
     ('terminal_denied', 'profile_unknown') =>
       l.problemTerminalDeniedProfileUnknown,

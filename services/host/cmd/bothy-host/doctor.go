@@ -50,6 +50,7 @@ func cmdDoctor(ctx context.Context, args []string, stdout, stderr io.Writer) int
 func directDoctor(ctx context.Context, c *config.Config, stdout io.Writer) int {
 	st := state.Open(c.StateDir, sys.protector)
 	env := sys.doctorEnv(c, st)
+	defer closeHelpers(env)
 	env.Declaration, _ = st.ReadDeclaration()
 	env.Bindings, _ = st.ReadBindings()
 	if p, err := st.ReadPairing(); err == nil {

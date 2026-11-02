@@ -67,6 +67,8 @@ type SessionUser struct {
 	UserID    ids.ID
 	OSUser    string
 	CreatedAt time.Time
+	// OwnerAccount marks an assignment of the owner account mode (ADR 0073).
+	OwnerAccount bool
 }
 
 // Session is a row of terminal_sessions as the end of a session and terminal_session.changed read
@@ -120,6 +122,8 @@ func (h Host) Apply(r Result, t time.Time) Host {
 type OwnSessionUser struct {
 	ID, HostID ids.ID
 	OSUser     string
+	// OwnerAccount marks an assignment of the owner account mode (ADR 0073).
+	OwnerAccount bool
 	// HostReport is hosts.reported_session_users of the host.
 	HostReport []ReportedSessionUser
 }

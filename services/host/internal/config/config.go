@@ -75,6 +75,10 @@ type Config struct {
 	// host_service.reconnect_backoff_cap.
 	ReconnectBackoffBase time.Duration
 	ReconnectBackoffCap  time.Duration
+	// OwnerAccount is host_service.owner_account (ADR 0073): the existing account of the instance
+	// owner that the host service and its only session user run as; empty for the separate users of
+	// ADR 0068.
+	OwnerAccount string
 }
 
 // Workdirs returns the configured list of sessionUser, or nil.
@@ -100,7 +104,7 @@ func DefaultPath(p Platform) string {
 	switch p.GOOS {
 	case "darwin":
 		return "/Library/Application Support/bothy-host/config.yaml"
-	case "windows":
+	case goosWindows:
 		return p.ProgramFiles + `\bothy-host\config.yaml`
 	}
 	return "/etc/bothy-host/config.yaml"
@@ -109,7 +113,7 @@ func DefaultPath(p Platform) string {
 // Defaults returns the configuration without a file: the defaults of 24 section 17 for p.
 func Defaults(p Platform) Config {
 	state := "/var/lib/bothy-host"
-	if p.GOOS == "windows" {
+	if p.GOOS == goosWindows {
 		state = p.ProgramData + `\bothy-host`
 	}
 	return Config{
@@ -167,6 +171,7 @@ func Parse(b []byte, p Platform) (*Config, error) {
 		return &c, nil
 	}
 	root := doc.Content[0]
+	ownerSet := false
 	if root.Kind != yaml.MappingNode {
 		return nil, invalid("host_service", "the file must be a mapping with the key host_service")
 	}
@@ -177,13 +182,19 @@ func Parse(b []byte, p Platform) (*Config, error) {
 		if v.Kind != yaml.MappingNode {
 			return invalid(key, "must be a mapping")
 		}
-		return eachKey(v, "host_service.", c.set)
+		return eachKey(v, "host_service.", func(key string, v *yaml.Node) error {
+			ownerSet = ownerSet || key == keyOwnerAccount
+			return c.set(key, v)
+		})
 	})
 	if err != nil {
 		return nil, err
 	}
 	if c.ReconnectBackoffCap < c.ReconnectBackoffBase {
 		return nil, invalid("host_service.reconnect_backoff_cap", "must not be below host_service.reconnect_backoff_base")
+	}
+	if err := c.ownerAccountRules(p, ownerSet); err != nil {
+		return nil, err
 	}
 	return &c, nil
 }
@@ -249,10 +260,39 @@ func (c *Config) set(key string, v *yaml.Node) error {
 		c.ReconnectBackoffBase, err = positiveDuration(key, v)
 	case "host_service.reconnect_backoff_cap":
 		c.ReconnectBackoffCap, err = positiveDuration(key, v)
+	case keyOwnerAccount:
+		c.OwnerAccount, err = str(key, v)
 	default:
 		err = invalid(key, "unknown key")
 	}
 	return err
+}
+
+// goosWindows is the GOOS of Windows.
+const goosWindows = "windows"
+
+// keyOwnerAccount is the key of the owner account mode.
+const keyOwnerAccount = "host_service.owner_account"
+
+// ownerAccountRules applies the rules of host_service.owner_account (D-OA-1, D-OA-3, D-OA-10): a
+// name, not on Windows, the only session user (an empty list is filled in) and no local
+// confirmation, because nobody sits at the machine.
+func (c *Config) ownerAccountRules(p Platform, set bool) error {
+	switch {
+	case !set:
+		return nil
+	case c.OwnerAccount == "":
+		return invalid(keyOwnerAccount, "must name an account")
+	case p.GOOS == goosWindows:
+		return invalid(keyOwnerAccount, "is not supported on this platform")
+	case c.RequireLocalConfirm:
+		return invalid("host_service.require_local_confirm", "must be false with host_service.owner_account")
+	case len(c.SessionUsers) == 0:
+		c.SessionUsers = []string{c.OwnerAccount}
+	case len(c.SessionUsers) != 1 || c.SessionUsers[0] != c.OwnerAccount:
+		return invalid("host_service.session_users", "must be exactly host_service.owner_account")
+	}
+	return nil
 }
 
 func scalar(key string, v *yaml.Node, tag, what string) (string, error) {

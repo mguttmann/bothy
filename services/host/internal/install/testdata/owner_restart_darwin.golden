@@ -1,0 +1,1 @@
+run /bin/launchctl kickstart -k gui/501/bothy-host

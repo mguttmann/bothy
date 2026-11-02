@@ -75,6 +75,10 @@ func asServiceUser(ctx context.Context, uid, gid int, args []string, stdin []byt
 	return 0, err
 }
 
+// inheritedListener returns the socket the host service passed to its child helper (owner
+// account mode, ADR 0073).
+func inheritedListener() (net.Listener, error) { return localchan.InheritedListener() }
+
 // helperListener returns the socket the service manager passed.
 func helperListener(string, string) (net.Listener, error) {
 	return localchan.ActivatedListener(runtime.GOOS, sys.getenv("LISTEN_PID"), sys.getenv("LISTEN_FDS"))
