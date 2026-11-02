@@ -60,7 +60,7 @@ List<(int, int)> dsMatchRanges(String text, String query) {
   ];
 }
 
-/// One styled piece of a text: the characters from [start] to [end] in [style].
+/// One styled piece of a text: the characters from `start` to `end` in `style`.
 typedef DsStyledRange = (int start, int end, TextStyle style);
 
 /// The spans of [text] in the styled [ranges] (in order, covering the text), with the matches

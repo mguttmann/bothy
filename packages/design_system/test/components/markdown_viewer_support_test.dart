@@ -180,7 +180,10 @@ void main() {
 
     test('dsMatchRanges ignores case and never overlaps', () {
       expect(dsMatchRanges('aAa', 'aa'), [(0, 2)]);
+      // A German sample of case folding with a sharp s.
+      // language-check: off
       expect(dsMatchRanges('Straße STRASSE', 'straße'), [(0, 6)]);
+      // language-check: on
       expect(dsMatchRanges('x', ''), isEmpty);
     });
   });

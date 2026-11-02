@@ -151,9 +151,9 @@ void main() {
       final dir = Directory.systemTemp.createTempSync('document-content');
       addTearDown(() => dir.deleteSync(recursive: true));
       final small = File('${dir.path}/a.md')
-        ..writeAsBytesSync([0xEF, 0xBB, 0xBF, ...utf8.encode('# Hi ü')]);
+        ..writeAsBytesSync([0xEF, 0xBB, 0xBF, ...utf8.encode('# Hi é')]);
       final read = await readDocument(small, DocumentKind.markdown);
-      expect(read.text, '# Hi ü');
+      expect(read.text, '# Hi é');
       expect(read.truncated, isFalse);
 
       final big = File('${dir.path}/b.log')
