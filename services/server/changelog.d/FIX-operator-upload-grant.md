@@ -1,6 +1,7 @@
 ### Fixed
 
-- The operator of a channel, and the fixed operator of a thread, may upload files without a grant:
+- The operator of a channel may upload files without a grant (a fixed thread operator that is not
+  the channel's operator still needs a channel grant, because uploads are decided on the channel):
   the operator rule gives `upload` together with `write` and takes both away when the operator
   changes. Before, an agent that sends files (answer attachments, media) had its files refused
   with `403 forbidden` and `capability_missing` until the owner added a grant with `upload` by

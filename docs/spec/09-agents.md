@@ -87,6 +87,8 @@ An agent has at most `write` and, as a capability, at most `upload` (R-DM-08, R-
 every channel that it operates, and in every thread with it as the fixed operator, it has `write`
 and `upload` without a grant row (operator rule, 05 section 2.3, R-AZ-13). Whether it may send
 files there is the owner's switch `supports_files_out` (2.2), checked when the message is accepted.
+`file.upload` is decided on the channel, so a fixed thread operator that is not the channel's
+operator still needs a channel grant with `upload` to send files (ruling FIX-OUG/6).
 As a guest agent or in report channels it needs a grant with `write`, and for files one with
 `upload`. Reason for the operator rule: an operator that must not write only produces failing
 runs, and a second, separately maintained grant would remain after a change of operator. `upload`
