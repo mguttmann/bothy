@@ -7087,6 +7087,46 @@
   "@terminalReattach": {
     "description": "Button that attaches to a detached terminal session again."
   },
+  "terminalCloseTab": "Close",
+  "@terminalCloseTab": {
+    "description": "Button that closes the tab of an ended terminal session; the session no longer runs."
+  },
+  "terminalSessions": "Sessions",
+  "@terminalSessions": {
+    "description": "Button that shows the list of the person's running terminal sessions on the host."
+  },
+  "terminalSessionsTitle": "Running sessions",
+  "@terminalSessionsTitle": {
+    "description": "Title of the list of the person's running terminal sessions on the host."
+  },
+  "terminalSessionsNone": "No running sessions.",
+  "@terminalSessionsNone": {
+    "description": "Text of the session list when no terminal session runs on the host."
+  },
+  "terminalSessionStarted": "Started {time}",
+  "@terminalSessionStarted": {
+    "description": "When a terminal session was opened, in the session list.",
+    "placeholders": {
+      "time": {
+        "type": "String",
+        "example": "08:27"
+      }
+    }
+  },
+  "terminalSessionDetachedSince": "Detached since {time}",
+  "@terminalSessionDetachedSince": {
+    "description": "Since when a terminal session runs without a connected device, in the session list.",
+    "placeholders": {
+      "time": {
+        "type": "String",
+        "example": "08:37"
+      }
+    }
+  },
+  "terminalSessionConnected": "Connected",
+  "@terminalSessionConnected": {
+    "description": "A terminal session this device is connected to, in the session list."
+  },
   "terminalStateConnecting": "Opening the encrypted connection to the host",
   "@terminalStateConnecting": {
     "description": "Banner while the terminal session opens."

@@ -300,6 +300,9 @@ type rig struct {
 	peerBad atomic.Bool
 	clk     clock.Clock
 	sock    string
+	// ownerAccount runs the rig in the owner account mode (ADR 0073): the session user is the
+	// owner account and every token carries own = true.
+	ownerAccount bool
 	// startDelay slows every PTY start of the helper.
 	startDelay time.Duration
 	helper     *exec.Cmd
@@ -315,6 +318,7 @@ func withStartDelay(d time.Duration) rigOption {
 	return func(r *rig) { r.startDelay = d }
 }
 func withClock(c clock.Clock) rigOption { return func(r *rig) { r.clk = c } }
+func withOwnerAccount() rigOption       { return func(r *rig) { r.ownerAccount = true } }
 func withValues(v sessiontest.Values) rigOption {
 	return func(r *rig) { r.values = v }
 }
@@ -362,6 +366,9 @@ func newRig(t *testing.T, opts ...rigOption) *rig {
 	cfg.Profiles = append(cfg.Profiles, config.Profile{Name: "echo", DisplayName: "Echo", Kind: config.KindCommand, Program: "/bin/echo", Args: []string{"command-ran"}})
 	cfg.ScrollbackBytes = 4096
 	cfg.RequireLocalConfirm = r.confirm != nil
+	if r.ownerAccount {
+		cfg.OwnerAccount = r.osu
+	}
 	r.cfg = &cfg
 	r.runner = &fakeRunner{res: shellResult(r.osu), lightUser: map[string]int{}}
 	r.gate = NewGate(r.runner, r.clk, cfg.CredentialCheckInterval, nil, nil)
@@ -469,7 +476,11 @@ func (r *rig) sessionOpen(id, prf string, window time.Duration) {
 
 // claims returns valid claims for id and the device dev.
 func (r *rig) claims(id, prf, att string, dev *sessiontest.Device) map[string]any {
-	return sessiontest.Claims(hostID, id, r.sub, r.osu, prf, dev.Cek(), att, r.clk.Now(), 30*time.Second)
+	c := sessiontest.Claims(hostID, id, r.sub, r.osu, prf, dev.Cek(), att, r.clk.Now(), 30*time.Second)
+	if r.ownerAccount {
+		c["own"] = true
+	}
+	return c
 }
 
 // handshake sends message 1 with tok on dc and reads message 2.

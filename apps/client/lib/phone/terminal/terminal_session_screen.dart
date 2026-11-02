@@ -17,7 +17,6 @@ import 'dart:async';
 
 import 'package:api_client/api_client.dart' show Host, HostProfile;
 import 'package:design_system/design_system.dart';
-import 'package:domain/domain.dart' show AppConfigValues;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:l10n/l10n.dart';
@@ -26,6 +25,7 @@ import 'package:terminal_ui/terminal_ui.dart';
 import '../../app/providers/ports.dart';
 import '../../platform/terminal_guard.dart';
 import '../../terminal/providers.dart';
+import '../../terminal/tabs_pane.dart';
 import 'providers.dart';
 
 /// M8 of [hostId].
@@ -159,22 +159,15 @@ class _TerminalSessionScreenState extends ConsumerState<TerminalSessionScreen>
         ],
       );
     }
-    return TerminalPane(
+    return tabsPane(
       key: ValueKey('phone.terminal.pane.${widget.hostId}'),
-      controller: current,
-      fontSize: tabs.fontSize,
-      tabs: [
-        for (final (profile, n) in tabs.labels)
-          SessionTabData(label: l.terminalTabLabel(profile, n)),
-      ],
-      selected: tabs.selected,
-      onSelect: tabs.select,
-      maxSessionDuration: tabs.services.config.maxSessionDuration,
+      tabs: tabs,
+      current: current,
+      host: host,
+      l: l,
       now: tabs.services.clock.now,
       phone: true,
-      showExtraKeys: true,
       hardwareKeyboard: _keyboard,
-      autofocus: true,
     );
   }
 }

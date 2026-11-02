@@ -15,6 +15,7 @@ import 'package:terminal_ui/src/extra_keys/extra_keys_bar.dart';
 import 'package:terminal_ui/src/extra_keys/extra_keys_controller.dart';
 import 'package:terminal_ui/src/extra_keys/hardware_keyboard.dart';
 import 'package:terminal_ui/src/render/terminal_view.dart';
+import 'package:terminal_ui/src/widgets/session_list.dart';
 import 'package:terminal_ui/src/widgets/session_switcher.dart';
 import 'package:terminal_ui/src/widgets/session_tabs.dart';
 import 'package:terminal_ui/src/widgets/terminal_header.dart';
@@ -61,6 +62,9 @@ class TerminalPane extends StatefulWidget {
     this.readClipboard,
     this.shortcuts = const {},
     this.autofocus = false,
+    this.onEnd,
+    this.onClose,
+    this.sessions,
   });
 
   /// The controller of the selected tab.
@@ -114,12 +118,25 @@ class TerminalPane extends StatefulWidget {
   /// Whether the screen takes the focus when it appears.
   final bool autofocus;
 
+  /// "End" of the selected session: the app ends it on the host and closes its tab
+  /// (FIX-terminal-session-lifecycle); null ends it in the controller and keeps the tab.
+  final VoidCallback? onEnd;
+
+  /// Closes the tab of the selected session once it ended or was blocked: "Close" then replaces
+  /// the dead "Detach" and "End"; null keeps them (disabled).
+  final VoidCallback? onClose;
+
+  /// The running sessions of the host for the list behind "Sessions"; null hides the button.
+  final List<TerminalSessionEntry>? sessions;
+
   @override
   State<TerminalPane> createState() => _TerminalPaneState();
 }
 
 bool _canEnd(TerminalTabState state) =>
     state.phase != TerminalPhase.ended && state.phase != TerminalPhase.blocked;
+
+bool _closable(TerminalTabState state) => !_canEnd(state);
 
 class _TerminalPaneState extends State<TerminalPane> {
   late final ExtraKeysController _ownKeys = ExtraKeysController();
@@ -160,6 +177,13 @@ class _TerminalPaneState extends State<TerminalPane> {
         : Timer.periodic(widget.remainingRefresh, (_) {
             if (mounted) setState(() {});
           });
+  }
+
+  VoidCallback? _sessionsAction(BuildContext context) {
+    final sessions = widget.sessions;
+    if (sessions == null) return null;
+    return () =>
+        unawaited(showTerminalSessionList(context, sessions, now: widget.now));
   }
 
   @override
@@ -209,7 +233,11 @@ class _TerminalPaneState extends State<TerminalPane> {
                             selected: widget.selected,
                             onSelect: widget.onSelect,
                             onDetach: live ? controller.detach : null,
-                            onEnd: _canEnd(state) ? controller.end : null,
+                            onEnd: _canEnd(state)
+                                ? (widget.onEnd ?? controller.end)
+                                : null,
+                            onClose: _closable(state) ? widget.onClose : null,
+                            onSessions: _sessionsAction(context),
                           )
                         else if (state.sessionId != null)
                           SessionTabs(
@@ -217,7 +245,11 @@ class _TerminalPaneState extends State<TerminalPane> {
                             selected: widget.selected,
                             onSelect: widget.onSelect,
                             onDetach: live ? controller.detach : null,
-                            onEnd: _canEnd(state) ? controller.end : null,
+                            onEnd: _canEnd(state)
+                                ? (widget.onEnd ?? controller.end)
+                                : null,
+                            onClose: _closable(state) ? widget.onClose : null,
+                            onSessions: _sessionsAction(context),
                           ),
                       ],
                     ),

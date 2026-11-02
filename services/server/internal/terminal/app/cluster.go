@@ -86,9 +86,13 @@ func (s *Service) expectation(ctx context.Context, hostID, sessionID ids.ID, wdi
 	if started || domain.ProfileKind(h.Profiles, ses.Profile) != domain.ProfileKindClaude {
 		wdi = nil
 	}
+	times, err := s.sessionTimes(rctx, ses)
+	if err != nil {
+		return Expectation{}, domain.Session{}, domain.Host{}, false
+	}
 	confirm := h.RequireLocalConfirm != nil && *h.RequireLocalConfirm
 	return Expectation{SessionID: ses.ID, HostID: h.ID, DeviceID: ses.DeviceID, Deadline: s.d.Clock.Now().Add(s.cfg.OpenTimeout),
-		Started: started, LocalConfirm: confirm, WorkdirIndex: wdi, Grant: ses.TokenJTI, Times: sessionTimes(ses)}, ses, h, true
+		Started: started, LocalConfirm: confirm, WorkdirIndex: wdi, Grant: ses.TokenJTI, Times: times}, ses, h, true
 }
 
 // RelayExpectation builds the expectation of the current grant of a session from its row, for a

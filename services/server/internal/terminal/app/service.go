@@ -66,6 +66,13 @@ type Config struct {
 	IdleGrace          time.Duration `config:"terminal.idle_grace"`
 	MaxSessionDuration time.Duration `config:"terminal.max_session_duration"`
 	DetachGrace        time.Duration `config:"terminal.detach_grace"`
+	// OwnerAccountDetachGrace and OwnerAccountMaxSessionDuration are
+	// terminal.owner_account_detach_grace and terminal.owner_account_max_session_duration: the detach
+	// lifetime and the maximum of a session in the owner account of its host (24 section 2.4,
+	// D-TSL-1 of FIX-terminal-session-lifecycle); zero falls back to DetachGrace and
+	// MaxSessionDuration.
+	OwnerAccountDetachGrace        time.Duration `config:"terminal.owner_account_detach_grace"`
+	OwnerAccountMaxSessionDuration time.Duration `config:"terminal.owner_account_max_session_duration"`
 	// TxRetryMax is database.tx_retry_max: how often an opening starts again when the counts of
 	// the session limits moved between the decision and the locked unit of work (M2-46 Design
 	// note 9).

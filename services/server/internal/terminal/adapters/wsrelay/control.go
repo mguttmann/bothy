@@ -151,6 +151,9 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 type conn struct {
 	h *Handler
 	k *link
+	// detach replaces terminal.detach_grace in the hello of a data connection when positive (the
+	// value of its session, D-TSL-1).
+	detach time.Duration
 	// timer is the running deadline: the login, then the heartbeat.
 	mu    gosync.Mutex
 	timer *time.Timer
@@ -273,7 +276,11 @@ func (c *conn) identify(ctx context.Context, data bool) (app.Login, app.Identify
 		return app.Login{}, app.Identify{}, false
 	}
 	k.lastJWKS = keySet(keys)
-	k.send(helloFrame(challenge, helloAt, h.cfg, keys))
+	cfg := h.cfg
+	if c.detach > 0 {
+		cfg.DetachGrace = c.detach
+	}
+	k.send(helloFrame(challenge, helloAt, cfg, keys))
 	c.setTimer(h.cfg.AuthTimeout, func() {
 		if err := h.d.UseCases.AuthFailed(ctx); err != nil {
 			h.d.Log.LogAttrs(ctx, slog.LevelError, msgInternal, slog.String(logErrorType, errorInternal))

@@ -333,7 +333,10 @@ sections 3.4 and 9; the reasons are the rows `D-M2-47-<n>` of
   (the tolerance on `exp` of the session token and its `jti` memory), `idle_timeout_ms` from
   `terminal.idle_timeout` and `detach_grace_ms` from `terminal.detach_grace` (its timers); the
   host service takes them from the `hello` of the data connection that carries the handshake
-  (M2-45 Design note 2a). `internal/wire` binds the three keys into `wsrelay.Config`; the two
+  (M2-45 Design note 2a). On a data connection `detach_grace_ms` is the value of the session of
+  its path (`app.Service.HelloDetachGrace`): `terminal.owner_account_detach_grace` for a session
+  in the owner account mode (D-TSL-1 of FIX-terminal-session-lifecycle). `internal/wire` binds
+  the three keys into `wsrelay.Config`; the two
   terminal keys are registered here, and the server's own checks with them follow in M2-46. The
   Fake-Host's script `EndAfterHandshake` plays the close order of the host service after message 2
   (`session.ended`, data connection kept open), proven by `TestRelay_HostEndCloseOrder`.
@@ -390,7 +393,10 @@ are the rows `D-M2-46-<n>` of [docs/decisions.d/M2-46.md](../../../../docs/decis
   latest of the last device message this process saw, `last_input_at`, `started_at` and
   `opened_at` plus `terminal.idle_timeout` plus `terminal.idle_grace`, in every open state;
   `opened_at` plus `terminal.max_session_duration` across reattaching; `detached_at` plus
-  `terminal.detach_grace`). The instant itself ends (`domain.Reached`); the relay ends through
+  `terminal.detach_grace`). A session in the owner account mode (`SessionTimes.OwnerAccount`,
+  read from its assignment) uses `terminal.owner_account_max_session_duration` and
+  `terminal.owner_account_detach_grace`, has no idle limit while detached and counts its last
+  grant as input (D-TSL-1, D-TSL-2). The instant itself ends (`domain.Reached`); the relay ends through
   `RelayEnd` with its unwritten counts. Progress: the relay writes its counts since the last write
   as additions at most once per `terminal.idle_grace` (`domain.PersistDue`) and when a pairing is
   released, `last_input_at` only forward, without a new version and without an event; a failed

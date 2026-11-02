@@ -20,13 +20,18 @@ import 'package:domain/domain.dart' show AppConfig, AppConfigValues, HostId;
 import 'package:flutter/widgets.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:sync_engine/sync_engine.dart' as sync;
+import 'package:sync_engine/sync_engine.dart'
+    show AppLifecycle, ConnectionPhase;
 import 'package:terminal_ui/terminal_ui.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../app/providers/ports.dart';
 import '../app/providers/session.dart';
+import '../lock/app_lock_controller.dart';
+import '../lock/providers.dart';
 import 'host_events_adapter.dart';
 import 'pin_store_adapter.dart';
+import 'reconnect.dart';
 import 'terminal_api_adapter.dart';
 import 'terminal_transport_io.dart';
 
@@ -65,6 +70,9 @@ final class TerminalServices {
     required this.clock,
     required this.config,
     required this.context,
+    this.online = const Stream.empty(),
+    this.lifecycle,
+    this.lock,
   });
 
   /// The REST side (without the interceptor that answers step-ups itself).
@@ -96,6 +104,16 @@ final class TerminalServices {
 
   /// The context of the navigator the dialogs open over.
   final BuildContext? Function() context;
+
+  /// Whether the engine's connection is live, one value per change: a dropped stream attaches
+  /// again once it turns live (FIX-terminal-session-lifecycle).
+  final Stream<bool> online;
+
+  /// The app's life cycle: coming to the front attaches dropped streams again; null without.
+  final AppLifecycle? lifecycle;
+
+  /// The app lock: no dropped stream attaches again while it holds the content; null without.
+  final TerminalReconnectLock? lock;
 }
 
 /// The terminal ports of the signed-in instance, or null before the login.
@@ -125,7 +143,45 @@ TerminalServices? terminalServices(Ref ref) {
     clock: ports.clock,
     config: ports.config,
     context: () => ports.navigatorKey.currentContext,
+    online: services.engine.states.map((s) => s.phase == ConnectionPhase.live),
+    lifecycle: ports.lifecycle,
+    lock: switch (ref.watch(appLockProvider)) {
+      final lock? => _AppLockHold(lock),
+      null => null,
+    },
   );
+}
+
+/// Attaches the dropped streams of every host's tabs again when the app is online again or in
+/// front (FIX-terminal-session-lifecycle, D-TSL-5), never while the app lock holds the content;
+/// null before the login.
+@Riverpod(keepAlive: true)
+TerminalReconnector? terminalReconnector(Ref ref) {
+  final services = ref.watch(terminalServicesProvider);
+  if (services == null) return null;
+  final r = TerminalReconnector(
+    online: services.online,
+    lifecycle: services.lifecycle,
+    lock: services.lock,
+  );
+  ref.onDispose(r.dispose);
+  return r;
+}
+
+/// [TerminalReconnectLock] over the app lock controller.
+final class _AppLockHold implements TerminalReconnectLock {
+  _AppLockHold(this._lock);
+
+  final AppLockController _lock;
+
+  @override
+  bool get holdsContent => _lock.closed || _lock.deciding;
+
+  @override
+  void addListener(VoidCallback listener) => _lock.addListener(listener);
+
+  @override
+  void removeListener(VoidCallback listener) => _lock.removeListener(listener);
 }
 
 /// The person's own user ID as the engine's last snapshot named it; null before it.
@@ -251,8 +307,10 @@ class HostsList extends _$HostsList {
 ///
 /// The tabs live as long as the login, so leaving the view keeps the streams; the logout
 /// disposes them with the services. A session the server lists for the person becomes a
-/// detached tab with "Reattach" (`TerminalController.adopt`).
-final class TerminalTabs extends ChangeNotifier {
+/// detached tab with "Reattach" (`TerminalController.adopt`); a session the server closed ends
+/// its tab, which "Close" removes (FIX-terminal-session-lifecycle).
+final class TerminalTabs extends ChangeNotifier
+    implements TerminalReconnectTarget {
   /// Creates the tabs of [hostId].
   TerminalTabs({
     required this.hostId,
@@ -327,8 +385,9 @@ final class TerminalTabs extends ChangeNotifier {
     events: services.events,
   );
 
-  /// Loads the host and the person's sessions on it and adds a detached tab for each own
-  /// session that is not closed and has no tab yet.
+  /// Loads the host and the person's sessions on it, adds a detached tab for each own session
+  /// that is not closed and has no tab yet, and ends the tab of a session the server closed
+  /// meanwhile (the app slept and missed its event; `TerminalController.reconcile`).
   Future<void> refresh() async {
     final Host host;
     final List<TerminalSession> sessions;
@@ -340,6 +399,10 @@ final class TerminalTabs extends ChangeNotifier {
       return;
     }
     if (_disposed) return;
+    final byId = {for (final s in sessions) s.id: s};
+    for (final t in _tabs) {
+      if (byId[t.state.sessionId] case final s?) t.reconcile(s);
+    }
     // A tab whose opening still waits for the server has no session ID yet; its session
     // would show up twice, so the next refresh adds what is new.
     if (_tabs.any(_opening)) return;
@@ -395,6 +458,85 @@ final class TerminalTabs extends ChangeNotifier {
       (t.state.phase == TerminalPhase.failed ||
           t.state.phase == TerminalPhase.idle);
 
+  /// The maximum duration of the person's sessions on [host] for the header:
+  /// `terminal.owner_account_max_session_duration` in the owner account mode (the person's own
+  /// assignment is the owner account, ADR 0073), else `terminal.max_session_duration`.
+  Duration maxSessionDuration(Host host) =>
+      ownOwnerAccount(host, selfUserId) != null
+      ? services.config.ownerAccountMaxSessionDuration
+      : services.config.maxSessionDuration;
+
+  /// The rows of the session list (FIX-terminal-session-lifecycle): every tab with a session,
+  /// named by [label], with its start, since when it is detached, "Reattach" for a detached one
+  /// and a tap that selects its tab.
+  List<TerminalSessionEntry> entries(
+    String Function(String profile, int n) label,
+  ) {
+    final names = labels;
+    return [
+      for (final (i, t) in _tabs.indexed)
+        if (t.state.sessionId != null &&
+            t.state.phase != TerminalPhase.ended &&
+            t.state.phase != TerminalPhase.blocked)
+          TerminalSessionEntry(
+            label: label(names[i].$1, names[i].$2),
+            phase: t.state.phase,
+            startedAt: t.state.openedAt,
+            detachedAt: t.state.phase == TerminalPhase.detached
+                ? t.state.detachedAt
+                : null,
+            onReattach: t.state.phase == TerminalPhase.detached
+                ? () {
+                    select(_tabs.indexOf(t));
+                    unawaited(t.attach());
+                  }
+                : null,
+            onSelect: () => select(_tabs.indexOf(t)),
+          ),
+    ];
+  }
+
+  /// Removes the tab of [tab] and disposes it; the selection stays on the tab next to it.
+  /// Used for an ended tab ("Close") and after "End" (FIX-terminal-session-lifecycle).
+  void close(TerminalController tab) {
+    final i = _tabs.indexOf(tab);
+    if (i < 0) return;
+    _tabs.removeAt(i);
+    tab
+      ..removeListener(notifyListeners)
+      ..dispose();
+    if (_selected >= _tabs.length) {
+      _selected = _tabs.isEmpty ? 0 : _tabs.length - 1;
+    }
+    if (!_disposed) notifyListeners();
+  }
+
+  /// "End": ends the session of [tab] on the host and closes its tab.
+  Future<void> end(TerminalController tab) async {
+    await tab.end();
+    close(tab);
+  }
+
+  /// The detach causes of a stream that dropped while the tab was attached: those attach again
+  /// by themselves once the app is back (D-TSL-5). A detach by the person, another device
+  /// (`4103`), a stale token (`4101`, needs a step-up) or a refused login stay.
+  static const Set<DetachCause> _reconnectable = {
+    DetachCause.connectionLost,
+    DetachCause.serverRestart,
+    DetachCause.slowConsumer,
+    DetachCause.hostUnavailable,
+  };
+
+  @override
+  void reconnectLost() {
+    for (final t in List.of(_tabs)) {
+      if (t.state.phase == TerminalPhase.detached &&
+          _reconnectable.contains(t.state.detachCause)) {
+        unawaited(t.attach());
+      }
+    }
+  }
+
   /// Selects tab [index].
   void select(int index) {
     if (index < 0 || index >= _tabs.length || index == _selected) return;
@@ -445,7 +587,12 @@ TerminalTabs? terminalTabs(Ref ref, String hostId) {
   final me = ref.watch(terminalSelfUserIdProvider);
   if (services == null || me == null) return null;
   final tabs = TerminalTabs(hostId: hostId, services: services, selfUserId: me);
-  ref.onDispose(tabs.dispose);
+  final reconnector = ref.watch(terminalReconnectorProvider);
+  reconnector?.register(tabs);
+  ref.onDispose(() {
+    reconnector?.unregister(tabs);
+    tabs.dispose();
+  });
   return tabs;
 }
 

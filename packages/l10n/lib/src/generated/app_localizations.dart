@@ -7597,6 +7597,48 @@ abstract class AppLocalizations {
   /// **'Reattach'**
   String get terminalReattach;
 
+  /// Button that closes the tab of an ended terminal session; the session no longer runs.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get terminalCloseTab;
+
+  /// Button that shows the list of the person's running terminal sessions on the host.
+  ///
+  /// In en, this message translates to:
+  /// **'Sessions'**
+  String get terminalSessions;
+
+  /// Title of the list of the person's running terminal sessions on the host.
+  ///
+  /// In en, this message translates to:
+  /// **'Running sessions'**
+  String get terminalSessionsTitle;
+
+  /// Text of the session list when no terminal session runs on the host.
+  ///
+  /// In en, this message translates to:
+  /// **'No running sessions.'**
+  String get terminalSessionsNone;
+
+  /// When a terminal session was opened, in the session list.
+  ///
+  /// In en, this message translates to:
+  /// **'Started {time}'**
+  String terminalSessionStarted(String time);
+
+  /// Since when a terminal session runs without a connected device, in the session list.
+  ///
+  /// In en, this message translates to:
+  /// **'Detached since {time}'**
+  String terminalSessionDetachedSince(String time);
+
+  /// A terminal session this device is connected to, in the session list.
+  ///
+  /// In en, this message translates to:
+  /// **'Connected'**
+  String get terminalSessionConnected;
+
   /// Banner while the terminal session opens.
   ///
   /// In en, this message translates to:

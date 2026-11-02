@@ -15,7 +15,6 @@ import 'dart:async';
 
 import 'package:api_client/api_client.dart' show Host, HostProfile;
 import 'package:design_system/design_system.dart';
-import 'package:domain/domain.dart' show AppConfigValues;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:l10n/l10n.dart';
@@ -24,6 +23,7 @@ import 'package:terminal_ui/terminal_ui.dart';
 import '../keyboard/bindings.dart' show ShortcutPlatform;
 import '../switcher/quick_switcher.dart' show showQuickSwitcher;
 import 'providers.dart';
+import 'tabs_pane.dart';
 import 'terminal_shortcuts.dart';
 
 /// The lines of the scrollback of [controller] that contain [query] (case-insensitive), in
@@ -168,7 +168,7 @@ class _HostTerminalPageState extends ConsumerState<HostTerminalPage> {
                     _search.clear();
                   }),
                 ),
-              Expanded(child: _view(context, tabs, hostId)),
+              Expanded(child: _view(context, tabs, host)),
             ],
           ),
         ),
@@ -177,27 +177,22 @@ class _HostTerminalPageState extends ConsumerState<HostTerminalPage> {
   }
 
   /// The pane of the selected tab, or the empty state without a tab.
-  Widget _view(BuildContext context, TerminalTabs tabs, String hostId) {
+  Widget _view(BuildContext context, TerminalTabs tabs, Host host) {
+    final hostId = host.id;
     final l = AppLocalizations.of(context);
     final current = tabs.current;
     if (current == null) {
       return _Note(noteKey: 'terminal.empty', text: l.terminalNoSessions);
     }
-    return TerminalPane(
+    return tabsPane(
       key: ValueKey('terminal.pane.$hostId'),
-      controller: current,
-      fontSize: tabs.fontSize,
-      tabs: [
-        for (final (profile, n) in tabs.labels)
-          SessionTabData(label: l.terminalTabLabel(profile, n)),
-      ],
-      selected: tabs.selected,
-      onSelect: tabs.select,
-      maxSessionDuration: tabs.services.config.maxSessionDuration,
+      tabs: tabs,
+      current: current,
+      host: host,
+      l: l,
       shortcuts: terminalActivators(
         widget.platform ?? ShortcutPlatform.current,
       ),
-      autofocus: true,
     );
   }
 

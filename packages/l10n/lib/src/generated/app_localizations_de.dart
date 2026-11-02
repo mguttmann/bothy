@@ -4692,7 +4692,32 @@ class AppLocalizationsDe extends AppLocalizations {
   String get terminalEnd => 'Beenden';
 
   @override
-  String get terminalReattach => 'Wiederanhängen';
+  String get terminalReattach => 'Wieder verbinden';
+
+  @override
+  String get terminalCloseTab => 'Schließen';
+
+  @override
+  String get terminalSessions => 'Sitzungen';
+
+  @override
+  String get terminalSessionsTitle => 'Laufende Sitzungen';
+
+  @override
+  String get terminalSessionsNone => 'Keine laufenden Sitzungen.';
+
+  @override
+  String terminalSessionStarted(String time) {
+    return 'Gestartet $time';
+  }
+
+  @override
+  String terminalSessionDetachedSince(String time) {
+    return 'Getrennt seit $time';
+  }
+
+  @override
+  String get terminalSessionConnected => 'Verbunden';
 
   @override
   String get terminalStateConnecting =>
@@ -4708,11 +4733,11 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get terminalStateDetachedHostUnavailable =>
-      'Der Rechner ist nicht verbunden. Später wiederanhängen.';
+      'Der Rechner ist nicht verbunden. Später wieder verbinden.';
 
   @override
   String get terminalStateDetachedTokenStale =>
-      'Das Sitzungs-Token ist abgelaufen oder wurde schon benutzt. Wiederanhängen fragt erneut nach der Bestätigung.';
+      'Das Sitzungs-Token ist abgelaufen oder wurde schon benutzt. Wieder verbinden fragt erneut nach der Bestätigung.';
 
   @override
   String get terminalStateDetachedReplaced =>
@@ -4728,11 +4753,11 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get terminalStateDetachedAuth =>
-      'Die Anmeldung der Verbindung ist gescheitert. Neu anmelden und dann wiederanhängen.';
+      'Die Anmeldung der Verbindung ist gescheitert. Neu anmelden und dann wieder verbinden.';
 
   @override
   String get terminalStateDetachedRateLimited =>
-      'Zu viele Versuche. Kurz warten und dann wiederanhängen.';
+      'Zu viele Versuche. Kurz warten und dann wieder verbinden.';
 
   @override
   String terminalStateExited(int code) {
@@ -5009,7 +5034,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get meHostsEntryHint =>
-      'Terminal-Sitzungen öffnen, wiederanhängen und beenden';
+      'Terminal-Sitzungen öffnen, wieder verbinden und beenden';
 
   @override
   String get hostSessionStateOpening => 'wird geöffnet';
@@ -5032,7 +5057,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String terminalStepUpAttach(String name) {
-    return 'Terminal auf $name wiederanhängen';
+    return 'Terminal auf $name wieder verbinden';
   }
 
   @override

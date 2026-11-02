@@ -7,7 +7,8 @@ library;
 
 import 'package:design_system/design_system.dart';
 import 'package:flutter/material.dart';
-import 'package:terminal_ui/src/widgets/session_tabs.dart' show SessionTabData;
+import 'package:terminal_ui/src/widgets/session_tabs.dart'
+    show SessionTabData, sessionActions;
 
 /// The row of the switcher and the two actions; a null callback disables its button.
 ///
@@ -24,6 +25,8 @@ class SessionSwitcher extends StatelessWidget {
     this.onSelect,
     this.onDetach,
     this.onEnd,
+    this.onClose,
+    this.onSessions,
   });
 
   /// The sessions, in order.
@@ -40,6 +43,13 @@ class SessionSwitcher extends StatelessWidget {
 
   /// Ends the selected session; null disables "End".
   final VoidCallback? onEnd;
+
+  /// Closes the tab of the selected session, which ended; when set, "Close" replaces "Detach"
+  /// and "End" (FIX-terminal-session-lifecycle).
+  final VoidCallback? onClose;
+
+  /// Shows the list of the running sessions; null hides "Sessions".
+  final VoidCallback? onSessions;
 
   @override
   Widget build(BuildContext context) {
@@ -109,15 +119,18 @@ class SessionSwitcher extends StatelessWidget {
               ),
             ),
           ),
-          OutlinedButton(onPressed: onDetach, child: Text(l.terminalDetach)),
-          OutlinedButton(
-            style: OutlinedButton.styleFrom(
-              foregroundColor: c.dangerFg,
-              side: BorderSide(color: c.dangerBorder),
+          if (onSessions case final sessions?)
+            TextButton(
+              key: const ValueKey('terminal.sessions'),
+              onPressed: sessions,
+              child: Text(l.terminalSessions),
             ),
-            onPressed: onEnd,
-            child: Text(l.terminalEnd),
-          ),
+          ...sessionActions(
+            context,
+            onDetach,
+            onEnd,
+            onClose,
+          ).where((w) => w is! SizedBox),
         ],
       ),
     );

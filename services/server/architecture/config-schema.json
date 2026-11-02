@@ -5367,6 +5367,30 @@
       "doc": "Deadline until both sides are connected in the relay and the opening has started."
     },
     {
+      "name": "terminal.owner_account_detach_grace",
+      "env": "BOTHY_TERMINAL__OWNER_ACCOUNT_DETACH_GRACE",
+      "kind": "duration",
+      "default": "24h",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "24-terminal.md",
+      "doc": "This long a detached session in the owner account mode stays attachable; announced to the host service in the hello of its data connection."
+    },
+    {
+      "name": "terminal.owner_account_max_session_duration",
+      "env": "BOTHY_TERMINAL__OWNER_ACCOUNT_MAX_SESSION_DURATION",
+      "kind": "duration",
+      "default": "168h",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "24-terminal.md",
+      "doc": "Longest duration of a session in the owner account mode from its opening, also across reattaching."
+    },
+    {
       "name": "terminal.pairing_code_ttl",
       "env": "BOTHY_TERMINAL__PAIRING_CODE_TTL",
       "kind": "duration",

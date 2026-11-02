@@ -5,6 +5,7 @@ package app_test
 import (
 	"context"
 	"errors"
+	"slices"
 	gosync "sync"
 	"testing"
 	"time"
@@ -122,7 +123,9 @@ func (s *memStore) LockOpenSessions(_ context.Context, hostID, userID ids.ID) ([
 }
 
 func (s *memStore) SessionUsers(context.Context, ids.ID) ([]domain.SessionUserRow, error) {
-	return nil, nil
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return slices.Clone(s.users), nil
 }
 
 func (s *memStore) ValidSessionUsers(context.Context, []ids.ID) (map[ids.ID][]domain.SessionUser, error) {

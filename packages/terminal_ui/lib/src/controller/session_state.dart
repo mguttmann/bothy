@@ -90,6 +90,7 @@ final class TerminalTabState {
     this.sessionId,
     this.profile,
     this.openedAt,
+    this.detachedAt,
     this.exitCode,
     this.closeReason,
     this.detachCause,
@@ -115,6 +116,11 @@ final class TerminalTabState {
 
   /// `opened_at` of the session: the start of the remaining time in the header.
   final DateTime? openedAt;
+
+  /// Since when the session is detached: `detached_at` of the server for an adopted session, the
+  /// time of the detach on this device otherwise; null while attached or unknown
+  /// (FIX-terminal-session-lifecycle, the session list).
+  final DateTime? detachedAt;
 
   /// The exit code of the process in [TerminalPhase.exited].
   final int? exitCode;
@@ -142,12 +148,15 @@ final class TerminalTabState {
   bool get acceptsInput => phase == TerminalPhase.connected && !replaying;
 
   /// Returns a copy with the given members replaced; [clearCauses] drops the causes, the exit
-  /// code, the close reason and the problem code of the previous phase.
+  /// code, the close reason and the problem code of the previous phase; [clearDetachedAt] drops
+  /// [detachedAt] (the tab is attached again).
   TerminalTabState copyWith({
     TerminalPhase? phase,
     String? sessionId,
     String? profile,
     DateTime? openedAt,
+    DateTime? detachedAt,
+    bool clearDetachedAt = false,
     int? exitCode,
     String? closeReason,
     DetachCause? detachCause,
@@ -161,6 +170,7 @@ final class TerminalTabState {
     sessionId: sessionId ?? this.sessionId,
     profile: profile ?? this.profile,
     openedAt: openedAt ?? this.openedAt,
+    detachedAt: detachedAt ?? (clearDetachedAt ? null : this.detachedAt),
     exitCode: exitCode ?? (clearCauses ? null : this.exitCode),
     closeReason: closeReason ?? (clearCauses ? null : this.closeReason),
     detachCause: detachCause ?? (clearCauses ? null : this.detachCause),

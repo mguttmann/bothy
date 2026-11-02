@@ -35,6 +35,7 @@ export 'src/widgets/foreign_host_warning.dart';
 export 'src/widgets/key_changed_dialog.dart';
 export 'src/widgets/link_confirm_dialog.dart';
 export 'src/widgets/open_terminal_dialog.dart';
+export 'src/widgets/session_list.dart';
 export 'src/widgets/session_switcher.dart';
 export 'src/widgets/session_tabs.dart';
 export 'src/widgets/terminal_header.dart';

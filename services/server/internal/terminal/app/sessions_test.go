@@ -38,6 +38,8 @@ type memStore struct {
 	hosts    map[ids.ID]domain.Host
 	own      []domain.OwnSessionUser
 	sessions map[ids.ID]domain.Session
+	// users are the rows of host_session_users that SessionUsers returns (nil: none).
+	users []domain.SessionUserRow
 }
 
 func (s *memStore) snapshot() (map[ids.ID]domain.Host, map[ids.ID]domain.Session) {
@@ -265,7 +267,7 @@ type sworld struct {
 	r1     ids.ID
 }
 
-func newSWorld(t *testing.T, signErr error) *sworld {
+func newSWorld(t *testing.T, signErr error, opts ...func(*app.Config)) *sworld {
 	t.Helper()
 	_, key, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
@@ -282,6 +284,9 @@ func newSWorld(t *testing.T, signErr error) *sworld {
 	cfg := app.Config{NameMaxChars: 10, OSUserMaxChars: 10, ReasonMaxChars: 60, PairingCodeTTL: time.Minute, PageSizeDefault: 1, PageSizeMax: 2,
 		FingerprintConfirmChars: 8, FingerprintMaxAttempts: 3, ReportLabelMaxChars: 10, ReportMaxEntries: 4,
 		SessionTokenTTL: 30 * time.Second, OpenTimeout: 20 * time.Second}
+	for _, o := range opts {
+		o(&cfg)
+	}
 	w.svc, err = app.New(cfg, app.Deps{Store: w.store, PairingCodes: realCodes{}, Instance: nopInstance{}, People: fixedPeople{}, UoW: memUoW{s: w.store},
 		Authorizer: w.authz, Audit: w.audit, Events: w.events, Cursors: nopCursors{}, StepUps: w.steps, Signer: edSigner{key: key, err: signErr}})
 	if err != nil {

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/coder/websocket"
 
@@ -17,9 +18,12 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/terminal/domain"
 )
 
-// DataSessions checks the session of a data connection (app.Service.DataSession, M2-44).
+// DataSessions checks the session of a data connection (app.Service.DataSession, M2-44) and names
+// the detach value of its hello (app.Service.HelloDetachGrace: terminal.owner_account_detach_grace
+// for a session in the owner account mode, D-TSL-1 of FIX-terminal-session-lifecycle).
 type DataSessions interface {
 	DataSession(ctx context.Context, l app.Login, id ids.ID) (bool, error)
+	HelloDetachGrace(ctx context.Context, id ids.ID) (time.Duration, error)
 }
 
 // DataHandler is the HTTP handler of GET /api/v1/hosts/sessions/{session_id}/stream (asyncapi
@@ -78,6 +82,13 @@ func (d *DataHandler) serve(ctx context.Context, ws *websocket.Conn, id ids.ID) 
 			k.close(domain.CodeUnknownError)
 		}
 	}()
+	// The hello of a data connection carries the detach value of the session of its path.
+	detach, err := d.sessions.HelloDetachGrace(ctx, id)
+	if err != nil {
+		c.fail(ctx)
+		return
+	}
+	c.detach = detach
 	l, in, ok := c.identify(ctx, true)
 	if !ok {
 		return

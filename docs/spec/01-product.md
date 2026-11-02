@@ -547,7 +547,9 @@ for screen readers.
 with one tab per own session on the host. The header shows the host, the connection, the badge of
 the LLM login, the start of the fingerprint and the time left until
 `terminal.max_session_duration`. "Detach" keeps the session running (it can be reattached), "End"
-closes it. Opening requires confirmation with a passkey or a step-up device key; the dialog
+ends it on the host and closes its tab; a tab whose session ended shows only "Close". "Sessions"
+lists the own sessions on the host with start, "detached since" and "Reattach", on every device
+(FIX-terminal-session-lifecycle). Opening requires confirmation with a passkey or a step-up device key; the dialog
 names the host and the profile. All keys go to the shell, except the shortcuts from section 7.
 
 ```text
@@ -2142,7 +2144,7 @@ macOS release (ticket in 15-client-architecture.md).
 | Kopplung, Kopplungs-Code | Pairing, pairing code | `host.pair` |
 | Fingerabdruck | Fingerprint | `key_fingerprint` |
 | Terminal-Sitzung | Terminal session | `terminal_session` |
-| Trennen, Wiederanhängen | Detach, reattach | `detached`, `terminal.attach` |
+| Trennen, Wieder verbinden | Detach, reattach | `detached`, `terminal.attach` |
 | Sondertasten-Leiste | Extra keys bar | |
 | LLM-Anmeldung | LLM login | `llm_credentials` |
 | Live-Topologie | Live topology | |

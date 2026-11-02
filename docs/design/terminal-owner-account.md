@@ -68,3 +68,8 @@ sequenceDiagram
 - **Opt-in at the assignment, not only in the host.** The host config alone must not be enough to
   hand an administrator shell to whoever the server assigns; the server stores the flag and checks
   it against the report, and the host enforces `own = true` itself.
+- **Detach like `tmux`** (FIX-terminal-session-lifecycle). The owner detaches on purpose and picks
+  the shell up later from another device, so a detached session in this mode lives
+  `terminal.owner_account_detach_grace` and idle pauses while it is detached; the rulings and their
+  security reasoning are D-TSL-1 to D-TSL-3 in
+  [decisions.d/FIX-terminal-session-lifecycle.md](../decisions.d/FIX-terminal-session-lifecycle.md).

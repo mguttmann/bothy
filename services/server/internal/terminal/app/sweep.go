@@ -28,7 +28,8 @@ type SweepResult struct {
 // windows returns the limits of 24 section 6.3 that the sweep and the relay check.
 func (s *Service) windows() domain.Windows {
 	return domain.Windows{Idle: s.cfg.IdleTimeout, IdleGrace: s.cfg.IdleGrace, MaxDuration: s.cfg.MaxSessionDuration,
-		DetachGrace: s.cfg.DetachGrace, OpenTimeout: s.cfg.OpenTimeout}
+		DetachGrace: s.cfg.DetachGrace, OpenTimeout: s.cfg.OpenTimeout,
+		OwnerDetachGrace: s.cfg.OwnerAccountDetachGrace, OwnerMaxDuration: s.cfg.OwnerAccountMaxSessionDuration}
 }
 
 // Windows returns the limits of a session (terminal.idle_timeout, terminal.idle_grace,
@@ -37,10 +38,34 @@ func (s *Service) windows() domain.Windows {
 func (s *Service) Windows() domain.Windows { return s.windows() }
 
 // sessionTimes returns the times of ses for the deadlines: the time of the last grant is the UUIDv7
-// timestamp of its token jti, which every grant renews (Design note 8 a).
-func sessionTimes(ses domain.Session) domain.SessionTimes {
+// timestamp of its token jti, which every grant renews (Design note 8 a); OwnerAccount says whether
+// ses runs in the owner account of its host (D-TSL-1), read from its assignment.
+func (s *Service) sessionTimes(ctx context.Context, ses domain.Session) (domain.SessionTimes, error) {
+	owner, err := s.inOwnerAccount(ctx, ses)
+	if err != nil {
+		return domain.SessionTimes{}, err
+	}
 	return domain.SessionTimes{State: ses.State, OpenedAt: ses.OpenedAt, GrantedAt: ses.TokenJTI.Time(), StartedAt: ses.StartedAt,
-		DetachedAt: ses.DetachedAt, LastInputAt: ses.LastInputAt}
+		DetachedAt: ses.DetachedAt, LastInputAt: ses.LastInputAt, OwnerAccount: owner}, nil
+}
+
+// HelloDetachGrace returns the detach value of the hello of a data connection for the session of
+// its path (24 section 2.2 point 5, D-TSL-1): terminal.owner_account_detach_grace when the session
+// runs in the owner account of its host, else terminal.detach_grace, also for an unknown or closed
+// session (its login fails after hello anyway). Errors: those of the store.
+func (s *Service) HelloDetachGrace(ctx context.Context, sessionID ids.ID) (time.Duration, error) {
+	ses, found, err := s.d.Store.Session(ctx, sessionID)
+	if err != nil || !found || ses.State == domain.SessionClosed {
+		return s.cfg.DetachGrace, err
+	}
+	t, err := s.sessionTimes(ctx, ses)
+	if err != nil {
+		return 0, err
+	}
+	if t.OwnerAccount && s.cfg.OwnerAccountDetachGrace > 0 {
+		return s.cfg.OwnerAccountDetachGrace, nil
+	}
+	return s.cfg.DetachGrace, nil
 }
 
 // Sweep is the job terminal.sweep (worker, every terminal.sweep_interval; 02 section 12.3, M2-46
@@ -106,7 +131,11 @@ func (s *Service) sweepOne(ctx context.Context, c SweepCandidate, authEnded bool
 			return err
 		}
 		confirm := h.RequireLocalConfirm != nil && *h.RequireLocalConfirm
-		reason, detail, ok := domain.SweepVerdict(string(h.State), confirm, authEnded, sessionTimes(ses), now, w)
+		times, err := s.sessionTimes(ctx, ses)
+		if err != nil {
+			return err
+		}
+		reason, detail, ok := domain.SweepVerdict(string(h.State), confirm, authEnded, times, now, w)
 		if !ok {
 			return nil
 		}

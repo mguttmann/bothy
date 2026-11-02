@@ -158,7 +158,9 @@ flowchart LR
         `clock_leeway_ms` (`auth.clock_leeway`), `idle_timeout_ms` (`terminal.idle_timeout`) and
         `detach_grace_ms` (`terminal.detach_grace`). The host service uses those of the data
         connection that carries a handshake: the leeway for the checks of `exp` and `jti` (5.3),
-        idle and detach for the timers of that session (6.2, 6.3); every attach refreshes them. A
+        idle and detach for the timers of that session (6.2, 6.3); every attach refreshes them. For
+        a session in the owner account mode the server sends `terminal.owner_account_detach_grace`
+        as `detach_grace_ms` (2.4; it knows the session from the path of the data connection). A
         `hello` with a negative leeway or without a positive idle or detach value closes that data
         connection with `4002`. The declaration comes only from `ready` (D-M2-42-15); the server
         sends `ready` again after a committed change of the declaration, the host service stores
@@ -729,6 +731,14 @@ in [decisions.d/FEAT-terminal-admin-user.md](../decisions.d/FEAT-terminal-admin-
   the way; "writable by a session user" there means writable by any other person account of the
   host or by everyone. HD4, the service part of HD8 and HD11 at the places of the account are
   unchanged.
+- **Detach and reattach** (FIX-terminal-session-lifecycle, rulings `D-TSL-1` to `D-TSL-6` in
+  [decisions.d/FIX-terminal-session-lifecycle.md](../decisions.d/FIX-terminal-session-lifecycle.md)).
+  The owner detaches on purpose and picks the shell up later from any of his devices, like `tmux`:
+  a detached session stays attachable for `terminal.owner_account_detach_grace` instead of
+  `terminal.detach_grace`, and lives at most `terminal.owner_account_max_session_duration` instead
+  of `terminal.max_session_duration`. Idle time pauses while it is detached and starts again with
+  the reattach; the idle timeout of an attached session, the step-up rules of 6.2 for every
+  reattach and the scrollback in the memory of the host service are unchanged.
 - **What the mode gives up, honestly.** A session runs with administrator rights and reaches the
   keys of the host, the host service and every file of the machine; whoever has the owner's
   password and second factor and a device of the owner has the machine. The separation of people
@@ -1389,7 +1399,8 @@ Diagram: [seq-8-open-terminal.svg](../architecture/seq-8-open-terminal.svg) (sou
   memory of the old process. The list in `identify` needs no state in the server and separates a
   restart from a network drop, after which the PTYs keep running.
 - After `terminal.detach_grace` without an attach, the host service ends the PTY, and the server
-  closes the session with `detach_expired`.
+  closes the session with `detach_expired`. A session in the owner account mode uses
+  `terminal.owner_account_detach_grace` instead (2.4).
 - A session listed in `live_sessions` that is `closed` for this host, unknown, or of another host
   gets `session.close` right after `ready`, with the stored `close_reason`, else `access_revoked`
   (M2-43, D-M2-43-8): a PTY the server no longer allows ends at the next login, fail closed for IDs
@@ -1405,8 +1416,9 @@ Diagram: [seq-8-open-terminal.svg](../architecture/seq-8-open-terminal.svg) (sou
   `session.ended`, because the server closed the session already. A `session.close` for a
   session the host service does not know changes nothing. Every other close of the data
   connection by the server (`1000`, `4002`, `4013`, `4014` or a code of the login) and its loss,
-  while the PTY lives, make the session detached on the host: idle keeps counting, the detach
-  timer of `terminal.detach_grace` starts, and the host service waits for the next
+  while the PTY lives, make the session detached on the host: idle keeps counting (in the owner
+  account mode it pauses and the next attach starts it again, 2.4), the detach timer of the
+  detach value of the last `hello` starts, and the host service waits for the next
   `session.open`; it never redials a data connection on its own. When the detach timer runs out
   the session ends with `detach_expired`.
 - Replay on the host (M2-45, D-M2-45-14): the host service keeps per session a ring buffer of
@@ -1450,7 +1462,8 @@ Idle on the host (M2-45, D-M2-45-2): the host service takes `terminal.idle_timeo
 `terminal.detach_grace` from `idle_timeout_ms` and `detach_grace_ms` of the `hello` of the data
 connection of the last handshake of a session (2.2 point 5). Idle is the time since the last
 input frame of the device (`data` or `resize`), also across a detach; when it reaches the value
-the session ends with `idle_timeout`.
+the session ends with `idle_timeout`. In the owner account mode (2.4) idle pauses while the session
+is detached, and a successful attach counts as the last input.
 
 Limits in the relay (M2-46, D-M2-46-7, D-M2-46-18): the relay of the api process that holds a
 side of a session ends it itself, without the host service, through the one end function with
@@ -1460,7 +1473,10 @@ counts), the stored `last_input_at`, `started_at` and `opened_at`, in every stat
 `closed`; the session ends with `idle_timeout` at that instant plus `terminal.idle_timeout` plus
 `terminal.idle_grace`. The maximum is `opened_at` plus `terminal.max_session_duration`, unchanged
 by reattaching (`max_duration`); in `detached` the detach limit is `detached_at` plus
-`terminal.detach_grace` (`detach_expired`). The instant itself ends a session, one tick before it
+`terminal.detach_grace` (`detach_expired`). For a session in the owner account mode (2.4, read
+from its assignment) the maximum is `terminal.owner_account_max_session_duration`, the detach
+limit uses `terminal.owner_account_detach_grace`, there is no idle limit while it is detached, and
+the time of its last grant counts as input. The instant itself ends a session, one tick before it
 keeps it; when device input moved the idle deadline meanwhile, the relay waits for the new one.
 The relay learns `started_at` and `detached_at` from the committed `terminal_session.changed` of
 the log tail.
@@ -2309,6 +2325,14 @@ Every client shows: session list per host with state, reattach, fingerprint of t
 host, badge of the LLM login ("Personal", "Organization", "None"), remaining time until the
 maximum duration.
 
+Tab life cycle in the apps (desktop on macOS and Windows, phone screen M8; FIX-terminal-session-lifecycle,
+`D-TSL-4` to `D-TSL-6`): "Sessions" lists the person's sessions on the host that are not closed
+with name, start time, "connected" or "detached since" and "Reattach"; a tab whose session ended
+or was blocked offers only "Close", which removes it; "End" ends the session on the host and closes
+its tab; a refresh of the list ends the tab of a session the server closed meanwhile; a tab whose
+stream dropped while it was attached attaches again once when the app's connection is live again
+or the app returns to the front, never in a loop and never for a detach by the person.
+
 PTY on the host: Unix PTY on macOS and Linux; Windows through ConPTY (`CreatePseudoConsole`),
 available from Windows 10 version 1809 and Windows Server 2019
 (https://learn.microsoft.com/en-us/windows/console/createpseudoconsole, retrieved 2026-10-10
@@ -2474,6 +2498,8 @@ Column "Place": Server = configuration reference of the server; Host service = c
 | `terminal.idle_timeout` | Server | `30m` | without input from the device for this long, the session ends |
 | `terminal.idle_grace` | Server | `2m` | Extra time after which the server itself ends the session because of idleness |
 | `terminal.max_session_duration` | Server | `12h` | Maximum duration of a session |
+| `terminal.owner_account_detach_grace` | Server | `24h` | this long a detached session in the owner account mode stays attachable; the hello of its data connection carries it as `detach_grace_ms` (2.4, 6.2) |
+| `terminal.owner_account_max_session_duration` | Server | `168h` | Maximum duration of a session in the owner account mode (2.4, 6.3) |
 | `terminal.max_sessions_per_person` | Server | `5` | open sessions per person |
 | `terminal.max_sessions_per_host` | Server | `10` | open sessions per host |
 | `terminal.relay_buffer_max_bytes` | Server | `262144` | Buffer of the relay per direction and session |

@@ -25,11 +25,13 @@ import 'package:terminal_ui/terminal_ui.dart';
 
 import '../../lock/app_lock_controller.dart';
 import '../../terminal/providers.dart' show TerminalTabs;
+import '../../terminal/reconnect.dart' show TerminalReconnectLock;
 
 /// What the terminal needs to know about the app lock of M5-08.
-abstract interface class TerminalLockGate implements Listenable {
+abstract interface class TerminalLockGate implements TerminalReconnectLock {
   /// Whether the lock hides the content now or is still deciding on a return; no session
   /// attaches meanwhile.
+  @override
   bool get holdsContent;
 
   /// The `locked` and `unlocked` events of the lock.
