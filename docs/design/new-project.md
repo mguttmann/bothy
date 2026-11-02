@@ -199,7 +199,7 @@ folder; no folder that has a binding is ever offered or bound a second time.
 
 | Function | Before M4-44 | Gap |
 |---|---|---|
-| Never a second forum for a bound folder | the unique index on `lower(workspace_ref)` (03, M2-03) refuses a second binding with `conflict`; the new project dialog keeps its forum on "Try again" and binds a changed folder to it (D-M4-43-8, D-M4-43-10) | none for binding; a list of folders must leave bound ones out |
+| Never a second forum for a bound folder | the unique index on `lower(workspace_ref)` (03, M2-03; without the released bindings of deleted forums since FIX-delete-releases-binding) refuses a second binding with `conflict`; the new project dialog keeps its forum on "Try again" and binds a changed folder to it (D-M4-43-8, D-M4-43-10) | none for binding; a list of folders must leave bound ones out |
 | Sync of existing folders | mode "Existing folder" binds one typed folder name | the app cannot see the folders: only the runner can |
 | Rename a project forum | `updateChannel` (`channel.update`, `manage`) changes a channel's name; no client entry | an entry and a dialog |
 

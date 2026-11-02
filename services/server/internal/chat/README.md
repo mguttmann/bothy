@@ -629,10 +629,17 @@ R-DM-57, 07 4.5a, 20 4.2a.
 - `DeletionInfo` counts in `DeletionScope` (channels and threads not deleted on their own, the
   sum of `message_count`), files through `FileCounter` and sessions through `SessionCounter`; the
   folder part only for an owner (identity's owner list, the source of `getMe` `is_owner`).
-- `Purges` (`DuePurges`, `FinishPurge`) serves the job `messaging.purge_deleted`; `ProjectTrash`
-  serves the heartbeat: requests of a purged forum for its runner, outcomes stored once with the
-  audit entry `channel.project.trash` (actor the runner). `ApplyProjectReadiness` stores a given
-  `trash_check` that differs, without a binding version; a binding or operator change clears it.
+- `Purges` (`DuePurges`, `FinishPurge`, `ReleaseFinalBindings`) serves the job
+  `messaging.purge_deleted`; `ProjectTrash` serves the heartbeat: requests of a purged forum for
+  its runner, outcomes stored once with the audit entry `channel.project.trash` (actor the
+  runner). `ApplyProjectReadiness` stores a given `trash_check` that differs, without a binding
+  version; a binding or operator change clears it.
+- Release of a deleted forum's binding (FIX-delete-releases-binding, migrations `00090` and
+  `00091`): `released_at` is set by the purge of a channel or space, by a stored folder move
+  outcome and by every run of the purge job (the repair of earlier purges), never while a folder
+  move is `requested`; the unique index on `lower(workspace_ref)` and `BoundProjectFolders` leave
+  released rows out. `DeleteProjectBinding` is allowed on an archived or deleted forum
+  (`lockForumAnyState`); `PutProjectBinding` there stays `409 conflict`.
 
 ## Port (root package `internal/chat`)
 

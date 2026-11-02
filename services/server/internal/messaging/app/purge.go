@@ -29,10 +29,15 @@ func (s *Service) Purge(p chat.Purges, batch int) *Purge {
 	return &Purge{r: s.Retention(), chat: p, batch: max(batch, 1)}
 }
 
-// Run purges every due item and returns the number of deleted messages. Errors: those of the
-// database, and internal when a round over the messages of an item deletes none of them, so a
-// persistent refusal cannot loop.
+// Run first releases the project bindings of purged forums that are not released yet (a folder
+// move that ended since the last run, or a forum purged before the release existed,
+// FIX-delete-releases-binding), then purges every due item and returns the number of deleted
+// messages. Errors: those of the database, and internal when a round over the messages of an item
+// deletes none of them, so a persistent refusal cannot loop.
 func (p *Purge) Run(ctx context.Context) (int, error) {
+	if _, err := p.chat.ReleaseFinalBindings(ctx); err != nil {
+		return 0, err
+	}
 	total := 0
 	for {
 		items, err := p.chat.DuePurges(ctx, p.batch)

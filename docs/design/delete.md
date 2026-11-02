@@ -8,7 +8,8 @@ section 4.5 and 4.6; [07-permissions.md](../spec/07-permissions.md) 4.5a;
 [09-agents.md](../spec/09-agents.md) 18.15, R-AG-38; [20-privacy.md](../spec/20-privacy.md) 4.2a;
 [openapi.yaml](../api/openapi.yaml)). Rulings:
 [decisions.d/FEAT-delete-spaces-chats.md](../decisions.d/FEAT-delete-spaces-chats.md)
-(`D-DEL-1` to `D-DEL-16`).
+(`D-DEL-1` to `D-DEL-16`) and
+[decisions.d/FIX-delete-releases-binding.md](../decisions.d/FIX-delete-releases-binding.md) (D-DEL-17).
 
 ## 1. Goal
 
@@ -176,6 +177,17 @@ against the instance's data in this repository). With this feature the owner rem
 that channel, which takes it out of every client at once; "+", the forum menu entry and Cmd+N stay
 the ways to start a chat. Reason: the entry is data, not code; the new delete removes it everywhere.
 
+**D-DEL-17 The binding gives its folder free when the deletion is final.** Addendum of 2026-11-02
+(FIX-delete-releases-binding, rulings D-DEL-REL-1 to D-DEL-REL-7). A deleted forum keeps its
+project binding during the undo window, so a restore always gets it back; the purge of the forum
+or of its space releases it (`project_bindings.released_at`), and the unique index on
+`lower(workspace_ref)` leaves released rows out, so the folder can be bound to a new forum. A
+binding whose folder move is still requested is released only with the runner's outcome. The owner
+may also remove the binding of an archived or deleted forum. Every run of
+`messaging.purge_deleted` first releases bindings purged before this rule existed. Reason: in
+operation a project deleted without the folder box blocked its folder for every new forum, and
+neither binding it again nor unbinding the deleted forum was possible.
+
 ## 4. Flow
 
 ```mermaid
@@ -193,6 +205,7 @@ sequenceDiagram
     Server-->>Runner: HeartbeatAck.project_trash
     Runner->>Runner: stop turn, check again, move to trash
     Runner->>Server: heartbeat project_trash_results (trashed or refused)
+    Server->>Server: binding released (at the purge without a folder move)
     App->>Server: getChannelDeletion (folder outcome)
 ```
 

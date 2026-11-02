@@ -104,3 +104,21 @@ FOR UPDATE;
 -- The outcome a runner reported for its requested folder move; stored once.
 UPDATE project_bindings SET trash_state = @result, trash_reason = sqlc.narg(reason)
 WHERE channel_id = @channel_id AND trash_state = 'requested';
+
+-- name: ReleaseFinalBindings :execrows
+-- Releases the project bindings whose deletion is final (FIX-delete-releases-binding): the forum
+-- or its space is purged and no folder move waits for its runner, so the folder can be bound to
+-- another forum (the unique index on lower(workspace_ref) leaves released rows out). The rows
+-- stay. The rows are locked in ascending channel id like every other multi-row binding write.
+UPDATE project_bindings
+SET released_at = @released_at
+WHERE channel_id IN (
+    SELECT pb.channel_id
+    FROM project_bindings pb
+    JOIN channels c ON c.id = pb.channel_id
+    LEFT JOIN spaces s ON s.id = c.space_id
+    WHERE pb.released_at IS NULL AND pb.trash_state IS DISTINCT FROM 'requested'
+      AND (c.purged_at IS NOT NULL OR s.purged_at IS NOT NULL)
+    ORDER BY pb.channel_id
+    FOR UPDATE OF pb
+);

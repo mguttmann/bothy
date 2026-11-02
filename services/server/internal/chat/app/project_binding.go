@@ -125,12 +125,7 @@ func (s *Service) loadForum(ctx context.Context, a actor.Actor, id ids.ID) (ids.
 // section 6.3), and 409 for an archived forum or a forum of an archived space (07 section 4.5).
 // The effective operator of the returned row is the one at commit.
 func (s *Service) lockForum(ctx context.Context, id, space ids.ID) (ChannelRow, error) {
-	if !space.IsZero() {
-		if _, found, err := s.d.Store.ShareSpace(ctx, space); err != nil || !found {
-			return ChannelRow{}, firstErr(err, invisible())
-		}
-	}
-	c, err := s.lockChannel(ctx, id)
+	c, err := s.lockForumAnyState(ctx, id, space)
 	if err != nil {
 		return ChannelRow{}, err
 	}
@@ -138,6 +133,16 @@ func (s *Service) lockForum(ctx context.Context, id, space ids.ID) (ChannelRow, 
 		return ChannelRow{}, channelArchivedConflict()
 	}
 	return c, nil
+}
+
+// lockForumAnyState is lockForum without the 409 for an archived forum: the locks only.
+func (s *Service) lockForumAnyState(ctx context.Context, id, space ids.ID) (ChannelRow, error) {
+	if !space.IsZero() {
+		if _, found, err := s.d.Store.ShareSpace(ctx, space); err != nil || !found {
+			return ChannelRow{}, firstErr(err, invisible())
+		}
+	}
+	return s.lockChannel(ctx, id)
 }
 
 // PutProjectBinding implements chat.ProjectBindings (design notes 2, 4, 5 and 9 of M2-03): the
@@ -219,9 +224,12 @@ func (s *Service) putProjectBinding(ctx context.Context, st BindingStore, a acto
 }
 
 // DeleteProjectBinding implements chat.ProjectBindings (design note 3 of M2-03): steps a, b and d
-// of PutProjectBinding, then 404 when the forum has no binding (a binding has no tombstone, so a
-// repeated DELETE answers 404 and writes no audit entry), otherwise the delete, settings_version
-// with its events and the audit entry.
+// of PutProjectBinding, except that an archived or deleted forum and a forum of an archived space
+// may lose their binding (FIX-delete-releases-binding, D-DEL-REL-3: giving a folder free is no
+// change of the frozen history, and it is the owner's way out when a folder move never ends);
+// then 404 when the forum has no binding (a binding has no tombstone, so a repeated DELETE answers
+// 404 and writes no audit entry), otherwise the delete (which drops a requested folder move with
+// the row), settings_version with its events and the audit entry.
 func (s *Service) DeleteProjectBinding(ctx context.Context, channelID ids.ID) error {
 	a, err := caller(ctx)
 	if err != nil {
@@ -236,7 +244,7 @@ func (s *Service) DeleteProjectBinding(ctx context.Context, channelID ids.ID) er
 		return err
 	}
 	return s.d.UoW.Do(ctx, func(ctx context.Context) error {
-		c, err := s.lockForum(ctx, channelID, space)
+		c, err := s.lockForumAnyState(ctx, channelID, space)
 		if err != nil {
 			return err
 		}

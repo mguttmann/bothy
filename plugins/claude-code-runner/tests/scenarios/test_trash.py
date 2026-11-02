@@ -125,3 +125,25 @@ async def test_a_restart_does_not_repeat_the_move(world: World) -> None:
     await world.until(lambda: len(world.fake.project_trash_results) == 2)
     assert world.fake.project_trash_results[1] == {"channel_id": str(notes), "result": "trashed"}
     assert (folder / "new.txt").read_text() == "new"
+
+
+async def test_a_deleted_forum_gives_its_folder_to_a_new_forum(world: World) -> None:
+    """FIX-delete-releases-binding: the folder of a deleted forum serves the forum bound next.
+
+    A deletion takes the forum out of the served channels (``access.changed``); once the server
+    released its binding the same folder is bound to a new forum, which the runner serves with
+    a ready entry and an ok folder check, not ``contains_other_project``.
+    """
+    (world.projects / "notes").mkdir()
+    old = world.fake.add_forum("Notes", "notes")
+    await world.start(world.config(trash_check_interval="200ms"))
+    await world.until(lambda: {"ok": True} in checks(world, old))
+    world.fake.set_operator(old, served=False)
+    new = world.fake.add_forum("Notes again", "notes", served=False)
+    count = len(world.fake.heartbeats)
+    world.fake.set_operator(new)
+    await world.until(lambda: {"ok": True} in checks(world, new))
+    beats = world.fake.heartbeats[count:]
+    assert any((readiness_of(b, new) or {}).get("ready") is True for b in beats)
+    assert readiness_of(beats[-1], old) is None
+    assert all(c == {"ok": True} for c in checks(world, new))

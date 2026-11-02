@@ -277,6 +277,33 @@ func (q *Queries) PurgeThread(ctx context.Context, arg PurgeThreadParams) (int64
 	return result.RowsAffected(), nil
 }
 
+const releaseFinalBindings = `-- name: ReleaseFinalBindings :execrows
+UPDATE project_bindings
+SET released_at = $1
+WHERE channel_id IN (
+    SELECT pb.channel_id
+    FROM project_bindings pb
+    JOIN channels c ON c.id = pb.channel_id
+    LEFT JOIN spaces s ON s.id = c.space_id
+    WHERE pb.released_at IS NULL AND pb.trash_state IS DISTINCT FROM 'requested'
+      AND (c.purged_at IS NOT NULL OR s.purged_at IS NOT NULL)
+    ORDER BY pb.channel_id
+    FOR UPDATE OF pb
+)
+`
+
+// Releases the project bindings whose deletion is final (FIX-delete-releases-binding): the forum
+// or its space is purged and no folder move waits for its runner, so the folder can be bound to
+// another forum (the unique index on lower(workspace_ref) leaves released rows out). The rows
+// stay. The rows are locked in ascending channel id like every other multi-row binding write.
+func (q *Queries) ReleaseFinalBindings(ctx context.Context, releasedAt pgtype.Timestamptz) (int64, error) {
+	result, err := q.db.Exec(ctx, releaseFinalBindings, releasedAt)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const requestTrash = `-- name: RequestTrash :exec
 UPDATE project_bindings
 SET trash_state = 'requested', trash_agent_id = $1, trash_requested_at = $2, trash_reason = NULL

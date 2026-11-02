@@ -3442,7 +3442,10 @@ moves it and never trusts the server or an older check for its own file system.
     an accepted `sendHeartbeat` carried it. It keeps each handled request with its result in
     `<runner.state_dir>/trash.json` (a move in progress with its target), so a restart neither
     repeats a move nor loses a result; a request the server repeats after the result was sent gets
-    the same result again and moves nothing.
+    the same result again and moves nothing. The stored outcome releases the binding of the
+    deleted forum (03 `project_bindings.released_at`), so its folder name can be bound again; a
+    deletion without a folder move releases it at the purge (addendum of 2026-11-02,
+    FIX-delete-releases-binding).
 
 5. **Logs.** `project_trash_moved` (place `trash`, `fallback` or `recovered` after
     a restart), `project_trash_refused` (code), `project_trash_deferred` and `project_trash_failed`

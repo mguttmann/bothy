@@ -149,6 +149,11 @@ type Purges interface {
 	// unit of work; an item purged already is left as it is. The caller removed every message
 	// of t before.
 	FinishPurge(ctx context.Context, t PurgeTarget) error
+	// ReleaseFinalBindings releases, in its own unit of work, the project binding of every purged
+	// forum and of every forum of a purged space whose folder move is not still requested, so its
+	// workspace_ref can be bound again (FIX-delete-releases-binding); it returns how many it
+	// released. Idempotent: a released binding stays released.
+	ReleaseFinalBindings(ctx context.Context) (int, error)
 }
 
 // ProjectTrashCheckReport is the folder check a runner reports per bound forum (schema
