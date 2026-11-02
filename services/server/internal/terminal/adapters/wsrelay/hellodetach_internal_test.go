@@ -49,7 +49,7 @@ func TestDataHelloCarriesTheSessionDetachGrace(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	h, err := NewHandler(Config{HeartbeatInterval: 20 * time.Second, HeartbeatMissLimit: 3, AuthTimeout: time.Minute, DuplicateProbeTimeout: time.Second,
+	h, err := NewHandler(Config{HeartbeatInterval: 20 * time.Second, HeartbeatMissLimit: testkit.HeartbeatMissLimit(20 * time.Second), AuthTimeout: testkit.Patience, DuplicateProbeTimeout: time.Second,
 		MaxFrameBytes: 1 << 16, MaxJSONDepth: 32, OutboundQueueMax: 16, WriteTimeout: time.Second, IdleTimeout: 30 * time.Minute,
 		DetachGrace: 15 * time.Minute}, Deps{UseCases: helloUC{}, Links: NewLinks(nil, nil), Schemas: schemas})
 	if err != nil {
