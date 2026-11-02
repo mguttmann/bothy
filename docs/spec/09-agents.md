@@ -3096,7 +3096,9 @@ Claude announces attachments with lines `ATTACH: <path>` in the reply (runner pr
    (secret files such as `.env*`, `*.pem`, `*.key`, `id_*`, `.netrc`, folders `.ssh`, `.claude`,
    `.config`, `.aws`, `.azure`, `.gnupg`);
 4. checks count (`message.max_attachments`) and size (`file.max_upload_bytes`) before the first
-   upload and then uploads all or none;
+   upload and then sends best effort: every file that passes every check and uploads goes with
+   the reply (addendum of 2026-11-02, FIX-APR/2; before, one rejected file stopped the whole
+   set);
 5. removes the `ATTACH` lines from the reply and names rejected files with the reason.
 
 **Lines.** An `ATTACH:` line starts at column 0 with exactly `ATTACH:` (case sensitive) followed
@@ -3131,26 +3133,30 @@ matches, else `denied_pattern`; it is a regular file (`not_a_regular_file`) with
 (`hard_link`, because a hard link to a file outside the roots passes every path test) and at least
 one byte (`empty_file`). The same real path announced twice counts once, at its first line.
 
-**The set: all or none.** The limits come from `getInstance` (`InstanceLimits`
-`message_max_attachments`, `file_max_upload_bytes`), read once per reply with `ATTACH:` lines
-inside the run binding; a failed read gives `limits_unavailable`, more files than the limit
-`too_many`, a file above the size `too_large`. When any file is rejected, no file is staged or
-uploaded and every other file gets `set_not_sent`. Otherwise each file is opened with
-`O_NOFOLLOW`, compared with its check (device, inode, type, one link, size; else
-`changed_during_check` for the whole set) and copied into a private staging copy under
-`<runner.state_dir>/outgoing/<run_id>/`; the upload reads only that copy.
+**The set: best effort.** Addendum of 2026-11-02 (FIX-APR/2). The limits come from `getInstance`
+(`InstanceLimits` `message_max_attachments`, `file_max_upload_bytes`), read once per reply with
+`ATTACH:` lines inside the run binding; a failed read gives every file `limits_unavailable`, a
+file above the size `too_large`, and once `message_max_attachments` files are accepted every
+later file that passed gets `too_many` (only files that pass count). A rejected file is named in
+the notice; every other file goes on. Each accepted file is opened with `O_NOFOLLOW`, compared
+with its check (device, inode, type, one link, size; else `changed_during_check` for that file)
+and copied into a private staging copy under `<runner.state_dir>/outgoing/<run_id>/`; the upload
+reads only that copy. When no file is left, the reply goes out without attachments and with the
+notice.
 
 **Upload and sending.** Files go one after the other through the upload session (12 3.1 to 3.4,
 mode `direct`; another mode gives `upload_failed`), every request through the SDK client inside the
 run binding (07 SR9), so a file reaches a channel only when the agent and the triggering person may
 both upload there; while a set uploads `/status_line` is `uploading_attachments`. A final problem
 gives `upload_refused` with its code and reason, a transport failure after the retries
-`upload_failed`; then no further file starts, the open session of the failing file is aborted and
-the reply goes out without attachments. A complete set is attached with `attachment_file_ids` to
-the reply in the run's thread (an exception of SR9). When the server refuses the attachments (`403
-feature_disabled`, `403 forbidden`, `409 conflict` with `file_not_attachable`, `400
-validation_failed` on `/attachment_file_ids` only), the reply is sent again without them, with the
-notice (`not_attached`) and a new `client_msg_id`. A failed set never fails the run.
+`upload_failed`; then the open session of the failing file is aborted and the next file starts.
+The files that uploaded are attached with `attachment_file_ids` to the reply in the run's thread
+(an exception of SR9), with the notice of the refused files below the text; when none uploaded,
+the reply goes out without attachments and with the notice. When the server refuses the
+attachments (`403 feature_disabled`, `403 forbidden`, `409 conflict` with `file_not_attachable`,
+`400 validation_failed` on `/attachment_file_ids` only), the reply is sent again without them,
+with the notice (those files `not_attached`) and a new `client_msg_id`. A failed file never
+fails the run.
 
 **Long answers.** Addendum of 2026-10-29 (01 6.13, D-M4-47-6). An answer is never split into
 several messages. An answer text (after the `ATTACH:` lines) longer than `LIMIT_READ_FLOOR_BYTES`
@@ -3158,27 +3164,33 @@ UTF-8 bytes reads `InstanceLimits.message_max_content_bytes` with `getInstance`;
 keeps the head (cut at a line break, never inside a character or a fenced code block) and the rest
 becomes the last file `answer.txt` of the set, staged by the runner itself (it is not checked
 against the roots and patterns, which are about files of the turn) and counted against
-`message_max_attachments` and `file_max_upload_bytes` like the others. The set stays all or none:
-when it fails, the reply goes out with the head and the notice, which names `answer.txt` with its
-code (`too_large` for a rest above `file_max_upload_bytes`); the head is then shortened so head and
-notice fit the limit together. A shorter text, or a failed read of the limit, sends the answer as
-it is.
+`message_max_attachments` and `file_max_upload_bytes` like the others. When `answer.txt` itself is
+refused, the notice names it with its code (`too_large` for a rest above
+`file_max_upload_bytes`); whenever the reply carries a notice, the head is shortened so head and
+notice fit the limit together (with `answer.txt` sent, the cut lines are then missing between
+head and rest, FIX-APR/6). A shorter text, or a failed read of the limit, sends the answer as it
+is.
 
-**Notice.** After one blank line, the line `Attachments not sent:` and one line per announced file
-`` - `<name>`: <code> `` (with `(<problem code>, <reason>)` for `upload_refused` and
-`not_attached`), at most `message_max_attachments` named lines and then `- and <n> more`. The
+**Notice.** After one blank line, the line `Attachments not sent:` and one line per refused file
+in the order of its `ATTACH:` line `` - `<name>`: <code> `` (with `(<problem code>, <reason>)` for
+`upload_refused` and `not_attached`, and with ` (copy it into TMPDIR and attach the copy)` for
+`outside_allowed_roots`, FIX-APR/5), at most `message_max_attachments` named lines and then
+`- and <n> more`; a reply whose files all went out has no notice. The
 notice follows `locale_default` of `getInstance` (read for the limits anyway; addendum of
 2026-11-02): for German (`de`, `de-*`) the heading, the last line and each code are German texts,
 with fixed texts for the common problems of `upload_refused` and `not_attached` and the problem
 code and reason in brackets for any other; any other or unknown locale keeps the English form
 above. The closed set of codes: `not_found`, `outside_allowed_roots`, `denied_pattern`,
 `not_a_regular_file`, `hard_link`, `empty_file`, `changed_during_check`, `too_large`, `too_many`,
-`limits_unavailable`, `upload_refused`, `upload_failed`, `not_attached`, `set_not_sent`. `<name>`
+`limits_unavailable`, `upload_refused`, `upload_failed`, `not_attached`, and `set_not_sent`, which
+only a record of a runner before FIX-APR/2 still holds. `<name>`
 is the last component of the announced path without control, bidi and backtick characters, never a
 folder or a real path. The German texts:
 
 <!-- language-check: off -->
 - heading `Anhänge nicht gesendet:`, last line `- und <n> weitere`;
+- `outside_allowed_roots`: `liegt außerhalb der erlaubten Ordner (der Agent kann die Datei nach
+  TMPDIR kopieren und die Kopie anhängen)`;
 - `upload_refused` with `forbidden`, `capability_missing`: `Hochladen nicht erlaubt (Recht fehlt)`;
   with `forbidden`, `acting_for_insufficient`:
   `Hochladen nicht erlaubt (der auslösenden Person fehlt das Recht)`;
@@ -3186,11 +3198,18 @@ folder or a real path. The German texts:
 <!-- language-check: on -->
 
 **Persistence and stop.** The progress of a set is stored before each request that depends on it
-(`Idempotency-Key` values, `file_id`, confirmed parts, the `client_msg_id` of a fallback), so a
-runner that adopts the turn after a crash resumes it without a second upload session or a second
-reply. A stop cancels the request in flight, aborts the open sessions and sends no reply. Staged
+(`Idempotency-Key` values, `file_id`, confirmed parts, each refused file with its position, the
+`client_msg_id` of a fallback), so a runner that adopts the turn after a crash resumes it without
+a second upload session or a second reply; a file that already failed is not tried again, and the
+reply text with its notice is rebuilt from the record only, so a repeated send is the same
+body. A stop cancels the request in flight, aborts the open sessions and sends no reply. Staged
 copies and records are deleted once the reply is sent or the run stopped; leftovers fall to the
 retention sweep after `runner.stream_log_retention`.
+
+**Files from elsewhere.** The roots stay narrow (FIX-APR/4). The runner prompt tells the agent to
+write files it makes for the person into the project directory or `$TMPDIR`, and to copy a file
+that lives anywhere else into `$TMPDIR` first and attach the copy, never copying a file whose name
+marks it as a secret or that holds a secret; the copy passes the same checks as any other file.
 
 **Residuals.** The checks protect the paths the runner sends, not what a turn of class `host` can
 read or copy on its own (T-DEV-01, SR2); a secret file under a name no pattern knows is sent when

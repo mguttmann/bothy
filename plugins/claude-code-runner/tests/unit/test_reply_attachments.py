@@ -403,24 +403,35 @@ def _cand(name: str, size: int = 10, real: str | None = None) -> tuple[str, Cand
     return name, Candidate(name, real or f"/p/{name}", size, 1, hash(name) & 0xFFFF)
 
 
-def test_check_set_all_or_none() -> None:
+def test_check_set_best_effort() -> None:
+    """FIX-attach-partial-and-roots: every file that passes goes, only the refused are named."""
     limits = Limits(max_attachments=3, max_upload_bytes=100)
     verdict = check_set([_cand("a"), ("b/.env", Rejection("denied_pattern")), _cand("c")], limits)
     assert not verdict.ok
-    assert verdict.accepted == ()
-    assert [o.rejection.code for o in verdict.outcomes if o.rejection] == [
-        "set_not_sent",
-        "denied_pattern",
-        "set_not_sent",
+    assert [c.announced for c in verdict.accepted] == ["a", "c"]
+    assert [(o.announced, o.rejection) for o in verdict.outcomes] == [
+        ("a", None),
+        ("b/.env", Rejection("denied_pattern")),
+        ("c", None),
     ]
+    # The live case: one file outside the roots no longer drops the valid one.
+    live = check_set(
+        [
+            _cand("review-model-proposal.md"),
+            ("2026-11-04-ai-enablement-brief.md", Rejection("outside_allowed_roots")),
+        ],
+        limits,
+    )
+    assert [c.announced for c in live.accepted] == ["review-model-proposal.md"]
+    # Only files that pass count against the limit; the first ones go, the later get too_many.
     many = check_set([_cand(n) for n in "abcd"], limits)
-    assert {o.rejection.code for o in many.outcomes if o.rejection} == {"too_many"}
+    assert [c.announced for c in many.accepted] == ["a", "b", "c"]
+    assert [o.rejection.code for o in many.outcomes if o.rejection] == ["too_many"]
+    refused_first = check_set([("x", Rejection("not_found")), *(_cand(n) for n in "abc")], limits)
+    assert [c.announced for c in refused_first.accepted] == ["a", "b", "c"]
     big = check_set([_cand("a"), _cand("b", size=101), _cand("c")], limits)
-    assert [o.rejection.code for o in big.outcomes if o.rejection] == [
-        "set_not_sent",
-        "too_large",
-        "set_not_sent",
-    ]
+    assert [c.announced for c in big.accepted] == ["a", "c"]
+    assert [o.rejection.code for o in big.outcomes if o.rejection] == ["too_large"]
     twice = check_set([_cand("a"), _cand("b", real="/p/a"), _cand("c")], limits)
     assert twice.ok
     assert [c.announced for c in twice.accepted] == ["a", "c"]
@@ -429,6 +440,7 @@ def test_check_set_all_or_none() -> None:
     dup4 = check_set([_cand("a"), _cand("b"), _cand("c"), _cand("d", real="/p/a")], limits)
     assert dup4.ok
     none = check_set([_cand("a"), _cand("b")], None)
+    assert none.accepted == ()
     assert {o.rejection.code for o in none.outcomes if o.rejection} == {"limits_unavailable"}
     good = check_set([_cand("a"), _cand("b", size=100)], limits)
     assert good.ok
@@ -461,6 +473,9 @@ def test_build_notice() -> None:
     )
     assert "/srv" not in notice
     assert build_notice([Outcome("a.md"), Outcome("b.md")], 3) == ""
+    # A sent file is not named; the limit counts named lines only.
+    mixed = [Outcome("a.md"), Outcome("x/b.md", Rejection("not_found")), Outcome("c.md")]
+    assert build_notice(mixed, 1) == "Attachments not sent:\n- `b.md`: not_found"
     assert with_notice("Done.", "") == "Done."
     assert with_notice("Done.", "N") == "Done.\n\nN"
     assert with_notice("", "N") == "N"
@@ -503,6 +518,26 @@ def test_build_notice_follows_the_instance_language() -> None:
     for other in ("en", "fr", "", None):
         assert build_notice(outcomes[:1], 4, other) == english
     assert build_notice([Outcome("a.md")], 3, "de") == ""
+
+
+def test_notice_tells_how_to_send_a_file_from_elsewhere() -> None:
+    """FIX-attach-partial-and-roots: outside_allowed_roots names the file and the way out."""
+    outcomes = [
+        Outcome("review-model-proposal.md"),
+        Outcome("/home/x/2026-11-04-ai-enablement-brief.md", Rejection("outside_allowed_roots")),
+    ]
+    assert build_notice(outcomes, 3) == (
+        "Attachments not sent:\n"
+        "- `2026-11-04-ai-enablement-brief.md`: outside_allowed_roots"
+        " (copy it into TMPDIR and attach the copy)"
+    )
+    # language-check: off
+    assert build_notice(outcomes, 3, "de") == (
+        "Anhänge nicht gesendet:\n"
+        "- `2026-11-04-ai-enablement-brief.md`: liegt außerhalb der erlaubten Ordner"
+        " (der Agent kann die Datei nach TMPDIR kopieren und die Kopie anhängen)"
+    )
+    # language-check: on
 
 
 def test_german_reason_for_every_code() -> None:

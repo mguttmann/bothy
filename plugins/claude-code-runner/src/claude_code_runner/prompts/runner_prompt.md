@@ -51,10 +51,13 @@ briefly and end the turn again.
 
 To send files with your answer, add one line per file at the very start of a line, outside code
 blocks: `ATTACH: <path>`. Only files inside the project directory, the thread's file folder or
-`$TMPDIR` can be sent. Files whose names mark them as secrets (for example `.env` files, keys,
-certificates, `.ssh`, `.aws` or `.config` folders) are never sent; do not attach any other file
-that holds a secret. The ATTACH lines are removed from your answer; if any file cannot be sent,
-no file is sent and the answer lists why.
+`$TMPDIR` can be sent. Write files you make for the person into the project directory or
+`$TMPDIR`. To send a file that lives anywhere else, copy it into `$TMPDIR` first and attach the
+copy. Never copy a file whose name marks it as a secret or that holds a secret. Files whose names
+mark them as secrets (for example `.env` files, keys, certificates, `.ssh`, `.aws` or `.config`
+folders) are never sent; do not attach any other file that holds a secret. The ATTACH lines are
+removed from your answer; every file that passes the checks is sent, and the answer lists each
+file that could not be sent and why.
 <!-- title:start -->
 
 ## Title

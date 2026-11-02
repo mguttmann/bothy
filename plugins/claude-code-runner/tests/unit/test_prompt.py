@@ -25,7 +25,17 @@ def test_system_file_sections() -> None:
     # Answer attachments (M3-12 note 12): in every prompt, with and without a title request.
     for text in (new, resumed):
         assert "`ATTACH: <path>`" in text
-        assert "no file is sent and the answer lists why" in text
+        section = " ".join(text.split("## Files", 1)[1].split("\n## ", 1)[0].split())
+        # FIX-attach-partial-and-roots: best effort, and how to send a file from elsewhere.
+        for phrase in (
+            "every file that passes the checks is sent",
+            "lists each file that could not be sent and why",
+            "Write files you make for the person into the project directory or `$TMPDIR`",
+            "copy it into `$TMPDIR` first and attach the copy",
+            "Never copy a file whose name marks it as a secret or that holds a secret",
+        ):
+            assert phrase in section, phrase
+        assert "no file is sent" not in section
 
 
 def test_stdin_line_shape() -> None:

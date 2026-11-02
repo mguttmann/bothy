@@ -33,11 +33,17 @@ def world_timings() -> dict[str, float]:
     return {"agent.cancel_grace": 100 * PATIENCE, "agent.invocation_token_ttl": 100 * PATIENCE}
 
 
-@pytest.mark.parametrize("held", ["createUpload", "uploadPart"])
-async def test_crash_during_upload_resumes_once(world: World, held: str) -> None:
+@pytest.mark.parametrize(
+    ("held", "refused"), [("createUpload", False), ("uploadPart", False), ("uploadPart", True)]
+)
+async def test_crash_during_upload_resumes_once(world: World, held: str, refused: bool) -> None:
     _limits(world)
     _write(_project(world), {"a.md": REPORT, "b.md": SUMMARY})
-    world.scenario(fixture="plain", result_override={"result": "Two.\nATTACH: a.md\nATTACH: b.md"})
+    # With a refused file between them (FIX-attach-partial-and-roots): the valid two still go,
+    # and the resumed answer carries the notice once.
+    middle = "ATTACH: missing.md\n" if refused else ""
+    text = f"Two.\nATTACH: a.md\n{middle}ATTACH: b.md"
+    world.scenario(fixture="plain", result_override={"result": text})
     gate = HoldGate()
     if held == "uploadPart":
         world.fake.inject("uploadPart", Fault.passthrough())  # part 1 is confirmed
@@ -77,6 +83,8 @@ async def test_crash_during_upload_resumes_once(world: World, held: str) -> None
         assert len(REPORT) == 3 * PART
     (message,) = world.fake.messages
     assert message["attachment_file_ids"] == [str(s.file_id) for s in sessions]
+    notice = "\n\nAttachments not sent:\n- `missing.md`: not_found" if refused else ""
+    assert message["content_md"] == "Two." + notice
     assert len(world.requests("finishRun")) == 1
     await world.until(lambda: not (world.state / "outgoing" / str(run.run_id)).exists())
     assert not list((world.state / "sessions").rglob(f"{run.run_id}.attach-*.json"))

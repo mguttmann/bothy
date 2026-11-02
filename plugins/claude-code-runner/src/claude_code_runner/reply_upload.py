@@ -5,9 +5,11 @@
 ``ATTACH:`` lines: it reads the server's limits (``getInstance``), checks the set with
 `claude_code_runner.reply_attachments`, copies the accepted files into private staging copies
 (`stage_files`), uploads them one after the other through the upload session of M3-03
-(`upload_set`) and sends the answer with ``attachment_file_ids``; when any step fails it sends
-the answer without attachments and with the notice: all or none (09 18.10 point 4). Every
-request goes through the SDK client inside the run's binding (07 SR9).
+(`upload_set`) and sends the answer with ``attachment_file_ids``. Best effort (09 18.10 point
+4, FIX-attach-partial-and-roots): every file that passes the checks and uploads goes with the
+answer; a file refused at any step is named in the notice below the answer, and only when no
+file is left does the answer go out without attachments. Every request goes through the SDK
+client inside the run's binding (07 SR9).
 
 An answer above ``message_max_content_bytes`` (brief M4-47) goes the same way with its text cut
 by `bothy_sdk.long_answers.split_for_limit`: the rest becomes one more staged file
@@ -234,43 +236,39 @@ def _copy(candidate: Candidate, target: Path, max_bytes: int) -> tuple[int, str]
 
 def stage_files(
     accepted: Sequence[Candidate], max_upload_bytes: int, directory: Path
-) -> list[StagedFile] | tuple[Outcome, ...]:
+) -> list[StagedFile | Rejection]:
     """Copy every accepted file into ``directory`` right after the checks (note 5 c).
 
     Each file is opened with ``O_NOFOLLOW``; its device, inode and type must equal the
     ``stat`` of the check, it must still have one link, and the copy must have exactly the
     checked size and at most ``max_upload_bytes`` bytes. The upload reads only the copy, so a
     turn that changes the file afterwards cannot change what is sent, and the SHA-256 of
-    ``createUpload`` describes the bytes sent.
+    ``createUpload`` describes the bytes sent. A file that changed is refused alone (best
+    effort, FIX-attach-partial-and-roots); nothing of it is left in ``directory``.
 
     Args:
-        accepted: The candidates of a set without rejection, in position order.
+        accepted: The accepted candidates of a set, in position order.
         max_upload_bytes: ``InstanceLimits.file_max_upload_bytes``.
         directory: ``<runner.state_dir>/outgoing/<run_id>/<answer>`` (created ``0700``).
 
     Returns:
-        The staged files in position order, or, when one file changed, the outcomes of the set
-        (that file ``changed_during_check``, every other ``set_not_sent``); then nothing is
-        left in ``directory``.
+        Per candidate, in the same order, its staged copy (named by its place in ``accepted``,
+        from 1) or ``changed_during_check``.
     """
     ensure_private_dir(directory)
-    staged: list[StagedFile] = []
-    for position, candidate in enumerate(accepted, start=1):
-        target = directory / str(position)
+    results: list[StagedFile | Rejection] = []
+    for index, candidate in enumerate(accepted, start=1):
+        target = directory / str(index)
         with contextlib.suppress(FileNotFoundError):
             target.unlink()  # a copy of an earlier attempt of the same answer
         copied = _copy(candidate, target, max_upload_bytes)
         if copied is None:
-            shutil.rmtree(directory, ignore_errors=True)
-            return tuple(
-                Outcome(
-                    c.announced,
-                    Rejection("changed_during_check" if c is candidate else "set_not_sent"),
-                )
-                for c in accepted
-            )
-        staged.append(StagedFile(candidate.announced, candidate.name, target, *copied))
-    return staged
+            with contextlib.suppress(FileNotFoundError):
+                target.unlink()
+            results.append(Rejection("changed_during_check"))
+            continue
+        results.append(StagedFile(candidate.announced, candidate.name, target, *copied))
+    return results
 
 
 def part_slices(size: int, part_size: int) -> list[tuple[int, int, int]]:
@@ -311,6 +309,7 @@ class _FileState:
     plan: list[dict[str, Any]] = field(default_factory=list)
     etags: dict[str, str] = field(default_factory=dict)
     state: str = "staged"
+    position: int = 0
 
 
 @dataclass
@@ -320,12 +319,13 @@ class AttachmentSetRecord:
     Attributes:
         path: Where the record lives.
         answer: The index of the answer in the run, from 1.
-        state: ``staged``, ``uploaded``, ``failed`` (the set will not be attached; the
-            fallback is due) or ``fallback``.
-        files: Per staged file its keys, ``file_id``, part plan, confirmed parts and state
-            (``staged``, ``created``, ``completed``, ``failed``).
-        outcomes: The outcome per announced file of a failed set (announced path, code,
-            problem, reason).
+        state: ``staged``, ``uploaded`` (the completed files go with the answer), ``failed``
+            (no file will be attached; the fallback is due) or ``fallback``.
+        files: Per staged file its keys, ``file_id``, part plan, confirmed parts, state
+            (``staged``, ``created``, ``completed``, ``failed``) and the position of its
+            ``ATTACH:`` line.
+        outcomes: Every refused file (announced path, code, problem, reason, position), the
+            content of the notice.
         limit: ``message_max_attachments`` for the notice (``None`` when unknown).
         locale: The instance's ``locale_default``, the language of the notice (``None`` when
             unknown; a record of an older runner has none and keeps the English notice).
@@ -403,26 +403,36 @@ class AttachmentSetRecord:
         except (OSError, ValueError, KeyError, TypeError):
             return None
 
-    def set_outcomes(self, outcomes: Sequence[Outcome]) -> None:
-        """Store the outcomes of a failed set and mark it ``failed``."""
-        self.state = "failed"
-        self.outcomes = [
+    def refuse(self, position: int, outcome: Outcome) -> None:
+        """Note a file that is not sent; the caller saves the record.
+
+        Args:
+            position: The place of its ``ATTACH:`` line, from 1 (``answer.txt`` comes last).
+            outcome: The file and why it is not sent.
+        """
+        rejection = outcome.rejection or Rejection("upload_failed")
+        self.outcomes.append(
             {
-                "announced": o.announced,
-                "code": (o.rejection or Rejection("set_not_sent")).code,
-                "problem": o.rejection.problem if o.rejection else None,
-                "reason": o.rejection.reason if o.rejection else None,
+                "announced": outcome.announced,
+                "code": rejection.code,
+                "problem": rejection.problem,
+                "reason": rejection.reason,
+                "position": position,
             }
-            for o in outcomes
-        ]
+        )
+
+    def completed(self) -> list[_FileState]:
+        """The uploaded files in position order: those that go with the answer."""
+        return [f for f in self.files if f.state == "completed"]
 
     def notice(self) -> str:
-        """The notice of the stored outcomes (note 8)."""
+        """The notice of the refused files, in the order of their lines (note 8)."""
+        ordered = sorted(self.outcomes, key=lambda o: int(o.get("position") or 0))
         outcomes = [
             Outcome(
                 str(o["announced"]), Rejection(str(o["code"]), o.get("problem"), o.get("reason"))
             )
-            for o in self.outcomes
+            for o in ordered
         ]
         return build_notice(outcomes, self.limit, self.locale)
 
@@ -549,18 +559,10 @@ def _check(ctx: ReplyContext, paths: Sequence[str], limits: Limits | None) -> Se
     return check_set(checked, limits)
 
 
-def _with_overflow(
-    outcomes: Sequence[Outcome], overflow: str | None, code: str = "set_not_sent"
-) -> list[Outcome]:
-    """The outcomes of a set that is not sent, with the rest of a long answer last (M4-47)."""
-    rest = [Outcome(OVERFLOW_NAME, Rejection(code))] if overflow is not None else []
-    return [*outcomes, *rest]
-
-
 def _stage_overflow(
-    overflow: str, directory: Path, position: int, limits: Limits
+    overflow: str, directory: Path, index: int, position: int, limits: Limits
 ) -> _FileState | None:
-    """Write the rest of a long answer as the staged file ``position`` (M4-47).
+    """Write the rest of a long answer as the staged file ``index`` (M4-47).
 
     Returns:
         Its state, or ``None`` above ``file_max_upload_bytes``.
@@ -568,12 +570,44 @@ def _stage_overflow(
     data = overflow.encode("utf-8")
     if not data or len(data) > limits.max_upload_bytes:
         return None
-    target = directory / str(position)
+    target = directory / str(index)
     with contextlib.suppress(FileNotFoundError):
         target.unlink()  # a copy of an earlier attempt of the same answer
     write_private(target, data)
     digest = hashlib.sha256(data).hexdigest()
-    return _FileState(OVERFLOW_NAME, OVERFLOW_NAME, str(target), len(data), digest)
+    return _FileState(
+        OVERFLOW_NAME, OVERFLOW_NAME, str(target), len(data), digest, position=position
+    )
+
+
+def _stage_accepted(
+    ctx: ReplyContext,
+    record: AttachmentSetRecord,
+    accepted: Sequence[tuple[int, Candidate]],
+    directory: Path,
+    limits: Limits,
+) -> list[_FileState]:
+    """Stage the accepted files; a file that changed since its check is noted in the record."""
+    ensure_private_dir(directory)
+    files: list[_FileState] = []
+    candidates = [c for _, c in accepted]
+    staged = stage_files(candidates, limits.max_upload_bytes, directory)
+    for (position, candidate), result in zip(accepted, staged, strict=True):
+        if isinstance(result, Rejection):
+            record.refuse(position, Outcome(candidate.announced, result))
+            _log("attachment_changed_during_check", **ctx.ids)
+            continue
+        files.append(
+            _FileState(
+                result.announced,
+                result.name,
+                str(result.path),
+                result.size,
+                result.sha256,
+                position=position,
+            )
+        )
+    return files
 
 
 async def _prepare(
@@ -585,8 +619,9 @@ async def _prepare(
 ) -> AttachmentSetRecord:
     """Read the limits, check the set and stage it (notes 5 and 6); the record is stored.
 
-    The rest of a long answer (``overflow``, M4-47) takes the last place of the set, so the
-    ``ATTACH:`` files may use one place less.
+    Best effort (FIX-attach-partial-and-roots): every file that passes is staged, every other
+    is noted with its reason. The rest of a long answer (``overflow``, M4-47) takes the last
+    place of the set, so the ``ATTACH:`` files may use one place less.
     """
     cfg = ctx.config
     path = AttachmentSetRecord.path_for(cfg.state_dir, ctx.session_ref, ctx.run_id, answer)
@@ -603,34 +638,34 @@ async def _prepare(
         locale=limits.locale if limits is not None else None,
         client_msg_id=str(client_msg_id),
     )
-    if not verdict.ok or limits is None:
-        code = "limits_unavailable" if limits is None else "set_not_sent"
-        record.set_outcomes(_with_overflow(verdict.outcomes, overflow, code))
-        _log("attachments_rejected", count=len(verdict.outcomes), **ctx.ids)
+    positions = []
+    for position, outcome in enumerate(verdict.outcomes, start=1):
+        if outcome.rejection is None:
+            positions.append(position)
+        else:
+            record.refuse(position, outcome)
+    rest_position = len(verdict.outcomes) + 1
+    files: list[_FileState] = []
+    if limits is None:
+        if overflow is not None:
+            record.refuse(rest_position, Outcome(OVERFLOW_NAME, Rejection("limits_unavailable")))
     else:
         directory = outgoing_dir(cfg.state_dir, ctx.run_id) / str(answer)
-        staged = stage_files(verdict.accepted, limits.max_upload_bytes, directory)
-        if isinstance(staged, tuple):
-            record.set_outcomes(_with_overflow(staged, overflow))
-            _log("attachments_changed_during_check", **ctx.ids)
-        else:
-            files = [_FileState(s.announced, s.name, str(s.path), s.size, s.sha256) for s in staged]
-            rest = (
-                _stage_overflow(overflow, directory, len(files) + 1, limits)
-                if overflow is not None
-                else None
-            )
-            if overflow is not None and rest is None:
-                shutil.rmtree(directory, ignore_errors=True)
-                record.set_outcomes(
-                    [
-                        *(Outcome(f.announced, Rejection("set_not_sent")) for f in files),
-                        Outcome(OVERFLOW_NAME, Rejection("too_large")),
-                    ]
-                )
+        accepted = list(zip(positions, verdict.accepted, strict=True))
+        files = _stage_accepted(ctx, record, accepted, directory, limits)
+        if overflow is not None:
+            index = len(verdict.accepted) + 1
+            rest = _stage_overflow(overflow, directory, index, rest_position, limits)
+            if rest is None:
+                record.refuse(rest_position, Outcome(OVERFLOW_NAME, Rejection("too_large")))
                 _log("answer_rest_too_large", **ctx.ids)
             else:
-                record.files = [*files, *([rest] if rest is not None else [])]
+                files.append(rest)
+    record.files = files
+    if not files:
+        record.state = "failed"
+    if record.outcomes:
+        _log("attachments_rejected", count=len(record.outcomes), **ctx.ids)
     record.save()
     return record
 
@@ -766,17 +801,24 @@ async def _upload_file(ctx: ReplyContext, record: AttachmentSetRecord, f: _FileS
     record.save()
 
 
+async def _abort_file(ctx: ReplyContext, f: _FileState) -> None:
+    """``abortUpload`` for the open session of one file (best effort, codes only)."""
+    if f.file_id is None or f.state in ("completed", "failed"):
+        return
+    try:
+        await ctx.client.call(abort_upload.asyncio_detailed, file_id=UUID(f.file_id))
+    except ProblemError as err:
+        _log("attachment_abort_failed", code=err.code, **ctx.ids)
+    except httpx.TransportError:
+        _log("attachment_abort_failed", code="transport_error", **ctx.ids)
+
+
 async def _abort_open(ctx: ReplyContext, record: AttachmentSetRecord) -> None:
     """``abortUpload`` for every open session of the set (best effort, codes only)."""
     for f in record.files:
-        if f.file_id is None or f.state == "completed":
+        if f.file_id is None or f.state in ("completed", "failed"):
             continue
-        try:
-            await ctx.client.call(abort_upload.asyncio_detailed, file_id=UUID(f.file_id))
-        except ProblemError as err:
-            _log("attachment_abort_failed", code=err.code, **ctx.ids)
-        except httpx.TransportError:
-            _log("attachment_abort_failed", code="transport_error", **ctx.ids)
+        await _abort_file(ctx, f)
         f.state = "failed"
     record.save()
 
@@ -785,37 +827,37 @@ async def upload_set(ctx: ReplyContext, record: AttachmentSetRecord) -> list[UUI
     """Upload the staged files of a set, one after the other (note 7).
 
     Files go in position order, parts in order, every request through the client inside the
-    run's binding. A failure of any file ends the set: the failing file keeps its reason,
-    every other file gets ``set_not_sent``, the open session of the failing file is aborted
-    and no further file starts; the record is then ``failed``.
+    run's binding. Best effort (FIX-attach-partial-and-roots): a file that fails keeps its
+    reason in the record, its open session is aborted and the next file starts; a file that
+    failed before an adoption is not tried again. The record is then ``uploaded`` when any file
+    completed, else ``failed``.
 
     Args:
         ctx: The answer's context.
         record: The record of the set (``staged``, or partly uploaded after an adoption).
 
     Returns:
-        The ``file_id`` values in position order, or ``None`` when the set failed.
+        The ``file_id`` values of the completed files in position order, or ``None`` when no
+        file completed.
 
     Raises:
         RunEnded: The server ended the run (note 7 f).
         asyncio.CancelledError: A stop came (the caller aborts the open sessions).
     """
-    for index, f in enumerate(record.files):
+    for f in record.files:
+        if f.state == "failed":
+            continue
         try:
             await _upload_file(ctx, record, f)
         except _FileFailed as failed:
-            await _abort_open(ctx, record)
-            record.set_outcomes(
-                [
-                    Outcome(g.announced, failed.rejection if i == index else None)
-                    for i, g in enumerate(record.files)
-                ]
-            )
+            await _abort_file(ctx, f)
+            f.state = "failed"
+            record.refuse(f.position, Outcome(f.announced, failed.rejection))
             record.save()
-            return None
-    record.state = "uploaded"
+    completed = record.completed()
+    record.state = "uploaded" if completed else "failed"
     record.save()
-    return [UUID(str(f.file_id)) for f in record.files]
+    return [UUID(str(f.file_id)) for f in completed] or None
 
 
 # ---- note 9: sending -----------------------------------------------------------------------
@@ -876,12 +918,13 @@ async def send_answer_with_attachments(  # noqa: PLR0913 - the answer and its re
 ) -> SendResult:
     """Check, stage, upload and send one answer with ``ATTACH:`` lines (note 9).
 
-    A set that uploaded completely goes out with ``attachment_file_ids`` in position order
-    under the answer's ``client_msg_id``. A rejected or failed set, or an answer whose
-    attachments the server refuses (``403 feature_disabled``, ``403 forbidden``, ``409
-    conflict`` with ``file_not_attachable``, ``400 validation_failed`` on
-    ``/attachment_file_ids`` only), goes out without them, with the notice and a new
-    ``client_msg_id`` stored first. A stop sends nothing. An existing record (after an
+    Best effort (FIX-attach-partial-and-roots): every file that passed its checks and uploaded
+    goes out with ``attachment_file_ids`` in position order under the answer's
+    ``client_msg_id``, the refused files are named in the notice below the text. When no file
+    is left, or the server refuses the attachments (``403 feature_disabled``, ``403
+    forbidden``, ``409 conflict`` with ``file_not_attachable``, ``400 validation_failed`` on
+    ``/attachment_file_ids`` only), the answer goes out without them, with the notice and a
+    new ``client_msg_id`` stored first. A stop sends nothing. An existing record (after an
     adoption) is resumed instead of starting again.
 
     Args:
@@ -892,8 +935,8 @@ async def send_answer_with_attachments(  # noqa: PLR0913 - the answer and its re
         client_msg_id: The answer's ``client_msg_id`` of the turn record.
         overflow: The rest of an answer above ``message_max_content_bytes`` (M4-47), sent as
             the last file ``answer.txt`` of the set; ``text`` is then the head.
-        limit: ``message_max_content_bytes`` when the answer was cut to it; the answer without
-            its files then shortens its head so head and notice fit the limit together.
+        limit: ``message_max_content_bytes`` when the answer was cut to it; an answer with a
+            notice then shortens its head so head and notice fit the limit together.
 
     Returns:
         What became of the answer.
@@ -910,15 +953,12 @@ async def send_answer_with_attachments(  # noqa: PLR0913 - the answer and its re
         if record is None:
             record = await _prepare(ctx, paths, answer, client_msg_id, overflow)
         if record.state == "staged":
-            ids = await _upload_tracked(ctx, record)
+            await _upload_tracked(ctx, record)
             _no_stop(ctx)
-            if ids is None and record.state != "failed":
-                record.set_outcomes(
-                    [Outcome(f.announced, Rejection("upload_failed")) for f in record.files]
-                )
-                record.save()
+            if record.state == "staged":
+                _settle(record)  # the upload ended without deciding (it was cancelled)
         if record.state == "uploaded":
-            sent = await _send_attached(ctx, record, text)
+            sent = await _send_attached(ctx, record, text, limit)
             if sent is not None:
                 return sent
         return await _send_fallback(ctx, record, text, limit)
@@ -943,13 +983,42 @@ def _no_stop(ctx: ReplyContext) -> None:
         raise _Stopped
 
 
+def _settle(record: AttachmentSetRecord) -> None:
+    """Every file that neither completed nor failed fails with ``upload_failed``."""
+    for f in record.files:
+        if f.state not in ("completed", "failed"):
+            f.state = "failed"
+            record.refuse(f.position, Outcome(f.announced, Rejection("upload_failed")))
+    record.state = "uploaded" if record.completed() else "failed"
+    record.save()
+
+
+def _body(text: str, notice: str, limit: int | None) -> str:
+    """The answer with the notice; a head cut to ``limit`` (M4-47) is shortened so both fit."""
+    body = with_notice(text, notice)
+    if limit is not None and len(body.encode("utf-8")) > limit:
+        room = len(with_notice("x", notice).encode("utf-8")) - 1
+        head, _ = split_for_limit(text, max(1, limit - room))
+        body = with_notice(head, notice)
+    return body
+
+
 async def _send_attached(
-    ctx: ReplyContext, record: AttachmentSetRecord, text: str
+    ctx: ReplyContext, record: AttachmentSetRecord, text: str, limit: int | None = None
 ) -> SendResult | None:
-    """Send the answer with its uploaded files; ``None`` when the server refused them."""
+    """Send the answer with its uploaded files and the notice of the refused ones.
+
+    The body is built from the stored record only, so a resumed send repeats it exactly under
+    the same ``client_msg_id``.
+
+    Returns:
+        The result, or ``None`` when the server refused the attachments (the fallback is due).
+    """
     _no_stop(ctx)  # the stop wins also between the last upload and createMessage
-    ids = [UUID(str(f.file_id)) for f in record.files]
-    problem, refusal = await ctx.deliver(text, UUID(record.client_msg_id), ids)
+    completed = record.completed()
+    ids = [UUID(str(f.file_id)) for f in completed]
+    body = _body(text, record.notice(), limit)
+    problem, refusal = await ctx.deliver(body, UUID(record.client_msg_id), ids)
     if problem is None:
         _log("answer_attachments_sent", count=len(ids), **ctx.ids)
         return SendResult(None, attached=len(ids))
@@ -959,9 +1028,9 @@ async def _send_attached(
         return SendResult(problem)
     _log("answer_attachments_refused", code=problem, **ctx.ids)
     reason = refusal.reason if refusal is not None else None
-    record.set_outcomes(
-        [Outcome(f.announced, Rejection("not_attached", problem, reason)) for f in record.files]
-    )
+    for f in completed:
+        record.refuse(f.position, Outcome(f.announced, Rejection("not_attached", problem, reason)))
+    record.state = "failed"
     record.save()
     return None
 
@@ -977,12 +1046,7 @@ async def _send_fallback(
         record.fallback_msg_id = str(uuid7())
         record.save()  # a new id before the send: the old id with another body is 422
     _no_stop(ctx)
-    notice = record.notice()
-    body = with_notice(text, notice)
-    if limit is not None and len(body.encode("utf-8")) > limit:
-        room = len(with_notice("x", notice).encode("utf-8")) - 1
-        head, _ = split_for_limit(text, max(1, limit - room))
-        body = with_notice(head, notice)
+    body = _body(text, record.notice(), limit)
     problem, refusal = await ctx.deliver(body, UUID(record.fallback_msg_id), ())
     if refusal is not None and _ended(refusal):
         raise RunEnded
