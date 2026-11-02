@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Per-channel skill bindings and channel prompts against the pinned Hermes.
 
-The profile binds skills and an extra prompt to one Bothy channel the way Hermes' Discord
+The profile binds skills and an extra prompt to one channel of the server the way Hermes' Discord
 platform binds them to a Discord channel (``channel_skill_bindings``, ``channel_prompts``). A
 person's message in a thread of the bound channel starts a Hermes session with the bound skill
 loaded and the channel prompt next to the context the server delivered; a channel without a
