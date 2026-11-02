@@ -15,6 +15,36 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'sheets.dart';
 
+/// Largest share of differing pixels a CI golden of this file may show (one pixel in 1,000).
+///
+/// The scenario label of alchemist above the dark touch sheet ends one pixel column apart on
+/// macOS and on the Linux runner (22 pixels of 47,840), more than [dsCiGoldenDiffThreshold]
+/// allows on a sheet this small. A thick focus ring would change far more pixels. Platform
+/// goldens stay exact (FIX-KD/4).
+const double _ciTolerance = 0.001;
+
+/// Passes a CI golden whose difference stays within [_ciTolerance]; every other comparison
+/// is left to the package's [DsGoldenFileComparator].
+class _TolerantComparator extends DsGoldenFileComparator {
+  _TolerantComparator(super.testFile);
+
+  @override
+  Future<bool> compare(Uint8List imageBytes, Uri golden) async {
+    if (golden.pathSegments.first == 'ci') {
+      final result = await GoldenFileComparator.compareLists(
+        imageBytes,
+        await getGoldenBytes(golden),
+      );
+      final passed = result.passed || result.diffPercent <= _ciTolerance;
+      result.dispose();
+      if (passed) {
+        return true;
+      }
+    }
+    return super.compare(imageBytes, golden);
+  }
+}
+
 Widget _focusedSheet() => Sheet([
   DsComposer(
     targetName: 'general',
@@ -35,6 +65,14 @@ Future<AsyncCallback?> _focus(WidgetTester tester) async {
 }
 
 void main() {
+  setUpAll(() {
+    final previous = goldenFileComparator;
+    if (previous is LocalFileComparator) {
+      goldenFileComparator = _TolerantComparator(
+        previous.basedir.resolve('composer_focused_golden_test.dart'),
+      );
+    }
+  });
   for (final density in const [
     DsDensityMode.touch,
     DsDensityMode.comfortable,
