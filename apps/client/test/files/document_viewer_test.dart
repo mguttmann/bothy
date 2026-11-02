@@ -498,17 +498,17 @@ void main() {
       await pumpView(
         tester,
         DocumentContent.prepare(
-          '{"name":"bothy","tags":["a"]}',
+          '{"name":"demo","tags":["a"]}',
           DocumentKind.json,
-          totalBytes: 29,
+          totalBytes: 28,
         ),
         name: 'data.json',
       );
-      expect(find.textContaining('  "name": "bothy"'), findsOneWidget);
+      expect(find.textContaining('  "name": "demo"'), findsOneWidget);
       await tester.tap(_key('document.toggle'));
       await tester.pump();
       expect(
-        find.textContaining('{"name":"bothy","tags":["a"]}'),
+        find.textContaining('{"name":"demo","tags":["a"]}'),
         findsOneWidget,
       );
     });
