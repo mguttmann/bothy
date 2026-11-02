@@ -30,6 +30,7 @@ from bothy_hermes_adapter.runtime import (
     CardKind,
     CardRequest,
     ResolvedCredential,
+    SessionSwitch,
     TurnOutcome,
     TurnRequest,
     Usage,
@@ -705,6 +706,33 @@ async def test_session_modes(tmp_path: Path) -> None:
         await r.until(lambda: r.finished(guest2.run_id))
         assert len(r.requests("reportAgentSession")) == before
         assert rt.switches[-1] == (guest.thread_id, "new", None)
+
+
+async def test_new_session_flag_follows_the_switch(tmp_path: Path) -> None:
+    """A bind Hermes refuses falls back to a new session, which loads the bound skills."""
+    rt = FakeRuntime()
+    refused: list[str] = []
+
+    async def switch(turn: TurnRequest, mode: str, ref: str | None) -> SessionSwitch:
+        refused.append(mode)
+        rt.sessions[turn.thread_id] = "sess-fallback"
+        return SessionSwitch.NEW
+
+    async with rig(tmp_path, runtime=rt) as r:
+        fake = r.fake
+        first = await fake.trigger(session_mode="new")
+        await r.until(lambda: r.finished(first.run_id))
+        assert rt.turns[-1].new_session is True
+        fake.start_session(first.thread_id, rt.sessions[first.thread_id])
+        resumed = await fake.trigger("go on", thread_id=first.thread_id, session_mode="resume")
+        await r.until(lambda: r.finished(resumed.run_id))
+        assert rt.turns[-1].new_session is False
+        rt.switch_session = switch  # type: ignore[method-assign]
+        fake.start_session(first.thread_id, "sess-elsewhere", started=False)
+        bound = await fake.trigger("bind", thread_id=first.thread_id, session_mode="bind")
+        await r.until(lambda: r.finished(bound.run_id))
+        assert refused == ["bind"]
+        assert rt.turns[-1].new_session is True
 
 
 # ---- heartbeat, SR9 header, logs ---------------------------------------------------------------

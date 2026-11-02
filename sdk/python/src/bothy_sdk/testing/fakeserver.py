@@ -722,13 +722,14 @@ class FakeServer:
         meta["title"], meta["title_source"] = title, "manual"
         meta["version"] += 1
 
-    def close_thread(self, thread_id: UUID) -> None:
+    def close_thread(self, thread_id: UUID, person: str = "robin") -> None:
         """A person marks the thread done (the app's Done button, ``thread.close``).
 
         Args:
             thread_id: The thread.
+            person: The handle of the person who closes it.
         """
-        self.world.close_thread(str(thread_id))
+        self.world.close_thread(str(thread_id), self.world.by_handle[person].id)
 
     @property
     def reopened_by_message(self) -> list[UUID]:

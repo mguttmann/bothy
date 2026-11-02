@@ -45,7 +45,7 @@ import asyncio
 import contextlib
 import logging
 from collections.abc import Iterator, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 from typing import Any, Final
 from uuid import UUID
@@ -615,6 +615,9 @@ class HermesHandler(AgentHandler):
             new_session=self._starts_session(turn),
         )
         switched = await self._before_turn(turn, request)
+        if switched is SessionSwitch.NEW and not request.new_session:
+            # A refused bind falls back to a new session (9.5): it loads the bound skills too.
+            request = replace(request, new_session=True)
         outcome = await self.runtime.start_turn(request)
         await self._end_turn(turn, outcome, switched)
 

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -13,7 +14,7 @@ from adapter_kit import settings_for
 from bothy_sdk.testing.fakeserver import FakeServer
 from bothy_sdk.testing.faults import Fault
 
-from bothy_hermes_adapter.__main__ import build_parser, platform_extra
+from bothy_hermes_adapter.__main__ import build_parser, platform_extra, run_thread_action
 from bothy_hermes_adapter.reports import standalone_send
 from bothy_hermes_adapter.threads import thread_action
 
@@ -133,3 +134,18 @@ def test_thread_command_line() -> None:
     assert platform_extra(config, "support") == {"k": "v"}
     assert platform_extra(config, "bothy") == {}
     assert platform_extra({"gateway": None}, "bothy") == {}
+
+
+def test_thread_command_with_a_broken_config(capsys: pytest.CaptureFixture[str]) -> None:
+    class Broken:
+        def read_config(self) -> dict[str, Any]:
+            raise ValueError("bad YAML")
+
+    args = build_parser().parse_args(
+        ["thread", "close", "0192f4a0-7b1c-7000-8000-000000000001", "--profile-home", "/srv/h"]
+    )
+    assert run_thread_action(Broken(), args) == 1
+    assert json.loads(capsys.readouterr().out) == {
+        "ok": False,
+        "error": "the platform configuration is not usable",
+    }

@@ -1393,10 +1393,11 @@ class World:
             raise FakeProblem("not_found")
         return meta
 
-    def close_thread(self, thread_id: str) -> dict[str, Any]:
-        """``closeThread`` by Lotse: the thread is done; a done thread stays as it is (01 6.1).
+    def close_thread(self, thread_id: str, closed_by: UUID | None = None) -> dict[str, Any]:
+        """``closeThread``: the thread is done; a done thread stays as it is (01 6.1).
 
-        A main thread is never done (``invalid_state_transition``).
+        ``closed_by`` is Lotse unless a person closes it. A main thread is never done
+        (``invalid_state_transition``).
         """
         meta = self._thread_or_404(thread_id)
         if meta["kind"] == "main":
@@ -1405,7 +1406,7 @@ class World:
             meta["state"], meta["closed_at"], meta["closed_by"] = (
                 "closed",
                 self.now_iso(),
-                str(self.lotse.id),
+                str(closed_by or self.lotse.id),
             )
             meta["version"] += 1
         return self.thread_doc(thread_id)

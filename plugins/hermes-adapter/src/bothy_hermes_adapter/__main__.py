@@ -165,7 +165,13 @@ def run_thread_action(bridge: Any, args: argparse.Namespace) -> int:
     """
     from bothy_hermes_adapter.threads import thread_action  # noqa: PLC0415 - SDK only here
 
-    extra = platform_extra(bridge.read_config(), args.platform_key)
+    try:
+        config = bridge.read_config()
+    except Exception:  # any reader error of Hermes (its YAML library varies)
+        # An unreadable config.yaml is an unusable configuration: thread_action answers it with
+        # its own error, so the command still prints one JSON line.
+        config = {}
+    extra = platform_extra(config, args.platform_key)
     result = asyncio.run(thread_action(extra, args.action, args.thread_id, args.title))
     sys.stdout.write(json.dumps(result) + "\n")
     return 0 if result.get("ok") else 1
