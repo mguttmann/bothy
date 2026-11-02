@@ -1,0 +1,14 @@
+# FIX-hermes-inbound-images Attachments of a message reach Hermes
+
+A screenshot sent to a Hermes agent arrived as an empty message: the adapter built the turn's
+event from the person's text and the transcripts of audio attachments only
+(`platform.ServerPlatform._event`, `MessageEvent(text=..., message_type=TEXT)` without
+`media_urls`), and the handler loaded only audio (`handler.prepare`, `media.audio_to_transcribe`).
+The image stood only as a line with name, type and size in the system part. The server had the
+file `complete` and `clean` before the message was posted; the adapter made no file request.
+
+| No | Date | Ruling | Reason |
+|---|---|---|---|
+| D-FIX-HIMG-1 | 2026-11-02 | After `startRun` and before the turn, every attachment of the triggering message without an `audio/*` type is loaded whole (`downloadFile`) and placed in Hermes' media cache with Hermes' own `cache_media_bytes_async`; the turn's event carries `media_urls`, `media_types`, `media_text_inlined` (false) and the message type of the first file (`photo`, `video`, `document`), as Hermes' Discord platform builds it. Audio stays on the transcription path of D-HERMES-MEDIA-4, so its event part is unchanged. Place: `handler.py` (`_media`, `_cache`), `platform.py` (`cache_media`, `media_limit`, `_attach`), `runtime.py` (`InboundMedia`, `TurnRequest.media`), stubs `gateway/platforms/base.pyi` and `event.pyi`. | The same function and the same event fields give the same handling as on Hermes' other platforms: native image parts or the pre-analysis by `agent.image_input_mode`, Hermes' document note with the cached path, the re-homing of a multiplexed gateway. Passing audio too would make Hermes transcribe it a second time inside the turn, where the transcript never reaches the server (D-HERMES-MEDIA-4). |
+| D-FIX-HIMG-2 | 2026-11-02 | An attachment that is not passed on reaches the turn as a note before the person's text with its name (characters outside letters, digits, `.`, `-`, `_` and space replaced, as Hermes writes file names), its type and the reason: scan pending (`scan_status` `pending`, `409 file_not_ready`), scan blocked (any other unserved state, `409 file_blocked`), larger than Hermes' `gateway.max_inbound_media_bytes` (nothing is loaded), Hermes refused the bytes, or not handed out. Logs carry the reason code only. A message with attachments and no text gets Hermes' Discord wording `(The user sent a message with no text content)`. | The model must be able to tell the person why it does not see the file instead of answering that the message was empty. Hermes' own cap bounds what the adapter holds in memory, as Discord's adapter checks it before reading. |
+| D-FIX-HIMG-3 | 2026-11-02 | Attachments of context messages and of follow-ups are not passed on; they stay lines of the context (09 4.6). | Hermes' steer path takes text only (`_hm_text_only`), and context files belong to earlier turns the session holds already. |

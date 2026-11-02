@@ -22,7 +22,10 @@ of 17.3 to `bothy_hermes_adapter.handler.HermesHandler` on the adapter's event l
   uploads each one and sends it attached; an image Hermes names by a web address is sent as the
   address (the adapter downloads nothing from the web). Voice input is transcribed with Hermes's
   own speech to text (``_enrich_message_with_transcription`` of the gateway, the function its
-  other platforms use).
+  other platforms use). Every other attachment of the triggering message goes into Hermes's
+  media cache with ``cache_media_bytes_async`` and into the turn's ``media_urls`` and
+  ``media_types`` with the message type of the first one, as Hermes's Discord platform passes
+  attachments: images reach its vision, other files its note with the cached path.
 * A control command (09 10.4) is ``handle_message`` with ``/<name>`` from the control sender;
   Hermes' reply (``send`` with the command's message as ``reply_to``) is collected for the
   handler instead of being sent. A skill command is a turn whose text is Hermes' own skill
@@ -62,6 +65,8 @@ from gateway.platforms.base import (
     ExecApprovalPrompt,
     SendResult,
     cache_audio_from_bytes_async,
+    cache_media_bytes_async,
+    get_inbound_media_max_bytes,
 )
 from gateway.platforms.event import MessageEvent, MessageType, ProcessingOutcome
 from gateway.session_context import get_session_env
@@ -90,6 +95,7 @@ from bothy_hermes_adapter.runtime import (
     CardKind,
     CardRequest,
     CommandRequest,
+    InboundMedia,
     MediaKind,
     OpenCard,
     ResolvedCredential,
@@ -343,6 +349,22 @@ class ServerPlatform(BasePlatformAdapter):
             allow_gateway_control=control,
         )
 
+    @staticmethod
+    def _attach(event: MessageEvent, media: tuple[InboundMedia, ...]) -> None:
+        """Put cached attachments on a turn's event as Hermes's Discord platform does."""
+        if not media:
+            return
+        event.media_urls = [m.path for m in media]
+        event.media_types = [m.media_type for m in media]
+        event.media_text_inlined = [False] * len(media)
+        first = media[0].media_type
+        if first.startswith("image/"):
+            event.message_type = MessageType.PHOTO
+        elif first.startswith("video/"):
+            event.message_type = MessageType.VIDEO
+        else:
+            event.message_type = MessageType.DOCUMENT
+
     async def _dispatch(self, event: MessageEvent) -> TurnOutcome:
         if self._loop is None:
             return TurnOutcome.FAILED
@@ -368,6 +390,7 @@ class ServerPlatform(BasePlatformAdapter):
             turn.thread_id, turn.user_text, message_id=str(turn.message_id), control=False
         )
         event.channel_prompt = turn.system_part
+        self._attach(event, turn.media)
         event.user_id = str(turn.user_id)
         event.user_name = turn.user_name
         return await self._dispatch(event)
@@ -570,6 +593,21 @@ class ServerPlatform(BasePlatformAdapter):
         if transcripts:
             return Transcription(str(transcripts[0]))
         return Transcription(None, str(text or ""))
+
+    def media_limit(self) -> int:
+        """Hermes's limit for incoming media (``gateway.max_inbound_media_bytes``, ``0``: none)."""
+        return max(0, int(get_inbound_media_max_bytes()))
+
+    async def cache_media(self, data: bytes, name: str, mime_type: str) -> InboundMedia | None:
+        """Cache an attachment as Hermes's platforms do (``cache_media_bytes_async``, 17.6).
+
+        Images go into the image cache (``None`` when the bytes are no image), video and other
+        files into theirs; the MIME type is the one Hermes records for the file.
+        """
+        cached = await cache_media_bytes_async(data, filename=name, mime_type=mime_type)
+        if cached is None:
+            return None
+        return InboundMedia(str(cached.path), str(cached.media_type))
 
     # ---- Hermes callbacks (17.3) --------------------------------------------------------------
 

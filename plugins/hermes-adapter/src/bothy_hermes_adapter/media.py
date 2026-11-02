@@ -12,7 +12,12 @@ message that carries it is the caller's.
 Incoming: `audio_to_transcribe` names the audio attachments of the triggering message that
 carry no transcript and that the server serves (scan state ``clean`` or ``skipped``);
 `with_transcripts` puts Hermes's transcripts on them, so the context renders them in the
-person's text with the trust of the message (ADR 0054), as a transcript of the server.
+person's text with the trust of the message (ADR 0054), as a transcript of the server. Every
+other attachment of the triggering message (`files_for_hermes`) goes into Hermes's media cache
+and reaches the turn as Hermes's own platforms pass it (``media_urls`` and ``media_types``:
+images to its vision, other files as cached paths); one that cannot be passed on reaches the
+turn as a note (`undelivered_note`) instead, and a message of attachments only carries
+`NO_TEXT`, Hermes's own wording on Discord.
 
 Nothing here logs or returns a path, a file name or a content (SEC-LOG-2); refusals carry codes.
 """
@@ -25,6 +30,7 @@ import hashlib
 import logging
 import mimetypes
 import os
+import re
 import stat
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
@@ -50,11 +56,16 @@ from bothy_sdk.ids import uuid7
 from bothy_sdk.uploads import upload_part
 
 __all__ = [
+    "NO_TEXT",
     "FileRefused",
     "LocalFile",
     "audio_cache_ext",
     "audio_to_transcribe",
+    "files_for_hermes",
+    "problem_reason",
     "read_local_file",
+    "scan_refusal",
+    "undelivered_note",
     "upload",
     "with_transcripts",
 ]
@@ -69,6 +80,19 @@ _AUDIO_SUFFIXES: Final = frozenset(
     {".aac", ".amr", ".flac", ".m4a", ".mp3", ".mp4", ".oga", ".ogg", ".opus", ".wav", ".webm"}
 )
 _DEFAULT_AUDIO_SUFFIX: Final = ".ogg"
+#: The text of a message with attachments and no words, as Hermes's Discord platform writes it.
+NO_TEXT: Final = "(The user sent a message with no text content)"
+#: Why an attachment did not reach Hermes, per reason code (for the model, English).
+_REASONS: Final = {
+    "scan_pending": "its virus scan has not finished yet; ask the user to send it again shortly",
+    "scan_blocked": "the virus scan blocked it",
+    "too_large": "it is larger than the limit for incoming files of this agent",
+    "unreadable": "its content could not be read as its file type",
+    "unavailable": "it could not be loaded from the chat server",
+}
+#: Problem codes of ``downloadFile`` that name a scan state (12 3.5).
+_PROBLEM_REASONS: Final = {"file_not_ready": "scan_pending", "file_blocked": "scan_blocked"}
+_NAME_MAX: Final = 200
 
 
 def audio_cache_ext(name: str, mime_type: str) -> str:
@@ -288,3 +312,53 @@ def with_transcripts(ctx: RunContext, transcripts: Mapping[UUID, str]) -> RunCon
         if text is not None:
             item["transcript"] = text
     return RunContext.from_dict(data)
+
+
+def _mime(item: RunContextAttachment) -> str:
+    return str(item.mime_type).split(";", 1)[0].strip().lower()
+
+
+def files_for_hermes(ctx: RunContext) -> list[RunContextAttachment]:
+    """The attachments of the triggering message that go into Hermes's media cache (09 17.6).
+
+    Every attachment but audio, which reaches Hermes as a transcript (`audio_to_transcribe`).
+    Attachments of context messages and of follow-ups do not count.
+
+    Args:
+        ctx: The run context.
+
+    Returns:
+        The attachments in their order.
+    """
+    return [a for a in ctx.trigger_message.attachments if not _mime(a).startswith("audio/")]
+
+
+def scan_refusal(item: RunContextAttachment) -> str | None:
+    """The reason code when the server does not serve the attachment, else ``None``."""
+    status = str(item.scan_status)
+    if status in _SERVED:
+        return None
+    return "scan_pending" if status == "pending" else "scan_blocked"
+
+
+def problem_reason(code: str) -> str:
+    """The reason code of a ``downloadFile`` problem."""
+    return _PROBLEM_REASONS.get(code, "unavailable")
+
+
+def undelivered_note(item: RunContextAttachment, reason: str) -> str:
+    """The line Hermes gets for an attachment that did not reach it.
+
+    The name is the person's and stands as Hermes's own platforms write a file name (characters
+    other than letters, digits, ``.``, ``-``, ``_`` and space replaced, at most 200).
+
+    Args:
+        item: The attachment.
+        reason: A key of the reason table.
+
+    Returns:
+        The note.
+    """
+    name = re.sub(r"[^\w.\- ]", "_", str(item.original_name))[:_NAME_MAX] or "file"
+    why = _REASONS.get(reason, _REASONS["unavailable"])
+    return f"[The user sent the file '{name}' ({_mime(item)}), but it did not reach you: {why}.]"

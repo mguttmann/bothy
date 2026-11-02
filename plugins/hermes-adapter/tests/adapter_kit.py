@@ -31,6 +31,7 @@ from bothy_hermes_adapter.heartbeat import HermesAdapterLoop
 from bothy_hermes_adapter.runtime import (
     CardRequest,
     CommandRequest,
+    InboundMedia,
     OpenCard,
     ResolvedCredential,
     SessionSwitch,
@@ -81,6 +82,10 @@ class FakeRuntime:
     stt: bool = True
     transcripts: Mapping[bytes, str] = field(default_factory=dict)
     heard: list[tuple[bytes, str, str]] = field(default_factory=list)
+    limit: int = 0
+    refuse_cache: bool = False
+    cached: list[tuple[bytes, str, str]] = field(default_factory=list)
+    cache_dir: Path | None = None
     skills: dict[str, str] = field(default_factory=dict)
     commands: list[CommandRequest] = field(default_factory=list)
     replies: list[str] = field(default_factory=lambda: ["Hermes Agent v0.0.0"])
@@ -184,6 +189,18 @@ class FakeRuntime:
             return Transcription(None, "[voice message could not be transcribed automatically]")
         return Transcription(text)
 
+    def media_limit(self) -> int:
+        return self.limit
+
+    async def cache_media(self, data: bytes, name: str, mime_type: str) -> InboundMedia | None:
+        self.cached.append((data, name, mime_type))
+        if self.refuse_cache:
+            return None
+        assert self.cache_dir is not None
+        path = self.cache_dir / f"{len(self.cached)}-{Path(name).name}"
+        path.write_bytes(data)
+        return InboundMedia(str(path), mime_type)
+
 
 @dataclass
 class Rig:
@@ -245,6 +262,9 @@ async def rig(
     if own:
         await server.start()
     rt = runtime or FakeRuntime()
+    if rt.cache_dir is None:
+        rt.cache_dir = root / "hermes-cache"
+        rt.cache_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
     state = root / "state"
     state.mkdir(mode=0o700, parents=True, exist_ok=True)
     state.parent.chmod(0o700)

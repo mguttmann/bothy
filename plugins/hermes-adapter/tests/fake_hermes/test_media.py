@@ -142,3 +142,77 @@ async def test_voice_without_speech_to_text_reaches_hermes_as_its_note(
         bodies = json.dumps(rig.model.raw)
         assert "The user sent a voice message" in bodies, gateway_log(rig)
         assert "Listen." in bodies
+
+
+def _png() -> bytes:
+    """A real one-pixel PNG: Hermes checks the magic bytes before it caches an image."""
+    import struct
+    import zlib
+
+    def chunk(kind: bytes, data: bytes) -> bytes:
+        body = kind + data
+        return struct.pack(">I", len(data)) + body + struct.pack(">I", zlib.crc32(body))
+
+    header = struct.pack(">IIBBBBB", 1, 1, 8, 2, 0, 0, 0)
+    pixels = zlib.compress(b"\x00\xff\x00\x00")
+    return (
+        b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", header) + chunk(b"IDAT", pixels) + chunk(b"IEND", b"")
+    )
+
+
+#: Native image input: the model sees the pixels, as with a vision model on Discord.
+VISION = Profile(config={"agent": {"image_input_mode": "native"}})
+
+
+def _images_seen(rig: HermesRig, data: bytes) -> bool:
+    """Whether a model request carried the image bytes as an image part (base64)."""
+    import base64
+
+    return base64.b64encode(data).decode("ascii") in json.dumps(rig.model.raw)
+
+
+@pytest.mark.parametrize("text", ["What does the screenshot show?", ""])
+async def test_image_of_the_trigger_reaches_hermes_vision(world: HermesWorld, text: str) -> None:
+    script = [ScriptTurn(text=("A green pixel.",), paced=False)]
+    async with hermes_rig(world, script, profile=VISION) as rig:
+        png = _png()
+        image = ContextFile(uuid7(), "pasted-1793625290748.png", "image/png", png)
+        triggered = await rig.fake.trigger(text, files=(image,))
+        await _done(rig, triggered.run_id)
+        # The image went to the model as pixels, the way Hermes's Discord platform passes it.
+        assert _images_seen(rig, png), gateway_log(rig)
+        bodies = json.dumps(rig.model.raw)
+        if text:
+            assert text in bodies
+        # The image lies in Hermes's image cache of the profile.
+        cached = [p for p in (rig.home / "cache").rglob("*.png") if p.read_bytes() == png]
+        assert cached, gateway_log(rig)
+        assert "downloadFile" in [r.operation_id for r in rig.fake.requests]
+
+
+async def test_document_of_the_trigger_reaches_hermes_as_a_file(world: HermesWorld) -> None:
+    script = [ScriptTurn(text=("I read it.",), paced=False)]
+    async with hermes_rig(world, script) as rig:
+        pdf = ContextFile(uuid7(), "plan.pdf", "application/pdf", FILES["report.pdf"])
+        triggered = await rig.fake.trigger("", files=(pdf,))
+        await _done(rig, triggered.run_id)
+        bodies = json.dumps(rig.model.raw)
+        # Hermes's own note for a document names the file and its cached path.
+        assert "The user sent a document: 'plan.pdf'" in bodies, gateway_log(rig)
+        cached = [
+            p for p in (rig.home / "cache").rglob("*plan.pdf") if p.read_bytes() == pdf.content
+        ]
+        assert cached, gateway_log(rig)
+
+
+async def test_undeliverable_image_reaches_hermes_as_a_note(world: HermesWorld) -> None:
+    script = [ScriptTurn(text=("I will wait for the scan.",), paced=False)]
+    async with hermes_rig(world, script, profile=VISION) as rig:
+        png = _png()
+        image = ContextFile(uuid7(), "shot.png", "image/png", png, scan_status="pending")
+        triggered = await rig.fake.trigger("", files=(image,))
+        await _done(rig, triggered.run_id)
+        bodies = json.dumps(rig.model.raw)
+        assert "shot.png" in bodies, gateway_log(rig)
+        assert "virus scan" in bodies
+        assert not _images_seen(rig, png)

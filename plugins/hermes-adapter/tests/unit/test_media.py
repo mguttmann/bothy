@@ -17,7 +17,7 @@ from bothy_sdk.ids import uuid7
 from bothy_sdk.testing.fakeserver import ContextFile
 from bothy_sdk.testing.faults import Fault
 
-from bothy_hermes_adapter.media import audio_cache_ext
+from bothy_hermes_adapter.media import NO_TEXT, audio_cache_ext
 from bothy_hermes_adapter.runtime import FileSent, MediaKind, TurnOutcome, TurnRequest
 
 pytestmark = pytest.mark.anyio
@@ -313,3 +313,115 @@ def test_audio_cache_ext_takes_only_known_audio_suffixes(
     name: str, mime_type: str, ext: str
 ) -> None:
     assert audio_cache_ext(name, mime_type) == ext
+
+
+# ---- attachments to Hermes ---------------------------------------------------------------------
+
+JPEG = b"\xff\xd8\xff\xe0 a pasted screenshot"
+
+
+def _file(content: bytes, name: str, mime_type: str, **over: Any) -> ContextFile:
+    return ContextFile(uuid7(), name, mime_type, content, **over)
+
+
+async def _turn(r: Rig, text: str, *files: ContextFile) -> TurnRequest:
+    triggered = await r.fake.trigger(text, files=files)
+    await r.until(lambda: r.finished(triggered.run_id), "the end of the run")
+    assert r.fake.run_state(triggered.run_id).state == "completed"
+    return r.runtime.turns[-1]
+
+
+@pytest.mark.parametrize("text", ["Do you see the picture?", ""])
+async def test_image_of_the_trigger_reaches_hermes_as_media(tmp_path: Path, text: str) -> None:
+    runtime = FakeRuntime()
+    async with rig(tmp_path, runtime=runtime) as r:
+        image = _file(JPEG, "pasted-1793625290748.jpg", "image/jpeg")
+        turn = await _turn(r, text, image)
+        assert runtime.cached == [(JPEG, "pasted-1793625290748.jpg", "image/jpeg")]
+        assert [(m.media_type, Path(m.path).read_bytes()) for m in turn.media] == [
+            ("image/jpeg", JPEG)
+        ]
+        if text:
+            assert text in turn.user_text
+        else:
+            # An attachment without text is never an empty message (Hermes's Discord wording).
+            assert turn.user_text == NO_TEXT
+        ops = _ops(r)
+        assert ops.index("startRun") < ops.index("downloadFile") < ops.index("finishRun")
+
+
+async def test_every_kind_of_file_reaches_hermes_and_audio_stays_a_transcript(
+    tmp_path: Path,
+) -> None:
+    runtime = FakeRuntime(transcripts={b"audio": "Book the boat."})
+    async with rig(tmp_path, runtime=runtime) as r:
+        files = (
+            _file(JPEG, "a.jpg", "image/jpeg"),
+            _file(b"%PDF-1.4 plan", "plan.pdf", "application/pdf"),
+            _file(b"day one", "notes.txt", "text/plain"),
+            _file(b"\x00\x00\x00\x18ftypmp42", "clip.mp4", "video/mp4"),
+            _file(b"audio", "voice.m4a", "audio/mp4"),
+        )
+        turn = await _turn(r, "Here.", *files)
+        assert [name for _, name, _ in runtime.cached] == [
+            "a.jpg",
+            "plan.pdf",
+            "notes.txt",
+            "clip.mp4",
+        ]
+        assert [m.media_type for m in turn.media] == [
+            "image/jpeg",
+            "application/pdf",
+            "text/plain",
+            "video/mp4",
+        ]
+        assert "Book the boat." in turn.user_text
+        assert runtime.heard == [(b"audio", "voice.m4a", "audio/mp4")]
+
+
+@pytest.mark.parametrize(
+    ("over", "fault", "reason"),
+    [
+        ({"scan_status": "pending"}, None, "virus scan has not finished"),
+        ({"scan_status": "blocked"}, None, "virus scan blocked it"),
+        ({}, Fault.problem("file_not_ready"), "virus scan has not finished"),
+        ({}, Fault.problem("file_blocked"), "virus scan blocked it"),
+        ({}, Fault.problem("not_found"), "could not be loaded"),
+    ],
+)
+async def test_undeliverable_file_reaches_hermes_as_a_note(
+    tmp_path: Path, over: dict[str, Any], fault: Any, reason: str
+) -> None:
+    runtime = FakeRuntime()
+    async with rig(tmp_path, runtime=runtime) as r:
+        if fault is not None:
+            r.fake.inject("downloadFile", fault)
+        with captured_logs() as logs:
+            turn = await _turn(r, "", _file(JPEG, "shot.jpg", "image/jpeg", **over))
+        assert turn.media == ()
+        assert runtime.cached == []
+        assert "'shot.jpg'" in turn.user_text
+        assert reason in turn.user_text
+        assert NO_TEXT not in turn.user_text
+        assert "shot.jpg" not in logs.text()
+        if over:
+            assert "downloadFile" not in _ops(r)
+
+
+async def test_file_over_hermes_limit_is_not_loaded(tmp_path: Path) -> None:
+    runtime = FakeRuntime(limit=len(JPEG) - 1)
+    async with rig(tmp_path, runtime=runtime) as r:
+        turn = await _turn(r, "Look.", _file(JPEG, "big.jpg", "image/jpeg"))
+        assert turn.media == ()
+        assert "downloadFile" not in _ops(r)
+        assert "larger than" in turn.user_text
+        assert "Look." in turn.user_text
+
+
+async def test_file_hermes_refuses_to_cache_reaches_hermes_as_a_note(tmp_path: Path) -> None:
+    runtime = FakeRuntime(refuse_cache=True)
+    async with rig(tmp_path, runtime=runtime) as r:
+        turn = await _turn(r, "", _file(b"<html>", "fake.jpg", "image/jpeg"))
+        assert turn.media == ()
+        assert "'fake.jpg'" in turn.user_text
+        assert "could not be read" in turn.user_text
