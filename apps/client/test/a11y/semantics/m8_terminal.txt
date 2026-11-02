@@ -5,6 +5,7 @@ label "Backend: Organization"
 label "Fingerprint of the host: 7KQ2 9XTA M4PB 1C8D 0000 0000 0000 0000 0000 0000 0000 0000 0000"
 label "Left 11:12"
 button, collapsed, disabled, label "Terminal session: shell 1", tooltip "Show menu"
+button, label "Sessions", action tap
 button, disabled, label "Detach"
 button, label "End", action tap
 label "Detached. The terminal session keeps going on the host."
