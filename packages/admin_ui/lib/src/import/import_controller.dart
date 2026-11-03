@@ -64,9 +64,9 @@ final class ImportChannelRow {
   /// Whether the channel is imported (its channel item is `posted`).
   bool get imported => item != null;
 
-  /// Whether the imported channel is no longer live here: archived or deleted, or `getChannel`
-  /// answered `404` (gone for good). Its lead can no longer change and it does not block
-  /// completion (22 13.5).
+  /// Whether the imported channel is no longer live here: archived or deleted, in an archived
+  /// space, or `getChannel` answered `404` (gone for good). Its lead can no longer change and it
+  /// does not block completion (22 13.5).
   bool get notLive {
     if (!imported) return false;
     final c = channel;

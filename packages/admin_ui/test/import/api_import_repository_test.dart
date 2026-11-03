@@ -329,6 +329,46 @@ void main() {
     }
   });
 
+  test('a channel in an archived space reads as not live', () async {
+    const space = '0192f4a0-7b1c-72d4-8bae-7661d2b2f100';
+    for (final (spaceStatus, archivedAt, live) in [
+      (200, null, true),
+      (200, '2026-10-18T08:00:00.000Z', false),
+      (500, null, true),
+    ]) {
+      setUpWith(
+        (o) => o.uri.path.startsWith('/api/v1/spaces/')
+            ? (
+                spaceStatus,
+                spaceStatus != 200
+                    ? {'status': spaceStatus, 'title': 'failed'}
+                    : {
+                        'space': {
+                          'id': space,
+                          'name': 'Support',
+                          'sort_key': 'a0',
+                          'version': 1,
+                          'created_at': '2026-10-17T08:00:00.000Z',
+                          'archived_at': ?archivedAt,
+                        },
+                        'level': 'manage',
+                        'capabilities': <String>[],
+                      },
+              )
+            : (
+                200,
+                {
+                  'channel': _channelJson(extra: const {'space_id': space}),
+                  'level': 'manage',
+                  'capabilities': <String>[],
+                },
+              ),
+      );
+      expect((await repository.importChannel(_channel)).live, live);
+      expect(adapter.seen.last.options.uri.path, '/api/v1/spaces/$space');
+    }
+  });
+
   test('the operator step sends If-Match, the reason and resolve_i1', () async {
     setUpWith(
       (o) => o.method == 'GET'

@@ -305,7 +305,7 @@ final class ImportChannelState {
   final int version;
 
   /// Whether the channel is live: neither archived nor deleted (`archived_at` and `deleted_at`
-  /// unset).
+  /// unset) and not in an archived space.
   final bool live;
 }
 
@@ -597,13 +597,41 @@ final class ApiImportRepository implements ImportRepository {
   });
 
   @override
-  Future<ImportChannelState> importChannel(String channelId) => adminCall(
-    () async => _channel(
-      (await _api.getChannelsApi().getChannel(channelId: channelId))
-          .data!
-          .channel,
-    ),
-  );
+  Future<ImportChannelState> importChannel(String channelId) =>
+      adminCall(() async {
+        final c = (await _api.getChannelsApi().getChannel(channelId: channelId))
+            .data!
+            .channel;
+        final state = _channel(c);
+        final space = c.spaceId;
+        if (!state.live || space == null || !await _spaceArchived(space)) {
+          return state;
+        }
+        return ImportChannelState(
+          id: state.id,
+          name: state.name,
+          readOnly: state.readOnly,
+          operatorAgentId: state.operatorAgentId,
+          version: state.version,
+          live: false,
+        );
+      });
+
+  /// Whether the space [spaceId] reads with `archived_at` (`getSpace`). A failed read counts as
+  /// not archived, so the channel keeps blocking completion (the safe side); a lost session
+  /// still surfaces.
+  Future<bool> _spaceArchived(String spaceId) async {
+    try {
+      return (await _api.getSpacesApi().getSpace(spaceId: spaceId))
+              .data!
+              .space
+              .archivedAt !=
+          null;
+    } on DioException catch (e) {
+      if (e.error is AuthException) rethrow;
+      return false;
+    }
+  }
 
   @override
   Future<ImportChannelState> setImportChannelOperator(

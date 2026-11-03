@@ -805,8 +805,8 @@ transfers or discards them.
 
 ### 13.5 Completion
 
-When all imported channels (channel item `posted`) have `lead = bothy`: end the mirror; source `completed` (`import.manage`, by the
-owner in the web console). An imported channel that was deleted or archived in Bothy (or whose
+When all imported channels (channel item `posted`) that are still live here have `lead = bothy`: end the mirror; source `completed` (`import.manage`, by the
+owner in the web console). An imported channel that was deleted, archived or purged in Bothy (or whose
 space was archived) does not block the completion even while its lead is `discord`: its lead can no
 longer change (`setImportLead` answers `404`), and it stays read-only; after a restore the owner
 lifts read-only with `setChannelReadOnly`. The
