@@ -255,7 +255,9 @@ func (s *Service) Complete(ctx context.Context, a actor.Actor, id ids.ID) (impor
 }
 
 // leadsHere refuses the completion while a mapped channel whose target is not skip and whose
-// channel item is posted still has lead discord.
+// channel item is posted still has lead discord and its target channel is live here. A target
+// that was deleted or archived here (or lies in an archived space, or is gone) does not block:
+// its lead can no longer change, setImportLead answers 404 for it (22 13.5).
 func (s *Service) leadsHere(ctx context.Context, src importer.Source) error {
 	m, ok := domain.StoredMapping(src.Config)
 	if !ok {
@@ -270,7 +272,16 @@ func (s *Service) leadsHere(ctx context.Context, src importer.Source) error {
 		if code != "" {
 			continue
 		}
-		if e := m.Channel(k.IDs[0]); e != nil && !e.Target.Skip && e.Lead != domain.LeadHere {
+		if e := m.Channel(k.IDs[0]); e == nil || e.Target.Skip || e.Lead == domain.LeadHere {
+			continue
+		}
+		live := false
+		if !it.TargetID.IsZero() {
+			if _, live, err = s.d.Structure.LiveChannel(ctx, it.TargetID); err != nil {
+				return err
+			}
+		}
+		if live {
 			return conflict(importer.ReasonLeadNotHere, "an imported channel is still led by the source")
 		}
 	}

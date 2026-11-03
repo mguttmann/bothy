@@ -309,7 +309,9 @@ switch-over follows section 8 again.
 
 ## 10. Completion
 
-When every imported channel is led by Bothy:
+When every imported channel is led by Bothy (an imported channel that was deleted or archived in
+Bothy, or whose space was archived, does not count: its lead can no longer change, and it stays
+read-only; after a restore, lift read-only on the channel):
 
 1. End the read mirror (stop the service, remove the schedule).
 2. Web console, owner: "Complete" (step-up). The confirmation warns: the mapping in
@@ -319,7 +321,8 @@ When every imported channel is led by Bothy:
 3. Remove the import bot from the Discord server (section 2) and log the tool out:
    `bothy import logout`.
 
-Check: the source shows "Completed"; every channel row shows "Led here, operator ok". Going back:
+Check: the source shows "Completed"; every channel row of a live channel shows "Led here,
+operator ok". Going back:
 a completed source cannot be started again, and nothing mirrors Discord any more.
 
 ## 11. Troubleshooting

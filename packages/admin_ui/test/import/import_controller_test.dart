@@ -220,6 +220,54 @@ void main() {
   });
 
   test(
+    'a channel deleted or archived here no longer blocks completion',
+    () async {
+      final id = repository.seedImport('Old', state: 'running');
+      repository.postChannels(id, ['301', '302']);
+      await repository.setImportLead(
+        id,
+        discordChannel: '302',
+        lead: ImportLead.here,
+        purpose: 'p',
+      );
+      // 301 still leads in Discord and its channel is live: completion is not offered.
+      await controller.refresh(id);
+      expect(controller.details(id)!.allImportedLedHere, isFalse);
+
+      // Deleted here: the channel reads with deleted_at (pending, archived as well).
+      repository.channelGoneElsewhere(id, '301');
+      await controller.refresh(id);
+      final row = controller.details(id)!.rows.first;
+      expect(row.mapped.lead, ImportLead.discord);
+      expect(row.notLive, isTrue);
+      expect(controller.details(id)!.allImportedLedHere, isTrue);
+
+      // Purged for good: getChannel answers 404.
+      repository.importChannelsById.remove('ch-301');
+      await controller.refresh(id);
+      expect(controller.details(id)!.rows.first.notLive, isTrue);
+      expect(controller.details(id)!.allImportedLedHere, isTrue);
+    },
+  );
+
+  test(
+    'an unreadable channel that is not gone still blocks completion',
+    () async {
+      final id = repository.seedImport('Old', state: 'running');
+      repository.postChannels(id, ['301']);
+      repository.refuse['importChannel'] = const ApiProblem(
+        status: 403,
+        code: 'forbidden',
+      );
+      await controller.refresh(id);
+      final row = controller.details(id)!.rows.first;
+      expect(row.channelError, isNotNull);
+      expect(row.notLive, isFalse);
+      expect(controller.details(id)!.allImportedLedHere, isFalse);
+    },
+  );
+
+  test(
     'failed items are kept; a refused agent list leaves the plan unresolved',
     () async {
       final id = repository.seedImport('Old', state: 'running');

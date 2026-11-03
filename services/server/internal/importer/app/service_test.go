@@ -183,6 +183,38 @@ func TestTransitions(t *testing.T) {
 	}
 }
 
+// TestCompleteSkipsChannelNotLive: a mapped channel whose target was deleted or archived here
+// no longer blocks completeImport although its lead is still discord (its lead cannot change any
+// more, setImportLead answers 404); a live channel that the source still leads keeps the 409
+// lead_not_bothy.
+func TestCompleteSkipsChannelNotLive(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t)
+	ctx := context.Background()
+	s := e.running(t)
+	b := structureBatch()
+	b.Items = append(b.Items, o("channel:22", "channel", `{"existing_channel_id":"`+e.channel.String()+`","kind":"text","sort_key":"a2"}`))
+	res, err := e.svc.ApplyBatch(ctx, e.owner, s.ID, b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := byKey(res.Items)
+	if got["channel:20"].State != importer.ItemPosted || got["channel:22"].TargetID != e.channel {
+		t.Fatalf("items %+v", got)
+	}
+	e.structure.drop(got["channel:20"].TargetID)
+	_, err = e.svc.SetLead(ctx, e.owner, s.ID, importer.LeadCmd{SourceChannel: "20", Lead: "bothy"})
+	wantErr(t, err, errs.CodeNotFound, "")
+	_, err = e.svc.Complete(ctx, e.owner, s.ID)
+	wantErr(t, err, errs.CodeConflict, importer.ReasonLeadNotHere)
+	if _, err = e.svc.SetLead(ctx, e.owner, s.ID, importer.LeadCmd{SourceChannel: "22", Lead: "bothy"}); err != nil {
+		t.Fatal(err)
+	}
+	if s, err = e.svc.Complete(ctx, e.owner, s.ID); err != nil || s.State != importer.StateCompleted {
+		t.Fatalf("complete %+v %v", s, err)
+	}
+}
+
 // TestApplyBatch covers design note 5 over the fakes: targets, skips, mapped people, placeholders
 // with the counter, replay without event, source_changed and the counters.
 func TestApplyBatch(t *testing.T) {
