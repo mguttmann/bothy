@@ -342,9 +342,14 @@ func (s *structure) ForumTag(_ context.Context, channel ids.ID, t chat.ImportedT
 	return id, nil
 }
 
+// SetReadOnly answers not_found for a channel that is not live, like chat refuses an unknown,
+// deleted or archived one.
 func (s *structure) SetReadOnly(_ context.Context, channel ids.ID, ro bool, _ string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if _, ok := s.channels[channel]; !ok {
+		return errs.New(errs.CodeNotFound, "")
+	}
 	s.readOnly[channel] = ro
 	return nil
 }
@@ -354,6 +359,13 @@ func (s *structure) LiveSpace(_ context.Context, id ids.ID) (bool, error) {
 	defer s.mu.Unlock()
 	_, ok := s.spaces[id]
 	return ok, nil
+}
+
+// drop makes the channel not live, as a deletion or archive in chat does.
+func (s *structure) drop(id ids.ID) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.channels, id)
 }
 
 func (s *structure) LiveChannel(_ context.Context, id ids.ID) (ids.ID, bool, error) {

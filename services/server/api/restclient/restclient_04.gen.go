@@ -7,6 +7,11 @@ import (
 	"net/http"
 )
 
+// UpdateCommandResponse404Headers the declared response headers of an HTTP 404 response for UpdateCommand
+type UpdateCommandResponse404Headers struct {
+	CorrelationId *CorrelationId
+}
+
 // UpdateCommandResponse412Headers the declared response headers of an HTTP 412 response for UpdateCommand
 type UpdateCommandResponse412Headers struct {
 	CorrelationId *CorrelationId
@@ -26033,42 +26038,4 @@ type CreateStatusIncidentResponse429Headers struct {
 // CreateStatusIncidentResponseDefaultHeaders the declared response headers of an HTTP default response for CreateStatusIncident
 type CreateStatusIncidentResponseDefaultHeaders struct {
 	CorrelationId *CorrelationId
-}
-
-type CreateStatusIncidentResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// JSON201 the response for an HTTP 201 `application/json` response
-	JSON201 *StatusIncident
-	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
-	ApplicationproblemJSON400 *BadRequest
-	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
-	ApplicationproblemJSON401 *Unauthorized
-	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
-	ApplicationproblemJSON403 *Forbidden
-	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
-	ApplicationproblemJSON422 *UnprocessableEntity
-	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
-	ApplicationproblemJSON429 *TooManyRequests
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *Error
-	// Headers201 the parsed response headers for an HTTP 201 response
-	Headers201 *CreateStatusIncidentResponse201Headers
-	// Headers400 the parsed response headers for an HTTP 400 response
-	Headers400 *CreateStatusIncidentResponse400Headers
-	// Headers401 the parsed response headers for an HTTP 401 response
-	Headers401 *CreateStatusIncidentResponse401Headers
-	// Headers403 the parsed response headers for an HTTP 403 response
-	Headers403 *CreateStatusIncidentResponse403Headers
-	// Headers422 the parsed response headers for an HTTP 422 response
-	Headers422 *CreateStatusIncidentResponse422Headers
-	// Headers429 the parsed response headers for an HTTP 429 response
-	Headers429 *CreateStatusIncidentResponse429Headers
-	// HeadersDefault the parsed response headers for an HTTP default response
-	HeadersDefault *CreateStatusIncidentResponseDefaultHeaders
-}
-
-// GetJSON201 returns the response for an HTTP 201 `application/json` response
-func (r CreateStatusIncidentResponse) GetJSON201() *StatusIncident {
-	return r.JSON201
 }

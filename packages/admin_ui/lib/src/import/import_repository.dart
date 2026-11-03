@@ -286,6 +286,7 @@ final class ImportChannelState {
     required this.readOnly,
     required this.version,
     this.operatorAgentId,
+    this.live = true,
   });
 
   /// The channel ID.
@@ -302,6 +303,10 @@ final class ImportChannelState {
 
   /// The version for `If-Match`.
   final int version;
+
+  /// Whether the channel is live: neither archived nor deleted (`archived_at` and `deleted_at`
+  /// unset).
+  final bool live;
 }
 
 /// One page of sources (`listImports`).
@@ -425,6 +430,7 @@ final class ApiImportRepository implements ImportRepository {
     readOnly: c.readOnly,
     operatorAgentId: c.operator_.effectiveAgentId,
     version: c.version,
+    live: c.archivedAt == null && c.deletedAt == null,
   );
 
   @override

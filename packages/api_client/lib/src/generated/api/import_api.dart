@@ -239,7 +239,7 @@ class ImportApi {
   }
 
   /// Complete an import
-  /// When every channel is led by this server: stop the mirror, source &#x60;completed&#x60; (22, 13.5). Only from &#x60;running&#x60; or &#x60;paused&#x60;, else &#x60;409 conflict&#x60; with &#x60;reason&#x60; &#x60;import_state&#x60;. Every channel of the mapping whose target is not &#x60;skip&#x60; and whose channel item is &#x60;posted&#x60; must have &#x60;lead &#x3D; bothy&#x60;, else &#x60;409 conflict&#x60; with &#x60;reason&#x60; &#x60;lead_not_bothy&#x60;; mapped channels that were never imported do not block it.
+  /// When every channel is led by this server: stop the mirror, source &#x60;completed&#x60; (22, 13.5). Only from &#x60;running&#x60; or &#x60;paused&#x60;, else &#x60;409 conflict&#x60; with &#x60;reason&#x60; &#x60;import_state&#x60;. Every channel of the mapping whose target is not &#x60;skip&#x60; and whose channel item is &#x60;posted&#x60; must have &#x60;lead &#x3D; bothy&#x60;, else &#x60;409 conflict&#x60; with &#x60;reason&#x60; &#x60;lead_not_bothy&#x60;; mapped channels that were never imported do not block it, nor do channels whose channel here is no longer live (deleted, archived or in an archived space), whose lead can no longer change.
   ///
   /// Parameters:
   /// * [importId]

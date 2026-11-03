@@ -166,6 +166,20 @@ mixin FakeImport {
     };
   }
 
+  /// Deletes or archives the channel of [discordId] of source [id] without a request (what
+  /// another owner did): it still reads, but it is no longer live.
+  void channelGoneElsewhere(String id, String discordId) {
+    final c = importChannelsById['ch-$discordId']!;
+    importChannelsById[c.id] = ImportChannelState(
+      id: c.id,
+      name: c.name,
+      readOnly: c.readOnly,
+      operatorAgentId: c.operatorAgentId,
+      version: c.version + 1,
+      live: false,
+    );
+  }
+
   /// Sets the operator of the channel of [discordId] of source [id] to [agentId] without a
   /// request (what another owner did).
   void operatorElsewhere(String id, String discordId, String? agentId) {

@@ -7891,7 +7891,7 @@ type ClientWithResponsesInterface interface {
 	// CompleteImportWithResponse Complete an import
 	//
 	// When every channel is led by this server: stop the mirror, source `completed` (22, 13.5).
-	// Only from `running` or `paused`, else `409 conflict` with `reason` `import_state`. Every channel of the mapping whose target is not `skip` and whose channel item is `posted` must have `lead = bothy`, else `409 conflict` with `reason` `lead_not_bothy`; mapped channels that were never imported do not block it.
+	// Only from `running` or `paused`, else `409 conflict` with `reason` `import_state`. Every channel of the mapping whose target is not `skip` and whose channel item is `posted` must have `lead = bothy`, else `409 conflict` with `reason` `lead_not_bothy`; mapped channels that were never imported do not block it, nor do channels whose channel here is no longer live (deleted, archived or in an archived space), whose lead can no longer change.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -23144,10 +23144,5 @@ type UpdateCommandResponse401Headers struct {
 
 // UpdateCommandResponse403Headers the declared response headers of an HTTP 403 response for UpdateCommand
 type UpdateCommandResponse403Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// UpdateCommandResponse404Headers the declared response headers of an HTTP 404 response for UpdateCommand
-type UpdateCommandResponse404Headers struct {
 	CorrelationId *CorrelationId
 }

@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart';
 
 import '../data/admin_repository.dart';
 import '../data/agents_repository.dart';
+import '../data/self_repository.dart' show SelfActionFailed;
 import 'import_repository.dart';
 
 /// Where a mapped channel stands (22 13.1), as its row shows it.
@@ -63,6 +64,17 @@ final class ImportChannelRow {
   /// Whether the channel is imported (its channel item is `posted`).
   bool get imported => item != null;
 
+  /// Whether the imported channel is no longer live here: archived or deleted, or `getChannel`
+  /// answered `404` (gone for good). Its lead can no longer change and it does not block
+  /// completion (22 13.5).
+  bool get notLive {
+    if (!imported) return false;
+    final c = channel;
+    if (c != null) return !c.live;
+    final e = channelError;
+    return e is SelfActionFailed && e.problem?.status == 404;
+  }
+
   /// The phase of the row; the lead is the stored one of the snapshot.
   ImportChannelPhase get phase {
     if (!imported) return ImportChannelPhase.notImported;
@@ -97,9 +109,11 @@ final class ImportSourceDetails {
   /// The agents the server lists (for the operator step).
   final List<AgentRecord> agents;
 
-  /// Whether completion may be offered: every imported channel is led here (22 13.5).
-  bool get allImportedLedHere =>
-      rows.every((r) => !r.imported || r.mapped.lead == ImportLead.here);
+  /// Whether completion may be offered: every imported channel that is still live here is led
+  /// here (22 13.5).
+  bool get allImportedLedHere => rows.every(
+    (r) => !r.imported || r.notLive || r.mapped.lead == ImportLead.here,
+  );
 }
 
 /// Holds the latest [ImportSourceSnapshot] per source ID and the details of the open source.

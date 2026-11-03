@@ -97,7 +97,8 @@ def sync_detailed(
     Only from `running` or `paused`, else `409 conflict` with `reason` `import_state`. Every channel of
     the mapping whose target is not `skip` and whose channel item is `posted` must have `lead = bothy`,
     else `409 conflict` with `reason` `lead_not_bothy`; mapped channels that were never imported do not
-    block it.
+    block it, nor do channels whose channel here is no longer live (deleted, archived or in an archived
+    space), whose lead can no longer change.
 
     Args:
         import_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -135,7 +136,8 @@ def sync(
     Only from `running` or `paused`, else `409 conflict` with `reason` `import_state`. Every channel of
     the mapping whose target is not `skip` and whose channel item is `posted` must have `lead = bothy`,
     else `409 conflict` with `reason` `lead_not_bothy`; mapped channels that were never imported do not
-    block it.
+    block it, nor do channels whose channel here is no longer live (deleted, archived or in an archived
+    space), whose lead can no longer change.
 
     Args:
         import_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -168,7 +170,8 @@ async def asyncio_detailed(
     Only from `running` or `paused`, else `409 conflict` with `reason` `import_state`. Every channel of
     the mapping whose target is not `skip` and whose channel item is `posted` must have `lead = bothy`,
     else `409 conflict` with `reason` `lead_not_bothy`; mapped channels that were never imported do not
-    block it.
+    block it, nor do channels whose channel here is no longer live (deleted, archived or in an archived
+    space), whose lead can no longer change.
 
     Args:
         import_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -204,7 +207,8 @@ async def asyncio(
     Only from `running` or `paused`, else `409 conflict` with `reason` `import_state`. Every channel of
     the mapping whose target is not `skip` and whose channel item is `posted` must have `lead = bothy`,
     else `409 conflict` with `reason` `lead_not_bothy`; mapped channels that were never imported do not
-    block it.
+    block it, nor do channels whose channel here is no longer live (deleted, archived or in an archived
+    space), whose lead can no longer change.
 
     Args:
         import_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.

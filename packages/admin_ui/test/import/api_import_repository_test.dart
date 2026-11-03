@@ -86,7 +86,12 @@ Map<String, Object?> _sourceJson({String state = 'draft'}) => {
   'created_at': '2026-10-17T08:00:00.000Z',
 };
 
-Map<String, Object?> _channelJson({String? operator, int version = 3}) => {
+Map<String, Object?> _channelJson({
+  String? operator,
+  int version = 3,
+  Map<String, Object?> extra = const {},
+}) => {
+  ...extra,
   'id': _channel,
   'kind': 'text',
   'name': 'tickets',
@@ -296,6 +301,32 @@ void main() {
     );
     expect(adapter.seen, hasLength(2));
     expect(adapter.seen.last.options.uri.queryParameters['cursor'], 'c2');
+  });
+
+  test('a channel reads as not live when it is archived or deleted', () async {
+    for (final (extra, live) in [
+      (const <String, Object?>{}, true),
+      (const {'archived_at': '2026-10-18T08:00:00.000Z'}, false),
+      (
+        const {
+          'archived_at': '2026-10-18T08:00:00.000Z',
+          'deleted_at': '2026-10-18T08:00:00.000Z',
+        },
+        false,
+      ),
+    ]) {
+      setUpWith(
+        (o) => (
+          200,
+          {
+            'channel': _channelJson(extra: extra),
+            'level': 'manage',
+            'capabilities': <String>[],
+          },
+        ),
+      );
+      expect((await repository.importChannel(_channel)).live, live);
+    }
   });
 
   test('the operator step sends If-Match, the reason and resolve_i1', () async {

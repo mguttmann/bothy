@@ -466,8 +466,9 @@ States and answers of the interface (M8-03): `startImport` moves `draft` or `pau
 `running` and sets `started_at` on the first start; `pauseImport` moves `running` to `paused`;
 `cancelImport` moves `draft`, `running` or `paused` to `failed` with the counter
 `server.cancelled = true` (there is no state `cancelled`); `completeImport` moves `running` or
-`paused` to `completed` only when every mapped channel whose target is not `skip` and whose channel
-item is `posted` has `lead = bothy` (else `409 conflict` with `reason` `lead_not_bothy`). Repeating
+`paused` to `completed` only when every mapped channel whose target is not `skip`, whose channel
+item is `posted` and whose channel here is still live (not deleted, not archived, not in an archived
+space) has `lead = bothy` (else `409 conflict` with `reason` `lead_not_bothy`). Repeating
 the transition that already happened (start on `running`, pause on `paused`) answers the source
 unchanged without an event; every other transition is `409 conflict` with `reason`
 `import_state`. `setImportLead` answers `404` for a channel the mapping does not name or maps to
@@ -805,7 +806,10 @@ transfers or discards them.
 ### 13.5 Completion
 
 When all imported channels (channel item `posted`) have `lead = bothy`: end the mirror; source `completed` (`import.manage`, by the
-owner in the web console). The
+owner in the web console). An imported channel that was deleted or archived in Bothy (or whose
+space was archived) does not block the completion even while its lead is `discord`: its lead can no
+longer change (`setImportLead` answers `404`), and it stays read-only; after a restore the owner
+lifts read-only with `setChannelReadOnly`. The
 mapping `import_items` remains until the owner has the retention class `import` deleted
 ([20-privacy.md](20-privacy.md)). After that a repeated import is no longer idempotent;
 the web console warns before this step (in the confirmation of the completion).
