@@ -1057,7 +1057,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get markdownCopyQuote => 'Copy quote';
 
   @override
-  String get markdownCodeWrap => 'Wrap lines';
+  String get markdownCopyAsText => 'Copy as text';
+
+  @override
+  String get markdownCopyAsTextHint =>
+      'Joins the lines of each paragraph, for a mail or a message';
+
+  @override
+  String get markdownCodeWrap => 'Wrap display';
+
+  @override
+  String get markdownCodeWrapHint =>
+      'Changes only the display; the copy keeps the line breaks of the text';
 
   @override
   String get markdownCodeShowAll => 'Show all';

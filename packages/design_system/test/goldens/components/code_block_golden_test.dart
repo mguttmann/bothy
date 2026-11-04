@@ -2,7 +2,8 @@
 
 // The golden of a long single-line code block (01 6.14, R-PR-28; brief M4-49): the live case of
 // one long sentence sent as a fenced block "to copy". By default it wraps, so the whole sentence
-// is visible; after the toggle "Wrap lines" it stays one line with the horizontal scrollbar.
+// is visible; after the toggle "Wrap display" it stays one line with the horizontal scrollbar.
+// Both blocks are text blocks, so their headers also show "Copy as text" (F-KOPIER-FLIESSTEXT).
 // Light and dark, on the desktop (comfortable) and on the phone (touch), in German.
 
 import 'package:alchemist/alchemist.dart';

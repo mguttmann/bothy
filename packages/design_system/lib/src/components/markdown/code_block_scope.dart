@@ -39,7 +39,7 @@ class DsCodeBlockScope extends InheritedWidget {
   /// line stays one line with a horizontal scroll (false).
   final bool wrap;
 
-  /// Called with the new choice when the person switches the toggle "Wrap lines" of any
+  /// Called with the new choice when the person switches the toggle "Wrap display" of any
   /// block; null when nothing stores it, then the toggle switches only its own block.
   final ValueChanged<bool>? onWrapChanged;
 

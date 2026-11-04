@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Readable code blocks (01 6.14, R-PR-28; brief M4-49): a fenced block wraps long lines by
-// default so its whole content is visible, the toggle "Wrap lines" in its header switches to one
+// default so its whole content is visible, the toggle "Wrap display" in its header switches to one
 // line per line with a working horizontal scroll (a visible scrollbar, shift and the wheel, the
 // trackpad and a drag), the choice goes to the device through [DsCodeBlockScope], a long block
 // shows collapsed with a fade and "Show all" / "Show less", wrapped lines keep their indentation
@@ -377,10 +377,28 @@ void main() {
       expect(_scroll, findsOneWidget);
     }, variant: _desktop);
 
-    testWidgets('the copy button stays first for the keyboard; the toggle '
-        'follows', (tester) async {
+    testWidgets('the copy button stays first for the keyboard; "Copy as '
+        'text" and the toggle follow', (tester) async {
       final device = _Device();
-      final recorder = await _pump(tester, '```\nx\n```', device: device);
+      final recorder = await _pump(tester, '```\nx\ny\n```', device: device);
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pump();
+      expect(recorder.writes, [const DsCopyData('x\ny')]);
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pump();
+      expect(recorder.writes.last, const DsCopyData('x y'));
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pump();
+      expect(device.written, [false]);
+    }, variant: _desktop);
+
+    testWidgets('a code block without "Copy as text": the toggle follows the '
+        'copy button', (tester) async {
+      final device = _Device();
+      final recorder = await _pump(tester, '```sh\nx\n```', device: device);
       await tester.sendKeyEvent(LogicalKeyboardKey.tab);
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);
       await tester.pump();
@@ -419,7 +437,7 @@ void main() {
     testWidgets('the German label', (tester) async {
       await _pump(tester, '```\nx\n```', locale: const Locale('de'));
       final l = await de();
-      expect(l.markdownCodeWrap, 'Zeilen umbrechen');
+      expect(l.markdownCodeWrap, 'Anzeige umbrechen');
       expect(find.text(l.markdownCodeWrap), findsOneWidget);
     }, variant: _desktop);
   });
@@ -618,6 +636,108 @@ void main() {
       await tester.pump();
       await tester.pump();
       expect(find.text('Weniger'), findsOneWidget);
+    }, variant: _desktop);
+  });
+
+  // "Copy as text" (01 6.12 item 7, R-PR-35; ticket F-KOPIER-FLIESSTEXT): a text block an agent
+  // broke by hand copies as running text; a code block never offers it.
+  group('copy as text', () {
+    const prose =
+        'Hello Sam, thanks for the quick answer \u{1F64F} I looked at the state\n'
+        'this morning and the release is fine \u2013 with two points:\n'
+        '\n'
+        '- the translation is missing\n'
+        '- the export needs a test';
+    const joined =
+        'Hello Sam, thanks for the quick answer \u{1F64F} I looked at the state '
+        'this morning and the release is fine \u2013 with two points:\n'
+        '\n'
+        '- the translation is missing\n'
+        '- the export needs a test';
+
+    for (final fence in ['```', '```text', '```plaintext', '```markdown']) {
+      testWidgets('desktop: a block "$fence" offers it and copies running '
+          'text, "Copy code" stays exact', (tester) async {
+        final recorder = await _pump(tester, '$fence\n$prose\n```');
+        final l = await en();
+        final asText = find.bySemanticsLabel(l.markdownCopyAsText);
+        expect(asText, findsOneWidget);
+        expect(find.text(l.markdownCopyAsText), findsOneWidget);
+        await tester.tap(asText);
+        await tester.pump();
+        expect(recorder.writes, [const DsCopyData(joined)]);
+        await tester.tap(find.bySemanticsLabel(l.markdownCopyCode));
+        await tester.pump();
+        expect(recorder.writes.last, const DsCopyData(prose));
+      }, variant: _desktop);
+    }
+
+    for (final touch in [false, true]) {
+      final layout = touch ? 'phone' : 'desktop';
+      testWidgets('$layout: a block in a programming language never offers '
+          'it', (tester) async {
+        if (touch) _haptics(tester);
+        await _pump(
+          tester,
+          '```dart\nvar a = 1;\nvar b = 2;\n```',
+          touch: touch,
+        );
+        final l = await en();
+        expect(find.bySemanticsLabel(l.markdownCopyAsText), findsNothing);
+        expect(find.text(l.markdownCopyAsText), findsNothing);
+        // On the phone the block's tap action also reads the language label.
+        expect(
+          find.bySemanticsLabel(RegExp('^${l.markdownCopyCode}')),
+          findsOneWidget,
+        );
+      }, variant: touch ? _phone : _desktop);
+    }
+
+    testWidgets('phone: the button in the header copies running text, a tap '
+        'on the block still copies the exact text', (tester) async {
+      _haptics(tester);
+      final recorder = await _pump(tester, '```\n$prose\n```', touch: true);
+      final l = await en();
+      expect(find.text(l.markdownCopyAsText), findsOneWidget);
+      await tester.tap(find.text(l.markdownCopyAsText));
+      await tester.pump();
+      expect(recorder.writes, [const DsCopyData(joined)]);
+      await tester.tapAt(
+        Offset(
+          tester.getRect(_block).left + 60,
+          _textRect(tester, 'Hello').top + _lineHeight() / 2,
+        ),
+      );
+      await tester.pump();
+      expect(recorder.writes.last, const DsCopyData(prose));
+    }, variant: _phone);
+
+    testWidgets('desktop: the header reads toggle, "Copy as text", "Copy code" '
+        'from left to right, and both text controls explain themselves', (
+      tester,
+    ) async {
+      await _pump(tester, '```\n$prose\n```', width: 600);
+      final l = await en();
+      final toggle = tester.getCenter(
+        find.bySemanticsLabel(l.markdownCodeWrap),
+      );
+      final asText = tester.getCenter(
+        find.bySemanticsLabel(l.markdownCopyAsText),
+      );
+      final code = tester.getCenter(find.bySemanticsLabel(l.markdownCopyCode));
+      expect(toggle.dx, lessThan(asText.dx));
+      expect(asText.dx, lessThan(code.dx));
+      expect(asText.dy, moreOrLessEquals(code.dy, epsilon: 1));
+      expect(find.byTooltip(l.markdownCopyAsTextHint), findsOneWidget);
+      expect(find.byTooltip(l.markdownCodeWrapHint), findsOneWidget);
+    }, variant: _desktop);
+
+    testWidgets('the German labels', (tester) async {
+      await _pump(tester, '```\nx\n```', locale: const Locale('de'));
+      final l = await de();
+      expect(l.markdownCopyAsText, 'Als Text kopieren');
+      expect(find.text('Als Text kopieren'), findsOneWidget);
+      expect(find.text('Anzeige umbrechen'), findsOneWidget);
     }, variant: _desktop);
   });
 }

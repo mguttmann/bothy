@@ -1729,11 +1729,29 @@ abstract class AppLocalizations {
   /// **'Copy quote'**
   String get markdownCopyQuote;
 
-  /// Toggle in the header of a code block in a message: on, long lines wrap so the whole content is visible; off, the block keeps one line per line and scrolls sideways. Kept per device (01 6.14, M4-49).
+  /// Button in the header of a code block without a language or with a text language (text, plaintext, markdown): copies the block as running text, the line breaks inside a paragraph joined with a space, paragraphs and list items kept, for a paste into a mail or another chat (01 6.12 item 7, F-KOPIER-FLIESSTEXT).
   ///
   /// In en, this message translates to:
-  /// **'Wrap lines'**
+  /// **'Copy as text'**
+  String get markdownCopyAsText;
+
+  /// Tooltip on the desktop and screen reader hint of the button 'Copy as text' of a code block (01 6.12 item 7).
+  ///
+  /// In en, this message translates to:
+  /// **'Joins the lines of each paragraph, for a mail or a message'**
+  String get markdownCopyAsTextHint;
+
+  /// Toggle in the header of a code block in a message: on, long lines wrap on screen so the whole content is visible; off, the block keeps one line per line and scrolls sideways. Changes only the display, never the copy. Kept per device (01 6.14, M4-49, F-KOPIER-FLIESSTEXT).
+  ///
+  /// In en, this message translates to:
+  /// **'Wrap display'**
   String get markdownCodeWrap;
+
+  /// Tooltip on the desktop and screen reader hint of the toggle 'Wrap display' of a code block (01 6.14 item 1).
+  ///
+  /// In en, this message translates to:
+  /// **'Changes only the display; the copy keeps the line breaks of the text'**
+  String get markdownCodeWrapHint;
 
   /// Control below a long code block shown collapsed with a fade; expands the block in place (01 6.14, M4-49).
   ///

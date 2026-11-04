@@ -207,7 +207,7 @@ class DsTappable extends StatefulWidget {
   final bool? expanded;
 
   /// The on or off state of a toggle button for screen readers, or null when the surface is
-  /// no toggle (the "Wrap lines" toggle of a code block, M4-49).
+  /// no toggle (the "Wrap display" toggle of a code block, M4-49).
   final bool? toggled;
 
   /// Whether the surface reads as a button.

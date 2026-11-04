@@ -856,7 +856,7 @@ phone, where a long press on the message opens the message menu; `lib/app/rich_c
 writes a quote as plain text and HTML through the runners' channel `bothy/clipboard` (macOS,
 Windows, iOS, Android) and falls back to plain text (docs/decisions.d/M4-48.md). Code blocks
 wrap their long lines by default (01 6.14, M4-49): `lib/app/code_block_preference.dart` gives the
-renderer, from the app root, the device's choice of the toggle "Wrap lines" (kept in the local
+renderer, from the app root, the device's choice of the toggle "Wrap display" (kept in the local
 view state, `shell_view_state.code_blocks_unwrapped`) and the limit
 `ui.code_block_collapse_lines` above which a block shows collapsed with "Show all"
 (docs/decisions.d/M4-49.md). On the desktop the content of a message is selectable with the

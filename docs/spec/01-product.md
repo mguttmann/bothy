@@ -1772,6 +1772,26 @@ Applies to every message the renderer draws, on the desktop (macOS, Windows) and
 6. **Selection.** Selecting part of a message with the system selection (6.15 on the desktop, the
    view "Select text" on the phone) is not changed by the copy targets: a tap is the block's, a
    long press and a drag stay with the selection and the message.
+7. **Copy as text** (addendum of 2026-11-04, R-PR-35, ticket F-KOPIER-FLIESSTEXT). Agents hand a
+   text to forward (a reply to a colleague, a mail) in a fenced block so it can be copied, and
+   often break its lines by hand after 60 to 70 characters; "Copy code" copied those breaks, so a
+   paste into a mail or another chat arrived as a packet of short lines, and "Wrap lines" changed
+   nothing about it. A code block without a language or with the language `text`, `plaintext`,
+   `txt`, `markdown` or `md` (in any case) therefore has a second button "Copy as text" in its
+   header, on the desktop left of "Copy code" and on the phone beside the toggle of 6.14; a tap on
+   it never triggers the copy of the whole block. It copies the block as running text, plain text
+   only: the line breaks inside a paragraph become one space (white space at the join collapses
+   to that space), and a blank line (also one of only white space) stays the break between two
+   paragraphs, several blank lines become one; a line that starts a list item (`-`, `*`, `+`,
+   a number with `.` or `)`, each followed by a space) or a heading (`#`) stays its own line, and
+   a following line without such a start joins its item; a line that ends in a Markdown hard
+   break (two spaces or a backslash) keeps its line break without the marker. CRLF and a lone CR
+   count as line breaks; leading and trailing blank lines and the trailing line break are
+   dropped. Every other character stays as it is, Unicode included (emoji, umlauts, dashes,
+   quotes). A block in any other language never offers it, so code is never changed, and
+   "Copy code" stays the exact copy of item 3 for every block. On the desktop the button has the
+   tooltip "Joins the lines of each paragraph, for a mail or a message", which the screen reader
+   reads as its hint.
 
 ### 6.13 Long texts
 
@@ -1820,13 +1840,17 @@ every code block the renderer draws, on the desktop (macOS, Windows) and on the 
 Android).
 
 1. **Wrap by default.** A code block (fenced or indented) wraps its long lines, so its whole
-   content is visible without scrolling. A small toggle "Wrap lines" in the header of every block,
-   beside the copy button on the desktop, switches to no wrap: every line stays one line and the
+   content is visible without scrolling. A small toggle "Wrap display" in the header of every
+   block, beside the copy buttons on the desktop, switches to no wrap: every line stays one line and the
    block scrolls horizontally, with a visible scrollbar on the desktop that can be dragged, shift
    and the mouse wheel, a sideways trackpad gesture, and a drag on the phone. The choice is kept per
    device and applies to every code block of that device (local view state, never synchronized);
    without a local database (before the sign-in) the toggle switches only its own block. A tap on
-   the toggle on the phone never copies the block (6.12 item 2).
+   the toggle on the phone never copies the block (6.12 item 2). The toggle was called "Wrap
+   lines" until 2026-11-04: on a text an agent had broken by hand it changed nothing visible and
+   read as broken, because it changes only the display and never the copy (item 4). Its tooltip
+   on the desktop, also the screen reader's hint, says so: "Changes only the display; the copy
+   keeps the line breaks of the text". Running text comes from "Copy as text" (6.12 item 7).
 2. **Long blocks.** A code block higher than `ui.code_block_collapse_lines` lines of code (the
    rendered height, so wrapped lines count) shows collapsed to that height with a fade at its
    bottom and a control "Show all" below it, which expands the block in place;
@@ -1867,8 +1891,8 @@ of every message of the history (main history and threads).
    apart from the next by an empty line. A code block without wrap scrolls sideways the same way
    while the pointer is held beyond its side. Only the content is selectable:
    the author's name, the time, the reply line, "(edited)", "Show more", the reactions, the files,
-   the hover bar, the language label and the controls of a code block ("Copy code", "Wrap
-   lines", "Show all") never are. The text of a card's components (6.5) and of a message still in
+   the hover bar, the language label and the controls of a code block ("Copy code", "Copy as
+   text", "Wrap display", "Show all") never are. The text of a card's components (6.5) and of a message still in
    the outbox is not selectable; "Copy text" copies it.
 2. **Copy.** Cmd+C (Ctrl+C) copies the selection, and while text is selected the message menu of
    a right click starts with "Copy", which copies it and confirms with "Copied". On macOS a right
@@ -1882,8 +1906,8 @@ of every message of the history (main history and threads).
    content (6.12 item 3): its line breaks, indentation, tabs and empty lines, never a fence, the
    language label or a line break of the display wrap (6.14).
 4. **Actions stay.** A click or a drag that selects triggers no action of the message: no menu,
-   no reply, no mark unread. A click on a link opens it; the copy buttons, "Wrap lines", "Show
-   all" and "Show more" work as before. A click in another message ends the selection.
+   no reply, no mark unread. A click on a link opens it; the copy buttons, "Wrap display",
+   "Show all" and "Show more" work as before. A click in another message ends the selection.
 5. **Phone (iOS, Android).** The history keeps its gestures: a tap on a block copies it, a long
    press opens the message menu (6.12 item 2). The menu has "Select text" after "Copy text"; it
    opens the message in a sheet with the system selection (handles, the system menu with Copy and
@@ -2343,13 +2367,14 @@ Rules:
 | R-PR-25 | Every code block and quote block of a message copies on its own: on the desktop through a copy button at its top right, on the phone through a tap with "Copied" and a haptic, while a long press keeps the message menu; a code block copies its raw content byte for byte, a quote its text without markers and, where the clipboard holds rich text, also as HTML (6.12, addendum of 2026-10-29). | Owner request 2026-10-29: in Discord a tap on a code block on the phone never copied it and "Copy text" always copied the whole message. |
 | R-PR-26 | A paste over `ui.composer_paste_file_chars` characters or `ui.composer_paste_file_lines` lines becomes a text file attachment with "Insert as text"; a text over `message.max_content_bytes` goes out as one message with its rest as one attachment, from people and agents alike; a message is never split (6.13, addendum of 2026-10-29). | Owner decision 2026-10-29: a person never hits a length limit, as in the former chat tool where 2000 characters forced splitting or a paid plan; one message keeps a reply readable and quotable as one. |
 | R-PR-27 | Every forum the Claude Code runner operates is a Claude Code chat: its folder need not be a Git repository, a forum without a project binding works in the runner's default folder when one is set, and a failed run shows its cause in the thread next to the reason (section 4, addendum of 2026-10-30). | Owner expectation 2026-10-30: three forums bound to folders without Git stayed "not ready", and a forum without a binding failed after 0 s with only "Error in the adapter" (docs/decisions.d/RUNNER-NO-GIT.md). |
-| R-PR-28 | A code block wraps its long lines by default, keeps the indentation of a wrapped line, and switches per device to one line per line with a working horizontal scroll through the toggle "Wrap lines"; a block higher than `ui.code_block_collapse_lines` lines shows collapsed with a fade and "Show all" / "Show less"; the copy stays the raw content (6.14, addendum of 2026-10-31). | Owner decision 2026-10-31: a long sentence sent as a fenced block "to copy" showed as one cut-off line that could neither be scrolled nor expanded on macOS, so the owner could not read what he would copy (docs/decisions.d/M4-49.md). |
+| R-PR-28 | A code block wraps its long lines by default, keeps the indentation of a wrapped line, and switches per device to one line per line with a working horizontal scroll through the toggle "Wrap display" (called "Wrap lines" until 2026-11-04); a block higher than `ui.code_block_collapse_lines` lines shows collapsed with a fade and "Show all" / "Show less"; the copy stays the raw content (6.14, addendum of 2026-10-31). | Owner decision 2026-10-31: a long sentence sent as a fenced block "to copy" showed as one cut-off line that could neither be scrolled nor expanded on macOS, so the owner could not read what he would copy (docs/decisions.d/M4-49.md). |
 | R-PR-29 | The content of the messages in the history is selectable with the mouse on the desktop (drag, double and triple click, shift and click) across messages, a drag held beyond the top or bottom edge scrolls the history and extends the selection (addendum of 2026-11-02), Cmd+C (Ctrl+C) and "Copy" of the message menu copy it as plain text in the structure of the message with code parts exact; on the phone "Select text" in the message menu opens the message with the system selection (6.15, addendum of 2026-10-31). | Owner report 2026-10-31 (macOS app): no text of the history could be selected, so parts of messages, logs and code could not be copied; the history offered no system selection (docs/decisions.d/M4-50.md). Owner report 2026-11-02 (macOS app): a drag did not scroll, so only what was on screen could be selected (docs/decisions.d/FIX-drag-select-autoscroll.md). |
 | R-PR-30 | Spaces, the channels and forums of a space and the open posts of a forum are dragged into the person's own order (a line shows the drop on the desktop, a long press lifts the row on the phone, "Move up" and "Move down" in the row menu), kept per person across devices and never visible to others; three personal settings arrange each level by last activity instead (spaces and channels off, chats on by default), and an automatic level cannot be dragged (6.16, addendum of 2026-10-31). | Owner request 2026-10-31: nothing in the sidebar could be moved, not five imported spaces, not 25 project forums of a dev space, not the chats of a forum; the sidebar order is data that follows the person (R-PR-24), and chats by activity is the order of R-PR-23 (docs/decisions.d/M4-51.md). |
 | R-PR-31 | A chat row in the sidebar shows a status mark (green done, yellow working, blue waiting for the person, red failed, each with its own shape, tooltip and label) only for an agent state the person has not seen since they last had the chat open; opening the chat clears it, a new change brings it back, seen follows the person's read state, the mark replaces the unread bar on rows with agent runs, and forum and project rows show the most urgent unseen state behind the setting `sidebar.show_project_status` (6.17, addendum of 2026-10-31). | Owner request and amendment 2026-10-31: with many agent chats the person could not tell where something had happened without opening each one; only news the person has not seen is worth a mark, and two markers on one row would compete (docs/decisions.d/M4-52.md). |
 | R-PR-32 | On iPhone and Android the thread uses the screen: message content at the full width with a small avatar in the header line of a group, a one-line header (back, title, overflow menu with the operator) that collapses while older messages are read and never with a screen reader, a one-line live box, and an input whose text field fills it from the attachment button to the microphone inside it, starts at the left and grows to `ui.composer_max_lines` lines (5.3 M3, addendum of 2026-10-31). | Owner screenshots 2026-10-31 (iPhone): about a quarter of the width went to an avatar column, the input's text area was a small box in its middle, and header, operator line and live box took a large part of the height (docs/decisions.d/M5-17.md). |
 | R-PR-33 | Spaces, channels, project forums and chats are deleted from "Delete..." at the end of their menus (owner for a space, `manage` for a channel or forum, the creator or `manage` for a chat, never a main thread) after a dialog that names the non-zero counts of what goes; an owner may also move the project folder to the trash of the runner's host when the runner's check allows it; a toast offers "Undo" within the undo window, and every client removes a deleted item at once and brings it back on undo (6.18, addendum of 2026-11-01). | Owner request 2026-11-01: nothing could be deleted in the app; the confirmation must name what goes, a slip needs a quick undo, and a project folder must never be lost (docs/decisions.d/FEAT-delete-spaces-chats.md). |
 | R-PR-34 | A servable Markdown, text, log, JSON, YAML or CSV attachment opens in an in-app document viewer instead of the system app: Markdown rendered by the renderer of messages, JSON pretty, a small CSV as a table, text raw, with raw and formatted view, search with marks, copy all, Save as, Open in another app, a table of contents, the mouse selection of the desktop and reading keys; a file that is not servable never opens, and web images load only on a click (6.19, addendum of 2026-11-02). | Owner request 2026-11-02: most of what agents send are Markdown files and had to be viewed outside the app (docs/decisions.d/FEAT-markdown-viewer.md). |
+| R-PR-35 | A code block without a language or with a text language (`text`, `plaintext`, `txt`, `markdown`, `md`) also offers "Copy as text", which joins the line breaks inside a paragraph with a space and keeps paragraphs, list items, headings and Markdown hard breaks; a block in a programming language never offers it and "Copy code" stays exact; the toggle of 6.14 reads "Wrap display" with a tooltip that it changes only the display (6.12 item 7, addendum of 2026-11-04). | Owner report 2026-11-04: a reply an agent had written to forward, broken by hand after about 60 to 70 characters in a fenced block, arrived as a packet of short lines in a mail or another chat whether "Wrap lines" was on or off (docs/decisions.d/F-KOPIER-FLIESSTEXT.md). |
 
 ## 14. Configuration values of this chapter
 

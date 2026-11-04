@@ -1066,7 +1066,18 @@ class AppLocalizationsDe extends AppLocalizations {
   String get markdownCopyQuote => 'Zitat kopieren';
 
   @override
-  String get markdownCodeWrap => 'Zeilen umbrechen';
+  String get markdownCopyAsText => 'Als Text kopieren';
+
+  @override
+  String get markdownCopyAsTextHint =>
+      'Fügt die Zeilen jedes Absatzes zusammen, für eine Mail oder Nachricht';
+
+  @override
+  String get markdownCodeWrap => 'Anzeige umbrechen';
+
+  @override
+  String get markdownCodeWrapHint =>
+      'Ändert nur die Anzeige; die Kopie behält die Zeilenumbrüche des Textes';
 
   @override
   String get markdownCodeShowAll => 'Alles anzeigen';

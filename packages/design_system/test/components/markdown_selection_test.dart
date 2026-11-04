@@ -5,7 +5,7 @@
 // an empty line, list items on their own lines with their marker, table cells by a tab, code
 // lines by a line break), a partial selection of a code block copies exactly its part without
 // fences and without the display wrap of M4-49, the chrome of a block (language label, "Copy
-// code", "Wrap lines", "Show all") is never part of it, links stay clickable, the copy buttons,
+// code", "Wrap display", "Show all") is never part of it, links stay clickable, the copy buttons,
 // the toggle and the expand keep working, and `DsMessage` makes only its content selectable.
 
 import 'package:design_system/design_system.dart';
