@@ -2027,6 +2027,7 @@ export interface paths {
         /**
          * Set or inherit the operator of a channel
          * @description Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.
+         *     On a forum with a project binding the new effective operator (the named agent, or the space's default operator for `inherit`) must be able to serve a project, that is an agent with `adapter_kind` `code_runner` (09 18.16); otherwise `400 validation_failed` with the field code `operator_cannot_serve_project` on `/agent_id` (on `/mode` for `inherit`).
          */
         put: operations["setChannelOperator"];
         post?: never;
@@ -2065,7 +2066,10 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Bind a forum to a project */
+        /**
+         * Bind a forum to a project
+         * @description Creates or replaces the project binding of a forum. The forum's effective operator must be able to serve a project, that is an agent with `adapter_kind` `code_runner` (09 18.16); a forum without an operator or with another agent is refused with `400 validation_failed` and the field code `operator_cannot_serve_project` on `#path/channel_id`, before anything is written.
+         */
         put: operations["putProjectBinding"];
         post?: never;
         /** Remove the project binding */
@@ -3978,6 +3982,26 @@ export interface paths {
          *     answer is that run and nothing is written.
          */
         post: operations["retryRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/messages/{message_id}/retrigger": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Trigger a failed message again
+         * @description Runs the trigger decision (09 3.4) again for an own message whose `trigger_state` is `failed` with `trigger_state_reason` `project_not_ready`, `operator_cannot_serve_project` or `operator_not_in_channel`, after the cause was fixed (a runner set as operator, a folder created), so the person does not have to write the message again (09 3.7, addendum of 2026-11-04). Only the author may do this (`403 forbidden` with `reason` `not_self` otherwise); a message that is not readable is `404`; another state or reason, or a deleted message, is `409 invalid_state_transition`. When the message's thread is a thread whose fixed operator is not the channel's effective operator and never completed a run in it, the thread takes the channel's effective operator first (an exception to R-DM-12, recorded as `thread.updated`). A caller without `trigger` on the thread (`agent.invoke` in filter mode with the thread's operator refuses with `level_insufficient` or `no_grant`) gets `403 agent_invocation_denied`. Then the acceptance runs as for a new message: `agent.invoke` in request mode for the caller (authz audits a denial), and the message's `trigger_state` and `trigger_state_reason` follow it (`received` and a queued run, or `failed` with the reason of now). The answer is the message after the decision. Repeating the request after a successful retrigger answers `409 invalid_state_transition`, because the message is no longer `failed`.
+         */
+        post: operations["retriggerMessage"];
         delete?: never;
         options?: never;
         head?: never;
@@ -7421,7 +7445,7 @@ export interface components {
             provision?: components["schemas"]["ProjectProvision"];
             ready: boolean;
             /**
-             * @description The code the serving runner reported with `ready` false (09 18.12, for example `provisioning` or `clone_failed`); absent while `ready` is true and before the first report.
+             * @description The code the serving runner reported with `ready` false (09 18.12, for example `provisioning` or `clone_failed`), or `operator_cannot_serve_project` while the forum's effective operator is no agent with `adapter_kind` `code_runner` (09 18.16; derived when read, never stored); absent while `ready` is true and before the first report.
              * @example provisioning
              */
             ready_reason?: string;
@@ -7710,7 +7734,7 @@ export interface components {
             run_id?: components["schemas"]["Uuid"];
             trigger_state?: components["schemas"]["TriggerState"];
             trigger_state_at?: components["schemas"]["Timestamp"];
-            /** @description Reason when `trigger_state` is `failed` or `cancelled`, e.g. `billing_mode_personal_not_holder`, `run_active_other_agent`, `user_cancelled`. */
+            /** @description Reason when `trigger_state` is `failed` or `cancelled`, e.g. `billing_mode_personal_not_holder`, `run_active_other_agent`, `user_cancelled`, `project_not_ready`, `operator_cannot_serve_project`. A message that failed with `project_not_ready`, `operator_cannot_serve_project` or `operator_not_in_channel` can be triggered again with `retriggerMessage` once the cause is fixed. */
             trigger_state_reason?: string;
             silent: boolean;
             /** @description Attachments in position order (the order of `attachment_file_ids` at sending); empty for a message without attachments and for a deleted message. */
@@ -20895,6 +20919,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RunSummary"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
+    retriggerMessage: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`. */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                message_id: components["parameters"]["MessageIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK; the message with its trigger state after the decision. */
+            200: {
+                headers: {
+                    "Correlation-Id": components["headers"]["Correlation-Id"];
+                    RateLimit: components["headers"]["RateLimit"];
+                    "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Message"];
                 };
             };
             400: components["responses"]["BadRequest"];

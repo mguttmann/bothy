@@ -1086,6 +1086,7 @@ Generated from openapi.yaml.
 | GET | `/api/v1/runs/{run_id}/context` | `getRunContext` | `run.context.read` | Load the context of an own active run |
 | POST | `/api/v1/runs/{run_id}/cancel` | `cancelRun` | `run.cancel` | Cancel a run |
 | POST | `/api/v1/runs/{run_id}/retry` | `retryRun` | `agent.invoke` | Retry a failed or cancelled run |
+| POST | `/api/v1/messages/{message_id}/retrigger` | `retriggerMessage` | `agent.invoke` | Trigger a failed message again |
 
 #### Commands
 

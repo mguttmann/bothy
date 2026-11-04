@@ -34,6 +34,9 @@ const (
 	// channel (09 3.4 step 4a, addendum of 2026-10-30): not the channel's effective operator, no
 	// write of its own on the channel, no active and no completed run in the thread.
 	ReasonOperatorNotInChannel Reason = "operator_not_in_channel"
+	// ReasonOperatorCannotServeProject: the project binding of the channel is not ready and the
+	// candidate is no agent that can serve a project (09 18.16, addendum of 2026-11-04).
+	ReasonOperatorCannotServeProject Reason = "operator_cannot_serve_project"
 )
 
 // Outcome is the result kind of a Decision. The zero value is OutcomeNone, so a zero Decision

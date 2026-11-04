@@ -92,8 +92,10 @@ final class ProjectSyncRow {
   ChannelId? _forum;
 
   String? _key;
+  String? _grantKey;
   bool _assigned = false;
   bool _bound = false;
+  bool _granted = false;
 
   bool get _open =>
       _checked &&
@@ -296,6 +298,17 @@ final class ProjectSyncFlow extends ChangeNotifier {
         step = NewProjectStep.bindProject;
         await _port.bind(r._forum!, workspaceRef: r.name, provision: 'none');
         r._bound = true;
+      }
+      if (!r._granted) {
+        // The runner's upload right on the forum, as in the dialog "New project"
+        // (F-PROJEKT-BEREIT); one key per row, so a repeat creates it once.
+        step = NewProjectStep.grantUpload;
+        await _port.grantUpload(
+          r._forum!,
+          _runner!,
+          idempotencyKey: r._grantKey ??= _newKey(),
+        );
+        r._granted = true;
       }
       _set(r, ProjectSyncRowState.waitingForRunner);
     } on Object catch (e) {

@@ -146,6 +146,19 @@ func (t *Thread) SetTitle(title string, source TitleSource) bool {
 	return true
 }
 
+// RepinOperator gives a thread of kind thread the fixed operator agent and bumps the version; it
+// reports false and changes nothing for a main thread, the zero id and the current operator. It is
+// the exception to R-DM-12 of retriggerMessage (09 3.8, F-PROJEKT-BEREIT): the caller decided that
+// the old operator never worked in the thread.
+func (t *Thread) RepinOperator(agent ids.ID) bool {
+	if t.Main() || agent.IsZero() || t.OperatorAgentID == agent {
+		return false
+	}
+	t.OperatorAgentID = agent
+	t.Version++
+	return true
+}
+
 // CheckThreadTitle checks a thread title (SEC-IN-4, 03 threads): at most maxChars Unicode
 // characters (thread.title_max_chars) and no control or bidi characters; empty is allowed, and the
 // title is stored as given. Errors: validation_failed on /title; the error never repeats the input.

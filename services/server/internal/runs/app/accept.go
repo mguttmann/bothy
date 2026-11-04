@@ -35,6 +35,7 @@ const (
 // The deny reasons of 07 4.1 the acceptance handles itself (the values of kernel/auditing.Reason).
 const (
 	denyLevelInsufficient = "level_insufficient"
+	denyNoGrant           = "no_grant"
 )
 
 // knownDenials are the deny reasons of agent.invoke that 09 3.5 and 05 section 5 name; any other
@@ -42,6 +43,7 @@ const (
 var knownDenials = map[string]bool{
 	"level_insufficient": true, "no_grant": true, "agent_not_reachable": true, "billing_mode_personal_not_holder": true,
 	"tool_class_owner_only": true, "project_not_ready": true, "dev_environment_not_ready": true, "run_active_other_agent": true,
+	"operator_cannot_serve_project": true,
 }
 
 // The log lines of the acceptance; they never carry IDs or contents.
@@ -115,6 +117,13 @@ func (s *Service) accept(ctx context.Context, ev messaging.MessagePosted) error 
 	if ev.Origin != originHuman || (ev.Kind != kindText && ev.Kind != kindVoice) {
 		return nil
 	}
+	return s.acceptTrigger(ctx, ev)
+}
+
+// acceptTrigger is the trigger part of the acceptance of a message of a person: the facts, then
+// at most two rounds of the decision and step 7. retriggerMessage runs it again for a stored
+// message (09 3.8).
+func (s *Service) acceptTrigger(ctx context.Context, ev messaging.MessagePosted) error {
 	info, err := s.d.Threads.Info(ctx, ev.ThreadID)
 	if err != nil {
 		return err

@@ -351,6 +351,16 @@ type SystemLine struct {
 	Code               string
 }
 
+// Retriggers decides a failed message of a person again (retriggerMessage, 09 3.8,
+// F-PROJEKT-BEREIT). runs implements it; internal/wire binds it into the REST handlers of
+// messaging, which render the message after the decision. Errors: 403 forbidden with reason
+// not_self for another principal than the author, 409 invalid_state_transition for a message
+// that is not failed with project_not_ready, operator_cannot_serve_project or
+// operator_not_in_channel, or that was deleted.
+type Retriggers interface {
+	Retrigger(ctx context.Context, messageID ids.ID) error
+}
+
 // TriggerMessage are the facts of a triggering message that runs reads at a delivery (M2-08
 // design note 5): place, author, origin and kind, the mentions now and the trigger state. It carries
 // no content.
@@ -369,6 +379,9 @@ type TriggerMessage struct {
 	ThreadSeq int64
 	// Deleted reports a tombstone (M1-58): its content may never become the trigger of a run.
 	Deleted bool
+	// HasAttachments reports messages.has_attachments (M3-07): a trigger of the message again
+	// (retriggerMessage, F-PROJEKT-BEREIT) holds its invocation like the acceptance did.
+	HasAttachments bool
 }
 
 // AnchorRef names a live box anchor of a run (09 section 5.4: the only message with run_id, kind

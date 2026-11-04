@@ -424,6 +424,10 @@ func TestDecideInvokeGuard(t *testing.T) {
 		{"host tool class", func(in *domain.Input) { in.Invoke.ReportedToolClass = domain.ToolHost }, domain.ReasonToolClassOwnerOnly},
 		{"unknown tool class", func(in *domain.Input) { in.Invoke.ToolClass = "other" }, domain.ReasonToolClassOwnerOnly},
 		{"project not ready", func(in *domain.Input) { in.Invoke.ProjectBound = true }, domain.ReasonProjectNotReady},
+		// F-PROJEKT-BEREIT: an agent that cannot serve a project names the cause instead.
+		{"operator cannot serve the project", func(in *domain.Input) {
+			in.Invoke.ProjectBound, in.Invoke.AgentCannotServeProject = true, true
+		}, domain.ReasonOperatorCannotServeProject},
 		{"dev environment", func(in *domain.Input) { in.Invoke.ProjectBound, in.Invoke.ProjectReady = true, true }, domain.ReasonDevEnvironmentNotReady},
 		{"other agent running", func(in *domain.Input) { in.Invoke.ActiveRunAgentID = ids.New() }, domain.ReasonRunActiveOtherAgent},
 	}
@@ -441,6 +445,8 @@ func TestDecideInvokeGuard(t *testing.T) {
 	owner := invokeIn()
 	owner.Eff.Owner, owner.Invoke.ToolClass, owner.Invoke.ProjectBound, owner.Invoke.ProjectReady = true, domain.ToolHost, true, true
 	wantDecision(t, "owner with a host tool", mustDecide(t, owner), domain.OutcomeAllow, "")
+	owner.Invoke.AgentCannotServeProject = true
+	wantDecision(t, "ready project, agent of another kind", mustDecide(t, owner), domain.OutcomeAllow, "")
 	guest := invokeIn()
 	guest.Path.ChannelOperatorID = ids.New()
 	wantDecision(t, "guest without mention", mustDecide(t, guest), domain.OutcomeForbidden, domain.ReasonAgentNotReachable)

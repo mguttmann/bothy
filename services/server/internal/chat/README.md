@@ -548,6 +548,16 @@ canary class `manage_only` of `test/canary`.
   channels and bindings in this order and ascending id, and writes no event, no audit entry and no
   `settings_version`. `SetChannelOperator` and `SetSpaceOperator` reset `ready` of the bound forums
   whose effective operator changed.
+- Who serves a project (F-PROJEKT-BEREIT, 09 18.16): `servesProjects` asks the agent policy source
+  for `adapter_kind` `code_runner` (`authz.AdapterKindCodeRunner`). `PutProjectBinding` refuses a
+  forum whose effective operator is no such agent, and `SetChannelOperator` refuses on a bound forum
+  an assignment that leaves no such operator (both units check it), with `400 validation_failed`
+  and the field code `operator_cannot_serve_project` (`#path/channel_id`, `/agent_id` or `/mode`).
+  `SetSpaceOperator` stays free. `GetChannelBehavior` derives `ready_reason`
+  `operator_cannot_serve_project` for a binding that is not ready under such an operator; it is
+  never stored. `RepinThreadOperator` gives a thread the channel's effective operator in the
+  caller's unit (thread lock, new version, `thread.updated`) for `retriggerMessage` of runs (09
+  3.8); `SaveThread` writes `operator_agent_id` for it.
 - Facts: every channel query `LEFT JOIN`s `project_bindings` for `ChannelFacts.ProjectBound` and
   `ProjectReady` of `authz.StructureSource`; `agent.invoke` gives `project_not_ready` while a bound
   forum is not ready.

@@ -193,7 +193,8 @@ type Store interface {
 	// InsertThread inserts the thread th of kind thread and returns the stored row. Errors:
 	// conflict on /parent_message_id when the parent message already started a thread.
 	InsertThread(ctx context.Context, th domain.Thread) (domain.Thread, error)
-	// SaveThread writes title, title source, state, closed_at, closed_by and version of th.
+	// SaveThread writes title, title source, state, closed_at, closed_by, the fixed operator and
+	// version of th.
 	SaveThread(ctx context.Context, th domain.Thread) error
 	// AppendToThread raises last_message_seq, message_count and version of the locked thread id,
 	// sets last_activity_at to at and with reopen opens it; it returns the stored row (03 section

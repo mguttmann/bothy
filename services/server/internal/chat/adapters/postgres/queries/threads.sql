@@ -42,10 +42,11 @@ RETURNING id, channel_id, kind, parent_message_id, title, title_source, state, c
     last_message_seq, unread_floor_seq, last_activity_at, message_count, created_by, created_at, moved_at, version, deleted_at, deleted_by, purged_at;
 
 -- name: SaveThread :exec
--- Writes the columns of thread.title.update, thread.close and thread.reopen and the version.
+-- Writes the columns of thread.title.update, thread.close and thread.reopen, the fixed operator
+-- (retriggerMessage, F-PROJEKT-BEREIT) and the version.
 UPDATE threads
 SET title = @title, title_source = @title_source, state = @state, closed_at = sqlc.narg(closed_at),
-    closed_by = sqlc.narg(closed_by), version = @version
+    closed_by = sqlc.narg(closed_by), operator_agent_id = sqlc.narg(operator_agent_id), version = @version
 WHERE id = @id;
 
 -- name: AppendToThread :one

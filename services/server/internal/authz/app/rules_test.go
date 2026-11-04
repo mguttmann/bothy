@@ -255,6 +255,12 @@ func TestAgentInvoke_ProjectNotReady(t *testing.T) {
 	w := newWorld(t)
 	w.setChannel(t, w.projektA, func(c *authz.ChannelFacts) { c.ProjectReady = false })
 	w.expect(t, w.user(w.owner), authorize.ActionAgentInvoke, w.invoke(w.projektA, w.runner, true), forbidden, "project_not_ready")
+	// The adapter kind of the policy source names the cause: a code runner keeps project_not_ready,
+	// an agent of another kind cannot serve the project (F-PROJEKT-BEREIT).
+	w.policies.Put(w.runner, authz.AgentPolicy{BillingMode: domain.BillingOrganization, ToolClass: domain.ToolChat, AdapterKind: "code_runner"})
+	w.expect(t, w.user(w.owner), authorize.ActionAgentInvoke, w.invoke(w.projektA, w.runner, true), forbidden, "project_not_ready")
+	w.policies.Put(w.runner, authz.AgentPolicy{BillingMode: domain.BillingOrganization, ToolClass: domain.ToolChat, AdapterKind: "hermes"})
+	w.expect(t, w.user(w.owner), authorize.ActionAgentInvoke, w.invoke(w.projektA, w.runner, true), forbidden, "operator_cannot_serve_project")
 }
 
 // TestAgentInvoke_ProjectReadinessFreshInStructureScope: inside one structure scope (the hub

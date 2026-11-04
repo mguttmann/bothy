@@ -5,7 +5,8 @@
 ///
 /// The flow composes actions that exist (D-M4-43-1): create the forum (`channel.create`),
 /// assign the runner when it is not the space's default operator (`channel.operator.set`),
-/// bind the project with `provision` (`channel.project.bind`), read the readiness the runner
+/// bind the project with `provision` (`channel.project.bind`), let the runner upload reply
+/// files in the forum (`grant.create`, F-PROJEKT-BEREIT), read the readiness the runner
 /// reports until it is ready or names a failure (`getChannelBehavior`, 09 18.12), and for an
 /// idea post it as the first chat (`thread.create` through the outbox). A failed step stops
 /// the flow; [NewProjectFlow.run] again resumes at the failed step with the IDs and the
@@ -44,6 +45,10 @@ enum NewProjectStep {
 
   /// `putProjectBinding` with `provision`.
   bindProject,
+
+  /// `createGrant`: `write` with `upload` for the runner on the forum (01 6.9 item 3,
+  /// F-PROJEKT-BEREIT), so the runner can attach files to its answers.
+  grantUpload,
 
   /// The runner creates or checks the folder; the flow reads the readiness.
   prepareFolder,
@@ -154,6 +159,28 @@ final class BindingReadiness {
   final String? reason;
 }
 
+/// A runner the dialog offers: an active agent; [canServe] is false for an agent that cannot
+/// serve a project (its `adapter_kind` is not `code_runner`, 09 18.16), which the dialog shows
+/// greyed out.
+@immutable
+final class ProjectRunner {
+  /// Creates the entry.
+  const ProjectRunner({
+    required this.id,
+    required this.name,
+    this.canServe = true,
+  });
+
+  /// The agent.
+  final PrincipalId id;
+
+  /// Its display name.
+  final String name;
+
+  /// Whether it can serve a project.
+  final bool canServe;
+}
+
 /// The server side of the flow; every method throws [NewProjectFailure].
 abstract interface class NewProjectPort {
   /// Creates the forum [name] in [space] with [idempotencyKey] and returns its ID.
@@ -173,6 +200,13 @@ abstract interface class NewProjectPort {
     required String workspaceRef,
     required String provision,
     String? repositoryUrl,
+  });
+
+  /// Gives [runner] `write` with `upload` on [forum] with [idempotencyKey] (`createGrant`).
+  Future<void> grantUpload(
+    ChannelId forum,
+    PrincipalId runner, {
+    required String idempotencyKey,
   });
 
   /// The readiness of the binding of [forum], or null while there is none.
@@ -228,6 +262,7 @@ final class NewProjectFlow extends ChangeNotifier {
   final String Function() _newKey;
   String? _key;
   String? _keyName;
+  String? _grantKey;
 
   /// The space.
   final SpaceId space;
@@ -318,6 +353,25 @@ final class NewProjectFlow extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Chooses the default runner from [runners] once they are known (01 6.9 item 2,
+  /// F-PROJEKT-BEREIT): the space's default operator when it can serve a project, otherwise
+  /// the only agent that can, otherwise none. A runner the person chose stays.
+  void chooseDefaultRunner(List<ProjectRunner> runners) {
+    if (!canEdit(NewProjectField.runner) || _runner != spaceRunner) return;
+    final serving = [
+      for (final r in runners)
+        if (r.canServe) r.id,
+    ];
+    final next = serving.contains(spaceRunner)
+        ? spaceRunner
+        : serving.length == 1
+        ? serving.single
+        : null;
+    if (next == _runner) return;
+    _runner = next;
+    notifyListeners();
+  }
+
   void _suggest() {
     if (_nameTyped || _forum != null) return;
     final suggestion = switch (_mode) {
@@ -340,6 +394,7 @@ final class NewProjectFlow extends ChangeNotifier {
     NewProjectStep.createForum,
     if (_needsRunner) NewProjectStep.assignRunner,
     NewProjectStep.bindProject,
+    NewProjectStep.grantUpload,
     NewProjectStep.prepareFolder,
     if (_mode == NewProjectMode.idea) NewProjectStep.postIdea,
   ];
@@ -479,6 +534,13 @@ final class NewProjectFlow extends ChangeNotifier {
           workspaceRef: _workspaceRef,
           provision: _provision,
           repositoryUrl: _mode == NewProjectMode.clone ? _url : null,
+        );
+      case NewProjectStep.grantUpload:
+        // One key per flow: a repeat after a failure is answered from the server's record.
+        await _port.grantUpload(
+          _forum!,
+          _runner!,
+          idempotencyKey: _grantKey ??= _newKey(),
         );
       case NewProjectStep.prepareFolder:
         await _waitReady();

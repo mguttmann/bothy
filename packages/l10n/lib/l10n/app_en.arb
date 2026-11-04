@@ -15026,5 +15026,113 @@
         "example": "example.com"
       }
     }
+  },
+  "newProjectRunnerCannotServe": "{name} (cannot work in a project folder)",
+  "@newProjectRunnerCannotServe": {
+    "description": "Entry of the runner choice of the new project dialog for an active agent that cannot serve a project (its adapter kind is not code_runner, docs/spec/09 section 18.16); the entry is greyed out.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Assistant"
+      }
+    }
+  },
+  "newProjectRunnerOnlyCodeRunners": "Only an agent that works in project folders can be the runner.",
+  "@newProjectRunnerOnlyCodeRunners": {
+    "description": "Hint below the runner choice of the new project dialog when some agents are greyed out (docs/spec/01 section 6.9 item 2)."
+  },
+  "newProjectStepGrant": "Allow the runner to upload files",
+  "@newProjectStepGrant": {
+    "description": "Step of the new project dialog: create the grant write with upload for the runner on the new forum (docs/spec/01 section 6.9 item 3)."
+  },
+  "triggerReasonOperatorCannotServeProject": "This project has no runner. An owner can make a runner its operator.",
+  "@triggerReasonOperatorCannotServeProject": {
+    "description": "Notice for the rejection reason `operator_cannot_serve_project` at acceptance of a triggering message: the project binding is not ready and the agent cannot serve a project (docs/spec/09 sections 3.5 and 18.16)."
+  },
+  "projectNotReady": "Project not ready: {reason}",
+  "@projectNotReady": {
+    "description": "Banner of a project forum whose binding is not ready, and the notice beside a message that failed for it (docs/spec/01 section 6.9 item 8); reason is one sentence of the cause.",
+    "placeholders": {
+      "reason": {
+        "type": "String",
+        "example": "the runner is creating the folder"
+      }
+    }
+  },
+  "projectReasonOperatorCannotServe": "the agent of this forum cannot work in a project folder",
+  "@projectReasonOperatorCannotServe": {
+    "description": "Cause in the project banner for the ready reason `operator_cannot_serve_project` (docs/spec/09 section 18.16)."
+  },
+  "projectReasonWaiting": "the runner has not reported the project yet",
+  "@projectReasonWaiting": {
+    "description": "Cause in the project banner for a binding that is not ready without a reason."
+  },
+  "projectReasonProvisioning": "the runner is creating the folder",
+  "@projectReasonProvisioning": {
+    "description": "Cause in the project banner for the ready reason `provisioning` (docs/spec/09 section 18.12)."
+  },
+  "projectRunnerOffline": "The runner {name} is offline.",
+  "@projectRunnerOffline": {
+    "description": "Line of the project banner when the agent of the forum is offline (docs/spec/01 section 6.9 item 8).",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Claude Code"
+      }
+    }
+  },
+  "projectActionSetRunner": "Make {name} the runner",
+  "@projectActionSetRunner": {
+    "description": "Action of the project banner for `operator_cannot_serve_project`: set the only agent that can serve a project as the forum's operator (setChannelOperator).",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Claude Code"
+      }
+    }
+  },
+  "projectActionRenameFolder": "Change folder name",
+  "@projectActionRenameFolder": {
+    "description": "Action of the project banner for `workspace_exists`: bind the forum to another folder name (putProjectBinding)."
+  },
+  "projectActionCheckAgain": "Check again",
+  "@projectActionCheckAgain": {
+    "description": "Action of the project banner: read the readiness of the project again."
+  },
+  "projectRenameFolderTitle": "New folder name",
+  "@projectRenameFolderTitle": {
+    "description": "Title and field label of the dialog that changes the folder of a project after `workspace_exists`."
+  },
+  "projectRenameFolderSave": "Save",
+  "@projectRenameFolderSave": {
+    "description": "Button of the dialog that changes the folder of a project."
+  },
+  "projectActionFailed": "Could not change the project: {reason}",
+  "@projectActionFailed": {
+    "description": "Line of the project banner when an action was refused; reason is the translated problem.",
+    "placeholders": {
+      "reason": {
+        "type": "String",
+        "example": "Owners only"
+      }
+    }
+  },
+  "retriggerMessage": "Trigger again",
+  "@retriggerMessage": {
+    "description": "Button beside a message that failed because the project or the agent of the thread was not ready: sends the stored message to the agent again (retriggerMessage, docs/spec/09 section 3.8)."
+  },
+  "retriggerMessageFor": "Trigger the message again",
+  "@retriggerMessageFor": {
+    "description": "Screen reader label of the button that triggers a failed message again (retriggerMessage)."
+  },
+  "retriggerRefused": "Could not trigger again: {reason}",
+  "@retriggerRefused": {
+    "description": "Line beside a failed message when the server refused to trigger it again; reason is the translated problem.",
+    "placeholders": {
+      "reason": {
+        "type": "String",
+        "example": "Project not ready"
+      }
+    }
   }
 }

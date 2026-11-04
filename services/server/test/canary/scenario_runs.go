@@ -83,7 +83,8 @@ func (sc *Scenario) runContext(first string) {
 // changing it: start, resume and renew present a forged invocation token (a secret canary, which
 // no output may carry) and are refused, waiting for input and finishing are no transitions of a
 // queued run, and Alex, who did not trigger the run, may not cancel it. A retry (retryRun) of the
-// queued run is refused, as only a failed or cancelled run can be retried.
+// queued run is refused, as only a failed or cancelled run can be retried, and so is a retrigger
+// (retriggerMessage, F-PROJEKT-BEREIT) of its triggering message by Alex, who did not write it.
 func (sc *Scenario) runLifecycle(run string) {
 	sc.T.Helper()
 	lotse, alex := sc.W.Agents["Lotse"], sc.W.People["Alex"]
@@ -99,6 +100,10 @@ func (sc *Scenario) runLifecycle(run string) {
 		header: header("Idempotency-Key", newID())}, http.StatusForbidden, http.StatusNotFound)
 	sc.call(alex, req{method: http.MethodPost, path: "/runs/" + run + "/retry",
 		header: header("Idempotency-Key", newID())}, http.StatusForbidden, http.StatusNotFound, http.StatusConflict)
+	if msg := jsonText(obj(sc.get(alex, "/runs/"+run, ok...))["triggering_message_id"]); msg != "" {
+		sc.call(alex, req{method: http.MethodPost, path: "/messages/" + msg + "/retrigger",
+			header: header("Idempotency-Key", newID())}, http.StatusForbidden, http.StatusNotFound, http.StatusConflict)
+	}
 }
 
 // agentSessions drives the four session operations of M2-12 on the thread of Support/Allgemein

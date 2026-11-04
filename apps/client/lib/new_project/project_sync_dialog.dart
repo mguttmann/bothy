@@ -271,7 +271,13 @@ class _ProjectSyncDialogState extends State<ProjectSyncDialog> {
         for (final r in runners)
           DropdownMenuEntry(
             value: r.id,
-            label: r.id == space ? l.newProjectRunnerSpace(r.name) : r.name,
+            // An agent that cannot serve a project shows greyed out (09 18.16).
+            enabled: r.canServe,
+            label: !r.canServe
+                ? l.newProjectRunnerCannotServe(r.name)
+                : r.id == space
+                ? l.newProjectRunnerSpace(r.name)
+                : r.name,
           ),
       ],
       onSelected: _chooseRunner,

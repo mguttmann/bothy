@@ -153,6 +153,41 @@ func (s *Service) activeAgent(ctx context.Context, id ids.ID) (bool, error) {
 	return found, err
 }
 
+// servesProjects reports whether agent can serve a project (09 18.16, F-PROJEKT-BEREIT): an agent
+// with an agents row whose adapter kind is code_runner, the only kind that reports
+// project_readiness. The zero id (no operator) serves nothing.
+func (s *Service) servesProjects(ctx context.Context, agent ids.ID) (bool, error) {
+	if agent.IsZero() {
+		return false, nil
+	}
+	pol, found, err := s.d.Policies.AgentPolicy(ctx, agent)
+	if err != nil {
+		return false, err
+	}
+	return found && pol.AdapterKind == authz.AdapterKindCodeRunner, nil
+}
+
+// checkProjectOperator refuses an operator assignment want that leaves the bound forum c without
+// an operator able to serve its project (09 18.16): 400 validation_failed with the field code
+// operator_cannot_serve_project on /agent_id for mode agent and on /mode otherwise. A forum
+// without a binding takes any operator.
+func (s *Service) checkProjectOperator(ctx context.Context, c ChannelRow, want domain.OperatorAssignment) error {
+	if !c.ProjectBound {
+		return nil
+	}
+	after := domain.EffectiveOperator(want.Mode == domain.OperatorInherit, want.AgentID, c.SpaceDefaultOperatorID)
+	ok, err := s.servesProjects(ctx, after)
+	if err != nil || ok {
+		return err
+	}
+	pointer := "/mode"
+	if want.Mode == domain.OperatorAgent {
+		pointer = "/agent_id"
+	}
+	return codeError(pointer, domain.FieldOperatorCannotServeProject,
+		"the operator of a project forum must be an agent that can serve a project (adapter kind code_runner)")
+}
+
 // SetChannelOperator implements chat.Structure (D2 to D4 of M1-54). A first unit loads and
 // authorizes channel.operator.set, checks If-Match, the body (D1) and the archive state, and
 // records the same assignment as a call without effect. Otherwise a second unit, declared as the
@@ -186,6 +221,9 @@ func (s *Service) SetChannelOperator(ctx context.Context, a actor.Actor, cmd cha
 		}
 		if archived(c) {
 			return channelArchivedConflict()
+		}
+		if err := s.checkProjectOperator(ctx, c, want); err != nil {
+			return err
 		}
 		out = c
 		if c.Channel.Assignment() == want {
@@ -225,6 +263,10 @@ func (s *Service) setChannelOperatorWrite(ctx context.Context, a actor.Actor, cm
 		// A concurrent call set the same assignment first: answered as without effect.
 		return c, s.recordChannel(ctx, authorize.ActionChannelOperatorSet, c.Channel.ID,
 			withNoChange(operatorAttrs(resourceChannel, c.Channel.ID, want, want, cmd.Reason)))
+	}
+	// The binding may have appeared since the first unit: checked again under the lock.
+	if err := s.checkProjectOperator(ctx, c, want); err != nil {
+		return ChannelRow{}, err
 	}
 	if err := s.resolve(ctx, a, req); err != nil {
 		return ChannelRow{}, err

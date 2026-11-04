@@ -149,6 +149,7 @@ const (
 var invokeDenials = map[authorize.Reason]bool{
 	"agent_not_reachable": true, "billing_mode_personal_not_holder": true, "tool_class_owner_only": true,
 	"project_not_ready": true, "dev_environment_not_ready": true, "run_active_other_agent": true,
+	"operator_cannot_serve_project": true,
 }
 
 // now is the clock time in the precision of the columns.

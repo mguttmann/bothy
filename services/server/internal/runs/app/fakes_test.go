@@ -778,11 +778,31 @@ func (e events) Append(ctx context.Context, evs ...eventlog.Event) error {
 	return nil
 }
 
-// threads is the fake ThreadPort over a map of threads.
+// threads is the fake ThreadPort over a map of threads; chans gives RepinThreadOperator the
+// effective operators of the channels.
 type threads struct {
 	j     *journal
 	mu    sync.Mutex
 	infos map[ids.ID]chat.ThreadInfo
+	chans channels
+}
+
+// RepinThreadOperator gives a thread the effective operator of its channel (F-PROJEKT-BEREIT).
+func (t *threads) RepinThreadOperator(_ context.Context, id ids.ID) (bool, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	in, ok := t.infos[id]
+	if !ok {
+		return false, errs.New(errs.CodeNotFound, "")
+	}
+	op := t.chans[in.ChannelID].EffectiveOperatorID
+	if in.Kind != "thread" || op.IsZero() || op == in.OperatorAgentID {
+		return false, nil
+	}
+	t.j.add("repin", id)
+	in.OperatorAgentID = op
+	t.infos[id] = in
+	return true, nil
 }
 
 func (t *threads) Info(_ context.Context, id ids.ID) (chat.ThreadInfo, error) {
@@ -1055,6 +1075,7 @@ func newWorld(t *testing.T) *world {
 		ChannelID: w.channel, SpaceID: w.space, Kind: "text", EffectiveOperatorID: w.lotse, RequireMention: true, AutoThread: true,
 	}
 	w.channels = channels{w.channel: w.defaultSwitches, w.dmChannel: {ChannelID: w.dmChannel, Kind: "dm"}}
+	w.threads.chans = w.channels
 	w.agents = agentFacts{
 		w.lotse:  {ID: w.lotse, Handle: "lotse", Status: "active", BillingMode: "organization", ToolClass: "chat"},
 		w.texter: {ID: w.texter, Handle: "texter", Status: "active", BillingMode: "organization", ToolClass: "chat"},
@@ -1095,7 +1116,7 @@ func (w *world) deps() app.Deps {
 		Agents: w.agents, Cursors: cursors{}, Errors: w.errs, Log: slog.New(slog.NewJSONHandler(w.log, nil)), Clock: w.clk, Metrics: w.metrics,
 		Versions: versions{}, Audit: w.audit, Telemetry: w.telemetry, Expiry: expiryJournal{w.j},
 		Publisher: w.pub, Steps: w.steps, FollowupRows: w.fus, Files: w.files, Holds: holdJournal{w.j}, Sessions: w.agentSessions(),
-		Transcripts: w.modes,
+		Transcripts: w.modes, ThreadOperators: w.threads,
 	}
 	if w.gate != nil {
 		d = w.gate.wrap(d)

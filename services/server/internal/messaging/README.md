@@ -464,6 +464,13 @@ same `404`. When the visible read misses, an existing message is still decided b
 so an app with a grant on the channel but without `messages:read` gets `403 scope_missing`. `200` with the full content, never `content_truncated`, and `ETag: "<version>"`; a
 tombstone is `200` too. It is the reload path for content cut in lists and events.
 
+`retriggerMessage` (`POST /api/v1/messages/{message_id}/retrigger`, `agent.invoke`, `rl.trigger`,
+F-PROJEKT-BEREIT, 09 3.8): the handler reads the message like `getMessage` (the same `404`), lets
+runs decide it again through the port `Retriggers` (bound by `internal/wire` with
+`BindRetriggers` once runs exists), and answers `200` with the message after the decision. The
+author check, the state rules and the decision belong to runs. `TriggerMessage.HasAttachments`
+carries `messages.has_attachments`, so the invocation of such a message is held as at acceptance.
+
 Tombstones: a deleted message keeps its row and `thread_seq`; its form has `content_md = ""`, empty
 `attachments`, `mention_ids`, `reactions` and `components`, `pinned: false` and `deleted_at`, all
 other fields as stored. Logs and metrics never carry content, query strings or names.

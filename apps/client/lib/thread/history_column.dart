@@ -35,6 +35,7 @@ import '../files/attachment_tile.dart';
 import '../files/providers.dart';
 import '../files/upload_executor.dart';
 import '../forum/forum_model.dart' show timeLabel;
+import '../forum/project_readiness.dart' show ProjectReadinessBanner;
 import '../forum/providers.dart'
     show
         channelColumnHiddenProvider,
@@ -59,6 +60,7 @@ import 'move_thread_dialog.dart';
 import 'outbox_rows.dart';
 import 'providers.dart';
 import 'reaction_picker.dart';
+import 'retrigger_notice.dart';
 import 'revisions_dialog.dart';
 import 'thread_actions.dart';
 import 'thread_header.dart';
@@ -781,6 +783,15 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
                 )
               else
                 threadHeader,
+              // F-PROJEKT-BEREIT: a chat of a project forum that is not ready says why.
+              if (channel != null &&
+                  channel.kind == ChannelKind.forum &&
+                  channel.projectBound)
+                ProjectReadinessBanner(
+                  key: ValueKey('project.banner.${channel.id.value}'),
+                  forum: channel.id,
+                  forumName: channel.name,
+                ),
               // M4-21: the live box of the active run, pinned over the history (01 6.2).
               LiveBoxSlot(
                 threadId: widget.threadId,
@@ -912,6 +923,10 @@ class _MessageRow extends ConsumerWidget {
       components: card,
       longPressMenu: ref.watch(appPortsProvider).formFactor.isPhone,
       selection: selection,
+      // The cause beside the red X and "Trigger again" for its author (F-PROJEKT-BEREIT).
+      notice: offersRetrigger(message)
+          ? RetriggerNotice(message: message, mine: message.authorId == me)
+          : null,
       started: [
         for (final t in started)
           ThreadStarterLine(thread: t, onOpen: () => onOpenThread(t)),

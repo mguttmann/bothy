@@ -861,6 +861,10 @@ func (stubServer) RetryRun(context.Context, rest.RetryRunRequestObject) (rest.Re
 	return nil, nil
 }
 
+func (stubServer) RetriggerMessage(context.Context, rest.RetriggerMessageRequestObject) (rest.RetriggerMessageResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) CreateInteraction(context.Context, rest.CreateInteractionRequestObject) (rest.CreateInteractionResponseObject, error) {
 	return nil, nil
 }
@@ -1681,6 +1685,8 @@ func TestRealTable_Enabled(t *testing.T) {
 		"downloadGdprExport": {"GET /api/v1/gdpr-requests/{request_id}/export", "gdpr.export.download", "rl.export"},
 		// FIX-run-retry-and-orphan-operator
 		"retryRun": {"POST /api/v1/runs/{run_id}/retry", "agent.invoke", "rl.trigger"},
+		// F-PROJEKT-BEREIT
+		"retriggerMessage": {"POST /api/v1/messages/{message_id}/retrigger", "agent.invoke", "rl.trigger"},
 		// SERVER-AGENT-TRIGGERERS
 		"getAgentTriggerers": {"GET /api/v1/agents/me/triggerers", "agent.triggerers.read", "rl.agent_runtime"},
 		// FEAT-delete-spaces-chats

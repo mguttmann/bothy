@@ -105,6 +105,11 @@ def sync_detailed(
 ) -> Response[Problem | ProjectBinding]:
     """Bind a forum to a project
 
+     Creates or replaces the project binding of a forum. The forum's effective operator must be able to
+    serve a project, that is an agent with `adapter_kind` `code_runner` (09 18.16); a forum without an
+    operator or with another agent is refused with `400 validation_failed` and the field code
+    `operator_cannot_serve_project` on `#path/channel_id`, before anything is written.
+
     Args:
         channel_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         if_match (str | Unset):
@@ -140,6 +145,11 @@ def sync(
 ) -> Problem | ProjectBinding | None:
     """Bind a forum to a project
 
+     Creates or replaces the project binding of a forum. The forum's effective operator must be able to
+    serve a project, that is an agent with `adapter_kind` `code_runner` (09 18.16); a forum without an
+    operator or with another agent is refused with `400 validation_failed` and the field code
+    `operator_cannot_serve_project` on `#path/channel_id`, before anything is written.
+
     Args:
         channel_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         if_match (str | Unset):
@@ -169,6 +179,11 @@ async def asyncio_detailed(
     if_match: str | Unset = UNSET,
 ) -> Response[Problem | ProjectBinding]:
     """Bind a forum to a project
+
+     Creates or replaces the project binding of a forum. The forum's effective operator must be able to
+    serve a project, that is an agent with `adapter_kind` `code_runner` (09 18.16); a forum without an
+    operator or with another agent is refused with `400 validation_failed` and the field code
+    `operator_cannot_serve_project` on `#path/channel_id`, before anything is written.
 
     Args:
         channel_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -202,6 +217,11 @@ async def asyncio(
     if_match: str | Unset = UNSET,
 ) -> Problem | ProjectBinding | None:
     """Bind a forum to a project
+
+     Creates or replaces the project binding of a forum. The forum's effective operator must be able to
+    serve a project, that is an agent with `adapter_kind` `code_runner` (09 18.16); a forum without an
+    operator or with another agent is refused with `400 validation_failed` and the field code
+    `operator_cannot_serve_project` on `#path/channel_id`, before anything is written.
 
     Args:
         channel_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.

@@ -193,7 +193,9 @@ class _NewProjectDialogState extends State<NewProjectDialog> {
     } on Object {
       list = const [];
     }
-    if (mounted) setState(() => _runners = list);
+    if (!mounted) return;
+    setState(() => _runners = list);
+    _flow.chooseDefaultRunner(list);
   }
 
   void _changed() {
@@ -426,20 +428,47 @@ class _NewProjectDialogState extends State<NewProjectDialog> {
   Widget _runnerField(AppLocalizations l, NewProjectFlow flow) {
     final runners = _runners ?? const <ProjectRunner>[];
     final space = widget.spaceRunner;
-    return DsDropdownField<PrincipalId>(
-      // A new field once the runners arrive, so the preselected runner shows its label.
-      key: ValueKey('newProject.runner.${runners.length}'),
-      label: l.newProjectRunner,
-      enabled: flow.canEdit(NewProjectField.runner) && runners.isNotEmpty,
-      initialSelection: flow.runner,
-      entries: [
-        for (final r in runners)
-          DropdownMenuEntry(
-            value: r.id,
-            label: r.id == space ? l.newProjectRunnerSpace(r.name) : r.name,
+    final greyed = runners.any((r) => !r.canServe);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        DsDropdownField<PrincipalId>(
+          // A new field once the runners arrive and when the default changes, so the
+          // preselected runner shows its label.
+          key: ValueKey(
+            'newProject.runner.${runners.length}.${flow.runner?.value}',
+          ),
+          label: l.newProjectRunner,
+          enabled: flow.canEdit(NewProjectField.runner) && runners.isNotEmpty,
+          initialSelection: flow.runner,
+          entries: [
+            for (final r in runners)
+              DropdownMenuEntry(
+                value: r.id,
+                // Only an agent that can serve a project can be chosen (09 18.16,
+                // F-PROJEKT-BEREIT); the others show greyed out with the reason.
+                enabled: r.canServe,
+                label: !r.canServe
+                    ? l.newProjectRunnerCannotServe(r.name)
+                    : r.id == space
+                    ? l.newProjectRunnerSpace(r.name)
+                    : r.name,
+              ),
+          ],
+          onSelected: (id) => flow.runner = id,
+        ),
+        if (greyed)
+          Padding(
+            padding: const EdgeInsets.only(top: DsSpace.s4),
+            child: Text(
+              l.newProjectRunnerOnlyCodeRunners,
+              key: const ValueKey('newProject.runner.hint'),
+              style: dsTextStyle(DsType.bodySm)
+                  .copyWith(color: context.dsColors.textSecondary),
+            ),
           ),
       ],
-      onSelected: (id) => flow.runner = id,
     );
   }
 
@@ -458,6 +487,7 @@ class _NewProjectDialogState extends State<NewProjectDialog> {
     NewProjectStep.createForum => l.newProjectStepForum,
     NewProjectStep.assignRunner => l.newProjectStepRunner,
     NewProjectStep.bindProject => l.newProjectStepBind,
+    NewProjectStep.grantUpload => l.newProjectStepGrant,
     NewProjectStep.prepareFolder =>
       flow.folderCloning
           ? l.newProjectStepCloning

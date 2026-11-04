@@ -2818,7 +2818,7 @@ section 4 applies, and the gate fails.
 | R-DM-09 | Grants are immutable; a change = revocation plus a new grant. | Complete history without a revision table. |
 | R-DM-10 | DM channels have no space and no grants; access only through `dm_participants`. | Direct messages belong to no space; grants on spaces must not open DMs. |
 | R-DM-11 | Every text and DM channel has exactly one thread `kind = 'main'` as its main thread. | Every message has a thread; one sequence mechanism for everything. |
-| R-DM-12 | `threads.operator_agent_id` is fixed when a thread (`kind = 'thread'`) is created. | One agent session per thread; an operator change on the channel does not switch a running session. |
+| R-DM-12 | `threads.operator_agent_id` is fixed when a thread (`kind = 'thread'`) is created. The one exception is `retriggerMessage`: a thread whose operator is not the channel's effective operator and never completed a run in it takes the channel's operator ([09](09-agents.md) 3.8, addendum of 2026-11-04). | One agent session per thread; an operator change on the channel does not switch a running session. An operator that never completed a run has no session to keep. |
 | R-DM-13 | No file deduplication across files. | Deletion is simple; the existence of a hash reveals nothing. |
 | R-DM-14 | At most one active run per thread (partial index). | Further messages become follow-ups; no parallel runs on one session. |
 | R-DM-15 | `event_log` is partitioned by `seq`. | Retention by detaching whole partitions instead of an expensive `DELETE`. |

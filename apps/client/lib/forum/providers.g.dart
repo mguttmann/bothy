@@ -8,6 +8,62 @@ part of 'providers.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
+/// The server side of the project banner over the signed-in session (F-PROJEKT-BEREIT), null
+/// without a session; tests override it.
+
+@ProviderFor(projectReadinessPort)
+final projectReadinessPortProvider = ProjectReadinessPortProvider._();
+
+/// The server side of the project banner over the signed-in session (F-PROJEKT-BEREIT), null
+/// without a session; tests override it.
+
+final class ProjectReadinessPortProvider
+    extends
+        $FunctionalProvider<
+          ProjectReadinessPort?,
+          ProjectReadinessPort?,
+          ProjectReadinessPort?
+        >
+    with $Provider<ProjectReadinessPort?> {
+  /// The server side of the project banner over the signed-in session (F-PROJEKT-BEREIT), null
+  /// without a session; tests override it.
+  ProjectReadinessPortProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'projectReadinessPortProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$projectReadinessPortHash();
+
+  @$internal
+  @override
+  $ProviderElement<ProjectReadinessPort?> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  ProjectReadinessPort? create(Ref ref) {
+    return projectReadinessPort(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(ProjectReadinessPort? value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<ProjectReadinessPort?>(value),
+    );
+  }
+}
+
+String _$projectReadinessPortHash() =>
+    r'20ef7fa3f966be1ede03d11cbbbad952681513e8';
+
 /// The channel [channelId], or null when it is not stored.
 
 @ProviderFor(storedChannel)

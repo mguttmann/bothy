@@ -149,7 +149,7 @@ Reasons (`state_reason`) are translated, never shown raw: `billing_mode_mismatch
 "Backend does not match", `access_revoked` -> "Access revoked", `stale` -> "Canceled after
 stall", `user_cancelled` -> "Canceled by <Name>", `adapter_error` -> "Error in the adapter",
 `cancel_timeout` -> "Adapter did not confirm the cancellation", `project_not_ready` -> "Project
-not ready". Unknown reasons: "Failed" plus the code in `type.code-sm`.
+not ready", `operator_cannot_serve_project` -> "This project has no runner" (F-PROJEKT-BEREIT). Unknown reasons: "Failed" plus the code in `type.code-sm`.
 
 ### 2.2 Collapsed (final states)
 

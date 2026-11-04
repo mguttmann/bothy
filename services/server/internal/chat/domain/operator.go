@@ -12,6 +12,10 @@ const (
 	FieldInheritOnlyForChannels = "inherit_only_for_channels"
 	// FieldAgentNotActive marks an agent_id that names no active agent.
 	FieldAgentNotActive = "agent_not_active"
+	// FieldOperatorCannotServeProject marks an operator of a bound forum that is no agent able to
+	// serve a project (09 18.16, F-PROJEKT-BEREIT); it is also the derived ready_reason of such a
+	// binding.
+	FieldOperatorCannotServeProject = "operator_cannot_serve_project"
 )
 
 // OperatorAssignment is the operator a request sets (OpenAPI OperatorSet without the reason):

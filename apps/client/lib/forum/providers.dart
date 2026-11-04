@@ -16,8 +16,17 @@ import '../sidebar/providers.dart';
 import '../sync/thread_ops.dart';
 import 'failed_post_notice.dart';
 import 'forum_model.dart';
+import 'project_readiness.dart';
 
 part 'providers.g.dart';
+
+/// The server side of the project banner over the signed-in session (F-PROJEKT-BEREIT), null
+/// without a session; tests override it.
+@riverpod
+ProjectReadinessPort? projectReadinessPort(Ref ref) {
+  final services = ref.watch(signedInServicesProvider);
+  return services == null ? null : ApiProjectReadinessPort(services.auth.api);
+}
 
 /// The channel [channelId], or null when it is not stored.
 @riverpod

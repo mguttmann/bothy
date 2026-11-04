@@ -783,10 +783,13 @@ For an owner (`getMe` `is_owner`) every space row on the desktop has "+" ("New p
 opens `lib/new_project/new_project_dialog.dart` with four modes: an empty project, a clone of an
 `https` repository, an existing folder under the runner's projects folder, and an idea. The name
 is suggested from the URL or the first words of the idea until the person types one
-(`ui.new_project_name_max_chars`), and the runner is the space's default operator unless another
-active agent is chosen. "Create" runs `NewProjectFlow`: `createChannel` (forum, one
+(`ui.new_project_name_max_chars`). The runner list offers the active agents with `adapter_kind`
+`code_runner` and shows every other active agent greyed out with a hint (F-PROJEKT-BEREIT, 09
+18.16); the default is the space's default operator when it is such an agent, otherwise the only
+one. "Create" runs `NewProjectFlow`: `createChannel` (forum, one
 `Idempotency-Key` per name), `setChannelOperator` only for another runner, `putProjectBinding`
-with `provision` (`init`, `clone` or `none`), then `getChannelBehavior` every
+with `provision` (`init`, `clone` or `none`), `createGrant` (`write` with `upload` for the runner
+on the forum, one `Idempotency-Key` per flow), then `getChannelBehavior` every
 `ui.new_project_poll_interval` until the binding is ready or carries a `ready_reason` other than
 `provisioning`; for an idea it first stores the idea as the forum's new post draft and, once
 ready, sends it through the outbox with `clear_draft` and an empty title. The dialog lists the
@@ -805,7 +808,8 @@ forum (`listAgentProjectFolders`), each with a checked box; the list is the prev
 created before "Add forums". `ProjectSyncFlow` then runs, one checked folder after the other, the
 steps of a new project in mode "Existing folder" with the folder name as forum name
 (`createChannel` with one `Idempotency-Key` per folder, `setChannelOperator` only for another
-runner, `putProjectBinding` with `provision` `none`), so the first step-up covers the rest and a
+runner, `putProjectBinding` with `provision` `none`, `createGrant` for the runner's upload), so
+the first step-up covers the rest and a
 failed folder does not stop the others, and then reads the readiness of all bound forums every
 `ui.new_project_poll_interval` until each is ready, names a reason or `ui.new_project_wait`
 passed. Each row shows its state and the failure sentence of the new project dialog; "Try again"
@@ -818,6 +822,20 @@ The menu of a forum with a project binding has "Rename project" for a person wit
 and the version of `getChannel` as `If-Match`; the folder and the binding stay. A
 `version_conflict` reads the version again and asks for one more press. Rulings:
 docs/decisions.d/M4-44.md.
+
+### Project not ready (F-PROJEKT-BEREIT)
+
+A project forum whose binding is not ready shows `lib/forum/project_readiness.dart` over its post
+list and over each of its chats (desktop and phone): "Project not ready: <cause>" from
+`ready_reason` of `getChannelBehavior`, that the forum's agent is offline (`getAgent`), and for
+an owner "Make <runner> the runner" (`setChannelOperator`, when exactly one active agent can serve
+a project) for `operator_cannot_serve_project` or "Change folder name" (`putProjectBinding` with
+the other values kept) for `workspace_exists`; "Check again" reads it again. A reader without
+`manage` cannot read the binding and sees no banner. A message whose trigger state is `failed`
+with `project_not_ready`, `operator_cannot_serve_project` or `operator_not_in_channel` shows its
+cause below the content (`lib/thread/retrigger_notice.dart`) and, for its author, "Trigger again",
+which puts one `retriggerMessage` into the outbox (lane `message:<id>`, 09 3.8); a refusal shows
+its reason and offers the button again. Rulings: docs/decisions.d/F-PROJEKT-BEREIT.md.
 
 ## Notification levels and channel export
 

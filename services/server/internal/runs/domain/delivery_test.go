@@ -83,6 +83,7 @@ func TestDeliveryReasonMapping(t *testing.T) {
 		{"billing_mode_personal_not_holder", true, "billing_mode_personal_not_holder"},
 		{"tool_class_owner_only", true, "tool_class_owner_only"},
 		{"project_not_ready", true, "project_not_ready"},
+		{"operator_cannot_serve_project", true, "project_not_ready"},
 		{"channel_read_only", true, "channel_read_only"},
 		{"channel_archived", true, "channel_read_only"},
 		{"principal_inactive", true, "user_disabled"},

@@ -667,6 +667,9 @@ type ServerInterface interface {
 	// AddReaction Add own reaction
 	// (PUT /messages/{message_id}/reactions/{emoji})
 	AddReaction(w http.ResponseWriter, r *http.Request, messageId MessageIdPath, emoji EmojiPath)
+	// RetriggerMessage Trigger a failed message again
+	// (POST /messages/{message_id}/retrigger)
+	RetriggerMessage(w http.ResponseWriter, r *http.Request, messageId MessageIdPath, params RetriggerMessageParams)
 	// ListMessageRevisions Read earlier versions
 	// (GET /messages/{message_id}/revisions)
 	ListMessageRevisions(w http.ResponseWriter, r *http.Request, messageId MessageIdPath)
@@ -9226,6 +9229,56 @@ func (siw *ServerInterfaceWrapper) AddReaction(w http.ResponseWriter, r *http.Re
 	handler.ServeHTTP(w, r)
 }
 
+// RetriggerMessage operation middleware
+func (siw *ServerInterfaceWrapper) RetriggerMessage(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "message_id" -------------
+	var messageId MessageIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "message_id", r.PathValue("message_id"), &messageId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "message_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params RetriggerMessageParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RetriggerMessage(w, r, messageId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListMessageRevisions operation middleware
 func (siw *ServerInterfaceWrapper) ListMessageRevisions(w http.ResponseWriter, r *http.Request) {
 
@@ -14399,6 +14452,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/runs/{run_id}/finish", wrapper.FinishRun)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/runs/{run_id}/cancel", wrapper.CancelRun)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/runs/{run_id}/retry", wrapper.RetryRun)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/messages/{message_id}/retrigger", wrapper.RetriggerMessage)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/channels/{channel_id}/commands", wrapper.ListChannelCommands)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/commands", wrapper.RegisterCommand)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/commands/{command_id}", wrapper.RemoveCommand)
@@ -15307,6 +15361,9 @@ type StrictServerInterface interface {
 	// AddReaction Add own reaction
 	// (PUT /messages/{message_id}/reactions/{emoji})
 	AddReaction(ctx context.Context, request AddReactionRequestObject) (AddReactionResponseObject, error)
+	// RetriggerMessage Trigger a failed message again
+	// (POST /messages/{message_id}/retrigger)
+	RetriggerMessage(ctx context.Context, request RetriggerMessageRequestObject) (RetriggerMessageResponseObject, error)
 	// ListMessageRevisions Read earlier versions
 	// (GET /messages/{message_id}/revisions)
 	ListMessageRevisions(ctx context.Context, request ListMessageRevisionsRequestObject) (ListMessageRevisionsResponseObject, error)
@@ -22077,6 +22134,33 @@ func (sh *strictHandler) AddReaction(w http.ResponseWriter, r *http.Request, mes
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(AddReactionResponseObject); ok {
 		if err := validResponse.VisitAddReactionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RetriggerMessage operation middleware
+func (sh *strictHandler) RetriggerMessage(w http.ResponseWriter, r *http.Request, messageId MessageIdPath, params RetriggerMessageParams) {
+	var request RetriggerMessageRequestObject
+
+	request.MessageId = messageId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RetriggerMessage(ctx, request.(RetriggerMessageRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RetriggerMessage")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RetriggerMessageResponseObject); ok {
+		if err := validResponse.VisitRetriggerMessageResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

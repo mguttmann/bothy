@@ -65,7 +65,8 @@ func (s *Source) PersonalAgents(ctx context.Context) ([]authz.PersonalAgent, err
 
 // AgentPolicy implements authz.AgentPolicySource: the target mode and holder, the target tool
 // class and the reported one (authz reckons with the higher of the two classes, 07 section 2.11)
-// and the billing modes the adapter reported (M1-49). ok is false for an unknown agent.
+// the billing modes the adapter reported (M1-49) and the adapter kind (09 18.16). ok is false for
+// an unknown agent.
 func (s *Source) AgentPolicy(ctx context.Context, agentID ids.ID) (authz.AgentPolicy, bool, error) {
 	rec, found, err := s.store.Agent(ctx, agentID)
 	if err != nil || !found {
@@ -78,6 +79,7 @@ func (s *Source) AgentPolicy(ctx context.Context, agentID ids.ID) (authz.AgentPo
 	return authz.AgentPolicy{
 		BillingMode: string(rec.Policy.Mode), CredentialHolderID: rec.Policy.HolderID,
 		ToolClass: string(rec.ToolClass), ReportedToolClass: string(rec.Reported.ToolClass), BillingModesSupported: modes,
+		AdapterKind: rec.AdapterKind,
 	}, true, nil
 }
 

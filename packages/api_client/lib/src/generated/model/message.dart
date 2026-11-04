@@ -35,7 +35,7 @@ part 'message.g.dart';
 /// * [runId] - Set only for `kind = run`: the run whose live box this anchor holds.
 /// * [triggerState]
 /// * [triggerStateAt] - RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
-/// * [triggerStateReason] - Reason when `trigger_state` is `failed` or `cancelled`, e.g. `billing_mode_personal_not_holder`, `run_active_other_agent`, `user_cancelled`.
+/// * [triggerStateReason] - Reason when `trigger_state` is `failed` or `cancelled`, e.g. `billing_mode_personal_not_holder`, `run_active_other_agent`, `user_cancelled`, `project_not_ready`, `operator_cannot_serve_project`. A message that failed with `project_not_ready`, `operator_cannot_serve_project` or `operator_not_in_channel` can be triggered again with `retriggerMessage` once the cause is fixed.
 /// * [silent]
 /// * [attachments] - Attachments in position order (the order of `attachment_file_ids` at sending); empty for a message without attachments and for a deleted message.
 /// * [mentionIds] - Principals resolved from the mention tokens of `content_md`, sorted. Clients render a token as a mention only for these.
@@ -112,7 +112,7 @@ abstract class Message implements Built<Message, MessageBuilder> {
   @BuiltValueField(wireName: r'trigger_state_at')
   DateTime? get triggerStateAt;
 
-  /// Reason when `trigger_state` is `failed` or `cancelled`, e.g. `billing_mode_personal_not_holder`, `run_active_other_agent`, `user_cancelled`.
+  /// Reason when `trigger_state` is `failed` or `cancelled`, e.g. `billing_mode_personal_not_holder`, `run_active_other_agent`, `user_cancelled`, `project_not_ready`, `operator_cannot_serve_project`. A message that failed with `project_not_ready`, `operator_cannot_serve_project` or `operator_not_in_channel` can be triggered again with `retriggerMessage` once the cause is fixed.
   @BuiltValueField(wireName: r'trigger_state_reason')
   String? get triggerStateReason;
 

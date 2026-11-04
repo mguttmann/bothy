@@ -437,3 +437,50 @@ func TestSetTitle_AutoFillsOnly(t *testing.T) {
 	_, err = e.svc.SetTitle(ctx, agent, chat.SetTitleCmd{ThreadID: manual.ID, Title: "ja", Auto: true, IfMatch: match(manual.Version)})
 	wantCode(t, err, errs.CodeTitleManual)
 }
+
+// TestRepinThreadOperator (F-PROJEKT-BEREIT): inside a unit the thread takes the channel's
+// effective operator with a new version and thread.updated; again, or for a main thread, nothing
+// changes; outside a unit it is an internal error.
+func TestRepinThreadOperator(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t)
+	sp := e.create(t, "Support", ids.ID{})
+	forum := e.channel(t, sp.ID, "forum", "forum")
+	old, next := ids.New(), ids.New()
+	th, err := e.newThread(e.owner, chat.CreateThreadCmd{ChannelID: forum.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.setThreadOperator(th.ID, old)
+	e.store.mu.Lock()
+	s := e.store.spaces[sp.ID]
+	s.DefaultOperatorAgentID = next
+	e.store.spaces[sp.ID] = s
+	e.store.mu.Unlock()
+	if _, err := e.svc.RepinThreadOperator(context.Background(), th.ID); err == nil {
+		t.Fatal("repin outside a unit")
+	}
+	repin := func() bool {
+		t.Helper()
+		var changed bool
+		if err := e.uow.Do(context.Background(), func(ctx context.Context) error {
+			var err error
+			changed, err = e.svc.RepinThreadOperator(ctx, th.ID)
+			return err
+		}); err != nil {
+			t.Fatal(err)
+		}
+		return changed
+	}
+	updated := e.eventCount("thread.updated")
+	if !repin() {
+		t.Fatal("no repin")
+	}
+	got, err := e.svc.Get(context.Background(), e.owner, th.ID)
+	if err != nil || got.OperatorAgentID != next || got.Version != th.Version+1 || e.eventCount("thread.updated") != updated+1 {
+		t.Fatalf("after repin %+v, %v, events %d", got, err, e.eventCount("thread.updated"))
+	}
+	if repin() || e.eventCount("thread.updated") != updated+1 {
+		t.Fatal("second repin changed the thread")
+	}
+}

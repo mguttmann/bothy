@@ -500,7 +500,7 @@ func (a *Authorizer) invokeFacts(ctx context.Context, s *actingPrincipal, f *aut
 		return nil, sourceError("agent policy source", err)
 	}
 	out.PolicyFound, out.BillingMode, out.CredentialHolderID = ok, pol.BillingMode, pol.CredentialHolderID
-	out.ToolClass, out.ReportedToolClass = pol.ToolClass, pol.ReportedToolClass
+	out.ToolClass, out.ReportedToolClass, out.AgentCannotServeProject = pol.ToolClass, pol.ReportedToolClass, pol.CannotServeProject()
 	if found && string(pf.Kind) == domain.KindAgent {
 		v := s.entry.snap.PermissionVersion
 		ae, err := a.load(ctx, authz.CredentialRef{PrincipalID: f.AgentID}, v, t)

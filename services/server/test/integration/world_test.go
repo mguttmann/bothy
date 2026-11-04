@@ -533,7 +533,13 @@ func (w *world) channel(space ids.ID, kind, name string) ids.ID {
 // token of it under handle.
 func (w *world) agent(handle string) ids.ID {
 	w.t.Helper()
-	m := w.want(w.do("owner", http.MethodPost, "/api/v1/agents", `{"handle":"`+handle+`","display_name":"`+handle+`","adapter_kind":"hermes"}`, key()...),
+	kind := "hermes"
+	if handle == "runner" || handle == "lotse" {
+		// The runner of the project forums and Lotse, the other operator the binding tests give a
+		// bound forum, can serve a project (09 18.16, F-PROJEKT-BEREIT).
+		kind = "code_runner"
+	}
+	m := w.want(w.do("owner", http.MethodPost, "/api/v1/agents", `{"handle":"`+handle+`","display_name":"`+handle+`","adapter_kind":"`+kind+`"}`, key()...),
 		http.StatusCreated, "")
 	id := ids.MustParse(m["id"].(string))
 	issued, err := w.id.Tokens.Issue(context.Background(), identity.IssueTokenCmd{

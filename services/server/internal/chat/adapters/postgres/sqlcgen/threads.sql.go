@@ -767,21 +767,23 @@ func (q *Queries) LockThread(ctx context.Context, id pgtype.UUID) (LockThreadRow
 const saveThread = `-- name: SaveThread :exec
 UPDATE threads
 SET title = $1, title_source = $2, state = $3, closed_at = $4,
-    closed_by = $5, version = $6
-WHERE id = $7
+    closed_by = $5, operator_agent_id = $6, version = $7
+WHERE id = $8
 `
 
 type SaveThreadParams struct {
-	Title       string
-	TitleSource string
-	State       string
-	ClosedAt    pgtype.Timestamptz
-	ClosedBy    pgtype.UUID
-	Version     int64
-	ID          pgtype.UUID
+	Title           string
+	TitleSource     string
+	State           string
+	ClosedAt        pgtype.Timestamptz
+	ClosedBy        pgtype.UUID
+	OperatorAgentID pgtype.UUID
+	Version         int64
+	ID              pgtype.UUID
 }
 
-// Writes the columns of thread.title.update, thread.close and thread.reopen and the version.
+// Writes the columns of thread.title.update, thread.close and thread.reopen, the fixed operator
+// (retriggerMessage, F-PROJEKT-BEREIT) and the version.
 func (q *Queries) SaveThread(ctx context.Context, arg SaveThreadParams) error {
 	_, err := q.db.Exec(ctx, saveThread,
 		arg.Title,
@@ -789,6 +791,7 @@ func (q *Queries) SaveThread(ctx context.Context, arg SaveThreadParams) error {
 		arg.State,
 		arg.ClosedAt,
 		arg.ClosedBy,
+		arg.OperatorAgentID,
 		arg.Version,
 		arg.ID,
 	)

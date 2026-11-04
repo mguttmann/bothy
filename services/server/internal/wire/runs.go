@@ -290,6 +290,12 @@ func withContext(out *runsapp.Deps, az authorize.Authorizer, d RunsDeps) error {
 		return errors.New("wire: the Authorizer of runs does not answer the trigger holders")
 	}
 	out.ContextMessages, out.TriggerHolders = cm, th
+	// The chat use cases behind d.Threads change the operator of a thread for retriggerMessage
+	// (F-PROJEKT-BEREIT); a thread port without it leaves the port nil, and such a change is then an
+	// internal error of runs.
+	if ops, ok := d.Threads.(runsapp.ThreadOperators); ok {
+		out.ThreadOperators = ops
+	}
 	if d.Sessions == nil {
 		return nil
 	}
