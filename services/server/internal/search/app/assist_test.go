@@ -191,12 +191,12 @@ func newAssistEnv(t *testing.T, configured bool) *assistEnv {
 
 // threadHit is a hit of the thread search; messageHit one of the message search.
 func threadHit(thread, channel ids.ID, title string, at time.Time) search.ResultHit {
-	return search.ResultHit{Kind: "thread", ID: thread, ThreadID: thread, ChannelID: channel, ThreadTitle: title, ChannelName: "bothy",
+	return search.ResultHit{Kind: "thread", ID: thread, ThreadID: thread, ChannelID: channel, ThreadTitle: title, ChannelName: "larkspur",
 		SpaceName: "Projects", CreatedAt: at, Segments: []searchkit.Segment{{Text: title, Match: true}}}
 }
 
 func messageHit(thread, channel ids.ID, title, text string, at time.Time) search.ResultHit {
-	return search.ResultHit{Kind: "message", ID: ids.New(), ThreadID: thread, ChannelID: channel, ThreadTitle: title, ChannelName: "bothy",
+	return search.ResultHit{Kind: "message", ID: ids.New(), ThreadID: thread, ChannelID: channel, ThreadTitle: title, ChannelName: "larkspur",
 		SpaceName: "Projects", CreatedAt: at, Segments: []searchkit.Segment{{Text: text, Match: false}}}
 }
 
@@ -212,27 +212,27 @@ func TestAssist_WithoutAssistantAnswersFusedFullText(t *testing.T) {
 	t.Parallel()
 	e := newAssistEnv(t, false)
 	takeover, other := ids.New(), ids.New()
-	q := "takeover or bothy or hermes"
-	e.search.threads[q] = []search.ResultHit{threadHit(takeover, e.general, "Takeover of Bothy", day)}
+	q := "takeover or larkspur or hermes"
+	e.search.threads[q] = []search.ResultHit{threadHit(takeover, e.general, "Takeover of Larkspur", day)}
 	e.search.messages[q] = []search.ResultHit{
-		messageHit(other, e.general, "Release", "bothy release", day.Add(time.Hour)),
-		messageHit(takeover, e.general, "Takeover of Bothy", "Hermes takes over", day),
+		messageHit(other, e.general, "Release", "larkspur release", day.Add(time.Hour)),
+		messageHit(takeover, e.general, "Takeover of Larkspur", "Hermes takes over", day),
 	}
-	res, err := e.as.Assist(context.Background(), e.alex, search.AssistRequest{Q: "I am looking for the takeover of Bothy on Hermes"})
+	res, err := e.as.Assist(context.Background(), e.alex, search.AssistRequest{Q: "I am looking for the takeover of Larkspur on Hermes"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if res.Mode != search.ModeFulltext || res.FallbackReason != search.FallbackNotConfigured || res.Cost != nil {
 		t.Fatalf("result %+v, want full text without an assistant", res)
 	}
-	if !slices.Equal(res.Terms, []string{"takeover", "bothy", "hermes"}) {
+	if !slices.Equal(res.Terms, []string{"takeover", "larkspur", "hermes"}) {
 		t.Fatalf("terms %q", res.Terms)
 	}
 	if len(res.Hits) != 2 || res.Hits[0].ThreadID != takeover || res.Hits[1].ThreadID != other {
 		t.Fatalf("hits %+v, want the takeover thread first", res.Hits)
 	}
 	first := res.Hits[0]
-	if first.Source != search.SourceFulltext || first.Reason != "" || first.MessageID.IsZero() || first.ThreadTitle != "Takeover of Bothy" {
+	if first.Source != search.SourceFulltext || first.Reason != "" || first.MessageID.IsZero() || first.ThreadTitle != "Takeover of Larkspur" {
 		t.Fatalf("first hit %+v, want the matching message as jump target", first)
 	}
 	if len(e.relay.events) != 0 {
@@ -267,7 +267,7 @@ func TestAssist_ValidatesTheQuestion(t *testing.T) {
 	}{
 		{search.AssistRequest{Q: strings.Repeat("x", 257)}, "too_long", "/q"},
 		{search.AssistRequest{Q: "the of and"}, "empty", "/q"},
-		{search.AssistRequest{Q: "bothy", History: make([]search.AssistTurn, 4)}, "too_many_items", "/history"},
+		{search.AssistRequest{Q: "larkspur", History: make([]search.AssistTurn, 4)}, "too_many_items", "/history"},
 	} {
 		_, err := e.as.Assist(ctx, e.alex, tc.r)
 		code, pointer := field(t, err)
@@ -286,7 +286,7 @@ func TestAssist_TheAssistantSeesOnlyWhatBothMayRead(t *testing.T) {
 	shared, secret := ids.New(), ids.New()
 	q := "takeover"
 	e.search.threads[q] = []search.ResultHit{threadHit(secret, e.private, "Secret takeover plan", day.Add(time.Hour))}
-	e.search.messages[q] = []search.ResultHit{messageHit(shared, e.general, "Takeover of Bothy", "the takeover", day)}
+	e.search.messages[q] = []search.ResultHit{messageHit(shared, e.general, "Takeover of Larkspur", "the takeover", day)}
 	e.az.deny[e.helper.ID] = map[ids.ID]bool{secret: true}
 	answered := make(chan error, 2)
 	e.relay.answer = func(ev eventlog.EphemeralEvent) {
@@ -343,7 +343,7 @@ func TestAssist_TermsOfTheAssistantRunASecondPass(t *testing.T) {
 	e := newAssistEnv(t, true)
 	move, takeover := ids.New(), ids.New()
 	e.search.messages["umzug or discord"] = []search.ResultHit{messageHit(move, e.general, "Discord bots", "discord bot", day)}
-	e.search.threads["migration or takeover"] = []search.ResultHit{threadHit(takeover, e.general, "Takeover of Bothy", day)}
+	e.search.threads["migration or takeover"] = []search.ResultHit{threadHit(takeover, e.general, "Takeover of Larkspur", day)}
 	amount := int64(1500)
 	e.relay.answer = func(ev eventlog.EphemeralEvent) {
 		var p struct {
@@ -373,7 +373,7 @@ func TestAssist_NoCandidatesStillAsksForTerms(t *testing.T) {
 	t.Parallel()
 	e := newAssistEnv(t, true)
 	takeover := ids.New()
-	e.search.threads["takeover"] = []search.ResultHit{threadHit(takeover, e.general, "Takeover of Bothy", day)}
+	e.search.threads["takeover"] = []search.ResultHit{threadHit(takeover, e.general, "Takeover of Larkspur", day)}
 	e.relay.answer = func(ev eventlog.EphemeralEvent) {
 		var p struct {
 			RequestID  string `json:"request_id"`
@@ -468,10 +468,10 @@ func TestAssist_HistoryMarksShownThreadsAndKeepsTerms(t *testing.T) {
 	t.Parallel()
 	e := newAssistEnv(t, true)
 	older, newer := ids.New(), ids.New()
-	q := "older or takeover or bothy"
+	q := "older or takeover or larkspur"
 	e.search.messages[q] = []search.ResultHit{
 		messageHit(newer, e.general, "Takeover again", "takeover", day.Add(48*time.Hour)),
-		messageHit(older, e.general, "Takeover of Bothy", "takeover", day),
+		messageHit(older, e.general, "Takeover of Larkspur", "takeover", day),
 	}
 	got := make(chan string, 1)
 	e.relay.answer = func(ev eventlog.EphemeralEvent) {
@@ -484,12 +484,12 @@ func TestAssist_HistoryMarksShownThreadsAndKeepsTerms(t *testing.T) {
 			Picks: []search.AssistPick{{Ref: "c2", Reason: "The older one."}}})
 	}
 	res, err := e.as.Assist(context.Background(), e.alex, search.AssistRequest{Q: "no, the older one",
-		History: []search.AssistTurn{{Q: "takeover of bothy", Terms: []string{"takeover", "bothy"}, ThreadIDs: []ids.ID{newer}}}})
+		History: []search.AssistTurn{{Q: "takeover of larkspur", Terms: []string{"takeover", "larkspur"}, ThreadIDs: []ids.ID{newer}}}})
 	if err != nil {
 		t.Fatal(err)
 	}
 	payload := <-got
-	if !strings.Contains(payload, `"history":["takeover of bothy"]`) {
+	if !strings.Contains(payload, `"history":["takeover of larkspur"]`) {
 		t.Fatalf("history missing: %s", payload)
 	}
 	var p struct {

@@ -19,8 +19,8 @@ import (
 // language-check: off
 
 const (
-	takeoverQuestion = "Ich suche die Übernahme von Bothy auf Hermes"
-	moveQuestion     = "Umzug der Steuersitzung von Discord nach Bothy"
+	takeoverQuestion = "Ich suche die Übernahme von Larkspur auf Hermes"
+	moveQuestion     = "Umzug der Steuersitzung von Discord nach Larkspur"
 )
 
 // language-check: on
@@ -29,12 +29,12 @@ const (
 
 func TestAssistTerms_DropsStopWordsShortWordsAndDuplicates(t *testing.T) {
 	got := domain.AssistTerms(takeoverQuestion, nil, 3, 12)
-	want := []string{"übernahme", "bothy", "hermes"}
+	want := []string{"übernahme", "larkspur", "hermes"}
 	if !slices.Equal(got, want) {
 		t.Fatalf("terms = %q, want %q", got, want)
 	}
 	got = domain.AssistTerms(moveQuestion, nil, 3, 12)
-	want = []string{"umzug", "steuersitzung", "discord", "bothy"}
+	want = []string{"umzug", "steuersitzung", "discord", "larkspur"}
 	if !slices.Equal(got, want) {
 		t.Fatalf("terms = %q, want %q", got, want)
 	}
@@ -43,8 +43,8 @@ func TestAssistTerms_DropsStopWordsShortWordsAndDuplicates(t *testing.T) {
 // language-check: on
 
 func TestAssistTerms_FollowUpKeepsEarlierTermsAfterTheNewOnes(t *testing.T) {
-	got := domain.AssistTerms("no, the older one about Discord", []string{"bothy", "discord", "hermes"}, 3, 4)
-	want := []string{"older", "discord", "bothy", "hermes"}
+	got := domain.AssistTerms("no, the older one about Discord", []string{"larkspur", "discord", "hermes"}, 3, 4)
+	want := []string{"older", "discord", "larkspur", "hermes"}
 	if !slices.Equal(got, want) {
 		t.Fatalf("terms = %q, want %q", got, want)
 	}
@@ -59,7 +59,7 @@ func TestAssistTerms_SplitsAtEveryNonLetter(t *testing.T) {
 }
 
 func TestAssistQueryText_IsAnOrOfTheTerms(t *testing.T) {
-	if got := domain.AssistQueryText([]string{"bothy", "hermes"}); got != "bothy or hermes" {
+	if got := domain.AssistQueryText([]string{"larkspur", "hermes"}); got != "larkspur or hermes" {
 		t.Fatalf("query = %q", got)
 	}
 	if got := domain.AssistQueryText(nil); got != "" {
@@ -147,10 +147,10 @@ func TestAssistPayload_HoldsNoIDsAndDropsCandidatesThatDoNotFit(t *testing.T) {
 	req := ids.New()
 	at := time.Date(2026, 11, 2, 10, 0, 0, 0, time.UTC)
 	cands := []domain.AssistCandidate{
-		{Ref: "c1", Title: "Takeover", ChannelName: "bothy", SpaceName: "Projects", At: at, Excerpt: "moved", ShownBefore: true},
+		{Ref: "c1", Title: "Takeover", ChannelName: "larkspur", SpaceName: "Projects", At: at, Excerpt: "moved", ShownBefore: true},
 		{Ref: "c2", ChannelName: "general", At: at, Excerpt: strings.Repeat("x", 400)},
 	}
-	in := domain.AssistPayloadInput{RequestID: req, Q: "takeover", History: []string{"bothy"}, Candidates: cands, MaxPicks: 5,
+	in := domain.AssistPayloadInput{RequestID: req, Q: "takeover", History: []string{"larkspur"}, Candidates: cands, MaxPicks: 5,
 		MaxTerms: 8, ExpiresAt: at}
 	b, kept, err := domain.AssistPayload(in, 4096)
 	if err != nil || kept != 2 {

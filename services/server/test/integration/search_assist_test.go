@@ -18,21 +18,21 @@ import (
 )
 
 // The fixture of the owner's example (14 4.10): the session where the steering
-// session moved from Discord to Bothy, among sessions that share single words with the questions.
+// session moved from Discord to Larkspur, among sessions that share single words with the questions.
 // language-check: off
 
 const (
-	takeoverTitle   = "Übernahme Bothy von Discord"
-	takeoverMessage = "Die Steuersitzung zieht von Discord nach Bothy um, Hermes übernimmt ab jetzt die Steuerung."
-	askTakeover     = "Ich suche die Übernahme von Bothy auf Hermes"
-	askMove         = "Umzug der Steuersitzung von Discord nach Bothy"
+	takeoverTitle   = "Übernahme Larkspur von Discord"
+	takeoverMessage = "Die Steuersitzung zieht von Discord nach Larkspur um, Hermes übernimmt ab jetzt die Steuerung."
+	askTakeover     = "Ich suche die Übernahme von Larkspur auf Hermes"
+	askMove         = "Umzug der Steuersitzung von Discord nach Larkspur"
 )
 
 var assistDistractors = [][2]string{
-	{"Bothy Release 1.4 vorbereiten", "Changelog und Tags für das nächste Bothy Release."},
+	{"Larkspur Release 1.4 vorbereiten", "Changelog und Tags für das nächste Larkspur Release."},
 	{"Discord Bot Rechte prüfen", "Der Discord Bot braucht Leserechte im Kanal."},
 	{"Hermes Gateway Neustart", "Nach dem Update startet das Hermes Gateway neu."},
-	{"Bothy Sidebar Sortierung", "Sortierung der Kanäle in der Seitenleiste von Bothy."},
+	{"Larkspur Sidebar Sortierung", "Sortierung der Kanäle in der Seitenleiste von Larkspur."},
 	{"Steuerberater Termine", "Die Sitzung mit dem Steuerberater ist am Freitag."},
 }
 
@@ -119,7 +119,7 @@ func TestSearchAssist_NobodyFindsSessionsTheyMayNotRead(t *testing.T) {
 	t.Parallel()
 	w := newWorld(t)
 	w.takeoverFixture()
-	own := w.say("alex", w.eskalation, "Bothy takeover notes for Hermes")
+	own := w.say("alex", w.eskalation, "Larkspur takeover notes for Hermes")
 	for _, name := range []string{"alex", "sam"} {
 		for _, question := range []string{askTakeover, askMove} {
 			r := w.do(name, http.MethodPost, "/api/v1/search/assist", `{"q":"`+question+`"}`)
@@ -143,7 +143,7 @@ func TestSearchAssist_AgentsMayNotAsk(t *testing.T) {
 	t.Parallel()
 	w := newWorld(t)
 	w.setActor("lotse-token", actor.Actor{ID: w.lotse, Kind: actor.KindAgent})
-	w.want(w.do("lotse-token", http.MethodPost, "/api/v1/search/assist", `{"q":"bothy"}`), http.StatusForbidden, "")
+	w.want(w.do("lotse-token", http.MethodPost, "/api/v1/search/assist", `{"q":"larkspur"}`), http.StatusForbidden, "")
 }
 
 // capturingRelay records the payloads and answers each request through answer.
@@ -177,7 +177,7 @@ func TestSearchAssist_TheAssistantNeverSeesWhatItMayNotRead(t *testing.T) {
 	t.Parallel()
 	w := newWorld(t)
 	thread, _ := w.takeoverFixture()
-	own := w.say("alex", w.eskalation, "Bothy takeover notes for Hermes")
+	own := w.say("alex", w.eskalation, "Larkspur takeover notes for Hermes")
 	cfg := searchAssistConfig()
 	cfg.AgentID = w.lotse.String()
 	as, err := searchapp.NewAssistant(cfg, searchapp.AssistDeps{Search: w.search.Coordinator, Authorizer: w.az, Clock: w.clk})
@@ -213,7 +213,7 @@ func TestSearchAssist_TheAssistantNeverSeesWhatItMayNotRead(t *testing.T) {
 	must(t, err)
 	<-answers
 	must(t, <-answers)
-	if !strings.Contains(relay.last(), "Bothy takeover notes") {
+	if !strings.Contains(relay.last(), "Larkspur takeover notes") {
 		t.Fatalf("Alex's own readable thread is missing from the payload: %s", relay.last())
 	}
 	if len(res.Hits) != 1 || res.Hits[0].MessageID != own || res.Hits[0].Source != search.SourceAssistant || res.Hits[0].Reason == "" {

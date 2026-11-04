@@ -29,7 +29,7 @@ final DateTime now = DateTime.utc(2026, 11, 4, 12);
 
 // language-check: off
 
-const String takeoverQuestion = 'Übernahme von Bothy auf Hermes';
+const String takeoverQuestion = 'Übernahme von Larkspur auf Hermes';
 
 // language-check: on
 
@@ -53,11 +53,11 @@ final AssistHit takeover = AssistHit(
   threadId: threadId(1),
   messageId: takeoverMessage,
   channelId: channelId(1),
-  channelName: 'bothy',
-  threadTitle: 'Takeover of Bothy from Discord',
+  channelName: 'larkspur',
+  threadTitle: 'Takeover of Larkspur from Discord',
   spaceName: 'Projects',
   at: now.subtract(const Duration(days: 2)),
-  reason: 'The thread where the steering session moved to Bothy.',
+  reason: 'The thread where the steering session moved to Larkspur.',
   segments: const [
     SearchSegment(text: 'the steering session ', match: false),
     SearchSegment(text: 'moved', match: true),
@@ -67,7 +67,7 @@ final AssistHit takeover = AssistHit(
 final AssistHit release = AssistHit(
   threadId: threadId(2),
   channelId: channelId(2),
-  channelName: 'bothy',
+  channelName: 'larkspur',
   threadTitle: 'Release 1.4',
   spaceName: 'Projects',
   at: now.subtract(const Duration(days: 1)),
@@ -162,14 +162,14 @@ void main() {
       0,
       AssistAnswer(
         hits: [takeover, release],
-        terms: const ['bothy', 'hermes', 'migration'],
+        terms: const ['larkspur', 'hermes', 'migration'],
         costMicros: 1200,
         currency: 'USD',
       ),
     );
     expect(find.byKey(const ValueKey('assist.pending')), findsNothing);
     expect(
-      find.textContaining('Takeover of Bothy from Discord'),
+      find.textContaining('Takeover of Larkspur from Discord'),
       findsOneWidget,
     );
     expect(find.textContaining(takeover.reason!), findsOneWidget);
@@ -189,7 +189,7 @@ void main() {
     await h.open();
     await h.answer(
       0,
-      AssistAnswer(hits: [release], terms: const ['bothy', 'hermes']),
+      AssistAnswer(hits: [release], terms: const ['larkspur', 'hermes']),
     );
     await tester.enterText(
       find.byKey(const ValueKey('assist.field')),
@@ -200,7 +200,7 @@ void main() {
     final follow = h.assistant.calls.last;
     expect(follow.q, 'no, the older one');
     expect(follow.history.single.q, takeoverQuestion);
-    expect(follow.history.single.terms, ['bothy', 'hermes']);
+    expect(follow.history.single.terms, ['larkspur', 'hermes']);
     expect(follow.history.single.threadIds, [threadId(2)]);
 
     await h.answer(

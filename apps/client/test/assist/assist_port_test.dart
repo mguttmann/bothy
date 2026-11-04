@@ -49,14 +49,14 @@ class CaptureAdapter implements HttpClientAdapter {
 
 final Map<String, Object?> answerJson = {
   'mode': 'assisted',
-  'terms': ['takeover', 'bothy', 'migration'],
+  'terms': ['takeover', 'larkspur', 'migration'],
   'hits': [
     {
       'thread_id': threadId(1).value,
       'message_id': uuid(0x7a1),
       'channel_id': channelId(1).value,
-      'thread_title': 'Takeover of Bothy',
-      'channel_name': 'bothy',
+      'thread_title': 'Takeover of Larkspur',
+      'channel_name': 'larkspur',
       'space_name': 'Projects',
       'at': '2026-11-02T10:00:00.000Z',
       'source': 'assistant',
@@ -93,7 +93,7 @@ void main() {
         terms: const ['takeover'],
         threadIds: [threadId(1)],
       ),
-      const AssistTurn(q: 'bothy'),
+      const AssistTurn(q: 'larkspur'),
     ]);
     expect(adapter.request!.method, 'POST');
     expect(adapter.request!.uri.path, '/search/assist');
@@ -105,7 +105,7 @@ void main() {
           'terms': ['takeover'],
           'thread_ids': [threadId(1).value],
         },
-        {'q': 'bothy'},
+        {'q': 'larkspur'},
       ],
     });
     expect(answer.hits, hasLength(2));
@@ -118,13 +118,13 @@ void main() {
     )!;
     final a = assistAnswerFromRest(result);
     expect(a.fallback, isNull);
-    expect(a.terms, ['takeover', 'bothy', 'migration']);
+    expect(a.terms, ['takeover', 'larkspur', 'migration']);
     expect(a.costMicros, 1200);
     expect(a.currency, 'USD');
     final [pick, full] = a.hits;
     expect(pick.picked, isTrue);
     expect(pick.reason, 'The move.');
-    expect(pick.threadTitle, 'Takeover of Bothy');
+    expect(pick.threadTitle, 'Takeover of Larkspur');
     expect(pick.spaceName, 'Projects');
     expect(assistTargetOf(pick), '/t/${threadId(1).value}?m=${uuid(0x7a1)}');
     expect(full.picked, isFalse);

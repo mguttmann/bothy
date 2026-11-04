@@ -91,7 +91,7 @@ func TestSearchAssistThroughTheGateway(t *testing.T) {
 	w.must(w.owner, http.MethodPost, "/api/v1/grants", map[string]any{
 		"subject_kind": "agent", "subject_id": assistant.String(), "target_kind": "channel", "target_id": w.allgemein.id, "level": "read",
 		"reason": "search assistant"})
-	msg, _ := w.say(w.sam, w.allgemein.thread, "The steering session moved from Discord to Bothy today")
+	msg, _ := w.say(w.sam, w.allgemein.thread, "The steering session moved from Discord to Larkspur today")
 	c := w.connectAs(t, finder, "default")
 
 	ask := func(p gwPerson, q string) <-chan acReply {
@@ -99,7 +99,7 @@ func TestSearchAssistThroughTheGateway(t *testing.T) {
 		go func() { out <- w.rawRequest(&p, nil, "/api/v1/search/assist", map[string]any{"q": q}) }()
 		return out
 	}
-	reply := ask(w.sam, "Where did the steering session move to Bothy?")
+	reply := ask(w.sam, "Where did the steering session move to Larkspur?")
 	f, ok := nextAssist(t, c)
 	if !ok {
 		t.Fatal("the assistant got no search.assist_requested")
@@ -144,7 +144,7 @@ func TestSearchAssistThroughTheGateway(t *testing.T) {
 		t.Fatalf("assistSearch = %s", got.body)
 	}
 
-	reply = ask(w.robin, "Where did the steering session move to Bothy?")
+	reply = ask(w.robin, "Where did the steering session move to Larkspur?")
 	f, ok = nextAssist(t, c)
 	if !ok {
 		t.Fatal("no request for Robin's question")
