@@ -7,6 +7,11 @@ import (
 	"net/http"
 )
 
+// RemoveCommandResponseDefaultHeaders the declared response headers of an HTTP default response for RemoveCommand
+type RemoveCommandResponseDefaultHeaders struct {
+	CorrelationId *CorrelationId
+}
+
 type RemoveCommandResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -26085,9 +26090,4 @@ func (r CreateStatusComponentResponse) GetApplicationproblemJSON422() *Unprocess
 // GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
 func (r CreateStatusComponentResponse) GetApplicationproblemJSON429() *TooManyRequests {
 	return r.ApplicationproblemJSON429
-}
-
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r CreateStatusComponentResponse) GetApplicationproblemJSONDefault() *Error {
-	return r.ApplicationproblemJSONDefault
 }

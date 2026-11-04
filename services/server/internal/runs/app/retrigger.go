@@ -4,8 +4,10 @@ package app
 
 import (
 	"context"
+	"slices"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
+	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/messaging"
@@ -58,10 +60,46 @@ func (s *Service) retriggerTx(ctx context.Context, a actor.Actor, messageID ids.
 	if err := s.repinOperator(ctx, m.ThreadID); err != nil {
 		return err
 	}
+	if err := s.retriggerRight(ctx, a, m); err != nil {
+		return err
+	}
 	return s.acceptTrigger(ctx, messaging.MessagePosted{
 		MessageID: m.ID, ThreadID: m.ThreadID, ChannelID: m.ChannelID, ThreadSeq: m.ThreadSeq, AuthorID: m.Author.ID,
 		AuthorKind: m.Author.Kind, Origin: m.Origin, Kind: m.Kind, MentionedIDs: m.MentionedIDs, HasAttachments: m.HasAttachments,
 	})
+}
+
+// retriggerRight decides agent.invoke in filter mode for the caller on the message's thread
+// with the operator that would take it (the thread's, else the channel's): the rights of
+// triggering. A caller without trigger there (level_insufficient, no_grant) is refused with 403
+// agent_invocation_denied; every other refusal is left to the acceptance, which writes it on the
+// message. The check is also the route's proof of agent.invoke when the acceptance decides
+// without one (no trigger, or a rejection before agent.invoke).
+func (s *Service) retriggerRight(ctx context.Context, a actor.Actor, m messaging.TriggerMessage) error {
+	info, err := s.d.Threads.Info(ctx, m.ThreadID)
+	if err != nil {
+		return err
+	}
+	op := info.OperatorAgentID
+	if op.IsZero() {
+		ch, err := s.d.Channels.TriggerChannel(ctx, info.ChannelID)
+		if err != nil {
+			return err
+		}
+		op = ch.EffectiveOperatorID
+	}
+	res := authorize.Resource{
+		Kind: authorize.ResourceThread, ID: info.ID, ChannelID: info.ChannelID, SpaceID: info.SpaceID, OwnerID: info.CreatedBy,
+		Invoke: &authorize.InvokeFacts{AgentID: op, TriggerOrigin: originHuman, MentionsAgent: slices.Contains(m.MentionedIDs, op)},
+	}
+	v, err := s.d.Authorizer.Authorize(authorize.Filter(ctx), a, authorize.ActionAgentInvoke, res)
+	if err != nil {
+		return err
+	}
+	if !v.Allowed() && (v.Reason == denyLevelInsufficient || v.Reason == denyNoGrant) {
+		return invocationDenied(string(v.Reason))
+	}
+	return nil
 }
 
 // repinOperator gives the thread the channel's effective operator when its fixed operator is

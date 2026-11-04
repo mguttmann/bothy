@@ -117,6 +117,39 @@ func TestRetrigger(t *testing.T) {
 			t.Fatalf("a refused retrigger wrote: %v", w.j.whats())
 		}
 	})
+	t.Run("a caller without trigger is refused before anything is written", func(t *testing.T) {
+		t.Parallel()
+		w := newWorld(t)
+		msg := w.failedMessage("project_not_ready")
+		w.authz.decide = func(act authorize.Action, filter bool, _ authorize.Resource) decision {
+			if act == authorize.ActionAgentInvoke && filter {
+				return decision{reason: "level_insufficient"}
+			}
+			return decision{allowed: true}
+		}
+		wantCode(t, w.retriggerAs(w.alex, msg), errs.CodeAgentInvocationDenied, "level_insufficient")
+		if len(w.repo.runs) != 0 || len(w.triggers()) != 0 {
+			t.Fatalf("a refused retrigger wrote: %v", w.j.whats())
+		}
+	})
+	t.Run("the rights of triggering are checked with the thread's operator", func(t *testing.T) {
+		t.Parallel()
+		w := newWorld(t)
+		msg := w.failedMessage("project_not_ready")
+		if err := w.retriggerAs(w.alex, msg); err != nil {
+			t.Fatal(err)
+		}
+		var res authorize.Resource
+		for _, c := range w.j.list() {
+			if c.what == "authz:agent.invoke:filter" {
+				res = c.arg.(authorize.Resource)
+				break
+			}
+		}
+		if res.Kind != authorize.ResourceThread || res.ID != w.thread || res.Invoke == nil || res.Invoke.AgentID != w.lotse {
+			t.Fatalf("the filter check %+v", res)
+		}
+	})
 	t.Run("another state, another reason or a deleted message cannot be triggered again", func(t *testing.T) {
 		t.Parallel()
 		w := newWorld(t)

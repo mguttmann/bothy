@@ -301,7 +301,10 @@ agent again without writing it again: `retriggerMessage`
    takes the channel's effective operator (`threads.operator_agent_id`, new version,
    `thread.updated`). This is the one exception to R-DM-12: the old operator has no session in the
    thread to keep, and step 4a of 3.4 would refuse every message for it.
-3. Then 3.4 runs again for the stored message as for a new one, with the caller as the trigger:
+3. A caller without `trigger` on the thread (`agent.invoke` in filter mode with the thread's
+   operator, else the channel's, refuses with `level_insufficient` or `no_grant`) gets
+   `403 agent_invocation_denied` with that reason; every other refusal is left to the next step.
+   Then 3.4 runs again for the stored message as for a new one, with the caller as the trigger:
    `agent.invoke` in request mode (a denial is audited), and `trigger_state` follows it
    (`received` with a queued run, or `failed` with the reason of now). The answer is the message
    after the decision.

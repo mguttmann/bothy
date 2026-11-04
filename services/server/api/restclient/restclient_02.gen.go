@@ -2749,7 +2749,7 @@ type ClientInterface interface {
 
 	// RetriggerMessage Trigger a failed message again
 	//
-	// Runs the trigger decision (09 3.4) again for an own message whose `trigger_state` is `failed` with `trigger_state_reason` `project_not_ready`, `operator_cannot_serve_project` or `operator_not_in_channel`, after the cause was fixed (a runner set as operator, a folder created), so the person does not have to write the message again (09 3.7, addendum of 2026-11-04). Only the author may do this (`403 forbidden` with `reason` `not_self` otherwise); a message that is not readable is `404`; another state or reason, or a deleted message, is `409 invalid_state_transition`. When the message's thread is a thread whose fixed operator is not the channel's effective operator and never completed a run in it, the thread takes the channel's effective operator first (an exception to R-DM-12, recorded as `thread.updated`). Then the acceptance runs as for a new message: `agent.invoke` in request mode for the caller (authz audits a denial), and the message's `trigger_state` and `trigger_state_reason` follow it (`received` and a queued run, or `failed` with the reason of now). The answer is the message after the decision. Repeating the request after a successful retrigger answers `409 invalid_state_transition`, because the message is no longer `failed`.
+	// Runs the trigger decision (09 3.4) again for an own message whose `trigger_state` is `failed` with `trigger_state_reason` `project_not_ready`, `operator_cannot_serve_project` or `operator_not_in_channel`, after the cause was fixed (a runner set as operator, a folder created), so the person does not have to write the message again (09 3.7, addendum of 2026-11-04). Only the author may do this (`403 forbidden` with `reason` `not_self` otherwise); a message that is not readable is `404`; another state or reason, or a deleted message, is `409 invalid_state_transition`. When the message's thread is a thread whose fixed operator is not the channel's effective operator and never completed a run in it, the thread takes the channel's effective operator first (an exception to R-DM-12, recorded as `thread.updated`). A caller without `trigger` on the thread (`agent.invoke` in filter mode with the thread's operator refuses with `level_insufficient` or `no_grant`) gets `403 agent_invocation_denied`. Then the acceptance runs as for a new message: `agent.invoke` in request mode for the caller (authz audits a denial), and the message's `trigger_state` and `trigger_state_reason` follow it (`received` and a queued run, or `failed` with the reason of now). The answer is the message after the decision. Repeating the request after a successful retrigger answers `409 invalid_state_transition`, because the message is no longer `failed`.
 	//
 	// Corresponds with POST /messages/{message_id}/retrigger (the `RetriggerMessage` operationId).
 	RetriggerMessage(ctx context.Context, messageId MessageIdPath, params *RetriggerMessageParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -9996,7 +9996,7 @@ func (c *Client) AddReaction(ctx context.Context, messageId MessageIdPath, emoji
 
 // RetriggerMessage Trigger a failed message again
 //
-// Runs the trigger decision (09 3.4) again for an own message whose `trigger_state` is `failed` with `trigger_state_reason` `project_not_ready`, `operator_cannot_serve_project` or `operator_not_in_channel`, after the cause was fixed (a runner set as operator, a folder created), so the person does not have to write the message again (09 3.7, addendum of 2026-11-04). Only the author may do this (`403 forbidden` with `reason` `not_self` otherwise); a message that is not readable is `404`; another state or reason, or a deleted message, is `409 invalid_state_transition`. When the message's thread is a thread whose fixed operator is not the channel's effective operator and never completed a run in it, the thread takes the channel's effective operator first (an exception to R-DM-12, recorded as `thread.updated`). Then the acceptance runs as for a new message: `agent.invoke` in request mode for the caller (authz audits a denial), and the message's `trigger_state` and `trigger_state_reason` follow it (`received` and a queued run, or `failed` with the reason of now). The answer is the message after the decision. Repeating the request after a successful retrigger answers `409 invalid_state_transition`, because the message is no longer `failed`.
+// Runs the trigger decision (09 3.4) again for an own message whose `trigger_state` is `failed` with `trigger_state_reason` `project_not_ready`, `operator_cannot_serve_project` or `operator_not_in_channel`, after the cause was fixed (a runner set as operator, a folder created), so the person does not have to write the message again (09 3.7, addendum of 2026-11-04). Only the author may do this (`403 forbidden` with `reason` `not_self` otherwise); a message that is not readable is `404`; another state or reason, or a deleted message, is `409 invalid_state_transition`. When the message's thread is a thread whose fixed operator is not the channel's effective operator and never completed a run in it, the thread takes the channel's effective operator first (an exception to R-DM-12, recorded as `thread.updated`). A caller without `trigger` on the thread (`agent.invoke` in filter mode with the thread's operator refuses with `level_insufficient` or `no_grant`) gets `403 agent_invocation_denied`. Then the acceptance runs as for a new message: `agent.invoke` in request mode for the caller (authz audits a denial), and the message's `trigger_state` and `trigger_state_reason` follow it (`received` and a queued run, or `failed` with the reason of now). The answer is the message after the decision. Repeating the request after a successful retrigger answers `409 invalid_state_transition`, because the message is no longer `failed`.
 //
 // Corresponds with POST /messages/{message_id}/retrigger (the `RetriggerMessage` operationId).
 func (c *Client) RetriggerMessage(ctx context.Context, messageId MessageIdPath, params *RetriggerMessageParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -23908,48 +23908,4 @@ func NewAddOwnerRequest(server string, params *AddOwnerParams, body AddOwnerJSON
 	}
 	bodyReader = bytes.NewReader(buf)
 	return NewAddOwnerRequestWithBody(server, params, "application/json", bodyReader)
-}
-
-// NewAddOwnerRequestWithBody constructs an http.Request for the AddOwner method, with any body, and a specified content type
-func NewAddOwnerRequestWithBody(server string, params *AddOwnerParams, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/owners")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
-	}
-
-	return req, nil
 }

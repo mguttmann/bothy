@@ -35,6 +35,7 @@ const (
 // The deny reasons of 07 4.1 the acceptance handles itself (the values of kernel/auditing.Reason).
 const (
 	denyLevelInsufficient = "level_insufficient"
+	denyNoGrant           = "no_grant"
 )
 
 // knownDenials are the deny reasons of agent.invoke that 09 3.5 and 05 section 5 name; any other

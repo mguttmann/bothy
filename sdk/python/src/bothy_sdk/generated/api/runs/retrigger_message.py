@@ -101,7 +101,9 @@ def sync_detailed(
     readable is `404`; another state or reason, or a deleted message, is `409 invalid_state_transition`.
     When the message's thread is a thread whose fixed operator is not the channel's effective operator
     and never completed a run in it, the thread takes the channel's effective operator first (an
-    exception to R-DM-12, recorded as `thread.updated`). Then the acceptance runs as for a new message:
+    exception to R-DM-12, recorded as `thread.updated`). A caller without `trigger` on the thread
+    (`agent.invoke` in filter mode with the thread's operator refuses with `level_insufficient` or
+    `no_grant`) gets `403 agent_invocation_denied`. Then the acceptance runs as for a new message:
     `agent.invoke` in request mode for the caller (authz audits a denial), and the message's
     `trigger_state` and `trigger_state_reason` follow it (`received` and a queued run, or `failed` with
     the reason of now). The answer is the message after the decision. Repeating the request after a
@@ -148,7 +150,9 @@ def sync(
     readable is `404`; another state or reason, or a deleted message, is `409 invalid_state_transition`.
     When the message's thread is a thread whose fixed operator is not the channel's effective operator
     and never completed a run in it, the thread takes the channel's effective operator first (an
-    exception to R-DM-12, recorded as `thread.updated`). Then the acceptance runs as for a new message:
+    exception to R-DM-12, recorded as `thread.updated`). A caller without `trigger` on the thread
+    (`agent.invoke` in filter mode with the thread's operator refuses with `level_insufficient` or
+    `no_grant`) gets `403 agent_invocation_denied`. Then the acceptance runs as for a new message:
     `agent.invoke` in request mode for the caller (authz audits a denial), and the message's
     `trigger_state` and `trigger_state_reason` follow it (`received` and a queued run, or `failed` with
     the reason of now). The answer is the message after the decision. Repeating the request after a
@@ -190,7 +194,9 @@ async def asyncio_detailed(
     readable is `404`; another state or reason, or a deleted message, is `409 invalid_state_transition`.
     When the message's thread is a thread whose fixed operator is not the channel's effective operator
     and never completed a run in it, the thread takes the channel's effective operator first (an
-    exception to R-DM-12, recorded as `thread.updated`). Then the acceptance runs as for a new message:
+    exception to R-DM-12, recorded as `thread.updated`). A caller without `trigger` on the thread
+    (`agent.invoke` in filter mode with the thread's operator refuses with `level_insufficient` or
+    `no_grant`) gets `403 agent_invocation_denied`. Then the acceptance runs as for a new message:
     `agent.invoke` in request mode for the caller (authz audits a denial), and the message's
     `trigger_state` and `trigger_state_reason` follow it (`received` and a queued run, or `failed` with
     the reason of now). The answer is the message after the decision. Repeating the request after a
@@ -235,7 +241,9 @@ async def asyncio(
     readable is `404`; another state or reason, or a deleted message, is `409 invalid_state_transition`.
     When the message's thread is a thread whose fixed operator is not the channel's effective operator
     and never completed a run in it, the thread takes the channel's effective operator first (an
-    exception to R-DM-12, recorded as `thread.updated`). Then the acceptance runs as for a new message:
+    exception to R-DM-12, recorded as `thread.updated`). A caller without `trigger` on the thread
+    (`agent.invoke` in filter mode with the thread's operator refuses with `level_insufficient` or
+    `no_grant`) gets `403 agent_invocation_denied`. Then the acceptance runs as for a new message:
     `agent.invoke` in request mode for the caller (authz audits a denial), and the message's
     `trigger_state` and `trigger_state_reason` follow it (`received` and a queued run, or `failed` with
     the reason of now). The answer is the message after the decision. Repeating the request after a
