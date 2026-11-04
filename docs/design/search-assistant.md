@@ -123,7 +123,7 @@ appends the remaining candidates of both passes as full-text hits, up to `search
 | Result | Thread, message to jump to, channel or project forum, space, date, reason, source | A project forum is the project; a development session is a thread of it |
 | Runs | A run is found through its thread (the agent's replies are messages); the run detail view of F-LAUFHISTORIE is linked once it is on main | The run history view is not on main yet; the thread already shows its runs |
 | Cost | The estimate of the answer's `costs` is shown, for information; it is not booked in `cost_entries` | `cost_entries` belongs to a run (03, `run_id`, `thread_id`, `channel_id` are required); a question has no run. The model call runs on the assistant's account like its runs |
-| Failures | `fulltext` with `fallback_reason`: `assistant_not_configured`, `assistant_unavailable`, `assistant_timeout`; no hit at all answers an empty list; a statement timeout is `503 search_timeout` as for `search` | The person always gets the best the server has |
+| Failures | `fulltext` with `fallback_reason`: `assistant_not_configured`, `assistant_unavailable`, `assistant_timeout`; no hit at all answers an empty list; a statement timeout is `503 unavailable` with reason `search_timeout` as for `search` | The person always gets the best the server has |
 | Web console | Not offered | The console is the administration and statistics surface (ADR 0028); sessions open in the apps |
 
 ## 4. Client
