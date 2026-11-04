@@ -10,6 +10,8 @@ import 'package:dio/dio.dart';
 
 import 'package:api_client/src/generated/api_util.dart';
 import 'package:api_client/src/generated/model/problem.dart';
+import 'package:api_client/src/generated/model/search_assist_query.dart';
+import 'package:api_client/src/generated/model/search_assist_result.dart';
 import 'package:api_client/src/generated/model/search_hit_page.dart';
 import 'package:api_client/src/generated/model/thread_state.dart';
 import 'package:api_client/src/generated/model/thread_title_hit_list.dart';
@@ -21,6 +23,108 @@ class SearchApi {
   final Serializers _serializers;
 
   const SearchApi(this._dio, this._serializers);
+
+  /// Ask the search assistant
+  /// Smart search (14, 4.10): the server turns &#x60;q&#x60; and the terms of &#x60;history&#x60; into search terms, runs the thread title and message search with the access filter of &#x60;/search&#x60;, fuses the hits per thread and, when &#x60;search.assist.agent_id&#x60; names an assistant agent with a live gateway connection, sends the candidates the agent may read too as &#x60;search.assist_requested&#x60; and waits up to &#x60;search.assist.timeout&#x60; for its picks. The answer holds at most &#x60;search.assist.max_hits&#x60; hits: the assistant&#39;s picks with a reason first, then full-text hits. Without an assistant answer &#x60;mode&#x60; is &#x60;fulltext&#x60; and &#x60;fallback_reason&#x60; says why. Nothing is stored; only persons may ask (agents and apps get &#x60;403&#x60;). &#x60;q&#x60; longer than &#x60;search.query_max_chars&#x60; or without a term is &#x60;400 validation_failed&#x60;; more than &#x60;search.assist.max_turns&#x60; turns in &#x60;history&#x60; is &#x60;too_many_items&#x60;. A statement timeout is &#x60;503 unavailable&#x60; with reason &#x60;search_timeout&#x60;.
+  ///
+  /// Parameters:
+  /// * [searchAssistQuery]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [SearchAssistResult] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<SearchAssistResult>> assistSearch({
+    required SearchAssistQuery searchAssistQuery,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/search/assist';
+    final _options = Options(
+      method: r'POST',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'apiKey',
+            'name': 'consoleSession',
+            'keyName': '__Host-console_session',
+            'where': '',
+          },
+          {'type': 'http', 'scheme': 'DPoP', 'name': 'dpopAuth'},
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearerAuth'},
+        ],
+        ...?extra,
+      },
+      contentType: 'application/json',
+      validateStatus: validateStatus,
+    );
+
+    dynamic _bodyData;
+
+    try {
+      const _type = FullType(SearchAssistQuery);
+      _bodyData = _serializers.serialize(
+        searchAssistQuery,
+        specifiedType: _type,
+      );
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _options.compose(_dio.options, _path),
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    final _response = await _dio.request<Object>(
+      _path,
+      data: _bodyData,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    SearchAssistResult? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(
+              rawResponse,
+              specifiedType: const FullType(SearchAssistResult),
+            ) as SearchAssistResult;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<SearchAssistResult>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
 
   /// Full-text search
   /// Results are filtered by &#x60;message.read&#x60;, &#x60;thread.read&#x60; and &#x60;file.read&#x60; inside the query; counts are not returned. Page size &#x60;search.page_size_default&#x60;, at most &#x60;search.page_size_max&#x60; (14, 4.7).

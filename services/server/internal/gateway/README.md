@@ -408,6 +408,15 @@ docs/spec/25-visualization.md 5, docs/decisions.d/M6-15.md.
 - `Hub.LiveConnections` counts the registered connections by kind for the member `connections`
   of the frame (`cluster.mode = single` only).
 
+## Search assistant relay (F-INTELLIGENTE-SUCHE)
+
+`adapters/assistrelay` implements the source port `search.AssistRelay` on the hub
+(`Hub.AskAssistant`, `app/assist.go`) with the correlation of the request, by the rules of the
+autocomplete relay below: one live connection of the assistant agent (consumer `default`, else the
+newest attached), admitted with `agent.events.consume` in delivery mode, queued without blocking.
+The frame `search.assist_requested` carries no `invocation_token`; the hub refuses any other type
+or a token as a programming fault. The answer comes over REST (`answerSearchAssist`), not as an op.
+
 ## Autocomplete relay (M2-17)
 
 `adapters/autocompleterelay` implements the source port `runs.AutocompleteRelay` on the hub
@@ -457,9 +466,9 @@ resumable for `sync.resume_window`; the sweeper runs every `sync.resume_window`.
 
 ## Dependencies
 
-May use the ports of these modules: `chat`, `agents`, `runs`, `sync`, `stats`.
+May use the ports of these modules: `chat`, `agents`, `runs`, `sync`, `stats`, `search`.
 
-Reason: thread to channel for focus and typing; consumer cursor and presence; run patches and delivery preparation; tail, catch-up, snapshot; live frame for `stats.subscribe`.
+Reason: thread to channel for focus and typing; consumer cursor and presence; run patches and delivery preparation; tail, catch-up, snapshot; live frame for `stats.subscribe`; the relay of `search.assist_requested`.
 
 M1-64 and M1-65 use `sync` (`Snapshot`, `CatchUp`), M1-66 `chat` (`Threads.Info` for the place
 of a focused or typed-in thread); the others serve agent presence and live statistics of later

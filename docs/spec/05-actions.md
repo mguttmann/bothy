@@ -233,7 +233,8 @@ machine-readable catalogue carries it per action ([ADR 0049](../adr/0049-machine
 - the actions whose ID ends in `.read` or `.list`, plus `cost.read.thread` and
   `cost.read.aggregate`, except `audit.read` (Audit `yes`);
 - `access.explain`, `search.query`, `events.catch_up`, `gateway.connect`, `gateway.focus`,
-  `typing.start`, `command.autocomplete`, `command.autocomplete.respond`, `client_metrics.submit`, `console.csp_report`,
+  `typing.start`, `command.autocomplete`, `command.autocomplete.respond`, `search.assist`,
+  `search.assist.respond`, `client_metrics.submit`, `console.csp_report`,
   `push.deliver`, `webhook_out.deliver` and `terminal.read_own`.
 
 All others have `write`. Reason for the closed list: a new action without an entry is
@@ -457,6 +458,7 @@ make sure that clients clear their cache and runs end (R-AZ-15).
 | `file.transcribe` | start the transcription of a voice message by the server (flag `voice.enabled`) | file | write | no | no | no | no | `rl.upload` |
 | `file.transcript.submit` | save the transcript of a voice message (`transcript_source = 'agent'`), with `If-Match` | file | agent-self: operator of the thread whose message the file is attached to, and read | no | no | no | no | `rl.agent_runtime` |
 | `search.query` | full-text search; hits filtered by `message.read`, `thread.read`, `file.read` | instance | auth | no | no | no | no | `rl.search` |
+| `search.assist` | ask the search assistant ([14-search.md](14-search.md) 4.10); hits filtered like `search.query`, the candidates to the assistant agent additionally by its own `thread.read` and `message.read` | instance | human | no | no | no | no | `rl.trigger` |
 <!-- END GENERATED: actions.files -->
 
 ### 4.9 Personal data, notifications, sync
@@ -508,6 +510,7 @@ make sure that clients clear their cache and runs end (R-AZ-15).
 | `command.remove` | remove a command | command | agent-self or app-self with scope | no | no | yes | no | `rl.admin` |
 | `command.autocomplete` | fetch suggestions for an option from the owner of the command | channel | trigger and `agent.invoke` without a run (for app commands `required_level`) | no | no | no | no | `rl.trigger` |
 | `command.autocomplete.respond` | deliver suggestions for a request (gateway op or REST) | command | agent-self or app-self, owner of the command | no | no | no | no | `rl.agent_runtime` |
+| `search.assist.respond` | deliver the picks and terms for an open `search.assist_requested` (REST) | agent | agent-self, the assistant agent the request was sent to | no | no | no | no | `rl.agent_runtime` |
 | `command.invoke` | run a command. Agent commands check `required_level` and `agent.invoke`; model commands during an active run: denial `run_active`. App commands check `required_level` and scope, without `agent.invoke` and I2. The control command `stop` additionally checks `run.cancel` | channel, thread | `required_level` of the command and rules as described | no | no | denials | no | `rl.trigger` |
 | `run.read` | read a run, its steps and metrics | run | read | no | no | no | no | `rl.read` |
 | `run.overview.read` | read "Running now" and the run history, filtered by `run.read` | instance | auth | no | no | no | no | `rl.read` |
@@ -784,6 +787,7 @@ Ephemeral events:
 | `stats.live` | instance, space | `stats.read` | only to connections with a `stats.subscribe` subscription; content filtered to the visible channels, costs only with `cost.read.aggregate` ([25-visualization.md](25-visualization.md), section 5) |
 | `notification.created` | thread; for a hint without a thread the recipient (`user`) | self and `push.deliver`; for a hint without a thread: self and the recipient rule of R-AZ-30 | only to connections of the receiver, instead of a push to this device ([13-push-notifications.md](13-push-notifications.md), section 6.3) |
 | `command.autocomplete_requested` | command | self (owner of the command); agent additionally `agent.events.consume` | carries a token with `trigger_kind = autocomplete`; only to one gateway connection of the owner |
+| `search.assist_requested` | agent | self (the assistant agent of `search.assist.agent_id`); additionally `agent.events.consume` | carries no token and no ids of threads or messages; only to one gateway connection of the assistant |
 <!-- END GENERATED: events.ephemeral -->
 
 Outgoing webhooks and push use the same receive action (`webhook_out.deliver`,

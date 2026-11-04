@@ -72,7 +72,7 @@ var requirementGroups = []struct {
 		"channel.delete", "channel.read_only.set", "channel.reorder", "channel.restore", "channel.update", "forum_tag.manage", "pin.create",
 		"pin.delete", "space.update", "webhook_in.create", "webhook_in.read", "webhook_in.revoke",
 	}},
-	{"human", Human, []string{"client_metrics.submit", "dm.create"}},
+	{"human", Human, []string{"client_metrics.submit", "dm.create", "search.assist"}},
 	// command.autocomplete (M2-17 design note 3): an agent owner needs trigger and the agent.invoke
 	// guard without a run, an app owner the required_level of the command.
 	{"trigger and `agent.invoke` without a run (for app commands `required_level`)", AutocompleteLevel, []string{
@@ -81,6 +81,9 @@ var requirementGroups = []struct {
 	{"agent-self or app-self, owner of the command", Any(AgentSelf, AppSelf), []string{
 		"command.autocomplete.respond",
 	}},
+	// search.assist.respond (14 4.10): the resource is the agent the request was sent
+	// to, so only that agent itself passes.
+	{"agent-self, the assistant agent the request was sent to", AgentSelf, []string{"search.assist.respond"}},
 	// command.invoke (M2-16): the level of the command, then the guard (app owner internal, model
 	// command during an active run run_active); agent commands add agent.invoke in runs.
 	{"`required_level` of the command and rules as described", CommandLevel, []string{"command.invoke"}},

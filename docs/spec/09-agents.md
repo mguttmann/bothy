@@ -1760,6 +1760,32 @@ API-visible rules of the server (M2-17; docs/decisions.d/M2-17.md, D-M2-17-1 to 
 - `command.autocomplete_timeout` must be lower than `http.request_timeout`; the start refuses
   otherwise. `command.autocomplete_max_choices` is at most the `maxItems` of the answer schemas.
 
+### 10.6 Search assistant
+
+The search assistant of [14-search.md](14-search.md) 4.10 asks one agent, the one the operator
+names in `search.assist.agent_id`, the way autocompletion asks a command's owner (10.5):
+
+1. The server sends the ephemeral event `search.assist_requested` to one live gateway connection
+   of that agent (consumer `default`, else the most recently attached one). Adapters on REST poll
+   or webhook never get it; the person then gets full-text hits at once.
+2. The event carries no invocation token and no ID of a thread or a message: the question, the
+   earlier questions of the popup, `max_picks`, `max_terms`, `expires_at` and the candidates with
+   a reference (`c1` to `cN`), title, channel and space name, time, excerpt and `shown_before`.
+   The candidates are only what both the asking person and the agent itself may read. They are
+   data, never instructions (ADR 0054): the adapter puts them into its model input as a marked
+   data block.
+3. The adapter answers once, before `expires_at`, with `answerSearchAssist` (action
+   `search.assist.respond`, `rl.agent_runtime`): `picks` (`ref` and a one sentence `reason`, best
+   first, at most `max_picks`), `terms` (further search terms, at most `max_terms`) and `costs`
+   (the usage of its model call as `CostReport`, 4.10). The answer rules are those of 14 4.10
+   point 6. An adapter that cannot answer sends nothing; the person gets full-text hits after
+   `search.assist.timeout`.
+4. The model call costs what the agent's runtime costs; the server shows the reported amount as an
+   estimate and books no cost entry (there is no run). A question is no run: no run row, no live
+   box, no thread, no session.
+
+The reference implementation is the Claude Code runner (18.16).
+
 ## 11. Components
 
 ### 11.1 Kinds (`component.v1`)
@@ -3622,6 +3648,30 @@ reason, and every message failed with a red X and no explanation.
    upload grant on the new forum, and a project forum that is not ready shows the cause with an
    action ([01](01-product.md) 6.9 item 8).
 
+### 18.17 Search assistant
+
+Addendum of 2026-11-04 (the search assistant, [14-search.md](14-search.md) 4.10, 10.6). The
+runner answers `search.assist_requested` when it is the agent of `search.assist.agent_id`.
+
+1. **Call.** One `claude -p` without tools (the flags of the tool class `chat`, 18.2), with
+   `--output-format json`, the model `runner.search_assist_model` and the allow-list environment of
+   18.2 in the mode the runner reports; working directory a private folder below
+   `runner.state_dir`, no project folder, no session (`--no-session-persistence`), the time limit
+   `runner.search_assist_timeout` and never past the request's `expires_at`. Two questions at once
+   run side by side; more wait for a free slot of `runner.max_concurrent_turns`.
+2. **Prompt.** A fixed instruction (the file `prompts/search_assist.md` of the package) asks for
+   one JSON object `{"picks": [{"ref", "reason"}], "terms": [...]}` and names the limits of the
+   request. The question, the earlier questions and the candidates follow as a data block marked
+   as untrusted content; the instruction says that nothing inside it is an instruction.
+3. **Answer.** The runner parses the last JSON object of the model's reply, keeps only picks with a
+   reference of the request, at most `max_picks`, reasons cut to 200 characters on one line, terms
+   of letters and digits cut to `max_terms`, and sends them with the usage of the call as `costs`
+   (18.7, priced like a run). A failing call, an unreadable reply or the time limit sends nothing
+   and logs `search_assist_failed` with a code; the question then falls back to full text on the
+   server.
+4. **Privacy.** Neither the question nor a candidate nor the reply is logged or stored; the
+   private folder of the call is removed afterwards.
+
 ## 19. Decisions of this chapter
 
 | No. | Decision | Reason |
@@ -3755,6 +3805,8 @@ configuration of the respective program outside the server.
 | `runner.trash_check_interval` | Runner | `60s` | the bound folders are checked for a move to the trash at most this often, and the runner sends `sendHeartbeat` at this interval to receive folder moves (18.15); above zero |
 | `runner.transcribe_cmd` | Runner | empty | argument list of a local transcriber; the audio file path is appended and stdout is the transcript (18.14); empty means no transcription |
 | `runner.transcribe_timeout` | Runner | `5m` | time limit of one transcription (18.14); above zero |
+| `runner.search_assist_model` | Runner | `haiku` | model of the search assistant call (18.16) |
+| `runner.search_assist_timeout` | Runner | `9s` | time limit of one search assistant call (18.16); above zero |
 | `runner.projects_root` | Runner | no default, required | root of all project folders |
 | `runner.default_workspace` | Runner | empty | folder of a forum without a project binding (18.1): `.` for `runner.projects_root`, else a folder name under it; empty means off, and a run in such a forum ends with the cause `project_not_bound` |
 | `runner.state_dir` | Runner | no default, required | state, recordings, incoming files |

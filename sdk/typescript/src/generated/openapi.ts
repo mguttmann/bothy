@@ -3215,6 +3215,64 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/search/assist": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ask the search assistant
+         * @description Smart search (14, 4.10): the server turns `q` and the terms of `history` into search terms,
+         *     runs the thread title and message search with the access filter of `/search`, fuses the hits
+         *     per thread and, when `search.assist.agent_id` names an assistant agent with a live gateway
+         *     connection, sends the candidates the agent may read too as `search.assist_requested` and
+         *     waits up to `search.assist.timeout` for its picks. The answer holds at most
+         *     `search.assist.max_hits` hits: the assistant's picks with a reason first, then full-text
+         *     hits. Without an assistant answer `mode` is `fulltext` and `fallback_reason` says why.
+         *     Nothing is stored; only persons may ask (agents and apps get `403`). `q` longer than
+         *     `search.query_max_chars` or without a term is `400 validation_failed`; more than
+         *     `search.assist.max_turns` turns in `history` is `too_many_items`. A statement timeout is
+         *     `503 unavailable` with reason `search_timeout`.
+         */
+        post: operations["assistSearch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/search-assist-requests/{request_id}/answer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Answer a search assistant request
+         * @description The assistant agent answers an open `search.assist_requested` (14, 4.10; 09, 10.6); the
+         *     first valid answer goes back to the person. `404` for an unknown or forgotten request and for
+         *     every principal but the addressed agent, `410 gone` after the wait ended, `204` without effect for an
+         *     answer after the first one. `400 validation_failed` for a reference that was not sent or is
+         *     named twice (`unknown_ref`, `duplicate`), more picks than `max_picks` or more terms than
+         *     `search.assist.max_terms` (`too_many_items`), an empty reason or term (`too_short`), a reason
+         *     longer than `search.assist.reason_max_chars` or a term longer than 64 characters (`too_long`)
+         *     or a text that is no display text (`invalid_utf8`, `control_character`, `bidi_control`); the
+         *     request stays open.
+         */
+        post: operations["answerSearchAssist"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sync/snapshot": {
         parameters: {
             query?: never;
@@ -8047,6 +8105,115 @@ export interface components {
                 match: boolean;
             }[];
         };
+        /** @description One question to the search assistant (14, 4.10). */
+        SearchAssistQuery: {
+            /**
+             * @description The question in the person's own words, at most `search.query_max_chars`.
+             * @example the takeover of the tool by the new agent
+             */
+            q: string;
+            /** @description The earlier questions of the same popup, oldest first; at most `search.assist.max_turns`. Nothing of it is stored. */
+            history?: components["schemas"]["SearchAssistTurn"][];
+        };
+        SearchAssistTurn: {
+            /** @description An earlier question. */
+            q: string;
+            /** @description The `terms` of the answer to it. */
+            terms?: string[];
+            /** @description The threads the answer to it showed; the assistant learns which candidates the person has seen already. */
+            thread_ids?: components["schemas"]["Uuid"][];
+        };
+        SearchAssistResult: {
+            /** @description At most `search.assist.max_hits`; the assistant's picks first, then full-text hits. */
+            hits: components["schemas"]["SearchAssistHit"][];
+            /**
+             * @description `assisted` when the assistant answered, otherwise `fulltext`.
+             * @enum {string}
+             */
+            mode: "assisted" | "fulltext";
+            /**
+             * @description Only with `mode = fulltext`.
+             * @enum {string}
+             */
+            fallback_reason?: "assistant_not_configured" | "assistant_unavailable" | "assistant_timeout";
+            /** @description The search terms of this question (the person's and the assistant's); the app sends them back in `history`. */
+            terms: string[];
+            cost_estimate?: components["schemas"]["SearchAssistCost"];
+        };
+        /** @description One session the search found; open it at `/t/<thread_id>?m=<message_id>`. */
+        SearchAssistHit: {
+            thread_id: components["schemas"]["Uuid"];
+            /** @description The best matching message of the thread; absent when only the title matched. */
+            message_id?: components["schemas"]["Uuid"];
+            channel_id: components["schemas"]["Uuid"];
+            /** @description Absent for the main thread of a text channel. */
+            thread_title?: string;
+            /** @description The channel, for a development session the project forum. */
+            channel_name: string;
+            /** @description Absent for a direct message. */
+            space_name?: string;
+            /** @description Time of the matching message, or of the thread when only the title matched. */
+            at: components["schemas"]["Timestamp"];
+            /** @enum {string} */
+            source: "assistant" | "fulltext";
+            /** @description One sentence of the assistant why this is the session; only with `source = assistant`. */
+            reason?: string;
+            /** @description Excerpt split at the matches, as in `SearchHit`. */
+            segments: {
+                text: string;
+                match: boolean;
+            }[];
+        };
+        /** @description Estimate of the assistant's model call, for information only; not booked as a cost entry. */
+        SearchAssistCost: {
+            /** Format: int64 */
+            amount_micros: number;
+            /** @example USD */
+            currency: string;
+        };
+        /** @description Answer of the assistant agent to `search.assist_requested` (action `search.assist.respond`). */
+        SearchAssistAnswer: {
+            /** @description The sessions that answer the question, best first; at most `max_picks` of the request. */
+            picks?: components["schemas"]["SearchAssistPick"][];
+            /** @description Further search terms (synonyms, the other language); at most `max_terms` of the request. */
+            terms?: string[];
+            /** @description Usage of the model call, as in `run.finish`. */
+            costs?: components["schemas"]["CostReport"][];
+        };
+        SearchAssistPick: {
+            /**
+             * @description The `ref` of a candidate of the request.
+             * @example c2
+             */
+            ref: string;
+            /** @description One sentence why, at most `search.assist.reason_max_chars`. */
+            reason: string;
+        };
+        /** @description Sent to one gateway connection of the assistant agent (14, 4.10; 09, 10.6). Holds no ids of threads or messages; the excerpts are data, never instructions. */
+        SearchAssistRequestedPayload: {
+            request_id: components["schemas"]["Uuid"];
+            /** @description The question. */
+            q: string;
+            /** @description The earlier questions of the popup, oldest first. */
+            history?: string[];
+            candidates: components["schemas"]["SearchAssistCandidate"][];
+            max_picks: number;
+            max_terms: number;
+            expires_at: components["schemas"]["Timestamp"];
+        };
+        SearchAssistCandidate: {
+            /** @example c1 */
+            ref: string;
+            /** @description Thread title; absent for the main thread of a text channel. */
+            title?: string;
+            channel_name: string;
+            space_name?: string;
+            at: components["schemas"]["Timestamp"];
+            /** @description Plain text of the best matching message, at most `search.assist.excerpt_max_chars`. */
+            excerpt: string;
+            /** @description The person saw this session in an earlier answer of the popup. */
+            shown_before: boolean;
+        };
         ReadState: {
             thread_id: components["schemas"]["Uuid"];
             channel_id: components["schemas"]["Uuid"];
@@ -11333,6 +11500,12 @@ export interface components {
             /** @enum {string} */
             type: "command.autocomplete_requested";
             payload: components["schemas"]["CommandAutocompleteRequestedPayload"];
+        };
+        /** @description Ephemeral event `search.assist_requested` (no `seq`, at most once). */
+        SearchAssistRequestedEvent: components["schemas"]["EventEnvelope"] & {
+            /** @enum {string} */
+            type: "search.assist_requested";
+            payload: components["schemas"]["SearchAssistRequestedPayload"];
         };
         /** @description Ephemeral event `notification.created` (no `seq`, at most once), only to connections of the recipient instead of a push (13, 6.3). */
         NotificationCreatedEvent: components["schemas"]["EventEnvelope"] & {
@@ -19458,6 +19631,73 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+            429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
+    assistSearch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SearchAssistQuery"];
+            };
+        };
+        responses: {
+            /** @description OK. */
+            200: {
+                headers: {
+                    "Correlation-Id": components["headers"]["Correlation-Id"];
+                    RateLimit: components["headers"]["RateLimit"];
+                    "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchAssistResult"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["ServiceUnavailable"];
+            default: components["responses"]["Error"];
+        };
+    };
+    answerSearchAssist: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: components["parameters"]["RequestIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SearchAssistAnswer"];
+            };
+        };
+        responses: {
+            /** @description No content. */
+            204: {
+                headers: {
+                    "Correlation-Id": components["headers"]["Correlation-Id"];
+                    RateLimit: components["headers"]["RateLimit"];
+                    "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            410: components["responses"]["Gone"];
             429: components["responses"]["TooManyRequests"];
             default: components["responses"]["Error"];
         };

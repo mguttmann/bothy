@@ -14,6 +14,7 @@ import (
 	auditdomain "github.com/OWNER/bothy/services/server/internal/audit/domain"
 	identityapp "github.com/OWNER/bothy/services/server/internal/identity/app"
 	identitydomain "github.com/OWNER/bothy/services/server/internal/identity/domain"
+	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/notify/adapters/fcm"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
@@ -76,6 +77,8 @@ var configChecks = []configCheck{
 	{name: "webhook_in_formats", keys: []string{keyWebhookInFormatsEnabled}, fn: webhookInFormats},
 	{name: "heartbeat_persist_below_orphan_timeout", keys: []string{keyHeartbeatPersistInterval, keyOrphanTimeout}, fn: heartbeatPersistBelowOrphanTimeout},
 	{name: "autocomplete_below_request_timeout", keys: []string{keyAutocompleteTimeout, keyHTTPRequestTimeout}, fn: autocompleteBelowRequestTimeout},
+	{name: "search_assist_below_request_timeout", keys: []string{keySearchAssistTimeout, keyHTTPRequestTimeout}, fn: searchAssistBelowRequestTimeout},
+	{name: "search_assist_agent_id", keys: []string{keySearchAssistAgentID}, fn: searchAssistAgentID},
 	{name: "push_apns_complete", keys: apnsCheckKeys, fn: pushAPNsComplete},
 	{name: "push_fcm_project_id", keys: []string{fcm.KeyProjectID}, fn: pushFCMProjectID},
 	{name: "stats_retention_covers_slo_period", keys: []string{keyRetentionStatsMinute}, fn: statsRetentionCoversSLOPeriod},
@@ -127,6 +130,27 @@ const keyHTTPRequestTimeout = "http.request_timeout"
 func autocompleteBelowRequestTimeout(v *config.Values) error {
 	if v.Duration(keyAutocompleteTimeout) >= v.Duration(keyHTTPRequestTimeout) {
 		return errors.New(keyAutocompleteTimeout + " must be lower than " + keyHTTPRequestTimeout)
+	}
+	return nil
+}
+
+// searchAssistBelowRequestTimeout requires search.assist.timeout below http.request_timeout
+// (14 4.10): the request context must outlive the wait, so a slow assistant still ends
+// in the full-text answer. The error names the keys, never a value.
+func searchAssistBelowRequestTimeout(v *config.Values) error {
+	if v.Duration(keySearchAssistTimeout) >= v.Duration(keyHTTPRequestTimeout) {
+		return errors.New(keySearchAssistTimeout + " must be lower than " + keyHTTPRequestTimeout)
+	}
+	return nil
+}
+
+// searchAssistAgentID requires search.assist.agent_id to be empty or a UUID. The error names the
+// key, never a value.
+func searchAssistAgentID(v *config.Values) error {
+	if s := v.String(keySearchAssistAgentID); s != "" {
+		if _, err := ids.Parse(s); err != nil {
+			return errors.New(keySearchAssistAgentID + " must be empty or the id of an agent")
+		}
 	}
 	return nil
 }

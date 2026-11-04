@@ -31,6 +31,7 @@ import 'package:api_client/src/generated/model/run_finish.dart';
 import 'package:api_client/src/generated/model/run_patch.dart';
 import 'package:api_client/src/generated/model/run_patch_result.dart';
 import 'package:api_client/src/generated/model/run_start.dart';
+import 'package:api_client/src/generated/model/search_assist_answer.dart';
 import 'package:api_client/src/generated/model/transcript.dart';
 import 'package:api_client/src/generated/model/transcript_submit.dart';
 
@@ -212,6 +213,90 @@ class AgentRuntimeApi {
       const _type = FullType(AutocompleteAnswer);
       _bodyData = _serializers.serialize(
         autocompleteAnswer,
+        specifiedType: _type,
+      );
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _options.compose(_dio.options, _path),
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    final _response = await _dio.request<Object>(
+      _path,
+      data: _bodyData,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    return _response;
+  }
+
+  /// Answer a search assistant request
+  /// The assistant agent answers an open &#x60;search.assist_requested&#x60; (14, 4.10; 09, 10.6); the first valid answer goes back to the person. &#x60;404&#x60; for an unknown or forgotten request and for every principal but the addressed agent, &#x60;410 gone&#x60; after the wait ended, &#x60;204&#x60; without effect for an answer after the first one. &#x60;400 validation_failed&#x60; for a reference that was not sent or is named twice (&#x60;unknown_ref&#x60;, &#x60;duplicate&#x60;), more picks than &#x60;max_picks&#x60; or more terms than &#x60;search.assist.max_terms&#x60; (&#x60;too_many_items&#x60;), an empty reason or term (&#x60;too_short&#x60;), a reason longer than &#x60;search.assist.reason_max_chars&#x60; or a term longer than 64 characters (&#x60;too_long&#x60;) or a text that is no display text (&#x60;invalid_utf8&#x60;, &#x60;control_character&#x60;, &#x60;bidi_control&#x60;); the request stays open.
+  ///
+  /// Parameters:
+  /// * [requestId]
+  /// * [searchAssistAnswer]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future]
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<void>> answerSearchAssist({
+    required String requestId,
+    required SearchAssistAnswer searchAssistAnswer,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/search-assist-requests/{request_id}/answer'.replaceAll(
+      '{'
+      r'request_id'
+      '}',
+      encodeQueryParameter(
+        _serializers,
+        requestId,
+        const FullType(String),
+      ).toString(),
+    );
+    final _options = Options(
+      method: r'POST',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'apiKey',
+            'name': 'consoleSession',
+            'keyName': '__Host-console_session',
+            'where': '',
+          },
+          {'type': 'http', 'scheme': 'DPoP', 'name': 'dpopAuth'},
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearerAuth'},
+        ],
+        ...?extra,
+      },
+      contentType: 'application/json',
+      validateStatus: validateStatus,
+    );
+
+    dynamic _bodyData;
+
+    try {
+      const _type = FullType(SearchAssistAnswer);
+      _bodyData = _serializers.serialize(
+        searchAssistAnswer,
         specifiedType: _type,
       );
     } catch (error, stackTrace) {

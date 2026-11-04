@@ -75,6 +75,8 @@ type ResultHit struct {
 	// ChannelName and SpaceName name the channel and its space; "" for a channel without a
 	// visible space (a DM channel).
 	ChannelName, SpaceName string
+	// CreatedAt is created_at of the message, thread or file.
+	CreatedAt time.Time
 }
 
 // Result is one page of hits. There is no total and no count per channel (14 4.3 item 4).

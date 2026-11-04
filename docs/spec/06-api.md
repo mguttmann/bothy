@@ -413,9 +413,11 @@ all texts of the YAML files (R-API-15); every response component names its statu
 | `attachTerminalSession` | POST | `/api/v1/terminal/sessions/{session_id}/attach` | login or session flow: one-time challenge or code, refresh rotation, replacement of the child session |
 | `previewGrant` | POST | `/api/v1/grants/preview` | reads only, changes no durable state |
 | `createFileTicket` | POST | `/api/v1/files/{file_id}/tickets` | reads only, changes no durable state |
+| `assistSearch` | POST | `/api/v1/search/assist` | reads only, changes no durable state |
 | `autocompleteCommand` | POST | `/api/v1/channels/{channel_id}/commands/{command_id}/autocomplete` | reads only, changes no durable state |
 | `validateManifest` | POST | `/api/v1/app-manifests/validate` | reads only, changes no durable state |
 | `verifyAuditChain` | POST | `/api/v1/audit/verify` | reads only, changes no durable state |
+| `answerSearchAssist` | POST | `/api/v1/search-assist-requests/{request_id}/answer` | agent runtime: monotonic or compare-and-swap |
 | `sendHeartbeat` | POST | `/api/v1/agents/me/heartbeat` | agent runtime: monotonic or compare-and-swap |
 | `ackAgentEvents` | POST | `/api/v1/agents/me/consumers/{consumer}/ack` | agent runtime: monotonic or compare-and-swap |
 | `patchRun` | PATCH | `/api/v1/runs/{run_id}` | agent runtime: monotonic or compare-and-swap |
@@ -1003,6 +1005,7 @@ Generated from openapi.yaml.
 |---|---|---|---|---|
 | GET | `/api/v1/search` | `search` | `search.query` | Full-text search |
 | GET | `/api/v1/search/thread-titles` | `searchThreadTitles` | `search.query` | Prefix search over thread titles |
+| POST | `/api/v1/search/assist` | `assistSearch` | `search.assist` | Ask the search assistant |
 
 #### Sync
 
@@ -1060,6 +1063,7 @@ Generated from openapi.yaml.
 | POST | `/api/v1/threads/{thread_id}/agent-sessions/report` | `reportAgentSession` | `agent_session.report` | Report the external session reference and model |
 | POST | `/api/v1/interactions/{interaction_id}/respond` | `respondToInteraction` | `interaction.respond` | Acknowledge or answer an interaction |
 | PUT | `/api/v1/files/{file_id}/transcript` | `submitTranscript` | `file.transcript.submit` | Store a transcript created by the agent |
+| POST | `/api/v1/search-assist-requests/{request_id}/answer` | `answerSearchAssist` | `search.assist.respond` | Answer a search assistant request |
 | POST | `/api/v1/agents/me/heartbeat` | `sendHeartbeat` | `agent.heartbeat` | Report state and actual billing mode |
 | GET | `/api/v1/agents/me/consumers/{consumer}` | `getConsumerState` | `agent.events.consume` | Read the cursor of a consumer |
 | GET | `/api/v1/agents/me/consumers/{consumer}/events` | `pollAgentEvents` | `agent.events.consume` | Fetch events for a consumer without WebSocket |
@@ -1326,6 +1330,7 @@ Events (receive action per 05, section 6; schema in openapi.yaml):
 | `stats.live` | ephemeral | `stats.read` |  | `StatsLiveEvent` |  |
 | `notification.created` | ephemeral | `push.deliver` | self | `NotificationCreatedEvent` |  |
 | `command.autocomplete_requested` | ephemeral | `agent.events.consume` | self | `CommandAutocompleteRequestedEvent` |  |
+| `search.assist_requested` | ephemeral | `agent.events.consume` | self | `SearchAssistRequestedEvent` |  |
 <!-- END GENERATED: events -->
 
 ## 18. Alignment with the core contract

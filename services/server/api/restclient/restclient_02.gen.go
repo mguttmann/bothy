@@ -3125,6 +3125,78 @@ type ClientInterface interface {
 	// Corresponds with GET /search (the `Search` operationId).
 	Search(ctx context.Context, params *SearchParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// AnswerSearchAssistWithBody Answer a search assistant request
+	//
+	// The assistant agent answers an open `search.assist_requested` (14, 4.10; 09, 10.6); the
+	// first valid answer goes back to the person. `404` for an unknown or forgotten request and for
+	// every principal but the addressed agent, `410 gone` after the wait ended, `204` without effect for an
+	// answer after the first one. `400 validation_failed` for a reference that was not sent or is
+	// named twice (`unknown_ref`, `duplicate`), more picks than `max_picks` or more terms than
+	// `search.assist.max_terms` (`too_many_items`), an empty reason or term (`too_short`), a reason
+	// longer than `search.assist.reason_max_chars` or a term longer than 64 characters (`too_long`)
+	// or a text that is no display text (`invalid_utf8`, `control_character`, `bidi_control`); the
+	// request stays open.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /search-assist-requests/{request_id}/answer (the `AnswerSearchAssist` operationId).
+	AnswerSearchAssistWithBody(ctx context.Context, requestId RequestIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// AnswerSearchAssist Answer a search assistant request
+	//
+	// The assistant agent answers an open `search.assist_requested` (14, 4.10; 09, 10.6); the
+	// first valid answer goes back to the person. `404` for an unknown or forgotten request and for
+	// every principal but the addressed agent, `410 gone` after the wait ended, `204` without effect for an
+	// answer after the first one. `400 validation_failed` for a reference that was not sent or is
+	// named twice (`unknown_ref`, `duplicate`), more picks than `max_picks` or more terms than
+	// `search.assist.max_terms` (`too_many_items`), an empty reason or term (`too_short`), a reason
+	// longer than `search.assist.reason_max_chars` or a term longer than 64 characters (`too_long`)
+	// or a text that is no display text (`invalid_utf8`, `control_character`, `bidi_control`); the
+	// request stays open.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /search-assist-requests/{request_id}/answer (the `AnswerSearchAssist` operationId).
+	AnswerSearchAssist(ctx context.Context, requestId RequestIdPath, body AnswerSearchAssistJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// AssistSearchWithBody Ask the search assistant
+	//
+	// Smart search (14, 4.10): the server turns `q` and the terms of `history` into search terms,
+	// runs the thread title and message search with the access filter of `/search`, fuses the hits
+	// per thread and, when `search.assist.agent_id` names an assistant agent with a live gateway
+	// connection, sends the candidates the agent may read too as `search.assist_requested` and
+	// waits up to `search.assist.timeout` for its picks. The answer holds at most
+	// `search.assist.max_hits` hits: the assistant's picks with a reason first, then full-text
+	// hits. Without an assistant answer `mode` is `fulltext` and `fallback_reason` says why.
+	// Nothing is stored; only persons may ask (agents and apps get `403`). `q` longer than
+	// `search.query_max_chars` or without a term is `400 validation_failed`; more than
+	// `search.assist.max_turns` turns in `history` is `too_many_items`. A statement timeout is
+	// `503 unavailable` with reason `search_timeout`.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /search/assist (the `AssistSearch` operationId).
+	AssistSearchWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// AssistSearch Ask the search assistant
+	//
+	// Smart search (14, 4.10): the server turns `q` and the terms of `history` into search terms,
+	// runs the thread title and message search with the access filter of `/search`, fuses the hits
+	// per thread and, when `search.assist.agent_id` names an assistant agent with a live gateway
+	// connection, sends the candidates the agent may read too as `search.assist_requested` and
+	// waits up to `search.assist.timeout` for its picks. The answer holds at most
+	// `search.assist.max_hits` hits: the assistant's picks with a reason first, then full-text
+	// hits. Without an assistant answer `mode` is `fulltext` and `fallback_reason` says why.
+	// Nothing is stored; only persons may ask (agents and apps get `403`). `q` longer than
+	// `search.query_max_chars` or without a term is `400 validation_failed`; more than
+	// `search.assist.max_turns` turns in `history` is `too_many_items`. A statement timeout is
+	// `503 unavailable` with reason `search_timeout`.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /search/assist (the `AssistSearch` operationId).
+	AssistSearch(ctx context.Context, body AssistSearchJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// SearchThreadTitles Prefix search over thread titles
 	//
 	// For the quick switcher (14, 4.9): words shorter than `search.prefix_min_chars` are dropped; same access filter as `/search`, newest activity first. Page size `search.page_size_default`, at most `search.page_size_max`.
@@ -10759,6 +10831,118 @@ func (c *Client) ListRunSteps(ctx context.Context, runId RunIdPath, params *List
 // Corresponds with GET /search (the `Search` operationId).
 func (c *Client) Search(ctx context.Context, params *SearchParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewSearchRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// AnswerSearchAssistWithBody Answer a search assistant request
+//
+// The assistant agent answers an open `search.assist_requested` (14, 4.10; 09, 10.6); the
+// first valid answer goes back to the person. `404` for an unknown or forgotten request and for
+// every principal but the addressed agent, `410 gone` after the wait ended, `204` without effect for an
+// answer after the first one. `400 validation_failed` for a reference that was not sent or is
+// named twice (`unknown_ref`, `duplicate`), more picks than `max_picks` or more terms than
+// `search.assist.max_terms` (`too_many_items`), an empty reason or term (`too_short`), a reason
+// longer than `search.assist.reason_max_chars` or a term longer than 64 characters (`too_long`)
+// or a text that is no display text (`invalid_utf8`, `control_character`, `bidi_control`); the
+// request stays open.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /search-assist-requests/{request_id}/answer (the `AnswerSearchAssist` operationId).
+func (c *Client) AnswerSearchAssistWithBody(ctx context.Context, requestId RequestIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewAnswerSearchAssistRequestWithBody(c.Server, requestId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// AnswerSearchAssist Answer a search assistant request
+//
+// The assistant agent answers an open `search.assist_requested` (14, 4.10; 09, 10.6); the
+// first valid answer goes back to the person. `404` for an unknown or forgotten request and for
+// every principal but the addressed agent, `410 gone` after the wait ended, `204` without effect for an
+// answer after the first one. `400 validation_failed` for a reference that was not sent or is
+// named twice (`unknown_ref`, `duplicate`), more picks than `max_picks` or more terms than
+// `search.assist.max_terms` (`too_many_items`), an empty reason or term (`too_short`), a reason
+// longer than `search.assist.reason_max_chars` or a term longer than 64 characters (`too_long`)
+// or a text that is no display text (`invalid_utf8`, `control_character`, `bidi_control`); the
+// request stays open.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /search-assist-requests/{request_id}/answer (the `AnswerSearchAssist` operationId).
+func (c *Client) AnswerSearchAssist(ctx context.Context, requestId RequestIdPath, body AnswerSearchAssistJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewAnswerSearchAssistRequest(c.Server, requestId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// AssistSearchWithBody Ask the search assistant
+//
+// Smart search (14, 4.10): the server turns `q` and the terms of `history` into search terms,
+// runs the thread title and message search with the access filter of `/search`, fuses the hits
+// per thread and, when `search.assist.agent_id` names an assistant agent with a live gateway
+// connection, sends the candidates the agent may read too as `search.assist_requested` and
+// waits up to `search.assist.timeout` for its picks. The answer holds at most
+// `search.assist.max_hits` hits: the assistant's picks with a reason first, then full-text
+// hits. Without an assistant answer `mode` is `fulltext` and `fallback_reason` says why.
+// Nothing is stored; only persons may ask (agents and apps get `403`). `q` longer than
+// `search.query_max_chars` or without a term is `400 validation_failed`; more than
+// `search.assist.max_turns` turns in `history` is `too_many_items`. A statement timeout is
+// `503 unavailable` with reason `search_timeout`.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /search/assist (the `AssistSearch` operationId).
+func (c *Client) AssistSearchWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewAssistSearchRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// AssistSearch Ask the search assistant
+//
+// Smart search (14, 4.10): the server turns `q` and the terms of `history` into search terms,
+// runs the thread title and message search with the access filter of `/search`, fuses the hits
+// per thread and, when `search.assist.agent_id` names an assistant agent with a live gateway
+// connection, sends the candidates the agent may read too as `search.assist_requested` and
+// waits up to `search.assist.timeout` for its picks. The answer holds at most
+// `search.assist.max_hits` hits: the assistant's picks with a reason first, then full-text
+// hits. Without an assistant answer `mode` is `fulltext` and `fallback_reason` says why.
+// Nothing is stored; only persons may ask (agents and apps get `403`). `q` longer than
+// `search.query_max_chars` or without a term is `400 validation_failed`; more than
+// `search.assist.max_turns` turns in `history` is `too_many_items`. A statement timeout is
+// `503 unavailable` with reason `search_timeout`.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /search/assist (the `AssistSearch` operationId).
+func (c *Client) AssistSearch(ctx context.Context, body AssistSearchJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewAssistSearchRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -23516,382 +23700,4 @@ func NewUpdateMessageRequest(server string, messageId MessageIdPath, params *Upd
 	}
 	bodyReader = bytes.NewReader(buf)
 	return NewUpdateMessageRequestWithBody(server, messageId, params, "application/json", bodyReader)
-}
-
-// NewUpdateMessageRequestWithBody constructs an http.Request for the UpdateMessage method, with any body, and a specified content type
-func NewUpdateMessageRequestWithBody(server string, messageId MessageIdPath, params *UpdateMessageParams, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "message_id", messageId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/messages/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
-		var headerParam1 string
-
-		headerParam1, err = runtime.StyleParamWithOptions("simple", false, "If-Match", params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
-		if err != nil {
-			return nil, err
-		}
-
-		req.Header.Set("If-Match", headerParam1)
-
-	}
-
-	return req, nil
-}
-
-// NewUnpinMessageRequest constructs an http.Request for the UnpinMessage method
-func NewUnpinMessageRequest(server string, messageId MessageIdPath) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "message_id", messageId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/messages/%s/pin", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewPinMessageRequest constructs an http.Request for the PinMessage method
-func NewPinMessageRequest(server string, messageId MessageIdPath) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "message_id", messageId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/messages/%s/pin", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPut, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewListReactionsRequest constructs an http.Request for the ListReactions method
-func NewListReactionsRequest(server string, messageId MessageIdPath, params *ListReactionsParams) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "message_id", messageId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/messages/%s/reactions", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-		// queryValues collects non-styled parameters (passthrough, JSON)
-		// that are safe to round-trip through url.Values.Encode().
-		queryValues := queryURL.Query()
-		// rawQueryFragments collects pre-encoded query fragments from
-		// styled parameters, preserving literal commas as delimiters
-		// per the OpenAPI spec (e.g. "color=blue,black,brown").
-		var rawQueryFragments []string
-
-		if params.Cursor != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if params.Limit != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if params.Emoji != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "emoji", *params.Emoji, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if encoded := queryValues.Encode(); encoded != "" {
-			rawQueryFragments = append(rawQueryFragments, encoded)
-		}
-		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewRemoveReactionRequest constructs an http.Request for the RemoveReaction method
-func NewRemoveReactionRequest(server string, messageId MessageIdPath, emoji EmojiPath) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "message_id", messageId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	var pathParam1 string
-
-	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "emoji", emoji, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/messages/%s/reactions/%s", pathParam0, pathParam1)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewAddReactionRequest constructs an http.Request for the AddReaction method
-func NewAddReactionRequest(server string, messageId MessageIdPath, emoji EmojiPath) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "message_id", messageId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	var pathParam1 string
-
-	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "emoji", emoji, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/messages/%s/reactions/%s", pathParam0, pathParam1)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPut, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewRetriggerMessageRequest constructs an http.Request for the RetriggerMessage method
-func NewRetriggerMessageRequest(server string, messageId MessageIdPath, params *RetriggerMessageParams) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "message_id", messageId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/messages/%s/retrigger", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
-	}
-
-	return req, nil
-}
-
-// NewListMessageRevisionsRequest constructs an http.Request for the ListMessageRevisions method
-func NewListMessageRevisionsRequest(server string, messageId MessageIdPath) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "message_id", messageId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/messages/%s/revisions", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
 }

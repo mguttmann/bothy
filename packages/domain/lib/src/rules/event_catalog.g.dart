@@ -47,6 +47,7 @@ const Map<String, EventInfo> _catalogue = <String, EventInfo>{
   'run.cancel_requested': EventInfo(type: 'run.cancel_requested', durable: true, carriesResourceVersion: false, resourceKind: 'run', personal: true),
   'run.state_changed': EventInfo(type: 'run.state_changed', durable: true, carriesResourceVersion: true, resourceKind: 'run', personal: false),
   'run.updated': EventInfo(type: 'run.updated', durable: false, carriesResourceVersion: true, resourceKind: 'run', personal: false),
+  'search.assist_requested': EventInfo(type: 'search.assist_requested', durable: false, carriesResourceVersion: false, resourceKind: 'agent', personal: true),
   'session.revoked': EventInfo(type: 'session.revoked', durable: true, carriesResourceVersion: false, resourceKind: 'auth_session', personal: true),
   'settings.updated': EventInfo(type: 'settings.updated', durable: true, carriesResourceVersion: false, resourceKind: 'user', personal: true),
   'sidebar.updated': EventInfo(type: 'sidebar.updated', durable: true, carriesResourceVersion: false, resourceKind: 'space', personal: true),

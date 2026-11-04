@@ -96,6 +96,12 @@ func (s *server) mountGateway(mux Mux, chain *httpserver.Chain, limiter *ratelim
 	if err := bindAutocomplete(s.values, rn, gw); err != nil {
 		return err
 	}
+	s.mu.Lock()
+	sr := s.searchModule
+	s.mu.Unlock()
+	if err := bindAssistRelay(sr, gw); err != nil {
+		return err
+	}
 	if ag.Presence != nil {
 		// agent.presence_changed goes through the hub of this process (M1-66, D-M2-20-1).
 		ag.Presence.BindPublisher(gw.Publisher)

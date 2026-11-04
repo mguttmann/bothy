@@ -601,6 +601,20 @@ Serializers _$serializers =
           ..add(RunUpdatedEvent.serializer)
           ..add(RunUpdatedEventTypeEnum.serializer)
           ..add(RunUpdatedPayload.serializer)
+          ..add(SearchAssistAnswer.serializer)
+          ..add(SearchAssistCandidate.serializer)
+          ..add(SearchAssistCost.serializer)
+          ..add(SearchAssistHit.serializer)
+          ..add(SearchAssistHitSource_Enum.serializer)
+          ..add(SearchAssistPick.serializer)
+          ..add(SearchAssistQuery.serializer)
+          ..add(SearchAssistRequestedEvent.serializer)
+          ..add(SearchAssistRequestedEventTypeEnum.serializer)
+          ..add(SearchAssistRequestedPayload.serializer)
+          ..add(SearchAssistResult.serializer)
+          ..add(SearchAssistResultFallbackReasonEnum.serializer)
+          ..add(SearchAssistResultModeEnum.serializer)
+          ..add(SearchAssistTurn.serializer)
           ..add(SearchHit.serializer)
           ..add(SearchHitKind.serializer)
           ..add(SearchHitPage.serializer)
@@ -1435,8 +1449,38 @@ Serializers _$serializers =
             () => ListBuilder<RunSummary>(),
           )
           ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(SearchAssistHit)]),
+            () => ListBuilder<SearchAssistHit>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(String)]),
+            () => ListBuilder<String>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(SearchAssistPick)]),
+            () => ListBuilder<SearchAssistPick>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(String)]),
+            () => ListBuilder<String>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(CostReport)]),
+            () => ListBuilder<CostReport>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(SearchAssistTurn)]),
+            () => ListBuilder<SearchAssistTurn>(),
+          )
+          ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(SearchHit)]),
             () => ListBuilder<SearchHit>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [
+              const FullType(SearchHitSegmentsInner),
+            ]),
+            () => ListBuilder<SearchHitSegmentsInner>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, const [
@@ -1712,9 +1756,27 @@ Serializers _$serializers =
           )
           ..addBuilderFactory(
             const FullType(BuiltList, const [
+              const FullType(SearchAssistCandidate),
+            ]),
+            () => ListBuilder<SearchAssistCandidate>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(String)]),
+            () => ListBuilder<String>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [
               const FullType(StatusIncidentUpdate),
             ]),
             () => ListBuilder<StatusIncidentUpdate>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(String)]),
+            () => ListBuilder<String>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(String)]),
+            () => ListBuilder<String>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(String)]),

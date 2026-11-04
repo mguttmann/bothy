@@ -414,7 +414,7 @@ func (c *Coordinator) labelled(ctx context.Context, pl plan, fresh authorize.Sco
 		rh := search.ResultHit{
 			Kind: hitKind(pl.typ), ID: h.ID, ThreadID: h.ThreadID, ChannelID: h.ChannelID, MessageID: h.MessageID,
 			Segments: h.Segments, ThreadTitle: labels.ThreadTitles[h.ThreadID],
-			ChannelName: labels.Channels[h.ChannelID].Name, SpaceName: labels.Channels[h.ChannelID].SpaceName,
+			ChannelName: labels.Channels[h.ChannelID].Name, SpaceName: labels.Channels[h.ChannelID].SpaceName, CreatedAt: h.CreatedAt,
 		}
 		if rh.Segments == nil {
 			rh.Segments = []searchkit.Segment{}

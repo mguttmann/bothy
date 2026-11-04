@@ -53,11 +53,13 @@ type Renderers struct {
 	File    func(files.File) rest.File
 }
 
-// Finder implements search and searchThreadTitles.
+// Finder implements search and searchThreadTitles, and with WithAssistant assistSearch and
+// answerSearchAssist.
 type Finder struct {
-	search  search.Search
-	objects Objects
-	render  Renderers
+	search    search.Search
+	objects   Objects
+	render    Renderers
+	assistant search.Assistant
 }
 
 // New returns the handlers. Errors: a missing collaborator.

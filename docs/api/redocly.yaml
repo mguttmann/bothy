@@ -223,6 +223,8 @@ rules:
         - run.start
         - run.token.renew
         - run.update
+        - search.assist
+        - search.assist.respond
         - search.query
         - self.profile.update
         - self.read
@@ -490,6 +492,8 @@ rules:
         - run.start
         - run.token.renew
         - run.update
+        - search.assist
+        - search.assist.respond
         - search.query
         - self
         - self.profile.update

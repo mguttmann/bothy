@@ -1,6 +1,6 @@
 # Module `search`
 
-Status: built (M3-14). The coordinator of full-text search and of the prefix search of the quick switcher.
+Status: built (M3-14). The coordinator of full-text search and of the prefix search of the quick switcher; the search assistant (F-INTELLIGENTE-SUCHE).
 The normative sources are [docs/spec/14-search.md](../../../../docs/spec/14-search.md) and [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); where they differ, the chapters apply.
 
 ## Purpose
@@ -27,6 +27,10 @@ Full-text search over messages, thread titles and files with a permission filter
 
 Filters on thread facts (`thread_state`, `tag_id`, `agent_id`) for messages and files are composed through `chat.ThreadsMatching` into a thread id list in the same unit (07 7.4 rule 6).
 
+## Search assistant (14 4.10)
+
+`app.Assistant` implements `search.Assistant` (`assistSearch`, `answerSearchAssist`): the terms of a question (`domain.AssistTerms` with the stop word lists in `domain/stopwords/`), two searches through the coordinator with the person's rights (thread titles and messages), the fusion per thread (`domain.FuseThreads`), the filter by the assistant agent's own `thread.read` and `message.read` (filter mode, fresh request scope), the payload of `search.assist_requested` without ids (`domain.AssistPayload`), one in-process registry of open requests like autocompletion (open, answered, expired; forgotten after `expires_at` plus `search.assist.timeout`), the answer rules (`domain.ValidateAssistAnswer`), the second pass with the agent's terms and the order of the hits. The relay is the source port `search.AssistRelay`, implemented by `gateway/adapters/assistrelay` over `Hub.AskAssistant` and bound by `internal/wire` once the gateway exists. Without `search.assist.agent_id`, without a bound relay or a live connection, and after the timeout the answer is the fused full text with its `fallback_reason`. Nothing of a question is stored; one log line `search: assist` names mode, reason and counts.
+
 ## Page check
 
 After the read operation the coordinator reads the rights again in a fresh request scope in filter mode: one `Scope`, then for each hit its channel in that scope and `authorize`. A hit whose channel left the scope lost its permission meanwhile and drops silently; a hit `authorize` refuses although its channel is visible is a mismatch between the SQL filter and `authorize`: it drops, one log line without IDs is written and `bothy.authz.errors` counts `filter_mismatch`. Resources carry only IDs that never change. Dropping never moves the cursor.
@@ -37,10 +41,10 @@ The duration of a search still depends on hits in channels the caller cannot rea
 
 ## Port (root package `internal/search`)
 
-- Inbound: `Search`; `Probe`, the test query `search.query` of the status page (M7-09): the message search for a fixed term in a channel that does not exist, under `search.statement_timeout`, without authorization and without `bothy.search.duration`.
+- Inbound: `Search`; `Assistant` (the search assistant, 14 4.10); `Probe`, the test query `search.query` of the status page (M7-09): the message search for a fixed term in a channel that does not exist, under `search.statement_timeout`, without authorization and without `bothy.search.duration`.
 - Emits in-tx events: none.
 - Subscribes to in-tx events: none.
-- Implements source ports and cross-cutting ports: none.
+- Implements source ports and cross-cutting ports: none. Declares the source port `AssistRelay`, which the gateway implements.
 
 ## Dependencies
 
@@ -59,15 +63,19 @@ None. The module reads through the ports of other modules (03-data-model.md, pri
 
 `search.query`: right auth, rate-limit class rl.search, effect read; an allow is not logged, and an app token needs its read scope (05 section 2.6).
 
+`search.assist`: right human, rate-limit class rl.trigger, effect read; an allow is not logged.
+
+`search.assist.respond`: right agent-self (the assistant agent the request was sent to), rate-limit class rl.agent_runtime, effect read.
+
 ## Events and WebSocket ops
 
 - Durable: none.
-- Ephemeral: none.
+- Ephemeral: `search.assist_requested`.
 - WebSocket ops (client to server): none.
 
 ## Telemetry
 
-`bothy.search.duration` for `search`; the prefix search is measured by `http.server.request.duration`. No log field, span attribute or metric attribute carries `q`, an excerpt or a name (SEC-LOG-4).
+`bothy.search.duration` for `search` and for each search of a question of the assistant; the prefix search and the assistant are measured by `http.server.request.duration`. No log field, span attribute or metric attribute carries `q`, an excerpt or a name (SEC-LOG-4).
 
 ## Chapters
 

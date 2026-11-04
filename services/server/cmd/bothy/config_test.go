@@ -549,6 +549,14 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"run.queued_max_age = 2d  # default\n" +
 		"run.stall_after = 10m  # default\n" +
 		"run.step_detail_max_bytes = 16384  # default\n" +
+		"search.assist.agent_id =   # default\n" +
+		"search.assist.excerpt_max_chars = 300  # default\n" +
+		"search.assist.max_candidates = 20  # default\n" +
+		"search.assist.max_hits = 8  # default\n" +
+		"search.assist.max_terms = 12  # default\n" +
+		"search.assist.max_turns = 6  # default\n" +
+		"search.assist.reason_max_chars = 200  # default\n" +
+		"search.assist.timeout = 10s  # default\n" +
 		"search.extract.max_archive_entries = 10000  # default\n" +
 		"search.extract.max_input_bytes = 52428800  # default\n" +
 		"search.extract.max_text_bytes = 1048576  # default\n" +
