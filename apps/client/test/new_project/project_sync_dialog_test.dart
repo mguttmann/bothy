@@ -4,7 +4,6 @@
 // M4-44.md D-M4-44-4, D-M4-44-5).
 
 import 'package:client/new_project/new_project_flow.dart';
-import 'package:client/new_project/new_project_port.dart';
 import 'package:client/new_project/project_sync_dialog.dart';
 import 'package:client/new_project/project_sync_flow.dart';
 import 'package:design_system/design_system.dart';
@@ -60,6 +59,13 @@ final class ScriptedPort implements NewProjectPort, ProjectFolderSource {
     final f = failBind.remove(workspaceRef);
     if (f != null) throw f;
   }
+
+  @override
+  Future<void> grantUpload(
+    ChannelId forum,
+    PrincipalId runner, {
+    required String idempotencyKey,
+  }) async => calls.add('grantUpload');
 
   @override
   Future<BindingReadiness?> readiness(ChannelId forum) async =>
@@ -150,8 +156,10 @@ void main() {
       expect(port.calls.skip(1), [
         'createForum api',
         'bind api none',
+        'grantUpload',
         'createForum web',
         'bind web none',
+        'grantUpload',
       ]);
       expect(find.byType(ProjectSyncDialog), findsNothing);
       expect(results.single, [_forumOf('api'), _forumOf('web')]);
@@ -181,7 +189,7 @@ void main() {
       port.calls.clear();
       await tester.tap(find.byKey(const ValueKey('projectSync.retry')));
       await tester.pumpAndSettle();
-      expect(port.calls, ['bind api none']);
+      expect(port.calls, ['bind api none', 'grantUpload']);
       expect(results.single, [_forumOf('api'), _forumOf('web')]);
     },
   );

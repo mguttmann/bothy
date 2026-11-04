@@ -3,7 +3,8 @@
 /// The server side of a new project (01 6.9; docs/decisions.d/M4-43.md D-M4-43-1): the existing
 /// operations `createChannel`, `getChannel` with `setChannelOperator`, `putProjectBinding` and
 /// `getChannelBehavior` through the client of the signed-in session (DPoP, refresh and the
-/// step-up interceptor apply, so the step-up prompt appears where the server demands it), and
+/// step-up interceptor apply, so the step-up prompt appears where the server demands it),
+/// `createGrant` for the runner's upload right on the new forum (F-PROJEKT-BEREIT), and
 /// the idea through the outbox as the forum's new post draft and its first post (01 6.8 item 8).
 /// The folders of a runner without a binding come from `listAgentProjectFolders` (01 6.10), the
 /// rename of a project forum goes through `updateChannel` (01 6.11, M4-44).
@@ -12,6 +13,7 @@ library;
 import 'package:api_client/api_client.dart';
 import 'package:auth/auth.dart'
     show AuthException, StepUpUnavailable, stepUpPurposeExtra;
+import 'package:built_collection/built_collection.dart';
 import 'package:dio/dio.dart';
 import 'package:domain/domain.dart' as d;
 import 'package:local_store/local_store.dart' show OutboxDao;
@@ -22,17 +24,8 @@ import '../sync/thread_ops.dart';
 import 'new_project_flow.dart';
 import 'project_sync_flow.dart';
 
-/// A runner the dialog offers: an active agent.
-final class ProjectRunner {
-  /// Creates the entry.
-  const ProjectRunner({required this.id, required this.name});
-
-  /// The agent.
-  final d.PrincipalId id;
-
-  /// Its display name.
-  final String name;
-}
+/// The `adapter_kind` of an agent that can serve a project (09 18.16).
+const String codeRunnerAdapterKind = 'code_runner';
 
 /// [NewProjectPort] over [ApiClient] and the outbox.
 ///
@@ -63,22 +56,29 @@ final class ApiNewProjectPort implements NewProjectPort, ProjectFolderSource {
 
   Map<String, Object?> get _extra => {stepUpPurposeExtra: _purpose(_name)};
 
-  /// The active agents in the order of the server (the runner choice, D-M4-43-11).
+  /// The active agents for the runner choice (D-M4-43-11, F-PROJEKT-BEREIT): first those
+  /// that can serve a project (`adapter_kind` `code_runner`), then the others with
+  /// [ProjectRunner.canServe] false, each group in the order of the server.
   Future<List<ProjectRunner>> runners() => _guard(() async {
-    final out = <ProjectRunner>[];
+    final serving = <ProjectRunner>[];
+    final others = <ProjectRunner>[];
     String? cursor;
     do {
       final page = (await _api.getAgentsApi().listAgents(cursor: cursor)).data!;
       for (final a in page.items) {
-        if (a.status == AgentStatusEnum.active) {
-          out.add(
-            ProjectRunner(id: d.PrincipalId.parse(a.id), name: a.displayName),
-          );
-        }
+        if (a.status != AgentStatusEnum.active) continue;
+        final canServe = a.adapterKind == codeRunnerAdapterKind;
+        (canServe ? serving : others).add(
+          ProjectRunner(
+            id: d.PrincipalId.parse(a.id),
+            name: a.displayName,
+            canServe: canServe,
+          ),
+        );
       }
       cursor = page.nextCursor;
     } while (cursor != null);
-    return out;
+    return [...serving, ...others];
   });
 
   @override
@@ -144,6 +144,28 @@ final class ApiNewProjectPort implements NewProjectPort, ProjectFolderSource {
           ..workspaceRef = workspaceRef
           ..provision = ProjectProvision.valueOf(provision)
           ..repositoryUrl = repositoryUrl
+          ..reason = _reason,
+      ),
+      extra: _extra,
+    );
+  });
+
+  @override
+  Future<void> grantUpload(
+    d.ChannelId forum,
+    d.PrincipalId runner, {
+    required String idempotencyKey,
+  }) => _guard(() async {
+    await _api.getAccessApi().createGrant(
+      idempotencyKey: idempotencyKey,
+      grantCreate: GrantCreate(
+        (b) => b
+          ..subjectKind = GrantSubjectKind.agent
+          ..subjectId = runner.value
+          ..targetKind = TargetKind.channel
+          ..targetId = forum.value
+          ..level = Level.write
+          ..capabilities = ListBuilder<Capability>([Capability.upload])
           ..reason = _reason,
       ),
       extra: _extra,

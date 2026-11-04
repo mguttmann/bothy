@@ -10090,4 +10090,75 @@ class AppLocalizationsDe extends AppLocalizations {
   String documentRemoteImage(String domain) {
     return 'Bild von $domain laden';
   }
+
+  @override
+  String newProjectRunnerCannotServe(String name) {
+    return '$name (kann nicht in einem Projektordner arbeiten)';
+  }
+
+  @override
+  String get newProjectRunnerOnlyCodeRunners =>
+      'Nur ein Agent, der in Projektordnern arbeitet, kann der Runner sein.';
+
+  @override
+  String get newProjectStepGrant =>
+      'Dem Runner das Hochladen von Dateien erlauben';
+
+  @override
+  String get triggerReasonOperatorCannotServeProject =>
+      'Dieses Projekt hat keinen Runner. Ein Owner kann einen Runner zu seinem Bediener machen.';
+
+  @override
+  String projectNotReady(String reason) {
+    return 'Projekt nicht bereit: $reason';
+  }
+
+  @override
+  String get projectReasonOperatorCannotServe =>
+      'der Agent dieses Forums kann nicht in einem Projektordner arbeiten';
+
+  @override
+  String get projectReasonWaiting =>
+      'der Runner hat das Projekt noch nicht gemeldet';
+
+  @override
+  String get projectReasonProvisioning => 'der Runner legt den Ordner an';
+
+  @override
+  String projectRunnerOffline(String name) {
+    return 'Der Runner $name ist offline.';
+  }
+
+  @override
+  String projectActionSetRunner(String name) {
+    return '$name zum Runner machen';
+  }
+
+  @override
+  String get projectActionRenameFolder => 'Ordnernamen ändern';
+
+  @override
+  String get projectActionCheckAgain => 'Erneut prüfen';
+
+  @override
+  String get projectRenameFolderTitle => 'Neuer Ordnername';
+
+  @override
+  String get projectRenameFolderSave => 'Speichern';
+
+  @override
+  String projectActionFailed(String reason) {
+    return 'Das Projekt konnte nicht geändert werden: $reason';
+  }
+
+  @override
+  String get retriggerMessage => 'Erneut auslösen';
+
+  @override
+  String get retriggerMessageFor => 'Die Nachricht erneut auslösen';
+
+  @override
+  String retriggerRefused(String reason) {
+    return 'Erneutes Auslösen nicht möglich: $reason';
+  }
 }

@@ -267,7 +267,7 @@ async def _put_space_operator(real: RealServer, space: UUID, agent: UUID) -> Non
             as_="owner",
             path={"space_id": space},
             body={"mode": "agent", "agent_id": str(agent), "reason": "e2e"},
-            header={"If-Match": f'"{current["version"]}"'},
+            header={"If-Match": f'"{current["space"]["version"]}"'},
         )
     )
 

@@ -71,6 +71,13 @@ final class FakePort implements NewProjectPort, ProjectFolderSource {
   }
 
   @override
+  Future<void> grantUpload(
+    ChannelId forum,
+    PrincipalId runner, {
+    required String idempotencyKey,
+  }) async => calls.add('grantUpload ${names[forum]}');
+
+  @override
   Future<BindingReadiness?> readiness(ChannelId forum) async {
     calls.add('readiness ${names[forum]}');
     final list = answers[forum];
@@ -165,8 +172,10 @@ void main() {
       expect(h.port.calls.skip(1), [
         'createForum api',
         'bind api none',
+        'grantUpload api',
         'createForum web',
         'bind web none',
+        'grantUpload web',
         'readiness api',
         'readiness web',
       ]);
@@ -211,7 +220,7 @@ void main() {
     expect(h.flow.hasFailures, isTrue);
     h.port.calls.clear();
     await h.flow.run();
-    expect(h.port.calls, ['bind api none', 'readiness api']);
+    expect(h.port.calls, ['bind api none', 'grantUpload api', 'readiness api']);
     expect(h.flow.finished, isTrue);
   });
 

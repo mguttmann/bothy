@@ -68,6 +68,7 @@ final class AppOpsStore {
 /// | `createPersonalTemplate` | `name`, `content_md` | no | `templates` |
 /// | `cancelRun` | `run_id`, optional `reason` | no | `run:<id>` |
 /// | `retryRun` | `run_id` | no | `run:<id>` |
+/// | `retriggerMessage` | `message_id` | no | `message:<id>` |
 /// | `putThreadDraft` | `DraftPut` (replaces the executor of M4-15) | yes | thread |
 /// | `putReadState` | `ReadStatePut` (replaces the executor of M4-15) | yes | thread |
 ///
@@ -102,6 +103,10 @@ abstract final class AppMessageOps {
 
   /// `POST /runs/{run_id}/retry` (Retry on the line of a failed or cancelled run, 09 5.7).
   static const String retryRun = 'retryRun';
+
+  /// `POST /messages/{message_id}/retrigger` (Trigger again beside a message that failed
+  /// because the project or the thread's agent was not ready, 09 3.8, F-PROJEKT-BEREIT).
+  static const String retriggerMessage = 'retriggerMessage';
 
   /// Registers the executors on [registry]; they call [api] and hand what the server returned
   /// to [store].
@@ -213,6 +218,13 @@ abstract final class AppMessageOps {
         );
         return OutboxResponse(status: response.statusCode, body: response.data);
       }, lane: (e) => 'run:${decodePayload(e.payload)['run_id']}')
+      ..register(retriggerMessage, (e, ctx) async {
+        final response = await api.getRunsApi().retriggerMessage(
+          messageId: _required<String>(decodePayload(e.payload), 'message_id'),
+          extra: ctx.extra,
+        );
+        return OutboxResponse(status: response.statusCode, body: response.data);
+      }, lane: (e) => 'message:${decodePayload(e.payload)['message_id']}')
       ..register(PersonalOps.putReadState, (e, ctx) async {
         final response = await prefs.putReadState(
           threadId: _thread(e),

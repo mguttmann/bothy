@@ -24,6 +24,7 @@ import 'forum_model.dart';
 import 'new_chat_view.dart' show editRefusedPost, openNewChat;
 import 'post_list_header.dart';
 import 'post_row.dart';
+import 'project_readiness.dart' show ProjectReadinessBanner;
 import 'providers.dart';
 
 /// The post list as it looks for given data, without providers (widget and golden tests use
@@ -223,6 +224,13 @@ class _PostListViewState extends State<PostListView> {
           onTags: w.onTags,
           onSort: w.onSort,
         ),
+        // F-PROJEKT-BEREIT: a project forum that is not ready says why and how to fix it.
+        if (w.forum.projectBound)
+          ProjectReadinessBanner(
+            key: ValueKey('project.banner.${w.forum.id.value}'),
+            forum: w.forum.id,
+            forumName: w.forum.name,
+          ),
         Expanded(
           child: Semantics(
             container: true,

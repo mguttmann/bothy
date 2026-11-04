@@ -10039,4 +10039,74 @@ class AppLocalizationsEn extends AppLocalizations {
   String documentRemoteImage(String domain) {
     return 'Load image from $domain';
   }
+
+  @override
+  String newProjectRunnerCannotServe(String name) {
+    return '$name (cannot work in a project folder)';
+  }
+
+  @override
+  String get newProjectRunnerOnlyCodeRunners =>
+      'Only an agent that works in project folders can be the runner.';
+
+  @override
+  String get newProjectStepGrant => 'Allow the runner to upload files';
+
+  @override
+  String get triggerReasonOperatorCannotServeProject =>
+      'This project has no runner. An owner can make a runner its operator.';
+
+  @override
+  String projectNotReady(String reason) {
+    return 'Project not ready: $reason';
+  }
+
+  @override
+  String get projectReasonOperatorCannotServe =>
+      'the agent of this forum cannot work in a project folder';
+
+  @override
+  String get projectReasonWaiting =>
+      'the runner has not reported the project yet';
+
+  @override
+  String get projectReasonProvisioning => 'the runner is creating the folder';
+
+  @override
+  String projectRunnerOffline(String name) {
+    return 'The runner $name is offline.';
+  }
+
+  @override
+  String projectActionSetRunner(String name) {
+    return 'Make $name the runner';
+  }
+
+  @override
+  String get projectActionRenameFolder => 'Change folder name';
+
+  @override
+  String get projectActionCheckAgain => 'Check again';
+
+  @override
+  String get projectRenameFolderTitle => 'New folder name';
+
+  @override
+  String get projectRenameFolderSave => 'Save';
+
+  @override
+  String projectActionFailed(String reason) {
+    return 'Could not change the project: $reason';
+  }
+
+  @override
+  String get retriggerMessage => 'Trigger again';
+
+  @override
+  String get retriggerMessageFor => 'Trigger the message again';
+
+  @override
+  String retriggerRefused(String reason) {
+    return 'Could not trigger again: $reason';
+  }
 }

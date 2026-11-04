@@ -16151,6 +16151,114 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Load image from {domain}'**
   String documentRemoteImage(String domain);
+
+  /// Entry of the runner choice of the new project dialog for an active agent that cannot serve a project (its adapter kind is not code_runner, docs/spec/09 section 18.16); the entry is greyed out.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} (cannot work in a project folder)'**
+  String newProjectRunnerCannotServe(String name);
+
+  /// Hint below the runner choice of the new project dialog when some agents are greyed out (docs/spec/01 section 6.9 item 2).
+  ///
+  /// In en, this message translates to:
+  /// **'Only an agent that works in project folders can be the runner.'**
+  String get newProjectRunnerOnlyCodeRunners;
+
+  /// Step of the new project dialog: create the grant write with upload for the runner on the new forum (docs/spec/01 section 6.9 item 3).
+  ///
+  /// In en, this message translates to:
+  /// **'Allow the runner to upload files'**
+  String get newProjectStepGrant;
+
+  /// Notice for the rejection reason `operator_cannot_serve_project` at acceptance of a triggering message: the project binding is not ready and the agent cannot serve a project (docs/spec/09 sections 3.5 and 18.16).
+  ///
+  /// In en, this message translates to:
+  /// **'This project has no runner. An owner can make a runner its operator.'**
+  String get triggerReasonOperatorCannotServeProject;
+
+  /// Banner of a project forum whose binding is not ready, and the notice beside a message that failed for it (docs/spec/01 section 6.9 item 8); reason is one sentence of the cause.
+  ///
+  /// In en, this message translates to:
+  /// **'Project not ready: {reason}'**
+  String projectNotReady(String reason);
+
+  /// Cause in the project banner for the ready reason `operator_cannot_serve_project` (docs/spec/09 section 18.16).
+  ///
+  /// In en, this message translates to:
+  /// **'the agent of this forum cannot work in a project folder'**
+  String get projectReasonOperatorCannotServe;
+
+  /// Cause in the project banner for a binding that is not ready without a reason.
+  ///
+  /// In en, this message translates to:
+  /// **'the runner has not reported the project yet'**
+  String get projectReasonWaiting;
+
+  /// Cause in the project banner for the ready reason `provisioning` (docs/spec/09 section 18.12).
+  ///
+  /// In en, this message translates to:
+  /// **'the runner is creating the folder'**
+  String get projectReasonProvisioning;
+
+  /// Line of the project banner when the agent of the forum is offline (docs/spec/01 section 6.9 item 8).
+  ///
+  /// In en, this message translates to:
+  /// **'The runner {name} is offline.'**
+  String projectRunnerOffline(String name);
+
+  /// Action of the project banner for `operator_cannot_serve_project`: set the only agent that can serve a project as the forum's operator (setChannelOperator).
+  ///
+  /// In en, this message translates to:
+  /// **'Make {name} the runner'**
+  String projectActionSetRunner(String name);
+
+  /// Action of the project banner for `workspace_exists`: bind the forum to another folder name (putProjectBinding).
+  ///
+  /// In en, this message translates to:
+  /// **'Change folder name'**
+  String get projectActionRenameFolder;
+
+  /// Action of the project banner: read the readiness of the project again.
+  ///
+  /// In en, this message translates to:
+  /// **'Check again'**
+  String get projectActionCheckAgain;
+
+  /// Title and field label of the dialog that changes the folder of a project after `workspace_exists`.
+  ///
+  /// In en, this message translates to:
+  /// **'New folder name'**
+  String get projectRenameFolderTitle;
+
+  /// Button of the dialog that changes the folder of a project.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get projectRenameFolderSave;
+
+  /// Line of the project banner when an action was refused; reason is the translated problem.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not change the project: {reason}'**
+  String projectActionFailed(String reason);
+
+  /// Button beside a message that failed because the project or the agent of the thread was not ready: sends the stored message to the agent again (retriggerMessage, docs/spec/09 section 3.8).
+  ///
+  /// In en, this message translates to:
+  /// **'Trigger again'**
+  String get retriggerMessage;
+
+  /// Screen reader label of the button that triggers a failed message again (retriggerMessage).
+  ///
+  /// In en, this message translates to:
+  /// **'Trigger the message again'**
+  String get retriggerMessageFor;
+
+  /// Line beside a failed message when the server refused to trigger it again; reason is the translated problem.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not trigger again: {reason}'**
+  String retriggerRefused(String reason);
 }
 
 class _AppLocalizationsDelegate

@@ -11,14 +11,17 @@ final _space = SpaceId.parse('0192f4a0-7b1c-72d4-8bae-000000000001');
 final _forum = ChannelId.parse('0192f4a0-7b1c-72d4-8bae-000000000002');
 final _spaceRunner = PrincipalId.parse('0192f4a0-7b1c-72d4-8bae-000000000003');
 final _otherRunner = PrincipalId.parse('0192f4a0-7b1c-72d4-8bae-000000000004');
+final _thirdRunner = PrincipalId.parse('0192f4a0-7b1c-72d4-8bae-000000000005');
 
 /// A port that records every call and answers from scripted values.
 final class FakePort implements NewProjectPort {
   final List<String> calls = [];
   final List<String> keys = [];
+  final List<String> grantKeys = [];
   final List<BindingReadiness?> answers = [];
   NewProjectFailure? failCreate;
   NewProjectFailure? failBind;
+  NewProjectFailure? failGrant;
   Object? failAssign;
 
   @override
@@ -58,6 +61,21 @@ final class FakePort implements NewProjectPort {
     final f = failBind;
     if (f != null) {
       failBind = null;
+      throw f;
+    }
+  }
+
+  @override
+  Future<void> grantUpload(
+    ChannelId forum,
+    PrincipalId runner, {
+    required String idempotencyKey,
+  }) async {
+    calls.add('grantUpload ${runner.value}');
+    grantKeys.add(idempotencyKey);
+    final f = failGrant;
+    if (f != null) {
+      failGrant = null;
       throw f;
     }
   }
@@ -122,12 +140,14 @@ void main() {
       expect(h.flow.steps, [
         NewProjectStep.createForum,
         NewProjectStep.bindProject,
+        NewProjectStep.grantUpload,
         NewProjectStep.prepareFolder,
       ]);
       await h.flow.run();
       expect(h.port.calls, [
         'createForum website',
         'bind website init -',
+        'grantUpload ${_spaceRunner.value}',
         'readiness',
         'readiness',
         'readiness',
@@ -155,6 +175,7 @@ void main() {
       'createForum web-site',
       'assignRunner ${_otherRunner.value}',
       'bind web-site clone https://git.example.com/team/web-site.git',
+      'grantUpload ${_otherRunner.value}',
       'readiness',
     ]);
   });
@@ -170,6 +191,7 @@ void main() {
     expect(h.port.calls, [
       'createForum website',
       'bind team/website none -',
+      'grantUpload ${_spaceRunner.value}',
       'readiness',
     ]);
   });
@@ -187,6 +209,7 @@ void main() {
       'createForum a-shopping-list-app',
       'saveIdea A shopping list app',
       'bind a-shopping-list-app init -',
+      'grantUpload ${_spaceRunner.value}',
       'readiness',
       'readiness',
       'postIdea A shopping list app',
@@ -481,6 +504,72 @@ void main() {
       newKey: () => 'k',
     )..name = 'website';
     expect(none.invalidFields, {NewProjectField.runner});
+  });
+
+  test('the upload grant is created once; a folder failure binds again without a second grant', () async {
+    final h = Harness();
+    h.port
+      ..failGrant = const NewProjectFailure.offline()
+      ..answers.add(
+        const BindingReadiness(ready: false, reason: 'workspace_exists'),
+      );
+    h.flow
+      ..mode = NewProjectMode.empty
+      ..name = 'website';
+    await h.flow.run();
+    expect(h.flow.failedStep, NewProjectStep.grantUpload);
+    await h.flow.run();
+    expect(h.flow.failedStep, NewProjectStep.prepareFolder);
+    h.port.answers
+      ..clear()
+      ..add(_ready);
+    h.flow.folder = 'website-2';
+    await h.flow.run();
+    expect(h.flow.finished, isTrue);
+    expect(h.port.calls.where((c) => c.startsWith('grantUpload')), [
+      'grantUpload ${_spaceRunner.value}',
+      'grantUpload ${_spaceRunner.value}',
+    ]);
+    // The repeat after the failed grant sends the same key, so the server creates it once.
+    expect(h.port.grantKeys, hasLength(2));
+    expect(h.port.grantKeys.toSet(), hasLength(1));
+    expect(h.port.calls.where((c) => c.startsWith('bind')), [
+      'bind website init -',
+      'bind website-2 init -',
+    ]);
+  });
+
+  test('the default runner is one that can serve a project (09 18.16)', () {
+    final chat = ProjectRunner(
+      id: PrincipalId.parse('0192f4a0-7b1c-72d4-8bae-000000000006'),
+      name: 'Chat',
+      canServe: false,
+    );
+    final runner = ProjectRunner(id: _otherRunner, name: 'Claude Code');
+    // The space's default cannot serve a project: the only runner is chosen.
+    final h = Harness();
+    h.flow.chooseDefaultRunner([
+      ProjectRunner(id: _spaceRunner, name: 'Hermes', canServe: false),
+      runner,
+    ]);
+    expect(h.flow.runner, _otherRunner);
+    // The space's default can: it stays.
+    final h2 = Harness();
+    h2.flow.chooseDefaultRunner([
+      ProjectRunner(id: _spaceRunner, name: 'Space runner'),
+      runner,
+    ]);
+    expect(h2.flow.runner, _spaceRunner);
+    // Two runners and a default that cannot serve: none is chosen.
+    final h3 = Harness();
+    h3.flow.chooseDefaultRunner([
+      ProjectRunner(id: _spaceRunner, name: 'Hermes', canServe: false),
+      runner,
+      ProjectRunner(id: _thirdRunner, name: 'Second'),
+      chat,
+    ]);
+    expect(h3.flow.runner, isNull);
+    expect(h3.flow.invalidFields, contains(NewProjectField.runner));
   });
 
   test('a name the person typed is not replaced by the suggestion', () {

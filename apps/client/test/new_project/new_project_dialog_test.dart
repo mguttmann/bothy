@@ -5,7 +5,6 @@
 
 import 'package:client/new_project/new_project_dialog.dart';
 import 'package:client/new_project/new_project_flow.dart';
-import 'package:client/new_project/new_project_port.dart';
 import 'package:design_system/design_system.dart';
 import 'package:domain/domain.dart';
 import 'package:flutter/material.dart';
@@ -56,6 +55,13 @@ final class ScriptedPort implements NewProjectPort {
       calls.add('bind $workspaceRef $provision ${repositoryUrl ?? '-'}');
 
   @override
+  Future<void> grantUpload(
+    ChannelId forum,
+    PrincipalId runner, {
+    required String idempotencyKey,
+  }) async => calls.add('grantUpload');
+
+  @override
   Future<BindingReadiness?> readiness(ChannelId forum) async {
     calls.add('readiness');
     return answers.length > 1 ? answers.removeAt(0) : answers.firstOrNull;
@@ -73,10 +79,13 @@ final class ScriptedPort implements NewProjectPort {
 }
 
 class Opener extends StatefulWidget {
-  const Opener({super.key, required this.port, this.results});
+  const Opener({super.key, required this.port, this.results, this.runners});
 
   final ScriptedPort port;
   final List<NewProjectResult?>? results;
+
+  /// The runner choice; null offers two code runners.
+  final List<ProjectRunner>? runners;
 
   @override
   State<Opener> createState() => _OpenerState();
@@ -95,10 +104,12 @@ class _OpenerState extends State<Opener> {
             spaceName: 'Engineering',
             spaceRunner: _runnerA,
             port: widget.port,
-            runners: () async => [
-              ProjectRunner(id: _runnerA, name: 'Code Runner'),
-              ProjectRunner(id: _runnerB, name: 'Lab Runner'),
-            ],
+            runners: () async =>
+                widget.runners ??
+                [
+                  ProjectRunner(id: _runnerA, name: 'Code Runner'),
+                  ProjectRunner(id: _runnerB, name: 'Lab Runner'),
+                ],
             pollInterval: const Duration(seconds: 2),
             wait: const Duration(seconds: 10),
             nameMaxChars: 40,
@@ -117,17 +128,59 @@ Future<AppLocalizations> open(
   WidgetTester tester,
   ScriptedPort port, [
   List<NewProjectResult?>? results,
+  List<ProjectRunner>? runners,
 ]) async {
   tester.view.physicalSize = const Size(1400, 1200);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
-  await tester.pumpWidget(hostScreen(Opener(port: port, results: results)));
+  await tester.pumpWidget(
+    hostScreen(Opener(port: port, results: results, runners: runners)),
+  );
   await tester.tap(find.text('open'));
   await tester.pumpAndSettle();
   return AppLocalizations.delegate.load(const Locale('en'));
 }
 
 void main() {
+  testWidgets(
+    'a chat agent is greyed out; the only code runner is chosen and assigned (F-PROJEKT-BEREIT)',
+    (tester) async {
+      final port = ScriptedPort()
+        ..answers.add(const BindingReadiness(ready: true));
+      final l = await open(tester, port, null, [
+        ProjectRunner(id: _runnerB, name: 'Claude Code'),
+        // The space's default operator is a chat agent.
+        ProjectRunner(id: _runnerA, name: 'Hermes', canServe: false),
+      ]);
+      expect(
+        find.byKey(const ValueKey('newProject.runner.hint')),
+        findsOneWidget,
+      );
+      expect(find.text(l.newProjectRunnerOnlyCodeRunners), findsOneWidget);
+      final field = tester.widget<DsDropdownField<PrincipalId>>(
+        find.byType(DsDropdownField<PrincipalId>),
+      );
+      expect(field.initialSelection, _runnerB);
+      final hermes = field.entries.singleWhere((e) => e.value == _runnerA);
+      expect(hermes.enabled, isFalse);
+      expect(hermes.label, l.newProjectRunnerCannotServe('Hermes'));
+      await tester.enterText(
+        find.byKey(const ValueKey('newProject.name')),
+        'shop',
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('newProject.create')));
+      await tester.pumpAndSettle();
+      expect(port.calls, [
+        'createForum shop',
+        'assignRunner',
+        'bind shop init -',
+        'grantUpload',
+        'readiness',
+      ]);
+    },
+  );
+
   testWidgets(
     'clone: the name follows the URL, then the steps run and the forum opens',
     (tester) async {
@@ -162,6 +215,7 @@ void main() {
       expect(port.calls, [
         'createForum web-site',
         'bind web-site clone https://git.example.com/team/web-site.git',
+        'grantUpload',
         'readiness',
         'readiness',
       ]);
@@ -256,6 +310,7 @@ void main() {
         'createForum a-shopping-list-app',
         'saveIdea',
         'bind a-shopping-list-app init -',
+        'grantUpload',
         'readiness',
       ]);
       expect(find.text(l.newProjectStepCreating), findsOneWidget);

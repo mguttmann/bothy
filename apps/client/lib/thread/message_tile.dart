@@ -109,6 +109,7 @@ class MessageTile extends StatefulWidget {
     this.components,
     this.longPressMenu = false,
     this.selection,
+    this.notice,
   });
 
   /// The message.
@@ -157,6 +158,10 @@ class MessageTile extends StatefulWidget {
   /// selection of the history, which spans messages (01 6.15; ticket
   /// FIX-drag-select-autoscroll); null leaves the content without a selection.
   final ValueListenable<String>? selection;
+
+  /// A line below the content, such as the cause and "Trigger again" of a message that failed
+  /// because its project was not ready (F-PROJEKT-BEREIT); null for none.
+  final Widget? notice;
 
   @override
   State<MessageTile> createState() => _MessageTileState();
@@ -326,6 +331,7 @@ class _MessageTileState extends State<MessageTile> {
                 ),
                 child: files,
               ),
+            if (widget.notice case final notice? when editing == null) notice,
             ...widget.started,
           ],
         ),
