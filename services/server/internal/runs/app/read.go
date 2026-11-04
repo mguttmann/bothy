@@ -322,7 +322,9 @@ func (s *Service) fill(ctx context.Context, a actor.Actor, limit int, after *Run
 }
 
 // keyOf is the keyset position of a row.
-func keyOf(r RunRow) *RunKey { return &RunKey{QueuedAt: r.QueuedAt, ID: r.ID} }
+func keyOf(r RunRow) *RunKey {
+	return &RunKey{QueuedAt: r.QueuedAt, FinishedAt: r.FinishedAt, ID: r.ID}
+}
 
 // scan adds the rows of one batch that pass keep to kept. at is the index of the row that filled
 // the page (limit above 0), -1 when the page is not full.

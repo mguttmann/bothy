@@ -150,10 +150,12 @@ type StallMark struct {
 	At, StalledBefore time.Time
 }
 
-// RunKey is the keyset position (queued_at DESC, id DESC) of the run lists.
+// RunKey is the keyset position (queued_at DESC, id DESC) of the run lists; FinishedAt is the
+// position (finished_at DESC, id DESC) of the run history (F-LAUFHISTORIE).
 type RunKey struct {
-	QueuedAt time.Time
-	ID       ids.ID
+	QueuedAt   time.Time
+	FinishedAt time.Time
+	ID         ids.ID
 }
 
 // ThreadRunsRead is the input of Repository.ThreadRuns.
@@ -176,6 +178,21 @@ type ActiveRunsRead struct {
 	// AgentID keeps one agent; zero for all.
 	AgentID ids.ID
 	// After is the keyset position the batch starts after; nil for the first batch.
+	After *RunKey
+	Limit int
+}
+
+// HistoryRead is the input of Repository.HistoryRuns (F-LAUFHISTORIE): the finished runs of
+// ThreadIDs, optionally of one agent and one end state.
+type HistoryRead struct {
+	// ThreadIDs are the threads the use case resolved from the channels of its Scope; empty reads
+	// nothing.
+	ThreadIDs []ids.ID
+	// AgentID keeps one agent; zero for all.
+	AgentID ids.ID
+	// State keeps completed, failed or cancelled; "" for all three.
+	State string
+	// After is the keyset position (FinishedAt and ID) the batch starts after; nil for the first.
 	After *RunKey
 	Limit int
 }
@@ -242,6 +259,9 @@ type Repository interface {
 	// ActiveRuns reads the runs in queued, running or waiting_input in keyset order (queued_at
 	// DESC, id DESC), optionally of one agent.
 	ActiveRuns(ctx context.Context, q ActiveRunsRead) ([]RunRow, error)
+	// HistoryRuns reads the finished runs of q.ThreadIDs in keyset order (finished_at DESC, id
+	// DESC), optionally of one agent and one end state (listRunHistory, F-LAUFHISTORIE).
+	HistoryRuns(ctx context.Context, q HistoryRead) ([]RunRow, error)
 	// ActiveCounts groups the active runs by agent and state for the gauge bothy.run.active.
 	ActiveCounts(ctx context.Context) ([]ActiveCount, error)
 	// RunningOfAgent reads the runs of agentID in state running in ascending id, never nil

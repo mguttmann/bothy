@@ -599,4 +599,63 @@ void main() {
       },
     );
   });
+  group('listRunHistory', () {
+    test(
+      'lists ended visible runs newest end first with filter and paging',
+      () async {
+        final m1 = post(w.alex, w.releaseNotes, 'Run one');
+        final m2 = post(w.alex, w.printer, 'Run two');
+        final m3 = post(w.sam, w.budget, 'Run hidden');
+        Map<String, Object?> ended(
+          Map<String, Object?> message,
+          String state,
+          String by,
+        ) {
+          final run = world.createRun(
+            agentId: w.robin.id,
+            triggeringMessageId: message['id']! as String,
+            triggeredBy: by,
+          );
+          world.setRunState(run['id']! as String, state);
+          return run;
+        }
+
+        final first = ended(m1, 'completed', w.alex.id);
+        final second = ended(m2, 'failed', w.alex.id);
+        final hidden = ended(m3, 'cancelled', w.sam.id);
+        final active = world.createRun(
+          agentId: w.robin.id,
+          triggeringMessageId: m1['id']! as String,
+          triggeredBy: w.alex.id,
+        );
+
+        final runs = alexApi.getRunsApi();
+        final seen = <String>[];
+        String? cursor;
+        do {
+          final page = (await runs.listRunHistory(
+            limit: 1,
+            cursor: cursor,
+          )).data!;
+          seen.addAll([for (final r in page.items) r.id]);
+          cursor = page.nextCursor;
+        } while (cursor != null);
+        expect(seen, [second['id'], first['id']]);
+        expect(seen, isNot(contains(active['id'])));
+        expect(seen, isNot(contains(hidden['id'])));
+
+        final failed = (await runs.listRunHistory(state: 'failed')).data!;
+        expect([for (final r in failed.items) r.id], [second['id']]);
+        final entry = failed.items.single;
+        expect(entry.chat?.threadId, entry.threadId);
+        expect(entry.finishedAt, isNotNull);
+
+        final page = (await runs.listRunHistory(limit: 1)).data!;
+        final bad = await problem(
+          runs.listRunHistory(state: 'failed', cursor: page.nextCursor),
+        );
+        expect(bad['code'], 'cursor_invalid');
+      },
+    );
+  });
 }

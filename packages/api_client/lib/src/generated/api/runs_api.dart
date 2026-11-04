@@ -14,6 +14,7 @@ import 'package:api_client/src/generated/model/problem.dart';
 import 'package:api_client/src/generated/model/run.dart';
 import 'package:api_client/src/generated/model/run_cancel.dart';
 import 'package:api_client/src/generated/model/run_context.dart';
+import 'package:api_client/src/generated/model/run_history_page.dart';
 import 'package:api_client/src/generated/model/run_step_page.dart';
 import 'package:api_client/src/generated/model/run_summary.dart';
 import 'package:api_client/src/generated/model/run_summary_page.dart';
@@ -422,6 +423,131 @@ class RunsApi {
     }
 
     return Response<RunSummaryPage>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// Finished runs, newest first
+  /// Runs in &#x60;completed&#x60;, &#x60;failed&#x60; or &#x60;cancelled&#x60; across every thread the caller may read, ordered by &#x60;finished_at&#x60; descending, then by ID; each run passes &#x60;run.read&#x60; in filter mode, as in &#x60;listActiveRuns&#x60; (docs/spec/25-visualization.md, section 6.7). A &#x60;space_id&#x60; or &#x60;agent_id&#x60; the caller cannot see gives an empty page. Runs stay as long as their thread: there is no time-based deletion of runs, so the last page reaches the oldest run the caller may read.
+  ///
+  /// Parameters:
+  /// * [cursor] - Cursor from `next_cursor` of the previous page.
+  /// * [limit]
+  /// * [spaceId] - Only runs whose thread lies in a channel of this space.
+  /// * [agentId] - Only runs of this agent.
+  /// * [state] - Only runs that ended in this state.
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [RunHistoryPage] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<RunHistoryPage>> listRunHistory({
+    String? cursor,
+    int? limit,
+    String? spaceId,
+    String? agentId,
+    String? state,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/run-history';
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'apiKey',
+            'name': 'consoleSession',
+            'keyName': '__Host-console_session',
+            'where': '',
+          },
+          {'type': 'http', 'scheme': 'DPoP', 'name': 'dpopAuth'},
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearerAuth'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _queryParameters = <String, dynamic>{
+      if (cursor != null)
+        r'cursor': encodeQueryParameter(
+          _serializers,
+          cursor,
+          const FullType(String),
+        ),
+      if (limit != null)
+        r'limit': encodeQueryParameter(
+          _serializers,
+          limit,
+          const FullType(int),
+        ),
+      if (spaceId != null)
+        r'space_id': encodeQueryParameter(
+          _serializers,
+          spaceId,
+          const FullType(String),
+        ),
+      if (agentId != null)
+        r'agent_id': encodeQueryParameter(
+          _serializers,
+          agentId,
+          const FullType(String),
+        ),
+      if (state != null)
+        r'state': encodeQueryParameter(
+          _serializers,
+          state,
+          const FullType(String),
+        ),
+    };
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      queryParameters: _queryParameters,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    RunHistoryPage? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(
+              rawResponse,
+              specifiedType: const FullType(RunHistoryPage),
+            ) as RunHistoryPage;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<RunHistoryPage>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,

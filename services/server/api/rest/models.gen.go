@@ -5928,6 +5928,27 @@ func (e PutNotificationPreferenceParamsTargetKind) Valid() bool {
 	}
 }
 
+// Defines values for ListRunHistoryParamsState.
+const (
+	ListRunHistoryParamsStateCancelled ListRunHistoryParamsState = "cancelled"
+	ListRunHistoryParamsStateCompleted ListRunHistoryParamsState = "completed"
+	ListRunHistoryParamsStateFailed    ListRunHistoryParamsState = "failed"
+)
+
+// Valid indicates whether the value is a known member of the ListRunHistoryParamsState enum.
+func (e ListRunHistoryParamsState) Valid() bool {
+	switch e {
+	case ListRunHistoryParamsStateCancelled:
+		return true
+	case ListRunHistoryParamsStateCompleted:
+		return true
+	case ListRunHistoryParamsStateFailed:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for SearchParamsType.
 const (
 	Files    SearchParamsType = "files"
@@ -14137,6 +14158,70 @@ type RunFollowup struct {
 // RunFollowupState defines model for RunFollowup.State.
 type RunFollowupState string
 
+// RunHistoryEntry A finished run in the run history (docs/spec/25-visualization.md, section 6.7). The step tree, the last text excerpt and the triggering message come from `getRun`.
+type RunHistoryEntry struct {
+	// AgentId UUIDv7 (RFC 9562), lowercase canonical form.
+	AgentId Uuid `json:"agent_id"`
+
+	// BillingModeExpected Backend policy of an agent. `personal` runs on the subscription of exactly one person.
+	BillingModeExpected BillingMode `json:"billing_mode_expected"`
+
+	// BillingModeUsed Backend policy of an agent. `personal` runs on the subscription of exactly one person.
+	BillingModeUsed *BillingMode `json:"billing_mode_used,omitempty"`
+
+	// ChannelId UUIDv7 (RFC 9562), lowercase canonical form.
+	ChannelId Uuid `json:"channel_id"`
+
+	// Chat The chat a run belongs to, as the sidebar names it: the name of its channel (the project) and the title of its thread. Present only when the caller may read the thread (`thread.read`, the same rule as the sidebar); absent otherwise, and then a client shows neither a name nor a link (docs/spec/25-visualization.md, section 4, rule 6).
+	Chat *StatsRunChat `json:"chat,omitempty"`
+
+	// Cost Amount in micro units of the currency. Never a float.
+	Cost       Money  `json:"cost"`
+	DurationMs *int64 `json:"duration_ms,omitempty"`
+
+	// FinishedAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+	FinishedAt Timestamp `json:"finished_at"`
+
+	// Id UUIDv7 (RFC 9562), lowercase canonical form.
+	Id Uuid `json:"id"`
+
+	// Metrics Schema `run_metrics.v1`.
+	Metrics RunMetrics `json:"metrics"`
+
+	// Model Examples: model-large
+	Model *string `json:"model,omitempty"`
+
+	// QueuedAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+	QueuedAt Timestamp `json:"queued_at"`
+
+	// SpaceId Space of the channel now; absent for a direct message channel.
+	SpaceId *Uuid `json:"space_id,omitempty"`
+
+	// StartedAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+	StartedAt *Timestamp `json:"started_at,omitempty"`
+	State     RunState   `json:"state"`
+
+	// StateReason Examples: user_cancelled
+	StateReason *string `json:"state_reason,omitempty"`
+	StepCount   int     `json:"step_count"`
+
+	// Summary Examples: Found the cause and proposed a fix
+	Summary *string `json:"summary,omitempty"`
+
+	// ThreadId UUIDv7 (RFC 9562), lowercase canonical form.
+	ThreadId Uuid `json:"thread_id"`
+}
+
+// RunHistoryPage One page of the run history. `next_cursor` is absent on the last page, which ends with the oldest run the caller may read.
+type RunHistoryPage struct {
+	Items []RunHistoryEntry `json:"items"`
+
+	// NextCursor Opaque pagination cursor. Clients must not parse or build cursors.
+	//
+	// Examples: eyJrIjoiMDE5MmY0YTAtN2IxYy03MDAwLThhMDAtMDAwMDAwMDAwMDAxIn0
+	NextCursor *Cursor `json:"next_cursor,omitempty"`
+}
+
 // RunMetrics Schema `run_metrics.v1`.
 type RunMetrics struct {
 	ApiRetries     *int `json:"api_retries,omitempty"`
@@ -18465,6 +18550,25 @@ type GetPushPreviewParams struct {
 	// Kind Kind of the notification, copied from the push payload (`k`, 13, 6.1 and 6.2). The server keeps no record of a hint, so the kind selects only the labels on the device; the answer echoes it. Only the kinds that point at a message are allowed; `security` and `admin` give `400 validation_failed` with `errors[].code` `invalid` at `#query/kind`, before the token is checked.
 	Kind NotificationKind `form:"kind" json:"kind"`
 }
+
+// ListRunHistoryParams defines parameters for ListRunHistory.
+type ListRunHistoryParams struct {
+	// Cursor Cursor from `next_cursor` of the previous page.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Limit  *Limit  `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// SpaceId Only runs whose thread lies in a channel of this space.
+	SpaceId *Uuid `form:"space_id,omitempty" json:"space_id,omitempty"`
+
+	// AgentId Only runs of this agent.
+	AgentId *Uuid `form:"agent_id,omitempty" json:"agent_id,omitempty"`
+
+	// State Only runs that ended in this state.
+	State *ListRunHistoryParamsState `form:"state,omitempty" json:"state,omitempty"`
+}
+
+// ListRunHistoryParamsState defines parameters for ListRunHistory.
+type ListRunHistoryParamsState string
 
 // ListActiveRunsParams defines parameters for ListActiveRuns.
 type ListActiveRunsParams struct {

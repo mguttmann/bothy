@@ -435,6 +435,30 @@ func (r *Repository) ActiveRuns(ctx context.Context, a app.ActiveRunsRead) ([]ap
 	return runs(rows, err, "reading the active runs")
 }
 
+// HistoryRuns implements app.Repository.
+func (r *Repository) HistoryRuns(ctx context.Context, q app.HistoryRead) ([]app.RunRow, error) {
+	limit, err := rowLimit(q.Limit)
+	if err != nil {
+		return nil, err
+	}
+	if len(q.ThreadIDs) == 0 {
+		return []app.RunRow{}, nil
+	}
+	threads := make([]pgtype.UUID, 0, len(q.ThreadIDs))
+	for _, id := range q.ThreadIDs {
+		threads = append(threads, uuid(id))
+	}
+	p := sqlcgen.HistoryRunsParams{ThreadIds: threads, AgentID: optionalUUID(q.AgentID), RowLimit: limit}
+	if q.State != "" {
+		p.EndState = pgtype.Text{String: q.State, Valid: true}
+	}
+	if q.After != nil {
+		p.AfterAt, p.AfterID = ts(q.After.FinishedAt), uuid(q.After.ID)
+	}
+	rows, err := r.read(ctx).HistoryRuns(ctx, p)
+	return runs(rows, err, "reading the run history")
+}
+
 // ActiveCounts implements app.Repository.
 func (r *Repository) ActiveCounts(ctx context.Context) ([]app.ActiveCount, error) {
 	rows, err := r.read(ctx).ActiveCounts(ctx)

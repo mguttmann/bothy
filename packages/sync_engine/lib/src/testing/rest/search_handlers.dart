@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// Handlers of the cross-cutting views of brief M4-23: `search` (14 4), `searchThreadTitles`
-/// (14 4.9), `listMyMentions` (01 3.5) and `listActiveRuns` (01 D10). `getTranscript` and
+/// (14 4.9), `listMyMentions` (01 3.5), `listActiveRuns` (01 D10) and `listRunHistory`
+/// (25 6.7). `getTranscript` and
 /// `cancelRun` already live in `file_handlers.dart` and `run_handlers.dart`.
 ///
 /// The fake simplifies the query language and the ranking of 14 4.2 and 4.5: `q` is split into
@@ -35,6 +36,9 @@ const Map<String, Set<String>> _filterTypes = {
 
 /// The run states "Running now" lists (`listActiveRuns`, 01 D10).
 const Set<String> _activeRunStates = {'queued', 'running', 'waiting_input'};
+
+/// The end states the run history lists (`listRunHistory`, F-LAUFHISTORIE).
+const Set<String> _endedRunStates = {'completed', 'failed', 'cancelled'};
 
 final RegExp _word = RegExp(r'[\p{L}\p{N}]+', unicode: true);
 
@@ -532,6 +536,51 @@ void registerSearchHandlers(RestFake rest) {
       );
       return FakeResponse(200, {
         'items': [for (final run in page.items) world.runSummary(run)],
+        'next_cursor': ?page.next,
+      });
+    })
+    ..handle('listRunHistory', (r) {
+      final me = r.person.id;
+      final spaceId = r.query('space_id');
+      final agentId = r.query('agent_id');
+      final state = r.query('state');
+      if (state != null && !_endedRunStates.contains(state)) {
+        throw const FakeProblem(400, 'validation_failed');
+      }
+      final runs = [
+        for (final run in world.runs.values)
+          if (_endedRunStates.contains(run['state']) &&
+              run['finished_at'] != null &&
+              world.seesChannel(me, run['channel_id']! as String) &&
+              (spaceId == null ||
+                  world.channels[run['channel_id']]?.spaceId == spaceId) &&
+              (agentId == null || run['agent_id'] == agentId) &&
+              (state == null || run['state'] == state))
+            run,
+      ];
+      // Newest end first (F-LAUFHISTORIE, 25 6.7).
+      List<Object?> keyOf(JsonMap run) => [run['finished_at'], run['id']];
+      runs.sort((a, b) => _descending(keyOf(a), keyOf(b)));
+      final hash = _hashOf(me, {
+        'space_id': spaceId,
+        'agent_id': agentId,
+        'state': state,
+      });
+      final cursor = r.query('cursor');
+      final page = _page(
+        entries: runs,
+        keyOf: keyOf,
+        compare: _descending,
+        limit: _limit(
+          r,
+          settings.listPageSizeDefault,
+          settings.listPageSizeMax,
+        ),
+        hash: hash,
+        after: cursor == null ? null : _decodeCursor(cursor, hash, 2).key,
+      );
+      return FakeResponse(200, {
+        'items': [for (final run in page.items) world.runHistoryEntry(run)],
         'next_cursor': ?page.next,
       });
     });

@@ -206,6 +206,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - listPins
   - listPrices
   - listReactions
+  - listRunHistory
   - listRunSteps
   - listServedChannels
   - listSpaceChannels

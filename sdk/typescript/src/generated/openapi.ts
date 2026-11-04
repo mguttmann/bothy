@@ -3750,6 +3750,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/run-history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Finished runs, newest first
+         * @description Runs in `completed`, `failed` or `cancelled` across every thread the caller may read, ordered by `finished_at` descending, then by ID; each run passes `run.read` in filter mode, as in `listActiveRuns` (docs/spec/25-visualization.md, section 6.7). A `space_id` or `agent_id` the caller cannot see gives an empty page. Runs stay as long as their thread: there is no time-based deletion of runs, so the last page reaches the oldest run the caller may read.
+         */
+        get: operations["listRunHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/runs/{run_id}": {
         parameters: {
             query?: never;
@@ -11484,6 +11504,38 @@ export interface components {
         /** @description One page. `next_cursor` is absent on the last page. */
         RunSummaryPage: {
             items: components["schemas"]["RunSummary"][];
+            next_cursor?: components["schemas"]["Cursor"];
+        };
+        /** @description A finished run in the run history (docs/spec/25-visualization.md, section 6.7). The step tree, the last text excerpt and the triggering message come from `getRun`. */
+        RunHistoryEntry: {
+            id: components["schemas"]["Uuid"];
+            thread_id: components["schemas"]["Uuid"];
+            channel_id: components["schemas"]["Uuid"];
+            /** @description Space of the channel now; absent for a direct message channel. */
+            space_id?: components["schemas"]["Uuid"];
+            agent_id: components["schemas"]["Uuid"];
+            state: components["schemas"]["RunState"];
+            /** @example user_cancelled */
+            state_reason?: string;
+            billing_mode_expected: components["schemas"]["BillingMode"];
+            billing_mode_used?: components["schemas"]["BillingMode"];
+            /** @example model-large */
+            model?: string;
+            /** @example Found the cause and proposed a fix */
+            summary?: string;
+            cost: components["schemas"]["Money"];
+            metrics: components["schemas"]["RunMetrics"];
+            step_count: number;
+            queued_at: components["schemas"]["Timestamp"];
+            started_at?: components["schemas"]["Timestamp"];
+            finished_at: components["schemas"]["Timestamp"];
+            /** Format: int64 */
+            duration_ms?: number;
+            chat?: components["schemas"]["StatsRunChat"];
+        };
+        /** @description One page of the run history. `next_cursor` is absent on the last page, which ends with the oldest run the caller may read. */
+        RunHistoryPage: {
+            items: components["schemas"]["RunHistoryEntry"][];
             next_cursor?: components["schemas"]["Cursor"];
         };
         PinList: {
@@ -20568,6 +20620,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RunSummaryPage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
+    listRunHistory: {
+        parameters: {
+            query?: {
+                /** @description Cursor from `next_cursor` of the previous page. */
+                cursor?: components["parameters"]["Cursor"];
+                limit?: components["parameters"]["Limit"];
+                /** @description Only runs whose thread lies in a channel of this space. */
+                space_id?: components["schemas"]["Uuid"];
+                /** @description Only runs of this agent. */
+                agent_id?: components["schemas"]["Uuid"];
+                /** @description Only runs that ended in this state. */
+                state?: "completed" | "failed" | "cancelled";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK. */
+            200: {
+                headers: {
+                    "Correlation-Id": components["headers"]["Correlation-Id"];
+                    RateLimit: components["headers"]["RateLimit"];
+                    "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunHistoryPage"];
                 };
             };
             400: components["responses"]["BadRequest"];

@@ -506,6 +506,37 @@ func (r *repo) ActiveRuns(_ context.Context, q app.ActiveRunsRead) ([]app.RunRow
 	return r.keyset(func(x app.RunRow) bool { return x.State.Active() && (q.AgentID.IsZero() || x.AgentID == q.AgentID) }, q.After, q.Limit), nil
 }
 
+// HistoryRuns implements app.Repository like adapters/postgres: the finished runs of the thread
+// set in (finished_at DESC, id DESC) order after q.After.
+func (r *repo) HistoryRuns(_ context.Context, q app.HistoryRead) ([]app.RunRow, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	var all []app.RunRow
+	for _, x := range r.runs {
+		if x.State.Ended() && slices.Contains(q.ThreadIDs, x.ThreadID) && (q.AgentID.IsZero() || x.AgentID == q.AgentID) &&
+			(q.State == "" || string(x.State) == q.State) {
+			all = append(all, x)
+		}
+	}
+	slices.SortFunc(all, func(a, b app.RunRow) int {
+		if c := b.FinishedAt.Compare(a.FinishedAt); c != 0 {
+			return c
+		}
+		return bytes.Compare(b.ID[:], a.ID[:])
+	})
+	out := []app.RunRow{}
+	for _, x := range all {
+		if a := q.After; a != nil && (x.FinishedAt.After(a.FinishedAt) || (x.FinishedAt.Equal(a.FinishedAt) && bytes.Compare(x.ID[:], a.ID[:]) >= 0)) {
+			continue
+		}
+		if len(out) == q.Limit {
+			break
+		}
+		out = append(out, x)
+	}
+	return out, nil
+}
+
 // RunningOfAgent implements app.Repository like adapters/postgres.
 func (r *repo) RunningOfAgent(_ context.Context, agentID ids.ID) ([]runs.RunningRun, error) {
 	r.mu.Lock()

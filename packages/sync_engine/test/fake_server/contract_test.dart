@@ -760,6 +760,7 @@ void main() {
     await search.searchThreadTitles(q: 'rel');
     await api.getMeApi().listMyMentions();
     await api.getRunsApi().listActiveRuns();
+    await api.getRunsApi().listRunHistory();
     await fileApi.abortUpload(fileId: (await startUpload(png)).fileId);
     await fileApi.deleteFile(fileId: (await startUpload(png)).fileId);
 

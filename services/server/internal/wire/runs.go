@@ -13,6 +13,8 @@ import (
 	authztelemetry "github.com/OWNER/bothy/services/server/internal/authz/adapters/telemetry"
 	"github.com/OWNER/bothy/services/server/internal/billing"
 	"github.com/OWNER/bothy/services/server/internal/chat"
+	chatpg "github.com/OWNER/bothy/services/server/internal/chat/adapters/postgres"
+	chatapp "github.com/OWNER/bothy/services/server/internal/chat/app"
 	"github.com/OWNER/bothy/services/server/internal/files"
 	"github.com/OWNER/bothy/services/server/internal/gateway/adapters/autocompleterelay"
 	"github.com/OWNER/bothy/services/server/internal/identity"
@@ -141,6 +143,10 @@ type RunsDeps struct {
 	AppDispatches runsapp.DispatchScheduler
 }
 
+// Compile-time check: the chat use cases are the places of the run history, which runs takes
+// from its Threads (F-LAUFHISTORIE).
+var _ runsapp.HistoryPlaces = (*chatapp.Service)(nil)
+
 // NewRuns builds the runs module over pool with the unit of work uow, the Authorizer az and the
 // collaborators d, the clock (nil means clock.System()) and log (nil means slog.Default()), which
 // with bothy.authz.errors records a listed run that fails run.read (filter_mismatch). It opens no
@@ -179,6 +185,12 @@ func NewRuns(cfg runsapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize
 		return nil, err
 	}
 	repo := runspg.NewRepository(pool)
+	// The chat names of the run history (F-LAUFHISTORIE): the statistics reader of chat names the
+	// channel and thread of each run the use case already authorized.
+	chats, err := chatapp.NewStats(chatpg.NewRepository(pool))
+	if err != nil {
+		return nil, err
+	}
 	deps := runsapp.Deps{
 		Repo: repo, UoW: uow, Authorizer: az, Events: d.Events, Messages: d.Messages, Threads: d.Threads,
 		Channels: d.Channels, Agents: d.Agents, Cursors: runshttp.Cursors{}, Errors: counter, Log: log, Clock: clk, Metrics: d.Metrics,
@@ -186,7 +198,7 @@ func NewRuns(cfg runsapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize
 		Heartbeats: d.Heartbeats, Mismatches: mismatches, FollowupRows: repo, Steps: stepMetrics(d.Metrics), Sessions: d.Sessions, Costs: d.Costs,
 		ContextRows: repo,
 		Files:       d.Files, Holds: d.Holds, Uncorrelated: synctelemetry.Uncorrelated, Measure: d.Measure, Transcripts: d.Transcripts,
-		AppDispatches: d.AppDispatches,
+		AppDispatches: d.AppDispatches, Chats: chats,
 	}
 	svc, components, err := newRunsService(cfg, deps, d, repo)
 	if err != nil {

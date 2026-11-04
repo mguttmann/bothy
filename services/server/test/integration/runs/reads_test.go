@@ -458,3 +458,93 @@ func TestRunActiveGauge(t *testing.T) {
 		t.Fatalf("gauge %v, want %v", keys(got), keys(want))
 	}
 }
+
+// historyIDs lists the ids of listRunHistory for name with the query, following every cursor.
+func (w *world) historyIDs(name, query string) []string {
+	w.t.Helper()
+	var out []string
+	cursor := ""
+	for {
+		q := query
+		if cursor != "" {
+			q += "&cursor=" + cursor
+		}
+		page := w.wantOK(w.do(name, http.MethodGet, "/api/v1/run-history?"+q, ""))
+		for _, it := range page["items"].([]any) {
+			out = append(out, it.(map[string]any)["id"].(string))
+		}
+		next, _ := page["next_cursor"].(string)
+		if next == "" {
+			return out
+		}
+		cursor = next
+	}
+}
+
+// TestListRunHistory_Visibility (F-LAUFHISTORIE): every reader sees the finished runs of the
+// channels it may read, newest end first, never an active run; the space, agent and state filters
+// narrow the list; an entry carries metrics, model, space and chat; a foreign cursor is
+// cursor_invalid and an active state validation_failed.
+func TestListRunHistory_Visibility(t *testing.T) {
+	t.Parallel()
+	w := runsWorld(t)
+	end := func(name string, channel ids.ID, state domain.State, reason string) string {
+		m := w.post(name, w.newThread(channel), "Please help")["id"].(string)
+		r, ok := w.runOf(m)
+		if !ok {
+			t.Fatalf("%s in %v opened no run", name, channel)
+		}
+		w.clk.Advance(time.Minute)
+		w.mustTransition(r.ID, domain.StateQueued, state, 1, reason, domain.SetterServer)
+		return r.ID
+	}
+	alg := end("alex", w.allgemein, domain.StateCancelled, "user_cancelled")
+	w.sql(`UPDATE runs SET model = 'model-large', metrics = '{"tokens_in": 1200, "tokens_out": 300, "tokens_cache_read": 9000, "tokens_cache_write": 40, "subagents": 7}' WHERE id = $1`, alg)
+	esk := end("alex", w.eskalation, domain.StateFailed, "stale")
+	kam := end("sam", w.kampagnen, domain.StateCancelled, "user_cancelled")
+	notes := end("owner", w.notizen, domain.StateFailed, "stale")
+	active, ok := w.runOf(w.post("alex", w.newThread(w.allgemein), "Still running")["id"].(string))
+	if !ok {
+		t.Fatal("no active run")
+	}
+	for _, c := range []struct {
+		name, query string
+		want        []string
+	}{
+		{"alex", "limit=1", []string{esk, alg}},
+		{"sam", "limit=1", []string{kam, alg}},
+		{"owner", "limit=2", []string{notes, kam, esk, alg}},
+		{"owner", "space_id=" + w.support.String(), []string{esk, alg}},
+		{"owner", "agent_id=" + w.texter.String(), []string{kam}},
+		{"owner", "state=failed", []string{notes, esk}},
+		{"owner", "space_id=" + ids.New().String(), nil},
+		{"alex", "space_id=" + w.marketing.String(), nil},
+	} {
+		if got := w.historyIDs(c.name, c.query); !slices.Equal(got, c.want) {
+			t.Fatalf("%s %s sees %v, want %v", c.name, c.query, got, c.want)
+		}
+	}
+	page := w.wantOK(w.do("alex", http.MethodGet, "/api/v1/run-history?limit=5", ""))
+	var entry map[string]any
+	for _, it := range page["items"].([]any) {
+		if e := it.(map[string]any); e["id"] == alg {
+			entry = e
+		}
+		if it.(map[string]any)["id"] == active.ID {
+			t.Fatal("an active run is in the history")
+		}
+	}
+	metrics := entry["metrics"].(map[string]any)
+	if entry["model"] != "model-large" || entry["space_id"] != w.support.String() || entry["state"] != "cancelled" ||
+		entry["finished_at"] == nil || metrics["subagents"].(float64) != 7 || metrics["tokens_cache_write"].(float64) != 40 {
+		t.Fatalf("entry %v", entry)
+	}
+	chat := entry["chat"].(map[string]any)
+	if chat["channel_name"] != "Allgemein" || chat["thread_id"] != entry["thread_id"] {
+		t.Fatalf("chat %v", chat)
+	}
+	first := w.wantOK(w.do("owner", http.MethodGet, "/api/v1/run-history?limit=1", ""))
+	w.want(w.do("owner", http.MethodGet, "/api/v1/run-history?state=failed&cursor="+first["next_cursor"].(string), ""),
+		http.StatusBadRequest, "cursor_invalid")
+	w.want(w.do("owner", http.MethodGet, "/api/v1/run-history?state=running", ""), http.StatusBadRequest, "")
+}

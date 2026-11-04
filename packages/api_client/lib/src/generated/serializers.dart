@@ -461,6 +461,8 @@ import 'package:api_client/src/generated/model/run_context_message.dart';
 import 'package:api_client/src/generated/model/run_cost.dart';
 import 'package:api_client/src/generated/model/run_finish.dart';
 import 'package:api_client/src/generated/model/run_followup.dart';
+import 'package:api_client/src/generated/model/run_history_entry.dart';
+import 'package:api_client/src/generated/model/run_history_page.dart';
 import 'package:api_client/src/generated/model/run_metrics.dart';
 import 'package:api_client/src/generated/model/run_patch.dart';
 import 'package:api_client/src/generated/model/run_patch_result.dart';
@@ -1087,6 +1089,8 @@ part 'serializers.g.dart';
   RunCost,
   RunFinish,
   RunFollowup,
+  RunHistoryEntry,
+  RunHistoryPage,
   RunMetrics,
   RunPatch,
   RunPatchResult,
@@ -1679,6 +1683,10 @@ Serializers serializers =
           ..addBuilderFactory(
             const FullType(BuiltList, [FullType(GdprRequest)]),
             () => ListBuilder<GdprRequest>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(RunHistoryEntry)]),
+            () => ListBuilder<RunHistoryEntry>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, [FullType(ChannelLabel)]),

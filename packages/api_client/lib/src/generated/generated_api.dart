@@ -489,6 +489,8 @@ export 'package:api_client/src/generated/model/run_context_message.dart';
 export 'package:api_client/src/generated/model/run_cost.dart';
 export 'package:api_client/src/generated/model/run_finish.dart';
 export 'package:api_client/src/generated/model/run_followup.dart';
+export 'package:api_client/src/generated/model/run_history_entry.dart';
+export 'package:api_client/src/generated/model/run_history_page.dart';
 export 'package:api_client/src/generated/model/run_metrics.dart';
 export 'package:api_client/src/generated/model/run_patch.dart';
 export 'package:api_client/src/generated/model/run_patch_result.dart';

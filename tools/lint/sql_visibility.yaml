@@ -441,6 +441,9 @@ exceptions:
   - query: runs.ActiveRuns
     category: thread_scope
     reason: "listActiveRuns and the snapshot read the active runs in batches, resolve their threads through chat.Threads.Locate, keep only threads whose channel is in Scope.ChannelIDs and authorize each row with run.read; runs has no channel_id (D-M2-05-9). The live frame of stats (M6-15) reads the same batches for the base frame of the node, which is never sent unfiltered: each receiver gets only the runs of the channels of its Scope after stats.read (docs/decisions.d/M6-15.md)"
+  - query: runs.HistoryRuns
+    category: thread_scope
+    reason: "listRunHistory reads the finished runs of the thread set the use case resolved through chat from the channels of Scope(run.read) (narrowed to one space), in batches, resolves each thread again through chat.Threads.Locate, keeps only threads whose channel is in Scope.ChannelIDs and authorizes each row with run.read; runs has no channel_id (D-M2-05-9, F-LAUFHISTORIE)"
   - query: runs.ActiveCounts
     category: system_job
     reason: "the gauge bothy.run.active of the worker counts the active runs per agent and state without a principal; only numbers, no content (M2-05)"
