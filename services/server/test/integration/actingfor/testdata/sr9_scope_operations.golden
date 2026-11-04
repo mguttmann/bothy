@@ -11,6 +11,7 @@ listHosts
 listMessageRevisions
 listPins
 listReactions
+listRunHistory
 listServedChannels
 listSpaceChannels
 listSpaces
