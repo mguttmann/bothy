@@ -1985,7 +1985,7 @@ class ChannelsApi {
   }
 
   /// Bind a forum to a project
-  ///
+  /// Creates or replaces the project binding of a forum. The forum&#39;s effective operator must be able to serve a project, that is an agent with &#x60;adapter_kind&#x60; &#x60;code_runner&#x60; (09 18.16); a forum without an operator or with another agent is refused with &#x60;400 validation_failed&#x60; and the field code &#x60;operator_cannot_serve_project&#x60; on &#x60;#path/channel_id&#x60;, before anything is written.
   ///
   /// Parameters:
   /// * [channelId]
@@ -2200,7 +2200,7 @@ class ChannelsApi {
   }
 
   /// Set or inherit the operator of a channel
-  /// Optional &#x60;resolve_i1&#x60; runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with &#x60;agent.billing_mode.set&#x60; and switched to &#x60;organization&#x60; first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.
+  /// Optional &#x60;resolve_i1&#x60; runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with &#x60;agent.billing_mode.set&#x60; and switched to &#x60;organization&#x60; first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none. On a forum with a project binding the new effective operator (the named agent, or the space&#39;s default operator for &#x60;inherit&#x60;) must be able to serve a project, that is an agent with &#x60;adapter_kind&#x60; &#x60;code_runner&#x60; (09 18.16); otherwise &#x60;400 validation_failed&#x60; with the field code &#x60;operator_cannot_serve_project&#x60; on &#x60;/agent_id&#x60; (on &#x60;/mode&#x60; for &#x60;inherit&#x60;).
   ///
   /// Parameters:
   /// * [channelId]

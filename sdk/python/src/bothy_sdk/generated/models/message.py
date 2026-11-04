@@ -62,7 +62,9 @@ class Message:
         trigger_state_at (datetime.datetime | Unset): RFC 3339 timestamp in UTC with millisecond precision and suffix
             `Z`.
         trigger_state_reason (str | Unset): Reason when `trigger_state` is `failed` or `cancelled`, e.g.
-            `billing_mode_personal_not_holder`, `run_active_other_agent`, `user_cancelled`.
+            `billing_mode_personal_not_holder`, `run_active_other_agent`, `user_cancelled`, `project_not_ready`,
+            `operator_cannot_serve_project`. A message that failed with `project_not_ready`, `operator_cannot_serve_project`
+            or `operator_not_in_channel` can be triggered again with `retriggerMessage` once the cause is fixed.
         my_reactions (list[str] | Unset): Emoji the caller reacted with. Only in REST responses, never in events.
         edited_at (datetime.datetime | Unset): RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
         deleted_at (datetime.datetime | Unset): RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.

@@ -31,7 +31,9 @@ class ProjectBinding:
             `repository_url`, which must be `https`. With `init` or `clone` the `workspace_ref` is one segment of
             `^[A-Za-z0-9][A-Za-z0-9._-]*$`. Absent means `none`; the server always sends it.
         ready_reason (str | Unset): The code the serving runner reported with `ready` false (09 18.12, for example
-            `provisioning` or `clone_failed`); absent while `ready` is true and before the first report.
+            `provisioning` or `clone_failed`), or `operator_cannot_serve_project` while the forum's effective operator is no
+            agent with `adapter_kind` `code_runner` (09 18.16; derived when read, never stored); absent while `ready` is
+            true and before the first report.
     """
 
     workspace_ref: str

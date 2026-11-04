@@ -112,6 +112,10 @@ def sync_detailed(
      Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are
     authorized with `agent.billing_mode.set` and switched to `organization` first, in the same
     transaction as the change; I1 is checked before the commit, and either both parts commit or none.
+    On a forum with a project binding the new effective operator (the named agent, or the space's
+    default operator for `inherit`) must be able to serve a project, that is an agent with
+    `adapter_kind` `code_runner` (09 18.16); otherwise `400 validation_failed` with the field code
+    `operator_cannot_serve_project` on `/agent_id` (on `/mode` for `inherit`).
 
     Args:
         channel_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -151,6 +155,10 @@ def sync(
      Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are
     authorized with `agent.billing_mode.set` and switched to `organization` first, in the same
     transaction as the change; I1 is checked before the commit, and either both parts commit or none.
+    On a forum with a project binding the new effective operator (the named agent, or the space's
+    default operator for `inherit`) must be able to serve a project, that is an agent with
+    `adapter_kind` `code_runner` (09 18.16); otherwise `400 validation_failed` with the field code
+    `operator_cannot_serve_project` on `/agent_id` (on `/mode` for `inherit`).
 
     Args:
         channel_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -185,6 +193,10 @@ async def asyncio_detailed(
      Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are
     authorized with `agent.billing_mode.set` and switched to `organization` first, in the same
     transaction as the change; I1 is checked before the commit, and either both parts commit or none.
+    On a forum with a project binding the new effective operator (the named agent, or the space's
+    default operator for `inherit`) must be able to serve a project, that is an agent with
+    `adapter_kind` `code_runner` (09 18.16); otherwise `400 validation_failed` with the field code
+    `operator_cannot_serve_project` on `/agent_id` (on `/mode` for `inherit`).
 
     Args:
         channel_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -222,6 +234,10 @@ async def asyncio(
      Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are
     authorized with `agent.billing_mode.set` and switched to `organization` first, in the same
     transaction as the change; I1 is checked before the commit, and either both parts commit or none.
+    On a forum with a project binding the new effective operator (the named agent, or the space's
+    default operator for `inherit`) must be able to serve a project, that is an agent with
+    `adapter_kind` `code_runner` (09 18.16); otherwise `400 validation_failed` with the field code
+    `operator_cannot_serve_project` on `/agent_id` (on `/mode` for `inherit`).
 
     Args:
         channel_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.

@@ -979,6 +979,7 @@ type ClientInterface interface {
 	// SetChannelOperatorWithBody Set or inherit the operator of a channel
 	//
 	// Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.
+	// On a forum with a project binding the new effective operator (the named agent, or the space's default operator for `inherit`) must be able to serve a project, that is an agent with `adapter_kind` `code_runner` (09 18.16); otherwise `400 validation_failed` with the field code `operator_cannot_serve_project` on `/agent_id` (on `/mode` for `inherit`).
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -988,6 +989,7 @@ type ClientInterface interface {
 	// SetChannelOperator Set or inherit the operator of a channel
 	//
 	// Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.
+	// On a forum with a project binding the new effective operator (the named agent, or the space's default operator for `inherit`) must be able to serve a project, that is an agent with `adapter_kind` `code_runner` (09 18.16); otherwise `400 validation_failed` with the field code `operator_cannot_serve_project` on `/agent_id` (on `/mode` for `inherit`).
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -1001,12 +1003,16 @@ type ClientInterface interface {
 
 	// PutProjectBindingWithBody Bind a forum to a project
 	//
+	// Creates or replaces the project binding of a forum. The forum's effective operator must be able to serve a project, that is an agent with `adapter_kind` `code_runner` (09 18.16); a forum without an operator or with another agent is refused with `400 validation_failed` and the field code `operator_cannot_serve_project` on `#path/channel_id`, before anything is written.
+	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with PUT /channels/{channel_id}/project-binding (the `PutProjectBinding` operationId).
 	PutProjectBindingWithBody(ctx context.Context, channelId ChannelIdPath, params *PutProjectBindingParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// PutProjectBinding Bind a forum to a project
+	//
+	// Creates or replaces the project binding of a forum. The forum's effective operator must be able to serve a project, that is an agent with `adapter_kind` `code_runner` (09 18.16); a forum without an operator or with another agent is refused with `400 validation_failed` and the field code `operator_cannot_serve_project` on `#path/channel_id`, before anything is written.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -2740,6 +2746,13 @@ type ClientInterface interface {
 	//
 	// Corresponds with PUT /messages/{message_id}/reactions/{emoji} (the `AddReaction` operationId).
 	AddReaction(ctx context.Context, messageId MessageIdPath, emoji EmojiPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RetriggerMessage Trigger a failed message again
+	//
+	// Runs the trigger decision (09 3.4) again for an own message whose `trigger_state` is `failed` with `trigger_state_reason` `project_not_ready`, `operator_cannot_serve_project` or `operator_not_in_channel`, after the cause was fixed (a runner set as operator, a folder created), so the person does not have to write the message again (09 3.7, addendum of 2026-11-04). Only the author may do this (`403 forbidden` with `reason` `not_self` otherwise); a message that is not readable is `404`; another state or reason, or a deleted message, is `409 invalid_state_transition`. When the message's thread is a thread whose fixed operator is not the channel's effective operator and never completed a run in it, the thread takes the channel's effective operator first (an exception to R-DM-12, recorded as `thread.updated`). Then the acceptance runs as for a new message: `agent.invoke` in request mode for the caller (authz audits a denial), and the message's `trigger_state` and `trigger_state_reason` follow it (`received` and a queued run, or `failed` with the reason of now). The answer is the message after the decision. Repeating the request after a successful retrigger answers `409 invalid_state_transition`, because the message is no longer `failed`.
+	//
+	// Corresponds with POST /messages/{message_id}/retrigger (the `RetriggerMessage` operationId).
+	RetriggerMessage(ctx context.Context, messageId MessageIdPath, params *RetriggerMessageParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListMessageRevisions Read earlier versions
 	//
@@ -6033,6 +6046,7 @@ func (c *Client) MoveChannel(ctx context.Context, channelId ChannelIdPath, param
 // SetChannelOperatorWithBody Set or inherit the operator of a channel
 //
 // Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.
+// On a forum with a project binding the new effective operator (the named agent, or the space's default operator for `inherit`) must be able to serve a project, that is an agent with `adapter_kind` `code_runner` (09 18.16); otherwise `400 validation_failed` with the field code `operator_cannot_serve_project` on `/agent_id` (on `/mode` for `inherit`).
 //
 // Takes any type of body and a specified content type.
 //
@@ -6052,6 +6066,7 @@ func (c *Client) SetChannelOperatorWithBody(ctx context.Context, channelId Chann
 // SetChannelOperator Set or inherit the operator of a channel
 //
 // Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.
+// On a forum with a project binding the new effective operator (the named agent, or the space's default operator for `inherit`) must be able to serve a project, that is an agent with `adapter_kind` `code_runner` (09 18.16); otherwise `400 validation_failed` with the field code `operator_cannot_serve_project` on `/agent_id` (on `/mode` for `inherit`).
 //
 // Takes a body of the `application/json` content type.
 //
@@ -6085,6 +6100,8 @@ func (c *Client) DeleteProjectBinding(ctx context.Context, channelId ChannelIdPa
 
 // PutProjectBindingWithBody Bind a forum to a project
 //
+// Creates or replaces the project binding of a forum. The forum's effective operator must be able to serve a project, that is an agent with `adapter_kind` `code_runner` (09 18.16); a forum without an operator or with another agent is refused with `400 validation_failed` and the field code `operator_cannot_serve_project` on `#path/channel_id`, before anything is written.
+//
 // Takes any type of body and a specified content type.
 //
 // Corresponds with PUT /channels/{channel_id}/project-binding (the `PutProjectBinding` operationId).
@@ -6101,6 +6118,8 @@ func (c *Client) PutProjectBindingWithBody(ctx context.Context, channelId Channe
 }
 
 // PutProjectBinding Bind a forum to a project
+//
+// Creates or replaces the project binding of a forum. The forum's effective operator must be able to serve a project, that is an agent with `adapter_kind` `code_runner` (09 18.16); a forum without an operator or with another agent is refused with `400 validation_failed` and the field code `operator_cannot_serve_project` on `#path/channel_id`, before anything is written.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -9965,6 +9984,23 @@ func (c *Client) RemoveReaction(ctx context.Context, messageId MessageIdPath, em
 // Corresponds with PUT /messages/{message_id}/reactions/{emoji} (the `AddReaction` operationId).
 func (c *Client) AddReaction(ctx context.Context, messageId MessageIdPath, emoji EmojiPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewAddReactionRequest(c.Server, messageId, emoji)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RetriggerMessage Trigger a failed message again
+//
+// Runs the trigger decision (09 3.4) again for an own message whose `trigger_state` is `failed` with `trigger_state_reason` `project_not_ready`, `operator_cannot_serve_project` or `operator_not_in_channel`, after the cause was fixed (a runner set as operator, a folder created), so the person does not have to write the message again (09 3.7, addendum of 2026-11-04). Only the author may do this (`403 forbidden` with `reason` `not_self` otherwise); a message that is not readable is `404`; another state or reason, or a deleted message, is `409 invalid_state_transition`. When the message's thread is a thread whose fixed operator is not the channel's effective operator and never completed a run in it, the thread takes the channel's effective operator first (an exception to R-DM-12, recorded as `thread.updated`). Then the acceptance runs as for a new message: `agent.invoke` in request mode for the caller (authz audits a denial), and the message's `trigger_state` and `trigger_state_reason` follow it (`received` and a queued run, or `failed` with the reason of now). The answer is the message after the decision. Repeating the request after a successful retrigger answers `409 invalid_state_transition`, because the message is no longer `failed`.
+//
+// Corresponds with POST /messages/{message_id}/retrigger (the `RetriggerMessage` operationId).
+func (c *Client) RetriggerMessage(ctx context.Context, messageId MessageIdPath, params *RetriggerMessageParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRetriggerMessageRequest(c.Server, messageId, params)
 	if err != nil {
 		return nil, err
 	}
@@ -23753,6 +23789,55 @@ func NewAddReactionRequest(server string, messageId MessageIdPath, emoji EmojiPa
 	return req, nil
 }
 
+// NewRetriggerMessageRequest constructs an http.Request for the RetriggerMessage method
+func NewRetriggerMessageRequest(server string, messageId MessageIdPath, params *RetriggerMessageParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "message_id", messageId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/messages/%s/retrigger", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
 // NewListMessageRevisionsRequest constructs an http.Request for the ListMessageRevisions method
 func NewListMessageRevisionsRequest(server string, messageId MessageIdPath) (*http.Request, error) {
 	var err error
@@ -23835,212 +23920,6 @@ func NewAddOwnerRequestWithBody(server string, params *AddOwnerParams, contentTy
 	}
 
 	operationPath := fmt.Sprintf("/owners")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
-	}
-
-	return req, nil
-}
-
-// NewRevokeOwnerRequest calls the generic RevokeOwner builder with application/json body
-func NewRevokeOwnerRequest(server string, userId UserIdPath, params *RevokeOwnerParams, body RevokeOwnerJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewRevokeOwnerRequestWithBody(server, userId, params, "application/json", bodyReader)
-}
-
-// NewRevokeOwnerRequestWithBody constructs an http.Request for the RevokeOwner method, with any body, and a specified content type
-func NewRevokeOwnerRequestWithBody(server string, userId UserIdPath, params *RevokeOwnerParams, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "user_id", userId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/owners/%s/revoke", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
-	}
-
-	return req, nil
-}
-
-// NewListPricesRequest constructs an http.Request for the ListPrices method
-func NewListPricesRequest(server string) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/prices")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewCreatePriceRequest calls the generic CreatePrice builder with application/json body
-func NewCreatePriceRequest(server string, params *CreatePriceParams, body CreatePriceJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewCreatePriceRequestWithBody(server, params, "application/json", bodyReader)
-}
-
-// NewCreatePriceRequestWithBody constructs an http.Request for the CreatePrice method, with any body, and a specified content type
-func NewCreatePriceRequestWithBody(server string, params *CreatePriceParams, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/prices")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
-	}
-
-	return req, nil
-}
-
-// NewClosePriceRequest calls the generic ClosePrice builder with application/json body
-func NewClosePriceRequest(server string, priceId PriceIdPath, params *ClosePriceParams, body ClosePriceJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewClosePriceRequestWithBody(server, priceId, params, "application/json", bodyReader)
-}
-
-// NewClosePriceRequestWithBody constructs an http.Request for the ClosePrice method, with any body, and a specified content type
-func NewClosePriceRequestWithBody(server string, priceId PriceIdPath, params *ClosePriceParams, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "price_id", priceId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/prices/%s/close", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}

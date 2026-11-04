@@ -19,7 +19,7 @@ part 'project_binding.g.dart';
 /// * [runnerConfig]
 /// * [provision]
 /// * [ready]
-/// * [readyReason] - The code the serving runner reported with `ready` false (09 18.12, for example `provisioning` or `clone_failed`); absent while `ready` is true and before the first report.
+/// * [readyReason] - The code the serving runner reported with `ready` false (09 18.12, for example `provisioning` or `clone_failed`), or `operator_cannot_serve_project` while the forum's effective operator is no agent with `adapter_kind` `code_runner` (09 18.16; derived when read, never stored); absent while `ready` is true and before the first report.
 /// * [version]
 @BuiltValue()
 abstract class ProjectBinding
@@ -45,7 +45,7 @@ abstract class ProjectBinding
   @BuiltValueField(wireName: r'ready')
   bool get ready;
 
-  /// The code the serving runner reported with `ready` false (09 18.12, for example `provisioning` or `clone_failed`); absent while `ready` is true and before the first report.
+  /// The code the serving runner reported with `ready` false (09 18.12, for example `provisioning` or `clone_failed`), or `operator_cannot_serve_project` while the forum's effective operator is no agent with `adapter_kind` `code_runner` (09 18.16; derived when read, never stored); absent while `ready` is true and before the first report.
   @BuiltValueField(wireName: r'ready_reason')
   String? get readyReason;
 

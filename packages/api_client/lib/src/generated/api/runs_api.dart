@@ -9,6 +9,7 @@ import 'package:built_value/serializer.dart';
 import 'package:dio/dio.dart';
 
 import 'package:api_client/src/generated/api_util.dart';
+import 'package:api_client/src/generated/model/message.dart';
 import 'package:api_client/src/generated/model/problem.dart';
 import 'package:api_client/src/generated/model/run.dart';
 import 'package:api_client/src/generated/model/run_cancel.dart';
@@ -645,6 +646,103 @@ class RunsApi {
     }
 
     return Response<RunSummaryPage>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// Trigger a failed message again
+  /// Runs the trigger decision (09 3.4) again for an own message whose &#x60;trigger_state&#x60; is &#x60;failed&#x60; with &#x60;trigger_state_reason&#x60; &#x60;project_not_ready&#x60;, &#x60;operator_cannot_serve_project&#x60; or &#x60;operator_not_in_channel&#x60;, after the cause was fixed (a runner set as operator, a folder created), so the person does not have to write the message again (09 3.7, addendum of 2026-11-04). Only the author may do this (&#x60;403 forbidden&#x60; with &#x60;reason&#x60; &#x60;not_self&#x60; otherwise); a message that is not readable is &#x60;404&#x60;; another state or reason, or a deleted message, is &#x60;409 invalid_state_transition&#x60;. When the message&#39;s thread is a thread whose fixed operator is not the channel&#39;s effective operator and never completed a run in it, the thread takes the channel&#39;s effective operator first (an exception to R-DM-12, recorded as &#x60;thread.updated&#x60;). Then the acceptance runs as for a new message: &#x60;agent.invoke&#x60; in request mode for the caller (authz audits a denial), and the message&#39;s &#x60;trigger_state&#x60; and &#x60;trigger_state_reason&#x60; follow it (&#x60;received&#x60; and a queued run, or &#x60;failed&#x60; with the reason of now). The answer is the message after the decision. Repeating the request after a successful retrigger answers &#x60;409 invalid_state_transition&#x60;, because the message is no longer &#x60;failed&#x60;.
+  ///
+  /// Parameters:
+  /// * [messageId]
+  /// * [idempotencyKey] - UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [Message] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<Message>> retriggerMessage({
+    required String messageId,
+    String? idempotencyKey,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/messages/{message_id}/retrigger'.replaceAll(
+      '{'
+      r'message_id'
+      '}',
+      encodeQueryParameter(
+        _serializers,
+        messageId,
+        const FullType(String),
+      ).toString(),
+    );
+    final _options = Options(
+      method: r'POST',
+      headers: <String, dynamic>{
+        if (idempotencyKey != null) r'Idempotency-Key': idempotencyKey,
+        ...?headers,
+      },
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'apiKey',
+            'name': 'consoleSession',
+            'keyName': '__Host-console_session',
+            'where': '',
+          },
+          {'type': 'http', 'scheme': 'DPoP', 'name': 'dpopAuth'},
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearerAuth'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    Message? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(
+              rawResponse,
+              specifiedType: const FullType(Message),
+            ) as Message;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<Message>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,

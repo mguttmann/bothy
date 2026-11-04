@@ -12043,7 +12043,7 @@ type Message struct {
 	// TriggerStateAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 	TriggerStateAt *Timestamp `json:"trigger_state_at,omitempty"`
 
-	// TriggerStateReason Reason when `trigger_state` is `failed` or `cancelled`, e.g. `billing_mode_personal_not_holder`, `run_active_other_agent`, `user_cancelled`.
+	// TriggerStateReason Reason when `trigger_state` is `failed` or `cancelled`, e.g. `billing_mode_personal_not_holder`, `run_active_other_agent`, `user_cancelled`, `project_not_ready`, `operator_cannot_serve_project`. A message that failed with `project_not_ready`, `operator_cannot_serve_project` or `operator_not_in_channel` can be triggered again with `retriggerMessage` once the cause is fixed.
 	TriggerStateReason *string `json:"trigger_state_reason,omitempty"`
 	Version            int64   `json:"version"`
 }
@@ -13148,7 +13148,7 @@ type ProjectBinding struct {
 	Provision *ProjectProvision `json:"provision,omitempty"`
 	Ready     bool              `json:"ready"`
 
-	// ReadyReason The code the serving runner reported with `ready` false (09 18.12, for example `provisioning` or `clone_failed`); absent while `ready` is true and before the first report.
+	// ReadyReason The code the serving runner reported with `ready` false (09 18.12, for example `provisioning` or `clone_failed`), or `operator_cannot_serve_project` while the forum's effective operator is no agent with `adapter_kind` `code_runner` (09 18.16; derived when read, never stored); absent while `ready` is true and before the first report.
 	//
 	// Examples: provisioning
 	ReadyReason *string `json:"ready_reason,omitempty"`
@@ -18366,6 +18366,12 @@ type ListReactionsParams struct {
 
 	// Emoji Only this emoji.
 	Emoji *string `form:"emoji,omitempty" json:"emoji,omitempty"`
+}
+
+// RetriggerMessageParams defines parameters for RetriggerMessage.
+type RetriggerMessageParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
 // AddOwnerParams defines parameters for AddOwner.
