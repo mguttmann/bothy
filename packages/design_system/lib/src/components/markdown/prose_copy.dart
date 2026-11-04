@@ -27,8 +27,9 @@ final RegExp _listItem = RegExp(r'^\s*(?:[-*+]|\d{1,9}[.)])(?:\s|$)');
 /// An ATX heading: up to three spaces, one to six `#`, then a space or the line end.
 final RegExp _heading = RegExp(r'^ {0,3}#{1,6}(?:\s|$)');
 
-/// A Markdown hard break at the end of a line: two or more spaces, or a backslash.
-final RegExp _hardBreak = RegExp(r'(?: {2,}|\\)$');
+/// A Markdown hard break at the end of a line: two or more spaces, or a backslash that is not
+/// itself escaped (an odd number of trailing backslashes).
+final RegExp _hardBreak = RegExp(r'(?: {2,}|(?<=(?:^|[^\\])(?:\\\\)*)\\)$');
 
 /// [text] as running text: the line breaks inside a paragraph become one space, so a paste into
 /// a mail or a chat reflows; a blank line stays the break between paragraphs.
@@ -36,8 +37,9 @@ final RegExp _hardBreak = RegExp(r'(?: {2,}|\\)$');
 /// * A line that starts a list item (`-`, `*`, `+`, `1.`, `1)`) or is a heading stays its own
 ///   line; a following line without such a start joins the item, a nested item keeps its
 ///   indentation.
-/// * A line that ends in a Markdown hard break (two spaces or a backslash) keeps its line break;
-///   the marker is dropped.
+/// * A line that ends in a Markdown hard break (two spaces or a backslash) and is followed by
+///   another line of its paragraph keeps its line break; the marker is dropped. A backslash at
+///   the end of a paragraph or of the text, or an escaped one (`\\`), stays as it is.
 /// * CRLF and a lone CR count as line breaks; a line of only white space is blank; leading and
 ///   trailing blank lines are dropped and several blank lines are one paragraph break.
 /// * Every other character, Unicode included, stays as it is; only the white space at a join
@@ -50,14 +52,20 @@ String dsProseCopy(String text) {
   final paragraphs = <List<String>>[];
   var current = <String>[];
   var breakAfter = false;
-  for (final raw in lines) {
+  for (var i = 0; i < lines.length; i++) {
+    final raw = lines[i];
     if (raw.trim().isEmpty) {
       if (current.isNotEmpty) paragraphs.add(current);
       current = <String>[];
       breakAfter = false;
       continue;
     }
-    final hard = _hardBreak.hasMatch(raw);
+    // A hard break needs a following line of the same paragraph; otherwise there is no break to
+    // keep and a trailing backslash is text.
+    final hard =
+        i + 1 < lines.length &&
+        lines[i + 1].trim().isNotEmpty &&
+        _hardBreak.hasMatch(raw);
     final line = (hard ? raw.replaceFirst(_hardBreak, '') : raw).trimRight();
     final heading = _heading.hasMatch(line);
     if (current.isEmpty || breakAfter || heading || _listItem.hasMatch(line)) {

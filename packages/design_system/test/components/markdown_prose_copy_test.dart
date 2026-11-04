@@ -111,6 +111,16 @@ void main() {
       expect(dsProseCopy('Regards,\\\nSam'), 'Regards,\nSam');
     });
 
+    test(
+      'a backslash without a following line or an escaped one stays text',
+      () {
+        expect(dsProseCopy(r'see C:\'), r'see C:\');
+        expect(dsProseCopy('path C:\\\n\nnext'), 'path C:\\\n\nnext');
+        expect(dsProseCopy('a \\\\\nb'), 'a \\\\ b');
+        expect(dsProseCopy('a \\\\\\\nb'), 'a \\\\\nb');
+      },
+    );
+
     test('a heading stays its own line', () {
       expect(
         dsProseCopy('# Title\nfirst line\nsecond line'),

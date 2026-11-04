@@ -1782,11 +1782,12 @@ Applies to every message the renderer draws, on the desktop (macOS, Windows) and
    it never triggers the copy of the whole block. It copies the block as running text, plain text
    only: the line breaks inside a paragraph become one space (white space at the join collapses
    to that space), and a blank line (also one of only white space) stays the break between two
-   paragraphs, several blank lines become one; a line that starts a list item (`-`, `*`, `+`,
-   a number with `.` or `)`, each followed by a space) or a heading (`#`) stays its own line, and
-   a following line without such a start joins its item; a line that ends in a Markdown hard
-   break (two spaces or a backslash) keeps its line break without the marker. CRLF and a lone CR
-   count as line breaks; leading and trailing blank lines and the trailing line break are
+   paragraphs, several blank lines become one; a line that starts a list item (`-`, `*`, `+`, a
+   number with `.` or `)`, each followed by a space or the line end) or a heading (`#`) stays its
+   own line, and a following line without such a start joins its item; a line that ends in a
+   Markdown hard break (two spaces or a backslash that is not itself escaped) and is followed by
+   another line of its paragraph keeps its line break without the marker. CRLF and a lone CR count
+   as line breaks; leading and trailing blank lines and the trailing line break are
    dropped. Every other character stays as it is, Unicode included (emoji, umlauts, dashes,
    quotes). A block in any other language never offers it, so code is never changed, and
    "Copy code" stays the exact copy of item 3 for every block. On the desktop the button has the

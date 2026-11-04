@@ -693,6 +693,21 @@ void main() {
       }, variant: touch ? _phone : _desktop);
     }
 
+    testWidgets('phone: on a narrow block the header controls stay inside '
+        'the header', (tester) async {
+      _haptics(tester);
+      await _pump(
+        tester,
+        '```\nhello\n```',
+        touch: true,
+        width: 200,
+        locale: const Locale('de'),
+      );
+      expect(tester.takeException(), isNull);
+      final l = await de();
+      expect(find.text(l.markdownCopyAsText), findsOneWidget);
+    }, variant: _phone);
+
     testWidgets('phone: the button in the header copies running text, a tap '
         'on the block still copies the exact text', (tester) async {
       _haptics(tester);

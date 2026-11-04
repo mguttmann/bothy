@@ -1192,14 +1192,26 @@ class _DsMarkdownCodeBlockState extends State<DsMarkdownCodeBlock> {
       wrap: wrap,
       onTap: () => _toggleWrap(scope, wrap),
     );
+    // On the phone the controls share the room the label leaves and wrap their labels on a
+    // narrow block instead of running past the header's edge.
     final header = touch
         ? Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const SizedBox(width: DsSpace.s8),
-              Expanded(child: label),
-              toggle,
-              ?asText,
-              const SizedBox(width: DsSpace.s4),
+              Padding(
+                padding: const EdgeInsets.only(left: DsSpace.s8),
+                child: label,
+              ),
+              Flexible(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(child: toggle),
+                    if (asText != null) Flexible(child: asText),
+                    const SizedBox(width: DsSpace.s4),
+                  ],
+                ),
+              ),
             ],
           )
         // The copy button stays the first stop of the keyboard (M4-48), "Copy as text" the
