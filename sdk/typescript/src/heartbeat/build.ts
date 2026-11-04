@@ -25,6 +25,8 @@ type ToolClass = components["schemas"]["ToolClass"];
 type ProjectReadiness = components["schemas"]["ProjectReadiness"];
 type ProjectTrashResult = components["schemas"]["ProjectTrashResult"];
 type AgentRateLimitState = components["schemas"]["AgentRateLimitState"];
+type RunSlots = components["schemas"]["RunSlots"];
+type WaitingRun = components["schemas"]["WaitingRun"];
 
 /** Form of `details.adapter.name` and `details.runtime.name`. */
 export const NAME_FORM = "^[a-z0-9][a-z0-9._-]*$";
@@ -70,6 +72,8 @@ export const HEARTBEAT_MEMBERS = Object.freeze([
   "project_readiness",
   "project_folders",
   "project_trash_results",
+  "run_slots",
+  "waiting_runs",
 ] as const);
 
 /** The options of {@link buildHeartbeat}; each maps to the member of the same name. */
@@ -121,6 +125,18 @@ export interface BuildHeartbeatOptions {
    * form {@link REASON_FORM}), distinct channels (09 18.15).
    */
   readonly projectTrashResults?: readonly ProjectTrashResult[] | undefined;
+  /**
+   * `run_slots`: runners only, `used` turns run of at most `total` (`runner.max_parallel_runs`),
+   * integers up to 10000, `total` at least 1 and `used` at most `total` (09 4.8). Leaving it out
+   * clears the stored one.
+   */
+  readonly runSlots?: RunSlots | undefined;
+  /**
+   * `waiting_runs`: the accepted runs that wait before their start, each `run_id` and `reason`
+   * (`slots_full` or `thread_busy`), distinct runs (09 5.2.1). Leaving it out counts as the
+   * empty list.
+   */
+  readonly waitingRuns?: readonly WaitingRun[] | undefined;
 }
 
 const OPTION_KEYS: ReadonlySet<string> = new Set([
@@ -134,6 +150,8 @@ const OPTION_KEYS: ReadonlySet<string> = new Set([
   "projectReadiness",
   "projectFolders",
   "projectTrashResults",
+  "runSlots",
+  "waitingRuns",
 ]);
 // The records make tsc hold each vocabulary equal to the generated type.
 const STATES: Readonly<Record<Heartbeat["state"], true>> = {
@@ -182,6 +200,14 @@ const TRASH_RESULT_KEYS = ["channel_id", "result", "reason"] as const;
 const TRASH_RESULTS: Readonly<Record<ProjectTrashResult["result"], true>> = {
   trashed: true,
   refused: true,
+};
+const RUN_SLOTS_KEYS = ["used", "total"] as const;
+// The maximum of `RunSlots.used` and `RunSlots.total` in the OpenAPI.
+const RUN_SLOTS_MAX = 10000;
+const WAITING_RUN_KEYS = ["run_id", "reason"] as const;
+const WAIT_REASONS: Readonly<Record<WaitingRun["reason"], true>> = {
+  slots_full: true,
+  thread_busy: true,
 };
 const REASON_MAX = 64;
 // `protocol_version` is a 32-bit integer on the server; a larger one is refused there.
@@ -264,6 +290,9 @@ export function buildHeartbeat(
     beat.project_folders = folders(o.projectFolders);
   if (o.projectTrashResults !== undefined)
     beat.project_trash_results = trashResults(o.projectTrashResults);
+  if (o.runSlots !== undefined) beat.run_slots = runSlots(o.runSlots);
+  if (o.waitingRuns !== undefined)
+    beat.waiting_runs = waitingRuns(o.waitingRuns);
   return beat;
 }
 
@@ -540,6 +569,47 @@ function trashResults(value: unknown): ProjectTrashResult[] {
   });
   distinct(
     out.map((r) => r.channel_id),
+    field,
+  );
+  return out;
+}
+
+/** An integer in `[low, 10000]`. */
+function count(value: unknown, field: string, low: number): number {
+  if (typeof value !== "number" || !Number.isInteger(value))
+    throw new RangeError(`${field}: must be an integer`);
+  if (value < low || value > RUN_SLOTS_MAX)
+    throw new RangeError(`${field}: out of range`);
+  return value;
+}
+
+/** `run_slots`: `used` and `total` required, `total` at least 1, `used` at most it (09 4.8). */
+function runSlots(value: unknown): RunSlots {
+  const field = "run_slots";
+  const raw = closed(value, RUN_SLOTS_KEYS, field);
+  for (const key of RUN_SLOTS_KEYS)
+    if (raw[key] === undefined)
+      throw new RangeError(`${field}.${key}: required`);
+  const used = count(raw.used, `${field}.used`, 0);
+  const total = count(raw.total, `${field}.total`, 1);
+  if (used > total) throw new RangeError(`${field}.used: above ${field}.total`);
+  return { used, total };
+}
+
+/** `waiting_runs`: closed entries with distinct runs and a wait reason (09 5.2.1). */
+function waitingRuns(value: unknown): WaitingRun[] {
+  const field = "waiting_runs";
+  const out = list(value, field).map((entry) => {
+    const raw = closed(entry, WAITING_RUN_KEYS, field);
+    if (typeof raw.run_id !== "string" || !UUID.test(raw.run_id))
+      throw new RangeError(`${field}.run_id: must be a run ID`);
+    return {
+      run_id: raw.run_id.toLowerCase(),
+      reason: member(WAIT_REASONS, raw.reason, `${field}.reason`),
+    };
+  });
+  distinct(
+    out.map((w) => w.run_id),
     field,
   );
   return out;

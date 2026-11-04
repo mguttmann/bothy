@@ -453,6 +453,54 @@ describe("buildHeartbeat folder trash (09 18.15)", () => {
   });
 });
 
+describe("buildHeartbeat run slots and waits (09 4.8, 5.2.1)", () => {
+  it("carries the slot use and the waiting runs and refuses everything else", () => {
+    const run = uuidv7();
+    const other = uuidv7();
+    const beat = buildHeartbeat("online", {
+      runSlots: { used: 2, total: 2 },
+      waitingRuns: [
+        { run_id: run, reason: "slots_full" },
+        { run_id: other.toUpperCase(), reason: "thread_busy" },
+      ],
+    });
+    expect(beat.run_slots).toEqual({ used: 2, total: 2 });
+    expect(beat.waiting_runs).toEqual([
+      { run_id: run, reason: "slots_full" },
+      { run_id: other, reason: "thread_busy" },
+    ]);
+    expect(buildHeartbeat("online")).not.toHaveProperty("run_slots");
+    expect(buildHeartbeat("online")).not.toHaveProperty("waiting_runs");
+    raisesNaming("run_slots.used", () =>
+      buildHeartbeat("online", { runSlots: { used: 3, total: 2 } }),
+    );
+    raisesNaming("run_slots.total", () =>
+      buildHeartbeat("online", { runSlots: { used: 0, total: 0 } }),
+    );
+    raisesNaming("run_slots.used", () =>
+      buildHeartbeat("online", { runSlots: { used: 1.5, total: 2 } }),
+    );
+    raisesNaming("waiting_runs", () =>
+      buildHeartbeat("online", {
+        waitingRuns: [
+          { run_id: run, reason: "slots_full" },
+          { run_id: run, reason: "thread_busy" },
+        ],
+      }),
+    );
+    raisesNaming("waiting_runs.reason", () =>
+      buildHeartbeat("online", {
+        waitingRuns: [{ run_id: run, reason: "rate_limit" as "slots_full" }],
+      }),
+    );
+    raisesNaming("waiting_runs.run_id", () =>
+      buildHeartbeat("online", {
+        waitingRuns: [{ run_id: "run-1", reason: "slots_full" }],
+      }),
+    );
+  });
+});
+
 describe("buildHeartbeat rateLimit", () => {
   it("keeps state and resets_at and refuses everything else", () => {
     expect(buildHeartbeat("online", { rateLimit: { state: "ok" } })).toEqual({
