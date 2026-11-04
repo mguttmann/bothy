@@ -3,7 +3,7 @@
 // Readable code blocks in the history (01 6.14, R-PR-28; brief M4-49), with the device choice
 // of the app (`CodeBlockPreferenceScope`, `shell_view_state.code_blocks_unwrapped`) and the
 // limit `ui.code_block_collapse_lines`: on macOS and Windows and on iOS and Android a long line
-// wraps by default, the toggle "Wrap lines" switches every block of the device to one line per
+// wraps by default, the toggle "Wrap display" switches every block of the device to one line per
 // line with a horizontal scroll and the choice survives a restart, a long block shows collapsed
 // with "Show all" and "Show less", and the copy stays the exact text.
 

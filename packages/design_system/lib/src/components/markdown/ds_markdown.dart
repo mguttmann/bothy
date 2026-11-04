@@ -16,6 +16,7 @@ import 'block_copy.dart';
 import 'code_block_scope.dart';
 import 'code_lines.dart';
 import 'link_policy.dart';
+import 'prose_copy.dart';
 import 'selection_join.dart';
 import 'syntax_highlight.dart';
 import 'text_search.dart';
@@ -24,6 +25,7 @@ export 'block_copy.dart';
 export 'code_block_scope.dart';
 export 'code_lines.dart';
 export 'link_policy.dart';
+export 'prose_copy.dart';
 export 'selection_join.dart';
 export 'syntax_highlight.dart';
 export 'text_search.dart';
@@ -929,16 +931,23 @@ Future<void> _copyBlock(
 ///
 /// Kept out of the system selection, so a selection across the block never copies its label.
 class _CopyButton extends StatelessWidget {
-  const _CopyButton({required this.label, required this.onTap});
+  const _CopyButton({required this.label, required this.onTap, this.hint});
 
   final String label;
   final VoidCallback onTap;
 
+  /// What the button does beyond its label: the tooltip on the desktop and the screen
+  /// reader's hint, or null.
+  final String? hint;
+
   @override
   Widget build(BuildContext context) {
-    return SelectionContainer.disabled(
-      child: DsTappable(
+    return _withTooltip(
+      context,
+      hint,
+      DsTappable(
         label: label,
+        hint: hint,
         excludeChildSemantics: true,
         onTap: onTap,
         child: Center(
@@ -956,6 +965,16 @@ class _CopyButton extends StatelessWidget {
       ),
     );
   }
+}
+
+/// [control] out of the system selection, so a selection across the block never copies its
+/// label, with [hint] as its tooltip on the desktop. The phone shows no tooltip: a long press
+/// there belongs to the message menu (01 6.12 item 2); the hint stays for the screen reader.
+Widget _withTooltip(BuildContext context, String? hint, Widget control) {
+  final child = hint == null || _touch(context)
+      ? control
+      : Tooltip(message: hint, excludeFromSemantics: true, child: control);
+  return SelectionContainer.disabled(child: child);
 }
 
 /// On the phone: [child] as one tap target that copies the block, with [label] as the
@@ -1043,14 +1062,16 @@ class DsMarkdownQuoteBlock extends StatelessWidget {
 /// block on the phone; 01 6.12) and the readable layout of 01 6.14 (M4-49):
 ///
 /// * long lines wrap by default, with a hanging indent for indented lines ([DsCodeLines]);
-/// * the toggle "Wrap lines" in the header switches to one line per line with a horizontal
+/// * the toggle "Wrap display" in the header switches to one line per line with a horizontal
 ///   scroll: a visible scrollbar on the desktop, shift and the mouse wheel, the trackpad, a drag
 ///   on the phone. The choice goes to [DsCodeBlockScope.onWrapChanged], so every block of the
 ///   device follows it; without a callback only this block switches;
 /// * a block higher than [DsCodeBlockScope.collapseLines] lines shows collapsed with a fade and
 ///   "Show all", which expands it in place, and "Show less" collapses it again.
 ///
-/// Wrapping, scrolling and collapsing are display only: the copy is [code] as it is.
+/// Wrapping, scrolling and collapsing are display only: the copy is [code] as it is. A text
+/// block ([dsIsProseBlock]: no language or a text language) also has "Copy as text", which
+/// copies [dsProseCopy] of [code] (01 6.12 item 7, F-KOPIER-FLIESSTEXT).
 class DsMarkdownCodeBlock extends StatefulWidget {
   /// Creates the block.
   const DsMarkdownCodeBlock({
@@ -1143,6 +1164,19 @@ class _DsMarkdownCodeBlockState extends State<DsMarkdownCodeBlock> {
     final wrap = _wrap(scope);
     final code = widget.code;
     void copy() => _copyBlock(context, DsCopyData(code), touch: touch);
+    // A text block (no language or a text language) also copies as running text (01 6.12
+    // item 7); code is never changed.
+    final asText = dsIsProseBlock(widget.language)
+        ? _CopyButton(
+            label: l.markdownCopyAsText,
+            hint: l.markdownCopyAsTextHint,
+            onTap: () => _copyBlock(
+              context,
+              DsCopyData(dsProseCopy(code)),
+              touch: touch,
+            ),
+          )
+        : null;
     final style = dsTextStyle(DsType.code).copyWith(color: colors.codeFg);
     final lineHeight = _lineHeight(style, MediaQuery.textScalerOf(context));
     // The language is a label of the block, not its content: never part of a selection.
@@ -1154,19 +1188,34 @@ class _DsMarkdownCodeBlockState extends State<DsMarkdownCodeBlock> {
     );
     final toggle = _WrapToggle(
       label: l.markdownCodeWrap,
+      hint: l.markdownCodeWrapHint,
       wrap: wrap,
       onTap: () => _toggleWrap(scope, wrap),
     );
+    // On the phone the controls share the room the label leaves and wrap their labels on a
+    // narrow block instead of running past the header's edge.
     final header = touch
         ? Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const SizedBox(width: DsSpace.s8),
-              Expanded(child: label),
-              toggle,
-              const SizedBox(width: DsSpace.s4),
+              Padding(
+                padding: const EdgeInsets.only(left: DsSpace.s8),
+                child: label,
+              ),
+              Flexible(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(child: toggle),
+                    if (asText != null) Flexible(child: asText),
+                    const SizedBox(width: DsSpace.s4),
+                  ],
+                ),
+              ),
             ],
           )
-        // The copy button stays the first stop of the keyboard (M4-48), the toggle the second.
+        // The copy button stays the first stop of the keyboard (M4-48), "Copy as text" the
+        // second where the block has it, the toggle the last.
         : FocusTraversalGroup(
             policy: OrderedTraversalPolicy(),
             child: Row(
@@ -1174,9 +1223,14 @@ class _DsMarkdownCodeBlockState extends State<DsMarkdownCodeBlock> {
                 const SizedBox(width: DsSpace.s8),
                 Expanded(child: label),
                 FocusTraversalOrder(
-                  order: const NumericFocusOrder(2),
+                  order: const NumericFocusOrder(3),
                   child: toggle,
                 ),
+                if (asText != null)
+                  FocusTraversalOrder(
+                    order: const NumericFocusOrder(2),
+                    child: asText,
+                  ),
                 FocusTraversalOrder(
                   order: const NumericFocusOrder(1),
                   child: _CopyButton(label: l.markdownCopyCode, onTap: copy),
@@ -1348,27 +1402,35 @@ double _lineHeight(TextStyle style, TextScaler scaler) {
   return height;
 }
 
-/// The toggle "Wrap lines" in the header of a code block: a small text button, highlighted and
+/// The toggle "Wrap display" in the header of a code block: a small text button, highlighted and
 /// read as "on" by the screen reader while lines wrap (01 6.14 item 1).
 ///
 /// Kept out of the system selection, so a selection across the block never copies its label.
 class _WrapToggle extends StatelessWidget {
   const _WrapToggle({
     required this.label,
+    required this.hint,
     required this.wrap,
     required this.onTap,
   });
 
   final String label;
+
+  /// That the toggle changes only the display: the tooltip on the desktop and the screen
+  /// reader's hint (F-KOPIER-FLIESSTEXT).
+  final String hint;
   final bool wrap;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.dsColors;
-    return SelectionContainer.disabled(
-      child: DsTappable(
+    return _withTooltip(
+      context,
+      hint,
+      DsTappable(
         label: label,
+        hint: hint,
         toggled: wrap,
         excludeChildSemantics: true,
         onTap: onTap,

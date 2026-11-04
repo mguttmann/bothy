@@ -72,7 +72,7 @@ Pin, More).
 Long replies: content over `ui.message_collapse_lines` lines is collapsed; a text button
 "Show more" (`color.text.link`) expands it. Code blocks in `type.code` on `color.code.bg` wrap
 their long lines by default, an indented line with a hanging indent (01 6.14, M4-49). The text
-toggle "Wrap lines" in `type.label` in the block header (left of the copy button on the desktop,
+toggle "Wrap display" (called "Wrap lines" until F-KOPIER-FLIESSTEXT) in `type.label` in the block header (left of the copy buttons on the desktop,
 highlighted with `color.surface.selected` and `color.text.link` while on) switches every block of
 the device to one line per line with a horizontal scroll and a scrollbar that is always visible on
 the desktop. A block higher than `ui.code_block_collapse_lines` lines shows that height with a
@@ -81,7 +81,7 @@ reads "Show less". A block whose fence names a known language colors its code (0
 FEAT-markdown-viewer): keywords `color.category.heather.fg`, strings `color.category.moss.fg`,
 numbers `color.category.amber.fg`, type names `color.category.loch.fg`, comments
 `color.text.muted` in italic, added and removed lines of a diff `color.success.fg` and
-`color.danger.fg`. Search marks of the document viewer (01 6.19) lie on `color.attention.subtle`,
+`color.danger.fg`. The toggle has a tooltip on the desktop that it changes only the display. A block without a language or with a text language (`text`, `plaintext`, `txt`, `markdown`, `md`) also has the text button "Copy as text" in `type.label`, `color.text.link`, between the toggle and "Copy code" on the desktop and after the toggle on the phone, with a tooltip on the desktop; it copies the block as running text (01 6.12 item 7, F-KOPIER-FLIESSTEXT). Search marks of the document viewer (01 6.19) lie on `color.attention.subtle`,
 the current match on `color.attention.bg` in `color.attention.on-bg`. Every code block and quote block copies on its own (01 6.12, M4-48): on
 the desktop a text button "Copy code" or "Copy quote" in `type.label`, `color.text.link`, at the
 top right of the block; on the phone (density `touch`) the whole block is the tap target, with a
