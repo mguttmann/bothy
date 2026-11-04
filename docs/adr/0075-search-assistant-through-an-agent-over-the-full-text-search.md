@@ -104,6 +104,6 @@ Without an answer the person gets the fused full-text hits.
 
 ## More Information
 
-- The reference adapter is the Claude Code runner (09 18.16).
+- The reference adapter is the Claude Code runner (09 18.17).
 - Revisit when a local embedding model ships with the product or when search questions need costs
   per space (then `cost_entries` needs a source other than a run).

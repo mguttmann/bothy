@@ -40,7 +40,7 @@ the title once per new session and reports the cost of the run.
 | `channels.py`, `workspace.py` | Cache of the served forums and their bindings, reloaded while running (09 18.1); resolution of `workspace_ref` and `runner.default_workspace`, readiness and the project folder report (09 18.13, M4-44) |
 | `causes.py` | The sentence for the thread that names the cause of a refused run (09 18.9, RUNNER-NO-GIT) |
 | `transcribe.py` | The local transcriber of audio attachments and the note without a transcript (09 18.14) |
-| `searchassist.py` | The search assistant: one call without tools per question, the reply parsed into picks and terms (09 18.16) |
+| `searchassist.py` | The search assistant: one call without tools per question, the reply parsed into picks and terms (09 18.17) |
 | `provision.py` | Folder creation of a binding with `provision` `init` or `clone`, its creation record and the readiness reasons (09 18.12, M4-43) |
 | `trash.py` | The folder check of the bound forums, the move of a deleted forum's folder to the host trash and its record (09 18.15) |
 | `toolclass.py`, `commandline.py`, `environment.py` | Tool class order, the argument list of a turn, the allow-list environment |
@@ -144,7 +144,7 @@ readiness changed, a heartbeat goes out at once, so a forum that just got the ru
 is reported ready right after the change. Log codes: `channels_resynced` (cause and whether anything changed) and
 `channels_resync_failed` (the cache stays as it was).
 
-## Search assistant (09 18.16)
+## Search assistant (09 18.17)
 
 When the server names this runner's agent in `search.assist.agent_id`, every question of the
 search assistant reaches it as `search.assist_requested`. The runner answers with one

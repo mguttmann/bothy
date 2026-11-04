@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""The search assistant call of the runner (09 18.16) with a scripted CLI."""
+"""The search assistant call of the runner (09 18.17) with a scripted CLI."""
 
 from __future__ import annotations
 

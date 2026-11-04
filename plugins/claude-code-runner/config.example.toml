@@ -34,7 +34,7 @@ trash_check_interval = "60s"
 # ["/usr/local/bin/transcribe-audio"] (a wrapper around a whisper.cpp binary, see the README).
 transcribe_cmd = []
 transcribe_timeout = "5m"
-# The search assistant (09 18.16): the model and the time limit of one call; the server waits
+# The search assistant (09 18.17): the model and the time limit of one call; the server waits
 # search.assist.timeout (default 10s), so keep the limit below it.
 search_assist_model = "haiku"
 search_assist_timeout = "9s"

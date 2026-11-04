@@ -149,7 +149,7 @@ class RunnerConfig:
             18.14). Empty: no transcription.
         transcribe_timeout: ``runner.transcribe_timeout``: time limit of one transcription.
         search_assist_model: ``runner.search_assist_model``: the model of the search assistant
-            call (09 18.16).
+            call (09 18.17).
         search_assist_timeout: ``runner.search_assist_timeout``: time limit of one search
             assistant call; above zero.
         trash_check_interval: ``runner.trash_check_interval``: the bound folders are checked for
@@ -344,7 +344,7 @@ def _positive(r: _Reader, name: str, default: str) -> float:
 
 
 def _search_assist_model(r: _Reader) -> str:
-    """``runner.search_assist_model``: a model argument of the search assistant call (09 18.16)."""
+    """``runner.search_assist_model``: a model argument of the search assistant call (09 18.17)."""
     model: str = r.get("search_assist_model", str, default="haiku")
     if not check_argument(model):
         raise r.fail("search_assist_model", "empty, starts with - or has controls")

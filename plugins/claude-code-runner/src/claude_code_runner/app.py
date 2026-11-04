@@ -623,7 +623,7 @@ class RunnerHandler(AgentHandler):
         raw = getattr(payload, "reason", None)
         await turn.request_stop(str(getattr(raw, "value", raw) or "user_cancelled"))
 
-    # ---- search assistant (09 18.16) --------------------------------------------------------
+    # ---- search assistant (09 18.17) --------------------------------------------------------
 
     async def on_search_assist(self, request: AssistQuestion) -> AssistReply | None:
         """Answer a question of the search assistant with one call without tools.
@@ -640,7 +640,7 @@ class RunnerHandler(AgentHandler):
         return (self.adapter.clock if self.adapter is not None else SystemClock()).now()
 
     def _assist_env(self) -> dict[str, str]:
-        """The environment of a search assistant call (09 18.16).
+        """The environment of a search assistant call (09 18.17).
 
         ``organization`` with the API key when one is configured, else ``personal`` when allowed,
         never a fallback between them.

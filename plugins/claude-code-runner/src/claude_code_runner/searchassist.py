@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""The search assistant of the runner (docs/spec/09-agents.md 18.16, 14-search.md 4.10).
+"""The search assistant of the runner (docs/spec/09-agents.md 18.17, 14-search.md 4.10).
 
 When the runner is the agent of ``search.assist.agent_id``, each question of the search assistant
 becomes one ``claude -p`` call without tools: the fixed instruction ``prompts/search_assist.md``

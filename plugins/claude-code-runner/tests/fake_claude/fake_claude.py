@@ -104,7 +104,7 @@ class Fake:
         return int(self.scenario.get("auth_exit", 1 if method == "none" else 0))
 
     def assist(self) -> int:
-        """The search assistant call of 18.16: one ``-p`` with ``--output-format json``.
+        """The search assistant call of 18.17: one ``-p`` with ``--output-format json``.
 
         Records argv, cwd, environment, the system prompt file and stdin, then prints the
         ``result`` with ``assist_reply`` as its text (default: one pick of ``c1``) and the usage

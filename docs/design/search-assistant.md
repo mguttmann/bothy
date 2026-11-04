@@ -92,7 +92,7 @@ live gateway connection, exactly like `command.autocomplete_requested` (09 10.5)
 `default`, else the newest attached connection; nobody else gets it. The payload holds no IDs of
 threads or messages: each candidate has a reference `c1` to `cN`, a title, channel and space name,
 a date and a plain text excerpt of at most `search.assist.excerpt_max_chars`. The reference
-adapter is the Claude Code runner (09 18.16): one `claude -p` call without tools on its own
+adapter is the Claude Code runner (09 18.17): one `claude -p` call without tools on its own
 account, with a fixed prompt that treats the candidates as data (ADR 0054), answering JSON with
 picks and terms. The adapter answers with `answerSearchAssist`: picks (`ref`, `reason`), terms and
 the usage of the call as `costs` (the `CostReport` list of `run.finish`). A question whose terms

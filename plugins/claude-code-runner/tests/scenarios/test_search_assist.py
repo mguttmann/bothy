@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""The search assistant of the runner (09 18.16) against the FakeServer and Fake-Claude."""
+"""The search assistant of the runner (09 18.17) against the FakeServer and Fake-Claude."""
 
 from __future__ import annotations
 

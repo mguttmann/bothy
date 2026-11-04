@@ -4,7 +4,7 @@ Owner request of 2026-11-04: a search at the top of the apps that understands a 
 person's own words and returns links to the matching chat and development sessions. Decision:
 [ADR 0075](../adr/0075-search-assistant-through-an-agent-over-the-full-text-search.md). Design note:
 [search-assistant.md](../design/search-assistant.md). Normative: [14-search.md](../spec/14-search.md)
-4.10, [09-agents.md](../spec/09-agents.md) 10.6 and 18.16.
+4.10, [09-agents.md](../spec/09-agents.md) 10.6 and 18.17.
 
 | No | Date | Ruling | Reason |
 |---|---|---|---|

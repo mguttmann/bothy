@@ -253,7 +253,7 @@ def test_transcribe_keys(tmp_path: Path) -> None:
 
 
 def test_search_assist_keys(tmp_path: Path) -> None:
-    """``runner.search_assist_model`` and ``runner.search_assist_timeout`` (09 18.16)."""
+    """``runner.search_assist_model`` and ``runner.search_assist_timeout`` (09 18.17)."""
     cfg = load_config(write(tmp_path))
     assert cfg.search_assist_model == "haiku"
     assert cfg.search_assist_timeout == 9.0
