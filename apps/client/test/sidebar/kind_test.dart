@@ -7,6 +7,7 @@
 
 import 'package:client/forum/forum_model.dart';
 import 'package:client/forum/post_list_column.dart';
+import 'package:client/forum/providers.dart';
 import 'package:client/sidebar/sidebar_column.dart';
 import 'package:client/sidebar/sidebar_model.dart';
 import 'package:client/sidebar/sidebar_order.dart';
@@ -15,6 +16,7 @@ import 'package:design_system/design_system.dart';
 import 'package:domain/domain.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/structure.dart';
@@ -58,23 +60,27 @@ Widget sidebar() => Scaffold(
 Finder rowOf(Channel c) =>
     find.byKey(ValueKey('sidebar.channel.${c.id.value}'));
 
-Widget overview(Channel c, {PostListModel? model}) => Scaffold(
-  body: PostListView(
-    forum: c,
-    filter: const PostListFilter(),
-    model: model ?? const PostListModel(open: [], done: []),
-    tags: const [],
-    names: const {},
-    now: t0,
-    doneCollapsed: true,
-    morePages: false,
-    onNewPost: () {},
-    onView: (_) {},
-    onTags: (_) {},
-    onSort: (_) {},
-    onToggleDone: (_) {},
-    onOpenPost: (_) {},
-    onPin: () {},
+// A project forum shows the readiness banner; without a port it stays empty.
+Widget overview(Channel c, {PostListModel? model}) => ProviderScope(
+  overrides: [projectReadinessPortProvider.overrideWithValue(null)],
+  child: Scaffold(
+    body: PostListView(
+      forum: c,
+      filter: const PostListFilter(),
+      model: model ?? const PostListModel(open: [], done: []),
+      tags: const [],
+      names: const {},
+      now: t0,
+      doneCollapsed: true,
+      morePages: false,
+      onNewPost: () {},
+      onView: (_) {},
+      onTags: (_) {},
+      onSort: (_) {},
+      onToggleDone: (_) {},
+      onOpenPost: (_) {},
+      onPin: () {},
+    ),
   ),
 );
 

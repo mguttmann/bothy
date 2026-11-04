@@ -13,10 +13,12 @@
 import 'package:alchemist/alchemist.dart';
 import 'package:client/forum/forum_model.dart';
 import 'package:client/forum/post_list_column.dart';
+import 'package:client/forum/providers.dart';
 import 'package:design_system/design_system.dart';
 import 'package:design_system/testing.dart';
 import 'package:domain/domain.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../support/structure.dart';
 
@@ -158,24 +160,28 @@ void main() {
         builder: () => cell(
           SizedBox.fromSize(
             size: pinnedColumn,
-            child: PostListView(
-              forum: project,
-              filter: const PostListFilter(),
-              model: const PostListModel(open: [], done: []),
-              tags: const [],
-              names: const {},
-              now: t0,
-              doneCollapsed: true,
-              morePages: false,
-              pinned: true,
-              onNewPost: () {},
-              onView: (_) {},
-              onTags: (_) {},
-              onSort: (_) {},
-              onToggleDone: (_) {},
-              onOpenPost: (_) {},
-              onPin: () {},
-              onSearch: () {},
+            // A project forum shows the readiness banner; without a port it stays empty.
+            child: ProviderScope(
+              overrides: [projectReadinessPortProvider.overrideWithValue(null)],
+              child: PostListView(
+                forum: project,
+                filter: const PostListFilter(),
+                model: const PostListModel(open: [], done: []),
+                tags: const [],
+                names: const {},
+                now: t0,
+                doneCollapsed: true,
+                morePages: false,
+                pinned: true,
+                onNewPost: () {},
+                onView: (_) {},
+                onTags: (_) {},
+                onSort: (_) {},
+                onToggleDone: (_) {},
+                onOpenPost: (_) {},
+                onPin: () {},
+                onSearch: () {},
+              ),
             ),
           ),
         ),
