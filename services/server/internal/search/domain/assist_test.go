@@ -11,6 +11,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/internal/search/domain"
 )
 
@@ -167,9 +168,7 @@ func TestAssistPayload_HoldsNoIDsAndDropsCandidatesThatDoNotFit(t *testing.T) {
 	if _, has := c2["title"]; has || c2["shown_before"] != false {
 		t.Fatalf("candidate without a title = %v", c2)
 	}
-	if strings.Contains(string(b), "null") {
-		t.Fatalf("payload has null: %s", b)
-	}
+	testkit.NoJSONNull(t, "payload", b)
 	small, kept, err := domain.AssistPayload(in, 400)
 	if err != nil || kept != 1 || len(small) >= 400 {
 		t.Fatalf("small payload: kept %d, len %d, %v", kept, len(small), err)
