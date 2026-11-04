@@ -9,6 +9,7 @@
 import 'package:design_system/design_system.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+// language-check: off
 /// The live case, rebuilt without personal data: two paragraphs broken by hand, an emoji, an
 /// umlaut, an en dash, typographic and straight quotes and a list whose second item is broken too.
 const _live =
@@ -33,6 +34,7 @@ const _liveJoined =
     '\n'
     'Wenn das erledigt ist, können wir am Montag live gehen. Sag gern '
     'Bescheid, falls du "noch etwas" brauchst. \u{1F44D}';
+// language-check: on
 
 void main() {
   group('dsProseCopy', () {
@@ -42,6 +44,7 @@ void main() {
 
     test('Unicode stays as it is', () {
       final out = dsProseCopy(_live);
+      // language-check: off
       for (final s in [
         '\u{1F64F}',
         '\u{1F44D}',
@@ -54,6 +57,7 @@ void main() {
         '“',
         '"noch etwas"',
       ]) {
+        // language-check: on
         expect(out, contains(s));
       }
     });
