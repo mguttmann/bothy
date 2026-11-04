@@ -165,6 +165,8 @@ void main() {
     final world = ViewWorld();
     await _pumpHistory(tester, world, locale: const Locale('de'));
     expect(find.text('Laufhistorie'), findsOneWidget);
+    // language-check: off
     expect(find.text('Weitere Läufe laden'), findsOneWidget);
+    // language-check: on
   });
 }
