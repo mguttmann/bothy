@@ -5578,6 +5578,24 @@ func (e UserUpdatedEventType) Valid() bool {
 	}
 }
 
+// Defines values for WaitingRunReason.
+const (
+	SlotsFull  WaitingRunReason = "slots_full"
+	ThreadBusy WaitingRunReason = "thread_busy"
+)
+
+// Valid indicates whether the value is a known member of the WaitingRunReason enum.
+func (e WaitingRunReason) Valid() bool {
+	switch e {
+	case SlotsFull:
+		return true
+	case ThreadBusy:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for WebhookDeliveryStatus.
 const (
 	WebhookDeliveryStatusDead      WebhookDeliveryStatus = "dead"
@@ -6710,6 +6728,9 @@ type AgentRuntimeStatus struct {
 
 	// ReportedToolClass Tool class of an agent runtime, ordered `chat` < `scoped` < `host` (07, 2.11).
 	ReportedToolClass *ToolClass `json:"reported_tool_class,omitempty"`
+
+	// RunSlots Runners only, the slot use of the last heartbeat (09 4.8); absent when the adapter does not report it.
+	RunSlots *RunSlots `json:"run_slots,omitempty"`
 
 	// RuntimeVersion Examples: 2.3.1
 	RuntimeVersion *string `json:"runtime_version,omitempty"`
@@ -10299,11 +10320,17 @@ type Heartbeat struct {
 	// ReportedToolClass Tool class of an agent runtime, ordered `chat` < `scoped` < `host` (07, 2.11).
 	ReportedToolClass *ToolClass `json:"reported_tool_class,omitempty"`
 
+	// RunSlots Runners only, how many turns run now of how many may run at once (09 4.8). Stored in `agents.reported_details.run_slots`; absent clears a stored one (full state).
+	RunSlots *RunSlots `json:"run_slots,omitempty"`
+
 	// RuntimeVersion Version of the agent runtime (column `reported_runtime_version`); the adapter's own version is `details.adapter.version`.
 	//
 	// Examples: 2.3.1
 	RuntimeVersion *string        `json:"runtime_version,omitempty"`
 	State          HeartbeatState `json:"state"`
+
+	// WaitingRuns The accepted runs of this adapter that wait before their start, each with its wait reason (09 5.2.1); the run ids must be distinct. The server stores the reason as `runs.state_reason` of each listed run that is still `queued`, and clears a runner reason of a queued run of the agent that is no longer listed; absent counts as the empty list.
+	WaitingRuns *[]WaitingRun `json:"waiting_runs,omitempty"`
 }
 
 // HeartbeatState defines model for Heartbeat.State.
@@ -13851,9 +13878,13 @@ type Run struct {
 	StallWarnedAt *Timestamp `json:"stall_warned_at,omitempty"`
 
 	// StartedAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
-	StartedAt   *Timestamp `json:"started_at,omitempty"`
-	State       RunState   `json:"state"`
-	StateReason *string    `json:"state_reason,omitempty"`
+	StartedAt *Timestamp `json:"started_at,omitempty"`
+	State     RunState   `json:"state"`
+
+	// StateReason The reason of `failed` and `cancelled` (09 5.2); while `queued` the wait reason of 09 5.2.1, `invocation_held` (the server holds the invocation until an attachment or transcript is final), `slots_full` (every slot of the runner is in use) or `thread_busy` (the runner waits for the thread or session lock); absent while queued when the agent has not reported a wait.
+	//
+	// Examples: slots_full
+	StateReason *string `json:"state_reason,omitempty"`
 
 	// StatusLine Examples: Reading the export logs
 	StatusLine *string `json:"status_line,omitempty"`
@@ -14160,6 +14191,15 @@ type RunPlan struct {
 // RunPlanItemsStatus defines model for RunPlan.Items.Status.
 type RunPlanItemsStatus string
 
+// RunSlots Slot use of a runner (09 4.8, 18.2), `used` turns run of at most `total` (`runner.max_parallel_runs`) at once; `used` is at most `total`.
+type RunSlots struct {
+	// Total Examples: 4
+	Total int `json:"total"`
+
+	// Used Examples: 4
+	Used int `json:"used"`
+}
+
 // RunStart defines model for RunStart.
 type RunStart struct {
 	// BillingEvidence How the runtime proves its actual billing mode. Never a key value or prefix (schema `billing_evidence.v1`).
@@ -14334,7 +14374,9 @@ type RunSummary struct {
 	StartedAt *Timestamp `json:"started_at,omitempty"`
 	State     RunState   `json:"state"`
 
-	// StateReason Examples: user_cancelled
+	// StateReason The reason of `failed` and `cancelled` (09 5.2); while `queued` the wait reason of 09 5.2.1, `invocation_held` (the server holds the invocation until an attachment or transcript is final), `slots_full` (every slot of the runner is in use) or `thread_busy` (the runner waits for the thread or session lock); absent while queued when the agent has not reported a wait.
+	//
+	// Examples: user_cancelled, slots_full
 	StateReason *string `json:"state_reason,omitempty"`
 
 	// StatusLine Examples: Reading the export logs
@@ -15266,6 +15308,9 @@ type StatsLiveAgent struct {
 
 	// ReportedBillingMode Absent when the adapter follows the configured mode per run.
 	ReportedBillingMode *BillingMode `json:"reported_billing_mode,omitempty"`
+
+	// RunSlots Runners only, the slot use of the last heartbeat (09 4.8); with the runs of the frame a client names the runs that hold the slots.
+	RunSlots *RunSlots `json:"run_slots,omitempty"`
 }
 
 // StatsLiveConnections Gateway connections of this node; only with `cluster.mode = single`.
@@ -15410,6 +15455,11 @@ type StatsLiveRun struct {
 	// StartedAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 	StartedAt *Timestamp        `json:"started_at,omitempty"`
 	State     StatsLiveRunState `json:"state"`
+
+	// StateReason Only for `queued`, the wait reason of `runs.state_reason` (09 5.2.1, for example `slots_full`); absent when none is stored. A client shows the agent offline when its presence in `agents` is `offline` or `unknown`.
+	//
+	// Examples: slots_full
+	StateReason *string `json:"state_reason,omitempty"`
 
 	// Step Current step of a run; only kind and name (for tools the tool name), never title or detail.
 	Step *StatsLiveStep `json:"step,omitempty"`
@@ -17091,6 +17141,18 @@ type ViewAsSnapshot struct {
 	// User Minimal public view of a principal, embedded in other objects.
 	User PrincipalRef `json:"user"`
 }
+
+// WaitingRun One run an adapter accepted that waits before its start (09 5.2.1).
+type WaitingRun struct {
+	// Reason `slots_full`: every slot of `runner.max_parallel_runs` is in use; `thread_busy`: the thread or session lock is held by another turn.
+	Reason WaitingRunReason `json:"reason"`
+
+	// RunId UUIDv7 (RFC 9562), lowercase canonical form.
+	RunId Uuid `json:"run_id"`
+}
+
+// WaitingRunReason `slots_full`: every slot of `runner.max_parallel_runs` is in use; `thread_busy`: the thread or session lock is held by another turn.
+type WaitingRunReason string
 
 // WebAuthnChallenge defines model for WebAuthnChallenge.
 type WebAuthnChallenge struct {

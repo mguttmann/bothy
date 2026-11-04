@@ -16,6 +16,8 @@ if TYPE_CHECKING:
     from ..models.json_object import JsonObject
     from ..models.project_readiness import ProjectReadiness
     from ..models.project_trash_result import ProjectTrashResult
+    from ..models.run_slots import RunSlots
+    from ..models.waiting_run import WaitingRun
 
 
 T = TypeVar("T", bound="Heartbeat")
@@ -47,6 +49,12 @@ class Heartbeat:
         project_trash_results (list[ProjectTrashResult] | Unset): Runners only, the outcome of each folder move of
             `HeartbeatAck.project_trash` the runner finished since its last heartbeat (09 18.15); the server stores it once
             and audits it as `channel.project.trash`.
+        run_slots (RunSlots | Unset): Slot use of a runner (09 4.8, 18.2), `used` turns run of at most `total`
+            (`runner.max_parallel_runs`) at once; `used` is at most `total`.
+        waiting_runs (list[WaitingRun] | Unset): The accepted runs of this adapter that wait before their start, each
+            with its wait reason (09 5.2.1); the run ids must be distinct. The server stores the reason as
+            `runs.state_reason` of each listed run that is still `queued`, and clears a runner reason of a queued run of the
+            agent that is no longer listed; absent counts as the empty list.
     """
 
     state: HeartbeatState
@@ -60,6 +68,8 @@ class Heartbeat:
     project_readiness: list[ProjectReadiness] | Unset = UNSET
     project_folders: list[str] | Unset = UNSET
     project_trash_results: list[ProjectTrashResult] | Unset = UNSET
+    run_slots: RunSlots | Unset = UNSET
+    waiting_runs: list[WaitingRun] | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         state = self.state.value
@@ -111,6 +121,17 @@ class Heartbeat:
                 project_trash_results_item = project_trash_results_item_data.to_dict()
                 project_trash_results.append(project_trash_results_item)
 
+        run_slots: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.run_slots, Unset):
+            run_slots = self.run_slots.to_dict()
+
+        waiting_runs: list[dict[str, Any]] | Unset = UNSET
+        if not isinstance(self.waiting_runs, Unset):
+            waiting_runs = []
+            for waiting_runs_item_data in self.waiting_runs:
+                waiting_runs_item = waiting_runs_item_data.to_dict()
+                waiting_runs.append(waiting_runs_item)
+
         field_dict: dict[str, Any] = {}
 
         field_dict.update(
@@ -138,6 +159,10 @@ class Heartbeat:
             field_dict["project_folders"] = project_folders
         if project_trash_results is not UNSET:
             field_dict["project_trash_results"] = project_trash_results
+        if run_slots is not UNSET:
+            field_dict["run_slots"] = run_slots
+        if waiting_runs is not UNSET:
+            field_dict["waiting_runs"] = waiting_runs
 
         return field_dict
 
@@ -148,6 +173,8 @@ class Heartbeat:
         from ..models.json_object import JsonObject
         from ..models.project_readiness import ProjectReadiness
         from ..models.project_trash_result import ProjectTrashResult
+        from ..models.run_slots import RunSlots
+        from ..models.waiting_run import WaitingRun
 
         d = dict(src_dict)
         state = HeartbeatState(d.pop("state"))
@@ -224,6 +251,22 @@ class Heartbeat:
 
                 project_trash_results.append(project_trash_results_item)
 
+        _run_slots = d.pop("run_slots", UNSET)
+        run_slots: RunSlots | Unset
+        if isinstance(_run_slots, Unset):
+            run_slots = UNSET
+        else:
+            run_slots = RunSlots.from_dict(_run_slots)
+
+        _waiting_runs = d.pop("waiting_runs", UNSET)
+        waiting_runs: list[WaitingRun] | Unset = UNSET
+        if _waiting_runs is not UNSET:
+            waiting_runs = []
+            for waiting_runs_item_data in _waiting_runs:
+                waiting_runs_item = WaitingRun.from_dict(waiting_runs_item_data)
+
+                waiting_runs.append(waiting_runs_item)
+
         heartbeat = cls(
             state=state,
             runtime_version=runtime_version,
@@ -236,6 +279,8 @@ class Heartbeat:
             project_readiness=project_readiness,
             project_folders=project_folders,
             project_trash_results=project_trash_results,
+            run_slots=run_slots,
+            waiting_runs=waiting_runs,
         )
 
         return heartbeat

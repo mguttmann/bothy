@@ -92,6 +92,8 @@ class _$StatsLiveRun extends StatsLiveRun {
   @override
   final StatsLiveRunStateEnum state;
   @override
+  final String? stateReason;
+  @override
   final DateTime queuedAt;
   @override
   final DateTime? startedAt;
@@ -124,6 +126,7 @@ class _$StatsLiveRun extends StatsLiveRun {
     required this.spaceId,
     required this.agentId,
     required this.state,
+    this.stateReason,
     required this.queuedAt,
     this.startedAt,
     required this.billingMode,
@@ -153,6 +156,7 @@ class _$StatsLiveRun extends StatsLiveRun {
         spaceId == other.spaceId &&
         agentId == other.agentId &&
         state == other.state &&
+        stateReason == other.stateReason &&
         queuedAt == other.queuedAt &&
         startedAt == other.startedAt &&
         billingMode == other.billingMode &&
@@ -175,6 +179,7 @@ class _$StatsLiveRun extends StatsLiveRun {
     _$hash = $jc(_$hash, spaceId.hashCode);
     _$hash = $jc(_$hash, agentId.hashCode);
     _$hash = $jc(_$hash, state.hashCode);
+    _$hash = $jc(_$hash, stateReason.hashCode);
     _$hash = $jc(_$hash, queuedAt.hashCode);
     _$hash = $jc(_$hash, startedAt.hashCode);
     _$hash = $jc(_$hash, billingMode.hashCode);
@@ -199,6 +204,7 @@ class _$StatsLiveRun extends StatsLiveRun {
           ..add('spaceId', spaceId)
           ..add('agentId', agentId)
           ..add('state', state)
+          ..add('stateReason', stateReason)
           ..add('queuedAt', queuedAt)
           ..add('startedAt', startedAt)
           ..add('billingMode', billingMode)
@@ -241,6 +247,10 @@ class StatsLiveRunBuilder
   StatsLiveRunStateEnum? _state;
   StatsLiveRunStateEnum? get state => _$this._state;
   set state(StatsLiveRunStateEnum? state) => _$this._state = state;
+
+  String? _stateReason;
+  String? get stateReason => _$this._stateReason;
+  set stateReason(String? stateReason) => _$this._stateReason = stateReason;
 
   DateTime? _queuedAt;
   DateTime? get queuedAt => _$this._queuedAt;
@@ -304,6 +314,7 @@ class StatsLiveRunBuilder
       _spaceId = $v.spaceId;
       _agentId = $v.agentId;
       _state = $v.state;
+      _stateReason = $v.stateReason;
       _queuedAt = $v.queuedAt;
       _startedAt = $v.startedAt;
       _billingMode = $v.billingMode;
@@ -369,6 +380,7 @@ class StatsLiveRunBuilder
               r'StatsLiveRun',
               'state',
             ),
+            stateReason: stateReason,
             queuedAt: BuiltValueNullFieldError.checkNotNull(
               queuedAt,
               r'StatsLiveRun',

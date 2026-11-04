@@ -779,7 +779,7 @@ Module: `agents`.
 | `reported_runtime_state` | `text` | no | `'unknown'` | `CHECK (reported_runtime_state IN ('unknown','online','degraded','offline'))` |
 | `reported_billing_mode` | `text` | yes | | last reported mode from the heartbeat, `personal` or `organization`; NULL without a heartbeat or for adapters that follow the configured mode per run (then `reported_details.billing_modes_supported` names the modes that can be proven; the check per run is binding) |
 | `reported_runtime_version` | `text` | yes | | |
-| `reported_details` | `jsonb` | no | `'{}'` | schema `agent_heartbeat.v1` ([09-agents.md](09-agents.md), section 4.8): `capabilities`, `billing_modes_supported`, `billing_evidence` (`provider`, `key_type`, `method`, never a value), `active_runs`, `degraded_reasons`, `rate_limit`; without secrets and without content |
+| `reported_details` | `jsonb` | no | `'{}'` | schema `agent_heartbeat.v1` ([09-agents.md](09-agents.md), section 4.8): `capabilities`, `billing_modes_supported`, `billing_evidence` (`provider`, `key_type`, `method`, never a value), `active_runs`, `degraded_reasons`, `rate_limit`, `run_slots` (`used`, `total`, runners only, addendum of 2026-11-04); without secrets and without content |
 | `last_heartbeat_at` | `timestamptz` | yes | | |
 | `reported_project_folders` | `text[]` | yes | | runners only: the folder names of the heartbeat member `project_folders` ([09-agents.md](09-agents.md), section 18.13), sorted and distinct, each one segment of `^[A-Za-z0-9][A-Za-z0-9._-]*$`; NULL until the first report; names only, never a path (addendum of 2026-10-29, R-DM-56) |
 | `version` | `bigint` | no | `1` | |
@@ -1619,7 +1619,7 @@ Purpose: one agent turn; at the same time the live box. Module: `runs`.
 | `triggering_interaction_id` | `uuid` | yes | | set exactly when `trigger_kind = 'interaction'` (interaction without a waiting run) |
 | `triggered_by` | `uuid` | no | | person who triggered |
 | `state` | `text` | no | `'queued'` | `CHECK (state IN ('queued','running','waiting_input','completed','failed','cancelled'))` |
-| `state_reason` | `text` | yes | | reason code from [09-agents.md](09-agents.md), section 5.2, for example `billing_mode_mismatch`, `access_revoked`, `stale`, `user_cancelled`, `channel_read_only` |
+| `state_reason` | `text` | yes | | reason code from [09-agents.md](09-agents.md), section 5.2, for example `billing_mode_mismatch`, `access_revoked`, `stale`, `user_cancelled`, `channel_read_only`; while `queued` the wait reason of 09 5.2.1 (`invocation_held`, `slots_full`, `thread_busy`) or NULL, cleared by `run.start` (addendum of 2026-11-04, R-AG-41) |
 | `version` | `bigint` | no | `1` | rises with every stored change; basis of the patches |
 | `billing_mode_expected` | `text` | no | | configured mode from `agents.billing_mode` at the last delivery; every delivery sets it anew |
 | `billing_mode_used` | `text` | yes | | reported mode, as reported by the adapter per run |

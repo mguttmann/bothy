@@ -94,6 +94,10 @@ class _$Heartbeat extends Heartbeat {
   final BuiltSet<String>? projectFolders;
   @override
   final BuiltList<ProjectTrashResult>? projectTrashResults;
+  @override
+  final RunSlots? runSlots;
+  @override
+  final BuiltList<WaitingRun>? waitingRuns;
 
   factory _$Heartbeat([void Function(HeartbeatBuilder)? updates]) =>
       (HeartbeatBuilder()..update(updates))._build();
@@ -110,6 +114,8 @@ class _$Heartbeat extends Heartbeat {
     this.projectReadiness,
     this.projectFolders,
     this.projectTrashResults,
+    this.runSlots,
+    this.waitingRuns,
   }) : super._();
   @override
   Heartbeat rebuild(void Function(HeartbeatBuilder) updates) =>
@@ -132,7 +138,9 @@ class _$Heartbeat extends Heartbeat {
         details == other.details &&
         projectReadiness == other.projectReadiness &&
         projectFolders == other.projectFolders &&
-        projectTrashResults == other.projectTrashResults;
+        projectTrashResults == other.projectTrashResults &&
+        runSlots == other.runSlots &&
+        waitingRuns == other.waitingRuns;
   }
 
   @override
@@ -149,6 +157,8 @@ class _$Heartbeat extends Heartbeat {
     _$hash = $jc(_$hash, projectReadiness.hashCode);
     _$hash = $jc(_$hash, projectFolders.hashCode);
     _$hash = $jc(_$hash, projectTrashResults.hashCode);
+    _$hash = $jc(_$hash, runSlots.hashCode);
+    _$hash = $jc(_$hash, waitingRuns.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -166,7 +176,9 @@ class _$Heartbeat extends Heartbeat {
           ..add('details', details)
           ..add('projectReadiness', projectReadiness)
           ..add('projectFolders', projectFolders)
-          ..add('projectTrashResults', projectTrashResults))
+          ..add('projectTrashResults', projectTrashResults)
+          ..add('runSlots', runSlots)
+          ..add('waitingRuns', waitingRuns))
         .toString();
   }
 }
@@ -236,6 +248,16 @@ class HeartbeatBuilder implements Builder<Heartbeat, HeartbeatBuilder> {
     ListBuilder<ProjectTrashResult>? projectTrashResults,
   ) => _$this._projectTrashResults = projectTrashResults;
 
+  RunSlotsBuilder? _runSlots;
+  RunSlotsBuilder get runSlots => _$this._runSlots ??= RunSlotsBuilder();
+  set runSlots(RunSlotsBuilder? runSlots) => _$this._runSlots = runSlots;
+
+  ListBuilder<WaitingRun>? _waitingRuns;
+  ListBuilder<WaitingRun> get waitingRuns =>
+      _$this._waitingRuns ??= ListBuilder<WaitingRun>();
+  set waitingRuns(ListBuilder<WaitingRun>? waitingRuns) =>
+      _$this._waitingRuns = waitingRuns;
+
   HeartbeatBuilder() {
     Heartbeat._defaults(this);
   }
@@ -254,6 +276,8 @@ class HeartbeatBuilder implements Builder<Heartbeat, HeartbeatBuilder> {
       _projectReadiness = $v.projectReadiness?.toBuilder();
       _projectFolders = $v.projectFolders?.toBuilder();
       _projectTrashResults = $v.projectTrashResults?.toBuilder();
+      _runSlots = $v.runSlots?.toBuilder();
+      _waitingRuns = $v.waitingRuns?.toBuilder();
       _$v = null;
     }
     return this;
@@ -293,6 +317,8 @@ class HeartbeatBuilder implements Builder<Heartbeat, HeartbeatBuilder> {
             projectReadiness: _projectReadiness?.build(),
             projectFolders: _projectFolders?.build(),
             projectTrashResults: _projectTrashResults?.build(),
+            runSlots: _runSlots?.build(),
+            waitingRuns: _waitingRuns?.build(),
           );
     } catch (_) {
       late String _$failedField;
@@ -312,6 +338,10 @@ class HeartbeatBuilder implements Builder<Heartbeat, HeartbeatBuilder> {
         _projectFolders?.build();
         _$failedField = 'projectTrashResults';
         _projectTrashResults?.build();
+        _$failedField = 'runSlots';
+        _runSlots?.build();
+        _$failedField = 'waitingRuns';
+        _waitingRuns?.build();
       } catch (e) {
         throw BuiltValueNestedFieldError(
           r'Heartbeat',

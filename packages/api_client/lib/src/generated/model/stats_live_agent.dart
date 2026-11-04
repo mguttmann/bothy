@@ -3,6 +3,7 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:api_client/src/generated/model/run_slots.dart';
 import 'package:api_client/src/generated/model/billing_mode.dart';
 import 'package:api_client/src/generated/model/agent_runtime_state.dart';
 import 'package:api_client/src/generated/model/agent_rate_limit_state.dart';
@@ -19,6 +20,7 @@ part 'stats_live_agent.g.dart';
 /// * [billingMode]
 /// * [reportedBillingMode] - Absent when the adapter follows the configured mode per run.
 /// * [rateLimit]
+/// * [runSlots] - Runners only, the slot use of the last heartbeat (09 4.8); with the runs of the frame a client names the runs that hold the slots.
 @BuiltValue()
 abstract class StatsLiveAgent
     implements Built<StatsLiveAgent, StatsLiveAgentBuilder> {
@@ -41,6 +43,10 @@ abstract class StatsLiveAgent
 
   @BuiltValueField(wireName: r'rate_limit')
   AgentRateLimitState? get rateLimit;
+
+  /// Runners only, the slot use of the last heartbeat (09 4.8); with the runs of the frame a client names the runs that hold the slots.
+  @BuiltValueField(wireName: r'run_slots')
+  RunSlots? get runSlots;
 
   StatsLiveAgent._();
 
@@ -95,6 +101,13 @@ class _$StatsLiveAgentSerializer
       yield serializers.serialize(
         object.rateLimit,
         specifiedType: const FullType(AgentRateLimitState),
+      );
+    }
+    if (object.runSlots != null) {
+      yield r'run_slots';
+      yield serializers.serialize(
+        object.runSlots,
+        specifiedType: const FullType(RunSlots),
       );
     }
   }
@@ -160,6 +173,14 @@ class _$StatsLiveAgentSerializer
           ) as AgentRateLimitState?;
           if (valueDes == null) continue;
           result.rateLimit.replace(valueDes);
+          break;
+        case r'run_slots':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(RunSlots),
+          ) as RunSlots?;
+          if (valueDes == null) continue;
+          result.runSlots.replace(valueDes);
           break;
         default:
           unhandled.add(key);

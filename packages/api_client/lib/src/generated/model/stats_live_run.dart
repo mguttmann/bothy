@@ -22,6 +22,7 @@ part 'stats_live_run.g.dart';
 /// * [spaceId] - UUIDv7 (RFC 9562), lowercase canonical form.
 /// * [agentId] - UUIDv7 (RFC 9562), lowercase canonical form.
 /// * [state]
+/// * [stateReason] - Only for `queued`, the wait reason of `runs.state_reason` (09 5.2.1, for example `slots_full`); absent when none is stored. A client shows the agent offline when its presence in `agents` is `offline` or `unknown`.
 /// * [queuedAt] - RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 /// * [startedAt] - RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 /// * [billingMode] - Mode used by the run, else the configured mode.
@@ -59,6 +60,10 @@ abstract class StatsLiveRun
   @BuiltValueField(wireName: r'state')
   StatsLiveRunStateEnum get state;
   // enum stateEnum {  queued,  running,  waiting_input,  };
+
+  /// Only for `queued`, the wait reason of `runs.state_reason` (09 5.2.1, for example `slots_full`); absent when none is stored. A client shows the agent offline when its presence in `agents` is `offline` or `unknown`.
+  @BuiltValueField(wireName: r'state_reason')
+  String? get stateReason;
 
   /// RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
   @BuiltValueField(wireName: r'queued_at')
@@ -154,6 +159,13 @@ class _$StatsLiveRunSerializer implements PrimitiveSerializer<StatsLiveRun> {
       object.state,
       specifiedType: const FullType(StatsLiveRunStateEnum),
     );
+    if (object.stateReason != null) {
+      yield r'state_reason';
+      yield serializers.serialize(
+        object.stateReason,
+        specifiedType: const FullType(String),
+      );
+    }
     yield r'queued_at';
     yield serializers.serialize(
       object.queuedAt,
@@ -293,6 +305,14 @@ class _$StatsLiveRunSerializer implements PrimitiveSerializer<StatsLiveRun> {
             specifiedType: const FullType(StatsLiveRunStateEnum),
           ) as StatsLiveRunStateEnum;
           result.state = valueDes;
+          break;
+        case r'state_reason':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(String),
+          ) as String?;
+          if (valueDes == null) continue;
+          result.stateReason = valueDes;
           break;
         case r'queued_at':
           final valueDes = serializers.deserialize(

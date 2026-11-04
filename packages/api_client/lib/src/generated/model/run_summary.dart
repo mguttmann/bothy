@@ -20,7 +20,7 @@ part 'run_summary.g.dart';
 /// * [agentId] - UUIDv7 (RFC 9562), lowercase canonical form.
 /// * [triggeredBy] - UUIDv7 (RFC 9562), lowercase canonical form.
 /// * [state]
-/// * [stateReason]
+/// * [stateReason] - The reason of `failed` and `cancelled` (09 5.2); while `queued` the wait reason of 09 5.2.1, `invocation_held` (the server holds the invocation until an attachment or transcript is final), `slots_full` (every slot of the runner is in use) or `thread_busy` (the runner waits for the thread or session lock); absent while queued when the agent has not reported a wait.
 /// * [version]
 /// * [billingModeExpected]
 /// * [billingModeUsed]
@@ -59,6 +59,7 @@ abstract class RunSummary implements Built<RunSummary, RunSummaryBuilder> {
   RunState get state;
   // enum stateEnum {  queued,  running,  waiting_input,  completed,  failed,  cancelled,  };
 
+  /// The reason of `failed` and `cancelled` (09 5.2); while `queued` the wait reason of 09 5.2.1, `invocation_held` (the server holds the invocation until an attachment or transcript is final), `slots_full` (every slot of the runner is in use) or `thread_busy` (the runner waits for the thread or session lock); absent while queued when the agent has not reported a wait.
   @BuiltValueField(wireName: r'state_reason')
   String? get stateReason;
 

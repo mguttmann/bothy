@@ -690,6 +690,8 @@ Top-level members (openapi `Heartbeat`, closed; an unknown member is `400 valida
 | `project_readiness` | runners only: list of `{channel_id, ready, reason}`, one entry per bound forum, distinct `channel_id` values (sets `project_bindings.ready`, M2-03); `reason` is optional, a code of 18.12 in the reason form below, sent only with `ready` false and stored as `project_bindings.ready_reason` (M4-43); `trash_check` is optional, `{ok, reason}` of the folder check of 18.15 with a code of 18.15 as `reason` when `ok` is false, sent at most every `runner.trash_check_interval` and stored on the binding (FEAT-delete-spaces-chats) |
 | `project_folders` | runners only: the distinct folder names directly under the projects root that are Git work trees, sorted, at most `runner.project_folders_max` (18.13); each one segment of `^[A-Za-z0-9][A-Za-z0-9._-]*$` with the length limit of `ProjectFolderName` in the OpenAPI; stored as `agents.reported_project_folders` (M4-44) |
 | `project_trash_results` | runners only: list of `{channel_id, result, reason}` with distinct `channel_id` values, the outcome (`trashed` or `refused` with a code of 18.15) of each folder move of `HeartbeatAck.project_trash` whose result no accepted `sendHeartbeat` carried yet (18.15); the server stores it once and audits it as `channel.project.trash` |
+| `run_slots` | runners only: `{used, total}`, the turns that run now (`used`) of the turns that may run at once (`total`, `runner.max_parallel_runs` of 18.2), `used` at most `total`; stored as `agents.reported_details.run_slots` and shown as `AgentRuntimeStatus.run_slots` and `StatsLiveAgent.run_slots`; a heartbeat without it clears the stored one (full state; addendum of 2026-11-04, F-WARTESCHLANGE-GRUND) |
+| `waiting_runs` | list of `{run_id, reason}` with distinct `run_id` values: the runs the adapter accepted that wait before `run.start`, each with its wait reason `slots_full` or `thread_busy` (5.2.1); applied as described below; absent counts as the empty list (addendum of 2026-11-04) |
 
 Keys of `details` (closed; any other key, also inside `capabilities`, `adapter` and `runtime`, is
 an unknown member):
@@ -722,12 +724,16 @@ out of `reported_details`. Exception: `project_readiness` is applied only when p
 different from the last list this server process applied for the agent, or when that
 application is at least `agent.heartbeat_persist_interval` old (a binding change resets the stored
 readiness, and an unchanged list must restore it), in its own transaction before the rest of the
-heartbeat; absent means "unchanged". `project_folders` too is applied only when present and
+heartbeat; absent means "unchanged". `waiting_runs` is applied when the list (absent counts as
+empty) differs from the last one this server process applied for the agent, in its own transaction
+before the rest of the heartbeat: every listed run of the agent that is still `queued` gets the
+reason as `runs.state_reason`, and every `queued` run of the agent whose stored reason is
+`slots_full` or `thread_busy` and that is not listed gets none (5.2.1). `project_folders` too is applied only when present and
 different from the last list this server process wrote for the agent, in its own transaction
 before the rest of the heartbeat; absent means "unchanged" (M4-44). A folder name listed twice
 or breaking its form is one field error at `/project_folders/<i>`. `reported_details` holds exactly
 `capabilities`, `billing_modes_supported`, `billing_evidence`, `active_runs` (run ids as strings),
-`degraded_reasons`, `adapter`, `runtime` and `protocol_version`, never `null`.
+`degraded_reasons`, `adapter`, `runtime`, `protocol_version` and `run_slots`, never `null`.
 
 Storage: a change of `reported_billing_mode` or `reported_tool_class` against the stored value,
 also from or to "not reported" and the first report ever, is stored at once with the whole
@@ -926,6 +932,31 @@ unknown code, or a server code such as `stale`) as `adapter_error` (D-M2-05-8). 
 original code as the detail `original_reason` of a server step with `kind = status` and
 `name = adapter_reason`, cut to `run.step_detail_max_bytes`.
 
+#### 5.2.1 Wait reasons of a queued run
+
+Addendum of 2026-11-04 (F-WARTESCHLANGE-GRUND, `docs/decisions.d/F-WARTESCHLANGE-GRUND.md`, R-AG-39): a
+run in `queued` says why it waits. `runs.state_reason` holds the wait reason while the run is
+`queued`; `run.start` clears it (a start carries no reason), and an end state replaces it with the
+reason of 5.2.
+
+| Wait reason | Set by | Meaning | Cleared |
+|---|---|---|---|
+| `invocation_held` | Server at acceptance | `agent.invocation` is held until an attachment or the server transcript of the triggering message is final (`runs.invocation_held_until`, 04 15.3 step 1) | at the release |
+| `slots_full` | Adapter, heartbeat `waiting_runs` | every slot of the runner is in use (`runner.max_parallel_runs`, 18.2); the runner's `run_slots` gives the count | when the run is no longer listed, at its start or end |
+| `thread_busy` | Adapter, heartbeat `waiting_runs` | the runner waits for the thread or session lock of another turn (18.2 "Locks") | as `slots_full` |
+
+A queued run without a wait reason was delivered and the agent has not reported a wait yet.
+Clients show "agent offline" ahead of `slots_full`, `thread_busy` and no reason while the presence
+of the run's agent is `offline` or `unknown` (4.8); the server does not store it, because the
+presence changes without a write to the run. A thread has at most one active run (R-DM-14), so no
+run waits on the server for another run of its thread; a rate limit of the provider never delays a
+start (the runtime retries inside a running turn, `metrics.last_api_retry`), so it is no wait
+reason. Every change of a wait reason raises `runs.version` and appends `run.state_changed`
+without a trigger state, so the live box, "Running now" and the live topology show it at once
+([25-visualization.md](25-visualization.md) 6.1). The runs that hold the slots of a `slots_full`
+run are the runs of the same agent in `running`; a client names only those the caller may read
+(`listActiveRuns` with `agent_id`, or the runs of the live frame) and counts the rest.
+
 ### 5.3 Run document (`run_document.v1`)
 
 The document is the view of `runs`, `run_steps` and `run_followups` (04 section 11.1). The
@@ -1021,6 +1052,7 @@ Rules of `patchRun` and the gateway op `run.update` (both call the same use case
 | Display | Source | During the run | Collapsed |
 |---|---|---|---|
 | State | `state` | yes, as icon and word | yes |
+| Wait reason | `state_reason` of a `queued` run (5.2.1), with the agent's `run_slots` and presence; for `slots_full` the runs that hold the slots, each a link to its thread when the reader may read it | yes, while `queued` | no |
 | Duration | `started_at` until now, or `duration_ms` | yes, counted up locally | yes |
 | Context in percent | `metrics.context_pct` | yes | no |
 | Costs | `cost`, with "Estimate" as long as `is_estimate` for `organization`, "information only" for `personal` (10 12.2, addendum of 2026-11-01) | yes, growing with the adapter's `/cost` patches | yes |
@@ -2741,7 +2773,7 @@ character (D-M2-34-8).
 | Process group | own (`start_new_session`) | stop and cleanup hit all children |
 | Detachment | stdout and stderr go to the files `<run_id>.stream.jsonl` and `<run_id>.stderr.log` under `<runner.state_dir>/sessions/<session>/` (mode `0600`), not to pipes; the runner reads the stream file every `runner.poll_interval`; the turn record `<runner.state_dir>/turns/<run_id>.json` holds run, thread, channel, session, PID, group, start time and file paths, never a token; turns survive a restart of the runner, and the new runner finds running turns via the record and ends orphaned ones (M2-35) | a restart never silently kills a turn |
 | Locks | `flock` per thread and per session (`<runner.state_dir>/locks/`), taken in this order with attempts every `runner.poll_interval`; wait at most `runner.session_lock_wait`, then the run ends `failed` with `adapter_error`; the turn inherits the descriptors, so a lock lives as long as the turn, also when the runner dies | a session never runs twice at the same time |
-| Parallelism | at most `runner.max_parallel_runs` turns | host and rate limits |
+| Parallelism | at most `runner.max_parallel_runs` turns; the runner reports `run_slots` (`used`, `total`) in every heartbeat and every run that waits in prepare for a lock (`thread_busy`) or a slot (`slots_full`) in `waiting_runs` (4.8, 5.2.1), and sends a heartbeat at once when a run starts or stops waiting | host and rate limits; the person sees why a run waits and which runs hold the slots |
 | Input | the system prompt file (`--append-system-prompt-file`, `<run_id>.system-prompt.md`) holds only the fixed runner instructions (the `TITLE:` request only for a new or unstarted session) and, in an own section, the channel prompt `behavior.prompt`; the first stdin line is one `user` message with two text items: first the context of 4.6 with trust marks, every `unverified` content and every file entry in marked data blocks, the attachments of the triggering message as local paths inside those blocks; second the text of the triggering message with the transcripts of its attachments (of the server, or of the runner's transcriber for an audio attachment without one, 18.14); the line is stored as `<run_id>.input.jsonl` | the context becomes part of the session history, so a `--resume` turn still knows what `context_floor_seq` no longer sends; files are data, never instructions (ADR 0054); follow-ups through the same pipe (18.5) |
 | Recording | stream and stderr per session in `runner.state_dir`, prompt files and downloaded attachments too, kept for `runner.stream_log_retention` (swept at start and after every turn; the usage of a session, `usage.json`, is state and never swept) | troubleshooting, fixtures |
 | Permission prompts | `--permission-prompts none`: actions that are not allowed are rejected instead of waiting | an unattended turn never hangs on a question |
@@ -3591,6 +3623,7 @@ reason, and every message failed with a red X and no explanation.
 | R-AG-38 | The Claude Code runner moves the folder of a deleted project forum only into the trash of its host, or `.bothy-trash` under its projects root, with one rename after it stopped the forum's turns and checked the folder again, and refuses with a code a folder outside its root, a link, a foreign work tree, uncommitted or unpushed work, a folder holding another project and any Git error (18.15, addendum of 2026-11-01). | The owner wants the folder of a deleted project gone but recoverable; a rename cannot half delete a project, and the runner must not trust the server or an older check for its own file system (D-DEL-10 to D-DEL-13). |
 | R-AG-39 | Only an agent with `adapter_kind` `code_runner` operates a bound forum: `putProjectBinding` and `setChannelOperator` refuse another one with `operator_cannot_serve_project`, a binding that is not ready under such an operator reads that reason, and `agent.invoke` names it (18.16, addendum of 2026-11-04). | Live use 2026-11-04: the dialog "New project" bound a forum with a chat agent as operator; no readiness was ever reported, and every message failed without an explanation or an action. |
 | R-AG-40 | A message that failed with `project_not_ready`, `operator_cannot_serve_project` or `operator_not_in_channel` can be triggered again by its author once the cause is fixed; its thread takes the channel's operator when the old operator never completed a run in it (3.8, addendum of 2026-11-04). | Live use 2026-11-04: after the operator was corrected the first post stayed dead; it had no run that `retryRun` could start, and step 4a refused every new message in it. |
+| R-AG-41 | A queued run carries its wait reason in `runs.state_reason` (`invocation_held` from the server, `slots_full` and `thread_busy` from the adapter's heartbeat member `waiting_runs`), the runner reports its slot use as `run_slots`, and clients show an offline agent ahead of a stored reason (5.2.1, addendum of 2026-11-04). | Live use 2026-11-04: a run showed only "Queued" while four turns held every slot of `runner.max_parallel_runs`; the owner could see neither the reason nor the runs that held the slots (F-WARTESCHLANGE-GRUND). |
 
 ## 20. Alignment with the core contract
 

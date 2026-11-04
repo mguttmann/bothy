@@ -35,6 +35,9 @@ class StatsLiveRun:
         billing_mode (BillingMode): Backend policy of an agent. `personal` runs on the subscription of exactly one
             person.
         approval_pending (bool): An approval card of this run waits for a decision.
+        state_reason (str | Unset): Only for `queued`, the wait reason of `runs.state_reason` (09 5.2.1, for example
+            `slots_full`); absent when none is stored. A client shows the agent offline when its presence in `agents` is
+            `offline` or `unknown`.
         started_at (datetime.datetime | Unset): RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
         step (StatsLiveStep | Unset): Current step of a run; only kind and name (for tools the tool name), never title
             or detail.
@@ -62,6 +65,7 @@ class StatsLiveRun:
     queued_at: datetime.datetime
     billing_mode: BillingMode
     approval_pending: bool
+    state_reason: str | Unset = UNSET
     started_at: datetime.datetime | Unset = UNSET
     step: StatsLiveStep | Unset = UNSET
     cost_micros: int | Unset = UNSET
@@ -90,6 +94,8 @@ class StatsLiveRun:
         billing_mode = self.billing_mode.value
 
         approval_pending = self.approval_pending
+
+        state_reason = self.state_reason
 
         started_at: str | Unset = UNSET
         if not isinstance(self.started_at, Unset):
@@ -133,6 +139,8 @@ class StatsLiveRun:
                 "approval_pending": approval_pending,
             }
         )
+        if state_reason is not UNSET:
+            field_dict["state_reason"] = state_reason
         if started_at is not UNSET:
             field_dict["started_at"] = started_at
         if step is not UNSET:
@@ -176,6 +184,8 @@ class StatsLiveRun:
         billing_mode = BillingMode(d.pop("billing_mode"))
 
         approval_pending = d.pop("approval_pending")
+
+        state_reason = d.pop("state_reason", UNSET)
 
         _started_at = d.pop("started_at", UNSET)
         started_at: datetime.datetime | Unset
@@ -225,6 +235,7 @@ class StatsLiveRun:
             queued_at=queued_at,
             billing_mode=billing_mode,
             approval_pending=approval_pending,
+            state_reason=state_reason,
             started_at=started_at,
             step=step,
             cost_micros=cost_micros,

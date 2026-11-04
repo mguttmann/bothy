@@ -8279,6 +8279,8 @@ export interface components {
             /** @description False when the reported mode differs from the configured `billing_mode`. */
             billing_mode_matches?: boolean;
             rate_limit?: components["schemas"]["AgentRateLimitState"];
+            /** @description Runners only, the slot use of the last heartbeat (09 4.8); absent when the adapter does not report it. */
+            run_slots?: components["schemas"]["RunSlots"];
             billing_evidence?: components["schemas"]["BillingEvidence"];
             /** @description Known values `billing_mode_mismatch` (the reported mode has differed from the configured one for longer than `billing.mismatch_alert_after`), `billing_mode_unsupported` (no reported mode and the configured one is not in `billing_modes_supported`), `billing_evidence_unknown` (`billing_evidence.key_type` is `unknown`) and `tool_class_mismatch` (the reported tool class differs from the configured one). Only while the state is `online` or `degraded`. */
             warnings?: string[];
@@ -8348,6 +8350,26 @@ export interface components {
             project_folders?: components["schemas"]["ProjectFolderName"][];
             /** @description Runners only, the outcome of each folder move of `HeartbeatAck.project_trash` the runner finished since its last heartbeat (09 18.15); the server stores it once and audits it as `channel.project.trash`. */
             project_trash_results?: components["schemas"]["ProjectTrashResult"][];
+            /** @description Runners only, how many turns run now of how many may run at once (09 4.8). Stored in `agents.reported_details.run_slots`; absent clears a stored one (full state). */
+            run_slots?: components["schemas"]["RunSlots"];
+            /** @description The accepted runs of this adapter that wait before their start, each with its wait reason (09 5.2.1); the run ids must be distinct. The server stores the reason as `runs.state_reason` of each listed run that is still `queued`, and clears a runner reason of a queued run of the agent that is no longer listed; absent counts as the empty list. */
+            waiting_runs?: components["schemas"]["WaitingRun"][];
+        };
+        /** @description Slot use of a runner (09 4.8, 18.2), `used` turns run of at most `total` (`runner.max_parallel_runs`) at once; `used` is at most `total`. */
+        RunSlots: {
+            /** @example 4 */
+            used: number;
+            /** @example 4 */
+            total: number;
+        };
+        /** @description One run an adapter accepted that waits before its start (09 5.2.1). */
+        WaitingRun: {
+            run_id: components["schemas"]["Uuid"];
+            /**
+             * @description `slots_full`: every slot of `runner.max_parallel_runs` is in use; `thread_busy`: the thread or session lock is held by another turn.
+             * @enum {string}
+             */
+            reason: "slots_full" | "thread_busy";
         };
         /**
          * @description One folder name directly under a runner's projects root, the one-segment form of `workspace_ref` (09 18.12 item 2).
@@ -8522,7 +8544,11 @@ export interface components {
             agent_id: components["schemas"]["Uuid"];
             triggered_by: components["schemas"]["Uuid"];
             state: components["schemas"]["RunState"];
-            /** @example user_cancelled */
+            /**
+             * @description The reason of `failed` and `cancelled` (09 5.2); while `queued` the wait reason of 09 5.2.1, `invocation_held` (the server holds the invocation until an attachment or transcript is final), `slots_full` (every slot of the runner is in use) or `thread_busy` (the runner waits for the thread or session lock); absent while queued when the agent has not reported a wait.
+             * @example user_cancelled
+             * @example slots_full
+             */
             state_reason?: string;
             /** Format: int64 */
             version: number;
@@ -8556,6 +8582,10 @@ export interface components {
             triggering_interaction_id?: components["schemas"]["Uuid"];
             triggered_by: components["schemas"]["Uuid"];
             state: components["schemas"]["RunState"];
+            /**
+             * @description The reason of `failed` and `cancelled` (09 5.2); while `queued` the wait reason of 09 5.2.1, `invocation_held` (the server holds the invocation until an attachment or transcript is final), `slots_full` (every slot of the runner is in use) or `thread_busy` (the runner waits for the thread or session lock); absent while queued when the agent has not reported a wait.
+             * @example slots_full
+             */
             state_reason?: string;
             /** Format: int64 */
             version: number;
@@ -10111,6 +10141,11 @@ export interface components {
             agent_id: components["schemas"]["Uuid"];
             /** @enum {string} */
             state: "queued" | "running" | "waiting_input";
+            /**
+             * @description Only for `queued`, the wait reason of `runs.state_reason` (09 5.2.1, for example `slots_full`); absent when none is stored. A client shows the agent offline when its presence in `agents` is `offline` or `unknown`.
+             * @example slots_full
+             */
+            state_reason?: string;
             queued_at: components["schemas"]["Timestamp"];
             started_at?: components["schemas"]["Timestamp"];
             /** @description Mode used by the run, else the configured mode. */
@@ -10182,6 +10217,8 @@ export interface components {
             /** @description Absent when the adapter follows the configured mode per run. */
             reported_billing_mode?: components["schemas"]["BillingMode"];
             rate_limit?: components["schemas"]["AgentRateLimitState"];
+            /** @description Runners only, the slot use of the last heartbeat (09 4.8); with the runs of the frame a client names the runs that hold the slots. */
+            run_slots?: components["schemas"]["RunSlots"];
         };
         /** @description Sum of `count` (and `sum` where meaningful) of one metric over the last full minute and the current minute up to `at`. */
         StatsLiveRate: {

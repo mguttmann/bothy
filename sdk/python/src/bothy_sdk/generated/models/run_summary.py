@@ -36,7 +36,10 @@ class RunSummary:
         cost (Money): Amount in micro units of the currency. Never a float.
         step_count (int):
         queued_at (datetime.datetime): RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
-        state_reason (str | Unset):
+        state_reason (str | Unset): The reason of `failed` and `cancelled` (09 5.2); while `queued` the wait reason of
+            09 5.2.1, `invocation_held` (the server holds the invocation until an attachment or transcript is final),
+            `slots_full` (every slot of the runner is in use) or `thread_busy` (the runner waits for the thread or session
+            lock); absent while queued when the agent has not reported a wait.
         billing_mode_used (BillingMode | Unset): Backend policy of an agent. `personal` runs on the subscription of
             exactly one person.
         status_line (str | Unset):
