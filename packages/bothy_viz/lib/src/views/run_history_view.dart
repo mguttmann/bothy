@@ -104,6 +104,7 @@ class _RunHistoryViewState extends State<RunHistoryView> {
         _next = page.nextCursor;
         _loaded = true;
         _loadingMore = false;
+        _error = null;
       });
     } on Object catch (error) {
       if (!mounted || generation != _generation) return;
@@ -128,7 +129,10 @@ class _RunHistoryViewState extends State<RunHistoryView> {
 
   void _more() {
     if (_loadingMore || _next == null) return;
-    setState(() => _loadingMore = true);
+    setState(() {
+      _loadingMore = true;
+      _error = null;
+    });
     unawaited(_load(reset: false));
   }
 

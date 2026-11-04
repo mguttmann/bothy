@@ -551,9 +551,15 @@ void registerSearchHandlers(RestFake rest) {
         for (final run in world.runs.values)
           if (_endedRunStates.contains(run['state']) &&
               run['finished_at'] != null &&
-              world.seesChannel(me, run['channel_id']! as String) &&
+              // The run's thread where it is now: a moved thread counts in its current
+              // channel, a deleted one drops out (as the server's thread list).
+              world.seesThread(me, run['thread_id']! as String) &&
               (spaceId == null ||
-                  world.channels[run['channel_id']]?.spaceId == spaceId) &&
+                  world
+                          .channels[world
+                              .threads[run['thread_id']]!['channel_id']]
+                          ?.spaceId ==
+                      spaceId) &&
               (agentId == null || run['agent_id'] == agentId) &&
               (state == null || run['state'] == state))
             run,
@@ -577,7 +583,9 @@ void registerSearchHandlers(RestFake rest) {
           settings.listPageSizeMax,
         ),
         hash: hash,
-        after: cursor == null ? null : _decodeCursor(cursor, hash, 2).key,
+        after: cursor == null || cursor.isEmpty
+            ? null
+            : _decodeCursor(cursor, hash, 2).key,
       );
       return FakeResponse(200, {
         'items': [for (final run in page.items) world.runHistoryEntry(run)],

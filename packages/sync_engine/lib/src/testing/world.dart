@@ -2525,8 +2525,9 @@ final class FakeWorld {
   /// The API `RunHistoryEntry` of the finished [run] (F-LAUFHISTORIE): the summary members of
   /// the schema with the space, model and metrics, and the chat named by its channel and thread.
   JsonMap runHistoryEntry(JsonMap run) {
-    final channel = channels[run['channel_id']];
     final thread = threads[run['thread_id']];
+    // The chat where the thread is now, as the server reads it.
+    final channel = channels[thread?['channel_id'] ?? run['channel_id']];
     final title = thread?['kind'] == 'main' ? null : thread?['title'];
     return {
       for (final k in const [

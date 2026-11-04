@@ -657,5 +657,30 @@ void main() {
         expect(bad['code'], 'cursor_invalid');
       },
     );
+    test('an empty cursor reads the first page', () async {
+      final message = post(w.alex, w.releaseNotes, 'Run one');
+      final run = world.createRun(
+        agentId: w.robin.id,
+        triggeringMessageId: message['id']! as String,
+        triggeredBy: w.alex.id,
+      );
+      world.setRunState(run['id']! as String, 'completed');
+      final page = (await alexApi.getRunsApi().listRunHistory(cursor: ''))
+          .data!;
+      expect([for (final r in page.items) r.id], [run['id']]);
+    });
+    test('a run of a deleted thread drops out', () async {
+      final message = post(w.alex, w.releaseNotes, 'Run one');
+      final run = world.createRun(
+        agentId: w.robin.id,
+        triggeringMessageId: message['id']! as String,
+        triggeredBy: w.alex.id,
+      );
+      world.setRunState(run['id']! as String, 'completed');
+      world.threads[run['thread_id']]!['deleted_at'] =
+          '2026-01-01T00:00:00.000Z';
+      final page = (await alexApi.getRunsApi().listRunHistory()).data!;
+      expect(page.items, isEmpty);
+    });
   });
 }
