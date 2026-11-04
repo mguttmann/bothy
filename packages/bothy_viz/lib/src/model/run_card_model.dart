@@ -168,8 +168,8 @@ final class RunCardModel {
     );
   }
 
-  /// The wait of the queued [run] in [frame] (09 5.2.1): the agent's presence and slot use from
-  /// `agents`, the agent's `running` runs of the frame as the runs that hold the slots, each
+  /// The wait of the queued [run] in a live frame (09 5.2.1): the agent's presence and slot use
+  /// from [agents], the agent's `running` runs among [runs] as the runs that hold the slots, each
   /// with the label [names] gives it; the slots the frame does not show are counted.
   static RunWaitModel waitIn(
     api.StatsLiveRun run,
