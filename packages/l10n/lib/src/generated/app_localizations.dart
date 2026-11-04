@@ -16463,6 +16463,120 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Subagents'**
   String get vizColSubagents;
+
+  /// Title and screen reader name of the search assistant popup (14-search 4.10).
+  ///
+  /// In en, this message translates to:
+  /// **'Search assistant'**
+  String get assistTitle;
+
+  /// Button of the search view and row of the quick switcher that open the search assistant.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask the search assistant'**
+  String get assistOpen;
+
+  /// Last row of the quick switcher; opens the search assistant with the typed text.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask the search assistant: {question}'**
+  String assistAskRow(String question);
+
+  /// Hint of the empty search assistant.
+  ///
+  /// In en, this message translates to:
+  /// **'Describe the chat or development session you are looking for in your own words, for example: where did we move the steering session?'**
+  String get assistIntro;
+
+  /// Screen reader name of the question field.
+  ///
+  /// In en, this message translates to:
+  /// **'Question to the search assistant'**
+  String get assistFieldLabel;
+
+  /// Placeholder of the question field.
+  ///
+  /// In en, this message translates to:
+  /// **'What are you looking for?'**
+  String get assistFieldHint;
+
+  /// Button that sends the question.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask'**
+  String get assistSend;
+
+  /// Shown while the search assistant works on a question.
+  ///
+  /// In en, this message translates to:
+  /// **'Searching'**
+  String get assistSearching;
+
+  /// An answer without hits.
+  ///
+  /// In en, this message translates to:
+  /// **'No session found'**
+  String get assistNothing;
+
+  /// Marks a hit the search assistant did not pick.
+  ///
+  /// In en, this message translates to:
+  /// **'Full text, without the assistant'**
+  String get assistFulltext;
+
+  /// The answer is full text because no assistant agent is configured.
+  ///
+  /// In en, this message translates to:
+  /// **'No search assistant is set up on this server; these are full-text hits.'**
+  String get assistFallbackNotConfigured;
+
+  /// The answer is full text because the assistant agent is not connected.
+  ///
+  /// In en, this message translates to:
+  /// **'The search assistant is not reachable; these are full-text hits.'**
+  String get assistFallbackUnavailable;
+
+  /// The answer is full text because the assistant did not answer in time.
+  ///
+  /// In en, this message translates to:
+  /// **'The search assistant took too long; these are full-text hits.'**
+  String get assistFallbackTimeout;
+
+  /// Cost estimate of one answer; amount is the number with the currency.
+  ///
+  /// In en, this message translates to:
+  /// **'Estimate of the assistant, for information only: {amount}'**
+  String assistCost(String amount);
+
+  /// The question has no search term.
+  ///
+  /// In en, this message translates to:
+  /// **'Describe it with a few more words.'**
+  String get assistQueryEmpty;
+
+  /// The question exceeds the length limit.
+  ///
+  /// In en, this message translates to:
+  /// **'The question is too long.'**
+  String get assistQueryTooLong;
+
+  /// The question did not reach the server.
+  ///
+  /// In en, this message translates to:
+  /// **'No connection to the server.'**
+  String get assistOffline;
+
+  /// Any other failure of a question.
+  ///
+  /// In en, this message translates to:
+  /// **'The search failed. Try again.'**
+  String get assistFailed;
+
+  /// Screen reader label of one hit of the search assistant.
+  ///
+  /// In en, this message translates to:
+  /// **'{title}, {place}, {time}: {reason}'**
+  String assistHitLabel(String title, String place, String time, String reason);
 }
 
 class _AppLocalizationsDelegate

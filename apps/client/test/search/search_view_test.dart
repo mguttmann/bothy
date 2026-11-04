@@ -10,6 +10,8 @@ import 'dart:io';
 
 import 'package:client/app/providers/ports.dart';
 import 'package:client/app/providers/session.dart';
+import 'package:client/assist/assist_port.dart';
+import 'package:client/assist/providers.dart';
 import 'package:client/search/providers.dart';
 import 'package:client/search/search_port.dart';
 import 'package:client/search/search_view.dart';
@@ -109,6 +111,7 @@ class Host {
   final WidgetTester tester;
   late final GoRouter router;
   final FakeServer server = FakeServer();
+  final RecordingAssistant assistant = RecordingAssistant();
   final FakeLocal local = FakeLocal([messageHit('local-1', local: true)]);
   final StreamController<sync.ConnectionState> phases =
       StreamController<sync.ConnectionState>.broadcast();
@@ -130,6 +133,7 @@ class Host {
           ),
           personTimeZoneProvider.overrideWithValue('UTC'),
           searchPortProvider.overrideWithValue(server),
+          assistPortProvider.overrideWithValue(assistant),
           localSearchPortProvider.overrideWithValue(local),
           searchPrincipalsProvider.overrideWith(
             (ref) => Stream.value([
@@ -182,7 +186,36 @@ SearchResultPage page(
 }) =>
     SearchResultPage(items: items, nextCursor: next, candidatesCapped: capped);
 
+/// The search assistant of the view's button; records the questions.
+class RecordingAssistant implements AssistPort {
+  final List<String> questions = [];
+
+  @override
+  Future<AssistAnswer> ask(String q, List<AssistTurn> history) async {
+    questions.add(q);
+    return const AssistAnswer(hits: [], terms: []);
+  }
+}
+
 void main() {
+  testWidgets(
+    'the assistant button asks the search assistant with the field text',
+    (tester) async {
+      final h = Host(tester, initialQuery: '');
+      await h.open();
+      await tester.enterText(
+        find.byKey(const ValueKey('search.field')),
+        'where did the steering session move',
+      );
+      await tester.tap(find.byKey(const ValueKey('search.assist')));
+      await tester.pump();
+      await tester.pump();
+      expect(find.byKey(const ValueKey('assist.dialog')), findsOneWidget);
+      expect(h.assistant.questions, ['where did the steering session move']);
+      expect(h.server.calls, isEmpty);
+    },
+  );
+
   testWidgets(
     'the route query runs on open; local hits with the note, then the server',
     (tester) async {

@@ -10231,4 +10231,76 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get vizColSubagents => 'Subagents';
+
+  @override
+  String get assistTitle => 'Search assistant';
+
+  @override
+  String get assistOpen => 'Ask the search assistant';
+
+  @override
+  String assistAskRow(String question) {
+    return 'Ask the search assistant: $question';
+  }
+
+  @override
+  String get assistIntro =>
+      'Describe the chat or development session you are looking for in your own words, for example: where did we move the steering session?';
+
+  @override
+  String get assistFieldLabel => 'Question to the search assistant';
+
+  @override
+  String get assistFieldHint => 'What are you looking for?';
+
+  @override
+  String get assistSend => 'Ask';
+
+  @override
+  String get assistSearching => 'Searching';
+
+  @override
+  String get assistNothing => 'No session found';
+
+  @override
+  String get assistFulltext => 'Full text, without the assistant';
+
+  @override
+  String get assistFallbackNotConfigured =>
+      'No search assistant is set up on this server; these are full-text hits.';
+
+  @override
+  String get assistFallbackUnavailable =>
+      'The search assistant is not reachable; these are full-text hits.';
+
+  @override
+  String get assistFallbackTimeout =>
+      'The search assistant took too long; these are full-text hits.';
+
+  @override
+  String assistCost(String amount) {
+    return 'Estimate of the assistant, for information only: $amount';
+  }
+
+  @override
+  String get assistQueryEmpty => 'Describe it with a few more words.';
+
+  @override
+  String get assistQueryTooLong => 'The question is too long.';
+
+  @override
+  String get assistOffline => 'No connection to the server.';
+
+  @override
+  String get assistFailed => 'The search failed. Try again.';
+
+  @override
+  String assistHitLabel(
+    String title,
+    String place,
+    String time,
+    String reason,
+  ) {
+    return '$title, $place, $time: $reason';
+  }
 }

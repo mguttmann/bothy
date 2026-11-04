@@ -3,7 +3,8 @@
 /// The quick switcher D6 (docs/spec/01-product.md 5.1 D6, 7: Cmd+K or Ctrl+K; brief M4-23
 /// Design note 3): a dialog over the shell with the search field, the result rows and the
 /// filter row. The binding of Cmd+K is M4-24; the sidebar's "Jump to" and that binding call
-/// [showQuickSwitcher].
+/// [showQuickSwitcher]. Below the rows, "Ask the search assistant" hands the typed text to the
+/// search assistant (docs/spec/14-search.md 4.10).
 library;
 
 import 'package:design_system/design_system.dart';
@@ -13,6 +14,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:l10n/l10n.dart';
 
+import '../assist/assist_dialog.dart';
 import 'providers.dart';
 import 'switcher_sources.dart';
 
@@ -33,14 +35,29 @@ Future<void> showQuickSwitcher(BuildContext context) async {
     barrierColor: context.dsColors.scrim,
     builder: (_) => QuickSwitcher(location: location),
   );
-  if (path != null) router?.go(path);
+  if (path == null) return;
+  if (path.startsWith(switcherAskPrefix)) {
+    if (!context.mounted) return;
+    await showSearchAssistant(
+      context,
+      initialQuestion: path.substring(switcherAskPrefix.length),
+    );
+    return;
+  }
+  router?.go(path);
 }
+
+/// The prefix of the switcher's result that asks the search assistant: a path always starts
+/// with `/`, so the two never meet.
+const String switcherAskPrefix = 'ask:';
 
 /// The dialog of the quick switcher; pops with the path of the chosen row, or null.
 ///
-/// Keys: `switcher.dialog`, `switcher.field`, `switcher.row.<kind>.<id>`,
+/// Keys: `switcher.dialog`, `switcher.field`, `switcher.row.<kind>.<id>`, `switcher.ask`,
 /// `switcher.filter.<name>`, `switcher.close`. Tab and Shift+Tab cycle the filter row, the
-/// arrow keys move the selection, Enter takes the selected row, Esc closes.
+/// arrow keys move the selection, Enter takes the selected row, Cmd+Enter or Ctrl+Enter asks
+/// the search assistant, Esc closes. The last row, shown for any typed text, asks the search
+/// assistant too.
 class QuickSwitcher extends ConsumerStatefulWidget {
   /// Creates the switcher for the route [location] (path and query); the field starts with
   /// [initialQuery].
@@ -88,9 +105,15 @@ class _QuickSwitcherState extends ConsumerState<QuickSwitcher> {
     _selected = 0;
   });
 
+  /// Whether the row "Ask the search assistant" shows: for any typed text.
+  bool get _canAsk => _field.text.trim().isNotEmpty;
+
+  /// The number of selectable rows: the results and the ask row.
+  int get _selectable => _rows.length + (_canAsk ? 1 : 0);
+
   void _move(int delta) {
-    if (_rows.isEmpty) return;
-    setState(() => _selected = (_selected + delta).clamp(0, _rows.length - 1));
+    if (_selectable == 0) return;
+    setState(() => _selected = (_selected + delta).clamp(0, _selectable - 1));
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final row = _selectedRow.currentContext;
       if (row != null && row.mounted) Scrollable.ensureVisible(row);
@@ -100,7 +123,17 @@ class _QuickSwitcherState extends ConsumerState<QuickSwitcher> {
   void _take(SwitcherEntry entry) => Navigator.of(context).pop(entry.path);
 
   void _takeSelected() {
-    if (_selected < _rows.length) _take(_rows[_selected]);
+    if (_selected < _rows.length) {
+      _take(_rows[_selected]);
+    } else if (_canAsk) {
+      _ask();
+    }
+  }
+
+  /// Closes the switcher and hands the typed text to the search assistant.
+  void _ask() {
+    if (!_canAsk) return;
+    Navigator.of(context).pop('$switcherAskPrefix${_field.text.trim()}');
   }
 
   KeyEventResult _onKey(FocusNode node, KeyEvent event) {
@@ -120,7 +153,12 @@ class _QuickSwitcherState extends ConsumerState<QuickSwitcher> {
       _move(-1);
     } else if (key == LogicalKeyboardKey.enter ||
         key == LogicalKeyboardKey.numpadEnter) {
-      if (event is KeyDownEvent) _takeSelected();
+      final keyboard = HardwareKeyboard.instance;
+      if (event is KeyDownEvent) {
+        keyboard.isMetaPressed || keyboard.isControlPressed
+            ? _ask()
+            : _takeSelected();
+      }
     } else if (key == LogicalKeyboardKey.escape) {
       Navigator.of(context).pop();
     } else {
@@ -138,7 +176,7 @@ class _QuickSwitcherState extends ConsumerState<QuickSwitcher> {
         .value;
     final loading = ref.watch(switcherLocalDataProvider(current)) == null;
     _rows = ref.watch(switcherRowsProvider(_field.text, _filter, current));
-    if (_selected >= _rows.length) _selected = 0;
+    if (_selected >= _selectable) _selected = 0;
     return Dialog(
       key: const ValueKey('switcher.dialog'),
       alignment: Alignment.topCenter,
@@ -208,6 +246,15 @@ class _QuickSwitcherState extends ConsumerState<QuickSwitcher> {
                           ),
                         ),
                 ),
+                if (_canAsk)
+                  KeyedSubtree(
+                    key: _selected == _rows.length ? _selectedRow : null,
+                    child: _AskRow(
+                      question: _field.text.trim(),
+                      selected: _selected == _rows.length,
+                      onTap: _ask,
+                    ),
+                  ),
                 Divider(height: 1, color: c.borderSubtle),
                 _FilterRow(
                   filter: _filter,
@@ -220,6 +267,66 @@ class _QuickSwitcherState extends ConsumerState<QuickSwitcher> {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The last row: "Ask the search assistant: `text`" (docs/spec/14-search.md 4.10).
+class _AskRow extends StatelessWidget {
+  const _AskRow({
+    required this.question,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String question;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final c = context.dsColors;
+    final text = l.assistAskRow(dsIsolate(question));
+    return DsTappable(
+      key: const ValueKey('switcher.ask'),
+      onTap: onTap,
+      label: text,
+      selected: selected,
+      excludeChildSemantics: true,
+      child: Container(
+        color: selected ? c.surfaceSelected : null,
+        constraints: BoxConstraints(minHeight: context.dsDensity.targetMin),
+        padding: const EdgeInsets.symmetric(
+          horizontal: DsSpace.s12,
+          vertical: DsSpace.s4,
+        ),
+        child: Row(
+          children: [
+            SizedBox(
+              width: DsSize.avatarMd,
+              child: Center(
+                child: DsIcon(
+                  DsIcons.actionSearch,
+                  size: DsIconSizeRole.sm,
+                  color: c.textSecondary,
+                  decorative: true,
+                ),
+              ),
+            ),
+            const SizedBox(width: DsSpace.s8),
+            Expanded(
+              child: Text(
+                text,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: dsTextStyle(selected ? DsType.bodyStrong : DsType.body)
+                    .copyWith(color: c.textPrimary),
+              ),
+            ),
+          ],
         ),
       ),
     );

@@ -86,4 +86,5 @@ if it is out of date. Do not edit it by hand.
 | [0072](0072-firebase-messaging-only-in-builds-with-a-firebase-configuration.md) | Firebase messaging only in builds with a Firebase configuration | accepted | 2026-10-25 |
 | [0073](0073-terminal-in-the-owners-own-account.md) | Terminal in the owner's own account (owner account mode) | accepted | 2026-11-01 |
 | [0074](0074-format-rules-for-agent-replies-from-the-sdk.md) | Format rules for agent replies from the SDK | accepted | 2026-11-04 |
+| [0075](0075-search-assistant-through-an-agent-over-the-full-text-search.md) | Search assistant through an agent over the full-text search | accepted | 2026-11-04 |
 <!-- adr-index:end -->

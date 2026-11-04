@@ -25,6 +25,8 @@ const (
 
 // language-check: on
 
+// language-check: off
+
 func TestAssistTerms_DropsStopWordsShortWordsAndDuplicates(t *testing.T) {
 	got := domain.AssistTerms(takeoverQuestion, nil, 3, 12)
 	want := []string{"übernahme", "bothy", "hermes"}
@@ -37,6 +39,8 @@ func TestAssistTerms_DropsStopWordsShortWordsAndDuplicates(t *testing.T) {
 		t.Fatalf("terms = %q, want %q", got, want)
 	}
 }
+
+// language-check: on
 
 func TestAssistTerms_FollowUpKeepsEarlierTermsAfterTheNewOnes(t *testing.T) {
 	got := domain.AssistTerms("no, the older one about Discord", []string{"bothy", "discord", "hermes"}, 3, 4)
@@ -89,6 +93,8 @@ func TestFuseThreads_TitleHitsCountTwiceAndTiesGoToTheNewer(t *testing.T) {
 	}
 }
 
+// language-check: off
+
 func TestAssistExcerpt_CollapsesSpaceAndCutsAtRunes(t *testing.T) {
 	if got := domain.AssistExcerpt("  one\n\ttwo   three ", 100); got != "one two three" {
 		t.Fatalf("excerpt = %q", got)
@@ -97,6 +103,8 @@ func TestAssistExcerpt_CollapsesSpaceAndCutsAtRunes(t *testing.T) {
 		t.Fatalf("cut = %q", got)
 	}
 }
+
+// language-check: on
 
 func TestValidateAssistAnswer(t *testing.T) {
 	refs := map[string]bool{"c1": true, "c2": true}

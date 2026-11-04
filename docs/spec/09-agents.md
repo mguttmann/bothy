@@ -3655,10 +3655,11 @@ runner answers `search.assist_requested` when it is the agent of `search.assist.
 
 1. **Call.** One `claude -p` without tools (the flags of the tool class `chat`, 18.2), with
    `--output-format json`, the model `runner.search_assist_model` and the allow-list environment of
-   18.2 in the mode the runner reports; working directory a private folder below
-   `runner.state_dir`, no project folder, no session (`--no-session-persistence`), the time limit
-   `runner.search_assist_timeout` and never past the request's `expires_at`. Two questions at once
-   run side by side; more wait for a free slot of `runner.max_concurrent_turns`.
+   18.2: `organization` with the API key when `runner.anthropic_api_key_ref` is set, else
+   `personal` when `runner.allow_personal` is on, else no call and no answer; never a fallback
+   from one to the other. Working directory a private folder below `runner.state_dir`, no project
+   folder, no session (`--no-session-persistence`), the time limit `runner.search_assist_timeout`
+   and never past the request's `expires_at`. At most two calls run at once; more wait.
 2. **Prompt.** A fixed instruction (the file `prompts/search_assist.md` of the package) asks for
    one JSON object `{"picks": [{"ref", "reason"}], "terms": [...]}` and names the limits of the
    request. The question, the earlier questions and the candidates follow as a data block marked

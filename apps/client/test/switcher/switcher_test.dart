@@ -9,6 +9,8 @@ import 'dart:io' as io;
 
 import 'package:client/app/providers/ports.dart';
 import 'package:client/app/providers/session.dart';
+import 'package:client/assist/assist_port.dart';
+import 'package:client/assist/providers.dart';
 import 'package:client/switcher/providers.dart';
 import 'package:client/switcher/quick_switcher.dart';
 import 'package:client/switcher/recent_targets.dart';
@@ -375,6 +377,7 @@ void main() {
       Map<String, String> config = const {},
       ConnectionPhase phase = ConnectionPhase.offline,
       String location = '/',
+      AssistPort? assist,
     }) async {
       host = await ColumnHost.open(tester);
       final db = host.db;
@@ -459,6 +462,7 @@ void main() {
               (ref) => Stream.value(ConnectionState(phase)),
             ),
             threadTitleSearchProvider.overrideWithValue(titles),
+            assistPortProvider.overrideWithValue(assist),
           ],
           child: hostRouter(router),
         ),
@@ -620,6 +624,54 @@ void main() {
       await host.dispose(tester);
     });
 
+    testWidgets(
+      'the last row hands the typed text to the search assistant; Ctrl+Enter too',
+      (tester) async {
+        final assist = _AskedAssistant();
+        await open(tester, assist: assist);
+        expect(find.byKey(const ValueKey('switcher.ask')), findsNothing);
+        await type(tester, 'takeover of the tool');
+        expect(find.byKey(const ValueKey('switcher.ask')), findsOneWidget);
+        await tester.tap(find.byKey(const ValueKey('switcher.ask')));
+        await pumpUntil(
+          tester,
+          () =>
+              find.byKey(const ValueKey('assist.dialog')).evaluate().isNotEmpty,
+          what: 'the search assistant',
+        );
+        await host.settle(tester);
+        expect(find.byKey(const ValueKey('switcher.dialog')), findsNothing);
+        expect(assist.questions, ['takeover of the tool']);
+        await tester.tap(find.byKey(const ValueKey('assist.close')));
+        await host.settle(tester);
+
+        await tester.tap(find.byKey(const ValueKey('open')));
+        await pumpUntil(
+          tester,
+          () => find
+              .byKey(const ValueKey('switcher.dialog'))
+              .evaluate()
+              .isNotEmpty,
+          what: 'the switcher',
+        );
+        await type(tester, 'release notes');
+        await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+        await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+        await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+        await pumpUntil(
+          tester,
+          () =>
+              find.byKey(const ValueKey('assist.dialog')).evaluate().isNotEmpty,
+          what: 'the search assistant',
+        );
+        await host.settle(tester);
+        expect(assist.questions, ['takeover of the tool', 'release notes']);
+        await tester.tap(find.byKey(const ValueKey('assist.close')));
+        await host.settle(tester);
+        await host.dispose(tester);
+      },
+    );
+
     testWidgets('nothing found shows the note', (tester) async {
       await open(tester);
       await type(tester, 'zzz');
@@ -638,3 +690,14 @@ String selectedFilter(WidgetTester tester) => [
         .selected)
       f.name,
 ].single;
+
+/// A search assistant that records the questions and answers with nothing.
+class _AskedAssistant implements AssistPort {
+  final List<String> questions = [];
+
+  @override
+  Future<AssistAnswer> ask(String q, List<AssistTurn> history) async {
+    questions.add(q);
+    return const AssistAnswer(hits: [], terms: []);
+  }
+}
