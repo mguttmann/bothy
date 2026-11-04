@@ -141,6 +141,13 @@ void main() {
       422,
     );
     world.setOperator(h.seed.general, h.seed.robin.id);
+    final trigger = h.seed.post(h.seed.alex, h.seed.releaseNotes, 'Run it');
+    final run = world.createRun(
+      agentId: h.seed.robin.id,
+      triggeringMessageId: trigger['id']! as String,
+      triggeredBy: h.seed.alex.id,
+    );
+    world.setRunState(run['id']! as String, 'completed');
     final moved = (await threads.moveThread(
       threadId: h.seed.releaseNotes,
       threadMove: to(other),
@@ -148,6 +155,15 @@ void main() {
     expect(moved.id, h.seed.releaseNotes);
     expect(moved.channelId, other);
     expect(world.log.last.type, 'thread.moved');
+    // The run of the thread moves along: its history entry and getRun name the new channel.
+    final runs = alex.api.getRunsApi();
+    final history = (await runs.listRunHistory()).data!.items.single;
+    expect(history.channelId, other);
+    expect(history.chat?.channelName, 'ops');
+    expect(
+      (await runs.getRun(runId: run['id']! as String)).data!.channelId,
+      other,
+    );
     expect(h.server.violations, isEmpty);
   });
 

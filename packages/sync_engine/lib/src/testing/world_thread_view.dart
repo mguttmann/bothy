@@ -195,6 +195,10 @@ extension ThreadViewWorld on FakeWorld {
     for (final m in messagesOf(threadId)) {
       m['channel_id'] = targetChannelId;
     }
+    // A run reads its channel through its thread on the server, so it moves along.
+    for (final run in runs.values) {
+      if (run['thread_id'] == threadId) run['channel_id'] = targetChannelId;
+    }
     append(
       'thread.moved',
       resource: {
