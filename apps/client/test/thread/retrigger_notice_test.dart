@@ -4,6 +4,7 @@
 // thread's agent was not ready (09 3.8; F-PROJEKT-BEREIT): the cause for everyone, the button
 // for the author, a refusal with its reason, and nothing for another failure.
 
+import 'package:client/sync/message_ops_app.dart';
 import 'package:client/thread/retrigger_notice.dart';
 import 'package:design_system/design_system.dart';
 import 'package:domain/domain.dart';
@@ -74,15 +75,19 @@ void main() {
     },
   );
 
-  testWidgets('a refusal shows its reason and offers the button again', (
+  testWidgets('failed again shows its reason and offers the button again', (
     tester,
   ) async {
+    // The server answers 200 with the message failed again; the executor of
+    // retriggerMessage turns that into this refusal (retrigger_op_test.dart).
     final l = await pumpNotice(
       tester,
       _failed('project_not_ready'),
       mine: true,
-      retrigger: (_) async =>
-          (code: 'agent_invocation_denied', reason: 'project_not_ready'),
+      retrigger: (_) async => (
+        code: AppMessageOps.retriggerStillFailed,
+        reason: 'project_not_ready',
+      ),
     );
     await tester.tap(find.byKey(const ValueKey('retrigger.button')));
     await tester.pumpAndSettle();
@@ -95,6 +100,39 @@ void main() {
     );
     expect(button.onPressed, isNotNull);
   });
+
+  testWidgets(
+    'a new revision of the message ends the wait of an accepted send',
+    (tester) async {
+      final message = _failed('operator_cannot_serve_project');
+      Future<void> host(Message m) => tester.pumpWidget(
+        ProviderScope(
+          child: hostScreen(
+            Scaffold(
+              body: RetriggerNotice(
+                message: m,
+                mine: true,
+                retrigger: (_) async => null,
+              ),
+            ),
+          ),
+        ),
+      );
+      await host(message);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('retrigger.button')));
+      await tester.pump();
+      DsButton button() => tester.widget<DsButton>(
+        find.byKey(const ValueKey('retrigger.button')),
+      );
+      expect(button().onPressed, isNull);
+      await host(
+        message.copyWith(triggerStateAt: DateTime.utc(2026, 11, 4, 12)),
+      );
+      await tester.pump();
+      expect(button().onPressed, isNotNull);
+    },
+  );
 
   testWidgets('another person sees the cause without the button', (
     tester,

@@ -108,6 +108,10 @@ abstract final class AppMessageOps {
   /// because the project or the thread's agent was not ready, 09 3.8, F-PROJEKT-BEREIT).
   static const String retriggerMessage = 'retriggerMessage';
 
+  /// The failure code of a `retriggerMessage` the server accepted with the message failed
+  /// again (the cause is still there); the entry's reason is the message's new reason.
+  static const String retriggerStillFailed = 'retrigger_still_failed';
+
   /// Registers the executors on [registry]; they call [api] and hand what the server returned
   /// to [store].
   static void register(
@@ -223,7 +227,18 @@ abstract final class AppMessageOps {
           messageId: _required<String>(decodePayload(e.payload), 'message_id'),
           extra: ctx.extra,
         );
-        return OutboxResponse(status: response.statusCode, body: response.data);
+        final data = response.data;
+        // 09 3.8: a cause that is still there is no 403; the server answers 200 with the
+        // message failed again. The entry fails with that reason, so "Trigger again" shows it
+        // and offers the button again instead of waiting for a change that never comes.
+        if (data != null && data.triggerState?.name == 'failed') {
+          throw ApiProblem(
+            status: response.statusCode ?? 200,
+            code: retriggerStillFailed,
+            reason: data.triggerStateReason,
+          );
+        }
+        return OutboxResponse(status: response.statusCode, body: data);
       }, lane: (e) => 'message:${decodePayload(e.payload)['message_id']}')
       ..register(PersonalOps.putReadState, (e, ctx) async {
         final response = await prefs.putReadState(

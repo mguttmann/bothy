@@ -86,6 +86,22 @@ class _RetriggerNoticeState extends ConsumerState<RetriggerNotice> {
   bool _busy = false;
   RetriggerRefusal? _refusal;
 
+  @override
+  void didUpdateWidget(RetriggerNotice old) {
+    super.didUpdateWidget(old);
+    // A new revision of the message (failed again, or another trigger state) ends the wait
+    // of an accepted "Trigger again"; the notice then shows that revision's cause.
+    final m = widget.message;
+    final o = old.message;
+    if (_busy &&
+        (m.version != o.version ||
+            m.triggerState != o.triggerState ||
+            m.triggerStateAt != o.triggerStateAt ||
+            m.triggerStateReason != o.triggerStateReason)) {
+      _busy = false;
+    }
+  }
+
   Future<void> _send() async {
     if (_busy) return;
     var send = widget.retrigger;
