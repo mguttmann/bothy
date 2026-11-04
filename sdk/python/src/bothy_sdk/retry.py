@@ -125,6 +125,8 @@ EXEMPT_ROUTES: tuple[ExemptRoute, ...] = (
     ExemptRoute("POST", "/runs/{run_id}/invocation-token", "agent_runtime"),
     ExemptRoute("POST", "/runs/{run_id}/resume", "agent_runtime"),
     ExemptRoute("POST", "/runs/{run_id}/start", "agent_runtime"),
+    ExemptRoute("POST", "/search-assist-requests/{request_id}/answer", "agent_runtime"),
+    ExemptRoute("POST", "/search/assist", "read_only"),
     ExemptRoute("POST", "/terminal/sessions/{session_id}/attach", "auth_flow"),
     ExemptRoute("POST", "/threads/{thread_id}/messages", "client_id"),
 )

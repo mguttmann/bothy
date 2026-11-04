@@ -45,6 +45,8 @@ export const IDEMPOTENT_EXEMPT_OPERATIONS: ReadonlyMap<string, string> =
     ["POST /runs/{run_id}/invocation-token", "agent_runtime"], // renewInvocationToken
     ["POST /runs/{run_id}/resume", "agent_runtime"], // resumeRun
     ["POST /runs/{run_id}/start", "agent_runtime"], // startRun
+    ["POST /search-assist-requests/{request_id}/answer", "agent_runtime"], // answerSearchAssist
+    ["POST /search/assist", "read_only"], // assistSearch
     ["POST /threads/{thread_id}/messages", "client_id"], // createMessage
   ]);
 

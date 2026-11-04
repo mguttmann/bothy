@@ -120,6 +120,7 @@ _ROUTES: tuple[tuple[str, str, str], ...] = (
     ("DELETE", "/commands/{command_id}", "removeCommand"),
     ("GET", "/channels/{channel_id}/commands", "listChannelCommands"),
     ("POST", "/command-autocompletions/{request_id}/answer", "answerAutocomplete"),
+    ("POST", "/search-assist-requests/{request_id}/answer", "answerSearchAssist"),
     ("GET", "/me", "getMe"),
     ("GET", "/messages/{message_id}", "getMessage"),
     ("GET", "/files/{file_id}/content", "downloadFile"),
@@ -971,6 +972,45 @@ class FakeServer:
             raise RuntimeError("no live gateway connection")
         return UUID(envelope["payload"]["request_id"])
 
+    async def request_search_assist(
+        self,
+        q: str,
+        candidates: list[dict[str, Any]],
+        *,
+        history: list[str] | None = None,
+        expires_in: float = 9.0,
+    ) -> UUID:
+        """Send ``search.assist_requested`` to a live gateway connection of Lotse (14 4.10).
+
+        Args:
+            q: Alex's question.
+            candidates: The candidates (``ref``, ``channel_name`` and optionally ``title``,
+                ``space_name``, ``excerpt``, ``shown_before``, ``at``).
+            history: The earlier questions.
+            expires_in: Seconds until ``expires_at``.
+
+        Returns:
+            The request ID.
+
+        Raises:
+            RuntimeError: No gateway connection of Lotse is live.
+        """
+        envelope = self.world.search_assist_event(q, candidates, history or [], expires_in)
+        if not await self.hub.ephemeral(envelope):
+            raise RuntimeError("no live gateway connection")
+        return UUID(envelope["payload"]["request_id"])
+
+    def search_assist_answer(self, request_id: UUID) -> dict[str, Any] | None:
+        """What the adapter answered before ``expires_at``, if anything.
+
+        Args:
+            request_id: The request.
+
+        Returns:
+            The answer body, or ``None`` when none arrived in time.
+        """
+        return self.world.search_assist_answers.get(request_id)
+
     def autocomplete_answer(self, request_id: UUID) -> list[CommandChoice] | None:
         """What the adapter answered before ``expires_at``, if anything.
 
@@ -1491,6 +1531,8 @@ class FakeServer:
             return 200, world.channel_commands(p["channel_id"]), {}
         if op in _THREAD_OPS:
             return self._thread_operation(op, p, request, body)
+        if op == "answerSearchAssist":
+            return self._answer_search_assist(p["request_id"], body)
         return self._answer_autocomplete(p["request_id"], body)
 
     def _create_message(self, thread_id: str, body: Any) -> _Answer:
@@ -1545,6 +1587,28 @@ class FakeServer:
         message = self.world._get(self.world.messages, p["message_id"])
         updated = self.world.extra.update_message(message, body, request.headers.get("If-Match"))
         return 200, updated, {"ETag": f'"{updated["version"]}"'}
+
+    def _answer_search_assist(self, request_id: str, body: Any) -> _Answer:
+        """``answerSearchAssist`` with the reference and limit rules of 14 4.10 point 6."""
+        try:
+            key = UUID(request_id)
+        except ValueError:
+            raise FakeProblem("not_found") from None
+        pending = self.world.search_assist.get(key)
+        if pending is None:
+            raise FakeProblem("not_found")
+        if self.world.now().timestamp() > pending["expires"]:
+            raise FakeProblem("gone")
+        if not isinstance(body, dict):
+            raise field_error("", "required")
+        picks = body.get("picks", [])
+        if len(picks) > pending["max_picks"]:
+            raise field_error("/picks", "too_many_items")
+        for i, pick in enumerate(picks):
+            if pick.get("ref") not in pending["refs"]:
+                raise field_error(f"/picks/{i}/ref", "unknown_ref")
+        self.world.search_assist_answers.setdefault(key, body)
+        return 204, None, {}
 
     def _answer_autocomplete(self, request_id: str, body: Any) -> _Answer:
         try:

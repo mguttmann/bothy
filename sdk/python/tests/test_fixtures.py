@@ -29,7 +29,10 @@ EVENT_FIXTURES = (
     "access.changed",
 )
 # Gateway-only events are not in the Event union; their own generated model decodes them.
-EPHEMERAL_FIXTURES = {"command.autocomplete_requested": models.CommandAutocompleteRequestedEvent}
+EPHEMERAL_FIXTURES = {
+    "command.autocomplete_requested": models.CommandAutocompleteRequestedEvent,
+    "search.assist_requested": models.SearchAssistRequestedEvent,
+}
 BODY_FIXTURES = {
     "run": models.Run,
     "run_context": models.RunContext,

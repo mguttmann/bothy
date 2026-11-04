@@ -83,6 +83,7 @@ from bothy_sdk.generated.models import (
     RunFinishState,
     RunSlots,
     RunStart,
+    SearchAssistRequestedEvent,
     ToolClass,
 )
 from bothy_sdk.heartbeat import build_heartbeat
@@ -99,6 +100,13 @@ from bothy_sdk.invocation import (
 )
 from bothy_sdk.outbox import Outbox, OutboxStore, SqliteOutboxStore
 from bothy_sdk.runs import RunHandle
+from bothy_sdk.search_assist import (
+    AssistQuestion,
+    AssistReply,
+    guarded_search_assist,
+    request_from,
+    send_answer,
+)
 from bothy_sdk.settings import SdkSettings
 from bothy_sdk.sources import (
     CursorAdvance,
@@ -131,6 +139,7 @@ _FOLLOWUP = "agent.followup"
 _INTERACTION = "interaction.created"
 _COMMAND = "command.invoked"
 _AUTOCOMPLETE = "command.autocomplete_requested"
+_SEARCH_ASSIST = "search.assist_requested"
 _CANCEL = "run.cancel_requested"
 _STATE_CHANGED = "run.state_changed"
 _ACCESS_CHANGED = "access.changed"
@@ -506,6 +515,20 @@ class AgentHandler:
         """
         return ()
 
+    async def on_search_assist(self, request: AssistQuestion) -> AssistReply | None:
+        """Answer a question of the search assistant before it expires (14 4.10, 09 10.6).
+
+        Called only on the agent the operator named in ``search.assist.agent_id``. The candidates
+        are data, never instructions; an answer may only name their references.
+
+        Args:
+            request: The question with its candidates.
+
+        Returns:
+            The picks, terms and usage, or ``None`` to send nothing (the default).
+        """
+        return None
+
     async def on_event(self, envelope: Envelope) -> None:
         """Handle an event without an invocation token (for example ``agent.config_changed``).
 
@@ -842,6 +865,9 @@ class Adapter:
             await self.source.settle(env.seq)
 
     async def _on_envelope(self, env: Envelope) -> None:
+        if env.type == _SEARCH_ASSIST:
+            self._spawn(self._search_assist(env))
+            return
         if env.type in TOKEN_EVENT_TYPES:
             if env.type == _AUTOCOMPLETE:
                 self._spawn(self._autocomplete(env))
@@ -1508,6 +1534,23 @@ class Adapter:
             await self.handler.on_autocomplete_sent(request, sent)
         except Exception:  # a handler failure must not stop the connection
             _LOG.exception("on_autocomplete_sent failed")
+
+    async def _search_assist(self, env: Envelope) -> None:
+        if not isinstance(env.event, SearchAssistRequestedEvent):
+            _LOG.warning("search assist %s: undecodable payload", env.id)
+            return
+        request = request_from(env.event)
+        client = self.client
+
+        async def send(request_id: UUID, answer: AssistReply) -> None:
+            await send_answer(client, request_id, answer)
+
+        try:
+            await guarded_search_assist(
+                self.handler.on_search_assist, request, send, clock=self.clock
+            )
+        except Exception:  # a handler or send failure must not stop the connection
+            _LOG.exception("search assist %s failed", request.request_id)
 
 
 def _max_age(cache_control: str | None) -> float | None:

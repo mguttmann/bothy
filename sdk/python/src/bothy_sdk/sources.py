@@ -53,6 +53,7 @@ from bothy_sdk.generated.models import (
     ConsumerAck,
     Heartbeat,
     HeartbeatAck,
+    SearchAssistRequestedEvent,
 )
 from bothy_sdk.settings import SdkSettings
 from bothy_sdk.tolerance import KnownEvent, UnknownEvent, decode_event
@@ -71,6 +72,7 @@ __all__ = [
 
 _LOG = logging.getLogger("bothy_sdk")
 _AUTOCOMPLETE = "command.autocomplete_requested"
+_SEARCH_ASSIST = "search.assist_requested"
 _TOKEN_FIELD = "invocation_token"  # noqa: S105 - a member name, not a secret  # nosec B105
 
 
@@ -147,8 +149,10 @@ def envelope_from(data: Mapping[str, Any]) -> Envelope:
         raise ValueError("envelope without id or type")
     seq = raw.get("seq")
     if event_type == _AUTOCOMPLETE:
-        # The ephemeral event is not part of the durable Event union of the core.
+        # The ephemeral events are not part of the durable Event union of the core.
         event: KnownEvent | UnknownEvent = CommandAutocompleteRequestedEvent.from_dict(raw)
+    elif event_type == _SEARCH_ASSIST:
+        event = SearchAssistRequestedEvent.from_dict(raw)
     else:
         event = decode_event(raw)
     return Envelope(

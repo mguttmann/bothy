@@ -634,6 +634,21 @@ from .run_trigger_kind import RunTriggerKind
 from .run_updated_event import RunUpdatedEvent
 from .run_updated_event_type import RunUpdatedEventType
 from .run_updated_payload import RunUpdatedPayload
+from .search_assist_answer import SearchAssistAnswer
+from .search_assist_candidate import SearchAssistCandidate
+from .search_assist_cost import SearchAssistCost
+from .search_assist_hit import SearchAssistHit
+from .search_assist_hit_segments_item import SearchAssistHitSegmentsItem
+from .search_assist_hit_source import SearchAssistHitSource
+from .search_assist_pick import SearchAssistPick
+from .search_assist_query import SearchAssistQuery
+from .search_assist_requested_event import SearchAssistRequestedEvent
+from .search_assist_requested_event_type import SearchAssistRequestedEventType
+from .search_assist_requested_payload import SearchAssistRequestedPayload
+from .search_assist_result import SearchAssistResult
+from .search_assist_result_fallback_reason import SearchAssistResultFallbackReason
+from .search_assist_result_mode import SearchAssistResultMode
+from .search_assist_turn import SearchAssistTurn
 from .search_hit import SearchHit
 from .search_hit_kind import SearchHitKind
 from .search_hit_page import SearchHitPage
@@ -1450,6 +1465,21 @@ __all__ = (
     "RunUpdatedEvent",
     "RunUpdatedEventType",
     "RunUpdatedPayload",
+    "SearchAssistAnswer",
+    "SearchAssistCandidate",
+    "SearchAssistCost",
+    "SearchAssistHit",
+    "SearchAssistHitSegmentsItem",
+    "SearchAssistHitSource",
+    "SearchAssistPick",
+    "SearchAssistQuery",
+    "SearchAssistRequestedEvent",
+    "SearchAssistRequestedEventType",
+    "SearchAssistRequestedPayload",
+    "SearchAssistResult",
+    "SearchAssistResultFallbackReason",
+    "SearchAssistResultMode",
+    "SearchAssistTurn",
     "SearchHit",
     "SearchHitKind",
     "SearchHitPage",
