@@ -36,9 +36,11 @@ async def test_third_run_waits_for_a_slot(world: World) -> None:
     for run in runs:
         assert await world.ended(run.run_id) == "completed"
     assert world.fake.run_state(waiting_id).state == "completed"
-    # Once the run took its slot the runner reported it no longer waiting, at once.
+    # Once the run took its slot the runner reported it no longer waiting, at once; the send is
+    # scheduled, so it may land after the run ended.
     seen = world.fake.heartbeats.index(beat)
-    assert any(not _waiting(b) for b in world.fake.heartbeats[seen + 1 :])
+    await world.until(lambda: any(not _waiting(b) for b in world.fake.heartbeats[seen + 1 :]))
+    await world.until(lambda: not _waiting(world.fake.heartbeats[-1]))
     last = world.fake.heartbeats[-1]
     assert last["run_slots"]["total"] == 2
     assert not _waiting(last)
@@ -59,4 +61,4 @@ async def test_second_run_of_a_thread_waits_for_the_lock(world: World) -> None:
     world.release(gate)
     assert await world.ended(first.run_id) == "completed"
     assert await world.ended(second.run_id) == "completed"
-    assert not _waiting(world.fake.heartbeats[-1])
+    await world.until(lambda: not _waiting(world.fake.heartbeats[-1]))

@@ -530,13 +530,15 @@ class RunCardTreeMark extends StatelessWidget {
       children: [
         card,
         ?held,
-        TaskTreeMark(
-          key: ValueKey('taskTree.run.${model.runId}'),
-          tasks: model.tasks,
-          threadId: model.label.threadId ?? model.threadId,
-          truncated: model.tasksTruncated,
-          onTap: model.label.threadId == null ? null : onTap,
-        ),
+        // A card that only waits has no task tree to announce.
+        if (model.tasks.isNotEmpty || model.tasksTruncated)
+          TaskTreeMark(
+            key: ValueKey('taskTree.run.${model.runId}'),
+            tasks: model.tasks,
+            threadId: model.label.threadId ?? model.threadId,
+            truncated: model.tasksTruncated,
+            onTap: model.label.threadId == null ? null : onTap,
+          ),
       ],
     );
   }

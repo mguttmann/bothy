@@ -725,7 +725,9 @@ different from the last list this server process applied for the agent, or when 
 application is at least `agent.heartbeat_persist_interval` old (a binding change resets the stored
 readiness, and an unchanged list must restore it), in its own transaction before the rest of the
 heartbeat; absent means "unchanged". `waiting_runs` is applied when the list (absent counts as
-empty) differs from the last one this server process applied for the agent, in its own transaction
+empty) differs from the last one this server process applied for the agent, or when that
+application is at least `agent.heartbeat_persist_interval` old (another node may have applied
+another list meanwhile), in its own transaction
 before the rest of the heartbeat: every listed run of the agent that is still `queued` gets the
 reason as `runs.state_reason`, and every `queued` run of the agent whose stored reason is
 `slots_full` or `thread_busy` and that is not listed gets none (5.2.1). `project_folders` too is applied only when present and
