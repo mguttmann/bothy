@@ -486,6 +486,8 @@ Source: [09-agents.md](../spec/09-agents.md), section 21.
 | `runner.trash_check_interval` |  | Runner |  | `60s` | the bound folders are checked for a move to the trash at most this often, and the runner sends `sendHeartbeat` at this interval to receive folder moves (18.15); above zero |  |
 | `runner.transcribe_cmd` |  | Runner |  | empty | argument list of a local transcriber; the audio file path is appended and stdout is the transcript (18.14); empty means no transcription |  |
 | `runner.transcribe_timeout` |  | Runner |  | `5m` | time limit of one transcription (18.14); above zero |  |
+| `runner.search_assist_model` |  | Runner |  | `haiku` | model of the search assistant call (18.16) |  |
+| `runner.search_assist_timeout` |  | Runner |  | `9s` | time limit of one search assistant call (18.16); above zero |  |
 | `runner.projects_root` |  | Runner |  | no default, required | root of all project folders |  |
 | `runner.default_workspace` |  | Runner |  | empty | folder of a forum without a project binding (18.1): `.` for `runner.projects_root`, else a folder name under it; empty means off, and a run in such a forum ends with the cause `project_not_bound` |  |
 | `runner.state_dir` |  | Runner |  | no default, required | state, recordings, incoming files |  |
