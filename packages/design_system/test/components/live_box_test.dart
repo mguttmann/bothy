@@ -54,10 +54,12 @@ void main() {
     final colors = DsColors.light;
     final accent = DsAccent.of(dsDefaultAccent, Brightness.light);
     final table = {
+      // A queued run says why it waits (09 5.2.1); without a reason the agent has not
+      // started it yet.
       DsRunState.queued: (
         colors.runQueued,
         DsIcons.runQueued,
-        l.liveBoxStateQueued,
+        l.liveBoxWaitAgentStart,
       ),
       DsRunState.running: (
         accent.runRunning,

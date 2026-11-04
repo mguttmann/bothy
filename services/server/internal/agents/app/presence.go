@@ -67,6 +67,13 @@ type Readiness interface {
 	ApplyProjectTrashResults(ctx context.Context, agentID ids.ID, results []chat.ProjectTrashResult) error
 }
 
+// RunWaits is the port of runs the heartbeat applies waiting_runs with (09 4.8 and 5.2.1,
+// F-WARTESCHLANGE-GRUND): every listed queued run of the agent gets its wait reason, and a queued
+// run of the agent with a runner reason that is not listed gets none.
+type RunWaits interface {
+	ApplyRunWaits(ctx context.Context, agentID ids.ID, waits []agents.RunWait) error
+}
+
 // Principals is the part of identity.Directory the tracker reads handle and status with.
 type Principals interface {
 	Principal(ctx context.Context, id ids.ID) (identity.PrincipalView, error)
@@ -104,6 +111,7 @@ type Tracker struct {
 	entries   map[ids.ID]*entry
 	publisher eventlog.EphemeralPublisher
 	readiness Readiness
+	runWaits  RunWaits
 	stopFlush func() bool
 
 	// stopped is set by the stop step: timers stop and nothing is published any more.
@@ -151,6 +159,21 @@ func (t *Tracker) BindReadiness(r Readiness) {
 	t.readiness = r
 }
 
+// BindRunWaits binds the run waits port of runs (F-WARTESCHLANGE-GRUND); without it a heartbeat
+// applies no waiting_runs.
+func (t *Tracker) BindRunWaits(w RunWaits) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.runWaits = w
+}
+
+// boundRunWaits returns the run waits port, nil while unbound.
+func (t *Tracker) boundRunWaits() RunWaits {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.runWaits
+}
+
 // Interval returns sync.heartbeat_interval, the interval_ms of HeartbeatAck (D-M2-20-11).
 func (t *Tracker) Interval() time.Duration { return t.cfg.HeartbeatInterval }
 
@@ -191,6 +214,11 @@ type entry struct {
 	readiness    []domain.Readiness
 	readinessSet bool
 	readinessAt  time.Time
+	// waits is the last waiting_runs list this process applied at waitsAt; waitsSet tells an
+	// applied empty list from none (F-WARTESCHLANGE-GRUND). beat guards them like readiness.
+	waits    []domain.WaitingRun
+	waitsSet bool
+	waitsAt  time.Time
 	// folders is the last project folder list this process wrote; foldersSet tells a written
 	// empty list from none (M4-44). Guarded by beat like readiness.
 	folders    []string
@@ -401,6 +429,9 @@ func statusOf(id ids.ID, target domain.Target, r domain.Report, state domain.Run
 	}
 	if r.Evidence != nil {
 		st.BillingEvidence = &agents.BillingEvidence{Provider: r.Evidence.Provider, KeyType: r.Evidence.KeyType, Method: r.Evidence.Method}
+	}
+	if r.RunSlots != nil {
+		st.RunSlots = &agents.RunSlots{Used: r.RunSlots.Used, Total: r.RunSlots.Total}
 	}
 	return st
 }

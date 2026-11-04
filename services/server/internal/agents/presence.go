@@ -71,9 +71,24 @@ type PresenceStatus struct {
 	BillingEvidence *BillingEvidence
 	// Warnings are the Warning codes that hold now; only while online or degraded.
 	Warnings []string
+	// RunSlots is the slot use of the last heartbeat (run_slots, 09 4.8, F-WARTESCHLANGE-GRUND);
+	// nil when not reported.
+	RunSlots *RunSlots
 	// ProjectTrash are the folder moves the runner owes (HeartbeatAck.project_trash, 09 18.15,
 	// D-DEL-11); set only in the answer to a heartbeat, nil otherwise.
 	ProjectTrash []ProjectTrashRequest
+}
+
+// RunSlots is the slot use of a runner (schema RunSlots): Used turns run of at most Total.
+type RunSlots struct {
+	Used, Total int
+}
+
+// RunWait is one entry of the heartbeat member waiting_runs (schema WaitingRun, 09 5.2.1): an
+// accepted run of the agent that waits before run.start, with its wait reason.
+type RunWait struct {
+	RunID  ids.ID
+	Reason string
 }
 
 // ProjectTrashRequest is a folder move the serving runner owes (schema ProjectTrashRequest,

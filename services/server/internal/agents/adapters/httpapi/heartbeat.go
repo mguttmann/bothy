@@ -79,5 +79,8 @@ func presenceREST(p agents.PresenceStatus) rest.AgentRuntimeStatus {
 		w := append([]string(nil), p.Warnings...)
 		out.Warnings = &w
 	}
+	if s := p.RunSlots; s != nil {
+		out.RunSlots = &rest.RunSlots{Used: s.Used, Total: s.Total}
+	}
 	return out
 }

@@ -14,10 +14,14 @@ WHERE state = 'queued' AND triggering_message_id = sqlc.arg(message_id) AND invo
 ORDER BY id
 FOR UPDATE;
 
--- name: ReleaseHeldInvocation :execrows
--- The release: the column is cleared and version rises by one like every stored change of a run
--- (03 runs.version), without run.state_changed. A run that ended or was released meanwhile
--- matches no row, so a second release changes nothing.
+-- name: ReleaseHeldInvocation :one
+-- The release: the column and the wait reason invocation_held (09 5.2.1) are cleared and version
+-- rises by one like every stored change of a run (03 runs.version); the use case appends
+-- run.state_changed for the cleared reason. A run that ended or was released meanwhile matches no
+-- row, so a second release changes nothing.
 UPDATE runs
-SET invocation_held_until = NULL, version = version + 1
-WHERE id = sqlc.arg(id) AND state = 'queued' AND invocation_held_until IS NOT NULL;
+SET invocation_held_until = NULL,
+    state_reason = CASE WHEN state_reason = 'invocation_held' THEN NULL ELSE state_reason END,
+    version = version + 1
+WHERE id = sqlc.arg(id) AND state = 'queued' AND invocation_held_until IS NOT NULL
+RETURNING *;

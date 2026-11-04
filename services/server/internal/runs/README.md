@@ -566,7 +566,7 @@ A message that triggers an agent while one of its attachments is not final (12 s
   asks unconditionally (it has no `MessagePosted`). Pending: `domain.HoldUntil` gives one clock
   reading plus `file.invocation_hold_max` (`voice.transcript_hold_max` when only a transcript is
   pending, M3-09), `Open` stores it in `runs.invocation_held_until`
-  (R-DM-44), no `agent.invocation` is written and the job `runs.invocation_hold_timeout` is
+  (R-DM-44) with the wait reason `invocation_held` in `runs.state_reason` (09 5.2.1), no `agent.invocation` is written and the job `runs.invocation_hold_timeout` is
   scheduled at that time (`Deps.Holds`). The release time is fixed at acceptance, so a later
   change of the key does not move held runs. Everything else of the acceptance (anchor,
   `run.state_changed`, `received`, `runs.queued_expiry`) is unchanged. Follow-ups
@@ -574,8 +574,9 @@ A message that triggers an agent while one of its attachments is not final (12 s
 - **Release** (`Service.ReleaseInvocation(ctx, runID, cause)`, inside the caller's unit of work):
   the run row is locked; for `domain.ReleaseFinal` `Pending` is read after the lock;
   `domain.ReleaseVerdict` releases only a `queued` run whose column is set, for `ReleaseFinal`
-  only when nothing is pending. The release clears the column and raises `runs.version` by one
-  (no `run.state_changed`), then appends `agent.invocation` with the facts of now (the scope of
+  only when nothing is pending. The release clears the column and the wait reason
+  `invocation_held`, raises `runs.version` by one and appends `run.state_changed` without actor,
+  correlation and trigger state for the cleared reason (F-WARTESCHLANGE-GRUND), then appends `agent.invocation` with the facts of now (the scope of
   the run's thread, the agent's billing mode, the channel's `settings_version`, `triggered_by`)
   and without `actor` and `correlation_id` (`Deps.Uncorrelated` removes the trace span). It never
   authorizes (`Prepare` checks `agent.invoke` before the hand-over) and never touches
@@ -583,6 +584,12 @@ A message that triggers an agent while one of its attachments is not final (12 s
   `agent.invocation`; a run that ended while held keeps its column and is never released. A
   release by `ReleaseTimeout` logs one Info line with `bothy.run.id` only; the line names both
   windows, `file.invocation_hold_max` and `voice.transcript_hold_max` (M3-09).
+- **Wait reasons** (`Service.ApplyRunWaits(ctx, agentID, waits)`, `app/waits.go`, 09 5.2.1,
+  F-WARTESCHLANGE-GRUND): the port `agents/app.RunWaits` of the heartbeat member `waiting_runs`.
+  In one unit of work the queued runs of the agent are locked in ascending id
+  (`LockQueuedRunsOfAgent`), `domain.WaitChanges` decides, and each changed run gets its reason
+  with `SetQueuedReason` (one version step) and `run.state_changed` without a trigger state. A
+  listed run keeps `invocation_held`; an unlisted run loses `slots_full` or `thread_busy`.
 - **Subscriber** (`Acceptor.OnFileFinalized`, in-transaction subscriber of
   `files.FileFinalized`): `Attachments.MessageOf` of the file; for an attached file the queued
   held runs of its message are locked in ascending id and released with `ReleaseFinal`, so the

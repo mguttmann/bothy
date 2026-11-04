@@ -515,6 +515,7 @@ final class DsRunData {
     this.subagentCount = 0,
     this.stalledFor,
     this.questionId,
+    this.wait,
   });
 
   /// The run ID.
@@ -580,8 +581,87 @@ final class DsRunData {
   /// The ID of the open question of a `waiting_input` run, or null; a new ID is announced.
   final String? questionId;
 
+  /// Why a queued run waits, with the slot count and the runs that hold the slots (09 5.2.1);
+  /// null when the caller knows nothing beyond [stateReason], which then decides alone.
+  final DsWait? wait;
+
   /// Whether the stall banner shows.
   bool get stalled => stalledFor != null;
+}
+
+/// Why a queued run waits (09 5.2.1, F-WARTESCHLANGE-GRUND), in the order a client decides it
+/// (`dsWaitReason`).
+enum DsWaitReason {
+  /// `invocation_held`: the server holds the invocation until an attachment or transcript is
+  /// final.
+  invocationHeld,
+
+  /// The agent of the run is offline or never reported (presence `offline` or `unknown`).
+  agentOffline,
+
+  /// `slots_full`: every slot of the runner is in use.
+  slotsFull,
+
+  /// `thread_busy`: the runner waits for the earlier turn of the chat.
+  threadBusy,
+
+  /// No reason: the run was delivered and the agent has not started it yet.
+  agentStart,
+}
+
+/// The wait reason of a queued run from its `state_reason` and the presence of its agent
+/// (09 5.2.1): `invocation_held` first, then an offline agent, then the runner's reason; an
+/// unknown code or none is [DsWaitReason.agentStart].
+DsWaitReason dsWaitReason(String? stateReason, {bool agentOffline = false}) {
+  if (stateReason == 'invocation_held') return DsWaitReason.invocationHeld;
+  if (agentOffline) return DsWaitReason.agentOffline;
+  return switch (stateReason) {
+    'slots_full' => DsWaitReason.slotsFull,
+    'thread_busy' => DsWaitReason.threadBusy,
+    _ => DsWaitReason.agentStart,
+  };
+}
+
+/// One run that holds a slot a queued run waits for (09 5.2.1).
+@immutable
+final class DsWaitBlocker {
+  /// Creates the entry.
+  const DsWaitBlocker({required this.label, this.onTap});
+
+  /// The run as its label names it (project and chat, or agent and short ID).
+  final String label;
+
+  /// Opens the chat of the run; null when the reader may not read it (then it is no button).
+  final VoidCallback? onTap;
+}
+
+/// Why a queued run waits, with what the person can see of it (09 5.2.1).
+@immutable
+final class DsWait {
+  /// Creates the wait.
+  const DsWait({
+    required this.reason,
+    this.slotsUsed,
+    this.slotsTotal,
+    this.blockers = const [],
+    this.hiddenBlockers = 0,
+  });
+
+  /// The reason.
+  final DsWaitReason reason;
+
+  /// For [DsWaitReason.slotsFull]: the slots in use and the slots of the runner
+  /// (`run_slots`); null when unknown.
+  final int? slotsUsed;
+
+  /// See [slotsUsed].
+  final int? slotsTotal;
+
+  /// The runs that hold the slots and that the reader may see.
+  final List<DsWaitBlocker> blockers;
+
+  /// The runs that hold slots but that the reader may not see: counted, never named.
+  final int hiddenBlockers;
 }
 
 /// A reaction under a message.

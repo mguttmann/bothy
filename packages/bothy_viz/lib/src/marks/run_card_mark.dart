@@ -37,7 +37,7 @@ class RunCardMark extends StatelessWidget {
   /// The texts of the card in reading order.
   static List<String> parts(VizTexts texts, RunCardModel model) => [
     ...VizRunLabelText.parts(texts, model.label),
-    texts.runState(model.state),
+    texts.cardState(model),
     if (model.stepKind != null && model.stepName != null)
       texts.step(model.stepKind!, model.stepName!),
     texts.badge(model.billingMode),
@@ -92,7 +92,7 @@ class RunCardMark extends StatelessWidget {
                   ),
                   const SizedBox(width: DsSpace.s4),
                   Flexible(
-                    child: Text(texts.runState(model.state), style: secondary),
+                    child: Text(texts.cardState(model), style: secondary),
                   ),
                 ],
               ),

@@ -43,7 +43,8 @@ type RunSummary struct {
 	ID, ThreadID, AgentID, TriggeredBy ids.ID
 	// ChannelID is the channel of the run's thread now (a run follows its thread, M1-62).
 	ChannelID ids.ID
-	// State is a value of schema RunState; StateReason the reason of failed and cancelled.
+	// State is a value of schema RunState; StateReason the reason of failed and cancelled, or
+	// the wait reason of a queued run (09 5.2.1).
 	State, StateReason string
 	// Version is runs.version, the ETag of the run.
 	Version int64
@@ -474,6 +475,8 @@ type LiveRun struct {
 	ChannelID, SpaceID ids.ID
 	// State is queued, running or waiting_input.
 	State string
+	// StateReason is runs.state_reason: the wait reason of a queued run (09 5.2.1), "" for none.
+	StateReason string
 	// QueuedAt is never zero; StartedAt is zero before the start.
 	QueuedAt, StartedAt time.Time
 	// BillingMode is the mode the adapter reported for the run (billing_mode_used), else the

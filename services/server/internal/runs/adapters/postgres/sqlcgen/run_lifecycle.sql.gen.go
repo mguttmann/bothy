@@ -214,6 +214,71 @@ func (q *Queries) LockActiveRunsByThreads(ctx context.Context, threadIds []pgtyp
 	return items, nil
 }
 
+const lockQueuedRunsOfAgent = `-- name: LockQueuedRunsOfAgent :many
+SELECT id, thread_id, agent_id, agent_session_id, trigger_kind, triggering_message_id, triggering_command_id, triggering_interaction_id, triggered_by, state, state_reason, version, billing_mode_expected, billing_mode_used, billing_evidence, invocation_jti, started_jti, renewed_from_jti, dev_environment_id, model, status_line, last_text_excerpt, plan, metrics, cost_micros, currency, cost_is_estimate, summary, stall_warned_at, queued_at, invocation_held_until, started_at, finished_at, duration_ms, last_progress_at FROM runs
+WHERE state = 'queued' AND agent_id = $1
+ORDER BY id
+FOR UPDATE
+`
+
+// The queued runs of one agent for the wait reasons of its heartbeat (09 4.8 and 5.2.1,
+// F-WARTESCHLANGE-GRUND), locked in ascending id; runs_state_agent_active_idx serves it.
+func (q *Queries) LockQueuedRunsOfAgent(ctx context.Context, agentID pgtype.UUID) ([]Run, error) {
+	rows, err := q.db.Query(ctx, lockQueuedRunsOfAgent, agentID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Run
+	for rows.Next() {
+		var i Run
+		if err := rows.Scan(
+			&i.ID,
+			&i.ThreadID,
+			&i.AgentID,
+			&i.AgentSessionID,
+			&i.TriggerKind,
+			&i.TriggeringMessageID,
+			&i.TriggeringCommandID,
+			&i.TriggeringInteractionID,
+			&i.TriggeredBy,
+			&i.State,
+			&i.StateReason,
+			&i.Version,
+			&i.BillingModeExpected,
+			&i.BillingModeUsed,
+			&i.BillingEvidence,
+			&i.InvocationJti,
+			&i.StartedJti,
+			&i.RenewedFromJti,
+			&i.DevEnvironmentID,
+			&i.Model,
+			&i.StatusLine,
+			&i.LastTextExcerpt,
+			&i.Plan,
+			&i.Metrics,
+			&i.CostMicros,
+			&i.Currency,
+			&i.CostIsEstimate,
+			&i.Summary,
+			&i.StallWarnedAt,
+			&i.QueuedAt,
+			&i.InvocationHeldUntil,
+			&i.StartedAt,
+			&i.FinishedAt,
+			&i.DurationMs,
+			&i.LastProgressAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const markRunStalled = `-- name: MarkRunStalled :one
 UPDATE runs
 SET stall_warned_at = $1::timestamptz,
@@ -343,4 +408,61 @@ func (q *Queries) OrphanCandidates(ctx context.Context) ([]Run, error) {
 		return nil, err
 	}
 	return items, nil
+}
+
+const setQueuedReason = `-- name: SetQueuedReason :one
+UPDATE runs
+SET state_reason = NULLIF($1::text, ''), version = version + 1
+WHERE id = $2 AND state = 'queued'
+RETURNING id, thread_id, agent_id, agent_session_id, trigger_kind, triggering_message_id, triggering_command_id, triggering_interaction_id, triggered_by, state, state_reason, version, billing_mode_expected, billing_mode_used, billing_evidence, invocation_jti, started_jti, renewed_from_jti, dev_environment_id, model, status_line, last_text_excerpt, plan, metrics, cost_micros, currency, cost_is_estimate, summary, stall_warned_at, queued_at, invocation_held_until, started_at, finished_at, duration_ms, last_progress_at
+`
+
+type SetQueuedReasonParams struct {
+	Reason string
+	ID     pgtype.UUID
+}
+
+// The wait reason of a locked queued run (09 5.2.1): an empty reason stores NULL; version rises by
+// one. No row: the run is no longer queued.
+func (q *Queries) SetQueuedReason(ctx context.Context, arg SetQueuedReasonParams) (Run, error) {
+	row := q.db.QueryRow(ctx, setQueuedReason, arg.Reason, arg.ID)
+	var i Run
+	err := row.Scan(
+		&i.ID,
+		&i.ThreadID,
+		&i.AgentID,
+		&i.AgentSessionID,
+		&i.TriggerKind,
+		&i.TriggeringMessageID,
+		&i.TriggeringCommandID,
+		&i.TriggeringInteractionID,
+		&i.TriggeredBy,
+		&i.State,
+		&i.StateReason,
+		&i.Version,
+		&i.BillingModeExpected,
+		&i.BillingModeUsed,
+		&i.BillingEvidence,
+		&i.InvocationJti,
+		&i.StartedJti,
+		&i.RenewedFromJti,
+		&i.DevEnvironmentID,
+		&i.Model,
+		&i.StatusLine,
+		&i.LastTextExcerpt,
+		&i.Plan,
+		&i.Metrics,
+		&i.CostMicros,
+		&i.Currency,
+		&i.CostIsEstimate,
+		&i.Summary,
+		&i.StallWarnedAt,
+		&i.QueuedAt,
+		&i.InvocationHeldUntil,
+		&i.StartedAt,
+		&i.FinishedAt,
+		&i.DurationMs,
+		&i.LastProgressAt,
+	)
+	return i, err
 }

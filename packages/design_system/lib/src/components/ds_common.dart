@@ -71,10 +71,43 @@ String? dsReasonText(AppLocalizations l, String? code, {String? name}) {
   };
 }
 
-/// The state word of a run in the live box (components.md section 2.1).
+/// The text of a wait reason (09 5.2.1); for [DsWaitReason.slotsFull] with the slot count
+/// when [used] and [total] are known ("Waiting for a free slot (4 of 4 in use)").
+String dsWaitText(
+  AppLocalizations l,
+  DsWaitReason reason, {
+  int? used,
+  int? total,
+}) {
+  return switch (reason) {
+    DsWaitReason.invocationHeld => l.liveBoxWaitInvocationHeld,
+    DsWaitReason.agentOffline => l.liveBoxWaitAgentOffline,
+    DsWaitReason.slotsFull =>
+      used == null || total == null
+          ? l.liveBoxWaitSlotsFullNoCount
+          : l.liveBoxWaitSlotsFull(used, total),
+    DsWaitReason.threadBusy => l.liveBoxWaitThreadBusy,
+    DsWaitReason.agentStart => l.liveBoxWaitAgentStart,
+  };
+}
+
+/// The wait text of the queued [run]: its [DsRunData.wait], else its `state_reason` alone.
+String dsRunWaitText(AppLocalizations l, DsRunData run) {
+  final wait = run.wait;
+  if (wait == null) return dsWaitText(l, dsWaitReason(run.stateReason));
+  return dsWaitText(
+    l,
+    wait.reason,
+    used: wait.slotsUsed,
+    total: wait.slotsTotal,
+  );
+}
+
+/// The state word of a run in the live box (components.md section 2.1); a queued run says
+/// why it waits (09 5.2.1), never only "Queued".
 String dsRunStateWord(AppLocalizations l, DsRunData run) {
   return switch (run.state) {
-    DsRunState.queued => l.liveBoxStateQueued,
+    DsRunState.queued => dsRunWaitText(l, run),
     DsRunState.running => l.liveBoxStateRunning,
     DsRunState.waitingInput =>
       run.waitingForName == null

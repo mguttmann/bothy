@@ -932,7 +932,7 @@ unknown code, or a server code such as `stale`) as `adapter_error` (D-M2-05-8). 
 original code as the detail `original_reason` of a server step with `kind = status` and
 `name = adapter_reason`, cut to `run.step_detail_max_bytes`.
 
-#### 5.2.1 Wait reasons of a queued run
+### 5.2.1 Wait reasons of a queued run
 
 Addendum of 2026-11-04 (F-WARTESCHLANGE-GRUND, `docs/decisions.d/F-WARTESCHLANGE-GRUND.md`, R-AG-39): a
 run in `queued` says why it waits. `runs.state_reason` holds the wait reason while the run is

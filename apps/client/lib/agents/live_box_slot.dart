@@ -30,7 +30,8 @@ import '../app/providers/session.dart';
 import '../app/router.dart';
 import '../keyboard/app_shortcuts.dart';
 import '../keyboard/intents.dart';
-import '../running/providers.dart' show mayStop, stopRun;
+import '../running/providers.dart'
+    show RunningRow, mayStop, runningRowsProvider, stopRun;
 import '../thread/providers.dart';
 import 'followups.dart';
 import 'providers.dart';
@@ -177,13 +178,42 @@ class _LiveBoxSlotState extends ConsumerState<LiveBoxSlot> {
     // A question waits for the person who triggered the run; for that person it reads
     // "Waiting for you" (components.md 2.1).
     final waitingFor = run.triggeredBy == me ? null : name(run.triggeredBy);
+    // Why a queued run waits (09 5.2.1): from the summary, which run.state_changed keeps
+    // current, with the agent's presence, slot count and the running runs the device knows.
+    final wait = run.state == RunState.queued
+        ? queuedWait(
+            run,
+            presence: ref
+                .watch(agentPresenceProvider(run.agentId.value))
+                .value
+                ?.state,
+            slotsTotal: ref
+                .watch(agentInfoProvider(run.agentId.value))
+                .value
+                ?.runSlots
+                ?.total,
+            holders: [
+              for (final row
+                  in ref.watch(runningRowsProvider).value ??
+                      const <RunningRow>[])
+                (run: row.run, label: row.path.join(' > ')),
+            ],
+            open: (thread) => context.go('/t/${thread.value}'),
+          )
+        : null;
     final data = doc == null
-        ? runFromSummary(run, agentName: name(run.agentId), now: now)
+        ? runFromSummary(
+            run,
+            agentName: name(run.agentId),
+            now: now,
+            wait: wait,
+          )
         : runFromDocument(
             doc,
             agentName: name(run.agentId),
             now: now,
             waitingForName: waitingFor,
+            wait: wait,
           );
     final expanded = ref.watch(runExpansionProvider)[run.id.value] ?? true;
     final engine = ref.watch(syncEngineProvider);

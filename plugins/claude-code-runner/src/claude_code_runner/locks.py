@@ -19,6 +19,7 @@ import contextlib
 import fcntl
 import os
 import time
+from collections.abc import Callable
 from pathlib import Path
 
 from claude_code_runner.statedir import ensure_private_dir
@@ -30,13 +31,17 @@ class LockTimeout(Exception):  # noqa: N818 - the name says what happened
     """The lock stayed held for ``runner.session_lock_wait``."""
 
 
-async def acquire(path: Path, wait: float, poll: float) -> int:
+async def acquire(
+    path: Path, wait: float, poll: float, on_busy: Callable[[], None] | None = None
+) -> int:
     """Take an exclusive lock, trying again every ``poll`` until ``wait`` has passed.
 
     Args:
         path: The lock file (created with mode ``0600``).
         wait: ``runner.session_lock_wait``.
         poll: ``runner.poll_interval``.
+        on_busy: Called once when the first attempt finds the lock held, before the wait
+            (the wait reason ``thread_busy``, 09 5.2.1).
 
     Returns:
         The descriptor that holds the lock.
@@ -54,6 +59,9 @@ async def acquire(path: Path, wait: float, poll: float) -> int:
                 fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
                 return fd
             except BlockingIOError:
+                if on_busy is not None:
+                    on_busy()
+                    on_busy = None
                 if time.monotonic() >= deadline:
                     raise LockTimeout from None
             # Outside the handler: a cancellation during the wait reaches the close below.

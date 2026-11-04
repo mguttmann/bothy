@@ -21,6 +21,7 @@ typedef AgentInfo = ({
   BillingMode billingMode,
   AgentRuntimeState presence,
   BillingMode? reportedBillingMode,
+  ({int used, int total})? runSlots,
 });
 
 /// One agent session of a thread (API `AgentSession`).
@@ -92,6 +93,12 @@ final class EngineAgentReads implements AgentReads {
         reportedBillingMode: a.presence.reportedBillingMode == null
             ? null
             : BillingMode.fromCode(a.presence.reportedBillingMode!.name),
+        runSlots: a.presence.runSlots == null
+            ? null
+            : (
+                used: a.presence.runSlots!.used,
+                total: a.presence.runSlots!.total,
+              ),
       );
     } on Object {
       return null;

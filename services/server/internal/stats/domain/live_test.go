@@ -487,3 +487,51 @@ func TestFilterChatNames(t *testing.T) {
 		}
 	})
 }
+
+// TestFilterWaitReason (F-WARTESCHLANGE-GRUND, 25 5.2): a queued run carries its wait reason as
+// state_reason, a started run never does, and an agent carries the slot use of its last heartbeat
+// as run_slots; an agent without one has no member.
+func TestFilterWaitReason(t *testing.T) {
+	t.Parallel()
+	w := newLiveWorld()
+	queued := ids.New()
+	w.base.Runs = append(w.base.Runs, domain.LiveRun{RunID: queued, ThreadID: ids.New(), ChannelID: w.devCh, SpaceID: w.engineering,
+		AgentID: w.devRunner, State: "queued", StateReason: "slots_full", QueuedAt: w.at, BillingMode: "organization"})
+	w.base.Runs[0].StateReason = "slots_full" // a running run whose stored reason was not cleared yet
+	dev := w.base.Agents[w.devRunner]
+	dev.RunSlots = &domain.RunSlots{Used: 2, Total: 2}
+	w.base.Agents[w.devRunner] = dev
+	_, b := filter(t, w.base, domain.Receiver{Visible: set(w.supportCh, w.devCh)}, limits())
+	var f struct {
+		Runs []struct {
+			RunID       string  `json:"run_id"`
+			StateReason *string `json:"state_reason"`
+		} `json:"runs"`
+		Agents []struct {
+			AgentID  string `json:"agent_id"`
+			RunSlots *struct {
+				Used  int `json:"used"`
+				Total int `json:"total"`
+			} `json:"run_slots"`
+		} `json:"agents"`
+	}
+	if err := json.Unmarshal(b, &f); err != nil {
+		t.Fatal(err)
+	}
+	for _, r := range f.Runs {
+		switch {
+		case r.RunID == queued.String() && (r.StateReason == nil || *r.StateReason != "slots_full"):
+			t.Fatalf("queued run state_reason = %v, want slots_full: %s", r.StateReason, b)
+		case r.RunID != queued.String() && r.StateReason != nil:
+			t.Fatalf("run %s not queued carries state_reason %q", r.RunID, *r.StateReason)
+		}
+	}
+	for _, a := range f.Agents {
+		switch {
+		case a.AgentID == w.devRunner.String() && (a.RunSlots == nil || a.RunSlots.Used != 2 || a.RunSlots.Total != 2):
+			t.Fatalf("runner run_slots = %+v, want 2 of 2", a.RunSlots)
+		case a.AgentID != w.devRunner.String() && a.RunSlots != nil:
+			t.Fatalf("agent %s without a report carries run_slots %+v", a.AgentID, a.RunSlots)
+		}
+	}
+}

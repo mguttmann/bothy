@@ -55,7 +55,7 @@ func (s *Service) LiveRuns(ctx context.Context, perChannel int) ([]runs.LiveRun,
 		}
 		out = append(out, runs.LiveRun{
 			ID: r.ID, ThreadID: r.ThreadID, AgentID: r.AgentID, ChannelID: info.ChannelID, SpaceID: info.SpaceID, State: string(r.State),
-			QueuedAt: r.QueuedAt, StartedAt: r.StartedAt, BillingMode: mode,
+			StateReason: r.StateReason, QueuedAt: r.QueuedAt, StartedAt: r.StartedAt, BillingMode: mode,
 			Cost: runs.Money{AmountMicros: r.CostMicros, Currency: r.Currency, IsEstimate: r.CostIsEstimate},
 		})
 		kept = append(kept, r.ID)

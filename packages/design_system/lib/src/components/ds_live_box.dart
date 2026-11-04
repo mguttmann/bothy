@@ -304,10 +304,13 @@ class DsLiveBoxState extends State<DsLiveBox> {
           children: [
             _stateIcon(context),
             const SizedBox(width: DsSpace.s6),
-            Text(
-              dsRunStateWord(l, run),
-              style: dsTextStyle(DsType.label)
-                  .copyWith(color: colors.textPrimary),
+            // A queued run's wait text is long (09 5.2.1): it wraps instead of overflowing.
+            Flexible(
+              child: Text(
+                dsRunStateWord(l, run),
+                style: dsTextStyle(DsType.label)
+                    .copyWith(color: colors.textPrimary),
+              ),
             ),
           ],
         ),
@@ -391,6 +394,7 @@ class DsLiveBoxState extends State<DsLiveBox> {
     final children = <Widget>[
       header,
       ?reason,
+      ?_heldBy(context, run),
       if (detail != null)
         Text(
           detail,
@@ -496,6 +500,50 @@ class DsLiveBoxState extends State<DsLiveBox> {
           ),
         ),
       ),
+    );
+  }
+
+  /// The runs that hold the slots a queued [run] waits for (09 5.2.1): a heading, one entry
+  /// per run the reader may see (a link when it opens a chat) and the count of the others;
+  /// null when the run is not queued or names none.
+  static Widget? _heldBy(BuildContext context, DsRunData run) {
+    final wait = run.wait;
+    if (run.state != DsRunState.queued ||
+        wait == null ||
+        (wait.blockers.isEmpty && wait.hiddenBlockers == 0)) {
+      return null;
+    }
+    final l = dsL10n(context);
+    final colors = context.dsColors;
+    final plain = dsTextStyle(DsType.bodySm)
+        .copyWith(color: colors.textSecondary);
+    final link = dsTextStyle(DsType.bodySm)
+        .copyWith(color: context.dsAccent.textLink);
+    return Column(
+      key: const ValueKey('livebox.heldBy'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          l.liveBoxWaitHeldBy,
+          style: dsTextStyle(DsType.label).copyWith(color: colors.textPrimary),
+        ),
+        for (final b in wait.blockers)
+          b.onTap == null
+              ? Text(dsIsolate(b.label), style: plain)
+              : DsTappable(
+                  onTap: b.onTap,
+                  label: l.liveBoxWaitOpenRun(b.label),
+                  excludeChildSemantics: true,
+                  child: Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    widthFactor: 1,
+                    child: Text(dsIsolate(b.label), style: link),
+                  ),
+                ),
+        if (wait.hiddenBlockers > 0)
+          Text(l.liveBoxWaitHiddenRuns(wait.hiddenBlockers), style: plain),
+      ],
     );
   }
 

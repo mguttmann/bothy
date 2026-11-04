@@ -218,6 +218,60 @@ abstract class AppLocalizations {
   /// **'Project not ready'**
   String get liveBoxReasonProjectNotReady;
 
+  /// State text of a queued run whose agent has every slot of `runner.max_parallel_runs` in use (wait reason `slots_full`, 09 5.2.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for a free slot ({used} of {total} in use)'**
+  String liveBoxWaitSlotsFull(int used, int total);
+
+  /// State text of a queued run with the wait reason `slots_full` while the slot count of the agent is not known (09 5.2.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for a free slot of the agent'**
+  String get liveBoxWaitSlotsFullNoCount;
+
+  /// State text of a queued run whose agent is offline or never reported (09 5.2.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for the agent: it is offline'**
+  String get liveBoxWaitAgentOffline;
+
+  /// State text of a queued run whose runner waits for the thread or session lock (wait reason `thread_busy`, 09 5.2.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for the earlier turn of this chat to end'**
+  String get liveBoxWaitThreadBusy;
+
+  /// State text of a queued run whose invocation the server holds until an attachment or transcript is final (wait reason `invocation_held`, 09 5.2.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for an attachment or a transcript'**
+  String get liveBoxWaitInvocationHeld;
+
+  /// State text of a queued run without a wait reason: delivered, the agent has not started it yet (09 5.2.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for the agent to start it'**
+  String get liveBoxWaitAgentStart;
+
+  /// Heading of the list of runs that hold the slots a queued run waits for (09 5.2.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Slots in use by'**
+  String get liveBoxWaitHeldBy;
+
+  /// Last entry of the list of runs that hold the slots: the runs the reader may not read, counted, never named (09 5.2.1).
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 run you cannot see} other{{count} runs you cannot see}}'**
+  String liveBoxWaitHiddenRuns(int count);
+
+  /// Semantics label of one run in the list of runs that hold the slots; a tap opens its chat (09 5.2.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Open the chat of {label}'**
+  String liveBoxWaitOpenRun(String label);
+
   /// Translated state reason `user_cancelled` of a run with the name of the person who stopped it (components.md section 2.1).
   ///
   /// In en, this message translates to:

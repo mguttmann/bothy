@@ -75,6 +75,49 @@ class AppLocalizationsDe extends AppLocalizations {
   String get liveBoxReasonProjectNotReady => 'Projekt nicht bereit';
 
   @override
+  String liveBoxWaitSlotsFull(int used, int total) {
+    return 'Wartet auf einen freien Platz ($used von $total belegt)';
+  }
+
+  @override
+  String get liveBoxWaitSlotsFullNoCount =>
+      'Wartet auf einen freien Platz beim Agenten';
+
+  @override
+  String get liveBoxWaitAgentOffline =>
+      'Wartet auf den Agenten: er ist offline';
+
+  @override
+  String get liveBoxWaitThreadBusy =>
+      'Wartet, bis der vorige Lauf dieses Chats endet';
+
+  @override
+  String get liveBoxWaitInvocationHeld =>
+      'Wartet auf einen Anhang oder ein Transkript';
+
+  @override
+  String get liveBoxWaitAgentStart => 'Wartet, bis der Agent ihn startet';
+
+  @override
+  String get liveBoxWaitHeldBy => 'Plätze belegt von';
+
+  @override
+  String liveBoxWaitHiddenRuns(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Läufe, die du nicht sehen kannst',
+      one: '1 Lauf, den du nicht sehen kannst',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String liveBoxWaitOpenRun(String label) {
+    return 'Chat von $label öffnen';
+  }
+
+  @override
   String liveBoxReasonUserCancelled(String name) {
     return 'Von $name abgebrochen';
   }

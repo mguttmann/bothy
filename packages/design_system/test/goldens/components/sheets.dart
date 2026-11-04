@@ -182,28 +182,33 @@ const _steps = [
   ),
 ];
 
-DsRunData _run(DsRunState state, {String? reason, Duration? stalledFor}) =>
-    DsRunData(
-      id: 'r1',
-      agentName: 'Robin',
-      state: state,
-      stateReason: reason,
-      elapsed: const Duration(minutes: 3, seconds: 12),
-      contextPercent: 42,
-      tokens: 12000,
-      cost: const DsCost(
-        DsMoney(0.42, 'USD'),
-        mode: DsBillingMode.organization,
-        isEstimate: true,
-      ),
-      billingMode: DsBillingMode.organization,
-      statusLine: 'Running the tests',
-      lastTextExcerpt: 'Two tests left.',
-      steps: _steps,
-      toolCount: 2,
-      subagentCount: 1,
-      stalledFor: stalledFor,
-    );
+DsRunData _run(
+  DsRunState state, {
+  String? reason,
+  Duration? stalledFor,
+  DsWait? wait,
+}) => DsRunData(
+  id: 'r1',
+  agentName: 'Robin',
+  state: state,
+  stateReason: reason,
+  elapsed: const Duration(minutes: 3, seconds: 12),
+  contextPercent: 42,
+  tokens: 12000,
+  cost: const DsCost(
+    DsMoney(0.42, 'USD'),
+    mode: DsBillingMode.organization,
+    isEstimate: true,
+  ),
+  billingMode: DsBillingMode.organization,
+  statusLine: 'Running the tests',
+  lastTextExcerpt: 'Two tests left.',
+  steps: _steps,
+  toolCount: 2,
+  subagentCount: 1,
+  stalledFor: stalledFor,
+  wait: wait,
+);
 
 /// The active live box states of 2.1 with the stall banner.
 Widget liveBoxActiveSheet() => Sheet([
@@ -219,8 +224,22 @@ Widget liveBoxActiveSheet() => Sheet([
     announceMinInterval: const Duration(seconds: 2),
     onStop: () {},
   ),
+  // A queued run says why it waits and which runs hold the slots (09 5.2.1).
   DsLiveBox(
-    _run(DsRunState.queued),
+    _run(
+      DsRunState.queued,
+      reason: 'slots_full',
+      wait: DsWait(
+        reason: DsWaitReason.slotsFull,
+        slotsUsed: 4,
+        slotsTotal: 4,
+        blockers: [
+          DsWaitBlocker(label: 'backend / Payment integration', onTap: () {}),
+          const DsWaitBlocker(label: 'dev-runner · 0a77f1'),
+        ],
+        hiddenBlockers: 2,
+      ),
+    ),
     visibleSteps: 2,
     announceMinInterval: const Duration(seconds: 2),
     onStop: () {},

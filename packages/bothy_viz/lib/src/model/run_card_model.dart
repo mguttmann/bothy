@@ -4,6 +4,8 @@
 library;
 
 import 'package:api_client/api_client.dart' as api;
+import 'package:design_system/design_system.dart'
+    show DsWaitReason, dsWaitReason;
 import 'package:flutter/foundation.dart';
 
 import 'costs.dart';
@@ -48,6 +50,48 @@ enum RunStepKind {
   unknown,
 }
 
+/// Why a queued run waits (09 5.2.1, 25 6.1): the reason, the slot use of its agent for
+/// `slots_full`, and the runs of the frame that hold the slots.
+@immutable
+final class RunWaitModel {
+  /// Creates the wait.
+  const RunWaitModel({
+    required this.reason,
+    this.used,
+    this.total,
+    this.blockers = const [],
+    this.hidden = 0,
+  });
+
+  /// The reason, decided by `dsWaitReason` from `state_reason` and the agent's presence.
+  final DsWaitReason reason;
+
+  /// `run_slots.used` and `run_slots.total` of the agent; `null` when not reported.
+  final int? used;
+
+  /// See [used].
+  final int? total;
+
+  /// The runs of the frame that hold the slots: the agent's `running` runs.
+  final List<VizRunLabel> blockers;
+
+  /// Slots in use by runs the frame does not show (`used` minus [blockers], never negative).
+  final int hidden;
+
+  @override
+  bool operator ==(Object other) =>
+      other is RunWaitModel &&
+      other.reason == reason &&
+      other.used == used &&
+      other.total == total &&
+      other.hidden == hidden &&
+      listEquals(other.blockers, blockers);
+
+  @override
+  int get hashCode =>
+      Object.hash(reason, used, total, hidden, Object.hashAll(blockers));
+}
+
 /// One active run of a live frame as a card: its label (project, chat, agent, short ID), state,
 /// tool chip, badge, approval note and cost; no other content (25 1 rule 3, 4 rule 6).
 final class RunCardModel {
@@ -66,6 +110,7 @@ final class RunCardModel {
     this.cost,
     this.tasks = const [],
     this.tasksTruncated = false,
+    this.wait,
   });
 
   /// Derives the card from [run]; [names] gives the agent name, [at] (the frame time) the
@@ -79,6 +124,7 @@ final class RunCardModel {
     api.StatsLiveRun run,
     VizNames names, {
     DateTime? at,
+    RunWaitModel? wait,
   }) {
     final micros = run.costMicros;
     final currency = run.currency;
@@ -116,6 +162,44 @@ final class RunCardModel {
         at ?? run.startedAt ?? run.queuedAt,
       ),
       tasksTruncated: run.tasksTruncated ?? false,
+      wait: run.state == api.StatsLiveRunStateEnum.queued
+          ? wait ?? RunWaitModel(reason: dsWaitReason(run.stateReason))
+          : null,
+    );
+  }
+
+  /// The wait of the queued [run] in [frame] (09 5.2.1): the agent's presence and slot use from
+  /// `agents`, the agent's `running` runs of the frame as the runs that hold the slots, each
+  /// with the label [names] gives it; the slots the frame does not show are counted.
+  static RunWaitModel waitIn(
+    api.StatsLiveRun run,
+    Iterable<api.StatsLiveRun> runs,
+    Iterable<api.StatsLiveAgent> agents,
+    VizNames names,
+  ) {
+    final agent = agents.where((a) => a.agentId == run.agentId).firstOrNull;
+    final offline =
+        agent == null ||
+        agent.presence == api.AgentRuntimeState.offline ||
+        agent.presence == api.AgentRuntimeState.unknown;
+    final reason = dsWaitReason(run.stateReason, agentOffline: offline);
+    if (reason != DsWaitReason.slotsFull) return RunWaitModel(reason: reason);
+    final slots = agent?.runSlots;
+    final blockers = [
+      for (final r in runs)
+        if (r.agentId == run.agentId &&
+            r.state == api.StatsLiveRunStateEnum.running)
+          VizRunLabel.of(r.chat, agent: names.agent(r.agentId), id: r.runId),
+    ];
+    final used = slots?.used;
+    return RunWaitModel(
+      reason: reason,
+      used: used,
+      total: slots?.total,
+      blockers: List.unmodifiable(blockers),
+      hidden: used == null || used <= blockers.length
+          ? 0
+          : used - blockers.length,
     );
   }
 
@@ -169,6 +253,9 @@ final class RunCardModel {
   /// The server left nodes of the tree out ("More agents and jobs than shown").
   final bool tasksTruncated;
 
+  /// Why the run waits; set only for a queued run (09 5.2.1).
+  final RunWaitModel? wait;
+
   /// This card without its cost: TV mode without `viz.tv_show_costs` (25 6.6).
   RunCardModel withoutCost() => cost == null
       ? this
@@ -185,6 +272,7 @@ final class RunCardModel {
           stepName: stepName,
           tasks: tasks,
           tasksTruncated: tasksTruncated,
+          wait: wait,
         );
 
   // Value equality lets the live topology reuse the widget of an unchanged card between two
@@ -204,6 +292,7 @@ final class RunCardModel {
       other.stepName == stepName &&
       other.cost == cost &&
       other.tasksTruncated == tasksTruncated &&
+      other.wait == wait &&
       listEquals(other.tasks, tasks);
 
   @override
@@ -220,6 +309,7 @@ final class RunCardModel {
     stepName,
     cost,
     tasksTruncated,
+    wait,
     Object.hashAll(tasks),
   );
 }
@@ -292,6 +382,7 @@ final class LaneModel {
     Iterable<api.StatsLiveRun> runs,
     VizNames names, {
     DateTime? at,
+    Iterable<api.StatsLiveAgent> agents = const [],
   }) {
     final lanes = <(String, String), List<RunCardModel>>{};
     final keys = <(String, String)>[];
@@ -301,7 +392,16 @@ final class LaneModel {
         keys.add(key);
         return <RunCardModel>[];
       });
-      cards.add(RunCardModel.fromRun(run, names, at: at));
+      cards.add(
+        RunCardModel.fromRun(
+          run,
+          names,
+          at: at,
+          wait: run.state == api.StatsLiveRunStateEnum.queued
+              ? RunCardModel.waitIn(run, runs, agents, names)
+              : null,
+        ),
+      );
     }
     return [
       for (final (space, channel) in keys)

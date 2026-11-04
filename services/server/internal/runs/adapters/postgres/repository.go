@@ -75,7 +75,7 @@ func (r *Repository) InsertRun(ctx context.Context, n app.NewRun) (app.RunRow, b
 		TriggeringInteractionID: optionalUUID(n.TriggeringInteractionID),
 		TriggeredBy:             uuid(n.TriggeredBy),
 		BillingModeExpected:     n.BillingModeExpected, InvocationJti: uuid(n.InvocationJTI), QueuedAt: ts(n.QueuedAt),
-		InvocationHeldUntil: optionalTS(n.InvocationHeldUntil),
+		InvocationHeldUntil: optionalTS(n.InvocationHeldUntil), StateReason: optionalText(n.StateReason),
 	})
 	return one(row, err, "inserting a run")
 }
@@ -211,6 +211,29 @@ func (r *Repository) LockActiveRunsByThreads(ctx context.Context, threadIDs []id
 	}
 	rows, err := q.LockActiveRunsByThreads(ctx, in)
 	return runs(rows, err, "locking the active runs of threads")
+}
+
+// LockQueuedRunsOfAgent implements app.Repository: the queued runs of the agent, locked in
+// ascending id (09 5.2.1). Errors: internal outside a unit of work.
+func (r *Repository) LockQueuedRunsOfAgent(ctx context.Context, agentID ids.ID) ([]app.RunRow, error) {
+	q, err := r.write(ctx)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := q.LockQueuedRunsOfAgent(ctx, uuid(agentID))
+	return runs(rows, err, "locking the queued runs of an agent")
+}
+
+// SetQueuedReason implements app.Repository: the wait reason of a queued run ("" stores NULL)
+// with one version step; found is false when the run is no longer queued (09 5.2.1). Errors:
+// internal outside a unit of work.
+func (r *Repository) SetQueuedReason(ctx context.Context, id ids.ID, reason string) (app.RunRow, bool, error) {
+	q, err := r.write(ctx)
+	if err != nil {
+		return app.RunRow{}, false, err
+	}
+	row, err := q.SetQueuedReason(ctx, sqlcgen.SetQueuedReasonParams{ID: uuid(id), Reason: reason})
+	return one(row, err, "storing the wait reason of a run")
 }
 
 // LockActiveRunsByAgent implements app.Repository. Errors: internal outside a unit of work.

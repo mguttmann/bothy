@@ -46,7 +46,10 @@ from bothy_sdk.generated.models import (
     ProjectReadiness,
     ProjectTrashResult,
     ProjectTrashResultResult,
+    RunSlots,
     ToolClass,
+    WaitingRun,
+    WaitingRunReason,
 )
 from bothy_sdk.generated.types import UNSET, Unset
 
@@ -98,8 +101,15 @@ HEARTBEAT_MEMBERS = (
     "project_readiness",
     "project_folders",
     "project_trash_results",
+    "run_slots",
+    "waiting_runs",
 )
 """The top-level members `build_heartbeat` sets."""
+
+_RUN_SLOTS_MAX = 10000
+"""The maximum of ``RunSlots.used`` and ``RunSlots.total`` in the OpenAPI."""
+_RUN_SLOTS_KEYS = ("used", "total")
+_WAITING_RUN_KEYS = ("run_id", "reason")
 
 _FOLDER_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 _FOLDER_NAME_MAX = 255
@@ -135,6 +145,8 @@ def build_heartbeat(  # noqa: PLR0913 - keywords mirror the members of Heartbeat
     project_readiness: Iterable[ProjectReadiness] | None = None,
     project_folders: Iterable[str] | None = None,
     project_trash_results: Iterable[ProjectTrashResult] | None = None,
+    run_slots: RunSlots | Mapping[str, Any] | None = None,
+    waiting_runs: Iterable[WaitingRun | Mapping[str, Any] | tuple[UUID | str, str]] | None = None,
 ) -> Heartbeat:
     """Build a heartbeat of schema ``agent_heartbeat.v1``.
 
@@ -169,6 +181,12 @@ def build_heartbeat(  # noqa: PLR0913 - keywords mirror the members of Heartbeat
         project_trash_results: Runners only: the outcome of each folder move of
             ``HeartbeatAck.project_trash`` not yet reported, distinct channels, a ``reason`` of
             the form `REASON_FORM` (09 18.15).
+        run_slots: Runners only: ``used`` turns run of at most ``total``
+            (``runner.max_parallel_runs``), ``used`` at most ``total`` (09 4.8). Leaving it out
+            clears the stored one.
+        waiting_runs: The accepted runs that wait before their start, each a `WaitingRun`, a
+            mapping or a ``(run_id, reason)`` pair with the reason ``slots_full`` or
+            ``thread_busy`` (09 5.2.1); distinct runs. Leaving it out counts as the empty list.
 
     Returns:
         The generated `Heartbeat`.
@@ -211,7 +229,75 @@ def build_heartbeat(  # noqa: PLR0913 - keywords mirror the members of Heartbeat
         beat.project_folders = _folders(project_folders)
     if project_trash_results is not None:
         beat.project_trash_results = _trash_results(project_trash_results)
+    _add_load(beat, run_slots, waiting_runs)
     return beat
+
+
+def _add_load(
+    beat: Heartbeat,
+    run_slots: RunSlots | Mapping[str, Any] | None,
+    waiting_runs: Iterable[WaitingRun | Mapping[str, Any] | tuple[UUID | str, str]] | None,
+) -> None:
+    """Set ``run_slots`` and ``waiting_runs`` of `beat` when given (09 4.8, 5.2.1)."""
+    if run_slots is not None:
+        beat.run_slots = _run_slots(run_slots)
+    if waiting_runs is not None:
+        beat.waiting_runs = _waiting_runs(waiting_runs)
+
+
+def _count(value: object, field: str, low: int) -> int:
+    """An integer in ``[low, 10000]``; a boolean is no count."""
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError(f"{field}: must be an integer")
+    if not low <= value <= _RUN_SLOTS_MAX:
+        raise ValueError(f"{field}: out of range")
+    return value
+
+
+def _run_slots(value: RunSlots | Mapping[str, Any]) -> RunSlots:
+    """``run_slots``: ``used`` and ``total`` required, ``total`` at least 1, ``used`` at most it."""
+    raw = value.to_dict() if isinstance(value, RunSlots) else value
+    raw = _closed(raw, _RUN_SLOTS_KEYS, "run_slots")
+    for key in _RUN_SLOTS_KEYS:
+        if key not in raw:
+            raise ValueError(f"run_slots.{key}: required")
+    used = _count(raw["used"], "run_slots.used", 0)
+    total = _count(raw["total"], "run_slots.total", 1)
+    if used > total:
+        raise ValueError("run_slots.used: above run_slots.total")
+    return RunSlots(used=used, total=total)
+
+
+def _waiting_run(entry: object) -> WaitingRun:
+    """One entry of ``waiting_runs``."""
+    if isinstance(entry, WaitingRun):
+        raw: Mapping[str, Any] = entry.to_dict()
+    elif isinstance(entry, tuple):
+        if len(entry) != len(_WAITING_RUN_KEYS):
+            raise ValueError("waiting_runs: entries must be (run_id, reason) pairs")
+        raw = dict(zip(_WAITING_RUN_KEYS, entry, strict=True))
+    else:
+        raw = _closed(entry, _WAITING_RUN_KEYS, "waiting_runs")
+    if "run_id" not in raw or "reason" not in raw:
+        raise ValueError("waiting_runs: run_id and reason are required")
+    run_id = raw["run_id"]
+    if not isinstance(run_id, UUID):
+        try:
+            run_id = UUID(run_id)
+        except (TypeError, ValueError, AttributeError):
+            raise ValueError("waiting_runs.run_id: must be a run ID") from None
+    return WaitingRun(
+        run_id=run_id, reason=_member(WaitingRunReason, raw["reason"], "waiting_runs.reason")
+    )
+
+
+def _waiting_runs(
+    entries: Iterable[WaitingRun | Mapping[str, Any] | tuple[UUID | str, str]],
+) -> list[WaitingRun]:
+    """``waiting_runs``: entries with distinct runs and a reason of `WaitingRunReason`."""
+    out = [_waiting_run(e) for e in _list(entries, "waiting_runs")]
+    _distinct([w.run_id for w in out], "waiting_runs")
+    return out
 
 
 def _reason(value: object, field: str) -> None:

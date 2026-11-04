@@ -90,6 +90,8 @@ from claude_code_runner.environment import (
 from claude_code_runner.heartbeat import (
     CAPABILITIES,
     MIN_CLAUDE_CODE_VERSION,
+    WAIT_SLOTS_FULL,
+    WAIT_THREAD_BUSY,
     Probe,
     billing_modes_supported,
     parse_version,
@@ -217,6 +219,9 @@ class RunnerHandler(AgentHandler):
         self._resync_lock = asyncio.Lock()
         self._resyncing: asyncio.Task[None] | None = None
         self._slots = asyncio.Semaphore(config.max_parallel_runs)
+        self._waiting: dict[UUID, str] = {}
+        """The runs that wait in prepare, with their wait reason (09 5.2.1)."""
+        self._beats: set[asyncio.Task[None]] = set()
         self._modes = billing_modes_supported(
             has_key_ref=config.anthropic_api_key_ref is not None,
             allow_personal=config.allow_personal,
@@ -254,8 +259,40 @@ class RunnerHandler(AgentHandler):
         folders = project_folders(self.config.projects_root, self.config.project_folders_max)
         readiness = cache.readiness() if cache else []
         self.trash.annotate(readiness)
-        status = runtime_status(self.probe, readiness, self._modes, folders, self.trash.results())
+        status = runtime_status(
+            self.probe,
+            readiness,
+            self._modes,
+            folders,
+            self.trash.results(),
+            slots=(self._slots_used(), self.config.max_parallel_runs),
+            waiting=dict(self._waiting),
+        )
         return dataclasses.replace(status, active_runs=sorted(self.adopted, key=str))
+
+    def _slots_used(self) -> int:
+        """The turns that hold a slot of ``runner.max_parallel_runs`` now."""
+        used = sum(1 for state in self._runs.values() if state.slot is not None)
+        return min(used, self.config.max_parallel_runs)
+
+    def _wait(self, run_id: UUID, reason: str | None) -> None:
+        """Note that a run in prepare waits for ``reason`` (``None``: no longer) and report it.
+
+        A change sends a heartbeat at once (09 5.2.1), so the person sees why the run waits;
+        the task is kept until it ends and cancelled by `close`.
+        """
+        if self._waiting.get(run_id) == reason:
+            return
+        if reason is None:
+            self._waiting.pop(run_id, None)
+        else:
+            self._waiting[run_id] = reason
+            log("run_waiting", run_id=run_id, reason=reason)
+        if self.adapter is None:
+            return
+        task = asyncio.get_running_loop().create_task(self.adapter.send_heartbeat())
+        self._beats.add(task)
+        task.add_done_callback(self._beats.discard)
 
     def _workspace_refs(self) -> dict[UUID, str]:
         return self.channels.workspace_refs() if self.channels is not None else {}
@@ -624,6 +661,10 @@ class RunnerHandler(AgentHandler):
             follow.cancel()
             with contextlib.suppress(asyncio.CancelledError, Exception):
                 await follow
+        for beat in list(self._beats):
+            beat.cancel()
+            with contextlib.suppress(asyncio.CancelledError, Exception):
+                await beat
         task = self._probing
         if task is not None and not task.done():
             task.cancel()
@@ -771,20 +812,28 @@ class RunnerHandler(AgentHandler):
         return cache.binding(payload.channel_id)
 
     async def _take_locks(self, state: RunState, ids: Mapping[str, Any]) -> None:
+        """Take the thread lock, the session lock and a slot; report each wait (09 5.2.1)."""
         locks = self.config.state_dir / "locks"
+        run_id = state.run_id
         try:
-            for name in (f"thread-{state.thread_id}", f"session-{state.session.ref}"):  # type: ignore[union-attr]
-                state.locks.append(
-                    await acquire(
-                        locks / f"{name}.lock",
-                        self.config.session_lock_wait,
-                        self.config.poll_interval,
+            try:
+                for name in (f"thread-{state.thread_id}", f"session-{state.session.ref}"):  # type: ignore[union-attr]
+                    state.locks.append(
+                        await acquire(
+                            locks / f"{name}.lock",
+                            self.config.session_lock_wait,
+                            self.config.poll_interval,
+                            on_busy=lambda: self._wait(run_id, WAIT_THREAD_BUSY),
+                        )
                     )
-                )
-        except LockTimeout:
-            refuse("session_busy", "adapter_error", ids)
-        await self._slots.acquire()
-        state.slot = self._slots
+            except LockTimeout:
+                refuse("session_busy", "adapter_error", ids)
+            if self._slots.locked():
+                self._wait(run_id, WAIT_SLOTS_FULL)
+            await self._slots.acquire()
+            state.slot = self._slots
+        finally:
+            self._wait(run_id, None)
 
     async def _context(self, run: RunHandle, ids: Mapping[str, Any]) -> RunContext:
         try:

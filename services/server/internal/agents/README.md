@@ -238,8 +238,13 @@ Agents, backend policy and tool class (configured), reported state, consumer cur
   only when the list changed since this process applied it (`ApplyProjectReadiness` of `chat` in
   its own unit of work), the project folders of M4-44 (`project_folders`, written to
   `agents.reported_project_folders` with `WriteProjectFolders` in its own unit of work only when
-  the list differs from the last one this process wrote; absent means unchanged), then the change
-  path, the entry update, the reassessment, the re-armed deadline and the event.
+  the list differs from the last one this process wrote; absent means unchanged), the waiting
+  runs of F-WARTESCHLANGE-GRUND (`waiting_runs`, absent counts as empty, handed to the port
+  `RunWaits` of `runs`, bound late with `BindRunWaits`, when the list differs from the last one
+  this process applied or that application is at least `agent.heartbeat_persist_interval` old),
+  then the change path, the entry update, the reassessment, the re-armed deadline and the event.
+  `run_slots` is part of the reported state (`reported_details.run_slots`,
+  `AgentRuntimeStatus.run_slots`, 09 4.8).
 - `app/project_folders.go` (M4-44, migration `00084`): `ProjectFolders`, the use case of
   `listAgentProjectFolders`: `authorize` `agent.project_folders.read` (owner) on the agent,
   `GetProjectFolders` (`reported` false while the column is NULL, `not_found` for an unknown

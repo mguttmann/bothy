@@ -17,6 +17,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:l10n/l10n.dart';
 
+import '../agents/providers.dart' show agentInfoProvider, agentPresenceProvider;
+import '../agents/run_mapping.dart' show queuedWait;
 import '../app/providers/ports.dart';
 import '../app/providers/session.dart';
 import '../forum/post_list_header.dart' show FilterChipButton;
@@ -355,8 +357,26 @@ class RunningRowTile extends ConsumerWidget {
     final c = context.dsColors;
     final run = row.run;
     final state = DsRunState.fromCode(run.state.code);
+    // A queued run says why it waits (09 5.2.1), never only "Queued".
+    final wait = queuedWait(
+      run,
+      presence: ref
+          .watch(agentPresenceProvider(run.agentId.value))
+          .value
+          ?.state,
+      slotsTotal: ref
+          .watch(agentInfoProvider(run.agentId.value))
+          .value
+          ?.runSlots
+          ?.total,
+    );
     final stateWord = switch (state) {
-      DsRunState.queued => l.liveBoxStateQueued,
+      DsRunState.queued => dsWaitText(
+        l,
+        wait!.reason,
+        used: wait.slotsUsed,
+        total: wait.slotsTotal,
+      ),
       DsRunState.waitingInput => l.liveBoxStateWaitingForYou,
       _ => l.liveBoxStateRunning,
     };
