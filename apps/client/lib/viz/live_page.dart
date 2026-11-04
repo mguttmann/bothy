@@ -28,7 +28,8 @@ const String livePath = '/live';
 /// engine ([EngineLiveFrameSource]), the REST queries over the client of the signed-in
 /// session ([ApiStatsQuerySource], DPoP and refresh apply), the spaces, agent names and
 /// telemetry link of the same client, the system browser for "Open in Grafana" (never a web
-/// view, 25 9.1) and the deep link `/t/{thread_id}` for a run card.
+/// view, 25 9.1), the deep link `/t/{thread_id}` for a run card and `/t/{thread_id}?m={message_id}`
+/// for the triggering message of a run in the run history.
 ///
 /// On the phone ([phone]) the views use the form factor `mobile`: no TV mode (25 6.6); the
 /// density `touch` comes from the app's theme on a touch platform. Signed out the page is
@@ -96,6 +97,9 @@ class _LivePageState extends ConsumerState<LivePage> {
       queries: _queries,
       directory: _directory,
       onOpenThread: (threadId) => context.go('/t/$threadId'),
+      // The run history jumps to the message that started a run (25 6.7).
+      onOpenMessage: (threadId, messageId) =>
+          context.go('/t/$threadId?m=$messageId'),
       openExternal: (url) =>
           unawaited(ref.read(appPortsProvider).browser.open(url)),
       config: ref.watch(appConfigProvider),

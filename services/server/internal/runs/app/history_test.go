@@ -122,7 +122,7 @@ func (w *world) historyRun(channel, space, agent ids.ID, state domain.State, i i
 // and repeats nothing.
 func TestListHistory_NewestEndFirstAcrossPages(t *testing.T) {
 	t.Parallel()
-	w, _, _ := historyWorld(t)
+	w, _, names := historyWorld(t)
 	other := ids.New() // a channel outside the scope
 	var visible []app.RunRow
 	for i := 1; i <= 6; i++ {
@@ -150,6 +150,10 @@ func TestListHistory_NewestEndFirstAcrossPages(t *testing.T) {
 	}
 	if e.Chat == nil || e.Chat.ThreadID != e.ThreadID || e.Chat.ChannelName != "backend" {
 		t.Fatalf("chat %+v", e.Chat)
+	}
+	// The chat names are asked only for the visible channels.
+	if len(names.channels) != 1 || !slices.Equal(names.channels[0], []ids.ID{w.channel}) {
+		t.Fatalf("chat channels %v", names.channels)
 	}
 	next, err := w.svc.ListHistory(w.asAlex(), runs.HistoryQuery{Limit: 2, Cursor: page.NextCursor})
 	if err != nil {

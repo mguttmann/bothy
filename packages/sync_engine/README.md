@@ -675,8 +675,9 @@ above it (the app under test in the macOS app sandbox, M4-18), it uses the copy 
   prefix, case-insensitive, in message texts, thread titles, file names and transcripts (a
   transcript match is a file hit); the score is the number of matched words, ties newest first;
   the agent filter uses the thread's operator, else the channel's; the cursor is base64url JSON
-  with a hash of person, query, type, sort and filters. `searchThreadTitles`, `listMyMentions`
-  and `listActiveRuns` follow the API with visibility only. The limits (`queryMaxChars`,
+  with a hash of person, query, type, sort and filters. `searchThreadTitles`, `listMyMentions`,
+  `listActiveRuns` and `listRunHistory` (finished runs, newest end first, with the filters
+  `space_id`, `agent_id` and `state`) follow the API with visibility only. The limits (`queryMaxChars`,
   `maxCandidates`, `prefixMinChars`, page sizes) lie in `world.searchSettings`, so a test can
   lower them.
 - Agent interface (M4-21, `rest/agent_ui_handlers.dart`, `world_agents.dart`):

@@ -16331,6 +16331,138 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Could not trigger again: {reason}'**
   String retriggerRefused(String reason);
+
+  /// Title of the view and tab with the finished runs (docs/spec/25-visualization.md 6.7).
+  ///
+  /// In en, this message translates to:
+  /// **'Run history'**
+  String get vizViewRunHistory;
+
+  /// Filter of the run history: runs of every end state.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get vizHistoryAll;
+
+  /// Label of the end state filter of the run history.
+  ///
+  /// In en, this message translates to:
+  /// **'End state'**
+  String get vizHistoryStateFilter;
+
+  /// Button under the run history that loads the next page.
+  ///
+  /// In en, this message translates to:
+  /// **'Load more runs'**
+  String get vizHistoryLoadMore;
+
+  /// Note under the last page of the run history.
+  ///
+  /// In en, this message translates to:
+  /// **'Start of the history: there are no older runs.'**
+  String get vizHistoryEnd;
+
+  /// Note above the run history on how far back it reaches (the retention of runs follows their thread, docs/spec/20-privacy.md 2).
+  ///
+  /// In en, this message translates to:
+  /// **'Runs are kept as long as their chat. Deleting a chat removes its runs; nothing is deleted because of its age.'**
+  String get vizHistoryRetention;
+
+  /// The run history without any finished run in the scope and filter.
+  ///
+  /// In en, this message translates to:
+  /// **'No finished runs yet.'**
+  String get vizHistoryEmpty;
+
+  /// Button of the run detail that returns to the list.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to the run history'**
+  String get vizHistoryBack;
+
+  /// Button of the run detail that opens the thread of the run.
+  ///
+  /// In en, this message translates to:
+  /// **'Open the chat'**
+  String get vizHistoryOpenChat;
+
+  /// Button of the run detail that opens the thread at the message that started the run.
+  ///
+  /// In en, this message translates to:
+  /// **'Go to the triggering message'**
+  String get vizHistoryOpenMessage;
+
+  /// Heading of the summary of the agent in the run detail.
+  ///
+  /// In en, this message translates to:
+  /// **'Summary'**
+  String get vizHistorySummary;
+
+  /// Heading of the last text excerpt of the agent in the run detail.
+  ///
+  /// In en, this message translates to:
+  /// **'Last text'**
+  String get vizHistoryLastText;
+
+  /// Heading of the step tree in the run detail and column header of the step count.
+  ///
+  /// In en, this message translates to:
+  /// **'Steps'**
+  String get vizHistorySteps;
+
+  /// Name of the button of a row of the run history that opens the run detail.
+  ///
+  /// In en, this message translates to:
+  /// **'Open run {id}'**
+  String vizHistoryOpenRun(String id);
+
+  /// Column header: running time of a run.
+  ///
+  /// In en, this message translates to:
+  /// **'Duration'**
+  String get vizColDuration;
+
+  /// Column header: the model of a run.
+  ///
+  /// In en, this message translates to:
+  /// **'Model'**
+  String get vizColModel;
+
+  /// Column header: the cost of a finished run with its label.
+  ///
+  /// In en, this message translates to:
+  /// **'Cost'**
+  String get vizColRunCost;
+
+  /// Column header: input tokens of a run.
+  ///
+  /// In en, this message translates to:
+  /// **'Input tokens'**
+  String get vizColTokensIn;
+
+  /// Column header: output tokens of a run.
+  ///
+  /// In en, this message translates to:
+  /// **'Output tokens'**
+  String get vizColTokensOut;
+
+  /// Column header: tokens a run read from the prompt cache.
+  ///
+  /// In en, this message translates to:
+  /// **'Cache read'**
+  String get vizColCacheRead;
+
+  /// Column header: tokens a run wrote to the prompt cache (five minutes and one hour together).
+  ///
+  /// In en, this message translates to:
+  /// **'Cache write'**
+  String get vizColCacheWrite;
+
+  /// Column header: subagents a run started.
+  ///
+  /// In en, this message translates to:
+  /// **'Subagents'**
+  String get vizColSubagents;
 }
 
 class _AppLocalizationsDelegate

@@ -10215,4 +10215,74 @@ class AppLocalizationsDe extends AppLocalizations {
   String retriggerRefused(String reason) {
     return 'Erneutes Auslösen nicht möglich: $reason';
   }
+
+  @override
+  String get vizViewRunHistory => 'Laufhistorie';
+
+  @override
+  String get vizHistoryAll => 'Alle';
+
+  @override
+  String get vizHistoryStateFilter => 'Endzustand';
+
+  @override
+  String get vizHistoryLoadMore => 'Weitere Läufe laden';
+
+  @override
+  String get vizHistoryEnd =>
+      'Anfang der Historie: Es gibt keine älteren Läufe.';
+
+  @override
+  String get vizHistoryRetention =>
+      'Läufe bleiben so lange wie ihr Chat. Wer einen Chat löscht, löscht seine Läufe mit; nach Alter wird nichts gelöscht.';
+
+  @override
+  String get vizHistoryEmpty => 'Noch keine beendeten Läufe.';
+
+  @override
+  String get vizHistoryBack => 'Zurück zur Laufhistorie';
+
+  @override
+  String get vizHistoryOpenChat => 'Chat öffnen';
+
+  @override
+  String get vizHistoryOpenMessage => 'Zur auslösenden Nachricht';
+
+  @override
+  String get vizHistorySummary => 'Zusammenfassung';
+
+  @override
+  String get vizHistoryLastText => 'Letzter Text';
+
+  @override
+  String get vizHistorySteps => 'Schritte';
+
+  @override
+  String vizHistoryOpenRun(String id) {
+    return 'Lauf $id öffnen';
+  }
+
+  @override
+  String get vizColDuration => 'Dauer';
+
+  @override
+  String get vizColModel => 'Modell';
+
+  @override
+  String get vizColRunCost => 'Kosten';
+
+  @override
+  String get vizColTokensIn => 'Eingabe-Tokens';
+
+  @override
+  String get vizColTokensOut => 'Ausgabe-Tokens';
+
+  @override
+  String get vizColCacheRead => 'Cache gelesen';
+
+  @override
+  String get vizColCacheWrite => 'Cache geschrieben';
+
+  @override
+  String get vizColSubagents => 'Subagenten';
 }

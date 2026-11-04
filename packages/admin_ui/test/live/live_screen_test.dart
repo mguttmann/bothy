@@ -68,6 +68,7 @@ final class _World {
     available: _files.keys.toSet(),
   );
   final List<String> opened = [];
+  final List<String> openedMessages = [];
   final List<Uri> external = [];
 
   Future<void> load() async {
@@ -90,6 +91,7 @@ final class _World {
     queries: queries,
     directory: _Directory(dashboard: dashboard),
     onOpenThread: opened.add,
+    onOpenMessage: (thread, message) => openedMessages.add('$thread/$message'),
     openExternal: external.add,
     config: config,
     clock: clock,
@@ -159,9 +161,11 @@ void main() {
     expect(world.live.spaceId, isNull, reason: 'the instance scope first');
     expect(find.byType(RunCardMark), findsWidgets);
 
+    await tester.ensureVisible(_tab(VizViewKind.executive));
     await tester.tap(_tab(VizViewKind.executive));
     await _settle(tester, world);
     expect(find.byType(ExecutiveView), findsOneWidget);
+    await tester.ensureVisible(_tab(VizViewKind.timeline));
     await tester.tap(_tab(VizViewKind.timeline));
     await _settle(tester, world);
     expect(find.byType(TimelineView), findsOneWidget);
@@ -182,6 +186,7 @@ void main() {
       VizViewKind.executive,
       VizViewKind.timeline,
     ]) {
+      await tester.ensureVisible(_tab(kind));
       await tester.tap(_tab(kind));
       await _settle(tester, world);
       final toggle = find.byKey(const ValueKey('viz-as-table')).first;
@@ -191,6 +196,36 @@ void main() {
       expect(find.byType(VizTable), findsWidgets, reason: kind.name);
     }
   });
+
+  for (final form in [VizFormFactor.desktop, VizFormFactor.mobile]) {
+    testWidgets(
+      '${form.name}: the run history tab lists finished runs and its detail '
+      'jumps to the triggering message',
+      (tester) async {
+        final world = await _pump(tester, formFactor: form);
+        await tester.ensureVisible(_tab(VizViewKind.runHistory));
+        await tester.tap(_tab(VizViewKind.runHistory));
+        await _settle(tester, world);
+        expect(find.byType(RunHistoryView), findsOneWidget);
+        expect(world.queries.calls, contains('runHistory'));
+        final row = find
+            .byKey(
+              const ValueKey(
+                'viz-history-row-0192f4a0-7b1c-7000-8a00-000000000902',
+              ),
+            )
+            .first;
+        await tester.ensureVisible(row);
+        await tester.tap(row);
+        await _settle(tester, world);
+        expect(find.byType(RunGraphView), findsOneWidget);
+        final jump = find.byKey(const ValueKey('viz-history-open-message'));
+        await tester.ensureVisible(jump);
+        await tester.tap(jump);
+        expect(world.openedMessages, hasLength(1));
+      },
+    );
+  }
 
   testWidgets('a run card opens its thread', (tester) async {
     final world = await _pump(tester);
@@ -264,6 +299,7 @@ void main() {
     await _settle(tester, world);
     expect(world.live.spaceId, _support);
     expect(world.live.isRunning, isTrue);
+    await tester.ensureVisible(_tab(VizViewKind.delivery));
     await tester.tap(_tab(VizViewKind.delivery));
     await _settle(tester, world);
     expect(find.text('Only for the owner'), findsOneWidget);

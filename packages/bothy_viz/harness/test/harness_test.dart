@@ -124,6 +124,7 @@ void main() {
     await settle(tester);
     final views = {
       VizViewKind.liveTopology: LiveTopologyView,
+      VizViewKind.runHistory: RunHistoryView,
       VizViewKind.backend: BackendView,
       VizViewKind.delivery: DeliveryView,
       VizViewKind.executive: ExecutiveView,

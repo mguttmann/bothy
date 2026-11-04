@@ -47,6 +47,11 @@ const Map<String, String> exceptions = {
       'German plural of the term Run; {estimate} is costEstimate',
   'runningPersonalNote': 'German plural of the term Run',
   'runningFailed': 'German plural of the term Run',
+  // The run history (F-LAUFHISTORIE) names the runs in the plural.
+  'vizHistoryLoadMore': 'German plural of the term Run',
+  'vizHistoryEnd': 'German plural of the term Run',
+  'vizHistoryRetention': 'German plural of the term Run',
+  'vizHistoryEmpty': 'German plural of the term Run',
 };
 
 void main() {

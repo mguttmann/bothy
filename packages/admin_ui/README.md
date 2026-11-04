@@ -119,7 +119,9 @@ one space of `listSpaces`), TV mode over the whole window where the form factor 
 "Open in Grafana" only when `getInstance` names `telemetry_dashboard_url`. The host passes its
 live source (the gateway subscription in the apps, polling in the console), `ApiStatsQuerySource`
 over its own client, an `AdminStatsSource` for the names and the link, and what a run card does
-(docs/decisions.d/M6-16.md). The page knows no transport and no permission.
+(docs/decisions.d/M6-16.md), and what the jump of the run history to a triggering message does
+(`onOpenMessage`, F-LAUFHISTORIE; TV mode leaves the run history out). `ApiStatsQuerySource` also
+reads `listRunHistory` and `getRun` for that tab. The page knows no transport and no permission.
 
 ## Dependencies
 

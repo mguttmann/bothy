@@ -267,11 +267,20 @@ void main() {
           .map((s) => s.kind),
       [
         VizViewKind.liveTopology,
+        VizViewKind.runHistory,
         VizViewKind.backend,
         VizViewKind.delivery,
         VizViewKind.executive,
         VizViewKind.timeline,
       ],
+    );
+    // The run history is a list to click through: TV mode never rotates to it (25 6.7).
+    expect(
+      [
+        for (final s in vizViewRegistry)
+          if (!s.inTvMode) s.kind,
+      ],
+      [VizViewKind.runHistory],
     );
   });
 

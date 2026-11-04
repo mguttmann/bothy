@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The REST queries of the six views over the generated client (docs/spec/25-visualization.md
-/// 5, 7.1; brief M6-16 Scope).
+/// The REST queries of the views over the generated client (docs/spec/25-visualization.md
+/// 5, 6.7, 7.1; brief M6-16 Scope).
 library;
 
 import 'package:api_client/api_client.dart' as api;
@@ -65,6 +65,25 @@ final class ApiStatsQuerySource implements StatsQuerySource {
       metric: metrics == null ? null : BuiltList<api.StatsMetric>(metrics),
     ),
   );
+
+  @override
+  Future<api.RunHistoryPage> runHistory({
+    String? spaceId,
+    String? state,
+    String? cursor,
+    int? limit,
+  }) => _call(
+    () => _api.getRunsApi().listRunHistory(
+      spaceId: spaceId,
+      state: state,
+      cursor: cursor,
+      limit: limit,
+    ),
+  );
+
+  @override
+  Future<api.Run> run(String runId) =>
+      _call(() => _api.getRunsApi().getRun(runId: runId));
 
   @override
   Future<api.StatsSloReport> slo() => _call(_stats.getStatsSlo);

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The six views and the registry the hosts use for navigation and tabs (brief M6-12,
-/// design note 1).
+/// The views and the registry the hosts use for navigation and tabs (brief M6-12, design
+/// note 1; the run history of F-LAUFHISTORIE).
 library;
 
 import 'package:design_system/design_system.dart';
@@ -14,6 +14,7 @@ import 'backend_view.dart';
 import 'delivery_view.dart';
 import 'executive_view.dart';
 import 'live_topology_view.dart';
+import 'run_history_view.dart';
 import 'timeline_view.dart';
 import 'viz_host_options.dart';
 
@@ -21,6 +22,9 @@ import 'viz_host_options.dart';
 enum VizViewKind {
   /// Live topology (6.1).
   liveTopology,
+
+  /// Run history (6.7): the finished runs next to the live topology; never in TV mode.
+  runHistory,
 
   /// Backend view (6.2).
   backend,
@@ -48,6 +52,7 @@ final class VizViewSpec {
     required this.glyph,
     required this.instanceOnly,
     required this.onMobile,
+    this.inTvMode = true,
   });
 
   /// The view.
@@ -68,6 +73,10 @@ final class VizViewSpec {
 
   /// The view appears on mobile (all but TV mode, 01 5.3 M10).
   final bool onMobile;
+
+  /// TV mode rotates through the view; the run history, a list to click through, is left out
+  /// (25 6.6, 6.7).
+  final bool inTvMode;
 }
 
 /// Every view in the order of the tabs.
@@ -79,6 +88,15 @@ final List<VizViewSpec> vizViewRegistry = List.unmodifiable([
     glyph: DsIcons.agent,
     instanceOnly: false,
     onMobile: true,
+  ),
+  VizViewSpec(
+    kind: VizViewKind.runHistory,
+    titleKey: 'vizViewRunHistory',
+    title: (l) => l.vizViewRunHistory,
+    glyph: DsIcons.runCompleted,
+    instanceOnly: false,
+    onMobile: true,
+    inTvMode: false,
   ),
   VizViewSpec(
     kind: VizViewKind.backend,
@@ -135,7 +153,8 @@ List<VizViewSpec> vizViewsFor(VizHostOptions options) => [
       if (options.formFactor != VizFormFactor.mobile || spec.onMobile) spec,
 ];
 
-/// Builds the view of [kind] with the shared view contract.
+/// Builds the view of [kind] with the shared view contract; [onOpenMessage] opens a thread at
+/// a message (the jump of the run history to the triggering message), `null` hides that jump.
 ///
 /// Throws an [ArgumentError] for [VizViewKind.tvMode]: the host opens TV mode as an overlay
 /// with its own exit callback (`TvMode`).
@@ -145,6 +164,7 @@ Widget buildVizView(
   required StatsQuerySource queries,
   required VizHostOptions options,
   required void Function(String threadId) onOpenThread,
+  VizOpenMessage? onOpenMessage,
   Key? key,
 }) => switch (kind) {
   VizViewKind.liveTopology => LiveTopologyView(
@@ -153,6 +173,14 @@ Widget buildVizView(
     queries: queries,
     options: options,
     onOpenThread: onOpenThread,
+  ),
+  VizViewKind.runHistory => RunHistoryView(
+    key: key,
+    live: live,
+    queries: queries,
+    options: options,
+    onOpenThread: onOpenThread,
+    onOpenMessage: onOpenMessage,
   ),
   VizViewKind.backend => BackendView(
     key: key,

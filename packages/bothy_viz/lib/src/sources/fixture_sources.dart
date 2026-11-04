@@ -192,6 +192,37 @@ final class FixtureStatsQuerySource implements StatsQuerySource {
     return fixtures.costSeries(_pick('CostSeries'));
   });
 
+  /// The run history answers `RunHistoryPage.<state>.json` for the first page and an empty
+  /// last page for a [cursor]; [state] and [spaceId] are recorded in [historyQueries].
+  @override
+  Future<api.RunHistoryPage> runHistory({
+    String? spaceId,
+    String? state,
+    String? cursor,
+    int? limit,
+  }) => _answer('runHistory', () async {
+    historyQueries.add((spaceId: spaceId, state: state, cursor: cursor));
+    if (cursor != null) return fixtures.runHistoryPage('empty');
+    final page = await fixtures.runHistoryPage(_pick('RunHistoryPage'));
+    if (state == null) return page;
+    return page.rebuild(
+      (b) => b
+        ..items.where((e) => e.state.name == state)
+        ..nextCursor = null,
+    );
+  });
+
+  /// The run document of the detail: `Run.finished.json` with the ID of [runId].
+  @override
+  Future<api.Run> run(String runId) => _answer('run', () async {
+    final run = await fixtures.run('finished');
+    return run.rebuild((b) => b.id = runId);
+  });
+
+  /// The filters of every [runHistory] call, in order.
+  final List<({String? spaceId, String? state, String? cursor})>
+  historyQueries = [];
+
   /// `StatsSeries.<query>.<state>.json`; the state `empty` is shared by every query.
   Future<api.StatsSeries> _series(String query) => _answer(query, () {
     if (state == 'empty') return fixtures.series('empty');

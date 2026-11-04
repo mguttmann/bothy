@@ -88,6 +88,9 @@ final class ViewWorld {
   /// The opened threads.
   final List<String> opened = [];
 
+  /// The opened messages as `thread/message` (the run history, 25 6.7).
+  final List<String> openedMessages = [];
+
   /// The live fixture of [state]: its own file, else `normal`.
   String get frameState =>
       fixtureFiles.containsKey('StatsLiveFrame.$state.json') ? state : 'normal';
@@ -131,6 +134,7 @@ final class ViewWorld {
     queries: queries,
     options: options,
     onOpenThread: opened.add,
+    onOpenMessage: (thread, message) => openedMessages.add('$thread/$message'),
   );
 }
 
@@ -218,4 +222,5 @@ const Map<VizViewKind, List<String>> viewStates = {
   VizViewKind.delivery: ['normal', 'empty'],
   VizViewKind.executive: ['normal', 'empty', 'no_cost_permission'],
   VizViewKind.timeline: ['normal', 'empty', 'truncated', 'day_boundary'],
+  VizViewKind.runHistory: ['normal', 'empty'],
 };

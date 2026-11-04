@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/chat"
+	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
@@ -50,20 +51,7 @@ var endStates = []string{"completed", "failed", "cancelled"}
 // run.read on a run is the read right on its thread, so the entry names its chat (25 4 rule 6).
 func (s *Service) ListHistory(ctx context.Context, q runs.HistoryQuery) (runs.HistoryPage, error) {
 	a := caller(ctx)
-	d, err := s.d.Authorizer.Authorize(ctx, a, authorize.ActionRunOverviewRead, authorize.Resource{Kind: authorize.ResourceInstance})
-	if err != nil {
-		return runs.HistoryPage{}, err
-	}
-	if err := d.Err(); err != nil {
-		return runs.HistoryPage{}, err
-	}
-	if q.State != "" && !slices.Contains(endStates, q.State) {
-		return runs.HistoryPage{}, errs.New(errs.CodeValidationFailed, "runs: the history lists only ended runs")
-	}
-	if s.d.History == nil {
-		return runs.HistoryPage{}, errs.New(errs.CodeInternalError, "runs: the run history has no chat places")
-	}
-	sc, err := s.d.Authorizer.Scope(ctx, a, authorize.ActionRunRead)
+	sc, err := s.historyScope(ctx, a, q)
 	if err != nil {
 		return runs.HistoryPage{}, err
 	}
@@ -73,11 +61,7 @@ func (s *Service) ListHistory(ctx context.Context, q runs.HistoryQuery) (runs.Hi
 		return runs.HistoryPage{}, err
 	}
 	out := runs.HistoryPage{Items: []runs.HistoryEntry{}}
-	visible, err := s.historyChannels(ctx, sc.ChannelIDs, q.SpaceID)
-	if err != nil || len(visible) == 0 {
-		return out, err
-	}
-	threads, err := s.d.History.ThreadIDsOfChannels(ctx, visible)
+	visible, threads, err := s.historyThreads(ctx, sc.ChannelIDs, q.SpaceID)
 	if err != nil || len(threads) == 0 {
 		return out, err
 	}
@@ -97,6 +81,37 @@ func (s *Service) ListHistory(ctx context.Context, q runs.HistoryQuery) (runs.Hi
 		}
 	}
 	return out, nil
+}
+
+// historyScope checks run.overview.read on the instance and the state filter, then returns
+// Scope(run.read). Errors: the refusal of authorize, 400 validation_failed for a state that is
+// not an end state, internal without the chat places.
+func (s *Service) historyScope(ctx context.Context, a actor.Actor, q runs.HistoryQuery) (authorize.Scope, error) {
+	d, err := s.d.Authorizer.Authorize(ctx, a, authorize.ActionRunOverviewRead, authorize.Resource{Kind: authorize.ResourceInstance})
+	if err != nil {
+		return authorize.Scope{}, err
+	}
+	if err := d.Err(); err != nil {
+		return authorize.Scope{}, err
+	}
+	if q.State != "" && !slices.Contains(endStates, q.State) {
+		return authorize.Scope{}, errs.New(errs.CodeValidationFailed, "runs: the history lists only ended runs")
+	}
+	if s.d.History == nil {
+		return authorize.Scope{}, errs.New(errs.CodeInternalError, "runs: the run history has no chat places")
+	}
+	return s.d.Authorizer.Scope(ctx, a, authorize.ActionRunRead)
+}
+
+// historyThreads returns the visible channels, narrowed to spaceID unless it is zero, and their
+// threads; both empty when nothing is visible.
+func (s *Service) historyThreads(ctx context.Context, scope []ids.ID, spaceID ids.ID) (visible, threads []ids.ID, err error) {
+	visible, err = s.historyChannels(ctx, scope, spaceID)
+	if err != nil || len(visible) == 0 {
+		return nil, nil, err
+	}
+	threads, err = s.d.History.ThreadIDsOfChannels(ctx, visible)
+	return visible, threads, err
 }
 
 // historyCursor decodes the history cursor; nil for none. Errors: 400 cursor_invalid.

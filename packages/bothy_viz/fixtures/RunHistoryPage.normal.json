@@ -1,0 +1,90 @@
+{
+  "items": [
+    {
+      "id": "0192f4a0-7b1c-7000-8a00-000000000902",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000000301",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000102",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "completed",
+      "billing_mode_expected": "organization",
+      "billing_mode_used": "organization",
+      "model": "model-a",
+      "summary": "Resume window fixed; the subagent tests pass.",
+      "cost": {
+        "amount_micros": 880000,
+        "currency": "USD",
+        "is_estimate": true
+      },
+      "metrics": {
+        "tokens_in": 120400,
+        "tokens_out": 8200,
+        "tokens_cache_read": 940000,
+        "tokens_cache_write": 30500,
+        "subagents": 3,
+        "background_jobs": 1
+      },
+      "step_count": 19,
+      "queued_at": "2026-10-24T08:59:57.000Z",
+      "started_at": "2026-10-24T09:00:00.000Z",
+      "finished_at": "2026-10-24T09:39:12.000Z",
+      "duration_ms": 2352000,
+      "chat": {
+        "thread_id": "0192f4a0-7b1c-7000-8a00-000000000301",
+        "channel_name": "backend",
+        "thread_title": "Payment integration"
+      }
+    },
+    {
+      "id": "0192f4a0-7b1c-7000-8a00-000000000903",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000000303",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000101",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000001",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000201",
+      "state": "failed",
+      "state_reason": "runtime_error",
+      "billing_mode_expected": "personal",
+      "billing_mode_used": "personal",
+      "model": "model-b",
+      "cost": {
+        "amount_micros": 50000,
+        "currency": "USD",
+        "is_estimate": true
+      },
+      "metrics": {
+        "tokens_in": 3100,
+        "tokens_out": 410
+      },
+      "step_count": 4,
+      "queued_at": "2026-10-24T08:10:00.000Z",
+      "started_at": "2026-10-24T08:10:02.000Z",
+      "finished_at": "2026-10-24T08:14:30.000Z",
+      "duration_ms": 268000,
+      "chat": {
+        "thread_id": "0192f4a0-7b1c-7000-8a00-000000000303",
+        "channel_name": "tickets",
+        "thread_title": "Login fails after update"
+      }
+    },
+    {
+      "id": "0192f4a0-7b1c-7000-8a00-000000000904",
+      "thread_id": "0192f4a0-7b1c-7000-8a00-000000000304",
+      "channel_id": "0192f4a0-7b1c-7000-8a00-000000000103",
+      "space_id": "0192f4a0-7b1c-7000-8a00-000000000002",
+      "agent_id": "0192f4a0-7b1c-7000-8a00-000000000202",
+      "state": "cancelled",
+      "state_reason": "user_cancelled",
+      "billing_mode_expected": "organization",
+      "cost": {
+        "amount_micros": 0,
+        "currency": "USD",
+        "is_estimate": true
+      },
+      "metrics": {},
+      "step_count": 0,
+      "queued_at": "2026-10-23T17:00:00.000Z",
+      "finished_at": "2026-10-23T17:00:20.000Z"
+    }
+  ],
+  "next_cursor": "eyJrIjoiaGlzdG9yeSJ9"
+}

@@ -77,4 +77,28 @@ void main() {
     );
     expect(find.textContaining(thread), findsOneWidget);
   });
+
+  testWidgets('the run history reads listRunHistory and its message jump '
+      'says "Open in the app"', (tester) async {
+    browserWindow(tester);
+    final b = _browser();
+    b.server.routes['GET /api/v1/run-history'] = (_) =>
+        Answer(200, _fixture('RunHistoryPage.normal.json'));
+    await pumpConsole(tester, b, location: '/live');
+    final tab = find.byKey(const ValueKey('live.tab.runHistory'));
+    await tester.ensureVisible(tab);
+    await tester.tap(tab);
+    for (var i = 0; i < 5; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    expect(b.server.to('GET', '/api/v1/run-history'), isNotEmpty);
+    expect(find.text('backend / Payment integration'), findsOneWidget);
+    const thread = '0192f4a0-7b1c-7000-8a00-000000000301';
+    tester.widget<LiveScreen>(find.byType(LiveScreen)).onOpenMessage!(
+      thread,
+      '0192f4a0-7b1c-7000-8a00-000000000501',
+    );
+    await tester.pump();
+    expect(find.textContaining(thread), findsOneWidget);
+  });
 }
