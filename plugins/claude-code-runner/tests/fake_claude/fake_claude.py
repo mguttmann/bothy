@@ -103,6 +103,42 @@ class Fake:
         print(json.dumps({"loggedIn": method != "none", "authMethod": method}))
         return int(self.scenario.get("auth_exit", 1 if method == "none" else 0))
 
+    def assist(self) -> int:
+        """The search assistant call of 18.16: one ``-p`` with ``--output-format json``.
+
+        Records argv, cwd, environment, the system prompt file and stdin, then prints the
+        ``result`` with ``assist_reply`` as its text (default: one pick of ``c1``) and the usage
+        of ``assist_usage``; ``assist_exit`` sets the exit status.
+        """
+        argv = sys.argv[1:]
+        prompt_file = _after(argv, "--system-prompt-file")
+        self.record(
+            "assist",
+            argv=argv,
+            cwd=os.getcwd(),
+            env=dict(os.environ),
+            prompt=Path(prompt_file).read_text() if prompt_file else None,
+            stdin=sys.stdin.read(),
+        )
+        reply = self.scenario.get(
+            "assist_reply",
+            json.dumps({"picks": [{"ref": "c1", "reason": "Fake pick."}], "terms": ["fake"]}),
+        )
+        usage = self.scenario.get(
+            "assist_usage",
+            {"model-fast": {"inputTokens": 800, "outputTokens": 30, "costUSD": 0.001}},
+        )
+        self.emit(
+            {
+                "type": "result",
+                "subtype": "success",
+                "is_error": False,
+                "result": reply,
+                "modelUsage": usage,
+            }
+        )
+        return int(self.scenario.get("assist_exit", 0))
+
     def turn(self) -> int:  # noqa: PLR0911, PLR0912 - one branch per scripted behaviour
         argv = sys.argv[1:]
         prompt_file = _after(argv, "--append-system-prompt-file")
@@ -720,6 +756,8 @@ def main(scenario_path: str, capture_path: str) -> int:
     if args[:1] == ["--help"]:
         print("fake help")
         return 0
+    if "-p" in args and _after(args, "--output-format") == "json":
+        return fake.assist()
     if "-p" in args:
         return fake.turn()
     fake.record("unknown", argv=args)

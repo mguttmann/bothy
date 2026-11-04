@@ -40,6 +40,7 @@ the title once per new session and reports the cost of the run.
 | `channels.py`, `workspace.py` | Cache of the served forums and their bindings, reloaded while running (09 18.1); resolution of `workspace_ref` and `runner.default_workspace`, readiness and the project folder report (09 18.13, M4-44) |
 | `causes.py` | The sentence for the thread that names the cause of a refused run (09 18.9, RUNNER-NO-GIT) |
 | `transcribe.py` | The local transcriber of audio attachments and the note without a transcript (09 18.14) |
+| `searchassist.py` | The search assistant: one call without tools per question, the reply parsed into picks and terms (09 18.16) |
 | `provision.py` | Folder creation of a binding with `provision` `init` or `clone`, its creation record and the readiness reasons (09 18.12, M4-43) |
 | `trash.py` | The folder check of the bound forums, the move of a deleted forum's folder to the host trash and its record (09 18.15) |
 | `toolclass.py`, `commandline.py`, `environment.py` | Tool class order, the argument list of a turn, the allow-list environment |
@@ -142,6 +143,20 @@ operator change, 04 8.2), `channel.updated`, `space.updated`, `channel.archived`
 readiness changed, a heartbeat goes out at once, so a forum that just got the runner as operator
 is reported ready right after the change. Log codes: `channels_resynced` (cause and whether anything changed) and
 `channels_resync_failed` (the cache stays as it was).
+
+## Search assistant (09 18.16)
+
+When the server names this runner's agent in `search.assist.agent_id`, every question of the
+search assistant reaches it as `search.assist_requested`. The runner answers with one
+`claude -p` call without tools (`--output-format json`, `--no-session-persistence`, the fixed
+instruction `prompts/search_assist.md` as system prompt, the question and the candidates as a
+data block on stdin), with the model `runner.search_assist_model` (default `haiku`) and the time
+limit `runner.search_assist_timeout` (default `9s`, below the server's wait). It runs with the API
+key when `runner.anthropic_api_key_ref` is set, else on the personal login when
+`runner.allow_personal` is on, else it answers nothing. The reply becomes picks of the sent
+references and further search terms; the usage goes back as costs, which the person sees as an
+estimate. A failed call logs `search_assist_failed` with a code and sends nothing; neither the
+question nor a candidate nor the reply is logged.
 
 ## Voice messages (09 18.14)
 

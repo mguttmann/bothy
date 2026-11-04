@@ -41,7 +41,7 @@ from bothy_sdk.adapter import (
 )
 from bothy_sdk.auth import Credentials, FileDpopKey, Secret
 from bothy_sdk.client import Client
-from bothy_sdk.clock import Clock
+from bothy_sdk.clock import Clock, SystemClock
 from bothy_sdk.errors import InvocationTokenInvalid, NotFoundError, ProblemError
 from bothy_sdk.gateway import CloseReason
 from bothy_sdk.generated.api.me import get_me
@@ -58,6 +58,7 @@ from bothy_sdk.generated.models import (
 from bothy_sdk.generated.types import Unset
 from bothy_sdk.invocation import stored_claims
 from bothy_sdk.runs import RunHandle
+from bothy_sdk.search_assist import AssistQuestion, AssistReply
 from bothy_sdk.sources import Envelope
 
 from claude_code_runner import ADAPTER_NAME, RUNTIME_NAME, __version__
@@ -103,6 +104,7 @@ from claude_code_runner.locks import LockTimeout, acquire, release
 from claude_code_runner.provision import Provisioner
 from claude_code_runner.reply_upload import remove_run_files, run_temp_dir
 from claude_code_runner.runturn import RunState, RunTurn
+from claude_code_runner.searchassist import SearchAssistant
 from claude_code_runner.secrets import SecretError, resolve
 from claude_code_runner.statedir import ensure_private_dir, sweep
 from claude_code_runner.stop import stop_group
@@ -199,6 +201,14 @@ class RunnerHandler(AgentHandler):
             on_done=self.on_provisioned,
         )
         self.transcriber = _transcriber(config, self.environ, self.path_entries)
+        self.search_assistant = SearchAssistant(
+            claude_bin=self.claude_bin,
+            env=self._assist_env,
+            state_dir=config.state_dir,
+            model=config.search_assist_model,
+            timeout=config.search_assist_timeout,
+            now=self._now,
+        )
         self.trash = FolderTrash(
             projects_root=config.projects_root,
             state_dir=config.state_dir,
@@ -612,6 +622,49 @@ class RunnerHandler(AgentHandler):
             return
         raw = getattr(payload, "reason", None)
         await turn.request_stop(str(getattr(raw, "value", raw) or "user_cancelled"))
+
+    # ---- search assistant (09 18.16) --------------------------------------------------------
+
+    async def on_search_assist(self, request: AssistQuestion) -> AssistReply | None:
+        """Answer a question of the search assistant with one call without tools.
+
+        Args:
+            request: The question with its candidates.
+
+        Returns:
+            The reply, or ``None`` when the call failed (the server then shows full text).
+        """
+        return await self.search_assistant.answer(request)
+
+    def _now(self) -> Any:
+        return (self.adapter.clock if self.adapter is not None else SystemClock()).now()
+
+    def _assist_env(self) -> dict[str, str]:
+        """The environment of a search assistant call (09 18.16).
+
+        ``organization`` with the API key when one is configured, else ``personal`` when allowed,
+        never a fallback between them.
+
+        Raises:
+            RunEnvironmentError: ``no_billing_mode``, or the errors of `build_environment`.
+            SecretError: The API key cannot be read.
+        """
+        ref = self.config.anthropic_api_key_ref
+        if ref is not None:
+            return build_environment(
+                self.environ,
+                mode="organization",
+                api_key=resolve(ref),
+                config_dir=ensure_private_dir(
+                    self.config.state_dir / "claude-config" / "organization"
+                ),
+                forward_ssh_agent=False,
+            )
+        if not self.config.allow_personal:
+            raise RunEnvironmentError("no_billing_mode")
+        return build_environment(
+            self.environ, mode="personal", api_key=None, config_dir=None, forward_ssh_agent=False
+        )
 
     # ---- version probe --------------------------------------------------------------------
 
