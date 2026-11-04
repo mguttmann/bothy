@@ -1668,14 +1668,20 @@ result like any forum.
    projects folder) and "Start from an idea" (a multi-line text; the project is created empty and
    the idea becomes its first chat). Fields: the name (suggested from the URL or the idea, at most
    `ui.new_project_name_max_chars` characters, editable; used for the forum and the folder), the
-   runner (the active agents, default the space's default operator) and the mode's own field. The
+   runner and the mode's own field. The runner list offers the active agents that can serve a
+   project (`adapter_kind` `code_runner`, [09](09-agents.md) 18.16); every other active agent is
+   shown greyed out with the hint that it cannot work in a project folder (addendum of
+   2026-11-04). The default is the space's default operator when it can serve a project, otherwise
+   the only such agent when there is exactly one, otherwise none. The
    dialog checks the name (letters, digits, `.`, `_`, `-`, starting with a letter or digit) and the
    URL (`https` with a host) before it sends.
 3. **Steps.** "Create" runs, in order: create the forum (`channel.create`), assign the runner when
    it is not the space's default operator (`channel.operator.set`), bind the project
-   (`channel.project.bind` with `provision` `init`, `clone` or `none`), wait until the runner
-   reports the project ready (`getChannelBehavior`, every `ui.new_project_poll_interval`), and for
-   an idea post it (`thread.create`). The dialog lists the steps with the states waiting, running,
+   (`channel.project.bind` with `provision` `init`, `clone` or `none`), allow the runner to upload
+   reply files in the forum (`grant.create`: `write` with `upload` for the runner on the forum,
+   addendum of 2026-11-04), wait until the runner reports the project ready
+   (`getChannelBehavior`, every `ui.new_project_poll_interval`), and for an idea post it
+   (`thread.create`). The dialog lists the steps with the states waiting, running,
    done and failed; while the runner works the folder step reads "Creating folder" or "Cloning".
    A step-up prompt appears where an action needs one.
 4. **Idea.** The idea is first stored as the person's draft of a new post in the new forum (6.8
@@ -1692,6 +1698,19 @@ result like any forum.
    runner has not finished and that the forum becomes ready by itself; the person may close it.
 7. **Done.** The dialog closes and opens the new forum, for an idea the new chat; the forum shows
    as a project in the sidebar (6.8 item 11).
+
+8. **Project not ready** (addendum of 2026-11-04, F-PROJEKT-BEREIT). No post in a project forum
+   fails silently. While the binding of a project forum is not ready, the forum header and the
+   chat header show a banner "Project not ready: <cause>" with the cause from `ready_reason`
+   ([09](09-agents.md) 18.12, 18.16) and, when the forum's runner is offline, that it is offline.
+   The banner offers the action that fixes the cause: "Make <runner> the runner" for
+   `operator_cannot_serve_project` (owner, `channel.operator.set`, offered when exactly one agent
+   can serve a project), "Change folder name" for `workspace_exists` (owner,
+   `channel.project.bind` with the new folder) and otherwise "Check again". A message whose
+   trigger icon is the red X with `project_not_ready`, `operator_cannot_serve_project` or
+   `operator_not_in_channel` shows the same cause next to the icon and, for its author,
+   "Trigger again" (`retriggerMessage`, [09](09-agents.md) 3.8), which sends the stored message to
+   the agent once the cause is fixed. Desktop and phone show the same banner and actions.
 
 ### 6.10 Forums for existing folders
 

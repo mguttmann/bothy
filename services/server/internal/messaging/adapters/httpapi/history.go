@@ -6,6 +6,7 @@ import (
 	"context"
 
 	"github.com/OWNER/bothy/services/server/api/rest"
+	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/messaging"
 	"github.com/OWNER/bothy/services/server/internal/messaging/domain"
@@ -43,6 +44,28 @@ func (h *Messages) ListThreadMessages(ctx context.Context, req rest.ListThreadMe
 		out.Items = append(out.Items, MessageREST(m))
 	}
 	return rest.ListThreadMessages200JSONResponse{Body: out}, nil
+}
+
+// RetriggerMessage implements rest.StrictServerInterface (POST /messages/{message_id}/retrigger,
+// retriggerMessage, 09 3.8, F-PROJEKT-BEREIT): the read of getMessage first, so a message the caller
+// may not read answers 404 as there, then runs decides the message again, then the message as it
+// is after the decision; the Idempotency-Key is handled by the middleware of the chain.
+func (h *Messages) RetriggerMessage(ctx context.Context, req rest.RetriggerMessageRequestObject) (rest.RetriggerMessageResponseObject, error) {
+	id := ids.ID(req.MessageId)
+	if _, err := h.messages.Get(ctx, id); err != nil {
+		return nil, err
+	}
+	if h.retrigger == nil {
+		return nil, errs.New(errs.CodeInternalError, "messaging: retriggerMessage without the runs use case")
+	}
+	if err := h.retrigger.Retrigger(ctx, id); err != nil {
+		return nil, err
+	}
+	m, err := h.messages.Get(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return rest.RetriggerMessage200JSONResponse{Body: MessageREST(m)}, nil
 }
 
 // GetMessage implements rest.StrictServerInterface (GET /messages/{message_id}, M1-57): the whole

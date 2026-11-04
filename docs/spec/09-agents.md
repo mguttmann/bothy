@@ -204,7 +204,7 @@ deny list of 07 4.1 has no `agent_disabled`, and the guard of `agent.invoke` ans
 | `agent_not_reachable`, candidate not active | `agent_disabled` |
 | `agent_not_reachable`, candidate active | `agent_not_allowed_here` |
 | `level_insufficient`, `no_grant` | `no_trigger_right` |
-| every other reason (`billing_mode_personal_not_holder`, `project_not_ready`, `run_active_other_agent`, `tool_class_owner_only`, `dev_environment_not_ready`, `channel_read_only`, ...) | unchanged |
+| every other reason (`billing_mode_personal_not_holder`, `project_not_ready`, `operator_cannot_serve_project`, `run_active_other_agent`, `tool_class_owner_only`, `dev_environment_not_ready`, `channel_read_only`, ...) | unchanged |
 
 A message with `trigger_state = failed` shows its reason from `messages.trigger_state_reason`
 (03). Reason for the separate field: a rejection at acceptance creates no run on which
@@ -247,6 +247,7 @@ flowchart TD
 | `agent_disabled` | agent disabled | "Agent is switched off." |
 | `billing_mode_personal_not_holder` | I2 (05 section 5 item 4) | "This agent runs on a personal subscription." |
 | `project_not_ready` | project binding not ready | "Project environment is not ready." |
+| `operator_cannot_serve_project` | project binding not ready and the candidate is no agent that can serve a project (18.16, addendum of 2026-11-04) | "This project has no runner. An owner can make a runner its operator." |
 | `voice_unsupported` | voice message without a transcription path (13) | "Voice messages are not understood here." |
 | `run_active` | model command during an active run (10.4) | "The agent is currently working; send the command again after the run." |
 | `operator_not_in_channel` | the fixed operator of the thread is no longer allowed in the channel (3.4 step 4a) | "The agent of this thread no longer works in this channel. An owner can make it the channel's operator again." |
@@ -282,6 +283,38 @@ main-thread mention rule of the channel ("for new threads", 05 section 5 item 3;
 title is set, the client shows the first
 line of M. M stays in the main thread and carries the `trigger_state`; run, live box anchor,
 replies and session belong to T'.
+
+### 3.8 Triggering a failed message again
+
+Addendum of 2026-11-04 (F-PROJEKT-BEREIT, R-AG-40). A message that failed at acceptance because
+the project or the thread's operator was not ready (`trigger_state = failed` with
+`project_not_ready`, `operator_cannot_serve_project` or `operator_not_in_channel`) created no run,
+so `retryRun` (5.7) cannot start it. Once an owner fixed the cause, its author sends it to the
+agent again without writing it again: `retriggerMessage`
+(`POST /messages/{message_id}/retrigger`, [06](06-api.md)).
+
+1. The message must be readable for the caller (`message.read`, otherwise `404`) and the caller
+   must be its author (`403 forbidden` with `reason = not_self`). Another state or reason, or a
+   deleted message, is `409 invalid_state_transition`.
+2. Under the thread's lock, when the message's thread is a thread (`kind = thread`) whose fixed
+   operator is not the channel's effective operator and never completed a run in it, the thread
+   takes the channel's effective operator (`threads.operator_agent_id`, new version,
+   `thread.updated`). This is the one exception to R-DM-12: the old operator has no session in the
+   thread to keep, and step 4a of 3.4 would refuse every message for it.
+3. Then 3.4 runs again for the stored message as for a new one, with the caller as the trigger:
+   `agent.invoke` in request mode (a denial is audited), and `trigger_state` follows it
+   (`received` with a queued run, or `failed` with the reason of now). The answer is the message
+   after the decision.
+4. A repeat after a successful retrigger answers `409 invalid_state_transition`, because the
+   message is no longer `failed`; a repeated request with the same `Idempotency-Key` gets the
+   stored answer (06 7).
+
+Decision (F-PROJEKT-BEREIT): the message is decided again in its own thread rather than copied
+into a new thread with the current operator. The person keeps one conversation, attachments stay
+attached to the one message they were sent with, and the rule of 3.4 step 4a already treats an
+operator that never worked in the thread as gone; a copy would leave the failed post next to its
+duplicate and need attachments that belong to two messages, which 03 `message_attachments` does
+not allow.
 
 ## 4. Adapter contract
 
@@ -3353,6 +3386,7 @@ Reasons of a not ready forum (`ProjectReadiness.reason`, `project_bindings.ready
 | `clone_failed` | `git clone` or the rename failed |
 | `provision_timeout` | the creation exceeded `runner.provision_timeout` |
 | `provision_refused` | a check of item 2 refused the binding |
+| `operator_cannot_serve_project` | never sent by a runner: the server derives it when it reads a binding that is not ready while the forum's effective operator cannot serve a project (18.16) |
 
 ### 18.13 Reporting the project folders
 
@@ -3482,6 +3516,34 @@ moves it and never trusts the server or an older check for its own file system.
     a restart), `project_trash_refused` (code), `project_trash_deferred` and `project_trash_failed`
     carry codes and channel IDs, never a path or a folder name.
 
+### 18.16 Who can serve a project
+
+Addendum of 2026-11-04 (F-PROJEKT-BEREIT, R-AG-39). A bound forum works only when its effective
+operator is an agent that reports `project_readiness` (4.8) and works in the bound folder: an
+agent with `adapter_kind` `code_runner` (03 `agents`). Live use showed a forum bound with another
+agent as operator: nobody ever reported readiness, the binding stayed not ready with an empty
+reason, and every message failed with a red X and no explanation.
+
+1. **Refused.** `putProjectBinding` refuses a forum whose effective operator is no such agent, or
+   that has none, with `400 validation_failed` and the field code `operator_cannot_serve_project`
+   on `#path/channel_id`. `setChannelOperator` on a bound forum refuses an assignment whose
+   effective operator is no such agent (mode `agent` with another agent, `inherit` of such a
+   default, `none`) with the same code on `/agent_id` (on `/mode` for `inherit` and `none`).
+   `setSpaceOperator` stays free: a space holds forums of every kind, and an inheriting bound
+   forum then shows the derived reason of item 2.
+2. **Derived reason.** `getChannelBehavior` answers `ready_reason = operator_cannot_serve_project`
+   for a binding that is not ready while the forum's effective operator cannot serve a project.
+   The value is derived on every read and never stored, so it follows an operator change at once
+   and needs no migration of existing bindings.
+3. **Trigger reason.** `agent.invoke` in a bound forum that is not ready names
+   `operator_cannot_serve_project` instead of `project_not_ready` when the agent to trigger is
+   known to be of another adapter kind ([07](07-permissions.md) 4.1); the decision stays the same.
+   A run already queued that is refused before its delivery for this reason ends with
+   `project_not_ready` (5.2 is a closed list).
+4. **Apps.** The dialog "New project" offers only such agents as the runner, creates the runner's
+   upload grant on the new forum, and a project forum that is not ready shows the cause with an
+   action ([01](01-product.md) 6.9 item 8).
+
 ## 19. Decisions of this chapter
 
 | No. | Decision | Reason |
@@ -3524,6 +3586,8 @@ moves it and never trusts the server or an older check for its own file system.
 | R-AG-36 | A fixed thread operator triggers only while it is allowed in the channel: it is the channel's effective operator, has `write` of its own on the channel, has the active run of the thread, or completed a run in the thread; otherwise a message that would trigger it gets `operator_not_in_channel` and no run (3.4 step 4a, addendum of 2026-10-30). | Live use 2026-10-30: imported threads carry `planned_operator` (R-IM-08), and a switch-over that left the channel without that operator made every message start a run that failed at once; a thread its operator has worked in keeps its session after an operator change (R-DM-12). |
 | R-AG-37 | A failed or cancelled run of the newest trigger of a thread can be retried for the same message with the rights of triggering, idempotently (`retryRun`, 5.7, addendum of 2026-10-30). | Live use 2026-10-30: after `adapter_error` the person had to write the message again; the API and the apps had no way to start it again. |
 | R-AG-38 | The Claude Code runner moves the folder of a deleted project forum only into the trash of its host, or `.bothy-trash` under its projects root, with one rename after it stopped the forum's turns and checked the folder again, and refuses with a code a folder outside its root, a link, a foreign work tree, uncommitted or unpushed work, a folder holding another project and any Git error (18.15, addendum of 2026-11-01). | The owner wants the folder of a deleted project gone but recoverable; a rename cannot half delete a project, and the runner must not trust the server or an older check for its own file system (D-DEL-10 to D-DEL-13). |
+| R-AG-39 | Only an agent with `adapter_kind` `code_runner` operates a bound forum: `putProjectBinding` and `setChannelOperator` refuse another one with `operator_cannot_serve_project`, a binding that is not ready under such an operator reads that reason, and `agent.invoke` names it (18.16, addendum of 2026-11-04). | Live use 2026-11-04: the dialog "New project" bound a forum with a chat agent as operator; no readiness was ever reported, and every message failed without an explanation or an action. |
+| R-AG-40 | A message that failed with `project_not_ready`, `operator_cannot_serve_project` or `operator_not_in_channel` can be triggered again by its author once the cause is fixed; its thread takes the channel's operator when the old operator never completed a run in it (3.8, addendum of 2026-11-04). | Live use 2026-11-04: after the operator was corrected the first post stayed dead; it had no run that `retryRun` could start, and step 4a refused every new message in it. |
 
 ## 20. Alignment with the core contract
 

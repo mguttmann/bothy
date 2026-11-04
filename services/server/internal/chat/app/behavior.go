@@ -111,14 +111,36 @@ func (s *Service) readBehavior(ctx context.Context, id ids.ID) (BehaviorRow, err
 // (manage) before any answer about the channel, then the behaviour in one read. An archived
 // channel stays readable (07 section 4.5).
 func (s *Service) GetChannelBehavior(ctx context.Context, a actor.Actor, channelID ids.ID) (chat.ChannelBehavior, error) {
-	if _, err := s.loadChannel(ctx, a, authorize.ActionChannelBehaviorRead, channelID); err != nil {
+	c, err := s.loadChannel(ctx, a, authorize.ActionChannelBehaviorRead, channelID)
+	if err != nil {
 		return chat.ChannelBehavior{}, err
 	}
 	b, err := s.readBehavior(ctx, channelID)
 	if err != nil {
 		return chat.ChannelBehavior{}, err
 	}
+	if err := s.deriveReadyReason(ctx, c, &b); err != nil {
+		return chat.ChannelBehavior{}, err
+	}
 	return behaviorDTO(b), nil
+}
+
+// deriveReadyReason sets ready_reason operator_cannot_serve_project on a binding of b that is not
+// ready while the effective operator of c cannot serve a project (09 18.16, F-PROJEKT-BEREIT): no
+// runner will ever report for it, so the stored empty reason would explain nothing. The value is
+// derived on every read and never stored, so it follows an operator change at once.
+func (s *Service) deriveReadyReason(ctx context.Context, c ChannelRow, b *BehaviorRow) error {
+	if b.Binding == nil || b.Binding.Ready {
+		return nil
+	}
+	ok, err := s.servesProjects(ctx, c.Channel.Operator(c.SpaceDefaultOperatorID).EffectiveAgentID)
+	if err != nil || ok {
+		return err
+	}
+	pb := *b.Binding
+	pb.ReadyReason = domain.FieldOperatorCannotServeProject
+	b.Binding = &pb
+	return nil
 }
 
 // PutChannelBehavior implements chat.AgentConfig in one unit of work (design note 4 of M2-02):

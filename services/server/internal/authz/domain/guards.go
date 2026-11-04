@@ -31,6 +31,9 @@ type InvokeFacts struct {
 	AgentFound  bool
 	AgentKind   string
 	AgentStatus string
+	// AgentCannotServeProject reports an agent whose adapter kind is known and is not
+	// authz.AdapterKindCodeRunner, so it never reports project readiness (09 18.16).
+	AgentCannotServeProject bool
 	// PolicyFound, BillingMode, CredentialHolderID, ToolClass and ReportedToolClass come from the
 	// agent policy source.
 	PolicyFound        bool
@@ -255,9 +258,14 @@ func toolClassOwnerOnly(owner bool, f *InvokeFacts) bool {
 }
 
 // projectRules are the project binding (point 7) and SR3 rule 1; owner is the effective owner role
-// of the principal. They follow SR2 and, with interaction facts, point 6.
+// of the principal. They follow SR2 and, with interaction facts, point 6. A binding that is not
+// ready names operator_cannot_serve_project when the agent is known to be of an adapter kind that
+// never reports readiness (09 18.16, F-PROJEKT-BEREIT): the person then sees the cause, not only
+// that the project is not ready. The decision itself is the same.
 func projectRules(owner bool, f *InvokeFacts) Reason {
 	switch {
+	case f.ProjectBound && !f.ProjectReady && f.AgentCannotServeProject:
+		return ReasonOperatorCannotServeProject
 	case f.ProjectBound && !f.ProjectReady:
 		return ReasonProjectNotReady
 	case f.ProjectBound && !owner && !f.DevEnvironmentReady:

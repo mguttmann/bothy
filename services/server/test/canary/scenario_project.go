@@ -9,7 +9,8 @@ import "net/http"
 // repository_url, default_branch and runner_config.model, and a canary reason of class
 // admin_reason: the owner binds and reads the behaviour, Alex (no read on Engineering, 404) and
 // Robin (trigger on the forum, 403 owner_only) are refused, and the owner removes the binding
-// again. The values may appear only in the success
+// again. A bound forum needs a runner as its operator (09 18.16), so Runner operates the forum
+// while it is bound and the forum inherits again afterwards. The values may appear only in the success
 // bodies (no sink captures them) and the reason in audit_events.details; never in an event, a log,
 // a trace, a metric or another audit field.
 func (sc *Scenario) projectBinding() {
@@ -26,10 +27,19 @@ func (sc *Scenario) projectBinding() {
 			"reason":         "Bind " + sc.Reg.New(ClassAdminReason, forum, "project binding reason"+label),
 		}
 	}
+	operator := func(mode, label string) {
+		b := map[string]any{"mode": mode, "reason": sc.Reg.New(ClassAdminReason, forum, "project operator reason"+label)}
+		if mode == "agent" {
+			b["agent_id"] = sc.W.Agents["Runner"].PrincipalID
+		}
+		sc.matched(o, "/channels/"+forum, req{method: http.MethodPut, path: "/channels/" + forum + "/operator", body: b}, ok...)
+	}
+	operator("agent", "")
 	sc.put(o, path, body(""), ok...)
 	sc.get(o, "/channels/"+forum+"/behavior", ok...)
 	sc.put(alex, path, body(" (404)"), http.StatusNotFound)
 	sc.put(robin, path, body(" (403)"), http.StatusForbidden)
 	sc.del(robin, path, http.StatusForbidden)
 	sc.del(o, path, none...)
+	operator("inherit", " (back)")
 }

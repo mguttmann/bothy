@@ -141,7 +141,12 @@ forum and folder keeps them recognisable.
 default operator when it is set. When the person chooses another agent, the dialog sets it as the
 forum's operator. Reason: readiness counts only from the effective operator of the forum (09 18.1);
 a space such as "Engineering" usually has its runner as default operator, so the field is mostly
-already right.
+already right. Superseded in part by F-PB/2 and F-PB/3 (2026-11-04,
+[docs/decisions.d/F-PROJEKT-BEREIT.md](../decisions.d/F-PROJEKT-BEREIT.md)): only agents with
+`adapter_kind` `code_runner` can be chosen, the others show greyed out with a hint, the space's
+default is preselected only when it is such an agent and otherwise the only one when there is
+exactly one; the server refuses another operator for a bound forum. After the binding the dialog
+creates the runner's upload grant on the forum.
 
 **D-M4-43-12 Desktop only.** iPhone and Android keep binding projects out of scope; the phone shows
 the new forum and its posts as any other. Reason: the owner asked on the Mac; creating projects is

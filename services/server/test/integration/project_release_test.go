@@ -79,7 +79,7 @@ func TestDeleteSpace_ReleasesBindingsWhenFinal(t *testing.T) {
 	t.Parallel()
 	w := newPBWorld(t)
 	labor := w.space("Labor")
-	forum := w.channel(labor, "forum", "Alt")
+	forum := w.runnerForum(labor, "Alt")
 	w.bind(forum, "lab-site")
 	w.wantOK(w.do("owner", http.MethodPost, "/api/v1/spaces/"+labor.String()+"/delete", "", key()...))
 	w.clk.Advance(31 * time.Second)
@@ -133,7 +133,7 @@ func TestDeleteProjectBinding_ArchivedOrDeletedForum(t *testing.T) {
 	}
 
 	archive := w.space("Archiv")
-	old := w.channel(archive, "forum", "Alt")
+	old := w.runnerForum(archive, "Alt")
 	w.bind(old, "old-site")
 	w.wantOK(w.do("owner", http.MethodPost, "/api/v1/spaces/"+archive.String()+"/archive", `{"reason":"Done"}`, key()...))
 	if r := w.del("owner", old); r.StatusCode != http.StatusNoContent {
@@ -160,7 +160,7 @@ func TestDeleteProjectBinding_ArchivedOrDeletedForum(t *testing.T) {
 		t.Fatalf("a removed binding still asks for a folder move: %v", ack)
 	}
 	// Non-owners still cannot.
-	other := w.channel(w.engineering, "forum", "Projekt-C")
+	other := w.runnerForum(w.engineering, "Projekt-C")
 	w.bind(other, "docs")
 	w.want(w.del("alex", other), http.StatusForbidden, "forbidden")
 }

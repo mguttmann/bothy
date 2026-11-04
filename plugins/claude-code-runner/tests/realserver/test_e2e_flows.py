@@ -246,3 +246,124 @@ async def test_retry_of_a_failed_run(world: RealWorld) -> None:
     assert second != run_id
     assert (await _ended(real, second)).state == "completed"
     assert len(await _agent_messages(real, thread_id)) >= 1
+
+
+async def _put_operator(real: RealServer, channel: UUID, body: dict[str, Any]) -> ApiAnswer:
+    current = _ok(await real.call("getChannel", as_="owner", path={"channel_id": channel}))
+    return await real.call(
+        "setChannelOperator",
+        as_="owner",
+        path={"channel_id": channel},
+        body={**body, "reason": "e2e"},
+        header={"If-Match": f'"{current["channel"]["version"]}"'},
+    )
+
+
+async def _put_space_operator(real: RealServer, space: UUID, agent: UUID) -> None:
+    current = _ok(await real.call("getSpace", as_="owner", path={"space_id": space}))
+    _ok(
+        await real.call(
+            "setSpaceOperator",
+            as_="owner",
+            path={"space_id": space},
+            body={"mode": "agent", "agent_id": str(agent), "reason": "e2e"},
+            header={"If-Match": f'"{current["version"]}"'},
+        )
+    )
+
+
+async def _binding(real: RealServer, forum: UUID) -> dict[str, Any]:
+    behavior = _ok(await real.call("getChannelBehavior", as_="owner", path={"channel_id": forum}))
+    return behavior.get("project_binding") or {}
+
+
+def _field(answer: ApiAnswer) -> tuple[str, str]:
+    error = (answer.body.get("errors") or [{}])[0]
+    return error.get("pointer", ""), error.get("code", "")
+
+
+async def test_project_forum_with_a_chat_agent_says_why_and_is_triggered_again(
+    world: RealWorld,
+) -> None:
+    """F-PROJEKT-BEREIT, the live case of 2026-11-04 (09 3.8, 18.16): a chat agent cannot become
+    the operator of a project forum; a bound forum that a chat agent operates anyway (through its
+    space) explains itself, its post fails with that reason, and after the owner made the runner
+    the operator the post is triggered again and the runner completes it."""
+    real = world.real
+    (world.projects / "shop").mkdir()
+    await world.start()
+    space = UUID(
+        _ok(await real.call("createSpace", as_="owner", body={"name": "Projects"}), 201)["id"]
+    )
+    await _put_space_operator(real, space, real.agent_id)
+    forum = UUID(
+        _ok(
+            await real.call(
+                "createChannel",
+                as_="owner",
+                path={"space_id": space},
+                body={"kind": "forum", "name": "Shop"},
+            ),
+            201,
+        )["id"]
+    )
+    bind = {"workspace_ref": "shop", "provision": "none", "reason": "e2e"}
+    _ok(await real.call("putProjectBinding", as_="owner", path={"channel_id": forum}, body=bind))
+
+    # The wrong operator is refused with its reason.
+    refused = await _put_operator(
+        real, forum, {"mode": "agent", "agent_id": str(real.other_agent_id)}
+    )
+    assert refused.status == 400
+    assert _field(refused) == ("/agent_id", "operator_cannot_serve_project")
+    other = UUID(
+        _ok(
+            await real.call(
+                "createChannel",
+                as_="owner",
+                path={"space_id": real.world.space_id},
+                body={"kind": "forum", "name": "Chat forum"},
+            ),
+            201,
+        )["id"]
+    )
+    _ok(await _put_operator(real, other, {"mode": "agent", "agent_id": str(real.other_agent_id)}))
+    refused = await real.call(
+        "putProjectBinding",
+        as_="owner",
+        path={"channel_id": other},
+        body={**bind, "workspace_ref": "chat"},
+    )
+    assert refused.status == 400
+    assert _field(refused) == ("#path/channel_id", "operator_cannot_serve_project")
+
+    # The space's default becomes the chat agent: the bound forum says why it is not ready.
+    await _put_space_operator(real, space, real.other_agent_id)
+    assert (await _binding(real, forum)).get("ready_reason") == "operator_cannot_serve_project"
+    body = {
+        "title": "Build",
+        "first_message": {"client_msg_id": str(uuid7()), "content_md": "Set it up"},
+    }
+    created = _ok(
+        await real.call("createThread", as_="owner", path={"channel_id": forum}, body=body), 201
+    )
+    message = UUID(created["first_message"]["id"])
+    got = _ok(await real.call("getMessage", as_="owner", path={"message_id": message}))
+    assert (got["trigger_state"], got.get("trigger_state_reason")) == (
+        "failed",
+        "operator_cannot_serve_project",
+    )
+
+    # The owner makes the runner the forum's operator; the runner reports the project ready.
+    _ok(await _put_operator(real, forum, {"mode": "agent", "agent_id": str(real.agent_id)}))
+
+    async def ready() -> bool:
+        return bool((await _binding(real, forum)).get("ready"))
+
+    await _until("the runner reports the project ready", ready)
+    again = _ok(await real.call("retriggerMessage", as_="owner", path={"message_id": message}))
+    assert again["trigger_state"] == "received"
+    run_id, _ = await real.wait_run(message)
+    view = await _ended(real, run_id)
+    assert (view.state, view.state_reason) == ("completed", None)
+    assert len(world.turns()) == 1

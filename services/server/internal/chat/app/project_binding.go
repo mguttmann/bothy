@@ -188,6 +188,12 @@ func (s *Service) putProjectBinding(ctx context.Context, st BindingStore, a acto
 	if err != nil {
 		return domain.ProjectBinding{}, err
 	}
+	// The operator at commit must be able to serve the project (09 18.16, F-PROJEKT-BEREIT): a
+	// binding nobody reports readiness for would leave every message of the forum failed.
+	if ok, err := s.servesProjects(ctx, c.Channel.Operator(c.SpaceDefaultOperatorID).EffectiveAgentID); err != nil || !ok {
+		return domain.ProjectBinding{}, firstErr(err, codeError("#path/channel_id", domain.FieldOperatorCannotServeProject,
+			"the forum's operator is no agent that can serve a project (adapter kind code_runner)"))
+	}
 	cur, found, err := st.LockBinding(ctx, cmd.ChannelID)
 	if err != nil {
 		return domain.ProjectBinding{}, err

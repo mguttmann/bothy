@@ -281,10 +281,25 @@ type AgentPolicy struct {
 	ToolClass string
 	// ReportedToolClass is the class the last heartbeat reported; "" for none.
 	ReportedToolClass string
+	// AdapterKind is agents.adapter_kind (03 agents): AdapterKindCodeRunner for an agent that can
+	// serve a project (09 18.16); "" when the source does not know it.
+	AdapterKind string
 	// BillingModesSupported are the billing modes the adapter reported it can prove
 	// (agents.reported_details); organization among them makes an I1 conflict organization_ready
 	// (10 section 11, M1-49).
 	BillingModesSupported []string
+}
+
+// AdapterKindCodeRunner is the adapter kind of an agent that can serve a project: it reports
+// project_readiness and works in the bound folder (09 18.16, F-PROJEKT-BEREIT). chat refuses
+// another agent as the operator of a bound forum, and agent.invoke names
+// operator_cannot_serve_project for one.
+const AdapterKindCodeRunner = "code_runner"
+
+// CannotServeProject reports whether the policy p names an agent that is known not to serve a
+// project: an adapter kind other than AdapterKindCodeRunner; "" (unknown) is not refused.
+func (p AgentPolicy) CannotServeProject() bool {
+	return p.AdapterKind != "" && p.AdapterKind != AdapterKindCodeRunner
 }
 
 // PersonalAgent is an active agent with billing_mode = 'personal' and its credential holder

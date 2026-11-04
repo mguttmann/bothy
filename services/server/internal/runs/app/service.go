@@ -169,6 +169,13 @@ type ThreadPort interface {
 	Create(ctx context.Context, a actor.Actor, cmd chat.CreateThreadCmd) (chat.Thread, error)
 }
 
+// ThreadOperators is the part of chat that changes the fixed operator of a thread (09 3.8,
+// F-PROJEKT-BEREIT): RepinThreadOperator gives the thread the effective operator of its channel in
+// the caller's unit of work and reports whether it changed.
+type ThreadOperators interface {
+	RepinThreadOperator(ctx context.Context, threadID ids.ID) (bool, error)
+}
+
 // Cursors is the outgoing port that encodes and checks the opaque list cursors (06
 // "Pagination"); adapters/httpapi implements it with platform/httpserver. Decode answers every
 // mismatch with 400 cursor_invalid.
@@ -298,6 +305,10 @@ type Deps struct {
 	TriggerHolders  authorize.TriggerHolders
 	RunSessions     agents.RunSessions
 	ContextRows     ContextRepository
+	// ThreadOperators gives a thread the channel's operator when a failed message is triggered
+	// again (chat, retriggerMessage, F-PROJEKT-BEREIT). nil makes such a change an internal error;
+	// internal/wire always sets it.
+	ThreadOperators ThreadOperators
 
 	// AppDispatches inserts the job runs.app_dispatch with every app command and every interaction
 	// on an app card (M2-25); an app command or interaction without it is an internal error.

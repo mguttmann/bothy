@@ -296,6 +296,7 @@ reveals nothing (never with `404`).
 | `dev_environment_not_ready` | `forbidden` | SR3 |
 | `dev_environment_foreign_thread` | `forbidden` | SR3, the thread runs in someone else's environment |
 | `project_not_ready` | `forbidden` | project binding not ready (05, section 5, item 7) |
+| `operator_cannot_serve_project` | `forbidden` | project binding not ready and the agent cannot serve a project: its `adapter_kind` is not `code_runner` ([09-agents.md](09-agents.md) 18.16, addendum of 2026-11-04) |
 | `channel_read_only` | `forbidden` | channel read-only; writing and triggering actions blocked, even for owners (05, rule 1.8); problem code `channel_read_only` |
 | `channel_archived` | `forbidden` | channel or its space archived; writing and triggering actions blocked, even for owners (section 4.5); problem code `channel_read_only` with `reason` |
 | `run_active_other_agent` | `forbidden` | the thread has an active run of another agent (05, section 5, item 8) |

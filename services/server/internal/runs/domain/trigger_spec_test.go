@@ -160,6 +160,7 @@ func TestRejectionTableCoversSpec(t *testing.T) {
 		"agent_disabled":                   viaSettle("agent_not_reachable", false),
 		"billing_mode_personal_not_holder": viaSettle("billing_mode_personal_not_holder", true),
 		"project_not_ready":                viaSettle("project_not_ready", true),
+		"operator_cannot_serve_project":    viaSettle("operator_cannot_serve_project", true),
 		"run_active": func(t *testing.T) domain.Reason {
 			d, err := domain.DecideCommand(domain.CommandTrigger{
 				CommandID: commandID, ThreadID: threadT, Owner: lotse(),

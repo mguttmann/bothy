@@ -99,7 +99,8 @@ func (r *Repository) SaveThread(ctx context.Context, th domain.Thread) error {
 	}
 	err = q.SaveThread(ctx, sqlcgen.SaveThreadParams{
 		ID: uuid(th.ID), Title: th.Title, TitleSource: string(th.TitleSource), State: string(th.State),
-		ClosedAt: optionalTime(th.ClosedAt), ClosedBy: optionalUUID(th.ClosedBy), Version: th.Version,
+		ClosedAt: optionalTime(th.ClosedAt), ClosedBy: optionalUUID(th.ClosedBy), OperatorAgentID: optionalUUID(th.OperatorAgentID),
+		Version: th.Version,
 	})
 	return mapError(err, "updating a thread")
 }

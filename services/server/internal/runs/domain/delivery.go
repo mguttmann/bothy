@@ -101,6 +101,7 @@ const (
 	denyBillingPersonal  = "billing_mode_personal_not_holder"
 	denyToolClass        = "tool_class_owner_only"
 	denyProjectNotReady  = "project_not_ready"
+	denyCannotServe      = "operator_cannot_serve_project"
 	denyChannelReadOnly  = "channel_read_only"
 	denyChannelArchived  = "channel_archived"
 	denyPrincipalInactve = "principal_inactive"
@@ -123,7 +124,9 @@ func DeliveryReason(authzReason string, agentActive bool) string {
 		return RunReasonBillingModePersonalNotHolder
 	case denyToolClass:
 		return RunReasonToolClassOwnerOnly
-	case denyProjectNotReady:
+	case denyProjectNotReady, denyCannotServe:
+		// The run reasons of 09 5.2 are closed: an operator that cannot serve the project is a
+		// project that is not ready for the run (F-PROJEKT-BEREIT).
 		return RunReasonProjectNotReady
 	case denyChannelReadOnly, denyChannelArchived:
 		return RunReasonChannelReadOnly

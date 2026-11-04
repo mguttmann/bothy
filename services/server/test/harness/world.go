@@ -87,9 +87,11 @@ func BuildMatrixWorld(tb testing.TB, s *Server) *World {
 		w.People[p.DisplayName] = s.NewUser(tb, p)
 	}
 	for _, a := range []AgentSpec{
-		{Handle: "lotse", DisplayName: "Lotse", BillingMode: "organization"},
+		// Lotse and Runner are code runners, so they may operate a bound forum (09 18.16): the
+		// end-to-end suite of the Claude Code runner runs as Lotse; Texter stays a chat agent.
+		{Handle: "lotse", DisplayName: "Lotse", BillingMode: "organization", AdapterKind: "code_runner"},
 		{Handle: "texter", DisplayName: "Texter", BillingMode: "organization"},
-		{Handle: "runner", DisplayName: "Runner", BillingMode: "organization"},
+		{Handle: "runner", DisplayName: "Runner", BillingMode: "organization", AdapterKind: "code_runner"},
 		{Handle: "assistent", DisplayName: "Assistent", BillingMode: "personal", CredentialHolder: o.PrincipalID},
 	} {
 		w.Agents[a.DisplayName] = s.NewAgent(tb, a)

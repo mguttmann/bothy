@@ -39,6 +39,7 @@ const (
 	ReasonDevEnvironmentNotReady           Reason = "dev_environment_not_ready"
 	ReasonDevEnvironmentForeignThread      Reason = "dev_environment_foreign_thread"
 	ReasonProjectNotReady                  Reason = "project_not_ready"
+	ReasonOperatorCannotServeProject       Reason = "operator_cannot_serve_project"
 	ReasonChannelReadOnly                  Reason = "channel_read_only"
 	ReasonChannelArchived                  Reason = "channel_archived"
 	ReasonRunActiveOtherAgent              Reason = "run_active_other_agent"
@@ -98,6 +99,7 @@ var reasons = []Reason{
 	ReasonDevEnvironmentNotReady,
 	ReasonDevEnvironmentForeignThread,
 	ReasonProjectNotReady,
+	ReasonOperatorCannotServeProject,
 	ReasonChannelReadOnly,
 	ReasonChannelArchived,
 	ReasonRunActiveOtherAgent,

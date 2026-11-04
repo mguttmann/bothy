@@ -85,7 +85,7 @@ func realWorld(t *testing.T, holder ids.ID, list []agentFixture) authz.AgentPoli
 			details = string(b)
 		}
 		exec(`INSERT INTO agents (principal_id, adapter_kind, billing_mode, credential_holder_id, tool_class, reported_tool_class, reported_details)
-			VALUES ($1, 'hermes', $2, $3, $4, $5, $6)`, a.id.String(), a.policy.BillingMode, h, a.policy.ToolClass, reported, details)
+			VALUES ($1, $7, $2, $3, $4, $5, $6)`, a.id.String(), a.policy.BillingMode, h, a.policy.ToolClass, reported, details, a.policy.AdapterKind)
 	}
 	repo := identitypg.NewRepository(app)
 	return authzsource.New(agentspg.NewRepository(app), identityapp.NewDirectory(repo))
@@ -105,10 +105,10 @@ func TestAgentPolicySourceContract(t *testing.T) {
 			holder := ids.New()
 			list := []agentFixture{
 				{id: ids.New(), policy: authz.AgentPolicy{BillingMode: "personal", CredentialHolderID: holder, ToolClass: "chat",
-					BillingModesSupported: []string{"personal", "organization"}}, reported: "host", active: true},
-				{id: ids.New(), policy: authz.AgentPolicy{BillingMode: "organization", ToolClass: "scoped"}, active: true},
-				{id: ids.New(), policy: authz.AgentPolicy{BillingMode: "personal", CredentialHolderID: holder, ToolClass: "host"}, active: false},
-				{id: ids.New(), policy: authz.AgentPolicy{BillingMode: "personal", CredentialHolderID: holder, ToolClass: "scoped"}, active: true},
+					BillingModesSupported: []string{"personal", "organization"}, AdapterKind: "code_runner"}, reported: "host", active: true},
+				{id: ids.New(), policy: authz.AgentPolicy{BillingMode: "organization", ToolClass: "scoped", AdapterKind: "hermes"}, active: true},
+				{id: ids.New(), policy: authz.AgentPolicy{BillingMode: "personal", CredentialHolderID: holder, ToolClass: "host", AdapterKind: "hermes"}, active: false},
+				{id: ids.New(), policy: authz.AgentPolicy{BillingMode: "personal", CredentialHolderID: holder, ToolClass: "scoped", AdapterKind: "custom"}, active: true},
 			}
 			src := build(t, holder, list)
 			ctx := context.Background()
@@ -123,12 +123,12 @@ func TestAgentPolicySourceContract(t *testing.T) {
 			}
 			pol, ok, err := src.AgentPolicy(ctx, list[0].id)
 			if err != nil || !ok || pol.BillingMode != "personal" || pol.CredentialHolderID != holder || pol.ToolClass != "chat" || pol.ReportedToolClass != "host" ||
-				!slices.Equal(pol.BillingModesSupported, []string{"personal", "organization"}) {
+				!slices.Equal(pol.BillingModesSupported, []string{"personal", "organization"}) || pol.AdapterKind != "code_runner" {
 				t.Fatalf("AgentPolicy personal = %+v, %v, %v", pol, ok, err)
 			}
 			pol, ok, err = src.AgentPolicy(ctx, list[1].id)
 			if err != nil || !ok || pol.BillingMode != "organization" || !pol.CredentialHolderID.IsZero() || pol.ReportedToolClass != "" ||
-				len(pol.BillingModesSupported) != 0 {
+				len(pol.BillingModesSupported) != 0 || pol.AdapterKind != "hermes" {
 				t.Fatalf("AgentPolicy organization = %+v, %v, %v", pol, ok, err)
 			}
 			if pol, ok, err := src.AgentPolicy(ctx, list[2].id); err != nil || !ok || pol.ToolClass != "host" {

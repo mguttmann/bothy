@@ -45,6 +45,15 @@ func newPBWorld(t *testing.T) *pbWorld {
 	return w
 }
 
+// runnerForum creates the forum name in space with Runner as its operator: a bound forum needs an
+// operator that can serve a project (09 18.16, F-PROJEKT-BEREIT).
+func (w *pbWorld) runnerForum(space ids.ID, name string) ids.ID {
+	w.t.Helper()
+	forum := w.channel(space, "forum", name)
+	w.wantOK(w.setChannelOperator(forum, agentBody(w.runner)))
+	return forum
+}
+
 // bindPath is the path of the binding of channel.
 func bindPath(channel ids.ID) string {
 	return "/api/v1/channels/" + channel.String() + "/project-binding"
@@ -252,7 +261,7 @@ func TestPutProjectBinding_ArchivedForum409(t *testing.T) {
 	w.wantOK(w.do("owner", http.MethodPost, "/api/v1/channels/"+w.projektB.String()+"/archive", `{"reason":"Done"}`, key()...))
 	w.want(w.put("owner", w.projektB, bindBody("other")), http.StatusConflict, "conflict")
 	archive := w.space("Archiv")
-	forum := w.channel(archive, "forum", "Alt")
+	forum := w.runnerForum(archive, "Alt")
 	w.bind(forum, "old-site")
 	w.wantOK(w.do("owner", http.MethodPost, "/api/v1/spaces/"+archive.String()+"/archive", `{"reason":"Done"}`, key()...))
 	w.want(w.put("owner", forum, bindBody("other")), http.StatusConflict, "conflict")
@@ -493,10 +502,10 @@ func TestProjectBinding_EventsAndSettingsVersion(t *testing.T) {
 			}
 		}
 	}
-	lone := w.channel(w.engineering, "forum", "Projekt-C")
+	lone := w.runnerForum(w.engineering, "Projekt-C")
 	seq = w.headSeq()
 	w.bind(lone, "lonely")
-	w.wantSettingsEvents(w.settingsSince(seq), lone, ids.ID{}, canaries)
+	w.wantSettingsEvents(w.settingsSince(seq), lone, w.runner, canaries)
 }
 
 // channelUpdated checks that evs is exactly one channel.updated of channel whose payload is a

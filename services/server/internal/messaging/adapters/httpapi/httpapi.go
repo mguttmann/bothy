@@ -37,7 +37,14 @@ type Messages struct {
 	export    messaging.Export
 	threads   chat.Threads
 	log       *slog.Logger
+	// retrigger decides a failed message again (retriggerMessage, F-PROJEKT-BEREIT); bound by
+	// internal/wire once runs exists (BindRetriggers).
+	retrigger messaging.Retriggers
 }
+
+// BindRetriggers sets the use case of retriggerMessage (runs). internal/wire calls it once while it
+// builds the server, before the routes serve.
+func (h *Messages) BindRetriggers(r messaging.Retriggers) { h.retrigger = r }
 
 // New returns the handlers over the use cases of messaging (sending m, mentions mn, templates
 // tp, reactions rc, pins pn, the channel export ex) and the thread port of chat, which gives the

@@ -109,6 +109,8 @@ func (s *server) startRuns(context.Context) error {
 	if err := a.RunsAcceptor().Bind(rn.Service); err != nil {
 		return err
 	}
+	// retriggerMessage is a messaging route decided by runs (F-PROJEKT-BEREIT).
+	m.Handlers.BindRetriggers(rn.Service)
 	if s.worker() {
 		if err := rn.RegisterActiveGauge(); err != nil {
 			return err

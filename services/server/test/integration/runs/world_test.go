@@ -342,6 +342,7 @@ func newEmptyWorldWithChat(t *testing.T, search searchlang.Map, chatCfg chatapp.
 	}, w.clk, log)
 	must(t, err)
 	must(t, mods.RunsAcceptor.Bind(rn.Service))
+	m.Handlers.BindRetriggers(rn.Service)
 	w.runs = rn.Service
 	// The invocation tokens of M2-06 over in-memory keys and a fixed issuer (M2-09).
 	w.keys = newTestKeys(t)
@@ -551,7 +552,12 @@ func (w *world) channel(space ids.ID, kind, name string) ids.ID {
 // token of it under handle.
 func (w *world) agent(handle string) ids.ID {
 	w.t.Helper()
-	m := w.want(w.do("owner", http.MethodPost, "/api/v1/agents", `{"handle":"`+handle+`","display_name":"`+handle+`","adapter_kind":"hermes"}`, key()...),
+	kind := "hermes"
+	if handle == "runner" {
+		// The runner of the project forums can serve a project (09 18.16, F-PROJEKT-BEREIT).
+		kind = "code_runner"
+	}
+	m := w.want(w.do("owner", http.MethodPost, "/api/v1/agents", `{"handle":"`+handle+`","display_name":"`+handle+`","adapter_kind":"`+kind+`"}`, key()...),
 		http.StatusCreated, "")
 	id := ids.MustParse(m["id"].(string))
 	issued, err := w.id.Tokens.Issue(context.Background(), identity.IssueTokenCmd{

@@ -623,6 +623,38 @@ func (s *Service) LockForMessageChange(ctx context.Context, threadID ids.ID) err
 	return err
 }
 
+// RepinThreadOperator gives the thread threadID the effective operator of its channel as its fixed
+// operator inside the caller's unit of work (retriggerMessage, 09 3.8, F-PROJEKT-BEREIT): the
+// thread row lock, then the channel row, then the change, saved with a new version and announced as
+// thread.updated. It never authorizes; runs decided that the caller may trigger the message again
+// and that the old operator never completed a run in the thread. A main thread, a thread whose
+// operator already is the channel's and a channel without an operator change nothing (false).
+// Errors: internal outside a unit of work; not_found for an unknown thread.
+func (s *Service) RepinThreadOperator(ctx context.Context, threadID ids.ID) (bool, error) {
+	if err := inUnit(ctx, "Threads.RepinThreadOperator"); err != nil {
+		return false, err
+	}
+	th, err := s.lockThread(ctx, threadID)
+	if err != nil {
+		return false, err
+	}
+	c, err := s.threadChannel(ctx, th)
+	if err != nil {
+		return false, err
+	}
+	if !th.RepinOperator(c.Channel.Operator(c.SpaceDefaultOperatorID).EffectiveAgentID) {
+		return false, nil
+	}
+	if err := s.d.Store.SaveThread(ctx, th); err != nil {
+		return false, err
+	}
+	v, err := s.threadView(ctx, th)
+	if err != nil {
+		return false, err
+	}
+	return true, s.emitThread(ctx, authorize.EventThreadUpdated, c.Channel.SpaceID, v)
+}
+
 // DecrementMessageCount implements chat.Threads (M1-58) inside the caller's unit of work, which
 // holds the thread lock: message_count - 1 and version + 1 (03 threads). Errors: internal for an
 // unknown thread or a count of zero.

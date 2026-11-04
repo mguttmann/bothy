@@ -337,7 +337,9 @@ guard of `agent.invoke` with these additions, in this order (brief M2-15 design 
    `component_restricted` for `restricted_to = run_starter` when the principal is neither the run's
    starter nor an effective owner, and for `restricted_to = owner` when it is not an effective owner
    (owners hold every capability and pass every restriction);
-7. `project_not_ready`, `dev_environment_not_ready`;
+7. `operator_cannot_serve_project` (a binding that is not ready while the agent's known
+   `adapter_kind` is not `code_runner`, `AgentPolicy.CannotServeProject`, F-PROJEKT-BEREIT),
+   `project_not_ready`, `dev_environment_not_ready`;
 8. `run_active_other_agent` when the thread's active run belongs to another agent; at stage
    `accept` `run_active` for a component without a run while the card's agent has an active run.
 
@@ -354,7 +356,8 @@ agent `not_found no_grant` without read on the channel and `forbidden not_self` 
 `Decision.Err()` (design note 8 d): `forbidden component_inactive` answers `409 component_used`
 without a reason (the reason stays in the audit, so a lost race answers the same whether
 `authorize` or the single-use lock decided); `origin_not_human`, `agent_not_reachable`,
-`billing_mode_personal_not_holder`, `tool_class_owner_only`, `project_not_ready`, `run_active` and
+`billing_mode_personal_not_holder`, `tool_class_owner_only`, `project_not_ready`,
+`operator_cannot_serve_project`, `run_active` and
 `run_active_other_agent` answer `403 agent_invocation_denied` with the reason, for `agent.invoke`
 as well; `level_insufficient`, `capability_missing`, `component_restricted`,
 `subject_kind_not_allowed`, `not_self` and `view_as_read_only` stay `403 forbidden` with the reason,

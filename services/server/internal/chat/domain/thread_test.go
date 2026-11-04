@@ -116,3 +116,24 @@ func TestCheckTagSet(t *testing.T) {
 	wantCode(t, domain.CheckTagSet([]ids.ID{a, a}, 5), "/tag_ids", domain.FieldDuplicate)
 	wantCode(t, domain.CheckTagSet([]ids.ID{a, b}, 1), "/tag_ids", domain.FieldLimitReached)
 }
+
+// TestRepinOperator (F-PROJEKT-BEREIT): a thread takes a new fixed operator once and bumps its
+// version; the same operator, the zero id and a main thread change nothing.
+func TestRepinOperator(t *testing.T) {
+	t.Parallel()
+	old, next := ids.New(), ids.New()
+	th := domain.Thread{ID: ids.New(), Kind: domain.ThreadKindThread, OperatorAgentID: old, Version: 3}
+	if !th.RepinOperator(next) || th.OperatorAgentID != next || th.Version != 4 {
+		t.Fatalf("repin %+v", th)
+	}
+	if th.RepinOperator(next) || th.Version != 4 {
+		t.Fatalf("same operator changed %+v", th)
+	}
+	if th.RepinOperator(ids.ID{}) || th.OperatorAgentID != next {
+		t.Fatalf("zero operator changed %+v", th)
+	}
+	main := domain.NewMainThread(ids.New(), ids.New(), ids.New(), time.Now())
+	if main.RepinOperator(next) || !main.OperatorAgentID.IsZero() || main.Version != 1 {
+		t.Fatalf("main thread changed %+v", main)
+	}
+}

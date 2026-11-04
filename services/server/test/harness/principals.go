@@ -25,6 +25,9 @@ type UserSpec struct {
 // "personal"; CredentialHolder is the principal ID of the holder of a personal agent.
 type AgentSpec struct {
 	Handle, DisplayName, BillingMode, CredentialHolder string
+	// AdapterKind is agents.adapter_kind; "" means hermes. code_runner makes an agent that may
+	// operate a bound forum (docs/spec/09-agents.md 18.16).
+	AdapterKind string
 }
 
 // apiTokenTTL is the validity of the agent tokens of NewAgent.
@@ -115,8 +118,12 @@ func (s *Server) CreateUser(ctx context.Context, spec UserSpec) (*Client, error)
 // a fresh DPoP key (createToken with dpop_jkt), and returns the client of the agent.
 func (s *Server) NewAgent(tb testing.TB, spec AgentSpec) *Client {
 	tb.Helper()
+	kind := spec.AdapterKind
+	if kind == "" {
+		kind = "hermes"
+	}
 	resp := MustDo(tb, s.Owner, Request{Method: http.MethodPost, Path: "/agents", Body: map[string]any{
-		"handle": spec.Handle, "display_name": spec.DisplayName, "adapter_kind": "hermes",
+		"handle": spec.Handle, "display_name": spec.DisplayName, "adapter_kind": kind,
 	}}, http.StatusCreated)
 	var agent struct {
 		ID      string `json:"id"`
