@@ -955,7 +955,8 @@ reason. Every change of a wait reason raises `runs.version` and appends `run.sta
 without a trigger state, so the live box, "Running now" and the live topology show it at once
 ([25-visualization.md](25-visualization.md) 6.1). The runs that hold the slots of a `slots_full`
 run are the runs of the same agent in `running`; a client names only those the caller may read
-(`listActiveRuns` with `agent_id`, or the runs of the live frame) and counts the rest.
+(the device's synced runs, which "Running now" loads with `listActiveRuns`, or the runs of the
+live frame) and counts the rest.
 
 ### 5.3 Run document (`run_document.v1`)
 
@@ -3623,7 +3624,7 @@ reason, and every message failed with a red X and no explanation.
 | R-AG-38 | The Claude Code runner moves the folder of a deleted project forum only into the trash of its host, or `.bothy-trash` under its projects root, with one rename after it stopped the forum's turns and checked the folder again, and refuses with a code a folder outside its root, a link, a foreign work tree, uncommitted or unpushed work, a folder holding another project and any Git error (18.15, addendum of 2026-11-01). | The owner wants the folder of a deleted project gone but recoverable; a rename cannot half delete a project, and the runner must not trust the server or an older check for its own file system (D-DEL-10 to D-DEL-13). |
 | R-AG-39 | Only an agent with `adapter_kind` `code_runner` operates a bound forum: `putProjectBinding` and `setChannelOperator` refuse another one with `operator_cannot_serve_project`, a binding that is not ready under such an operator reads that reason, and `agent.invoke` names it (18.16, addendum of 2026-11-04). | Live use 2026-11-04: the dialog "New project" bound a forum with a chat agent as operator; no readiness was ever reported, and every message failed without an explanation or an action. |
 | R-AG-40 | A message that failed with `project_not_ready`, `operator_cannot_serve_project` or `operator_not_in_channel` can be triggered again by its author once the cause is fixed; its thread takes the channel's operator when the old operator never completed a run in it (3.8, addendum of 2026-11-04). | Live use 2026-11-04: after the operator was corrected the first post stayed dead; it had no run that `retryRun` could start, and step 4a refused every new message in it. |
-| R-AG-41 | A queued run carries its wait reason in `runs.state_reason` (`invocation_held` from the server, `slots_full` and `thread_busy` from the adapter's heartbeat member `waiting_runs`), the runner reports its slot use as `run_slots`, and clients show an offline agent ahead of a stored reason (5.2.1, addendum of 2026-11-04). | Live use 2026-11-04: a run showed only "Queued" while four turns held every slot of `runner.max_parallel_runs`; the owner could see neither the reason nor the runs that held the slots (F-WARTESCHLANGE-GRUND). |
+| R-AG-41 | A queued run carries its wait reason in `runs.state_reason` (`invocation_held` from the server, `slots_full` and `thread_busy` from the adapter's heartbeat member `waiting_runs`), the runner reports its slot use as `run_slots`, and clients show an offline agent ahead of a runner reason or no reason, but after `invocation_held` (5.2.1, addendum of 2026-11-04). | Live use 2026-11-04: a run showed only "Queued" while four turns held every slot of `runner.max_parallel_runs`; the owner could see neither the reason nor the runs that held the slots (F-WARTESCHLANGE-GRUND). |
 
 ## 20. Alignment with the core contract
 
