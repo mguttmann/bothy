@@ -75,6 +75,48 @@ class AppLocalizationsEn extends AppLocalizations {
   String get liveBoxReasonProjectNotReady => 'Project not ready';
 
   @override
+  String liveBoxWaitSlotsFull(int used, int total) {
+    return 'Waiting for a free slot ($used of $total in use)';
+  }
+
+  @override
+  String get liveBoxWaitSlotsFullNoCount =>
+      'Waiting for a free slot of the agent';
+
+  @override
+  String get liveBoxWaitAgentOffline => 'Waiting for the agent: it is offline';
+
+  @override
+  String get liveBoxWaitThreadBusy =>
+      'Waiting for the earlier turn of this chat to end';
+
+  @override
+  String get liveBoxWaitInvocationHeld =>
+      'Waiting for an attachment or a transcript';
+
+  @override
+  String get liveBoxWaitAgentStart => 'Waiting for the agent to start it';
+
+  @override
+  String get liveBoxWaitHeldBy => 'Slots in use by';
+
+  @override
+  String liveBoxWaitHiddenRuns(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count runs you cannot see',
+      one: '1 run you cannot see',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String liveBoxWaitOpenRun(String label) {
+    return 'Open the chat of $label';
+  }
+
+  @override
   String liveBoxReasonUserCancelled(String name) {
     return 'Canceled by $name';
   }

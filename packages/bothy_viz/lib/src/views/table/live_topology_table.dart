@@ -8,6 +8,7 @@ import 'package:api_client/api_client.dart' as api;
 import '../../marks/task_tree_mark.dart';
 import '../../marks/viz_texts.dart';
 import '../../model/run_card_model.dart';
+import '../../model/run_label.dart';
 import '../../model/series_model.dart';
 import '../../model/task_tree_model.dart';
 import '../view_texts.dart';
@@ -45,7 +46,7 @@ List<VizTableData> liveTopologyTables(
               VizCell(lane.spaceName),
               vizChatCell(texts, card.label, onOpenThread),
               VizCell(texts.runDetail(card.label)),
-              VizCell(texts.runState(card.state)),
+              VizCell(texts.cardState(card)),
               VizCell(
                 card.stepKind != null && card.stepName != null
                     ? texts.step(card.stepKind!, card.stepName!)
@@ -61,6 +62,32 @@ List<VizTableData> liveTopologyTables(
                   sortBy: card.cost?.micros ?? -1,
                 ),
             ],
+            // The runs that hold the slots of a waiting card (09 5.2.1), each opening its chat.
+            for (final holder in card.wait?.blockers ?? const <VizRunLabel>[])
+              [
+                VizCell(lane.spaceName),
+                vizChatCell(texts, holder, onOpenThread),
+                VizCell(texts.runDetail(holder), level: 1),
+                VizCell(l10n.liveBoxWaitHeldBy),
+                VizCell(l10n.vizNone),
+                VizCell(l10n.vizNone),
+                VizCell(l10n.vizNone),
+                if (withCost) VizCell(l10n.vizNone, sortBy: -1),
+              ],
+            if ((card.wait?.hidden ?? 0) > 0)
+              [
+                VizCell(lane.spaceName),
+                VizCell(texts.runTitle(card.label)),
+                VizCell(
+                  l10n.liveBoxWaitHiddenRuns(card.wait!.hidden),
+                  level: 1,
+                ),
+                VizCell(l10n.liveBoxWaitHeldBy),
+                VizCell(l10n.vizNone),
+                VizCell(l10n.vizNone),
+                VizCell(l10n.vizNone),
+                if (withCost) VizCell(l10n.vizNone, sortBy: -1),
+              ],
             for (final (node, level) in _tree(card.tasks, 1))
               [
                 VizCell(lane.spaceName),

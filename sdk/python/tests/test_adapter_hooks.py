@@ -538,3 +538,19 @@ async def test_a_failed_reconciliation_calls_no_hook(fake: FakeServer) -> None:
             fake, lambda: any(r.operation_id == "listServedChannels" for r in fake.requests)
         )
     assert handler.reconciled == []
+
+
+@pytest.mark.anyio
+async def test_runtime_status_sends_the_run_slots_and_waiting_runs(fake: FakeServer) -> None:
+    """``RuntimeStatus.run_slots`` and ``waiting_runs`` reach the fake server (09 4.8, 5.2.1)."""
+    run = UUID("0192d3a0-0000-7000-8000-0000000000a1")
+    status = RuntimeStatus(run_slots={"used": 2, "total": 2}, waiting_runs=((run, "slots_full"),))
+    handler = Reporting(status)
+    adapter = make_adapter(fake, handler, "slots")
+    async with running(adapter, fake):
+        await until(fake, lambda: handler.ready == 1)
+        before = len(fake.heartbeats)
+        await adapter.send_heartbeat()
+    beat = fake.heartbeats[before]
+    assert beat["run_slots"] == {"used": 2, "total": 2}
+    assert beat["waiting_runs"] == [{"run_id": str(run), "reason": "slots_full"}]

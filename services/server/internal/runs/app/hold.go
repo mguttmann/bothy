@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/files"
+	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/reqmeta"
@@ -108,8 +109,11 @@ func (s *Service) ReleaseInvocation(ctx context.Context, runID ids.ID, cause dom
 	if !domain.ReleaseVerdict(row.State, row.InvocationHeldUntil, cause, pending) {
 		return nil
 	}
-	released, err := s.d.Repo.ReleaseHeldInvocation(ctx, row.ID)
-	if err != nil || !released {
+	released, ok, err := s.d.Repo.ReleaseHeldInvocation(ctx, row.ID)
+	if err != nil || !ok {
+		return err
+	}
+	if err := s.releasedReason(ctx, row, released); err != nil {
 		return err
 	}
 	mode := row.BillingModeExpected
@@ -128,6 +132,17 @@ func (s *Service) ReleaseInvocation(ctx context.Context, runID ids.ID, cause dom
 		s.d.Log.LogAttrs(ctx, slog.LevelInfo, msgHoldTimeout, slog.String(logKeyRunID, row.ID.String()))
 	}
 	return nil
+}
+
+// releasedReason appends run.state_changed when the release cleared the wait reason
+// invocation_held of before (09 5.2.1). Like the released agent.invocation the event has no
+// actor and no correlation: the release is the server's, not the act of whoever finalized the
+// file.
+func (s *Service) releasedReason(ctx context.Context, before, after RunRow) error {
+	if before.StateReason == after.StateReason {
+		return nil
+	}
+	return s.emitReasonChanged(actor.WithActor(s.uncorrelated(ctx), actor.Anonymous()), after)
 }
 
 // InvocationHoldTimeout is the use case of the job runs.invocation_hold_timeout (M3-07 design note

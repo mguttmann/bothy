@@ -614,6 +614,7 @@ from .run_patch_result import RunPatchResult
 from .run_plan import RunPlan
 from .run_plan_items_item import RunPlanItemsItem
 from .run_plan_items_item_status import RunPlanItemsItemStatus
+from .run_slots import RunSlots
 from .run_start import RunStart
 from .run_state import RunState
 from .run_state_changed_event import RunStateChangedEvent
@@ -817,6 +818,8 @@ from .user_update import UserUpdate
 from .user_updated_event import UserUpdatedEvent
 from .user_updated_event_type import UserUpdatedEventType
 from .view_as_snapshot import ViewAsSnapshot
+from .waiting_run import WaitingRun
+from .waiting_run_reason import WaitingRunReason
 from .web_authn_challenge import WebAuthnChallenge
 from .webhook_delivery import WebhookDelivery
 from .webhook_delivery_page import WebhookDeliveryPage
@@ -1424,6 +1427,7 @@ __all__ = (
     "RunPlan",
     "RunPlanItemsItem",
     "RunPlanItemsItemStatus",
+    "RunSlots",
     "RunStart",
     "RunState",
     "RunStateChangedEvent",
@@ -1627,6 +1631,8 @@ __all__ = (
     "UserUpdatedEvent",
     "UserUpdatedEventType",
     "ViewAsSnapshot",
+    "WaitingRun",
+    "WaitingRunReason",
     "WebAuthnChallenge",
     "WebhookDelivery",
     "WebhookDeliveryPage",

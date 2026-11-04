@@ -68,6 +68,7 @@ DsRunData runFromDocument(
   String? cancelledByName,
   String? waitingForName,
   String? holderName,
+  DsWait? wait,
 }) {
   final m = doc.metrics;
   final tokensIn = m.tokensIn;
@@ -141,6 +142,7 @@ DsRunData runFromDocument(
     questionId: state == DsRunState.waitingInput
         ? 'question.${doc.id?.value ?? ''}'
         : null,
+    wait: wait,
   );
 }
 
@@ -153,6 +155,7 @@ DsRunData runFromSummary(
   required DateTime now,
   ({int tools, int subagents})? steps,
   String? cancelledByName,
+  DsWait? wait,
 }) {
   final mode = run.billingModeUsed ?? run.billingModeExpected;
   final state = DsRunState.fromCode(run.state.code);
@@ -178,6 +181,7 @@ DsRunData runFromSummary(
     reasonDetail: cause,
     toolCount: steps?.tools ?? run.stepCount,
     subagentCount: steps?.subagents ?? 0,
+    wait: wait,
   );
 }
 
@@ -198,3 +202,46 @@ DsRunData runFromSummary(
 /// Whether [state] ended with a reason whose cause the adapter may name in its summary.
 bool _ended(DsRunState state) =>
     state == DsRunState.failed || state == DsRunState.cancelled;
+
+/// Why the queued [run] waits (09 5.2.1, F-WARTESCHLANGE-GRUND), or null for a run that is not
+/// queued: its `state_reason` with the [presence] of its agent (`offline` and `unknown` say the
+/// agent is offline; null means not known), and for `slots_full` the slot count [slotsTotal]
+/// of the agent (`run_slots.total`; all of them are in use while it waits) and the runs that
+/// hold them: the [holders] of the same agent in `running`, each opening its thread through
+/// [open]; the slots no holder of the device explains are counted, never named.
+DsWait? queuedWait(
+  RunSummary run, {
+  required AgentRuntimeState? presence,
+  required int? slotsTotal,
+  List<({RunSummary run, String label})> holders = const [],
+  void Function(ThreadId thread)? open,
+}) {
+  if (run.state != RunState.queued) return null;
+  final offline =
+      presence == AgentRuntimeState.offline ||
+      presence == AgentRuntimeState.unknown;
+  final reason = dsWaitReason(run.stateReason, agentOffline: offline);
+  if (reason != DsWaitReason.slotsFull) return DsWait(reason: reason);
+  final shown = [
+    for (final h in holders)
+      if (h.run.agentId == run.agentId &&
+          h.run.id != run.id &&
+          h.run.state == RunState.running)
+        h,
+  ];
+  return DsWait(
+    reason: reason,
+    slotsUsed: slotsTotal,
+    slotsTotal: slotsTotal,
+    blockers: [
+      for (final h in shown)
+        DsWaitBlocker(
+          label: h.label,
+          onTap: open == null ? null : () => open(h.run.threadId),
+        ),
+    ],
+    hiddenBlockers: slotsTotal == null || slotsTotal <= shown.length
+        ? 0
+        : slotsTotal - shown.length,
+  );
+}

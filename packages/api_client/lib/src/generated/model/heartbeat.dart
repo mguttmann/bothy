@@ -7,7 +7,9 @@ import 'package:api_client/src/generated/model/tool_class.dart';
 import 'package:api_client/src/generated/model/project_readiness.dart';
 import 'package:api_client/src/generated/model/project_trash_result.dart';
 import 'package:built_collection/built_collection.dart';
+import 'package:api_client/src/generated/model/run_slots.dart';
 import 'package:api_client/src/generated/model/billing_mode.dart';
+import 'package:api_client/src/generated/model/waiting_run.dart';
 import 'package:api_client/src/generated/model/billing_evidence.dart';
 import 'package:api_client/src/generated/model/agent_rate_limit_state.dart';
 import 'package:built_value/json_object.dart';
@@ -30,6 +32,8 @@ part 'heartbeat.g.dart';
 /// * [projectReadiness] - Readiness per bound forum of a runner (M2-03); the channels must be distinct. Applied only when present and different from the last list this server process applied; absent means \"unchanged\".
 /// * [projectFolders] - Runners only, the folder names directly under the projects root that are Git work trees, sorted, at most `runner.project_folders_max` (09 18.13, M4-44). Applied only when present and different from the last list this server process applied; absent means \"unchanged\". Names only, never a path.
 /// * [projectTrashResults] - Runners only, the outcome of each folder move of `HeartbeatAck.project_trash` the runner finished since its last heartbeat (09 18.15); the server stores it once and audits it as `channel.project.trash`.
+/// * [runSlots] - Runners only, how many turns run now of how many may run at once (09 4.8). Stored in `agents.reported_details.run_slots`; absent clears a stored one (full state).
+/// * [waitingRuns] - The accepted runs of this adapter that wait before their start, each with its wait reason (09 5.2.1); the run ids must be distinct. The server stores the reason as `runs.state_reason` of each listed run that is still `queued`, and clears a runner reason of a queued run of the agent that is no longer listed; absent counts as the empty list.
 @BuiltValue()
 abstract class Heartbeat implements Built<Heartbeat, HeartbeatBuilder> {
   @BuiltValueField(wireName: r'state')
@@ -74,6 +78,14 @@ abstract class Heartbeat implements Built<Heartbeat, HeartbeatBuilder> {
   /// Runners only, the outcome of each folder move of `HeartbeatAck.project_trash` the runner finished since its last heartbeat (09 18.15); the server stores it once and audits it as `channel.project.trash`.
   @BuiltValueField(wireName: r'project_trash_results')
   BuiltList<ProjectTrashResult>? get projectTrashResults;
+
+  /// Runners only, how many turns run now of how many may run at once (09 4.8). Stored in `agents.reported_details.run_slots`; absent clears a stored one (full state).
+  @BuiltValueField(wireName: r'run_slots')
+  RunSlots? get runSlots;
+
+  /// The accepted runs of this adapter that wait before their start, each with its wait reason (09 5.2.1); the run ids must be distinct. The server stores the reason as `runs.state_reason` of each listed run that is still `queued`, and clears a runner reason of a queued run of the agent that is no longer listed; absent counts as the empty list.
+  @BuiltValueField(wireName: r'waiting_runs')
+  BuiltList<WaitingRun>? get waitingRuns;
 
   Heartbeat._();
 
@@ -176,6 +188,20 @@ class _$HeartbeatSerializer implements PrimitiveSerializer<Heartbeat> {
         specifiedType: const FullType(BuiltList, [
           FullType(ProjectTrashResult),
         ]),
+      );
+    }
+    if (object.runSlots != null) {
+      yield r'run_slots';
+      yield serializers.serialize(
+        object.runSlots,
+        specifiedType: const FullType(RunSlots),
+      );
+    }
+    if (object.waitingRuns != null) {
+      yield r'waiting_runs';
+      yield serializers.serialize(
+        object.waitingRuns,
+        specifiedType: const FullType(BuiltList, [FullType(WaitingRun)]),
       );
     }
   }
@@ -302,6 +328,24 @@ class _$HeartbeatSerializer implements PrimitiveSerializer<Heartbeat> {
           ) as BuiltList<ProjectTrashResult>?;
           if (valueDes == null) continue;
           result.projectTrashResults.replace(valueDes);
+          break;
+        case r'run_slots':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(RunSlots),
+          ) as RunSlots?;
+          if (valueDes == null) continue;
+          result.runSlots.replace(valueDes);
+          break;
+        case r'waiting_runs':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(BuiltList, [
+              FullType(WaitingRun),
+            ]),
+          ) as BuiltList<WaitingRun>?;
+          if (valueDes == null) continue;
+          result.waitingRuns.replace(valueDes);
           break;
         default:
           unhandled.add(key);

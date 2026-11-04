@@ -47,3 +47,19 @@ SET stall_warned_at = sqlc.arg(at)::timestamptz,
 WHERE id = sqlc.arg(id) AND version = sqlc.arg(version) AND state = 'running'
     AND stall_warned_at IS NULL AND last_progress_at < sqlc.arg(stalled_before)::timestamptz
 RETURNING *;
+
+-- name: LockQueuedRunsOfAgent :many
+-- The queued runs of one agent for the wait reasons of its heartbeat (09 4.8 and 5.2.1,
+-- F-WARTESCHLANGE-GRUND), locked in ascending id; runs_state_agent_active_idx serves it.
+SELECT * FROM runs
+WHERE state = 'queued' AND agent_id = sqlc.arg(agent_id)
+ORDER BY id
+FOR UPDATE;
+
+-- name: SetQueuedReason :one
+-- The wait reason of a locked queued run (09 5.2.1): an empty reason stores NULL; version rises by
+-- one. No row: the run is no longer queued.
+UPDATE runs
+SET state_reason = NULLIF(sqlc.arg(reason)::text, ''), version = version + 1
+WHERE id = sqlc.arg(id) AND state = 'queued'
+RETURNING *;

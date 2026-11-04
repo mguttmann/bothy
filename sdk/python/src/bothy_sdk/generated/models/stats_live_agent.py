@@ -13,6 +13,7 @@ from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
     from ..models.agent_rate_limit_state import AgentRateLimitState
+    from ..models.run_slots import RunSlots
 
 
 T = TypeVar("T", bound="StatsLiveAgent")
@@ -30,6 +31,8 @@ class StatsLiveAgent:
             exactly one person.
         rate_limit (AgentRateLimitState | Unset): Rate-limit state of the agent runtime at its provider as reported by
             the adapter (`agent_heartbeat.v1`). Never quotas of an account, keys or subscription names.
+        run_slots (RunSlots | Unset): Slot use of a runner (09 4.8, 18.2), `used` turns run of at most `total`
+            (`runner.max_parallel_runs`) at once; `used` is at most `total`.
     """
 
     agent_id: UUID
@@ -37,6 +40,7 @@ class StatsLiveAgent:
     billing_mode: BillingMode
     reported_billing_mode: BillingMode | Unset = UNSET
     rate_limit: AgentRateLimitState | Unset = UNSET
+    run_slots: RunSlots | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -54,6 +58,10 @@ class StatsLiveAgent:
         if not isinstance(self.rate_limit, Unset):
             rate_limit = self.rate_limit.to_dict()
 
+        run_slots: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.run_slots, Unset):
+            run_slots = self.run_slots.to_dict()
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -67,12 +75,15 @@ class StatsLiveAgent:
             field_dict["reported_billing_mode"] = reported_billing_mode
         if rate_limit is not UNSET:
             field_dict["rate_limit"] = rate_limit
+        if run_slots is not UNSET:
+            field_dict["run_slots"] = run_slots
 
         return field_dict
 
     @classmethod
     def from_dict(cls, src_dict: Mapping[str, Any]) -> Self:
         from ..models.agent_rate_limit_state import AgentRateLimitState
+        from ..models.run_slots import RunSlots
 
         d = dict(src_dict)
         agent_id = UUID(d.pop("agent_id"))
@@ -95,12 +106,20 @@ class StatsLiveAgent:
         else:
             rate_limit = AgentRateLimitState.from_dict(_rate_limit)
 
+        _run_slots = d.pop("run_slots", UNSET)
+        run_slots: RunSlots | Unset
+        if isinstance(_run_slots, Unset):
+            run_slots = UNSET
+        else:
+            run_slots = RunSlots.from_dict(_run_slots)
+
         stats_live_agent = cls(
             agent_id=agent_id,
             presence=presence,
             billing_mode=billing_mode,
             reported_billing_mode=reported_billing_mode,
             rate_limit=rate_limit,
+            run_slots=run_slots,
         )
 
         stats_live_agent.additional_properties = d

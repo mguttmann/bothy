@@ -23,6 +23,7 @@ import subprocess  # nosec B404 - argument list, never a shell, program from the
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
+from uuid import UUID
 
 from bothy_sdk.adapter import RuntimeStatus
 from bothy_sdk.generated.models import ProjectReadiness, ProjectTrashResult
@@ -31,6 +32,8 @@ __all__ = [
     "CAPABILITIES",
     "MIN_CLAUDE_CODE_VERSION",
     "PINNED_CLAUDE_CODE_VERSION",
+    "WAIT_SLOTS_FULL",
+    "WAIT_THREAD_BUSY",
     "Probe",
     "billing_modes_supported",
     "parse_version",
@@ -60,6 +63,13 @@ answers carry files (18.10, M3-12). The owner's switch ``supports_files_out`` is
 server at the send (``403 feature_disabled``), so the runner never reads ``operator_config``.
 ``voice_input`` is the default; the runner reports true when ``runner.transcribe_cmd`` is set
 (18.14)."""
+
+WAIT_SLOTS_FULL = "slots_full"
+"""Wait reason of a run in prepare while every slot of ``runner.max_parallel_runs`` is in use
+(09 5.2.1)."""
+
+WAIT_THREAD_BUSY = "thread_busy"
+"""Wait reason of a run in prepare while another turn holds its thread or session lock."""
 
 _VERSION = re.compile(r"^\s*v?(\d+)\.(\d+)\.(\d+)(?:\s|$)")
 BLOCKING = frozenset({"runtime_unreachable", "runtime_version_unsupported"})
@@ -214,12 +224,15 @@ def billing_modes_supported(*, has_key_ref: bool, allow_personal: bool) -> tuple
     return modes or None
 
 
-def runtime_status(
+def runtime_status(  # noqa: PLR0913 - one argument per heartbeat member
     probe: Probe,
     readiness: Sequence[ProjectReadiness],
     modes: tuple[str, ...] | None,
     folders: Sequence[str] | None = None,
     trash_results: Sequence[ProjectTrashResult] = (),
+    *,
+    slots: tuple[int, int] | None = None,
+    waiting: Mapping[UUID, str] | None = None,
 ) -> RuntimeStatus:
     """Build the heartbeat members that change at run time.
 
@@ -233,6 +246,9 @@ def runtime_status(
         folders: The project folder names of 09 18.13; ``None`` leaves the member out.
         trash_results: The folder move outcomes of 09 18.15 not yet reported; none leaves the
             member out.
+        slots: ``run_slots`` as ``(used, total)`` (09 4.8); ``None`` leaves the member out.
+        waiting: The runs that wait in prepare with their wait reason (09 5.2.1), sent as
+            ``waiting_runs`` in run id order; ``None`` leaves the member out.
 
     Returns:
         The status.
@@ -245,4 +261,8 @@ def runtime_status(
         project_readiness=tuple(readiness),
         project_folders=None if folders is None else tuple(folders),
         project_trash_results=tuple(trash_results) or None,
+        run_slots=None if slots is None else {"used": slots[0], "total": slots[1]},
+        waiting_runs=None
+        if waiting is None
+        else tuple(sorted(waiting.items(), key=lambda item: str(item[0]))),
     )

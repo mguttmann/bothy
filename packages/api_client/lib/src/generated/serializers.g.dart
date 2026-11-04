@@ -583,6 +583,7 @@ Serializers _$serializers =
           ..add(RunPlan.serializer)
           ..add(RunPlanItemsInner.serializer)
           ..add(RunPlanItemsInnerStatusEnum.serializer)
+          ..add(RunSlots.serializer)
           ..add(RunStart.serializer)
           ..add(RunState.serializer)
           ..add(RunStateChangedEvent.serializer)
@@ -781,6 +782,8 @@ Serializers _$serializers =
           ..add(UserUpdatedEvent.serializer)
           ..add(UserUpdatedEventTypeEnum.serializer)
           ..add(ViewAsSnapshot.serializer)
+          ..add(WaitingRun.serializer)
+          ..add(WaitingRunReasonEnum.serializer)
           ..add(WebAuthnChallenge.serializer)
           ..add(WebhookDelivery.serializer)
           ..add(WebhookDeliveryPage.serializer)
@@ -952,6 +955,10 @@ Serializers _$serializers =
               const FullType(ProjectTrashResult),
             ]),
             () => ListBuilder<ProjectTrashResult>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(WaitingRun)]),
+            () => ListBuilder<WaitingRun>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, const [

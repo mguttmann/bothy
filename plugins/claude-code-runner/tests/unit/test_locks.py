@@ -63,3 +63,16 @@ async def test_cancelled_wait_closes_the_descriptor(tmp_path: Path) -> None:
         await waiter
     assert _open_fds() == before
     release(held)
+
+
+@pytest.mark.anyio
+async def test_on_busy_once_only_when_held(tmp_path: Path) -> None:
+    """``on_busy`` reports the wait reason ``thread_busy`` once, and never for a free lock."""
+    path = tmp_path / "locks" / "thread-a.lock"
+    calls: list[str] = []
+    fd = await acquire(path, wait=1.0, poll=0.02, on_busy=lambda: calls.append("busy"))
+    assert calls == []
+    with pytest.raises(LockTimeout):
+        await acquire(path, wait=0.2, poll=0.02, on_busy=lambda: calls.append("busy"))
+    assert calls == ["busy"]
+    release(fd)

@@ -150,6 +150,34 @@ type TrashResult struct {
 // The values of TrashResult.Result.
 var trashResults = []string{"trashed", "refused"}
 
+// RunSlots is run_slots of agent_heartbeat.v1 (schema RunSlots, F-WARTESCHLANGE-GRUND): Used turns
+// run of at most Total (runner.max_parallel_runs, 09 18.2); Used is at most Total.
+type RunSlots struct {
+	Used  int `json:"used"`
+	Total int `json:"total"`
+}
+
+// runSlotsMax is the maximum of RunSlots.used and RunSlots.total in the OpenAPI.
+const runSlotsMax = 10000
+
+// The wait reasons an adapter reports in waiting_runs (schema WaitingRun, 09 5.2.1).
+const (
+	// WaitSlotsFull: every slot of runner.max_parallel_runs is in use.
+	WaitSlotsFull = "slots_full"
+	// WaitThreadBusy: the runner waits for the thread or session lock of another turn.
+	WaitThreadBusy = "thread_busy"
+)
+
+// waitReasons are the values of WaitingRun.reason.
+var waitReasons = []string{WaitSlotsFull, WaitThreadBusy}
+
+// WaitingRun is one entry of waiting_runs (schema WaitingRun): an accepted run of the adapter that
+// waits before run.start, with its wait reason.
+type WaitingRun struct {
+	RunID  ids.ID
+	Reason string
+}
+
 // Report is one decoded heartbeat (agent_heartbeat.v1). Every heartbeat is the whole reported
 // state (D-M2-20-3): an empty value is "not reported".
 type Report struct {
@@ -178,6 +206,10 @@ type Report struct {
 	// 18.13, M4-44); FoldersGiven tells an absent member from an empty list.
 	Folders      []string
 	FoldersGiven bool
+	// RunSlots is run_slots; nil when not reported (an earlier stored one is cleared).
+	RunSlots *RunSlots
+	// Waiting is waiting_runs; nil when absent, which counts as the empty list (09 4.8).
+	Waiting []WaitingRun
 }
 
 // Reported returns the columns and details of r as the stored form Reported; LastHeartbeatAt is
@@ -246,13 +278,15 @@ type storedDetails struct {
 	Runtime               *Runtime         `json:"runtime,omitempty"`
 	ProtocolVersion       int              `json:"protocol_version,omitempty"`
 	RateLimit             *storedRateLimit `json:"rate_limit,omitempty"`
+	RunSlots              *RunSlots        `json:"run_slots,omitempty"`
 }
 
 // StoredDetails returns the JSON object of agents.reported_details for r. active_runs holds the
 // run ids as strings, the shape runs.stall_check of M2-09 reads.
 func (r Report) StoredDetails() []byte {
 	d := storedDetails{Capabilities: r.Details.Capabilities, BillingEvidence: r.Evidence, Adapter: r.Details.Adapter,
-		Runtime: r.Details.Runtime, ProtocolVersion: r.Details.ProtocolVersion, DegradedReasons: r.Details.DegradedReasons}
+		Runtime: r.Details.Runtime, ProtocolVersion: r.Details.ProtocolVersion, DegradedReasons: r.Details.DegradedReasons,
+		RunSlots: r.RunSlots}
 	if r.BillingModesSupported != nil {
 		d.BillingModesSupported = make([]string, 0, len(r.BillingModesSupported))
 		for _, m := range r.BillingModesSupported {
@@ -293,6 +327,10 @@ func ReportFromStore(state RuntimeState, version string, mode BillingMode, class
 		Details: Details{Capabilities: d.Capabilities, DegradedReasons: d.DegradedReasons, Adapter: d.Adapter, Runtime: d.Runtime,
 			ProtocolVersion: d.ProtocolVersion}}
 	r.RateLimit = d.RateLimit.report()
+	if s := d.RunSlots; s != nil && s.Total >= 1 && s.Used >= 0 && s.Used <= s.Total {
+		c := *s
+		r.RunSlots = &c
+	}
 	for _, s := range d.BillingModesSupported {
 		if m := BillingMode(s); m.Valid() {
 			r.BillingModesSupported = append(r.BillingModesSupported, m)
@@ -456,7 +494,8 @@ func (d *decoder) form(pointer string, raw json.RawMessage, re *regexp.Regexp) (
 
 // The top-level members of the schema Heartbeat.
 var heartbeatMembers = []string{"state", "runtime_version", "reported_billing_mode", "billing_modes_supported", "billing_evidence",
-	"reported_tool_class", "rate_limit", "details", "project_readiness", "project_folders", "project_trash_results"}
+	"reported_tool_class", "rate_limit", "details", "project_readiness", "project_folders", "project_trash_results",
+	"run_slots", "waiting_runs"}
 
 // billingModes and toolClasses are the enumerations of BillingMode and ToolClass.
 var (
@@ -524,10 +563,115 @@ func DecodeHeartbeat(raw []byte) (Report, []errs.FieldError) {
 	if v, has := m["project_trash_results"]; has {
 		r.TrashResults = d.trashResults(v)
 	}
+	d.load(m, &r)
 	if len(d.errs) > 0 {
 		return Report{}, d.errs
 	}
 	return r, nil
+}
+
+// count reads a JSON integer in [lo, runSlotsMax]; ok is false after a field error.
+func (d *decoder) count(p string, raw json.RawMessage, lo int) (int, bool) {
+	n, err := strconv.ParseInt(string(bytes.TrimSpace(raw)), 10, 32)
+	switch {
+	case errors.Is(err, strconv.ErrRange) || (err == nil && n > runSlotsMax):
+		d.fail(p, codeTooLarge)
+	case err != nil:
+		d.fail(p, codeInvalidType)
+	case n < int64(lo):
+		d.fail(p, codeTooSmall)
+	default:
+		return int(n), true
+	}
+	return 0, false
+}
+
+// runSlots reads run_slots (schema RunSlots): used and total required, total at least 1 and used
+// at most total.
+func (d *decoder) runSlots(raw json.RawMessage) *RunSlots {
+	const p = "/run_slots"
+	m, ok := d.object(p, raw, "used", "total")
+	if !ok {
+		return nil
+	}
+	var out RunSlots
+	usedOK, totalOK := false, false
+	if v, has := m["used"]; has {
+		out.Used, usedOK = d.count(p+"/used", v, 0)
+	} else {
+		d.fail(p+"/used", codeRequired)
+	}
+	if v, has := m["total"]; has {
+		out.Total, totalOK = d.count(p+"/total", v, 1)
+	} else {
+		d.fail(p+"/total", codeRequired)
+	}
+	if usedOK && totalOK && out.Used > out.Total {
+		d.fail(p+"/used", codeTooLarge)
+	}
+	return &out
+}
+
+// load reads the runner load members run_slots and waiting_runs of m into r (09 4.8, 5.2.1).
+func (d *decoder) load(m map[string]json.RawMessage, r *Report) {
+	if v, has := m["run_slots"]; has {
+		r.RunSlots = d.runSlots(v)
+	}
+	if v, has := m["waiting_runs"]; has {
+		r.Waiting = d.waitingRuns(v)
+	}
+}
+
+// waitingRuns reads waiting_runs (schema WaitingRun): distinct run ids, each with a wait reason
+// of waitReasons. The result is never nil, so an empty list is a report.
+func (d *decoder) waitingRuns(raw json.RawMessage) []WaitingRun {
+	const p = "/waiting_runs"
+	items, ok := d.array(p, raw)
+	if !ok {
+		return nil
+	}
+	out := make([]WaitingRun, 0, len(items))
+	for i, it := range items {
+		if w, ok := d.waitingRun(index(p, i), it, out); ok {
+			out = append(out, w)
+		}
+	}
+	return out
+}
+
+// waitingRun reads one entry of waiting_runs; ok is false when its run id is missing, invalid
+// or already in seen.
+func (d *decoder) waitingRun(ip string, raw json.RawMessage, seen []WaitingRun) (WaitingRun, bool) {
+	m, ok := d.object(ip, raw, "run_id", "reason")
+	if !ok {
+		return WaitingRun{}, false
+	}
+	var w WaitingRun
+	if v, has := m["reason"]; has {
+		w.Reason, _ = d.enum(ip+"/reason", v, waitReasons)
+	} else {
+		d.fail(ip+"/reason", codeRequired)
+	}
+	v, has := m["run_id"]
+	if !has {
+		d.fail(ip+"/run_id", codeRequired)
+		return w, false
+	}
+	s, ok := d.str(ip+"/run_id", v)
+	if !ok {
+		return w, false
+	}
+	id, err := ids.Parse(s)
+	switch {
+	case err != nil:
+		d.fail(ip+"/run_id", codeInvalidFormat)
+		return w, false
+	case slices.ContainsFunc(seen, func(o WaitingRun) bool { return o.RunID == id }):
+		d.fail(ip+"/run_id", codeDuplicate)
+		return w, false
+	}
+	w.RunID = id
+	return w, true
 }
 
 // modes reads billing_modes_supported: distinct values of BillingMode.

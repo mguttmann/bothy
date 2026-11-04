@@ -48,7 +48,10 @@ class Run:
         triggering_message_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
         triggering_command_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
         triggering_interaction_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
-        state_reason (str | Unset):
+        state_reason (str | Unset): The reason of `failed` and `cancelled` (09 5.2); while `queued` the wait reason of
+            09 5.2.1, `invocation_held` (the server holds the invocation until an attachment or transcript is final),
+            `slots_full` (every slot of the runner is in use) or `thread_busy` (the runner waits for the thread or session
+            lock); absent while queued when the agent has not reported a wait.
         billing_mode_used (BillingMode | Unset): Backend policy of an agent. `personal` runs on the subscription of
             exactly one person.
         model (str | Unset):

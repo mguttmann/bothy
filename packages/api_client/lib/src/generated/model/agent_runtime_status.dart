@@ -5,6 +5,7 @@
 // ignore_for_file: unused_element
 import 'package:api_client/src/generated/model/tool_class.dart';
 import 'package:built_collection/built_collection.dart';
+import 'package:api_client/src/generated/model/run_slots.dart';
 import 'package:api_client/src/generated/model/billing_mode.dart';
 import 'package:api_client/src/generated/model/agent_runtime_state.dart';
 import 'package:api_client/src/generated/model/billing_evidence.dart';
@@ -25,6 +26,7 @@ part 'agent_runtime_status.g.dart';
 /// * [reportedToolClass]
 /// * [billingModeMatches] - False when the reported mode differs from the configured `billing_mode`.
 /// * [rateLimit]
+/// * [runSlots] - Runners only, the slot use of the last heartbeat (09 4.8); absent when the adapter does not report it.
 /// * [billingEvidence]
 /// * [warnings] - Known values `billing_mode_mismatch` (the reported mode has differed from the configured one for longer than `billing.mismatch_alert_after`), `billing_mode_unsupported` (no reported mode and the configured one is not in `billing_modes_supported`), `billing_evidence_unknown` (`billing_evidence.key_type` is `unknown`) and `tool_class_mismatch` (the reported tool class differs from the configured one). Only while the state is `online` or `degraded`.
 @BuiltValue()
@@ -58,6 +60,10 @@ abstract class AgentRuntimeStatus
 
   @BuiltValueField(wireName: r'rate_limit')
   AgentRateLimitState? get rateLimit;
+
+  /// Runners only, the slot use of the last heartbeat (09 4.8); absent when the adapter does not report it.
+  @BuiltValueField(wireName: r'run_slots')
+  RunSlots? get runSlots;
 
   @BuiltValueField(wireName: r'billing_evidence')
   BillingEvidence? get billingEvidence;
@@ -144,6 +150,13 @@ class _$AgentRuntimeStatusSerializer
       yield serializers.serialize(
         object.rateLimit,
         specifiedType: const FullType(AgentRateLimitState),
+      );
+    }
+    if (object.runSlots != null) {
+      yield r'run_slots';
+      yield serializers.serialize(
+        object.runSlots,
+        specifiedType: const FullType(RunSlots),
       );
     }
     if (object.billingEvidence != null) {
@@ -251,6 +264,14 @@ class _$AgentRuntimeStatusSerializer
           ) as AgentRateLimitState?;
           if (valueDes == null) continue;
           result.rateLimit.replace(valueDes);
+          break;
+        case r'run_slots':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(RunSlots),
+          ) as RunSlots?;
+          if (valueDes == null) continue;
+          result.runSlots.replace(valueDes);
           break;
         case r'billing_evidence':
           final valueDes = serializers.deserialize(

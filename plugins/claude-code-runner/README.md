@@ -331,6 +331,15 @@ create its folder under `runner.projects_root` (docs/spec/09-agents.md 18.12). T
 A private repository needs a credential helper of the runner user (`HOME` is kept); `ssh` clones
 are not supported.
 
+## Slots and wait reasons (F-WARTESCHLANGE-GRUND)
+
+Every heartbeat carries `run_slots`: the turns that hold a slot now and `runner.max_parallel_runs`
+(docs/spec/09-agents.md 4.8, 18.2). A run that waits in prepare is listed in `waiting_runs` with
+`thread_busy` while another turn holds its thread or session lock and `slots_full` while every
+slot is in use; a heartbeat goes out at once when a run starts or stops waiting, so the app
+shows why the run waits and which runs hold the slots (09 5.2.1). Raising
+`runner.max_parallel_runs` is the operator's remedy for long `slots_full` waits.
+
 ## Project folder report (M4-44)
 
 Every heartbeat carries `project_folders`: the names of the Git work trees directly under

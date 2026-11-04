@@ -258,9 +258,9 @@ Schema in [openapi.yaml](../api/openapi.yaml) (`StatsLiveFrame`); English accord
 | `at` | time of the frame (server clock) |
 | `interval_ms` | `stats.live_interval` |
 | `scope` | `instance`, or `space` with `space_id` |
-| `runs` | active runs (`queued`, `running`, `waiting_input`) in visible channels, at most `stats.live_max_runs`, newest first; per run: `run_id`, `thread_id`, `channel_id`, `space_id`, `agent_id`, `state`, `queued_at`, `started_at`, `billing_mode` (reported mode, otherwise configured mode), current step (`kind`, `name`), `approval_pending`, cost so far (`cost_micros`, `currency`, `cost_is_estimate`; only with `cost.read.aggregate`), the agent tree `tasks` and `tasks_truncated` (below), the chat of the run (`chat`; only when the receiver may read the thread, section 4 rule 6) |
+| `runs` | active runs (`queued`, `running`, `waiting_input`) in visible channels, at most `stats.live_max_runs`, newest first; per run: `run_id`, `thread_id`, `channel_id`, `space_id`, `agent_id`, `state`, `state_reason` (only for `queued`: the wait reason of 09 5.2.1, addendum of 2026-11-04), `queued_at`, `started_at`, `billing_mode` (reported mode, otherwise configured mode), current step (`kind`, `name`), `approval_pending`, cost so far (`cost_micros`, `currency`, `cost_is_estimate`; only with `cost.read.aggregate`), the agent tree `tasks` and `tasks_truncated` (below), the chat of the run (`chat`; only when the receiver may read the thread, section 4 rule 6) |
 | `runs_truncated` | `true` if more runs are active than `stats.live_max_runs` |
-| `agents` | per agent with a run or an operator role in visible channels: `agent_id`, presence (`online`, `degraded`, `offline`), `billing_mode` (configured mode), `reported_billing_mode` (reported mode, missing for adapters that follow per run), `rate_limit` with `state` and `resets_at` (09, section 4.8) |
+| `agents` | per agent with a run or an operator role in visible channels: `agent_id`, presence (`online`, `degraded`, `offline`), `billing_mode` (configured mode), `reported_billing_mode` (reported mode, missing for adapters that follow per run), `rate_limit` with `state` and `resets_at` (09, section 4.8), `run_slots` with `used` and `total` (runners only, 09 4.8, addendum of 2026-11-04) |
 | `rates` | per metric from 3.2 without `sli.*`: sum of the last full minute and of the current minute up to `at`, in visible channels; costs only with `cost.read.aggregate` |
 | `sli` | only with instance scope: per `sli.*` metric, the good share and the count over the last `stats.live_sli_window` |
 | `connections` | gateway connections of this node by kind (`user`, `agent`, `app`); only with instance scope and `cluster.mode = single`, otherwise the field is missing |
@@ -297,6 +297,16 @@ only", addendum of 2026-11-01, FIX-cost-display) and a note "Approval waiting" w
 card is open. A click on a card whose chat the server named opens the thread via deep link
 (console: "Open in the app"); a card without a chat is no button. Data: `stats.live`.
 
+A queued card says why it waits (addendum of 2026-11-04, F-WARTESCHLANGE-GRUND,
+[09-agents.md](09-agents.md) 5.2.1), never only "queued": "Waiting for a free slot (4 of 4 in
+use)" from `state_reason` `slots_full` and the agent's `run_slots`, "Waiting for the agent: it is
+offline" while the agent's presence is `offline` or `unknown`, "Waiting for the earlier turn of
+this chat" for `thread_busy`, "Waiting for an attachment" for `invocation_held`, and "Waiting for
+the agent to start it" without a reason. A `slots_full` card names the runs that hold the slots:
+the runs of the frame with the same agent in `running`, each a link to its chat when the frame
+names the chat; the slots the frame does not show are counted ("and 2 more"). The table form has
+the same text in its state column.
+
 Below each card its agent tree (addendum of 2026-11-01, FEAT-topology-agent-tree): the nodes of
 `tasks` as small cards under the run, indented by level with elbow lines from parent to child, each
 with kind icon, label (without one: kind and position, "Subagent 2"), state as color, icon and word,
@@ -311,7 +321,7 @@ node in a row below its run, indented by level. The same tree on the phone.
 +---------------------------------------------------------------------------------------------+
 | Engineering  | #backend   [Agent Runner | running | Tool: Bash | Org | 0,42 USD estimate]   |
 |              | #infra     [Agent Ops    | waiting_input | Approval waiting | Personal]      |
-| Support      | #tickets   [Agent Helper | queued | Personal]                                |
+| Support      | #tickets   [Agent Helper | Waiting for a free slot (4 of 4 in use) | Pers.]  |
 | Research     | (no active runs)                                                             |
 +---------------------------------------------------------------------------------------------+
 | Rates last minute: messages 14 | runs started 3 | tool calls 41 | errors 0                  |

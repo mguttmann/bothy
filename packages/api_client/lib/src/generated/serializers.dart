@@ -466,6 +466,7 @@ import 'package:api_client/src/generated/model/run_patch.dart';
 import 'package:api_client/src/generated/model/run_patch_result.dart';
 import 'package:api_client/src/generated/model/run_plan.dart';
 import 'package:api_client/src/generated/model/run_plan_items_inner.dart';
+import 'package:api_client/src/generated/model/run_slots.dart';
 import 'package:api_client/src/generated/model/run_start.dart';
 import 'package:api_client/src/generated/model/run_state.dart';
 import 'package:api_client/src/generated/model/run_state_changed_event.dart';
@@ -621,6 +622,7 @@ import 'package:api_client/src/generated/model/user_status.dart';
 import 'package:api_client/src/generated/model/user_update.dart';
 import 'package:api_client/src/generated/model/user_updated_event.dart';
 import 'package:api_client/src/generated/model/view_as_snapshot.dart';
+import 'package:api_client/src/generated/model/waiting_run.dart';
 import 'package:api_client/src/generated/model/web_authn_challenge.dart';
 import 'package:api_client/src/generated/model/webhook_delivery.dart';
 import 'package:api_client/src/generated/model/webhook_delivery_page.dart';
@@ -1090,6 +1092,7 @@ part 'serializers.g.dart';
   RunPatchResult,
   RunPlan,
   RunPlanItemsInner,
+  RunSlots,
   RunStart,
   RunState,
   RunStateChangedEvent,
@@ -1245,6 +1248,7 @@ part 'serializers.g.dart';
   UserUpdate,
   UserUpdatedEvent,
   ViewAsSnapshot,
+  WaitingRun,
   WebAuthnChallenge,
   WebhookDelivery,
   WebhookDeliveryPage,
@@ -1731,6 +1735,10 @@ Serializers serializers =
           ..addBuilderFactory(
             const FullType(BuiltList, [FullType(ClientMetricBucketsInner)]),
             () => ListBuilder<ClientMetricBucketsInner>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(WaitingRun)]),
+            () => ListBuilder<WaitingRun>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, [FullType(StatsLiveAgent)]),

@@ -92,6 +92,64 @@
   "@liveBoxReasonProjectNotReady": {
     "description": "Translated state reason `project_not_ready` of a run (components.md section 2.1)."
   },
+  "liveBoxWaitSlotsFull": "Waiting for a free slot ({used} of {total} in use)",
+  "@liveBoxWaitSlotsFull": {
+    "description": "State text of a queued run whose agent has every slot of `runner.max_parallel_runs` in use (wait reason `slots_full`, 09 5.2.1).",
+    "placeholders": {
+      "used": {
+        "type": "int",
+        "example": "4"
+      },
+      "total": {
+        "type": "int",
+        "example": "4"
+      }
+    }
+  },
+  "liveBoxWaitSlotsFullNoCount": "Waiting for a free slot of the agent",
+  "@liveBoxWaitSlotsFullNoCount": {
+    "description": "State text of a queued run with the wait reason `slots_full` while the slot count of the agent is not known (09 5.2.1)."
+  },
+  "liveBoxWaitAgentOffline": "Waiting for the agent: it is offline",
+  "@liveBoxWaitAgentOffline": {
+    "description": "State text of a queued run whose agent is offline or never reported (09 5.2.1)."
+  },
+  "liveBoxWaitThreadBusy": "Waiting for the earlier turn of this chat to end",
+  "@liveBoxWaitThreadBusy": {
+    "description": "State text of a queued run whose runner waits for the thread or session lock (wait reason `thread_busy`, 09 5.2.1)."
+  },
+  "liveBoxWaitInvocationHeld": "Waiting for an attachment or a transcript",
+  "@liveBoxWaitInvocationHeld": {
+    "description": "State text of a queued run whose invocation the server holds until an attachment or transcript is final (wait reason `invocation_held`, 09 5.2.1)."
+  },
+  "liveBoxWaitAgentStart": "Waiting for the agent to start it",
+  "@liveBoxWaitAgentStart": {
+    "description": "State text of a queued run without a wait reason: delivered, the agent has not started it yet (09 5.2.1)."
+  },
+  "liveBoxWaitHeldBy": "Slots in use by",
+  "@liveBoxWaitHeldBy": {
+    "description": "Heading of the list of runs that hold the slots a queued run waits for (09 5.2.1)."
+  },
+  "liveBoxWaitHiddenRuns": "{count, plural, =1{1 run you cannot see} other{{count} runs you cannot see}}",
+  "@liveBoxWaitHiddenRuns": {
+    "description": "Last entry of the list of runs that hold the slots: the runs the reader may not read, counted, never named (09 5.2.1).",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "2"
+      }
+    }
+  },
+  "liveBoxWaitOpenRun": "Open the chat of {label}",
+  "@liveBoxWaitOpenRun": {
+    "description": "Semantics label of one run in the list of runs that hold the slots; a tap opens its chat (09 5.2.1).",
+    "placeholders": {
+      "label": {
+        "type": "String",
+        "example": "backend / Payment"
+      }
+    }
+  },
   "liveBoxReasonUserCancelled": "Canceled by {name}",
   "@liveBoxReasonUserCancelled": {
     "description": "Translated state reason `user_cancelled` of a run with the name of the person who stopped it (components.md section 2.1).",

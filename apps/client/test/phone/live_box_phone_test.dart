@@ -25,8 +25,10 @@ import '../support/widgets.dart';
 Future<ColumnHost> openRun(
   WidgetTester tester,
   RunState state,
-  Map<String, Object?> doc,
-) async {
+  Map<String, Object?> doc, {
+  String? reason,
+  FakeAgentReads? reads,
+}) async {
   final host = await ColumnHost.open(tester);
   final source = StoreRunSource();
   source.fetcher.docs[runId(1)] = doc;
@@ -46,7 +48,7 @@ Future<ColumnHost> openRun(
       ],
       level: AccessLevel.trigger,
     );
-    await host.db.runsDao.upsertIfNewer(run(1, state));
+    await host.db.runsDao.upsertIfNewer(run(1, state, reason: reason));
   });
   await host.pump(
     tester,
@@ -56,7 +58,7 @@ Future<ColumnHost> openRun(
     overrides: [
       ...threadOverrides(FakeThreadReads(host.db)),
       runSourceProvider.overrideWithValue(source),
-      agentReadsProvider.overrideWithValue(FakeAgentReads()),
+      agentReadsProvider.overrideWithValue(reads ?? FakeAgentReads()),
     ],
   );
   return host;
@@ -112,6 +114,35 @@ void main() {
       find.descendant(
         of: sheet,
         matching: find.bySemanticsLabel(en.liveBoxStopRun('Robin')),
+      ),
+      findsOneWidget,
+    );
+    await host.dispose(tester);
+  });
+
+  testWidgets('the sheet of a queued run says why it waits, with the slot '
+      'count (09 5.2.1)', (tester) async {
+    final reads = FakeAgentReads()
+      ..agents[robin] = (
+        billingMode: BillingMode.personal,
+        presence: AgentRuntimeState.online,
+        reportedBillingMode: null,
+        runSlots: (used: 2, total: 2),
+      );
+    final host = await openRun(
+      tester,
+      RunState.queued,
+      runDoc(1, state: 'queued'),
+      reason: 'slots_full',
+      reads: reads,
+    );
+    await tester.tap(find.byKey(ValueKey('livebox.line.${runId(1).value}')));
+    await host.settle(tester);
+    final sheet = find.byKey(ValueKey('livebox.sheet.${runId(1).value}'));
+    expect(
+      find.descendant(
+        of: sheet,
+        matching: find.text(en.liveBoxWaitSlotsFull(2, 2)),
       ),
       findsOneWidget,
     );

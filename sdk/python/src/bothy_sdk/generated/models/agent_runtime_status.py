@@ -15,6 +15,7 @@ from ..types import UNSET, Unset
 if TYPE_CHECKING:
     from ..models.agent_rate_limit_state import AgentRateLimitState
     from ..models.billing_evidence import BillingEvidence
+    from ..models.run_slots import RunSlots
 
 
 T = TypeVar("T", bound="AgentRuntimeStatus")
@@ -37,6 +38,8 @@ class AgentRuntimeStatus:
         billing_mode_matches (bool | Unset): False when the reported mode differs from the configured `billing_mode`.
         rate_limit (AgentRateLimitState | Unset): Rate-limit state of the agent runtime at its provider as reported by
             the adapter (`agent_heartbeat.v1`). Never quotas of an account, keys or subscription names.
+        run_slots (RunSlots | Unset): Slot use of a runner (09 4.8, 18.2), `used` turns run of at most `total`
+            (`runner.max_parallel_runs`) at once; `used` is at most `total`.
         billing_evidence (BillingEvidence | Unset): How the runtime proves its actual billing mode. Never a key value or
             prefix (schema `billing_evidence.v1`).
         warnings (list[str] | Unset): Known values `billing_mode_mismatch` (the reported mode has differed from the
@@ -54,6 +57,7 @@ class AgentRuntimeStatus:
     reported_tool_class: ToolClass | Unset = UNSET
     billing_mode_matches: bool | Unset = UNSET
     rate_limit: AgentRateLimitState | Unset = UNSET
+    run_slots: RunSlots | Unset = UNSET
     billing_evidence: BillingEvidence | Unset = UNSET
     warnings: list[str] | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
@@ -88,6 +92,10 @@ class AgentRuntimeStatus:
         if not isinstance(self.rate_limit, Unset):
             rate_limit = self.rate_limit.to_dict()
 
+        run_slots: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.run_slots, Unset):
+            run_slots = self.run_slots.to_dict()
+
         billing_evidence: dict[str, Any] | Unset = UNSET
         if not isinstance(self.billing_evidence, Unset):
             billing_evidence = self.billing_evidence.to_dict()
@@ -117,6 +125,8 @@ class AgentRuntimeStatus:
             field_dict["billing_mode_matches"] = billing_mode_matches
         if rate_limit is not UNSET:
             field_dict["rate_limit"] = rate_limit
+        if run_slots is not UNSET:
+            field_dict["run_slots"] = run_slots
         if billing_evidence is not UNSET:
             field_dict["billing_evidence"] = billing_evidence
         if warnings is not UNSET:
@@ -128,6 +138,7 @@ class AgentRuntimeStatus:
     def from_dict(cls, src_dict: Mapping[str, Any]) -> Self:
         from ..models.agent_rate_limit_state import AgentRateLimitState
         from ..models.billing_evidence import BillingEvidence
+        from ..models.run_slots import RunSlots
 
         d = dict(src_dict)
         state = AgentRuntimeState(d.pop("state"))
@@ -175,6 +186,13 @@ class AgentRuntimeStatus:
         else:
             rate_limit = AgentRateLimitState.from_dict(_rate_limit)
 
+        _run_slots = d.pop("run_slots", UNSET)
+        run_slots: RunSlots | Unset
+        if isinstance(_run_slots, Unset):
+            run_slots = UNSET
+        else:
+            run_slots = RunSlots.from_dict(_run_slots)
+
         _billing_evidence = d.pop("billing_evidence", UNSET)
         billing_evidence: BillingEvidence | Unset
         if isinstance(_billing_evidence, Unset):
@@ -193,6 +211,7 @@ class AgentRuntimeStatus:
             reported_tool_class=reported_tool_class,
             billing_mode_matches=billing_mode_matches,
             rate_limit=rate_limit,
+            run_slots=run_slots,
             billing_evidence=billing_evidence,
             warnings=warnings,
         )

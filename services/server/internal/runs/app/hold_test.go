@@ -30,6 +30,17 @@ func invocations(w *world) []eventlog.Event {
 	return out
 }
 
+// stateChanged returns the payloads of the appended run.state_changed events.
+func stateChanged(w *world) []string {
+	var out []string
+	for _, c := range w.j.list() {
+		if c.what == "event" && c.arg.(eventlog.Event).Type == "run.state_changed" {
+			out = append(out, string(c.arg.(eventlog.Event).Payload))
+		}
+	}
+	return out
+}
+
 // holds returns the scheduled runs.invocation_hold_timeout jobs.
 func holds(w *world) []expiryAt {
 	var out []expiryAt
@@ -94,6 +105,13 @@ func TestHold_PendingHoldsAtAcceptance(t *testing.T) {
 	if len(invocations(w)) != 0 || run.State != domain.StateQueued || !run.InvocationHeldUntil.Equal(want) {
 		t.Fatalf("run %+v invocations %d", run, len(invocations(w)))
 	}
+	// The held run says why it waits (09 5.2.1), also in the run.state_changed of the acceptance.
+	if run.StateReason != domain.WaitInvocationHeld {
+		t.Fatalf("state_reason %q, want invocation_held", run.StateReason)
+	}
+	if ev := stateChanged(w); len(ev) != 1 || !strings.Contains(ev[0], `"state_reason":"invocation_held"`) {
+		t.Fatalf("run.state_changed %v", ev)
+	}
 	if h := holds(w); len(h) != 1 || h[0].run != run.ID || !h[0].at.Equal(want) {
 		t.Fatalf("hold jobs %+v", h)
 	}
@@ -118,6 +136,7 @@ func TestReleaseInvocation(t *testing.T) {
 		w := newWorld(t)
 		ev, run := postWithAttachment(t, w, true)
 		triggers := w.j.count("trigger")
+		changes := len(stateChanged(w))
 		if err := release(w, run.ID, domain.ReleaseFinal); err != nil || len(invocations(w)) != 0 || w.repo.runs[0].Version != run.Version {
 			t.Fatalf("pending: %v %+v", err, w.repo.runs[0])
 		}
@@ -136,8 +155,12 @@ func TestReleaseInvocation(t *testing.T) {
 			t.Fatal(err)
 		}
 		got := w.repo.runs[0]
-		if got.Version != run.Version+1 || !got.InvocationHeldUntil.IsZero() || got.State != domain.StateQueued {
+		if got.Version != run.Version+1 || !got.InvocationHeldUntil.IsZero() || got.State != domain.StateQueued || got.StateReason != "" {
 			t.Fatalf("run %+v", got)
+		}
+		// The cleared wait reason reaches the clients (09 5.2.1).
+		if ev := stateChanged(w); len(ev) != changes+1 || strings.Contains(ev[len(ev)-1], "state_reason") {
+			t.Fatalf("run.state_changed after the release %v", ev)
 		}
 		evs := invocations(w)
 		if len(evs) != 1 {

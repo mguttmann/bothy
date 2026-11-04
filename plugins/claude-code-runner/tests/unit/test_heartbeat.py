@@ -20,6 +20,8 @@ from claude_code_runner.heartbeat import (
     CAPABILITIES,
     MIN_CLAUDE_CODE_VERSION,
     PINNED_CLAUDE_CODE_VERSION,
+    WAIT_SLOTS_FULL,
+    WAIT_THREAD_BUSY,
     Probe,
     billing_modes_supported,
     parse_version,
@@ -159,3 +161,23 @@ def test_runtime_status_carries_the_folder_move_results() -> None:
     status = runtime_status(Probe(PINNED_CLAUDE_CODE_VERSION, ()), [], None, None, [done])
     assert status.project_trash_results == (done,)
     assert runtime_status(Probe(), [], None, None, []).project_trash_results is None
+
+
+def test_runtime_status_carries_slots_and_waiting_runs() -> None:
+    """``run_slots`` and ``waiting_runs`` in run id order (09 4.8, 5.2.1)."""
+    a, b = (
+        UUID("0192d3a0-0000-7000-8000-00000000000b"),
+        UUID("0192d3a0-0000-7000-8000-00000000000a"),
+    )
+    status = runtime_status(
+        Probe(PINNED_CLAUDE_CODE_VERSION, ()),
+        [],
+        None,
+        slots=(2, 2),
+        waiting={a: WAIT_SLOTS_FULL, b: WAIT_THREAD_BUSY},
+    )
+    assert status.run_slots == {"used": 2, "total": 2}
+    assert status.waiting_runs == ((b, "thread_busy"), (a, "slots_full"))
+    bare = runtime_status(Probe(PINNED_CLAUDE_CODE_VERSION, ()), [], None)
+    assert bare.run_slots is None
+    assert bare.waiting_runs is None

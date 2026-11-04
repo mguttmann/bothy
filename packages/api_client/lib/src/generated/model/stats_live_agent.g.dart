@@ -17,6 +17,8 @@ class _$StatsLiveAgent extends StatsLiveAgent {
   final BillingMode? reportedBillingMode;
   @override
   final AgentRateLimitState? rateLimit;
+  @override
+  final RunSlots? runSlots;
 
   factory _$StatsLiveAgent([void Function(StatsLiveAgentBuilder)? updates]) =>
       (StatsLiveAgentBuilder()..update(updates))._build();
@@ -27,6 +29,7 @@ class _$StatsLiveAgent extends StatsLiveAgent {
     required this.billingMode,
     this.reportedBillingMode,
     this.rateLimit,
+    this.runSlots,
   }) : super._();
   @override
   StatsLiveAgent rebuild(void Function(StatsLiveAgentBuilder) updates) =>
@@ -43,7 +46,8 @@ class _$StatsLiveAgent extends StatsLiveAgent {
         presence == other.presence &&
         billingMode == other.billingMode &&
         reportedBillingMode == other.reportedBillingMode &&
-        rateLimit == other.rateLimit;
+        rateLimit == other.rateLimit &&
+        runSlots == other.runSlots;
   }
 
   @override
@@ -54,6 +58,7 @@ class _$StatsLiveAgent extends StatsLiveAgent {
     _$hash = $jc(_$hash, billingMode.hashCode);
     _$hash = $jc(_$hash, reportedBillingMode.hashCode);
     _$hash = $jc(_$hash, rateLimit.hashCode);
+    _$hash = $jc(_$hash, runSlots.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -65,7 +70,8 @@ class _$StatsLiveAgent extends StatsLiveAgent {
           ..add('presence', presence)
           ..add('billingMode', billingMode)
           ..add('reportedBillingMode', reportedBillingMode)
-          ..add('rateLimit', rateLimit))
+          ..add('rateLimit', rateLimit)
+          ..add('runSlots', runSlots))
         .toString();
   }
 }
@@ -98,6 +104,10 @@ class StatsLiveAgentBuilder
   set rateLimit(AgentRateLimitStateBuilder? rateLimit) =>
       _$this._rateLimit = rateLimit;
 
+  RunSlotsBuilder? _runSlots;
+  RunSlotsBuilder get runSlots => _$this._runSlots ??= RunSlotsBuilder();
+  set runSlots(RunSlotsBuilder? runSlots) => _$this._runSlots = runSlots;
+
   StatsLiveAgentBuilder() {
     StatsLiveAgent._defaults(this);
   }
@@ -110,6 +120,7 @@ class StatsLiveAgentBuilder
       _billingMode = $v.billingMode;
       _reportedBillingMode = $v.reportedBillingMode;
       _rateLimit = $v.rateLimit?.toBuilder();
+      _runSlots = $v.runSlots?.toBuilder();
       _$v = null;
     }
     return this;
@@ -151,12 +162,15 @@ class StatsLiveAgentBuilder
             ),
             reportedBillingMode: reportedBillingMode,
             rateLimit: _rateLimit?.build(),
+            runSlots: _runSlots?.build(),
           );
     } catch (_) {
       late String _$failedField;
       try {
         _$failedField = 'rateLimit';
         _rateLimit?.build();
+        _$failedField = 'runSlots';
+        _runSlots?.build();
       } catch (e) {
         throw BuiltValueNestedFieldError(
           r'StatsLiveAgent',

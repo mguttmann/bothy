@@ -62,6 +62,9 @@ type LiveRun struct {
 	RunID, ThreadID, ChannelID, SpaceID, AgentID ids.ID
 	// State is queued, running or waiting_input.
 	State string
+	// StateReason is the wait reason of a queued run (09 5.2.1); it is sent only with State
+	// queued.
+	StateReason string
 	// QueuedAt is never zero; StartedAt is zero before the start.
 	QueuedAt, StartedAt time.Time
 	// BillingMode is the reported mode of the run, else the configured mode.
@@ -91,6 +94,14 @@ type LiveAgent struct {
 	// BillingMode is the configured mode; ReportedBillingMode the reported one, "" when the
 	// adapter follows the configured mode per run.
 	BillingMode, ReportedBillingMode string
+	// RunSlots is the slot use of the agent's last heartbeat (09 4.8); nil when not reported.
+	RunSlots *RunSlots
+}
+
+// RunSlots is the slot use of a runner (schema RunSlots).
+type RunSlots struct {
+	Used  int `json:"used"`
+	Total int `json:"total"`
 }
 
 // RateCell is one key of stats_minutes summed over agents for the last full minute and the
@@ -168,6 +179,7 @@ type (
 		SpaceID         string     `json:"space_id"`
 		AgentID         string     `json:"agent_id"`
 		State           string     `json:"state"`
+		StateReason     string     `json:"state_reason,omitempty"`
 		QueuedAt        string     `json:"queued_at"`
 		StartedAt       string     `json:"started_at,omitempty"`
 		BillingMode     string     `json:"billing_mode"`
@@ -197,10 +209,11 @@ type (
 		ThreadTitle string `json:"thread_title,omitempty"`
 	}
 	agentJSON struct {
-		AgentID             string `json:"agent_id"`
-		Presence            string `json:"presence"`
-		BillingMode         string `json:"billing_mode"`
-		ReportedBillingMode string `json:"reported_billing_mode,omitempty"`
+		AgentID             string    `json:"agent_id"`
+		Presence            string    `json:"presence"`
+		BillingMode         string    `json:"billing_mode"`
+		ReportedBillingMode string    `json:"reported_billing_mode,omitempty"`
+		RunSlots            *RunSlots `json:"run_slots,omitempty"`
 	}
 	rateJSON struct {
 		Metric        string `json:"metric"`
@@ -339,6 +352,9 @@ func encodeRun(run LiveRun, costs, labels, named bool) runJSON {
 	out := runJSON{RunID: run.RunID.String(), ThreadID: run.ThreadID.String(), ChannelID: run.ChannelID.String(),
 		SpaceID: run.SpaceID.String(), AgentID: run.AgentID.String(), State: run.State, QueuedAt: clock.FormatAPI(run.QueuedAt),
 		BillingMode: run.BillingMode, ApprovalPending: run.ApprovalPending}
+	if run.State == "queued" {
+		out.StateReason = run.StateReason
+	}
 	if !run.StartedAt.IsZero() {
 		out.StartedAt = clock.FormatAPI(run.StartedAt)
 	}
@@ -366,7 +382,7 @@ func agents(base *BaseFrame, want map[ids.ID]struct{}) []agentJSON {
 			continue
 		}
 		out = append(out, agentJSON{AgentID: id.String(), Presence: a.Presence, BillingMode: a.BillingMode,
-			ReportedBillingMode: a.ReportedBillingMode})
+			ReportedBillingMode: a.ReportedBillingMode, RunSlots: a.RunSlots})
 	}
 	slices.SortFunc(out, func(x, y agentJSON) int { return strings.Compare(x.AgentID, y.AgentID) })
 	return out

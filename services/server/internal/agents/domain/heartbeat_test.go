@@ -443,3 +443,72 @@ func TestDecodeHeartbeatTrashResults(t *testing.T) {
 		}
 	}
 }
+
+// TestDecodeHeartbeatRunSlots (F-WARTESCHLANGE-GRUND, 09 4.8): run_slots carries used and total,
+// used at most total, total at least 1; it is stored in reported_details and read back, and a
+// heartbeat without it stores none (full state).
+func TestDecodeHeartbeatRunSlots(t *testing.T) {
+	t.Parallel()
+	r, fes := domain.DecodeHeartbeat([]byte(`{"state":"online","run_slots":{"used":4,"total":4}}`))
+	if len(fes) > 0 || r.RunSlots == nil || r.RunSlots.Used != 4 || r.RunSlots.Total != 4 {
+		t.Fatalf("report %+v errors %+v", r.RunSlots, fes)
+	}
+	raw := r.StoredDetails()
+	if !bytes.Contains(raw, []byte(`"run_slots":{"used":4,"total":4}`)) {
+		t.Fatalf("stored %s", raw)
+	}
+	back, err := domain.ReportFromStore(domain.RuntimeOnline, "", "", "", raw)
+	if err != nil || back.RunSlots == nil || *back.RunSlots != *r.RunSlots {
+		t.Fatalf("read back %+v %v", back.RunSlots, err)
+	}
+	none, _ := domain.DecodeHeartbeat([]byte(`{"state":"online"}`))
+	if none.RunSlots != nil || bytes.Contains(none.StoredDetails(), []byte("run_slots")) {
+		t.Fatalf("absent run_slots stored: %s", none.StoredDetails())
+	}
+	for name, c := range map[string]struct{ value, pointer, code string }{
+		"used above total": {`{"used":5,"total":4}`, "/run_slots/used", "too_large"},
+		"total zero":       {`{"used":0,"total":0}`, "/run_slots/total", "too_small"},
+		"negative used":    {`{"used":-1,"total":2}`, "/run_slots/used", "too_small"},
+		"no total":         {`{"used":1}`, "/run_slots/total", "required"},
+		"text":             {`{"used":"1","total":2}`, "/run_slots/used", "invalid_type"},
+		"fraction":         {`{"used":1.5,"total":2}`, "/run_slots/used", "invalid_type"},
+		"unknown member":   {`{"used":1,"total":2,"free":1}`, "/run_slots/free", "unknown_member"},
+		"not an object":    {`[1,2]`, "/run_slots", "invalid_type"},
+	} {
+		if _, fes := domain.DecodeHeartbeat([]byte(`{"state":"online","run_slots":` + c.value + `}`)); !hasError(fes, c.pointer, c.code) {
+			t.Errorf("%s: errors %+v, want %s at %s", name, fes, c.code, c.pointer)
+		}
+	}
+}
+
+// TestDecodeHeartbeatWaitingRuns (F-WARTESCHLANGE-GRUND, 09 4.8 and 5.2.1): waiting_runs lists
+// distinct runs with the wait reason slots_full or thread_busy; absent is the empty list.
+func TestDecodeHeartbeatWaitingRuns(t *testing.T) {
+	t.Parallel()
+	r, fes := domain.DecodeHeartbeat([]byte(`{"state":"online","waiting_runs":[{"run_id":"` + runA + `","reason":"slots_full"},` +
+		`{"run_id":"` + runB + `","reason":"thread_busy"}]}`))
+	if len(fes) > 0 || len(r.Waiting) != 2 || r.Waiting[0].RunID.String() != runA || r.Waiting[0].Reason != "slots_full" ||
+		r.Waiting[1].Reason != "thread_busy" {
+		t.Fatalf("report %+v errors %+v", r.Waiting, fes)
+	}
+	if bytes.Contains(r.StoredDetails(), []byte("waiting")) {
+		t.Fatalf("waiting runs stored in reported_details: %s", r.StoredDetails())
+	}
+	if none, _ := domain.DecodeHeartbeat([]byte(`{"state":"online"}`)); none.Waiting != nil {
+		t.Fatalf("absent member %+v", none.Waiting)
+	}
+	for name, c := range map[string]struct{ list, pointer, code string }{
+		"unknown reason": {`[{"run_id":"` + runA + `","reason":"rate_limited"}]`, "/waiting_runs/0/reason", "invalid_enum"},
+		"no reason":      {`[{"run_id":"` + runA + `"}]`, "/waiting_runs/0/reason", "required"},
+		"no run":         {`[{"reason":"slots_full"}]`, "/waiting_runs/0/run_id", "required"},
+		"bad run id":     {`[{"run_id":"x","reason":"slots_full"}]`, "/waiting_runs/0/run_id", "invalid_format"},
+		"twice": {`[{"run_id":"` + runA + `","reason":"slots_full"},{"run_id":"` + runA + `","reason":"thread_busy"}]`,
+			"/waiting_runs/1/run_id", "duplicate"},
+		"unknown member": {`[{"run_id":"` + runA + `","reason":"slots_full","x":1}]`, "/waiting_runs/0/x", "unknown_member"},
+		"not a list":     {`{}`, "/waiting_runs", "invalid_type"},
+	} {
+		if _, fes := domain.DecodeHeartbeat([]byte(`{"state":"online","waiting_runs":` + c.list + `}`)); !hasError(fes, c.pointer, c.code) {
+			t.Errorf("%s: errors %+v, want %s at %s", name, fes, c.code, c.pointer)
+		}
+	}
+}

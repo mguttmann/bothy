@@ -215,7 +215,11 @@ void main() {
         findsOneWidget,
       );
       expect(
-        find.descendant(of: row(3), matching: find.text(en.liveBoxStateQueued)),
+        // A queued run says why it waits (09 5.2.1); this one has no reason yet.
+        find.descendant(
+          of: row(3),
+          matching: find.text(en.liveBoxWaitAgentStart),
+        ),
         findsOneWidget,
       );
       expect(

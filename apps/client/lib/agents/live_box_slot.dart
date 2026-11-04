@@ -30,7 +30,8 @@ import '../app/providers/session.dart';
 import '../app/router.dart';
 import '../keyboard/app_shortcuts.dart';
 import '../keyboard/intents.dart';
-import '../running/providers.dart' show mayStop, stopRun;
+import '../running/providers.dart'
+    show RunningRow, mayStop, runningRowsProvider, stopRun;
 import '../thread/providers.dart';
 import 'followups.dart';
 import 'providers.dart';
@@ -177,13 +178,24 @@ class _LiveBoxSlotState extends ConsumerState<LiveBoxSlot> {
     // A question waits for the person who triggered the run; for that person it reads
     // "Waiting for you" (components.md 2.1).
     final waitingFor = run.triggeredBy == me ? null : name(run.triggeredBy);
+    final wait = liveBoxWait(
+      ref,
+      run,
+      open: (thread) => context.go('/t/${thread.value}'),
+    );
     final data = doc == null
-        ? runFromSummary(run, agentName: name(run.agentId), now: now)
+        ? runFromSummary(
+            run,
+            agentName: name(run.agentId),
+            now: now,
+            wait: wait,
+          )
         : runFromDocument(
             doc,
             agentName: name(run.agentId),
             now: now,
             waitingForName: waitingFor,
+            wait: wait,
           );
     final expanded = ref.watch(runExpansionProvider)[run.id.value] ?? true;
     final engine = ref.watch(syncEngineProvider);
@@ -264,13 +276,44 @@ class _LiveBoxSlotState extends ConsumerState<LiveBoxSlot> {
   }
 }
 
+/// Why the queued [run] waits (09 5.2.1), or null for a run that does not wait: from the
+/// summary, which run.state_changed keeps current, with the agent's presence, slot count and
+/// the running runs the device knows; [open] opens the thread of a run that holds a slot
+/// (shared by the slot and the phone's sheet).
+DsWait? liveBoxWait(
+  WidgetRef ref,
+  RunSummary run, {
+  required void Function(ThreadId thread) open,
+}) => run.state == RunState.queued
+    ? queuedWait(
+        run,
+        presence: ref
+            .watch(agentPresenceProvider(run.agentId.value))
+            .value
+            ?.state,
+        slotsTotal: ref
+            .watch(agentInfoProvider(run.agentId.value))
+            .value
+            ?.runSlots
+            ?.total,
+        holders: [
+          for (final row
+              in ref.watch(runningRowsProvider).value ?? const <RunningRow>[])
+            (run: row.run, label: row.path.join(' > ')),
+        ],
+        open: open,
+      )
+    : null;
+
 /// The view model of the active [run] of [threadId] and its Stop, or null for Stop where the
-/// server's answers do not allow `run.cancel` (shared by the slot and the phone's sheet).
+/// server's answers do not allow `run.cancel` (shared by the slot and the phone's sheet);
+/// [open] opens the thread of a run that holds a slot of a queued run's agent.
 ({DsRunData data, VoidCallback? stop}) liveBoxView(
   WidgetRef ref,
   RunSummary run, {
   required ThreadId threadId,
   required ChannelId channelId,
+  required void Function(ThreadId thread) open,
 }) {
   final thread = threadId.value;
   final principals = ref.watch(principalsByIdProvider).value ?? const {};
@@ -282,13 +325,15 @@ class _LiveBoxSlotState extends ConsumerState<LiveBoxSlot> {
   // A question waits for the person who triggered the run; for that person it reads
   // "Waiting for you" (components.md 2.1).
   final waitingFor = run.triggeredBy == me ? null : name(run.triggeredBy);
+  final wait = liveBoxWait(ref, run, open: open);
   final data = doc == null
-      ? runFromSummary(run, agentName: name(run.agentId), now: now)
+      ? runFromSummary(run, agentName: name(run.agentId), now: now, wait: wait)
       : runFromDocument(
           doc,
           agentName: name(run.agentId),
           now: now,
           waitingForName: waitingFor,
+          wait: wait,
         );
   final engine = ref.watch(syncEngineProvider);
   final canStop = engine != null && mayStop(run, access, me);
@@ -380,6 +425,12 @@ class _LiveBoxSheetState extends ConsumerState<LiveBoxSheet> {
       run,
       threadId: widget.threadId,
       channelId: widget.channelId,
+      // A run that holds a slot opens its thread; the sheet closes first.
+      open: (thread) {
+        final router = GoRouter.of(context);
+        unawaited(Navigator.of(context).maybePop());
+        router.go('/t/${thread.value}');
+      },
     );
     final config = ref.watch(appConfigProvider);
     return SingleChildScrollView(

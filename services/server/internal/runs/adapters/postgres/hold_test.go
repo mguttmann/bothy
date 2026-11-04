@@ -23,7 +23,7 @@ import (
 // heldRun is a run of agent in thread held until held.
 func heldRun(w world, thread, agent ids.ID, queued, held time.Time) app.NewRun {
 	n := newRun(w, thread, agent, queued)
-	n.InvocationHeldUntil = held
+	n.InvocationHeldUntil, n.StateReason = held, domain.WaitInvocationHeld
 	return n
 }
 
@@ -39,8 +39,8 @@ func TestRepository_HoldQueries(t *testing.T) {
 	held := queued.Add(3 * time.Minute)
 	a := e.insert(t, heldRun(w, w.thread, w.robin, queued, held), true)
 	b := e.insert(t, heldRun(w, w.other, w.sam, queued, held), true)
-	if !a.InvocationHeldUntil.Equal(held) {
-		t.Fatalf("held until %v, want %v", a.InvocationHeldUntil, held)
+	if !a.InvocationHeldUntil.Equal(held) || a.StateReason != domain.WaitInvocationHeld {
+		t.Fatalf("held until %v reason %q, want %v and invocation_held", a.InvocationHeldUntil, a.StateReason, held)
 	}
 	if read, _, _ := e.repo.Run(ctx, a.ID); !read.InvocationHeldUntil.Equal(held) {
 		t.Fatalf("read back %v", read.InvocationHeldUntil)
@@ -70,7 +70,7 @@ func TestRepository_HoldQueries(t *testing.T) {
 	release := func(id ids.ID, want bool) {
 		t.Helper()
 		e.do(t, func(ctx context.Context) error {
-			ok, err := e.repo.ReleaseHeldInvocation(ctx, id)
+			_, ok, err := e.repo.ReleaseHeldInvocation(ctx, id)
 			if err == nil && ok != want {
 				t.Errorf("ReleaseHeldInvocation %v, want %v", ok, want)
 			}
@@ -79,7 +79,8 @@ func TestRepository_HoldQueries(t *testing.T) {
 	}
 	release(a.ID, true)
 	release(a.ID, false)
-	if r, _, _ := e.repo.Run(ctx, a.ID); !r.InvocationHeldUntil.IsZero() || r.Version != a.Version+1 || r.State != domain.StateQueued {
+	if r, _, _ := e.repo.Run(ctx, a.ID); !r.InvocationHeldUntil.IsZero() || r.Version != a.Version+1 || r.State != domain.StateQueued ||
+		r.StateReason != "" {
 		t.Fatalf("released run %+v", r)
 	}
 	ended := e.transition(t, app.TransitionWrite{ID: b.ID, From: domain.StateQueued, Version: b.Version, To: domain.StateFailed,
@@ -144,8 +145,11 @@ func TestInvocationHoldTimeout_Postgres(t *testing.T) {
 		t.Fatalf("released: %+v", r)
 	}
 	got := evs.list()
-	if len(got) != 1 || got[0].Type != "agent.invocation" || got[0].ActorKind != "" || got[0].ResourceID != run.ID ||
-		got[0].ChannelID != channel || got[0].AudiencePrincipalID != w.robin || len(sched.list()) != 1 {
+	// The release clears the wait reason invocation_held (run.state_changed without an actor, 09
+	// 5.2.1) and writes the invocation.
+	if len(got) != 2 || got[0].Type != "run.state_changed" || got[0].ActorKind != "" || got[0].ResourceID != run.ID ||
+		got[1].Type != "agent.invocation" || got[1].ActorKind != "" || got[1].ResourceID != run.ID ||
+		got[1].ChannelID != channel || got[1].AudiencePrincipalID != w.robin || len(sched.list()) != 1 {
 		t.Fatalf("events %+v schedules %v", got, sched.list())
 	}
 }

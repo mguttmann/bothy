@@ -32,7 +32,7 @@ final class LiveTopologyModel {
       at: frame.at,
       spaceId: frame.scope.spaceId,
       lanes: List.unmodifiable(
-        LaneModel.group(frame.runs, names, at: frame.at),
+        LaneModel.group(frame.runs, names, at: frame.at, agents: frame.agents),
       ),
       runsTruncated: frame.runsTruncated,
       rates: List.unmodifiable([

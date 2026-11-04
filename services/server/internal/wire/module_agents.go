@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/OWNER/bothy/services/server/internal/agents"
 	agentsapp "github.com/OWNER/bothy/services/server/internal/agents/app"
 	"github.com/OWNER/bothy/services/server/internal/chat"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
@@ -46,12 +47,27 @@ func agentsWiring() moduleWiring {
 // applies project readiness through chat (M2-03, D-M2-20-10).
 func (s *server) bindAgentReadiness(context.Context) error {
 	s.mu.Lock()
-	ag, c := s.agents, s.chat
+	ag, c, rn := s.agents, s.chat, s.runs
 	s.mu.Unlock()
 	if ag != nil && ag.Presence != nil {
 		ag.Presence.BindReadiness(readinessInMaintenance{chat: c.Service})
+		if rn != nil && rn.Service != nil {
+			// The wait reasons of waiting_runs (09 5.2.1, F-WARTESCHLANGE-GRUND); runs starts in
+			// the same step before this binding (order 1320).
+			ag.Presence.BindRunWaits(runWaitsInMaintenance{runs: rn.Service})
+		}
 	}
 	return nil
+}
+
+// runWaitsInMaintenance passes the waiting runs of a heartbeat to runs with
+// txn.WithWriteInMaintenance: the wait reason is runtime state the agent reports, like the
+// project readiness (D-M7-08-9).
+type runWaitsInMaintenance struct{ runs agentsapp.RunWaits }
+
+// ApplyRunWaits implements agentsapp.RunWaits.
+func (r runWaitsInMaintenance) ApplyRunWaits(ctx context.Context, agentID ids.ID, waits []agents.RunWait) error {
+	return r.runs.ApplyRunWaits(txn.WithWriteInMaintenance(ctx), agentID, waits)
 }
 
 // readinessInMaintenance passes the project readiness of a heartbeat to chat with

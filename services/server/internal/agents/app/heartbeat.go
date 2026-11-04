@@ -79,6 +79,9 @@ func (t *Tracker) Heartbeat(ctx context.Context, body json.RawMessage) (agents.P
 	if err := t.applyFolders(ctx, e, report); err != nil {
 		return agents.PresenceStatus{}, err
 	}
+	if err := t.applyWaits(ctx, e, report, now); err != nil {
+		return agents.PresenceStatus{}, err
+	}
 	trash, err := t.applyTrash(ctx, a.ID, report)
 	if err != nil {
 		return agents.PresenceStatus{}, err
@@ -218,6 +221,34 @@ func (t *Tracker) applyReadiness(ctx context.Context, e *entry, r domain.Report,
 		return internal(err, "agents: applying project readiness")
 	}
 	e.readiness, e.readinessSet, e.readinessAt = slices.Clone(r.Readiness), true, now
+	return nil
+}
+
+// applyWaits hands waiting_runs of r to runs when the list (absent counts as empty) differs from
+// the last one this process applied for the agent, or that application is at least
+// PersistInterval old: another node may have applied another list meanwhile (09 4.8, 5.2.1;
+// F-WARTESCHLANGE-GRUND). The caller holds e.beat, which guards the applied list. Without a bound
+// port nothing is applied. Any error of the port fails the heartbeat with internal_error.
+func (t *Tracker) applyWaits(ctx context.Context, e *entry, r domain.Report, now time.Time) error {
+	port := t.boundRunWaits()
+	if port == nil {
+		return nil
+	}
+	list := r.Waiting
+	if list == nil {
+		list = []domain.WaitingRun{}
+	}
+	if e.waitsSet && slices.Equal(e.waits, list) && now.Sub(e.waitsAt) < t.cfg.PersistInterval {
+		return nil
+	}
+	waits := make([]agents.RunWait, 0, len(list))
+	for _, w := range list {
+		waits = append(waits, agents.RunWait{RunID: w.RunID, Reason: w.Reason})
+	}
+	if err := port.ApplyRunWaits(ctx, e.id, waits); err != nil {
+		return internal(err, "agents: applying the waiting runs")
+	}
+	e.waits, e.waitsSet, e.waitsAt = slices.Clone(list), true, now
 	return nil
 }
 

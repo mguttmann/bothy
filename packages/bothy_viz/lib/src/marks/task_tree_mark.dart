@@ -513,20 +513,87 @@ class RunCardTreeMark extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final card = RunCardMark(model: model, onTap: onTap);
-    if (model.tasks.isEmpty && !model.tasksTruncated) return card;
+    final wait = model.wait;
+    final held = wait != null && (wait.blockers.isNotEmpty || wait.hidden > 0)
+        ? RunWaitMark(
+            key: ValueKey('runWait.run.${model.runId}'),
+            wait: wait,
+            onTap: onTap,
+          )
+        : null;
+    if (model.tasks.isEmpty && !model.tasksTruncated && held == null) {
+      return card;
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
         card,
-        TaskTreeMark(
-          key: ValueKey('taskTree.run.${model.runId}'),
-          tasks: model.tasks,
-          threadId: model.label.threadId ?? model.threadId,
-          truncated: model.tasksTruncated,
-          onTap: model.label.threadId == null ? null : onTap,
-        ),
+        ?held,
+        // A card that only waits has no task tree to announce.
+        if (model.tasks.isNotEmpty || model.tasksTruncated)
+          TaskTreeMark(
+            key: ValueKey('taskTree.run.${model.runId}'),
+            tasks: model.tasks,
+            threadId: model.label.threadId ?? model.threadId,
+            truncated: model.tasksTruncated,
+            onTap: model.label.threadId == null ? null : onTap,
+          ),
       ],
+    );
+  }
+}
+
+/// The runs that hold the slots a queued card waits for (09 5.2.1, 25 6.1), below the card: a
+/// heading, one link per run whose chat the server named (others as plain text) and the count
+/// of the slots the frame does not show.
+class RunWaitMark extends StatelessWidget {
+  /// Creates the list of [wait]; [onTap] opens the chat of a named run.
+  const RunWaitMark({super.key, required this.wait, this.onTap});
+
+  /// The wait of the card.
+  final RunWaitModel wait;
+
+  /// Called with the thread of a run of [RunWaitModel.blockers].
+  final RunTapCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final texts = VizTexts.of(context);
+    final l10n = texts.l10n;
+    final colors = context.dsColors;
+    final plain = dsTextStyle(DsType.caption)
+        .copyWith(color: colors.textSecondary);
+    final link = dsTextStyle(DsType.caption)
+        .copyWith(color: context.dsAccent.textLink);
+    final tap = onTap;
+    return Padding(
+      padding: const EdgeInsetsDirectional.only(
+        start: DsSpace.s12,
+        top: DsSpace.s4,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(l10n.liveBoxWaitHeldBy, style: plain),
+          for (final b in wait.blockers)
+            if (tap != null && b.threadId != null)
+              DsTappable(
+                onTap: () => tap(b.threadId!),
+                label: l10n.liveBoxWaitOpenRun(texts.runTitle(b)),
+                excludeChildSemantics: true,
+                child: Text(dsIsolate(texts.runTitle(b)), style: link),
+              )
+            else
+              Text(
+                dsIsolate(b.named ? texts.runTitle(b) : texts.runDetail(b)),
+                style: plain,
+              ),
+          if (wait.hidden > 0)
+            Text(l10n.liveBoxWaitHiddenRuns(wait.hidden), style: plain),
+        ],
+      ),
     );
   }
 }

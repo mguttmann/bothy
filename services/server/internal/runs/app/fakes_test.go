@@ -73,7 +73,7 @@ func (r *repo) InsertRun(_ context.Context, n app.NewRun) (app.RunRow, bool, err
 		ID: n.ID, ThreadID: n.ThreadID, AgentID: n.AgentID, TriggerKind: n.TriggerKind, TriggeringMessageID: n.TriggeringMessageID,
 		TriggeredBy: n.TriggeredBy, State: domain.StateQueued, Version: 1, BillingModeExpected: n.BillingModeExpected,
 		InvocationJTI: n.InvocationJTI, Plan: []byte("{}"), Metrics: []byte("{}"), Currency: "USD", CostIsEstimate: true, QueuedAt: n.QueuedAt,
-		InvocationHeldUntil: n.InvocationHeldUntil,
+		InvocationHeldUntil: n.InvocationHeldUntil, StateReason: n.StateReason,
 	}
 	r.runs = append(r.runs, row)
 	return row, true, nil
@@ -155,16 +155,37 @@ func (r *repo) LockHeldRunsOfMessage(_ context.Context, message ids.ID) ([]ids.I
 
 // ReleaseHeldInvocation clears the column of a held queued run and raises its version, like the
 // UPDATE of queries/hold.sql; released is false when no such row exists.
-func (r *repo) ReleaseHeldInvocation(_ context.Context, id ids.ID) (bool, error) {
+func (r *repo) ReleaseHeldInvocation(_ context.Context, id ids.ID) (app.RunRow, bool, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	for i, x := range r.runs {
 		if x.ID == id && x.State == domain.StateQueued && !x.InvocationHeldUntil.IsZero() {
 			r.runs[i].InvocationHeldUntil, r.runs[i].Version = time.Time{}, x.Version+1
-			return true, nil
+			if x.StateReason == domain.WaitInvocationHeld {
+				r.runs[i].StateReason = ""
+			}
+			return r.runs[i], true, nil
 		}
 	}
-	return false, nil
+	return app.RunRow{}, false, nil
+}
+
+// LockQueuedRunsOfAgent returns the queued runs of agent in ascending id, like queries/run_lifecycle.sql.
+func (r *repo) LockQueuedRunsOfAgent(_ context.Context, agent ids.ID) ([]app.RunRow, error) {
+	return r.lockActive(func(x app.RunRow) bool { return x.AgentID == agent && x.State == domain.StateQueued }), nil
+}
+
+// SetQueuedReason stores the wait reason of a queued run with one version step.
+func (r *repo) SetQueuedReason(_ context.Context, id ids.ID, reason string) (app.RunRow, bool, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for i, x := range r.runs {
+		if x.ID == id && x.State == domain.StateQueued {
+			r.runs[i].StateReason, r.runs[i].Version = reason, x.Version+1
+			return r.runs[i], true, nil
+		}
+	}
+	return app.RunRow{}, false, nil
 }
 
 func (r *repo) RaiseRunVersion(_ context.Context, id ids.ID) (int64, error) {

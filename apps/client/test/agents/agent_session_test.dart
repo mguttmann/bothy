@@ -24,6 +24,7 @@ FakeAgentReads agentReads() => FakeAgentReads()
   ..agents[robin] = (
     billingMode: BillingMode.organization,
     presence: AgentRuntimeState.online,
+    runSlots: null,
     reportedBillingMode: BillingMode.personal,
   )
   ..sessionsOf[threadId(1)] = <AgentSessionView>[

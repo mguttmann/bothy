@@ -89,6 +89,9 @@ type NewRun struct {
 	// InvocationHeldUntil is the release time of a held agent.invocation (M3-07); zero stores NULL
 	// (not held).
 	InvocationHeldUntil time.Time
+	// StateReason is the wait reason of the new run (09 5.2.1): invocation_held for a held run, ""
+	// (NULL) otherwise.
+	StateReason string
 }
 
 // TransitionWrite is the input of Repository.TransitionRun: the compare-and-swap on state and
@@ -255,6 +258,11 @@ type Repository interface {
 	// LockActiveRunsByStarter locks the active runs triggered by one of principalIDs in ascending
 	// id (R-SY-11, M2-09). It needs a unit of work.
 	LockActiveRunsByStarter(ctx context.Context, principalIDs []ids.ID) ([]RunRow, error)
+	// LockQueuedRunsOfAgent locks the queued runs of agentID in ascending id (09 5.2.1).
+	LockQueuedRunsOfAgent(ctx context.Context, agentID ids.ID) ([]RunRow, error)
+	// SetQueuedReason stores the wait reason of the queued run id ("" stores NULL) with one
+	// version step; found is false when the run is no longer queued.
+	SetQueuedReason(ctx context.Context, id ids.ID, reason string) (row RunRow, found bool, err error)
 	// LockActiveRunsByAgent locks the active runs of agentID in ascending id (09 2.1, M2-09). It
 	// needs a unit of work.
 	LockActiveRunsByAgent(ctx context.Context, agentID ids.ID) ([]RunRow, error)
@@ -294,10 +302,11 @@ type Repository interface {
 	// held (invocation_held_until set), in ascending id, and returns their ids (M3-07, the
 	// subscriber of files.FileFinalized). It needs a unit of work.
 	LockHeldRunsOfMessage(ctx context.Context, messageID ids.ID) ([]ids.ID, error)
-	// ReleaseHeldInvocation clears invocation_held_until of a queued held run and raises version
-	// by one (M3-07); released is false when the run is not queued or not held, which leaves it
-	// unchanged. The caller holds the row lock. Errors: internal outside a unit of work.
-	ReleaseHeldInvocation(ctx context.Context, id ids.ID) (released bool, err error)
+	// ReleaseHeldInvocation clears invocation_held_until and the wait reason invocation_held of a
+	// queued held run, raises version by one and returns the row (M3-07, 09 5.2.1); released is
+	// false when the run is not queued or not held, which leaves it unchanged. The caller holds
+	// the row lock. Errors: internal outside a unit of work.
+	ReleaseHeldInvocation(ctx context.Context, id ids.ID) (row RunRow, released bool, err error)
 	// SetRunSession writes runs.agent_session_id of runID and nothing else: no version change and
 	// no event (M2-12 design notes 10 and 12). It needs a unit of work. Errors: not_found for an
 	// unknown run.

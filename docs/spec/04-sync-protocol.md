@@ -620,7 +620,9 @@ change per `agent.run_update_min_interval`.
 
 1. State changes (`queued`, `running`, `waiting_input`, end) are durable events
    `run.state_changed` with a summary (state, duration, cost, number of steps). The sidebar and
-   "Running now" are fed from them.
+   "Running now" are fed from them. A change of the wait reason of a `queued` run
+   ([09-agents.md](09-agents.md) 5.2.1) is one too, without a trigger state (addendum of
+   2026-11-04).
 2. Content changes are the ephemeral event `run.updated {run_id, base_version,
    version, ops}`. It goes only to connections that have the thread in `focus` and
    may perform `run.read`; a thread in `background_thread_ids` (6.2) counts as in focus for

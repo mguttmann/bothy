@@ -81,6 +81,7 @@ from bothy_sdk.generated.models import (
     Run,
     RunFinish,
     RunFinishState,
+    RunSlots,
     RunStart,
     ToolClass,
 )
@@ -313,6 +314,11 @@ class RuntimeStatus:
             ``None`` leaves the member out (the adapter follows the configured mode per run).
         billing_evidence: Where the runtime's key comes from (``key_type``, ``provider``,
             ``method``), never a key value; ``None`` leaves the member out (M2-37).
+        run_slots: Runners only: the turns that run now of the turns that may run at once
+            (``used``, ``total``; 09 4.8); ``None`` leaves the member out.
+        waiting_runs: The accepted runs that wait in ``prepare`` with their wait reason
+            (``slots_full`` or ``thread_busy``, 09 5.2.1) as ``(run_id, reason)`` pairs;
+            ``None`` leaves the member out, which the server takes as the empty list.
     """
 
     state: str = "online"
@@ -326,6 +332,8 @@ class RuntimeStatus:
     rate_limit: AgentRateLimitState | Mapping[str, Any] | None = None
     reported_billing_mode: str | None = None
     billing_evidence: BillingEvidence | Mapping[str, Any] | None = None
+    run_slots: RunSlots | Mapping[str, Any] | None = None
+    waiting_runs: Sequence[tuple[UUID, str]] | None = None
 
 
 class AgentHandler:
@@ -785,6 +793,8 @@ class Adapter:
             project_readiness=None if status is None else status.project_readiness,
             project_folders=None if status is None else status.project_folders,
             project_trash_results=None if status is None else status.project_trash_results,
+            run_slots=None if status is None else status.run_slots,
+            waiting_runs=None if status is None else status.waiting_runs,
         )
 
     async def send_heartbeat(self) -> None:

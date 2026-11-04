@@ -26758,6 +26758,9 @@ components:
           description: False when the reported mode differs from the configured `billing_mode`.
         rate_limit:
           $ref: '#/components/schemas/AgentRateLimitState'
+        run_slots:
+          $ref: '#/components/schemas/RunSlots'
+          description: Runners only, the slot use of the last heartbeat (09 4.8); absent when the adapter does not report it.
         billing_evidence:
           $ref: '#/components/schemas/BillingEvidence'
         warnings:
@@ -26896,6 +26899,43 @@ components:
           description: Runners only, the outcome of each folder move of `HeartbeatAck.project_trash` the runner finished since its last heartbeat (09 18.15); the server stores it once and audits it as `channel.project.trash`.
           items:
             $ref: '#/components/schemas/ProjectTrashResult'
+        run_slots:
+          $ref: '#/components/schemas/RunSlots'
+          description: Runners only, how many turns run now of how many may run at once (09 4.8). Stored in `agents.reported_details.run_slots`; absent clears a stored one (full state).
+        waiting_runs:
+          type: array
+          maxItems: 1000
+          description: The accepted runs of this adapter that wait before their start, each with its wait reason (09 5.2.1); the run ids must be distinct. The server stores the reason as `runs.state_reason` of each listed run that is still `queued`, and clears a runner reason of a queued run of the agent that is no longer listed; absent counts as the empty list.
+          items:
+            $ref: '#/components/schemas/WaitingRun'
+    RunSlots:
+      type: object
+      additionalProperties: false
+      description: Slot use of a runner (09 4.8, 18.2), `used` turns run of at most `total` (`runner.max_parallel_runs`) at once; `used` is at most `total`.
+      required: [used, total]
+      properties:
+        used:
+          type: integer
+          minimum: 0
+          maximum: 10000
+          examples: [4]
+        total:
+          type: integer
+          minimum: 1
+          maximum: 10000
+          examples: [4]
+    WaitingRun:
+      type: object
+      additionalProperties: false
+      description: One run an adapter accepted that waits before its start (09 5.2.1).
+      required: [run_id, reason]
+      properties:
+        run_id:
+          $ref: '#/components/schemas/Uuid'
+        reason:
+          type: string
+          enum: [slots_full, thread_busy]
+          description: '`slots_full`: every slot of `runner.max_parallel_runs` is in use; `thread_busy`: the thread or session lock is held by another turn.'
     ProjectFolderName:
       type: string
       description: One folder name directly under a runner's projects root, the one-segment form of `workspace_ref` (09 18.12 item 2).
@@ -27189,7 +27229,8 @@ components:
           $ref: '#/components/schemas/RunState'
         state_reason:
           type: string
-          examples: [user_cancelled]
+          description: The reason of `failed` and `cancelled` (09 5.2); while `queued` the wait reason of 09 5.2.1, `invocation_held` (the server holds the invocation until an attachment or transcript is final), `slots_full` (every slot of the runner is in use) or `thread_busy` (the runner waits for the thread or session lock); absent while queued when the agent has not reported a wait.
+          examples: [user_cancelled, slots_full]
         version:
           type: integer
           format: int64
@@ -27262,6 +27303,8 @@ components:
           $ref: '#/components/schemas/RunState'
         state_reason:
           type: string
+          description: The reason of `failed` and `cancelled` (09 5.2); while `queued` the wait reason of 09 5.2.1, `invocation_held` (the server holds the invocation until an attachment or transcript is final), `slots_full` (every slot of the runner is in use) or `thread_busy` (the runner waits for the thread or session lock); absent while queued when the agent has not reported a wait.
+          examples: [slots_full]
         version:
           type: integer
           format: int64
@@ -30109,6 +30152,10 @@ components:
         state:
           type: string
           enum: [queued, running, waiting_input]
+        state_reason:
+          type: string
+          description: Only for `queued`, the wait reason of `runs.state_reason` (09 5.2.1, for example `slots_full`); absent when none is stored. A client shows the agent offline when its presence in `agents` is `offline` or `unknown`.
+          examples: [slots_full]
         queued_at:
           $ref: '#/components/schemas/Timestamp'
         started_at:
@@ -30207,6 +30254,9 @@ components:
           description: Absent when the adapter follows the configured mode per run.
         rate_limit:
           $ref: '#/components/schemas/AgentRateLimitState'
+        run_slots:
+          $ref: '#/components/schemas/RunSlots'
+          description: Runners only, the slot use of the last heartbeat (09 4.8); with the runs of the frame a client names the runs that hold the slots.
     StatsLiveRate:
       type: object
       description: Sum of `count` (and `sum` where meaningful) of one metric over the last full minute and the current minute up to `at`.

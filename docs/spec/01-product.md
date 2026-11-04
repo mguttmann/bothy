@@ -537,7 +537,7 @@ for screen readers.
 +----------------------------------------------------------------------------------------------------+
 | (o) dev-runner     server > Gateway: resume after network change   4:12  62 %  0,62 USD  [Stop]    |
 | [!] dev-runner     server > Check migration 0012         waiting for you  2:03  [Open]             |
-| (z) research-bot   Research > Weekly report                Queued                 [Open]           |
+| (z) research-bot   Research > Weekly report    Waiting for a free slot (4 of 4 in use)  [Open]     |
 +----------------------------------------------------------------------------------------------------+
 | Organization: sum of active runs 0,80 USD (estimate). Personal runs: information only.             |
 +----------------------------------------------------------------------------------------------------+

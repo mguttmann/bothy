@@ -408,6 +408,9 @@ exceptions:
   - query: runs.LockActiveRunsByAgent
     category: system_job
     reason: "the in-transaction subscriber of agents.AgentDisabled locks the active runs of the disabled agent and ends them cancelled; nothing of the rows leaves the server (09 2.1, M2-09)"
+  - query: runs.LockQueuedRunsOfAgent
+    category: system_job
+    reason: "the heartbeat of an agent locks the queued runs of that agent, the caller itself, to store the wait reasons it reported in waiting_runs; nothing of the rows leaves the server except run.state_changed, which the gateway delivers only with run.read (09 5.2.1, F-WARTESCHLANGE-GRUND)"
   - query: runs.LockActiveRunsByThreads
     category: system_job
     reason: "the in-transaction subscriber of chat.ChannelReadOnlySet locks the active runs of the threads of a channel that became read-only and sends their agent run.cancel_requested; nothing of the rows leaves the server (05 channel.read_only.set, M8-03)"

@@ -5,7 +5,7 @@ library;
 
 import 'package:api_client/api_client.dart' as api;
 import 'package:built_value/serializer.dart';
-import 'package:design_system/design_system.dart' show dsReasonText;
+import 'package:design_system/design_system.dart' show dsReasonText, dsWaitText;
 import 'package:domain/domain.dart';
 import 'package:flutter/widgets.dart';
 import 'package:l10n/l10n.dart';
@@ -166,6 +166,16 @@ final class VizTexts {
   String runDetail(VizRunLabel label) => label.named
       ? l10n.vizRunDetail(label.agent, label.shortId)
       : label.shortId;
+
+  /// The state text of [card]: a queued card says why it waits (09 5.2.1), never only
+  /// "Queued"; the other states as [runState].
+  String cardState(RunCardModel card) {
+    final wait = card.wait;
+    if (card.state != RunCardState.queued || wait == null) {
+      return runState(card.state);
+    }
+    return dsWaitText(l10n, wait.reason, used: wait.used, total: wait.total);
+  }
 
   /// The text of a run [state].
   String runState(RunCardState state) => switch (state) {

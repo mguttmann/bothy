@@ -48,19 +48,58 @@ func (q *Queries) LockHeldRunsOfMessage(ctx context.Context, messageID pgtype.UU
 	return items, nil
 }
 
-const releaseHeldInvocation = `-- name: ReleaseHeldInvocation :execrows
+const releaseHeldInvocation = `-- name: ReleaseHeldInvocation :one
 UPDATE runs
-SET invocation_held_until = NULL, version = version + 1
+SET invocation_held_until = NULL,
+    state_reason = CASE WHEN state_reason = 'invocation_held' THEN NULL ELSE state_reason END,
+    version = version + 1
 WHERE id = $1 AND state = 'queued' AND invocation_held_until IS NOT NULL
+RETURNING id, thread_id, agent_id, agent_session_id, trigger_kind, triggering_message_id, triggering_command_id, triggering_interaction_id, triggered_by, state, state_reason, version, billing_mode_expected, billing_mode_used, billing_evidence, invocation_jti, started_jti, renewed_from_jti, dev_environment_id, model, status_line, last_text_excerpt, plan, metrics, cost_micros, currency, cost_is_estimate, summary, stall_warned_at, queued_at, invocation_held_until, started_at, finished_at, duration_ms, last_progress_at
 `
 
-// The release: the column is cleared and version rises by one like every stored change of a run
-// (03 runs.version), without run.state_changed. A run that ended or was released meanwhile
-// matches no row, so a second release changes nothing.
-func (q *Queries) ReleaseHeldInvocation(ctx context.Context, id pgtype.UUID) (int64, error) {
-	result, err := q.db.Exec(ctx, releaseHeldInvocation, id)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
+// The release: the column and the wait reason invocation_held (09 5.2.1) are cleared and version
+// rises by one like every stored change of a run (03 runs.version); the use case appends
+// run.state_changed for the cleared reason. A run that ended or was released meanwhile matches no
+// row, so a second release changes nothing.
+func (q *Queries) ReleaseHeldInvocation(ctx context.Context, id pgtype.UUID) (Run, error) {
+	row := q.db.QueryRow(ctx, releaseHeldInvocation, id)
+	var i Run
+	err := row.Scan(
+		&i.ID,
+		&i.ThreadID,
+		&i.AgentID,
+		&i.AgentSessionID,
+		&i.TriggerKind,
+		&i.TriggeringMessageID,
+		&i.TriggeringCommandID,
+		&i.TriggeringInteractionID,
+		&i.TriggeredBy,
+		&i.State,
+		&i.StateReason,
+		&i.Version,
+		&i.BillingModeExpected,
+		&i.BillingModeUsed,
+		&i.BillingEvidence,
+		&i.InvocationJti,
+		&i.StartedJti,
+		&i.RenewedFromJti,
+		&i.DevEnvironmentID,
+		&i.Model,
+		&i.StatusLine,
+		&i.LastTextExcerpt,
+		&i.Plan,
+		&i.Metrics,
+		&i.CostMicros,
+		&i.Currency,
+		&i.CostIsEstimate,
+		&i.Summary,
+		&i.StallWarnedAt,
+		&i.QueuedAt,
+		&i.InvocationHeldUntil,
+		&i.StartedAt,
+		&i.FinishedAt,
+		&i.DurationMs,
+		&i.LastProgressAt,
+	)
+	return i, err
 }

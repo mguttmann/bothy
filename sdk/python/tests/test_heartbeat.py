@@ -380,3 +380,35 @@ def test_project_readiness_trash_check() -> None:
         lambda: build_heartbeat(project_readiness=[entry]),
         bad,
     )
+
+
+def test_run_slots_and_waiting_runs() -> None:
+    """``run_slots`` and ``waiting_runs`` of a runner (09 4.8, 5.2.1; F-WARTESCHLANGE-GRUND)."""
+    body = build_heartbeat(
+        run_slots={"used": 2, "total": 2},
+        waiting_runs=[{"run_id": RUN_A, "reason": "slots_full"}, (RUN_B, "thread_busy")],
+    ).to_dict()
+    assert body["run_slots"] == {"used": 2, "total": 2}
+    assert body["waiting_runs"] == [
+        {"run_id": str(RUN_A), "reason": "slots_full"},
+        {"run_id": str(RUN_B), "reason": "thread_busy"},
+    ]
+    assert build_heartbeat(waiting_runs=[]).to_dict()["waiting_runs"] == []
+    assert "run_slots" not in build_heartbeat().to_dict()
+    raises_naming("run_slots.used", lambda: build_heartbeat(run_slots={"used": 3, "total": 2}))
+    raises_naming("run_slots.total", lambda: build_heartbeat(run_slots={"used": 0, "total": 0}))
+    raises_naming("run_slots.used", lambda: build_heartbeat(run_slots={"used": True, "total": 2}))
+    raises_naming(
+        "run_slots.free", lambda: build_heartbeat(run_slots={"used": 1, "total": 2, "free": 1})
+    )
+    raises_naming(
+        "waiting_runs.reason",
+        lambda: build_heartbeat(waiting_runs=[{"run_id": RUN_A, "reason": "rate_limited"}]),
+    )
+    raises_naming(
+        "waiting_runs",
+        lambda: build_heartbeat(waiting_runs=[(RUN_A, "slots_full"), (RUN_A, "thread_busy")]),
+    )
+    raises_naming(
+        "waiting_runs.run_id", lambda: build_heartbeat(waiting_runs=[("x", "slots_full")])
+    )

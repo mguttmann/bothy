@@ -483,7 +483,7 @@ func (l *Live) nameRuns(ctx context.Context, base *domain.BaseFrame) error {
 // liveRun converts a run of the source with its agent tree at the build time at.
 func (l *Live) liveRun(r runs.LiveRun, at time.Time) domain.LiveRun {
 	out := domain.LiveRun{RunID: r.ID, ThreadID: r.ThreadID, ChannelID: r.ChannelID, SpaceID: r.SpaceID, AgentID: r.AgentID, State: r.State,
-		QueuedAt: r.QueuedAt, StartedAt: r.StartedAt, BillingMode: r.BillingMode, StepKind: r.StepKind, StepName: r.StepName,
+		StateReason: r.StateReason, QueuedAt: r.QueuedAt, StartedAt: r.StartedAt, BillingMode: r.BillingMode, StepKind: r.StepKind, StepName: r.StepName,
 		ApprovalPending: r.ApprovalPending, CostMicros: r.Cost.AmountMicros, Currency: r.Cost.Currency, CostIsEstimate: r.Cost.IsEstimate}
 	if len(r.Steps) == 0 {
 		return out
@@ -579,6 +579,9 @@ func (l *Live) agentStates(ctx context.Context, want map[ids.ID]struct{}) (map[i
 			continue
 		}
 		a.Presence, a.ReportedBillingMode = s.State, s.ReportedBillingMode
+		if rs := s.RunSlots; rs != nil {
+			a.RunSlots = &domain.RunSlots{Used: rs.Used, Total: rs.Total}
+		}
 		out[s.AgentID] = a
 	}
 	return out, nil
