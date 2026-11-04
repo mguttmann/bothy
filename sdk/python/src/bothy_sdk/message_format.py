@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""The format rules for agent replies in Bothy (docs/spec/09-agents.md 4.11, ADR 0074).
+"""The format rules for agent replies (docs/spec/09-agents.md 4.11, ADR 0074).
 
 The apps render an agent's reply as Markdown (docs/spec/01-product.md 6.14): they wrap running
 text to the width of the view, show fenced code with its language, scroll a wide table or a
