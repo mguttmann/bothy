@@ -138,7 +138,7 @@ Surface `color.surface.raised`, border `color.border.default`, radius `radius.md
 
 | State | Spine and icon | Icon | Word |
 |---|---|---|---|
-| `queued` | `color.run.queued` | `run.queued` | the wait reason of 09 5.2.1, never only "Queued": "Waiting for a free slot (4 of 4 in use)" with a list "Slots in use by" (a link per run the reader may read, the others counted), "Waiting for the agent: it is offline", "Waiting for the earlier turn of this chat to end", "Waiting for an attachment or a transcript" or "Waiting for the agent to start it" (F-WARTESCHLANGE-GRUND) |
+| `queued` | `color.run.queued` | `run.queued` | "Queued" only as the state word (badge, preview); the box shows the wait reason of 09 5.2.1 instead: "Waiting for a free slot (4 of 4 in use)" with a list "Slots in use by" (a link per run the reader may read, the others counted), "Waiting for the agent: it is offline", "Waiting for the earlier turn of this chat to end", "Waiting for an attachment or a transcript" or "Waiting for the agent to start it" (F-WARTESCHLANGE-GRUND) |
 | `running` | `color.run.running` | `run.running` (spins) | "Running" |
 | `waiting_input` | `color.run.waiting` | `run.waiting` | "Waiting for you" or "Waiting for Alex" |
 | `completed` | `color.run.completed` | `run.completed` | "Done" |
