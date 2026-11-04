@@ -30,6 +30,8 @@ func (sc *Scenario) runs() {
 		http.StatusOK, http.StatusConflict)
 	sc.get(alex, "/runs/"+run+"/steps", ok...)
 	sc.get(alex, "/runs", ok...)
+	// The run history (listRunHistory, F-LAUFHISTORIE): the ended runs Alex may read.
+	sc.get(alex, "/run-history", ok...)
 	sc.get(sam, "/runs/"+run, ok...)
 	sc.get(sam, "/runs/"+run+"/steps?limit=1", ok...)
 	// A run of Marketing is invisible to Alex: the same 404 as an unknown run.
