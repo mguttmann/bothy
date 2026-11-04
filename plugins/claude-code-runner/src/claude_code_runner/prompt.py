@@ -3,7 +3,8 @@
 
 * The system prompt file (``--append-system-prompt-file``) holds only the fixed runner
   instructions of ``prompts/runner_prompt.md`` (the TITLE request only for a new or unstarted
-  session) and, in an own section, the channel prompt ``behavior.prompt`` (SEC-AI-1).
+  session), the format rules of `bothy_sdk.message_format` in an own section (09 4.11) and, in
+  an own section, the channel prompt ``behavior.prompt`` (SEC-AI-1).
 * The first stdin line is one ``user`` message with two text items: the system part of
   `bothy_sdk.context.render_context` (context with trust marks, ``unverified`` content and
   every file entry in marked data blocks) and its trigger part (the words and transcripts of
@@ -24,6 +25,7 @@ from collections.abc import Sequence
 from importlib import resources
 
 from bothy_sdk.context import RenderedContext
+from bothy_sdk.message_format import MESSAGE_FORMAT_RULES, MESSAGE_FORMAT_TITLE
 
 __all__ = ["RUNNER_PROMPT", "context_items", "system_prompt", "user_line"]
 
@@ -49,6 +51,7 @@ def system_prompt(*, title_request: bool, channel_prompt: str) -> str:
         (lambda m: "\n" + m.group(1)) if title_request else (lambda _m: ""), RUNNER_PROMPT
     )
     text = text.rstrip() + "\n"
+    text += f"\n## {MESSAGE_FORMAT_TITLE}\n\n{MESSAGE_FORMAT_RULES}\n"
     if channel_prompt.strip():
         text += "\n## Channel prompt\n\n" + channel_prompt.strip() + "\n"
     return text

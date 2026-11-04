@@ -119,6 +119,9 @@ The adapter checks every invocation token itself (09 4.5), acknowledges an event
 stored with its token in the inbox, starts a run at most once with the newest token, renews an
 expired one, and ends a refused run with the reason of 09 4.5. `bothy_sdk.context.render_context`
 turns the run context into a system part with trust marks and the trigger text.
+`bothy_sdk.MESSAGE_FORMAT_RULES` are the format rules for replies (09 4.11): an adapter hands
+them to its runtime on every run as an instruction, under `MESSAGE_FORMAT_TITLE`, before any
+channel prompt, and never writes its own copy.
 
 Rate limits (M6-14): a handler whose runtime knows its provider's rate-limit state returns it in
 `RuntimeStatus(rate_limit={"state": "near_limit", "resets_at": datetime(..., tzinfo=UTC)})` from

@@ -10,6 +10,7 @@ from typing import Any
 
 import pytest
 from bothy_sdk.ids import uuid7
+from bothy_sdk.message_format import MESSAGE_FORMAT_RULES
 from bothy_sdk.testing.fakeserver import ContextFile, ContextMessage
 from bothy_sdk.testing.faults import Fault
 from fake_hermes_kit import HermesRig, HermesWorld, Profile, gateway_log, hermes_rig
@@ -190,6 +191,8 @@ async def test_ag20_context_marks_unverified_content(world: HermesWorld) -> None
         assert SYSTEM_NOTE in system
         blocks = "\n".join(m.group(3) for m in _BLOCK.finditer(system))
         outside = _BLOCK.sub("", system)
+        # F-AGENT-FORMAT: the SDK's format rules reach Hermes' model as instructions.
+        assert MESSAGE_FORMAT_RULES in outside
         for unverified in (writer, texter, imported, attachment):
             assert unverified in blocks, unverified
             assert unverified not in outside, unverified

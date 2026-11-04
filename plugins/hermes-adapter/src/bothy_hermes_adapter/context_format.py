@@ -5,8 +5,9 @@
 (docs/DECISIONS.md D-M2-33-6):
 
 * the system part, handed to Hermes as the event's ephemeral channel prompt (never stored in
-  the transcript): a fixed note for the model, the channel instructions (the channel prompt and
-  the channel's skills, both set by a person with ``manage``), then the context rendered by
+  the transcript): a fixed note for the model, the format rules for replies of
+  `bothy_sdk.message_format` (09 4.11), the channel instructions (the channel prompt and the
+  channel's skills, both set by a person with ``manage``), then the context rendered by
   `bothy_sdk.context.render_context`: every element with author and trust, contents marked
   ``unverified`` and every file text only inside data blocks whose markers carry a random
   boundary of this turn, so no content can close a block or pose as a header line;
@@ -35,6 +36,7 @@ import httpx
 from bothy_sdk.context import render_context
 from bothy_sdk.errors import ProblemError
 from bothy_sdk.generated.models import ChannelBehavior, RunContext
+from bothy_sdk.message_format import MESSAGE_FORMAT_RULES, MESSAGE_FORMAT_TITLE
 
 __all__ = [
     "CUT_MARK",
@@ -136,6 +138,16 @@ async def _file_texts(ctx: RunContext, fetch: Fetcher, limit: int) -> dict[UUID,
 
 
 def _instructions(channel: ChannelBehavior | None) -> list[str]:
+    """The fixed note, the format rules and the channel instructions, as lines."""
+    lines = [
+        SYSTEM_NOTE,
+        f"{MESSAGE_FORMAT_TITLE} of every reply in this chat:",
+        MESSAGE_FORMAT_RULES,
+    ]
+    return lines + _channel_lines(channel)
+
+
+def _channel_lines(channel: ChannelBehavior | None) -> list[str]:
     if channel is None:
         return []
     prompt = channel.prompt if isinstance(channel.prompt, str) else ""
@@ -173,12 +185,12 @@ async def build_context(
     pruned = _without_delivered(ctx)
     texts = await _file_texts(pruned, fetch, attachment_limit)
     rendered = render_context(pruned, file_texts=texts, boundary=boundary)
-    system = "\n".join([SYSTEM_NOTE, *_instructions(channel), rendered.system])
+    system = "\n".join([*_instructions(channel), rendered.system])
     return BuiltContext(system_part=system, user_text=rendered.trigger)
 
 
 def command_system_part(channel: ChannelBehavior | None) -> str:
-    """The system part of a command run: the fixed note and the channel instructions.
+    """The system part of a command run: the fixed note, format rules and channel instructions.
 
     A command run has no run context (09 4.6 defines it for a triggering message only; the
     server answers ``getRunContext`` of a command run with ``500``), so nothing else is added.
@@ -189,7 +201,7 @@ def command_system_part(channel: ChannelBehavior | None) -> str:
     Returns:
         The text.
     """
-    return "\n".join([SYSTEM_NOTE, *_instructions(channel)])
+    return "\n".join(_instructions(channel))
 
 
 def find_message_text(ctx: RunContext, message_id: UUID) -> str | None:

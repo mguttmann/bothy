@@ -965,6 +965,11 @@ Step 7: accepted run {run_id}: token checked, actual mode organization
 Step 7: context of run {run_id}: unverified, trigger
 ```
 
+Hand your runtime the format rules for replies too, on every run and as an instruction, never as
+part of the context: `bothy_sdk.MESSAGE_FORMAT_RULES` under the heading `MESSAGE_FORMAT_TITLE`,
+before any channel prompt. The apps render a reply as Markdown, and the rules keep text, code,
+tables and texts to copy readable there ([09-agents.md](../spec/09-agents.md) 4.11).
+
 ## Step 8: Manage the run
 
 ```python title="sdk/python/examples/guide/runtime.py"

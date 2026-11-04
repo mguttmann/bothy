@@ -630,8 +630,7 @@ class _Builder {
           ),
       ],
     );
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
+    return _TableScroll(
       child: _selectable ? DsSelectionJoin.table(child: grid) : grid,
     );
   }
@@ -792,6 +791,47 @@ class _Builder {
 }
 
 /// A placeholder span that carries a resolved attachment widget out of the line.
+/// The horizontal scroll of a table that is wider than the view: its columns keep their width
+/// and the table scrolls sideways instead of breaking its cells (09 4.11, F-AGENT-FORMAT). As for
+/// a code block without wrap (01 6.14 item 1), the default scroll behavior draws no scrollbar on a
+/// horizontal scroll, so the table brings its own: always visible on the desktop, where a mouse
+/// cannot drag the content, and while scrolling on the phone. On the desktop a room below the
+/// table keeps the thumb off its last row.
+class _TableScroll extends StatefulWidget {
+  const _TableScroll({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_TableScroll> createState() => _TableScrollState();
+}
+
+class _TableScrollState extends State<_TableScroll> {
+  final ScrollController _scroll = ScrollController();
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final touch = _touch(context);
+    return Scrollbar(
+      controller: _scroll,
+      thumbVisibility: !touch,
+      child: SingleChildScrollView(
+        controller: _scroll,
+        primary: false,
+        scrollDirection: Axis.horizontal,
+        padding: EdgeInsets.only(bottom: touch ? 0 : DsSpace.s12),
+        child: widget.child,
+      ),
+    );
+  }
+}
+
 class _BlockSpan extends WidgetSpan {
   const _BlockSpan(this.widget) : super(child: widget);
 
