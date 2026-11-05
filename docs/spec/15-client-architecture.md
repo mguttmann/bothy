@@ -407,6 +407,12 @@ connected as long as the app runs.
    before it shows the message.
 5. Personal data: the echo of one's own device (`updated_by_device_id`) is ignored; a draft with
    `overwrote_newer` shows a notice; read state only increases.
+6. The person's level and capabilities on a space or channel come only from a `SpaceView` or
+   `ChannelView` (snapshot or REST); `space.created` and `channel.created` carry none, and an
+   owner gets no `access.changed` for them. So after applying such an event, and for every
+   stored space or channel without a level on a connection from the cursor, the client loads the
+   view through REST (`getSpace` with `listSpaceChannels`, `getChannel`) and stores its access
+   (FIX-access-on-created).
 
 ### 7.4 Live box
 

@@ -697,6 +697,9 @@ above it (the app under test in the macOS app sandbox, M4-18), it uses the copy 
   an active run or unread, then the newest others up to 20 (`snapshotThreadsPerChannel`; no
   activity window). Every channel carries `project_bound`; `setProjectBound` creates or deletes a
   binding as the server does: the flag, a higher `version` and `channel.updated` (R-DM-54).
+  `createSpace` and `createChannel` (`world_structure.dart`) create a space or channel with
+  `space.created` and `channel.created` as the server does: the payload carries only the object,
+  no level and no capabilities, and the creator gets no `access.changed` (FIX-access-on-created).
   `requestsOf(operationId)` counts the REST requests, for example `listChannelThreads` and
   `getThread`.
 

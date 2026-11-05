@@ -157,6 +157,13 @@ final class SyncContext {
   /// none behind, and goes when its load ends, whether the load stored the thread or failed.
   final Set<ThreadId> threadLoads = {};
 
+  /// The spaces and channels whose view is queued or loading because the database holds no
+  /// access for them (brief FIX-access-on-created): a row learned through `space.created` or
+  /// `channel.created`, whose payload carries no level, or such a row stored before. A further
+  /// event of the target queues no second load. As with [threadLoads], an ID enters after the
+  /// commit of its event and goes when its load ends.
+  final Set<String> accessLoads = {};
+
   /// Whether a background read may store content of [threadId] in [channelId]: the channel is
   /// stored here and neither it nor the thread was removed. Call it inside the transaction of
   /// the write, so a removal cannot slip in between.

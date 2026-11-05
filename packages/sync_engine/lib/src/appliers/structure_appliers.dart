@@ -2,7 +2,10 @@
 
 /// Appliers of `space.*` and `channel.*` (04 9 item 3, 04 8.1): spaces and channels by version;
 /// archiving and a new `read_only` or operator come with the object (brief M4-14 Design note
-/// 2d). The caller's access comes from `SpaceView` and `ChannelView` of REST and the snapshot.
+/// 2d). The caller's access comes from `SpaceView` and `ChannelView` of REST and the snapshot;
+/// `space.created` and `channel.created` carry none (the server sends no level in them and no
+/// `access.changed` to an owner), so a stored row without access queues the load of its view
+/// after the commit (brief FIX-access-on-created, 15 7.3).
 ///
 /// A space or channel whose object carries `deleted_at` goes as a removed target with its
 /// content, and a later version without it brings it back with its structure loaded through
@@ -42,7 +45,11 @@ Future<void> _space(ApplyContext c) async {
   final undo = _undoOf(c, target, space.version, stored: stored != null);
   if (undo == _Undo.stale) return;
   await c.db.structureDao.upsertSpaceIfNewer(space);
-  if (undo == _Undo.restore) _reload(c, target);
+  if (undo == _Undo.restore) {
+    _reload(c, target);
+  } else if (await c.db.structureDao.spaceAccess(space.id) == null) {
+    queueAccessLoad(c.sync, c.after, target);
+  }
 }
 
 Future<void> _channel(ApplyContext c) async {
@@ -61,7 +68,11 @@ Future<void> _channel(ApplyContext c) async {
   final undo = _undoOf(c, target, channel.version, stored: stored != null);
   if (undo == _Undo.stale) return;
   await c.db.structureDao.upsertChannelIfNewer(channel);
-  if (undo == _Undo.restore) _reload(c, target);
+  if (undo == _Undo.restore) {
+    _reload(c, target);
+  } else if (await c.db.structureDao.channelAccess(channel.id) == null) {
+    queueAccessLoad(c.sync, c.after, target);
+  }
 }
 
 /// What an object of [target] without `deleted_at` means after a deletion (D-DEL-5).
@@ -109,6 +120,43 @@ _Undo _undoOf(
 void _reload(ApplyContext c, TargetRef target) {
   final sync = c.sync;
   c.after.reads.add(() => loadStructureOf(sync, [target]));
+}
+
+/// Queues, after the commit of the page, the load of the structure of [target], a space or
+/// channel the database holds without the caller's access (brief FIX-access-on-created):
+/// [loadStructureOf] stores its view with level and capabilities. [SyncContext.accessLoads]
+/// keeps it to one load per target; the ID enters after the commit, so a page that rolls back
+/// leaves none behind, and goes when the load ends. A failed load is logged by the background
+/// reads without content; the row stays without access, and the next event of the target or
+/// the next connection from the cursor ([queueMissingAccess]) tries again.
+void queueAccessLoad(SyncContext sync, AfterCommit after, TargetRef target) {
+  after.steps.add(() {
+    if (!sync.accessLoads.add(target.id)) return;
+    after.reads.add(() async {
+      try {
+        await loadStructureOf(sync, [target]);
+      } finally {
+        sync.accessLoads.remove(target.id);
+      }
+    });
+  });
+}
+
+/// Queues the load of every stored space and channel without the caller's access, one read
+/// per target, so one failure does not hold back the others; [db] is the database of the
+/// page's transaction. Rows stored from `space.created` or `channel.created` before the engine
+/// loaded their views recover on the next connection without a resync.
+Future<void> queueMissingAccess(
+  SyncContext sync,
+  LocalDatabase db,
+  AfterCommit after,
+) async {
+  for (final id in await db.structureDao.spacesWithoutAccess()) {
+    queueAccessLoad(sync, after, TargetRef.space(id));
+  }
+  for (final id in await db.structureDao.channelsWithoutAccess()) {
+    queueAccessLoad(sync, after, TargetRef.channel(id));
+  }
 }
 
 /// Loads the structure of [targets] through REST (`Fetcher.loadStructure`) and stores the
