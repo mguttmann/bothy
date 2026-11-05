@@ -67,6 +67,23 @@ async def test_background_end_wakes_the_session_and_posts_its_answer(world: Worl
     assert world.calls("background_killed") == []
 
 
+async def test_background_work_survives_a_resume_that_reports_lost_work(world: World) -> None:
+    # FIX-runner-hold-background, as on 2026-11-05: the previous process of the session had
+    # lost background work, so the CLI starts the next turn with a turn of its own per stopped
+    # task (an empty result) while Alex's message is still queued. The runner took that result
+    # for the answer and closed stdin, so the work the real turn then started was stopped.
+    job = world.gate("background_gate")
+    world.scenario(fixture="plain", background_gate=str(job), lost_notifications=2)
+    await world.start(world.config(followup_grace="200ms"))
+    run = await world.fake.trigger("Run the suite", channel_id=world.forum_a)
+    await world.until(lambda: texts(world) == ["Done."])
+    assert world.state_of(run.run_id) == "running"  # stdin held for the background job
+    world.release(job)
+    assert await world.ended(run.run_id) == "completed"
+    assert texts(world) == ["Done.", "The suite passed."]
+    assert world.calls("background_killed") == []
+
+
 async def test_stop_during_background_work_ends_everything(world: World) -> None:
     _, run_id, _job = await background_run(world, followup_grace="200ms")
     await world.fake.cancel(run_id)

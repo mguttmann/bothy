@@ -8,7 +8,7 @@ end. It polls the file every ``runner.poll_interval`` (stream in a file, design 
 
 Examples:
     >>> sorted(KNOWN_TYPES)
-    ['assistant', 'result', 'system', 'tool_progress', 'user']
+    ['assistant', 'command_lifecycle', 'result', 'system', 'tool_progress', 'user']
 """
 
 from __future__ import annotations
@@ -25,7 +25,9 @@ __all__ = ["KNOWN_TYPES", "StreamReader"]
 
 _LOG = logging.getLogger("claude_code_runner")
 
-KNOWN_TYPES = frozenset({"system", "assistant", "user", "tool_progress", "result"})
+KNOWN_TYPES = frozenset(
+    {"system", "assistant", "user", "tool_progress", "result", "command_lifecycle"}
+)
 """Message types of the stream the runner reads; others are skipped."""
 
 

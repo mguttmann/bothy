@@ -820,6 +820,11 @@ class RunTurn:
                 self._held_logged = True
                 _log("stdin_held_for_background", **self.ids)
             return
+        if self.background.input_waiting:
+            # The result came from a turn the CLI ran by itself before it started a queued
+            # input (a stopped task of a lost process on resume): the input's turn is still to
+            # come and may start background work (FIX-runner-hold-background).
+            return
         pending = len(self.followups.pending())
         if self.phase == "open" and stdin_close_due(
             self.monotonic(), last_result_at, pending, self.cfg.followup_grace

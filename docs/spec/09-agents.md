@@ -2976,6 +2976,7 @@ log line without content); all changes go through the throttled patch of the SDK
 | `system` `background_tasks_changed` | `tasks[]` with `task_id`, `description` | open background steps outside the set end `completed`; `/metrics/background_jobs` is the size of the set |
 | `system` `status` | `status` | `compacting` sets `/status_line` to `compacting`, its absence removes it |
 | `system` `api_retry` | `attempt`, `max_retries`, `retry_delay_ms`, `error` | `/metrics/api_retries` and `/metrics/last_api_retry` |
+| `command_lifecycle` | `command_uuid`, `state` (`queued`, `started`, `completed`, `cancelled`) | none; a queued input keeps stdin open (18.5, addendum of 2026-11-05) |
 | `result` | `subtype`, `is_error`, `result`, `modelUsage` (`inputTokens`, `outputTokens`, `cacheReadInputTokens`, `cacheCreationInputTokens`, `costUSD`, `contextWindow` per model) | end of the turn, reply, costs (18.7) |
 
 Step title: the first non-empty line of the first string member of `input` in the order
@@ -3061,6 +3062,11 @@ one exception: after a `result` without error, stdin stays open while the last
 `background_tasks_changed` lists a task (without `ambient` and `skip_transcript` tasks), and for
 a process that had background work also while a turn of it runs and until
 `runner.followup_grace` passed without a stream line (log code `stdin_held_for_background`).
+A `result` that comes while an input line is queued and not started yet (`command_lifecycle`
+`queued` without `started`, `completed` or `cancelled` of the same `command_uuid`) closes stdin
+neither: on a resume after lost background work the pinned CLI first runs a turn by itself per
+stopped task, an empty `result` before the input's own turn, and closing stdin then stopped the
+work that turn started (addendum of 2026-11-05, docs/decisions.d/FIX-runner-hold-background.md).
 Meanwhile the run stays `running`, every follow-up is written at once and becomes a turn of its
 own with its own answer, the answer of a notification turn is posted like any other (an empty
 one is not), and while a task runs the live box reports progress against `run.stall_after` once
