@@ -241,7 +241,10 @@ async def test_voice_message_is_transcribed_by_hermes_and_submitted(tmp_path: Pa
         assert runtime.heard == [(b"audio-1", "voice.m4a", "audio/mp4")]
         user_text = runtime.turns[0].user_text
         assert "Please book the boat for Saturday." in user_text
-        assert "Please book the boat" not in runtime.turns[0].system_part.split("Triggering")[0]
+        assert (
+            "Please book the boat"
+            not in runtime.turns[0].user_side.compose().context.split("Triggering")[0]
+        )
         submitted = r.requests("submitTranscript")
         assert [q.json["text"] for q in submitted] == ["Please book the boat for Saturday."]
         assert submitted[0].headers.get("if-match")

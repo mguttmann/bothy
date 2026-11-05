@@ -20,7 +20,7 @@ the runtime, and the Fake-Hermes tests run the pinned Hermes in a subprocess.
 | `config` | The configuration from `PlatformConfig.extra` and the token file. |
 | `actual_mode` | The actual billing mode from the kind of credential Hermes resolves. |
 | `tool_class` | The actual tool class from the enabled toolsets. |
-| `context_format` | The run context as the fixed system part with data blocks. |
+| `context_format` | Format rules, channel instructions and the run context with data blocks for the user side of a turn. |
 | `media` | Files of the answer, the audio attachments to transcribe and the other attachments passed to Hermes. |
 | `live_box` | Steps, status line and draft of a running turn. |
 | `cards` | Cards for clarify, approval and slash confirmations. |

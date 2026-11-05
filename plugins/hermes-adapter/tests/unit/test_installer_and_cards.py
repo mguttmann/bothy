@@ -164,6 +164,38 @@ def test_plugin_entry_imports_neither_hermes_nor_the_platform() -> None:
     ), done.stdout + done.stderr
 
 
+def test_plugin_hook_returns_the_platform_answer(monkeypatch: pytest.MonkeyPatch) -> None:
+    """D-FHUSC-1: ``pre_llm_call`` hands Hermes the platform's user side; other keys get none."""
+    import types
+
+    from bothy_hermes_adapter.entry import make_register
+
+    hooks: dict[str, Any] = {}
+
+    class Ctx:
+        def register_platform(self, **kw: Any) -> None:
+            pass
+
+        def register_hook(self, name: str, cb: Any) -> None:
+            hooks[name] = cb
+
+    make_register("bothy")(Ctx())
+    assert hooks["pre_llm_call"](platform="bothy") is None  # no platform module yet
+    module = types.ModuleType("bothy_hermes_adapter.platform")
+    seen: list[tuple[str, str]] = []
+
+    def dispatch_hook(key: str, name: str, kwargs: Any) -> Any:
+        seen.append((key, name))
+        return {"context": "rules"} if name == "pre_llm_call" else None
+
+    module.dispatch_hook = dispatch_hook  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "bothy_hermes_adapter.platform", module)
+    assert hooks["pre_llm_call"](platform="bothy") == {"context": "rules"}
+    assert hooks["post_api_request"](platform="bothy") is None
+    assert hooks["pre_llm_call"](platform="discord") is None
+    assert seen == [("bothy", "pre_llm_call"), ("bothy", "post_api_request")]
+
+
 def _src_env() -> dict[str, str]:
     import bothy_sdk
 

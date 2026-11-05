@@ -4,8 +4,8 @@
 The profile binds skills and an extra prompt to one channel of the server the way Hermes' Discord
 platform binds them to a Discord channel (``channel_skill_bindings``, ``channel_prompts``). A
 person's message in a thread of the bound channel starts a Hermes session with the bound skill
-loaded and the channel prompt next to the context the server delivered; a channel without a
-binding stays as before.
+loaded and the channel prompt among the channel instructions on the user side of the turn, next
+to the context the server delivered; a channel without a binding stays as before.
 """
 
 from __future__ import annotations
@@ -15,6 +15,7 @@ from typing import Any
 
 import pytest
 import yaml
+from bothy_sdk.message_format import MESSAGE_FORMAT_RULES
 from fake_hermes_kit import PLATFORM_KEY, HermesRig, HermesWorld, gateway_log, hermes_rig
 from hermes_harness.fake_model import ScriptTurn
 
@@ -136,18 +137,22 @@ async def test_bound_channel_loads_skills_and_combines_the_prompt(world: HermesW
         assert user.index(SKILL_MARKER) < user.index(BOUND_ASK)
         # A bound skill the profile disables on this platform stays out (as in Hermes' gateway).
         assert HIDDEN_MARKER not in user
-        # Combined with the context of the server, never replacing it.
-        assert PROMPT_MARKER in system, gateway_log(rig)
-        assert SYSTEM_NOTE in system
-        assert system.index(SYSTEM_NOTE) < system.index(PROMPT_MARKER)
+        # Combined with the context of the server, never replacing it, on the user side after
+        # the person's text: the format rules, the profile's prompt, then the note and context
+        # (D-FHUSC-2).
+        assert PROMPT_MARKER in user, gateway_log(rig)
+        assert PROMPT_MARKER not in system
+        assert SYSTEM_NOTE in user
+        order = [BOUND_ASK, MESSAGE_FORMAT_RULES, PROMPT_MARKER, SYSTEM_NOTE]
+        assert [user.index(part) for part in order] == sorted(user.index(p) for p in order)
 
         # A channel without a binding: no skill, no channel prompt, the server's context only.
         unbound = await rig.fake.trigger(UNBOUND_ASK)
         await _done(rig, unbound.run_id)
         system, user = _body_for(rig, UNBOUND_ASK)
         assert SKILL_MARKER not in user
-        assert PROMPT_MARKER not in system
-        assert SYSTEM_NOTE in system
+        assert PROMPT_MARKER not in system + user
+        assert SYSTEM_NOTE in user
         assert json.dumps(rig.model.raw).count(PROMPT_MARKER) >= 1
 
         # A bind to a session Hermes does not know keeps the new session of the switch: it

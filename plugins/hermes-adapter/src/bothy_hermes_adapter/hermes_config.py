@@ -10,7 +10,8 @@ uses Hermes's own code so the adapter and the installer see what Hermes sees (09
   ``agent.anthropic_credentials.anthropic_route_is_oauth``; no public surface exists in the pinned
   version, 17.8, RK-12). It returns only the provider and the key type; the value stays in this
   function and is never logged, formatted, stored or returned.
-* `busy_input_mode` and `enabled_toolsets` read the profile configuration.
+* `busy_input_mode` and `enabled_toolsets` read the profile configuration, `hook_context_limit`
+  Hermes' limit for a hook's context (``tools.hook_output_spill.get_spill_config``).
 * The installer functions read and write ``config.yaml`` and ``.env`` of a profile home with
   Hermes's own reader and writer (``hermes_cli.config``), under a context-local home override.
 
@@ -38,6 +39,7 @@ from hermes_cli.env_loader import load_hermes_dotenv
 from hermes_cli.runtime_provider import resolve_runtime_provider
 from hermes_cli.tools_config import _get_platform_tools
 from hermes_constants import reset_hermes_home_override, set_hermes_home_override
+from tools.hook_output_spill import get_spill_config
 
 from bothy_hermes_adapter.runtime import ResolvedCredential
 
@@ -47,6 +49,7 @@ __all__ = [
     "busy_input_mode",
     "enabled_toolsets",
     "env_defines",
+    "hook_context_limit",
     "profile_home",
     "read_config",
     "remove_env",
@@ -102,6 +105,22 @@ def busy_input_mode() -> str:
     display = load_config().get("display") or {}
     mode = str(display.get("busy_input_mode") or "interrupt").strip().lower()
     return mode if mode in ("steer", "queue") else "interrupt"
+
+
+def hook_context_limit() -> int | None:
+    """The most characters a ``pre_llm_call`` context may have before Hermes spills it.
+
+    Above ``hooks.output_spill.max_chars`` Hermes writes a hook's context to a file and sends only
+    its head and tail (docs/decisions.d/FIX-hermes-user-side-context.md, D-FHUSC-3).
+
+    Returns:
+        The limit, or ``None`` when the spill is off.
+    """
+    config: Mapping[str, Any] = get_spill_config()
+    if not config.get("enabled", True):
+        return None
+    limit = config.get("max_chars")
+    return limit if isinstance(limit, int) and not isinstance(limit, bool) and limit > 0 else None
 
 
 def enabled_toolsets(platform_key: str) -> frozenset[str]:

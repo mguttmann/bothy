@@ -98,7 +98,7 @@ from bothy_hermes_adapter.config import AdapterSettings
 from bothy_hermes_adapter.context_format import (
     BuiltContext,
     build_context,
-    command_system_part,
+    command_user_side,
     cut_utf8,
 )
 from bothy_hermes_adapter.hermes_commands import (
@@ -351,8 +351,8 @@ class HermesHandler(AgentHandler):
         if skill_text is not None:
             # A command run has no run context: 09 4.6 defines it for a triggering message, and
             # the server answers getRunContext of any other trigger kind with 500. The turn is
-            # Hermes' own skill invocation with the fixed note and the channel instructions.
-            self._prepared[run.run_id] = BuiltContext(command_system_part(channel), skill_text)
+            # Hermes' own skill invocation with the format rules and the channel instructions.
+            self._prepared[run.run_id] = BuiltContext(command_user_side(channel), skill_text)
             actual = self.actual_mode()
             return StartOptions(billing_evidence=BillingEvidence.from_dict(actual.evidence))
         ctx = await run.load_context()
@@ -516,7 +516,7 @@ class HermesHandler(AgentHandler):
             return built
         prefix = "\n\n".join(notes)
         text = f"{prefix}\n\n{built.user_text}" if built.user_text.strip() else prefix
-        return BuiltContext(system_part=built.system_part, user_text=text)
+        return BuiltContext(user_side=built.user_side, user_text=text)
 
     async def _media(
         self, run: RunHandle, ctx: RunContext
@@ -610,7 +610,7 @@ class HermesHandler(AgentHandler):
             # A command run has no triggering message; Hermes needs an ID for the turn's event.
             message_id=payload.message_id if turn.anchored else turn.run_id,
             user_text=turn.built.user_text,
-            system_part=turn.built.system_part,
+            user_side=turn.built.user_side,
             media=turn.media,
             new_session=self._starts_session(turn),
         )
@@ -1435,4 +1435,4 @@ def _with_media(
     if not notes and text == built.user_text:
         return built
     joined = "\n\n".join([*notes, text] if text else notes)
-    return BuiltContext(system_part=built.system_part, user_text=joined)
+    return BuiltContext(user_side=built.user_side, user_text=joined)

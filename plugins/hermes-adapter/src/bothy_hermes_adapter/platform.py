@@ -11,11 +11,14 @@ of 17.3 to `bothy_hermes_adapter.handler.HermesHandler` on the adapter's event l
   close (another process took the consumer over) reports the platform disconnected without a
   reconnect. ``disconnect`` stops the loop.
 * A turn is ``handle_message`` with a ``MessageEvent`` whose source is built with
-  ``build_source`` and the thread ID (one Hermes session per thread, 17.4) and whose ephemeral
-  ``channel_prompt`` is the context's system part; it ends with ``on_processing_complete``. The
+  ``build_source`` and the thread ID (one Hermes session per thread, 17.4); it ends with
+  ``on_processing_complete``. The event carries no ephemeral ``channel_prompt``: the format
+  rules, the channel instructions and the run context ride the user side of the turn as the
+  ``context`` this platform returns from Hermes' ``pre_llm_call`` hook, within Hermes'
+  ``hooks.output_spill.max_chars`` (docs/decisions.d/FIX-hermes-user-side-context.md). The
   profile's ``channel_skill_bindings`` and ``channel_prompts`` of the platform section apply with
   Hermes' Discord semantics, keyed by channel or thread ID: the bound skills are loaded at the
-  start of a thread's session and the channel prompt follows the context.
+  start of a thread's session and the channel prompt joins the channel instructions.
 * Steering, stop and session switches are the commands and busy inputs the M2-32 record proved:
   a follow-up as busy input (``display.busy_input_mode``), ``/stop``, ``/new`` with its
   confirmation answered through ``tools.slash_confirm.resolve``, and ``/resume <id> --all`` from
@@ -38,8 +41,9 @@ of 17.3 to `bothy_hermes_adapter.handler.HermesHandler` on the adapter's event l
   background task, a send into another channel) is a report without a run (09 14):
   `bothy_hermes_adapter.handler.HermesHandler.on_report`.
 * Session IDs and usage come from the plugin hooks ``pre_llm_call``, ``on_session_reset`` and
-  ``post_api_request``; the thread of a hook or of ``set_status_text`` is the session's thread
-  variable of the turn (``gateway.session_context``).
+  ``post_api_request`` (``pre_llm_call`` also answers with the turn's user side); the thread of
+  a hook or of ``set_status_text`` is the session's thread variable of the turn
+  (``gateway.session_context``).
 
 Settings come only from ``PlatformConfig.extra`` (never from the environment, 17.2); the state
 lives in the directory named like the platform key below the profile home (mode ``0700``).
@@ -89,6 +93,7 @@ from bothy_hermes_adapter.config import (
     load_settings,
     load_token,
 )
+from bothy_hermes_adapter.context_format import ComposedUserSide
 from bothy_hermes_adapter.defaults import NO_SPLIT_LENGTH
 from bothy_hermes_adapter.handler import HermesHandler
 from bothy_hermes_adapter.heartbeat import ADAPTER_NAME, RUNTIME_NAME, HermesAdapterLoop
@@ -192,6 +197,9 @@ class ServerPlatform(BasePlatformAdapter):
         # the run it started or steered, an adapter command's message to nothing.
         self._turn_messages: dict[str, uuid.UUID | None] = {}
         self._control_messages: dict[str, None] = {}
+        # The user side of each thread's current run, and whether its first turn took the
+        # context (D-FHUSC-4). Written on the adapter's loop, read by Hermes' agent thread.
+        self._user_sides: dict[uuid.UUID, tuple[ComposedUserSide, bool]] = {}
 
     # ---- lifecycle ---------------------------------------------------------------------------
 
@@ -407,7 +415,7 @@ class ServerPlatform(BasePlatformAdapter):
         event = self._event(
             turn.thread_id, turn.user_text, message_id=str(turn.message_id), control=False
         )
-        event.channel_prompt = self._channel_prompt(turn)
+        _remember(self._user_sides, turn.thread_id, (self._user_side(turn), False))
         if turn.new_session:
             event.text = self._with_bound_skills(turn, event)
         self._attach(event, turn.media)
@@ -415,15 +423,27 @@ class ServerPlatform(BasePlatformAdapter):
         event.user_name = turn.user_name
         return await self._dispatch(event)
 
-    def _channel_prompt(self, turn: TurnRequest) -> str:
-        """The server's context, then the profile's ``channel_prompts`` entry of the thread.
+    def _user_side(self, turn: TurnRequest) -> ComposedUserSide:
+        """The turn's user side with the profile's ``channel_prompts`` entry of the thread.
 
         Hermes' own reader resolves the entry as for Discord: the thread's ID first, then its
-        channel's, so every thread of a bound channel inherits the channel's prompt. The entry is
-        appended to the context of the server, never put in its place.
+        channel's, so every thread of a bound channel inherits the channel's prompt. It joins the
+        channel instructions after the operator's (D-FHUSC-2); the whole text stays within Hermes'
+        limit for a hook's context (D-FHUSC-3).
         """
         prompt = resolve_channel_prompt(self._extra(), str(turn.thread_id), str(turn.channel_id))
-        return f"{turn.system_part}\n\n{prompt}" if prompt else turn.system_part
+        return turn.user_side.compose(prompt or "", hermes_config.hook_context_limit())
+
+    def _user_side_context(self, thread: uuid.UUID) -> dict[str, str] | None:
+        """``pre_llm_call``'s answer: the run's first turn gets the context, each turn the rules."""
+        entry = self._user_sides.get(thread)
+        if entry is None:
+            return None
+        side, taken = entry
+        if taken:
+            return {"context": side.instructions}
+        self._user_sides[thread] = (side, True)
+        return {"context": side.first_turn}
 
     def _with_bound_skills(self, turn: TurnRequest, event: MessageEvent) -> str:
         """The turn's text after the skills ``channel_skill_bindings`` binds to the thread.
@@ -1041,11 +1061,16 @@ class ServerPlatform(BasePlatformAdapter):
 
     # ---- hooks -------------------------------------------------------------------------------
 
-    def on_hook(self, name: str, kwargs: Mapping[str, Any]) -> None:
-        """A plugin hook of this platform (registered by `bothy_hermes_adapter.entry`)."""
+    def on_hook(self, name: str, kwargs: Mapping[str, Any]) -> dict[str, str] | None:
+        """A plugin hook of this platform (registered by `bothy_hermes_adapter.entry`).
+
+        Returns:
+            For ``pre_llm_call`` of a thread with a run: the ``context`` Hermes appends to the
+            turn's user text (D-FHUSC-1); else ``None``.
+        """
         thread = self._thread("", None)
         if thread is None:
-            return
+            return None
         if name == "pre_llm_call":
             session_id = kwargs.get("session_id")
             if session_id:
@@ -1068,6 +1093,9 @@ class ServerPlatform(BasePlatformAdapter):
             usage = _usage(kwargs)
             if usage is not None:
                 self._post(self.handler.on_usage, thread, usage)
+        if name == "pre_llm_call":
+            return self._user_side_context(thread)
+        return None
 
     def _persist_session(self, thread: uuid.UUID) -> None:
         """Keep the thread's session across restarts (09 9.1): a new process must know it."""
@@ -1084,7 +1112,7 @@ class ServerPlatform(BasePlatformAdapter):
 _KNOWN_MESSAGES = 4096
 
 
-def _remember(known: dict[str, Any], key: str, value: Any) -> None:
+def _remember(known: dict[Any, Any], key: Any, value: Any) -> None:
     """Keep ``key`` in an insertion-ordered map of at most `_KNOWN_MESSAGES` entries."""
     known.pop(key, None)
     known[key] = value
@@ -1133,14 +1161,16 @@ def _state_dir(platform_key: str) -> Path:
     return path
 
 
-def dispatch_hook(platform_key: str, name: str, kwargs: Mapping[str, Any]) -> None:
+def dispatch_hook(platform_key: str, name: str, kwargs: Mapping[str, Any]) -> Any:
     """Pass a plugin hook to the platform of the key, if it runs (`bothy_hermes_adapter.entry`).
 
     Args:
         platform_key: `hermes_adapter.platform_key`.
         name: The hook's name.
         kwargs: The hook's arguments.
+
+    Returns:
+        The platform's answer to Hermes (``pre_llm_call``: the turn's user side), or ``None``.
     """
     platform = _PLATFORMS.get(platform_key)
-    if platform is not None:
-        platform.on_hook(name, kwargs)
+    return platform.on_hook(name, kwargs) if platform is not None else None

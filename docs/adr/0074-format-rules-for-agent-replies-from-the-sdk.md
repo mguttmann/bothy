@@ -71,3 +71,11 @@ its Fake-Hermes test, and the runner's unit and scenario tests, check that each 
 text of the SDK word for word. The rendering of a reply in these rules on macOS, Windows, iOS and
 Android is checked by `packages/design_system/test/components/markdown_agent_reply_test.dart` and
 the golden `agent_reply`.
+
+### Addendum of 2026-11-05
+
+The Hermes adapter's instruction channel moved from the ephemeral system part to the user side of
+the turn (Hermes' `pre_llm_call` hook context): a host on the Anthropic OAuth route shortens the
+system text to a budget, so the rules never reached the model there
+([FIX-hermes-user-side-context](../decisions.d/FIX-hermes-user-side-context.md), 09 4.11 and
+17.6). The decision of this record stands; only the carrier of that adapter changed.

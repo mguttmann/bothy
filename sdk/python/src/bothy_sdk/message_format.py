@@ -6,8 +6,9 @@ text to the width of the view, show fenced code with its language, scroll a wide
 long code line sideways and copy a code block as it is. A reply that breaks lines by hand, draws
 a table with spaces or puts a text to copy into a block quote looks broken there and arrives as
 a bundle of short lines when copied. Every agent adapter therefore hands its runtime these rules
-on every run, in the runtime's instruction channel (the system prompt, never the context with
-its trust marks), with `MESSAGE_FORMAT_TITLE` as the heading. This module is their only source:
+on every run as an instruction that reaches the model whole (the system prompt, or the user side
+of the turn where the host may shorten its system text; never inside the context with its trust
+marks), with `MESSAGE_FORMAT_TITLE` as the heading. This module is their only source:
 an adapter never writes its own copy.
 
 Examples:
