@@ -55,6 +55,28 @@ def test_ambient_and_hidden_tasks_do_not_count() -> None:
     assert not work.holds(100.0, 1.0)
 
 
+def lifecycle(command: str, state: str) -> dict[str, object]:
+    return {"type": "command_lifecycle", "command_uuid": command, "state": state}
+
+
+def test_an_input_the_cli_has_not_started_yet_is_waiting() -> None:
+    # FIX-runner-hold-background: on a resume the CLI first runs a turn by itself for each
+    # notification of work the previous process lost (init, then an empty result) while the
+    # written input is still queued; that result is no answer to the input.
+    work = BackgroundWork()
+    work.apply(lifecycle("c1", "queued"), 0.0)
+    work.apply(INIT, 0.1)
+    work.apply(RESULT, 0.2)
+    assert work.input_waiting
+    work.apply(lifecycle("c1", "started"), 0.3)
+    assert not work.input_waiting
+    work.apply(lifecycle("c2", "queued"), 0.4)
+    work.apply(lifecycle("c2", "cancelled"), 0.5)
+    assert not work.input_waiting
+    work.apply({"type": "command_lifecycle", "state": "queued"}, 0.6)  # no command named
+    assert not work.input_waiting
+
+
 def test_malformed_task_lists_change_nothing() -> None:
     work = BackgroundWork()
     work.apply(tasks("b1"), 1.0)

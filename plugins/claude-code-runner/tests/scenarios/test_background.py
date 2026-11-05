@@ -9,6 +9,7 @@ its own answer, the job's end wakes the session and its answer is posted, and th
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 from uuid import UUID
 
@@ -64,6 +65,47 @@ async def test_background_end_wakes_the_session_and_posts_its_answer(world: Worl
     assert await world.ended(run_id) == "completed"
     assert texts(world) == ["Done.", "The suite passed."]
     assert world.calls("background_done")
+    assert world.calls("background_killed") == []
+
+
+async def test_background_work_survives_a_resume_that_reports_lost_work(world: World) -> None:
+    # FIX-runner-hold-background, as on 2026-11-05: the previous process of the session had
+    # lost background work, so the CLI starts the next turn with a turn of its own per stopped
+    # task (an empty result) while Alex's message is still queued. The runner took that result
+    # for the answer and closed stdin, so the work the real turn then started was stopped.
+    job = world.gate("background_gate")
+    world.scenario(fixture="plain", background_gate=str(job), lost_notifications=2)
+    await world.start(world.config(followup_grace="200ms"))
+    run = await world.fake.trigger("Run the suite", channel_id=world.forum_a)
+    await world.until(lambda: texts(world) == ["Done."])
+    assert world.state_of(run.run_id) == "running"  # stdin held for the background job
+    world.release(job)
+    assert await world.ended(run.run_id) == "completed"
+    assert texts(world) == ["Done.", "The suite passed."]
+    assert world.calls("background_killed") == []
+
+
+async def test_a_resume_that_reports_lost_work_keeps_stdin_while_the_model_thinks(
+    world: World,
+) -> None:
+    # FIX-runner-hold-background: the empty results of the lost tasks came before the input's
+    # turn; while that turn is still working (the model thinks before it starts the background
+    # job) they must not count as its answer either.
+    job = world.gate("background_gate")
+    turn = world.gate("turn_gate")
+    world.scenario(
+        fixture="plain", background_gate=str(job), turn_gate=str(turn), lost_notifications=2
+    )
+    await world.start(world.config(followup_grace="200ms"))
+    run = await world.fake.trigger("Run the suite", channel_id=world.forum_a)
+    await world.until(lambda: world.calls("gate_wait"))
+    await asyncio.sleep(0.5)  # many polls of the runner while the turn works
+    assert world.calls("stdin_eof") == []
+    world.release(turn)
+    await world.until(lambda: texts(world) == ["Done."])
+    world.release(job)
+    assert await world.ended(run.run_id) == "completed"
+    assert texts(world) == ["Done.", "The suite passed."]
     assert world.calls("background_killed") == []
 
 

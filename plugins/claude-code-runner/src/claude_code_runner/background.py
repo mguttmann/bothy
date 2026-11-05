@@ -13,6 +13,13 @@ open: while a task runs, while a turn of a process that had background work runs
 quiet window after its last line, so the notification turn that follows the end of the last task
 is not lost.
 
+A ``result`` does not always answer the input: on a resume after lost background work the pinned
+CLI first runs a turn by itself for each stopped task (``system/init``, then an empty ``result``)
+while the written input is still queued (``command_lifecycle`` ``queued``, then ``started``).
+`BackgroundWork.input_waiting` names that state, so the runner does not take such a ``result``
+for the end of the turn and close stdin, which made the CLI stop the work the turn then started
+(FIX-runner-hold-background, 2026-11-05).
+
 The end of stdin does not always end the process at once: on 2026-11-01 the pinned CLI kept one
 with running background work for about ten minutes after a failed turn closed its stdin, so
 `claude_code_runner.runturn` stops a process that outlives an error ``result`` by
@@ -42,6 +49,7 @@ class BackgroundWork:
         seen: The process had background work at some time.
         turn_open: A turn of the process has started (``system/init``) and has no ``result`` yet.
         last_line_at: The monotonic time of the last stream message.
+        queued: The commands (input lines) the CLI has queued and not started yet.
     """
 
     def __init__(self) -> None:
@@ -50,6 +58,12 @@ class BackgroundWork:
         self.seen = False
         self.turn_open = False
         self.last_line_at: float | None = None
+        self.queued: set[str] = set()
+
+    @property
+    def input_waiting(self) -> bool:
+        """An input line is queued and not started: a ``result`` now does not answer it."""
+        return bool(self.queued)
 
     def apply(self, message: Mapping[str, Any], now: float) -> None:
         """Take one stream message.
@@ -64,6 +78,13 @@ class BackgroundWork:
             self.turn_open = True
         elif kind == "result":
             self.turn_open = False
+        elif kind == "command_lifecycle":
+            command = message.get("command_uuid")
+            if isinstance(command, str):
+                if message.get("state") == "queued":
+                    self.queued.add(command)
+                else:  # started, completed or cancelled
+                    self.queued.discard(command)
         elif kind == "system" and subtype == "background_tasks_changed":
             tasks = message.get("tasks")
             if not isinstance(tasks, list):

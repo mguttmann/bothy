@@ -57,6 +57,8 @@ READ_TOKENS = (
     "task_id",
     "ambient",
     "skip_transcript",
+    # FIX-runner-hold-background: an input line the CLI has queued and not started yet.
+    "command_uuid",
 )
 _WRAPPER_MAX_BYTES = 1 << 20  # a launcher script, not the program; read its package instead
 

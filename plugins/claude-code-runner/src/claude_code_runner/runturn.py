@@ -769,8 +769,15 @@ class RunTurn:
                     self._report_cost()
             elif kind == "user" and message.get("isReplay") is True:
                 await self._echo(message.get("uuid"), adopted=not own)
+            elif kind == "command_lifecycle" and message.get("state") == "started":
+                # An input starts a turn of its own: an earlier result does not end it, so the
+                # stdin rule waits for the result of this turn (FIX-runner-hold-background).
+                last_result_at = None
             elif kind == "result":
-                last_result_at = self.monotonic()
+                if not self.background.input_waiting:
+                    # A result before a queued input started answers no input: it must not
+                    # start the stdin rule for the turn of that input (FIX-runner-hold-background).
+                    last_result_at = self.monotonic()
                 self._settle_cost()
                 if self.ledger.kind == "turn" and is_success(message):
                     await self._answer(message, reader.line_offset)
@@ -819,6 +826,11 @@ class RunTurn:
             if last_result_at is not None and not self._held_logged:
                 self._held_logged = True
                 _log("stdin_held_for_background", **self.ids)
+            return
+        if self.background.input_waiting:
+            # The result came from a turn the CLI ran by itself before it started a queued
+            # input (a stopped task of a lost process on resume): the input's turn is still to
+            # come and may start background work (FIX-runner-hold-background).
             return
         pending = len(self.followups.pending())
         if self.phase == "open" and stdin_close_due(

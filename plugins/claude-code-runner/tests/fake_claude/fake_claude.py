@@ -14,6 +14,8 @@ environment of a turn drops every control variable. Commands:
   ``result`` and exits after stdin EOF. SIGINT ends it with ``error_during_execution``.
   With ``background_gate`` the turn starts a background job that runs until the test creates
   the gate file, and the process stays between turns meanwhile (`Fake.background_phase`).
+  With ``lost_notifications`` the turn first plays the resume after lost background work
+  (`Fake.lost_work_turns`).
   ``{{tmpdir}}`` and ``{{add_dir}}`` in a fixture, in ``result_override`` or in
   ``meta_result_text`` become the turn's ``TMPDIR`` and its ``--add-dir``.
 
@@ -188,6 +190,10 @@ class Fake:
         self.record("stdin", line=first.rstrip("\n"))
         if _text_of(first) == "/compact":
             return self.compact()
+        command = f"cmd-{index}"
+        lost = int(self.scenario.get("lost_notifications", 0))
+        if lost:
+            self.lost_work_turns(command, lost)
         source = self.scenario.get("api_key_source")
         if source is None:
             source = "ANTHROPIC_API_KEY" if os.environ.get("ANTHROPIC_API_KEY") else "none"
@@ -253,6 +259,8 @@ class Fake:
             if isinstance(final.get("result"), str):
                 final["result"] = _expand(final["result"])
             self.emit(final)
+        if lost:
+            self.emit({"type": "command_lifecycle", "command_uuid": command, "state": "completed"})
         if self.scenario.get("meta_result"):
             # Like the CLI: a synthetic turn (a background task's notification) ends with a
             # success result that names no input (no user_message_uuid(s)).
@@ -278,8 +286,17 @@ class Fake:
         answered = folded
         while (line := lines.next(answered)) is not None:
             answered += 1
+            if self.scenario.get("lifecycle"):
+                # Like the pinned CLI: the line was queued while the turn ran and starts now;
+                # its turn may work a while before its result (``followup_gate``).
+                command = f"cmd-{index}-{answered}"
+                for state in ("queued", "started"):
+                    self.emit(
+                        {"type": "command_lifecycle", "command_uuid": command, "state": state}
+                    )
             if echo_mode in ("after_result", "on_consume"):
                 self.echo(line)
+            self.gate("followup_gate")
             if echo_mode == "never":
                 continue
             if answered - folded <= int(self.scenario.get("meta_folds", 0)):
@@ -314,6 +331,39 @@ class Fake:
             "tools": [],
             "cwd": os.getcwd(),
         }
+
+    def lost_work_turns(self, command: str, count: int) -> None:
+        """A resume after background work was lost, like the pinned CLI on 2026-11-05.
+
+        The CLI first reports each task the previous process stopped and queues the input line
+        (``command_lifecycle`` ``queued``); before it starts that line it runs one turn by itself
+        per notification, each a ``system/init`` and a ``result`` without a model turn and
+        without text. Only then the line starts (``started``) and the turn of the input follows.
+        """
+        for n in range(count):
+            self.emit(
+                {
+                    "type": "system",
+                    "subtype": "task_notification",
+                    "session_id": self.session_id,
+                    "task_id": f"lost{n}",
+                    "status": "stopped",
+                }
+            )
+        self.emit({"type": "command_lifecycle", "command_uuid": command, "state": "queued"})
+        for _ in range(count):
+            self.emit(self.init_line())
+            self.emit(
+                {
+                    "type": "result",
+                    "subtype": "success",
+                    "is_error": False,
+                    "session_id": self.session_id,
+                    "num_turns": 0,
+                    "result": "",
+                }
+            )
+        self.emit({"type": "command_lifecycle", "command_uuid": command, "state": "started"})
 
     def start_background(self) -> None:
         """The turn starts a background job (Bash with ``run_in_background``) before its result."""
@@ -653,6 +703,7 @@ class _StdinLines:
             with self.changed:
                 self.lines.append(line)
                 self.changed.notify_all()
+        self.fake.record("stdin_eof")
         with self.changed:
             self.done = True
             self.changed.notify_all()

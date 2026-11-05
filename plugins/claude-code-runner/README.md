@@ -228,7 +228,11 @@ level-one switch test holds them against the installed CLI.
   started in the background (Bash or a subagent with `run_in_background`, a workflow) still
   runs. Claude Code stops that work when its stdin ends, so the runner keeps stdin open while the
   stream lists a background task, and for a process that had one also during a turn and for
-  `runner.followup_grace` after the last line (log code `stdin_held_for_background`). Meanwhile
+  `runner.followup_grace` after the last line (log code `stdin_held_for_background`). A
+  `result` while the input line is still queued in Claude Code (`command_lifecycle`, for
+  example the empty turns for tasks a previous process lost) neither closes stdin nor starts
+  the follow-up window, and an input that starts waits for its own `result`
+  (FIX-runner-hold-background). Meanwhile
   every follow-up becomes a turn of its own with its own answer, the answer Claude Code gives
   when the work ends is posted in the thread, and the run stays `running` with progress patches
   against `run.stall_after`. The runner prompt asks Claude Code to start long work in the
