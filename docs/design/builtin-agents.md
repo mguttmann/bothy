@@ -142,11 +142,21 @@ as the host user. Whether the user-level `CLAUDE.md` is also left out with these
 A1-05; if it is not, A1-05 records the gap in the runner README and in the preview text of the
 creation flow instead of claiming isolation.
 
-**D-A1-9 Channel skills reach every runner turn.** The runner adds the skills of
-`channel_skill_bindings` of the channel to the turn as well, for its own agent and for hosted
-agents. A skill reference that the runner cannot resolve is logged and named in the live box, not
-fatal. Reason: the field exists and the adapter reads it, but the runner ignores it today; the
-interview may suggest channel skills, so they have to work.
+**D-A1-9 Channel skills only behind their own key.** A new key `runner.channel_skills_dir`
+(default unset) turns channel skills on. Only then does the runner add skills of
+`channel_skill_bindings` to a turn, for its own agent and for hosted agents. Resolution: a
+`skill_ref` of the form `claude-code:<name>` resolves to `<runner.channel_skills_dir>/<name>/`
+(a folder with a `SKILL.md`, handed to the turn as one more `--plugin-dir`); `<name>` must match
+`[a-z0-9-]{1,64}`, so a reference never leaves that folder. Every other reference belongs to
+another adapter (03 says the server does not interpret `skill_ref`; the Hermes adapter stores
+Hermes skill names there) and is skipped with a debug log only, no live box text. A
+`claude-code:` reference without a matching folder is logged and named in the live box, not
+fatal. Without the key the runner reads no bindings and its command line, heartbeat and live box
+stay byte-equal to today (D-A1-22, D-A1-23); the byte-equal fixtures of A1-05 include a channel
+with bindings of both forms and no key. Reason: the field exists and the runner ignores it today;
+turning it on for the runner's own agent without a key would change a running installation (a
+channel served by this runner may carry references meant for the other adapter); the interview
+may suggest channel skills, so they have to work once the owner sets the key.
 
 ## 5. Interview
 
@@ -254,7 +264,8 @@ stage writes no contract step. Reason: an installation that updates the server i
 running with its old runner, old adapters and old apps, and must be able to go back one version.
 
 **D-A1-22 Off until asked for.** The runner hosts agents only with `runner.hosted_agents`, answers
-the interview only with `runner.agent_builder`, and the server sends interviews only with
+the interview only with `runner.agent_builder`, reads channel skills only with
+`runner.channel_skills_dir` (D-A1-9), and the server sends interviews only with
 `agents.builder_agent_id`; all default off. Clients show "New agent" only to owners and only when
 at least one runner reports `hosts_agents`. Reason: an update must not change what a running
 installation does; turning the feature on is one key on one runner.
@@ -316,7 +327,7 @@ from briefs in `docs/briefs/` like every milestone.
 | A1-02 | Server: agent definitions | table, versioning, owner write inside `agent.update`, adapter read, schema validation with field errors, secret references only, size limits as configuration values, `agent.config_changed` on change, audit; migration additive | A1-01 |
 | A1-03 | Server: hosted agents | `hosted_by`, capability `hosts_agents`, host choice on create, token for the hosting runner bound to its key, replaced on disable and host change, `claude_agent` refused by R-AG-39 paths; tests for every refusal | A1-01 |
 | A1-04 | Runner: host many agents | `runner.hosted_agents` off by default; one connection, cursor, cache and state folder per hosted agent; shared slots; today's fixtures byte-equal without the key | A1-03 |
-| A1-05 | Runner: run the definition | agent folder from the definition, skills plugin, strict MCP file, setting sources, cost cap, channel skills for every turn; a probe test against the pinned CLI records what each flag does headless, including whether the user-level `CLAUDE.md` is left out | A1-02, A1-04 |
+| A1-05 | Runner: run the definition | agent folder from the definition, skills plugin, strict MCP file, setting sources, cost cap, channel skills behind `runner.channel_skills_dir` with the `claude-code:` resolution of D-A1-9; byte-equal fixtures without the key include a channel with bindings of both forms; a probe test against the pinned CLI records what each flag does headless, including whether the user-level `CLAUDE.md` is left out and whether `--mcp-config` in the chosen argument order swallows following arguments | A1-02, A1-04 |
 | A1-06 | Templates and their gate | `templates/agents/` with generic templates, schema, the template gate in `make check` and CI, read operation, `agents.templates_dir`; private list extended first (D-A1-16) | A1-02 |
 | A1-07 | Interview | owner operation and short-lived event, `agents.builder_agent_id`, `runner.agent_builder`, structured answer, fallback without a builder, cost estimate shown | A1-02 |
 | A1-08 | Clients: "New agent" | desktop, phone and console: template or interview, preview and edit, step-up, visible steps, channel with the agent as operator; hidden without a hosting runner | A1-03, A1-06, A1-07 |
@@ -375,3 +386,15 @@ Each with the recommendation this design builds on until the owner rules otherwi
    commits.
 6. **Test from zero by a third person.** Recommendation: after A1-10 and V1-09, one person who has
    never seen the project, a fresh host, only the README.
+
+## 13. Backlog (minors from the design review)
+
+Collected, not polished; the next run in this area (A1-01) takes them.
+
+1. V1-07 to V1-12 have no plan rows and no briefs yet: A1-01 adds their rows to `docs/PLAN.md`
+   and writes their briefs (or records that they run in `bothy-v4.js` in the form `{id, text}`).
+2. Owner decision 1 (section 12) recommends the no-reply address, while the operations runner
+   (`bothy-v4.js`) currently sets the work address as author; when the owner rules, the runner
+   script changes in the same step.
+3. The start arguments of section 11 leave out A1-01 although the table lists it as a dependency;
+   that is correct because A1-01 is merged first, and A1-01 states it in one sentence.
