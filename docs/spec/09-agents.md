@@ -2536,8 +2536,9 @@ attachments. The event carries no ephemeral channel prompt: the adapter answers 
 `pre_llm_call` with a `context`, which Hermes appends after the person's text at the time of the
 request and stores with the message (its `api_content`), so the stored text and the cached prefix
 stay stable. Reason (FIX-hermes-user-side-context): a host may shorten its system text; a budget on
-the Anthropic OAuth route keeps the identity block and about 3000 characters, so everything the
-adapter put in the system part never reached the model. The user side holds, in this order:
+the Anthropic OAuth route keeps the identity block and `providers.anthropic.oauth_system_budget_chars`
+characters of a host patch, so everything the adapter put in the system part never reached the
+model. The user side holds, in this order:
 
 1. The format rules for replies of 4.11 (`bothy_sdk.message_format`), under the line
    "Message format of every reply in this chat:", on every turn, also of a command run.
