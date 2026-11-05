@@ -49,7 +49,7 @@ func run(ctx context.Context) error {
 	}
 	fmt.Printf("termsuite-images: server image %s built in %s\n", server, time.Since(t0).Round(time.Second))
 	t0 = time.Now()
-	host, err := stack.HostImage(ctx, d, root)
+	host, err := stack.HostImage(ctx, d, root, os.Stderr)
 	if err != nil {
 		return fmt.Errorf("host image: %w", err)
 	}

@@ -144,7 +144,7 @@ func Start(ctx context.Context, o Options) (*Stack, error) {
 	s.Timings["server_image"] = time.Since(t0)
 	logf("stack: server image %s built in %s", s.ServerImage, s.Timings["server_image"].Round(time.Second))
 	t0 = time.Now()
-	if s.HostImage, err = HostImage(ctx, d, root); err != nil {
+	if s.HostImage, err = HostImage(ctx, d, root, os.Stderr); err != nil {
 		return s, err
 	}
 	s.Timings["host_image"] = time.Since(t0)
