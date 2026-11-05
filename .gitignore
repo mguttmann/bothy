@@ -6,6 +6,9 @@
 .env.*
 !.env.example
 tools/sonarqube/.env
+# Local Compose overrides of an installation (docs/design/builtin-agents.md, D-A1-25)
+compose.override.yaml
+compose.override.yml
 # Supplied secrets and decrypted escrow bundles of the Compose stack (docs/spec/16-operations.md 5.3)
 infra/compose/secrets/
 

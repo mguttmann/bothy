@@ -227,6 +227,7 @@ generated code matches the specification.
 | [ADR index](adr/README.md) | Architecture decisions in the MADR 4 format |
 | [Roadmap](roadmap.md) | public overview of the milestones |
 | [Design](design/README.md) | Design system: colors, typography, components, preview images |
+| [Built-in agents](design/builtin-agents.md) | Design of stage A1 (agents created in Bothy and hosted by the Claude Code runner) and the rest of V1 |
 | [Quality](quality/README.md) | Gates, tools, push discipline, going public |
 | [Operations](operations/configuration.md) | Configuration reference and guides for instance operators |
 | [Lessons from the predecessors](REUSE.md) | what Bothy takes over from earlier projects and what it does not |
