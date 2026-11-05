@@ -2557,12 +2557,12 @@ model. The user side holds, in this order:
 
 Items 1 and 2 ride every turn of the run's thread (also a follow-up Hermes runs as a turn of its
 own), items 3 and 4 the run's first turn; a new run replaces both. The whole text stays within
-Hermes' `hooks.output_spill.max_chars` (default 10000; above it Hermes would write the text to a
-file and send only its head and tail): items 1 and 2 stay whole, the context keeps its newest
-messages, leaving out the oldest (channel messages before thread messages), then the inlined
-attachment texts of the triggering message, and a line after the note names what was left out. A
-message left out this way is not delivered by a later run of the same session (its
-`context_floor_seq` starts after the previous trigger).
+Hermes' `hooks.output_spill.max_chars` as far as leaving out context allows (default 10000; above it
+Hermes writes the text to a file and sends only its head and tail, and the adapter logs a warning):
+items 1 and 2 stay whole, the context keeps its newest messages, leaving out the oldest (channel
+messages before thread messages), then the inlined attachment texts of the triggering message, and a
+line after the note names what was left out. A message left out this way is not delivered by a later
+run of the same session (its `context_floor_seq` starts after the previous trigger).
 
 Profile bindings (FEAT-hermes-channel-skills): the profile's own `channel_skill_bindings` and
 `channel_prompts` in the platform section (`PlatformConfig.extra`) apply as on Hermes' Discord

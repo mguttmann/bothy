@@ -428,8 +428,9 @@ class ServerPlatform(BasePlatformAdapter):
 
         Hermes' own reader resolves the entry as for Discord: the thread's ID first, then its
         channel's, so every thread of a bound channel inherits the channel's prompt. It joins the
-        channel instructions after the operator's (D-FHUSC-2); the whole text stays within Hermes'
-        limit for a hook's context (D-FHUSC-3).
+        channel instructions after the operator's (D-FHUSC-2); the context is shortened to
+        stay within Hermes' limit for a hook's context as far as leaving parts out allows
+        (D-FHUSC-3).
         """
         prompt = resolve_channel_prompt(self._extra(), str(turn.thread_id), str(turn.channel_id))
         return turn.user_side.compose(prompt or "", hermes_config.hook_context_limit())
