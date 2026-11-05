@@ -21,9 +21,12 @@ queued.
 
 | No | Date | Ruling | Reason |
 |---|---|---|---|
-| D-FIX-runner-hold-background-1 | 2026-11-05 | The stream reader knows `command_lifecycle`; `BackgroundWork` keeps the `command_uuid`s whose last state is `queued`, and while one is queued no `result` closes stdin (`input_waiting`, checked in `RunTurn._idle` before the stdin rule of note 5). Any other state (`started`, `completed`, `cancelled`) ends the wait. | The early results answer no input; the input's turn is still to come and may start background work, which the existing hold then covers. In every stream file the affected runner had stored on 2026-11-05, every queued command reached `started` and a terminal state, so the wait cannot keep stdin open for good. |
+| D-FIX-runner-hold-background-1 | 2026-11-05 | The stream reader knows `command_lifecycle`; `BackgroundWork` keeps the `command_uuid`s whose last state is `queued`, and a `result` that comes while one is queued neither closes stdin nor counts as the last `result` of the stdin rule of note 5 (`input_waiting`, checked in `RunTurn._read` and `RunTurn._idle`), so the input's turn may think as long as it needs before it starts background work. Any other state (`started`, `completed`, `cancelled`) ends the wait. | The early results answer no input; the input's turn is still to come and may start background work, which the existing hold then covers. In every stream file the affected runner had stored on 2026-11-05, every queued command reached `started` and a terminal state, so the wait cannot keep stdin open for good. |
 | D-FIX-runner-hold-background-2 | 2026-11-05 | A `result` with an error still closes stdin at once, also while an input is queued. | Unchanged recovery of 18.9 (D-FIX-runner-responsive-turns-6). |
 | D-FIX-runner-hold-background-3 | 2026-11-05 | No new log code: the turn of the input then logs `stdin_held_for_background` as any other turn with background work. | The fix restores the existing path; the stream files show the early results. |
+
+Limit (recorded, not built): a `queued` state that never ends would keep stdin open without a
+time bound; no stored stream shows one.
 
 Deploy note: nothing to configure. A session already caught in the loop leaves it with the first
 turn on the fixed runner: its early results no longer close stdin, so the work of that turn is

@@ -770,7 +770,10 @@ class RunTurn:
             elif kind == "user" and message.get("isReplay") is True:
                 await self._echo(message.get("uuid"), adopted=not own)
             elif kind == "result":
-                last_result_at = self.monotonic()
+                if not self.background.input_waiting:
+                    # A result before a queued input started answers no input: it must not
+                    # start the stdin rule for the turn of that input (FIX-runner-hold-background).
+                    last_result_at = self.monotonic()
                 self._settle_cost()
                 if self.ledger.kind == "turn" and is_success(message):
                     await self._answer(message, reader.line_offset)

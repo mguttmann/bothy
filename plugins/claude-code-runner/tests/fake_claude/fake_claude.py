@@ -694,6 +694,7 @@ class _StdinLines:
             with self.changed:
                 self.lines.append(line)
                 self.changed.notify_all()
+        self.fake.record("stdin_eof")
         with self.changed:
             self.done = True
             self.changed.notify_all()
