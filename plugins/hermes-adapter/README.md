@@ -37,7 +37,7 @@ installation.
 | `src/bothy_hermes_adapter/handler.py` | the runtime side of the SDK loop: start, turn, end, follow-ups, interactions |
 | `src/bothy_hermes_adapter/actual_mode.py`, `tool_class.py` | the actual billing mode (17.8) and the tool class (17.11) |
 | `src/bothy_hermes_adapter/media.py` | files of the answer (check, upload session, message kind), the audio attachments to transcribe and the other attachments for Hermes' media cache with the note for one not passed on (17.3, 17.6) |
-| `src/bothy_hermes_adapter/context_format.py` | the run context as the fixed system part (17.6) |
+| `src/bothy_hermes_adapter/context_format.py` | format rules, channel instructions and the run context for the user side of a turn (17.6) |
 | `src/bothy_hermes_adapter/hermes_commands.py` | the command table of the pinned version, the control and skill commands the adapter declares (17.3) |
 | `src/bothy_hermes_adapter/reports.py` | reports without a run: targets, a new forum post or the main thread, the standalone sender (17.9) |
 | `src/bothy_hermes_adapter/live_box.py`, `cards.py`, `store.py`, `heartbeat.py` | live box, cards, resolved callbacks and open cards, heartbeat |
@@ -154,7 +154,8 @@ every post of a bound forum inherits the forum's binding (Hermes' `resolve_chann
 `resolve_channel_prompt`, the Discord semantics). The bound skills are loaded at the start of the
 thread's Hermes session, each with Hermes' skill payload and auto-load note before the person's
 text, and stay in the session; a skill Hermes cannot find is skipped with a warning. The channel
-prompt is appended to the context the server delivers (09 17.6), never put in its place. Hermes
+prompt joins the channel instructions on the user side of the turn, after the operator's and
+before the context the server delivers (09 17.6), never in its place. Hermes
 copies `platforms.<key>.channel_skill_bindings` outside `extra` only for Discord and Slack, so
 write the bindings into `extra` for this platform. The adapter reads them at the gateway start;
 restart the gateway after a change.

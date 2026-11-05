@@ -279,6 +279,7 @@ _LATE_SEND_PROBE = """
 import asyncio, json, uuid
 from gateway.config import PlatformConfig
 from gateway.delivery_ledger import FLOOD_MARKER, RECONNECTED_MARKER, RECOVERED_MARKER
+from bothy_hermes_adapter.context_format import UserSideContext
 from bothy_hermes_adapter.platform import ServerPlatform
 from bothy_hermes_adapter.reports import recovered_reply
 from bothy_hermes_adapter.runtime import CommandRequest, TurnOutcome, TurnRequest
@@ -325,7 +326,7 @@ async def main():
     p._dispatch = dispatch
     turn = TurnRequest(
         run_id=R1, thread_id=T, channel_id=C, user_id=U, user_name="p",
-        message_id=M1, user_text="hi", system_part="",
+        message_id=M1, user_text="hi", user_side=UserSideContext(),
     )
     await p.start_turn(turn)
     out = {}

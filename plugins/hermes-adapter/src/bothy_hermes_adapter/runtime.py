@@ -30,6 +30,8 @@ from enum import StrEnum
 from typing import Any, Protocol, runtime_checkable
 from uuid import UUID
 
+from bothy_hermes_adapter.context_format import UserSideContext
+
 __all__ = [
     "CardKind",
     "CardRequest",
@@ -137,7 +139,8 @@ class TurnRequest:
         user_name: The person's display name.
         message_id: The triggering message.
         user_text: The person's text plus the transcripts of the voice attachments.
-        system_part: The run context as the fixed system part (09 4.6, 17.6).
+        user_side: The format rules, channel instructions and run context for the user side of
+            the turn (09 4.6, 4.11, 17.6).
         media: The attachments of the triggering message in Hermes's media cache.
         new_session: Whether the turn starts a new Hermes session of the thread (the channel's
             bound skills are loaded then, never again in the same session).
@@ -150,7 +153,7 @@ class TurnRequest:
     user_name: str = field(repr=False)
     message_id: UUID
     user_text: str = field(repr=False)
-    system_part: str = field(repr=False)
+    user_side: UserSideContext = field(repr=False)
     media: tuple[InboundMedia, ...] = ()
     new_session: bool = False
 

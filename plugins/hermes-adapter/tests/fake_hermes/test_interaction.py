@@ -15,8 +15,9 @@ from bothy_sdk.testing.fakeserver import ContextFile, ContextMessage
 from bothy_sdk.testing.faults import Fault
 from fake_hermes_kit import HermesRig, HermesWorld, Profile, gateway_log, hermes_rig
 from hermes_harness.fake_model import ScriptTurn
+from oauth_budget import trim
 
-from bothy_hermes_adapter.context_format import SYSTEM_NOTE
+from bothy_hermes_adapter.context_format import FORMAT_HEADING, SYSTEM_NOTE
 
 pytestmark = pytest.mark.anyio
 
@@ -188,19 +189,68 @@ async def test_ag20_context_marks_unverified_content(world: HermesWorld) -> None
         bodies = [b for b in rig.model.raw if b.get("tools")]
         assert bodies, gateway_log(rig)
         system, user = _system_and_user(bodies[0])
-        assert SYSTEM_NOTE in system
-        blocks = "\n".join(m.group(3) for m in _BLOCK.finditer(system))
-        outside = _BLOCK.sub("", system)
-        # F-AGENT-FORMAT: the SDK's format rules reach Hermes' model as instructions.
-        assert MESSAGE_FORMAT_RULES in outside
+        # D-FHUSC-1: rules and context ride the user side, after the person's text.
+        assert SYSTEM_NOTE in user
+        assert SYSTEM_NOTE not in system
+        blocks = "\n".join(m.group(3) for m in _BLOCK.finditer(user))
+        outside = _BLOCK.sub("", user)
+        # F-AGENT-FORMAT: the SDK's format rules reach Hermes' model as instructions, before the
+        # note that calls what follows material.
+        assert FORMAT_HEADING + "\n" + MESSAGE_FORMAT_RULES in outside
+        assert MESSAGE_FORMAT_RULES not in system
+        assert outside.index(MESSAGE_FORMAT_RULES) < outside.index(SYSTEM_NOTE)
         for unverified in (writer, texter, imported, attachment):
             assert unverified in blocks, unverified
             assert unverified not in outside, unverified
+            assert unverified not in system, unverified
         assert "Sam: the boat is booked." in outside
-        assert trigger in user
+        assert user.index(trigger) < user.index(FORMAT_HEADING)
         assert transcript in user
         assert trigger not in system
         assert json.dumps(bodies[0]).count(attachment) == 1
+
+
+async def test_oauth_budget_leaves_rules_channel_and_context_to_the_model(
+    world: HermesWorld,
+) -> None:
+    """D-FHUSC-6: the request of Hermes' own builder on the OAuth route, trimmed as a host does.
+
+    The pinned Hermes builds the request with ``build_anthropic_kwargs(..., is_oauth=True)``; a
+    host's budget then keeps the identity block and 3000 characters of the system text
+    (`oauth_budget.trim`). The format rules, the operator's channel prompt and the context stand
+    on the user side and reach the model whole; the context fits Hermes' spill limit, newest first.
+    """
+    operator = "OPERATOR-PROMPT-MARKER: answer as the help desk of this forum."
+    history = tuple(
+        ContextMessage("sam", f"Sam note {n:02d}: " + "z" * 400, trust="authorized")
+        for n in range(40)
+    )
+    ask = "Where is my booking?"
+    profile = Profile(dotenv={"anthropic_oauth": "oauth"})
+    script = [ScriptTurn(text=("Found ", "it."), paced=True)]
+    async with hermes_rig(world, script, profile=profile, billing_mode="personal") as rig:
+        rig.fake.set_channel(operator)
+        # An operator run (a session mode) reads the channel's prompt (09 4.6, 17.6).
+        triggered = await rig.fake.trigger(ask, history=history, session_mode="new")
+        await _end(rig, triggered.run_id)
+        assert rig.fake.run_state(triggered.run_id).state == "completed", gateway_log(rig)
+        used = [r for r in rig.model_requests() if r["route"] == "anthropic.messages"]
+        assert used
+        assert {str(r["credential"]) for r in used if r.get("tools")} == {"oauth"}
+        body = next(b for b in rig.model.raw if b.get("tools"))
+        sent = trim(body.get("system"))
+        system = "\n".join(_texts(sent))
+        users = [m for m in body.get("messages") or [] if m.get("role") == "user"]
+        user = "\n".join(_texts(users[-1].get("content")))
+        for part in (FORMAT_HEADING, MESSAGE_FORMAT_RULES, operator, SYSTEM_NOTE, "Sam note 39"):
+            assert part in user, part
+            assert part not in system, part
+        order = [ask, MESSAGE_FORMAT_RULES, operator, SYSTEM_NOTE, "Sam note 39"]
+        assert [user.index(p) for p in order] == sorted(user.index(p) for p in order)
+        # Hermes' spill limit (10000 by default) holds: no preview, the oldest notes left out.
+        assert "output truncated" not in user
+        assert "Sam note 00" not in user
+        assert "older messages left out" in user
 
 
 async def test_followup_during_the_final_answer_stays_in_the_run(world: HermesWorld) -> None:
@@ -232,8 +282,19 @@ async def test_followup_during_the_final_answer_stays_in_the_run(world: HermesWo
         ops = [q.operation_id for q in fake.requests if str(triggered.run_id) in q.path]
         assert ops.index("finishRun") == len(ops) - 1
         assert _followup_states(rig, message) == ["delivered", "absorbed"]
-        followed = [r for r in rig.model_requests() if picnic in r.get("scenario_texts", [])]
+        # Only the turns' own requests (they offer tools): an auxiliary request of Hermes without
+        # tools can carry the follow-up's text too, depending on timing.
+        followed = [
+            r
+            for r in rig.model_requests()
+            if r.get("tools") and picnic in r.get("scenario_texts", [])
+        ]
         assert len(followed) == 1
+        # D-FHUSC-4: the follow-up's own turn gets the rules again, the context only once.
+        turns = [_system_and_user(b)[1] for b in rig.model.raw if b.get("tools")]
+        picnic_turn = next(u for u in turns if picnic in u)
+        assert MESSAGE_FORMAT_RULES in picnic_turn
+        assert SYSTEM_NOTE not in picnic_turn
 
 
 async def test_followup_after_interim_commentary_is_steered(world: HermesWorld) -> None:

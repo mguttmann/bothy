@@ -95,13 +95,15 @@ def make_register(platform_key: str) -> Any:
         return ServerPlatform(config, platform_key)
 
     def hook(name: str) -> Any:
-        def callback(**kwargs: Any) -> None:
+        def callback(**kwargs: Any) -> Any:
             if str(kwargs.get("platform") or "") != platform_key:
-                return
+                return None
             # No platform exists before the factory imported its module; a hook never imports it.
             module = sys.modules.get(_PLATFORM_MODULE)
-            if module is not None:
-                module.dispatch_hook(platform_key, name, kwargs)
+            if module is None:
+                return None
+            # pre_llm_call answers with the turn's user side (D-FHUSC-1); the others with None.
+            return module.dispatch_hook(platform_key, name, kwargs)
 
         return callback
 
