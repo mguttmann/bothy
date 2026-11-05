@@ -881,6 +881,10 @@ func (stubServer) ListActiveRuns(context.Context, rest.ListActiveRunsRequestObje
 	return nil, nil
 }
 
+func (stubServer) ListRunHistory(context.Context, rest.ListRunHistoryRequestObject) (rest.ListRunHistoryResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) ListAgentProjectFolders(context.Context, rest.ListAgentProjectFoldersRequestObject) (rest.ListAgentProjectFoldersResponseObject, error) {
 	return nil, nil
 }
@@ -1525,6 +1529,8 @@ func TestRealTable_Enabled(t *testing.T) {
 		"listThreadRuns":     {"GET /api/v1/threads/{thread_id}/runs", "run.read", "rl.read"},
 		"listRunSteps":       {"GET /api/v1/runs/{run_id}/steps", "run.read", "rl.read"},
 		"listActiveRuns":     {"GET /api/v1/runs", "run.overview.read", "rl.read"},
+		// F-LAUFHISTORIE
+		"listRunHistory": {"GET /api/v1/run-history", "run.overview.read", "rl.read"},
 
 		// M2-26
 		"getWebhookKeys":            {"GET /api/v1/instance/webhook-keys", "instance.discovery.read", "rl.public_auth"},

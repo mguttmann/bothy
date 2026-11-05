@@ -70,6 +70,10 @@ final class VizFixtures {
   Future<api.Run> run(String state) =>
       decode('Run.$state.json', api.Run.serializer);
 
+  /// `RunHistoryPage.<state>.json`: a page of the run history (25 6.7).
+  Future<api.RunHistoryPage> runHistoryPage(String state) =>
+      decode('RunHistoryPage.$state.json', api.RunHistoryPage.serializer);
+
   /// `CostSeries.<state>.json`.
   Future<api.CostSeries> costSeries(String state) =>
       decode('CostSeries.$state.json', api.CostSeries.serializer);

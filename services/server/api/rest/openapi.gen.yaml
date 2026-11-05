@@ -13798,6 +13798,93 @@ paths:
         default:
           $ref: '#/components/responses/Error'
 
+  /run-history:
+    get:
+      operationId: listRunHistory
+      summary: Finished runs, newest first
+      tags: [Runs]
+      description: |-
+        Runs in `completed`, `failed` or `cancelled` across every thread the caller may read, ordered by `finished_at` descending, then by ID; each run passes `run.read` in filter mode, as in `listActiveRuns` (docs/spec/25-visualization.md, section 6.7). A `space_id` or `agent_id` the caller cannot see gives an empty page. Runs stay as long as their thread: there is no time-based deletion of runs, so the last page reaches the oldest run the caller may read.
+      x-authz-action: run.overview.read
+      x-rate-limit-class: rl.read
+      parameters:
+      - $ref: '#/components/parameters/Cursor'
+      - $ref: '#/components/parameters/Limit'
+      - name: space_id
+        in: query
+        description: Only runs whose thread lies in a channel of this space.
+        schema:
+          $ref: '#/components/schemas/Uuid'
+      - name: agent_id
+        in: query
+        description: Only runs of this agent.
+        schema:
+          $ref: '#/components/schemas/Uuid'
+      - name: state
+        in: query
+        description: Only runs that ended in this state.
+        schema:
+          type: string
+          enum: [completed, failed, cancelled]
+      responses:
+        '200':
+          description: OK.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RunHistoryPage'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    items:
+                    - id: 0192f4a0-7b1c-767f-8292-c1b14d7d40df
+                      thread_id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
+                      channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
+                      space_id: 0192f4a0-7b1c-7a11-8c2e-4b6f0d1e2a30
+                      agent_id: 0192f4a0-7b1c-7d07-84b0-358556a08a99
+                      state: completed
+                      billing_mode_expected: personal
+                      billing_mode_used: personal
+                      model: model-large
+                      summary: Found the cause and proposed a fix
+                      cost:
+                        amount_micros: 1250000
+                        currency: USD
+                        is_estimate: true
+                      metrics:
+                        tokens_in: 120400
+                        tokens_out: 8200
+                        tokens_cache_read: 940000
+                        tokens_cache_write: 30500
+                        subagents: 7
+                      step_count: 64
+                      queued_at: '2026-10-10T09:30:00.000Z'
+                      started_at: '2026-10-10T09:30:01.000Z'
+                      finished_at: '2026-10-10T10:09:12.000Z'
+                      duration_ms: 2351000
+                      chat:
+                        thread_id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
+                        channel_name: backend
+                        thread_title: Payment integration
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
   /runs/{run_id}:
     get:
       operationId: getRun
@@ -32083,6 +32170,78 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/RunSummary'
+        next_cursor:
+          $ref: '#/components/schemas/Cursor'
+    RunHistoryEntry:
+      type: object
+      additionalProperties: false
+      description: A finished run in the run history (docs/spec/25-visualization.md, section 6.7). The step tree, the last text excerpt and the triggering message come from `getRun`.
+      required:
+      - id
+      - thread_id
+      - channel_id
+      - agent_id
+      - state
+      - billing_mode_expected
+      - cost
+      - metrics
+      - step_count
+      - queued_at
+      - finished_at
+      properties:
+        id:
+          $ref: '#/components/schemas/Uuid'
+        thread_id:
+          $ref: '#/components/schemas/Uuid'
+        channel_id:
+          $ref: '#/components/schemas/Uuid'
+        space_id:
+          $ref: '#/components/schemas/Uuid'
+          description: Space of the channel now; absent for a direct message channel.
+        agent_id:
+          $ref: '#/components/schemas/Uuid'
+        state:
+          $ref: '#/components/schemas/RunState'
+        state_reason:
+          type: string
+          examples: [user_cancelled]
+        billing_mode_expected:
+          $ref: '#/components/schemas/BillingMode'
+        billing_mode_used:
+          $ref: '#/components/schemas/BillingMode'
+        model:
+          type: string
+          examples: [model-large]
+        summary:
+          type: string
+          examples: [Found the cause and proposed a fix]
+        cost:
+          $ref: '#/components/schemas/Money'
+        metrics:
+          $ref: '#/components/schemas/RunMetrics'
+        step_count:
+          type: integer
+        queued_at:
+          $ref: '#/components/schemas/Timestamp'
+        started_at:
+          $ref: '#/components/schemas/Timestamp'
+        finished_at:
+          $ref: '#/components/schemas/Timestamp'
+        duration_ms:
+          type: integer
+          format: int64
+        chat:
+          $ref: '#/components/schemas/StatsRunChat'
+    RunHistoryPage:
+      type: object
+      additionalProperties: false
+      description: One page of the run history. `next_cursor` is absent on the last page, which ends with the oldest run the caller may read.
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/RunHistoryEntry'
         next_cursor:
           $ref: '#/components/schemas/Cursor'
     PinList:

@@ -105,8 +105,8 @@ type Handlers struct {
 	*messaginghttp.Messages
 	// Finder implements search and searchThreadTitles (search, M3-14).
 	*searchhttp.Finder
-	// Runs implements getRun, listThreadRuns, listRunSteps and listActiveRuns (runs, M2-05), the
-	// adapter operations of M2-09 and patchRun (M2-10).
+	// Runs implements getRun, listThreadRuns, listRunSteps and listActiveRuns (runs, M2-05),
+	// listRunHistory (F-LAUFHISTORIE), the adapter operations of M2-09 and patchRun (M2-10).
 	*runshttp.Runs
 	// Billing implements getThreadCosts, listPrices, createPrice and closePrice (billing, M2-22).
 	*billinghttp.Billing

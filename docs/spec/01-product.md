@@ -97,6 +97,7 @@ milestones from the [plan](../PLAN.md).
 | Backend policy badge in the thread header and on the agent card | core | D, M, W | `agent.read` | Personal or Organization |
 | Costs per run and thread (organization: estimate until reconciliation) | core | D, M | `cost.read.thread` | with Personal only information |
 | Overview "Running now" | core | D, M | `run.overview.read` | as live cards or list (D10, M11; addendum of 2026-10-24) |
+| Run history: finished runs with tokens, duration, cost and their steps | core | D, M, W | `run.overview.read`, `run.read` | tab of D12, M10 and the console live view ([25-visualization.md](25-visualization.md) 6.7; addendum of 2026-11-04) |
 | Run graph: agent, subagents, workflows and background jobs as a tree on a time axis, live | core | D, M | `run.read` | D14, M12; addendum of 2026-10-24; not in the web console (no chat, ADR 0028) |
 | Typing indicator (people); the agent "types" through the live box | core | D, M | `typing.start` | |
 | Presence of agents (online, degraded, offline) | core | D, M | `agent.read` | people have no presence |
@@ -592,6 +593,8 @@ Confirmation on opening and warning on a changed key (24, section 5.5):
 card the agent tree of the run (subagents, workflows with their agents, background jobs; addendum
 of 2026-11-01); a click opens the thread. The same data as a table via "Table". Normative:
 [25-visualization.md](25-visualization.md), section 6.1.
+Next to it the tab "Run history" lists the finished runs with their figures; a click opens
+their detail with the step tree (addendum of 2026-11-04, 25 6.7).
 
 ```text
 +----------------------------+-------------------------------------------------------------------------------+
@@ -1116,7 +1119,8 @@ badge of the LLM login and own sessions; tapping a session attaches.
 ```
 
 **M10 Live.** The same views as D12 from `bothy_viz` in density `touch`, one tab per view:
-topology, backend, delivery, executive, timeline. The topology stacks the lanes vertically;
+topology, run history (addendum of 2026-11-04), backend, delivery, executive, timeline. The
+topology stacks the lanes vertically;
 tapping a run card opens the thread. Every view has the table view. The live stream
 runs only in the foreground. No TV mode. Normative: [25-visualization.md](25-visualization.md),
 section 6.
@@ -1254,7 +1258,10 @@ the same.
 Same administration screens as A1 to A8, the views from D12 and D13 and the terminal from D11,
 navigation on the left. No chat (ADR 0028); links to threads open the app via deep link. The run
 graph D14 and the control room D10 are not part of the console (addendum of 2026-10-24): both
-show run content that the console, without chat, has no place for; D12 stays its live view. The terminal
+show run content that the console, without chat, has no place for; D12 stays its live view. The run
+history of D12 (addendum of 2026-11-04, 25 6.7) is part of the console with its detail and step
+tree, as the owner asked for every client that shows the live topology; its jumps show "Open in
+the app". The terminal
 opens only after confirmation with a passkey with user verification; other step-up methods of the
 console do not count for it ([ADR 0070](../adr/0070-terminal-in-the-web-console.md)).
 

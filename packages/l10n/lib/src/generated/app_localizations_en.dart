@@ -10162,4 +10162,73 @@ class AppLocalizationsEn extends AppLocalizations {
   String retriggerRefused(String reason) {
     return 'Could not trigger again: $reason';
   }
+
+  @override
+  String get vizViewRunHistory => 'Run history';
+
+  @override
+  String get vizHistoryAll => 'All';
+
+  @override
+  String get vizHistoryStateFilter => 'End state';
+
+  @override
+  String get vizHistoryLoadMore => 'Load more runs';
+
+  @override
+  String get vizHistoryEnd => 'Start of the history: there are no older runs.';
+
+  @override
+  String get vizHistoryRetention =>
+      'Runs are kept as long as their chat. Deleting a chat removes its runs; nothing is deleted because of its age.';
+
+  @override
+  String get vizHistoryEmpty => 'No finished runs yet.';
+
+  @override
+  String get vizHistoryBack => 'Back to the run history';
+
+  @override
+  String get vizHistoryOpenChat => 'Open the chat';
+
+  @override
+  String get vizHistoryOpenMessage => 'Go to the triggering message';
+
+  @override
+  String get vizHistorySummary => 'Summary';
+
+  @override
+  String get vizHistoryLastText => 'Last text';
+
+  @override
+  String get vizHistorySteps => 'Steps';
+
+  @override
+  String vizHistoryOpenRun(String id) {
+    return 'Open run $id';
+  }
+
+  @override
+  String get vizColDuration => 'Duration';
+
+  @override
+  String get vizColModel => 'Model';
+
+  @override
+  String get vizColRunCost => 'Cost';
+
+  @override
+  String get vizColTokensIn => 'Input tokens';
+
+  @override
+  String get vizColTokensOut => 'Output tokens';
+
+  @override
+  String get vizColCacheRead => 'Cache read';
+
+  @override
+  String get vizColCacheWrite => 'Cache write';
+
+  @override
+  String get vizColSubagents => 'Subagents';
 }

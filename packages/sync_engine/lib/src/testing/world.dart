@@ -2522,6 +2522,44 @@ final class FakeWorld {
     'step_count': (run['steps']! as JsonMap).length,
   };
 
+  /// The API `RunHistoryEntry` of the finished [run] (F-LAUFHISTORIE): the summary members of
+  /// the schema with the space, model and metrics, and the chat named by its channel and thread.
+  JsonMap runHistoryEntry(JsonMap run) {
+    final thread = threads[run['thread_id']];
+    // The chat where the thread is now, as the server reads it.
+    final channel = channels[thread?['channel_id'] ?? run['channel_id']];
+    final title = thread?['kind'] == 'main' ? null : thread?['title'];
+    return {
+      for (final k in const [
+        'id',
+        'thread_id',
+        'channel_id',
+        'agent_id',
+        'state',
+        'state_reason',
+        'billing_mode_expected',
+        'billing_mode_used',
+        'model',
+        'summary',
+        'cost',
+        'duration_ms',
+        'queued_at',
+        'started_at',
+        'finished_at',
+      ])
+        if (run[k] != null) k: run[k],
+      'space_id': ?channel?.spaceId,
+      'metrics': run['metrics'] ?? <String, Object?>{},
+      'step_count': (run['steps']! as JsonMap).length,
+      if (channel != null)
+        'chat': {
+          'thread_id': run['thread_id'],
+          'channel_name': channel.json['name'],
+          if (title is String && title.isNotEmpty) 'thread_title': title,
+        },
+    };
+  }
+
   /// Applies the RFC 6902 [ops] (`add`, `replace`, `remove`) to the document of [runId],
   /// raises its version and returns the previous version (04 11.2).
   int patchRun(String runId, List<JsonMap> ops) {

@@ -25,7 +25,11 @@ harness and the fake server read them instead of a server.
   `ui.livebox_visible_steps`, `usage` on the tasks), `summary` (summary steps at the root and
   under a subagent), `stalled` (`stall_warned_at` set, a personal run) and `load` (exactly the
   default of `run.max_steps_persisted` steps). Each is a running run that started at
-  2026-10-24 09:00 UTC. Names of agents and spaces are not part of the schemas; the harness maps the IDs to
+  2026-10-24 09:00 UTC, except `finished`: the `subagents` run completed at 09:39 with its summary,
+  last text excerpt, triggering message and token metrics, the detail of the run history (25 6.7).
+  The run history pages `RunHistoryPage.<state>.json` are run content under `run.read` as well:
+  `normal` holds a completed organization run with a chat and every token count, a failed personal
+  run and a cancelled run without a chat, model or start, and a `next_cursor`. Names of agents and spaces are not part of the schemas; the harness maps the IDs to
   Support, Engineering, support-agent and dev-runner.
 
 Checks: `make api-checks` (rule `viz-fixtures`, `tools/api-checks/viz_fixtures.py`) validates
@@ -68,3 +72,6 @@ file, a file missing from the table below and a listed schema without a file. Th
 | `Run.summary.json` | `Run` | summary | run graph (summary rows) |
 | `Run.stalled.json` | `Run` | stalled | run graph, control room card (stall notice, personal cost) |
 | `Run.load.json` | `Run` | load | run graph (performance), harness |
+| `Run.finished.json` | `Run` | finished | run history detail (key figures, summary, step tree) |
+| `RunHistoryPage.normal.json` | `RunHistoryPage` | normal | run history list and table |
+| `RunHistoryPage.empty.json` | `RunHistoryPage` | empty | run history (no finished runs) |

@@ -97,6 +97,9 @@ class _ConsoleLivePageState extends State<ConsoleLivePage> {
       queries: _queries,
       directory: widget.admin.repository,
       onOpenThread: _openThread,
+      // No chat in the console: the triggering message of the run history names its thread
+      // the same way (ADR 0028).
+      onOpenMessage: (threadId, _) => _openThread(threadId),
       openExternal: links?.open,
       config: _config,
       timeZone: widget.admin.timeZone,

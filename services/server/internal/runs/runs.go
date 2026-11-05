@@ -150,6 +150,46 @@ type ActiveRunsQuery struct {
 	Limit   int
 }
 
+// HistoryQuery is the query of Runs.ListHistory (listRunHistory, docs/spec/25-visualization.md
+// 6.7): the finished runs the actor may read, newest end first.
+type HistoryQuery struct {
+	// SpaceID keeps the runs whose thread lies in a channel of the space now; zero for all.
+	SpaceID ids.ID
+	// AgentID keeps the runs of one agent; zero for all.
+	AgentID ids.ID
+	// State keeps the runs that ended in completed, failed or cancelled; "" for all three.
+	State  string
+	Cursor string
+	Limit  int
+}
+
+// HistoryChat names the chat of a run in the history (schema StatsRunChat): the name of its
+// channel and the title of its thread, "" for a main thread or an empty title.
+type HistoryChat struct {
+	ThreadID                 ids.ID
+	ChannelName, ThreadTitle string
+}
+
+// HistoryEntry is one finished run of the history (schema RunHistoryEntry): the summary with the
+// space of its channel now, the model, the stored metrics and the chat.
+type HistoryEntry struct {
+	RunSummary
+	// SpaceID is the space of the channel now; zero for a dm channel.
+	SpaceID ids.ID
+	// Model is "" while unset.
+	Model string
+	// Metrics is the object run_metrics.v1 as stored; never nil.
+	Metrics map[string]any
+	// Chat names the chat; nil when the chat source named none.
+	Chat *HistoryChat
+}
+
+// HistoryPage is one page of the history; NextCursor is "" on the last page.
+type HistoryPage struct {
+	Items      []HistoryEntry
+	NextCursor string
+}
+
 // BillingEvidence is billing_evidence.v1 as an adapter reports it at the start (schema
 // BillingEvidence): codes only, never a key value or prefix.
 type BillingEvidence struct {
@@ -259,6 +299,14 @@ type Runs interface {
 	// ListActive pages "Running now" (listActiveRuns, run.overview.read): runs in queued, running
 	// or waiting_input the actor may read with run.read, newest first.
 	ListActive(ctx context.Context, q ActiveRunsQuery) (RunSummaryPage, error)
+	// ListHistory pages the run history (listRunHistory, run.overview.read): runs in completed,
+	// failed or cancelled the actor may read with run.read, by finished_at descending. Errors: 403
+	// without run.overview.read, 400 cursor_invalid or validation_failed for an unknown state.
+	//
+	// Example:
+	//
+	//	page, err := rs.ListHistory(ctx, runs.HistoryQuery{SpaceID: space, Limit: 50})
+	ListHistory(ctx context.Context, q HistoryQuery) (HistoryPage, error)
 	// ActiveForActor lists all active runs the actor may read, for the snapshot (04 section 6.3
 	// step 4); the snapshot checked sync.snapshot.read, so run.overview.read is not checked here.
 	ActiveForActor(ctx context.Context) ([]RunSummary, error)

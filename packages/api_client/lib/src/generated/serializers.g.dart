@@ -577,6 +577,8 @@ Serializers _$serializers =
           ..add(RunFinishStateEnum.serializer)
           ..add(RunFollowup.serializer)
           ..add(RunFollowupStateEnum.serializer)
+          ..add(RunHistoryEntry.serializer)
+          ..add(RunHistoryPage.serializer)
           ..add(RunMetrics.serializer)
           ..add(RunPatch.serializer)
           ..add(RunPatchResult.serializer)
@@ -1413,6 +1415,10 @@ Serializers _$serializers =
               const FullType(RunContextMessage),
             ]),
             () => ListBuilder<RunContextMessage>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(RunHistoryEntry)]),
+            () => ListBuilder<RunHistoryEntry>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, const [

@@ -1,7 +1,7 @@
 # bothy_viz
 
 Visualizations of the statistics (docs/spec/25-visualization.md 7): view models, the ports
-`LiveFrameSource` and `StatsQuerySource`, the basic forms, the six views with their table views,
+`LiveFrameSource` and `StatsQuerySource`, the basic forms, the views with their table views (the run history of 25 6.7 included),
 the fixtures and the harness.
 
 Kind: Flutter package, a member of the Dart workspace at the repository root
@@ -28,7 +28,7 @@ a dependency or an import of it. Further rules:
 | `lib/src/model/` | view models from the generated types (`LiveTopologyModel`, `BackendModel`, `DeliveryModel`, `ExecutiveModel`, `TimelineModel`, `RunCardModel`, `LaneModel`, `SeriesModel`, `TrafficLightModel`, `MetricTileModel`, `BarModel`); a missing cost member is "not shown", never zero |
 | `lib/src/sources/` | `LiveFrameSource` with the base `LiveFrameSourceBase` (stale after `viz.stale_after` on a `VizClock`, error events), `StatsQuerySource`, and `FixtureLiveFrameSource`, `FixtureStatsQuerySource`, `FakeVizClock` for tests and the harness |
 | `lib/src/marks/` | `LaneMark`, `RunCardMark`, `AreaMark`, `BarMark`, `TrafficLightMark`, `MetricTileMark`; colors only from `color.viz.*`, the run state and the state roles; texts only from `l10n` |
-| `lib/src/views/` | the six views, `VizViewKind` with the registry `vizViewRegistry`, `VizHostOptions`, the shared frame (`VizViewScaffold`: switch "As table", notes, link "Open in Grafana") |
+| `lib/src/views/` | the views of 25 6 (`RunHistoryView` with `RunHistoryDetail` for the run history of 6.7, outside TV mode), `VizViewKind` with the registry `vizViewRegistry`, `VizHostOptions`, the shared frame (`VizViewScaffold`: switch "As table", notes, link "Open in Grafana") |
 | `lib/src/views/table/` | `VizTable` and one table builder per view, with the same values as the view |
 | `lib/src/views/timeline/` | `TimelinePlayback`: play, pause, jump and speed on a `VizClock` |
 | `lib/src/run_graph/` | the run graph and the control room card (M4-39; 09 5.6, R-VZ-14): `RunGraphModel.fromRun`, the pure derivation from the generated `Run`; `RunGraphView`, the trace view on a shared time axis with the list form "As list", arrow keys and rate-limited announcements (`RunGraphAnnouncer`); `RunControlCard` with `RunControlCardModel.from` over the generated `RunSummary` and, while live, the `Run`; `runSummaryOf`; `RunGraphTexts` |

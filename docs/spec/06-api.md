@@ -1081,6 +1081,7 @@ Generated from openapi.yaml.
 |---|---|---|---|---|
 | GET | `/api/v1/threads/{thread_id}/runs` | `listThreadRuns` | `run.read` | List runs of a thread |
 | GET | `/api/v1/runs` | `listActiveRuns` | `run.overview.read` | Running now |
+| GET | `/api/v1/run-history` | `listRunHistory` | `run.overview.read` | Finished runs, newest first |
 | GET | `/api/v1/runs/{run_id}` | `getRun` | `run.read` | Read the run document |
 | GET | `/api/v1/runs/{run_id}/steps` | `listRunSteps` | `run.read` | List steps in order |
 | GET | `/api/v1/runs/{run_id}/context` | `getRunContext` | `run.context.read` | Load the context of an own active run |

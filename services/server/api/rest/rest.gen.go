@@ -706,6 +706,9 @@ type ServerInterface interface {
 	// GetPushPreview Load the preview of a notification
 	// (GET /push/preview)
 	GetPushPreview(w http.ResponseWriter, r *http.Request, params GetPushPreviewParams)
+	// ListRunHistory Finished runs, newest first
+	// (GET /run-history)
+	ListRunHistory(w http.ResponseWriter, r *http.Request, params ListRunHistoryParams)
 	// ListActiveRuns Running now
 	// (GET /runs)
 	ListActiveRuns(w http.ResponseWriter, r *http.Request, params ListActiveRunsParams)
@@ -9731,6 +9734,91 @@ func (siw *ServerInterfaceWrapper) GetPushPreview(w http.ResponseWriter, r *http
 	handler.ServeHTTP(w, r)
 }
 
+// ListRunHistory operation middleware
+func (siw *ServerInterfaceWrapper) ListRunHistory(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListRunHistoryParams
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "space_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "space_id", r.URL.Query(), &params.SpaceId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "space_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "space_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "agent_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "agent_id", r.URL.Query(), &params.AgentId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "agent_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "agent_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "state" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "state", r.URL.Query(), &params.State, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "state"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "state", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListRunHistory(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListActiveRuns operation middleware
 func (siw *ServerInterfaceWrapper) ListActiveRuns(w http.ResponseWriter, r *http.Request) {
 
@@ -14441,6 +14529,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents/me/channels/{channel_id}/config", wrapper.GetServedChannelConfig)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents/me/triggerers", wrapper.GetAgentTriggerers)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/runs", wrapper.ListActiveRuns)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/run-history", wrapper.ListRunHistory)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/runs/{run_id}", wrapper.GetRun)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/runs/{run_id}", wrapper.PatchRun)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/runs/{run_id}/steps", wrapper.ListRunSteps)
@@ -15400,6 +15489,9 @@ type StrictServerInterface interface {
 	// GetPushPreview Load the preview of a notification
 	// (GET /push/preview)
 	GetPushPreview(ctx context.Context, request GetPushPreviewRequestObject) (GetPushPreviewResponseObject, error)
+	// ListRunHistory Finished runs, newest first
+	// (GET /run-history)
+	ListRunHistory(ctx context.Context, request ListRunHistoryRequestObject) (ListRunHistoryResponseObject, error)
 	// ListActiveRuns Running now
 	// (GET /runs)
 	ListActiveRuns(ctx context.Context, request ListActiveRunsRequestObject) (ListActiveRunsResponseObject, error)
@@ -22508,6 +22600,32 @@ func (sh *strictHandler) GetPushPreview(w http.ResponseWriter, r *http.Request, 
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetPushPreviewResponseObject); ok {
 		if err := validResponse.VisitGetPushPreviewResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListRunHistory operation middleware
+func (sh *strictHandler) ListRunHistory(w http.ResponseWriter, r *http.Request, params ListRunHistoryParams) {
+	var request ListRunHistoryRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListRunHistory(ctx, request.(ListRunHistoryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListRunHistory")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListRunHistoryResponseObject); ok {
+		if err := validResponse.VisitListRunHistoryResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package httpapi holds the REST handlers of the runs module as part of rest.StrictServerInterface
-// (M2-05): getRun, listThreadRuns, listRunSteps and listActiveRuns of docs/api/openapi.yaml, the
-// lifecycle of M2-09 and createInteraction, respondToInteraction and updateComponent (M2-15). The
+// (M2-05): getRun, listThreadRuns, listRunSteps, listActiveRuns and listRunHistory (F-LAUFHISTORIE)
+// of docs/api/openapi.yaml, the lifecycle of M2-09 and createInteraction, respondToInteraction and updateComponent (M2-15). The
 // use cases authorize; the handlers only convert, set the ETag of getRun and pass errors to the
 // problem writer of the chain unchanged. Cursors is the codec of platform/httpserver for the use
 // cases.
@@ -112,6 +112,58 @@ func (h *Runs) ListActiveRuns(ctx context.Context, req rest.ListActiveRunsReques
 		return nil, err
 	}
 	return rest.ListActiveRuns200JSONResponse{Body: summaryPage(page)}, nil
+}
+
+// ListRunHistory implements rest.StrictServerInterface (GET /run-history, F-LAUFHISTORIE).
+// Errors: internal when a stored metrics object does not fit its schema.
+func (h *Runs) ListRunHistory(ctx context.Context, req rest.ListRunHistoryRequestObject) (rest.ListRunHistoryResponseObject, error) {
+	q := runs.HistoryQuery{Cursor: deref(req.Params.Cursor), Limit: derefInt(req.Params.Limit)}
+	if req.Params.SpaceId != nil {
+		q.SpaceID = ids.ID(*req.Params.SpaceId)
+	}
+	if req.Params.AgentId != nil {
+		q.AgentID = ids.ID(*req.Params.AgentId)
+	}
+	if req.Params.State != nil {
+		q.State = string(*req.Params.State)
+	}
+	page, err := h.runs.ListHistory(ctx, q)
+	if err != nil {
+		return nil, err
+	}
+	out := rest.RunHistoryPage{Items: make([]rest.RunHistoryEntry, 0, len(page.Items))}
+	for _, e := range page.Items {
+		item, err := HistoryREST(e)
+		if err != nil {
+			return nil, err
+		}
+		out.Items = append(out.Items, item)
+	}
+	if page.NextCursor != "" {
+		c := page.NextCursor
+		out.NextCursor = &c
+	}
+	return rest.ListRunHistory200JSONResponse{Body: out}, nil
+}
+
+// HistoryREST converts a history entry (schema RunHistoryEntry); absent values stay absent
+// members. Errors: internal when the stored metrics do not fit RunMetrics.
+func HistoryREST(e runs.HistoryEntry) (rest.RunHistoryEntry, error) {
+	s := SummaryREST(e.RunSummary)
+	finished := timestamp(e.FinishedAt)
+	out := rest.RunHistoryEntry{
+		Id: s.Id, ThreadId: s.ThreadId, ChannelId: s.ChannelId, SpaceId: optionalID(e.SpaceID), AgentId: s.AgentId, State: s.State,
+		StateReason: s.StateReason, BillingModeExpected: s.BillingModeExpected, BillingModeUsed: s.BillingModeUsed, Model: optionalString(e.Model),
+		Summary: s.Summary, Cost: s.Cost, StepCount: s.StepCount, QueuedAt: s.QueuedAt, StartedAt: s.StartedAt, FinishedAt: finished,
+		DurationMs: s.DurationMs,
+	}
+	if err := convert(e.Metrics, &out.Metrics); err != nil {
+		return rest.RunHistoryEntry{}, err
+	}
+	if c := e.Chat; c != nil {
+		out.Chat = &rest.StatsRunChat{ThreadId: rest.Uuid(c.ThreadID), ChannelName: c.ChannelName, ThreadTitle: optionalString(c.ThreadTitle)}
+	}
+	return out, nil
 }
 
 // summaryPage converts a page of runs (schema RunSummaryPage).

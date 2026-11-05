@@ -69,6 +69,7 @@ class LiveScreen extends StatefulWidget {
     required this.live,
     required this.queries,
     required this.onOpenThread,
+    this.onOpenMessage,
     this.directory,
     this.openExternal,
     this.config,
@@ -88,6 +89,10 @@ class LiveScreen extends StatefulWidget {
   /// Opens the thread of a run card: the deep link `/t/{thread_id}` in the apps, the note
   /// "Open in the app" in the console (ADR 0028).
   final void Function(String threadId) onOpenThread;
+
+  /// Opens the thread at a message: the jump of the run history to the triggering message
+  /// (`/t/{thread_id}?m={message_id}` in the apps); null hides the jump.
+  final VizOpenMessage? onOpenMessage;
 
   /// The spaces of the scope selector, the agent names and the telemetry link, or null.
   final AdminStatsSource? directory;
@@ -178,6 +183,7 @@ class _LiveScreenState extends State<LiveScreen> {
     final views = [
       for (final spec in vizViewsFor(options))
         if (spec.kind != VizViewKind.tvMode &&
+            spec.inTvMode &&
             (options.scope.isInstance || !spec.instanceOnly))
           spec.kind,
     ];
@@ -297,6 +303,7 @@ class _LiveScreenState extends State<LiveScreen> {
                       queries: widget.queries,
                       options: options,
                       onOpenThread: widget.onOpenThread,
+                      onOpenMessage: widget.onOpenMessage,
                     ),
                   ),
           ),

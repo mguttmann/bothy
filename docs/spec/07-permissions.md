@@ -943,8 +943,9 @@ Rules:
    the rows of exactly one thread or run whose visibility was checked first (`getRun`,
    `listRunSteps`, `listThreadRuns`, the active run of a thread at the acceptance; exception
    category `after_authorize`, the load before `authorize` in `getRun` `authorize_resolution`),
-   or (b) for the active-run lists (`listActiveRuns`, `Snapshot.active_runs`) it reads the active
-   runs, resolves their threads through the port of `chat`, keeps only threads whose channel is
+   or (b) for the active-run lists (`listActiveRuns`, `Snapshot.active_runs`) and the run history
+   (`listRunHistory`, which reads the finished runs of the threads of the visible channels) it reads
+   the runs, resolves their threads through the port of `chat`, keeps only threads whose channel is
    in `Scope.ChannelIDs` and runs `authorize` per row (category `thread_scope`). The gauge query
    of `bothy.run.active` has no principal (`system_job`).
 2. Totals (`total`), facets and "more results" count only within this predicate.

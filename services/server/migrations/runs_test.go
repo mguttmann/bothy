@@ -97,6 +97,9 @@ func TestMigration_RunsAndRunSteps(t *testing.T) {
 	active := "WHERE (state = ANY (ARRAY['queued'::text, 'running'::text, 'waiting_input'::text]))"
 	wantIdx := []string{
 		"CREATE INDEX runs_agent_finished_idx ON public.runs USING btree (agent_id, finished_at DESC)",
+		// The run history (00092, F-LAUFHISTORIE).
+		"CREATE INDEX runs_finished_idx ON public.runs USING btree (finished_at DESC, id DESC) " +
+			"WHERE (state = ANY (ARRAY['completed'::text, 'failed'::text, 'cancelled'::text]))",
 		"CREATE INDEX runs_state_agent_active_idx ON public.runs USING btree (state, agent_id) " + active,
 		"CREATE INDEX runs_thread_queued_idx ON public.runs USING btree (thread_id, queued_at DESC)",
 		"CREATE UNIQUE INDEX runs_invocation_jti_key ON public.runs USING btree (invocation_jti)",

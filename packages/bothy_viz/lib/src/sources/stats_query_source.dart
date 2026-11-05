@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The port of the statistics queries (docs/spec/25-visualization.md 5, 7.1).
+/// The port of the statistics queries and the run history (docs/spec/25-visualization.md 5,
+/// 6.7, 7.1).
 library;
 
 import 'package:api_client/api_client.dart' as api;
@@ -61,6 +62,20 @@ abstract interface class StatsQuerySource {
     api.StatsGranularity? granularity,
     String? spaceId,
   });
+
+  /// `listRunHistory`: one page of the finished runs, newest end first, of [spaceId] or of
+  /// every space, optionally of one end [state] (`completed`, `failed`, `cancelled`), after
+  /// [cursor] (25 6.7).
+  Future<api.RunHistoryPage> runHistory({
+    String? spaceId,
+    String? state,
+    String? cursor,
+    int? limit,
+  });
+
+  /// `getRun`: the run document of [runId] with every step, for the detail of the run
+  /// history (25 6.7).
+  Future<api.Run> run(String runId);
 
   /// `getCostStats`.
   Future<api.CostSeries> costs({

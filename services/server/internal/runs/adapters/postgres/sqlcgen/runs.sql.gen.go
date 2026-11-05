@@ -243,6 +243,94 @@ func (q *Queries) GetRun(ctx context.Context, id pgtype.UUID) (Run, error) {
 	return i, err
 }
 
+const historyRuns = `-- name: HistoryRuns :many
+SELECT id, thread_id, agent_id, agent_session_id, trigger_kind, triggering_message_id, triggering_command_id, triggering_interaction_id, triggered_by, state, state_reason, version, billing_mode_expected, billing_mode_used, billing_evidence, invocation_jti, started_jti, renewed_from_jti, dev_environment_id, model, status_line, last_text_excerpt, plan, metrics, cost_micros, currency, cost_is_estimate, summary, stall_warned_at, queued_at, invocation_held_until, started_at, finished_at, duration_ms, last_progress_at FROM runs
+WHERE thread_id = ANY ($1::uuid[])
+  AND state IN ('completed', 'failed', 'cancelled')
+  AND ($2::text IS NULL OR state = $2::text)
+  AND ($3::uuid IS NULL OR agent_id = $3::uuid)
+  AND ($4::timestamptz IS NULL
+       OR (finished_at, id) < ($4::timestamptz, $5::uuid))
+ORDER BY finished_at DESC, id DESC
+LIMIT $6
+`
+
+type HistoryRunsParams struct {
+	ThreadIds []pgtype.UUID
+	EndState  pgtype.Text
+	AgentID   pgtype.UUID
+	AfterAt   pgtype.Timestamptz
+	AfterID   pgtype.UUID
+	RowLimit  int32
+}
+
+// The finished runs of the thread set the use case resolved from the channels of its Scope, newest
+// end first, in batches for the run history (listRunHistory, F-LAUFHISTORIE); keyset (finished_at
+// DESC, id DESC) over runs_finished_idx. The use case resolves every thread through chat again,
+// keeps only threads whose channel is in Scope.ChannelIDs and authorizes each row (D-M2-05-9).
+func (q *Queries) HistoryRuns(ctx context.Context, arg HistoryRunsParams) ([]Run, error) {
+	rows, err := q.db.Query(ctx, historyRuns,
+		arg.ThreadIds,
+		arg.EndState,
+		arg.AgentID,
+		arg.AfterAt,
+		arg.AfterID,
+		arg.RowLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Run
+	for rows.Next() {
+		var i Run
+		if err := rows.Scan(
+			&i.ID,
+			&i.ThreadID,
+			&i.AgentID,
+			&i.AgentSessionID,
+			&i.TriggerKind,
+			&i.TriggeringMessageID,
+			&i.TriggeringCommandID,
+			&i.TriggeringInteractionID,
+			&i.TriggeredBy,
+			&i.State,
+			&i.StateReason,
+			&i.Version,
+			&i.BillingModeExpected,
+			&i.BillingModeUsed,
+			&i.BillingEvidence,
+			&i.InvocationJti,
+			&i.StartedJti,
+			&i.RenewedFromJti,
+			&i.DevEnvironmentID,
+			&i.Model,
+			&i.StatusLine,
+			&i.LastTextExcerpt,
+			&i.Plan,
+			&i.Metrics,
+			&i.CostMicros,
+			&i.Currency,
+			&i.CostIsEstimate,
+			&i.Summary,
+			&i.StallWarnedAt,
+			&i.QueuedAt,
+			&i.InvocationHeldUntil,
+			&i.StartedAt,
+			&i.FinishedAt,
+			&i.DurationMs,
+			&i.LastProgressAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const insertRun = `-- name: InsertRun :one
 
 INSERT INTO runs (id, thread_id, agent_id, trigger_kind, triggering_message_id, triggering_command_id, triggering_interaction_id,

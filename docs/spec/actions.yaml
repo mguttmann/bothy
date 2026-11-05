@@ -1922,7 +1922,7 @@ actions:
   app_scope: messages:read
 - id: run.overview.read
   section: agents
-  description: read "Running now", filtered by `run.read`
+  description: read "Running now" and the run history, filtered by `run.read`
   resource: instance
   right: auth
   owner: false

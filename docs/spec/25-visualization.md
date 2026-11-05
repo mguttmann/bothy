@@ -427,6 +427,37 @@ There is no separate kiosk token without a person in this version. Reason: a tok
 instance statistics without device binding would be access without a person and without step-up; a
 screen in the office needs a normal login of a person with `stats.read`.
 
+### 6.7 Run history
+
+Addendum of 2026-11-04 (owner request, F-LAUFHISTORIE,
+[decisions](../decisions.d/F-LAUFHISTORIE.md)). A tab next to the live topology on the desktop
+apps, the mobile apps and the web console lists the finished runs (`completed`, `failed`,
+`cancelled`) the person may read, newest end first. Like the run graph it is run content under
+`run.read`, not a statistics view (R-VZ-14): it reads no `stats.*` source, and rules 2 and 3 of
+section 1 do not apply to it.
+
+- **List.** Per run: the run label (section 4 rule 6), end state as icon and word, start, end,
+  duration, cost as "Estimate", final amount or "information only" (the cost of `RunSummary`), input, output,
+  cache read and cache write tokens (the writes of five minutes and of one hour together),
+  subagents and model. Filters: the space of the page and the end state. Pages follow
+  `next_cursor` ("Load more runs"); the last page ends with "Start of the history". Above the
+  list a note says how far it reaches: runs and their steps stay as long as their thread
+  ([20-privacy.md](20-privacy.md), section 2), there is no deletion by age. The table form has
+  the same values; the chat cell opens the chat, the run cell the detail.
+- **Detail.** A click on a run opens its detail in place: the figures of the list, the step
+  count, the summary and the last text excerpt of the agent, the steps as the tree of the run
+  graph ([09-agents.md](09-agents.md) 5.6: subagents, workflows, background jobs and tool calls
+  with duration and state) and the buttons "Open the chat" (only with a chat entry) and "Go to
+  the triggering message" (only with `triggering_message_id`; `/t/{thread_id}?m={message_id}` in
+  the apps; the console shows "Open in the app").
+- **Data.** `listRunHistory` (`GET /api/v1/run-history`, `run.overview.read`): the pipeline of
+  `listActiveRuns` (Scope of `run.read`, the threads of the visible channels through chat,
+  `run.read` per row in filter mode) over the finished runs, keyset `finished_at` descending, then
+  ID; filters `space_id`, `agent_id`, `state`; each entry with space, model, metrics and chat
+  (`StatsRunChat`). The detail reads `getRun`. A new operation instead of a filter on
+  `listActiveRuns`, whose order, schema and meaning ("Running now") stay unchanged.
+- **TV mode** does not rotate to the history (a list to click through).
+
 ## 7. Package `packages/bothy_viz`
 
 ### 7.1 Structure
@@ -438,7 +469,7 @@ Flutter package in the pub workspace (15, section 3). Dependencies: `design_syst
 |---|---|
 | `lib/src/model/` | View models from the generated types of `api_client` (`StatsLiveFrame`, `StatsTimeline`, `StatsSloReport`, `StatsBackendReport`) |
 | `lib/src/sources/` | Port `LiveFrameSource` (stream of frames) and `StatsQuerySource` (REST); the apps supply the implementations |
-| `lib/src/views/` | the six views from section 6, each with a table view |
+| `lib/src/views/` | the views from section 6 (the run history of 6.7 included), each with a table view |
 | `lib/src/marks/` | Basic forms: lane, run card, area, bar, traffic light, metric tile; all with `CustomPainter` and semantics |
 | `lib/src/slo/` | `slo_catalog.g.dart` (3.3) |
 | `lib/src/run_graph/` | Addendum of 2026-10-24: the pure derivation of the run graph from the run document ([09-agents.md](09-agents.md), section 5.6), the trace view with its list form and the control room card; input is the generated `Run` and `RunSummary` of `api_client`, so the package keeps its dependencies (no `sync_engine`); fixtures `Run.<state>.json` for the graph |
@@ -811,6 +842,7 @@ auth proxy is [grafana-embedding.md](../operations/grafana-embedding.md).
 | R-VZ-13 | Tokens for the plugin as a further output of `tools/design-tokens`. | Same design language without a copy (ADR 0030). |
 | R-VZ-14 | The run graph and the control room are drawn by `bothy_viz` but are not views of level a; they follow `run.read` and `run.overview.read` instead of `stats.read` (addendum of 2026-10-24). | One design language and one package for drawing; the statistics rules (no content, no names) stay unchanged for the statistics views. |
 | R-VZ-15 | Runs carry their chat (channel name, thread title, thread) for a receiver who may read the thread; every view labels runs with one shared run label and translates every dimension code through `l10n` (owner request of 2026-11-01, [FIX-topology-session-names](../decisions.d/FIX-topology-session-names.md)). | Agent and short ID alone did not tell anyone which project and chat a run belongs to; the names are those the sidebar already shows the same person. |
+| R-VZ-16 | The run history is its own operation `listRunHistory` with the pipeline of `listActiveRuns` over the finished runs, and its own view next to the live topology, outside TV mode (owner request of 2026-11-04, [F-LAUFHISTORIE](../decisions.d/F-LAUFHISTORIE.md)). | A finished run left the live topology with its tree, costs and duration; a filter on `listActiveRuns` would change the order, schema and meaning of "Running now". |
 
 ## 15. Configuration values of this chapter
 

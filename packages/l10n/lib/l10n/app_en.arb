@@ -15192,5 +15192,99 @@
         "example": "Project not ready"
       }
     }
+  },
+  "vizViewRunHistory": "Run history",
+  "@vizViewRunHistory": {
+    "description": "Title of the view and tab with the finished runs (docs/spec/25-visualization.md 6.7)."
+  },
+  "vizHistoryAll": "All",
+  "@vizHistoryAll": {
+    "description": "Filter of the run history: runs of every end state."
+  },
+  "vizHistoryStateFilter": "End state",
+  "@vizHistoryStateFilter": {
+    "description": "Label of the end state filter of the run history."
+  },
+  "vizHistoryLoadMore": "Load more runs",
+  "@vizHistoryLoadMore": {
+    "description": "Button under the run history that loads the next page."
+  },
+  "vizHistoryEnd": "Start of the history: there are no older runs.",
+  "@vizHistoryEnd": {
+    "description": "Note under the last page of the run history."
+  },
+  "vizHistoryRetention": "Runs are kept as long as their chat. Deleting a chat removes its runs; nothing is deleted because of its age.",
+  "@vizHistoryRetention": {
+    "description": "Note above the run history on how far back it reaches (the retention of runs follows their thread, docs/spec/20-privacy.md 2)."
+  },
+  "vizHistoryEmpty": "No finished runs yet.",
+  "@vizHistoryEmpty": {
+    "description": "The run history without any finished run in the scope and filter."
+  },
+  "vizHistoryBack": "Back to the run history",
+  "@vizHistoryBack": {
+    "description": "Button of the run detail that returns to the list."
+  },
+  "vizHistoryOpenChat": "Open the chat",
+  "@vizHistoryOpenChat": {
+    "description": "Button of the run detail that opens the thread of the run."
+  },
+  "vizHistoryOpenMessage": "Go to the triggering message",
+  "@vizHistoryOpenMessage": {
+    "description": "Button of the run detail that opens the thread at the message that started the run."
+  },
+  "vizHistorySummary": "Summary",
+  "@vizHistorySummary": {
+    "description": "Heading of the summary of the agent in the run detail."
+  },
+  "vizHistoryLastText": "Last text",
+  "@vizHistoryLastText": {
+    "description": "Heading of the last text excerpt of the agent in the run detail."
+  },
+  "vizHistorySteps": "Steps",
+  "@vizHistorySteps": {
+    "description": "Heading of the step tree in the run detail and column header of the step count."
+  },
+  "vizHistoryOpenRun": "Open run {id}",
+  "@vizHistoryOpenRun": {
+    "description": "Name of the button of a row of the run history that opens the run detail.",
+    "placeholders": {
+      "id": {
+        "type": "String",
+        "example": "c29a71"
+      }
+    }
+  },
+  "vizColDuration": "Duration",
+  "@vizColDuration": {
+    "description": "Column header: running time of a run."
+  },
+  "vizColModel": "Model",
+  "@vizColModel": {
+    "description": "Column header: the model of a run."
+  },
+  "vizColRunCost": "Cost",
+  "@vizColRunCost": {
+    "description": "Column header: the cost of a finished run with its label."
+  },
+  "vizColTokensIn": "Input tokens",
+  "@vizColTokensIn": {
+    "description": "Column header: input tokens of a run."
+  },
+  "vizColTokensOut": "Output tokens",
+  "@vizColTokensOut": {
+    "description": "Column header: output tokens of a run."
+  },
+  "vizColCacheRead": "Cache read",
+  "@vizColCacheRead": {
+    "description": "Column header: tokens a run read from the prompt cache."
+  },
+  "vizColCacheWrite": "Cache write",
+  "@vizColCacheWrite": {
+    "description": "Column header: tokens a run wrote to the prompt cache (five minutes and one hour together)."
+  },
+  "vizColSubagents": "Subagents",
+  "@vizColSubagents": {
+    "description": "Column header: subagents a run started."
   }
 }

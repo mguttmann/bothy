@@ -266,6 +266,12 @@ type Deps struct {
 	// tool_calls, approval_cards, invocations_denied, cost, sli.run_start and sli.turn_duration;
 	// nil records nothing.
 	Measure measure.Recorder
+	// History are the chat reads of the run history (listRunHistory, F-LAUFHISTORIE): the channels
+	// of a space and the threads of channels (chat.Structure). nil means Threads when it implements
+	// HistoryPlaces; without one listRunHistory answers internal_error, never an unfiltered read.
+	History HistoryPlaces
+	// Chats names the chats of the run history (chat.StatsSource); nil names none.
+	Chats HistoryChats
 	// ChannelThreads names the threads of a channel that became read-only (chat, M8-03); nil means
 	// Threads when it implements ChannelThreads. Without one the subscriber of
 	// chat.ChannelReadOnlySet answers internal.
@@ -390,6 +396,9 @@ func New(cfg Config, d Deps) (*Service, error) {
 	}
 	if d.ChannelThreads == nil {
 		d.ChannelThreads, _ = d.Threads.(ChannelThreads)
+	}
+	if d.History == nil {
+		d.History, _ = d.Threads.(HistoryPlaces)
 	}
 	svc := &Service{cfg: cfg, d: d}
 	if d.FollowupRows != nil {

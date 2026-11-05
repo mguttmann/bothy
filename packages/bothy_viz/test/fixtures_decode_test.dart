@@ -15,6 +15,7 @@ final Map<String, Serializer<Object>> serializers = {
   'StatsSeries': api.StatsSeries.serializer,
   'CostSeries': api.CostSeries.serializer,
   'Run': api.Run.serializer,
+  'RunHistoryPage': api.RunHistoryPage.serializer,
 };
 
 void main() {

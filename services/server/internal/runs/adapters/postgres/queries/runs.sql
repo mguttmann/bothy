@@ -93,6 +93,21 @@ WHERE state IN ('queued', 'running', 'waiting_input')
 ORDER BY queued_at DESC, id DESC
 LIMIT sqlc.arg(row_limit);
 
+-- name: HistoryRuns :many
+-- The finished runs of the thread set the use case resolved from the channels of its Scope, newest
+-- end first, in batches for the run history (listRunHistory, F-LAUFHISTORIE); keyset (finished_at
+-- DESC, id DESC) over runs_finished_idx. The use case resolves every thread through chat again,
+-- keeps only threads whose channel is in Scope.ChannelIDs and authorizes each row (D-M2-05-9).
+SELECT * FROM runs
+WHERE thread_id = ANY (sqlc.arg(thread_ids)::uuid[])
+  AND state IN ('completed', 'failed', 'cancelled')
+  AND (sqlc.narg(end_state)::text IS NULL OR state = sqlc.narg(end_state)::text)
+  AND (sqlc.narg(agent_id)::uuid IS NULL OR agent_id = sqlc.narg(agent_id)::uuid)
+  AND (sqlc.narg(after_at)::timestamptz IS NULL
+       OR (finished_at, id) < (sqlc.narg(after_at)::timestamptz, sqlc.narg(after_id)::uuid))
+ORDER BY finished_at DESC, id DESC
+LIMIT sqlc.arg(row_limit);
+
 -- name: ActiveCounts :many
 -- The gauge bothy.run.active: one grouped count over runs_state_agent_active_idx, no content.
 SELECT agent_id, state, count(*)::bigint AS active

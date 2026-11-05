@@ -2887,6 +2887,13 @@ type ClientInterface interface {
 	// Corresponds with GET /push/preview (the `GetPushPreview` operationId).
 	GetPushPreview(ctx context.Context, params *GetPushPreviewParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListRunHistory Finished runs, newest first
+	//
+	// Runs in `completed`, `failed` or `cancelled` across every thread the caller may read, ordered by `finished_at` descending, then by ID; each run passes `run.read` in filter mode, as in `listActiveRuns` (docs/spec/25-visualization.md, section 6.7). A `space_id` or `agent_id` the caller cannot see gives an empty page. Runs stay as long as their thread: there is no time-based deletion of runs, so the last page reaches the oldest run the caller may read.
+	//
+	// Corresponds with GET /run-history (the `ListRunHistory` operationId).
+	ListRunHistory(ctx context.Context, params *ListRunHistoryParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListActiveRuns Running now
 	//
 	// Runs in `queued`, `running` or `waiting_input`, filtered by `run.read`.
@@ -10304,6 +10311,23 @@ func (c *Client) UnregisterPush(ctx context.Context, registrationId Registration
 // Corresponds with GET /push/preview (the `GetPushPreview` operationId).
 func (c *Client) GetPushPreview(ctx context.Context, params *GetPushPreviewParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetPushPreviewRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListRunHistory Finished runs, newest first
+//
+// Runs in `completed`, `failed` or `cancelled` across every thread the caller may read, ordered by `finished_at` descending, then by ID; each run passes `run.read` in filter mode, as in `listActiveRuns` (docs/spec/25-visualization.md, section 6.7). A `space_id` or `agent_id` the caller cannot see gives an empty page. Runs stay as long as their thread: there is no time-based deletion of runs, so the last page reaches the oldest run the caller may read.
+//
+// Corresponds with GET /run-history (the `ListRunHistory` operationId).
+func (c *Client) ListRunHistory(ctx context.Context, params *ListRunHistoryParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListRunHistoryRequest(c.Server, params)
 	if err != nil {
 		return nil, err
 	}
@@ -23870,42 +23894,4 @@ func NewListMessageRevisionsRequest(server string, messageId MessageIdPath) (*ht
 	}
 
 	return req, nil
-}
-
-// NewListOwnersRequest constructs an http.Request for the ListOwners method
-func NewListOwnersRequest(server string) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/owners")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewAddOwnerRequest calls the generic AddOwner builder with application/json body
-func NewAddOwnerRequest(server string, params *AddOwnerParams, body AddOwnerJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewAddOwnerRequestWithBody(server, params, "application/json", bodyReader)
 }

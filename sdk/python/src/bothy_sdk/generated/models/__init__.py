@@ -461,6 +461,7 @@ from .json_patch_operation_op import JsonPatchOperationOp
 from .jwks import Jwks
 from .level import Level
 from .level_or_none import LevelOrNone
+from .list_run_history_state import ListRunHistoryState
 from .llm_credentials import LlmCredentials
 from .local_credential_result import LocalCredentialResult
 from .local_credential_set import LocalCredentialSet
@@ -608,6 +609,8 @@ from .run_finish_state import RunFinishState
 from .run_followup import RunFollowup
 from .run_followup_state import RunFollowupState
 from .run_followups import RunFollowups
+from .run_history_entry import RunHistoryEntry
+from .run_history_page import RunHistoryPage
 from .run_metrics import RunMetrics
 from .run_patch import RunPatch
 from .run_patch_result import RunPatchResult
@@ -1274,6 +1277,7 @@ __all__ = (
     "Jwks",
     "Level",
     "LevelOrNone",
+    "ListRunHistoryState",
     "LlmCredentials",
     "LocalCredentialResult",
     "LocalCredentialSet",
@@ -1421,6 +1425,8 @@ __all__ = (
     "RunFollowup",
     "RunFollowupState",
     "RunFollowups",
+    "RunHistoryEntry",
+    "RunHistoryPage",
     "RunMetrics",
     "RunPatch",
     "RunPatchResult",

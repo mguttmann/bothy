@@ -88,7 +88,7 @@ final List<HarnessEntry> harnessMarks = [
   ),
 ];
 
-/// The six views, built from the registry on the fixture sources of [HarnessData]; TV mode
+/// The views, built from the registry on the fixture sources of [HarnessData]; TV mode
 /// shows in a box and returns to the first entry on a key press or click.
 final List<HarnessEntry> harnessViews = [
   for (final spec in vizViewRegistry)
@@ -100,7 +100,7 @@ final List<HarnessEntry> harnessViews = [
               child: TvMode(
                 views: [
                   for (final s in vizViewRegistry)
-                    if (s.kind != VizViewKind.tvMode) s.kind,
+                    if (s.kind != VizViewKind.tvMode && s.inTvMode) s.kind,
                 ],
                 options: data.options,
                 live: data.viewLive,
