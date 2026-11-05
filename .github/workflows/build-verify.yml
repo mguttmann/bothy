@@ -765,6 +765,12 @@ jobs:
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           enable-cache: false
+      # As in ci.yml: the Swift package cache, so the binary targets are not downloaded again.
+      - name: Restore the Swift package cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/Library/Caches/org.swift.swiftpm
+          key: swiftpm-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pubspec.lock') }}
       - name: make apps-platform
         shell: bash
         run: uv run --project tools --locked --quiet python tools/ci/apps_platform.py --system macos
@@ -790,6 +796,12 @@ jobs:
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           enable-cache: false
+      # As in ci.yml: the Swift package cache, so the binary targets are not downloaded again.
+      - name: Restore the Swift package cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/Library/Caches/org.swift.swiftpm
+          key: swiftpm-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pubspec.lock') }}
       - name: make apps-platform (iOS)
         shell: bash
         run: uv run --project tools --locked --quiet python tools/ci/apps_platform.py --system ios

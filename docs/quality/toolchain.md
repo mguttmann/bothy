@@ -123,7 +123,7 @@ tags, the commit SHA behind the tag).
 | `actions/setup-node` | `v7.1.0` | Node for the Node tools, with npm cache |
 | `actions/setup-go` | `v7.0.0` | one Go for all modules under `services/`, from the `go.mod` of the server (otherwise of the host service) |
 | `astral-sh/setup-uv` | `v10.3.0` | uv, with cache over `tools/uv.lock` |
-| `actions/cache` | `v6.1.0` | binary cache and pre-commit environments |
+| `actions/cache` | `v6.1.0` | binary cache, pre-commit environments, Swift packages of the Mac app jobs |
 | `actions/upload-artifact` | `v7.0.2` | release artifacts, Scorecard result |
 | `actions/download-artifact` | `v8.0.2` | collecting release artifacts |
 | `actions/attest` | `v4.2.2` | build provenance and SBOM attestation (public) |

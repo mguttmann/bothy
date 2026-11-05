@@ -329,3 +329,28 @@ def test_flutter_pin_step_fails_without_a_pin(tmp_path: Path) -> None:
     result = _run_pin(tmp_path, "name: x\nenvironment:\n  sdk: ^3.13.5\n")
     assert result.returncode != 0
     assert (tmp_path / "out").read_text(encoding="utf-8") == ""
+
+
+# The Swift package binary targets (sentry-cocoa xcframeworks) come from GitHub release downloads.
+# Main run 42044761383 (apps (iOS)) failed in both attempts on such a download; SwiftPM hides the
+# server error behind "already exists in file system" (its retry after a 5xx moves the second
+# body onto the first). The app jobs on the Mac restore the SwiftPM cache before the tests, keyed
+# on the workspace lock, so a run without a dependency change downloads nothing.
+SWIFTPM_CACHE = "~/Library/Caches/org.swift.swiftpm"
+
+
+@pytest.mark.parametrize("job", ["apps-macos", "apps-ios"])
+def test_mac_app_jobs_restore_the_swiftpm_cache(job: str) -> None:
+    steps = _steps(job)
+    caches = [
+        i
+        for i, step in enumerate(steps)
+        if str(step.get("uses", "")).startswith("actions/cache@")
+        and SWIFTPM_CACHE in str(step.get("with", {}).get("path", ""))
+    ]
+    assert len(caches) == 1, f"{job}: one actions/cache step for {SWIFTPM_CACHE}"
+    step = steps[caches[0]]
+    assert "hashFiles('pubspec.lock')" in step["with"]["key"]
+    assert "restore-keys" not in step["with"]
+    platform = next(i for i, s in enumerate(steps) if "apps_platform.py" in str(s.get("run", "")))
+    assert caches[0] < platform, f"{job}: the cache is restored before the tests"
