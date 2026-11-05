@@ -3,6 +3,8 @@
 - Background work started by a turn is no longer stopped right after the answer when the turn
   resumed a session whose previous process had lost background work. Claude Code first ran a
   short turn of its own for each stopped task, and the runner took its empty result for the end
-  of the turn and closed stdin, so Claude Code ended the new work after ten minutes and the next
+  of the turn and closed stdin, so Claude Code ended the new work once its wait limit for background work
+  (`CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS`) passed, and the next
   turn started the same way again. The runner now waits while the message is still queued in
-  Claude Code (`command_lifecycle`) and keeps stdin open for the work the turn starts.
+  Claude Code (`command_lifecycle`) and keeps stdin open for the work the turn starts. The same holds for a follow-up the
+  CLI starts after an answer: an earlier answer no longer closes stdin while its turn works.

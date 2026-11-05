@@ -286,8 +286,17 @@ class Fake:
         answered = folded
         while (line := lines.next(answered)) is not None:
             answered += 1
+            if self.scenario.get("lifecycle"):
+                # Like the pinned CLI: the line was queued while the turn ran and starts now;
+                # its turn may work a while before its result (``followup_gate``).
+                command = f"cmd-{index}-{answered}"
+                for state in ("queued", "started"):
+                    self.emit(
+                        {"type": "command_lifecycle", "command_uuid": command, "state": state}
+                    )
             if echo_mode in ("after_result", "on_consume"):
                 self.echo(line)
+            self.gate("followup_gate")
             if echo_mode == "never":
                 continue
             if answered - folded <= int(self.scenario.get("meta_folds", 0)):

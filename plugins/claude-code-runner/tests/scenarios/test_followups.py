@@ -8,6 +8,7 @@ Alex triggers runs in a thread of the forum; Sam writes follow-ups. A follow-up 
 
 from __future__ import annotations
 
+import asyncio
 import json
 from typing import Any
 from uuid import UUID
@@ -116,6 +117,34 @@ async def test_followup_grace_keeps_stdin_until_absorbed(world: World) -> None:
     assert [m["content_md"] for m in world.fake.messages] == ["Done.", "Follow-up 1 handled."]
     [finish] = finishes(world, run.run_id)
     assert [c["tokens_in"] for c in finish["costs"]] == [1100]  # from the second result
+
+
+async def test_stdin_stays_open_while_a_started_followup_works(world: World) -> None:
+    # FIX-runner-hold-background: a follow-up the CLI starts after the first result is a turn
+    # of its own; the earlier result must not close stdin while that turn still works (it may
+    # start background work before its own result).
+    turn = world.gate("turn_gate")
+    followup = world.gate("followup_gate")
+    world.scenario(
+        fixture="plain",
+        turn_gate=str(turn),
+        followup_gate=str(followup),
+        echo="after_result",
+        lifecycle=True,
+    )
+    await world.start(world.config(followup_grace="200ms"))
+    run = await world.fake.trigger("Fix the form", channel_id=world.forum_a)
+    await world.until(lambda: len(world.calls("gate_wait")) == 1)
+    message_id = await world.fake.deliver_followup(run.run_id, "One more", author="sam")
+    await world.until(lambda: world.fake.followup_state(run.run_id, message_id) == "delivered")
+    world.release(turn)
+    await world.until(lambda: len(world.calls("gate_wait")) == 2)  # the follow-up's turn works
+    await world.until(lambda: world.fake.followup_state(run.run_id, message_id) == "absorbed")
+    await asyncio.sleep(0.5)  # many polls of the runner while that turn works
+    assert world.calls("stdin_eof") == []
+    world.release(followup)
+    assert await world.ended(run.run_id) == "completed"
+    assert [m["content_md"] for m in world.fake.messages] == ["Done.", "Follow-up 1 handled."]
 
 
 async def test_followup_grace_expires_leaves_delivered(world: World) -> None:

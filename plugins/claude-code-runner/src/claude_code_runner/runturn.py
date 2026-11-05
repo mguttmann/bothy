@@ -769,6 +769,10 @@ class RunTurn:
                     self._report_cost()
             elif kind == "user" and message.get("isReplay") is True:
                 await self._echo(message.get("uuid"), adopted=not own)
+            elif kind == "command_lifecycle" and message.get("state") == "started":
+                # An input starts a turn of its own: an earlier result does not end it, so the
+                # stdin rule waits for the result of this turn (FIX-runner-hold-background).
+                last_result_at = None
             elif kind == "result":
                 if not self.background.input_waiting:
                     # A result before a queued input started answers no input: it must not
