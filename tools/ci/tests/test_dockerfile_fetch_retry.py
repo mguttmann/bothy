@@ -27,6 +27,9 @@ import pytest
 
 REPO = Path(__file__).resolve().parents[3]
 
+#: An APT source on snapshot.debian.org in a RUN command.
+SNAPSHOT_SOURCE = re.compile(r"\bdeb https?://snapshot\.debian\.org/")
+
 #: Splits a RUN command into simple commands at `;`, `&&`, `||` and `|`.
 SEPARATORS = re.compile(r"\s*(?:;|&&|\|\||\|)\s*")
 
@@ -59,7 +62,7 @@ def fetch_findings(path: str, text: str) -> list[str]:
             r"go mod download(?: [^;|&]*)?\s*&&\s*break\b", instruction
         ):
             findings.append(f"{path}:{number}: go mod download outside a retry loop")
-        if "snapshot.debian.org" in instruction and "apt-get install" in instruction:
+        if SNAPSHOT_SOURCE.search(instruction) and "apt-get install" in instruction:
             where = f"{path}:{number}: apt-get from snapshot.debian.org"
             if not re.search(
                 r"\bfor \w+ in [^;]+; do\b.*apt-get update.*apt-get install[^;]*&&\s*break\b",
