@@ -1470,6 +1470,18 @@ actions:
   rl_class: rl.search
   effect: read
   app_scope: messages:read
+- id: search.assist
+  section: files
+  description: ask the search assistant ([14-search.md](14-search.md) 4.10); hits filtered like `search.query`,
+    the candidates to the assistant agent additionally by its own `thread.read` and `message.read`
+  resource: instance
+  right: human
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.trigger
+  effect: read
 - id: read_state.update
   section: personal
   description: advance the read state
@@ -1895,6 +1907,17 @@ actions:
   rl_class: rl.agent_runtime
   effect: read
   app_scope: commands:write
+- id: search.assist.respond
+  section: agents
+  description: deliver the picks and terms for an open `search.assist_requested` (REST)
+  resource: agent
+  right: agent-self, the assistant agent the request was sent to
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.agent_runtime
+  effect: read
 - id: command.invoke
   section: agents
   description: 'run a command. Agent commands check `required_level` and `agent.invoke`; model commands
@@ -2964,6 +2987,15 @@ events:
   receivers: agent_or_app
   receive_text: self (owner of the command); agent additionally `agent.events.consume`
   note: carries a token with `trigger_kind = autocomplete`; only to one gateway connection of the owner
+  resource_version: false
+- type: search.assist_requested
+  kind: ephemeral
+  resource: agent
+  receive_action: agent.events.consume
+  audience: self
+  receivers: agent
+  receive_text: self (the assistant agent of `search.assist.agent_id`); additionally `agent.events.consume`
+  note: carries no token and no ids of threads or messages; only to one gateway connection of the assistant
   resource_version: false
 ws_ops:
 - op: identify

@@ -49,6 +49,15 @@ func searchConfig() searchapp.Config {
 	}
 }
 
+// searchAssistConfig is the configuration of the search assistant with the defaults of 14 section
+// 15 and no assistant agent.
+func searchAssistConfig() searchapp.AssistConfig {
+	return searchapp.AssistConfig{
+		Timeout: 10 * time.Second, MaxCandidates: 20, MaxHits: 8, MaxTerms: 12, MaxTurns: 6, ExcerptMaxChars: 300,
+		ReasonMaxChars: 200, QueryMaxChars: 256, PayloadMax: 65536,
+	}
+}
+
 // countingErrors is the ErrorCounter of a coordinator a test builds; it counts per reason.
 type countingErrors struct {
 	mu     sync.Mutex

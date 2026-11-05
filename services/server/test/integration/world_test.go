@@ -321,7 +321,7 @@ func newEmptyWorldWith(t *testing.T, search searchlang.Map) *world {
 	must(t, err)
 	w.searchLanguages = search.Languages()
 	w.searchReads = wire.SearchReads{Messaging: m.Service, Chat: c.Service, Files: f.Service}
-	w.search, err = wire.NewSearch(searchConfig(), w.searchLanguages, pool, uow, w.az, w.searchReads, w.clk, log)
+	w.search, err = wire.NewSearch(searchConfig(), searchAssistConfig(), w.searchLanguages, pool, uow, w.az, w.searchReads, w.clk, log)
 	must(t, err)
 	built, err := routes.Build(wire.Handlers{Access: authzhttp.New(w.admin), Agents: ag.Handlers, Spaces: c.Handlers, Channels: c.ChannelHandlers,
 		People: w.id.PeopleHandlers, Threads: c.ThreadHandlers, Deletion: c.DeletionHandlers, Behavior: c.BehaviorHandlers, Messages: m.Handlers, Personal: personal.Handlers, Admin: settings.Handlers,

@@ -162,6 +162,8 @@ var catalogEntries = []CatalogEntry{
 	{ID: "run.start", Right: "agent-self and token valid", RateLimitClass: "rl.agent_runtime"},
 	{ID: "run.token.renew", Right: "agent-self and token current", RateLimitClass: "rl.agent_runtime"},
 	{ID: "run.update", Right: "agent-self", RateLimitClass: "rl.agent_runtime"},
+	{ID: "search.assist", Right: "human", RateLimitClass: "rl.trigger"},
+	{ID: "search.assist.respond", Right: "agent-self, the assistant agent the request was sent to", RateLimitClass: "rl.agent_runtime"},
 	{ID: "search.query", Right: "auth", RateLimitClass: "rl.search"},
 	{ID: "self.profile.update", Right: "self", RateLimitClass: "rl.write"},
 	{ID: "self.read", Right: "auth and self", RateLimitClass: "rl.read"},

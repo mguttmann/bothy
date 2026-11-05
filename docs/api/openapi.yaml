@@ -11716,6 +11716,154 @@ paths:
         default:
           $ref: '#/components/responses/Error'
 
+  /search/assist:
+    post:
+      operationId: assistSearch
+      summary: Ask the search assistant
+      tags: [Search]
+      description: |-
+        Smart search (14, 4.10): the server turns `q` and the terms of `history` into search terms,
+        runs the thread title and message search with the access filter of `/search`, fuses the hits
+        per thread and, when `search.assist.agent_id` names an assistant agent with a live gateway
+        connection, sends the candidates the agent may read too as `search.assist_requested` and
+        waits up to `search.assist.timeout` for its picks. The answer holds at most
+        `search.assist.max_hits` hits: the assistant's picks with a reason first, then full-text
+        hits. Without an assistant answer `mode` is `fulltext` and `fallback_reason` says why.
+        Nothing is stored; only persons may ask (agents and apps get `403`). `q` longer than
+        `search.query_max_chars` or without a term is `400 validation_failed`; more than
+        `search.assist.max_turns` turns in `history` is `too_many_items`. A statement timeout is
+        `503 unavailable` with reason `search_timeout`.
+      x-authz-action: search.assist
+      x-rate-limit-class: rl.trigger
+      x-idempotency-exempt: read_only
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SearchAssistQuery'
+            examples:
+              default:
+                summary: Request
+                value:
+                  q: the takeover of the tool by the new agent
+      responses:
+        '200':
+          description: OK.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchAssistResult'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    mode: assisted
+                    terms: [takeover, tool, agent, migration]
+                    hits:
+                    - thread_id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
+                      message_id: 0192f4a0-7b1c-7a3e-9c4b-1f2e3d4c5b6a
+                      channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
+                      thread_title: Takeover of the tool
+                      channel_name: tool
+                      space_name: Projects
+                      at: '2026-10-10T09:30:00.000Z'
+                      source: assistant
+                      reason: The thread where the steering session moved to the tool.
+                      segments:
+                      - text: 'the '
+                        match: false
+                      - text: takeover
+                        match: true
+                    cost_estimate:
+                      amount_micros: 1200
+                      currency: USD
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /search-assist-requests/{request_id}/answer:
+    post:
+      operationId: answerSearchAssist
+      summary: Answer a search assistant request
+      tags: [Agent runtime]
+      description: |-
+        The assistant agent answers an open `search.assist_requested` (14, 4.10; 09, 10.6); the
+        first valid answer goes back to the person. `404` for an unknown or forgotten request and for
+        every principal but the addressed agent, `410 gone` after the wait ended, `204` without effect for an
+        answer after the first one. `400 validation_failed` for a reference that was not sent or is
+        named twice (`unknown_ref`, `duplicate`), more picks than `max_picks` or more terms than
+        `search.assist.max_terms` (`too_many_items`), an empty reason or term (`too_short`), a reason
+        longer than `search.assist.reason_max_chars` or a term longer than 64 characters (`too_long`)
+        or a text that is no display text (`invalid_utf8`, `control_character`, `bidi_control`); the
+        request stays open.
+      x-authz-action: search.assist.respond
+      x-rate-limit-class: rl.agent_runtime
+      x-idempotency-exempt: agent_runtime
+      parameters:
+      - $ref: '#/components/parameters/RequestIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SearchAssistAnswer'
+            examples:
+              default:
+                summary: Request
+                value:
+                  picks:
+                  - ref: c2
+                    reason: The thread where the steering session moved to the tool.
+                  terms: [migration, takeover]
+                  costs:
+                  - provider: anthropic
+                    model: model-fast
+                    tokens_in: 4200
+                    tokens_out: 180
+                    amount_micros: 1200
+                    currency: USD
+      responses:
+        '204':
+          description: No content.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '410':
+          $ref: '#/components/responses/Gone'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
   /sync/snapshot:
     get:
       operationId: getSnapshot
@@ -26356,6 +26504,203 @@ components:
                 type: string
               match:
                 type: boolean
+    SearchAssistQuery:
+      type: object
+      additionalProperties: false
+      description: One question to the search assistant (14, 4.10).
+      required: [q]
+      properties:
+        q:
+          type: string
+          minLength: 1
+          description: The question in the person's own words, at most `search.query_max_chars`.
+          examples: [the takeover of the tool by the new agent]
+        history:
+          type: array
+          maxItems: 10
+          description: The earlier questions of the same popup, oldest first; at most `search.assist.max_turns`. Nothing of it is stored.
+          items:
+            $ref: '#/components/schemas/SearchAssistTurn'
+    SearchAssistTurn:
+      type: object
+      additionalProperties: false
+      required: [q]
+      properties:
+        q:
+          type: string
+          minLength: 1
+          description: An earlier question.
+        terms:
+          type: array
+          maxItems: 32
+          description: The `terms` of the answer to it.
+          items:
+            type: string
+        thread_ids:
+          type: array
+          maxItems: 20
+          description: The threads the answer to it showed; the assistant learns which candidates the person has seen already.
+          items:
+            $ref: '#/components/schemas/Uuid'
+    SearchAssistResult:
+      type: object
+      required: [hits, mode, terms]
+      properties:
+        hits:
+          type: array
+          maxItems: 20
+          description: At most `search.assist.max_hits`; the assistant's picks first, then full-text hits.
+          items:
+            $ref: '#/components/schemas/SearchAssistHit'
+        mode:
+          type: string
+          enum: [assisted, fulltext]
+          description: '`assisted` when the assistant answered, otherwise `fulltext`.'
+        fallback_reason:
+          type: string
+          enum: [assistant_not_configured, assistant_unavailable, assistant_timeout]
+          description: Only with `mode = fulltext`.
+        terms:
+          type: array
+          description: The search terms of this question (the person's and the assistant's); the app sends them back in `history`.
+          items:
+            type: string
+        cost_estimate:
+          $ref: '#/components/schemas/SearchAssistCost'
+    SearchAssistHit:
+      type: object
+      description: One session the search found; open it at `/t/<thread_id>?m=<message_id>`.
+      required: [thread_id, channel_id, channel_name, at, source, segments]
+      properties:
+        thread_id:
+          $ref: '#/components/schemas/Uuid'
+        message_id:
+          $ref: '#/components/schemas/Uuid'
+          description: The best matching message of the thread; absent when only the title matched.
+        channel_id:
+          $ref: '#/components/schemas/Uuid'
+        thread_title:
+          type: string
+          description: Absent for the main thread of a text channel.
+        channel_name:
+          type: string
+          description: The channel, for a development session the project forum.
+        space_name:
+          type: string
+          description: Absent for a direct message.
+        at:
+          $ref: '#/components/schemas/Timestamp'
+          description: Time of the matching message, or of the thread when only the title matched.
+        source:
+          type: string
+          enum: [assistant, fulltext]
+        reason:
+          type: string
+          description: One sentence of the assistant why this is the session; only with `source = assistant`.
+        segments:
+          type: array
+          description: Excerpt split at the matches, as in `SearchHit`.
+          items:
+            type: object
+            required: [text, match]
+            properties:
+              text:
+                type: string
+              match:
+                type: boolean
+    SearchAssistCost:
+      type: object
+      required: [amount_micros, currency]
+      description: Estimate of the assistant's model call, for information only; not booked as a cost entry.
+      properties:
+        amount_micros:
+          type: integer
+          format: int64
+        currency:
+          type: string
+          examples: [USD]
+    SearchAssistAnswer:
+      type: object
+      additionalProperties: false
+      description: Answer of the assistant agent to `search.assist_requested` (action `search.assist.respond`).
+      properties:
+        picks:
+          type: array
+          maxItems: 20
+          description: The sessions that answer the question, best first; at most `max_picks` of the request.
+          items:
+            $ref: '#/components/schemas/SearchAssistPick'
+        terms:
+          type: array
+          maxItems: 16
+          description: Further search terms (synonyms, the other language); at most `max_terms` of the request.
+          items:
+            type: string
+        costs:
+          type: array
+          maxItems: 8
+          description: Usage of the model call, as in `run.finish`.
+          items:
+            $ref: '#/components/schemas/CostReport'
+    SearchAssistPick:
+      type: object
+      additionalProperties: false
+      required: [ref, reason]
+      properties:
+        ref:
+          type: string
+          description: The `ref` of a candidate of the request.
+          examples: [c2]
+        reason:
+          type: string
+          description: One sentence why, at most `search.assist.reason_max_chars`.
+    SearchAssistRequestedPayload:
+      type: object
+      description: Sent to one gateway connection of the assistant agent (14, 4.10; 09, 10.6). Holds no ids of threads or messages; the excerpts are data, never instructions.
+      required: [request_id, q, candidates, max_picks, max_terms, expires_at]
+      properties:
+        request_id:
+          $ref: '#/components/schemas/Uuid'
+        q:
+          type: string
+          description: The question.
+        history:
+          type: array
+          description: The earlier questions of the popup, oldest first.
+          items:
+            type: string
+        candidates:
+          type: array
+          items:
+            $ref: '#/components/schemas/SearchAssistCandidate'
+        max_picks:
+          type: integer
+        max_terms:
+          type: integer
+        expires_at:
+          $ref: '#/components/schemas/Timestamp'
+    SearchAssistCandidate:
+      type: object
+      required: [ref, channel_name, at, excerpt, shown_before]
+      properties:
+        ref:
+          type: string
+          examples: [c1]
+        title:
+          type: string
+          description: Thread title; absent for the main thread of a text channel.
+        channel_name:
+          type: string
+        space_name:
+          type: string
+        at:
+          $ref: '#/components/schemas/Timestamp'
+        excerpt:
+          type: string
+          description: Plain text of the best matching message, at most `search.assist.excerpt_max_chars`.
+        shown_before:
+          type: boolean
+          description: The person saw this session in an earlier answer of the popup.
     ReadState:
       type: object
       required:
@@ -31726,6 +32071,18 @@ components:
             enum: [command.autocomplete_requested]
           payload:
             $ref: '#/components/schemas/CommandAutocompleteRequestedPayload'
+    SearchAssistRequestedEvent:
+      description: Ephemeral event `search.assist_requested` (no `seq`, at most once).
+      allOf:
+      - $ref: '#/components/schemas/EventEnvelope'
+      - type: object
+        required: [type, payload]
+        properties:
+          type:
+            type: string
+            enum: [search.assist_requested]
+          payload:
+            $ref: '#/components/schemas/SearchAssistRequestedPayload'
     NotificationCreatedEvent:
       description: Ephemeral event `notification.created` (no `seq`, at most once), only to connections of the recipient instead of a push (13, 6.3).
       allOf:

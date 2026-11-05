@@ -4053,6 +4053,93 @@ func (e RunUpdatedEventType) Valid() bool {
 	}
 }
 
+// Defines values for SearchAssistHitSource.
+const (
+	SearchAssistHitSourceAssistant SearchAssistHitSource = "assistant"
+	SearchAssistHitSourceFulltext  SearchAssistHitSource = "fulltext"
+)
+
+// Valid indicates whether the value is a known member of the SearchAssistHitSource enum.
+func (e SearchAssistHitSource) Valid() bool {
+	switch e {
+	case SearchAssistHitSourceAssistant:
+		return true
+	case SearchAssistHitSourceFulltext:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SearchAssistRequestedEventAudience.
+const (
+	SearchAssistRequestedEventAudienceSelf SearchAssistRequestedEventAudience = "self"
+)
+
+// Valid indicates whether the value is a known member of the SearchAssistRequestedEventAudience enum.
+func (e SearchAssistRequestedEventAudience) Valid() bool {
+	switch e {
+	case SearchAssistRequestedEventAudienceSelf:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SearchAssistRequestedEventType.
+const (
+	SearchAssistRequested SearchAssistRequestedEventType = "search.assist_requested"
+)
+
+// Valid indicates whether the value is a known member of the SearchAssistRequestedEventType enum.
+func (e SearchAssistRequestedEventType) Valid() bool {
+	switch e {
+	case SearchAssistRequested:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SearchAssistResultFallbackReason.
+const (
+	AssistantNotConfigured SearchAssistResultFallbackReason = "assistant_not_configured"
+	AssistantTimeout       SearchAssistResultFallbackReason = "assistant_timeout"
+	AssistantUnavailable   SearchAssistResultFallbackReason = "assistant_unavailable"
+)
+
+// Valid indicates whether the value is a known member of the SearchAssistResultFallbackReason enum.
+func (e SearchAssistResultFallbackReason) Valid() bool {
+	switch e {
+	case AssistantNotConfigured:
+		return true
+	case AssistantTimeout:
+		return true
+	case AssistantUnavailable:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SearchAssistResultMode.
+const (
+	SearchAssistResultModeAssisted SearchAssistResultMode = "assisted"
+	SearchAssistResultModeFulltext SearchAssistResultMode = "fulltext"
+)
+
+// Valid indicates whether the value is a known member of the SearchAssistResultMode enum.
+func (e SearchAssistResultMode) Valid() bool {
+	switch e {
+	case SearchAssistResultModeAssisted:
+		return true
+	case SearchAssistResultModeFulltext:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for SearchHitKind.
 const (
 	SearchHitKindFile    SearchHitKind = "file"
@@ -14562,6 +14649,221 @@ type RunUpdatedPayload struct {
 	Version  int64 `json:"version"`
 }
 
+// SearchAssistAnswer Answer of the assistant agent to `search.assist_requested` (action `search.assist.respond`).
+type SearchAssistAnswer struct {
+	// Costs Usage of the model call, as in `run.finish`.
+	Costs *[]CostReport `json:"costs,omitempty"`
+
+	// Picks The sessions that answer the question, best first; at most `max_picks` of the request.
+	Picks *[]SearchAssistPick `json:"picks,omitempty"`
+
+	// Terms Further search terms (synonyms, the other language); at most `max_terms` of the request.
+	Terms *[]string `json:"terms,omitempty"`
+}
+
+// SearchAssistCandidate defines model for SearchAssistCandidate.
+type SearchAssistCandidate struct {
+	// At RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+	At          Timestamp `json:"at"`
+	ChannelName string    `json:"channel_name"`
+
+	// Excerpt Plain text of the best matching message, at most `search.assist.excerpt_max_chars`.
+	Excerpt string `json:"excerpt"`
+
+	// Ref Examples: c1
+	Ref string `json:"ref"`
+
+	// ShownBefore The person saw this session in an earlier answer of the popup.
+	ShownBefore bool    `json:"shown_before"`
+	SpaceName   *string `json:"space_name,omitempty"`
+
+	// Title Thread title; absent for the main thread of a text channel.
+	Title *string `json:"title,omitempty"`
+}
+
+// SearchAssistCost Estimate of the assistant's model call, for information only; not booked as a cost entry.
+type SearchAssistCost struct {
+	AmountMicros int64 `json:"amount_micros"`
+
+	// Currency Examples: USD
+	Currency string `json:"currency"`
+}
+
+// SearchAssistHit One session the search found; open it at `/t/<thread_id>?m=<message_id>`.
+type SearchAssistHit struct {
+	// At Time of the matching message, or of the thread when only the title matched.
+	At Timestamp `json:"at"`
+
+	// ChannelId UUIDv7 (RFC 9562), lowercase canonical form.
+	ChannelId Uuid `json:"channel_id"`
+
+	// ChannelName The channel, for a development session the project forum.
+	ChannelName string `json:"channel_name"`
+
+	// MessageId The best matching message of the thread; absent when only the title matched.
+	MessageId *Uuid `json:"message_id,omitempty"`
+
+	// Reason One sentence of the assistant why this is the session; only with `source = assistant`.
+	Reason *string `json:"reason,omitempty"`
+
+	// Segments Excerpt split at the matches, as in `SearchHit`.
+	Segments []struct {
+		Match bool   `json:"match"`
+		Text  string `json:"text"`
+	} `json:"segments"`
+	Source SearchAssistHitSource `json:"source"`
+
+	// SpaceName Absent for a direct message.
+	SpaceName *string `json:"space_name,omitempty"`
+
+	// ThreadId UUIDv7 (RFC 9562), lowercase canonical form.
+	ThreadId Uuid `json:"thread_id"`
+
+	// ThreadTitle Absent for the main thread of a text channel.
+	ThreadTitle *string `json:"thread_title,omitempty"`
+}
+
+// SearchAssistHitSource defines model for SearchAssistHit.Source.
+type SearchAssistHitSource string
+
+// SearchAssistPick defines model for SearchAssistPick.
+type SearchAssistPick struct {
+	// Reason One sentence why, at most `search.assist.reason_max_chars`.
+	Reason string `json:"reason"`
+
+	// Ref The `ref` of a candidate of the request.
+	//
+	// Examples: c2
+	Ref string `json:"ref"`
+}
+
+// SearchAssistQuery One question to the search assistant (14, 4.10).
+type SearchAssistQuery struct {
+	// History The earlier questions of the same popup, oldest first; at most `search.assist.max_turns`. Nothing of it is stored.
+	History *[]SearchAssistTurn `json:"history,omitempty"`
+
+	// Q The question in the person's own words, at most `search.query_max_chars`.
+	//
+	// Examples: the takeover of the tool by the new agent
+	Q string `json:"q"`
+}
+
+// SearchAssistRequestedEvent Ephemeral event `search.assist_requested` (no `seq`, at most once).
+type SearchAssistRequestedEvent struct {
+	Actor    *EventActor                         `json:"actor,omitempty"`
+	Audience *SearchAssistRequestedEventAudience `json:"audience,omitempty"`
+
+	// ClientMsgId UUIDv7 (RFC 9562), lowercase canonical form.
+	ClientMsgId *Uuid `json:"client_msg_id,omitempty"`
+
+	// CorrelationId W3C trace ID (16 bytes) of the request, written as a lowercase UUID; not a UUIDv7. Generated by the server.
+	//
+	// Examples: 4bf92f35-77b3-4da6-a3ce-929d0e0e4736
+	CorrelationId *CorrelationId `json:"correlation_id,omitempty"`
+
+	// Id UUIDv7 (RFC 9562), lowercase canonical form.
+	Id Uuid `json:"id"`
+
+	// InvocationToken Fresh invocation token (JWS, I3); only on agent-addressed invocation events.
+	InvocationToken *string `json:"invocation_token,omitempty"`
+
+	// OccurredAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+	OccurredAt Timestamp `json:"occurred_at"`
+
+	// Payload Sent to one gateway connection of the assistant agent (14, 4.10; 09, 10.6). Holds no ids of threads or messages; the excerpts are data, never instructions.
+	Payload           SearchAssistRequestedPayload `json:"payload"`
+	PermissionVersion *int64                       `json:"permission_version,omitempty"`
+	Redacted          *bool                        `json:"redacted,omitempty"`
+
+	// Redelivered Set on redelivery to an agent consumer after `agent.ack_timeout`.
+	Redelivered *bool         `json:"redelivered,omitempty"`
+	Resource    EventResource `json:"resource"`
+
+	// SchemaVersion Examples: 1
+	SchemaVersion int `json:"schema_version"`
+
+	// Scope Location of the event. Members are absent where not applicable.
+	Scope EventScope `json:"scope"`
+
+	// Seq Global commit-ordered sequence; absent for ephemeral events.
+	//
+	// Examples: 5301
+	Seq *int64 `json:"seq,omitempty"`
+
+	// SyncEpoch Delivery-only member of outgoing webhooks; the time line of the event log (04, 7.5; ADR 0059). A receiver that sees a new epoch resets its `seq` state.
+	SyncEpoch *Uuid `json:"sync_epoch,omitempty"`
+
+	// TraceContext W3C `traceparent` of the triggering request; only in deliveries to agent adapters and only if the request was recorded.
+	//
+	// Examples: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01
+	TraceContext *string `json:"trace_context,omitempty"`
+
+	// Truncated The payload was cut to `sync.event_payload_max_bytes`; load the resource via REST.
+	Truncated *bool                          `json:"truncated,omitempty"`
+	Type      SearchAssistRequestedEventType `json:"type"`
+}
+
+// SearchAssistRequestedEventAudience defines model for SearchAssistRequestedEvent.Audience.
+type SearchAssistRequestedEventAudience string
+
+// SearchAssistRequestedEventType defines model for SearchAssistRequestedEvent.Type.
+type SearchAssistRequestedEventType string
+
+// SearchAssistRequestedPayload Sent to one gateway connection of the assistant agent (14, 4.10; 09, 10.6). Holds no ids of threads or messages; the excerpts are data, never instructions.
+type SearchAssistRequestedPayload struct {
+	Candidates []SearchAssistCandidate `json:"candidates"`
+
+	// ExpiresAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+	ExpiresAt Timestamp `json:"expires_at"`
+
+	// History The earlier questions of the popup, oldest first.
+	History  *[]string `json:"history,omitempty"`
+	MaxPicks int       `json:"max_picks"`
+	MaxTerms int       `json:"max_terms"`
+
+	// Q The question.
+	Q string `json:"q"`
+
+	// RequestId UUIDv7 (RFC 9562), lowercase canonical form.
+	RequestId Uuid `json:"request_id"`
+}
+
+// SearchAssistResult defines model for SearchAssistResult.
+type SearchAssistResult struct {
+	// CostEstimate Estimate of the assistant's model call, for information only; not booked as a cost entry.
+	CostEstimate *SearchAssistCost `json:"cost_estimate,omitempty"`
+
+	// FallbackReason Only with `mode = fulltext`.
+	FallbackReason *SearchAssistResultFallbackReason `json:"fallback_reason,omitempty"`
+
+	// Hits At most `search.assist.max_hits`; the assistant's picks first, then full-text hits.
+	Hits []SearchAssistHit `json:"hits"`
+
+	// Mode `assisted` when the assistant answered, otherwise `fulltext`.
+	Mode SearchAssistResultMode `json:"mode"`
+
+	// Terms The search terms of this question (the person's and the assistant's); the app sends them back in `history`.
+	Terms []string `json:"terms"`
+}
+
+// SearchAssistResultFallbackReason Only with `mode = fulltext`.
+type SearchAssistResultFallbackReason string
+
+// SearchAssistResultMode `assisted` when the assistant answered, otherwise `fulltext`.
+type SearchAssistResultMode string
+
+// SearchAssistTurn defines model for SearchAssistTurn.
+type SearchAssistTurn struct {
+	// Q An earlier question.
+	Q string `json:"q"`
+
+	// Terms The `terms` of the answer to it.
+	Terms *[]string `json:"terms,omitempty"`
+
+	// ThreadIds The threads the answer to it showed; the assistant learns which candidates the person has seen already.
+	ThreadIds *[]Uuid `json:"thread_ids,omitempty"`
+}
+
 // SearchHit One hit. `kind` names which of the optional objects is set.
 type SearchHit struct {
 	ChannelName *string       `json:"channel_name,omitempty"`
@@ -19461,6 +19763,12 @@ type ResumeRunJSONRequestBody = RunStart
 
 // StartRunJSONRequestBody defines body for StartRun for application/json ContentType.
 type StartRunJSONRequestBody = RunStart
+
+// AnswerSearchAssistJSONRequestBody defines body for AnswerSearchAssist for application/json ContentType.
+type AnswerSearchAssistJSONRequestBody = SearchAssistAnswer
+
+// AssistSearchJSONRequestBody defines body for AssistSearch for application/json ContentType.
+type AssistSearchJSONRequestBody = SearchAssistQuery
 
 // RotateSigningKeyJSONRequestBody defines body for RotateSigningKey for application/json ContentType.
 type RotateSigningKeyJSONRequestBody = SigningKeyRotate

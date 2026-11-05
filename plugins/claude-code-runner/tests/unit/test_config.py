@@ -252,6 +252,21 @@ def test_transcribe_keys(tmp_path: Path) -> None:
         load_config(write(tmp_path, 'transcribe_timeout = "0s"\n'))
 
 
+def test_search_assist_keys(tmp_path: Path) -> None:
+    """``runner.search_assist_model`` and ``runner.search_assist_timeout`` (09 18.17)."""
+    cfg = load_config(write(tmp_path))
+    assert cfg.search_assist_model == "haiku"
+    assert cfg.search_assist_timeout == 9.0
+    cfg = load_config(
+        write(tmp_path, 'search_assist_model = "sonnet"\nsearch_assist_timeout = "5s"\n')
+    )
+    assert (cfg.search_assist_model, cfg.search_assist_timeout) == ("sonnet", 5.0)
+    with pytest.raises(ConfigError, match="search_assist_model"):
+        load_config(write(tmp_path, 'search_assist_model = "-x"\n'))
+    with pytest.raises(ConfigError, match="search_assist_timeout"):
+        load_config(write(tmp_path, 'search_assist_timeout = "0s"\n'))
+
+
 def test_default_workspace_is_off_by_default(tmp_path: Path) -> None:
     """RUNNER-NO-GIT: a forum without a binding gets no folder unless the operator names one."""
     assert load_config(write(tmp_path)).default_workspace is None

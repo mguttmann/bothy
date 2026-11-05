@@ -192,6 +192,9 @@ class World:
         self.commands: dict[UUID, dict[str, Any]] = {}
         self.autocomplete: dict[UUID, dict[str, Any]] = {}
         self.autocomplete_answers: dict[UUID, list[dict[str, str]]] = {}
+        # Open questions of the search assistant (14 4.10) and the answers the adapter sent.
+        self.search_assist: dict[UUID, dict[str, Any]] = {}
+        self.search_assist_answers: dict[UUID, dict[str, Any]] = {}
         self.heartbeats: list[dict[str, Any]] = []
         # Folder moves of deleted forums (09 18.15): handed in every heartbeat answer until a
         # heartbeat reports the channel's outcome, which is kept in `project_trash_results`.
@@ -766,6 +769,42 @@ class World:
             if record or changed:
                 run.version += 1
         envelope["invocation_token"] = token
+        return envelope
+
+    def search_assist_event(
+        self,
+        q: str,
+        candidates: list[dict[str, Any]],
+        history: list[str],
+        expires_in: float,
+    ) -> dict[str, Any]:
+        """An ephemeral ``search.assist_requested`` without a token and without ids (no ``seq``)."""
+        request_id = uuid7()
+        expires = self.now().timestamp() + expires_in
+        at = iso(self.now())
+        filled = [{"at": at, "shown_before": False, "excerpt": "", **c} for c in candidates]
+        payload: dict[str, Any] = {
+            "request_id": str(request_id),
+            "q": q,
+            "candidates": filled,
+            "max_picks": len(filled),
+            "max_terms": 8,
+            "expires_at": iso(datetime.fromtimestamp(expires, tz=self.now().tzinfo)),
+        }
+        if history:
+            payload["history"] = list(history)
+        envelope = self.envelope(
+            "search.assist_requested",
+            payload,
+            resource={"kind": "agent", "id": str(self.lotse.id)},
+            thread_id=None,
+            drop=("seq", "permission_version", "actor"),
+        )
+        self.search_assist[request_id] = {
+            "expires": expires,
+            "refs": {c["ref"] for c in filled},
+            "max_picks": len(filled),
+        }
         return envelope
 
     def autocomplete_event(

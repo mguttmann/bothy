@@ -45,6 +45,15 @@ func (h *Hub) AskAutocomplete(ctx context.Context, r AutocompleteRequest) (bool,
 	if ev.Type != string(authorize.EventCommandAutocompleteRequested) || ev.SchemaVersion < 1 || ev.Audience != r.OwnerID {
 		return false, fmt.Errorf("gateway: AskAutocomplete takes only %s for its owner", authorize.EventCommandAutocompleteRequested)
 	}
+	return h.askOwner(ctx, r)
+}
+
+// askOwner offers the ephemeral event of r to exactly one live connection of r.OwnerID (consumer
+// default, else the most recently attached), admitted with agent.events.consume on the owner in
+// delivery mode; the frame is queued without blocking and dropped when the queue is full. The
+// callers check the type. sent is false when no connection was live, admitted or had room.
+func (h *Hub) askOwner(ctx context.Context, r AutocompleteRequest) (bool, error) {
+	ev := r.Event
 	payload, err := h.ephemeralPayload(ev)
 	if err != nil {
 		return false, err

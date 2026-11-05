@@ -10285,4 +10285,77 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get vizColSubagents => 'Subagenten';
+
+  @override
+  String get assistTitle => 'Suchassistent';
+
+  @override
+  String get assistOpen => 'Suchassistent fragen';
+
+  @override
+  String assistAskRow(String question) {
+    return 'Suchassistent fragen: $question';
+  }
+
+  @override
+  String get assistIntro =>
+      'Beschreibe in eigenen Worten den Chat oder die Entwicklungssitzung, die du suchst, zum Beispiel: Wohin haben wir die Steuersitzung umgezogen?';
+
+  @override
+  String get assistFieldLabel => 'Frage an den Suchassistenten';
+
+  @override
+  String get assistFieldHint => 'Was suchst du?';
+
+  @override
+  String get assistSend => 'Fragen';
+
+  @override
+  String get assistSearching => 'Suche läuft';
+
+  @override
+  String get assistNothing => 'Keine Sitzung gefunden';
+
+  @override
+  String get assistFulltext => 'Volltext, ohne den Assistenten';
+
+  @override
+  String get assistFallbackNotConfigured =>
+      'Auf diesem Server ist kein Suchassistent eingerichtet; das sind Volltexttreffer.';
+
+  @override
+  String get assistFallbackUnavailable =>
+      'Der Suchassistent ist nicht erreichbar; das sind Volltexttreffer.';
+
+  @override
+  String get assistFallbackTimeout =>
+      'Der Suchassistent hat zu lange gebraucht; das sind Volltexttreffer.';
+
+  @override
+  String assistCost(String amount) {
+    return 'Schätzung des Assistenten, nur zur Information: $amount';
+  }
+
+  @override
+  String get assistQueryEmpty => 'Beschreibe es mit ein paar Worten mehr.';
+
+  @override
+  String get assistQueryTooLong => 'Die Frage ist zu lang.';
+
+  @override
+  String get assistOffline => 'Keine Verbindung zum Server.';
+
+  @override
+  String get assistFailed =>
+      'Die Suche ist fehlgeschlagen. Versuche es noch einmal.';
+
+  @override
+  String assistHitLabel(
+    String title,
+    String place,
+    String time,
+    String reason,
+  ) {
+    return '$title, $place, $time: $reason';
+  }
 }

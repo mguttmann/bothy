@@ -479,6 +479,16 @@ import 'package:api_client/src/generated/model/run_summary.dart';
 import 'package:api_client/src/generated/model/run_summary_page.dart';
 import 'package:api_client/src/generated/model/run_updated_event.dart';
 import 'package:api_client/src/generated/model/run_updated_payload.dart';
+import 'package:api_client/src/generated/model/search_assist_answer.dart';
+import 'package:api_client/src/generated/model/search_assist_candidate.dart';
+import 'package:api_client/src/generated/model/search_assist_cost.dart';
+import 'package:api_client/src/generated/model/search_assist_hit.dart';
+import 'package:api_client/src/generated/model/search_assist_pick.dart';
+import 'package:api_client/src/generated/model/search_assist_query.dart';
+import 'package:api_client/src/generated/model/search_assist_requested_event.dart';
+import 'package:api_client/src/generated/model/search_assist_requested_payload.dart';
+import 'package:api_client/src/generated/model/search_assist_result.dart';
+import 'package:api_client/src/generated/model/search_assist_turn.dart';
 import 'package:api_client/src/generated/model/search_hit.dart';
 import 'package:api_client/src/generated/model/search_hit_kind.dart';
 import 'package:api_client/src/generated/model/search_hit_page.dart';
@@ -1107,6 +1117,16 @@ part 'serializers.g.dart';
   RunSummaryPage,
   RunUpdatedEvent,
   RunUpdatedPayload,
+  SearchAssistAnswer,
+  SearchAssistCandidate,
+  SearchAssistCost,
+  SearchAssistHit,
+  SearchAssistPick,
+  SearchAssistQuery,
+  SearchAssistRequestedEvent,
+  SearchAssistRequestedPayload,
+  SearchAssistResult,
+  SearchAssistTurn,
   SearchHit,
   SearchHitKind,
   SearchHitPage,
@@ -1400,6 +1420,10 @@ Serializers serializers =
             () => ListBuilder<PrincipalRef>(),
           )
           ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(SearchAssistPick)]),
+            () => ListBuilder<SearchAssistPick>(),
+          )
+          ..addBuilderFactory(
             const FullType(BuiltList, [FullType(AccessEffect)]),
             () => ListBuilder<AccessEffect>(),
           )
@@ -1611,6 +1635,10 @@ Serializers serializers =
             () => ListBuilder<Grant>(),
           )
           ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(SearchAssistTurn)]),
+            () => ListBuilder<SearchAssistTurn>(),
+          )
+          ..addBuilderFactory(
             const FullType(BuiltList, [FullType(CommandChoice)]),
             () => ListBuilder<CommandChoice>(),
           )
@@ -1749,6 +1777,10 @@ Serializers serializers =
             () => ListBuilder<WaitingRun>(),
           )
           ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(SearchAssistHit)]),
+            () => ListBuilder<SearchAssistHit>(),
+          )
+          ..addBuilderFactory(
             const FullType(BuiltList, [FullType(StatsLiveAgent)]),
             () => ListBuilder<StatsLiveAgent>(),
           )
@@ -1815,6 +1847,10 @@ Serializers serializers =
           ..addBuilderFactory(
             const FullType(BuiltList, [FullType(StatsLiveRun)]),
             () => ListBuilder<StatsLiveRun>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(SearchAssistCandidate)]),
+            () => ListBuilder<SearchAssistCandidate>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, [FullType(int)]),

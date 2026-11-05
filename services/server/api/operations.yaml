@@ -15,11 +15,13 @@ enabled:             # operationIds that have a handler; sorted ascending
   - addReaction
   - addStatusIncidentUpdate
   - answerAutocomplete
+  - answerSearchAssist
   - applyImportBatch
   - approveDevice
   - approvePairing
   - archiveChannel
   - archiveSpace
+  - assistSearch
   - attachTerminalSession
   - autocompleteCommand
   - awaitRunInput

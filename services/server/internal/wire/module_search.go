@@ -33,6 +33,10 @@ func (s *server) startSearch(context.Context) error {
 	if err != nil {
 		return err
 	}
+	assist, err := SearchAssistConfig(s.values)
+	if err != nil {
+		return err
+	}
 	langs, err := SearchLanguages(s.values)
 	if err != nil {
 		return err
@@ -43,7 +47,7 @@ func (s *server) startSearch(context.Context) error {
 	if a == nil || az == nil || m == nil || c == nil || f == nil {
 		return errors.New("wire: search needs audit, the Authorizer, messaging, chat and files")
 	}
-	sr, err := NewSearch(cfg, langs.Languages(), pool, a.UoW(), az, SearchReads{
+	sr, err := NewSearch(cfg, assist, langs.Languages(), pool, a.UoW(), az, SearchReads{
 		Messaging: m.Service, Chat: c.Service, Files: f.Service,
 	}, s.deps.Clock, s.logger())
 	if err != nil {

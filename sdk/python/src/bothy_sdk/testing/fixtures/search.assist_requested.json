@@ -1,0 +1,33 @@
+{
+  "audience": "self",
+  "id": "01900000-0000-7000-8000-000000000701",
+  "occurred_at": "2026-01-01T00:00:00.000Z",
+  "payload": {
+    "candidates": [
+      {
+        "at": "2026-01-01T00:00:00.000Z",
+        "channel_name": "Allgemein",
+        "excerpt": "the session moved",
+        "ref": "c1",
+        "shown_before": false,
+        "space_name": "Support",
+        "title": "Takeover"
+      }
+    ],
+    "expires_at": "2026-01-01T00:00:09.000Z",
+    "max_picks": 1,
+    "max_terms": 8,
+    "q": "where did the session move",
+    "request_id": "01900000-0000-7000-8000-000000000702"
+  },
+  "resource": {
+    "id": "01900000-0000-7000-8000-000000000301",
+    "kind": "agent"
+  },
+  "schema_version": 1,
+  "scope": {
+    "channel_id": "01900000-0000-7000-8000-000000000103",
+    "space_id": "01900000-0000-7000-8000-000000000104"
+  },
+  "type": "search.assist_requested"
+}

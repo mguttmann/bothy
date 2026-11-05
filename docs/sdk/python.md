@@ -85,6 +85,8 @@ would only repeat that.
 
 ::: bothy_sdk.commands
 
+::: bothy_sdk.search_assist
+
 ::: bothy_sdk.outbox
 
 ::: bothy_sdk.uploads

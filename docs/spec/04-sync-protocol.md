@@ -26,7 +26,7 @@ are only in section 18.
 | Kind | Stored | Sequence | Can be caught up | Examples |
 |---|---|---|---|---|
 | durable | yes, in `event_log` | global `seq` | yes, until `sync.event_retention` | `message.created`, `thread.closed`, `run.state_changed`, `access.changed` |
-| ephemeral | no | none | no | `typing.started`, `run.updated`, `agent.presence_changed`, `notification.created`, `command.autocomplete_requested` |
+| ephemeral | no | none | no | `typing.started`, `run.updated`, `agent.presence_changed`, `notification.created`, `command.autocomplete_requested`, `search.assist_requested` |
 
 Rule: everything a client must know after a pause is durable. Ephemeral events
 are pure acceleration; their loss is healed by the next durable state or a
@@ -793,7 +793,8 @@ back, they appear again.
    `command.invoked`, `agent.config_changed`, `access.changed`) and `agent.updated` about
    itself (a change of the configured backend policy or of the configured tool class).
 5. Ephemeral, only to one active connection of the agent: `command.autocomplete_requested`
-   (section 15.7).
+   (section 15.7) and, for the assistant agent of `search.assist.agent_id`,
+   `search.assist_requested` without a token ([14-search.md](14-search.md) 4.10).
 
 ### 15.2 Ack and redelivery
 

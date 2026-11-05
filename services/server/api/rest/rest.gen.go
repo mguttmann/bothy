@@ -748,6 +748,12 @@ type ServerInterface interface {
 	// Search Full-text search
 	// (GET /search)
 	Search(w http.ResponseWriter, r *http.Request, params SearchParams)
+	// AnswerSearchAssist Answer a search assistant request
+	// (POST /search-assist-requests/{request_id}/answer)
+	AnswerSearchAssist(w http.ResponseWriter, r *http.Request, requestId RequestIdPath)
+	// AssistSearch Ask the search assistant
+	// (POST /search/assist)
+	AssistSearch(w http.ResponseWriter, r *http.Request)
 	// SearchThreadTitles Prefix search over thread titles
 	// (GET /search/thread-titles)
 	SearchThreadTitles(w http.ResponseWriter, r *http.Request, params SearchThreadTitlesParams)
@@ -10456,6 +10462,46 @@ func (siw *ServerInterfaceWrapper) Search(w http.ResponseWriter, r *http.Request
 	handler.ServeHTTP(w, r)
 }
 
+// AnswerSearchAssist operation middleware
+func (siw *ServerInterfaceWrapper) AnswerSearchAssist(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "request_id" -------------
+	var requestId RequestIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "request_id", r.PathValue("request_id"), &requestId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "request_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AnswerSearchAssist(w, r, requestId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AssistSearch operation middleware
+func (siw *ServerInterfaceWrapper) AssistSearch(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AssistSearch(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // SearchThreadTitles operation middleware
 func (siw *ServerInterfaceWrapper) SearchThreadTitles(w http.ResponseWriter, r *http.Request) {
 
@@ -14496,6 +14542,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/files/{file_id}/transcribe", wrapper.RequestTranscription)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/search", wrapper.Search)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/search/thread-titles", wrapper.SearchThreadTitles)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/search/assist", wrapper.AssistSearch)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/search-assist-requests/{request_id}/answer", wrapper.AnswerSearchAssist)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/sync/snapshot", wrapper.GetSnapshot)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/events", wrapper.ListEvents)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me/read-states", wrapper.ListMyReadStates)
@@ -15531,6 +15579,12 @@ type StrictServerInterface interface {
 	// Search Full-text search
 	// (GET /search)
 	Search(ctx context.Context, request SearchRequestObject) (SearchResponseObject, error)
+	// AnswerSearchAssist Answer a search assistant request
+	// (POST /search-assist-requests/{request_id}/answer)
+	AnswerSearchAssist(ctx context.Context, request AnswerSearchAssistRequestObject) (AnswerSearchAssistResponseObject, error)
+	// AssistSearch Ask the search assistant
+	// (POST /search/assist)
+	AssistSearch(ctx context.Context, request AssistSearchRequestObject) (AssistSearchResponseObject, error)
 	// SearchThreadTitles Prefix search over thread titles
 	// (GET /search/thread-titles)
 	SearchThreadTitles(ctx context.Context, request SearchThreadTitlesRequestObject) (SearchThreadTitlesResponseObject, error)
@@ -23016,6 +23070,70 @@ func (sh *strictHandler) Search(w http.ResponseWriter, r *http.Request, params S
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(SearchResponseObject); ok {
 		if err := validResponse.VisitSearchResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AnswerSearchAssist operation middleware
+func (sh *strictHandler) AnswerSearchAssist(w http.ResponseWriter, r *http.Request, requestId RequestIdPath) {
+	var request AnswerSearchAssistRequestObject
+
+	request.RequestId = requestId
+
+	var body AnswerSearchAssistJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.AnswerSearchAssist(ctx, request.(AnswerSearchAssistRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AnswerSearchAssist")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(AnswerSearchAssistResponseObject); ok {
+		if err := validResponse.VisitAnswerSearchAssistResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AssistSearch operation middleware
+func (sh *strictHandler) AssistSearch(w http.ResponseWriter, r *http.Request) {
+	var request AssistSearchRequestObject
+
+	var body AssistSearchJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.AssistSearch(ctx, request.(AssistSearchRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AssistSearch")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(AssistSearchResponseObject); ok {
+		if err := validResponse.VisitAssistSearchResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

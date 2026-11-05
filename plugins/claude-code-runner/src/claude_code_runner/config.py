@@ -148,6 +148,10 @@ class RunnerConfig:
             path of an audio file is appended and the text on stdout is the transcript (09
             18.14). Empty: no transcription.
         transcribe_timeout: ``runner.transcribe_timeout``: time limit of one transcription.
+        search_assist_model: ``runner.search_assist_model``: the model of the search assistant
+            call (09 18.17).
+        search_assist_timeout: ``runner.search_assist_timeout``: time limit of one search
+            assistant call; above zero.
         trash_check_interval: ``runner.trash_check_interval``: the bound folders are checked for
             a move to the trash at most this often, and a heartbeat that can carry a folder move
             request is sent at this interval (09 18.15); above zero.
@@ -191,6 +195,8 @@ class RunnerConfig:
     channels_resync_interval: float = 300.0
     transcribe_cmd: tuple[str, ...] = ()
     transcribe_timeout: float = 300.0
+    search_assist_model: str = "haiku"
+    search_assist_timeout: float = 9.0
     default_workspace: str | None = None
     trash_check_interval: float = 60.0
 
@@ -337,6 +343,14 @@ def _positive(r: _Reader, name: str, default: str) -> float:
     return value
 
 
+def _search_assist_model(r: _Reader) -> str:
+    """``runner.search_assist_model``: a model argument of the search assistant call (09 18.17)."""
+    model: str = r.get("search_assist_model", str, default="haiku")
+    if not check_argument(model):
+        raise r.fail("search_assist_model", "empty, starts with - or has controls")
+    return model
+
+
 def _transcribe_cmd(r: _Reader) -> tuple[str, ...]:
     """``runner.transcribe_cmd``: a program and its arguments, no shell (09 18.14)."""
     cmd = r.strings("transcribe_cmd")
@@ -462,6 +476,8 @@ def load_config(path: Path) -> RunnerConfig:
         channels_resync_interval=_positive(r, "channels_resync_interval", "5m"),
         transcribe_cmd=_transcribe_cmd(r),
         transcribe_timeout=_positive(r, "transcribe_timeout", "5m"),
+        search_assist_model=_search_assist_model(r),
+        search_assist_timeout=_positive(r, "search_assist_timeout", "9s"),
         default_workspace=_default_workspace(r, projects_root),
         trash_check_interval=_positive(r, "trash_check_interval", "60s"),
     )

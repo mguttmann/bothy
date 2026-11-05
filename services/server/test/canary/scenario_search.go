@@ -38,6 +38,10 @@ func (sc *Scenario) search() {
 	}
 	sc.get(alex, "/search?"+url.Values{"q": {term}, "sort": {"newest"}, "limit": {"1"}}.Encode(), ok...)
 	sc.get(alex, "/search/thread-titles?"+url.Values{"q": {term}}.Encode(), ok...)
+	// The search assistant (14 4.10): without an assistant agent the question answers the fused
+	// full text; its answer operation for an unknown request is 404 for the agent Lotse.
+	sc.post(alex, "/search/assist", map[string]any{"q": "search " + term}, ok...)
+	sc.post(sc.W.Agents["Lotse"], "/search-assist-requests/"+newID()+"/answer", map[string]any{}, http.StatusNotFound)
 	// A too long query with the term answers a problem that must not carry it.
 	long := term
 	for len(long) <= 256 {

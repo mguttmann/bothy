@@ -332,6 +332,63 @@ and the response is empty.
 Prefix queries are provided for in `to_tsquery` with `:*` [Q2, verified]. Same permission filter as
 4.3, sorted by `last_activity_at`.
 
+### 4.10 Search assistant
+
+The search assistant answers a question in the person's own words with a short list of sessions
+(F-INTELLIGENTE-SUCHE; design note [search-assistant.md](../design/search-assistant.md), decision
+[ADR 0075](../adr/0075-search-assistant-through-an-agent-over-the-full-text-search.md)). It is
+built on the search of this chapter; a model only chooses among the hits and adds terms.
+
+1. **Who asks.** `assistSearch` (`search.assist`, persons only, `rl.trigger`). The body holds the
+   question `q` (at most `search.query_max_chars`, `400 validation_failed` with `too_long` on `/q`)
+   and `history`, the earlier questions of the same popup with the `terms` and `thread_ids` of
+   their answers, at most `search.assist.max_turns` (`too_many_items` on `/history`). Nothing of it
+   is stored.
+2. **Terms.** The words of `q` (runs of letters and digits, lower case) without the stop words of
+   the module's word lists (German and English, with the words of asking for a search) and without
+   words shorter than three letters, then the terms of the earlier turns from the newest, at most
+   `search.assist.max_terms`, no duplicates. No term is `400 validation_failed` with `empty` on
+   `/q`. The query text is the terms joined with `or` (4.1), cut from the end to
+   `search.query_max_chars`.
+3. **Candidates.** Two searches with the person's rights, each through 4.3 to 4.6 with `relevance`
+   and a page of `search.assist.max_candidates`: thread titles and messages. They are fused per
+   thread by reciprocal rank (`1/(60 + rank)` per list, the title list counts twice; equal scores:
+   the newer first). The first message hit of a thread is its jump target and excerpt.
+4. **The assistant.** When `search.assist.agent_id` names an agent, the candidates it may read
+   itself (`thread.read` on the thread and `message.read` on the jump target, filter mode in a fresh
+   request scope) go to it as the ephemeral event `search.assist_requested` on one live gateway
+   connection (consumer `default`, else the newest attached one; 09 10.6). The payload holds the
+   request ID, the question, the earlier questions, `max_picks`, `max_terms`, `expires_at` and per
+   candidate a reference `c1` to `cN`, the title, channel and space name, the time, a plain text
+   excerpt of at most `search.assist.excerpt_max_chars` and `shown_before`; no ID of a thread or a
+   message and no invocation token. Candidates are dropped from the end until the payload is below
+   `sync.event_payload_max_bytes`. A question without candidates is sent with an empty list, so the
+   assistant can still name terms.
+5. **The wait.** Without an agent the answer is full text with `fallback_reason`
+   `assistant_not_configured`; without a live connection at once with `assistant_unavailable`;
+   without a valid answer within `search.assist.timeout` with `assistant_timeout`. Open requests
+   live in the memory of the api process until `expires_at` plus `search.assist.timeout`, as for
+   autocompletion (09 10.5).
+6. **The answer.** `answerSearchAssist` (`search.assist.respond`, only the addressed agent; every
+   other principal and an unknown or forgotten request get `404`): `picks` (`ref`, `reason`),
+   `terms`, `costs`. A reference that was not sent (`unknown_ref`), one picked twice
+   (`duplicate`), more than `max_picks` picks or `max_terms` terms (`too_many_items`), an empty
+   reason or term (`too_short`), a reason above `search.assist.reason_max_chars` or a term above 64
+   characters (`too_long`) and a text that is no display text answer `400 validation_failed`; the
+   request stays open. The first valid answer counts; a later one is `204` without effect, one
+   after the wait `410 gone`.
+7. **The result.** The picks in the model's order with their reason (`source = assistant`), then
+   the other candidates, then what a second pass of point 3 with the new terms of the answer finds
+   (`source = fulltext`), at most `search.assist.max_hits`, one hit per thread. Each hit names the
+   thread, the jump target, the channel (for a development session the project forum), the space,
+   the time and the excerpt. `terms` are the terms of both passes; `cost_estimate` is the sum of
+   the answer's `amount_micros` in one currency, for information only and not booked in
+   `cost_entries` (03), which belong to runs.
+8. **Not stored, not logged.** No question, term, reference or reason is stored, audited or
+   logged; one log line per question names the mode, the fallback reason and the counts of
+   candidates and picks. An allowed question is not audited (like `search.query`); denials are
+   audited by `authz`.
+
 ## 5. File text extraction
 
 ### 5.1 Flow
@@ -549,13 +606,15 @@ this is reported to team A in the return report.
 
 ## 11. Endpoints
 
-Binding is `docs/api/openapi.yaml` (`search`, `searchThreadTitles`); this table reflects the
-state of the spec.
+Binding is `docs/api/openapi.yaml` (`search`, `searchThreadTitles`, `assistSearch`,
+`answerSearchAssist`); this table reflects the state of the spec.
 
 | Method and path | Action | RL class | Purpose |
 |---|---|---|---|
 | `GET /api/v1/search` | `search.query` | `rl.search` | parameters `q`, `type` (`messages`, `threads`, `files`; default `messages`), filters from 4.4, `sort`, `cursor`, `limit` |
 | `GET /api/v1/search/thread-titles` | `search.query` | `rl.search` | prefix search for the quick switcher (4.9) |
+| `POST /api/v1/search/assist` | `search.assist` | `rl.trigger` | question to the search assistant (4.10) |
+| `POST /api/v1/search-assist-requests/{request_id}/answer` | `search.assist.respond` | `rl.agent_runtime` | answer of the assistant agent (4.10) |
 
 Response per hit: object summary (message, thread or file), thread title, channel
 and space name, `segments`, for `relevance` the score. In addition `next_cursor` and
@@ -581,6 +640,10 @@ and space name, `segments`, for `relevance` the score. In addition `next_cursor`
 | Office file with a zip bomb, XML with an external entity | `failed`, nothing loaded |
 | Load test | `search.p95_target` at `search.benchmark_messages` and `search.prefix_p95_target` (`perf/search`) |
 | Client: `access.changed` with `removed` | the local FTS index no longer contains any row of these targets |
+| Search assistant: both wordings of the owner's example over a fixture of sessions sharing single words | the takeover thread among the first three, with its message as jump target (`test/integration/search_assist_test.go`) |
+| Search assistant: two people, a forum only one of them reads | no hit, name or excerpt of it for the other |
+| Search assistant: an assistant agent that reads less than the person | its payload holds nothing it may not read, a pick of an unsent reference is `400`, the person still gets the hit as full text (unit, integration and gateway test) |
+| Search assistant: no agent, no connection, timeout | full text with the fallback reason |
 
 ## 13. Decisions of this chapter
 
@@ -595,6 +658,7 @@ and space name, `segments`, for `relevance` the score. In addition `next_cursor`
 | R-SU-07 | File text: pure Go for text and Office formats, Tika optional as a separate service. | No forced JVM; parser risk outside the server. |
 | R-SU-08 | Run steps are not searchable. | Tool outputs contain secrets and noise. |
 | R-SU-09 | Search as a coordinator with read ports of the owning modules. | Keeps the module rule from 03; an external adapter replaces only the coordinator. |
+| R-SU-10 | The search assistant chooses among full-text candidates through one model call of an assistant agent; the server holds no model credentials and stores nothing of a question (4.10). | Permissions stay in SQL and in `authz`; the model can only name what it was sent; ADR 0075. |
 
 ## 14. Alignment with the core contract
 
@@ -642,6 +706,14 @@ the configuration schema; `make perf` reads them from this table.
 | `search.extract.tika_url` | Server | empty | Tika server; empty = off (V3, not yet in the schema) |
 | `search.extract.refresh_interval` | Server | `24h` | interval of the maintenance job that re-extracts rows of older extractor versions |
 | `search.extract.refresh_batch_size` | Server | `500` | files per run of the maintenance job |
+| `search.assist.agent_id` | Server | empty | agent of the search assistant; empty = full text only (4.10) |
+| `search.assist.timeout` | Server | `10s` | longest wait for the assistant's answer; below `http.request_timeout` |
+| `search.assist.max_candidates` | Server | `20` | hits per search of a question and most candidates to the assistant |
+| `search.assist.max_hits` | Server | `8` | most hits of an answer and most picks |
+| `search.assist.max_terms` | Server | `12` | most terms of a question and of an answer |
+| `search.assist.max_turns` | Server | `6` | most earlier questions in `history` |
+| `search.assist.excerpt_max_chars` | Server | `300` | longest excerpt of a candidate |
+| `search.assist.reason_max_chars` | Server | `200` | longest reason of a pick |
 
 ## 16. Sources
 

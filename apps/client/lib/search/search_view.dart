@@ -17,6 +17,7 @@ import 'package:go_router/go_router.dart';
 import 'package:l10n/l10n.dart';
 
 import '../app/providers/ports.dart';
+import '../assist/assist_dialog.dart';
 import '../settings/settings_providers.dart' show personTimeZoneProvider;
 import 'providers.dart';
 import 'search_controller.dart';
@@ -88,6 +89,14 @@ class _SearchViewState extends ConsumerState<SearchView> {
     // On the phone the filters open as a sheet; the field and the results take the width
     // (brief M5-02 Design note 2).
     final phone = ref.watch(appPortsProvider).formFactor.isPhone;
+    // The search assistant with the typed text (14 4.10); on the phone the lens at the top of
+    // the spaces opens this view, so the assistant is one tap from there.
+    final assist = DsButton(
+      key: const ValueKey('search.assist'),
+      label: l.assistOpen,
+      onPressed: () =>
+          unawaited(showSearchAssistant(context, initialQuestion: _text.text)),
+    );
     final field = Padding(
       padding: const EdgeInsets.all(DsSpace.s12),
       child: Row(
@@ -121,31 +130,35 @@ class _SearchViewState extends ConsumerState<SearchView> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         field,
-        if (phone)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: DsSpace.s12),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: DsButton(
-                key: const ValueKey('search.filters'),
-                label: l.phoneSearchFilters,
-                onPressed: () => unawaited(
-                  showModalBottomSheet<void>(
-                    context: context,
-                    useSafeArea: true,
-                    isScrollControlled: true,
-                    builder: (_) => Consumer(
-                      builder: (context, ref, _) => SearchFilterColumn(
-                        filters: ref
-                            .watch(searchQueryControllerProvider())
-                            .filters,
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: DsSpace.s12),
+          child: Wrap(
+            spacing: DsSpace.s8,
+            runSpacing: DsSpace.s8,
+            children: [
+              if (phone)
+                DsButton(
+                  key: const ValueKey('search.filters'),
+                  label: l.phoneSearchFilters,
+                  onPressed: () => unawaited(
+                    showModalBottomSheet<void>(
+                      context: context,
+                      useSafeArea: true,
+                      isScrollControlled: true,
+                      builder: (_) => Consumer(
+                        builder: (context, ref, _) => SearchFilterColumn(
+                          filters: ref
+                              .watch(searchQueryControllerProvider())
+                              .filters,
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-            ),
+              assist,
+            ],
           ),
+        ),
         Expanded(child: SearchResults(state: state)),
       ],
     );

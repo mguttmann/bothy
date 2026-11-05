@@ -486,6 +486,8 @@ Source: [09-agents.md](../spec/09-agents.md), section 21.
 | `runner.trash_check_interval` |  | Runner |  | `60s` | the bound folders are checked for a move to the trash at most this often, and the runner sends `sendHeartbeat` at this interval to receive folder moves (18.15); above zero |  |
 | `runner.transcribe_cmd` |  | Runner |  | empty | argument list of a local transcriber; the audio file path is appended and stdout is the transcript (18.14); empty means no transcription |  |
 | `runner.transcribe_timeout` |  | Runner |  | `5m` | time limit of one transcription (18.14); above zero |  |
+| `runner.search_assist_model` |  | Runner |  | `haiku` | model of the search assistant call (18.17) |  |
+| `runner.search_assist_timeout` |  | Runner |  | `9s` | time limit of one search assistant call (18.17); above zero |  |
 | `runner.projects_root` |  | Runner |  | no default, required | root of all project folders |  |
 | `runner.default_workspace` |  | Runner |  | empty | folder of a forum without a project binding (18.1): `.` for `runner.projects_root`, else a folder name under it; empty means off, and a run in such a forum ends with the cause `project_not_bound` |  |
 | `runner.state_dir` |  | Runner |  | no default, required | state, recordings, incoming files |  |
@@ -686,6 +688,14 @@ Source: [14-search.md](../spec/14-search.md), section 15.
 | `search.extract.tika_url` | `BOTHY_SEARCH__EXTRACT__TIKA_URL` | Server |  | empty | Tika server; empty = off (V3, not yet in the schema) | planned (V3) |
 | `search.extract.refresh_interval` | `BOTHY_SEARCH__EXTRACT__REFRESH_INTERVAL` | Server | duration | `24h` | interval of the maintenance job that re-extracts rows of older extractor versions | active |
 | `search.extract.refresh_batch_size` | `BOTHY_SEARCH__EXTRACT__REFRESH_BATCH_SIZE` | Server | int | `500` | files per run of the maintenance job | active |
+| `search.assist.agent_id` | `BOTHY_SEARCH__ASSIST__AGENT_ID` | Server | string | empty | agent of the search assistant; empty = full text only (4.10) | active |
+| `search.assist.timeout` | `BOTHY_SEARCH__ASSIST__TIMEOUT` | Server | duration | `10s` | longest wait for the assistant's answer; below `http.request_timeout` | active |
+| `search.assist.max_candidates` | `BOTHY_SEARCH__ASSIST__MAX_CANDIDATES` | Server | int | `20` | hits per search of a question and most candidates to the assistant | active |
+| `search.assist.max_hits` | `BOTHY_SEARCH__ASSIST__MAX_HITS` | Server | int | `8` | most hits of an answer and most picks | active |
+| `search.assist.max_terms` | `BOTHY_SEARCH__ASSIST__MAX_TERMS` | Server | int | `12` | most terms of a question and of an answer | active |
+| `search.assist.max_turns` | `BOTHY_SEARCH__ASSIST__MAX_TURNS` | Server | int | `6` | most earlier questions in `history` | active |
+| `search.assist.excerpt_max_chars` | `BOTHY_SEARCH__ASSIST__EXCERPT_MAX_CHARS` | Server | int | `300` | longest excerpt of a candidate | active |
+| `search.assist.reason_max_chars` | `BOTHY_SEARCH__ASSIST__REASON_MAX_CHARS` | Server | int | `200` | longest reason of a pick | active |
 
 ### 15 Client architecture
 

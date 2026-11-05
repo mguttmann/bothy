@@ -435,6 +435,32 @@ Results only from what is visible; recently visited targets first. At most
 +------------------------------------------------------------------------+
 ```
 
+**D6a Search assistant.** For any typed text the quick switcher shows a last row "Ask the search
+assistant: `text`" (Enter on it, or Cmd+Enter or Ctrl+Enter anywhere); the search view D7 has the
+button "Ask the search assistant", which is how the phone reaches it from the lens at the top.
+The popup is a short conversation: the person describes the chat or development session in
+their own words and gets a short list of sessions with place, time and one sentence why, or a
+note that the hits are full text; follow-ups ("no, the older one") refine it. A tap opens the
+thread at the matching message. On the phone the popup fills the screen. Closing it forgets the
+conversation; nothing is stored. Rules: [14-search.md](14-search.md) 4.10.
+
+```text
++------------------------------------------------------------------------+
+| [Lens] Search assistant                                         [esc]  |
++------------------------------------------------------------------------+
+| the takeover of the tool by the new agent                              |
+|   Takeover of the tool                                                 |
+|   Projects > tool   Monday 09:30                                       |
+|   The thread where the steering session moved to the tool.             |
+|   Release 1.4                                                          |
+|   Projects > tool   Tuesday 14:02                                      |
+|   Full text, without the assistant                                     |
+|   Estimate of the assistant, for information only: 0.0012 USD          |
++------------------------------------------------------------------------+
+| [What are you looking for?                                ]   [Ask]    |
++------------------------------------------------------------------------+
+```
+
 **D7 Search.** Full text across messages, thread titles, file names and transcripts; filters on
 the left; results with highlighting and path. The result count counts only what is visible.
 

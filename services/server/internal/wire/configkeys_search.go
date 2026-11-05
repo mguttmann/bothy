@@ -113,7 +113,61 @@ func searchConfigKeys() []config.Key {
 			Doc:     "Time limit of the statements of one search; reaching it answers 503 search_timeout.",
 			Chapter: chapter14,
 		},
-	}, searchExtractConfigKeys()...)
+	}, append(searchExtractConfigKeys(), searchAssistConfigKeys()...)...)
+}
+
+// The keys of the search assistant that the cross-checks name (14 4.10).
+const (
+	keySearchAssistAgentID = "search.assist.agent_id"
+	keySearchAssistTimeout = "search.assist.timeout"
+)
+
+// searchAssistConfigKeys returns the keys of the search assistant (docs/spec/14-search.md 4.10 and
+// section 15). The bounds of max_hits and max_terms are the maxItems of SearchAssistResult.hits and
+// SearchAssistAnswer.terms in docs/api/openapi.yaml, so every configured value can be answered.
+func searchAssistConfigKeys() []config.Key {
+	return []config.Key{
+		{
+			Name: keySearchAssistAgentID, Kind: config.KindString, Default: "",
+			Doc:     "Agent that answers the search assistant (its id); empty answers every question with full-text hits.",
+			Chapter: chapter14,
+		},
+		{
+			Name: keySearchAssistTimeout, Kind: config.KindDuration, Default: defaultTenSeconds, Min: minPositiveDuration,
+			Doc:     "Longest wait of assistSearch for the assistant agent's answer; below http.request_timeout.",
+			Chapter: chapter14,
+		},
+		{
+			Name: "search.assist.max_candidates", Kind: config.KindInt, Default: "20", Min: "1", Max: "50",
+			Doc:     "Hits each search of a question reads and most candidates sent to the assistant agent.",
+			Chapter: chapter14,
+		},
+		{
+			Name: "search.assist.max_hits", Kind: config.KindInt, Default: "8", Min: "1", Max: "20",
+			Doc:     "Most hits of an answer of the search assistant, and most picks of the assistant agent.",
+			Chapter: chapter14,
+		},
+		{
+			Name: "search.assist.max_terms", Kind: config.KindInt, Default: "12", Min: "1", Max: "16",
+			Doc:     "Most search terms of a question, and most further terms of an answer of the assistant agent.",
+			Chapter: chapter14,
+		},
+		{
+			Name: "search.assist.max_turns", Kind: config.KindInt, Default: "6", Min: "0", Max: "10",
+			Doc:     "Most earlier questions of the popup a question may carry.",
+			Chapter: chapter14,
+		},
+		{
+			Name: "search.assist.excerpt_max_chars", Kind: config.KindInt, Default: "300", Min: "20", Max: "2000",
+			Doc:     "Longest excerpt of a candidate sent to the assistant agent, in characters.",
+			Chapter: chapter14,
+		},
+		{
+			Name: "search.assist.reason_max_chars", Kind: config.KindInt, Default: "200", Min: "20", Max: "1000",
+			Doc:     "Longest reason of a pick of the assistant agent, in characters.",
+			Chapter: chapter14,
+		},
+	}
 }
 
 // searchExtractTimeoutDefault is the default of search.extract.timeout (14 section 15).

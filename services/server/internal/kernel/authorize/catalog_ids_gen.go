@@ -327,6 +327,10 @@ const (
 	ActionRunTokenRenew Action = "run.token.renew"
 	// ActionRunUpdate is the action run.update.
 	ActionRunUpdate Action = "run.update"
+	// ActionSearchAssist is the action search.assist.
+	ActionSearchAssist Action = "search.assist"
+	// ActionSearchAssistRespond is the action search.assist.respond.
+	ActionSearchAssistRespond Action = "search.assist.respond"
 	// ActionSearchQuery is the action search.query.
 	ActionSearchQuery Action = "search.query"
 	// ActionSelfProfileUpdate is the action self.profile.update.
@@ -606,6 +610,8 @@ var actionByID = map[string]Action{
 	"run.start":                    ActionRunStart,
 	"run.token.renew":              ActionRunTokenRenew,
 	"run.update":                   ActionRunUpdate,
+	"search.assist":                ActionSearchAssist,
+	"search.assist.respond":        ActionSearchAssistRespond,
 	"search.query":                 ActionSearchQuery,
 	"self.profile.update":          ActionSelfProfileUpdate,
 	"self.read":                    ActionSelfRead,
@@ -826,6 +832,8 @@ var actionList = []Action{
 	ActionRunStart,
 	ActionRunTokenRenew,
 	ActionRunUpdate,
+	ActionSearchAssist,
+	ActionSearchAssistRespond,
 	ActionSearchQuery,
 	ActionSelfProfileUpdate,
 	ActionSelfRead,
@@ -989,6 +997,8 @@ const (
 	EventRunStateChanged EventType = "run.state_changed"
 	// EventRunUpdated is the event type run.updated.
 	EventRunUpdated EventType = "run.updated"
+	// EventSearchAssistRequested is the event type search.assist_requested.
+	EventSearchAssistRequested EventType = "search.assist_requested"
 	// EventSessionRevoked is the event type session.revoked.
 	EventSessionRevoked EventType = "session.revoked"
 	// EventSettingsUpdated is the event type settings.updated.
@@ -1071,6 +1081,7 @@ var eventTypeByID = map[string]EventType{
 	"run.cancel_requested":           EventRunCancelRequested,
 	"run.state_changed":              EventRunStateChanged,
 	"run.updated":                    EventRunUpdated,
+	"search.assist_requested":        EventSearchAssistRequested,
 	"session.revoked":                EventSessionRevoked,
 	"settings.updated":               EventSettingsUpdated,
 	"sidebar.updated":                EventSidebarUpdated,
@@ -1135,6 +1146,7 @@ var eventTypeList = []EventType{
 	EventRunCancelRequested,
 	EventRunStateChanged,
 	EventRunUpdated,
+	EventSearchAssistRequested,
 	EventSessionRevoked,
 	EventSettingsUpdated,
 	EventSidebarUpdated,

@@ -228,13 +228,14 @@ modules:
     adapter_vendors: [pgx, otel]   # sqlc code and the repository of runs and run_steps; adapters/otelmetrics records the run metrics (M2-05)
   search:
     tables: []
-    actions: [search.query]
+    actions: [search.query, search.assist, search.assist.respond]
     events: []
-    ephemeral_events: []
+    # search.assist_requested to one live connection of the assistant agent (F-INTELLIGENTE-SUCHE).
+    ephemeral_events: [search.assist_requested]
     ws_ops: []
     depends_on: [chat, messaging, files]
     # The tsquery construction over the ambient unit (adapters/postgres) and bothy.search.duration
-    # (adapters/otelmetrics), M3-14.
+    # and bothy.search.assist.duration (adapters/otelmetrics), M3-14, F-INTELLIGENTE-SUCHE.
     adapter_vendors: [pgx, otel]
   importer:
     tables: [import_sources, import_items]
@@ -306,7 +307,8 @@ modules:
     events: []
     ephemeral_events: [typing.started]
     ws_ops: [identify, resume, heartbeat, reauth, focus, typing.start, typing.stop]
-    depends_on: [chat, agents, runs, sync, stats]
+    # search: the relay of search.assist_requested (F-INTELLIGENTE-SUCHE), like the one of runs.
+    depends_on: [chat, agents, runs, sync, stats, search]
     # github.com/coder/websocket for the client connections (02 "Layers within a module" rule 4,
     # M1-64; terminal has its own for the host services, M2-43); otel for the span gateway.connect;
     # pgx for adapters/postgres, the sqlc code of gateway_presence and NOTIFY ephemeral (M7-17).

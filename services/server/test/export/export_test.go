@@ -643,6 +643,7 @@ func TestExportChannelLimits(t *testing.T) {
 		"ratelimit.rl.export.per_minute": "2",
 		"ratelimit.rl.export.burst":      "2",
 		"http.request_timeout":           "3s",
+		"search.assist.timeout":          "2s",
 		"http.transfer_timeout":          "2m",
 		"database.lock_timeout":          "90s",
 		"database.statement_timeout":     "90s",

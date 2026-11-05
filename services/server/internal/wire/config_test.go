@@ -393,6 +393,15 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"search.extract.timeout":                {Kind: config.KindDuration, Default: "60s", Min: "1ms", Chapter: "14-search.md"},
 		"search.extract.refresh_interval":       {Kind: config.KindDuration, Default: "24h", Min: "1s", Chapter: "14-search.md"},
 		"search.extract.refresh_batch_size":     {Kind: config.KindInt, Default: "500", Min: "1", Chapter: "14-search.md"},
+		// The search assistant (14 4.10).
+		"search.assist.agent_id":          {Kind: config.KindString, Default: "", Chapter: "14-search.md"},
+		"search.assist.timeout":           {Kind: config.KindDuration, Default: "10s", Min: "1ms", Chapter: "14-search.md"},
+		"search.assist.max_candidates":    {Kind: config.KindInt, Default: "20", Min: "1", Max: "50", Chapter: "14-search.md"},
+		"search.assist.max_hits":          {Kind: config.KindInt, Default: "8", Min: "1", Max: "20", Chapter: "14-search.md"},
+		"search.assist.max_terms":         {Kind: config.KindInt, Default: "12", Min: "1", Max: "16", Chapter: "14-search.md"},
+		"search.assist.max_turns":         {Kind: config.KindInt, Default: "6", Min: "0", Max: "10", Chapter: "14-search.md"},
+		"search.assist.excerpt_max_chars": {Kind: config.KindInt, Default: "300", Min: "20", Max: "2000", Chapter: "14-search.md"},
+		"search.assist.reason_max_chars":  {Kind: config.KindInt, Default: "200", Min: "20", Max: "1000", Chapter: "14-search.md"},
 
 		// M2-26
 		"webhook.max_consecutive_failures":     {Kind: config.KindInt, Default: "20", Min: "1", Chapter: "03-data-model.md"},

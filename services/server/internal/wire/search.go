@@ -11,6 +11,7 @@ import (
 	chathttp "github.com/OWNER/bothy/services/server/internal/chat/adapters/httpapi"
 	"github.com/OWNER/bothy/services/server/internal/files"
 	fileshttp "github.com/OWNER/bothy/services/server/internal/files/adapters/httpapi"
+	"github.com/OWNER/bothy/services/server/internal/gateway/adapters/assistrelay"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
@@ -22,6 +23,7 @@ import (
 	searchmetrics "github.com/OWNER/bothy/services/server/internal/search/adapters/otelmetrics"
 	searchpg "github.com/OWNER/bothy/services/server/internal/search/adapters/postgres"
 	searchapp "github.com/OWNER/bothy/services/server/internal/search/app"
+	synctelemetry "github.com/OWNER/bothy/services/server/internal/sync/adapters/telemetry"
 )
 
 // SearchConfig binds the keys of the search coordinator (docs/spec/14-search.md section 15, brief
@@ -34,13 +36,27 @@ func SearchConfig(v *config.Values) (searchapp.Config, error) {
 	return c, nil
 }
 
-// Search is the search module of the process (M3-14): the coordinator of search.Search and its
-// REST handlers. Filter mismatches of the page check count in bothy.authz.errors and the duration
-// of a search in bothy.search.duration, both on the global meter provider of platform/otel.
+// SearchAssistConfig binds the keys of the search assistant (docs/spec/14-search.md 4.10). The
+// error names the key whose binding failed, never a value.
+func SearchAssistConfig(v *config.Values) (searchapp.AssistConfig, error) {
+	var c searchapp.AssistConfig
+	if err := config.Bind(v, &c); err != nil {
+		return searchapp.AssistConfig{}, err
+	}
+	return c, nil
+}
+
+// Search is the search module of the process (M3-14): the coordinator of search.Search, the
+// search assistant (14 4.10) and their REST handlers. Filter mismatches of the page
+// check count in bothy.authz.errors and the duration of a search in bothy.search.duration, both on
+// the global meter provider of platform/otel.
 type Search struct {
 	// Coordinator implements search.Search.
 	Coordinator *searchapp.Coordinator
-	// Handlers are the REST handlers of search and searchThreadTitles.
+	// Assistant implements search.Assistant; its relay is bound once the gateway exists.
+	Assistant *searchapp.Assistant
+	// Handlers are the REST handlers of search, searchThreadTitles, assistSearch and
+	// answerSearchAssist.
 	Handlers *searchhttp.Finder
 }
 
@@ -56,8 +72,8 @@ type SearchReads struct {
 // search.languages, the unit of work uow, the Authorizer az, the read operations r, the clock
 // (nil means clock.System()) and log (nil means slog.Default()). It opens no connection. Errors:
 // a missing collaborator or a failing instrument.
-func NewSearch(cfg searchapp.Config, languages []string, pool *pg.Pool, uow txn.UnitOfWork, az authorize.Authorizer, r SearchReads,
-	clk clock.Clock, log *slog.Logger) (*Search, error) {
+func NewSearch(cfg searchapp.Config, assist searchapp.AssistConfig, languages []string, pool *pg.Pool, uow txn.UnitOfWork,
+	az authorize.Authorizer, r SearchReads, clk clock.Clock, log *slog.Logger) (*Search, error) {
 	if r.Messaging == nil || r.Chat == nil || r.Files == nil {
 		return nil, errors.New("wire: search needs the read operations of messaging, chat and files")
 	}
@@ -86,13 +102,28 @@ func NewSearch(cfg searchapp.Config, languages []string, pool *pg.Pool, uow txn.
 	if err != nil {
 		return nil, err
 	}
+	assistant, err := searchapp.NewAssistant(assist, searchapp.AssistDeps{Search: coord, Authorizer: az, Clock: clk, Log: log})
+	if err != nil {
+		return nil, err
+	}
 	h, err := searchhttp.New(coord, searchhttp.Objects{Messages: r.Messaging, Threads: r.Chat, Files: r.Files}, searchhttp.Renderers{
 		Message: messaginghttp.MessageREST, Thread: chathttp.ThreadREST, File: fileshttp.FileREST,
 	})
 	if err != nil {
 		return nil, err
 	}
-	return &Search{Coordinator: coord, Handlers: h}, nil
+	return &Search{Coordinator: coord, Assistant: assistant, Handlers: h.WithAssistant(assistant)}, nil
+}
+
+// bindAssistRelay binds the relay of search.assist_requested (gateway/adapters/assistrelay over the
+// hub of gw, with the correlator of the event log) into the search assistant. Without the search
+// module or without a hub it binds nothing, and every question falls back to full text with
+// assistant_unavailable.
+func bindAssistRelay(sr *Search, gw *Gateway) error {
+	if sr == nil || sr.Assistant == nil || gw == nil || gw.Hub == nil {
+		return nil
+	}
+	return sr.Assistant.BindRelay(assistrelay.New(gw.Hub, synctelemetry.Correlator{}), nil)
 }
 
 // fillHandlers sets the nil search handler of h to the one s built; a nil s (a role or a test

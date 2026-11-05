@@ -15286,5 +15286,105 @@
   "vizColSubagents": "Subagents",
   "@vizColSubagents": {
     "description": "Column header: subagents a run started."
+  },
+  "assistTitle": "Search assistant",
+  "@assistTitle": {
+    "description": "Title and screen reader name of the search assistant popup (14-search 4.10)."
+  },
+  "assistOpen": "Ask the search assistant",
+  "@assistOpen": {
+    "description": "Button of the search view and row of the quick switcher that open the search assistant."
+  },
+  "assistAskRow": "Ask the search assistant: {question}",
+  "@assistAskRow": {
+    "description": "Last row of the quick switcher; opens the search assistant with the typed text.",
+    "placeholders": {
+      "question": {
+        "type": "String"
+      }
+    }
+  },
+  "assistIntro": "Describe the chat or development session you are looking for in your own words, for example: where did we move the steering session?",
+  "@assistIntro": {
+    "description": "Hint of the empty search assistant."
+  },
+  "assistFieldLabel": "Question to the search assistant",
+  "@assistFieldLabel": {
+    "description": "Screen reader name of the question field."
+  },
+  "assistFieldHint": "What are you looking for?",
+  "@assistFieldHint": {
+    "description": "Placeholder of the question field."
+  },
+  "assistSend": "Ask",
+  "@assistSend": {
+    "description": "Button that sends the question."
+  },
+  "assistSearching": "Searching",
+  "@assistSearching": {
+    "description": "Shown while the search assistant works on a question."
+  },
+  "assistNothing": "No session found",
+  "@assistNothing": {
+    "description": "An answer without hits."
+  },
+  "assistFulltext": "Full text, without the assistant",
+  "@assistFulltext": {
+    "description": "Marks a hit the search assistant did not pick."
+  },
+  "assistFallbackNotConfigured": "No search assistant is set up on this server; these are full-text hits.",
+  "@assistFallbackNotConfigured": {
+    "description": "The answer is full text because no assistant agent is configured."
+  },
+  "assistFallbackUnavailable": "The search assistant is not reachable; these are full-text hits.",
+  "@assistFallbackUnavailable": {
+    "description": "The answer is full text because the assistant agent is not connected."
+  },
+  "assistFallbackTimeout": "The search assistant took too long; these are full-text hits.",
+  "@assistFallbackTimeout": {
+    "description": "The answer is full text because the assistant did not answer in time."
+  },
+  "assistCost": "Estimate of the assistant, for information only: {amount}",
+  "@assistCost": {
+    "description": "Cost estimate of one answer; amount is the number with the currency.",
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "assistQueryEmpty": "Describe it with a few more words.",
+  "@assistQueryEmpty": {
+    "description": "The question has no search term."
+  },
+  "assistQueryTooLong": "The question is too long.",
+  "@assistQueryTooLong": {
+    "description": "The question exceeds the length limit."
+  },
+  "assistOffline": "No connection to the server.",
+  "@assistOffline": {
+    "description": "The question did not reach the server."
+  },
+  "assistFailed": "The search failed. Try again.",
+  "@assistFailed": {
+    "description": "Any other failure of a question."
+  },
+  "assistHitLabel": "{title}, {place}, {time}: {reason}",
+  "@assistHitLabel": {
+    "description": "Screen reader label of one hit of the search assistant.",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "place": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      },
+      "reason": {
+        "type": "String"
+      }
+    }
   }
 }
