@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'support/views.dart';
 
 const _first = '0192f4a0-7b1c-7000-8a00-000000000902';
+const _noChat = '0192f4a0-7b1c-7000-8a00-000000000904';
 
 Future<void> _pumpHistory(
   WidgetTester tester,
@@ -138,6 +139,32 @@ void main() {
       expect(find.text(header), findsWidgets, reason: header);
     }
     expect(find.text('120,400'), findsOneWidget);
+  });
+
+  testWidgets('the table form pages too', (tester) async {
+    final world = ViewWorld();
+    await _pumpHistory(tester, world);
+    await tester.tap(find.byKey(const ValueKey('viz-as-table')));
+    await tester.pump();
+    await tester.ensureVisible(find.text('Load more runs'));
+    await tester.tap(find.text('Load more runs'));
+    await settleWorld(tester, world);
+    expect(world.queries.historyQueries.last.cursor, isNotNull);
+    expect(
+      find.text('Start of the history: there are no older runs.'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('the detail of a run without a chat offers no chat', (
+    tester,
+  ) async {
+    final world = ViewWorld();
+    await _pumpHistory(tester, world);
+    await tester.tap(find.byKey(const ValueKey('viz-history-row-$_noChat')));
+    await settleWorld(tester, world);
+    expect(find.text('Back to the run history'), findsOneWidget);
+    expect(find.text('Open the chat'), findsNothing);
   });
 
   testWidgets('an empty history says so and offers no more page', (

@@ -41,8 +41,9 @@ const List<api.RunState?> _filterStates = [
 /// follows `next_cursor`, and the last page ends with the note that there are no older runs.
 /// Above the list a note says how far the history reaches: runs stay as long as their chat
 /// (docs/spec/20-privacy.md 2). Each row names the chat with the shared run label and shows
-/// end state, start, end, duration, cost (as "Estimate" or "information only"), the tokens, the
-/// subagents and the model; a tap opens [RunHistoryDetail]. The table form has the same values.
+/// end state, start, end, duration, cost (as "Estimate", final amount or "information only"),
+/// the tokens, the subagents and the model; a tap opens [RunHistoryDetail]. The table form has
+/// the same values.
 class RunHistoryView extends StatefulWidget {
   /// Creates the view.
   const RunHistoryView({
@@ -202,8 +203,11 @@ class _RunHistoryViewState extends State<RunHistoryView> {
                 onOpen: () => _open(row),
               ),
             ),
-          if (_next != null)
-            Align(
+        ],
+      ),
+      // Paging below the chart and the table alike.
+      footer: _next != null
+          ? Align(
               alignment: AlignmentDirectional.centerStart,
               child: OutlinedButton(
                 key: const ValueKey('viz-history-more'),
@@ -212,14 +216,13 @@ class _RunHistoryViewState extends State<RunHistoryView> {
                 child: Text(l10n.vizHistoryLoadMore),
               ),
             )
-          else if (model.rows.isNotEmpty)
-            Text(
+          : model.rows.isNotEmpty
+          ? Text(
               l10n.vizHistoryEnd,
               style: dsTextStyle(DsType.bodySm)
                   .copyWith(color: context.dsColors.textSecondary),
-            ),
-        ],
-      ),
+            )
+          : null,
     );
   }
 }
@@ -588,12 +591,14 @@ class _RunHistoryDetailState extends State<RunHistoryDetail> {
           spacing: DsSpace.s8,
           runSpacing: DsSpace.s8,
           children: [
-            OutlinedButton(
-              key: const ValueKey('viz-history-open-chat'),
-              style: vizButtonStyle(context),
-              onPressed: () => widget.onOpenThread(row.threadId),
-              child: Text(l10n.vizHistoryOpenChat),
-            ),
+            // Without a chat entry the row offers no chat, so the detail does not either.
+            if (row.label.threadId != null)
+              OutlinedButton(
+                key: const ValueKey('viz-history-open-chat'),
+                style: vizButtonStyle(context),
+                onPressed: () => widget.onOpenThread(row.threadId),
+                child: Text(l10n.vizHistoryOpenChat),
+              ),
             if (message != null && openMessage != null)
               OutlinedButton(
                 key: const ValueKey('viz-history-open-message'),

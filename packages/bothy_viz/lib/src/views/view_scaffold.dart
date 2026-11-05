@@ -96,6 +96,7 @@ class VizViewScaffold extends StatefulWidget {
     this.subtitle,
     this.notes = const [],
     this.controls,
+    this.footer,
   });
 
   /// A line under the title in both modes, for example the time of the frame.
@@ -121,6 +122,9 @@ class VizViewScaffold extends StatefulWidget {
 
   /// Controls above the body (timeline playback); hidden in TV mode.
   final Widget? controls;
+
+  /// A line below the chart and the tables alike (paging); hidden in TV mode.
+  final Widget? footer;
 
   @override
   State<VizViewScaffold> createState() => _VizViewScaffoldState();
@@ -210,6 +214,10 @@ class _VizViewScaffoldState extends State<VizViewScaffold> {
                 VizTables(tables: widget.tables(texts))
               else
                 Builder(builder: widget.chart),
+              if (controls && widget.footer != null) ...[
+                const SizedBox(height: DsSpace.s8),
+                widget.footer!,
+              ],
             ],
           ),
         },

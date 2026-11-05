@@ -437,7 +437,7 @@ apps, the mobile apps and the web console lists the finished runs (`completed`, 
 section 1 do not apply to it.
 
 - **List.** Per run: the run label (section 4 rule 6), end state as icon and word, start, end,
-  duration, cost as "Estimate" or "information only" (the cost of `RunSummary`), input, output,
+  duration, cost as "Estimate", final amount or "information only" (the cost of `RunSummary`), input, output,
   cache read and cache write tokens (the writes of five minutes and of one hour together),
   subagents and model. Filters: the space of the page and the end state. Pages follow
   `next_cursor` ("Load more runs"); the last page ends with "Start of the history". Above the
@@ -447,8 +447,9 @@ section 1 do not apply to it.
 - **Detail.** A click on a run opens its detail in place: the figures of the list, the step
   count, the summary and the last text excerpt of the agent, the steps as the tree of the run
   graph ([09-agents.md](09-agents.md) 5.6: subagents, workflows, background jobs and tool calls
-  with duration and state) and the buttons "Open the chat" and "Go to the triggering message"
-  (`/t/{thread_id}?m={message_id}` in the apps; the console shows "Open in the app").
+  with duration and state) and the buttons "Open the chat" (only with a chat entry) and "Go to
+  the triggering message" (only with `triggering_message_id`; `/t/{thread_id}?m={message_id}` in
+  the apps; the console shows "Open in the app").
 - **Data.** `listRunHistory` (`GET /api/v1/run-history`, `run.overview.read`): the pipeline of
   `listActiveRuns` (Scope of `run.read`, the threads of the visible channels through chat,
   `run.read` per row in filter mode) over the finished runs, keyset `finished_at` descending, then
