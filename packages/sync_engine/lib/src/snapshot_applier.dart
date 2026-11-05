@@ -117,7 +117,8 @@ final class SnapshotApplier {
 
   /// Applies the parts of the snapshot that are not events (Design note 1): the run summaries
   /// by version inside [txn]; after the commit the counters, the agent presence and the
-  /// feature flags.
+  /// feature flags, and in the background the views of the stored spaces and channels that
+  /// hold no access yet.
   Future<void> applyNonEvent(
     LocalTxn txn,
     SnapshotData s,
@@ -131,6 +132,9 @@ final class SnapshotApplier {
     if (instance != null) {
       await db.instanceDao.put(instance.copyWith(features: s.features));
     }
+    // A space or channel stored without the caller's access (learned through `*.created`
+    // before its view was loaded) loads its view after the commit (FIX-access-on-created).
+    await queueMissingAccess(sync, db, after);
     final floors = <ThreadId, ThreadSeq>{};
     for (final u in s.unreadThreads) {
       final thread = await db.threadsDao.byId(u.threadId);

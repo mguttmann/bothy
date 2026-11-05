@@ -60,6 +60,24 @@ final class StructureDao {
     );
   }
 
+  /// The caller's access to space [id], or null when none was reported or the space is not
+  /// stored.
+  Future<AccessView?> spaceAccess(SpaceId id) async {
+    final row = await (_db.select(
+      _db.spaces,
+    )..where((t) => t.id.equals(id.value))).getSingleOrNull();
+    return row == null ? null : accessFromColumns(row.level, row.capabilities);
+  }
+
+  /// The stored spaces whose access no `SpaceView` reported yet (`level` is null): a space
+  /// first learned through `space.created`.
+  Future<List<SpaceId>> spacesWithoutAccess() async {
+    final rows = await (_db.select(
+      _db.spaces,
+    )..where((t) => t.level.isNull())).get();
+    return [for (final r in rows) SpaceId.parse(r.id)];
+  }
+
   /// The caller's access to space [id], or null when none was reported.
   Stream<AccessView?> watchSpaceAccess(SpaceId id) =>
       (_db.select(_db.spaces)..where((t) => t.id.equals(id.value)))
@@ -229,6 +247,24 @@ final class StructureDao {
         capabilities: Value(columns.capabilities),
       ),
     );
+  }
+
+  /// The caller's access to channel [id], or null when none was reported or the channel is not
+  /// stored.
+  Future<AccessView?> channelAccess(ChannelId id) async {
+    final row = await (_db.select(
+      _db.channels,
+    )..where((t) => t.id.equals(id.value))).getSingleOrNull();
+    return row == null ? null : accessFromColumns(row.level, row.capabilities);
+  }
+
+  /// The stored channels whose access no `ChannelView` reported yet (`level` is null): a
+  /// channel first learned through `channel.created`.
+  Future<List<ChannelId>> channelsWithoutAccess() async {
+    final rows = await (_db.select(
+      _db.channels,
+    )..where((t) => t.level.isNull())).get();
+    return [for (final r in rows) ChannelId.parse(r.id)];
   }
 
   /// The caller's access to channel [id], or null when none was reported.

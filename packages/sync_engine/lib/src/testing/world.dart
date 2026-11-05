@@ -27,6 +27,7 @@ part 'world_deletion.dart';
 part 'world_files.dart';
 part 'world_notify.dart';
 part 'world_search.dart';
+part 'world_structure.dart';
 part 'world_terminal.dart';
 part 'world_thread_view.dart';
 
