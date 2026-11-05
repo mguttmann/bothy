@@ -140,11 +140,11 @@ class UserSideContext:
         if self.run_context is None:
             return ComposedUserSide(instructions, "")
         room = None if max_chars is None else max_chars - len(instructions) - 2
-        return ComposedUserSide(instructions, self._context_within(room, max_chars))
+        return ComposedUserSide(
+            instructions, self._context_within(self.run_context, room, max_chars)
+        )
 
-    def _context_within(self, room: int | None, max_chars: int | None) -> str:
-        ctx = self.run_context
-        assert ctx is not None  # noqa: S101 - compose checks it
+    def _context_within(self, ctx: RunContext, room: int | None, max_chars: int | None) -> str:
         full = self._render(ctx, self.file_texts, 0, 0, max_chars)
         if room is None or len(full) <= room:
             return full
