@@ -3,6 +3,7 @@
 package stack
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -118,5 +119,51 @@ func TestHostImageTag(t *testing.T) {
 	}
 	if !strings.Contains(string(calls), "buildx build --load --tag "+tag) {
 		t.Errorf("the missing host image is not built:\n%s", calls)
+	}
+}
+
+// TestHostImageBuildErrorNamesTheAptErrors proves that a failed host build reports the APT errors
+// of its log: buildx's last line names only the RUN instruction and is cut, so main runs
+// 42082056885 and 42081964628 showed no reason for the failure.
+func TestHostImageBuildErrorNamesTheAptErrors(t *testing.T) {
+	root, err := RepoRoot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	script := `#!/bin/sh
+case "$1" in
+image) exit 1 ;;
+buildx)
+  printf '%s\n' '#5 3.1 E: Failed to fetch http://snapshot.example.com/a.deb  503  No healthy backends' \
+    '#5 3.2 E: Failed to fetch http://snapshot.example.com/b.deb  504  Gateway Timeout' \
+    '#5 3.3 E: Unable to fetch some archives, maybe run apt-get update or try with --fix-missing?' \
+    '#5 3.3 E: Unable to locate package strace' \
+    '#5 ERROR: process "/bin/sh -c rm -f /etc/apt/sources.list.d/debian.sources" did not complete successfully: exit code: 100' >&2
+  exit 1 ;;
+esac
+exit 0
+`
+	bin := filepath.Join(dir, "docker")
+	if err := os.WriteFile(bin, []byte(script), 0o700); err != nil { //nolint:gosec // G306: the fake must be executable
+		t.Fatal(err)
+	}
+	_, err = HostImage(t.Context(), &Docker{Bin: bin, Env: []string{"PATH=/usr/bin:/bin"}}, root)
+	if !errors.Is(err, ErrDocker) {
+		t.Fatalf("err = %v, want ErrDocker", err)
+	}
+	want := `docker buildx build exited 1: #5 ERROR: process "/bin/sh -c rm -f /etc/apt/sources.list.d/debian.sources" did not complete successfully: exit code: 100` +
+		"; apt: E: Failed to fetch http://snapshot.example.com/b.deb  504  Gateway Timeout" +
+		" | E: Unable to fetch some archives, maybe run apt-get update or try with --fix-missing?" +
+		" | E: Unable to locate package strace"
+	if !strings.HasSuffix(err.Error(), want) {
+		t.Errorf("err = %q\nwant suffix %q", err, want)
+	}
+}
+
+// TestAptErrorsWithoutAptErrors proves that a log without APT errors adds nothing.
+func TestAptErrorsWithoutAptErrors(t *testing.T) {
+	if got := aptErrors([]byte("#5 ERROR: failed to solve\nW: a warning\nFILE: x\n")); got != "" {
+		t.Errorf("aptErrors = %q, want empty", got)
 	}
 }

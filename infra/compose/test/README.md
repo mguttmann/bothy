@@ -188,7 +188,9 @@ smoke test inactive, and `BOTHY_PUBLIC_URL` is the instance origin `https://chat
 - **Host image.** `termsuite-host:<first 12 hex of the SHA-256 of host/Dockerfile>`, built with
   BuildKit when the tag is missing. Base `debian:trixie-slim` pinned by digest, APT sources on one
   timestamp of `snapshot.debian.org` (recorded in the Dockerfile,
-  [toolchain.md](../../../docs/quality/toolchain.md)). It runs as root because systemd is process
+  [toolchain.md](../../../docs/quality/toolchain.md)); after three failed attempts on the
+  snapshot the build installs the current trixie packages of `deb.debian.org` and says so on
+  stderr (docs/decisions.d/FIX-apt-snapshot-retry.md). It runs as root because systemd is process
   1 and `bothy-host install` creates real users and units; `termhost` is `privileged` because
   systemd needs a writable cgroup tree and the host service creates a cgroup per session. Only
   this test service is privileged. Each host of a case is one container `compose run --detach

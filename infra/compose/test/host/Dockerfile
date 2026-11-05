@@ -8,6 +8,12 @@
 #
 # The package set is reproducible: the APT sources point at one timestamp of snapshot.debian.org
 # (20261015T000000Z); Check-Valid-Until is off because the Release files of a snapshot expire.
+# snapshot.debian.org fails single fetches for a long time (HTTP 503 "No healthy backends" or
+# "first byte timeout", 504, connection failures; one file failed for more than ten minutes), so
+# `apt-get update` and `apt-get install` run in one bounded retry loop: three attempts on the
+# snapshot, then three on the current trixie packages of deb.debian.org, announced on stderr
+# (docs/decisions.d/FIX-apt-snapshot-retry.md). APT's own retries are off: with them, APT 3.0
+# repeats the warning "Tried to start delayed item" without end and grows until the kernel kills it.
 # strace, gdb, python3-minimal and netcat-openbsd serve the platform suite of the host service
 # (services/host/test/platform, run by e2e/hostplatform): the system call trace of TM-T25, the
 # attach attempt and the impostor on the helper endpoint of TM-T26, and the connect attempt on the
@@ -17,11 +23,19 @@ FROM debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d
 ARG SNAPSHOT=20261015T000000Z
 RUN rm -f /etc/apt/sources.list.d/debian.sources \
     && printf 'deb http://snapshot.debian.org/archive/debian/%s trixie main\ndeb http://snapshot.debian.org/archive/debian/%s trixie-updates main\ndeb http://snapshot.debian.org/archive/debian-security/%s trixie-security main\n' "$SNAPSHOT" "$SNAPSHOT" "$SNAPSHOT" > /etc/apt/sources.list \
-    && printf 'Acquire::Check-Valid-Until "false";\nAcquire::Retries "5";\n' > /etc/apt/apt.conf.d/99snapshot \
-    && apt-get update -qq \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
-       systemd systemd-sysv dbus sudo cron procps acl iproute2 ca-certificates passwd util-linux \
-       strace gdb python3-minimal netcat-openbsd \
+    && printf 'Acquire::Check-Valid-Until "false";\nAcquire::Retries "0";\n' > /etc/apt/apt.conf.d/99snapshot \
+    && for attempt in 1 2 3 4 5 6; do \
+         if [ "$attempt" = 4 ]; then \
+           echo "termsuite host image: snapshot.debian.org failed 3 times, installing the current trixie packages of deb.debian.org" >&2; \
+           printf 'deb http://deb.debian.org/debian trixie main\ndeb http://deb.debian.org/debian trixie-updates main\ndeb http://deb.debian.org/debian-security trixie-security main\n' > /etc/apt/sources.list; \
+         fi; \
+         apt-get update -qq \
+         && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
+              systemd systemd-sysv dbus sudo cron procps acl iproute2 ca-certificates passwd util-linux \
+              strace gdb python3-minimal netcat-openbsd \
+         && break; \
+         [ "$attempt" = 6 ] && exit 1; sleep $((attempt * 10)); \
+       done \
     && rm -rf /var/lib/apt/lists/* \
     && systemctl mask getty@tty1 console-getty.service systemd-firstboot.service systemd-modules-load.service \
     && install -d -m 1777 /var/tmp/termsuite-markers \

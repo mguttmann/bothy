@@ -101,7 +101,8 @@ func ServerImage(ctx context.Context, d *Docker, root, tmp string) (string, erro
 // HostImage returns the tag termsuite-host:<first 12 hex of the SHA-256 of the host
 // Dockerfile> and builds the image with BuildKit when the tag is missing.
 //
-// Errors: a failed build.
+// Errors: a failed build, with the last line of its output and the last APT errors (lines "E: ")
+// of the build log, because the last line names only the RUN instruction and is cut.
 func HostImage(ctx context.Context, d *Docker, root string) (string, error) {
 	file := filepath.Join(root, HostDockerfile)
 	sum, err := fileSHA256(file)
@@ -112,10 +113,41 @@ func HostImage(ctx context.Context, d *Docker, root string) (string, error) {
 	if r, err := d.run(ctx, nil, nil, "image", "inspect", "--format", "{{.Id}}", tag); err == nil && r.code == 0 {
 		return tag, nil
 	}
-	if _, err := d.must(ctx, nil, "buildx", "build", "--load", "--tag", tag, "--file", file, filepath.Dir(file)); err != nil {
-		return "", err
+	r, err := d.run(ctx, nil, nil, "buildx", "build", "--load", "--tag", tag, "--file", file, filepath.Dir(file))
+	if err != nil {
+		return "", fmt.Errorf("stack: docker buildx build: %w", err)
+	}
+	if r.code != 0 {
+		return "", fmt.Errorf("%w: docker buildx build exited %d: %s%s", ErrDocker, r.code, lastLine(r.stderr), aptErrors(r.stderr))
 	}
 	return tag, nil
+}
+
+// aptErrors returns the last three APT error lines ("E: ...") of a build log, each at most 300
+// bytes, as "; apt: <line> | <line>", or "" when the log has none.
+//
+// Example: a log line "#5 42.03 E: Failed to fetch http://h/a.deb  504  Gateway Timeout" gives
+// "; apt: E: Failed to fetch http://h/a.deb  504  Gateway Timeout".
+func aptErrors(log []byte) string {
+	var found []string
+	for _, l := range strings.Split(string(log), "\n") {
+		i := strings.Index(l, "E: ")
+		if i < 0 || (i > 0 && l[i-1] != ' ') {
+			continue
+		}
+		e := strings.TrimSpace(l[i:])
+		if len(e) > 300 {
+			e = e[:300]
+		}
+		found = append(found, e)
+	}
+	if len(found) == 0 {
+		return ""
+	}
+	if len(found) > 3 {
+		found = found[len(found)-3:]
+	}
+	return "; apt: " + strings.Join(found, " | ")
 }
 
 // fileSHA256 returns the lowercase hex SHA-256 of the file at path.
