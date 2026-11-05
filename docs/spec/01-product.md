@@ -1539,7 +1539,11 @@ Messages over `ui.message_collapse_lines` lines are collapsed with "Show more";
 code blocks wrap long lines by default and can be switched to a horizontal scroll, and a code
 block higher than `ui.code_block_collapse_lines` lines shows collapsed with "Show all" (6.14,
 addendum of 2026-10-31; this replaces the earlier rule that code blocks scroll horizontally
-instead of wrapping). Long replies are never split across several
+instead of wrapping). A table wider than the view keeps its columns, each cell on one line,
+and scrolls sideways, with a visible scrollbar on the desktop (macOS, Windows) that can be
+dragged, shift and the mouse wheel, a sideways trackpad gesture, and a drag on the phone
+(addendum of 2026-11-04, F-AGENT-FORMAT; agents write tables as GFM tables, 09 4.11). Long
+replies are never split across several
 messages; one fenced code block renders as one block however long it is. A text larger than
 `message.max_content_bytes` goes out as one message whose rest is one text attachment (6.13).
 

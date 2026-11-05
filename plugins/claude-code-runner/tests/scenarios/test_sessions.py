@@ -8,6 +8,7 @@ import os
 from typing import Any
 
 import pytest
+from bothy_sdk.message_format import MESSAGE_FORMAT_RULES
 from bothy_sdk.testing.faults import Fault
 
 from .conftest import World
@@ -64,6 +65,9 @@ async def test_session_new_then_resume_and_cost_difference(world: World) -> None
     assert len(world.requests("reportAgentSession")) == 1
     assert len(world.requests("setThreadTitle")) == 1
     assert "TITLE:" not in two["system_prompt"]
+    # F-AGENT-FORMAT: the format rules reach the process of every turn, new and resumed.
+    assert MESSAGE_FORMAT_RULES in one["system_prompt"]
+    assert MESSAGE_FORMAT_RULES in two["system_prompt"]
     assert "CONTEXT-CANARY-1" in one["stdin"][0]
     assert "CONTEXT-CANARY-1" not in two["stdin"][0]
     finish = [r for r in world.requests("finishRun") if str(second.run_id) in r.path][-1].json

@@ -7,6 +7,7 @@ import json
 import uuid
 
 from bothy_sdk.context import RenderedContext
+from bothy_sdk.message_format import MESSAGE_FORMAT_RULES, MESSAGE_FORMAT_TITLE
 
 from claude_code_runner.prompt import RUNNER_PROMPT, context_items, system_prompt, user_line
 
@@ -101,3 +102,18 @@ def test_background_work_overrides_every_other_wait_rule() -> None:
             "answer it at once",
         ):
             assert phrase in flat, phrase
+
+
+def test_message_format_rules_from_the_sdk_in_every_prompt() -> None:
+    # F-AGENT-FORMAT: the SDK's rules, word for word, in their own section of every prompt,
+    # before the channel prompt, so an operator's prompt can still add to them.
+    for text in (
+        system_prompt(title_request=True, channel_prompt=""),
+        system_prompt(title_request=False, channel_prompt="Be brief."),
+    ):
+        heading = f"## {MESSAGE_FORMAT_TITLE}\n\n"
+        assert text.count(heading) == 1
+        section = text.split(heading, 1)[1].split("\n## ", 1)[0]
+        assert section.strip() == MESSAGE_FORMAT_RULES
+        if "## Channel prompt" in text:
+            assert text.index(heading) < text.index("## Channel prompt")

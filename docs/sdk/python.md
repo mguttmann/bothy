@@ -79,6 +79,8 @@ would only repeat that.
 
 ::: bothy_sdk.context
 
+::: bothy_sdk.message_format
+
 ::: bothy_sdk.components
 
 ::: bothy_sdk.commands

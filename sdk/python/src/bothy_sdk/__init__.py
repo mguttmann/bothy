@@ -6,7 +6,8 @@ The generated core lives in `bothy_sdk.generated` (openapi-python-client, regene
 `bothy_sdk.tolerance.install` first, which makes the core accept what a newer server may send
 (gate G5). The hand layer (M2-29) builds on it: `Adapter` and `AgentHandler` for agent
 adapters, `Client` and `SyncClient` for REST, `render_context` for the run context with trust
-marks, and `bothy_sdk.testing` with the FakeServer.
+marks, `MESSAGE_FORMAT_RULES` for the format of agent replies, and `bothy_sdk.testing` with the
+FakeServer.
 
 Examples:
     >>> from bothy_sdk.generated.client import Client
@@ -35,6 +36,7 @@ from bothy_sdk.client import Client  # noqa: E402
 from bothy_sdk.context import RenderedContext, render_context  # noqa: E402
 from bothy_sdk.errors import ProblemError  # noqa: E402
 from bothy_sdk.gateway import CloseReason  # noqa: E402
+from bothy_sdk.message_format import MESSAGE_FORMAT_RULES  # noqa: E402
 from bothy_sdk.runs import RunHandle, RunPatcher  # noqa: E402
 from bothy_sdk.settings import SdkSettings  # noqa: E402
 from bothy_sdk.sync import SyncClient  # noqa: E402
@@ -47,6 +49,7 @@ from bothy_sdk.webhooks import (  # noqa: E402
 )
 
 __all__ = [
+    "MESSAGE_FORMAT_RULES",
     "ActualBilling",
     "Adapter",
     "AdapterConfig",

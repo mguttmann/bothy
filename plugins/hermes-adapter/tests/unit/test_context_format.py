@@ -11,11 +11,13 @@ import pytest
 from bothy_sdk.errors import ProblemError
 from bothy_sdk.generated.models import ChannelBehavior, RunContext
 from bothy_sdk.ids import uuid7
+from bothy_sdk.message_format import MESSAGE_FORMAT_RULES
 
 from bothy_hermes_adapter.context_format import (
     CUT_MARK,
     SYSTEM_NOTE,
     build_context,
+    command_system_part,
     cut_utf8,
     find_message_text,
 )
@@ -225,3 +227,43 @@ def test_find_message_text() -> None:
     )
     assert find_message_text(ctx, wanted) == "one more thing\nand spoken"
     assert find_message_text(ctx, uuid7()) is None
+
+
+async def test_message_format_rules_in_every_system_part() -> None:
+    """F-AGENT-FORMAT: the SDK's rules follow the fixed note in every system part.
+
+    They stand outside every data block and before the channel instructions, in a message run
+    with and without a channel and in a command run, so Hermes gets them on every run.
+    """
+    ctx = RunContext.from_dict(
+        {
+            "run_id": str(uuid7()),
+            "context_floor_seq": 0,
+            "thread_context": [_message(1, WRITER, "writer text", "unverified")],
+            "trigger_message": _message(2, ALEX, "Alex asks", "trigger"),
+        }
+    )
+    channel = ChannelBehavior.from_dict(
+        {
+            "require_mention": True,
+            "thread_require_mention": False,
+            "free_response": False,
+            "auto_thread": True,
+            "allow_mentioned_agents": True,
+            "history_backfill_limit": 50,
+            "prompt": "Answer in short sentences.",
+            "skills": [],
+            "settings_version": 1,
+        }
+    )
+    parts = [
+        (await build_context(ctx, channel=c, fetch=_no_fetch, attachment_limit=10)).system_part
+        for c in (None, channel)
+    ]
+    parts += [command_system_part(None), command_system_part(channel)]
+    for system in parts:
+        assert system.startswith(SYSTEM_NOTE)
+        assert system.count(MESSAGE_FORMAT_RULES) == 1
+        assert MESSAGE_FORMAT_RULES not in "".join(c for _, c in _blocks(system))
+        if "Channel instructions" in system:
+            assert system.index(MESSAGE_FORMAT_RULES) < system.index("Channel instructions")
