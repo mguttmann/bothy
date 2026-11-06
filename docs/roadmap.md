@@ -19,6 +19,9 @@ Next steps:
    with building the apps ([apps/distribution](../apps/distribution/README.md)).
 3. Push in the distributed apps; today push needs the operator's own Apple and Firebase
    accounts.
+4. Built-in agents: create an agent inside Bothy, from a template or through a short interview,
+   that runs on local Claude through the Claude Code runner, so trying Bothy needs no other agent
+   runtime ([design](design/builtin-agents.md)).
 
 | Milestone | Content | Status |
 |---|---|---|
@@ -31,6 +34,7 @@ Next steps:
 | M6 Console, statistics and visualization | Web console for management, statistics and terminal; live topology, backend view, delivery live, executive page, timeline and TV mode from own measurement ([chapter 25](spec/25-visualization.md)); the visualization packages are built as a track already after M1 | built |
 | M7 Operations, release and showcase | Backup and restore with test, privacy flows, status page, signing, auto-update, portability, Grafana panel plugin "Bothy Live", demo instance, images and video | built |
 | M8 Migration | Import from Discord, switchover channel by channel | built |
+| A1 Built-in agents | Agents created in the apps from generic templates or an interview, hosted by the Claude Code runner with their own instructions, skills and MCP servers; off until a runner turns hosting on ([design](design/builtin-agents.md)) | planned |
 | V1 Publication | Repository public, checklist [public-switch](quality/public-switch.md) | in progress: the repository is public; enable list, external test, placeholders, checklist and name are open |
 | V2 Multi-user development environment | Isolated development environments per person with their own terminal ([chapter 21](spec/21-dev-isolation.md)) | later |
 | V3 Expansion | Features that [chapter 01](spec/01-product.md) lists as "later" | later |
