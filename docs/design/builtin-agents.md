@@ -76,8 +76,8 @@ the product ships (09 18), and it already speaks the adapter contract.
 billing mode proof and the fixtures exist for the CLI and the pinned version; the Agent SDK would
 be a second runtime with the same capabilities and none of the tests. The pinned CLI already has
 the flags this stage needs (`--mcp-config`, `--strict-mcp-config`, `--setting-sources`,
-`--plugin-dir`, `--max-budget-usd`), read from `claude --help` of the pinned version on
-2026-11-05; their behaviour in a headless turn is probed by A1-05 before it builds on them.
+`--settings`, `--tools`, `--plugin-dir`, `--max-budget-usd`), read from `claude --help` of the
+pinned version on 2026-11-05 and 2026-11-06; their behaviour in a headless turn is probed by A1-05 before it builds on them.
 
 **D-A1-3 One runner process hosts many agents, switched on by a new key.** A new runner key
 `runner.hosted_agents` (default off) lets the runner hold one connection per hosted agent next to
@@ -116,11 +116,17 @@ holds:
 
 | Part | Content | Limits |
 |---|---|---|
-| Instructions | the text that becomes `CLAUDE.md` in the agent folder | size limit as a configuration value |
-| Skills | name, description and the `SKILL.md` text per skill; optional extra text files per skill | count and size limits as configuration values; text only, no binaries, no executables |
+| Instructions | the text that becomes `CLAUDE.md` in the agent folder | size limit as a configuration value; an `@` import that leaves the agent folder (absolute, `~` or `..`) is refused (D-A1-18) |
+| Skills | name, description and a Markdown body per skill; optional extra Markdown files per skill | count and size limits as configuration values; the runner writes the `SKILL.md` frontmatter itself from name and description only; a body with its own frontmatter or with inline shell is refused (D-A1-18); text only, no binaries, no executables |
 | MCP servers | name, transport (`http` with an `https` URL, or `stdio` with a command from an allow list of public package runners and a package pinned as `name@version`), arguments, and environment entries that are either plain non-secret values or secret references | never a secret value; a reference names a key in the runner's secret provider; an unpinned `stdio` package is refused; a `stdio` server makes the agent `host` (D-A1-18) |
 | Settings | model, tool class wish, allowed tools for `scoped`, cost cap per run | validated against the tool class rules of 07; the allowed tools only narrow `runner.scoped_allowed_tools` (D-A1-18) |
 | Origin | template slug and version, or "interview", or "manual" | display only |
+
+Nothing else: the schema is closed. A definition has no field for settings, hooks, permission
+rules, slash commands, subagents, output styles, workflows, plugin manifest entries, LSP servers,
+monitors or MCP configuration beyond the row above, and the runner writes every control file of the
+agent folder itself (D-A1-8). The full rule, with the surfaces of the pinned CLI it closes, is
+D-A1-18.
 
 Reason: the definition is created and edited in the apps, so it must live where the apps write,
 which is the server. The server already keeps prompts and skills of channels the same way
@@ -129,16 +135,22 @@ which is the server. The server already keeps prompts and skills of channels the
 
 **D-A1-8 The runner materializes the definition into an agent folder.** On start and on
 `agent.config_changed` the runner fetches the definition (new adapter read, like
-`agent.config.read`) and writes `<runner.hosted_agents_root>/<agent_id>/` with `CLAUDE.md`, a local
-plugin folder holding the skills, and an MCP configuration file with the secret references
-resolved at turn start into the turn's environment only. That folder is the working folder of the
-agent's turns. The turn gets, in addition to 09 18.2: `--plugin-dir <skills plugin>`,
-`--mcp-config <file> --strict-mcp-config`, `--setting-sources project,local` and
-`--max-budget-usd <cap>`. Reason: the CLI reads `CLAUDE.md` from the working folder already; a
-plugin folder and an explicit MCP file are the documented ways to hand skills and servers to one
-session; strict MCP and restricted setting sources keep the host user's own settings, hooks and
-servers out of a hosted agent's turn, which matters in billing mode `personal`, where the turn runs
-as the host user. Whether the user-level `CLAUDE.md` is also left out with these flags is probed in
+`agent.config.read`) and writes the agent folder `<runner.hosted_agents_root>/<agent_id>/` with
+`CLAUDE.md` and `.claude/settings.local.json`, and next to it, outside the agent folder, the control
+folder `<runner.hosted_agents_root>/<agent_id>.control/` with the runner's settings file, the
+skills plugin and the MCP configuration file, whose secret references are resolved at turn start
+into the turn's environment only. Every control file is written by the runner from the definition
+under the closed schema of D-A1-18; none is copied from the definition as a file. Before every
+turn the runner rebuilds the control files and removes foreign ones (D-A1-18). The agent folder is
+the working folder of the agent's turns. The turn gets, in addition to 09 18.2:
+`--settings <runner settings file>`, `--plugin-dir <skills plugin>`,
+`--mcp-config <file> --strict-mcp-config`, `--setting-sources project,local`, under `scoped`
+`--tools` with the intersected tool list (D-A1-18), and `--max-budget-usd <cap>`. Reason: the CLI
+reads `CLAUDE.md` from the working folder already; a plugin folder and an explicit MCP file are the
+documented ways to hand skills and servers to one session; strict MCP and restricted setting
+sources keep the host user's own settings, hooks and servers out of a hosted agent's turn, which
+matters in billing mode `personal`, where the turn runs as the host user; control files outside
+the working folder are out of reach of the turn's file tools. Whether the user-level `CLAUDE.md` is also left out with these flags is probed in
 A1-05; if it is not, A1-05 records the gap in the runner README and in the preview text of the
 creation flow instead of claiming isolation.
 
@@ -191,7 +203,11 @@ channel choice. The client shows a preview with every part: instructions, each s
 server with the secret names it needs, tool class, billing mode, model and cost cap. The server
 validates the draft again on create with the same rules as a manual definition and never trusts
 model output: a draft field outside the schema, a command outside the allow list, an unpinned
-`stdio` package or a secret value in place of a reference is refused with a field error.
+`stdio` package, a secret value in place of a reference, a skill body with frontmatter or inline
+shell, or an `@` import that leaves the agent folder is refused with a field error (the closed
+schema of D-A1-18). The builder's structured output schema itself has no field for settings,
+hooks, permission rules, commands, subagents or plugin parts, so a crafted answer cannot carry
+them; the server check holds even if it did.
 Creating composes existing and new actions in the order of 01 6.9: `agent.create` (step-up), the
 definition, the hosting assignment, then the channel and operator when asked for, each step
 visible with its result.
@@ -205,7 +221,8 @@ cannot be turned against the host by a crafted answer.
 **D-A1-14 Templates are data written for the repository, never exported from an installation.**
 One folder per template under `templates/agents/<slug>/` with `template.yaml` (name, description,
 tool class wish, model hint, required secret names, MCP servers, skills list, version),
-`CLAUDE.md`, `skills/<name>/SKILL.md` and nothing else. The server ships them in its image
+`CLAUDE.md`, `skills/<name>/SKILL.md` (frontmatter `name` and `description` only, D-A1-18) and
+nothing else. The server ships them in its image
 (copied by `make codegen`, held equal by `make codegen-check`) and lists them through a new read
 operation. An installation may add private templates from a folder outside the repository, named
 by the new server key `agents.templates_dir` (default empty), the same way `.env` and
@@ -219,7 +236,11 @@ installation.
 the pull request CI validates every template against its schema and fails on: a host, URL or
 e-mail outside the example domains, an absolute path, an IP address, a person's name outside the
 example persons (Alex, Sam, Robin), a secret-looking value, an MCP command outside the allow list,
-an unpinned `stdio` package, and every finding of the generic deny rules (`--allow-missing` run
+an unpinned `stdio` package, a `SKILL.md` frontmatter key other than `name` and `description`,
+inline shell in any template text, an `@` import that leaves the template folder, any file other
+than `template.yaml`, `CLAUDE.md` and `skills/<name>/SKILL.md` (so no `.claude/`, `.mcp.json`,
+`.lsp.json`, plugin manifest, hooks, commands, agents or output styles; the closed schema of
+D-A1-18), and every finding of the generic deny rules (`--allow-missing` run
 over `templates/`). The private deny list then runs over templates like over every other file, in
 `make denylist`, the pull request job and `denylist-main`. Reason: forks and outside contributors have no private list; the
 template gate must hold for them on its own, and the private list adds the instance-specific terms.
@@ -242,8 +263,8 @@ owner picks more in the preview. `scoped` needs the explicit tool list of the de
 as `mcp__<server>__<tool>` entries); `host` follows SR2 (07) unchanged. The tool list of the
 definition is always intersected with `runner.scoped_allowed_tools` of the hosting runner, in the
 order of the runner key, the same rule as `allowed_tools` of a project binding (09 18.1): the
-definition only narrows, and the host operator keeps the ceiling of what `scoped` may run on the
-host (09 18.2). MCP servers are never loaded under `chat`; there the runner keeps
+definition only narrows (nothing else in it grants tools, see "A definition is data" below), and
+the host operator keeps the ceiling of what `scoped` may run on the host (09 18.2). MCP servers are never loaded under `chat`; there the runner keeps
 `--disallowedTools "mcp__*"`, and the preview says so. Under `scoped` only `http` MCP servers are
 loaded. A `stdio` MCP server runs a local process with the rights of the host user, so it makes the
 effective tool class `host`: the server derives the class from the definition, refuses to store a
@@ -257,6 +278,56 @@ and 07 2.11 already define what each class may do (`scoped`: named tools with th
 credentials, one named, limited effect); the definition must not widen them, and an arbitrary
 package started as the host user is the `host` case. The runner has no approval cards, so `scoped`
 stays an allow list without interactive approvals in this stage, and the preview says that too.
+
+**A definition is data, not configuration of the CLI.** Below `host` this is what keeps the class
+ceiling: any content of a definition, a template or an interview draft that the CLI interprets as
+code or as a permission grant would let a `scoped` or `chat` agent run host code or widen its tools
+beyond `runner.scoped_allowed_tools` without SR2. In this stage the rule holds for every class, so
+there is one schema; `host` adds only `stdio` MCP servers, and a later ruling may open more for
+`host` alone. Surfaces of the pinned CLI 2.1.288, found in the strings of the binary and in its
+`claude --help` on 2026-11-06:
+
+| Surface | What the CLI does with it | Closed by |
+|---|---|---|
+| `SKILL.md` frontmatter | `hooks` ("Hooks registered while this skill is active. Same shape as settings.json `hooks`"), `allowed-tools` ("Tools available to the model while this file is active"), `model`, `effort`, `shell`, `context: fork` with `agent`, `paths`, `disable-model-invocation`, `user-invocable`, and internal keys such as `mcpServers`, `agents`, `settings`, `lspServers`, `monitors` | schema: the definition stores name, description and body; the runner writes the frontmatter with `name` and `description` only |
+| Inline shell in skill and command text | `` !`cmd` `` and a fenced block opened with `` ```! `` run as shell when the skill loads | schema: refused in every text; runner setting `disableSkillShellExecution` ("Disable inline shell execution in skills and custom slash commands from user, project, or plugin sources") as a second layer |
+| Settings files the turn reads (`--setting-sources project,local`) | `hooks`; `permissions` with allow rules, `defaultMode` and `additionalDirectories`; `env`; the command helpers `apiKeyHelper`, `otelHeadersHelper`, `awsAuthRefresh`, `awsCredentialExport`, `gcpAuthRefresh`, `statusLine`, `fileSuggestion`; `enableAllProjectMcpServers`, `enabledMcpjsonServers`; `enabledPlugins`, `extraKnownMarketplaces` | no settings field in the schema; the runner writes the only settings (below) and removes foreign files |
+| Discovered folder content | `.claude/skills`, `.claude/commands` (same frontmatter and inline shell as skills), `.claude/agents` (subagent frontmatter with tools, permission mode, `mcpServers` and `hooks`), `.claude/workflows`, `.claude/rules`, `.mcp.json`, `CLAUDE.local.md` | not in the schema; removed on rebuild; `.mcp.json` is also ignored under `--strict-mcp-config` |
+| Plugin folder (`--plugin-dir`) | `.claude-plugin/plugin.json` and the default component paths `hooks/hooks.json`, `.mcp.json`, `.lsp.json` (starts language servers), `monitors/monitors.json` ("unsandboxed, same trust tier as hooks"), `commands/`, `agents/`, `output-styles/` | the runner writes `plugin.json` with name and version only and `skills/` only; the plugin lives in the control folder outside the working folder |
+| `@` imports in `CLAUDE.md` | read files into the prompt; imports outside the project wait for an approval flag of the host user (`hasClaudeMdExternalIncludesApproved`) | schema: an import that leaves the agent folder is refused |
+
+Settings the runner writes, into its settings file passed with `--settings` and with the same
+content into the folder's `.claude/settings.local.json`: `disableSkillShellExecution: true`,
+`disableAllHooks: true` ("Disable all hooks and statusLine execution: the hooks defined in settings
+files and by installed plugins"), `disableWorkflows: true`, and deny rules for edits of the
+control files in the working folder (`CLAUDE.md`, `CLAUDE.local.md`, `.claude/`, `.mcp.json`,
+`.lsp.json`, `.claude-plugin/`; rule syntax to verify in A1-05). It writes no allow rules (the tool
+list stays on the command line, intersected as above), no `env`, no command helper, no MCP switch
+and no plugin or marketplace key. The binary marks `disableAllHooks`, `disableSkillShellExecution`
+and `disableWorkflows` as restrictive in its settings merge, so a lower source cannot turn them
+back off; A1-05 verifies that. `allowManagedPermissionRulesOnly` is not usable: it is read from
+managed settings only and would also drop the runner's own `--allowedTools`. So `allowed-tools` in
+frontmatter is closed by the schema, and under `scoped` the runner also passes `--tools` with the
+intersected built-in tool list, so no frontmatter can name a tool the turn does not have (to verify
+in A1-05).
+
+Rebuild: before every turn the runner checks the control folder and the working folder against the
+definition, rewrites every control file it owns, and removes every file of the surfaces above that
+it did not write, anywhere in the working folder; the agent's other files stay. A definition that
+fails the schema (written behind the server's back) is refused with `tool_class_mismatch`, like the
+`stdio` case, because it claims more than its class.
+
+Each of the four writers enforces the rule with its own test: the server on every definition write
+(A1-02, one refusal test per surface), the template gate (D-A1-15, A1-06, a fixture template per
+surface), the interview (D-A1-12, A1-07, a builder answer carrying each surface is refused), and the
+runner (A1-05: materializer and rebuild tests, the settings file content, and a probe against the
+pinned CLI with a planted skill carrying `hooks`, `allowed-tools: Bash` and both inline shell forms,
+expecting no hook run, no `Bash` and the placeholder "[shell command execution disabled by policy]").
+To verify in A1-05, because the strings do not settle them: whether `disableAllHooks` outside
+managed settings also drops hooks from skill frontmatter, whether a plugin's `bin/` folder reaches
+the turn's `PATH`, whether `--tools` holds against a skill's `allowed-tools`, whether the CLI
+reloads a settings file changed during a turn, and whether `--setting-sources` accepts an empty
+list, which would let the turn read no folder settings at all.
 
 **D-A1-19 Billing follows 10 unchanged.** A new agent is `organization` by default (I1). `personal`
 is offered only when the creating owner is the credential holder and the only owner, and the
@@ -340,12 +411,12 @@ from briefs in `docs/briefs/` like every milestone.
 | Ticket | Goal | Done when | Depends on |
 |---|---|---|---|
 | A1-01 | Specification, ADR, plan section and briefs for A1 | chapters 01, 03, 05, 06, 07, 09, 10 and the configuration tables carry sections 3 to 9 as normative text; ADR "Built-in agents hosted by the Claude Code runner"; plan section A1 and briefs A1-02 to A1-10 pass the brief format, rules and dependency checks; `make docs`, `make catalog-check` and `make config-doc-check` green | none |
-| A1-02 | Server: agent definitions | table, versioning, owner write inside `agent.update`, adapter read, schema validation with field errors, secret references only, size limits as configuration values, `agent.config_changed` on change, audit; migration additive; tool class derived from the definition (D-A1-18): a `stdio` MCP server needs `tool_class = 'host'` and is refused below it, only `http` servers under `scoped`, `stdio` packages pinned as `name@version`; tests for every refusal | A1-01 |
+| A1-02 | Server: agent definitions | table, versioning, owner write inside `agent.update`, adapter read, schema validation with field errors, secret references only, size limits as configuration values, `agent.config_changed` on change, audit; migration additive; tool class derived from the definition (D-A1-18): a `stdio` MCP server needs `tool_class = 'host'` and is refused below it, only `http` servers under `scoped`, `stdio` packages pinned as `name@version`; the closed schema of D-A1-18 (skills stored as name, description and body, a body with frontmatter or inline shell refused, an `@` import leaving the agent folder refused, no field for settings, hooks, permission rules, commands, subagents or plugin parts); tests for every refusal, one per surface of D-A1-18 | A1-01 |
 | A1-03 | Server: hosted agents | `hosted_by`, capability `hosts_agents`, host choice on create, token for the hosting runner bound to its key, replaced on disable and host change, `claude_agent` refused by R-AG-39 paths; tests for every refusal | A1-01 |
 | A1-04 | Runner: host many agents | `runner.hosted_agents` off by default; one connection, cursor, cache and state folder per hosted agent; shared slots; today's fixtures byte-equal without the key | A1-03 |
-| A1-05 | Runner: run the definition | agent folder from the definition, skills plugin, strict MCP file, setting sources, cost cap, allowed tools of the definition intersected with `runner.scoped_allowed_tools`, no `stdio` MCP server in a turn below `host` (the turn is refused with `tool_class_mismatch`), tests for both, channel skills behind `runner.channel_skills_dir` with the `claude-code:` resolution of D-A1-9; byte-equal fixtures without the key include a channel with bindings of both forms; a probe test against the pinned CLI records what each flag does headless, including whether the user-level `CLAUDE.md` is left out and whether `--mcp-config` in the chosen argument order swallows following arguments | A1-02, A1-04 |
-| A1-06 | Templates and their gate | `templates/agents/` with generic templates, schema, the template gate in `make check` and CI, read operation, `agents.templates_dir`; private list extended first (D-A1-16) | A1-02 |
-| A1-07 | Interview | owner operation and short-lived event, `agents.builder_agent_id`, `runner.agent_builder`, structured answer, fallback without a builder, cost estimate shown | A1-02 |
+| A1-05 | Runner: run the definition | agent folder from the definition, control folder outside it with the runner's settings file, the skills plugin (`plugin.json` with name and version, `skills/` only, frontmatter `name` and `description` only) and the strict MCP file, setting sources, cost cap, allowed tools of the definition intersected with `runner.scoped_allowed_tools` and passed also as `--tools` under `scoped`, no `stdio` MCP server in a turn below `host` (the turn is refused with `tool_class_mismatch`), tests for both; the runner settings of D-A1-18 (`disableSkillShellExecution`, `disableAllHooks`, `disableWorkflows`, deny rules for the control files, no allow rules, helpers, `env` or MCP and plugin switches) with a test of the file content; the runner's own schema check (refusal with `tool_class_mismatch`) and the rebuild before every turn that removes foreign control files, each with a test; a probe with a planted skill carrying `hooks`, `allowed-tools: Bash` and both inline shell forms, expecting none of them to act, plus the open points D-A1-18 lists as "to verify in A1-05"; channel skills behind `runner.channel_skills_dir` with the `claude-code:` resolution of D-A1-9; byte-equal fixtures without the key include a channel with bindings of both forms; a probe test against the pinned CLI records what each flag does headless, including whether the user-level `CLAUDE.md` is left out and whether `--mcp-config` in the chosen argument order swallows following arguments | A1-02, A1-04 |
+| A1-06 | Templates and their gate | `templates/agents/` with generic templates, schema, the template gate in `make check` and CI with the closed schema of D-A1-18 and a failing fixture template per surface, read operation, `agents.templates_dir`; private list extended first (D-A1-16) | A1-02 |
+| A1-07 | Interview | owner operation and short-lived event, `agents.builder_agent_id`, `runner.agent_builder`, structured answer whose schema has no field for the surfaces of D-A1-18, a builder answer carrying each surface refused with a test, fallback without a builder, cost estimate shown | A1-02 |
 | A1-08 | Clients: "New agent" | desktop, phone and console: template or interview, preview and edit, step-up, visible steps, channel with the agent as operator; hidden without a hosting runner | A1-03, A1-06, A1-07 |
 | A1-09 | Clients: edit and remove | edit instructions, skills, MCP servers and settings with preview and step-up; disable and delete through the existing actions | A1-08 |
 | A1-10 | End to end and documentation | an end-to-end test on the demo stack with a fake Claude: create from a template and from an interview, chat, cost shown, runner key off restores today's behaviour; guide for operators; README section for visitors | A1-05, A1-09 |
@@ -418,19 +489,23 @@ Collected, not polished; the next run in this area (A1-01) takes them.
 4. Tokens of hosted agents sit next to each other in `<runner.state_dir>/hosted/` (D-A1-3, lines
    84 to 85): a `host` turn of one hosted agent can read the others, and concurrent turns as the
    same user may expose MCP secrets in the process environment; A1-01 decides tokens in memory or
-   in the secret provider, `runner.hosted_agents_root` never under `runner.state_dir` (09 18.10),
-   and a threat model entry.
+   in the secret provider, `runner.hosted_agents_root` never under `runner.state_dir` (in the
+   way 09 18.10 keeps attachment roots apart), and a threat model entry.
 5. "replaced on `agent.disable`" (D-A1-4, line 96) should say revoked; A1-01 adds that blocking or
    revoking the host runner revokes the tokens of all its hosted agents, that the token operation
    goes through `authorize` with `hosted_by` equal to the caller, and its audit.
-6. Error paths of creation (D-A1-12, lines 195 to 197): what stays when `agent.create` succeeds
+6. Error paths of creation (D-A1-12, lines 211 to 213): what stays when `agent.create` succeeds
    but the definition or the host assignment fails, and whether the interview operation (it costs
    money) is audited and logged; A1-01 states both with a test each.
-7. Agent folder under `--setting-sources project,local` (D-A1-8, line 136): a `scoped` agent with
-   write access could write hooks into its own `.claude/settings.json`, and the runner does not yet
-   promise to remove foreign files when it rebuilds the folder; the A1-05 probe covers both, and
-   `CLAUDE.md` files of the folders above (compare T-TM-13).
-8. "the credential holder" in D-A1-19 (line 262) is ambiguous: A1-01 writes the
+7. Agent folder under `--setting-sources project,local` (D-A1-8, line 147): hooks a `scoped` agent
+   writes into its own `.claude/` and the removal of foreign files are now part of D-A1-18 (deny
+   rules, rebuild before every turn, tests); what stays for the A1-05 probe is whether `CLAUDE.md`
+   files of the folders above the agent folder are loaded (compare T-TM-13).
+8. "the credential holder" in D-A1-19 (line 333) is ambiguous: A1-01 writes the
    `credential_holder` of the hosting runner, which equals that of the hosted agent.
 9. Commit identity of the commits of this note (review minor 7): no finding of the diff; it stays
    with owner decision 1 (section 12).
+10. `agent.tool_class.set` can set an agent whose definition has a `stdio` server below `host`
+    again (D-A1-18, lines 269 to 275); the runner catches it with `tool_class_mismatch`, so there
+    is no harm, but the preview or the action should refuse the downgrade or say what it breaks;
+    A1-01 decides which, with a test (delta review of round 2, minor 1).
