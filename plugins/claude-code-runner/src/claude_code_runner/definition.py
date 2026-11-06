@@ -3,7 +3,7 @@
 
 The closed schema ``agent_definition.v1`` and its refusals, ported from the server's validator
 (``services/server/internal/agents/domain/definition``) with the rulings of
-``docs/decisions.d/A1-02.md``. It is the one place of these rules in the runner: the builder checks
+docs/decisions.d/A1-02.md. It is the one place of these rules in the runner: the builder checks
 its draft with it before it sends one (26 6.2 item 3), and the hosted turns of A1-05 check the
 current definition with it before every turn (26 5.6). The shared corpus ``tests/agent-definitions``
 holds it equal to the server: every fixture gives exactly its expected findings.
