@@ -13,7 +13,7 @@ import asyncio
 import contextlib
 import logging
 from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 from uuid import UUID
@@ -29,6 +29,7 @@ from bothy_hermes_adapter.config import AdapterSettings
 from bothy_hermes_adapter.handler import HermesHandler
 from bothy_hermes_adapter.heartbeat import HermesAdapterLoop
 from bothy_hermes_adapter.runtime import (
+    BackgroundTask,
     CardRequest,
     CommandRequest,
     InboundMedia,
@@ -90,6 +91,9 @@ class FakeRuntime:
     commands: list[CommandRequest] = field(default_factory=list)
     replies: list[str] = field(default_factory=lambda: ["Hermes Agent v0.0.0"])
     command_error: Exception | None = None
+    background: dict[UUID, list[BackgroundTask]] = field(default_factory=dict)
+    background_since: list[float] = field(default_factory=list)
+    cancelled_background: list[UUID] = field(default_factory=list)
     _events: HermesHandler | None = None
     _scripts: set[asyncio.Task[TurnOutcome]] = field(default_factory=set)
 
@@ -147,6 +151,24 @@ class FakeRuntime:
             return SessionSwitch.BOUND
         self.sessions[thread_id] = f"sess-new-{len(self.switches)}"
         return SessionSwitch.NEW if mode == "new" else SessionSwitch.BOUND
+
+    async def background_work(self, thread_id: UUID, since: float) -> tuple[BackgroundTask, ...]:
+        self.background_since.append(since)
+        return tuple(self.background.get(thread_id, ()))
+
+    async def cancel_background(self, thread_id: UUID) -> None:
+        self.cancelled_background.append(thread_id)
+        self.background[thread_id] = [
+            replace(t, state="cancelled", open=False) if t.open else t
+            for t in self.background.get(thread_id, ())
+        ]
+
+    def finish_background(self, thread_id: UUID, task_id: str, state: str = "completed") -> None:
+        """End one background task as Hermes' registry would report it."""
+        self.background[thread_id] = [
+            replace(t, state=state, open=False) if t.task_id == task_id else t
+            for t in self.background.get(thread_id, ())
+        ]
 
     async def run_command(self, command: CommandRequest) -> list[str]:
         self.commands.append(command)

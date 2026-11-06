@@ -15,7 +15,11 @@ SDK's (M2-29); this module decides what Hermes does:
   ``adapter_error`` without a start.
 * `execute` handles the session of the thread (09 9.1, 9.5), runs the Hermes turn and ends the
   run: buffered edits first, then the session report, the title and ``finishRun`` with metrics
-  and costs.
+  and costs. Before the end the run holds the background work its turns started (09 17.12,
+  R-AG-44): a step per delegation unit and process until they are done, the turns Hermes starts
+  with their results inside the run, a follow-up as a turn of its own; a stop or an early end
+  cancels that work. `tool_allowed` answers Hermes' ``pre_tool_call``: no tool runs in a thread
+  without an open run.
 * `on_followup` steers a running turn or answers a waiting card; `on_interaction` resolves a
   card's Hermes callback exactly once and answers the interaction.
 * `on_command` runs a control command (``command.invoked``) of
@@ -44,6 +48,8 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import time
+import unicodedata
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field, replace
 from datetime import datetime
@@ -129,6 +135,8 @@ from bothy_hermes_adapter.reports import (
     recovered_reply,
 )
 from bothy_hermes_adapter.runtime import (
+    BackgroundKind,
+    BackgroundTask,
     CardKind,
     CardRequest,
     CommandRequest,
@@ -145,7 +153,7 @@ from bothy_hermes_adapter.runtime import (
 from bothy_hermes_adapter.store import CallbackStore
 from bothy_hermes_adapter.tool_class import classify
 
-__all__ = ["DEFAULT_CURRENCY", "BusyMode", "HermesHandler", "PrepareRefused"]
+__all__ = ["DEFAULT_CURRENCY", "TOOL_REFUSED", "BusyMode", "HermesHandler", "PrepareRefused"]
 
 _LOG = logging.getLogger("bothy_hermes_adapter")
 
@@ -154,6 +162,17 @@ DEFAULT_CURRENCY: Final = "USD"
 pinned version ships (docs/DECISIONS.md D-M2-33-7)."""
 
 _STOP_STATUSES: Final = frozenset({403, 409, 412})
+
+TOOL_REFUSED: Final = (
+    "Refused by the chat platform: no run is open in this chat, so no tool may run now and "
+    "nothing was done. Answer in text only; the person can ask again."
+)
+"""The message of a tool call refused outside a run (09 17.12 point 7, R-AG-44); Hermes gives
+it to the model as the tool's error."""
+_STEP_TITLE_MAX: Final = 200
+"""Longest title of a background step (the length of a thread title, ``thread.title_max_chars``)."""
+_STEP_NAMES: Final = {BackgroundKind.SUBAGENT: "delegate_task", BackgroundKind.JOB: "terminal"}
+_ENDED_STATES: Final = frozenset({"completed", "failed", "cancelled"})
 
 
 class BusyMode:
@@ -198,6 +217,23 @@ class _Turn:
     interrupted: bool = False
     settled: asyncio.Event = field(default_factory=asyncio.Event)
     ended: bool = False
+    # Background work of the run (09 17.12, R-AG-44): the run's start in wall time (the registry
+    # filter), whether the first turn ended and the run holds work, the Hermes turns of the run
+    # that run now (own: started by the adapter; internal: started by Hermes itself), the steps
+    # of the work by Hermes' ID, and the monotonic time of the last sign of life.
+    started_wall: float = field(default_factory=time.time)
+    held: bool = False
+    seen_work: bool = False
+    own_turns: int = 1
+    internal: bool = False
+    failed_turn: bool = False
+    work_steps: dict[str, tuple[UUID, str]] = field(default_factory=dict)
+    work_counts: tuple[int, int] = (0, 0)
+    last_busy: float = field(default_factory=time.monotonic)
+    last_progress: float = field(default_factory=time.monotonic)
+    progress_events: int = 0
+    wake: asyncio.Event = field(default_factory=asyncio.Event)
+    pending: list[Message] = field(default_factory=list)
 
 
 class HermesHandler(AgentHandler):
@@ -652,24 +688,200 @@ class HermesHandler(AgentHandler):
         handle = turn.handle
         if turn.dropped or handle.finished:
             return
-        turn.ended = True
+        turn.own_turns -= 1
         if turn.live is not None:
             turn.live.end(failed=outcome is not TurnOutcome.COMPLETED)
         await self._flush_edits(turn)
         await self._report_session(turn, switched)
+        if outcome is TurnOutcome.COMPLETED and turn.abort_reason is None:
+            for message_id in turn.steered:
+                with contextlib.suppress(ValueError):
+                    handle.patch.followup_absorbed(message_id)
+            # The run covers the work its turn left running (09 17.12, R-AG-44).
+            await self._hold(turn)
+            if turn.failed_turn:
+                outcome = TurnOutcome.FAILED
+            if _gone(turn):
+                return  # cancelled or ended by the server while it held the work
+        turn.ended = True
+        if turn.live is not None:
+            turn.live.end(failed=outcome is not TurnOutcome.COMPLETED)
+        await self._flush_edits(turn)
+        if turn.abort_reason is not None or outcome is not TurnOutcome.COMPLETED:
+            # A run never ends while work it covers goes on unseen (R-AG-44).
+            await self._cancel_work(turn)
         metrics, costs = self._usage(turn)
         if turn.abort_reason is not None:
             await handle.finish("failed", reason=turn.abort_reason, metrics=metrics, costs=costs)
             return
         if outcome is TurnOutcome.COMPLETED:
-            for message_id in turn.steered:
-                with contextlib.suppress(ValueError):
-                    handle.patch.followup_absorbed(message_id)
             if turn.session_mode == "new":
                 await self._set_title(turn)
             await handle.finish("completed", metrics=metrics, costs=costs)
             return
         await handle.finish("failed", reason="runtime_error", metrics=metrics, costs=costs)
+
+    # ---- background work of the run (09 17.12, R-AG-44) -------------------------------------
+
+    async def _hold(self, turn: _Turn) -> None:
+        """Keep the run open while the work its turns started runs, and for the turns it causes.
+
+        Hermes' registries are read every ``background_poll_interval``; each unit is a step. The
+        run may end when no unit is open, no Hermes turn of the thread runs, and, after the run
+        saw background work, ``background_settle`` passed without a sign of a turn: the gateway
+        admits the turn that reports a result a moment after the unit ended.
+        """
+        settings = self.settings
+        turn.held = True
+        turn.settled.set()
+        turn.last_progress = time.monotonic()
+        while not (turn.dropped or turn.abort_reason is not None or turn.failed_turn):
+            open_work = await self._poll_work(turn)
+            if turn.seen_work and turn.own_turns == 0 and turn.pending:
+                # A follow-up the first turn did not take, or one written while the run holds
+                # work: a turn of its own, one after the other (17.12 point 5).
+                self._start_followup(turn, turn.pending.pop(0))
+            now = time.monotonic()
+            if open_work or turn.own_turns > 0 or turn.internal:
+                turn.last_busy = now
+            elif not turn.seen_work or now - turn.last_busy >= settings.background_settle:
+                return
+            if open_work and now - turn.last_progress >= settings.background_progress_interval:
+                # Progress against the stall notice of 5.5 while work runs.
+                turn.last_progress = now
+                turn.progress_events += 1
+                if not turn.dropped:
+                    with self._bound(turn):
+                        turn.handle.patch.set_metric("progress_events", turn.progress_events)
+            turn.wake.clear()
+            with contextlib.suppress(TimeoutError):
+                await asyncio.wait_for(turn.wake.wait(), settings.background_poll_interval)
+
+    async def _poll_work(self, turn: _Turn) -> bool:
+        """Read the thread's background work and show it; returns whether a unit is open."""
+        try:
+            tasks = await self.runtime.background_work(turn.thread_id, turn.started_wall)
+        except Exception as exc:  # unreadable registries: nothing to hold (logged)
+            _LOG.warning(
+                "run %s: background work not readable: %s", turn.run_id, type(exc).__name__
+            )
+            return False
+        if turn.dropped:
+            return False
+        if tasks:
+            turn.seen_work = True
+        with self._bound(turn):
+            for task in tasks:
+                self._show_task(turn, task)
+            self._count_work(turn, tasks)
+        return any(task.open for task in tasks)
+
+    def _show_task(self, turn: _Turn, task: BackgroundTask) -> None:
+        """Add or update the step of one unit (``subagent`` or ``background_job``)."""
+        status = task.state if task.state in _ENDED_STATES else "running"
+        known = turn.work_steps.get(task.task_id)
+        patch = turn.handle.patch
+        if known is None:
+            step = patch.add_step(
+                str(task.kind),
+                _STEP_NAMES[task.kind],
+                title=_one_line(task.title, _STEP_TITLE_MAX),
+                status="running",
+            )
+            turn.work_steps[task.task_id] = (step, "running")
+            _LOG.info("run %s: background %s started", turn.run_id, task.kind)
+            known = (step, "running")
+        step, shown = known
+        if status != shown:
+            patch.update_step(step, status=status, finished_at=self._now())
+            turn.work_steps[task.task_id] = (step, status)
+            _LOG.info("run %s: background %s %s", turn.run_id, task.kind, status)
+
+    def _count_work(self, turn: _Turn, tasks: Any) -> None:
+        """``/metrics/subagents`` and ``/metrics/background_jobs``: the open units (09 5.4)."""
+        open_tasks = [t for t in tasks if t.open]
+        counts = (
+            sum(1 for t in open_tasks if t.kind is BackgroundKind.SUBAGENT),
+            sum(1 for t in open_tasks if t.kind is BackgroundKind.JOB),
+        )
+        if counts == turn.work_counts:
+            return
+        turn.work_counts = counts
+        turn.handle.patch.set_metric("subagents", counts[0])
+        turn.handle.patch.set_metric("background_jobs", counts[1])
+
+    async def _cancel_work(self, turn: _Turn) -> None:
+        """Stop the work of the run: delegations interrupted, processes killed (R-AG-44)."""
+        try:
+            await self.runtime.cancel_background(turn.thread_id)
+        except Exception as exc:  # the run still ends; the log names the failure
+            _LOG.warning(
+                "run %s: background work not cancelled: %s", turn.run_id, type(exc).__name__
+            )
+        if turn.dropped or turn.handle.finished:
+            return
+        with self._bound(turn):
+            for task_id, (step, shown) in list(turn.work_steps.items()):
+                if shown == "running":
+                    turn.handle.patch.update_step(step, status="cancelled", finished_at=self._now())
+                    turn.work_steps[task_id] = (step, "cancelled")
+            if turn.work_counts != (0, 0):
+                turn.work_counts = (0, 0)
+                turn.handle.patch.set_metric("subagents", 0)
+                turn.handle.patch.set_metric("background_jobs", 0)
+
+    def _touch(self, turn: _Turn) -> None:
+        """A sign of a turn of the run: the settle time starts again, the hold looks at once."""
+        turn.last_busy = time.monotonic()
+        turn.wake.set()
+
+    def _start_followup(self, turn: _Turn, message: Message) -> None:
+        """Start a follow-up's own turn; the run counts it as running at once."""
+        turn.own_turns += 1
+        self._spawn(self._followup_turn(turn, message))
+
+    async def _followup_turn(self, turn: _Turn, message: Message) -> None:
+        """A follow-up while the run holds background work: a turn of its own in the run.
+
+        The person's text is the turn's text, the user side carries the format rules and the
+        channel instructions (the run context rode the run's first turn); the follow-up is
+        ``delivered`` at the start and ``absorbed`` when the turn completed (09 17.12).
+        """
+        message_id = message.id
+        run = turn.handle
+        turn.final_reply = False
+        turn.steered.append(message_id)
+        self._touch(turn)
+        author = message.author
+        request = TurnRequest(
+            run_id=turn.run_id,
+            thread_id=turn.thread_id,
+            channel_id=turn.channel_id,
+            user_id=author.id,
+            user_name=str(getattr(author, "display_name", "") or ""),
+            message_id=message_id,
+            user_text=_content(message),
+            user_side=turn.built.user_side,
+            context_taken=True,
+        )
+        outcome = TurnOutcome.FAILED
+        try:
+            with contextlib.suppress(ValueError):
+                run.patch.followup_delivered(message_id)
+            outcome = await self.runtime.start_turn(request)
+        finally:
+            turn.own_turns -= 1
+            self._touch(turn)
+        if turn.dropped or turn.handle.finished:
+            return
+        if turn.live is not None:
+            turn.live.end(failed=outcome is not TurnOutcome.COMPLETED)
+        await self._flush_edits(turn)
+        if outcome is TurnOutcome.COMPLETED:
+            with contextlib.suppress(ValueError):
+                run.patch.followup_absorbed(message_id)
+        else:
+            turn.failed_turn = True
 
     def _usage(self, turn: _Turn) -> tuple[RunMetrics | None, list[CostReport]]:
         if not turn.usage:
@@ -776,11 +988,12 @@ class HermesHandler(AgentHandler):
                 _LOG.info("run %s: title refused code=%s", turn.run_id, exc.code)
 
     async def _abandon(self, turn: _Turn) -> None:
-        """A cancelled run: interrupt the turn and drop every later callback (09 8)."""
+        """A cancelled run: interrupt the turn, cancel its work, drop later callbacks (09 8)."""
         turn.dropped = True
         if turn.live is not None:
             turn.live.drop()
         await self._interrupt(turn)
+        await self._cancel_work(turn)
 
     async def _interrupt(self, turn: _Turn) -> None:
         if turn.interrupted:
@@ -842,11 +1055,20 @@ class HermesHandler(AgentHandler):
             # undelivered, the server's follow-on run takes it as its triggering message, whose
             # files reach Hermes as media (09 7; D-FIX-HIMG-3).
             return
+        if turn.held:
+            # The run holds background work: the follow-up is a turn of its own (09 17.12).
+            turn.pending.append(message)
+            self._touch(turn)
+            return
         text = _content(message)
         if await self._into_turn(turn, text, message_id):
             with contextlib.suppress(ValueError):
                 run.patch.followup_delivered(message_id)
             turn.steered.append(message_id)
+        else:
+            # Not taken by this turn: a turn of its own if the run comes to hold background
+            # work; otherwise it stays queued for the follow-on run (09 7).
+            turn.pending.append(message)
 
     async def _into_turn(self, turn: _Turn, text: str, message_id: UUID) -> bool:
         """Pass a person's text into the running turn: the one place that may (09 7, 17.5).
@@ -961,9 +1183,12 @@ class HermesHandler(AgentHandler):
             _LOG.info("run %s: interaction answer refused code=%s", run.run_id, exc.code)
 
     async def _until_settled(self, turn: _Turn) -> None:
-        """Wait until the turn ended or waits again, so the SDK does not end the run early."""
+        """Wait until the turn ended or waits again, so the SDK does not end the run early.
+
+        While the run holds background work the run's ``execute`` keeps it open, so nothing waits.
+        """
         turn.settled.clear()
-        if turn.ended or turn.card is not None:
+        if turn.ended or turn.held or turn.card is not None:
             return
         try:
             await turn.settled.wait()
@@ -1090,6 +1315,9 @@ class HermesHandler(AgentHandler):
         """A status sentence (``set_status_text``); opens or closes a step."""
         turn = self._active(thread_id)
         if turn is not None and turn.live is not None:
+            if text is not None and turn.held and turn.own_turns == 0:
+                turn.internal = True  # a turn Hermes started itself is at work (17.12)
+            self._touch(turn)
             with self._bound(turn):
                 turn.live.status(text)
 
@@ -1134,6 +1362,7 @@ class HermesHandler(AgentHandler):
                 run_id=turn.run_id,
                 reply_to_message_id=_quote(turn, reply_to),
             )
+        self._touch(turn)
         if entry.message_id is None:
             return None
         key = str(entry.message_id)
@@ -1329,6 +1558,54 @@ class HermesHandler(AgentHandler):
         if turn is not None and not turn.dropped:
             turn.final_reply = not tool_calls
 
+    def on_turn_started(self, thread_id: UUID) -> None:
+        """Hermes started a turn of the thread (``pre_llm_call``).
+
+        While the run holds background work and no turn of the adapter runs, it is a turn Hermes
+        started itself (the result of a delegation or a process): a turn of the run (17.12).
+        Without an open run the turn has no run; its tool calls are refused (R-AG-44).
+        """
+        turn = self._active(thread_id)
+        if turn is None:
+            _LOG.info("thread %s: a Hermes turn without a run", thread_id)
+            return
+        if turn.held and turn.own_turns == 0:
+            turn.internal = True
+        self._touch(turn)
+
+    def on_turn_ended(self, thread_id: UUID) -> None:
+        """A turn of the thread ended its agent loop (``on_session_end``)."""
+        turn = self._turns.get(thread_id)
+        if turn is None or turn.dropped or not turn.held or turn.own_turns > 0:
+            return
+        turn.internal = False
+        if turn.live is not None and not turn.ended:
+            with self._bound(turn):
+                turn.live.end()
+        self._touch(turn)
+
+    def tool_allowed(self, thread_id: UUID | None) -> bool:
+        """Whether a tool may run now in the thread: only while a run of it is open (R-AG-44).
+
+        Hermes calls it from its agent threads (``pre_tool_call``), so it only reads.
+
+        Args:
+            thread_id: The thread of the tool call, ``None`` when it cannot be told.
+
+        Returns:
+            True while a run of the adapter in the thread is open and not ending.
+        """
+        if thread_id is None:
+            return False
+        turn = self._turns.get(thread_id)
+        return (
+            turn is not None
+            and not turn.dropped
+            and not turn.ended
+            and turn.abort_reason is None
+            and not turn.handle.finished
+        )
+
     # ---- for tests and the platform ----------------------------------------------------------
 
     def active_run(self, thread_id: UUID) -> UUID | None:
@@ -1342,6 +1619,20 @@ class HermesHandler(AgentHandler):
         """
         turn = self._active(thread_id)
         return turn.run_id if turn is not None else None
+
+
+def _gone(turn: _Turn) -> bool:
+    """Whether the run was cancelled or has ended (read again after an ``await``)."""
+    return turn.dropped or turn.handle.finished
+
+
+def _one_line(text: str, limit: int) -> str:
+    """A step title: one line without control or direction characters, at most ``limit``."""
+    cleaned = "".join(
+        " " if unicodedata.category(c) in ("Cc", "Cf", "Zl", "Zp") else c for c in text
+    )
+    words = " ".join(cleaned.split())
+    return words if len(words) <= limit else words[: limit - 3].rstrip() + "..."
 
 
 def _quote(turn: _Turn, reply_to: str | None) -> UUID | None:

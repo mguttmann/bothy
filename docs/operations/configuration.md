@@ -477,6 +477,9 @@ Source: [09-agents.md](../spec/09-agents.md), section 21.
 | `hermes_adapter.dpop_key_file` |  | Hermes adapter |  | no default | private key of the DPoP proofs; without it no DPoP |  |
 | `hermes_adapter.max_message_bytes` |  | Hermes adapter |  | `262144` | longest answer text; the rest of a longer answer goes as one attachment of the same message (17.3, 01 6.13); the default equals `message.max_content_bytes`, both change together |  |
 | `hermes_adapter.attachment_text_max_bytes` |  | Hermes adapter |  | `32768` | longest attachment text the adapter inlines as a data block; the default equals `agent.context_message_max_bytes` |  |
+| `hermes_adapter.background_poll_interval` |  | Hermes adapter |  | `2s` | how often a run that holds background work reads Hermes' registries (17.12) |  |
+| `hermes_adapter.background_settle` |  | Hermes adapter |  | `15s` | how long a run that saw background work stays open after the work ended and no turn of the thread ran, for the turn Hermes starts with the result (17.12) |  |
+| `hermes_adapter.background_progress_interval` |  | Hermes adapter |  | `2m` | while background work runs, `/metrics/progress_events` rises once per interval; must stay below the server's `run.stall_after` (17.12) |  |
 | `runner.claude_bin` |  | Runner |  | `claude` | program, searched in the cleaned `PATH` |  |
 | `runner.git_bin` |  | Runner |  | `git` | program for the folder creation of 18.12, searched in the cleaned `PATH` |  |
 | `runner.provision_timeout` |  | Runner |  | `10m` | time limit of one folder creation (`git init` or `git clone`, 18.12) |  |

@@ -72,6 +72,9 @@ def test_config_defaults_and_values() -> None:
         ("hermes_adapter.max_message_bytes", True),
         ("sdk.retry_max_attempts", "zero"),
         ("hermes_adapter.server_url", ""),
+        ("hermes_adapter.background_poll_interval", "soon"),
+        ("hermes_adapter.background_settle", 0),
+        ("hermes_adapter.background_progress_interval", True),
     ],
 )
 def test_config_rejects_invalid_values(key: str, value: Any) -> None:
@@ -132,3 +135,40 @@ def test_max_message_bytes_default_matches_server() -> None:
     assert int(_default_of("hermes_adapter.attachment_text_max_bytes")) == (
         DEFAULT_ATTACHMENT_TEXT_MAX_BYTES
     )
+
+
+def test_background_durations() -> None:
+    from bothy_sdk.settings import parse_duration
+
+    from bothy_hermes_adapter.defaults import (
+        DEFAULT_BACKGROUND_POLL_INTERVAL,
+        DEFAULT_BACKGROUND_PROGRESS_INTERVAL,
+        DEFAULT_BACKGROUND_SETTLE,
+    )
+
+    settings = load_settings(_extra())
+    assert settings.background_poll_interval == DEFAULT_BACKGROUND_POLL_INTERVAL
+    assert settings.background_settle == DEFAULT_BACKGROUND_SETTLE
+    assert settings.background_progress_interval == DEFAULT_BACKGROUND_PROGRESS_INTERVAL
+    for key, value in (
+        ("hermes_adapter.background_poll_interval", DEFAULT_BACKGROUND_POLL_INTERVAL),
+        ("hermes_adapter.background_settle", DEFAULT_BACKGROUND_SETTLE),
+        ("hermes_adapter.background_progress_interval", DEFAULT_BACKGROUND_PROGRESS_INTERVAL),
+    ):
+        assert parse_duration(_default_of(key)) == value
+    # The progress must come before the server's stall notice (09 5.5).
+    assert parse_duration(_default_of("run.stall_after")) > DEFAULT_BACKGROUND_PROGRESS_INTERVAL
+    custom = load_settings(
+        _extra(
+            **{
+                "hermes_adapter.background_poll_interval": "500ms",
+                "hermes_adapter.background_settle": 3,
+                "hermes_adapter.background_progress_interval": "1m",
+            }
+        )
+    )
+    assert (
+        custom.background_poll_interval,
+        custom.background_settle,
+        custom.background_progress_interval,
+    ) == (0.5, 3.0, 60.0)

@@ -132,6 +132,8 @@ One shared drawing in `packages/bothy_viz`, used by every app and the console:
 - A "waiting" state for a child: the stream has no signal that a subagent waits; a run waiting for
   a person stays the run's `waiting_input`.
 - Phases of a workflow as nodes of their own: the phase is in the agent's detail, not a node.
-- Children of other adapters (Hermes reports no subagents in the pinned version).
+- Children of other adapters: the Hermes adapter shows a delegation unit as a `subagent` step and
+  a background process as a `background_job` step since FIX-hermes-hidden-background (09 17.12),
+  without a parent step and without the tools of the subagent.
 - An index for the read of the task steps: the read is bounded by `run.max_steps_persisted` per
   run and the runs of the frame; it runs once per `stats.live_interval` only while someone watches.

@@ -211,6 +211,7 @@ nav:
       - Search assistant: design/search-assistant.md
       - Built-in agents: design/builtin-agents.md
       - Autonomous runs: design/autonomous-runs.md
+      - Background work of a Hermes run: design/hermes-background-work.md
   - Operations:
       - Configuration: operations/configuration.md
       - Installation with Compose: operations/install-compose.md

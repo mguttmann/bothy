@@ -30,8 +30,17 @@ from bothy_hermes_adapter.defaults import NO_SPLIT_LENGTH
 
 __all__ = ["HOOKS", "make_register", "parse_target_ref", "standalone_send"]
 
-HOOKS: Final = ("pre_llm_call", "on_session_reset", "post_api_request")
+HOOKS: Final = (
+    "pre_llm_call",
+    "on_session_reset",
+    "post_api_request",
+    "on_session_end",
+    "pre_tool_call",
+)
 """The Hermes plugin hooks the platform listens to."""
+
+_SESSION_SCOPED: Final = frozenset({"pre_tool_call"})
+"""Hooks without a ``platform`` argument: the platform tells its own sessions apart itself."""
 
 _PLATFORM_MODULE: Final = "bothy_hermes_adapter.platform"
 
@@ -96,13 +105,14 @@ def make_register(platform_key: str) -> Any:
 
     def hook(name: str) -> Any:
         def callback(**kwargs: Any) -> Any:
-            if str(kwargs.get("platform") or "") != platform_key:
+            if name not in _SESSION_SCOPED and str(kwargs.get("platform") or "") != platform_key:
                 return None
             # No platform exists before the factory imported its module; a hook never imports it.
             module = sys.modules.get(_PLATFORM_MODULE)
             if module is None:
                 return None
-            # pre_llm_call answers with the turn's user side (D-FHUSC-1); the others with None.
+            # pre_llm_call answers with the turn's user side (D-FHUSC-1), pre_tool_call with a
+            # refusal outside a run (R-AG-44); the others with None.
             return module.dispatch_hook(platform_key, name, kwargs)
 
         return callback

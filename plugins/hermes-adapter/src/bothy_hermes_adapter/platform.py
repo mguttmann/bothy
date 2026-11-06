@@ -37,9 +37,15 @@ of 17.3 to `bothy_hermes_adapter.handler.HermesHandler` on the adapter's event l
   handler instead of being sent. A skill command is a turn whose text is Hermes' own skill
   invocation message. At connect the adapter declares its commands
   (`bothy_hermes_adapter.hermes_commands`), the SDK reconciles them.
-* A ``send`` outside a turn of its thread (a cron job of the gateway's scheduler, a notice of a
-  background task, a send into another channel) is a report without a run (09 14):
-  `bothy_hermes_adapter.handler.HermesHandler.on_report`.
+* A ``send`` outside a turn of its thread (a cron job of the gateway's scheduler, a send into
+  another channel, the answer of a turn Hermes ran without an open run) is a report without a
+  run (09 14): `bothy_hermes_adapter.handler.HermesHandler.on_report`.
+* Background work (09 17.12, R-AG-44): the delegation units of ``tools.async_delegation`` and the
+  background processes of ``tools.process_registry`` of a thread's session are read for the
+  handler, which keeps the run open while they run; stop interrupts and kills them. The hooks
+  ``pre_llm_call`` and ``on_session_end`` tell the start and end of every turn of a thread, also
+  of one Hermes starts by itself with a result, and ``pre_tool_call`` refuses every tool call of
+  a thread without an open run.
 * Session IDs and usage come from the plugin hooks ``pre_llm_call``, ``on_session_reset`` and
   ``post_api_request`` (``pre_llm_call`` also answers with the turn's user side); the thread of
   a hook or of ``set_status_text`` is the session's thread variable of the turn
@@ -83,7 +89,13 @@ from hermes_cli import __version__ as hermes_version
 from hermes_constants import get_hermes_home
 from tools import slash_confirm
 from tools.approval import resolve_gateway_approval
+from tools.async_delegation import (
+    get_durable_delegation,
+    interrupt_for_session,
+    list_async_delegations,
+)
 from tools.clarify_gateway import resolve_gateway_clarify
+from tools.process_registry import process_registry
 from tools.transcription_tools import _get_provider, _load_stt_config, is_stt_enabled
 
 from bothy_hermes_adapter import __version__, cards, hermes_config
@@ -95,13 +107,15 @@ from bothy_hermes_adapter.config import (
 )
 from bothy_hermes_adapter.context_format import ComposedUserSide
 from bothy_hermes_adapter.defaults import NO_SPLIT_LENGTH
-from bothy_hermes_adapter.handler import HermesHandler
+from bothy_hermes_adapter.handler import TOOL_REFUSED, HermesHandler
 from bothy_hermes_adapter.heartbeat import ADAPTER_NAME, RUNTIME_NAME, HermesAdapterLoop
 from bothy_hermes_adapter.hermes_commands import declared_commands
 from bothy_hermes_adapter.installer import CONTROL_SENDER
 from bothy_hermes_adapter.media import audio_cache_ext
 from bothy_hermes_adapter.reports import ReportError
 from bothy_hermes_adapter.runtime import (
+    BackgroundKind,
+    BackgroundTask,
     CardKind,
     CardRequest,
     CommandRequest,
@@ -122,6 +136,11 @@ __all__ = ["CONTROL_SENDER", "ServerPlatform", "dispatch_hook"]
 _LOG = logging.getLogger("bothy_hermes_adapter")
 
 _THREAD_VAR: Final = "HERMES_SESSION_THREAD_ID"
+_PLATFORM_VAR: Final = "HERMES_SESSION_PLATFORM"
+# Delegation unit states of the pinned version (tools/async_delegation.py): live ones hold the run,
+# ended ones map to a step status; any other ended state is a failure.
+_LIVE_DELEGATION: Final = frozenset({"running", "stalling", "finalizing"})
+_ENDED_DELEGATION: Final = {"completed": "completed", "interrupted": "cancelled"}
 _OUTCOMES: Final = {
     ProcessingOutcome.SUCCESS: TurnOutcome.COMPLETED,
     ProcessingOutcome.FAILURE: TurnOutcome.FAILED,
@@ -415,7 +434,7 @@ class ServerPlatform(BasePlatformAdapter):
         event = self._event(
             turn.thread_id, turn.user_text, message_id=str(turn.message_id), control=False
         )
-        _remember(self._user_sides, turn.thread_id, (self._user_side(turn), False))
+        _remember(self._user_sides, turn.thread_id, (self._user_side(turn), turn.context_taken))
         if turn.new_session:
             event.text = self._with_bound_skills(turn, event)
         self._attach(event, turn.media)
@@ -717,6 +736,41 @@ class ServerPlatform(BasePlatformAdapter):
         if cached is None:
             return None
         return InboundMedia(str(cached.path), str(cached.media_type))
+
+    def _session_key(self, thread_id: uuid.UUID) -> str | None:
+        """Hermes' session key of a thread a turn of this process ran in (17.4), else ``None``."""
+        source = self._sources.get(thread_id)
+        if source is None:
+            return None
+        channel, user_id, user_name = source
+        event = MessageEvent(
+            text="",
+            message_type=MessageType.TEXT,
+            source=self.build_source(
+                chat_id=channel,
+                chat_type="thread",
+                thread_id=str(thread_id),
+                user_id=user_id,
+                user_name=user_name,
+            ),
+        )
+        return str(self._event_session_key(event))
+
+    async def background_work(
+        self, thread_id: uuid.UUID, since: float
+    ) -> tuple[BackgroundTask, ...]:
+        """The thread session's delegation units and background processes since ``since``."""
+        key = self._session_key(thread_id)
+        if key is None:
+            return ()
+        return await asyncio.to_thread(_read_background, key, since)
+
+    async def cancel_background(self, thread_id: uuid.UUID) -> None:
+        """Interrupt the session's delegations and kill its running processes (17.12 point 6)."""
+        key = self._session_key(thread_id)
+        if key is None:
+            return
+        await asyncio.to_thread(_cancel_background, key)
 
     # ---- Hermes callbacks (17.3) --------------------------------------------------------------
 
@@ -1067,11 +1121,22 @@ class ServerPlatform(BasePlatformAdapter):
 
         Returns:
             For ``pre_llm_call`` of a thread with a run: the ``context`` Hermes appends to the
-            turn's user text (D-FHUSC-1); else ``None``.
+            turn's user text (D-FHUSC-1); for ``pre_tool_call`` of a thread without an open run:
+            the block that refuses the call (R-AG-44); else ``None``.
         """
+        if name == "pre_tool_call":
+            return self._tool_gate()
         thread = self._thread("", None)
         if thread is None:
             return None
+        if name == "on_session_end":
+            # Only the thread's own session: a subagent's loop ends in its own session.
+            session_id = kwargs.get("session_id")
+            if self.handler is not None and session_id == self._sessions.get(thread):
+                self._post(self.handler.on_turn_ended, thread)
+            return None
+        if name == "pre_llm_call" and self.handler is not None:
+            self._post(self.handler.on_turn_started, thread)
         if name == "pre_llm_call":
             session_id = kwargs.get("session_id")
             if session_id:
@@ -1097,6 +1162,22 @@ class ServerPlatform(BasePlatformAdapter):
         if name == "pre_llm_call":
             return self._user_side_context(thread)
         return None
+
+    def _tool_gate(self) -> dict[str, str] | None:
+        """``pre_tool_call``: refuse a tool call of this platform's thread without an open run.
+
+        Hermes calls the hook from its agent threads, for every tool call of every session of the
+        profile; only a session of this platform is judged. A session of this platform whose
+        thread cannot be told is refused too (fail closed, 09 17.12 point 7).
+        """
+        if str(get_session_env(_PLATFORM_VAR, "")) != self.platform_key:
+            return None
+        thread = _uuid_of(get_session_env(_THREAD_VAR, ""))
+        handler = self.handler
+        if handler is not None and handler.tool_allowed(thread):
+            return None
+        _LOG.info("thread %s: tool call refused code=no_active_run", thread)
+        return {"action": "block", "message": TOOL_REFUSED}
 
     def _persist_session(self, thread: uuid.UUID) -> None:
         """Keep the thread's session across restarts (09 9.1): a new process must know it."""
@@ -1152,6 +1233,70 @@ def _usage(kwargs: Mapping[str, Any]) -> Usage | None:
         tokens_cache_read=number("cache_read_tokens", "cache_read_input_tokens"),
         tokens_cache_write=number("cache_write_tokens", "cache_creation_input_tokens"),
     )
+
+
+def _read_background(session_key: str, since: float) -> tuple[BackgroundTask, ...]:
+    """Hermes' registries: the session's delegation units and processes started since ``since``.
+
+    A unit is open while it is live or while its result turn is not admitted yet (the durable
+    ``delivery_state`` ``pending``); a process while it runs (09 17.12 point 1).
+    """
+    found: list[BackgroundTask] = []
+    for record in list_async_delegations():
+        if str(record.get("session_key") or "") != session_key:
+            continue
+        if float(record.get("dispatched_at") or 0.0) < since:
+            continue
+        delegation_id = str(record.get("delegation_id") or "")
+        status = str(record.get("status") or "")
+        if status in _LIVE_DELEGATION:
+            state, is_open = "running", True
+        else:
+            state = _ENDED_DELEGATION.get(status, "failed")
+            durable = get_durable_delegation(delegation_id)
+            is_open = durable is not None and durable.get("delivery_state") == "pending"
+        found.append(
+            BackgroundTask(
+                f"delegation:{delegation_id}",
+                BackgroundKind.SUBAGENT,
+                str(record.get("goal") or ""),
+                state,
+                is_open,
+            )
+        )
+    for entry in process_registry.list_sessions(session_key=session_key):
+        process_id = str(entry.get("session_id") or "")
+        process = process_registry.get(process_id)
+        if process is None or float(process.started_at) < since:
+            continue
+        running = entry.get("status") == "running"
+        state = "running" if running else "completed" if entry.get("exit_code") == 0 else "failed"
+        found.append(
+            BackgroundTask(
+                f"process:{process_id}",
+                BackgroundKind.JOB,
+                str(entry.get("command") or ""),
+                state,
+                running,
+            )
+        )
+    return tuple(found)
+
+
+def _cancel_background(session_key: str) -> None:
+    """Interrupt the session's live delegation units and kill its running processes.
+
+    A killed process's output is consumed, so Hermes starts no turn for it; an interrupted unit
+    reports itself in a turn that has no run (09 17.12 points 6 and 7).
+    """
+    interrupted = interrupt_for_session(session_key=session_key, reason="run_stopped")
+    killed = 0
+    for entry in process_registry.list_sessions(session_key=session_key):
+        if entry.get("status") == "running":
+            process_registry.kill_process(str(entry.get("session_id") or ""))
+            killed += 1
+    if interrupted or killed:
+        _LOG.info("background work stopped: delegations=%s processes=%s", interrupted, killed)
 
 
 def _state_dir(platform_key: str) -> Path:
