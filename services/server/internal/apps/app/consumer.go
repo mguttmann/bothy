@@ -63,14 +63,14 @@ func (c *Consumer) memo(ctx context.Context) (*roundMemo, error) {
 	return m, txn.Store(ctx, memoKey, m)
 }
 
-// HandleEvent implements sync.ConsumerHandler (M2-26 design note 3 a to e): skip types apps cannot
-// subscribe to; for each candidate whose event types and installation subscriptions name the
-// type (a personal event only for the installation of its audience) insert the pending row; pause
-// an active subscription whose open count crosses webhook.max_pending_per_subscription; schedule
-// one job per active subscription with an active installation that got a row in this round.
-// Rights are not checked here: they apply at delivery time.
+// HandleEvent implements sync.ConsumerHandler (M2-26 design note 3 a to e): skip types neither
+// apps nor agents can subscribe to; for each candidate that matches the event (matches) insert the
+// pending row; pause an active subscription whose open count crosses
+// webhook.max_pending_per_subscription; schedule one job per active subscription with an active
+// installation, or of an agent, that got a row in this round. Rights are not checked here: they
+// apply at delivery time.
 func (c *Consumer) HandleEvent(ctx context.Context, ev sync.Event) error {
-	if !domain.AppSubscribable(ev.Type) {
+	if !domain.Subscribable(ev.Type) {
 		return nil
 	}
 	m, err := c.memo(ctx)
@@ -78,10 +78,7 @@ func (c *Consumer) HandleEvent(ctx context.Context, ev sync.Event) error {
 		return err
 	}
 	for _, cand := range m.candidates {
-		if !slices.Contains(cand.EventTypes, ev.Type) || !slices.Contains(cand.InstallationEvents, ev.Type) {
-			continue
-		}
-		if !ev.AudiencePrincipalID.IsZero() && ev.AudiencePrincipalID != cand.AppID {
+		if !matches(cand, ev) {
 			continue
 		}
 		if err := c.add(ctx, m, cand, ev); err != nil {
@@ -89,6 +86,29 @@ func (c *Consumer) HandleEvent(ctx context.Context, ev sync.Event) error {
 		}
 	}
 	return nil
+}
+
+// matches reports whether ev belongs to cand: an app candidate needs an app type that its event
+// types and the event subscriptions of its installation name; an agent candidate (V1-01) an agent
+// type its event types name. A personal event goes only to the subscriptions of its audience.
+func matches(cand Candidate, ev sync.Event) bool {
+	owner := cand.AppID
+	if !cand.AgentID.IsZero() {
+		owner = cand.AgentID
+		if !domain.AgentSubscribable(ev.Type) || !slices.Contains(cand.EventTypes, ev.Type) {
+			return false
+		}
+	} else if !domain.AppSubscribable(ev.Type) || !slices.Contains(cand.EventTypes, ev.Type) ||
+		!slices.Contains(cand.InstallationEvents, ev.Type) {
+		return false
+	}
+	return ev.AudiencePrincipalID.IsZero() || ev.AudiencePrincipalID == owner
+}
+
+// deliverable reports whether a row of cand may be sent now: an agent subscription always, an app
+// subscription while its installation is active (a suspended one waits for app.resume).
+func (cand Candidate) deliverable() bool {
+	return !cand.AgentID.IsZero() || cand.InstallationState == domain.StateActive
 }
 
 // add inserts the row of ev for cand and applies the quota and the job of design note 3 d and e.
@@ -117,7 +137,7 @@ func (c *Consumer) add(ctx context.Context, m *roundMemo, cand Candidate, ev syn
 		}
 		m.state[cand.SubscriptionID] = domain.SubscriptionPaused
 	}
-	if m.state[cand.SubscriptionID] == domain.SubscriptionActive && cand.InstallationState == domain.StateActive && !m.scheduled[cand.SubscriptionID] {
+	if m.state[cand.SubscriptionID] == domain.SubscriptionActive && cand.deliverable() && !m.scheduled[cand.SubscriptionID] {
 		if err := c.w.d.Scheduler.Schedule(ctx, cand.SubscriptionID, c.w.now()); err != nil {
 			return err
 		}
@@ -128,7 +148,8 @@ func (c *Consumer) add(ctx context.Context, m *roundMemo, cand Candidate, ev syn
 
 // HandleLost implements sync.ConsumerLossHandler (M2-26 design note 3 f): the consumer itself
 // fell behind sync.event_retention, so every app subscription in state active or paused whose
-// installation is active or suspended becomes disabled with cause gap; its pending rows, all below
+// installation is active or suspended, and every agent subscription in state active or paused,
+// becomes disabled with cause gap; its pending rows, all below
 // the lost range, become dead with event_expired. The audit entry names from_seq (the lowest seq
 // of those rows, else from) and to_seq. A re-enable continues with the events read after it.
 func (c *Consumer) HandleLost(ctx context.Context, from, to int64) error {
@@ -182,7 +203,7 @@ const (
 
 // applyTransition applies the system event ev to rec in memory (disabled_at on a change to
 // disabled), writes the audit entry of webhook_out.transition in the unit of ctx (R-AZ-27: no
-// actor, resource the app) and the warn line; the caller writes rec. A change the rules refuse
+// actor, resource the app or the agent) and the warn line; the caller writes rec. A change the rules refuse
 // is no error and changes nothing.
 func (w *WebhookService) applyTransition(ctx context.Context, rec *SubscriptionRecord, ev domain.SubscriptionEvent, fromSeq, toSeq int64) error {
 	from := rec.State
@@ -201,9 +222,10 @@ func (w *WebhookService) applyTransition(ctx context.Context, rec *SubscriptionR
 	if ev == domain.EventGap {
 		attrs[attrFromSeq], attrs[attrToSeq] = auditing.Int(fromSeq), auditing.Int(toSeq)
 	}
+	res := ownerResource(*rec)
 	if err := w.d.Audit.Record(ctx, auditing.Entry{
 		Action: string(authorize.ActionWebhookOutTransition), Decision: auditing.DecisionAllow,
-		ResourceKind: string(authorize.ResourceApp), ResourceID: rec.AppID, Attrs: attrs,
+		ResourceKind: string(res.Kind), ResourceID: res.ID, Attrs: attrs,
 	}); err != nil {
 		return errs.Wrap(errs.CodeInternalError, err, "apps: audit of a subscription transition")
 	}

@@ -307,7 +307,7 @@ func TestLoadInputs_RejectsSecurityOverrideOfEnabledOperation(t *testing.T) {
 	}
 
 	spec, catalog, list = specWith(t, pairs...)
-	writeFile(t, list, "version: 1\nenabled: [createThing, getThing]\nlater:\n  - operation_id: updateThing\n    milestone: M3\n")
+	writeFile(t, list, "version: 1\nenabled: [createThing, getThing]\nlater:\n  - operation_id: updateThing\n    milestone: M3\n    reason: r\n    feature: f\n")
 	if _, err := loadInputs(spec, catalog, list); err != nil {
 		t.Errorf("a later operation with its own security is fine until it is enabled: %v", err)
 	}

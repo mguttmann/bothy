@@ -32,15 +32,18 @@ const sectionGatewayOps = "gateway_ops"
 var (
 	requiredListKeys = []string{"version", sectionEnabled, sectionLater}
 	listKeys         = []string{"version", sectionEnabled, sectionLater, sectionGatewayOps}
-	laterKeys        = []string{"operation_id", "milestone", "ticket"}
+	laterKeys        = []string{"operation_id", "milestone", "ticket", "reason", "feature"}
 )
 
 // laterEntry is one operation that has no handler yet, with the milestone (and optionally the
-// ticket) that builds it.
+// ticket) that builds it, the reason why it waits and the feature of
+// docs/spec/01-product.md section 3 it belongs to (P-04, V1-01).
 type laterEntry struct {
 	OperationID string `yaml:"operation_id"`
 	Milestone   string `yaml:"milestone"`
 	Ticket      string `yaml:"ticket"`
+	Reason      string `yaml:"reason"`
+	Feature     string `yaml:"feature"`
 }
 
 // enableList is the decoded enable list.
@@ -112,7 +115,9 @@ func knownKeys(path, where string, n *yaml.Node, allowed []string, p *problemsEr
 	}
 }
 
-// checkLaterEntry checks the fields of one later entry.
+// checkLaterEntry checks the fields of one later entry: operation ID, milestone, the optional
+// ticket of that milestone, and a non-blank reason and feature. Whether the feature is one that
+// docs/spec/01-product.md lists as later is the gate check TestEnableListComplete (V1-01).
 func checkLaterEntry(path string, i int, e laterEntry, p *problemsError) {
 	if e.OperationID == "" {
 		p.add(path, "later[%d]: missing operation_id", i)
@@ -124,6 +129,12 @@ func checkLaterEntry(path string, i int, e laterEntry, p *problemsError) {
 		p.add(at, "missing milestone")
 	case !milestoneForm.MatchString(e.Milestone):
 		p.add(at, "milestone %q is not one of M1 to M8 or V1 to V3", e.Milestone)
+	}
+	if strings.TrimSpace(e.Reason) == "" {
+		p.add(at, "missing reason (why the operation waits, P-04)")
+	}
+	if strings.TrimSpace(e.Feature) == "" {
+		p.add(at, "missing feature (the feature of docs/spec/01-product.md section 3 it belongs to)")
 	}
 	if e.Ticket == "" {
 		return

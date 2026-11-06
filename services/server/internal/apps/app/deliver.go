@@ -16,6 +16,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/runs"
 	"github.com/OWNER/bothy/services/server/internal/sync"
 )
 
@@ -73,7 +74,11 @@ func (w *WebhookService) claim(ctx context.Context, subscriptionID ids.ID) (clai
 		}
 		return claim{}, w.finishWithout(ctx, sub.ID, head, code)
 	}
-	req, signer, err := w.sign(ctx, sub, ev, now)
+	fields, send, err := w.invocation(ctx, sub, head, ev)
+	if err != nil || !send {
+		return claim{}, err
+	}
+	req, signer, err := w.sign(ctx, sub, ev, fields, now)
 	if err != nil {
 		return claim{}, err
 	}
@@ -90,28 +95,75 @@ func (w *WebhookService) claim(ctx context.Context, subscriptionID ids.ID) (clai
 
 // refusal returns the code that ends the head without a request (design note 4 c and d):
 // not_subscribed when the type left the event types of the subscription or of the installation,
-// not_authorized when webhook_out.deliver does not allow it; "" when the attempt may go out.
+// not_authorized when webhook_out.deliver does not allow it; "" when the attempt may go out. An
+// agent subscription (V1-01) has no installation; the agent itself is the receiver.
 func (w *WebhookService) refusal(ctx context.Context, sub SubscriptionRecord, inst InstallationRecord, ev sync.Event) (string, error) {
-	if !slices.Contains(sub.EventTypes, ev.Type) || !slices.Contains(inst.EventSubscriptions, ev.Type) {
+	receiver := actor.Actor{ID: sub.AgentID, Kind: actor.KindAgent}
+	if sub.AgentID.IsZero() {
+		if !slices.Contains(inst.EventSubscriptions, ev.Type) {
+			return apps.LastErrorNotSubscribed, nil
+		}
+		receiver = actor.Actor{ID: inst.AppID, Kind: actor.KindApp, InstallationID: inst.ID, GrantedScopes: slices.Clone(inst.GrantedScopes)}
+	}
+	if !slices.Contains(sub.EventTypes, ev.Type) {
 		return apps.LastErrorNotSubscribed, nil
 	}
-	allowed, err := w.mayReceive(ctx, inst, ev)
+	allowed, err := w.mayReceive(ctx, receiver, ev)
 	if err != nil || allowed {
 		return "", err
 	}
 	return apps.LastErrorNotAuthorized, nil
 }
 
+// invocation prepares the delivery fields of one attempt (V1-01; 09 section 4.2, R-SY-07): an
+// invocation-bearing event to an agent subscription passes runs.Delivery before every attempt, a
+// retry included, and carries the fresh invocation token it returns, a retry with redelivered.
+// A denial ends the head dead with not_authorized without a request (the run failed in this unit);
+// a hold (maintenance mode) sends nothing, keeps the head pending without an attempt and tries
+// again after webhook.retry_backoff_base. send is false in both cases. Every other event goes out
+// without a token.
+func (w *WebhookService) invocation(ctx context.Context, sub SubscriptionRecord, head DeliveryRecord, ev sync.Event) (sync.DeliveryFields, bool, error) {
+	if sub.AgentID.IsZero() {
+		return sync.DeliveryFields{}, true, nil
+	}
+	fields := sync.DeliveryFields{IncludeTraceContext: true, Redelivered: head.Attempt > 0}
+	if !runs.InvocationBearing(ev.Type) {
+		return fields, true, nil
+	}
+	out, err := w.d.Invocations.Prepare(ctx, runs.DeliveryInput{
+		AgentID: sub.AgentID, EventID: ev.ID, Seq: ev.Seq, Type: ev.Type, ResourceKind: ev.ResourceKind, ResourceID: ev.ResourceID,
+		Payload: ev.Payload, CorrelationID: ev.CorrelationID, Redelivered: fields.Redelivered,
+	})
+	switch {
+	case err != nil:
+		return sync.DeliveryFields{}, false, err
+	case out.Hold:
+		head.NextAttemptAt = w.now().Add(w.cfg.RetryBackoffBase)
+		if err := w.d.Store.UpdateDelivery(ctx, head); err != nil {
+			return sync.DeliveryFields{}, false, err
+		}
+		return sync.DeliveryFields{}, false, w.d.Scheduler.Schedule(ctx, sub.ID, head.NextAttemptAt)
+	case !out.Send:
+		return sync.DeliveryFields{}, false, w.finishWithout(ctx, sub.ID, head, apps.LastErrorNotAuthorized)
+	}
+	fields.InvocationToken = out.InvocationToken
+	return fields, true, nil
+}
+
 // dueHead is step a of design note 4: lock the subscription, and report its head when the
-// subscription is active, its installation active and the head due; due is false otherwise.
+// subscription is active, its installation active (an agent subscription has none) and the head
+// due; due is false otherwise.
 func (w *WebhookService) dueHead(ctx context.Context, subscriptionID ids.ID) (SubscriptionRecord, InstallationRecord, DeliveryRecord, bool, error) {
 	sub, found, err := w.d.Store.LockSubscription(ctx, subscriptionID)
 	if err != nil || !found || sub.State != domain.SubscriptionActive {
 		return SubscriptionRecord{}, InstallationRecord{}, DeliveryRecord{}, false, err
 	}
-	inst, found, err := w.d.Store.Installation(ctx, sub.InstallationID)
-	if err != nil || !found || inst.State != domain.StateActive {
-		return SubscriptionRecord{}, InstallationRecord{}, DeliveryRecord{}, false, err
+	var inst InstallationRecord
+	if sub.AgentID.IsZero() {
+		inst, found, err = w.d.Store.Installation(ctx, sub.InstallationID)
+		if err != nil || !found || inst.State != domain.StateActive {
+			return SubscriptionRecord{}, InstallationRecord{}, DeliveryRecord{}, false, err
+		}
 	}
 	head, found, err := w.d.Store.Head(ctx, sub.ID)
 	if err != nil || !found || head.NextAttemptAt.After(w.now()) {
@@ -157,12 +209,11 @@ func (w *WebhookService) finishWithout(ctx context.Context, subscription ids.ID,
 	return w.d.Scheduler.Schedule(ctx, subscription, w.now())
 }
 
-// mayReceive decides webhook_out.deliver for the app of inst on ev in filter mode with the current
-// grants and scopes (design note 4 d): allow is true; any other decision is false, also a stored
-// resource kind or receive action outside the catalogue (fail closed); an error is no decision
-// and returns.
-func (w *WebhookService) mayReceive(ctx context.Context, inst InstallationRecord, ev sync.Event) (bool, error) {
-	p := actor.Actor{ID: inst.AppID, Kind: actor.KindApp, InstallationID: inst.ID, GrantedScopes: slices.Clone(inst.GrantedScopes)}
+// mayReceive decides webhook_out.deliver for the receiver p (the app of the installation or the
+// agent of the subscription) on ev in filter mode with the current grants and scopes (design note
+// 4 d): allow is true; any other decision is false, also a stored resource kind or receive action
+// outside the catalogue (fail closed); an error is no decision and returns.
+func (w *WebhookService) mayReceive(ctx context.Context, p actor.Actor, ev sync.Event) (bool, error) {
 	kind, ok := authorize.ParseResourceKind(ev.ResourceKind)
 	if !ok {
 		// A stored kind outside the catalogue cannot be decided: fail closed, no request.
@@ -187,15 +238,17 @@ func (w *WebhookService) mayReceive(ctx context.Context, inst InstallationRecord
 }
 
 // sign builds the body and the headers of one attempt (requirement 15, design note 11): the
-// envelope with sync_epoch, the Unix seconds of now, v1a with every signer of webhook_out and v1
+// envelope with sync_epoch and the delivery fields of the attempt (invocation_token, redelivered
+// and trace_context of an agent subscription), the Unix seconds of now, v1a with every signer of webhook_out and v1
 // with the derived keys of the current and, inside webhook.secret_rotation_overlap, the previous
 // generation. It returns the request and the kid of the active signer.
-func (w *WebhookService) sign(ctx context.Context, sub SubscriptionRecord, ev sync.Event, now time.Time) (SignedRequest, string, error) {
+func (w *WebhookService) sign(ctx context.Context, sub SubscriptionRecord, ev sync.Event, fields sync.DeliveryFields, now time.Time) (SignedRequest, string, error) {
 	rec, err := w.d.State.Load(ctx)
 	if err != nil {
 		return SignedRequest{}, "", err
 	}
-	body, err := json.Marshal(ev.Envelope(sync.DeliveryFields{SyncEpoch: rec.SyncEpoch}))
+	fields.SyncEpoch = rec.SyncEpoch
+	body, err := json.Marshal(ev.Envelope(fields))
 	if err != nil {
 		return SignedRequest{}, "", errs.Wrap(errs.CodeInternalError, err, "apps: envelope of a delivery")
 	}

@@ -111,7 +111,7 @@ var (
 	// System marks an action only the server runs (05 rule 10); not evaluable.
 	System = Expr{op: opSystem}
 	// Delivery is the requirement of webhook_out.deliver (M2-26 design note 8): an app principal
-	// with events:subscribe, then the audience of a personal event or the full decision of the
+	// with events:subscribe or an agent principal (V1-01), then the audience of a personal event or the full decision of the
 	// receive action of the event on the same resource (DecideDelivery). It is never evaluated as
 	// an atom, so a call that bypasses DecideDelivery fails closed.
 	Delivery = Expr{op: opDelivery}

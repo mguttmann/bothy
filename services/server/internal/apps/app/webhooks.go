@@ -20,6 +20,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
+	"github.com/OWNER/bothy/services/server/internal/runs"
 	"github.com/OWNER/bothy/services/server/internal/sync"
 )
 
@@ -76,6 +77,11 @@ type WebhookDeps struct {
 	Log sync.LogReader
 	// Cursors encodes and checks the cursors of listWebhookDeliveries.
 	Cursors Cursors
+	// Agents tells an agent from any other principal for the agent subscriptions (V1-01).
+	Agents AgentPrincipals
+	// Invocations prepares every attempt of an invocation-bearing event to an agent subscription
+	// with a freshly issued invocation token (runs.Delivery, 09 section 4.2, R-SY-07).
+	Invocations runs.Delivery
 	// Clock is the time of the writes and attempts; nil means clock.System().
 	Clock clock.Clock
 	// Rand is the random source of the jitter, rnd(n) in [0, n); nil means math/rand/v2.
@@ -101,7 +107,8 @@ var _ apps.Webhooks = (*WebhookService)(nil)
 // range, or an entry of webhook.allowed_hosts that is no host[:port].
 func NewWebhooks(cfg WebhookConfig, d WebhookDeps) (*WebhookService, error) {
 	if d.Store == nil || d.Repo == nil || d.UoW == nil || d.Authorizer == nil || d.Audit == nil || d.Scheduler == nil ||
-		d.Sender == nil || d.Master == nil || d.Keys == nil || d.State == nil || d.Log == nil || d.Cursors == nil {
+		d.Sender == nil || d.Master == nil || d.Keys == nil || d.State == nil || d.Log == nil || d.Cursors == nil || d.Agents == nil ||
+		d.Invocations == nil {
 		return nil, errors.New("apps: NewWebhooks needs every collaborator")
 	}
 	switch {
@@ -199,14 +206,14 @@ func eventTypes(types, granted []string) error {
 	return errs.New(errs.CodeValidationFailed, "The event types break the rules of webhooks.md section 1.").WithFields(fe...)
 }
 
-// view assembles the Subscription of the port.
+// subscriptionView assembles the Subscription of the port.
 func subscriptionView(r SubscriptionRecord) apps.Subscription {
 	schemes := []string{domain.SchemeV1a}
 	if r.HMACEnabled {
 		schemes = append(schemes, domain.SchemeV1)
 	}
 	return apps.Subscription{
-		ID: r.ID, AppID: r.AppID, URL: r.URL, EventTypes: nonNil(r.EventTypes), State: string(r.State),
+		ID: r.ID, AppID: r.AppID, AgentID: r.AgentID, URL: r.URL, EventTypes: nonNil(r.EventTypes), State: string(r.State),
 		ConsecutiveFailures: r.ConsecutiveFailures, SignatureSchemes: schemes, SigningKeyKID: r.SigningKeyKID,
 		CreatedAt: r.CreatedAt, DisabledAt: r.DisabledAt,
 	}
@@ -221,20 +228,48 @@ func (w *WebhookService) secret(ctx context.Context, subscription ids.ID, genera
 	return domain.FormatSecret(domain.DeriveHMACKey(master, subscription, generation)), nil
 }
 
-// manageAttrs are the details of a webhook_out.manage entry.
-func manageAttrs(r SubscriptionRecord, host, change string) auditing.Attrs {
-	return auditing.Attrs{
-		attrSubscriptionID: auditing.ID(r.ID), attrAppID: auditing.ID(r.AppID), attrChange: auditing.Code(change),
-		attrHost: manifestCode(host), attrEventTypes: codes(r.EventTypes), attrHMACEnabled: auditing.Bool(r.HMACEnabled),
-		attrHMACGeneration: auditing.Int(int64(r.HMACGeneration)),
+// attrAgentID names the agent of an agent subscription in the audit details.
+const attrAgentID = "agent_id"
+
+// ownerResource is the resource the webhook actions of r decide and audit on: the agent of an
+// agent subscription (V1-01), else the app of its installation.
+func ownerResource(r SubscriptionRecord) authorize.Resource {
+	if !r.AgentID.IsZero() {
+		return agentResource(r.AgentID)
 	}
+	return appResource(r.AppID)
 }
 
-// recordManage writes the allow entry of webhook_out.manage on the app of r.
+// agentResource is the resource of one agent.
+func agentResource(id ids.ID) authorize.Resource {
+	return authorize.Resource{Kind: authorize.ResourceAgent, ID: id}
+}
+
+// ownerAttr is the detail that names the app or the agent of r.
+func ownerAttr(r SubscriptionRecord, attrs auditing.Attrs) auditing.Attrs {
+	if !r.AgentID.IsZero() {
+		attrs[attrAgentID] = auditing.ID(r.AgentID)
+	} else {
+		attrs[attrAppID] = auditing.ID(r.AppID)
+	}
+	return attrs
+}
+
+// manageAttrs are the details of a webhook_out.manage entry.
+func manageAttrs(r SubscriptionRecord, host, change string) auditing.Attrs {
+	return ownerAttr(r, auditing.Attrs{
+		attrSubscriptionID: auditing.ID(r.ID), attrChange: auditing.Code(change),
+		attrHost: manifestCode(host), attrEventTypes: codes(r.EventTypes), attrHMACEnabled: auditing.Bool(r.HMACEnabled),
+		attrHMACGeneration: auditing.Int(int64(r.HMACGeneration)),
+	})
+}
+
+// recordManage writes the allow entry of webhook_out.manage on the app or the agent of r.
 func (w *WebhookService) recordManage(ctx context.Context, r SubscriptionRecord, host, change string) error {
+	res := ownerResource(r)
 	return w.d.Audit.Record(ctx, auditing.Entry{
-		Action: string(authorize.ActionWebhookOutManage), Decision: auditing.DecisionAllow, ResourceKind: string(authorize.ResourceApp),
-		ResourceID: r.AppID, Attrs: manageAttrs(r, host, change),
+		Action: string(authorize.ActionWebhookOutManage), Decision: auditing.DecisionAllow, ResourceKind: string(res.Kind),
+		ResourceID: res.ID, Attrs: manageAttrs(r, host, change),
 	})
 }
 
@@ -284,29 +319,115 @@ func (w *WebhookService) CreateSubscription(ctx context.Context, a actor.Actor, 
 // insert checks address and event types against the installation, inserts the subscription and
 // writes the allow entry with change created, inside the unit of ctx.
 func (w *WebhookService) insert(ctx context.Context, a actor.Actor, inst InstallationRecord, rawURL string, types []string, hmac bool) (SubscriptionRecord, error) {
-	t, err := w.target(rawURL)
-	if err != nil {
+	if err := eventTypes(types, inst.EventSubscriptions); err != nil {
 		return SubscriptionRecord{}, err
 	}
-	if err := eventTypes(types, inst.EventSubscriptions); err != nil {
+	return w.insertRecord(ctx, a, SubscriptionRecord{InstallationID: inst.ID, AppID: inst.AppID}, rawURL, types, hmac)
+}
+
+// insertRecord checks the address, inserts the subscription of the owner in base (installation
+// and app, or agent) signed by the active webhook_out key and writes the allow entry with change
+// created, inside the unit of ctx. The event types are checked by the caller.
+func (w *WebhookService) insertRecord(ctx context.Context, a actor.Actor, base SubscriptionRecord, rawURL string, types []string, hmac bool) (SubscriptionRecord, error) {
+	t, err := w.target(rawURL)
+	if err != nil {
 		return SubscriptionRecord{}, err
 	}
 	signer, err := w.d.Keys.Signer(ctx, instance.PurposeWebhookOut)
 	if err != nil {
 		return SubscriptionRecord{}, err
 	}
-	rec, err := w.d.Store.InsertSubscription(ctx, SubscriptionRecord{
-		ID: ids.New(), InstallationID: inst.ID, AppID: inst.AppID, URL: rawURL, EventTypes: slices.Clone(types),
-		SigningKeyKID: signer.KeyID(), HMACEnabled: hmac, State: domain.SubscriptionActive, CreatedBy: a.ID,
-	})
+	base.ID, base.URL, base.EventTypes, base.SigningKeyKID = ids.New(), rawURL, slices.Clone(types), signer.KeyID()
+	base.HMACEnabled, base.State, base.CreatedBy = hmac, domain.SubscriptionActive, a.ID
+	rec, err := w.d.Store.InsertSubscription(ctx, base)
 	if err != nil {
 		return SubscriptionRecord{}, err
 	}
 	return rec, w.recordManage(ctx, rec, t.Host, changeCreated)
 }
 
-// loadVisible reads the subscription id and authorizes act on its app: an unknown id is 404
-// before authorize, and a caller who cannot see the app gets the same 404 (AZ-P4).
+// agentEventTypes checks the event types of an agent subscription (400 validation_failed).
+func agentEventTypes(types []string) error {
+	fe := domain.ValidateAgentEventTypes(types)
+	if len(fe) == 0 {
+		return nil
+	}
+	return errs.New(errs.CodeValidationFailed, "The event types break the rules of webhooks.md section 7.").WithFields(fe...)
+}
+
+// knownAgent returns 404 not_found unless id is an agent principal.
+func (w *WebhookService) knownAgent(ctx context.Context, id ids.ID) error {
+	p, err := w.d.Agents.Principal(ctx, id)
+	if e, ok := errs.As(err); ok && e.Code == errs.CodeNotFound {
+		return notFound()
+	}
+	if err != nil {
+		return err
+	}
+	if p.Kind != actor.KindAgent {
+		return notFound()
+	}
+	return nil
+}
+
+// CreateAgentSubscription implements apps.Webhooks (V1-01, 09 section 4.2): webhook_out.manage on
+// the agent, then the agent must exist (404), then one unit of work that checks address and event
+// types, inserts the subscription with agent_id signed by the active webhook_out key and writes
+// the allow entry. With HMAC the derived secret comes back once.
+func (w *WebhookService) CreateAgentSubscription(ctx context.Context, a actor.Actor, cmd apps.CreateAgentSubscription) (apps.SubscriptionCreated, error) {
+	ctx, err := withCaller(ctx, a)
+	if err != nil {
+		return apps.SubscriptionCreated{}, err
+	}
+	if err := w.authorizeOn(ctx, a, authorize.ActionWebhookOutManage, agentResource(cmd.AgentID)); err != nil {
+		return apps.SubscriptionCreated{}, err
+	}
+	if err := w.knownAgent(ctx, cmd.AgentID); err != nil {
+		return apps.SubscriptionCreated{}, err
+	}
+	var rec SubscriptionRecord
+	err = w.d.UoW.Do(ctx, func(ctx context.Context) error {
+		if err := agentEventTypes(cmd.EventTypes); err != nil {
+			return err
+		}
+		var err error
+		rec, err = w.insertRecord(ctx, a, SubscriptionRecord{AgentID: cmd.AgentID}, cmd.URL, cmd.EventTypes, cmd.EnableHMAC)
+		return err
+	})
+	if err != nil {
+		return apps.SubscriptionCreated{}, err
+	}
+	out := apps.SubscriptionCreated{Subscription: subscriptionView(rec)}
+	if rec.HMACEnabled {
+		if out.HMACSecret, err = w.secret(ctx, rec.ID, rec.HMACGeneration); err != nil {
+			return apps.SubscriptionCreated{}, err
+		}
+	}
+	return out, nil
+}
+
+// ListAgentSubscriptions implements apps.Webhooks (V1-01): webhook_out.read on the agent, then
+// every subscription of the agent.
+func (w *WebhookService) ListAgentSubscriptions(ctx context.Context, a actor.Actor, agentID ids.ID) ([]apps.Subscription, error) {
+	if err := w.authorizeOn(ctx, a, authorize.ActionWebhookOutRead, agentResource(agentID)); err != nil {
+		return nil, err
+	}
+	if err := w.knownAgent(ctx, agentID); err != nil {
+		return nil, err
+	}
+	rows, err := w.d.Store.AgentSubscriptions(ctx, agentID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]apps.Subscription, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, subscriptionView(r))
+	}
+	return out, nil
+}
+
+// loadVisible reads the subscription id and authorizes act on its app or agent: an unknown id is
+// 404 before authorize, and a caller who cannot see the app or agent gets the same 404 (AZ-P4).
 func (w *WebhookService) loadVisible(ctx context.Context, a actor.Actor, act authorize.Action, id ids.ID) (SubscriptionRecord, error) {
 	rec, found, err := w.d.Store.Subscription(ctx, id)
 	if err != nil {
@@ -315,7 +436,7 @@ func (w *WebhookService) loadVisible(ctx context.Context, a actor.Actor, act aut
 	if !found {
 		return SubscriptionRecord{}, notFound()
 	}
-	return rec, w.authorizeOn(ctx, a, act, appResource(rec.AppID))
+	return rec, w.authorizeOn(ctx, a, act, ownerResource(rec))
 }
 
 // UpdateSubscription implements apps.Webhooks (M2-26 design note 2 b): webhook_out.manage on the
@@ -400,7 +521,12 @@ func (w *WebhookService) applyFields(ctx context.Context, rec *SubscriptionRecor
 		}
 		rec.URL, host, changed = *cmd.URL, t.Host, true
 	}
-	if cmd.EventTypes != nil {
+	if cmd.EventTypes != nil && !rec.AgentID.IsZero() {
+		if err := agentEventTypes(*cmd.EventTypes); err != nil {
+			return "", false, err
+		}
+		rec.EventTypes, changed = slices.Clone(*cmd.EventTypes), true
+	} else if cmd.EventTypes != nil {
 		inst, found, err := w.d.Store.Installation(ctx, rec.InstallationID)
 		if err != nil || !found {
 			return "", false, orNotFound(err)

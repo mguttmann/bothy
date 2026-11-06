@@ -294,16 +294,17 @@ func GateHumanSession(req Expr, p Principal) Decision {
 }
 
 // DeliveryGate is the first part of the requirement Delivery of webhook_out.deliver (M2-26
-// design note 8), after the liveness check: a principal that is not an app is forbidden
-// subject_kind_not_allowed (agents until the agent transport); an app without events:subscribe in
-// its granted scopes is forbidden scope_missing (05 section 2.6 "Ereignis-Abos"); a personal event
-// (audience set) is allowed for its audience and not_found not_self for anyone else. done is false
-// when the decision continues with the full decision of the receive action on the same resource.
+// design note 8), after the liveness check: a principal that is neither an app nor an agent (the
+// agent transport, 09 section 4.2, V1-01) is forbidden subject_kind_not_allowed; an app without
+// events:subscribe in its granted scopes is forbidden scope_missing (05 section 2.6
+// "Ereignis-Abos"; an agent has no scopes); a personal event (audience set) is allowed for its
+// audience and not_found not_self for anyone else. done is false when the decision continues with
+// the full decision of the receive action on the same resource.
 func DeliveryGate(p Principal, audience ids.ID) (Decision, bool) {
 	switch {
-	case p.Kind != KindApp:
+	case p.Kind != KindApp && p.Kind != KindAgent:
 		return deny(OutcomeForbidden, ReasonSubjectKindNotAllowed), true
-	case !slices.Contains(p.GrantedScopes, ScopeEventsSubscribe):
+	case p.Kind == KindApp && !slices.Contains(p.GrantedScopes, ScopeEventsSubscribe):
 		return deny(OutcomeForbidden, ReasonScopeMissing), true
 	case audience.IsZero():
 		return Decision{}, false

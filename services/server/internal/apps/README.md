@@ -162,8 +162,8 @@ sections 6 and 7, ADR 0016 and 0051. Rulings: `docs/DECISIONS.md` D-M2-26-1 to D
   delivery quota `webhook.max_pending_per_subscription` (`max_pending`); each system change is one
   entry of `webhook_out.transition` without an actor.
 - **Consumer** `webhooks`: in the round's transaction one `pending` row per matching `active` or
-  `paused` subscription of an `active` or `suspended` installation (a personal event only for its
-  audience), the quota on the crossing, one job per active subscription; a range lost to
+  `paused` subscription of an `active` or `suspended` installation or of an agent (a personal
+  event only for its audience), the quota on the crossing, one job per active subscription; a range lost to
   retention disables every live subscription (`HandleLost`).
 - **Deliveries** (`webhook_deliveries`, retention class `transient`): statuses `pending`,
   `succeeded`, `failed` (after `410`), `dead` (after `webhook.retry_max_age`, `not_authorized`,
@@ -182,6 +182,21 @@ sections 6 and 7, ADR 0016 and 0051. Rulings: `docs/DECISIONS.md` D-M2-26-1 to D
   `webhook_hmac_master_key`, generator `key`); changing it changes every derived secret, owners
   then rotate (`rotate_hmac_secret`). Committed test vectors:
   [docs/api/webhook-test-vectors.json](../../../../docs/api/webhook-test-vectors.json).
+- **Agent subscriptions** (V1-01, the webhook transport of 09 section 4.2 and 04 section 15.6;
+  rulings in `docs/decisions.d/V1-01.md`): `createAgentWebhookSubscription` and
+  `listAgentWebhookSubscriptions` decide `webhook_out.manage` and `webhook_out.read` on the agent
+  (owner; an unknown id or a principal that is no agent is the same `404`); the row sets
+  `agent_id` instead of `app_installation_id`. `event_types` are the keys under `webhooks:` of
+  openapi.yaml (`domain.ValidateAgentEventTypes`); no installation narrows them. Update and delete
+  work by id as for an app, decided and audited on the agent; the delivery list decides
+  `webhook_out.read` on the agent, redelivery decides and audits on the `webhook_delivery`. The
+  consumer adds rows for the agent's own personal events and for every other subscribed event;
+  `webhook_out.deliver` decides the agent itself in filter mode (no app scope). Before every
+  attempt of `agent.invocation`, `agent.followup`, `interaction.created` and `command.invoked`
+  the job calls `runs.Delivery.Prepare`: an allow puts its fresh `invocation_token` into the body
+  (a retry carries `redelivered`), a denial ends the row `dead` with `not_authorized` without a
+  request, a hold (maintenance mode) keeps the head pending without an attempt for
+  `webhook.retry_backoff_base` (`webhook.retry_max_age` still runs from `created_at`). `2xx` moves `last_delivered_seq`, the agent's acknowledgement.
 
 ## Incoming webhooks (M2-27)
 

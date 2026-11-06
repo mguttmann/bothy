@@ -18023,6 +18023,12 @@ type SetAgentToolClassParams struct {
 	IfMatch IfMatchRequired `json:"If-Match"`
 }
 
+// CreateAgentWebhookSubscriptionParams defines parameters for CreateAgentWebhookSubscription.
+type CreateAgentWebhookSubscriptionParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
 // ListAppsParams defines parameters for ListApps.
 type ListAppsParams struct {
 	// Cursor Cursor from `next_cursor` of the previous page.
@@ -19415,6 +19421,9 @@ type EnableAgentJSONRequestBody = ReasonBody
 
 // SetAgentToolClassJSONRequestBody defines body for SetAgentToolClass for application/json ContentType.
 type SetAgentToolClassJSONRequestBody = ToolClassSet
+
+// CreateAgentWebhookSubscriptionJSONRequestBody defines body for CreateAgentWebhookSubscription for application/json ContentType.
+type CreateAgentWebhookSubscriptionJSONRequestBody = WebhookSubscriptionCreate
 
 // ValidateManifestJSONRequestBody defines body for ValidateManifest for application/json ContentType.
 type ValidateManifestJSONRequestBody = AppManifest

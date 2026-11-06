@@ -99,6 +99,8 @@ const fixtureGatewaySection = `gateway_ops:
   later:
     - op: pong
       milestone: M2
+      reason: r
+      feature: f
 `
 
 // gatewayFixture writes the fixture with the asyncapi document and the list extended by section
@@ -145,18 +147,22 @@ func TestGatewayOps_Rules(t *testing.T) {
 		"missing section": {fixtureAsyncAPI, "", "gateway_ops"},
 		"op missing from list": {fixtureAsyncAPI, "gateway_ops:\n  enabled:\n    - ping\n  later: []\n",
 			"pong"},
-		"unknown op": {fixtureAsyncAPI, "gateway_ops:\n  enabled:\n    - ping\n    - zap\n  later:\n    - op: pong\n      milestone: M2\n",
+		"unknown op": {fixtureAsyncAPI, "gateway_ops:\n  enabled:\n    - ping\n    - zap\n  later:\n    - op: pong\n      milestone: M2\n      reason: r\n      feature: f\n",
 			"zap"},
-		"server op listed": {fixtureAsyncAPI, "gateway_ops:\n  enabled:\n    - hello\n    - ping\n  later:\n    - op: pong\n      milestone: M2\n",
+		"server op listed": {fixtureAsyncAPI, "gateway_ops:\n  enabled:\n    - hello\n    - ping\n  later:\n    - op: pong\n      milestone: M2\n      reason: r\n      feature: f\n",
 			"hello"},
-		"other channel op listed": {fixtureAsyncAPI, "gateway_ops:\n  enabled:\n    - ping\n    - side\n  later:\n    - op: pong\n      milestone: M2\n",
+		"other channel op listed": {fixtureAsyncAPI, "gateway_ops:\n  enabled:\n    - ping\n    - side\n  later:\n    - op: pong\n      milestone: M2\n      reason: r\n      feature: f\n",
 			"side"},
-		"in both sections": {fixtureAsyncAPI, "gateway_ops:\n  enabled:\n    - ping\n    - pong\n  later:\n    - op: pong\n      milestone: M2\n",
+		"in both sections": {fixtureAsyncAPI, "gateway_ops:\n  enabled:\n    - ping\n    - pong\n  later:\n    - op: pong\n      milestone: M2\n      reason: r\n      feature: f\n",
 			"pong"},
 		"unsorted": {fixtureAsyncAPI, "gateway_ops:\n  enabled:\n    - pong\n    - ping\n  later: []\n",
 			"sorted"},
-		"bad milestone": {fixtureAsyncAPI, "gateway_ops:\n  enabled:\n    - ping\n  later:\n    - op: pong\n      milestone: X9\n",
+		"bad milestone": {fixtureAsyncAPI, "gateway_ops:\n  enabled:\n    - ping\n  later:\n    - op: pong\n      milestone: X9\n      reason: r\n      feature: f\n",
 			"milestone"},
+		"missing reason": {fixtureAsyncAPI, "gateway_ops:\n  enabled:\n    - ping\n  later:\n    - op: pong\n      milestone: M2\n      feature: f\n",
+			"missing reason"},
+		"missing feature": {fixtureAsyncAPI, "gateway_ops:\n  enabled:\n    - ping\n  later:\n    - op: pong\n      milestone: M2\n      reason: r\n",
+			"missing feature"},
 		"open frame body": {strings.Replace(fixtureAsyncAPI, "schemas/ThingCreate", "schemas/Thing", 1), fixtureGatewaySection,
 			"Thing"},
 	}

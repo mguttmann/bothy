@@ -13,6 +13,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/auditing"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
+	"github.com/OWNER/bothy/services/server/internal/runs"
 	"github.com/OWNER/bothy/services/server/internal/sync"
 )
 
@@ -30,13 +31,15 @@ type (
 	stubState      struct{ app.InstanceState }
 	stubLog        struct{ sync.LogReader }
 	stubCursors    struct{ app.Cursors }
+	stubAgents     struct{ app.AgentPrincipals }
+	stubDelivery   struct{ runs.Delivery }
 )
 
 func webhookDeps() app.WebhookDeps {
 	return app.WebhookDeps{
 		Store: stubStore{}, Repo: stubRepo{}, UoW: stubUoW{}, Authorizer: stubAuthorizer{}, Audit: stubAudit{},
 		Scheduler: stubScheduler{}, Sender: stubSender{}, Master: stubMaster{}, Keys: stubKeys{}, State: stubState{},
-		Log: stubLog{}, Cursors: stubCursors{},
+		Log: stubLog{}, Cursors: stubCursors{}, Agents: stubAgents{}, Invocations: stubDelivery{},
 	}
 }
 
@@ -56,10 +59,16 @@ func TestNewWebhooksChecksItsInputs(t *testing.T) {
 	if _, err := app.NewWebhooks(webhookConfig(), webhookDeps()); err != nil {
 		t.Fatalf("valid inputs: %v", err)
 	}
-	missing := webhookDeps()
-	missing.Cursors = nil
-	if _, err := app.NewWebhooks(webhookConfig(), missing); err == nil || !strings.Contains(err.Error(), "collaborator") {
-		t.Fatalf("missing collaborator: %v", err)
+	for name, drop := range map[string]func(*app.WebhookDeps){
+		"cursors":     func(d *app.WebhookDeps) { d.Cursors = nil },
+		"agents":      func(d *app.WebhookDeps) { d.Agents = nil },
+		"invocations": func(d *app.WebhookDeps) { d.Invocations = nil },
+	} {
+		missing := webhookDeps()
+		drop(&missing)
+		if _, err := app.NewWebhooks(webhookConfig(), missing); err == nil || !strings.Contains(err.Error(), "collaborator") {
+			t.Fatalf("missing %s: %v", name, err)
+		}
 	}
 	for name, change := range map[string]func(*app.WebhookConfig){
 		"failures":   func(c *app.WebhookConfig) { c.MaxConsecutiveFailures = 0 },

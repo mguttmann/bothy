@@ -92,7 +92,7 @@ func (s *server) startApps(ctx context.Context) error {
 	state := instanceapp.NewState(instancepg.NewRepository(pool), a.UoW())
 	ap, err := NewApps(cfg, pool, AppsDeps{UoW: a.UoW(), Rights: a.RightsHook(), Authorizer: az, Audit: a.Recorder(), Identity: id,
 		Grants: admin.Admin, Clock: s.deps.Clock, Webhooks: WebhookDeps{
-			Config: wcfg, State: state, Log: sy.LogReader(), Master: master, Sender: sender, Logger: s.logger(),
+			Config: wcfg, State: state, Log: sy.LogReader(), Master: master, Sender: sender, Invocations: rn.Service, Logger: s.logger(),
 		}, Incoming: icfg, Chat: ch, Messages: msg, Commands: ag.Commands, Components: rn.Service})
 	if err != nil {
 		return err

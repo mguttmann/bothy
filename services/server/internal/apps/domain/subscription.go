@@ -303,3 +303,47 @@ func AppSubscribable(eventType string) bool { return slices.Contains(appSubscrib
 
 // AppSubscribableTypes returns the subscribable types, ascending, in a fresh slice.
 func AppSubscribableTypes() []string { return slices.Clone(appSubscribable) }
+
+// agentOnly are the event types only an agent subscription may name (webhooks.md section 7,
+// "agent subscription only"): the types with receivers agent in docs/spec/actions.yaml.
+var agentOnly = []string{"agent.config_changed", "agent.followup", "agent.invocation", "run.cancel_requested"}
+
+// AgentSubscribable reports whether an agent subscription may name eventType (V1-01, 09 section
+// 4.2): every key under webhooks: of docs/api/openapi.yaml, the app types and the agent-only ones.
+// TestAppSubscribableMatchesContract holds the set equal to the contract.
+func AgentSubscribable(eventType string) bool {
+	return AppSubscribable(eventType) || slices.Contains(agentOnly, eventType)
+}
+
+// AgentSubscribableTypes returns the types an agent subscription may name, ascending, in a fresh
+// slice.
+func AgentSubscribableTypes() []string {
+	out := append(AppSubscribableTypes(), agentOnly...)
+	slices.Sort(out)
+	return out
+}
+
+// Subscribable reports whether an app or an agent subscription may name eventType; the consumer
+// round skips every other type.
+func Subscribable(eventType string) bool { return AgentSubscribable(eventType) }
+
+// ValidateAgentEventTypes checks the event_types of an agent subscription (V1-01, 04 section
+// 15.6): at least one, no duplicates, each subscribable by agents. An agent has no installation
+// that narrows the list; the rights of the agent decide at every delivery. It returns one field
+// error per violation with the pointers of ValidateEventTypes; nil when the list is valid.
+func ValidateAgentEventTypes(types []string) []errs.FieldError {
+	if len(types) == 0 {
+		return []errs.FieldError{{Pointer: "/event_types", Code: CodeTooFewItems, Detail: "A subscription needs at least one event type."}}
+	}
+	var out []errs.FieldError
+	for i, t := range types {
+		p := "/event_types/" + strconv.Itoa(i)
+		switch {
+		case slices.Contains(types[:i], t):
+			out = append(out, errs.FieldError{Pointer: p, Code: CodeInvalid, Detail: "The event type is listed twice."})
+		case !AgentSubscribable(t):
+			out = append(out, errs.FieldError{Pointer: p, Code: CodeNotSubscribable, Detail: "Agents cannot subscribe to this event type (webhooks.md section 7)."})
+		}
+	}
+	return out
+}

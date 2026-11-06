@@ -188,7 +188,7 @@ func TestLoadInputs_RejectsListForms(t *testing.T) {
 			[]string{"version 2", "want 1"}},
 		{"unknown key", "version: 1\nenabled: [createThing, getThing, updateThing]\nlater: []\nextra: 1\n",
 			[]string{"extra"}},
-		{"ticket form", "version: 1\nenabled: [createThing, getThing]\nlater:\n  - operation_id: updateThing\n    milestone: M2\n    ticket: M2-1\n",
+		{"ticket form", "version: 1\nenabled: [createThing, getThing]\nlater:\n  - operation_id: updateThing\n    milestone: M2\n    ticket: M2-1\n    reason: r\n    feature: f\n",
 			[]string{"updateThing", `ticket "M2-1"`}},
 		{"missing milestone", "version: 1\nenabled: [createThing, getThing]\nlater:\n  - operation_id: updateThing\n",
 			[]string{"updateThing", "milestone"}},
@@ -196,8 +196,14 @@ func TestLoadInputs_RejectsListForms(t *testing.T) {
 			[]string{"later[0]", "operation_id"}},
 		{"webhook listed", "version: 1\nenabled: [createThing, getThing, thingChanged, updateThing]\nlater: []\n",
 			[]string{"thingChanged", "not an operation under paths"}},
-		{"later unsorted", "version: 1\nenabled: [createThing]\nlater:\n  - operation_id: updateThing\n    milestone: M2\n  - operation_id: getThing\n    milestone: M1\n",
+		{"later unsorted", "version: 1\nenabled: [createThing]\nlater:\n  - operation_id: updateThing\n    milestone: M2\n    reason: r\n    feature: f\n  - operation_id: getThing\n    milestone: M1\n    reason: r\n    feature: f\n",
 			[]string{"getThing", "not sorted"}},
+		{"missing reason", "version: 1\nenabled: [createThing, getThing]\nlater:\n  - operation_id: updateThing\n    milestone: M2\n    feature: f\n",
+			[]string{"updateThing", "missing reason"}},
+		{"missing feature", "version: 1\nenabled: [createThing, getThing]\nlater:\n  - operation_id: updateThing\n    milestone: M2\n    reason: r\n",
+			[]string{"updateThing", "missing feature"}},
+		{"blank reason", "version: 1\nenabled: [createThing, getThing]\nlater:\n  - operation_id: updateThing\n    milestone: M2\n    reason: \"  \"\n    feature: f\n",
+			[]string{"updateThing", "missing reason"}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

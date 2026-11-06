@@ -714,8 +714,8 @@ func (a *Authorizer) decideOn(ctx context.Context, s *actingPrincipal, act autho
 }
 
 // authorizeDelivery decides webhook_out.deliver (M2-26 design note 8): the liveness check of the
-// receiving principal, the delivery gate of domain.DeliveryGate (app kind, events:subscribe, the
-// audience of a personal event), then the full decision of the receive action r.DeliveryOf on the
+// receiving principal, the delivery gate of domain.DeliveryGate (app or agent kind, events:subscribe
+// of an app, the audience of a personal event), then the full decision of the receive action r.DeliveryOf on the
 // same resource, whose outcome is the result. Without an audience an empty DeliveryOf or
 // webhook_out.deliver itself is an internal error.
 func (a *Authorizer) authorizeDelivery(ctx context.Context, p authorize.Principal, r authorize.Resource) (authorize.Decision, error) {

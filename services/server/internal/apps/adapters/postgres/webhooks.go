@@ -26,7 +26,8 @@ func (r *Repository) InsertSubscription(ctx context.Context, s app.SubscriptionR
 		return app.SubscriptionRecord{}, err
 	}
 	row, err := q.InsertSubscription(ctx, sqlcgen.InsertSubscriptionParams{
-		ID: uuid(s.ID), AppInstallationID: uuid(s.InstallationID), Url: s.URL, EventTypes: nonNil(s.EventTypes),
+		ID: uuid(s.ID), AppInstallationID: optionalUUID(s.InstallationID), AgentID: optionalUUID(s.AgentID), Url: s.URL,
+		EventTypes:    nonNil(s.EventTypes),
 		SigningKeyKid: s.SigningKeyKID, HmacEnabled: s.HMACEnabled, CreatedBy: uuid(s.CreatedBy),
 	})
 	if err != nil {
@@ -103,6 +104,19 @@ func (r *Repository) AppSubscriptions(ctx context.Context, appID ids.ID) ([]app.
 	return out, nil
 }
 
+// AgentSubscriptions implements app.WebhookStore.
+func (r *Repository) AgentSubscriptions(ctx context.Context, agentID ids.ID) ([]app.SubscriptionRecord, error) {
+	rows, err := r.read(ctx).ListAgentSubscriptions(ctx, uuid(agentID))
+	if err != nil {
+		return nil, mapError(err, "listing the subscriptions of an agent")
+	}
+	out := make([]app.SubscriptionRecord, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, toSubscription(row, ids.ID{}))
+	}
+	return out, nil
+}
+
 // LockInstallationSubscriptions implements app.WebhookStore.
 func (r *Repository) LockInstallationSubscriptions(ctx context.Context, installationID ids.ID) ([]app.SubscriptionRecord, error) {
 	q, err := r.write(ctx)
@@ -166,8 +180,8 @@ func (r *Repository) Candidates(ctx context.Context) ([]app.Candidate, error) {
 	for _, row := range rows {
 		out = append(out, app.Candidate{
 			SubscriptionID: ids.ID(row.ID.Bytes), InstallationID: ids.ID(row.InstallationID.Bytes), AppID: ids.ID(row.AppID.Bytes),
-			EventTypes: nonNil(row.EventTypes), State: domain.SubscriptionState(row.State),
-			InstallationState: domain.State(row.InstallationState), InstallationEvents: nonNil(row.EventSubscriptions),
+			AgentID: ids.ID(row.AgentID.Bytes), EventTypes: nonNil(row.EventTypes), State: domain.SubscriptionState(row.State),
+			InstallationState: domain.State(row.InstallationState.String), InstallationEvents: nonNil(row.EventSubscriptions),
 		})
 	}
 	return out, nil
@@ -270,10 +284,11 @@ func (r *Repository) Deliveries(ctx context.Context, subscriptionID ids.ID, stat
 	return out, nil
 }
 
-// toSubscription converts a row of webhook_subscriptions of the app appID.
+// toSubscription converts a row of webhook_subscriptions of the app appID (zero for an agent
+// subscription, whose agent the row names).
 func toSubscription(s sqlcgen.WebhookSubscription, appID ids.ID) app.SubscriptionRecord {
 	return app.SubscriptionRecord{
-		ID: ids.ID(s.ID.Bytes), InstallationID: ids.ID(s.AppInstallationID.Bytes), AppID: appID, URL: s.Url,
+		ID: ids.ID(s.ID.Bytes), InstallationID: ids.ID(s.AppInstallationID.Bytes), AppID: appID, AgentID: ids.ID(s.AgentID.Bytes), URL: s.Url,
 		EventTypes: nonNil(s.EventTypes), SigningKeyKID: s.SigningKeyKid, HMACEnabled: s.HmacEnabled,
 		HMACGeneration: int(s.HmacGeneration), HMACRotatedAt: timeOf(s.HmacRotatedAt), State: domain.SubscriptionState(s.State),
 		ConsecutiveFailures: int(s.ConsecutiveFailures), LastDeliveredSeq: s.LastDeliveredSeq, CreatedBy: ids.ID(s.CreatedBy.Bytes),

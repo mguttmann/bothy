@@ -4,19 +4,22 @@
 -- the subscription row, then its delivery rows.
 
 -- name: InsertSubscription :one
-INSERT INTO webhook_subscriptions (id, app_installation_id, url, event_types, signing_key_kid, hmac_enabled,
+-- Exactly one of app_installation_id and agent_id is set (an agent subscription, V1-01).
+INSERT INTO webhook_subscriptions (id, app_installation_id, agent_id, url, event_types, signing_key_kid, hmac_enabled,
     hmac_generation, state, created_by)
-VALUES (@id, @app_installation_id, @url, @event_types, @signing_key_kid, @hmac_enabled, 0, 'active', @created_by)
+VALUES (@id, sqlc.narg(app_installation_id), sqlc.narg(agent_id), @url, @event_types, @signing_key_kid, @hmac_enabled, 0,
+    'active', @created_by)
 RETURNING *;
 
 -- name: GetSubscription :one
+-- An agent subscription has no installation: app_id is NULL then.
 SELECT sqlc.embed(s), i.app_id FROM webhook_subscriptions s
-JOIN app_installations i ON i.id = s.app_installation_id
+LEFT JOIN app_installations i ON i.id = s.app_installation_id
 WHERE s.id = @id;
 
 -- name: LockSubscription :one
 SELECT sqlc.embed(s), i.app_id FROM webhook_subscriptions s
-JOIN app_installations i ON i.id = s.app_installation_id
+LEFT JOIN app_installations i ON i.id = s.app_installation_id
 WHERE s.id = @id
 FOR UPDATE OF s;
 
@@ -36,6 +39,11 @@ JOIN app_installations i ON i.id = s.app_installation_id
 WHERE i.app_id = @app_id
 ORDER BY s.created_at, s.id;
 
+-- name: ListAgentSubscriptions :many
+SELECT * FROM webhook_subscriptions
+WHERE agent_id = @agent_id
+ORDER BY created_at, id;
+
 -- name: LockInstallationSubscriptions :many
 -- uninstallApp and resumeApp change every subscription of an installation in their unit.
 SELECT sqlc.embed(s), i.app_id FROM webhook_subscriptions s
@@ -45,11 +53,11 @@ ORDER BY s.id
 FOR UPDATE OF s;
 
 -- name: LockLiveSubscriptions :many
--- The lost range of the consumer round: every app subscription that could have matched a lost
--- event (M2-26 design note 3 f).
+-- The lost range of the consumer round: every app and agent subscription that could have matched
+-- a lost event (M2-26 design note 3 f, V1-01).
 SELECT sqlc.embed(s), i.app_id FROM webhook_subscriptions s
-JOIN app_installations i ON i.id = s.app_installation_id
-WHERE s.state IN ('active', 'paused') AND i.state IN ('active', 'suspended')
+LEFT JOIN app_installations i ON i.id = s.app_installation_id
+WHERE s.state IN ('active', 'paused') AND (s.agent_id IS NOT NULL OR i.state IN ('active', 'suspended'))
 ORDER BY s.id
 FOR UPDATE OF s;
 
@@ -64,12 +72,13 @@ SELECT sqlc.embed(i) FROM app_installations i WHERE i.id = @id;
 
 -- name: Candidates :many
 -- The candidates of a consumer round (M2-26 design note 3 b): app subscriptions in state active or
--- paused whose installation is active or suspended.
-SELECT s.id, s.event_types, s.state, i.id AS installation_id, i.app_id, i.state AS installation_state,
+-- paused whose installation is active or suspended, and agent subscriptions in state active or
+-- paused (V1-01; their installation columns are NULL).
+SELECT s.id, s.event_types, s.state, s.agent_id, i.id AS installation_id, i.app_id, i.state AS installation_state,
        i.event_subscriptions
 FROM webhook_subscriptions s
-JOIN app_installations i ON i.id = s.app_installation_id
-WHERE s.state IN ('active', 'paused') AND i.state IN ('active', 'suspended')
+LEFT JOIN app_installations i ON i.id = s.app_installation_id
+WHERE s.state IN ('active', 'paused') AND (s.agent_id IS NOT NULL OR i.state IN ('active', 'suspended'))
 ORDER BY s.id;
 
 -- name: InsertDelivery :execrows

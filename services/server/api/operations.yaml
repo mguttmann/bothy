@@ -52,6 +52,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - completeUpload
   - confirmHost
   - createAgent
+  - createAgentWebhookSubscription
   - createChannel
   - createChannelTemplate
   - createEnrollmentCode
@@ -173,6 +174,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - listActiveRuns
   - listAgentProjectFolders
   - listAgentSessions
+  - listAgentWebhookSubscriptions
   - listAgents
   - listApps
   - listAuditEvents
@@ -336,20 +338,25 @@ enabled:             # operationIds that have a handler; sorted ascending
   - validateManifest
   - verifyAuditChain
   - viewAsUser
-later:               # every other operationId of docs/api/openapi.yaml; sorted by operation_id
-  - operation_id: createAgentWebhookSubscription
-    milestone: M2
+later:               # every other operationId of docs/api/openapi.yaml; sorted by operation_id. Each entry
+                     # names the milestone, the reason and the feature of docs/spec/01-product.md
+                     # section 3 it belongs to; the gate check TestEnableListComplete (V1-01) allows
+                     # only features that 01 lists as later, planned for V2 or V3.
   - operation_id: createDm
     milestone: V3
     ticket: V3-01
+    reason: Direct messages come after V1 behind the switch dm.enabled.
+    feature: Direct messages between people
   - operation_id: leaveDm
     milestone: V3
     ticket: V3-01
-  - operation_id: listAgentWebhookSubscriptions
-    milestone: M2
+    reason: Direct messages come after V1 behind the switch dm.enabled.
+    feature: Direct messages between people
   - operation_id: listMyDms
     milestone: V3
     ticket: V3-01
+    reason: Direct messages come after V1 behind the switch dm.enabled.
+    feature: Direct messages between people
 # WebSocket ops a client, agent or app sends on the channel gateway of docs/api/asyncapi.yaml
 # (M1-64). The gateway dispatcher registers exactly the ops under `enabled`; every other client op
 # of the channel stands under `later` and is treated as unknown (close code 4001) until its ticket

@@ -226,8 +226,9 @@ func TestGenerate_FilteredSpecDropsWebhooksAndDisabledMethods(t *testing.T) {
 // today: the route files compile without any generated server symbol.
 func TestGenerate_EmptyListRendersAnyServer(t *testing.T) {
 	spec, catalog, list := fixturePaths(t, "")
-	writeFile(t, list, "version: 1\nenabled: []\nlater:\n  - operation_id: createThing\n    milestone: M1\n"+
-		"  - operation_id: getThing\n    milestone: M1\n  - operation_id: updateThing\n    milestone: M2\n    ticket: M2-01\n")
+	writeFile(t, list, "version: 1\nenabled: []\nlater:\n  - operation_id: createThing\n    milestone: M1\n    reason: r\n    feature: f\n"+
+		"  - operation_id: getThing\n    milestone: M1\n    reason: r\n    feature: f\n"+
+		"  - operation_id: updateThing\n    milestone: M2\n    ticket: M2-01\n    reason: r\n    feature: f\n")
 	cfg := fixtureConfig(t, spec, catalog, list)
 	cfg.corePkg = ""
 	fake := &fakeCodegen{}
