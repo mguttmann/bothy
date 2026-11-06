@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: Apache-2.0
+# Schema agent_template.v1 (docs/spec/26-builtin-agents.md 7.1).
+name: Code reviewer
+description: Reviews the code in its agent folder and explains findings with file and line.
+version: 1.0.0
+tool_class_wish: scoped
+skills:
+  - review-diff
+  - explain-code

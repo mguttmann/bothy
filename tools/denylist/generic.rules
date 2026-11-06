@@ -10,6 +10,9 @@
 
 @exclude-path: tools/denylist/generic.rules
 @exclude-path: tools/denylist/tests/*
+# The failing fixture of the template gate's deny rule holds a match on purpose (A1-06); the gate
+# itself matches template files under their templates/agents path, which this glob never excludes.
+@exclude-path: tools/templates/tests/fixtures/denylist/*
 @exclude-path: *uv.lock
 @exclude-path: *package-lock.json
 @exclude-path: *pubspec.lock

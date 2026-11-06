@@ -1,0 +1,11 @@
+name: Fixture
+description: A fixture template of the template gate.
+version: 1.0.0
+tool_class_wish: chat
+mcp_servers:
+  - name: files
+    transport: stdio
+    command: npx
+    package: "@example/mcp-files@1.4.2"
+skills:
+  - note

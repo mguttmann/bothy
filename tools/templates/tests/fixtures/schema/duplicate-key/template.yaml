@@ -1,0 +1,7 @@
+name: Fixture
+name: Other
+description: A fixture.
+version: 1.0.0
+tool_class_wish: chat
+skills:
+  - note
