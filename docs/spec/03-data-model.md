@@ -1795,8 +1795,9 @@ of 2026-11-06). Module: `runs`.
 | `updated_at` | `timestamptz` | no | `now()` | |
 
 PK: `(thread_id, person_id)`. FK: `thread_id` -> `threads(id)` ON DELETE CASCADE; `person_id` ->
-`principals(id)` ON DELETE CASCADE. Checks: `chain_count >= 0 AND idle_count >= 0`. A run or a
-follow-up of the person sets both counts to `0` and clears `ended_reason` in the same transaction.
+`principals(id)` ON DELETE CASCADE. Checks: `chain_count >= 0 AND idle_count >= 0`. A run of the
+person that is not a wake run (`trigger_kind` other than `wake`) or a follow-up of the person sets
+both counts to `0` and clears `ended_reason` in the same transaction.
 Retention: `content`.
 
 #### `message_components`

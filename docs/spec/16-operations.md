@@ -1154,6 +1154,9 @@ guide (AR-09) describes the service form the handover relies on and these rules:
    2026-11-06).
 2. **Restart and update with the handover.** With `runner.turn_handover` a restart or update needs
    no wait: SIGTERM hands live turns over, the runner exits 75, and the next runner adopts them.
+   The guide restarts with an operation that starts the runner whatever its exit code
+   (`launchctl kickstart -k`, `systemctl restart`), because a runner without live turns exits 0
+   and a restart on failure alone would leave it stopped.
    The operator's check after switching the key on: a harmless background command in a thread
    survives a restart, shown by its notification turn and the log line `turn_adopted`.
 3. **Unloading and uninstall.** Before `launchctl bootout`, `systemctl disable --now` or an

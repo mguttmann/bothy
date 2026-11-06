@@ -4,12 +4,12 @@ Status: ready | Depends on: AR-04 | Milestone: AR
 
 ## Goal
 
-After this ticket the desktop, the phone and the web console show a thread's pending wake-ups with cancel, the end state of each finished run, wake runs and recovery runs, the notes of wake-up ends and caps, the usage-limit notice, and the channel switch "Let agents continue on their own" (01 6.21). Wake-up controls appear only for an agent that reports `wakes`.
+After this ticket the desktop and the phone show a thread's pending wake-ups with cancel, the end state of each finished run, wake runs and recovery runs, the notes of wake-up ends and caps, the usage-limit notice, and the channel switch "Let agents continue on their own" (01 6.21). Wake-up controls appear only for an agent that reports `wakes`, except that pending wake-ups and their cancel button stay visible; the web console has no chats and gets nothing of this (01 5.5).
 
 ## Read first
 
 - `docs/spec/01-product.md` 6.2, 6.21, R-PR-37; `docs/spec/09-agents.md` 5.8, 18.19.10, 18.19.11; `docs/spec/07-permissions.md` 2.14; `docs/spec/04-sync-protocol.md` 15.9; `docs/spec/15-client-architecture.md` (local database, outbox).
-- Code on the base branch: `apps/client`, `packages/admin_ui`, `apps/console`, the Dart client generated from `openapi.yaml`, `packages/sync_engine`, `packages/l10n`.
+- Code on the base branch: `apps/client`, `packages/admin_ui`, the Dart client generated from `openapi.yaml`, `packages/sync_engine`, `packages/l10n`.
 - Design note `docs/design/autonomous-runs.md` (context and evidence; where it differs from the chapters, the chapters win); ADR 0077; `docs/decisions.d/AR-01.md`.
 
 ## Fixed requirements that apply
@@ -49,7 +49,7 @@ Product requirements implemented here:
 
 ## Scope
 
-Change: `apps/client`, `packages/admin_ui`, `apps/console`, `packages/sync_engine` (local table of wake-ups), `packages/l10n` (strings in every shipped language), the Dart client (regenerated), their tests and READMEs; `docs/decisions.d/AR-08.md`.
+Change: `apps/client`, `packages/admin_ui`, `packages/sync_engine` (local table of wake-ups), `packages/l10n` (strings in every shipped language), the Dart client (regenerated), their tests and READMEs; `docs/decisions.d/AR-08.md`.
 
 ## Out of scope
 
@@ -83,13 +83,12 @@ Change: `apps/client`, `packages/admin_ui`, `apps/console`, `packages/sync_engin
 ```sh
 make apps-platform
 make e2e-desktop
-make console-e2e
 make check
 ```
 
 ## Acceptance criteria
 
-- [ ] Every item of 01 6.21 is shown and tested on desktop, phone and console.
+- [ ] Every item of 01 6.21 is shown and tested on desktop and phone.
 - [ ] `make check` is green.
 
 ## Definition of done

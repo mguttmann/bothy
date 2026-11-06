@@ -43,7 +43,7 @@ Note on rule 1: "stages" are the milestones and the stages A1 and AR of the plan
 
 Product requirements implemented here:
 
-12. On SIGTERM or SIGINT of the runner, every live turn is stopped by the 18.6 escalation (SIGINT, SIGTERM after `runner.stop_grace`, SIGKILL after `runner.kill_grace`, each escalation logged `stop_escalated`), and only after `os.killpg(pgid, 0)` raises `ProcessLookupError` is its run finished `cancelled` with the reason `adapter_stopped` (09 5.2) and a summary that names the cause and its record and run files removed.
+12. With `runner.turn_handover` off, on SIGTERM or SIGINT of the runner, every live turn the runner started itself is stopped by the 18.6 escalation (SIGINT, SIGTERM after `runner.stop_grace`, SIGKILL after `runner.kill_grace`, each escalation logged `stop_escalated`), and only after `os.killpg(pgid, 0)` raises `ProcessLookupError` is its run finished `cancelled` with the reason `adapter_stopped` (09 5.2) and a summary that names the cause and its record and run files removed. Adopted turns keep running with their records (18.9).
 13. The handle the cancel path uses is never cleared before the turn is gone; a cancellation in any await of `_run_process` reaches the stop.
 14. The runner's own exit waits for these stops, at most `runner.stop_grace` plus `runner.kill_grace` plus `runner.cli_probe_timeout`, logs `stop_turns_timeout` when that wait runs out, then exits 0 as today; a turn the stop did not reach or that outlived the wait is stopped by the cancel path the same way, and a turn whose cancellation is interrupted keeps its record for the next start (18.9, 18.19.2).
 15. A turn whose run the server already ended is stopped the same way without a finish (18.6).

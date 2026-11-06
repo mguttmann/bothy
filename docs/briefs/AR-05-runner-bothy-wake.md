@@ -69,6 +69,7 @@ Change:
 
 - Recovery and usage-window wake-ups (AR-06); the end-state check (AR-07); the server (AR-04); clients (AR-08).
 - `bothy-wake` for tool class `chat`.
+- Switching `runner.wakes` on in an installation: it stays off until AR-06 (recovery) and AR-07 (end state and idle count) are merged too, because without them lost work or idle notification turns could end without the note or the cap of 5.8.6; the service guide (AR-09) says so.
 
 ## Boundaries
 

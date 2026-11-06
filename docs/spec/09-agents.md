@@ -1400,8 +1400,8 @@ allowed when the source run's person is an owner of the instance, or when the ch
 this at create and again at fire time; a refusal says `autonomous_not_allowed`.
 
 - Chain count, kept per thread and person (`run_autonomy`, 03 4.8): consecutive autonomous inputs
-  since that person last triggered a run or wrote a follow-up in the thread. Only a run or
-  follow-up of that person resets it, so another person's message never extends an owner's chain.
+  since that person last triggered a run that is not a wake run or wrote a follow-up in the
+  thread. Only such a run or follow-up of that person resets it, so another person's message never extends an owner's chain.
   When it reaches `run.autonomous_chain_max` (`0` means no chain cap), the next wake-up ends
   `refused` with the reason `autonomous_chain_max` and a note that a reply of that person
   continues.
@@ -4084,7 +4084,8 @@ accepts both capabilities (16 10.1), and a server rollback below that version tu
 first. `runner.wakes` needs `runner.turn_handover`; the runner refuses to start with
 `runner.wakes` on and `runner.turn_handover` off and names both keys, because a wake input or a
 recovery run without the handover would be lost at the next restart. Clients show wake-up
-controls only when the thread's agent reports `wakes`.
+controls only when the thread's agent reports `wakes`; pending wake-ups and their cancel button stay
+visible without it (01 6.21).
 
 #### 18.19.2 Orderly stop without the handover
 
@@ -4113,8 +4114,10 @@ With `runner.turn_handover`, SIGTERM is a handover, not a stop. The runner:
    least one turn was handed over, else 0.
 
 The non-zero code makes a service manager that restarts on failure (launchd `KeepAlive
-{SuccessfulExit: false}`, systemd `Restart=on-failure`) start the next runner after every SIGTERM
-that does not unload the service. Only `claude-code-runner stop --turns` (stop every turn as in
+{SuccessfulExit: false}`, systemd `Restart=on-failure`) start the next runner after a SIGTERM that
+handed turns over; after exit 0 it does not. The restart and update operation of the service guide
+therefore restarts the runner whatever its exit code (`launchctl kickstart -k`, `systemctl
+restart`, 16 10.1). Only `claude-code-runner stop --turns` (stop every turn as in
 18.6, finish each run `cancelled` with reason `adapter_stopped`, then exit 0) or a stop of a run
 ends a turn on purpose. Unloading the service (`launchctl bootout`, `systemctl disable --now`,
 an uninstall) leaves handed-over turns without a runner; the next start adopts them, and after

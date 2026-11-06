@@ -2199,9 +2199,11 @@ console.
 ### 6.21 Autonomous runs in a thread
 
 Addendum of 2026-11-06 (stage AR, R-PR-37, [09-agents.md](09-agents.md) 5.8 and 18.19). Applies to
-the desktop, the phone and the web console on a server of stage AR. The wake-up parts apply only
-for an agent that reports `wakes`; the end-state display also applies when the agent does not
-report `wakes`.
+the desktop and the phone on a server of stage AR, not to the web console, which has no chats
+(5.5). The wake-up parts apply only for an agent that reports `wakes`, except that pending
+wake-ups and their cancel button stay visible when it no longer does (a runner that turned
+`runner.wakes` off, 16 10.1); the end-state display also applies when the agent does not report
+`wakes`.
 
 1. **Pending wake-ups.** A thread with pending wake-ups shows them above the composer: the label,
    the condition ("in 20 minutes", "at 17:55", "when the checks of #123 finish", "when the command

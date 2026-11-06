@@ -43,7 +43,7 @@ Note on rule 1: "stages" are the milestones and the stages A1 and AR of the plan
 
 Product requirements implemented here:
 
-12. `docs/operations/claude-code-runner.md` (new): service form for launchd and systemd (`KillMode=process`), restart and update with the handover, unloading and uninstall with `stop --turns`, the rule of D-AR-01-4, the rollout checklist with the server version check and the operator's check of a background command surviving a restart, rollback.
+12. `docs/operations/claude-code-runner.md` (new): service form for launchd and systemd (`KillMode=process`), restart and update with the handover through an operation that starts the runner whatever its exit code (`launchctl kickstart -k`, `systemctl restart`), unloading and uninstall with `stop --turns`, the rule of D-AR-01-4, the rollout checklist with the server version check, `runner.wakes` only once AR-06 and AR-07 are merged, and the operator's check of a background command surviving a restart, rollback.
 13. `tests/macos/test_launchd_handover.py` (macOS only, behind an explicit switch): a scratch launchd job with its own label and temporary plist of the assumed form, restarted with `launchctl kickstart -k` once with a runner that exits at SIGTERM and once with one that ignores it; the turn survives both; `launchctl bootout` leaves it alive; `stop --turns` ends it; the job is booted out at the end.
 14. Decide and record whether the runner needs a single-instance lock in its state folder or the guide a group kill after a timeout (design note backlog item 17).
 
