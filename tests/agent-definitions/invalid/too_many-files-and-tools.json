@@ -1,0 +1,135 @@
+{
+  "tool_class": "chat",
+  "definition": {
+    "instructions": "You help Alex write release notes for the team.\n",
+    "skills": [
+      {
+        "name": "notes",
+        "description": "Writes short notes",
+        "body": "Write short notes.\n",
+        "files": [
+          {
+            "name": "f0.md",
+            "content": ""
+          },
+          {
+            "name": "f1.md",
+            "content": ""
+          },
+          {
+            "name": "f2.md",
+            "content": ""
+          },
+          {
+            "name": "f3.md",
+            "content": ""
+          },
+          {
+            "name": "f4.md",
+            "content": ""
+          },
+          {
+            "name": "f5.md",
+            "content": ""
+          },
+          {
+            "name": "f6.md",
+            "content": ""
+          },
+          {
+            "name": "f7.md",
+            "content": ""
+          },
+          {
+            "name": "f8.md",
+            "content": ""
+          }
+        ]
+      }
+    ],
+    "mcp_servers": [],
+    "settings": {
+      "tool_class_wish": "chat",
+      "allowed_tools": [
+        "Tool0",
+        "Tool1",
+        "Tool2",
+        "Tool3",
+        "Tool4",
+        "Tool5",
+        "Tool6",
+        "Tool7",
+        "Tool8",
+        "Tool9",
+        "Tool10",
+        "Tool11",
+        "Tool12",
+        "Tool13",
+        "Tool14",
+        "Tool15",
+        "Tool16",
+        "Tool17",
+        "Tool18",
+        "Tool19",
+        "Tool20",
+        "Tool21",
+        "Tool22",
+        "Tool23",
+        "Tool24",
+        "Tool25",
+        "Tool26",
+        "Tool27",
+        "Tool28",
+        "Tool29",
+        "Tool30",
+        "Tool31",
+        "Tool32",
+        "Tool33",
+        "Tool34",
+        "Tool35",
+        "Tool36",
+        "Tool37",
+        "Tool38",
+        "Tool39",
+        "Tool40",
+        "Tool41",
+        "Tool42",
+        "Tool43",
+        "Tool44",
+        "Tool45",
+        "Tool46",
+        "Tool47",
+        "Tool48",
+        "Tool49",
+        "Tool50",
+        "Tool51",
+        "Tool52",
+        "Tool53",
+        "Tool54",
+        "Tool55",
+        "Tool56",
+        "Tool57",
+        "Tool58",
+        "Tool59",
+        "Tool60",
+        "Tool61",
+        "Tool62",
+        "Tool63",
+        "Tool64"
+      ]
+    },
+    "origin": {
+      "kind": "manual"
+    }
+  },
+  "expect": [
+    {
+      "pointer": "/skills/0/files",
+      "code": "too_many"
+    },
+    {
+      "pointer": "/settings/allowed_tools",
+      "code": "too_many"
+    }
+  ]
+}

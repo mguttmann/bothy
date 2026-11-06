@@ -66,6 +66,7 @@ const (
 	ReasonHostDuplicateConnection          Reason = "host_duplicate_connection"
 	ReasonUnknownAction                    Reason = "unknown_action"
 	ReasonTrustedHeaderRequiresLoopback    Reason = "trusted_header_requires_loopback"
+	ReasonDefinitionNeedsHost              Reason = "definition_needs_host"
 )
 
 // reasons is the list of 07 section 4.1 in table order.
@@ -126,6 +127,7 @@ var reasons = []Reason{
 	ReasonHostDuplicateConnection,
 	ReasonUnknownAction,
 	ReasonTrustedHeaderRequiresLoopback,
+	ReasonDefinitionNeedsHost,
 }
 
 // Reasons returns the closed list of reason codes of 07 section 4.1 in table order, as a copy.

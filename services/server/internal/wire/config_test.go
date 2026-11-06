@@ -470,6 +470,16 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"component.max_per_message":     {Kind: config.KindInt, Default: "25", Min: "1", Max: "1000", Chapter: "09-agents.md"},
 		"component.custom_id_max_chars": {Kind: config.KindInt, Default: "100", Min: "1", Chapter: "09-agents.md"},
 		"component.form_max_fields":     {Kind: config.KindInt, Default: "10", Min: "1", Chapter: "09-agents.md"},
+		// A1-02: the definitions of built-in agents (26 14).
+		"agents.definition.instructions_max_bytes":      {Kind: config.KindInt, Default: "65536", Min: "1", Max: "1048576", Chapter: "26-builtin-agents.md"},
+		"agents.definition.max_skills":                  {Kind: config.KindInt, Default: "32", Min: "0", Max: "1024", Chapter: "26-builtin-agents.md"},
+		"agents.definition.skill_description_max_chars": {Kind: config.KindInt, Default: "300", Min: "1", Max: "4096", Chapter: "26-builtin-agents.md"},
+		"agents.definition.skill_body_max_bytes":        {Kind: config.KindInt, Default: "65536", Min: "1", Max: "1048576", Chapter: "26-builtin-agents.md"},
+		"agents.definition.max_skill_files":             {Kind: config.KindInt, Default: "8", Min: "0", Max: "256", Chapter: "26-builtin-agents.md"},
+		"agents.definition.max_mcp_servers":             {Kind: config.KindInt, Default: "16", Min: "0", Max: "256", Chapter: "26-builtin-agents.md"},
+		"agents.definition.max_allowed_tools":           {Kind: config.KindInt, Default: "64", Min: "0", Max: "1024", Chapter: "26-builtin-agents.md"},
+		"agents.definition.max_cost_usd_per_run":        {Kind: config.KindFloat, Default: "50", Min: "0", Chapter: "26-builtin-agents.md"},
+		"agents.mcp_stdio_runners":                      {Kind: config.KindStringList, Default: `["npx", "uvx"]`, Chapter: "26-builtin-agents.md"},
 		// M2-12
 		"agent.session_ref_max_bytes": {Kind: config.KindInt, Default: "1024", Min: "1", Max: "2048", Chapter: "09-agents.md"},
 		// M1-64

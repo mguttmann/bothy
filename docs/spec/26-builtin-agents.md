@@ -158,6 +158,13 @@ All limits are configuration values (section 14).
 A `secret_ref` names a key in the secret provider of the hosting runner (16, the `secret_ref`
 form of `runner.anthropic_api_key_ref`); the server never resolves it.
 
+Optional are only `files[]`, `headers[]`, `args[]`, `env[]`, `settings.model` (absent: the runner's
+default model), `settings.allowed_tools` (absent: no narrowing; empty: no named tool),
+`settings.max_cost_usd_per_run` (absent: no cap), `origin.template_slug` and
+`origin.template_version`; every other member is required. The runner places `package` directly
+after `command` and every `args[]` entry after it, so no argument stands before the package
+(decisions.d/A1-02.md).
+
 ### 4.3 Refusals
 
 The server refuses a definition that breaks one rule with `400 validation_failed`, one
@@ -199,6 +206,12 @@ template gate, on every template (section 7); the runner repeats it before every
 7. **Class** (`tool_class_too_low`): a definition with a `stdio` MCP server for an agent whose
    `tool_class` is below `host` (4.4).
 8. **Limits** (`too_long`, `too_many`) and names (`invalid_name`, `duplicate_name`).
+
+A finding of the shape or of a character carries the code of the request validation of the API
+(`required`, `invalid_type`, `invalid_enum`, `invalid`, `too_large`, `too_small`) or of the text
+check (`invalid_utf8`, `control_character`, `bidi_control`). The exact rules and patterns are the
+rulings of [decisions.d/A1-02.md](../decisions.d/A1-02.md); the corpus `tests/agent-definitions`
+at the repository root is the conformance set of every writer (A1-02).
 
 ### 4.4 Tool class and definition
 
@@ -575,6 +588,9 @@ Permissions, step-up, audit and rate-limit classes: [07-permissions.md](07-permi
 | `agent.definition_changed` | durable, personal | agent | the agent itself (receive action `agent.definition.read`); payload `definition_version` only |
 | `agent.hosting_changed` | durable, personal | agent | the old and the new hosting runner (receive action `agent.hosted.list`); payload `agent_id` only |
 | `agent.interview_requested` | ephemeral | agent | one gateway connection of the builder agent; no token |
+
+`getAgentDefinition` takes the optional query `version`: owners read an older version for undo
+(8.4), the agent itself reads only its current version.
 
 `agent.updated` keeps its meaning and also follows `hosted_by` and a new definition version
 (`agents.version`).

@@ -1,0 +1,20 @@
+{
+  "tool_class": "chat",
+  "definition": {
+    "instructions": "````markdown\n```! id\n```\n````\n",
+    "skills": [],
+    "mcp_servers": [],
+    "settings": {
+      "tool_class_wish": "chat"
+    },
+    "origin": {
+      "kind": "manual"
+    }
+  },
+  "expect": [
+    {
+      "pointer": "/instructions",
+      "code": "inline_shell"
+    }
+  ]
+}

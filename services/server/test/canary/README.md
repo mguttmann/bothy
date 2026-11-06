@@ -124,6 +124,7 @@ go test -race -count=1 ./test/canary/... ./test/harness/...
 | `network` | nowhere (the audit log holds only `ip_hmac` with `ip_key_id`) |
 | `identity` | everywhere except logs, traces and metrics |
 | `manage_only` | success bodies of `getChannelBehavior`, `putChannelBehavior`, `listServedChannels` and `getServedChannelConfig` (no sink captures them) and `current` of a `412` of `putChannelBehavior`; nowhere else |
+| `definition` | success bodies of `getAgentDefinition` and `putAgentDefinition` (no sink captures them) and `current` of a `412` of `putAgentDefinition`; nowhere else |
 
 `manage_only` (M2-02) holds the channel prompt and the skill references. It is stricter than
 `content`: a reader of the channel is no permitted observer, because prompt and skills are readable
@@ -132,6 +133,12 @@ only the settings version in its events. Error records name their operation, so 
 `putChannelBehavior`, whose caller passed `manage` before the version check, may echo the value.
 Alex (reads Support without `manage`) is an observer with gateway, `listEvents` and `getSnapshot`;
 the pages of the operator Lotse are foreign records too.
+
+`definition` (A1-02) holds text of the definition of a built-in agent (instructions, a skill body,
+a header value). Only owners and the agent itself read a definition (26 4.1); the event
+`agent.definition_changed` carries the version only and the audit entry of `agent.update` names the
+changed parts only. Only the `412` of `putAgentDefinition`, whose caller passed `agent.update`
+before the version check, may echo the stored definition.
 
 Component form values (M2-15) are `content` of the scope `formScope`, which only Lotse, the
 card's agent, reads: they may appear in `interaction.created` of Lotse's consumer and otherwise

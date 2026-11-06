@@ -1,0 +1,26 @@
+{
+  "tool_class": "chat",
+  "definition": {
+    "instructions": "You help Alex write release notes for the team.\n",
+    "skills": [
+      {
+        "name": "notes",
+        "description": "Writes short notes",
+        "body": "---\nname: x\nhooks:\n  PreToolUse: []\n---\nBody\n"
+      }
+    ],
+    "mcp_servers": [],
+    "settings": {
+      "tool_class_wish": "chat"
+    },
+    "origin": {
+      "kind": "manual"
+    }
+  },
+  "expect": [
+    {
+      "pointer": "/skills/0/body",
+      "code": "skill_frontmatter"
+    }
+  ]
+}

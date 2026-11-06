@@ -100,6 +100,9 @@ var appPrivileges = map[string][]string{
 	"auth_login_flows": {"SELECT", "INSERT", "UPDATE", "DELETE"},
 	// 03 agents (M1-51): an agent principal is never hard deleted, its record lives with it.
 	"agents": {"SELECT", "INSERT", "UPDATE"},
+	// 03 agent_definitions (A1-02, R-DM-59): a version is inserted once and never updated or
+	// deleted; it lives with its agent, which is never hard deleted.
+	"agent_definitions": {"SELECT", "INSERT"},
 	// 03 commands (M2-16): a removal sets removed_at, the row stays for runs.triggering_command_id.
 	"commands": {"SELECT", "INSERT", "UPDATE"},
 	// 03 agent_consumer_cursors (M2-07): the rows end with their agent through ON DELETE CASCADE.

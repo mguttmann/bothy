@@ -1,0 +1,129 @@
+{
+  "tool_class": "host",
+  "definition": {
+    "instructions": "You help Alex write release notes for the team.\n",
+    "skills": [],
+    "mcp_servers": [
+      {
+        "name": "files",
+        "transport": "stdio",
+        "command": "npx",
+        "package": "@example/mcp-files@1.4.2",
+        "env": [
+          {
+            "name": "PATH",
+            "value": "x"
+          },
+          {
+            "name": "HOME",
+            "value": "x"
+          },
+          {
+            "name": "USER",
+            "value": "x"
+          },
+          {
+            "name": "LOGNAME",
+            "value": "x"
+          },
+          {
+            "name": "SHELL",
+            "value": "x"
+          },
+          {
+            "name": "TMPDIR",
+            "value": "x"
+          },
+          {
+            "name": "CLAUDE_CONFIG_DIR",
+            "value": "x"
+          },
+          {
+            "name": "CLAUDE_PRODUCT_RUN",
+            "value": "x"
+          },
+          {
+            "name": "ANTHROPIC_BASE_URL",
+            "value": "x"
+          },
+          {
+            "name": "CLAUDE_CODE_USE_BEDROCK",
+            "value": "x"
+          },
+          {
+            "name": "LD_PRELOAD",
+            "value": "x"
+          },
+          {
+            "name": "DYLD_INSERT_LIBRARIES",
+            "value": "x"
+          },
+          {
+            "name": "NODE_OPTIONS",
+            "value": "x"
+          }
+        ]
+      }
+    ],
+    "settings": {
+      "tool_class_wish": "chat"
+    },
+    "origin": {
+      "kind": "manual"
+    }
+  },
+  "expect": [
+    {
+      "pointer": "/mcp_servers/0/env/0/name",
+      "code": "env_name_reserved"
+    },
+    {
+      "pointer": "/mcp_servers/0/env/1/name",
+      "code": "env_name_reserved"
+    },
+    {
+      "pointer": "/mcp_servers/0/env/2/name",
+      "code": "env_name_reserved"
+    },
+    {
+      "pointer": "/mcp_servers/0/env/3/name",
+      "code": "env_name_reserved"
+    },
+    {
+      "pointer": "/mcp_servers/0/env/4/name",
+      "code": "env_name_reserved"
+    },
+    {
+      "pointer": "/mcp_servers/0/env/5/name",
+      "code": "env_name_reserved"
+    },
+    {
+      "pointer": "/mcp_servers/0/env/6/name",
+      "code": "env_name_reserved"
+    },
+    {
+      "pointer": "/mcp_servers/0/env/7/name",
+      "code": "env_name_reserved"
+    },
+    {
+      "pointer": "/mcp_servers/0/env/8/name",
+      "code": "env_name_reserved"
+    },
+    {
+      "pointer": "/mcp_servers/0/env/9/name",
+      "code": "env_name_reserved"
+    },
+    {
+      "pointer": "/mcp_servers/0/env/10/name",
+      "code": "env_name_reserved"
+    },
+    {
+      "pointer": "/mcp_servers/0/env/11/name",
+      "code": "env_name_reserved"
+    },
+    {
+      "pointer": "/mcp_servers/0/env/12/name",
+      "code": "env_name_reserved"
+    }
+  ]
+}

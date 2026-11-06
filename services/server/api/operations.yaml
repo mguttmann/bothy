@@ -115,6 +115,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - exportChannel
   - finishRun
   - getAgent
+  - getAgentDefinition
   - getAgentTriggerers
   - getApp
   - getBrandingLogo
@@ -172,6 +173,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - invokeCommand
   - issueHostPairingCode
   - listActiveRuns
+  - listAgentDefinitionVersions
   - listAgentProjectFolders
   - listAgentSessions
   - listAgentWebhookSubscriptions
@@ -242,6 +244,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - postIncomingWebhook
   - postIncomingWebhookWithBearer
   - previewGrant
+  - putAgentDefinition
   - putChannelBehavior
   - putChannelDraft
   - putFeatureFlag

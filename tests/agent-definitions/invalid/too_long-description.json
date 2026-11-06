@@ -1,0 +1,26 @@
+{
+  "tool_class": "chat",
+  "definition": {
+    "instructions": "You help Alex write release notes for the team.\n",
+    "skills": [
+      {
+        "name": "notes",
+        "description": "ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "body": "Write short notes.\n"
+      }
+    ],
+    "mcp_servers": [],
+    "settings": {
+      "tool_class_wish": "chat"
+    },
+    "origin": {
+      "kind": "manual"
+    }
+  },
+  "expect": [
+    {
+      "pointer": "/skills/0/description",
+      "code": "too_long"
+    }
+  ]
+}

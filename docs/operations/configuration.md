@@ -1004,15 +1004,15 @@ Source: [26-builtin-agents.md](../spec/26-builtin-agents.md), section 14.
 | `agents.interview.max_turns` | `BOTHY_AGENTS__INTERVIEW__MAX_TURNS` | Server |  | `12` | most turns of the interview history in one request | planned (A1) |
 | `agents.interview.answer_max_chars` | `BOTHY_AGENTS__INTERVIEW__ANSWER_MAX_CHARS` | Server |  | `4000` | longest answer of the person in one turn | planned (A1) |
 | `agents.hosted_token_ttl` | `BOTHY_AGENTS__HOSTED_TOKEN_TTL` | Server |  | `24h` | lifetime of a token for a hosted agent (3.3) | planned (A1) |
-| `agents.mcp_stdio_runners` | `BOTHY_AGENTS__MCP_STDIO_RUNNERS` | Server |  | `["npx", "uvx"]` | commands a `stdio` MCP server may use (4.2) | planned (A1) |
-| `agents.definition.instructions_max_bytes` | `BOTHY_AGENTS__DEFINITION__INSTRUCTIONS_MAX_BYTES` | Server |  | `65536` | longest `instructions` | planned (A1) |
-| `agents.definition.max_skills` | `BOTHY_AGENTS__DEFINITION__MAX_SKILLS` | Server |  | `32` | most skills of a definition | planned (A1) |
-| `agents.definition.skill_description_max_chars` | `BOTHY_AGENTS__DEFINITION__SKILL_DESCRIPTION_MAX_CHARS` | Server |  | `300` | longest skill description, one line | planned (A1) |
-| `agents.definition.skill_body_max_bytes` | `BOTHY_AGENTS__DEFINITION__SKILL_BODY_MAX_BYTES` | Server |  | `65536` | longest skill body and extra skill file | planned (A1) |
-| `agents.definition.max_skill_files` | `BOTHY_AGENTS__DEFINITION__MAX_SKILL_FILES` | Server |  | `8` | most extra files of one skill | planned (A1) |
-| `agents.definition.max_mcp_servers` | `BOTHY_AGENTS__DEFINITION__MAX_MCP_SERVERS` | Server |  | `16` | most MCP servers of a definition | planned (A1) |
-| `agents.definition.max_allowed_tools` | `BOTHY_AGENTS__DEFINITION__MAX_ALLOWED_TOOLS` | Server |  | `64` | most entries of `settings.allowed_tools` | planned (A1) |
-| `agents.definition.max_cost_usd_per_run` | `BOTHY_AGENTS__DEFINITION__MAX_COST_USD_PER_RUN` | Server |  | `50` | highest cost cap per run a definition may set | planned (A1) |
+| `agents.mcp_stdio_runners` | `BOTHY_AGENTS__MCP_STDIO_RUNNERS` | Server | list(string) | `["npx", "uvx"]` | commands a `stdio` MCP server may use (4.2) | active |
+| `agents.definition.instructions_max_bytes` | `BOTHY_AGENTS__DEFINITION__INSTRUCTIONS_MAX_BYTES` | Server | int | `65536` | longest `instructions` | active |
+| `agents.definition.max_skills` | `BOTHY_AGENTS__DEFINITION__MAX_SKILLS` | Server | int | `32` | most skills of a definition | active |
+| `agents.definition.skill_description_max_chars` | `BOTHY_AGENTS__DEFINITION__SKILL_DESCRIPTION_MAX_CHARS` | Server | int | `300` | longest skill description, one line | active |
+| `agents.definition.skill_body_max_bytes` | `BOTHY_AGENTS__DEFINITION__SKILL_BODY_MAX_BYTES` | Server | int | `65536` | longest skill body and extra skill file | active |
+| `agents.definition.max_skill_files` | `BOTHY_AGENTS__DEFINITION__MAX_SKILL_FILES` | Server | int | `8` | most extra files of one skill | active |
+| `agents.definition.max_mcp_servers` | `BOTHY_AGENTS__DEFINITION__MAX_MCP_SERVERS` | Server | int | `16` | most MCP servers of a definition | active |
+| `agents.definition.max_allowed_tools` | `BOTHY_AGENTS__DEFINITION__MAX_ALLOWED_TOOLS` | Server | int | `64` | most entries of `settings.allowed_tools` | active |
+| `agents.definition.max_cost_usd_per_run` | `BOTHY_AGENTS__DEFINITION__MAX_COST_USD_PER_RUN` | Server | float | `50` | highest cost cap per run a definition may set | active |
 | `runner.hosted_agents` |  | Runner |  | `false` | host the agents whose `hosted_by` is this runner (3.2) |  |
 | `runner.hosted_agents_root` |  | Runner |  | empty | root of the agent and control folders; required with `runner.hosted_agents`; never inside, equal to or above `runner.state_dir` or `runner.projects_root` (5.1) |  |
 | `runner.hosted_max_tool_class` |  | Runner |  | `scoped` | highest tool class loaded for a hosted agent, reported as the value of `hosts_agents` (3.1) |  |

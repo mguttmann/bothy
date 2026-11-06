@@ -64,6 +64,8 @@ type world struct {
 	// uow is the unit of work of the use cases; the tests of the guided flow (M2-21) run
 	// SwitchToOrganization inside it the way authz does.
 	uow txn.UnitOfWork
+	// rec is the audit recorder; the tests of refusals flush its aggregated denials.
+	rec *auditapp.Recorder
 }
 
 // newWorld builds a world on a new database.
@@ -145,14 +147,26 @@ func newWorld(t *testing.T) *world {
 	if w.id, err = wire.NewIdentity(idCfg, pool, uow, az, writes, []byte("0123456789abcdef0123456789abcdef"), clk, log); err != nil {
 		t.Fatal(err)
 	}
-	w.svc, err = app.New(app.Config{PageSizeDefault: 2, PageSizeMax: 3, ReasonMaxChars: 40}, app.Deps{
-		Store: agentspg.NewRepository(pool), Principals: w.id.Principals, Directory: identityapp.NewDirectory(repo), Tokens: w.id.Tokens,
+	w.rec = rec
+	w.svc, err = app.New(testConfig(), app.Deps{
+		Store: agentspg.NewRepository(pool), Definitions: agentspg.NewRepository(pool), Principals: w.id.Principals, Directory: identityapp.NewDirectory(repo), Tokens: w.id.Tokens,
 		Rights: hook, UoW: uow, Authorizer: az, Audit: rec, Events: appender, Cursors: agentshttp.Cursors{}, Clock: clk,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	return w
+}
+
+// testConfig is the configuration of the use cases: small pages and the definition limits of
+// docs/spec/26-builtin-agents.md 14 with a small instructions limit, so the tests reach it.
+func testConfig() app.Config {
+	return app.Config{
+		PageSizeDefault: 2, PageSizeMax: 3, ReasonMaxChars: 40,
+		DefinitionInstructionsMaxBytes: 64, DefinitionMaxSkills: 32, DefinitionSkillDescriptionMaxChars: 300,
+		DefinitionSkillBodyMaxBytes: 65536, DefinitionMaxSkillFiles: 8, DefinitionMaxMCPServers: 16, DefinitionMaxAllowedTools: 64,
+		DefinitionMaxCostUSDPerRun: 50, MCPStdioRunners: []string{"npx", "uvx"},
+	}
 }
 
 // sql runs stmt as the database owner.

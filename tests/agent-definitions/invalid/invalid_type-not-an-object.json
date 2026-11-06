@@ -1,0 +1,10 @@
+{
+  "tool_class": "chat",
+  "definition": [],
+  "expect": [
+    {
+      "pointer": "",
+      "code": "invalid_type"
+    }
+  ]
+}

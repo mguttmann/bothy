@@ -33,6 +33,8 @@ const (
 	ActionAgentCreate Action = "agent.create"
 	// ActionAgentCredentialHolderSet is the action agent.credential_holder.set.
 	ActionAgentCredentialHolderSet Action = "agent.credential_holder.set"
+	// ActionAgentDefinitionRead is the action agent.definition.read.
+	ActionAgentDefinitionRead Action = "agent.definition.read"
 	// ActionAgentDisable is the action agent.disable.
 	ActionAgentDisable Action = "agent.disable"
 	// ActionAgentEnable is the action agent.enable.
@@ -463,6 +465,7 @@ var actionByID = map[string]Action{
 	"agent.config.read":            ActionAgentConfigRead,
 	"agent.create":                 ActionAgentCreate,
 	"agent.credential_holder.set":  ActionAgentCredentialHolderSet,
+	"agent.definition.read":        ActionAgentDefinitionRead,
 	"agent.disable":                ActionAgentDisable,
 	"agent.enable":                 ActionAgentEnable,
 	"agent.events.consume":         ActionAgentEventsConsume,
@@ -685,6 +688,7 @@ var actionList = []Action{
 	ActionAgentConfigRead,
 	ActionAgentCreate,
 	ActionAgentCredentialHolderSet,
+	ActionAgentDefinitionRead,
 	ActionAgentDisable,
 	ActionAgentEnable,
 	ActionAgentEventsConsume,
@@ -919,6 +923,8 @@ const (
 	EventAccessExpiring EventType = "access.expiring"
 	// EventAgentConfigChanged is the event type agent.config_changed.
 	EventAgentConfigChanged EventType = "agent.config_changed"
+	// EventAgentDefinitionChanged is the event type agent.definition_changed.
+	EventAgentDefinitionChanged EventType = "agent.definition_changed"
 	// EventAgentFollowup is the event type agent.followup.
 	EventAgentFollowup EventType = "agent.followup"
 	// EventAgentInvocation is the event type agent.invocation.
@@ -1042,6 +1048,7 @@ var eventTypeByID = map[string]EventType{
 	"access.changed":                 EventAccessChanged,
 	"access.expiring":                EventAccessExpiring,
 	"agent.config_changed":           EventAgentConfigChanged,
+	"agent.definition_changed":       EventAgentDefinitionChanged,
 	"agent.followup":                 EventAgentFollowup,
 	"agent.invocation":               EventAgentInvocation,
 	"agent.presence_changed":         EventAgentPresenceChanged,
@@ -1107,6 +1114,7 @@ var eventTypeList = []EventType{
 	EventAccessChanged,
 	EventAccessExpiring,
 	EventAgentConfigChanged,
+	EventAgentDefinitionChanged,
 	EventAgentFollowup,
 	EventAgentInvocation,
 	EventAgentPresenceChanged,

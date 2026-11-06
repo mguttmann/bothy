@@ -27,13 +27,16 @@ import (
 // Agents implements listAgents, createAgent, getAgent, updateAgent, disableAgent, enableAgent,
 // setAgentBillingMode, setAllAgentsBillingMode, setCredentialHolder and setAgentToolClass, and the
 // consumer operations getConsumerState, pollAgentEvents and ackAgentEvents (M2-07),
-// sendHeartbeat (M2-20) and getAgentTriggerers.
+// sendHeartbeat (M2-20), getAgentTriggerers and the definitions of built-in agents
+// getAgentDefinition, listAgentDefinitionVersions and putAgentDefinition (A1-02).
 type Agents struct {
 	agents    agents.Agents
 	consumers agents.ConsumerAPI
 	// presence and interval serve sendHeartbeat (M2-20, WithPresence).
 	presence agents.Presence
 	interval time.Duration
+	// definitions serves the definitions of built-in agents (A1-02, WithDefinitions).
+	definitions agents.Definitions
 }
 
 // New returns the handlers over the use cases of the records a and of the consumers c.

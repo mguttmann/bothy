@@ -1,0 +1,22 @@
+{
+  "tool_class": "scoped",
+  "definition": {
+    "instructions": "You help Alex write release notes for the team.\n",
+    "skills": [],
+    "mcp_servers": [
+      {
+        "name": "wiki",
+        "transport": "http",
+        "url": "https://wiki.example.com:8443/mcp?team=docs"
+      }
+    ],
+    "settings": {
+      "tool_class_wish": "scoped",
+      "allowed_tools": []
+    },
+    "origin": {
+      "kind": "interview"
+    }
+  },
+  "expect": []
+}

@@ -1,0 +1,37 @@
+{
+  "tool_class": "host",
+  "definition": {
+    "instructions": "You help Alex write release notes for the team.\n",
+    "skills": [],
+    "mcp_servers": [
+      {
+        "name": "files",
+        "transport": "stdio",
+        "command": "bash",
+        "package": "x@1.0.0"
+      },
+      {
+        "name": "b",
+        "transport": "stdio",
+        "command": "/usr/bin/npx",
+        "package": "@example/mcp-files@1.4.2"
+      }
+    ],
+    "settings": {
+      "tool_class_wish": "chat"
+    },
+    "origin": {
+      "kind": "manual"
+    }
+  },
+  "expect": [
+    {
+      "pointer": "/mcp_servers/0/command",
+      "code": "mcp_command_not_allowed"
+    },
+    {
+      "pointer": "/mcp_servers/1/command",
+      "code": "mcp_command_not_allowed"
+    }
+  ]
+}

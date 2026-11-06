@@ -1,0 +1,97 @@
+{
+  "tool_class": "host",
+  "definition": {
+    "instructions": "You help Alex write release notes for the team.\n",
+    "skills": [
+      {
+        "name": "notes",
+        "description": "Writes short notes",
+        "body": "Write short notes.\n",
+        "x": 1,
+        "files": [
+          {
+            "name": "a.md",
+            "content": "",
+            "x": 1
+          }
+        ]
+      }
+    ],
+    "mcp_servers": [
+      {
+        "name": "docs",
+        "transport": "http",
+        "url": "https://mcp.example.com/v1",
+        "x": 1,
+        "headers": [
+          {
+            "name": "X-Team",
+            "value": "a",
+            "x": 1
+          }
+        ]
+      },
+      {
+        "name": "files",
+        "transport": "stdio",
+        "command": "npx",
+        "package": "@example/mcp-files@1.4.2",
+        "x": 1,
+        "env": [
+          {
+            "name": "LOG_LEVEL",
+            "value": "info",
+            "x": 1
+          }
+        ]
+      }
+    ],
+    "settings": {
+      "tool_class_wish": "chat",
+      "x": 1
+    },
+    "origin": {
+      "kind": "manual",
+      "x": 1
+    },
+    "x": 1
+  },
+  "expect": [
+    {
+      "pointer": "/x",
+      "code": "unknown_member"
+    },
+    {
+      "pointer": "/skills/0/x",
+      "code": "unknown_member"
+    },
+    {
+      "pointer": "/skills/0/files/0/x",
+      "code": "unknown_member"
+    },
+    {
+      "pointer": "/mcp_servers/0/x",
+      "code": "unknown_member"
+    },
+    {
+      "pointer": "/mcp_servers/0/headers/0/x",
+      "code": "unknown_member"
+    },
+    {
+      "pointer": "/mcp_servers/1/x",
+      "code": "unknown_member"
+    },
+    {
+      "pointer": "/mcp_servers/1/env/0/x",
+      "code": "unknown_member"
+    },
+    {
+      "pointer": "/settings/x",
+      "code": "unknown_member"
+    },
+    {
+      "pointer": "/origin/x",
+      "code": "unknown_member"
+    }
+  ]
+}

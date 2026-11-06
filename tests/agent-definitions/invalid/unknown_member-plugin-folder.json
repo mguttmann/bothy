@@ -1,0 +1,45 @@
+{
+  "tool_class": "chat",
+  "definition": {
+    "instructions": "You help Alex write release notes for the team.\n",
+    "skills": [],
+    "mcp_servers": [],
+    "settings": {
+      "tool_class_wish": "chat"
+    },
+    "origin": {
+      "kind": "manual"
+    },
+    "plugin": {
+      "name": "x"
+    },
+    "hooks": {
+      "PreToolUse": []
+    },
+    "monitors": [],
+    "output_styles": [],
+    "bin": {}
+  },
+  "expect": [
+    {
+      "pointer": "/plugin",
+      "code": "unknown_member"
+    },
+    {
+      "pointer": "/hooks",
+      "code": "unknown_member"
+    },
+    {
+      "pointer": "/monitors",
+      "code": "unknown_member"
+    },
+    {
+      "pointer": "/output_styles",
+      "code": "unknown_member"
+    },
+    {
+      "pointer": "/bin",
+      "code": "unknown_member"
+    }
+  ]
+}

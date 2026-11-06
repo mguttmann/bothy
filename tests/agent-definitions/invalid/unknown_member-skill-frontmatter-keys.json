@@ -1,0 +1,57 @@
+{
+  "tool_class": "chat",
+  "definition": {
+    "instructions": "You help Alex write release notes for the team.\n",
+    "skills": [
+      {
+        "name": "notes",
+        "description": "Writes short notes",
+        "body": "Write short notes.\n",
+        "allowed-tools": "Bash",
+        "hooks": {},
+        "model": "opus",
+        "context": "fork",
+        "agent": "x",
+        "disable-model-invocation": true,
+        "mcpServers": {}
+      }
+    ],
+    "mcp_servers": [],
+    "settings": {
+      "tool_class_wish": "chat"
+    },
+    "origin": {
+      "kind": "manual"
+    }
+  },
+  "expect": [
+    {
+      "pointer": "/skills/0/allowed-tools",
+      "code": "unknown_member"
+    },
+    {
+      "pointer": "/skills/0/hooks",
+      "code": "unknown_member"
+    },
+    {
+      "pointer": "/skills/0/model",
+      "code": "unknown_member"
+    },
+    {
+      "pointer": "/skills/0/context",
+      "code": "unknown_member"
+    },
+    {
+      "pointer": "/skills/0/agent",
+      "code": "unknown_member"
+    },
+    {
+      "pointer": "/skills/0/disable-model-invocation",
+      "code": "unknown_member"
+    },
+    {
+      "pointer": "/skills/0/mcpServers",
+      "code": "unknown_member"
+    }
+  ]
+}

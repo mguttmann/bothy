@@ -505,6 +505,7 @@ make sure that clients clear their cache and runs end (R-AZ-15).
 | `agent.config.read` | read prompt, skills, project binding of the channels that the agent operates | channel | agent-self and effective operator | no | no | no | no | `rl.read` |
 | `agent.project_folders.read` | read the project folders a runner reported that have no binding (09 18.13, M4-44) | agent | owner | yes | no | no | no | `rl.read` |
 | `agent.triggerers.read` | set of the people who may trigger this agent, with `permission_version` (allow list in the adapter) | agent | agent-self | no | no | no | no | `rl.agent_runtime` |
+| `agent.definition.read` | read the current definition and its versions ([26-builtin-agents.md](26-builtin-agents.md) 4.1) | agent | owner or agent-self | no | no | no | no | `rl.read` |
 | `command.read` | see the command list and options (built-in commands, those of the operator, of allowed guests and of apps with `write`) | channel | read | no | no | no | no | `rl.read` |
 | `command.register` | register or change a command; it may apply only to targets that its owner operates or on which the owner has `write` | command | agent-self or app-self with scope | no | no | yes | no | `rl.admin` |
 | `command.remove` | remove a command | command | agent-self or app-self with scope | no | no | yes | no | `rl.admin` |
@@ -771,6 +772,7 @@ allows it. Personal events (`audience = self`) go only to the named principal.
 | `interaction.created` | interaction | self (agent or app, owner of the component); agent additionally `agent.events.consume`, app `events:subscribe` | before delivery to agents, `agent.invoke` |
 | `command.invoked` | command | self (agent or app, owner of the command); agent additionally `agent.events.consume`, app `events:subscribe` | before delivery to agents, `agent.invoke` |
 | `agent.config_changed` | channel | self (agent) and `agent.config.read` | prompt, skills, project binding changed |
+| `agent.definition_changed` | agent | self (agent) and `agent.definition.read` | a new definition version of a built-in agent; payload `definition_version` only, never the definition |
 | `host.updated` | host | `host.read` | also on creation; state, assignee, LLM declaration, profiles, check results, assignments of the session users; `key_changed` on re-pairing; never keys |
 | `terminal_session.changed` | terminal_session | self | to the person of the session: state, device, `close_reason`; never contents |
 <!-- END GENERATED: events.durable -->

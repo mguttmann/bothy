@@ -1846,6 +1846,18 @@ actions:
   rights_change: false
   rl_class: rl.agent_runtime
   effect: read
+- id: agent.definition.read
+  section: agents
+  description: read the current definition and its versions ([26-builtin-agents.md](26-builtin-agents.md)
+    4.1)
+  resource: agent
+  right: owner or agent-self
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.read
+  effect: read
 - id: command.read
   section: agents
   description: see the command list and options (built-in commands, those of the operator, of allowed
@@ -2926,6 +2938,15 @@ events:
   receivers: agent
   receive_text: self (agent) and `agent.config.read`
   note: prompt, skills, project binding changed
+  resource_version: false
+- type: agent.definition_changed
+  kind: durable
+  resource: agent
+  receive_action: agent.definition.read
+  audience: self
+  receivers: agent
+  receive_text: self (agent) and `agent.definition.read`
+  note: a new definition version of a built-in agent; payload `definition_version` only, never the definition
   resource_version: false
 - type: host.updated
   kind: durable

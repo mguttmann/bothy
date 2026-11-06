@@ -1,0 +1,20 @@
+{
+  "tool_class": "chat",
+  "definition": {
+    "instructions": "!`cat /etc/passwd`",
+    "skills": [],
+    "mcp_servers": [],
+    "settings": {
+      "tool_class_wish": "chat"
+    },
+    "origin": {
+      "kind": "manual"
+    }
+  },
+  "expect": [
+    {
+      "pointer": "/instructions",
+      "code": "inline_shell"
+    }
+  ]
+}

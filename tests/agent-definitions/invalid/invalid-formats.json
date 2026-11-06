@@ -1,0 +1,164 @@
+{
+  "tool_class": "host",
+  "definition": {
+    "instructions": "You help Alex write release notes for the team.\n",
+    "skills": [],
+    "mcp_servers": [
+      {
+        "name": "docs",
+        "transport": "http",
+        "url": "http://mcp.example.com"
+      },
+      {
+        "name": "b",
+        "transport": "http",
+        "url": "https://alex:pw@mcp.example.com"
+      },
+      {
+        "name": "c",
+        "transport": "http",
+        "url": "https://mcp.example.com/#x"
+      },
+      {
+        "name": "d",
+        "transport": "http",
+        "url": "https:///nohost"
+      },
+      {
+        "name": "e",
+        "transport": "ftp"
+      },
+      {
+        "name": "f",
+        "transport": "http",
+        "url": "https://mcp.example.com/v1",
+        "headers": [
+          {
+            "name": "X-A",
+            "value": "1",
+            "secret_ref": "env:A"
+          },
+          {
+            "name": "X-B"
+          }
+        ]
+      },
+      {
+        "name": "g",
+        "transport": "stdio",
+        "command": "npx",
+        "package": "@example/mcp-files@1.4.2",
+        "env": [
+          {
+            "name": "A_KEY",
+            "secret_ref": "vault:x"
+          },
+          {
+            "name": "B_KEY",
+            "secret_ref": "file:relative/path"
+          },
+          {
+            "name": "C_KEY",
+            "secret_ref": "env:lower"
+          },
+          {
+            "name": "D_KEY",
+            "secret_ref": "file:/a/../b"
+          }
+        ]
+      }
+    ],
+    "settings": {
+      "model": "-x",
+      "tool_class_wish": "root",
+      "allowed_tools": [
+        "-Bash",
+        "mcp__unknown__x",
+        ""
+      ],
+      "max_cost_usd_per_run": 50.01
+    },
+    "origin": {
+      "kind": "export",
+      "template_slug": "Bad Slug"
+    }
+  },
+  "expect": [
+    {
+      "pointer": "/mcp_servers/0/url",
+      "code": "invalid"
+    },
+    {
+      "pointer": "/mcp_servers/1/url",
+      "code": "invalid"
+    },
+    {
+      "pointer": "/mcp_servers/2/url",
+      "code": "invalid"
+    },
+    {
+      "pointer": "/mcp_servers/3/url",
+      "code": "invalid"
+    },
+    {
+      "pointer": "/mcp_servers/4/transport",
+      "code": "invalid_enum"
+    },
+    {
+      "pointer": "/mcp_servers/5/headers/0",
+      "code": "invalid"
+    },
+    {
+      "pointer": "/mcp_servers/5/headers/1",
+      "code": "required"
+    },
+    {
+      "pointer": "/mcp_servers/6/env/0/secret_ref",
+      "code": "invalid"
+    },
+    {
+      "pointer": "/mcp_servers/6/env/1/secret_ref",
+      "code": "invalid"
+    },
+    {
+      "pointer": "/mcp_servers/6/env/2/secret_ref",
+      "code": "invalid"
+    },
+    {
+      "pointer": "/mcp_servers/6/env/3/secret_ref",
+      "code": "invalid"
+    },
+    {
+      "pointer": "/settings/model",
+      "code": "invalid"
+    },
+    {
+      "pointer": "/settings/tool_class_wish",
+      "code": "invalid_enum"
+    },
+    {
+      "pointer": "/settings/allowed_tools/0",
+      "code": "invalid"
+    },
+    {
+      "pointer": "/settings/allowed_tools/1",
+      "code": "invalid"
+    },
+    {
+      "pointer": "/settings/allowed_tools/2",
+      "code": "invalid"
+    },
+    {
+      "pointer": "/settings/max_cost_usd_per_run",
+      "code": "too_large"
+    },
+    {
+      "pointer": "/origin/kind",
+      "code": "invalid_enum"
+    },
+    {
+      "pointer": "/origin/template_slug",
+      "code": "invalid"
+    }
+  ]
+}

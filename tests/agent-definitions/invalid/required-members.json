@@ -1,0 +1,43 @@
+{
+  "tool_class": "chat",
+  "definition": {
+    "skills": [
+      {
+        "name": "a"
+      }
+    ],
+    "mcp_servers": [
+      {
+        "name": "b"
+      }
+    ],
+    "settings": {},
+    "origin": {}
+  },
+  "expect": [
+    {
+      "pointer": "/instructions",
+      "code": "required"
+    },
+    {
+      "pointer": "/skills/0/description",
+      "code": "required"
+    },
+    {
+      "pointer": "/skills/0/body",
+      "code": "required"
+    },
+    {
+      "pointer": "/mcp_servers/0/transport",
+      "code": "required"
+    },
+    {
+      "pointer": "/settings/tool_class_wish",
+      "code": "required"
+    },
+    {
+      "pointer": "/origin/kind",
+      "code": "required"
+    }
+  ]
+}

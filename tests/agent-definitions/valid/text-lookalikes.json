@@ -1,0 +1,15 @@
+{
+  "tool_class": "chat",
+  "definition": {
+    "instructions": "Say Hello!`name` is not shell, nor is ! `x`.\nUse ```bash fences freely:\n```bash\nls\n```\nWrite to robin@example.com or @sam about @notes/a..b.md.\nAn `!` alone and a closing `` ` `` are fine.\n",
+    "skills": [],
+    "mcp_servers": [],
+    "settings": {
+      "tool_class_wish": "chat"
+    },
+    "origin": {
+      "kind": "manual"
+    }
+  },
+  "expect": []
+}

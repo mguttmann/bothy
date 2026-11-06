@@ -201,8 +201,8 @@ through the `Fetcher` instead.
 In memory: `typing.started` and `agent.presence_changed` (`EphemeralStore`), `run.updated`
 (`onRunUpdated`, raw, also when truncated), `notification.created` (`notifications` of
 `CatchUpListener` and `SyncEngine`), `host.presence_changed` (`hostEvents`, M4-36). Skipped, the cursor advances (no local table):
-`access.expiring`, `agent.config_changed`, `agent.followup`, `agent.invocation`,
-`agent_session.changed`, `channel.settings_changed`, `command.invoked`, `device.pending`,
+`access.expiring`, `agent.config_changed`, `agent.definition_changed`, `agent.followup`,
+`agent.invocation`, `agent_session.changed`, `channel.settings_changed`, `command.invoked`, `device.pending`,
 `gdpr.request_due`, `gdpr.request_updated`, `grant.changed`, `group.changed`, `import.progress`,
 `interaction.created`, `run.cancel_requested`,
 and every type the catalogue does not know.

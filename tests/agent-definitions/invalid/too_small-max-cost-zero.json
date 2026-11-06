@@ -1,0 +1,21 @@
+{
+  "tool_class": "chat",
+  "definition": {
+    "instructions": "You help Alex write release notes for the team.\n",
+    "skills": [],
+    "mcp_servers": [],
+    "settings": {
+      "tool_class_wish": "chat",
+      "max_cost_usd_per_run": 0
+    },
+    "origin": {
+      "kind": "manual"
+    }
+  },
+  "expect": [
+    {
+      "pointer": "/settings/max_cost_usd_per_run",
+      "code": "too_small"
+    }
+  ]
+}

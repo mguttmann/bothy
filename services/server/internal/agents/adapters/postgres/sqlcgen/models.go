@@ -39,6 +39,15 @@ type AgentConsumerCursor struct {
 	UpdatedAt       pgtype.Timestamptz
 }
 
+type AgentDefinition struct {
+	AgentID    pgtype.UUID
+	Version    int64
+	Definition []byte
+	OriginKind string
+	CreatedAt  pgtype.Timestamptz
+	CreatedBy  pgtype.UUID
+}
+
 type AgentSession struct {
 	ID                   pgtype.UUID
 	ThreadID             pgtype.UUID

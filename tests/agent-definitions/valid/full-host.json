@@ -1,0 +1,90 @@
+{
+  "tool_class": "host",
+  "definition": {
+    "instructions": "# Release helper\n\nRead @docs/release.md and @./notes/today.md first.\nMail alex@example.com when done!\n",
+    "skills": [
+      {
+        "name": "notes",
+        "description": "Writes short notes",
+        "body": "Write short notes.\n",
+        "files": [
+          {
+            "name": "checklist.md",
+            "content": "- [ ] Changelog\n- [ ] Tag\n"
+          },
+          {
+            "name": "style-guide.v2.md",
+            "content": "Short sentences.\n"
+          }
+        ]
+      },
+      {
+        "name": "summarize-2",
+        "description": "Summarizes a thread in three lines",
+        "body": "Summarize.\n---\nNo frontmatter here.\n"
+      }
+    ],
+    "mcp_servers": [
+      {
+        "name": "docs",
+        "transport": "http",
+        "url": "https://mcp.example.com/v1",
+        "headers": [
+          {
+            "name": "Authorization",
+            "secret_ref": "env:DOCS_MCP_TOKEN"
+          },
+          {
+            "name": "X-Team",
+            "value": "release"
+          }
+        ]
+      },
+      {
+        "name": "files",
+        "transport": "stdio",
+        "command": "npx",
+        "package": "@example/mcp-files@1.4.2",
+        "args": [
+          "--root",
+          "/srv/shared",
+          "--read-only"
+        ],
+        "env": [
+          {
+            "name": "FILES_API_KEY",
+            "secret_ref": "file:/run/secrets/files-key"
+          },
+          {
+            "name": "LOG_LEVEL",
+            "value": "info"
+          }
+        ]
+      },
+      {
+        "name": "search-py",
+        "transport": "stdio",
+        "command": "uvx",
+        "package": "mcp-search@0.3.0-beta.1+build.7"
+      }
+    ],
+    "settings": {
+      "model": "claude-sonnet-4-5",
+      "tool_class_wish": "host",
+      "allowed_tools": [
+        "Read",
+        "Grep",
+        "Bash(git log:*)",
+        "mcp__docs__search",
+        "mcp__files"
+      ],
+      "max_cost_usd_per_run": 2.5
+    },
+    "origin": {
+      "kind": "template",
+      "template_slug": "release-helper",
+      "template_version": "1.2.0"
+    }
+  },
+  "expect": []
+}

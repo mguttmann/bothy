@@ -119,6 +119,8 @@ func (sc *Scenario) agents() {
 	sc.post(o, "/agents/"+agent+"/disable", map[string]any{"reason": sc.Reg.New(ClassAdminReason, "", "agent disable reason")}, ok...)
 	sc.post(o, "/agents/"+agent+"/enable", map[string]any{"reason": sc.Reg.New(ClassAdminReason, "", "agent enable reason")}, ok...)
 
+	sc.definitions()
+
 	// API tokens: one created, listed and revoked; the agents of the world use theirs below.
 	tok := sc.post(o, "/principals/"+agent+"/tokens", map[string]any{
 		"name": sc.Reg.New(ClassContent, "", "token name"), "expires_at": timestamp(time.Now().Add(time.Hour)), "dpop_jkt": thumbprint(),
@@ -271,4 +273,36 @@ func (sc *Scenario) cspReport() {
 	if r := sc.raw(http.MethodPost, "/csp-reports", header("Content-Type", "application/reports+json"), report, "browser"); r.Status != http.StatusNoContent {
 		sc.T.Errorf("submitCspReport: status %d", r.Status)
 	}
+}
+
+// definitions drives the definition of a built-in agent (A1-02) with canary values of class
+// definition in the instructions, a skill body and a header value: the owner writes two
+// versions, reads the current and the first and lists the versions, sends a stale PUT (412 with
+// current) and a refused PUT whose finding names only the pointer and the code.
+func (sc *Scenario) definitions() {
+	sc.T.Helper()
+	o := sc.W.Owner
+	a := sc.post(o, "/agents", map[string]any{
+		"handle": "kanarie-builtin", "display_name": sc.Reg.New(ClassContent, "", "built-in agent display name"), "adapter_kind": "claude_agent",
+	}, created...)
+	path := "/agents/" + id(a) + "/definition"
+	def := func(label string) map[string]any {
+		return map[string]any{
+			"instructions": "Help the team. " + sc.Reg.New(ClassDefinition, "", "definition instructions"+label),
+			"skills": []any{map[string]any{"name": "notes", "description": "Writes notes",
+				"body": "Write notes. " + sc.Reg.New(ClassDefinition, "", "definition skill body"+label)}},
+			"mcp_servers": []any{map[string]any{"name": "docs", "transport": "http", "url": "https://mcp.example.com/v1",
+				"headers": []any{map[string]any{"name": "X-Team", "value": sc.Reg.New(ClassDefinition, "", "definition header value"+label)}}}},
+			"settings": map[string]any{"tool_class_wish": "chat"}, "origin": map[string]any{"kind": "manual"},
+		}
+	}
+	sc.put(o, path, def(""), ok...)
+	sc.call(o, req{method: http.MethodPut, path: path, header: ifMatch(1), body: def(" (second)")}, ok...)
+	sc.get(o, path, ok...)
+	sc.get(o, path+"?version=1", ok...)
+	sc.get(o, path+"/versions", ok...)
+	sc.call(o, req{method: http.MethodPut, path: path, header: ifMatch(1), body: def(" (412)")}, http.StatusPreconditionFailed)
+	bad := def(" (400)")
+	bad["instructions"] = "!`id` " + sc.Reg.New(ClassDefinition, "", "definition instructions (400)")
+	sc.call(o, req{method: http.MethodPut, path: path, header: ifMatch(2), body: bad}, http.StatusBadRequest)
 }

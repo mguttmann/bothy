@@ -253,16 +253,19 @@ func (s *Service) SetCredentialHolder(ctx context.Context, a actor.Actor, id ids
 }
 
 // SetToolClass implements agents.Agents (07 section 2.11): the target class with reason; SR2
-// reads the effective class, so the change is a rights change for the agent.
+// reads the effective class, so the change is a rights change for the agent. A class below host
+// for a built-in agent whose current definition has a stdio MCP server is refused with 409
+// conflict, reason definition_needs_host (26 4.4 item 5, R-BA-06); the check runs in both units,
+// the second under the row lock that every definition write takes first.
 func (s *Service) SetToolClass(ctx context.Context, a actor.Actor, id ids.ID, cmd agents.ToolClassCmd) (agents.Agent, error) {
 	return s.run(ctx, a, id, change{
 		act: authorize.ActionAgentToolClassSet, reason: cmd.Reason, match: cmd.IfMatch,
-		decide: func(_ context.Context, rec domain.Agent) (bool, error) {
+		decide: func(ctx context.Context, rec domain.Agent) (bool, error) {
 			c, err := domain.ParseToolClass(cmd.ToolClass)
-			if err != nil {
+			if err != nil || c == rec.ToolClass {
 				return false, err
 			}
-			return c != rec.ToolClass, nil
+			return true, s.needsHost(ctx, rec, c)
 		},
 		apply: func(rec *domain.Agent) (auditing.Attrs, error) {
 			from := rec.ToolClass

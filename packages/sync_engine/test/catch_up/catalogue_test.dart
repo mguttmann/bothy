@@ -11,6 +11,7 @@ import 'package:test/test.dart';
 const Set<String> skippedDurable = {
   'access.expiring',
   'agent.config_changed',
+  'agent.definition_changed',
   'agent.followup',
   'agent.invocation',
   'agent_session.changed',

@@ -35,6 +35,21 @@ Serializers _$serializers =
           ..add(AgentConfigChangedEventTypeEnum.serializer)
           ..add(AgentConfigChangedPayload.serializer)
           ..add(AgentCreate.serializer)
+          ..add(AgentDefinition.serializer)
+          ..add(AgentDefinitionChangedEvent.serializer)
+          ..add(AgentDefinitionChangedEventTypeEnum.serializer)
+          ..add(AgentDefinitionChangedPayload.serializer)
+          ..add(AgentDefinitionEntry.serializer)
+          ..add(AgentDefinitionMcpServer.serializer)
+          ..add(AgentDefinitionMcpServerTransportEnum.serializer)
+          ..add(AgentDefinitionOrigin.serializer)
+          ..add(AgentDefinitionOriginKindEnum.serializer)
+          ..add(AgentDefinitionSettings.serializer)
+          ..add(AgentDefinitionSkill.serializer)
+          ..add(AgentDefinitionSkillFile.serializer)
+          ..add(AgentDefinitionVersion.serializer)
+          ..add(AgentDefinitionVersionOriginKindEnum.serializer)
+          ..add(AgentDefinitionVersionPage.serializer)
           ..add(AgentFollowupEvent.serializer)
           ..add(AgentFollowupEventTypeEnum.serializer)
           ..add(AgentFollowupPayload.serializer)
@@ -856,6 +871,46 @@ Serializers _$serializers =
             () => ListBuilder<AgentChannelConfig>(),
           )
           ..addBuilderFactory(
+            const FullType(BuiltList, const [
+              const FullType(AgentDefinitionEntry),
+            ]),
+            () => ListBuilder<AgentDefinitionEntry>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(String)]),
+            () => ListBuilder<String>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [
+              const FullType(AgentDefinitionEntry),
+            ]),
+            () => ListBuilder<AgentDefinitionEntry>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [
+              const FullType(AgentDefinitionSkill),
+            ]),
+            () => ListBuilder<AgentDefinitionSkill>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [
+              const FullType(AgentDefinitionMcpServer),
+            ]),
+            () => ListBuilder<AgentDefinitionMcpServer>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [
+              const FullType(AgentDefinitionSkillFile),
+            ]),
+            () => ListBuilder<AgentDefinitionSkillFile>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [
+              const FullType(AgentDefinitionVersion),
+            ]),
+            () => ListBuilder<AgentDefinitionVersion>(),
+          )
+          ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(AgentSession)]),
             () => ListBuilder<AgentSession>(),
           )
@@ -1611,6 +1666,10 @@ Serializers _$serializers =
           ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(StatusIncident)]),
             () => ListBuilder<StatusIncident>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(String)]),
+            () => ListBuilder<String>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(String)]),

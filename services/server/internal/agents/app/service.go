@@ -7,10 +7,12 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"slices"
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/agents"
 	"github.com/OWNER/bothy/services/server/internal/agents/domain"
+	"github.com/OWNER/bothy/services/server/internal/agents/domain/definition"
 	"github.com/OWNER/bothy/services/server/internal/authz"
 	"github.com/OWNER/bothy/services/server/internal/identity"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
@@ -34,12 +36,35 @@ type Config struct {
 	// ReasonMaxChars is audit.reason_max_chars, the longest reason of agent.billing_mode.set,
 	// agent.billing_mode.set_all and agent.credential_holder.set (SEC-AUD-5, M2-21).
 	ReasonMaxChars int `config:"audit.reason_max_chars"`
+	// The limits of a definition of a built-in agent (docs/spec/26-builtin-agents.md 14, A1-02);
+	// DefinitionLimits returns them for the validator.
+	DefinitionInstructionsMaxBytes     int      `config:"agents.definition.instructions_max_bytes"`
+	DefinitionMaxSkills                int      `config:"agents.definition.max_skills"`
+	DefinitionSkillDescriptionMaxChars int      `config:"agents.definition.skill_description_max_chars"`
+	DefinitionSkillBodyMaxBytes        int      `config:"agents.definition.skill_body_max_bytes"`
+	DefinitionMaxSkillFiles            int      `config:"agents.definition.max_skill_files"`
+	DefinitionMaxMCPServers            int      `config:"agents.definition.max_mcp_servers"`
+	DefinitionMaxAllowedTools          int      `config:"agents.definition.max_allowed_tools"`
+	DefinitionMaxCostUSDPerRun         float64  `config:"agents.definition.max_cost_usd_per_run"`
+	MCPStdioRunners                    []string `config:"agents.mcp_stdio_runners"`
+}
+
+// DefinitionLimits returns the limits of a definition from the configuration keys.
+func (c Config) DefinitionLimits() definition.Limits {
+	return definition.Limits{
+		InstructionsMaxBytes: c.DefinitionInstructionsMaxBytes, MaxSkills: c.DefinitionMaxSkills,
+		SkillDescriptionMaxChars: c.DefinitionSkillDescriptionMaxChars, SkillBodyMaxBytes: c.DefinitionSkillBodyMaxBytes,
+		MaxSkillFiles: c.DefinitionMaxSkillFiles, MaxMCPServers: c.DefinitionMaxMCPServers, MaxAllowedTools: c.DefinitionMaxAllowedTools,
+		MaxCostUSDPerRun: c.DefinitionMaxCostUSDPerRun, StdioRunners: slices.Clone(c.MCPStdioRunners),
+	}
 }
 
 // Deps are the collaborators of the agents use cases.
 type Deps struct {
 	// Store reads and writes the agents records.
 	Store Store
+	// Definitions reads and inserts the versions of the definitions of built-in agents (A1-02).
+	Definitions DefinitionStore
 	// Principals creates the agent principal and changes its status and display name.
 	Principals identity.PrincipalWriter
 	// Directory reads principals and checks credential holders.
@@ -84,7 +109,7 @@ var _ agents.Agents = (*Service)(nil)
 // New returns the use cases. Errors: a missing collaborator, a page size below 1 or an
 // audit.reason_max_chars below 1.
 func New(cfg Config, d Deps) (*Service, error) {
-	if d.Store == nil || d.Principals == nil || d.Directory == nil || d.Tokens == nil || d.Rights == nil || d.UoW == nil ||
+	if d.Store == nil || d.Definitions == nil || d.Principals == nil || d.Directory == nil || d.Tokens == nil || d.Rights == nil || d.UoW == nil ||
 		d.Authorizer == nil || d.Audit == nil || d.Events == nil || d.Cursors == nil {
 		return nil, errors.New("agents: New needs every collaborator")
 	}

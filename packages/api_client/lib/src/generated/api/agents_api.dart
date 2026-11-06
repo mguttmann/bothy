@@ -11,6 +11,9 @@ import 'package:dio/dio.dart';
 import 'package:api_client/src/generated/api_util.dart';
 import 'package:api_client/src/generated/model/agent.dart';
 import 'package:api_client/src/generated/model/agent_create.dart';
+import 'package:api_client/src/generated/model/agent_definition.dart';
+import 'package:api_client/src/generated/model/agent_definition_version.dart';
+import 'package:api_client/src/generated/model/agent_definition_version_page.dart';
 import 'package:api_client/src/generated/model/agent_page.dart';
 import 'package:api_client/src/generated/model/agent_update.dart';
 import 'package:api_client/src/generated/model/billing_mode_set.dart';
@@ -455,6 +458,222 @@ class AgentsApi {
     );
   }
 
+  /// Read the current definition of a built-in agent
+  /// The current (highest) version of the definition of the built-in agent &#x60;agent_id&#x60; (26 4.1), or with &#x60;version&#x60; an older one, which the version list offers for undo (26 8.4). The owner reads it, and the agent itself through the hosted connection of its hosting runner, which reads only the current version; another agent and a person who is no owner get the refusal of 07 2.13. A built-in agent without a definition, any other agent and an unknown &#x60;version&#x60; answer &#x60;404&#x60;. The definition appears only in this answer, in &#x60;putAgentDefinition&#x60; and in &#x60;current&#x60; of its &#x60;412&#x60;, never in an event, a log line, telemetry or an audit entry. &#x60;ETag&#x60; is the version of the answer; the &#x60;If-Match&#x60; of the next &#x60;putAgentDefinition&#x60; is the current version.
+  ///
+  /// Parameters:
+  /// * [agentId]
+  /// * [version] - A stored version to read instead of the current one; owners only, the agent itself reads only its current version.
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [AgentDefinitionVersion] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<AgentDefinitionVersion>> getAgentDefinition({
+    required String agentId,
+    int? version,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/agents/{agent_id}/definition'.replaceAll(
+      '{'
+      r'agent_id'
+      '}',
+      encodeQueryParameter(
+        _serializers,
+        agentId,
+        const FullType(String),
+      ).toString(),
+    );
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'apiKey',
+            'name': 'consoleSession',
+            'keyName': '__Host-console_session',
+            'where': '',
+          },
+          {'type': 'http', 'scheme': 'DPoP', 'name': 'dpopAuth'},
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearerAuth'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _queryParameters = <String, dynamic>{
+      if (version != null)
+        r'version': encodeQueryParameter(
+          _serializers,
+          version,
+          const FullType(int),
+        ),
+    };
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      queryParameters: _queryParameters,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    AgentDefinitionVersion? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(
+              rawResponse,
+              specifiedType: const FullType(AgentDefinitionVersion),
+            ) as AgentDefinitionVersion;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<AgentDefinitionVersion>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// List the versions of the definition of a built-in agent
+  /// The stored versions of the definition of the built-in agent &#x60;agent_id&#x60;, newest first, without the definition text (26 4.1). The version list offers undo: the client reads the content of an older version with &#x60;getAgentDefinition&#x60; and &#x60;version&#x60;, and writes it as a new version with &#x60;putAgentDefinition&#x60; (26 8.4). Permissions as &#x60;getAgentDefinition&#x60;; a built-in agent without a definition answers an empty list, any other agent &#x60;404&#x60;.
+  ///
+  /// Parameters:
+  /// * [agentId]
+  /// * [cursor] - Cursor from `next_cursor` of the previous page.
+  /// * [limit]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [AgentDefinitionVersionPage] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<AgentDefinitionVersionPage>> listAgentDefinitionVersions({
+    required String agentId,
+    String? cursor,
+    int? limit,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/agents/{agent_id}/definition/versions'.replaceAll(
+      '{'
+      r'agent_id'
+      '}',
+      encodeQueryParameter(
+        _serializers,
+        agentId,
+        const FullType(String),
+      ).toString(),
+    );
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'apiKey',
+            'name': 'consoleSession',
+            'keyName': '__Host-console_session',
+            'where': '',
+          },
+          {'type': 'http', 'scheme': 'DPoP', 'name': 'dpopAuth'},
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearerAuth'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _queryParameters = <String, dynamic>{
+      if (cursor != null)
+        r'cursor': encodeQueryParameter(
+          _serializers,
+          cursor,
+          const FullType(String),
+        ),
+      if (limit != null)
+        r'limit': encodeQueryParameter(
+          _serializers,
+          limit,
+          const FullType(int),
+        ),
+    };
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      queryParameters: _queryParameters,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    AgentDefinitionVersionPage? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(
+              rawResponse,
+              specifiedType: const FullType(AgentDefinitionVersionPage),
+            ) as AgentDefinitionVersionPage;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<AgentDefinitionVersionPage>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
   /// List the project folders of a runner that have no binding
   /// The folders directly under the projects root of the runner &#x60;agent_id&#x60; that its last heartbeat reported (&#x60;Heartbeat.project_folders&#x60;, 09 18.13) and that no forum is bound to: a name equal to the &#x60;workspace_ref&#x60; of any binding, compared without case, is left out (03 &#x60;runner_project_folders&#x60;, M4-44). &#x60;reported&#x60; is false while the runner has never reported its folders. The app offers these folders to add a forum for each (01 6.10); the server never reads a host&#39;s files.
   ///
@@ -637,6 +856,121 @@ class AgentsApi {
     }
 
     return Response<AgentPage>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// Store a new version of the definition of a built-in agent
+  /// Part of &#x60;agent.update&#x60; (owner, step-up, audit; 26 4.1, R-API-29). Stores the body as the next version of the definition, raises &#x60;agents.version&#x60; (&#x60;agent.updated&#x60;) and sends the durable personal event &#x60;agent.definition_changed&#x60; with &#x60;definition_version&#x60; only to the agent, all in one transaction. &#x60;If-Match&#x60; names the current definition version and is absent only for the first version: without it on an existing definition &#x60;428 precondition_required&#x60;, a stale one &#x60;412 version_conflict&#x60; with the current definition in &#x60;current&#x60;. Only a built-in agent (&#x60;adapter_kind &#x3D; &#39;claude_agent&#39;&#x60;) has a definition; another agent answers &#x60;409 conflict&#x60; with &#x60;reason: not_a_builtin_agent&#x60;. The server checks the body against 26 4.2 and 4.3 and answers every finding as one &#x60;errors[]&#x60; entry of &#x60;400 validation_failed&#x60; with the JSON Pointer and the field code (&#x60;unknown_member&#x60;, &#x60;skill_frontmatter&#x60;, &#x60;inline_shell&#x60;, &#x60;import_outside_folder&#x60;, &#x60;secret_value_not_allowed&#x60;, &#x60;env_name_reserved&#x60;, &#x60;mcp_command_not_allowed&#x60;, &#x60;mcp_package_unpinned&#x60;, &#x60;tool_class_too_low&#x60;, &#x60;too_long&#x60;, &#x60;too_many&#x60;, &#x60;invalid_name&#x60;, &#x60;duplicate_name&#x60;, and the shape codes of docs/decisions.d/A1-02.md); then it stores nothing. A body equal to the current definition stores no new version. The audit entry names the version and the changed parts, never their text. Undo writes the content of an older version as a new version.
+  ///
+  /// Parameters:
+  /// * [agentId]
+  /// * [agentDefinition]
+  /// * [ifMatch] - Optional ETag; when given, a mismatch gives 412 `version_conflict`.
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [AgentDefinitionVersion] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<AgentDefinitionVersion>> putAgentDefinition({
+    required String agentId,
+    required AgentDefinition agentDefinition,
+    String? ifMatch,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/agents/{agent_id}/definition'.replaceAll(
+      '{'
+      r'agent_id'
+      '}',
+      encodeQueryParameter(
+        _serializers,
+        agentId,
+        const FullType(String),
+      ).toString(),
+    );
+    final _options = Options(
+      method: r'PUT',
+      headers: <String, dynamic>{
+        if (ifMatch != null) r'If-Match': ifMatch,
+        ...?headers,
+      },
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'apiKey',
+            'name': 'consoleSession',
+            'keyName': '__Host-console_session',
+            'where': '',
+          },
+          {'type': 'http', 'scheme': 'DPoP', 'name': 'dpopAuth'},
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearerAuth'},
+        ],
+        ...?extra,
+      },
+      contentType: 'application/json',
+      validateStatus: validateStatus,
+    );
+
+    dynamic _bodyData;
+
+    try {
+      const _type = FullType(AgentDefinition);
+      _bodyData = _serializers.serialize(agentDefinition, specifiedType: _type);
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _options.compose(_dio.options, _path),
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    final _response = await _dio.request<Object>(
+      _path,
+      data: _bodyData,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    AgentDefinitionVersion? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(
+              rawResponse,
+              specifiedType: const FullType(AgentDefinitionVersion),
+            ) as AgentDefinitionVersion;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<AgentDefinitionVersion>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,

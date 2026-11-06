@@ -1,0 +1,11 @@
+{
+  "agents.definition.instructions_max_bytes": 65536,
+  "agents.definition.max_skills": 32,
+  "agents.definition.skill_description_max_chars": 300,
+  "agents.definition.skill_body_max_bytes": 65536,
+  "agents.definition.max_skill_files": 8,
+  "agents.definition.max_mcp_servers": 16,
+  "agents.definition.max_allowed_tools": 64,
+  "agents.definition.max_cost_usd_per_run": 50,
+  "agents.mcp_stdio_runners": ["npx", "uvx"]
+}
