@@ -345,7 +345,7 @@ func TestIssueHostedToken(t *testing.T) {
 		t.Fatal(err)
 	}
 	tok := first.Token
-	if tok.PrincipalID != a.ID || tok.CreatedBy != r1.ID || tok.DPoPJKT != testJKT || tok.Kind != identity.TokenKindAgent ||
+	if tok.PrincipalID != a.ID || tok.CreatedBy != r1.ID || tok.DPoPJKT != testJKT || tok.Kind != string(identity.TokenKindAgent) ||
 		!tok.ExpiresAt.Equal(start.Add(hostedTTL)) || tok.Name != "hosted by runner-one" || first.Secret.IsZero() {
 		t.Fatalf("issued %+v", tok)
 	}

@@ -8,7 +8,6 @@ import (
 
 	"github.com/OWNER/bothy/services/server/api/rest"
 	"github.com/OWNER/bothy/services/server/internal/agents"
-	"github.com/OWNER/bothy/services/server/internal/identity"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/idempotency"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
@@ -88,7 +87,7 @@ func (h *Agents) IssueHostedAgentToken(ctx context.Context, req rest.IssueHosted
 
 // hostedTokenREST converts the new token (schema ApiToken); empty values become absent members,
 // never null (ADR 0053). Neither the secret nor the hash is part of it.
-func hostedTokenREST(t identity.APIToken) rest.ApiToken {
+func hostedTokenREST(t agents.HostedTokenInfo) rest.ApiToken {
 	return rest.ApiToken{
 		Id: rest.Uuid(t.ID), PrincipalId: rest.Uuid(t.PrincipalID), Name: t.Name, TokenPrefix: t.TokenPrefix, Scopes: []rest.AppScope{},
 		DpopJkt: optional(t.DPoPJKT), ExpiresAt: optionalTime(t.ExpiresAt), CreatedAt: t.CreatedAt.UTC().Truncate(time.Millisecond),

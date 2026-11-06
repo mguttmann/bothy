@@ -294,13 +294,13 @@ func (s *Service) activeHosted(ctx context.Context, host, after ids.ID, want int
 // checks the host again, lets identity revoke the runner's older tokens of the agent and insert
 // the new one bound to the key of the calling token, and audits the issue with the token id,
 // never the value.
-func (s *Service) IssueHostedToken(ctx context.Context, a actor.Actor, id ids.ID) (identity.IssuedToken, error) {
+func (s *Service) IssueHostedToken(ctx context.Context, a actor.Actor, id ids.ID) (agents.HostedToken, error) {
 	ctx, err := withCaller(ctx, a)
 	if err != nil {
-		return identity.IssuedToken{}, err
+		return agents.HostedToken{}, err
 	}
 	if s.cfg.HostedTokenTTL <= 0 {
-		return identity.IssuedToken{}, errs.New(errs.CodeInternalError, "agents: agents.hosted_token_ttl is not bound")
+		return agents.HostedToken{}, errs.New(errs.CodeInternalError, "agents: agents.hosted_token_ttl is not bound")
 	}
 	err = s.d.UoW.Do(ctx, func(ctx context.Context) error {
 		rec, found, err := s.d.Store.Agent(ctx, id)
@@ -318,7 +318,7 @@ func (s *Service) IssueHostedToken(ctx context.Context, a actor.Actor, id ids.ID
 		return s.hostedIssuer(ctx, a, rec, found)
 	})
 	if err != nil {
-		return identity.IssuedToken{}, err
+		return agents.HostedToken{}, err
 	}
 	var out identity.IssuedToken
 	err = s.d.UoW.Do(ctx, func(ctx context.Context) error {
@@ -334,7 +334,22 @@ func (s *Service) IssueHostedToken(ctx context.Context, a actor.Actor, id ids.ID
 	}, txn.DeclareRightsChange(txn.RightsChangeSpec{
 		Action: string(authorize.ActionAgentHostedTokenIssue), Resource: agentRef(id), Principals: []ids.ID{id},
 	}))
-	return out, err
+	if err != nil {
+		return agents.HostedToken{}, err
+	}
+	return hostedToken(out), nil
+}
+
+// hostedToken converts identity's issued token to the agents port type.
+func hostedToken(it identity.IssuedToken) agents.HostedToken {
+	t := it.Token
+	return agents.HostedToken{
+		Token: agents.HostedTokenInfo{
+			ID: t.ID, PrincipalID: t.PrincipalID, Kind: string(t.Kind), Name: t.Name, TokenPrefix: t.TokenPrefix,
+			DPoPJKT: t.DPoPJKT, ExpiresAt: t.ExpiresAt, CreatedBy: t.CreatedBy, CreatedAt: t.CreatedAt,
+		},
+		Secret: agents.NewSecret(it.Secret.Reveal()),
+	}
 }
 
 // hostedIssuer checks that the caller a may receive a token of rec (found false for an unknown

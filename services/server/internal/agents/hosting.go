@@ -4,8 +4,11 @@ package agents
 
 import (
 	"context"
+	"fmt"
+	"io"
+	"log/slog"
+	"time"
 
-	"github.com/OWNER/bothy/services/server/internal/identity"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 )
@@ -41,5 +44,74 @@ type Hosting interface {
 	//
 	//	issued, err := hosting.IssueHostedToken(ctx, runner, agentID)
 	//	// issued.Secret.Reveal() is shown once in the answer, never logged.
-	IssueHostedToken(ctx context.Context, a actor.Actor, id ids.ID) (identity.IssuedToken, error)
+	IssueHostedToken(ctx context.Context, a actor.Actor, id ids.ID) (HostedToken, error)
 }
+
+// HostedToken is the result of IssueHostedToken: the stored token of the built-in agent and its
+// secret. The port packages do not import each other, so the agents port has its own types
+// besides identity.IssuedToken.
+type HostedToken struct {
+	Token  HostedTokenInfo
+	Secret Secret
+}
+
+// HostedTokenInfo is the stored token of a built-in agent (schema ApiToken), without its secret.
+type HostedTokenInfo struct {
+	ID, PrincipalID ids.ID
+	// Kind is the token kind (agt).
+	Kind string
+	// Name is the label of the token.
+	Name string
+	// TokenPrefix is bothy_<kind>_ plus the first 6 characters of the random part.
+	TokenPrefix string
+	// DPoPJKT is the RFC 7638 thumbprint the token is bound to.
+	DPoPJKT string
+	// ExpiresAt is the expiry, agents.hosted_token_ttl after the issue.
+	ExpiresAt time.Time
+	// CreatedBy is the hosting runner.
+	CreatedBy ids.ID
+	CreatedAt time.Time
+}
+
+// redacted is the only rendering of a Secret.
+const redacted = "[redacted]"
+
+// Secret is the value of a hosted token: it renders as "[redacted]" through fmt, slog,
+// encoding/json and encoding.TextMarshaler, so it never reaches a log, an event, an audit entry or
+// an error by accident (SEC-LOG-1). Only Reveal hands out the value; the issueHostedAgentToken
+// handler calls it to write the answer once.
+type Secret struct {
+	v *string
+}
+
+// NewSecret wraps v.
+func NewSecret(v string) Secret { return Secret{v: &v} }
+
+// Reveal returns the value; "" for the zero Secret.
+func (s Secret) Reveal() string {
+	if s.v == nil {
+		return ""
+	}
+	return *s.v
+}
+
+// IsZero reports whether s holds no value.
+func (s Secret) IsZero() bool { return s.v == nil }
+
+// String returns "[redacted]".
+func (Secret) String() string { return redacted }
+
+// GoString returns "[redacted]".
+func (Secret) GoString() string { return redacted }
+
+// Format writes "[redacted]" for every verb.
+func (Secret) Format(f fmt.State, _ rune) { _, _ = io.WriteString(f, redacted) }
+
+// LogValue implements slog.LogValuer.
+func (Secret) LogValue() slog.Value { return slog.StringValue(redacted) }
+
+// MarshalJSON returns the JSON string "[redacted]".
+func (Secret) MarshalJSON() ([]byte, error) { return []byte(`"` + redacted + `"`), nil }
+
+// MarshalText returns "[redacted]".
+func (Secret) MarshalText() ([]byte, error) { return []byte(redacted), nil }
