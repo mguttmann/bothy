@@ -43,7 +43,9 @@ var stdioServer = map[string]any{"name": "files", "transport": "stdio", "command
 // builtin creates a built-in agent as o.
 func (w *world) builtin(o actor.Actor, handle string) agents.Agent {
 	w.t.Helper()
-	a, err := w.svc.Create(context.Background(), o, agents.CreateCmd{Handle: handle, DisplayName: handle, AdapterKind: agents.AdapterKindBuiltin})
+	// A built-in agent names its hosting runner (A1-03); the ceiling host never limits the class.
+	host := w.runner(o, handle+"-host", "host")
+	a, err := w.svc.Create(context.Background(), o, agents.CreateCmd{Handle: handle, DisplayName: handle, AdapterKind: agents.AdapterKindBuiltin, HostedBy: host.ID})
 	if err != nil {
 		w.t.Fatal(err)
 	}

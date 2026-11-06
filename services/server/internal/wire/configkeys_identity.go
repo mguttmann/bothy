@@ -192,7 +192,7 @@ func identityConfigKeys() []config.Key {
 			Chapter: chapter08,
 		},
 		{
-			Name: "auth.api_token_max_ttl", Kind: config.KindDuration, Default: "365d", Min: "1s",
+			Name: keyAPITokenMaxTTL, Kind: config.KindDuration, Default: "365d", Min: "1s",
 			Doc:     "Longest lifetime of an agent or app token.",
 			Chapter: chapter08,
 		},
@@ -286,3 +286,7 @@ func apiConfigKeys() []config.Key {
 		},
 	}
 }
+
+// keyAPITokenMaxTTL is auth.api_token_max_ttl, which the cross-check
+// hosted_token_ttl_within_api_token_max_ttl compares with agents.hosted_token_ttl (A1-03).
+const keyAPITokenMaxTTL = "auth.api_token_max_ttl" //nolint:gosec // G101: a configuration key name, no credential.

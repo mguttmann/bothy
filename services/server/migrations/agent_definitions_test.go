@@ -57,8 +57,12 @@ func TestAgentDefinitionsMigration_Constraints(t *testing.T) {
 	const agent = "0192a3b4-c5d6-7e8f-9a0b-1c2d3e4f9b01"
 	const owner = "0192a3b4-c5d6-7e8f-9a0b-1c2d3e4f9b02"
 	const unknown = "0192a3b4-c5d6-7e8f-9a0b-1c2d3e4f9b03"
+	// A built-in agent names its hosting runner (A1-03, agents_hosted_by_check).
+	const runner = "0192a3b4-c5d6-7e8f-9a0b-1c2d3e4f9b04"
+	mustExec(t, app, `INSERT INTO principals (id, kind, handle, display_name) VALUES ($1, 'agent', 'runner', 'Runner')`, runner)
+	mustExec(t, app, `INSERT INTO agents (principal_id, adapter_kind) VALUES ($1, 'code_runner')`, runner)
 	mustExec(t, app, `INSERT INTO principals (id, kind, handle, display_name) VALUES ($1, 'agent', 'writer', 'Writer')`, agent)
-	mustExec(t, app, `INSERT INTO agents (principal_id, adapter_kind) VALUES ($1, 'claude_agent')`, agent)
+	mustExec(t, app, `INSERT INTO agents (principal_id, adapter_kind, hosted_by) VALUES ($1, 'claude_agent', $2)`, agent, runner)
 	mustExec(t, app, `INSERT INTO principals (id, kind, handle, display_name) VALUES ($1, 'user', 'alex', 'Alex')`, owner)
 	ins := `INSERT INTO agent_definitions (agent_id, version, definition, origin_kind, created_by) VALUES ($1, $2, '{}', $3, $4)`
 	mustExec(t, app, ins, agent, 1, "manual", owner)

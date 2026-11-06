@@ -19,15 +19,19 @@ import (
 // Disable implements agents.Agents (09 section 2.1). A first unit loads, authorizes
 // agent.disable and checks the reason; an agent that is already disabled is a call without
 // effect. Otherwise a second unit, declared as the rights change agent.disable for the agent,
-// locks the record, disables the principal (disabled_at), revokes every API token of the agent,
-// publishes AgentDisabled, bumps the version and appends agent.updated. Open gateway connections
-// end through the revocation path of the gateway (M1-65).
+// locks the record, disables the principal (disabled_at), revokes every API token of the agent
+// and every token it issued as a hosting runner to its built-in agents (26 3.3 item 3), publishes
+// AgentDisabled, bumps the version and appends agent.updated, and for a built-in agent
+// agent.hosting_changed to its runner. Open gateway connections end through the revocation path
+// of the gateway (M1-65).
 func (s *Service) Disable(ctx context.Context, a actor.Actor, id ids.ID, reason string) (agents.Agent, error) {
 	return s.setStatus(ctx, a, id, reason, authorize.ActionAgentDisable, identity.StatusDisabled)
 }
 
 // Enable implements agents.Agents like Disable, the other way: the rights hook checks I1 for the
-// agent, which counts again once it is active (10 section 5.1). Tokens are not restored.
+// agent, which counts again once it is active (10 section 5.1). Tokens are not restored. A
+// built-in agent's runner gets agent.hosting_changed, so it lists the agent again at once
+// (docs/decisions.d/A1-03.md D-A1-03-8).
 func (s *Service) Enable(ctx context.Context, a actor.Actor, id ids.ID, reason string) (agents.Agent, error) {
 	return s.setStatus(ctx, a, id, reason, authorize.ActionAgentEnable, identity.StatusActive)
 }
@@ -78,6 +82,26 @@ func (s *Service) setStatus(ctx context.Context, a actor.Actor, id ids.ID, reaso
 	return out, err
 }
 
+// revokeOnDisable revokes every API token of the disabled agent id and every token it issued as
+// a hosting runner to its built-in agents (26 3.3 item 3), counts both in attrs and publishes
+// AgentDisabled. Tokens of another agent are never created by an agent, so the second count is
+// zero for every agent that hosts nothing.
+func (s *Service) revokeOnDisable(ctx context.Context, a actor.Actor, id ids.ID, attrs auditing.Attrs) error {
+	n, err := s.d.Tokens.RevokeAllForPrincipal(ctx, id, a.ID)
+	if err != nil {
+		return err
+	}
+	attrs[attrRevokedTokens] = auditing.Int(int64(n))
+	hosted, err := s.d.Hosted.RevokeIssued(ctx, id, a.ID)
+	if err != nil {
+		return err
+	}
+	if hosted > 0 {
+		attrs[attrRevokedHosted] = auditing.Int(int64(hosted))
+	}
+	return txn.Publish(ctx, agents.AgentDisabled{AgentID: id})
+}
+
 // statusWrite is the second unit of setStatus, declared as the rights change act.
 func (s *Service) statusWrite(ctx context.Context, a actor.Actor, id ids.ID, reason string, act authorize.Action, target identity.Status) (agents.Agent, error) {
 	rec, err := s.lock(ctx, id)
@@ -102,15 +126,14 @@ func (s *Service) statusWrite(ctx context.Context, a actor.Actor, id ids.ID, rea
 	}
 	attrs := auditing.Attrs{attrFromStatus: auditing.Code(string(from)), attrReason: auditing.ReasonText(reason)}
 	if target == identity.StatusDisabled {
-		n, err := s.d.Tokens.RevokeAllForPrincipal(ctx, id, a.ID)
-		if err != nil {
-			return agents.Agent{}, err
-		}
-		attrs[attrRevokedTokens] = auditing.Int(int64(n))
-		if err := txn.Publish(ctx, agents.AgentDisabled{AgentID: id}); err != nil {
+		if err := s.revokeOnDisable(ctx, a, id, attrs); err != nil {
 			return agents.Agent{}, err
 		}
 	}
 	rec.Bump()
-	return s.changedAndEmit(ctx, act, rec, attrs)
+	out, err := s.changedAndEmit(ctx, act, rec, attrs)
+	if err != nil {
+		return agents.Agent{}, err
+	}
+	return out, s.emitHostingChanged(ctx, rec.ID, rec.HostedBy)
 }

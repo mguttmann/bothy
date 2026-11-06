@@ -530,6 +530,55 @@ definition, schema `agent_definition.v1` of
   and the agent itself read it, and the canary test carries it as the class `definition`. The
   rulings are [decisions.d/A1-02.md](../../../../docs/decisions.d/A1-02.md).
 
+## Hosted agents (A1-03)
+
+Built-in agents (`adapter_kind` `claude_agent`, [26-builtin-agents.md](../../../../docs/spec/26-builtin-agents.md)
+3) are hosted by a Claude Code runner named in `agents.hosted_by` (R-DM-58, migrations 00094 to
+00096). The rules live in `domain/hosting.go`, the use cases in `app/hosting.go` behind the port
+`agents.Hosting`, the handlers in `adapters/httpapi/hosting.go`.
+
+- **Create.** `createAgent` takes `hosted_by` exactly with `claude_agent` (else `400` on
+  `/hosted_by`, `required` or `not_allowed`); the runner must be an active `code_runner` that is not
+  hosted itself and whose last stored heartbeat reports the capability `hosts_agents`, else
+  `host_not_capable`. The second unit locks the runner row and checks again; the runner gets the
+  durable event `agent.hosting_changed` (resource the runner itself, receive action
+  `agent.hosted.list`, payload only `agent_id`).
+- **Heartbeat.** `details.capabilities.hosts_agents` (`chat`, `scoped`, `host`) is the ceiling of a
+  runner; a change of it is stored at once, not with the delayed flush. A built-in agent's own
+  heartbeat with it is `400` on `/details/capabilities/hosts_agents` (`not_allowed`).
+- **Ceiling.** `agent.tool_class.set` above the runner's ceiling and `agent.host.set` to a runner
+  below the agent's class are `409 host_tool_class_ceiling`; a runner without a reported ceiling
+  admits only `chat`.
+- **Billing (10 10.3, BR-14).** `checkHostedBilling` runs after the write in the same unit of
+  `agent.billing_mode.set` (and its `set_all` form and the guided switch),
+  `agent.credential_holder.set` and `agent.host.set`: a `personal` built-in agent needs a
+  `personal` runner with the same holder that reports `personal`, and a runner may not leave a
+  `personal` hosted agent with another holder (`409 hosted_holder_mismatch`). It locks the runner
+  row, so a change of the agent and one of its runner serialize.
+- **Move.** `setAgentHost` (owner, step-up, If-Match) refuses an agent that is not built in
+  (`409 not_a_builtin_agent`) and moves it; in the same unit identity revokes the agent's tokens
+  that the old runner holds, and both runners get `agent.hosting_changed`.
+- **List.** `listHostedAgents` (agent-self) pages the active agents whose `hosted_by` is the
+  caller; it does not ask for `hosts_agents`, so a runner may read it before its first heartbeat
+  is stored.
+- **Token.** `issueHostedAgentToken` authorizes on the target as a resource owned by its
+  `hosted_by`, then requires a built-in target hosted by the caller, active, and a caller that is
+  an active runner reporting `hosts_agents`; every other case is the `404` of an unknown agent,
+  audited as a denial. The write unit is a rights change (it revokes tokens): identity revokes the
+  runner's older tokens of the agent and issues one bound to the `dpop_jkt` of the calling token,
+  expiring after `agents.hosted_token_ttl`; the allow entry names the agent, the runner, the token
+  id and the expiry, never the value. The handler marks the one-time secret, so the
+  Idempotency-Key stage stores no part of the answer.
+- **Revocation.** `agent.disable` also revokes every token the agent issued as a runner
+  (`revoked_hosted_tokens` in the audit) and tells a built-in agent's runner; `agent.enable` tells
+  it too. A revoked runner token takes the hosted tokens of its key inside identity. The gateway
+  closes the connections of revoked tokens with `4012` through its existing revocation path.
+- **identity.** `IsHostedAgent` implements `identity.HostedAgents`, bound by `internal/wire`, so
+  `createToken` refuses a built-in agent (`409 hosted_agent_token`).
+
+Tests: `domain/hosting_test.go`, `app/hosting_test.go`, `test/integration/hosting_test.go`,
+`internal/wire/serve_hosted_test.go` (the `4012` closes) and `migrations/agents_hosted_by_test.go`.
+
 ## Port (root package `internal/agents`)
 
 - Inbound: `Agents` (administration, policy, tool class; M1-51), `Definitions` (definitions of built-in agents; A1-02), `Facts` (run facts of runs; M2-05), `Presence` (heartbeat and presence; M2-20), `Consumers` (cursor, ack, takeover with fencing), `Commands` (register), `OwnedCommands` (the commands of an app for the owner actions of `apps`; M2-25), `Sessions`, `DevEnvironments` (milestone), `StatusAgents` (M7-09: the active agents with their stored presence for the status page, `app.StatusSource`; a stored online or degraded state older than `agent.presence_timeout` plus `agent.heartbeat_persist_interval` counts as offline; never authorized).
@@ -555,11 +604,11 @@ Only this module writes and reads these tables by SQL (03-data-model.md, princip
 
 ## Actions (05-actions.md)
 
-`agent.read`, `agent.create`, `agent.update`, `agent.disable`, `agent.enable`, `agent.billing_mode.set`, `agent.billing_mode.set_all`, `agent.credential_holder.set`, `agent.tool_class.set`, `agent.heartbeat`, `agent.events.consume`, `agent.triggerers.read`, `agent.project_folders.read`, `agent.definition.read`, `agent_session.read`, `agent_session.reset`, `agent_session.bind`, `agent_session.report`, `command.read`, `command.register`, `command.remove`, `dev_environment.read`, `dev_environment.manage`, `dev_environment.report`.
+`agent.read`, `agent.create`, `agent.update`, `agent.disable`, `agent.enable`, `agent.billing_mode.set`, `agent.billing_mode.set_all`, `agent.credential_holder.set`, `agent.tool_class.set`, `agent.heartbeat`, `agent.events.consume`, `agent.triggerers.read`, `agent.project_folders.read`, `agent.definition.read`, `agent.host.set`, `agent.hosted.list`, `agent.hosted_token.issue`, `agent_session.read`, `agent_session.reset`, `agent_session.bind`, `agent_session.report`, `command.read`, `command.register`, `command.remove`, `dev_environment.read`, `dev_environment.manage`, `dev_environment.report`.
 
 ## Events and WebSocket ops
 
-- Durable: `agent_session.changed`, `command.changed`, `agent.updated`, `agent.definition_changed`.
+- Durable: `agent_session.changed`, `command.changed`, `agent.updated`, `agent.definition_changed`, `agent.hosting_changed`.
 - Ephemeral: `agent.presence_changed`.
 - WebSocket ops (client to server): `ack`.
 

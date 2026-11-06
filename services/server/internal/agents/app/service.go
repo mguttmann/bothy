@@ -47,6 +47,10 @@ type Config struct {
 	DefinitionMaxAllowedTools          int      `config:"agents.definition.max_allowed_tools"`
 	DefinitionMaxCostUSDPerRun         float64  `config:"agents.definition.max_cost_usd_per_run"`
 	MCPStdioRunners                    []string `config:"agents.mcp_stdio_runners"`
+	// HostedTokenTTL is agents.hosted_token_ttl, the lifetime of a token of a built-in agent
+	// (docs/spec/26-builtin-agents.md 3.3, A1-03). Zero leaves issueHostedAgentToken unbound: it
+	// answers internal_error, because the server never invents a lifetime.
+	HostedTokenTTL time.Duration `config:"agents.hosted_token_ttl"`
 }
 
 // DefinitionLimits returns the limits of a definition from the configuration keys.
@@ -71,6 +75,8 @@ type Deps struct {
 	Directory identity.Directory
 	// Tokens revokes the API tokens of a disabled agent.
 	Tokens TokenRevoker
+	// Hosted issues and revokes the tokens of built-in agents (identity, A1-03).
+	Hosted identity.HostedTokens
 	// Rights names agents as affected inside a rights change (the rights hook of authz).
 	Rights authz.RightsChanges
 	// UoW runs every write; its registry holds the rights hooks of authz.
@@ -106,10 +112,10 @@ type Service struct {
 // Compile-time check: the incoming port.
 var _ agents.Agents = (*Service)(nil)
 
-// New returns the use cases. Errors: a missing collaborator, a page size below 1 or an
-// audit.reason_max_chars below 1.
+// New returns the use cases. Errors: a missing collaborator, a page size below 1, an
+// audit.reason_max_chars below 1 or a negative agents.hosted_token_ttl.
 func New(cfg Config, d Deps) (*Service, error) {
-	if d.Store == nil || d.Definitions == nil || d.Principals == nil || d.Directory == nil || d.Tokens == nil || d.Rights == nil || d.UoW == nil ||
+	if d.Store == nil || d.Definitions == nil || d.Principals == nil || d.Directory == nil || d.Tokens == nil || d.Hosted == nil || d.Rights == nil || d.UoW == nil ||
 		d.Authorizer == nil || d.Audit == nil || d.Events == nil || d.Cursors == nil {
 		return nil, errors.New("agents: New needs every collaborator")
 	}
@@ -118,6 +124,9 @@ func New(cfg Config, d Deps) (*Service, error) {
 	}
 	if cfg.ReasonMaxChars < 1 {
 		return nil, errors.New("agents: audit.reason_max_chars must be at least 1")
+	}
+	if cfg.HostedTokenTTL < 0 {
+		return nil, errors.New("agents: agents.hosted_token_ttl must not be negative")
 	}
 	if d.Clock == nil {
 		d.Clock = clock.System()
@@ -149,6 +158,16 @@ const (
 	attrFromModes     = "from_billing_modes"
 	attrHeldAgentIDs  = "held_agent_ids"
 	attrFromHolders   = "from_credential_holder_ids"
+
+	// The values of hosting (A1-03, docs/spec/26-builtin-agents.md 3 and 9).
+	attrHostedBy        = "hosted_by"
+	attrFromHostedBy    = "from_hosted_by"
+	attrToHostedBy      = "to_hosted_by"
+	attrRevokedHosted   = "revoked_hosted_tokens"
+	attrTokenID         = "token_id"
+	attrExpiresAt       = "expires_at"
+	eventHostingChanged = "agent.hosting_changed"
+	receiveHostedList   = "agent.hosted.list"
 )
 
 // withCaller puts caller into ctx as the principal of the request, which the recorder and the
@@ -234,7 +253,7 @@ func (s *Service) agentView(rec domain.Agent, p identity.PrincipalView) agents.A
 		ID: rec.ID, Handle: p.Handle, DisplayName: p.DisplayName, AvatarFileID: p.AvatarFileID, Status: string(p.Status),
 		AdapterKind: rec.AdapterKind, Description: rec.Description, BillingMode: string(rec.Policy.Mode),
 		CredentialHolderID: rec.Policy.HolderID, BillingModeChangedAt: rec.BillingModeChangedAt, ToolClass: string(rec.ToolClass),
-		Presence: presence, OperatorConfig: rec.Config.Map(), Version: rec.Version,
+		Presence: presence, OperatorConfig: rec.Config.Map(), HostedBy: rec.HostedBy, Version: rec.Version,
 	}
 }
 
@@ -321,6 +340,7 @@ type agentJSON struct {
 	ToolClass            string         `json:"tool_class"`
 	Presence             presenceJSON   `json:"presence"`
 	OperatorConfig       map[string]any `json:"operator_config"`
+	HostedBy             string         `json:"hosted_by,omitempty"`
 	Version              int64          `json:"version"`
 }
 
@@ -354,7 +374,7 @@ func agentBody(v agents.Agent) agentJSON {
 		AdapterKind: v.AdapterKind, Description: v.Description, BillingMode: v.BillingMode,
 		CredentialHolderID: optionalID(v.CredentialHolderID), BillingModeChangedAt: stamp(v.BillingModeChangedAt), ToolClass: v.ToolClass,
 		Presence:       presenceBody(v.Presence),
-		OperatorConfig: config, Version: v.Version,
+		OperatorConfig: config, HostedBy: optionalID(v.HostedBy), Version: v.Version,
 	}
 }
 

@@ -12777,6 +12777,8 @@ paths:
       operationId: createAgent
       summary: Create an agent
       tags: [Agents]
+      description: |-
+        Creates an agent principal with its record: `organization`, tool class `chat`, version 1. A built-in agent (26 3.1) carries `adapter_kind` `claude_agent` together with `hosted_by`; `hosted_by` is set exactly then. `claude_agent` without `hosted_by` is `400 validation_failed` with the field code `required` on `/hosted_by`, `hosted_by` with another adapter kind the field code `not_allowed`, and a `hosted_by` that names no active Claude Code runner (`adapter_kind` `code_runner`) that is not hosted itself and whose last heartbeat reports `hosts_agents` the field code `host_not_capable`. A built-in agent's creation writes the durable event `agent.hosting_changed` to its runner.
       x-authz-action: agent.create
       x-rate-limit-class: rl.admin
       parameters:
@@ -13542,6 +13544,82 @@ paths:
         default:
           $ref: '#/components/responses/Error'
 
+  /agents/{agent_id}/host:
+    put:
+      operationId: setAgentHost
+      summary: Move a built-in agent to another runner
+      tags: [Agents]
+      description: |-
+        Changes `hosted_by` of a built-in agent (`adapter_kind` `claude_agent`, 26 3.1 item 4). The new runner follows the rules of `AgentCreate.hosted_by` (else `400 validation_failed` with the field code `host_not_capable` on `/hosted_by`, also for the agent itself); another agent is `409 conflict` with `reason` `not_a_builtin_agent`. A runner whose ceiling `hosts_agents` is below the agent's tool class is `409 conflict` with `reason` `host_tool_class_ceiling`; a `personal` agent needs a runner that is `personal` with the same `credential_holder_id` and reports `personal` in `billing_modes_supported`, else `409 conflict` with `reason` `hosted_holder_mismatch` (10 10.3). In the same transaction every token of the agent that the old runner holds is revoked (its connections close with `4012`), and the durable event `agent.hosting_changed` goes to the old and the new runner.
+      x-authz-action: agent.host.set
+      x-rate-limit-class: rl.admin
+      parameters:
+      - $ref: '#/components/parameters/AgentIdPath'
+      - $ref: '#/components/parameters/IfMatchRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HostSet'
+            examples:
+              default:
+                summary: Request
+                value:
+                  hosted_by: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
+                  reason: Move the agent to the build host
+      responses:
+        '200':
+          description: OK.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Agent'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    id: 0192f4a0-7b1c-7d07-84b0-358556a08a99
+                    handle: writing-helper
+                    display_name: Writing Helper
+                    status: active
+                    adapter_kind: claude_agent
+                    tool_class: chat
+                    description: Helps with drafts
+                    billing_mode: organization
+                    presence:
+                      state: unknown
+                    operator_config: {}
+                    hosted_by: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
+                    version: 4
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
   /agents/{agent_id}/project-folders:
     get:
       operationId: listAgentProjectFolders
@@ -14090,6 +14168,118 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /agents/me/hosted:
+    get:
+      operationId: listHostedAgents
+      summary: List the built-in agents this runner hosts
+      tags: [Agent runtime]
+      description: |-
+        The active agents whose `hosted_by` is the calling agent (26 3.2), ascending by id. A Claude Code runner with `runner.hosted_agents` reads it at start, on `agent.hosting_changed` and every `runner.channels_resync_interval`; for any other agent the list is empty. Only the agent itself may call it (agent-self).
+      x-authz-action: agent.hosted.list
+      x-rate-limit-class: rl.agent_runtime
+      parameters:
+      - $ref: '#/components/parameters/Cursor'
+      - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: OK.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentPage'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    items:
+                    - id: 0192f4a0-7b1c-7d07-84b0-358556a08a99
+                      handle: writing-helper
+                      display_name: Writing Helper
+                      status: active
+                      adapter_kind: claude_agent
+                      tool_class: chat
+                      description: Helps with drafts
+                      billing_mode: organization
+                      presence:
+                        state: unknown
+                      operator_config: {}
+                      hosted_by: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
+                      version: 4
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /agents/me/hosted/{agent_id}/token:
+    post:
+      operationId: issueHostedAgentToken
+      summary: Issue a token for a hosted agent
+      tags: [Agent runtime]
+      description: |-
+        Issues an API token for the built-in agent `agent_id` to its hosting runner (26 3.3 item 1). Only the runner named in the agent's `hosted_by` may call it, with its own DPoP-bound agent token, while both are active and the runner's last stored heartbeat reports `hosts_agents`; every other caller and every other case get `404` like an unknown agent, audited as a denial. The token has kind `agt`, is bound to the `dpop_jkt` of the calling token (a calling token without one is `409 conflict` with `reason` `dpop_required`) and expires after `agents.hosted_token_ttl`; every older active token of the agent from the same runner is revoked in the same transaction. One audit entry names the agent, the runner and the token prefix, never the value. The secret is shown once; a replay with the same `Idempotency-Key` answers `409 conflict` with `reason` `one_time_secret` (06, 7). A person never receives such a token: `createToken` for a built-in agent is `409 conflict` with `reason` `hosted_agent_token`.
+      x-authz-action: agent.hosted_token.issue
+      x-rate-limit-class: rl.agent_runtime
+      parameters:
+      - $ref: '#/components/parameters/AgentIdPath'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '201':
+          description: Created.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiTokenCreated'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    token:
+                      id: 0192f4a0-7b1c-7a3e-9c1d-2b4f6a8c0e12
+                      principal_id: 0192f4a0-7b1c-7d07-84b0-358556a08a99
+                      name: hosted by build-runner
+                      token_prefix: bothy_agt_EXAMPL
+                      scopes: []
+                      dpop_jkt: 0ZcOCORZNYy-DWpqq30jZyJGHTN0d2HglBV3uiguA4I
+                      expires_at: '2026-11-07T10:00:00.000Z'
+                      created_at: '2026-11-06T10:00:00.000Z'
+                    secret: bothy_agt_EXAMPLEOnlyNotARealTokenForTheChecksumTests_3NymP3
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
         '429':
           $ref: '#/components/responses/TooManyRequests'
         default:
@@ -27374,6 +27564,9 @@ components:
         operator_config:
           $ref: '#/components/schemas/JsonObject'
           description: Schema `agent_operator_config.v1`. No secrets.
+        hosted_by:
+          $ref: '#/components/schemas/Uuid'
+          description: Built-in agents only (`adapter_kind` `claude_agent`, 26 3.1); the Claude Code runner agent that hosts it. Absent for every other agent.
         version:
           type: integer
           format: int64
@@ -27432,6 +27625,21 @@ components:
           examples: [Answers support tickets]
         operator_config:
           $ref: '#/components/schemas/JsonObject'
+        hosted_by:
+          $ref: '#/components/schemas/Uuid'
+          description: Required exactly when `adapter_kind` is `claude_agent` (a built-in agent, 26 3.1); names an active agent with `adapter_kind` `code_runner` that is not hosted itself and whose last heartbeat reports the capability `hosts_agents`.
+    HostSet:
+      type: object
+      additionalProperties: false
+      required: [hosted_by, reason]
+      properties:
+        hosted_by:
+          $ref: '#/components/schemas/Uuid'
+          description: The new hosting runner, with the rules of `AgentCreate.hosted_by`.
+        reason:
+          type: string
+          maxLength: 500
+          examples: [Move the agent to the build host]
     AgentUpdate:
       type: object
       additionalProperties: false
@@ -27526,7 +27734,7 @@ components:
         details:
           $ref: '#/components/schemas/JsonObject'
           description: |-
-            Further fields of schema `agent_heartbeat.v1`, a closed object; any other key, also inside `capabilities`, `adapter` and `runtime`, is refused. Keys: `capabilities` (object: `followups` `steer` or `queue`; `components`, `voice_input`, `title`, `files_out` booleans), `active_runs` (distinct run ids), `degraded_reasons` (distinct codes), `adapter` (`name` required, `version` optional), `runtime` (`name` required), `protocol_version` (integer, at least 1). Names match `^[a-z0-9][a-z0-9._-]*$`, versions `^[0-9A-Za-z][0-9A-Za-z.+_-]*$`, codes `^[a-z0-9][a-z0-9_.:-]*$`. No secrets, no content, no paths.
+            Further fields of schema `agent_heartbeat.v1`, a closed object; any other key, also inside `capabilities`, `adapter` and `runtime`, is refused. Keys: `capabilities` (object: `followups` `steer` or `queue`; `components`, `voice_input`, `title`, `files_out` booleans; for Claude Code runners only `hosts_agents` `chat`, `scoped` or `host`, the highest tool class the runner loads for a hosted agent (26 3.1), which a built-in agent's own heartbeat never carries), `active_runs` (distinct run ids), `degraded_reasons` (distinct codes), `adapter` (`name` required, `version` optional), `runtime` (`name` required), `protocol_version` (integer, at least 1). Names match `^[a-z0-9][a-z0-9._-]*$`, versions `^[0-9A-Za-z][0-9A-Za-z.+_-]*$`, codes `^[a-z0-9][a-z0-9_.:-]*$`. No secrets, no content, no paths.
         project_readiness:
           type: array
           description: Readiness per bound forum of a runner (M2-03); the channels must be distinct. Applied only when present and different from the last list this server process applied; absent means "unchanged".
@@ -30327,6 +30535,13 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CommandOptionValue'
+    AgentHostingChangedPayload:
+      type: object
+      description: Payload of `agent.hosting_changed` (26 9); only the id of the built-in agent, the runner reads the rest with `listHostedAgents`.
+      required: [agent_id]
+      properties:
+        agent_id:
+          $ref: '#/components/schemas/Uuid'
     AgentConfigChangedPayload:
       type: object
       required: [channel_id, settings_version]
@@ -32256,6 +32471,18 @@ components:
             enum: [agent.definition_changed]
           payload:
             $ref: '#/components/schemas/AgentDefinitionChangedPayload'
+    AgentHostingChangedEvent:
+      description: Durable event `agent.hosting_changed`.
+      allOf:
+      - $ref: '#/components/schemas/EventEnvelope'
+      - type: object
+        required: [type, payload]
+        properties:
+          type:
+            type: string
+            enum: [agent.hosting_changed]
+          payload:
+            $ref: '#/components/schemas/AgentHostingChangedPayload'
     TypingStartedEvent:
       description: Ephemeral event `typing.started` (no `seq`, at most once).
       allOf:
@@ -32455,6 +32682,7 @@ components:
       - $ref: '#/components/schemas/CommandInvokedEvent'
       - $ref: '#/components/schemas/AgentConfigChangedEvent'
       - $ref: '#/components/schemas/AgentDefinitionChangedEvent'
+      - $ref: '#/components/schemas/AgentHostingChangedEvent'
       - $ref: '#/components/schemas/HostUpdatedEvent'
       - $ref: '#/components/schemas/TerminalSessionChangedEvent'
       discriminator:
@@ -32512,6 +32740,7 @@ components:
           command.invoked: '#/components/schemas/CommandInvokedEvent'
           agent.config_changed: '#/components/schemas/AgentConfigChangedEvent'
           agent.definition_changed: '#/components/schemas/AgentDefinitionChangedEvent'
+          agent.hosting_changed: '#/components/schemas/AgentHostingChangedEvent'
           host.updated: '#/components/schemas/HostUpdatedEvent'
           terminal_session.changed: '#/components/schemas/TerminalSessionChangedEvent'
     MentionItemPage:

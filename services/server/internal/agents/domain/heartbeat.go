@@ -81,6 +81,9 @@ type Capabilities struct {
 	VoiceInput *bool  `json:"voice_input,omitempty"`
 	Title      *bool  `json:"title,omitempty"`
 	FilesOut   *bool  `json:"files_out,omitempty"`
+	// HostsAgents is hosts_agents, the highest tool class a Claude Code runner loads for a hosted
+	// agent (09 section 2.2, docs/spec/26-builtin-agents.md 3.1); "" when not reported.
+	HostsAgents ToolClass `json:"hosts_agents,omitempty"`
 }
 
 // Adapter is details.adapter: the adapter's name and optional version (18 section 9 point 5).
@@ -220,6 +223,9 @@ func (r Report) Reported() Reported {
 	if c := r.Details.Capabilities; c != nil {
 		out.Followups = c.Followups
 		out.VoiceInput = c.VoiceInput != nil && *c.VoiceInput
+		if c.HostsAgents.Valid() {
+			out.HostsAgents = c.HostsAgents
+		}
 	}
 	return out
 }
@@ -751,7 +757,7 @@ func (d *decoder) evidence(raw json.RawMessage) *Evidence {
 // The keys of details and of its objects (D-M2-20-2).
 var (
 	detailsKeys      = []string{"capabilities", "active_runs", "degraded_reasons", "adapter", "runtime", "protocol_version"}
-	capabilitiesKeys = []string{"followups", "components", "voice_input", "title", "files_out"}
+	capabilitiesKeys = []string{"followups", "components", "voice_input", "title", "files_out", "hosts_agents"}
 )
 
 // details reads the closed object details.
@@ -824,6 +830,10 @@ func (d *decoder) capabilities(raw json.RawMessage) *Capabilities {
 	c.Title = d.optBool(p+"/title", v, has)
 	v, has = get("files_out")
 	c.FilesOut = d.optBool(p+"/files_out", v, has)
+	if v, has := get("hosts_agents"); has {
+		s, _ := d.enum(p+"/hosts_agents", v, toolClasses)
+		c.HostsAgents = ToolClass(s)
+	}
 	return &c
 }
 

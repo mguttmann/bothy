@@ -18,6 +18,7 @@ part 'agent_create.g.dart';
 /// * [adapterKind]
 /// * [description]
 /// * [operatorConfig] - Free-form JSON object whose schema is named in the field description.
+/// * [hostedBy] - Required exactly when `adapter_kind` is `claude_agent` (a built-in agent, 26 3.1); names an active agent with `adapter_kind` `code_runner` that is not hosted itself and whose last heartbeat reports the capability `hosts_agents`.
 @BuiltValue()
 abstract class AgentCreate implements Built<AgentCreate, AgentCreateBuilder> {
   @BuiltValueField(wireName: r'handle')
@@ -35,6 +36,10 @@ abstract class AgentCreate implements Built<AgentCreate, AgentCreateBuilder> {
   /// Free-form JSON object whose schema is named in the field description.
   @BuiltValueField(wireName: r'operator_config')
   BuiltMap<String, JsonObject?>? get operatorConfig;
+
+  /// Required exactly when `adapter_kind` is `claude_agent` (a built-in agent, 26 3.1); names an active agent with `adapter_kind` `code_runner` that is not hosted itself and whose last heartbeat reports the capability `hosts_agents`.
+  @BuiltValueField(wireName: r'hosted_by')
+  String? get hostedBy;
 
   AgentCreate._();
 
@@ -89,6 +94,13 @@ class _$AgentCreateSerializer implements PrimitiveSerializer<AgentCreate> {
           FullType(String),
           FullType.nullable(JsonObject),
         ]),
+      );
+    }
+    if (object.hostedBy != null) {
+      yield r'hosted_by';
+      yield serializers.serialize(
+        object.hostedBy,
+        specifiedType: const FullType(String),
       );
     }
   }
@@ -157,6 +169,14 @@ class _$AgentCreateSerializer implements PrimitiveSerializer<AgentCreate> {
           ) as BuiltMap<String, JsonObject?>?;
           if (valueDes == null) continue;
           result.operatorConfig.replace(valueDes);
+          break;
+        case r'hosted_by':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(String),
+          ) as String?;
+          if (valueDes == null) continue;
+          result.hostedBy = valueDes;
           break;
         default:
           unhandled.add(key);

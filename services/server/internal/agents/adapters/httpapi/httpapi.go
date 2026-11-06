@@ -109,6 +109,9 @@ func (h *Agents) ListAgents(ctx context.Context, req rest.ListAgentsRequestObjec
 func (h *Agents) CreateAgent(ctx context.Context, req rest.CreateAgentRequestObject) (rest.CreateAgentResponseObject, error) {
 	b := req.Body
 	cmd := agents.CreateCmd{Handle: b.Handle, DisplayName: b.DisplayName, AdapterKind: b.AdapterKind}
+	if b.HostedBy != nil {
+		cmd.HostedBy = ids.ID(*b.HostedBy)
+	}
 	if b.Description != nil {
 		cmd.Description = *b.Description
 	}
@@ -238,7 +241,7 @@ func toREST(a agents.Agent) rest.Agent {
 		Status: rest.AgentStatus(a.Status), AdapterKind: a.AdapterKind, Description: a.Description,
 		BillingMode: rest.BillingMode(a.BillingMode), CredentialHolderId: optionalID(a.CredentialHolderID),
 		BillingModeChangedAt: optionalTime(a.BillingModeChangedAt), ToolClass: rest.ToolClass(a.ToolClass),
-		Presence: presence, OperatorConfig: config, Version: a.Version,
+		Presence: presence, OperatorConfig: config, HostedBy: optionalID(a.HostedBy), Version: a.Version,
 	}
 }
 

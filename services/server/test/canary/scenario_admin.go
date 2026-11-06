@@ -144,6 +144,27 @@ func (sc *Scenario) agents() {
 	// logs, traces, metrics, events or audit.
 	sc.post(lotse, "/agents/me/heartbeat", map[string]any{"state": "online", "reported_billing_mode": "organization",
 		"runtime_version": sc.Reg.New(ClassContent, "", "runtime version")}, ok...)
+	sc.hostedAgents()
+}
+
+// hostedAgents drives the built-in agents of A1-03 (docs/spec/26-builtin-agents.md 3): Runner
+// reports hosts_agents, the owner creates a built-in agent on it with a canary display name and
+// sets the same runner again (a call without effect), and Runner lists it and fetches its token,
+// which needs a DPoP-bound runner token (409 dpop_required otherwise).
+func (sc *Scenario) hostedAgents() {
+	sc.T.Helper()
+	o, runner := sc.W.Owner, sc.W.Agents["Runner"]
+	sc.post(runner, "/agents/me/heartbeat", map[string]any{"state": "online", "details": map[string]any{
+		"capabilities": map[string]any{"hosts_agents": "chat"}}}, ok...)
+	built := id(sc.post(o, "/agents", map[string]any{
+		"handle": "kanarie-built", "display_name": sc.Reg.New(ClassContent, "", "built-in agent display name"),
+		"adapter_kind": "claude_agent", "hosted_by": runner.PrincipalID,
+	}, created...))
+	sc.matched(o, "/agents/"+built, req{method: http.MethodPut, path: "/agents/" + built + "/host", body: map[string]any{
+		"hosted_by": runner.PrincipalID, "reason": sc.Reg.New(ClassAdminReason, "", "host reason"),
+	}}, ok...)
+	sc.get(runner, "/agents/me/hosted", ok...)
+	sc.post(runner, "/agents/me/hosted/"+built+"/token", nil, http.StatusCreated, http.StatusConflict)
 }
 
 // settings drives the personal and instance settings, feature flags, branding, notification
@@ -281,9 +302,13 @@ func (sc *Scenario) cspReport() {
 // current) and a refused PUT whose finding names only the pointer and the code.
 func (sc *Scenario) definitions() {
 	sc.T.Helper()
-	o := sc.W.Owner
+	o, runner := sc.W.Owner, sc.W.Agents["Runner"]
+	// A built-in agent names its hosting runner, which reports hosts_agents (A1-03).
+	sc.post(runner, "/agents/me/heartbeat", map[string]any{"state": "online", "details": map[string]any{
+		"capabilities": map[string]any{"hosts_agents": "chat"}}}, ok...)
 	a := sc.post(o, "/agents", map[string]any{
 		"handle": "kanarie-builtin", "display_name": sc.Reg.New(ClassContent, "", "built-in agent display name"), "adapter_kind": "claude_agent",
+		"hosted_by": runner.PrincipalID,
 	}, created...)
 	path := "/agents/" + id(a) + "/definition"
 	def := func(label string) map[string]any {

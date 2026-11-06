@@ -64,6 +64,10 @@ type APITokenStore interface {
 	// RevokeAPITokensOfPrincipal revokes every active token of principalID and returns their
 	// number.
 	RevokeAPITokensOfPrincipal(ctx context.Context, principalID, by ids.ID, at time.Time) (int, error)
+	// RevokeIssuedAPITokens revokes the active tokens that issuer created for another principal,
+	// only of holder when it is not zero and only with dpopJKT when it is not "", and returns their
+	// number (the tokens of built-in agents, A1-03).
+	RevokeIssuedAPITokens(ctx context.Context, issuer, holder ids.ID, dpopJKT string, by ids.ID, at time.Time) (int, error)
 	// TouchAPIToken sets last_used_at = at when it is NULL or before threshold. It runs on the
 	// pool, never in the request's unit of work.
 	TouchAPIToken(ctx context.Context, id ids.ID, at, threshold time.Time) error

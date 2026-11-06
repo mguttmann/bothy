@@ -17,6 +17,8 @@ class _$AgentCreate extends AgentCreate {
   final String? description;
   @override
   final BuiltMap<String, JsonObject?>? operatorConfig;
+  @override
+  final String? hostedBy;
 
   factory _$AgentCreate([void Function(AgentCreateBuilder)? updates]) =>
       (AgentCreateBuilder()..update(updates))._build();
@@ -27,6 +29,7 @@ class _$AgentCreate extends AgentCreate {
     required this.adapterKind,
     this.description,
     this.operatorConfig,
+    this.hostedBy,
   }) : super._();
   @override
   AgentCreate rebuild(void Function(AgentCreateBuilder) updates) =>
@@ -43,7 +46,8 @@ class _$AgentCreate extends AgentCreate {
         displayName == other.displayName &&
         adapterKind == other.adapterKind &&
         description == other.description &&
-        operatorConfig == other.operatorConfig;
+        operatorConfig == other.operatorConfig &&
+        hostedBy == other.hostedBy;
   }
 
   @override
@@ -54,6 +58,7 @@ class _$AgentCreate extends AgentCreate {
     _$hash = $jc(_$hash, adapterKind.hashCode);
     _$hash = $jc(_$hash, description.hashCode);
     _$hash = $jc(_$hash, operatorConfig.hashCode);
+    _$hash = $jc(_$hash, hostedBy.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -65,7 +70,8 @@ class _$AgentCreate extends AgentCreate {
           ..add('displayName', displayName)
           ..add('adapterKind', adapterKind)
           ..add('description', description)
-          ..add('operatorConfig', operatorConfig))
+          ..add('operatorConfig', operatorConfig)
+          ..add('hostedBy', hostedBy))
         .toString();
   }
 }
@@ -95,6 +101,10 @@ class AgentCreateBuilder implements Builder<AgentCreate, AgentCreateBuilder> {
   set operatorConfig(MapBuilder<String, JsonObject?>? operatorConfig) =>
       _$this._operatorConfig = operatorConfig;
 
+  String? _hostedBy;
+  String? get hostedBy => _$this._hostedBy;
+  set hostedBy(String? hostedBy) => _$this._hostedBy = hostedBy;
+
   AgentCreateBuilder() {
     AgentCreate._defaults(this);
   }
@@ -107,6 +117,7 @@ class AgentCreateBuilder implements Builder<AgentCreate, AgentCreateBuilder> {
       _adapterKind = $v.adapterKind;
       _description = $v.description;
       _operatorConfig = $v.operatorConfig?.toBuilder();
+      _hostedBy = $v.hostedBy;
       _$v = null;
     }
     return this;
@@ -148,6 +159,7 @@ class AgentCreateBuilder implements Builder<AgentCreate, AgentCreateBuilder> {
             ),
             description: description,
             operatorConfig: _operatorConfig?.build(),
+            hostedBy: hostedBy,
           );
     } catch (_) {
       late String _$failedField;

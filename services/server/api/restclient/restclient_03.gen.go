@@ -16,6 +16,627 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// NewRegisterPushRequestWithBody constructs an http.Request for the RegisterPush method, with any body, and a specified content type
+func NewRegisterPushRequestWithBody(server string, params *RegisterPushParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/me/devices/current/push-registrations")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewApprovePairingRequest calls the generic ApprovePairing builder with application/json body
+func NewApprovePairingRequest(server string, params *ApprovePairingParams, body ApprovePairingJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewApprovePairingRequestWithBody(server, params, "application/json", bodyReader)
+}
+
+// NewApprovePairingRequestWithBody constructs an http.Request for the ApprovePairing method, with any body, and a specified content type
+func NewApprovePairingRequestWithBody(server string, params *ApprovePairingParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/me/devices/pairings")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewListMyDmsRequest constructs an http.Request for the ListMyDms method
+func NewListMyDmsRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/me/dms")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListMyDraftsRequest constructs an http.Request for the ListMyDrafts method
+func NewListMyDraftsRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/me/drafts")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewBeginIdentityLinkRequest calls the generic BeginIdentityLink builder with application/json body
+func NewBeginIdentityLinkRequest(server string, body BeginIdentityLinkJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewBeginIdentityLinkRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewBeginIdentityLinkRequestWithBody constructs an http.Request for the BeginIdentityLink method, with any body, and a specified content type
+func NewBeginIdentityLinkRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/me/identities/begin")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewCompleteIdentityLinkRequest calls the generic CompleteIdentityLink builder with application/json body
+func NewCompleteIdentityLinkRequest(server string, body CompleteIdentityLinkJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCompleteIdentityLinkRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewCompleteIdentityLinkRequestWithBody constructs an http.Request for the CompleteIdentityLink method, with any body, and a specified content type
+func NewCompleteIdentityLinkRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/me/identities/complete")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewSetMyLocalCredentialRequest calls the generic SetMyLocalCredential builder with application/json body
+func NewSetMyLocalCredentialRequest(server string, body SetMyLocalCredentialJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewSetMyLocalCredentialRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewSetMyLocalCredentialRequestWithBody constructs an http.Request for the SetMyLocalCredential method, with any body, and a specified content type
+func NewSetMyLocalCredentialRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/me/local-credential")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewListMyMentionsRequest constructs an http.Request for the ListMyMentions method
+func NewListMyMentionsRequest(server string, params *ListMyMentionsParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/me/mentions")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Cursor != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListMyNotificationPreferencesRequest constructs an http.Request for the ListMyNotificationPreferences method
+func NewListMyNotificationPreferencesRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/me/notification-preferences")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewDeleteNotificationPreferenceRequest constructs an http.Request for the DeleteNotificationPreference method
+func NewDeleteNotificationPreferenceRequest(server string, targetKind DeleteNotificationPreferenceParamsTargetKind, targetId TargetIdPath) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "target_kind", targetKind, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "target_id", targetId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/me/notification-preferences/%s/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPutNotificationPreferenceRequest calls the generic PutNotificationPreference builder with application/json body
+func NewPutNotificationPreferenceRequest(server string, targetKind PutNotificationPreferenceParamsTargetKind, targetId TargetIdPath, body PutNotificationPreferenceJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPutNotificationPreferenceRequestWithBody(server, targetKind, targetId, "application/json", bodyReader)
+}
+
+// NewPutNotificationPreferenceRequestWithBody constructs an http.Request for the PutNotificationPreference method, with any body, and a specified content type
+func NewPutNotificationPreferenceRequestWithBody(server string, targetKind PutNotificationPreferenceParamsTargetKind, targetId TargetIdPath, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "target_kind", targetKind, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "target_id", targetId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/me/notification-preferences/%s/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewBeginPasskeyRegistrationRequest constructs an http.Request for the BeginPasskeyRegistration method
+func NewBeginPasskeyRegistrationRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/me/passkeys/begin")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCompletePasskeyRegistrationRequest calls the generic CompletePasskeyRegistration builder with application/json body
+func NewCompletePasskeyRegistrationRequest(server string, body CompletePasskeyRegistrationJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCompletePasskeyRegistrationRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewCompletePasskeyRegistrationRequestWithBody constructs an http.Request for the CompletePasskeyRegistration method, with any body, and a specified content type
+func NewCompletePasskeyRegistrationRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/me/passkeys/complete")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewUpdateMyProfileRequest calls the generic UpdateMyProfile builder with application/json body
+func NewUpdateMyProfileRequest(server string, params *UpdateMyProfileParams, body UpdateMyProfileJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateMyProfileRequestWithBody(server, params, "application/json", bodyReader)
+}
+
+// NewUpdateMyProfileRequestWithBody constructs an http.Request for the UpdateMyProfile method, with any body, and a specified content type
+func NewUpdateMyProfileRequestWithBody(server string, params *UpdateMyProfileParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/me/profile")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewListMyQuietHoursRequest constructs an http.Request for the ListMyQuietHours method
+func NewListMyQuietHoursRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/me/quiet-hours")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateQuietHoursRuleRequest calls the generic CreateQuietHoursRule builder with application/json body
+func NewCreateQuietHoursRuleRequest(server string, params *CreateQuietHoursRuleParams, body CreateQuietHoursRuleJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateQuietHoursRuleRequestWithBody(server, params, "application/json", bodyReader)
+}
+
 // NewCreateQuietHoursRuleRequestWithBody constructs an http.Request for the CreateQuietHoursRule method, with any body, and a specified content type
 func NewCreateQuietHoursRuleRequestWithBody(server string, params *CreateQuietHoursRuleParams, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
@@ -7211,12 +7832,16 @@ type ClientWithResponsesInterface interface {
 
 	// CreateAgentWithBodyWithResponse Create an agent
 	//
+	// Creates an agent principal with its record: `organization`, tool class `chat`, version 1. A built-in agent (26 3.1) carries `adapter_kind` `claude_agent` together with `hosted_by`; `hosted_by` is set exactly then. `claude_agent` without `hosted_by` is `400 validation_failed` with the field code `required` on `/hosted_by`, `hosted_by` with another adapter kind the field code `not_allowed`, and a `hosted_by` that names no active Claude Code runner (`adapter_kind` `code_runner`) that is not hosted itself and whose last heartbeat reports `hosts_agents` the field code `host_not_capable`. A built-in agent's creation writes the durable event `agent.hosting_changed` to its runner.
+	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /agents (the `CreateAgent` operationId).
 	CreateAgentWithBodyWithResponse(ctx context.Context, params *CreateAgentParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateAgentResponse, error)
 
 	// CreateAgentWithResponse Create an agent
+	//
+	// Creates an agent principal with its record: `organization`, tool class `chat`, version 1. A built-in agent (26 3.1) carries `adapter_kind` `claude_agent` together with `hosted_by`; `hosted_by` is set exactly then. `claude_agent` without `hosted_by` is `400 validation_failed` with the field code `required` on `/hosted_by`, `hosted_by` with another adapter kind the field code `not_allowed`, and a `hosted_by` that names no active Claude Code runner (`adapter_kind` `code_runner`) that is not hosted itself and whose last heartbeat reports `hosts_agents` the field code `host_not_capable`. A built-in agent's creation writes the durable event `agent.hosting_changed` to its runner.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -7289,6 +7914,24 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /agents/me/heartbeat (the `SendHeartbeat` operationId).
 	SendHeartbeatWithResponse(ctx context.Context, body SendHeartbeatJSONRequestBody, reqEditors ...RequestEditorFn) (*SendHeartbeatResponse, error)
+
+	// ListHostedAgentsWithResponse List the built-in agents this runner hosts
+	//
+	// The active agents whose `hosted_by` is the calling agent (26 3.2), ascending by id. A Claude Code runner with `runner.hosted_agents` reads it at start, on `agent.hosting_changed` and every `runner.channels_resync_interval`; for any other agent the list is empty. Only the agent itself may call it (agent-self).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /agents/me/hosted (the `ListHostedAgents` operationId).
+	ListHostedAgentsWithResponse(ctx context.Context, params *ListHostedAgentsParams, reqEditors ...RequestEditorFn) (*ListHostedAgentsResponse, error)
+
+	// IssueHostedAgentTokenWithResponse Issue a token for a hosted agent
+	//
+	// Issues an API token for the built-in agent `agent_id` to its hosting runner (26 3.3 item 1). Only the runner named in the agent's `hosted_by` may call it, with its own DPoP-bound agent token, while both are active and the runner's last stored heartbeat reports `hosts_agents`; every other caller and every other case get `404` like an unknown agent, audited as a denial. The token has kind `agt`, is bound to the `dpop_jkt` of the calling token (a calling token without one is `409 conflict` with `reason` `dpop_required`) and expires after `agents.hosted_token_ttl`; every older active token of the agent from the same runner is revoked in the same transaction. One audit entry names the agent, the runner and the token prefix, never the value. The secret is shown once; a replay with the same `Idempotency-Key` answers `409 conflict` with `reason` `one_time_secret` (06, 7). A person never receives such a token: `createToken` for a built-in agent is `409 conflict` with `reason` `hosted_agent_token`.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /agents/me/hosted/{agent_id}/token (the `IssueHostedAgentToken` operationId).
+	IssueHostedAgentTokenWithResponse(ctx context.Context, agentId AgentIdPath, params *IssueHostedAgentTokenParams, reqEditors ...RequestEditorFn) (*IssueHostedAgentTokenResponse, error)
 
 	// GetAgentTriggerersWithResponse List who may trigger this agent
 	//
@@ -7417,6 +8060,24 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /agents/{agent_id}/enable (the `EnableAgent` operationId).
 	EnableAgentWithResponse(ctx context.Context, agentId AgentIdPath, params *EnableAgentParams, body EnableAgentJSONRequestBody, reqEditors ...RequestEditorFn) (*EnableAgentResponse, error)
+
+	// SetAgentHostWithBodyWithResponse Move a built-in agent to another runner
+	//
+	// Changes `hosted_by` of a built-in agent (`adapter_kind` `claude_agent`, 26 3.1 item 4). The new runner follows the rules of `AgentCreate.hosted_by` (else `400 validation_failed` with the field code `host_not_capable` on `/hosted_by`, also for the agent itself); another agent is `409 conflict` with `reason` `not_a_builtin_agent`. A runner whose ceiling `hosts_agents` is below the agent's tool class is `409 conflict` with `reason` `host_tool_class_ceiling`; a `personal` agent needs a runner that is `personal` with the same `credential_holder_id` and reports `personal` in `billing_modes_supported`, else `409 conflict` with `reason` `hosted_holder_mismatch` (10 10.3). In the same transaction every token of the agent that the old runner holds is revoked (its connections close with `4012`), and the durable event `agent.hosting_changed` goes to the old and the new runner.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /agents/{agent_id}/host (the `SetAgentHost` operationId).
+	SetAgentHostWithBodyWithResponse(ctx context.Context, agentId AgentIdPath, params *SetAgentHostParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetAgentHostResponse, error)
+
+	// SetAgentHostWithResponse Move a built-in agent to another runner
+	//
+	// Changes `hosted_by` of a built-in agent (`adapter_kind` `claude_agent`, 26 3.1 item 4). The new runner follows the rules of `AgentCreate.hosted_by` (else `400 validation_failed` with the field code `host_not_capable` on `/hosted_by`, also for the agent itself); another agent is `409 conflict` with `reason` `not_a_builtin_agent`. A runner whose ceiling `hosts_agents` is below the agent's tool class is `409 conflict` with `reason` `host_tool_class_ceiling`; a `personal` agent needs a runner that is `personal` with the same `credential_holder_id` and reports `personal` in `billing_modes_supported`, else `409 conflict` with `reason` `hosted_holder_mismatch` (10 10.3). In the same transaction every token of the agent that the old runner holds is revoked (its connections close with `4012`), and the durable event `agent.hosting_changed` goes to the old and the new runner.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /agents/{agent_id}/host (the `SetAgentHost` operationId).
+	SetAgentHostWithResponse(ctx context.Context, agentId AgentIdPath, params *SetAgentHostParams, body SetAgentHostJSONRequestBody, reqEditors ...RequestEditorFn) (*SetAgentHostResponse, error)
 
 	// ListAgentProjectFoldersWithResponse List the project folders of a runner that have no binding
 	//
@@ -12925,6 +13586,300 @@ func (r SendHeartbeatResponse) ContentType() string {
 	return ""
 }
 
+// ListHostedAgentsResponse200Headers the declared response headers of an HTTP 200 response for ListHostedAgents
+type ListHostedAgentsResponse200Headers struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+// ListHostedAgentsResponse400Headers the declared response headers of an HTTP 400 response for ListHostedAgents
+type ListHostedAgentsResponse400Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// ListHostedAgentsResponse401Headers the declared response headers of an HTTP 401 response for ListHostedAgents
+type ListHostedAgentsResponse401Headers struct {
+	CorrelationId   *CorrelationId
+	DPoPNonce       *string
+	SetCookie       *string
+	WWWAuthenticate *string
+}
+
+// ListHostedAgentsResponse403Headers the declared response headers of an HTTP 403 response for ListHostedAgents
+type ListHostedAgentsResponse403Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// ListHostedAgentsResponse429Headers the declared response headers of an HTTP 429 response for ListHostedAgents
+type ListHostedAgentsResponse429Headers struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      *int
+}
+
+// ListHostedAgentsResponseDefaultHeaders the declared response headers of an HTTP default response for ListHostedAgents
+type ListHostedAgentsResponseDefaultHeaders struct {
+	CorrelationId *CorrelationId
+}
+
+type ListHostedAgentsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *AgentPage
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
+	ApplicationproblemJSON429 *TooManyRequests
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Error
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *ListHostedAgentsResponse200Headers
+	// Headers400 the parsed response headers for an HTTP 400 response
+	Headers400 *ListHostedAgentsResponse400Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *ListHostedAgentsResponse401Headers
+	// Headers403 the parsed response headers for an HTTP 403 response
+	Headers403 *ListHostedAgentsResponse403Headers
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *ListHostedAgentsResponse429Headers
+	// HeadersDefault the parsed response headers for an HTTP default response
+	HeadersDefault *ListHostedAgentsResponseDefaultHeaders
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListHostedAgentsResponse) GetJSON200() *AgentPage {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r ListHostedAgentsResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ListHostedAgentsResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ListHostedAgentsResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
+func (r ListHostedAgentsResponse) GetApplicationproblemJSON429() *TooManyRequests {
+	return r.ApplicationproblemJSON429
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r ListHostedAgentsResponse) GetApplicationproblemJSONDefault() *Error {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ListHostedAgentsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListHostedAgentsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListHostedAgentsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListHostedAgentsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// IssueHostedAgentTokenResponse201Headers the declared response headers of an HTTP 201 response for IssueHostedAgentToken
+type IssueHostedAgentTokenResponse201Headers struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+// IssueHostedAgentTokenResponse400Headers the declared response headers of an HTTP 400 response for IssueHostedAgentToken
+type IssueHostedAgentTokenResponse400Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// IssueHostedAgentTokenResponse401Headers the declared response headers of an HTTP 401 response for IssueHostedAgentToken
+type IssueHostedAgentTokenResponse401Headers struct {
+	CorrelationId   *CorrelationId
+	DPoPNonce       *string
+	SetCookie       *string
+	WWWAuthenticate *string
+}
+
+// IssueHostedAgentTokenResponse403Headers the declared response headers of an HTTP 403 response for IssueHostedAgentToken
+type IssueHostedAgentTokenResponse403Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// IssueHostedAgentTokenResponse404Headers the declared response headers of an HTTP 404 response for IssueHostedAgentToken
+type IssueHostedAgentTokenResponse404Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// IssueHostedAgentTokenResponse409Headers the declared response headers of an HTTP 409 response for IssueHostedAgentToken
+type IssueHostedAgentTokenResponse409Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// IssueHostedAgentTokenResponse422Headers the declared response headers of an HTTP 422 response for IssueHostedAgentToken
+type IssueHostedAgentTokenResponse422Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// IssueHostedAgentTokenResponse429Headers the declared response headers of an HTTP 429 response for IssueHostedAgentToken
+type IssueHostedAgentTokenResponse429Headers struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      *int
+}
+
+// IssueHostedAgentTokenResponseDefaultHeaders the declared response headers of an HTTP default response for IssueHostedAgentToken
+type IssueHostedAgentTokenResponseDefaultHeaders struct {
+	CorrelationId *CorrelationId
+}
+
+type IssueHostedAgentTokenResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *ApiTokenCreated
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *UnprocessableEntity
+	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
+	ApplicationproblemJSON429 *TooManyRequests
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Error
+	// Headers201 the parsed response headers for an HTTP 201 response
+	Headers201 *IssueHostedAgentTokenResponse201Headers
+	// Headers400 the parsed response headers for an HTTP 400 response
+	Headers400 *IssueHostedAgentTokenResponse400Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *IssueHostedAgentTokenResponse401Headers
+	// Headers403 the parsed response headers for an HTTP 403 response
+	Headers403 *IssueHostedAgentTokenResponse403Headers
+	// Headers404 the parsed response headers for an HTTP 404 response
+	Headers404 *IssueHostedAgentTokenResponse404Headers
+	// Headers409 the parsed response headers for an HTTP 409 response
+	Headers409 *IssueHostedAgentTokenResponse409Headers
+	// Headers422 the parsed response headers for an HTTP 422 response
+	Headers422 *IssueHostedAgentTokenResponse422Headers
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *IssueHostedAgentTokenResponse429Headers
+	// HeadersDefault the parsed response headers for an HTTP default response
+	HeadersDefault *IssueHostedAgentTokenResponseDefaultHeaders
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r IssueHostedAgentTokenResponse) GetJSON201() *ApiTokenCreated {
+	return r.JSON201
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r IssueHostedAgentTokenResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r IssueHostedAgentTokenResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r IssueHostedAgentTokenResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r IssueHostedAgentTokenResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r IssueHostedAgentTokenResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r IssueHostedAgentTokenResponse) GetApplicationproblemJSON422() *UnprocessableEntity {
+	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
+func (r IssueHostedAgentTokenResponse) GetApplicationproblemJSON429() *TooManyRequests {
+	return r.ApplicationproblemJSON429
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r IssueHostedAgentTokenResponse) GetApplicationproblemJSONDefault() *Error {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r IssueHostedAgentTokenResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r IssueHostedAgentTokenResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r IssueHostedAgentTokenResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r IssueHostedAgentTokenResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 // GetAgentTriggerersResponse200Headers the declared response headers of an HTTP 200 response for GetAgentTriggerers
 type GetAgentTriggerersResponse200Headers struct {
 	CorrelationId   *CorrelationId
@@ -14507,6 +15462,189 @@ func (r EnableAgentResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r EnableAgentResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// SetAgentHostResponse200Headers the declared response headers of an HTTP 200 response for SetAgentHost
+type SetAgentHostResponse200Headers struct {
+	CorrelationId   *CorrelationId
+	ETag            *string
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+// SetAgentHostResponse400Headers the declared response headers of an HTTP 400 response for SetAgentHost
+type SetAgentHostResponse400Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// SetAgentHostResponse401Headers the declared response headers of an HTTP 401 response for SetAgentHost
+type SetAgentHostResponse401Headers struct {
+	CorrelationId   *CorrelationId
+	DPoPNonce       *string
+	SetCookie       *string
+	WWWAuthenticate *string
+}
+
+// SetAgentHostResponse403Headers the declared response headers of an HTTP 403 response for SetAgentHost
+type SetAgentHostResponse403Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// SetAgentHostResponse404Headers the declared response headers of an HTTP 404 response for SetAgentHost
+type SetAgentHostResponse404Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// SetAgentHostResponse409Headers the declared response headers of an HTTP 409 response for SetAgentHost
+type SetAgentHostResponse409Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// SetAgentHostResponse412Headers the declared response headers of an HTTP 412 response for SetAgentHost
+type SetAgentHostResponse412Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// SetAgentHostResponse428Headers the declared response headers of an HTTP 428 response for SetAgentHost
+type SetAgentHostResponse428Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// SetAgentHostResponse429Headers the declared response headers of an HTTP 429 response for SetAgentHost
+type SetAgentHostResponse429Headers struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      *int
+}
+
+// SetAgentHostResponseDefaultHeaders the declared response headers of an HTTP default response for SetAgentHost
+type SetAgentHostResponseDefaultHeaders struct {
+	CorrelationId *CorrelationId
+}
+
+type SetAgentHostResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Agent
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON412 the response for an HTTP 412 `application/problem+json` response
+	ApplicationproblemJSON412 *PreconditionFailed
+	// ApplicationproblemJSON428 the response for an HTTP 428 `application/problem+json` response
+	ApplicationproblemJSON428 *PreconditionRequired
+	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
+	ApplicationproblemJSON429 *TooManyRequests
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Error
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *SetAgentHostResponse200Headers
+	// Headers400 the parsed response headers for an HTTP 400 response
+	Headers400 *SetAgentHostResponse400Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *SetAgentHostResponse401Headers
+	// Headers403 the parsed response headers for an HTTP 403 response
+	Headers403 *SetAgentHostResponse403Headers
+	// Headers404 the parsed response headers for an HTTP 404 response
+	Headers404 *SetAgentHostResponse404Headers
+	// Headers409 the parsed response headers for an HTTP 409 response
+	Headers409 *SetAgentHostResponse409Headers
+	// Headers412 the parsed response headers for an HTTP 412 response
+	Headers412 *SetAgentHostResponse412Headers
+	// Headers428 the parsed response headers for an HTTP 428 response
+	Headers428 *SetAgentHostResponse428Headers
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *SetAgentHostResponse429Headers
+	// HeadersDefault the parsed response headers for an HTTP default response
+	HeadersDefault *SetAgentHostResponseDefaultHeaders
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r SetAgentHostResponse) GetJSON200() *Agent {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r SetAgentHostResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r SetAgentHostResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r SetAgentHostResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r SetAgentHostResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r SetAgentHostResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
+func (r SetAgentHostResponse) GetApplicationproblemJSON412() *PreconditionFailed {
+	return r.ApplicationproblemJSON412
+}
+
+// GetApplicationproblemJSON428 returns the response for an HTTP 428 `application/problem+json` response
+func (r SetAgentHostResponse) GetApplicationproblemJSON428() *PreconditionRequired {
+	return r.ApplicationproblemJSON428
+}
+
+// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
+func (r SetAgentHostResponse) GetApplicationproblemJSON429() *TooManyRequests {
+	return r.ApplicationproblemJSON429
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r SetAgentHostResponse) GetApplicationproblemJSONDefault() *Error {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r SetAgentHostResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r SetAgentHostResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SetAgentHostResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r SetAgentHostResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -22249,1047 +23387,4 @@ func (r SetChannelOperatorResponse) GetApplicationproblemJSON412() *Precondition
 // GetApplicationproblemJSON428 returns the response for an HTTP 428 `application/problem+json` response
 func (r SetChannelOperatorResponse) GetApplicationproblemJSON428() *PreconditionRequired {
 	return r.ApplicationproblemJSON428
-}
-
-// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
-func (r SetChannelOperatorResponse) GetApplicationproblemJSON429() *TooManyRequests {
-	return r.ApplicationproblemJSON429
-}
-
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r SetChannelOperatorResponse) GetApplicationproblemJSONDefault() *Error {
-	return r.ApplicationproblemJSONDefault
-}
-
-// GetBody returns the raw response body bytes
-func (r SetChannelOperatorResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r SetChannelOperatorResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r SetChannelOperatorResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r SetChannelOperatorResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-// DeleteProjectBindingResponse204Headers the declared response headers of an HTTP 204 response for DeleteProjectBinding
-type DeleteProjectBindingResponse204Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-}
-
-// DeleteProjectBindingResponse400Headers the declared response headers of an HTTP 400 response for DeleteProjectBinding
-type DeleteProjectBindingResponse400Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// DeleteProjectBindingResponse401Headers the declared response headers of an HTTP 401 response for DeleteProjectBinding
-type DeleteProjectBindingResponse401Headers struct {
-	CorrelationId   *CorrelationId
-	DPoPNonce       *string
-	SetCookie       *string
-	WWWAuthenticate *string
-}
-
-// DeleteProjectBindingResponse403Headers the declared response headers of an HTTP 403 response for DeleteProjectBinding
-type DeleteProjectBindingResponse403Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// DeleteProjectBindingResponse404Headers the declared response headers of an HTTP 404 response for DeleteProjectBinding
-type DeleteProjectBindingResponse404Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// DeleteProjectBindingResponse409Headers the declared response headers of an HTTP 409 response for DeleteProjectBinding
-type DeleteProjectBindingResponse409Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// DeleteProjectBindingResponse429Headers the declared response headers of an HTTP 429 response for DeleteProjectBinding
-type DeleteProjectBindingResponse429Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      *int
-}
-
-// DeleteProjectBindingResponseDefaultHeaders the declared response headers of an HTTP default response for DeleteProjectBinding
-type DeleteProjectBindingResponseDefaultHeaders struct {
-	CorrelationId *CorrelationId
-}
-
-type DeleteProjectBindingResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
-	ApplicationproblemJSON400 *BadRequest
-	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
-	ApplicationproblemJSON401 *Unauthorized
-	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
-	ApplicationproblemJSON403 *Forbidden
-	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
-	ApplicationproblemJSON404 *NotFound
-	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
-	ApplicationproblemJSON409 *Conflict
-	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
-	ApplicationproblemJSON429 *TooManyRequests
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *Error
-	// Headers204 the parsed response headers for an HTTP 204 response
-	Headers204 *DeleteProjectBindingResponse204Headers
-	// Headers400 the parsed response headers for an HTTP 400 response
-	Headers400 *DeleteProjectBindingResponse400Headers
-	// Headers401 the parsed response headers for an HTTP 401 response
-	Headers401 *DeleteProjectBindingResponse401Headers
-	// Headers403 the parsed response headers for an HTTP 403 response
-	Headers403 *DeleteProjectBindingResponse403Headers
-	// Headers404 the parsed response headers for an HTTP 404 response
-	Headers404 *DeleteProjectBindingResponse404Headers
-	// Headers409 the parsed response headers for an HTTP 409 response
-	Headers409 *DeleteProjectBindingResponse409Headers
-	// Headers429 the parsed response headers for an HTTP 429 response
-	Headers429 *DeleteProjectBindingResponse429Headers
-	// HeadersDefault the parsed response headers for an HTTP default response
-	HeadersDefault *DeleteProjectBindingResponseDefaultHeaders
-}
-
-// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
-func (r DeleteProjectBindingResponse) GetApplicationproblemJSON400() *BadRequest {
-	return r.ApplicationproblemJSON400
-}
-
-// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
-func (r DeleteProjectBindingResponse) GetApplicationproblemJSON401() *Unauthorized {
-	return r.ApplicationproblemJSON401
-}
-
-// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
-func (r DeleteProjectBindingResponse) GetApplicationproblemJSON403() *Forbidden {
-	return r.ApplicationproblemJSON403
-}
-
-// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
-func (r DeleteProjectBindingResponse) GetApplicationproblemJSON404() *NotFound {
-	return r.ApplicationproblemJSON404
-}
-
-// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
-func (r DeleteProjectBindingResponse) GetApplicationproblemJSON409() *Conflict {
-	return r.ApplicationproblemJSON409
-}
-
-// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
-func (r DeleteProjectBindingResponse) GetApplicationproblemJSON429() *TooManyRequests {
-	return r.ApplicationproblemJSON429
-}
-
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r DeleteProjectBindingResponse) GetApplicationproblemJSONDefault() *Error {
-	return r.ApplicationproblemJSONDefault
-}
-
-// GetBody returns the raw response body bytes
-func (r DeleteProjectBindingResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r DeleteProjectBindingResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r DeleteProjectBindingResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r DeleteProjectBindingResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-// PutProjectBindingResponse200Headers the declared response headers of an HTTP 200 response for PutProjectBinding
-type PutProjectBindingResponse200Headers struct {
-	CorrelationId   *CorrelationId
-	ETag            *string
-	RateLimit       *string
-	RateLimitPolicy *string
-}
-
-// PutProjectBindingResponse400Headers the declared response headers of an HTTP 400 response for PutProjectBinding
-type PutProjectBindingResponse400Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// PutProjectBindingResponse401Headers the declared response headers of an HTTP 401 response for PutProjectBinding
-type PutProjectBindingResponse401Headers struct {
-	CorrelationId   *CorrelationId
-	DPoPNonce       *string
-	SetCookie       *string
-	WWWAuthenticate *string
-}
-
-// PutProjectBindingResponse403Headers the declared response headers of an HTTP 403 response for PutProjectBinding
-type PutProjectBindingResponse403Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// PutProjectBindingResponse404Headers the declared response headers of an HTTP 404 response for PutProjectBinding
-type PutProjectBindingResponse404Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// PutProjectBindingResponse409Headers the declared response headers of an HTTP 409 response for PutProjectBinding
-type PutProjectBindingResponse409Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// PutProjectBindingResponse412Headers the declared response headers of an HTTP 412 response for PutProjectBinding
-type PutProjectBindingResponse412Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// PutProjectBindingResponse429Headers the declared response headers of an HTTP 429 response for PutProjectBinding
-type PutProjectBindingResponse429Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      *int
-}
-
-// PutProjectBindingResponseDefaultHeaders the declared response headers of an HTTP default response for PutProjectBinding
-type PutProjectBindingResponseDefaultHeaders struct {
-	CorrelationId *CorrelationId
-}
-
-type PutProjectBindingResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *ProjectBinding
-	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
-	ApplicationproblemJSON400 *BadRequest
-	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
-	ApplicationproblemJSON401 *Unauthorized
-	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
-	ApplicationproblemJSON403 *Forbidden
-	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
-	ApplicationproblemJSON404 *NotFound
-	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
-	ApplicationproblemJSON409 *Conflict
-	// ApplicationproblemJSON412 the response for an HTTP 412 `application/problem+json` response
-	ApplicationproblemJSON412 *PreconditionFailed
-	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
-	ApplicationproblemJSON429 *TooManyRequests
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *Error
-	// Headers200 the parsed response headers for an HTTP 200 response
-	Headers200 *PutProjectBindingResponse200Headers
-	// Headers400 the parsed response headers for an HTTP 400 response
-	Headers400 *PutProjectBindingResponse400Headers
-	// Headers401 the parsed response headers for an HTTP 401 response
-	Headers401 *PutProjectBindingResponse401Headers
-	// Headers403 the parsed response headers for an HTTP 403 response
-	Headers403 *PutProjectBindingResponse403Headers
-	// Headers404 the parsed response headers for an HTTP 404 response
-	Headers404 *PutProjectBindingResponse404Headers
-	// Headers409 the parsed response headers for an HTTP 409 response
-	Headers409 *PutProjectBindingResponse409Headers
-	// Headers412 the parsed response headers for an HTTP 412 response
-	Headers412 *PutProjectBindingResponse412Headers
-	// Headers429 the parsed response headers for an HTTP 429 response
-	Headers429 *PutProjectBindingResponse429Headers
-	// HeadersDefault the parsed response headers for an HTTP default response
-	HeadersDefault *PutProjectBindingResponseDefaultHeaders
-}
-
-// GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r PutProjectBindingResponse) GetJSON200() *ProjectBinding {
-	return r.JSON200
-}
-
-// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
-func (r PutProjectBindingResponse) GetApplicationproblemJSON400() *BadRequest {
-	return r.ApplicationproblemJSON400
-}
-
-// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
-func (r PutProjectBindingResponse) GetApplicationproblemJSON401() *Unauthorized {
-	return r.ApplicationproblemJSON401
-}
-
-// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
-func (r PutProjectBindingResponse) GetApplicationproblemJSON403() *Forbidden {
-	return r.ApplicationproblemJSON403
-}
-
-// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
-func (r PutProjectBindingResponse) GetApplicationproblemJSON404() *NotFound {
-	return r.ApplicationproblemJSON404
-}
-
-// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
-func (r PutProjectBindingResponse) GetApplicationproblemJSON409() *Conflict {
-	return r.ApplicationproblemJSON409
-}
-
-// GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
-func (r PutProjectBindingResponse) GetApplicationproblemJSON412() *PreconditionFailed {
-	return r.ApplicationproblemJSON412
-}
-
-// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
-func (r PutProjectBindingResponse) GetApplicationproblemJSON429() *TooManyRequests {
-	return r.ApplicationproblemJSON429
-}
-
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r PutProjectBindingResponse) GetApplicationproblemJSONDefault() *Error {
-	return r.ApplicationproblemJSONDefault
-}
-
-// GetBody returns the raw response body bytes
-func (r PutProjectBindingResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r PutProjectBindingResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r PutProjectBindingResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r PutProjectBindingResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-// SetChannelReadOnlyResponse200Headers the declared response headers of an HTTP 200 response for SetChannelReadOnly
-type SetChannelReadOnlyResponse200Headers struct {
-	CorrelationId   *CorrelationId
-	ETag            *string
-	RateLimit       *string
-	RateLimitPolicy *string
-}
-
-// SetChannelReadOnlyResponse400Headers the declared response headers of an HTTP 400 response for SetChannelReadOnly
-type SetChannelReadOnlyResponse400Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// SetChannelReadOnlyResponse401Headers the declared response headers of an HTTP 401 response for SetChannelReadOnly
-type SetChannelReadOnlyResponse401Headers struct {
-	CorrelationId   *CorrelationId
-	DPoPNonce       *string
-	SetCookie       *string
-	WWWAuthenticate *string
-}
-
-// SetChannelReadOnlyResponse403Headers the declared response headers of an HTTP 403 response for SetChannelReadOnly
-type SetChannelReadOnlyResponse403Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// SetChannelReadOnlyResponse404Headers the declared response headers of an HTTP 404 response for SetChannelReadOnly
-type SetChannelReadOnlyResponse404Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// SetChannelReadOnlyResponse412Headers the declared response headers of an HTTP 412 response for SetChannelReadOnly
-type SetChannelReadOnlyResponse412Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// SetChannelReadOnlyResponse428Headers the declared response headers of an HTTP 428 response for SetChannelReadOnly
-type SetChannelReadOnlyResponse428Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// SetChannelReadOnlyResponse429Headers the declared response headers of an HTTP 429 response for SetChannelReadOnly
-type SetChannelReadOnlyResponse429Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      *int
-}
-
-// SetChannelReadOnlyResponseDefaultHeaders the declared response headers of an HTTP default response for SetChannelReadOnly
-type SetChannelReadOnlyResponseDefaultHeaders struct {
-	CorrelationId *CorrelationId
-}
-
-type SetChannelReadOnlyResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *Channel
-	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
-	ApplicationproblemJSON400 *BadRequest
-	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
-	ApplicationproblemJSON401 *Unauthorized
-	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
-	ApplicationproblemJSON403 *Forbidden
-	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
-	ApplicationproblemJSON404 *NotFound
-	// ApplicationproblemJSON412 the response for an HTTP 412 `application/problem+json` response
-	ApplicationproblemJSON412 *PreconditionFailed
-	// ApplicationproblemJSON428 the response for an HTTP 428 `application/problem+json` response
-	ApplicationproblemJSON428 *PreconditionRequired
-	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
-	ApplicationproblemJSON429 *TooManyRequests
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *Error
-	// Headers200 the parsed response headers for an HTTP 200 response
-	Headers200 *SetChannelReadOnlyResponse200Headers
-	// Headers400 the parsed response headers for an HTTP 400 response
-	Headers400 *SetChannelReadOnlyResponse400Headers
-	// Headers401 the parsed response headers for an HTTP 401 response
-	Headers401 *SetChannelReadOnlyResponse401Headers
-	// Headers403 the parsed response headers for an HTTP 403 response
-	Headers403 *SetChannelReadOnlyResponse403Headers
-	// Headers404 the parsed response headers for an HTTP 404 response
-	Headers404 *SetChannelReadOnlyResponse404Headers
-	// Headers412 the parsed response headers for an HTTP 412 response
-	Headers412 *SetChannelReadOnlyResponse412Headers
-	// Headers428 the parsed response headers for an HTTP 428 response
-	Headers428 *SetChannelReadOnlyResponse428Headers
-	// Headers429 the parsed response headers for an HTTP 429 response
-	Headers429 *SetChannelReadOnlyResponse429Headers
-	// HeadersDefault the parsed response headers for an HTTP default response
-	HeadersDefault *SetChannelReadOnlyResponseDefaultHeaders
-}
-
-// GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r SetChannelReadOnlyResponse) GetJSON200() *Channel {
-	return r.JSON200
-}
-
-// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
-func (r SetChannelReadOnlyResponse) GetApplicationproblemJSON400() *BadRequest {
-	return r.ApplicationproblemJSON400
-}
-
-// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
-func (r SetChannelReadOnlyResponse) GetApplicationproblemJSON401() *Unauthorized {
-	return r.ApplicationproblemJSON401
-}
-
-// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
-func (r SetChannelReadOnlyResponse) GetApplicationproblemJSON403() *Forbidden {
-	return r.ApplicationproblemJSON403
-}
-
-// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
-func (r SetChannelReadOnlyResponse) GetApplicationproblemJSON404() *NotFound {
-	return r.ApplicationproblemJSON404
-}
-
-// GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
-func (r SetChannelReadOnlyResponse) GetApplicationproblemJSON412() *PreconditionFailed {
-	return r.ApplicationproblemJSON412
-}
-
-// GetApplicationproblemJSON428 returns the response for an HTTP 428 `application/problem+json` response
-func (r SetChannelReadOnlyResponse) GetApplicationproblemJSON428() *PreconditionRequired {
-	return r.ApplicationproblemJSON428
-}
-
-// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
-func (r SetChannelReadOnlyResponse) GetApplicationproblemJSON429() *TooManyRequests {
-	return r.ApplicationproblemJSON429
-}
-
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r SetChannelReadOnlyResponse) GetApplicationproblemJSONDefault() *Error {
-	return r.ApplicationproblemJSONDefault
-}
-
-// GetBody returns the raw response body bytes
-func (r SetChannelReadOnlyResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r SetChannelReadOnlyResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r SetChannelReadOnlyResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r SetChannelReadOnlyResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-// RestoreChannelResponse200Headers the declared response headers of an HTTP 200 response for RestoreChannel
-type RestoreChannelResponse200Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-}
-
-// RestoreChannelResponse400Headers the declared response headers of an HTTP 400 response for RestoreChannel
-type RestoreChannelResponse400Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// RestoreChannelResponse401Headers the declared response headers of an HTTP 401 response for RestoreChannel
-type RestoreChannelResponse401Headers struct {
-	CorrelationId   *CorrelationId
-	DPoPNonce       *string
-	SetCookie       *string
-	WWWAuthenticate *string
-}
-
-// RestoreChannelResponse403Headers the declared response headers of an HTTP 403 response for RestoreChannel
-type RestoreChannelResponse403Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// RestoreChannelResponse404Headers the declared response headers of an HTTP 404 response for RestoreChannel
-type RestoreChannelResponse404Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// RestoreChannelResponse409Headers the declared response headers of an HTTP 409 response for RestoreChannel
-type RestoreChannelResponse409Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// RestoreChannelResponse422Headers the declared response headers of an HTTP 422 response for RestoreChannel
-type RestoreChannelResponse422Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// RestoreChannelResponse429Headers the declared response headers of an HTTP 429 response for RestoreChannel
-type RestoreChannelResponse429Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      *int
-}
-
-// RestoreChannelResponseDefaultHeaders the declared response headers of an HTTP default response for RestoreChannel
-type RestoreChannelResponseDefaultHeaders struct {
-	CorrelationId *CorrelationId
-}
-
-type RestoreChannelResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *Channel
-	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
-	ApplicationproblemJSON400 *BadRequest
-	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
-	ApplicationproblemJSON401 *Unauthorized
-	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
-	ApplicationproblemJSON403 *Forbidden
-	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
-	ApplicationproblemJSON404 *NotFound
-	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
-	ApplicationproblemJSON409 *Conflict
-	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
-	ApplicationproblemJSON422 *UnprocessableEntity
-	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
-	ApplicationproblemJSON429 *TooManyRequests
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *Error
-	// Headers200 the parsed response headers for an HTTP 200 response
-	Headers200 *RestoreChannelResponse200Headers
-	// Headers400 the parsed response headers for an HTTP 400 response
-	Headers400 *RestoreChannelResponse400Headers
-	// Headers401 the parsed response headers for an HTTP 401 response
-	Headers401 *RestoreChannelResponse401Headers
-	// Headers403 the parsed response headers for an HTTP 403 response
-	Headers403 *RestoreChannelResponse403Headers
-	// Headers404 the parsed response headers for an HTTP 404 response
-	Headers404 *RestoreChannelResponse404Headers
-	// Headers409 the parsed response headers for an HTTP 409 response
-	Headers409 *RestoreChannelResponse409Headers
-	// Headers422 the parsed response headers for an HTTP 422 response
-	Headers422 *RestoreChannelResponse422Headers
-	// Headers429 the parsed response headers for an HTTP 429 response
-	Headers429 *RestoreChannelResponse429Headers
-	// HeadersDefault the parsed response headers for an HTTP default response
-	HeadersDefault *RestoreChannelResponseDefaultHeaders
-}
-
-// GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r RestoreChannelResponse) GetJSON200() *Channel {
-	return r.JSON200
-}
-
-// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
-func (r RestoreChannelResponse) GetApplicationproblemJSON400() *BadRequest {
-	return r.ApplicationproblemJSON400
-}
-
-// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
-func (r RestoreChannelResponse) GetApplicationproblemJSON401() *Unauthorized {
-	return r.ApplicationproblemJSON401
-}
-
-// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
-func (r RestoreChannelResponse) GetApplicationproblemJSON403() *Forbidden {
-	return r.ApplicationproblemJSON403
-}
-
-// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
-func (r RestoreChannelResponse) GetApplicationproblemJSON404() *NotFound {
-	return r.ApplicationproblemJSON404
-}
-
-// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
-func (r RestoreChannelResponse) GetApplicationproblemJSON409() *Conflict {
-	return r.ApplicationproblemJSON409
-}
-
-// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
-func (r RestoreChannelResponse) GetApplicationproblemJSON422() *UnprocessableEntity {
-	return r.ApplicationproblemJSON422
-}
-
-// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
-func (r RestoreChannelResponse) GetApplicationproblemJSON429() *TooManyRequests {
-	return r.ApplicationproblemJSON429
-}
-
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r RestoreChannelResponse) GetApplicationproblemJSONDefault() *Error {
-	return r.ApplicationproblemJSONDefault
-}
-
-// GetBody returns the raw response body bytes
-func (r RestoreChannelResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r RestoreChannelResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r RestoreChannelResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r RestoreChannelResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-// ListForumTagsResponse200Headers the declared response headers of an HTTP 200 response for ListForumTags
-type ListForumTagsResponse200Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-}
-
-// ListForumTagsResponse400Headers the declared response headers of an HTTP 400 response for ListForumTags
-type ListForumTagsResponse400Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// ListForumTagsResponse401Headers the declared response headers of an HTTP 401 response for ListForumTags
-type ListForumTagsResponse401Headers struct {
-	CorrelationId   *CorrelationId
-	DPoPNonce       *string
-	SetCookie       *string
-	WWWAuthenticate *string
-}
-
-// ListForumTagsResponse403Headers the declared response headers of an HTTP 403 response for ListForumTags
-type ListForumTagsResponse403Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// ListForumTagsResponse404Headers the declared response headers of an HTTP 404 response for ListForumTags
-type ListForumTagsResponse404Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// ListForumTagsResponse429Headers the declared response headers of an HTTP 429 response for ListForumTags
-type ListForumTagsResponse429Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      *int
-}
-
-// ListForumTagsResponseDefaultHeaders the declared response headers of an HTTP default response for ListForumTags
-type ListForumTagsResponseDefaultHeaders struct {
-	CorrelationId *CorrelationId
-}
-
-type ListForumTagsResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *ForumTagList
-	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
-	ApplicationproblemJSON400 *BadRequest
-	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
-	ApplicationproblemJSON401 *Unauthorized
-	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
-	ApplicationproblemJSON403 *Forbidden
-	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
-	ApplicationproblemJSON404 *NotFound
-	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
-	ApplicationproblemJSON429 *TooManyRequests
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *Error
-	// Headers200 the parsed response headers for an HTTP 200 response
-	Headers200 *ListForumTagsResponse200Headers
-	// Headers400 the parsed response headers for an HTTP 400 response
-	Headers400 *ListForumTagsResponse400Headers
-	// Headers401 the parsed response headers for an HTTP 401 response
-	Headers401 *ListForumTagsResponse401Headers
-	// Headers403 the parsed response headers for an HTTP 403 response
-	Headers403 *ListForumTagsResponse403Headers
-	// Headers404 the parsed response headers for an HTTP 404 response
-	Headers404 *ListForumTagsResponse404Headers
-	// Headers429 the parsed response headers for an HTTP 429 response
-	Headers429 *ListForumTagsResponse429Headers
-	// HeadersDefault the parsed response headers for an HTTP default response
-	HeadersDefault *ListForumTagsResponseDefaultHeaders
-}
-
-// GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r ListForumTagsResponse) GetJSON200() *ForumTagList {
-	return r.JSON200
-}
-
-// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
-func (r ListForumTagsResponse) GetApplicationproblemJSON400() *BadRequest {
-	return r.ApplicationproblemJSON400
-}
-
-// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
-func (r ListForumTagsResponse) GetApplicationproblemJSON401() *Unauthorized {
-	return r.ApplicationproblemJSON401
-}
-
-// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
-func (r ListForumTagsResponse) GetApplicationproblemJSON403() *Forbidden {
-	return r.ApplicationproblemJSON403
-}
-
-// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
-func (r ListForumTagsResponse) GetApplicationproblemJSON404() *NotFound {
-	return r.ApplicationproblemJSON404
-}
-
-// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
-func (r ListForumTagsResponse) GetApplicationproblemJSON429() *TooManyRequests {
-	return r.ApplicationproblemJSON429
-}
-
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r ListForumTagsResponse) GetApplicationproblemJSONDefault() *Error {
-	return r.ApplicationproblemJSONDefault
-}
-
-// GetBody returns the raw response body bytes
-func (r ListForumTagsResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r ListForumTagsResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r ListForumTagsResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r ListForumTagsResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-// CreateForumTagResponse201Headers the declared response headers of an HTTP 201 response for CreateForumTag
-type CreateForumTagResponse201Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-}
-
-// CreateForumTagResponse400Headers the declared response headers of an HTTP 400 response for CreateForumTag
-type CreateForumTagResponse400Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// CreateForumTagResponse401Headers the declared response headers of an HTTP 401 response for CreateForumTag
-type CreateForumTagResponse401Headers struct {
-	CorrelationId   *CorrelationId
-	DPoPNonce       *string
-	SetCookie       *string
-	WWWAuthenticate *string
-}
-
-// CreateForumTagResponse403Headers the declared response headers of an HTTP 403 response for CreateForumTag
-type CreateForumTagResponse403Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// CreateForumTagResponse404Headers the declared response headers of an HTTP 404 response for CreateForumTag
-type CreateForumTagResponse404Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// CreateForumTagResponse409Headers the declared response headers of an HTTP 409 response for CreateForumTag
-type CreateForumTagResponse409Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// CreateForumTagResponse422Headers the declared response headers of an HTTP 422 response for CreateForumTag
-type CreateForumTagResponse422Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// CreateForumTagResponse429Headers the declared response headers of an HTTP 429 response for CreateForumTag
-type CreateForumTagResponse429Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      *int
-}
-
-// CreateForumTagResponseDefaultHeaders the declared response headers of an HTTP default response for CreateForumTag
-type CreateForumTagResponseDefaultHeaders struct {
-	CorrelationId *CorrelationId
-}
-
-type CreateForumTagResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// JSON201 the response for an HTTP 201 `application/json` response
-	JSON201 *ForumTag
-	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
-	ApplicationproblemJSON400 *BadRequest
-	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
-	ApplicationproblemJSON401 *Unauthorized
-	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
-	ApplicationproblemJSON403 *Forbidden
-	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
-	ApplicationproblemJSON404 *NotFound
-	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
-	ApplicationproblemJSON409 *Conflict
-	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
-	ApplicationproblemJSON422 *UnprocessableEntity
-	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
-	ApplicationproblemJSON429 *TooManyRequests
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *Error
-	// Headers201 the parsed response headers for an HTTP 201 response
-	Headers201 *CreateForumTagResponse201Headers
-	// Headers400 the parsed response headers for an HTTP 400 response
-	Headers400 *CreateForumTagResponse400Headers
-	// Headers401 the parsed response headers for an HTTP 401 response
-	Headers401 *CreateForumTagResponse401Headers
-	// Headers403 the parsed response headers for an HTTP 403 response
-	Headers403 *CreateForumTagResponse403Headers
-	// Headers404 the parsed response headers for an HTTP 404 response
-	Headers404 *CreateForumTagResponse404Headers
-	// Headers409 the parsed response headers for an HTTP 409 response
-	Headers409 *CreateForumTagResponse409Headers
-	// Headers422 the parsed response headers for an HTTP 422 response
-	Headers422 *CreateForumTagResponse422Headers
-	// Headers429 the parsed response headers for an HTTP 429 response
-	Headers429 *CreateForumTagResponse429Headers
-	// HeadersDefault the parsed response headers for an HTTP default response
-	HeadersDefault *CreateForumTagResponseDefaultHeaders
-}
-
-// GetJSON201 returns the response for an HTTP 201 `application/json` response
-func (r CreateForumTagResponse) GetJSON201() *ForumTag {
-	return r.JSON201
-}
-
-// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
-func (r CreateForumTagResponse) GetApplicationproblemJSON400() *BadRequest {
-	return r.ApplicationproblemJSON400
-}
-
-// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
-func (r CreateForumTagResponse) GetApplicationproblemJSON401() *Unauthorized {
-	return r.ApplicationproblemJSON401
-}
-
-// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
-func (r CreateForumTagResponse) GetApplicationproblemJSON403() *Forbidden {
-	return r.ApplicationproblemJSON403
-}
-
-// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
-func (r CreateForumTagResponse) GetApplicationproblemJSON404() *NotFound {
-	return r.ApplicationproblemJSON404
-}
-
-// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
-func (r CreateForumTagResponse) GetApplicationproblemJSON409() *Conflict {
-	return r.ApplicationproblemJSON409
-}
-
-// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
-func (r CreateForumTagResponse) GetApplicationproblemJSON422() *UnprocessableEntity {
-	return r.ApplicationproblemJSON422
-}
-
-// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
-func (r CreateForumTagResponse) GetApplicationproblemJSON429() *TooManyRequests {
-	return r.ApplicationproblemJSON429
-}
-
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r CreateForumTagResponse) GetApplicationproblemJSONDefault() *Error {
-	return r.ApplicationproblemJSONDefault
-}
-
-// GetBody returns the raw response body bytes
-func (r CreateForumTagResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r CreateForumTagResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r CreateForumTagResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r CreateForumTagResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-// DeleteForumTagResponse204Headers the declared response headers of an HTTP 204 response for DeleteForumTag
-type DeleteForumTagResponse204Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-}
-
-// DeleteForumTagResponse400Headers the declared response headers of an HTTP 400 response for DeleteForumTag
-type DeleteForumTagResponse400Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// DeleteForumTagResponse401Headers the declared response headers of an HTTP 401 response for DeleteForumTag
-type DeleteForumTagResponse401Headers struct {
-	CorrelationId   *CorrelationId
-	DPoPNonce       *string
-	SetCookie       *string
-	WWWAuthenticate *string
-}
-
-// DeleteForumTagResponse403Headers the declared response headers of an HTTP 403 response for DeleteForumTag
-type DeleteForumTagResponse403Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// DeleteForumTagResponse404Headers the declared response headers of an HTTP 404 response for DeleteForumTag
-type DeleteForumTagResponse404Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// DeleteForumTagResponse429Headers the declared response headers of an HTTP 429 response for DeleteForumTag
-type DeleteForumTagResponse429Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      *int
-}
-
-// DeleteForumTagResponseDefaultHeaders the declared response headers of an HTTP default response for DeleteForumTag
-type DeleteForumTagResponseDefaultHeaders struct {
-	CorrelationId *CorrelationId
 }

@@ -482,6 +482,8 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"agents.mcp_stdio_runners":                      {Kind: config.KindStringList, Default: `["npx", "uvx"]`, Chapter: "26-builtin-agents.md"},
 		// M2-12
 		"agent.session_ref_max_bytes": {Kind: config.KindInt, Default: "1024", Min: "1", Max: "2048", Chapter: "09-agents.md"},
+		// A1-03
+		"agents.hosted_token_ttl": {Kind: config.KindDuration, Default: "24h", Min: "1s", Chapter: "26-builtin-agents.md"},
 		// M1-64
 		"sync.ws_max_frame_bytes":   {Kind: config.KindInt, Default: "1048576", Min: "1024", Max: "16777216", Chapter: "04-sync-protocol.md"},
 		"sync.identify_timeout":     {Kind: config.KindDuration, Default: "10s", Min: "1ms", Chapter: "04-sync-protocol.md"},

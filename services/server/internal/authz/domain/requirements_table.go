@@ -21,7 +21,7 @@ var requirementGroups = []struct {
 	{"permission of the target action", Preview, []string{"access.preview"}},
 	{"owner", Owner, []string{
 		"access.view_as", "agent.billing_mode.set", "agent.billing_mode.set_all", "agent.create",
-		"agent.credential_holder.set", "agent.disable", "agent.enable", "agent.project_folders.read", "agent.tool_class.set",
+		"agent.credential_holder.set", "agent.disable", "agent.enable", "agent.host.set", "agent.project_folders.read", "agent.tool_class.set",
 		"agent.update", "app.install", "app.read", "app.resume", "app.scopes.update", "app.suspend",
 		"app.uninstall", "audit.read", "audit.verify", "channel.operator.set", "channel.project.bind",
 		"cost.reconcile", "dev_environment.manage", "feature_flag.read", "feature_flag.update",
@@ -34,6 +34,11 @@ var requirementGroups = []struct {
 		"webhook_out.redeliver",
 	}},
 	{"agent-self and effective operator", ChannelOperator, []string{"agent.config.read"}},
+	// The hosted agents of a runner (26 3.2, 3.3, A1-03): agent-self on the calling runner for the
+	// list; for a token the resource is the hosted agent with OwnerID its hosted_by, and the agents
+	// module refuses the agent itself, an inactive target and a runner without hosts_agents as 404.
+	{"agent-self (a runner reporting `hosts_agents`)", AgentSelf, []string{"agent.hosted.list"}},
+	{"agent-self of the runner named in `hosted_by` of the target", AgentSelf, []string{"agent.hosted_token.issue"}},
 	{"agent-self", AgentSelf, []string{
 		"agent.events.consume", "agent.heartbeat", "agent.triggerers.read", "agent_session.report",
 		"channel.project.trash", "run.context.read", "run.finish", "run.update",

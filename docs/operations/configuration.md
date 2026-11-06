@@ -1003,7 +1003,7 @@ Source: [26-builtin-agents.md](../spec/26-builtin-agents.md), section 14.
 | `agents.interview.timeout` | `BOTHY_AGENTS__INTERVIEW__TIMEOUT` | Server |  | `90s` | longest wait for the builder's answer; the deadline of `interviewAgent` instead of `http.request_timeout` (6.1) | planned (A1) |
 | `agents.interview.max_turns` | `BOTHY_AGENTS__INTERVIEW__MAX_TURNS` | Server |  | `12` | most turns of the interview history in one request | planned (A1) |
 | `agents.interview.answer_max_chars` | `BOTHY_AGENTS__INTERVIEW__ANSWER_MAX_CHARS` | Server |  | `4000` | longest answer of the person in one turn | planned (A1) |
-| `agents.hosted_token_ttl` | `BOTHY_AGENTS__HOSTED_TOKEN_TTL` | Server |  | `24h` | lifetime of a token for a hosted agent (3.3) | planned (A1) |
+| `agents.hosted_token_ttl` | `BOTHY_AGENTS__HOSTED_TOKEN_TTL` | Server | duration | `24h` | lifetime of a token for a hosted agent (3.3) | active |
 | `agents.mcp_stdio_runners` | `BOTHY_AGENTS__MCP_STDIO_RUNNERS` | Server | list(string) | `["npx", "uvx"]` | commands a `stdio` MCP server may use (4.2) | active |
 | `agents.definition.instructions_max_bytes` | `BOTHY_AGENTS__DEFINITION__INSTRUCTIONS_MAX_BYTES` | Server | int | `65536` | longest `instructions` | active |
 | `agents.definition.max_skills` | `BOTHY_AGENTS__DEFINITION__MAX_SKILLS` | Server | int | `32` | most skills of a definition | active |

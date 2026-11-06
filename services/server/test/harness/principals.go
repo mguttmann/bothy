@@ -28,6 +28,10 @@ type AgentSpec struct {
 	// AdapterKind is agents.adapter_kind; "" means hermes. code_runner makes an agent that may
 	// operate a bound forum (docs/spec/09-agents.md 18.16).
 	AdapterKind string
+	// HostedBy is the hosting runner of a built-in agent (claude_agent, A1-03), made by NewRunner.
+	// The agent's token then comes from issueHostedAgentToken, bound to the runner's key, because
+	// createToken refuses a built-in agent (docs/spec/26-builtin-agents.md 3.3).
+	HostedBy *Client
 }
 
 // apiTokenTTL is the validity of the agent tokens of NewAgent.
@@ -122,14 +126,19 @@ func (s *Server) NewAgent(tb testing.TB, spec AgentSpec) *Client {
 	if kind == "" {
 		kind = "hermes"
 	}
-	resp := MustDo(tb, s.Owner, Request{Method: http.MethodPost, Path: "/agents", Body: map[string]any{
-		"handle": spec.Handle, "display_name": spec.DisplayName, "adapter_kind": kind,
-	}}, http.StatusCreated)
+	body := map[string]any{"handle": spec.Handle, "display_name": spec.DisplayName, "adapter_kind": kind}
+	if spec.HostedBy != nil {
+		body["hosted_by"] = spec.HostedBy.PrincipalID
+	}
+	resp := MustDo(tb, s.Owner, Request{Method: http.MethodPost, Path: "/agents", Body: body}, http.StatusCreated)
 	var agent struct {
 		ID      string `json:"id"`
 		Version int64  `json:"version"`
 	}
 	resp.JSON(tb, &agent)
+	if spec.HostedBy != nil {
+		return s.hostedClient(tb, spec.HostedBy, agent.ID)
+	}
 	if spec.BillingMode == "personal" {
 		body := map[string]any{"billing_mode": "personal", "reason": "harness"}
 		if spec.CredentialHolder != "" {
@@ -154,6 +163,32 @@ func (s *Server) NewAgent(tb testing.TB, spec AgentSpec) *Client {
 		s.tokens(token.Secret, "")
 	}
 	return &Client{PrincipalID: agent.ID, publicURL: s.PublicURL, http: s.http, tb: s.tb, key: key, access: token.Secret, apiToken: true, proofs: s.proofs, tokens: s.tokens, clk: s.proofClock()}
+}
+
+// NewRunner creates a Claude Code runner (code_runner) that reports the capability hosts_agents
+// with ceiling (chat, scoped or host) in a heartbeat, so it may host built-in agents (A1-03).
+func (s *Server) NewRunner(tb testing.TB, handle, ceiling string) *Client {
+	tb.Helper()
+	r := s.NewAgent(tb, AgentSpec{Handle: handle, DisplayName: handle, AdapterKind: "code_runner"})
+	MustDo(tb, r, Request{Method: http.MethodPost, Path: "/agents/me/heartbeat", Body: map[string]any{
+		"state": "online", "details": map[string]any{"capabilities": map[string]any{"hosts_agents": ceiling}},
+	}}, http.StatusOK)
+	return r
+}
+
+// hostedClient fetches a token of the built-in agent id through its hosting runner
+// (issueHostedAgentToken) and returns a client that acts with it and the runner's key.
+func (s *Server) hostedClient(tb testing.TB, runner *Client, id string) *Client {
+	tb.Helper()
+	tok := MustDo(tb, runner, Request{Method: http.MethodPost, Path: "/agents/me/hosted/" + id + "/token"}, http.StatusCreated)
+	var token struct {
+		Secret string `json:"secret"`
+	}
+	tok.JSON(tb, &token)
+	if s.tokens != nil {
+		s.tokens(token.Secret, "")
+	}
+	return &Client{PrincipalID: id, publicURL: s.PublicURL, http: s.http, tb: s.tb, key: runner.key, access: token.Secret, apiToken: true, proofs: s.proofs, tokens: s.tokens, clk: s.proofClock()}
 }
 
 // NewTokenClient creates an API token of the principal of c through the public API as the owner

@@ -270,6 +270,38 @@ func (q *Queries) RevokeAPITokensOfPrincipal(ctx context.Context, arg RevokeAPIT
 	return result.RowsAffected(), nil
 }
 
+const revokeIssuedAPITokens = `-- name: RevokeIssuedAPITokens :execrows
+UPDATE api_tokens SET revoked_at = $1, revoked_by = $2
+WHERE created_by = $3 AND principal_id <> $3 AND revoked_at IS NULL
+  AND ($4::uuid IS NULL OR principal_id = $4::uuid)
+  AND ($5::text IS NULL OR dpop_jkt = $5::text)
+`
+
+type RevokeIssuedAPITokensParams struct {
+	RevokedAt pgtype.Timestamptz
+	RevokedBy pgtype.UUID
+	Issuer    pgtype.UUID
+	Holder    pgtype.UUID
+	DpopJkt   pgtype.Text
+}
+
+// The tokens of built-in agents (A1-03, 26 3.3): the active tokens that the hosting runner
+// @issuer created for another principal, optionally only of one holder and only with one
+// dpop_jkt (a revoked runner token takes the hosted tokens bound to the same key).
+func (q *Queries) RevokeIssuedAPITokens(ctx context.Context, arg RevokeIssuedAPITokensParams) (int64, error) {
+	result, err := q.db.Exec(ctx, revokeIssuedAPITokens,
+		arg.RevokedAt,
+		arg.RevokedBy,
+		arg.Issuer,
+		arg.Holder,
+		arg.DpopJkt,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const touchAPIToken = `-- name: TouchAPIToken :exec
 UPDATE api_tokens SET last_used_at = $1
 WHERE id = $2 AND (last_used_at IS NULL OR last_used_at < $3)

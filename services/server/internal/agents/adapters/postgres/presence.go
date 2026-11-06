@@ -155,7 +155,7 @@ func presenceOf(row sqlcgen.ListLivePresenceRow) (domain.PresenceRow, error) {
 	}
 	return domain.PresenceRow{
 		ID: idOf(row.PrincipalID), Target: domain.Target{BillingMode: domain.BillingMode(row.BillingMode), ToolClass: domain.ToolClass(row.ToolClass)},
-		Stored: stored, LastHeartbeatAt: timeOf(row.LastHeartbeatAt),
+		Stored: stored, LastHeartbeatAt: timeOf(row.LastHeartbeatAt), AdapterKind: row.AdapterKind,
 	}, nil
 }
 

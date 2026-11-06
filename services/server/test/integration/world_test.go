@@ -278,7 +278,7 @@ func newEmptyWorldWith(t *testing.T, search searchlang.Map) *world {
 		Measure: w.measure}
 	w.id, err = wire.NewIdentity(idConfig, pool, uow, w.az, writes, pepper, w.clk, log)
 	must(t, err)
-	ag, err := wire.NewAgents(agentsapp.Config{PageSizeDefault: 20, PageSizeMax: 50, ReasonMaxChars: reasonMaxChars}, pool, uow, w.az, hook, writes, w.id, w.clk, log)
+	ag, err := wire.NewAgents(agentsapp.Config{PageSizeDefault: 20, PageSizeMax: 50, ReasonMaxChars: reasonMaxChars, HostedTokenTTL: time.Hour}, pool, uow, w.az, hook, writes, w.id, w.clk, log)
 	must(t, err)
 	w.resolver.BindSwitch(ag.Switch)
 	w.timers, w.pub = &fakeTimers{clk: w.clk}, &recPublisher{}

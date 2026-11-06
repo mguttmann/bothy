@@ -489,6 +489,33 @@ Principals, people, owners, login drivers, identities, local credentials, enroll
   (M2-27): `app/incomingtoken_test.go` (`TestIncomingWebhookToken_MintAndHash`,
   `TestHashIncomingWebhookToken_RejectsWithoutLookup`).
 
+### Tokens of built-in agents (A1-03)
+
+A built-in agent (`adapter_kind` `claude_agent`, docs/spec/26-builtin-agents.md 3.3) gets its API
+tokens only from its hosting runner; no column marks such a token, it is one whose `created_by`
+is the runner (docs/decisions.d/A1-01.md D-A1-01-4).
+
+- Port (`hosted.go`): `HostedTokens` (`IssueHosted`, `RevokeHosted`, `RevokeIssued`), implemented
+  by `app.Tokens` in `app/hostedtokens.go`. Only the agents module calls it, after it authorized
+  `agent.hosted_token.issue`, `agent.host.set` or `agent.disable`; every method needs a unit
+  declared as a rights change, like every revocation. `IssueHosted` locks the runner's calling
+  token (not found, another principal or inactive: `not_found`; without `dpop_jkt`:
+  `409 dpop_required`), revokes the runner's older tokens of the agent and inserts a token of kind
+  `agt` bound to the calling token's `dpop_jkt`, `created_by` the runner, with the expiry the
+  caller computed from `agents.hosted_token_ttl`; the secret is an `identity.Token` like every
+  other.
+- Cascade: revoking an agent token bound to a key (`Revoke`, `revokeToken`) also revokes, in the
+  same transaction, every active token that agent created for another principal with the same
+  `dpop_jkt` (`RevokeIssuedAPITokens`); the `token.revoke` audit entry counts them in
+  `revoked_hosted_tokens`. A person's token never cascades, so the agent tokens an owner created
+  stay.
+- Consumer port `HostedAgents` (`IsHostedAgent`), implemented by the agents module and bound by
+  `internal/wire` with `Tokens.BindHostedAgents`: `createToken` for a built-in agent is
+  `409 conflict` with `reason` `hosted_agent_token`. Unbound, no agent counts as built in.
+- Tests: `app/hostedtokens_test.go` (`TestTokens_Hosted`); the use cases and the HTTP and gateway
+  paths in `internal/agents/app/hosting_test.go`, `test/integration/hosting_test.go` and
+  `internal/wire/serve_hosted_test.go`.
+
 ### First setup, enrollment codes and login completion (M1-37)
 
 - Port (`enrollment.go`): `Enrollment` (`RedeemEnrollmentCode`, `CreateEnrollmentCode`) with

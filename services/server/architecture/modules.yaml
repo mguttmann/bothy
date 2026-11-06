@@ -138,12 +138,14 @@ modules:
     actions: [agent.read, agent.create, agent.update, agent.disable, agent.enable,
               agent.billing_mode.set, agent.billing_mode.set_all, agent.credential_holder.set,
               agent.tool_class.set, agent.heartbeat, agent.events.consume, agent.triggerers.read,
-              agent.project_folders.read, agent.definition.read,
+              agent.project_folders.read, agent.definition.read, agent.host.set, agent.hosted.list,
+              agent.hosted_token.issue,
               agent_session.read, agent_session.reset, agent_session.bind, agent_session.report,
               command.read, command.register, command.remove, dev_environment.read,
               dev_environment.manage, dev_environment.report]
-    # agent.definition_changed to the built-in agent itself (A1-02, 26 4.1).
-    events: [agent_session.changed, command.changed, agent.updated, agent.definition_changed]
+    # agent.definition_changed to the built-in agent itself (A1-02, 26 4.1), agent.hosting_changed
+    # to the old and the new hosting runner (A1-03).
+    events: [agent_session.changed, command.changed, agent.updated, agent.definition_changed, agent.hosting_changed]
     ephemeral_events: [agent.presence_changed]
     ws_ops: [ack]
     depends_on: [identity, authz, chat]

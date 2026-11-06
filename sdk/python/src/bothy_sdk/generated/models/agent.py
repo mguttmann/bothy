@@ -41,6 +41,7 @@ class Agent:
         credential_holder_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
         billing_mode_changed_at (datetime.datetime | Unset): RFC 3339 timestamp in UTC with millisecond precision and
             suffix `Z`.
+        hosted_by (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
     """
 
     id: UUID
@@ -57,6 +58,7 @@ class Agent:
     avatar_file_id: UUID | Unset = UNSET
     credential_holder_id: UUID | Unset = UNSET
     billing_mode_changed_at: datetime.datetime | Unset = UNSET
+    hosted_by: UUID | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -94,6 +96,10 @@ class Agent:
         if not isinstance(self.billing_mode_changed_at, Unset):
             billing_mode_changed_at = self.billing_mode_changed_at.isoformat()
 
+        hosted_by: str | Unset = UNSET
+        if not isinstance(self.hosted_by, Unset):
+            hosted_by = str(self.hosted_by)
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -117,6 +123,8 @@ class Agent:
             field_dict["credential_holder_id"] = credential_holder_id
         if billing_mode_changed_at is not UNSET:
             field_dict["billing_mode_changed_at"] = billing_mode_changed_at
+        if hosted_by is not UNSET:
+            field_dict["hosted_by"] = hosted_by
 
         return field_dict
 
@@ -171,6 +179,13 @@ class Agent:
                 _billing_mode_changed_at
             )
 
+        _hosted_by = d.pop("hosted_by", UNSET)
+        hosted_by: UUID | Unset
+        if isinstance(_hosted_by, Unset):
+            hosted_by = UNSET
+        else:
+            hosted_by = UUID(_hosted_by)
+
         agent = cls(
             id=id,
             handle=handle,
@@ -186,6 +201,7 @@ class Agent:
             avatar_file_id=avatar_file_id,
             credential_holder_id=credential_holder_id,
             billing_mode_changed_at=billing_mode_changed_at,
+            hosted_by=hosted_by,
         )
 
         agent.additional_properties = d

@@ -20,6 +20,7 @@ import 'package:api_client/src/generated/model/billing_mode_set.dart';
 import 'package:api_client/src/generated/model/billing_mode_set_all.dart';
 import 'package:api_client/src/generated/model/billing_mode_set_all_result.dart';
 import 'package:api_client/src/generated/model/credential_holder_set.dart';
+import 'package:api_client/src/generated/model/host_set.dart';
 import 'package:api_client/src/generated/model/problem.dart';
 import 'package:api_client/src/generated/model/project_folder_list.dart';
 import 'package:api_client/src/generated/model/reason_body.dart';
@@ -33,7 +34,7 @@ class AgentsApi {
   const AgentsApi(this._dio, this._serializers);
 
   /// Create an agent
-  ///
+  /// Creates an agent principal with its record: &#x60;organization&#x60;, tool class &#x60;chat&#x60;, version 1. A built-in agent (26 3.1) carries &#x60;adapter_kind&#x60; &#x60;claude_agent&#x60; together with &#x60;hosted_by&#x60;; &#x60;hosted_by&#x60; is set exactly then. &#x60;claude_agent&#x60; without &#x60;hosted_by&#x60; is &#x60;400 validation_failed&#x60; with the field code &#x60;required&#x60; on &#x60;/hosted_by&#x60;, &#x60;hosted_by&#x60; with another adapter kind the field code &#x60;not_allowed&#x60;, and a &#x60;hosted_by&#x60; that names no active Claude Code runner (&#x60;adapter_kind&#x60; &#x60;code_runner&#x60;) that is not hosted itself and whose last heartbeat reports &#x60;hosts_agents&#x60; the field code &#x60;host_not_capable&#x60;. A built-in agent&#39;s creation writes the durable event &#x60;agent.hosting_changed&#x60; to its runner.
   ///
   /// Parameters:
   /// * [agentCreate]
@@ -1044,6 +1045,118 @@ class AgentsApi {
     try {
       const _type = FullType(BillingModeSet);
       _bodyData = _serializers.serialize(billingModeSet, specifiedType: _type);
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _options.compose(_dio.options, _path),
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    final _response = await _dio.request<Object>(
+      _path,
+      data: _bodyData,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    Agent? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(
+              rawResponse,
+              specifiedType: const FullType(Agent),
+            ) as Agent;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<Agent>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// Move a built-in agent to another runner
+  /// Changes &#x60;hosted_by&#x60; of a built-in agent (&#x60;adapter_kind&#x60; &#x60;claude_agent&#x60;, 26 3.1 item 4). The new runner follows the rules of &#x60;AgentCreate.hosted_by&#x60; (else &#x60;400 validation_failed&#x60; with the field code &#x60;host_not_capable&#x60; on &#x60;/hosted_by&#x60;, also for the agent itself); another agent is &#x60;409 conflict&#x60; with &#x60;reason&#x60; &#x60;not_a_builtin_agent&#x60;. A runner whose ceiling &#x60;hosts_agents&#x60; is below the agent&#39;s tool class is &#x60;409 conflict&#x60; with &#x60;reason&#x60; &#x60;host_tool_class_ceiling&#x60;; a &#x60;personal&#x60; agent needs a runner that is &#x60;personal&#x60; with the same &#x60;credential_holder_id&#x60; and reports &#x60;personal&#x60; in &#x60;billing_modes_supported&#x60;, else &#x60;409 conflict&#x60; with &#x60;reason&#x60; &#x60;hosted_holder_mismatch&#x60; (10 10.3). In the same transaction every token of the agent that the old runner holds is revoked (its connections close with &#x60;4012&#x60;), and the durable event &#x60;agent.hosting_changed&#x60; goes to the old and the new runner.
+  ///
+  /// Parameters:
+  /// * [agentId]
+  /// * [ifMatch] - ETag of the version the change is based on, e.g. `\"7\"`. Mismatch gives 412 `version_conflict`.
+  /// * [hostSet]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [Agent] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<Agent>> setAgentHost({
+    required String agentId,
+    required String ifMatch,
+    required HostSet hostSet,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/agents/{agent_id}/host'.replaceAll(
+      '{'
+      r'agent_id'
+      '}',
+      encodeQueryParameter(
+        _serializers,
+        agentId,
+        const FullType(String),
+      ).toString(),
+    );
+    final _options = Options(
+      method: r'PUT',
+      headers: <String, dynamic>{r'If-Match': ifMatch, ...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'apiKey',
+            'name': 'consoleSession',
+            'keyName': '__Host-console_session',
+            'where': '',
+          },
+          {'type': 'http', 'scheme': 'DPoP', 'name': 'dpopAuth'},
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearerAuth'},
+        ],
+        ...?extra,
+      },
+      contentType: 'application/json',
+      validateStatus: validateStatus,
+    );
+
+    dynamic _bodyData;
+
+    try {
+      const _type = FullType(HostSet);
+      _bodyData = _serializers.serialize(hostSet, specifiedType: _type);
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _options.compose(_dio.options, _path),

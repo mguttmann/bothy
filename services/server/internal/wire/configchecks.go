@@ -78,6 +78,7 @@ var configChecks = []configCheck{
 	{name: "heartbeat_persist_below_orphan_timeout", keys: []string{keyHeartbeatPersistInterval, keyOrphanTimeout}, fn: heartbeatPersistBelowOrphanTimeout},
 	{name: "autocomplete_below_request_timeout", keys: []string{keyAutocompleteTimeout, keyHTTPRequestTimeout}, fn: autocompleteBelowRequestTimeout},
 	{name: "search_assist_below_request_timeout", keys: []string{keySearchAssistTimeout, keyHTTPRequestTimeout}, fn: searchAssistBelowRequestTimeout},
+	{name: "hosted_token_ttl_within_api_token_max_ttl", keys: []string{keyHostedTokenTTL, keyAPITokenMaxTTL}, fn: hostedTokenTTLWithinMax},
 	{name: "search_assist_agent_id", keys: []string{keySearchAssistAgentID}, fn: searchAssistAgentID},
 	{name: "push_apns_complete", keys: apnsCheckKeys, fn: pushAPNsComplete},
 	{name: "push_fcm_project_id", keys: []string{fcm.KeyProjectID}, fn: pushFCMProjectID},
@@ -130,6 +131,16 @@ const keyHTTPRequestTimeout = "http.request_timeout"
 func autocompleteBelowRequestTimeout(v *config.Values) error {
 	if v.Duration(keyAutocompleteTimeout) >= v.Duration(keyHTTPRequestTimeout) {
 		return errors.New(keyAutocompleteTimeout + " must be lower than " + keyHTTPRequestTimeout)
+	}
+	return nil
+}
+
+// hostedTokenTTLWithinMax requires agents.hosted_token_ttl at most auth.api_token_max_ttl (A1-03):
+// a hosted token is an agent token, which identity refuses beyond that bound, so a larger value
+// would fail every issueHostedAgentToken. The error names the keys, never a value.
+func hostedTokenTTLWithinMax(v *config.Values) error {
+	if v.Duration(keyHostedTokenTTL) > v.Duration(keyAPITokenMaxTTL) {
+		return errors.New(keyHostedTokenTTL + " must not be above " + keyAPITokenMaxTTL)
 	}
 	return nil
 }

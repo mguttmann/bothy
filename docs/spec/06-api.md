@@ -1057,6 +1057,7 @@ Generated from openapi.yaml.
 | GET | `/api/v1/agents/{agent_id}/definition` | `getAgentDefinition` | `agent.definition.read` | Read the current definition of a built-in agent |
 | PUT | `/api/v1/agents/{agent_id}/definition` | `putAgentDefinition` | `agent.update` | Store a new version of the definition of a built-in agent |
 | GET | `/api/v1/agents/{agent_id}/definition/versions` | `listAgentDefinitionVersions` | `agent.definition.read` | List the versions of the definition of a built-in agent |
+| PUT | `/api/v1/agents/{agent_id}/host` | `setAgentHost` | `agent.host.set` | Move a built-in agent to another runner |
 | GET | `/api/v1/agents/{agent_id}/project-folders` | `listAgentProjectFolders` | `agent.project_folders.read` | List the project folders of a runner that have no binding |
 
 #### Agent runtime
@@ -1074,6 +1075,8 @@ Generated from openapi.yaml.
 | GET | `/api/v1/agents/me/channels` | `listServedChannels` | `agent.config.read` | List channels the agent serves |
 | GET | `/api/v1/agents/me/channels/{channel_id}/config` | `getServedChannelConfig` | `agent.config.read` | Read prompt, skills and project binding of a served channel |
 | GET | `/api/v1/agents/me/triggerers` | `getAgentTriggerers` | `agent.triggerers.read` | List who may trigger this agent |
+| GET | `/api/v1/agents/me/hosted` | `listHostedAgents` | `agent.hosted.list` | List the built-in agents this runner hosts |
+| POST | `/api/v1/agents/me/hosted/{agent_id}/token` | `issueHostedAgentToken` | `agent.hosted_token.issue` | Issue a token for a hosted agent |
 | PATCH | `/api/v1/runs/{run_id}` | `patchRun` | `run.update` | Apply a live-box patch |
 | POST | `/api/v1/runs/{run_id}/start` | `startRun` | `run.start` | Start a queued run |
 | POST | `/api/v1/runs/{run_id}/resume` | `resumeRun` | `run.start` | Resume a run that waited for input |
@@ -1325,6 +1328,7 @@ Events (receive action per 05, section 6; schema in openapi.yaml):
 | `command.invoked` | durable | `agent.events.consume` | self | `CommandInvokedEvent` | yes |
 | `agent.config_changed` | durable | `agent.config.read` | self | `AgentConfigChangedEvent` | yes |
 | `agent.definition_changed` | durable | `agent.definition.read` | self | `AgentDefinitionChangedEvent` |  |
+| `agent.hosting_changed` | durable | `agent.hosted.list` | self | `AgentHostingChangedEvent` |  |
 | `host.updated` | durable | `host.read` |  | `HostUpdatedEvent` |  |
 | `terminal_session.changed` | durable | `self` | self | `TerminalSessionChangedEvent` |  |
 | `typing.started` | ephemeral | `thread.read` |  | `TypingStartedEvent` |  |

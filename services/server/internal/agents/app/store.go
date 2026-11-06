@@ -33,13 +33,19 @@ type Store interface {
 	// ListAgents returns up to limit records with an id above after (the zero ID for the first
 	// page), ascending by id.
 	ListAgents(ctx context.Context, after ids.ID, limit int) ([]domain.Agent, error)
+	// ListHostedAgents returns up to limit records whose hosted_by is host with an id above after
+	// (the zero ID for the first page), ascending by id, whatever their status (A1-03).
+	ListHostedAgents(ctx context.Context, host, after ids.ID, limit int) ([]domain.Agent, error)
+	// HostedAgentsOf returns every record whose hosted_by is host, ascending by id, disabled ones
+	// included (the billing rule of 10 section 10.3).
+	HostedAgentsOf(ctx context.Context, host ids.ID) ([]domain.Agent, error)
 	// PersonalAgents returns every record with billing_mode personal, ascending by id, without
 	// regard to the principal status; the policy source filters by status through identity.
 	PersonalAgents(ctx context.Context) ([]domain.Agent, error)
 	// InsertAgent inserts the record a; its principal must exist (identity, same unit of work).
 	InsertAgent(ctx context.Context, a domain.Agent) error
-	// UpdateAgent writes description, operator configuration, policy, tool class and version of
-	// a. agent.update needs a unit of work; the policy, holder and tool class need a declared
+	// UpdateAgent writes description, operator configuration, policy, tool class, hosted_by and
+	// version of a. agent.update needs a unit of work; the policy, holder and tool class need a declared
 	// rights change, which the caller owns.
 	UpdateAgent(ctx context.Context, a domain.Agent) error
 }
