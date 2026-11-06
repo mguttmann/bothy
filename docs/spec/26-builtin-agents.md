@@ -396,7 +396,8 @@ byte-equal to the fixtures, also for a channel with bindings of both forms (BA-T
    `{"kind": "questions", "questions": [...]}` with one or two questions, or
    `{"kind": "draft", "draft": {...}}` with a draft of the shape of 4.2 plus `name`, `handle`,
    `description` and a channel suggestion; and `costs` (09 4.10).
-3. The server validates a draft with the rules of 4.3, never trusting model output: a draft that
+3. The server validates a draft with the rules of 4.3 and the catalogue check of 7.4, never
+   trusting model output: a draft that
    fails is answered with the field errors and the person can ask the builder to fix it. It stores
    nothing of the interview; the answer shows the cost as an estimate like the search assistant
    (D-IS-8) and books no cost entry.
@@ -483,8 +484,9 @@ and its CI secret by the owner before the first template lands (D-A1-16, PLAN se
 
 The template catalogue sent with an interview request holds slug, name, description, tool class
 wish and the MCP servers of each template (shipped and private). The builder suggests MCP servers
-only from it; the server checks the draft against it and reports an MCP server outside it as a
-field error at its JSON Pointer.
+only from it; the server checks the draft against it: an `http` server must match a catalogue
+server in transport and URL, a `stdio` server in transport, command and package, else it is the
+field error `mcp_not_in_catalogue` at its JSON Pointer (6.1 item 3).
 
 ### 7.5 Topics
 
@@ -522,8 +524,11 @@ Every step is its own action with its own audit entry; nothing is rolled back. W
 the steps went. The dialog shows the failed step with one sentence for its cause and lets the owner
 edit the preview. "Try again" compares each step's target from the edited fields with what the
 agent has (class, current definition, billing mode, channel and operator) and runs, in the order
-of 8.2, every step whose target is not reached yet, so a class raised in the preview after a
-refused definition is set before the definition is written again; it creates nothing twice.
+of 8.2, every step whose target is not reached yet, with the class rule of 8.4: a class above the
+agent's current one is set before the definition, a lower one after it. So a class raised in the
+preview after a refused definition is set before the definition is written again, and a class
+lowered after a stored definition with a `stdio` server waits until the definition without it
+is stored (R-BA-06); it creates nothing twice.
 "Close" keeps what exists.
 The agent list marks a built-in agent without a definition as "not set up" with "Continue setup"
 and "Disable". Its hosting runner serves no turn for it (5.6 item 4). A test per step holds that a
@@ -610,8 +615,8 @@ hosted agent in `personal` always equals that of its hosting runner (R-BA-12).
 | BA-T12 | rebuild: planted files of every surface of 5.5 in the agent folder and the control folder | removed before the turn; the agent's other files stay (A1-05) |
 | BA-T13 | command line per class against 5.3 with fake Claude; `stdio` server under a token below `host`; a definition failing 4.3 | exact list; `tool_class_mismatch` before `run.start` (A1-05) |
 | BA-T14 | probe against the pinned CLI with a planted skill carrying `hooks`, `allowed-tools: Bash` and both inline shell forms, and every point of 5.7 | no hook, no `Bash`, the placeholder "[shell command execution disabled by policy]"; results recorded in 5.7 (A1-05, real CLI behind its switch) |
-| BA-T15 | interview: question turn, draft turn, a builder answer carrying each surface of 5.5, each fallback, timeout | draft validated; surfaces refused; fallback reason named; one audit entry and one log line without content (A1-07) |
-| BA-T16 | creation flow: a failure at each step after `agent.create`; a template with a `stdio` server created with class `host`; a definition refused with `tool_class_too_low`, the class raised in the preview, "Try again"; an edit that adds a `stdio` server and raises the class, and one that removes it and lowers the class | earlier steps and their audit entries stay, nothing more; `agent.tool_class.set` runs before `putAgentDefinition` when the class rises and after it when it falls, so the `stdio` cases are stored without `tool_class_too_low` or `definition_needs_host`; "Try again" runs the missing steps in the order of 8.2 and creates nothing twice (A1-08, A1-09) |
+| BA-T15 | interview: question turn, draft turn, a draft with an MCP server outside the catalogue (`mcp_not_in_catalogue`), a builder answer carrying each surface of 5.5, each fallback, timeout | draft validated; surfaces refused; fallback reason named; one audit entry and one log line without content (A1-07) |
+| BA-T16 | creation flow: a failure at each step after `agent.create`; a template with a `stdio` server created with class `host`; a definition refused with `tool_class_too_low`, the class raised in the preview, "Try again"; a step after the definition failing for a definition with a `stdio` server under `host`, the server removed and the class set to `chat` in the preview, "Try again"; an edit that adds a `stdio` server and raises the class, and one that removes it and lowers the class | earlier steps and their audit entries stay, nothing more; `agent.tool_class.set` runs before `putAgentDefinition` when the class rises and after it when it falls, so the `stdio` cases are stored without `tool_class_too_low` or `definition_needs_host`; "Try again" runs the missing steps in the order of 8.2 and creates nothing twice (A1-08, A1-09) |
 | BA-T17 | template gate: one failing fixture template per surface of 5.5 and per rule of 7.3; the shipped templates | each fixture fails with its rule; shipped templates pass (A1-06) |
 | BA-T18 | private templates folder with a taken slug and an invalid template | skipped with their log codes (A1-06) |
 | BA-T19 | cost cap reached in a turn (fake Claude) | run `failed`, `runtime_error`, cause `cost_cap_reached` in the summary, costs reported (A1-05) |
@@ -633,7 +638,7 @@ hosted agent in `personal` always equals that of its hosting runner (R-BA-12).
 | R-BA-08 | Secret values reach a turn only through a per-turn MCP file of mode `0600` in the control folder, never through the environment (5.2). | Concurrent turns of one host user can read each other's environment; a file outside the working folder is out of reach of `chat` and `scoped` file tools (design backlog item 4, T-BA-02). |
 | R-BA-09 | The interview is one owner request with its own deadline to the builder agent, short-lived, nothing stored, every draft validated like a definition, audited and logged with counts only (6.1). | The search assistant pattern is built and tested; an interview costs money, so it is audited, but its content is the owner's text and stays out of audit and logs (D-A1-10, D-A1-12; design backlog item 6). |
 | R-BA-10 | Templates are written for the repository, shipped in the image, listed by an owner read, held by a template gate that works without the private deny list; private templates come from `agents.templates_dir` (7). | Exporting a real agent is how private names leak; forks have no private list (D-A1-14 to D-A1-16). |
-| R-BA-11 | Creation composes visible steps, each its own action and audit entry, without rollback; the class is set before the definition, and on edit a raised class before and a lowered class after the definition; "Try again" runs the steps not reached yet in that order; a built-in agent without a definition is "not set up" and never served (8.2 to 8.4). | The pattern of "New project" (01 6.9); a rollback across actions would need a second write path (design backlog item 6); the server refuses a `stdio` server below `host` (4.3 item 7) and a downgrade while one is there (R-BA-06), so any other order cannot store such a definition (red team of A1-01, finding 1). |
+| R-BA-11 | Creation composes visible steps, each its own action and audit entry, without rollback; at creation, on "Try again" and on edit a raised class is set before and a lowered class after the definition; "Try again" runs the steps not reached yet in that order; a built-in agent without a definition is "not set up" and never served (8.2 to 8.4). | The pattern of "New project" (01 6.9); a rollback across actions would need a second write path (design backlog item 6); the server refuses a `stdio` server below `host` (4.3 item 7) and a downgrade while one is there (R-BA-06), so any other order cannot store such a definition (red team of A1-01, finding 1). |
 | R-BA-12 | A hosted agent in `personal` has the `credential_holder_id` of its hosting runner; a runner without one hosts only `organization` agents (10). | The turn runs with the login of the runner's host user; I1 to I5 apply as they are (D-A1-19; design backlog item 8). |
 | R-BA-13 | Channel skills only behind `runner.channel_skills_dir`, resolved from `claude-code:<name>`, and only in turns of class `host`; below `host` they are skipped and named in the live box (5.9). | A served channel may carry references of another adapter; turning them on without a key would change a running installation (D-A1-9); a channel skill folder is not checked like a definition and would widen a `chat` or `scoped` turn, while `host` adds nothing to a turn of the host user that only owners trigger (red team of A1-01, finding 2, decisions.d/A1-01.md). |
 | R-BA-14 | Actions, operations and events of this chapter enter the catalogue and the API documents with the ticket that builds them, with the values of 07 2.13 and section 9. | A catalogue entry generates Go constants and route checks; an entry without its code would be a second truth until the build (decisions.d/A1-01.md). |

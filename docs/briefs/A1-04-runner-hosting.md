@@ -120,7 +120,7 @@ Change:
 - `tests/unit/test_config.py`: the new keys, their defaults and the refusal of an unknown class.
 
 ```sh
-cd plugins/claude-code-runner && uv run --locked pytest -q
+(cd plugins/claude-code-runner && uv run --locked pytest -q)
 make adapters-e2e
 make check
 ```

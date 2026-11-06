@@ -128,7 +128,7 @@ Change:
 - `tests/real_cli/test_hosted_probe.py` (BA-T14), behind the switch.
 
 ```sh
-cd plugins/claude-code-runner && uv run --locked pytest -q
+(cd plugins/claude-code-runner && uv run --locked pytest -q)
 make adapters-e2e
 make docs
 make check

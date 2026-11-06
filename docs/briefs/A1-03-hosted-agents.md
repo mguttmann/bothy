@@ -130,7 +130,7 @@ Change:
 - Migration test: the column, checks, foreign key and index; the precheck fails with the agent IDs on a database with a fixture row of adapter kind `claude_agent`.
 
 ```sh
-cd services/server && go test -race -count=1 ./internal/agents/... ./internal/identity/... ./internal/chat/... ./migrations/...
+(cd services/server && go test -race -count=1 ./internal/agents/... ./internal/identity/... ./internal/chat/... ./migrations/...)
 make catalog && make catalog-check
 make config-reference && make config-doc-check
 make check

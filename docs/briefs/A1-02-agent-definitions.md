@@ -131,7 +131,7 @@ Change:
 - API contract tests that `make check` runs (G1 to G10) stay green with the new operations.
 
 ```sh
-cd services/server && go test -race -count=1 ./internal/agents/... ./migrations/...
+(cd services/server && go test -race -count=1 ./internal/agents/... ./migrations/...)
 make catalog && make catalog-check
 make config-reference && make config-doc-check
 make docs

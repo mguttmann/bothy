@@ -2189,7 +2189,7 @@ console.
    running, done and failed, and a step-up prompt where one is needed. The class comes before the
    definition, so a definition with a local (`stdio`) MCP server is accepted. A failed step shows
    one sentence for its cause and the editable preview; "Try again" runs the steps not done yet in
-   that order and creates nothing twice, "Close" keeps what exists (26 8.3).
+   that order, a lowered class after the definition (26 8.3), and creates nothing twice, "Close" keeps what exists (26 8.3).
 5. **Done.** The dialog opens the new channel, or the agent card when no channel was created.
 6. **Edit.** The agent card of a built-in agent offers "Edit" (the same preview, saved as a new
    version with step-up; a raised class is set before saving, a lowered one after it, 26 8.4),
