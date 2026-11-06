@@ -225,9 +225,10 @@ level-one switch test holds them against the installed CLI.
 - **Follow-ups** (`capabilities.followups = steer`): a follow-up is read with `getMessage` and
   written to the running turn's stdin as one `user` line, `Follow-up from <name> (@<handle>):`, a
   blank line and the text, with its own `uuid`; the runner patches `delivered`, and `absorbed`
-  once Claude Code echoes the line (`--replay-user-messages`). At the moment of writing the token
-  is checked again (expiry, mode, tool class, run, `trigger_kind`, author and thread); a failed
-  check writes nothing and never ends the run. Follow-ups of a run that has not started are held
+  once Claude Code echoes the line (`--replay-user-messages`). Before its files are stored and
+  again at the moment of writing the token is checked (expiry, judged at the time the open turn
+  took the follow-up up, mode, tool class, run, `trigger_kind`, author and thread); a failed
+  check stores, transcribes and writes nothing and never ends the run. Follow-ups of a run that has not started are held
   and written after the prompt line. After a `result` stdin stays open for
   `runner.followup_grace` while written follow-ups have no echo.
 - **Background work** (09 18.5, FIX-runner-responsive-turns): a turn may end while work it

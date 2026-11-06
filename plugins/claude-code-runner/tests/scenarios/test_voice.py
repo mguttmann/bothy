@@ -12,7 +12,7 @@ from uuid import UUID
 
 import pytest
 
-from .conftest import World
+from .conftest import LogLines, World
 
 pytestmark = pytest.mark.anyio
 
@@ -215,6 +215,49 @@ async def test_followups_keep_their_order_while_one_is_transcribed(world: World)
     assert second == "Follow-up from Sam (@sam):\n\nSecond"
     world.release(gate)
     assert await world.ended(run_id) == "completed"
+
+
+async def test_a_slow_transcription_does_not_expire_the_followups(
+    world: World, logs: LogLines
+) -> None:
+    # The token is judged when the follow-up is offered: a transcription longer than the
+    # token's lifetime loses neither the voice follow-up nor the text follow-up behind it.
+    hold = world.root / "transcriber.open"
+    run_id, gate = await _open_turn(world, transcribe_cmd=[_gated_transcriber(world, hold)])
+    voice = world.fake.add_file(b"AUDIO-BYTES", name="memo.ogg", mime="audio/ogg")
+    first = await world.fake.deliver_followup(run_id, "First", author="sam", files=(voice,))
+    await world.until((world.root / "transcriber.pid").exists)
+    second = await world.fake.deliver_followup(run_id, "Second", author="sam")
+    await world.until(lambda: len(world.requests("getMessage")) >= 2)
+    await world.fake.clock.advance(600)  # well past the token's lifetime and leeway
+    hold.touch()
+    await world.until(lambda: len(world.turns()[0]["stdin"]) == 3)
+    assert "LATE-VOICE" in _followup_text(world, 1)
+    assert _followup_text(world, 2) == "Follow-up from Sam (@sam):\n\nSecond"
+    await world.until(lambda: world.fake.followup_state(run_id, first) == "delivered")
+    await world.until(lambda: world.fake.followup_state(run_id, second) == "delivered")
+    assert "followup_token_expired" not in logs.text
+    world.release(gate)
+    assert await world.ended(run_id) == "completed"
+
+
+async def test_an_unauthorised_voice_followup_is_neither_stored_nor_transcribed(
+    world: World, logs: LogLines
+) -> None:
+    run_id, gate = await _open_turn(world, transcribe_cmd=[_fake_transcriber(world)])
+    voice = world.fake.add_file(b"AUDIO-BYTES", name="memo.ogg", mime="audio/ogg")
+    alex = str(world.fake.world.alex.id)
+    await world.fake.deliver_followup(
+        run_id, "", author="sam", claims={"sub": alex}, files=(voice,)
+    )
+    await world.until(lambda: "followup_check_failed" in logs.text)
+    world.release(gate)
+    assert await world.ended(run_id) == "completed"
+    assert len(world.turns()[0]["stdin"]) == 1
+    stored = world.state / "files" / str(world.fake.world.runs[run_id].thread_id) / str(voice)
+    assert not stored.exists()
+    assert world.requests("submitTranscript") == []
+    assert all("transcri" not in m["content_md"] for m in world.fake.messages)
 
 
 def _gone(pid: int) -> bool:

@@ -3117,7 +3117,11 @@ the follow-ups came.
 At the moment of writing the runner checks the follow-up's token again as before a start: expiry
 with `adapter.invocation_token_leeway` (4.5 point 5), the actual mode and tool class (points 8
 and 10), the run of the turn, `trigger_kind` `followup`, and the message's thread and author
-`sub`. A failed check writes nothing and patches nothing; the turn goes on, the follow-up stays
+`sub`. Expiry is judged at the time the turn took the follow-up up (its offer to the open turn),
+so the wait for its files, its transcription and the wait for earlier follow-ups never expire
+it; and a follow-up with files is checked the same way before its files are stored or
+transcribed, so a follow-up that fails the check never touches the host (addendum of
+2026-11-06, FIX-followup-transcribe). A failed check writes nothing and patches nothing; the turn goes on, the follow-up stays
 `queued`, and the server defers it at the end of the run (section 7). A broken follow-up token
 never ends the run (D-M2-35-1). A follow-up of a run whose turn has not started (in the inbox,
 waiting for a lock, a slot, the pre-check, or between the processes of a recovery) is kept and

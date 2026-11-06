@@ -941,7 +941,9 @@ class RunTurn:
         """Write a follow-up now, hold it, or leave it (design notes 2 to 4), in their order.
 
         Each follow-up is written only after the one offered before it is written or left, so
-        a follow-up that waits for its files or is transcribed keeps its place.
+        a follow-up that waits for its files or is transcribed keeps its place. Its token is
+        judged at the time of the offer (09 18.5), and a follow-up whose check fails is neither
+        stored nor transcribed.
 
         Args:
             inv: The ``agent.followup`` invocation (its claims were verified at acceptance).
@@ -950,6 +952,7 @@ class RunTurn:
         if not isinstance(message_id, UUID):
             return
         ids = {**self.ids, "message_id": message_id}
+        offered_at = self.handle.client.clock.now().timestamp()
         order = self.followup_order
         before, mine = order.tail, asyncio.Event()
         order.tail = mine
@@ -962,10 +965,10 @@ class RunTurn:
             if self.phase == "open" and message_id not in self.followups:
                 if message_id in order.preparing:
                     return  # a redelivery of a follow-up that is being prepared
-                read, prepared = await self._prepare_followup(message_id, ids)
+                read, prepared = await self._prepare_followup(inv, ids, offered_at)
             if before is not None:
                 await before.wait()
-            await self._write_followup(inv, ids, read, prepared)
+            await self._write_followup(inv, ids, offered_at, read, prepared)
         finally:
             mine.set()
 
@@ -973,6 +976,7 @@ class RunTurn:
         self,
         inv: Invocation,
         ids: Mapping[str, Any],
+        offered_at: float,
         read: tuple[Message | None] | None,
         prepared: _Prepared | None,
     ) -> None:
@@ -995,21 +999,7 @@ class RunTurn:
             if message is None:
                 return
             process = self.process
-            check = FollowupCheck(
-                claims=inv.claims,
-                now=self.handle.client.clock.now().timestamp(),
-                leeway=self.cfg.sdk.invocation_token_leeway,
-                turn_started=process is not None and self.phase == "open",
-                run_id=self.handle.run_id,
-                thread_id=self.state.thread_id,
-                billing_mode=self.state.mode,
-                tool_class=self.cfg.tool_class,
-                message_id=message_id,
-                author_id=message.author.id,
-                message_thread_id=message.thread_id,
-                written=set(self.followups.by_message),
-            )
-            verdict, code = followup_verdict(check)
+            verdict, code = self._followup_verdict(inv, message_id, message, offered_at)
             if verdict is FollowupVerdict.SKIP:
                 _warn(code, **ids)
                 return
@@ -1039,23 +1029,48 @@ class RunTurn:
         if self.followups.delivered(message_id):
             await self._followup_state(message_id, "absorbed")
 
+    def _followup_verdict(
+        self, inv: Invocation, message_id: UUID, message: Message, offered_at: float
+    ) -> tuple[FollowupVerdict, str]:
+        """The checks of a follow-up (design note 2 b and c), its token judged at the offer."""
+        check = FollowupCheck(
+            claims=inv.claims,
+            now=offered_at,
+            leeway=self.cfg.sdk.invocation_token_leeway,
+            turn_started=self.process is not None and self.phase == "open",
+            run_id=self.handle.run_id,
+            thread_id=self.state.thread_id,
+            billing_mode=self.state.mode,
+            tool_class=self.cfg.tool_class,
+            message_id=message_id,
+            author_id=message.author.id,
+            message_thread_id=message.thread_id,
+            written=set(self.followups.by_message),
+        )
+        return followup_verdict(check)
+
     async def _prepare_followup(
-        self, message_id: UUID, ids: Mapping[str, Any]
+        self, inv: Invocation, ids: Mapping[str, Any], offered_at: float
     ) -> tuple[tuple[Message | None], _Prepared | None]:
         """Read a follow-up once its files are final, then store and transcribe its files.
 
         Outside the lock, so other follow-ups and the stop go on while a file is checked or
-        transcribed.
+        transcribed. The files are touched only when the checks of the follow-up pass; the
+        write checks again and logs a failed check.
 
         Returns:
             The message of the last read and the prepared files (``None`` when the follow-up
-            has none, cannot be written or a stop came).
+            has none, cannot be written, fails its checks or a stop came).
         """
+        message_id: UUID = ids["message_id"]
         preparing = self.followup_order.preparing
         preparing.add(message_id)
         try:
             message = await self._await_followup_files(message_id, ids)
             if message is None or not message.attachments or self._stop_requested():
+                return (message,), None
+            verdict, _ = self._followup_verdict(inv, message_id, message, offered_at)
+            if verdict is not FollowupVerdict.WRITE:
                 return (message,), None
             return (message,), await self._followup_files(message)
         finally:

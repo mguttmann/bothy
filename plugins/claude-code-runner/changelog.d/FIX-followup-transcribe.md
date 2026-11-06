@@ -9,3 +9,6 @@
   transcription posts the note in the thread and the follow-up is written with its file. A stop
   ends a running transcription, and a later follow-up waits for the one being transcribed, so
   follow-ups keep their order (09 18.5, 18.14).
+  The token of a follow-up is judged when the turn takes it up, so a long transcription no
+  longer expires the voice follow-up or the follow-ups behind it, and a follow-up that fails
+  its checks is neither stored nor transcribed.
