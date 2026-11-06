@@ -102,7 +102,7 @@ builds of server and host service).
 
 Every job but the two desktop trials and the two host trials runs on a push to `main`, on a manual run, for an empty
 diff and when a shared input changes: every path the component map does not know (among them the `Makefile`, `.github/`, the
-root configuration files and the shared parts of `tools/`) and the API contract `docs/api/`.
+root configuration files but `mkdocs.yml`, and the shared parts of `tools/`) and the API contract `docs/api/`.
 
 Under `tools/` the self-contained tool folders are components of the map
 (`TOOL_COMPONENTS` in `tools/ci/components.py`): a change runs the conditional jobs of the
@@ -120,8 +120,17 @@ read `design/build/tokens.resolved.json`, which also selects `server`). Shared s
 `tools/node/` with its lock file), the root files of the tools project (`pyproject.toml`,
 `uv.lock`, `conftest.py`) and any tool folder the map does not name yet. A release (`release.yml` calls `ci.yml`)
 runs the jobs of the components of its tag. Documentation (`docs/` outside `docs/api/`, `infra/`,
-the root Markdown files, `LICENSE`, `NOTICE`) needs no conditional job, except the files the map
-assigns to a component (for example `docs/spec/actions.yaml` to `server`, and `infra/compose/` and `infra/otel/` to `server`, whose terminal suite starts that stack, M2-48). The plan reads the diff
+the root Markdown files, `LICENSE`, `NOTICE`, the site configuration `mkdocs.yml`) needs no
+conditional job, except the files the map assigns to a component (for example `docs/spec/actions.yaml` to `server`, and `infra/compose/` and `infra/otel/` to `server`, whose terminal suite starts that stack, M2-48).
+A file under `docs/` that a test, build or generator of a component reads selects that component
+(docs/decisions.d/CI-SPLIT-MERGE-QUEUE.md D-CSMQ-7): `docs/spec/` selects `server` and `apps`,
+`docs/operations/` selects `server`, and single files such as `docs/operations/configuration.md`
+(every component), `docs/observability/signals.md`, `docs/PLAN.md` and
+`docs/quality/accessibility-mobile.md` select their readers. `tools/ci/tests/test_components.py`
+scans the code of every component for the docs paths it names and fails while one does not
+select its reader. A pull request of only other documentation (decisions, briefs, design notes,
+architecture, this file) runs no conditional job: no component test, platform, image or
+end-to-end job, only the jobs of every change. The plan reads the diff
 without rename detection, so a moved file counts for its old and its new path. A build branch
 (`build-verify.yml`) measures from the merge base with `build-base/<ticket>` when the build team
 pushed that ref before it (the integration head the ticket branch was built on), else from the
@@ -145,7 +154,8 @@ to a build branch cancels its older `build-verify` run.
 with the merge queue of `main`: the repository variable `BOTHY_MERGE_QUEUE` is `true` exactly while
 the ruleset "main merge queue" exists (`tools/ci/merge_queue.py apply` sets both, the ruleset
 first; `disable` takes the variable back first). Without it a pull request runs the full plan of
-its diff as described above, and a maintainer squashes it by hand.
+its diff as described above (a pull request of only documentation runs no conditional job,
+D-CSMQ-7), and a maintainer squashes it by hand.
 
 1. **Pull request CI, the fast stage.** The plan runs `ci-plan --stage pr`: `gates`,
    `gates (docs and contracts)`, `gates (security and supply chain)`, `test (tools)` and the

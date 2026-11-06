@@ -102,7 +102,8 @@ def test_generator_input_outside_a_component_runs_codegen(repo: Path) -> None:
     change(repo, "docs/operations/configuration.md")
     args = build_push.fast_make_args(repo, "HEAD")
     assert "codegen-check" in args
-    assert args[-1] == "COMPONENTS=none"
+    # The tests of every component read the configuration reference too (D-CSMQ-7).
+    assert args[-1] == "COMPONENTS=apps plugins sdk-python sdk-typescript server"
 
 
 def test_shared_input_selects_every_component(repo: Path) -> None:

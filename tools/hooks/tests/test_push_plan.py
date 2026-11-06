@@ -62,16 +62,19 @@ def _no_push_env(monkeypatch: pytest.MonkeyPatch) -> None:
         ),
         (["packages/design_system/test/goldens/a.png"], ["apps"], ["tools"]),
         (["sdk/python/pyproject.toml"], ["plugins", "sdk-python", "server"], ["tools"]),
-        # Docs: no component, the tools gates and every repository gate.
-        (["docs/spec/07-permissions.md"], [], ["tools"]),
+        # Docs: no component, the tools gates and every repository gate; the site configuration
+        # too. The specification is read by the tests of the server and the apps (D-CSMQ-7).
+        (["docs/decisions.d/M2-48.md"], [], ["tools"]),
         (["docs/DECISIONS.md", "README.md"], [], ["tools"]),
+        (["mkdocs.yml"], [], ["tools"]),
+        (["docs/spec/07-permissions.md"], ["apps", "server"], ["tools"]),
         # The terminal suite of the server starts the Compose stack and its collector (M2-48).
         (["infra/compose/secrets.yaml"], ["server"], ["tools"]),
         (["infra/otel/collector.yaml"], ["server"], ["tools"]),
         # The Grafana pin of the Compose stack is an input of the panel plugin's tests (M7-25).
         (["infra/compose/compose.yaml"], ["plugins", "server"], ["tools"]),
         # Inputs of generated code outside the component select the component (codegen-check).
-        (["docs/spec/actions.yaml"], ["server"], ["tools"]),
+        (["docs/spec/actions.yaml"], ["apps", "server"], ["tools"]),
         (["pubspec.lock"], ["apps"], ["tools"]),
         (["design/tokens/color.json"], ["apps"], ["tools"]),
         (
@@ -105,7 +108,6 @@ def test_affected_plan(files: list[str], components: list[str], areas: list[str]
         ["quality/sonar/quality-gate.json"],
         ["sonar-project.properties"],
         [".gitleaks.toml"],
-        ["mkdocs.yml"],
         ["some-new-top-level.toml"],
         # One shared input in a push of component files is enough.
         ["services/server/x.go", "Makefile"],
@@ -131,7 +133,7 @@ def test_make_args_of_an_affected_plan() -> None:
         "LINT_FROM_REF=b1",
         "LINT_TO_REF=h1",
     ]
-    assert push_plan.plan(["docs/spec/x.md"]).make_args() == [
+    assert push_plan.plan(["docs/decisions.d/x.md"]).make_args() == [
         "check",
         "COMPONENTS=none",
         "AREAS=tools",
