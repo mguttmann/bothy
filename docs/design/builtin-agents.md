@@ -226,7 +226,7 @@ One folder per template under `templates/agents/<slug>/` with `template.yaml` (n
 tool class wish, model hint, required secret names, MCP servers, skills list, version),
 `CLAUDE.md`, `skills/<name>/SKILL.md` (frontmatter `name` and `description` only, D-A1-18) and
 nothing else. The server ships them in its image
-(copied by `make codegen`, held equal by `make codegen-check`) and lists them through a new read
+(copied by a `go generate` step, held equal by `make codegen-check`, 26 7.2) and lists them through a new read
 operation. An installation may add private templates from a folder outside the repository, named
 by the new server key `agents.templates_dir` (default empty), the same way `.env` and
 `compose.override.yaml` stay outside. Reason: copying a real agent and scrubbing it is exactly how

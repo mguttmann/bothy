@@ -247,6 +247,40 @@ def test_write_splits_the_graph_per_milestone(tmp_path: Path) -> None:
     assert brief_deps.check(root) == []
 
 
+def test_stage_tickets_get_their_own_block_after_the_milestones(tmp_path: Path) -> None:
+    """Tickets of a stage after the milestones (A1, PLAN section 21) are checked like the others."""
+    rows = dict(INDEX_ROWS, **{"A1-02": (1, "none (specification merged)"), "A1-03": (2, "A1-02")})
+    root = _repo(tmp_path, rows=rows, waves=WAVES, edges="  M1_01 --> M1_02\n")
+    assert brief_deps.main(["--root", str(root), "--write"]) == 0
+    text = (root / "docs/briefs/README.md").read_text(encoding="utf-8")
+    assert "| 1 | A1-02, M1-01, M1-04 |" in text
+    blocks = text.split("## Dependency graph")[1].split("```mermaid")[1:]
+    assert len(blocks) == 2
+    assert "M1_02 --> M1_03" in blocks[0]
+    assert "A1_02 --> A1_03" in blocks[1]
+    assert brief_deps.check(root) == []
+    plan = (root / "docs/PLAN.md").read_text(encoding="utf-8")
+    (root / "docs/PLAN.md").write_text(
+        plan.replace("| A1-03 | Title | A1-02 |", "| A1-03 | Title | none |")
+    )
+    assert any("A1-03: depends on []" in p for p in brief_deps.check(root))
+
+
+def test_stage_ticket_may_use_targets_of_every_milestone(tmp_path: Path) -> None:
+    """A stage ticket starts after the milestones, so their make targets count as merged."""
+    rows = dict(INDEX_ROWS, **{"A1-02": (1, "none (specification merged)")})
+    body = {"A1-02": "```sh\nmake gen-check && make other-check\n```"}
+    root = _repo(tmp_path, rows=rows, bodies=body)
+    assert brief_deps.main(["--root", str(root), "--write"]) == 0
+    assert brief_deps.check(root) == []
+
+
+def test_milestone_ticket_gets_no_stage_base() -> None:
+    deps = {"M1-01": [], "M1-02": ["M1-01"], "A1-02": []}
+    assert brief_deps.stage_base(deps, "M1-02") == set()
+    assert brief_deps.stage_base(deps, "A1-02") == {"M1-01", "M1-02"}
+
+
 def test_graph_block_over_the_edge_limit_fails(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

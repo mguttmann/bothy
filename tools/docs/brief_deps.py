@@ -18,7 +18,8 @@ This check reads all of them and fails on:
   index;
 - a `make <target>` inside code of a brief whose target is neither in the Makefile nor in the
   table "Make targets created by tickets", or whose creating ticket is not the brief itself or
-  in its dependency closure;
+  in its dependency closure (for a stage ticket such as `A1-02` every milestone ticket counts as
+  merged, because a stage starts after the milestones, PLAN P-27);
 - a ticket named in a start check of a brief (a paragraph or list item that ends the run with
   `Verdict: BLOCKED dependency ...` or `BLOCKED ... not merged`) that is not in the brief's
   dependency closure: the launcher could start the brief before that ticket is merged, and the
@@ -47,13 +48,18 @@ MAKEFILE = Path("Makefile")
 # Mermaid refuses a diagram with this many edges (its default `maxEdges`); the graph is
 # split into one block per milestone of the dependent tickets to stay below it.
 MAX_GRAPH_EDGES = 500
+# A ticket ID is a milestone (`M1` to `M8`) or a stage after the milestones (`A1`, built-in agents,
+# PLAN section 21) and a two-digit number (PLAN P-19).
+_TID = r"[MA]\d-\d\d"
+# Graph blocks of the milestones come first, then those of the later stages, each in order.
+_GROUP_ORDER = "MA"
 
-_ID = re.compile(r"M\d-\d\d")
+_ID = re.compile(_TID)
 _FENCE = re.compile(r"^\s*(`{3,}|~{3,})")
 _INLINE_CODE = re.compile(r"(`+)((?:(?!\1)(?:[^\n]|\n(?![ \t]*\n)))+?)\1")
 _MAKE = re.compile(r"(?<![\w./-])make ([a-z][a-z0-9-]*)")
 _MAKE_TARGET = re.compile(r"^([a-zA-Z0-9][a-zA-Z0-9_-]*)\s*:(?!=)", re.MULTILINE)
-_EDGE = re.compile(r"^\s*(M\d_\d\d) --> (M\d_\d\d)\s*$")
+_EDGE = re.compile(r"^\s*([MA]\d_\d\d) --> ([MA]\d_\d\d)\s*$")
 _BLOCK_START = re.compile(r"^\s*(?:[-*+]|\d+\.|[a-z]\.)\s")
 _START_CHECK = re.compile(r"BLOCKED dependency|BLOCKED [^`]*not merged")
 _SENTENCE = re.compile(r"(?<=[.;])\s+(?=[A-Z`])")
@@ -67,19 +73,19 @@ _OPTIONAL = re.compile(r"(?:only if|where|if) merged", re.IGNORECASE)
 # ticket before "only if merged" or "only where merged"; a ticket followed by "(if merged)"; and
 # the tickets of a list after "not in the closure ...:", "outside ... closure:" or "if merged:"
 # up to a comma that starts a new clause (not one before "and" or "or" and a last ticket).
-_TICKETS = r"M\d-\d\d(?:\s*,\s*M\d-\d\d)*(?:\s*,?\s*(?:and|or)\s+M\d-\d\d)?"
+_TICKETS = rf"{_TID}(?:\s*,\s*{_TID})*(?:\s*,?\s*(?:and|or)\s+{_TID})?"
 _OPTIONAL_SUBJECT = re.compile(
-    r"(M\d-\d\d)\s+(?:is|lies)\s+(?:not in|outside)\b[^.;:,]{0,40}\bclosure"
+    rf"({_TID})\s+(?:is|lies)\s+(?:not in|outside)\b[^.;:,]{{0,40}}\bclosure"
     rf"|({_TICKETS})\s+(?:are|lie)\s+(?:not in|outside)\b[^.;:,]{{0,40}}\bclosure"
-    r"|\b(?:if|when|once)\s+(M\d-\d\d)\s+(?:is|has)\s+(?:already\s+)?(?:been\s+)?"
+    rf"|\b(?:if|when|once)\s+({_TID})\s+(?:is|has)\s+(?:already\s+)?(?:been\s+)?"
     r"(?:already\s+)?(?:merged|on the base)"
     rf"|\b(?:if|when|once)\s+({_TICKETS})\s+(?:are|have)\s+(?:already\s+)?(?:been\s+)?"
     r"(?:already\s+)?(?:merged|on the base)"
-    r"|(M\d-\d\d)\s+(?:(?:is|are)\s+)?(?:\w+\s+)?only (?:if|where) merged",
+    rf"|({_TID})\s+(?:(?:is|are)\s+)?(?:\w+\s+)?only (?:if|where) merged",
     re.IGNORECASE,
 )
 _OPTIONAL_ASIDE = re.compile(
-    r"(M\d-\d\d)\b(?:(?!M\d-\d\d)[^.;:,()]){0,40}\((?:only )?(?:if|where) (?:it is )?merged\)",
+    rf"({_TID})\b(?:(?!{_TID})[^.;:,()]){{0,40}}\((?:only )?(?:if|where) (?:it is )?merged\)",
     re.IGNORECASE,
 )
 _OPTIONAL_LIST = re.compile(
@@ -87,7 +93,7 @@ _OPTIONAL_LIST = re.compile(
     r"[^:.;]{0,60}:\s*([^.;]+)",
     re.IGNORECASE,
 )
-_CLAUSE_BREAK = re.compile(r",\s+(?!(?:and|or)\s+M\d-\d\d\s*(?:[,.;]|$))(?=[a-z])")
+_CLAUSE_BREAK = re.compile(rf",\s+(?!(?:and|or)\s+{_TID}\s*(?:[,.;]|$))(?=[a-z])")
 _PARENS = re.compile(r"\([^()]*\)")
 
 
@@ -243,6 +249,18 @@ def closure(deps: dict[str, list[str]], tid: str) -> set[str]:
     return seen
 
 
+def stage_base(deps: dict[str, list[str]], tid: str) -> set[str]:
+    """Milestone tickets a stage ticket may rely on without naming them.
+
+    A stage after the milestones (`A1`) starts only when every milestone ticket is merged (PLAN
+    P-27, section 21 "Dependencies"), so its make targets and start checks may use what any
+    milestone ticket created. A milestone ticket gets nothing here.
+    """
+    if tid.startswith("M"):
+        return set()
+    return {t for t in deps if t.startswith("M")}
+
+
 def waves(deps: dict[str, list[str]]) -> dict[str, int]:
     """Wave of each ticket: 1 + largest wave of its dependencies; raises on a cycle."""
     result: dict[str, int] = {}
@@ -272,7 +290,7 @@ def _plan_deps(text: str, ids: Iterable[str]) -> dict[str, list[str]]:
     wanted = set(ids)
     out: dict[str, list[str]] = {}
     for line in text.splitlines():
-        m = re.match(r"^\| (M\d-\d\d) \|", line)
+        m = re.match(rf"^\| ({_TID}) \|", line)
         if m and m.group(1) in wanted:
             cells = [c.strip() for c in line.strip().strip("|").split("|")]
             out[m.group(1)] = _ID.findall(cells[-1])
@@ -336,7 +354,7 @@ def check(root: Path) -> list[str]:
         header = re.search(r"^Status: .*?\| Depends on: ([^|]*)\|", brief, re.MULTILINE)
         if header is None or sorted(_ID.findall(header.group(1))) != sorted(index.deps[tid]):
             problems.append(f"{name}: header 'Depends on' differs from the index")
-        reach = closure(index.deps, tid) | {tid}
+        reach = closure(index.deps, tid) | {tid} | stage_base(index.deps, tid)
         for named in sorted(called_optional_tickets(brief) & (reach - {tid})):
             problems.append(
                 f"{name}: {named} is a dependency of {tid}, but the brief calls it optional"
@@ -382,7 +400,7 @@ def write(root: Path) -> None:
     text = text[:start] + body + text[end:]
     start, end = _section(text, "Index")
     body = re.sub(
-        r"^\| \d+ \| (M\d-\d\d) \|",
+        rf"^\| \d+ \| ({_TID}) \|",
         lambda m: f"| {computed[m.group(1)]} | {m.group(1)} |",
         text[start:end],
         flags=re.MULTILINE,
@@ -390,7 +408,8 @@ def write(root: Path) -> None:
     text = text[:start] + body + text[end:]
     start, end = _section(text, "Dependency graph")
     body = text[start:end]
-    intro = body.split("```mermaid", 1)[0].split("\nTickets of M", 1)[0].rstrip("\n")
+    intro = re.split(r"\nTickets of [MA]\d:", body.split("```mermaid", 1)[0], maxsplit=1)[0]
+    intro = intro.rstrip("\n")
     rest = text[end:]
     graph = render_graph(index.deps) + ("\n" if rest else "")
     text = text[:start] + intro + "\n\n" + graph + rest
@@ -404,7 +423,8 @@ def render_graph(deps: dict[str, list[str]]) -> str:
         return tid.replace("-", "_")
 
     out = []
-    for milestone in sorted({tid[:2] for tid in deps}):
+    groups = {tid[:2] for tid in deps}
+    for milestone in sorted(groups, key=lambda g: (_GROUP_ORDER.index(g[0]), g)):
         tickets = sorted(t for t in deps if t[:2] == milestone)
         edges = [(d, t) for d, t in _edges(deps) if t[:2] == milestone]
         nodes = sorted(set(tickets) | {d for d, _ in edges})

@@ -541,3 +541,13 @@ nav:
           - "M7-26: Plugin in the Compose stack, portability and release": briefs/M7-26-plugin-release.md
           - "M7-27: Demo instance with made-up data (`bothy setup --demo`)": briefs/M7-27-demo-instance.md
           - "M7-28: Showcase: images, video, landing pages and release template": briefs/M7-28-showcase.md
+      - Stage A1:
+          - "A1-02: Server: agent definitions": briefs/A1-02-agent-definitions.md
+          - "A1-03: Server: hosted agents": briefs/A1-03-hosted-agents.md
+          - "A1-04: Runner: host many agents": briefs/A1-04-runner-hosting.md
+          - "A1-05: Runner: run the definition": briefs/A1-05-runner-definition.md
+          - "A1-06: Templates and their gate": briefs/A1-06-agent-templates.md
+          - "A1-07: Interview": briefs/A1-07-agent-interview.md
+          - "A1-08: Clients: New agent dialog": briefs/A1-08-new-agent-clients.md
+          - "A1-09: Clients: edit and remove": briefs/A1-09-edit-agent-clients.md
+          - "A1-10: End to end and documentation": briefs/A1-10-builtin-agents-end-to-end.md

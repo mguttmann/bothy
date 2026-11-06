@@ -100,7 +100,8 @@ that this chapter names enter `docs/spec/actions.yaml`, `docs/api/openapi.yaml` 
    `hosted_by` equals the calling agent, and the caller is active and reports `hosts_agents`;
    every other case answers `404` like an unknown agent. The server creates an `api_tokens` row
    for the hosted agent with `created_by` the hosting runner, `dpop_jkt` equal to the `dpop_jkt`
-   of the calling token and `expires_at` after `agents.hosted_token_ttl`, revokes every older
+   of the calling token (a calling token without `dpop_jkt` is refused with `409 conflict`, reason
+   `dpop_required`) and `expires_at` after `agents.hosted_token_ttl`, revokes every older
    active token of the hosted agent created by the same runner, writes one audit entry (agent,
    host, token prefix, never the value) and returns the token once.
 2. **Keep.** The runner keeps the token in memory only, never in a file, a log, the turn record or
@@ -135,6 +136,8 @@ with the agent as operator (section 8). Direct messages stay "later" (01).
    version.
 3. Reading is `agent.definition.read`: the owner, and the agent itself (its hosting runner through
    the hosted connection). Definitions never appear in an event, a log line or telemetry.
+4. Only built-in agents have a definition; `putAgentDefinition` for another agent answers
+   `409 conflict`, reason `not_a_builtin_agent`.
 
 ### 4.2 Schema `agent_definition.v1`
 
@@ -171,7 +174,14 @@ template gate, on every template (section 7); the runner repeats it before every
    only (5.2).
 3. **Inline shell** (`inline_shell`): in `instructions`, a skill `body` or a file `content`, the
    form `` !`<command>` `` at the start of the text or after white space, or a fenced code block
-   opened with `` ```! ``. The pinned CLI runs both as shell when a skill loads.
+   opened with `` ```! ``. The pinned CLI runs both as shell when a skill loads; its strings
+   (version 2.1.288, read on 2026-11-06) hold these two patterns, which the check covers at least:
+
+    ```text
+    /```!\s*\n?[\s\S]*?\n?```/g
+    (?<=^|\s)!`[^`]+`
+    ```
+
 4. **Imports** (`import_outside_folder`): an `@` import in any text whose path is absolute,
    starts with `~` or contains a `..` segment.
 5. **Secrets** (`secret_value_not_allowed`): a plain `value` of a header named `Authorization`,
@@ -281,8 +291,8 @@ source cannot turn them off.
 
 The CLI interprets these places as code or as permission grants; the closed schema (4.3) keeps the
 definition out of each, and the runner owns or removes each file (5.6). Read from the strings and
-the `--help` of the pinned CLI 2.1.288 on 2026-11-05 and 2026-11-06 (design note D-A1-18, red team
-reports of the design).
+the `--help` of the pinned CLI 2.1.288 on 2026-11-05 and 2026-11-06 (design note D-A1-18 and the
+red team rounds of the design note).
 
 | Surface | What the CLI does with it | Closed by |
 |---|---|---|
@@ -418,8 +428,10 @@ One folder per template under `templates/agents/<slug>/` (`<slug>` matching
 
 ### 7.2 Shipping and private templates
 
-1. `make codegen` copies the shipped templates into the server image, and `make codegen-check`
-   holds the copy equal. `listAgentTemplates` (action `agent.templates.read`, owner) returns them.
+1. A `go generate` step copies the shipped templates into the server module, where the binary
+   embeds them, and `make codegen-check` holds the copy equal to `templates/agents/` (Go embeds
+   only files below its module). `listAgentTemplates` (action `agent.templates.read`, owner)
+   returns them.
 2. `agents.templates_dir` (default empty) names a folder outside the repository with private
    templates of the same layout, read at start. A private template whose slug equals a shipped one
    is skipped with the log code `template_slug_taken`; one that fails the schema is skipped with
