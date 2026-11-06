@@ -921,6 +921,14 @@ func (stubServer) IssueHostedAgentToken(context.Context, rest.IssueHostedAgentTo
 	return nil, nil
 }
 
+func (stubServer) InterviewAgent(context.Context, rest.InterviewAgentRequestObject) (rest.InterviewAgentResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) AnswerAgentInterview(context.Context, rest.AnswerAgentInterviewRequestObject) (rest.AnswerAgentInterviewResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) ListAgentSessions(context.Context, rest.ListAgentSessionsRequestObject) (rest.ListAgentSessionsResponseObject, error) {
 	return nil, nil
 }
@@ -1447,6 +1455,9 @@ func TestRealTable_Enabled(t *testing.T) {
 		"setAgentHost":          {"PUT /api/v1/agents/{agent_id}/host", "agent.host.set", "rl.admin"},
 		"listHostedAgents":      {"GET /api/v1/agents/me/hosted", "agent.hosted.list", "rl.agent_runtime"},
 		"issueHostedAgentToken": {"POST /api/v1/agents/me/hosted/{agent_id}/token", "agent.hosted_token.issue", "rl.agent_runtime"},
+		// A1-07
+		"interviewAgent":       {"POST /api/v1/agents/interview", "agent.interview", "rl.trigger"},
+		"answerAgentInterview": {"POST /api/v1/agent-interview-requests/{request_id}/answer", "agent.interview.respond", "rl.agent_runtime"},
 		// M2-07
 		"getConsumerState": {"GET /api/v1/agents/me/consumers/{consumer}", "agent.events.consume", "rl.agent_runtime"},
 		"pollAgentEvents":  {"GET /api/v1/agents/me/consumers/{consumer}/events", "agent.events.consume", "rl.agent_runtime"},

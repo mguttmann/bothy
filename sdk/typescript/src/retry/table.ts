@@ -26,6 +26,8 @@ export const RETRY_EXEMPT_REASONS: readonly string[] = Object.freeze([
 export const IDEMPOTENT_EXEMPT_OPERATIONS: ReadonlyMap<string, string> =
   new Map([
     ["PATCH /runs/{run_id}", "agent_runtime"], // patchRun
+    ["POST /agent-interview-requests/{request_id}/answer", "agent_runtime"], // answerAgentInterview
+    ["POST /agents/interview", "read_only"], // interviewAgent
     ["POST /agents/me/consumers/{consumer}/ack", "agent_runtime"], // ackAgentEvents
     ["POST /agents/me/heartbeat", "agent_runtime"], // sendHeartbeat
     ["POST /app-manifests/validate", "read_only"], // validateManifest

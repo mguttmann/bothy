@@ -49,6 +49,10 @@ const (
 	ActionAgentHostedList Action = "agent.hosted.list"
 	// ActionAgentHostedTokenIssue is the action agent.hosted_token.issue.
 	ActionAgentHostedTokenIssue Action = "agent.hosted_token.issue"
+	// ActionAgentInterview is the action agent.interview.
+	ActionAgentInterview Action = "agent.interview"
+	// ActionAgentInterviewRespond is the action agent.interview.respond.
+	ActionAgentInterviewRespond Action = "agent.interview.respond"
 	// ActionAgentInvoke is the action agent.invoke.
 	ActionAgentInvoke Action = "agent.invoke"
 	// ActionAgentProjectFoldersRead is the action agent.project_folders.read.
@@ -479,6 +483,8 @@ var actionByID = map[string]Action{
 	"agent.host.set":               ActionAgentHostSet,
 	"agent.hosted.list":            ActionAgentHostedList,
 	"agent.hosted_token.issue":     ActionAgentHostedTokenIssue,
+	"agent.interview":              ActionAgentInterview,
+	"agent.interview.respond":      ActionAgentInterviewRespond,
 	"agent.invoke":                 ActionAgentInvoke,
 	"agent.project_folders.read":   ActionAgentProjectFoldersRead,
 	"agent.read":                   ActionAgentRead,
@@ -705,6 +711,8 @@ var actionList = []Action{
 	ActionAgentHostSet,
 	ActionAgentHostedList,
 	ActionAgentHostedTokenIssue,
+	ActionAgentInterview,
+	ActionAgentInterviewRespond,
 	ActionAgentInvoke,
 	ActionAgentProjectFoldersRead,
 	ActionAgentRead,
@@ -941,6 +949,8 @@ const (
 	EventAgentFollowup EventType = "agent.followup"
 	// EventAgentHostingChanged is the event type agent.hosting_changed.
 	EventAgentHostingChanged EventType = "agent.hosting_changed"
+	// EventAgentInterviewRequested is the event type agent.interview_requested.
+	EventAgentInterviewRequested EventType = "agent.interview_requested"
 	// EventAgentInvocation is the event type agent.invocation.
 	EventAgentInvocation EventType = "agent.invocation"
 	// EventAgentPresenceChanged is the event type agent.presence_changed.
@@ -1065,6 +1075,7 @@ var eventTypeByID = map[string]EventType{
 	"agent.definition_changed":       EventAgentDefinitionChanged,
 	"agent.followup":                 EventAgentFollowup,
 	"agent.hosting_changed":          EventAgentHostingChanged,
+	"agent.interview_requested":      EventAgentInterviewRequested,
 	"agent.invocation":               EventAgentInvocation,
 	"agent.presence_changed":         EventAgentPresenceChanged,
 	"agent.updated":                  EventAgentUpdated,
@@ -1132,6 +1143,7 @@ var eventTypeList = []EventType{
 	EventAgentDefinitionChanged,
 	EventAgentFollowup,
 	EventAgentHostingChanged,
+	EventAgentInterviewRequested,
 	EventAgentInvocation,
 	EventAgentPresenceChanged,
 	EventAgentUpdated,

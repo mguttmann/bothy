@@ -3273,6 +3273,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/agent-interview-requests/{request_id}/answer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Answer an interview request
+         * @description The builder agent answers an open `agent.interview_requested` once (26 6.1 item 2, 6.2): `kind = questions` with one or two questions of at most `agents.interview.answer_max_chars` characters, or `kind = draft` with a draft of the shape of 26 4.2 plus `name`, `handle`, `description` and an optional `channel_suggestion`; and the usage in `costs`. `404` for an unknown or forgotten request and for every principal but the builder agent the request was sent to, `410 gone` after `expires_at`, `409 conflict` with `reason: already_answered` for a second answer. The server decodes the answer strictly and never trusts it: a member outside the schema, a wrong type or a count outside the schema (an empty list, more than two questions) is refused by the request validation (`400`, the request stays open until `expires_at`); a `kind` without its member or with the member of the other kind, a draft that reaches a surface of 26 5.5 (a frontmatter, an inline shell form or an `@` import outside the agent folder) or a text that is no display text ends the request with `builder_invalid` and answers `400 validation_failed`. Any other finding of 26 4.3 or of the catalogue check (`mcp_not_in_catalogue`) goes back to the person as a field error of the draft; nothing is stored.
+         */
+        post: operations["answerAgentInterview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sync/snapshot": {
         parameters: {
             query?: never;
@@ -3500,6 +3520,26 @@ export interface paths {
          * @description Creates an agent principal with its record: `organization`, tool class `chat`, version 1. A built-in agent (26 3.1) carries `adapter_kind` `claude_agent` together with `hosted_by`; `hosted_by` is set exactly then. `claude_agent` without `hosted_by` is `400 validation_failed` with the field code `required` on `/hosted_by`, `hosted_by` with another adapter kind the field code `not_allowed`, and a `hosted_by` that names no active Claude Code runner (`adapter_kind` `code_runner`) that is not hosted itself and whose last heartbeat reports `hosts_agents` the field code `host_not_capable`. A built-in agent's creation writes the durable event `agent.hosting_changed` to its runner.
          */
         post: operations["createAgent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agents/interview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Let the builder agent interview the owner for a new agent
+         * @description The interview of "New agent" (26 6.1, R-API-29): the client sends the interview so far, at most `agents.interview.max_turns` turns of at most `agents.interview.answer_max_chars` characters each, and the server sends it as the ephemeral event `agent.interview_requested` to one live gateway connection of the builder agent named in `agents.builder_agent_id`, with the template catalogue (26 7.4), the definition limits and `expires_at`, and waits at most `agents.interview.timeout`; the deadline of this request is `agents.interview.timeout` plus `http.request_timeout` instead of `http.request_timeout` (02 14.2). The answer is `outcome = questions` with one or two questions, `outcome = draft` with a draft that the server checked with the rules of 26 4.3 and the catalogue check of 26 7.4 (its findings in `errors`, empty when it passes), or `outcome = fallback` with `fallback_reason` (`builder_not_configured`, `builder_offline`, `builder_timeout`, `builder_invalid`); the apps then offer the templates and the manual form. `cost_estimate` is the builder's estimate, never booked. Nothing of the interview is stored; every request writes one audit entry `agent.interview` with outcome, fallback reason and counts, never a text. Owners only (`403` for everyone else, also in "view as"), `503 maintenance` in maintenance mode. More turns than `agents.interview.max_turns` is `400 validation_failed` with `too_many_items` on `/turns`, a longer turn `too_long` on `/turns/<index>/text`, an interview that no longer fits `sync.event_payload_max_bytes` `too_large` on `/turns`.
+         */
+        post: operations["interviewAgent"];
         delete?: never;
         options?: never;
         head?: never;
@@ -11657,6 +11697,12 @@ export interface components {
             type: "search.assist_requested";
             payload: components["schemas"]["SearchAssistRequestedPayload"];
         };
+        /** @description Ephemeral event `agent.interview_requested` (no `seq`, at most once). */
+        AgentInterviewRequestedEvent: components["schemas"]["EventEnvelope"] & {
+            /** @enum {string} */
+            type: "agent.interview_requested";
+            payload: components["schemas"]["AgentInterviewRequestedPayload"];
+        };
         /** @description Ephemeral event `notification.created` (no `seq`, at most once), only to connections of the recipient instead of a push (13, 6.3). */
         NotificationCreatedEvent: components["schemas"]["EventEnvelope"] & {
             /** @enum {string} */
@@ -11994,6 +12040,120 @@ export interface components {
              * @example 1.0.0
              */
             template_version?: string;
+        };
+        /** @description The interview so far, kept by the client (26 6.1). Nothing of it is stored. */
+        AgentInterviewRequest: {
+            /** @description The builder's earlier questions and the person's answers, oldest first; at most `agents.interview.max_turns`. Empty for the start of an interview. */
+            turns: components["schemas"]["AgentInterviewTurn"][];
+            /** @description The person asks for a draft now instead of further questions. */
+            want_draft?: boolean;
+        };
+        AgentInterviewTurn: {
+            /**
+             * @description `builder` for a question of the builder, `owner` for an answer of the person.
+             * @enum {string}
+             */
+            role: "builder" | "owner";
+            /** @description At most `agents.interview.answer_max_chars` characters; line breaks allowed, no other control or bidi character. */
+            text: string;
+        };
+        /** @description The answer of `interviewAgent` (26 6.1). Nothing of it is stored. */
+        AgentInterviewAnswer: {
+            /** @enum {string} */
+            outcome: "questions" | "draft" | "fallback";
+            /** @description One or two questions of the builder; only with `outcome = questions`. */
+            questions?: string[];
+            draft?: components["schemas"]["AgentDraft"];
+            /** @description Only with `outcome = draft`; the findings of 26 4.3 and of the catalogue check (`mcp_not_in_catalogue`, 26 7.4) as JSON Pointers into the draft, empty when the draft passes for the class of its `settings.tool_class_wish`. */
+            errors?: components["schemas"]["FieldError"][];
+            /**
+             * @description Only with `outcome = fallback`; the apps then offer the templates and the manual form.
+             * @enum {string}
+             */
+            fallback_reason?: "builder_not_configured" | "builder_offline" | "builder_timeout" | "builder_invalid";
+            cost_estimate?: components["schemas"]["AgentInterviewCost"];
+        };
+        /** @description Estimate of the builder's model call, for information only; not booked as a cost entry. */
+        AgentInterviewCost: {
+            /** Format: int64 */
+            amount_micros: number;
+            /** @example USD */
+            currency: string;
+        };
+        /** @description A definition draft of the builder (26 6.1 item 2): the members of `AgentDefinition` plus the agent's name, handle, description and an optional channel suggestion. The server checks it like a definition for the class of `settings.tool_class_wish` and against the template catalogue; it never stores it. */
+        AgentDraft: {
+            /** @description Markdown that becomes `CLAUDE.md`; at most `agents.definition.instructions_max_bytes` bytes. */
+            instructions: string;
+            /** @description At most `agents.definition.max_skills` skills. */
+            skills: components["schemas"]["AgentDefinitionSkill"][];
+            /** @description At most `agents.definition.max_mcp_servers` servers, each equal to a server of the catalogue except `name`. */
+            mcp_servers: components["schemas"]["AgentDefinitionMcpServer"][];
+            settings: components["schemas"]["AgentDefinitionSettings"];
+            origin: components["schemas"]["AgentDefinitionOrigin"];
+            /**
+             * @description The display name the builder suggests.
+             * @example Writing helper
+             */
+            name: string;
+            /**
+             * @description The handle the builder suggests; `createAgent` checks it.
+             * @example writing-helper
+             */
+            handle: string;
+            /** @description One line about what the agent does. */
+            description: string;
+            channel_suggestion?: components["schemas"]["AgentDraftChannel"];
+        };
+        /** @description Where people talk to the new agent; the creation flow offers to create this channel (26 8.2). */
+        AgentDraftChannel: {
+            /** @example Team */
+            space_name: string;
+            /** @example writing */
+            channel_name: string;
+        };
+        /** @description Answer of the builder agent to `agent.interview_requested` (action `agent.interview.respond`, 26 6.1 item 2). It has no member for settings files, hooks, permission rules, commands, subagents or plugin parts (26 4.3 item 1). */
+        AgentInterviewBuilderAnswer: {
+            /** @enum {string} */
+            kind: "questions" | "draft";
+            /** @description Only with `kind = questions`; each at most `agents.interview.answer_max_chars` characters. */
+            questions?: string[];
+            draft?: components["schemas"]["AgentDraft"];
+            /** @description Usage of the model call, as in `run.finish`. */
+            costs?: components["schemas"]["CostReport"][];
+        };
+        /** @description Sent to one gateway connection of the builder agent (26 6.1 item 1), without a token. The turns and the catalogue are data, never instructions (ADR 0054). */
+        AgentInterviewRequestedPayload: {
+            request_id: components["schemas"]["Uuid"];
+            /** @description The interview so far, oldest first. */
+            turns: components["schemas"]["AgentInterviewTurn"][];
+            want_draft: boolean;
+            /** @description The template catalogue (26 7.4); a drafted MCP server must equal one of its servers except `name`. */
+            catalogue: components["schemas"]["AgentInterviewCatalogueEntry"][];
+            limits: components["schemas"]["AgentInterviewLimits"];
+            expires_at: components["schemas"]["Timestamp"];
+        };
+        AgentInterviewCatalogueEntry: {
+            /** @example writing-helper */
+            slug: string;
+            name: string;
+            description: string;
+            /** @enum {string} */
+            tool_class_wish: "chat" | "scoped" | "host";
+            mcp_servers: components["schemas"]["AgentDefinitionMcpServer"][];
+        };
+        /** @description The limits a draft must keep (the values of `agents.definition.*`, `agents.mcp_stdio_runners` and `agents.interview.answer_max_chars`). */
+        AgentInterviewLimits: {
+            instructions_max_bytes: number;
+            max_skills: number;
+            skill_description_max_chars: number;
+            skill_body_max_bytes: number;
+            max_skill_files: number;
+            max_mcp_servers: number;
+            max_allowed_tools: number;
+            max_cost_usd_per_run: number;
+            mcp_stdio_runners: string[];
+            /** @description The longest question of an answer. */
+            question_max_chars: number;
         };
         /** @description One stored version of the definition of a built-in agent; `definition` only in `getAgentDefinition` and `putAgentDefinition`. */
         AgentDefinitionVersion: {
@@ -19978,6 +20138,41 @@ export interface operations {
             default: components["responses"]["Error"];
         };
     };
+    answerAgentInterview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: components["parameters"]["RequestIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgentInterviewBuilderAnswer"];
+            };
+        };
+        responses: {
+            /** @description No content. */
+            204: {
+                headers: {
+                    "Correlation-Id": components["headers"]["Correlation-Id"];
+                    RateLimit: components["headers"]["RateLimit"];
+                    "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            410: components["responses"]["Gone"];
+            429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
     getSnapshot: {
         parameters: {
             query?: never;
@@ -20508,6 +20703,39 @@ export interface operations {
             409: components["responses"]["Conflict"];
             422: components["responses"]["UnprocessableEntity"];
             429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
+    interviewAgent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgentInterviewRequest"];
+            };
+        };
+        responses: {
+            /** @description OK. */
+            200: {
+                headers: {
+                    "Correlation-Id": components["headers"]["Correlation-Id"];
+                    RateLimit: components["headers"]["RateLimit"];
+                    "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentInterviewAnswer"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            429: components["responses"]["TooManyRequests"];
+            503: components["responses"]["ServiceUnavailable"];
             default: components["responses"]["Error"];
         };
     };

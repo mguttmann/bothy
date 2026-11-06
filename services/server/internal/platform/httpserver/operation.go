@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+	"time"
 )
 
 // BodyKind is the media type of an operation's request body (06 "Basic rules", row
@@ -108,6 +109,10 @@ type Operation struct {
 	// Download is true when a success streams a body that is not JSON (an export, a file): the
 	// route class of downloads, whose deadline is http.transfer_timeout (02 section 14.2).
 	Download bool
+	// Timeout, when above zero, replaces http.request_timeout as the deadline of this operation
+	// (02 section 14.2): interviewAgent waits for the builder agent up to agents.interview.timeout
+	// and gets that wait plus http.request_timeout (A1-07). It never applies to a transfer.
+	Timeout time.Duration
 	// AuthorizedInBand marks the one route whose handler authorizes its action on the connection
 	// it opens instead of in the request: GET /api/v1/gateway (M1-64), which upgrades to a
 	// WebSocket and authenticates and authorizes gateway.connect with the identify or resume

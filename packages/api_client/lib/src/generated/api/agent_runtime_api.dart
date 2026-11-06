@@ -11,6 +11,7 @@ import 'package:dio/dio.dart';
 import 'package:api_client/src/generated/api_util.dart';
 import 'package:api_client/src/generated/model/agent_channel_config.dart';
 import 'package:api_client/src/generated/model/agent_channel_config_list.dart';
+import 'package:api_client/src/generated/model/agent_interview_builder_answer.dart';
 import 'package:api_client/src/generated/model/agent_page.dart';
 import 'package:api_client/src/generated/model/agent_session.dart';
 import 'package:api_client/src/generated/model/agent_session_report.dart';
@@ -152,6 +153,90 @@ class AgentRuntimeApi {
       statusMessage: _response.statusMessage,
       extra: _response.extra,
     );
+  }
+
+  /// Answer an interview request
+  /// The builder agent answers an open &#x60;agent.interview_requested&#x60; once (26 6.1 item 2, 6.2): &#x60;kind &#x3D; questions&#x60; with one or two questions of at most &#x60;agents.interview.answer_max_chars&#x60; characters, or &#x60;kind &#x3D; draft&#x60; with a draft of the shape of 26 4.2 plus &#x60;name&#x60;, &#x60;handle&#x60;, &#x60;description&#x60; and an optional &#x60;channel_suggestion&#x60;; and the usage in &#x60;costs&#x60;. &#x60;404&#x60; for an unknown or forgotten request and for every principal but the builder agent the request was sent to, &#x60;410 gone&#x60; after &#x60;expires_at&#x60;, &#x60;409 conflict&#x60; with &#x60;reason: already_answered&#x60; for a second answer. The server decodes the answer strictly and never trusts it: a member outside the schema, a wrong type or a count outside the schema (an empty list, more than two questions) is refused by the request validation (&#x60;400&#x60;, the request stays open until &#x60;expires_at&#x60;); a &#x60;kind&#x60; without its member or with the member of the other kind, a draft that reaches a surface of 26 5.5 (a frontmatter, an inline shell form or an &#x60;@&#x60; import outside the agent folder) or a text that is no display text ends the request with &#x60;builder_invalid&#x60; and answers &#x60;400 validation_failed&#x60;. Any other finding of 26 4.3 or of the catalogue check (&#x60;mcp_not_in_catalogue&#x60;) goes back to the person as a field error of the draft; nothing is stored.
+  ///
+  /// Parameters:
+  /// * [requestId]
+  /// * [agentInterviewBuilderAnswer]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future]
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<void>> answerAgentInterview({
+    required String requestId,
+    required AgentInterviewBuilderAnswer agentInterviewBuilderAnswer,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/agent-interview-requests/{request_id}/answer'.replaceAll(
+      '{'
+      r'request_id'
+      '}',
+      encodeQueryParameter(
+        _serializers,
+        requestId,
+        const FullType(String),
+      ).toString(),
+    );
+    final _options = Options(
+      method: r'POST',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'apiKey',
+            'name': 'consoleSession',
+            'keyName': '__Host-console_session',
+            'where': '',
+          },
+          {'type': 'http', 'scheme': 'DPoP', 'name': 'dpopAuth'},
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearerAuth'},
+        ],
+        ...?extra,
+      },
+      contentType: 'application/json',
+      validateStatus: validateStatus,
+    );
+
+    dynamic _bodyData;
+
+    try {
+      const _type = FullType(AgentInterviewBuilderAnswer);
+      _bodyData = _serializers.serialize(
+        agentInterviewBuilderAnswer,
+        specifiedType: _type,
+      );
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _options.compose(_dio.options, _path),
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    final _response = await _dio.request<Object>(
+      _path,
+      data: _bodyData,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    return _response;
   }
 
   /// Answer an autocomplete request

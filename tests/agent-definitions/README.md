@@ -2,10 +2,14 @@
 
 Status: built (A1-02). The shared corpus of definitions of built-in agents: the conformance set of
 [26-builtin-agents.md](../../docs/spec/26-builtin-agents.md) 4.2 and 4.3 for every writer and
-reader of a definition. The server's validator (`services/server/internal/agents/domain/definition`,
-A1-02), the runner's own check before every turn (A1-05), the template gate (A1-06) and the
-interview's draft check (A1-07) each run every file of this folder and must give exactly its
-expected findings. A rule changes here first; a writer that disagrees with a fixture is wrong.
+reader of a definition. Two validators run every file of this folder and must give exactly its
+expected findings: the server's validator (`services/server/internal/agents/domain/definition`,
+A1-02) and the runner's own copy of the rules
+(`plugins/claude-code-runner/src/claude_code_runner/definition.py`, A1-07). The checks built on
+them (the runner's check before every turn of A1-05, the template gate of A1-06 and the draft
+checks of the interview of A1-07 on the server and in the builder) add their own refusals on top,
+so this corpus pins the shared rules, not each path. A rule changes here first; a writer that
+disagrees with a fixture is wrong.
 
 ## Files
 
@@ -48,4 +52,5 @@ only.
 
 ```sh
 (cd services/server && go test ./internal/agents/domain/definition/)
+(cd plugins/claude-code-runner && uv run --locked pytest -q tests/unit/test_definition.py)
 ```

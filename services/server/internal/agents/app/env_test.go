@@ -27,6 +27,7 @@ import (
 	instancepg "github.com/OWNER/bothy/services/server/internal/instance/adapters/postgres"
 	instanceapp "github.com/OWNER/bothy/services/server/internal/instance/app"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
+	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
@@ -69,6 +70,9 @@ type world struct {
 	uow txn.UnitOfWork
 	// rec is the audit recorder; the tests of refusals flush its aggregated denials.
 	rec *auditapp.Recorder
+	// az is the Authorizer and clk the clock of the use cases; the interview (A1-07) runs on both.
+	az  authorize.Authorizer
+	clk *clock.Fake
 }
 
 // newWorld builds a world on a new database.
@@ -124,7 +128,7 @@ func newWorld(t *testing.T) *world {
 	if _, err := maint.Run(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	az, err := authzapp.NewAuthorizer(authzapp.AuthorizerConfig{SnapshotCacheMaxEntries: 1000, StepUpMaxAge: 5 * time.Minute}, authzapp.AuthorizerDeps{
+	az, err := authzapp.NewAuthorizer(authzapp.AuthorizerConfig{SnapshotCacheMaxEntries: 1000, StepUpMaxAge: 5 * time.Minute, ViewAsMaxDuration: time.Hour}, authzapp.AuthorizerDeps{
 		Catalog: authzapp.NewCatalog(log), Store: authzpg.NewRepository(pool), Principals: principals, Credentials: w.creds,
 		Structure: w.structure, Policies: source, Versions: instanceapp.NewVersions(instancepg.NewRepository(pool)), Recorder: rec, Clock: clk, Log: log,
 	})
@@ -150,7 +154,7 @@ func newWorld(t *testing.T) *world {
 	if w.id, err = wire.NewIdentity(idCfg, pool, uow, az, writes, []byte("0123456789abcdef0123456789abcdef"), clk, log); err != nil {
 		t.Fatal(err)
 	}
-	w.rec = rec
+	w.rec, w.az, w.clk = rec, az, clk
 	w.svc, err = app.New(testConfig(), app.Deps{
 		Store: agentspg.NewRepository(pool), Definitions: agentspg.NewRepository(pool), Principals: w.id.Principals, Directory: identityapp.NewDirectory(repo), Tokens: w.id.Tokens,
 		Hosted: w.id.Tokens,

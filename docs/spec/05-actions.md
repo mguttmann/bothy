@@ -509,12 +509,14 @@ make sure that clients clear their cache and runs end (R-AZ-15).
 | `agent.host.set` | change the hosting runner of a built-in agent; revokes the tokens the old host holds ([26-builtin-agents.md](26-builtin-agents.md) 3.1, A1-03) | agent | owner | yes | yes | yes | no | `rl.admin` |
 | `agent.hosted.list` | list the agents whose `hosted_by` is the calling runner ([26-builtin-agents.md](26-builtin-agents.md) 3.2, A1-03) | agent | agent-self (a runner reporting `hosts_agents`) | no | no | no | no | `rl.agent_runtime` |
 | `agent.hosted_token.issue` | issue a token for a hosted agent, bound to the caller's DPoP key ([26-builtin-agents.md](26-builtin-agents.md) 3.3, A1-03) | agent | agent-self of the runner named in `hosted_by` of the target | no | no | yes | no | `rl.agent_runtime` |
+| `agent.interview` | send the interview so far to the builder agent and return its questions or draft ([26-builtin-agents.md](26-builtin-agents.md) 6.1) | instance | owner | yes | no | yes | no | `rl.trigger` |
 | `command.read` | see the command list and options (built-in commands, those of the operator, of allowed guests and of apps with `write`) | channel | read | no | no | no | no | `rl.read` |
 | `command.register` | register or change a command; it may apply only to targets that its owner operates or on which the owner has `write` | command | agent-self or app-self with scope | no | no | yes | no | `rl.admin` |
 | `command.remove` | remove a command | command | agent-self or app-self with scope | no | no | yes | no | `rl.admin` |
 | `command.autocomplete` | fetch suggestions for an option from the owner of the command | channel | trigger and `agent.invoke` without a run (for app commands `required_level`) | no | no | no | no | `rl.trigger` |
 | `command.autocomplete.respond` | deliver suggestions for a request (gateway op or REST) | command | agent-self or app-self, owner of the command | no | no | no | no | `rl.agent_runtime` |
 | `search.assist.respond` | deliver the picks and terms for an open `search.assist_requested` (REST) | agent | agent-self, the assistant agent the request was sent to | no | no | no | no | `rl.agent_runtime` |
+| `agent.interview.respond` | answer an open `agent.interview_requested` with questions or a draft (REST) | agent | agent-self, the builder agent the request was sent to | no | no | no | no | `rl.agent_runtime` |
 | `command.invoke` | run a command. Agent commands check `required_level` and `agent.invoke`; model commands during an active run: denial `run_active`. App commands check `required_level` and scope, without `agent.invoke` and I2. The control command `stop` additionally checks `run.cancel` | channel, thread | `required_level` of the command and rules as described | no | no | denials | no | `rl.trigger` |
 | `run.read` | read a run, its steps and metrics | run | read | no | no | no | no | `rl.read` |
 | `run.overview.read` | read "Running now" and the run history, filtered by `run.read` | instance | auth | no | no | no | no | `rl.read` |
@@ -794,6 +796,7 @@ Ephemeral events:
 | `notification.created` | thread; for a hint without a thread the recipient (`user`) | self and `push.deliver`; for a hint without a thread: self and the recipient rule of R-AZ-30 | only to connections of the receiver, instead of a push to this device ([13-push-notifications.md](13-push-notifications.md), section 6.3) |
 | `command.autocomplete_requested` | command | self (owner of the command); agent additionally `agent.events.consume` | carries a token with `trigger_kind = autocomplete`; only to one gateway connection of the owner |
 | `search.assist_requested` | agent | self (the assistant agent of `search.assist.agent_id`); additionally `agent.events.consume` | carries no token and no ids of threads or messages; only to one gateway connection of the assistant |
+| `agent.interview_requested` | agent | self (the builder agent of `agents.builder_agent_id`); additionally `agent.events.consume` | carries no token; the interview so far, the template catalogue and the definition limits; only to one gateway connection of the builder |
 <!-- END GENERATED: events.ephemeral -->
 
 Outgoing webhooks and push use the same receive action (`webhook_out.deliver`,

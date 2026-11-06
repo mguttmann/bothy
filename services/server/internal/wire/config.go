@@ -43,6 +43,7 @@ var configKeyGroups = []func() []config.Key{
 	pushConfigKeys,
 	agentsConfigKeys,
 	agentDefinitionConfigKeys,
+	agentInterviewConfigKeys,
 	runsConfigKeys,
 	commandsConfigKeys,
 	billingConfigKeys,

@@ -120,6 +120,7 @@ func (sc *Scenario) agents() {
 	sc.post(o, "/agents/"+agent+"/enable", map[string]any{"reason": sc.Reg.New(ClassAdminReason, "", "agent enable reason")}, ok...)
 
 	sc.definitions()
+	sc.interview()
 
 	// API tokens: one created, listed and revoked; the agents of the world use theirs below.
 	tok := sc.post(o, "/principals/"+agent+"/tokens", map[string]any{
@@ -330,4 +331,19 @@ func (sc *Scenario) definitions() {
 	bad := def(" (400)")
 	bad["instructions"] = "!`id` " + sc.Reg.New(ClassDefinition, "", "definition instructions (400)")
 	sc.call(o, req{method: http.MethodPut, path: path, header: ifMatch(2), body: bad}, http.StatusBadRequest)
+}
+
+// interview drives the interview of "New agent" (A1-07, 26 6.1) with a content canary in an owner
+// answer and a builder question: without agents.builder_agent_id the owner gets the fallback
+// builder_not_configured, which writes one audit entry and one log line with counts only, so the
+// turns appear in no sink. An answer to an unknown request is 404 like for every other agent.
+func (sc *Scenario) interview() {
+	sc.T.Helper()
+	turns := []any{
+		map[string]any{"role": "owner", "text": "A writing helper. " + sc.Reg.New(ClassContent, "", "interview owner answer")},
+		map[string]any{"role": "builder", "text": "Who reads it? " + sc.Reg.New(ClassContent, "", "interview builder question")},
+	}
+	sc.post(sc.W.Owner, "/agents/interview", map[string]any{"turns": turns, "want_draft": true}, ok...)
+	sc.post(sc.W.Agents["Lotse"], "/agent-interview-requests/"+newID()+"/answer",
+		map[string]any{"kind": "questions", "questions": []any{"Which tone?"}}, http.StatusNotFound)
 }

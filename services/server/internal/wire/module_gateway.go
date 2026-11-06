@@ -7,6 +7,7 @@ import (
 	"errors"
 	"log/slog"
 
+	interviewrelay "github.com/OWNER/bothy/services/server/internal/gateway/adapters/interviewrelay"
 	gatewayapp "github.com/OWNER/bothy/services/server/internal/gateway/app"
 	instancepg "github.com/OWNER/bothy/services/server/internal/instance/adapters/postgres"
 	instanceapp "github.com/OWNER/bothy/services/server/internal/instance/app"
@@ -16,6 +17,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	"github.com/OWNER/bothy/services/server/internal/platform/ratelimit"
 	"github.com/OWNER/bothy/services/server/internal/runs"
+	synctelemetry "github.com/OWNER/bothy/services/server/internal/sync/adapters/telemetry"
 )
 
 // gatewayState is the part of the server state the gateway module fills.
@@ -102,6 +104,9 @@ func (s *server) mountGateway(mux Mux, chain *httpserver.Chain, limiter *ratelim
 	if err := bindAssistRelay(sr, gw); err != nil {
 		return err
 	}
+	if err := bindInterviewRelay(ag, gw); err != nil {
+		return err
+	}
 	if ag.Presence != nil {
 		// agent.presence_changed goes through the hub of this process (M1-66, D-M2-20-1).
 		ag.Presence.BindPublisher(gw.Publisher)
@@ -123,4 +128,15 @@ func (s *server) mountGateway(mux Mux, chain *httpserver.Chain, limiter *ratelim
 	s.gateway, s.cluster = gw, cluster
 	s.mu.Unlock()
 	return nil
+}
+
+// bindInterviewRelay binds the relay of agent.interview_requested (gateway/adapters/interviewrelay
+// over the hub of gw, with the correlator of the event log) into the interview of the agents
+// module (A1-07). Without the interview or the hub there is nothing to bind and every request falls
+// back with builder_offline.
+func bindInterviewRelay(ag *Agents, gw *Gateway) error {
+	if ag == nil || ag.Interviewer == nil || gw == nil || gw.Hub == nil {
+		return nil
+	}
+	return ag.Interviewer.BindRelay(interviewrelay.New(gw.Hub, synctelemetry.Correlator{}), nil)
 }

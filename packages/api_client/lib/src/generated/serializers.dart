@@ -44,10 +44,21 @@ import 'package:api_client/src/generated/model/agent_definition_skill.dart';
 import 'package:api_client/src/generated/model/agent_definition_skill_file.dart';
 import 'package:api_client/src/generated/model/agent_definition_version.dart';
 import 'package:api_client/src/generated/model/agent_definition_version_page.dart';
+import 'package:api_client/src/generated/model/agent_draft.dart';
+import 'package:api_client/src/generated/model/agent_draft_channel.dart';
 import 'package:api_client/src/generated/model/agent_followup_event.dart';
 import 'package:api_client/src/generated/model/agent_followup_payload.dart';
 import 'package:api_client/src/generated/model/agent_hosting_changed_event.dart';
 import 'package:api_client/src/generated/model/agent_hosting_changed_payload.dart';
+import 'package:api_client/src/generated/model/agent_interview_answer.dart';
+import 'package:api_client/src/generated/model/agent_interview_builder_answer.dart';
+import 'package:api_client/src/generated/model/agent_interview_catalogue_entry.dart';
+import 'package:api_client/src/generated/model/agent_interview_cost.dart';
+import 'package:api_client/src/generated/model/agent_interview_limits.dart';
+import 'package:api_client/src/generated/model/agent_interview_request.dart';
+import 'package:api_client/src/generated/model/agent_interview_requested_event.dart';
+import 'package:api_client/src/generated/model/agent_interview_requested_payload.dart';
+import 'package:api_client/src/generated/model/agent_interview_turn.dart';
 import 'package:api_client/src/generated/model/agent_invocation_event.dart';
 import 'package:api_client/src/generated/model/agent_invocation_payload.dart';
 import 'package:api_client/src/generated/model/agent_page.dart';
@@ -694,10 +705,21 @@ part 'serializers.g.dart';
   AgentDefinitionSkillFile,
   AgentDefinitionVersion,
   AgentDefinitionVersionPage,
+  AgentDraft,
+  AgentDraftChannel,
   AgentFollowupEvent,
   AgentFollowupPayload,
   AgentHostingChangedEvent,
   AgentHostingChangedPayload,
+  AgentInterviewAnswer,
+  AgentInterviewBuilderAnswer,
+  AgentInterviewCatalogueEntry,
+  AgentInterviewCost,
+  AgentInterviewLimits,
+  AgentInterviewRequest,
+  AgentInterviewRequestedEvent,
+  AgentInterviewRequestedPayload,
+  AgentInterviewTurn,
   AgentInvocationEvent,
   AgentInvocationPayload,
   AgentPage,
@@ -1621,6 +1643,10 @@ Serializers serializers =
             () => ListBuilder<AppManifestIncomingWebhooksInner>(),
           )
           ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(AgentInterviewCatalogueEntry)]),
+            () => ListBuilder<AgentInterviewCatalogueEntry>(),
+          )
+          ..addBuilderFactory(
             const FullType(BuiltList, [FullType(ForumTag)]),
             () => ListBuilder<ForumTag>(),
           )
@@ -1677,6 +1703,10 @@ Serializers serializers =
           ..addBuilderFactory(
             const FullType(BuiltList, [FullType(CommandChoice)]),
             () => ListBuilder<CommandChoice>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(AgentInterviewTurn)]),
+            () => ListBuilder<AgentInterviewTurn>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, [FullType(SidebarState)]),

@@ -1,0 +1,39 @@
+{
+  "audience": "self",
+  "id": "01900000-0000-7000-8000-000000000711",
+  "occurred_at": "2026-01-01T00:00:00.000Z",
+  "payload": {
+    "catalogue": [],
+    "expires_at": "2026-01-01T00:01:30.000Z",
+    "limits": {
+      "instructions_max_bytes": 65536,
+      "max_allowed_tools": 64,
+      "max_cost_usd_per_run": 50,
+      "max_mcp_servers": 16,
+      "max_skill_files": 8,
+      "max_skills": 32,
+      "mcp_stdio_runners": ["npx", "uvx"],
+      "question_max_chars": 4000,
+      "skill_body_max_bytes": 65536,
+      "skill_description_max_chars": 300
+    },
+    "request_id": "01900000-0000-7000-8000-000000000712",
+    "turns": [
+      {
+        "role": "owner",
+        "text": "A writing helper for the texts of example.com"
+      }
+    ],
+    "want_draft": false
+  },
+  "resource": {
+    "id": "01900000-0000-7000-8000-000000000301",
+    "kind": "agent"
+  },
+  "schema_version": 1,
+  "scope": {
+    "channel_id": "01900000-0000-7000-8000-000000000103",
+    "space_id": "01900000-0000-7000-8000-000000000104"
+  },
+  "type": "agent.interview_requested"
+}

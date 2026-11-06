@@ -480,6 +480,11 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"agents.definition.max_allowed_tools":           {Kind: config.KindInt, Default: "64", Min: "0", Max: "1024", Chapter: "26-builtin-agents.md"},
 		"agents.definition.max_cost_usd_per_run":        {Kind: config.KindFloat, Default: "50", Min: "0", Chapter: "26-builtin-agents.md"},
 		"agents.mcp_stdio_runners":                      {Kind: config.KindStringList, Default: `["npx", "uvx"]`, Chapter: "26-builtin-agents.md"},
+		// A1-07: the interview (26 14).
+		"agents.builder_agent_id":           {Kind: config.KindString, Default: "", Chapter: "26-builtin-agents.md"},
+		"agents.interview.timeout":          {Kind: config.KindDuration, Default: "90s", Min: "1ms", Chapter: "26-builtin-agents.md"},
+		"agents.interview.max_turns":        {Kind: config.KindInt, Default: "12", Min: "1", Max: "64", Chapter: "26-builtin-agents.md"},
+		"agents.interview.answer_max_chars": {Kind: config.KindInt, Default: "4000", Min: "1", Max: "16000", Chapter: "26-builtin-agents.md"},
 		// M2-12
 		"agent.session_ref_max_bytes": {Kind: config.KindInt, Default: "1024", Min: "1", Max: "2048", Chapter: "09-agents.md"},
 		// A1-03

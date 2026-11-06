@@ -12,6 +12,8 @@ agent.heartbeat
 agent.host.set
 agent.hosted.list
 agent.hosted_token.issue
+agent.interview
+agent.interview.respond
 agent.invoke
 agent.tool_class.set
 agent.triggerers.read

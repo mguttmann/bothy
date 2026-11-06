@@ -394,6 +394,138 @@ func (e AgentHostingChangedEventType) Valid() bool {
 	}
 }
 
+// Defines values for AgentInterviewAnswerFallbackReason.
+const (
+	BuilderInvalid       AgentInterviewAnswerFallbackReason = "builder_invalid"
+	BuilderNotConfigured AgentInterviewAnswerFallbackReason = "builder_not_configured"
+	BuilderOffline       AgentInterviewAnswerFallbackReason = "builder_offline"
+	BuilderTimeout       AgentInterviewAnswerFallbackReason = "builder_timeout"
+)
+
+// Valid indicates whether the value is a known member of the AgentInterviewAnswerFallbackReason enum.
+func (e AgentInterviewAnswerFallbackReason) Valid() bool {
+	switch e {
+	case BuilderInvalid:
+		return true
+	case BuilderNotConfigured:
+		return true
+	case BuilderOffline:
+		return true
+	case BuilderTimeout:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AgentInterviewAnswerOutcome.
+const (
+	AgentInterviewAnswerOutcomeDraft     AgentInterviewAnswerOutcome = "draft"
+	AgentInterviewAnswerOutcomeFallback  AgentInterviewAnswerOutcome = "fallback"
+	AgentInterviewAnswerOutcomeQuestions AgentInterviewAnswerOutcome = "questions"
+)
+
+// Valid indicates whether the value is a known member of the AgentInterviewAnswerOutcome enum.
+func (e AgentInterviewAnswerOutcome) Valid() bool {
+	switch e {
+	case AgentInterviewAnswerOutcomeDraft:
+		return true
+	case AgentInterviewAnswerOutcomeFallback:
+		return true
+	case AgentInterviewAnswerOutcomeQuestions:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AgentInterviewBuilderAnswerKind.
+const (
+	AgentInterviewBuilderAnswerKindDraft     AgentInterviewBuilderAnswerKind = "draft"
+	AgentInterviewBuilderAnswerKindQuestions AgentInterviewBuilderAnswerKind = "questions"
+)
+
+// Valid indicates whether the value is a known member of the AgentInterviewBuilderAnswerKind enum.
+func (e AgentInterviewBuilderAnswerKind) Valid() bool {
+	switch e {
+	case AgentInterviewBuilderAnswerKindDraft:
+		return true
+	case AgentInterviewBuilderAnswerKindQuestions:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AgentInterviewCatalogueEntryToolClassWish.
+const (
+	AgentInterviewCatalogueEntryToolClassWishChat   AgentInterviewCatalogueEntryToolClassWish = "chat"
+	AgentInterviewCatalogueEntryToolClassWishHost   AgentInterviewCatalogueEntryToolClassWish = "host"
+	AgentInterviewCatalogueEntryToolClassWishScoped AgentInterviewCatalogueEntryToolClassWish = "scoped"
+)
+
+// Valid indicates whether the value is a known member of the AgentInterviewCatalogueEntryToolClassWish enum.
+func (e AgentInterviewCatalogueEntryToolClassWish) Valid() bool {
+	switch e {
+	case AgentInterviewCatalogueEntryToolClassWishChat:
+		return true
+	case AgentInterviewCatalogueEntryToolClassWishHost:
+		return true
+	case AgentInterviewCatalogueEntryToolClassWishScoped:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AgentInterviewRequestedEventAudience.
+const (
+	AgentInterviewRequestedEventAudienceSelf AgentInterviewRequestedEventAudience = "self"
+)
+
+// Valid indicates whether the value is a known member of the AgentInterviewRequestedEventAudience enum.
+func (e AgentInterviewRequestedEventAudience) Valid() bool {
+	switch e {
+	case AgentInterviewRequestedEventAudienceSelf:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AgentInterviewRequestedEventType.
+const (
+	AgentInterviewRequested AgentInterviewRequestedEventType = "agent.interview_requested"
+)
+
+// Valid indicates whether the value is a known member of the AgentInterviewRequestedEventType enum.
+func (e AgentInterviewRequestedEventType) Valid() bool {
+	switch e {
+	case AgentInterviewRequested:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AgentInterviewTurnRole.
+const (
+	AgentInterviewTurnRoleBuilder AgentInterviewTurnRole = "builder"
+	AgentInterviewTurnRoleOwner   AgentInterviewTurnRole = "owner"
+)
+
+// Valid indicates whether the value is a known member of the AgentInterviewTurnRole enum.
+func (e AgentInterviewTurnRole) Valid() bool {
+	switch e {
+	case AgentInterviewTurnRoleBuilder:
+		return true
+	case AgentInterviewTurnRoleOwner:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for AgentInvocationEventAudience.
 const (
 	AgentInvocationEventAudienceSelf AgentInvocationEventAudience = "self"
@@ -6871,6 +7003,49 @@ type AgentDefinitionVersionPage struct {
 	NextCursor *Cursor `json:"next_cursor,omitempty"`
 }
 
+// AgentDraft A definition draft of the builder (26 6.1 item 2): the members of `AgentDefinition` plus the agent's name, handle, description and an optional channel suggestion. The server checks it like a definition for the class of `settings.tool_class_wish` and against the template catalogue; it never stores it.
+type AgentDraft struct {
+	// ChannelSuggestion Where people talk to the new agent; the creation flow offers to create this channel (26 8.2).
+	ChannelSuggestion *AgentDraftChannel `json:"channel_suggestion,omitempty"`
+
+	// Description One line about what the agent does.
+	Description string `json:"description"`
+
+	// Handle The handle the builder suggests; `createAgent` checks it.
+	//
+	// Examples: writing-helper
+	Handle string `json:"handle"`
+
+	// Instructions Markdown that becomes `CLAUDE.md`; at most `agents.definition.instructions_max_bytes` bytes.
+	Instructions string `json:"instructions"`
+
+	// McpServers At most `agents.definition.max_mcp_servers` servers, each equal to a server of the catalogue except `name`.
+	McpServers []AgentDefinitionMcpServer `json:"mcp_servers"`
+
+	// Name The display name the builder suggests.
+	//
+	// Examples: Writing helper
+	Name string `json:"name"`
+
+	// Origin Where the definition came from; display only.
+	Origin AgentDefinitionOrigin `json:"origin"`
+
+	// Settings Settings of the built-in agent; the tool class itself is the agent's `tool_class` (07 2.11), never set here.
+	Settings AgentDefinitionSettings `json:"settings"`
+
+	// Skills At most `agents.definition.max_skills` skills.
+	Skills []AgentDefinitionSkill `json:"skills"`
+}
+
+// AgentDraftChannel Where people talk to the new agent; the creation flow offers to create this channel (26 8.2).
+type AgentDraftChannel struct {
+	// ChannelName Examples: writing
+	ChannelName string `json:"channel_name"`
+
+	// SpaceName Examples: Team
+	SpaceName string `json:"space_name"`
+}
+
 // AgentFollowupEvent Durable event `agent.followup`.
 type AgentFollowupEvent struct {
 	Actor    *EventActor                 `json:"actor,omitempty"`
@@ -7008,6 +7183,186 @@ type AgentHostingChangedPayload struct {
 	// AgentId UUIDv7 (RFC 9562), lowercase canonical form.
 	AgentId Uuid `json:"agent_id"`
 }
+
+// AgentInterviewAnswer The answer of `interviewAgent` (26 6.1). Nothing of it is stored.
+type AgentInterviewAnswer struct {
+	// CostEstimate Estimate of the builder's model call, for information only; not booked as a cost entry.
+	CostEstimate *AgentInterviewCost `json:"cost_estimate,omitempty"`
+
+	// Draft A definition draft of the builder (26 6.1 item 2): the members of `AgentDefinition` plus the agent's name, handle, description and an optional channel suggestion. The server checks it like a definition for the class of `settings.tool_class_wish` and against the template catalogue; it never stores it.
+	Draft *AgentDraft `json:"draft,omitempty"`
+
+	// Errors Only with `outcome = draft`; the findings of 26 4.3 and of the catalogue check (`mcp_not_in_catalogue`, 26 7.4) as JSON Pointers into the draft, empty when the draft passes for the class of its `settings.tool_class_wish`.
+	Errors *[]FieldError `json:"errors,omitempty"`
+
+	// FallbackReason Only with `outcome = fallback`; the apps then offer the templates and the manual form.
+	FallbackReason *AgentInterviewAnswerFallbackReason `json:"fallback_reason,omitempty"`
+	Outcome        AgentInterviewAnswerOutcome         `json:"outcome"`
+
+	// Questions One or two questions of the builder; only with `outcome = questions`.
+	Questions *[]string `json:"questions,omitempty"`
+}
+
+// AgentInterviewAnswerFallbackReason Only with `outcome = fallback`; the apps then offer the templates and the manual form.
+type AgentInterviewAnswerFallbackReason string
+
+// AgentInterviewAnswerOutcome defines model for AgentInterviewAnswer.Outcome.
+type AgentInterviewAnswerOutcome string
+
+// AgentInterviewBuilderAnswer Answer of the builder agent to `agent.interview_requested` (action `agent.interview.respond`, 26 6.1 item 2). It has no member for settings files, hooks, permission rules, commands, subagents or plugin parts (26 4.3 item 1).
+type AgentInterviewBuilderAnswer struct {
+	// Costs Usage of the model call, as in `run.finish`.
+	Costs *[]CostReport `json:"costs,omitempty"`
+
+	// Draft A definition draft of the builder (26 6.1 item 2): the members of `AgentDefinition` plus the agent's name, handle, description and an optional channel suggestion. The server checks it like a definition for the class of `settings.tool_class_wish` and against the template catalogue; it never stores it.
+	Draft *AgentDraft                     `json:"draft,omitempty"`
+	Kind  AgentInterviewBuilderAnswerKind `json:"kind"`
+
+	// Questions Only with `kind = questions`; each at most `agents.interview.answer_max_chars` characters.
+	Questions *[]string `json:"questions,omitempty"`
+}
+
+// AgentInterviewBuilderAnswerKind defines model for AgentInterviewBuilderAnswer.Kind.
+type AgentInterviewBuilderAnswerKind string
+
+// AgentInterviewCatalogueEntry defines model for AgentInterviewCatalogueEntry.
+type AgentInterviewCatalogueEntry struct {
+	Description string                     `json:"description"`
+	McpServers  []AgentDefinitionMcpServer `json:"mcp_servers"`
+	Name        string                     `json:"name"`
+
+	// Slug Examples: writing-helper
+	Slug          string                                    `json:"slug"`
+	ToolClassWish AgentInterviewCatalogueEntryToolClassWish `json:"tool_class_wish"`
+}
+
+// AgentInterviewCatalogueEntryToolClassWish defines model for AgentInterviewCatalogueEntry.ToolClassWish.
+type AgentInterviewCatalogueEntryToolClassWish string
+
+// AgentInterviewCost Estimate of the builder's model call, for information only; not booked as a cost entry.
+type AgentInterviewCost struct {
+	AmountMicros int64 `json:"amount_micros"`
+
+	// Currency Examples: USD
+	Currency string `json:"currency"`
+}
+
+// AgentInterviewLimits The limits a draft must keep (the values of `agents.definition.*`, `agents.mcp_stdio_runners` and `agents.interview.answer_max_chars`).
+type AgentInterviewLimits struct {
+	InstructionsMaxBytes int      `json:"instructions_max_bytes"`
+	MaxAllowedTools      int      `json:"max_allowed_tools"`
+	MaxCostUsdPerRun     float32  `json:"max_cost_usd_per_run"`
+	MaxMcpServers        int      `json:"max_mcp_servers"`
+	MaxSkillFiles        int      `json:"max_skill_files"`
+	MaxSkills            int      `json:"max_skills"`
+	McpStdioRunners      []string `json:"mcp_stdio_runners"`
+
+	// QuestionMaxChars The longest question of an answer.
+	QuestionMaxChars         int `json:"question_max_chars"`
+	SkillBodyMaxBytes        int `json:"skill_body_max_bytes"`
+	SkillDescriptionMaxChars int `json:"skill_description_max_chars"`
+}
+
+// AgentInterviewRequest The interview so far, kept by the client (26 6.1). Nothing of it is stored.
+type AgentInterviewRequest struct {
+	// Turns The builder's earlier questions and the person's answers, oldest first; at most `agents.interview.max_turns`. Empty for the start of an interview.
+	Turns []AgentInterviewTurn `json:"turns"`
+
+	// WantDraft The person asks for a draft now instead of further questions.
+	WantDraft *bool `json:"want_draft,omitempty"`
+}
+
+// AgentInterviewRequestedEvent Ephemeral event `agent.interview_requested` (no `seq`, at most once).
+type AgentInterviewRequestedEvent struct {
+	Actor    *EventActor                           `json:"actor,omitempty"`
+	Audience *AgentInterviewRequestedEventAudience `json:"audience,omitempty"`
+
+	// ClientMsgId UUIDv7 (RFC 9562), lowercase canonical form.
+	ClientMsgId *Uuid `json:"client_msg_id,omitempty"`
+
+	// CorrelationId W3C trace ID (16 bytes) of the request, written as a lowercase UUID; not a UUIDv7. Generated by the server.
+	//
+	// Examples: 4bf92f35-77b3-4da6-a3ce-929d0e0e4736
+	CorrelationId *CorrelationId `json:"correlation_id,omitempty"`
+
+	// Id UUIDv7 (RFC 9562), lowercase canonical form.
+	Id Uuid `json:"id"`
+
+	// InvocationToken Fresh invocation token (JWS, I3); only on agent-addressed invocation events.
+	InvocationToken *string `json:"invocation_token,omitempty"`
+
+	// OccurredAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+	OccurredAt Timestamp `json:"occurred_at"`
+
+	// Payload Sent to one gateway connection of the builder agent (26 6.1 item 1), without a token. The turns and the catalogue are data, never instructions (ADR 0054).
+	Payload           AgentInterviewRequestedPayload `json:"payload"`
+	PermissionVersion *int64                         `json:"permission_version,omitempty"`
+	Redacted          *bool                          `json:"redacted,omitempty"`
+
+	// Redelivered Set on redelivery to an agent consumer after `agent.ack_timeout`.
+	Redelivered *bool         `json:"redelivered,omitempty"`
+	Resource    EventResource `json:"resource"`
+
+	// SchemaVersion Examples: 1
+	SchemaVersion int `json:"schema_version"`
+
+	// Scope Location of the event. Members are absent where not applicable.
+	Scope EventScope `json:"scope"`
+
+	// Seq Global commit-ordered sequence; absent for ephemeral events.
+	//
+	// Examples: 5301
+	Seq *int64 `json:"seq,omitempty"`
+
+	// SyncEpoch Delivery-only member of outgoing webhooks; the time line of the event log (04, 7.5; ADR 0059). A receiver that sees a new epoch resets its `seq` state.
+	SyncEpoch *Uuid `json:"sync_epoch,omitempty"`
+
+	// TraceContext W3C `traceparent` of the triggering request; only in deliveries to agent adapters and only if the request was recorded.
+	//
+	// Examples: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01
+	TraceContext *string `json:"trace_context,omitempty"`
+
+	// Truncated The payload was cut to `sync.event_payload_max_bytes`; load the resource via REST.
+	Truncated *bool                            `json:"truncated,omitempty"`
+	Type      AgentInterviewRequestedEventType `json:"type"`
+}
+
+// AgentInterviewRequestedEventAudience defines model for AgentInterviewRequestedEvent.Audience.
+type AgentInterviewRequestedEventAudience string
+
+// AgentInterviewRequestedEventType defines model for AgentInterviewRequestedEvent.Type.
+type AgentInterviewRequestedEventType string
+
+// AgentInterviewRequestedPayload Sent to one gateway connection of the builder agent (26 6.1 item 1), without a token. The turns and the catalogue are data, never instructions (ADR 0054).
+type AgentInterviewRequestedPayload struct {
+	// Catalogue The template catalogue (26 7.4); a drafted MCP server must equal one of its servers except `name`.
+	Catalogue []AgentInterviewCatalogueEntry `json:"catalogue"`
+
+	// ExpiresAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+	ExpiresAt Timestamp `json:"expires_at"`
+
+	// Limits The limits a draft must keep (the values of `agents.definition.*`, `agents.mcp_stdio_runners` and `agents.interview.answer_max_chars`).
+	Limits AgentInterviewLimits `json:"limits"`
+
+	// RequestId UUIDv7 (RFC 9562), lowercase canonical form.
+	RequestId Uuid `json:"request_id"`
+
+	// Turns The interview so far, oldest first.
+	Turns     []AgentInterviewTurn `json:"turns"`
+	WantDraft bool                 `json:"want_draft"`
+}
+
+// AgentInterviewTurn defines model for AgentInterviewTurn.
+type AgentInterviewTurn struct {
+	// Role `builder` for a question of the builder, `owner` for an answer of the person.
+	Role AgentInterviewTurnRole `json:"role"`
+
+	// Text At most `agents.interview.answer_max_chars` characters; line breaks allowed, no other control or bidi character.
+	Text string `json:"text"`
+}
+
+// AgentInterviewTurnRole `builder` for a question of the builder, `owner` for an answer of the person.
+type AgentInterviewTurnRole string
 
 // AgentInvocationEvent Durable event `agent.invocation`.
 type AgentInvocationEvent struct {
@@ -20297,8 +20652,14 @@ type OnUserUpdatedEventParams struct {
 	WebhookSignature WebhookSignature `json:"webhook-signature"`
 }
 
+// AnswerAgentInterviewJSONRequestBody defines body for AnswerAgentInterview for application/json ContentType.
+type AnswerAgentInterviewJSONRequestBody = AgentInterviewBuilderAnswer
+
 // CreateAgentJSONRequestBody defines body for CreateAgent for application/json ContentType.
 type CreateAgentJSONRequestBody = AgentCreate
+
+// InterviewAgentJSONRequestBody defines body for InterviewAgent for application/json ContentType.
+type InterviewAgentJSONRequestBody = AgentInterviewRequest
 
 // AckAgentEventsJSONRequestBody defines body for AckAgentEvents for application/json ContentType.
 type AckAgentEventsJSONRequestBody = ConsumerAck

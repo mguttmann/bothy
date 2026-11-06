@@ -1894,6 +1894,18 @@ actions:
   rights_change: false
   rl_class: rl.agent_runtime
   effect: write
+- id: agent.interview
+  section: agents
+  description: send the interview so far to the builder agent and return its questions or draft ([26-builtin-agents.md](26-builtin-agents.md)
+    6.1)
+  resource: instance
+  right: owner
+  owner: true
+  step_up: false
+  audit: always
+  rights_change: false
+  rl_class: rl.trigger
+  effect: write
 - id: command.read
   section: agents
   description: see the command list and options (built-in commands, those of the operator, of allowed
@@ -1966,6 +1978,17 @@ actions:
   rights_change: false
   rl_class: rl.agent_runtime
   effect: read
+- id: agent.interview.respond
+  section: agents
+  description: answer an open `agent.interview_requested` with questions or a draft (REST)
+  resource: agent
+  right: agent-self, the builder agent the request was sent to
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.agent_runtime
+  effect: write
 - id: command.invoke
   section: agents
   description: 'run a command. Agent commands check `required_level` and `agent.invoke`; model commands
@@ -3063,6 +3086,15 @@ events:
   receivers: agent
   receive_text: self (the assistant agent of `search.assist.agent_id`); additionally `agent.events.consume`
   note: carries no token and no ids of threads or messages; only to one gateway connection of the assistant
+  resource_version: false
+- type: agent.interview_requested
+  kind: ephemeral
+  resource: agent
+  receive_action: agent.events.consume
+  audience: self
+  receivers: agent
+  receive_text: self (the builder agent of `agents.builder_agent_id`); additionally `agent.events.consume`
+  note: carries no token; the interview so far, the template catalogue and the definition limits; only to one gateway connection of the builder
   resource_version: false
 ws_ops:
 - op: identify

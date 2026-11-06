@@ -25,12 +25,18 @@ type ServerInterface interface {
 	// ListPermissionHints List the permission hints
 	// (GET /access/hints)
 	ListPermissionHints(w http.ResponseWriter, r *http.Request, params ListPermissionHintsParams)
+	// AnswerAgentInterview Answer an interview request
+	// (POST /agent-interview-requests/{request_id}/answer)
+	AnswerAgentInterview(w http.ResponseWriter, r *http.Request, requestId RequestIdPath)
 	// ListAgents List visible agents
 	// (GET /agents)
 	ListAgents(w http.ResponseWriter, r *http.Request, params ListAgentsParams)
 	// CreateAgent Create an agent
 	// (POST /agents)
 	CreateAgent(w http.ResponseWriter, r *http.Request, params CreateAgentParams)
+	// InterviewAgent Let the builder agent interview the owner for a new agent
+	// (POST /agents/interview)
+	InterviewAgent(w http.ResponseWriter, r *http.Request)
 	// ListServedChannels List channels the agent serves
 	// (GET /agents/me/channels)
 	ListServedChannels(w http.ResponseWriter, r *http.Request)
@@ -1169,6 +1175,32 @@ func (siw *ServerInterfaceWrapper) ListPermissionHints(w http.ResponseWriter, r 
 	handler.ServeHTTP(w, r)
 }
 
+// AnswerAgentInterview operation middleware
+func (siw *ServerInterfaceWrapper) AnswerAgentInterview(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "request_id" -------------
+	var requestId RequestIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "request_id", r.PathValue("request_id"), &requestId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "request_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AnswerAgentInterview(w, r, requestId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListAgents operation middleware
 func (siw *ServerInterfaceWrapper) ListAgents(w http.ResponseWriter, r *http.Request) {
 
@@ -1247,6 +1279,20 @@ func (siw *ServerInterfaceWrapper) CreateAgent(w http.ResponseWriter, r *http.Re
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateAgent(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// InterviewAgent operation middleware
+func (siw *ServerInterfaceWrapper) InterviewAgent(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.InterviewAgent(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -14941,6 +14987,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/search/thread-titles", wrapper.SearchThreadTitles)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/search/assist", wrapper.AssistSearch)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/search-assist-requests/{request_id}/answer", wrapper.AnswerSearchAssist)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/agent-interview-requests/{request_id}/answer", wrapper.AnswerAgentInterview)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/sync/snapshot", wrapper.GetSnapshot)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/events", wrapper.ListEvents)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me/read-states", wrapper.ListMyReadStates)
@@ -14958,6 +15005,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/client-metrics", wrapper.SubmitClientMetrics)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents", wrapper.ListAgents)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/agents", wrapper.CreateAgent)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/agents/interview", wrapper.InterviewAgent)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents/{agent_id}", wrapper.GetAgent)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/agents/{agent_id}", wrapper.UpdateAgent)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/agents/{agent_id}/disable", wrapper.DisableAgent)
@@ -15261,12 +15309,18 @@ type StrictServerInterface interface {
 	// ListPermissionHints List the permission hints
 	// (GET /access/hints)
 	ListPermissionHints(ctx context.Context, request ListPermissionHintsRequestObject) (ListPermissionHintsResponseObject, error)
+	// AnswerAgentInterview Answer an interview request
+	// (POST /agent-interview-requests/{request_id}/answer)
+	AnswerAgentInterview(ctx context.Context, request AnswerAgentInterviewRequestObject) (AnswerAgentInterviewResponseObject, error)
 	// ListAgents List visible agents
 	// (GET /agents)
 	ListAgents(ctx context.Context, request ListAgentsRequestObject) (ListAgentsResponseObject, error)
 	// CreateAgent Create an agent
 	// (POST /agents)
 	CreateAgent(ctx context.Context, request CreateAgentRequestObject) (CreateAgentResponseObject, error)
+	// InterviewAgent Let the builder agent interview the owner for a new agent
+	// (POST /agents/interview)
+	InterviewAgent(ctx context.Context, request InterviewAgentRequestObject) (InterviewAgentResponseObject, error)
 	// ListServedChannels List channels the agent serves
 	// (GET /agents/me/channels)
 	ListServedChannels(ctx context.Context, request ListServedChannelsRequestObject) (ListServedChannelsResponseObject, error)
@@ -16356,6 +16410,39 @@ func (sh *strictHandler) ListPermissionHints(w http.ResponseWriter, r *http.Requ
 	}
 }
 
+// AnswerAgentInterview operation middleware
+func (sh *strictHandler) AnswerAgentInterview(w http.ResponseWriter, r *http.Request, requestId RequestIdPath) {
+	var request AnswerAgentInterviewRequestObject
+
+	request.RequestId = requestId
+
+	var body AnswerAgentInterviewJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.AnswerAgentInterview(ctx, request.(AnswerAgentInterviewRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AnswerAgentInterview")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(AnswerAgentInterviewResponseObject); ok {
+		if err := validResponse.VisitAnswerAgentInterviewResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // ListAgents operation middleware
 func (sh *strictHandler) ListAgents(w http.ResponseWriter, r *http.Request, params ListAgentsParams) {
 	var request ListAgentsRequestObject
@@ -16408,6 +16495,37 @@ func (sh *strictHandler) CreateAgent(w http.ResponseWriter, r *http.Request, par
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(CreateAgentResponseObject); ok {
 		if err := validResponse.VisitCreateAgentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// InterviewAgent operation middleware
+func (sh *strictHandler) InterviewAgent(w http.ResponseWriter, r *http.Request) {
+	var request InterviewAgentRequestObject
+
+	var body InterviewAgentJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.InterviewAgent(ctx, request.(InterviewAgentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "InterviewAgent")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(InterviewAgentResponseObject); ok {
+		if err := validResponse.VisitInterviewAgentResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

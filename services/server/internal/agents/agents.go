@@ -15,12 +15,13 @@ import (
 // sections 6 and 7): the durable event agent.updated (M1-51), the ephemeral event
 // agent.presence_changed (M2-20), the durable event command.changed of the command register
 // (M2-16), the durable event agent.definition_changed of the definitions of built-in agents
-// (A1-02), the durable event agent.hosting_changed to a hosting runner (A1-03) and the client op
-// ack of agent consumers (M2-07). internal/wire lists it in
-// moduleRegistrations.
+// (A1-02), the durable event agent.hosting_changed to a hosting runner (A1-03), the ephemeral event
+// agent.interview_requested of the interview (A1-07) and the client op ack of agent consumers
+// (M2-07). internal/wire lists it in moduleRegistrations.
 func Register(r *authorize.Registry) {
 	r.Event("agents", authorize.EventAgentUpdated)
 	r.Event("agents", authorize.EventAgentDefinitionChanged)
+	r.Event("agents", authorize.EventAgentInterviewRequested)
 	r.Event("agents", authorize.EventAgentPresenceChanged)
 	r.Event("agents", authorize.EventCommandChanged)
 	r.Event("agents", authorize.EventAgentHostingChanged)

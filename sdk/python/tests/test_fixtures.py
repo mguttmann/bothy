@@ -32,6 +32,7 @@ EVENT_FIXTURES = (
 EPHEMERAL_FIXTURES = {
     "command.autocomplete_requested": models.CommandAutocompleteRequestedEvent,
     "search.assist_requested": models.SearchAssistRequestedEvent,
+    "agent.interview_requested": models.AgentInterviewRequestedEvent,
 }
 BODY_FIXTURES = {
     "run": models.Run,

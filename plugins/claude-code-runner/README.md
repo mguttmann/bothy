@@ -163,6 +163,34 @@ references and further search terms; the usage goes back as costs, which the per
 estimate. A failed call logs `search_assist_failed` with a code and sends nothing; neither the
 question nor a candidate nor the reply is logged.
 
+## Builder of the interview (26 6.2)
+
+With `runner.agent_builder = true` (default `false`) the runner answers the interview of "New
+agent" when the server names its agent in `agents.builder_agent_id`: only that agent receives
+`agent.interview_requested`. Each request is one `claude -p` call without tools: the flags of the
+class `chat` (`--tools ""`, `--disallowedTools "mcp__*"`), `--output-format json`,
+`--no-session-persistence`, the model `runner.agent_builder_model` (default `sonnet`), the fixed
+instruction `prompts/agent_builder.md` as system prompt and the interview so far, the template
+catalogue and the definition limits as a data block marked as untrusted content on stdin. It runs
+in a private folder below `runner.state_dir/agent-builder/`, removed afterwards, with the billing
+rule of the search assistant, and within `runner.agent_builder_timeout` (default `80s`), never
+past the request's `expires_at`.
+
+Keep `runner.agent_builder_timeout` below the server's `agents.interview.timeout` (default
+`90s`): the runner cannot read the server's key, and an answer after the server stopped waiting
+is refused with `410`.
+
+The runner parses the last JSON object of the reply and checks it before it sends anything: the
+answer schema (one or two questions, or a draft with `name`, `handle`, `description` and an
+optional `channel_suggestion`, no other member) and its own copy of the definition rules of 26
+4.2 and 4.3 (`src/claude_code_runner/definition.py`, held equal to the server by the whole corpus
+`tests/agent-definitions` in `tests/unit/test_definition.py`) for the class of the draft's
+`settings.tool_class_wish`. An answer that fails sends nothing and logs `agent_builder_failed`
+with a code (`invalid_answer` names the failed rule, never a value); the server then falls back
+with `builder_timeout` and the apps offer the templates and the manual form. Neither a turn nor
+the reply is logged. The builder holds no tool and writes no file; the cost of the call goes back
+as `costs`, which the owner sees as an estimate.
+
 ## Voice messages (09 18.14)
 
 Claude Code cannot hear audio. With `runner.transcribe_cmd` set, every audio attachment

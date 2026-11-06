@@ -162,8 +162,9 @@ docker compose -f compose.yaml -f compose.multi-node.yaml up -d
    `cluster.mode = multi`, as the worker does. What crosses the nodes and how failures show is
    in [multi-node.md](multi-node.md).
 7. The idle timeouts of `edge` follow the defaults of `terminal.idle_timeout` plus
-   `terminal.idle_grace` on the stream paths and of `terminal.host_heartbeat_interval` times
-   `terminal.host_heartbeat_miss_limit` elsewhere. If you change these keys, change
+   `terminal.idle_grace` on the stream paths, of `agents.interview.timeout` plus
+   `http.request_timeout` on `/api/v1/agents/interview` and of `terminal.host_heartbeat_interval`
+   times `terminal.host_heartbeat_miss_limit` elsewhere. If you change these keys, change
    `infra/compose/edge/nginx.conf` and the timeouts of your own proxy with them.
 
 ### 5.4 Panel plugin "Bothy Live" in Grafana

@@ -90,6 +90,8 @@ rules:
         - agent.host.set
         - agent.hosted.list
         - agent.hosted_token.issue
+        - agent.interview
+        - agent.interview.respond
         - agent.invoke
         - agent.project_folders.read
         - agent.read
@@ -363,6 +365,8 @@ rules:
         - agent.host.set
         - agent.hosted.list
         - agent.hosted_token.issue
+        - agent.interview
+        - agent.interview.respond
         - agent.invoke
         - agent.project_folders.read
         - agent.read

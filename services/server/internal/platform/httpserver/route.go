@@ -37,8 +37,11 @@ func (c *Chain) routeStage(op Operation, next http.Handler) http.Handler {
 		h.Set(headerCORP, valueSameOrigin)
 
 		limit, timeout := c.bodyLimit(op), c.cfg.RequestTimeout
-		if op.transfer() {
+		switch {
+		case op.transfer():
 			timeout = c.cfg.TransferTimeout
+		case op.Timeout > 0:
+			timeout = op.Timeout
 		}
 		// A body is read under the deadline of the route class (02 "Deadlines"), so a client that
 		// trickles its body cannot hold a request beyond it; transfers also bound the write. A JSON
