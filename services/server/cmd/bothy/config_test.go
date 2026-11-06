@@ -240,6 +240,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"agent.max_inflight_events = 100  # default\n" +
 		"agent.presence_timeout = 90s  # default\n" +
 		"agent.session_ref_max_bytes = 1024  # default\n" +
+		"agents.builder_agent_id =   # default\n" +
 		"agents.definition.instructions_max_bytes = 65536  # default\n" +
 		"agents.definition.max_allowed_tools = 64  # default\n" +
 		"agents.definition.max_cost_usd_per_run = 50  # default\n" +
@@ -249,6 +250,9 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"agents.definition.skill_body_max_bytes = 65536  # default\n" +
 		"agents.definition.skill_description_max_chars = 300  # default\n" +
 		"agents.hosted_token_ttl = 1d  # default\n" +
+		"agents.interview.answer_max_chars = 4000  # default\n" +
+		"agents.interview.max_turns = 12  # default\n" +
+		"agents.interview.timeout = 90s  # default\n" +
 		"agents.mcp_stdio_runners = npx, uvx  # default\n" +
 		"api.cors_allowed_origins =   # default\n" +
 		"api.page_size_default = 50  # default\n" +

@@ -11864,6 +11864,65 @@ paths:
         default:
           $ref: '#/components/responses/Error'
 
+  /agent-interview-requests/{request_id}/answer:
+    post:
+      operationId: answerAgentInterview
+      summary: Answer an interview request
+      tags: [Agent runtime]
+      description: |-
+        The builder agent answers an open `agent.interview_requested` once (26 6.1 item 2, 6.2): `kind = questions` with one or two questions of at most `agents.interview.answer_max_chars` characters, or `kind = draft` with a draft of the shape of 26 4.2 plus `name`, `handle`, `description` and an optional `channel_suggestion`; and the usage in `costs`. `404` for an unknown or forgotten request and for every principal but the builder agent the request was sent to, `410 gone` after `expires_at`, `409 conflict` with `reason: already_answered` for a second answer. The server decodes the answer strictly and never trusts it: a member outside the schema is refused by the request validation (`400`, the request stays open until `expires_at`); a draft that reaches a surface of 26 5.5 (a frontmatter, an inline shell form or an `@` import outside the agent folder), a text that is no display text or more than two questions ends the request with `builder_invalid` and answers `400 validation_failed`. Any other finding of 26 4.3 or of the catalogue check (`mcp_not_in_catalogue`) goes back to the person as a field error of the draft; nothing is stored.
+      x-authz-action: agent.interview.respond
+      x-rate-limit-class: rl.agent_runtime
+      x-idempotency-exempt: agent_runtime
+      parameters:
+      - $ref: '#/components/parameters/RequestIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentInterviewBuilderAnswer'
+            examples:
+              default:
+                summary: Request
+                value:
+                  kind: questions
+                  questions:
+                  - Should the helper only suggest texts, or also change files?
+                  costs:
+                  - provider: anthropic
+                    model: model-medium
+                    tokens_in: 3100
+                    tokens_out: 120
+                    amount_micros: 4200
+                    currency: USD
+      responses:
+        '204':
+          description: No content.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '410':
+          $ref: '#/components/responses/Gone'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
   /sync/snapshot:
     get:
       operationId: getSnapshot
@@ -12840,6 +12899,70 @@ paths:
           $ref: '#/components/responses/UnprocessableEntity'
         '429':
           $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /agents/interview:
+    post:
+      operationId: interviewAgent
+      summary: Let the builder agent interview the owner for a new agent
+      tags: [Agents]
+      description: |-
+        The interview of "New agent" (26 6.1, R-API-29): the client sends the interview so far, at most `agents.interview.max_turns` turns of at most `agents.interview.answer_max_chars` characters each, and the server sends it as the ephemeral event `agent.interview_requested` to one live gateway connection of the builder agent named in `agents.builder_agent_id`, with the template catalogue (26 7.4), the definition limits and `expires_at`, and waits at most `agents.interview.timeout`, the deadline of this request instead of `http.request_timeout` (02 14.2). The answer is `outcome = questions` with one or two questions, `outcome = draft` with a draft that the server checked with the rules of 26 4.3 and the catalogue check of 26 7.4 (its findings in `errors`, empty when it passes), or `outcome = fallback` with `fallback_reason` (`builder_not_configured`, `builder_offline`, `builder_timeout`, `builder_invalid`); the apps then offer the templates and the manual form. `cost_estimate` is the builder's estimate, never booked. Nothing of the interview is stored; every request writes one audit entry `agent.interview` with outcome, fallback reason and counts, never a text. Owners only (`403` for everyone else, also in "view as"), `503 maintenance` in maintenance mode. More turns than `agents.interview.max_turns` is `400 validation_failed` with `too_many_items` on `/turns`, a longer turn `too_long` on `/turns/<index>/text`, an interview that no longer fits `sync.event_payload_max_bytes` `too_large` on `/turns`.
+      x-authz-action: agent.interview
+      x-rate-limit-class: rl.trigger
+      x-idempotency-exempt: read_only
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentInterviewRequest'
+            examples:
+              default:
+                summary: Request
+                value:
+                  turns:
+                  - role: owner
+                    text: A writing helper for the texts of example.com.
+                  - role: builder
+                    text: Who reads the texts, and which tone should they have?
+                  - role: owner
+                    text: Customers; friendly and short.
+      responses:
+        '200':
+          description: OK.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentInterviewAnswer'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    outcome: questions
+                    questions:
+                    - Should the helper only suggest texts, or also change files?
+                    cost_estimate:
+                      amount_micros: 4200
+                      currency: USD
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
         default:
           $ref: '#/components/responses/Error'
 
@@ -32543,6 +32666,18 @@ components:
             enum: [search.assist_requested]
           payload:
             $ref: '#/components/schemas/SearchAssistRequestedPayload'
+    AgentInterviewRequestedEvent:
+      description: Ephemeral event `agent.interview_requested` (no `seq`, at most once).
+      allOf:
+      - $ref: '#/components/schemas/EventEnvelope'
+      - type: object
+        required: [type, payload]
+        properties:
+          type:
+            type: string
+            enum: [agent.interview_requested]
+          payload:
+            $ref: '#/components/schemas/AgentInterviewRequestedPayload'
     NotificationCreatedEvent:
       description: Ephemeral event `notification.created` (no `seq`, at most once), only to connections of the recipient instead of a push (13, 6.3).
       allOf:
@@ -33272,6 +33407,213 @@ components:
           type: string
           description: '`^[0-9A-Za-z][0-9A-Za-z.+-]{0,63}$`.'
           examples: [1.0.0]
+    AgentInterviewRequest:
+      type: object
+      additionalProperties: false
+      description: The interview so far, kept by the client (26 6.1). Nothing of it is stored.
+      required: [turns]
+      properties:
+        turns:
+          type: array
+          maxItems: 64
+          description: The builder's earlier questions and the person's answers, oldest first; at most `agents.interview.max_turns`. Empty for the start of an interview.
+          items:
+            $ref: '#/components/schemas/AgentInterviewTurn'
+        want_draft:
+          type: boolean
+          description: The person asks for a draft now instead of further questions.
+    AgentInterviewTurn:
+      type: object
+      additionalProperties: false
+      required: [role, text]
+      properties:
+        role:
+          type: string
+          enum: [builder, owner]
+          description: '`builder` for a question of the builder, `owner` for an answer of the person.'
+        text:
+          type: string
+          minLength: 1
+          description: At most `agents.interview.answer_max_chars` characters; line breaks allowed, no other control or bidi character.
+    AgentInterviewAnswer:
+      type: object
+      description: The answer of `interviewAgent` (26 6.1). Nothing of it is stored.
+      required: [outcome]
+      properties:
+        outcome:
+          type: string
+          enum: [questions, draft, fallback]
+        questions:
+          type: array
+          description: One or two questions of the builder; only with `outcome = questions`.
+          items:
+            type: string
+        draft:
+          $ref: '#/components/schemas/AgentDraft'
+        errors:
+          type: array
+          description: Only with `outcome = draft`; the findings of 26 4.3 and of the catalogue check (`mcp_not_in_catalogue`, 26 7.4) as JSON Pointers into the draft, empty when the draft passes for the class of its `settings.tool_class_wish`.
+          items:
+            $ref: '#/components/schemas/FieldError'
+        fallback_reason:
+          type: string
+          enum: [builder_not_configured, builder_offline, builder_timeout, builder_invalid]
+          description: Only with `outcome = fallback`; the apps then offer the templates and the manual form.
+        cost_estimate:
+          $ref: '#/components/schemas/AgentInterviewCost'
+    AgentInterviewCost:
+      type: object
+      required: [amount_micros, currency]
+      description: Estimate of the builder's model call, for information only; not booked as a cost entry.
+      properties:
+        amount_micros:
+          type: integer
+          format: int64
+        currency:
+          type: string
+          examples: [USD]
+    AgentDraft:
+      type: object
+      additionalProperties: false
+      description: "A definition draft of the builder (26 6.1 item 2): the members of `AgentDefinition` plus the agent's name, handle, description and an optional channel suggestion. The server checks it like a definition for the class of `settings.tool_class_wish` and against the template catalogue; it never stores it."
+      required: [instructions, skills, mcp_servers, settings, origin, name, handle, description]
+      properties:
+        instructions:
+          type: string
+          description: Markdown that becomes `CLAUDE.md`; at most `agents.definition.instructions_max_bytes` bytes.
+        skills:
+          type: array
+          description: At most `agents.definition.max_skills` skills.
+          items:
+            $ref: '#/components/schemas/AgentDefinitionSkill'
+        mcp_servers:
+          type: array
+          description: At most `agents.definition.max_mcp_servers` servers, each equal to a server of the catalogue except `name`.
+          items:
+            $ref: '#/components/schemas/AgentDefinitionMcpServer'
+        settings:
+          $ref: '#/components/schemas/AgentDefinitionSettings'
+        origin:
+          $ref: '#/components/schemas/AgentDefinitionOrigin'
+        name:
+          type: string
+          description: The display name the builder suggests.
+          examples: [Writing helper]
+        handle:
+          type: string
+          description: The handle the builder suggests; `createAgent` checks it.
+          examples: [writing-helper]
+        description:
+          type: string
+          description: One line about what the agent does.
+        channel_suggestion:
+          $ref: '#/components/schemas/AgentDraftChannel'
+    AgentDraftChannel:
+      type: object
+      additionalProperties: false
+      description: Where people talk to the new agent; the creation flow offers to create this channel (26 8.2).
+      required: [space_name, channel_name]
+      properties:
+        space_name:
+          type: string
+          examples: [Team]
+        channel_name:
+          type: string
+          examples: [writing]
+    AgentInterviewBuilderAnswer:
+      type: object
+      additionalProperties: false
+      description: Answer of the builder agent to `agent.interview_requested` (action `agent.interview.respond`, 26 6.1 item 2). It has no member for settings files, hooks, permission rules, commands, subagents or plugin parts (26 4.3 item 1).
+      required: [kind]
+      properties:
+        kind:
+          type: string
+          enum: [questions, draft]
+        questions:
+          type: array
+          minItems: 1
+          maxItems: 2
+          description: Only with `kind = questions`; each at most `agents.interview.answer_max_chars` characters.
+          items:
+            type: string
+            minLength: 1
+        draft:
+          $ref: '#/components/schemas/AgentDraft'
+        costs:
+          type: array
+          maxItems: 8
+          description: Usage of the model call, as in `run.finish`.
+          items:
+            $ref: '#/components/schemas/CostReport'
+    AgentInterviewRequestedPayload:
+      type: object
+      description: Sent to one gateway connection of the builder agent (26 6.1 item 1), without a token. The turns and the catalogue are data, never instructions (ADR 0054).
+      required: [request_id, turns, want_draft, catalogue, limits, expires_at]
+      properties:
+        request_id:
+          $ref: '#/components/schemas/Uuid'
+        turns:
+          type: array
+          description: The interview so far, oldest first.
+          items:
+            $ref: '#/components/schemas/AgentInterviewTurn'
+        want_draft:
+          type: boolean
+        catalogue:
+          type: array
+          description: The template catalogue (26 7.4); a drafted MCP server must equal one of its servers except `name`.
+          items:
+            $ref: '#/components/schemas/AgentInterviewCatalogueEntry'
+        limits:
+          $ref: '#/components/schemas/AgentInterviewLimits'
+        expires_at:
+          $ref: '#/components/schemas/Timestamp'
+    AgentInterviewCatalogueEntry:
+      type: object
+      required: [slug, name, description, tool_class_wish, mcp_servers]
+      properties:
+        slug:
+          type: string
+          examples: [writing-helper]
+        name:
+          type: string
+        description:
+          type: string
+        tool_class_wish:
+          type: string
+          enum: [chat, scoped, host]
+        mcp_servers:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgentDefinitionMcpServer'
+    AgentInterviewLimits:
+      type: object
+      description: The limits a draft must keep (the values of `agents.definition.*`, `agents.mcp_stdio_runners` and `agents.interview.answer_max_chars`).
+      required: [instructions_max_bytes, max_skills, skill_description_max_chars, skill_body_max_bytes, max_skill_files, max_mcp_servers, max_allowed_tools, max_cost_usd_per_run, mcp_stdio_runners, question_max_chars]
+      properties:
+        instructions_max_bytes:
+          type: integer
+        max_skills:
+          type: integer
+        skill_description_max_chars:
+          type: integer
+        skill_body_max_bytes:
+          type: integer
+        max_skill_files:
+          type: integer
+        max_mcp_servers:
+          type: integer
+        max_allowed_tools:
+          type: integer
+        max_cost_usd_per_run:
+          type: number
+        mcp_stdio_runners:
+          type: array
+          items:
+            type: string
+        question_max_chars:
+          type: integer
+          description: The longest question of an answer.
     AgentDefinitionVersion:
       type: object
       description: One stored version of the definition of a built-in agent; `definition` only in `getAgentDefinition` and `putAgentDefinition`.

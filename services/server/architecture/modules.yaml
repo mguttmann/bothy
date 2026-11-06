@@ -139,14 +139,15 @@ modules:
               agent.billing_mode.set, agent.billing_mode.set_all, agent.credential_holder.set,
               agent.tool_class.set, agent.heartbeat, agent.events.consume, agent.triggerers.read,
               agent.project_folders.read, agent.definition.read, agent.host.set, agent.hosted.list,
-              agent.hosted_token.issue,
+              agent.hosted_token.issue, agent.interview, agent.interview.respond,
               agent_session.read, agent_session.reset, agent_session.bind, agent_session.report,
               command.read, command.register, command.remove, dev_environment.read,
               dev_environment.manage, dev_environment.report]
     # agent.definition_changed to the built-in agent itself (A1-02, 26 4.1), agent.hosting_changed
     # to the old and the new hosting runner (A1-03).
     events: [agent_session.changed, command.changed, agent.updated, agent.definition_changed, agent.hosting_changed]
-    ephemeral_events: [agent.presence_changed]
+    # agent.interview_requested to one live connection of the builder agent (A1-07, 26 6.1).
+    ephemeral_events: [agent.presence_changed, agent.interview_requested]
     ws_ops: [ack]
     depends_on: [identity, authz, chat]
     adapter_vendors: [otel, pgx]   # sqlc code and the repository (M1-51); adapters/otelmetrics observes the presence gauges (M2-20)

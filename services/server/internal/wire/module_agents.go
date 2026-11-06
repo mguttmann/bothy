@@ -39,6 +39,9 @@ func agentsWiring() moduleWiring {
 			if h.Commands == nil && s.agents != nil {
 				h.Commands = s.agents.CommandHandlers
 			}
+			if h.Interview == nil && s.agents != nil {
+				h.Interview = s.agents.InterviewHandlers
+			}
 		},
 	}
 }
@@ -120,6 +123,14 @@ func (s *server) startAgents(context.Context) error {
 	admin := s.authzAdmin
 	s.mu.Unlock()
 	if err := bindGuidedFlow(admin, ag); err != nil {
+		return err
+	}
+	icfg, err := InterviewConfigFrom(s.values)
+	if err != nil {
+		return err
+	}
+	if err := ag.BindInterview(icfg, cfg, InterviewDeps{UoW: a.UoW(), Authorizer: az, Audit: a.Recorder(), Clock: s.deps.Clock,
+		Log: s.logger()}); err != nil {
 		return err
 	}
 	pcfg, err := PresenceConfigFrom(s.values)

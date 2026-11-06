@@ -319,3 +319,32 @@ func TestTransferDeadline_UsesTransferTimeout(t *testing.T) {
 		t.Fatalf("deadlines %v", left)
 	}
 }
+
+// TestOwnDeadline_ReplacesRequestTimeout: an operation with its own deadline (Operation.Timeout,
+// the interview of A1-07: agents.interview.timeout plus http.request_timeout, 02 section 14.2)
+// runs under it instead of http.request_timeout; the other operations keep theirs.
+func TestOwnDeadline_ReplacesRequestTimeout(t *testing.T) {
+	t.Parallel()
+	cfg := httpserver.DefaultChainConfig(httpservertest.PublicURL)
+	cfg.RequestTimeout = time.Second
+	long := httpservertest.Op("exportThings", http.MethodGet, "/api/v1/things-export", "thing.read")
+	long.Timeout = time.Hour
+	get := getThing()
+	left := map[string]time.Duration{}
+	measure := func(name string) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			d, _ := r.Context().Deadline()
+			left[name] = time.Until(d)
+			w.WriteHeader(204)
+		}
+	}
+	h := httpservertest.New(t, httpservertest.Options{Config: &cfg, Routes: []httpservertest.Route{
+		{Op: long, Handler: httpservertest.Authorized(long.Action, measure("long"))},
+		{Op: get, Handler: httpservertest.Authorized(get.Action, measure("get"))},
+	}})
+	h.Do(h.NewRequest(http.MethodGet, "/api/v1/things-export", ""))
+	h.Do(h.NewRequest(http.MethodGet, "/api/v1/things/"+thingID, "", "X-Mode", "fast"))
+	if left["long"] < 59*time.Minute || left["get"] > time.Second {
+		t.Fatalf("deadlines %v", left)
+	}
+}

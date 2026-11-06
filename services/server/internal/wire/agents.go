@@ -68,6 +68,48 @@ type Agents struct {
 	// BindCommands, which the chat step calls once chat exists.
 	Commands        *agentsapp.CommandService
 	CommandHandlers *agentshttp.Commands
+	// Interviewer is the interview of "New agent" (A1-07) and InterviewHandlers its REST handlers;
+	// nil until BindInterview. The gateway step binds its relay (bindInterviewRelay).
+	Interviewer       *agentsapp.Interviewer
+	InterviewHandlers *agentshttp.Interview
+}
+
+// InterviewConfigFrom binds the keys of the interview (agents.builder_agent_id,
+// agents.interview.*, sync.event_payload_max_bytes, docs/spec/26-builtin-agents.md 14). The error
+// names the key whose binding failed, never a value.
+func InterviewConfigFrom(v *config.Values) (agentsapp.InterviewConfig, error) {
+	var c agentsapp.InterviewConfig
+	if err := config.Bind(v, &c); err != nil {
+		return agentsapp.InterviewConfig{}, err
+	}
+	return c, nil
+}
+
+// InterviewDeps are the collaborators of the interview from the other steps of the start.
+type InterviewDeps struct {
+	UoW        txn.UnitOfWork
+	Authorizer authorize.Authorizer
+	Audit      auditing.Recorder
+	Clock      clock.Clock
+	Log        *slog.Logger
+	// Catalogue is the template catalogue of 26 7.4; nil until the templates of A1-06 exist, which
+	// sends an empty catalogue.
+	Catalogue agentsapp.CatalogueSource
+}
+
+// BindInterview builds the interview of the agents module (A1-07) with the definition limits of
+// the agents configuration and its REST handlers. Without agents.builder_agent_id every request
+// falls back with builder_not_configured. Errors: a missing collaborator, a builder id that is no
+// UUID or a limit below 1.
+func (ag *Agents) BindInterview(cfg agentsapp.InterviewConfig, limits agentsapp.Config, d InterviewDeps) error {
+	iv, err := agentsapp.NewInterviewer(cfg, agentsapp.InterviewDeps{
+		Authorizer: d.Authorizer, UoW: d.UoW, Audit: d.Audit, Clock: d.Clock, Log: d.Log, Limits: limits.DefinitionLimits(), Catalogue: d.Catalogue,
+	})
+	if err != nil {
+		return err
+	}
+	ag.Interviewer, ag.InterviewHandlers = iv, agentshttp.NewInterview(iv)
+	return nil
 }
 
 // CommandsConfig binds the keys of the command register (command.max_per_principal,

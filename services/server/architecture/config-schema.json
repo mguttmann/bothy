@@ -134,6 +134,18 @@
       "doc": "Longest external_session_ref and model of an agent session in bytes; the maximum keeps an entry of the unique index on (agent_id, external_session_ref) within the PostgreSQL B-tree entry limit."
     },
     {
+      "name": "agents.builder_agent_id",
+      "env": "BOTHY_AGENTS__BUILDER_AGENT_ID",
+      "kind": "string",
+      "default": "",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "26-builtin-agents.md",
+      "doc": "Agent that answers interview requests (its id); empty means no interview, templates and the manual form only."
+    },
+    {
       "name": "agents.definition.instructions_max_bytes",
       "env": "BOTHY_AGENTS__DEFINITION__INSTRUCTIONS_MAX_BYTES",
       "kind": "int",
@@ -240,6 +252,42 @@
       "max": "",
       "chapter": "26-builtin-agents.md",
       "doc": "Lifetime of a token for a hosted agent; the hosting runner fetches a new one before it ends."
+    },
+    {
+      "name": "agents.interview.answer_max_chars",
+      "env": "BOTHY_AGENTS__INTERVIEW__ANSWER_MAX_CHARS",
+      "kind": "int",
+      "default": "4000",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "16000",
+      "chapter": "26-builtin-agents.md",
+      "doc": "Longest turn of the interview in characters, and longest question of the builder."
+    },
+    {
+      "name": "agents.interview.max_turns",
+      "env": "BOTHY_AGENTS__INTERVIEW__MAX_TURNS",
+      "kind": "int",
+      "default": "12",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "64",
+      "chapter": "26-builtin-agents.md",
+      "doc": "Most turns of the interview history in one request."
+    },
+    {
+      "name": "agents.interview.timeout",
+      "env": "BOTHY_AGENTS__INTERVIEW__TIMEOUT",
+      "kind": "duration",
+      "default": "90s",
+      "required": false,
+      "enum": [],
+      "min": "1ms",
+      "max": "",
+      "chapter": "26-builtin-agents.md",
+      "doc": "Longest wait of interviewAgent for the builder's answer; the deadline of that request instead of http.request_timeout."
     },
     {
       "name": "agents.mcp_stdio_runners",

@@ -14,6 +14,8 @@ import 'package:api_client/src/generated/model/agent_create.dart';
 import 'package:api_client/src/generated/model/agent_definition.dart';
 import 'package:api_client/src/generated/model/agent_definition_version.dart';
 import 'package:api_client/src/generated/model/agent_definition_version_page.dart';
+import 'package:api_client/src/generated/model/agent_interview_answer.dart';
+import 'package:api_client/src/generated/model/agent_interview_request.dart';
 import 'package:api_client/src/generated/model/agent_page.dart';
 import 'package:api_client/src/generated/model/agent_update.dart';
 import 'package:api_client/src/generated/model/billing_mode_set.dart';
@@ -552,6 +554,108 @@ class AgentsApi {
     }
 
     return Response<AgentDefinitionVersion>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// Let the builder agent interview the owner for a new agent
+  /// The interview of \&quot;New agent\&quot; (26 6.1, R-API-29): the client sends the interview so far, at most &#x60;agents.interview.max_turns&#x60; turns of at most &#x60;agents.interview.answer_max_chars&#x60; characters each, and the server sends it as the ephemeral event &#x60;agent.interview_requested&#x60; to one live gateway connection of the builder agent named in &#x60;agents.builder_agent_id&#x60;, with the template catalogue (26 7.4), the definition limits and &#x60;expires_at&#x60;, and waits at most &#x60;agents.interview.timeout&#x60;, the deadline of this request instead of &#x60;http.request_timeout&#x60; (02 14.2). The answer is &#x60;outcome &#x3D; questions&#x60; with one or two questions, &#x60;outcome &#x3D; draft&#x60; with a draft that the server checked with the rules of 26 4.3 and the catalogue check of 26 7.4 (its findings in &#x60;errors&#x60;, empty when it passes), or &#x60;outcome &#x3D; fallback&#x60; with &#x60;fallback_reason&#x60; (&#x60;builder_not_configured&#x60;, &#x60;builder_offline&#x60;, &#x60;builder_timeout&#x60;, &#x60;builder_invalid&#x60;); the apps then offer the templates and the manual form. &#x60;cost_estimate&#x60; is the builder&#39;s estimate, never booked. Nothing of the interview is stored; every request writes one audit entry &#x60;agent.interview&#x60; with outcome, fallback reason and counts, never a text. Owners only (&#x60;403&#x60; for everyone else, also in \&quot;view as\&quot;), &#x60;503 maintenance&#x60; in maintenance mode. More turns than &#x60;agents.interview.max_turns&#x60; is &#x60;400 validation_failed&#x60; with &#x60;too_many_items&#x60; on &#x60;/turns&#x60;, a longer turn &#x60;too_long&#x60; on &#x60;/turns/&lt;index&gt;/text&#x60;, an interview that no longer fits &#x60;sync.event_payload_max_bytes&#x60; &#x60;too_large&#x60; on &#x60;/turns&#x60;.
+  ///
+  /// Parameters:
+  /// * [agentInterviewRequest]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [AgentInterviewAnswer] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<AgentInterviewAnswer>> interviewAgent({
+    required AgentInterviewRequest agentInterviewRequest,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/agents/interview';
+    final _options = Options(
+      method: r'POST',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'apiKey',
+            'name': 'consoleSession',
+            'keyName': '__Host-console_session',
+            'where': '',
+          },
+          {'type': 'http', 'scheme': 'DPoP', 'name': 'dpopAuth'},
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearerAuth'},
+        ],
+        ...?extra,
+      },
+      contentType: 'application/json',
+      validateStatus: validateStatus,
+    );
+
+    dynamic _bodyData;
+
+    try {
+      const _type = FullType(AgentInterviewRequest);
+      _bodyData = _serializers.serialize(
+        agentInterviewRequest,
+        specifiedType: _type,
+      );
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _options.compose(_dio.options, _path),
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    final _response = await _dio.request<Object>(
+      _path,
+      data: _bodyData,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    AgentInterviewAnswer? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(
+              rawResponse,
+              specifiedType: const FullType(AgentInterviewAnswer),
+            ) as AgentInterviewAnswer;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<AgentInterviewAnswer>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,

@@ -21,7 +21,7 @@ var requirementGroups = []struct {
 	{"permission of the target action", Preview, []string{"access.preview"}},
 	{"owner", Owner, []string{
 		"access.view_as", "agent.billing_mode.set", "agent.billing_mode.set_all", "agent.create",
-		"agent.credential_holder.set", "agent.disable", "agent.enable", "agent.host.set", "agent.project_folders.read", "agent.tool_class.set",
+		"agent.credential_holder.set", "agent.disable", "agent.enable", "agent.host.set", "agent.interview", "agent.project_folders.read", "agent.tool_class.set",
 		"agent.update", "app.install", "app.read", "app.resume", "app.scopes.update", "app.suspend",
 		"app.uninstall", "audit.read", "audit.verify", "channel.operator.set", "channel.project.bind",
 		"cost.reconcile", "dev_environment.manage", "feature_flag.read", "feature_flag.update",
@@ -92,6 +92,9 @@ var requirementGroups = []struct {
 	// search.assist.respond (14 4.10): the resource is the agent the request was sent
 	// to, so only that agent itself passes.
 	{"agent-self, the assistant agent the request was sent to", AgentSelf, []string{"search.assist.respond"}},
+	// agent.interview.respond (A1-07, 26 6.1 item 2): the resource is the builder agent the request
+	// was sent to, so only that agent itself passes.
+	{"agent-self, the builder agent the request was sent to", AgentSelf, []string{"agent.interview.respond"}},
 	// command.invoke (M2-16): the level of the command, then the guard (app owner internal, model
 	// command during an active run run_active); agent commands add agent.invoke in runs.
 	{"`required_level` of the command and rules as described", CommandLevel, []string{"command.invoke"}},

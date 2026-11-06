@@ -193,6 +193,8 @@ channels:
         $ref: '#/components/messages/event.command.autocomplete_requested'
       event.search.assist_requested:
         $ref: '#/components/messages/event.search.assist_requested'
+      event.agent.interview_requested:
+        $ref: '#/components/messages/event.agent.interview_requested'
       event.notification.created:
         $ref: '#/components/messages/event.notification.created'
       event.host.updated:
@@ -754,6 +756,7 @@ operations:
     - $ref: '#/channels/gateway/messages/event.notification.created'
     - $ref: '#/channels/gateway/messages/event.command.autocomplete_requested'
     - $ref: '#/channels/gateway/messages/event.search.assist_requested'
+    - $ref: '#/channels/gateway/messages/event.agent.interview_requested'
     x-authz-action: gateway.connect
     x-rate-limit-class: rl.gateway_connect
 
@@ -2127,6 +2130,23 @@ components:
             $ref: ./openapi.yaml#/components/schemas/SearchAssistRequestedEvent
       x-audience: self
       description: Only to one gateway connection of the assistant agent named in `search.assist.agent_id` (docs/spec/14-search.md, section 4.10).
+    event.agent.interview_requested:
+      name: agent.interview_requested
+      title: dispatch agent.interview_requested
+      summary: Ephemeral event, at most once.
+      x-event-kind: ephemeral
+      x-receive-action: agent.events.consume
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/AgentInterviewRequestedEvent
+      x-audience: self
+      description: Only to one gateway connection of the builder agent named in `agents.builder_agent_id`, without a token (docs/spec/26-builtin-agents.md, section 6.1).
     event.notification.created:
       name: notification.created
       title: dispatch notification.created

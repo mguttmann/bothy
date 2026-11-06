@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"slices"
+	"time"
 
 	"github.com/OWNER/bothy/services/server/api/routes"
 	agentshttp "github.com/OWNER/bothy/services/server/internal/agents/adapters/httpapi"
@@ -71,6 +72,8 @@ type Handlers struct {
 	// Commands implements registerCommand, updateCommand, removeCommand, getCommand and
 	// listChannelCommands (agents, M2-16).
 	*agentshttp.Commands
+	// Interview implements interviewAgent and answerAgentInterview (agents, A1-07).
+	*agentshttp.Interview
 	// CommandExec implements invokeCommand (runs, M2-16), autocompleteCommand and answerAutocomplete
 	// (runs, M2-17).
 	*runshttp.CommandExec
@@ -241,6 +244,21 @@ func WebhookBodyLimit(limit int64) RouteOption {
 	return func(op *httpserver.Operation) {
 		if op.Action == actionWebhookInPost {
 			op.BodyLimit, op.BodyLimitKey = limit, keyWebhookInMaxBodyBytes
+		}
+	}
+}
+
+// operationInterviewAgent is the operation with its own deadline (A1-07).
+const operationInterviewAgent = "interviewAgent"
+
+// InterviewDeadline sets the deadline of interviewAgent to d instead of http.request_timeout
+// (02 section 14.2, docs/spec/26-builtin-agents.md 6.1): the wait for the builder,
+// agents.interview.timeout, plus http.request_timeout for the rest of the request (authorize, the
+// audit entry), so the wait ends before the request does.
+func InterviewDeadline(d time.Duration) RouteOption {
+	return func(op *httpserver.Operation) {
+		if op.ID == operationInterviewAgent {
+			op.Timeout = d
 		}
 	}
 }

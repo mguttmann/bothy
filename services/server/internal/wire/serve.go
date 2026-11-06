@@ -840,7 +840,8 @@ func (s *server) mountAPI(ctx context.Context, cat *authzapp.Catalog, log *slog.
 		return errors.New("wire: the setup gate needs the unit of work of the audit step")
 	}
 	InstallSetupGate(chain, mux, instanceapp.NewState(instancepg.NewRepository(pool), a.UoW()))
-	if err := MountRoutes(s.role, mux, s.handlers(), cat, chain, log, WebhookBodyLimit(s.values.Int(keyWebhookInMaxBodyBytes))); err != nil {
+	if err := MountRoutes(s.role, mux, s.handlers(), cat, chain, log, WebhookBodyLimit(s.values.Int(keyWebhookInMaxBodyBytes)),
+		InterviewDeadline(s.values.Duration(keyInterviewTimeout)+s.values.Duration(keyHTTPRequestTimeout))); err != nil {
 		return err
 	}
 	if err := MountConsole(mux, s.values); err != nil {
