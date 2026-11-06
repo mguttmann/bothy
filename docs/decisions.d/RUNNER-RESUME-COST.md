@@ -1,10 +1,9 @@
 # RUNNER-RESUME-COST Resumed sessions book only their own turns
 
-Live finding of 2026-10-30: the first run after a takeover of a Discord session (import with
-`--sessions`) booked the whole old session as the cost of one run,
-because Claude Code reports `modelUsage` and `total_cost_usd` cumulatively on `--resume` and the
-runner had no stored values for the session. Operations had worked around it by writing a start
-value into the database for each affected thread. Normative text: 09 18.7 and 4.10, 22 9 step 7.
+Finding in operation: the first run after a takeover of a Discord session (import with
+`--sessions`) booked the whole old session as the cost of one run, because Claude Code reports
+`modelUsage` and `total_cost_usd` cumulatively on `--resume` and the runner had no stored values
+for the session. Nothing in the product set a start value for such a session. Normative text: 09 18.7 and 4.10, 22 9 step 7.
 
 | No | Date | Ruling | Reason |
 |---|---|---|---|
@@ -12,4 +11,4 @@ value into the database for each affected thread. Normative text: 09 18.7 and 4.
 | D-RUNNER-RESUME-COST-2 | 2026-10-30 | Only once per run, at its first process and only when that process resumes; a run that starts a new session takes none, and a later process of the same run (compaction, retry) keeps the stored values. | The run's costs come from its last `result`, which counts every process of the run; taking the totals again in the middle would drop the earlier processes' share. |
 | D-RUNNER-RESUME-COST-3 | 2026-10-30 | Transcript totals take precedence over `cost_baseline_micros` of the import or a rebind; the import baseline applies only when the transcript has no `cost-state` line. The sessions file of the import (22 9) already carries the baseline as `cost_baseline_micros` and `currency`; nothing is added to it. | Both describe the same old amounts; subtracting both would book the first run too low. The transcript gives values per model and for tokens, the baseline only an amount. |
 | D-RUNNER-RESUME-COST-4 | 2026-10-30 | No baseline from the first `result` of the run. | That `result` already includes the run's first turn, which would then never be booked; the CLI's cumulative values come only from the transcript, so where the runner finds no `cost-state` line the CLI restored none either and its values are the run's own. |
-| D-RUNNER-RESUME-COST-5 | 2026-10-30 | Not checked: whether the minimum version 2.1.259 writes `cost-state` lines as well. If it restores its totals from elsewhere, a run on it after a takeover books as before this ticket (import baseline, else the full amount). | Only 2.1.285 to 2.1.288 are installed on the build host; the runner reports `runtime_version_untested` for any version other than the pin. |
+| D-RUNNER-RESUME-COST-5 | 2026-10-30 | Not checked: whether the minimum version 2.1.259 writes `cost-state` lines as well. If it restores its totals from elsewhere, a run on it after a takeover books as before this ticket (import baseline, else the full amount). | Only the pinned version was probed for this ticket; the runner reports `runtime_version_untested` for any version other than the pin. |

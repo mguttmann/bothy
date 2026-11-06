@@ -85,12 +85,9 @@ HELPER_POLL_S = 2.0
 # The services of the mobile overlay that e2e.sh builds (E2E_BUILD): the E2E server image and the
 # fake push providers.
 BUILD = "api fakepush"
-# Ports the host rules reserve for other services; the kernel's ephemeral range does not
-# contain them on the supported hosts, the check keeps it so on any host.
-RESERVED_PORTS = frozenset(
-    {3000, 3978, 5000, 5432, 5433, 7000, 8080, 8081, 8798, 8799, 9119, 9177, 11434, 20241}
-    | set(range(8642, 8653))
-)
+# The dynamic port range of RFC 6335. Fixed ports of other services on the host lie below it; the
+# kernel's ephemeral range of some hosts starts lower, so a port outside it is not taken.
+DYNAMIC_PORTS = range(49152, 65536)
 # The console ports of the Android emulator are even numbers in this range (adb scans it).
 CONSOLE_PORTS = range(5554, 5684, 2)
 DEFAULT_BOOT_TIMEOUT_S = 900
@@ -239,15 +236,15 @@ def _kernel_port() -> int:
 def free_port(
     taken: Iterable[int] = (), bind: Callable[[], int] = _kernel_port, tries: int = 32
 ) -> int:
-    """Returns a free loopback port that is neither in taken nor reserved by the host rules.
+    """Returns a free loopback port of the dynamic range that is not in taken.
 
     Raises:
         RuntimeError: no such port after tries attempts.
     """
-    avoid = set(taken) | RESERVED_PORTS
+    avoid = set(taken)
     for _ in range(tries):
         port = bind()
-        if port not in avoid:
+        if port in DYNAMIC_PORTS and port not in avoid:
             return port
     raise RuntimeError("could not find a free port on 127.0.0.1")
 
@@ -529,7 +526,7 @@ def run_outer(platforms: Sequence[str], host: Host, bind: Callable[[], int] = _k
         if "ios" in ready:
             env["MOBILE_E2E_UDID"] = start_ios(host, cleanups)
         # The capture endpoint of fakepush and the two ports patrol binds on the host (its
-        # defaults are reserved by the host rules).
+        # defaults are fixed ports that another service of the host may hold).
         capture = free_port(bind=bind)
         test_server = free_port(taken={capture}, bind=bind)
         app_server = free_port(taken={capture, test_server}, bind=bind)

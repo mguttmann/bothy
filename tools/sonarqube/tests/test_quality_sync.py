@@ -217,7 +217,7 @@ def test_main_apply_then_check(server: tuple[State, str], monkeypatch: pytest.Mo
 
 
 def test_cloud_plan_refusing_default_gate_still_applies_profiles() -> None:
-    # SonarQube Cloud free plan: api/qualitygates/set_as_default answers HTTP 403.
+    # A SonarQube Cloud plan without that right: api/qualitygates/set_as_default answers HTTP 403.
     state = State(
         cloud=True, builtin_profile="Sonar way comprehensive", gate_default_forbidden=True
     )

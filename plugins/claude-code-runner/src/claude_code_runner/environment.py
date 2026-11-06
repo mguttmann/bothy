@@ -8,8 +8,8 @@ list lets every new secret through. Kept from the runner's own environment: ``HO
 is its own temporary directory ``<runner.state_dir>/tmp/<run_id>`` (18.2, M3-12 note 3 c), so
 files a turn writes as scratch output can be attached and never mix with another run's. Every
 turn gets ``CLAUDE_PRODUCT_RUN=1``, set by the runner and never taken from its own environment:
-user-level stop hooks that hold a headless session's turn open while background tasks run skip
-a turn with this marker, so a turn can end and the session stays reachable
+a user-level hook that would hold a headless session's turn open while background tasks run can
+recognise a product turn by this marker and let it end, so the session stays reachable
 (FIX-runner-responsive-turns). Mode ``organization`` adds ``ANTHROPIC_API_KEY`` and the runner's
 own ``CLAUDE_CONFIG_DIR``; ``personal`` adds nothing more (10 10.2, design note 7).
 

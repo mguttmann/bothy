@@ -1,6 +1,6 @@
 # HERMES-INSTALL-DURABLE Hermes adapter install that survives a new Hermes environment
 
-Live finding of 2026-10-30: Hermes `v0.22.5` creates a new Python environment on almost every
+Finding in operation: Hermes `v0.22.5` creates a new Python environment on almost every
 CLI command and collects the superseded ones. The `.pth` file and `attrs` an operator put into
 the gateway's environment were gone in the next one, and a gateway restarted after that ran
 without the adapter: the agent was offline without any error.

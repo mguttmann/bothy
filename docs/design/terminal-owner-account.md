@@ -12,9 +12,9 @@ SR12 and [openapi.yaml](../api/openapi.yaml). Decision:
 
 Owner decision of 2026-11-01 (translated): "but I want to run there as admin, I want to get things
 done" and "from the app I want to work in the terminal on the server, that was the requirement,
-that was the plan". He opens a terminal from the apps on his own server machine and works there as
-his normal administrator account. He has no physical access to that machine, so the setup must be
-completable remotely: no new local users, no root, no dialog, no step at the keyboard.
+that was the plan". The owner opens a terminal from the apps on the owner's own server machine and
+works there as the normal administrator account. The machine is remote, with nobody at it, so the
+setup must be completable remotely: no new local users, no root, no dialog, no step at the keyboard.
 
 Done means: an owner can bind his own person to his existing administrator account on a host
 (explicit opt-in), open a terminal there with step-up on every opening, and the opening is audited
@@ -43,7 +43,7 @@ else.
 
 ```mermaid
 sequenceDiagram
-    participant S as Steering session (ssh as the owner's account)
+    participant S as Operator session (ssh as the owner's account)
     participant H as bothy-host (owner's account)
     participant Srv as Server
     participant O as Owner in the app

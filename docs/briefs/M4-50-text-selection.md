@@ -13,7 +13,7 @@ message; a part of a code block copies exactly, without fences and without the l
 display wrap of M4-49. Selecting triggers no message action; links, the copy buttons of M4-48 and
 the toggle and expand of M4-49 keep working. On the phone (iOS and Android) the long press keeps
 the message menu, which gains "Select text": it opens the message in a sheet with the system
-selection. Why: owner report of 2026-10-31 (macOS app); no text of the history could be selected,
+selection. Why: owner report (macOS app); no text of the history could be selected,
 so parts of messages, logs and code could not be copied; only "Copy code" (a whole block) and
 "Copy text" (a whole message) worked.
 

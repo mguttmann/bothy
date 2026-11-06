@@ -10,7 +10,7 @@ import 'package:design_system/design_system.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 // language-check: off
-/// The live case, rebuilt without personal data: two paragraphs broken by hand, an emoji, an
+/// The reported case, rebuilt without personal data: two paragraphs broken by hand, an emoji, an
 /// umlaut, an en dash, typographic and straight quotes and a list whose second item is broken too.
 const _live =
     'Hallo Sam, danke für die schnelle Rückmeldung \u{1F64F} Ich habe mir den Stand\n'

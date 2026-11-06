@@ -5,8 +5,8 @@
 // one, also where the platform store is shared between apps (the login keychain of a macOS
 // debug or profile build, the DPAPI file of the Windows build under one support folder).
 //
-// The live case: a macOS profile build under a new bundle identifier read the refresh token
-// of the earlier bundle from the login keychain (5 access prompts), sent it, got 401
+// The reported case: a macOS profile build under a new bundle identifier read the refresh token
+// of the earlier bundle from the login keychain (several access prompts), sent it, got 401
 // `session_revoked`, wiped its data and showed the enrollment screen.
 
 import 'dart:convert';

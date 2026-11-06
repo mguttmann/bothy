@@ -28,10 +28,10 @@ Done means:
 4. The run graph (D14, "Graph" in the run header) shows the same workflow agents, because it reads
    the same run steps.
 
-## 2. What the runner already knows (measured 2026-11-01)
+## 2. What the runner already knows
 
 Read from the stream recordings the runner keeps per turn (`<state>/sessions/<session>/<turn>.stream.jsonl`)
-of the pinned CLI 2.1.288, 50 recorded turns:
+of the pinned CLI 2.1.288:
 
 | Signal | Stream | Reported before this change |
 |---|---|---|

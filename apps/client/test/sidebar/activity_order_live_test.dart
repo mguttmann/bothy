@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // "Arrange chats automatically" moves a post up the moment a message arrives (brief
-// FIX-autoarrange-delay). Owner report of 2026-11-01: the post he had just written into moved to
-// the top of its forum only about three minutes later. The server moves the thread's
+// FIX-autoarrange-delay). Owner report: the post he had just written into moved to
+// the top of its forum only minutes later. The server moves the thread's
 // `last_activity_at` with every message but writes only `message.created` (no `thread.updated`),
 // and the client did not apply that time to its stored thread, so the order waited for a later
 // REST read of the thread. Two devices of Alex (the desktop app and the phone app) against one

@@ -285,7 +285,7 @@ void main() {
     await mouse.removePointer();
     await host.dispose(tester);
   });
-  // Owner report of 2026-11-01 (brief FIX-autoarrange-channels): the pointer rested on the
+  // Owner report (brief FIX-autoarrange-channels): the pointer rested on the
   // sidebar after a click on a forum while the person wrote into the post with the keyboard, so
   // the sidebar held its order and the forum never moved up. A key press outside the sidebar
   // ends the hold of a resting pointer; a move of the pointer in the sidebar holds again.

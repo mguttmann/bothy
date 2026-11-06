@@ -45,7 +45,7 @@ of the upload session (section 3.1; table `file_upload_sessions` in 03).
 | check failed | `complete` | `error` | `completed` | no; label "Check failed" (addendum of 2026-10-31) |
 | canceled or expired | `failed` | `pending` | `aborted` or `expired` | no |
 
-Labels in the apps (addendum of 2026-10-31, live report of the same day,
+Labels in the apps (addendum of 2026-10-31, owner report,
 docs/decisions.d/FIX-scan-state-stale.md): "being checked" stands only while `scan_status` is
 `pending`; a file whose scan passed and that the server still prepares shows "Preparing", a
 servable one the normal attachment view, and a scan `error` is shown as "Check failed", apart
@@ -1356,7 +1356,7 @@ signature names only in the audit log.
 | R-FI-09 | Agent invocation with attachments only after a final state, with a time limit. | Agents never see unchecked bytes; no blocking of the event stream. |
 | R-FI-10 | Transcript by the agent by default; a service only by owner configuration. | No additional processor without a decision by the owner. |
 | R-FI-11 | No deduplication (R-DM-13 confirmed). | No existence side channel, reliable deletion. |
-| R-FI-12 | One upload session per file for its whole life; a retry resumes it, waits at least `Retry-After` plus jitter, and the uploads of a conversation go one at a time (3.8, addendum of 2026-10-30). | Live report of 2026-10-30: four attachments hung for minutes because every retry announced the file again, the status read was retried in two layers, every upload woke at the exact `Retry-After` and all uploads ran at once against one bucket. |
+| R-FI-12 | One upload session per file for its whole life; a retry resumes it, waits at least `Retry-After` plus jitter, and the uploads of a conversation go one at a time (3.8, addendum of 2026-10-30). | Owner report: several attachments hung for minutes because every retry announced the file again, the status read was retried in two layers, every upload woke at the exact `Retry-After` and all uploads ran at once against one bucket. |
 
 ## 17. Alignment with the core contract
 

@@ -38,7 +38,7 @@ const _phone = TargetPlatformVariant({
   TargetPlatform.android,
 });
 
-/// The live case of the owner's report: one long sentence as a fenced block "to copy".
+/// The case of the owner's report: one long sentence as a fenced block "to copy".
 const _sentence =
     'Please copy this long sentence into the ticket, so that everyone involved '
     'knows exactly which steps are still open tonight and who takes them over '

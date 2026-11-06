@@ -157,19 +157,25 @@ def _logs_in_tmp(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_free_port_skips_taken_ports() -> None:
-    offered = iter([5000, 41000, 41001])
-    port = mobile_e2e.free_port(taken={41000}, bind=lambda: next(offered))
-    assert port == 41001
+    offered = iter([5000, 51000, 51001])
+    port = mobile_e2e.free_port(taken={51000}, bind=lambda: next(offered))
+    assert port == 51001
 
 
 def test_free_port_gives_up_with_an_error() -> None:
     with pytest.raises(RuntimeError, match="free port"):
-        mobile_e2e.free_port(taken={41000}, bind=lambda: 41000)
+        mobile_e2e.free_port(taken={51000}, bind=lambda: 51000)
 
 
-def test_reserved_ports_of_the_host_rules_are_never_chosen() -> None:
-    offered = iter([3000, 8080, 5432, 8642, 52000])
-    assert mobile_e2e.free_port(bind=lambda: next(offered)) == 52000
+def test_only_ports_of_the_dynamic_range_are_chosen() -> None:
+    # A port below 49152 may be a fixed port of another service on the host, so a kernel port
+    # outside the dynamic range is offered again.
+    offered = iter([3000, 8080, 41000, 49151, 49152])
+    assert mobile_e2e.free_port(bind=lambda: next(offered)) == 49152
+
+
+def test_the_top_of_the_dynamic_range_is_chosen() -> None:
+    assert mobile_e2e.free_port(bind=lambda: 65535) == 65535
 
 
 def test_console_port_is_even_and_both_ports_free() -> None:
@@ -237,7 +243,7 @@ def test_unknown_suite_is_an_error() -> None:
 
 def test_the_terminal_suite_needs_go(capsys: pytest.CaptureFixture[str]) -> None:
     host = booting_host(tools={"xcrun", "flutter", "adb", "emulator", "docker"})
-    assert mobile_e2e.run_outer(["android"], host, bind=lambda: 47001) == 2
+    assert mobile_e2e.run_outer(["android"], host, bind=lambda: 50001) == 2
     assert "go is not on PATH" in capsys.readouterr().out
     assert e2e_calls(host) == []
 
@@ -260,15 +266,15 @@ def e2e_calls(host: FakeHost) -> list[int]:
 
 def test_run_hands_the_devices_and_the_capture_port_to_the_stack() -> None:
     host = booting_host()
-    ports = iter([47001, 47001, 47002, 3000, 47003])
+    ports = iter([50001, 50001, 50002, 3000, 50003])
     rc = mobile_e2e.run_outer(["ios", "android"], host, bind=lambda: next(ports))
     assert rc == 0
     (i,) = e2e_calls(host)
     env = host.envs[i]
     assert env is not None
     assert env["E2E_OVERLAY"].endswith("infra/compose/test/compose.e2e-mobile.yaml")
-    assert env["MOBILE_E2E_FAKEPUSH_PORT"] == "47001"
-    assert env["MOBILE_E2E_PATROL_PORTS"] == "47002 47003"
+    assert env["MOBILE_E2E_FAKEPUSH_PORT"] == "50001"
+    assert env["MOBILE_E2E_PATROL_PORTS"] == "50002 50003"
     assert env["MOBILE_E2E_UDID"] == "SIM-UDID-1"
     assert env["MOBILE_E2E_SERIAL"].startswith("emulator-")
     assert env["MOBILE_E2E_READY"] == "ios android"
@@ -283,7 +289,7 @@ def test_teardown_after_a_failing_stack_or_suite() -> None:
     host = booting_host()
     host.answers.insert(0, (("infra/compose/e2e.sh",), 1, ""))
     host.answers.insert(0, ((str(mobile_e2e.REPO / "infra/compose/e2e.sh"),), 1, ""))
-    ports = iter(range(47001, 47100))
+    ports = iter(range(50001, 50100))
     rc = mobile_e2e.run_outer(["ios", "android"], host, bind=lambda: next(ports))
     assert rc == 1
     serial = next(p.cmd for p in host.procs if "-avd" in p.cmd)
@@ -300,7 +306,7 @@ def test_teardown_after_a_failing_stack_or_suite() -> None:
 def test_teardown_when_the_emulator_never_boots() -> None:
     host = booting_host(env={"MOBILE_E2E_AVD": "a", "MOBILE_E2E_BOOT_TIMEOUT_S": "30"})
     host.answers.insert(0, (("adb", "-s"), 0, "0\n"))
-    rc = mobile_e2e.run_outer(["ios", "android"], host, bind=lambda: 47001)
+    rc = mobile_e2e.run_outer(["ios", "android"], host, bind=lambda: 50001)
     assert rc == 1
     assert e2e_calls(host) == []
     assert all(p.stopped for p in host.procs)
@@ -314,7 +320,7 @@ def test_a_given_simulator_and_emulator_are_not_removed() -> None:
     host.answers.insert(
         0, (("xcrun", "simctl", "list", "devices"), 0, "    iPhone (MINE) (Booted)\n")
     )
-    ports = iter(range(47001, 47100))
+    ports = iter(range(50001, 50100))
     assert mobile_e2e.run_outer(["ios", "android"], host, bind=lambda: next(ports)) == 0
     assert not host.ran("xcrun", "simctl", "create")
     assert not host.ran("xcrun", "simctl", "delete")
@@ -334,7 +340,7 @@ def test_inner_runs_relay_and_suite_and_stops_the_relay_after_a_failure(
             "MOBILE_E2E_READY": "ios android",
             "MOBILE_E2E_UDID": "SIM",
             "MOBILE_E2E_SERIAL": "emulator-5560",
-            "MOBILE_E2E_FAKEPUSH_PORT": "47001",
+            "MOBILE_E2E_FAKEPUSH_PORT": "50001",
             "MOBILE_E2E_LOG_DIR": str(tmp_path),
         }
     )
@@ -346,7 +352,7 @@ def test_inner_runs_relay_and_suite_and_stops_the_relay_after_a_failure(
     assert len(relays) == 2
     assert all(p.stopped for p in relays)
     assert "--capture-url" in relays[0].cmd
-    assert "http://127.0.0.1:47001" in relays[0].cmd
+    assert "http://127.0.0.1:50001" in relays[0].cmd
     assert host.ran(suite, "android")
     out = capsys.readouterr().out
     assert "e2e-mobile ios: FAIL" in out
@@ -358,7 +364,7 @@ def test_inner_runs_only_the_named_suites(tmp_path: Path) -> None:
         env={
             "MOBILE_E2E_READY": "android",
             "MOBILE_E2E_SERIAL": "emulator-5560",
-            "MOBILE_E2E_FAKEPUSH_PORT": "47001",
+            "MOBILE_E2E_FAKEPUSH_PORT": "50001",
             "MOBILE_E2E_SUITES": "push offline",
         }
     )
@@ -384,7 +390,7 @@ def helpers(host: FakeHost) -> list[FakeProc]:
 
 def test_terminal_suite_runs_on_every_platform_against_one_stack() -> None:
     host = booting_host()
-    ports = iter(range(47001, 47100))
+    ports = iter(range(50001, 50100))
     assert mobile_e2e.run_outer(["ios", "android"], host, bind=lambda: next(ports)) == 0
     (helper,) = helpers(host)
     i = host.calls.index(helper.cmd)
@@ -412,7 +418,7 @@ def test_the_terminal_stack_is_removed_after_a_failing_suite(
 ) -> None:
     host = booting_host(env={"MOBILE_E2E_SUITES": "terminal"})
     host.answers.insert(0, ((SUITE, "ios", "terminal"), 1, ""))
-    ports = iter(range(47001, 47100))
+    ports = iter(range(50001, 50100))
     assert mobile_e2e.run_outer(["ios", "android"], host, bind=lambda: next(ports)) == 1
     # Only the terminal suite was named: no stack of e2e.sh.
     assert e2e_calls(host) == []
@@ -431,7 +437,7 @@ def test_the_terminal_stack_is_removed_after_a_failing_suite(
 
 def test_a_terminal_stack_that_never_got_ready_fails_without_a_suite() -> None:
     host = booting_host(env={"MOBILE_E2E_SUITES": "terminal"}, helper_fails=True)
-    ports = iter(range(47001, 47100))
+    ports = iter(range(50001, 50100))
     assert mobile_e2e.run_outer(["android"], host, bind=lambda: next(ports)) == 1
     assert host.ran(SUITE) == []
     (helper,) = helpers(host)

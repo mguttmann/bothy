@@ -821,7 +821,7 @@ func TestPersonalOperationsRejectAgentToken(t *testing.T) {
 	}
 }
 
-// TestDraftsOwnWritesNeverOverwrite reproduces the live report of FIX-draft-conflict-banner:
+// TestDraftsOwnWritesNeverOverwrite reproduces the owner report of FIX-draft-conflict-banner:
 // the phone writes a draft keystroke by keystroke while the laptop of the same person writes
 // nothing. The phone's next write leaves before the answer of its previous one is applied, so it
 // carries no base or the base before its own last write; that is never overwrote_newer. Only a

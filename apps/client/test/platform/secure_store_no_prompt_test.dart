@@ -3,7 +3,7 @@
 // No read of the old secrets shows a keychain dialog or holds the start
 // (docs/decisions.d/FIX-macos-legacy-keychain-prompt.md).
 //
-// The live case of 2026-11-01: after the update into the app scope a macOS build that keeps its
+// The reported case: after the update into the app scope a macOS build that keeps its
 // secrets in the login keychain stopped at its start on a keychain access dialog. The old items
 // were written by a build of another bundle identifier, so their access list trusts only that
 // app; the plugin read of the move shows the dialog and waits for it, nobody could click, and

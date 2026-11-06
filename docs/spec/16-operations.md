@@ -1431,11 +1431,11 @@ measured values; M7-18 measured the capacity table below with `make load-capacit
 like the portability test (11.1), people, gateway connections and the message rate ramped in
 steps of 50, 100, 200, 300, 400, 600, 800 and 1000 messages per second until a target of
 [02-architecture.md](02-architecture.md) section 17 is missed. The numbers are measured results,
-not rules: profile `perf.reference_profile` in mode `emulated` (a Docker runtime of 8 vCPU and
-13.6 GiB on the build host, `api` and `worker` limited to 4 vCPU each, PostgreSQL to 4 vCPU and
+not rules: profile `perf.reference_profile` in mode `emulated` (a Docker runtime of 8 vCPU on a
+shared machine, `api` and `worker` limited to 4 vCPU each, PostgreSQL to 4 vCPU and
 8 GiB; the layout of the installation, `api` and `worker`, one api node), commit `6767ec99b` of the branch of M7-18,
 2026-10-26, the trial release `v0.0.0`, seed `20261026`. Four runs of the same procedure on the
-shared build host held up to 200, 300, 300 and 400 messages per second; the table shows the last
+same shared machine held up to 200, 300, 300 and 400 messages per second; the table shows the last
 run. The gate `perf.capacity_min_messages_per_s` of `make perf` holds the sustained throughput
 (02 section 22).
 

@@ -7,7 +7,7 @@ under `plugins/` call the server through the generated operation modules of the 
 docs/api/openapi.yaml with the method and path of its generated module, stand under `enabled` in
 the server's enable list services/server/api/operations.yaml and be registered in the generated
 route table services/server/api/routes/routes.gen.go. The first contract break of the Hermes
-adapter in live use was exactly such a call (`getAgentTriggerers`, documented but not enabled, so
+adapter in operation was exactly such a call (`getAgentTriggerers`, documented but not enabled, so
 the server answered 404; SERVER-AGENT-TRIGGERERS).
 
 Findings, one line each, `client-routes: <sub-check>: <subject>: <detail>`, the subject being the

@@ -13,8 +13,8 @@ justifies; the normative text is in the chapters it changes
 ## 1. Goal
 
 Owner feedback (2026-10-28, translated): in a space such as "Engineering" there is no way to add a
-project. In his earlier chat setup a text channel "new project" in the development category did
-this: he wrote what he wanted and an agent created it, in one of four ways:
+project. In a Discord-based setup like the ones the import takes over, a text channel "new project"
+in the development category did this: a person wrote what was wanted and an agent created it, in one of four ways:
 
 1. a new empty project (a new folder with `git init`),
 2. a clone of an existing repository by URL,
@@ -85,7 +85,7 @@ the runner must not trust the server for its own file system (T-DEV-01).
 folder it created per forum in its state directory. A binding with `provision` `init` or `clone`
 whose target exists but is not in that record is not ready with the reason `workspace_exists`; the
 runner neither writes into it nor binds it silently. Binding an existing folder is mode 3
-(`provision` `none`). Reason: the owner's former setup refused an existing folder for a new
+(`provision` `none`). Reason: the reference Discord setup refused an existing folder for a new
 project; a silent takeover would point a new project at someone else's work.
 
 **D-M4-43-5 Readiness carries a reason.** The heartbeat entry `ProjectReadiness` gets the optional
@@ -134,7 +134,7 @@ without `.git`, or from the first words of the idea, lowercased, other character
 hyphens, at most `ui.new_project_name_max_chars` characters; it stays editable and is used for the
 forum name and the folder name. After the runner refuses the folder (a folder that exists, or one
 bound to another forum) the forum's name is fixed and the dialog shows the folder name to change
-before "Try again". Reason: the owner's former agent chose such names; one name for
+before "Try again". Reason: the agent of the reference Discord setup chose such names; one name for
 forum and folder keeps them recognisable.
 
 **D-M4-43-11 Runner choice.** The dialog offers the active agents; the default is the space's
@@ -188,7 +188,7 @@ R-DM-56; [05-actions.md](../spec/05-actions.md) `agent.project_folders.read`;
 
 ### 6.1 Goal
 
-The owner's former Discord setup had three more project functions besides "new project":
+Such a Discord-based setup had three more project functions besides "new project":
 
 1. a sync that created a project forum for every folder under the projects root that had none,
    shown first as a dry-run list to confirm when there were more than a few;
@@ -252,7 +252,7 @@ steps keep one step-up prompt and the order of the forums equal to the list.
 sessions stay. It shows for a person with `manage` on the forum, the right of `channel.update`.
 Reason: `workspace_ref` is the folder's name on the runner and running sessions work in it; a
 rename of the folder would need the runner to move a folder it did not create (forbidden by 18.12
-item 7). The owner's former rename also changed only the forum.
+item 7). The rename of the reference Discord setup also changed only the forum.
 
 **D-M4-44-7 The folder list on the desktop only.** As D-M4-43-12, "Add forums for existing
 folders" is a desktop entry; the phone shows the new forums. "Rename project" sits in the menu

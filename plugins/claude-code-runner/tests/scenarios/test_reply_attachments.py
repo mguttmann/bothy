@@ -290,7 +290,7 @@ async def test_acting_for_insufficient_refuses_upload(world: World) -> None:
 
 
 async def test_notice_in_the_instance_language(world: World) -> None:
-    """FIX-operator-upload-grant: the live case on a German instance. ``createUpload`` answers
+    """FIX-operator-upload-grant: the reported case on a German instance. ``createUpload`` answers
     ``403 forbidden`` with ``capability_missing``; the answer carries the German notice."""
     world.fake.uploads.locale_default = "de"
     world.fake.inject("createUpload", Fault.problem("forbidden", reason="capability_missing"))
@@ -308,30 +308,30 @@ async def test_notice_in_the_instance_language(world: World) -> None:
 async def test_one_file_outside_the_roots_the_valid_one_is_sent(
     world: World, logs: LogLines, locale: str
 ) -> None:
-    """FIX-attach-partial-and-roots, the live case of 2026-11-02: one announced file lies
+    """FIX-attach-partial-and-roots, the reported case: one announced file lies
     outside the roots; the valid one is sent with the answer and only the refused one is named,
     with the hint how to send it (09 18.10, best effort)."""
     world.fake.uploads.locale_default = locale
-    outside = world.root / "elsewhere" / "2026-11-04-ai-enablement-brief.md"
+    outside = world.root / "elsewhere" / "outline.md"
     outside.parent.mkdir()
     outside.write_bytes(SECRET)
-    text = f"Done.\nATTACH: review-model-proposal.md\nATTACH: {outside}"
-    run_id = await _answer(world, text, {"review-model-proposal.md": REPORT})
+    text = f"Done.\nATTACH: findings.md\nATTACH: {outside}"
+    run_id = await _answer(world, text, {"findings.md": REPORT})
     assert await world.ended(run_id) == "completed"
     (message,) = world.fake.messages
     (session,) = world.fake.uploads.sessions.values()
-    assert session.name == "review-model-proposal.md"
+    assert session.name == "findings.md"
     assert session.content() == REPORT
     assert message["attachment_file_ids"] == [str(session.file_id)]
     assert session.attached is not None
     # language-check: off
     expected = {
         "en": (
-            "Done.\n\nAttachments not sent:\n- `2026-11-04-ai-enablement-brief.md`:"
+            "Done.\n\nAttachments not sent:\n- `outline.md`:"
             " outside_allowed_roots (copy it into TMPDIR and attach the copy)"
         ),
         "de": (
-            "Done.\n\nAnhänge nicht gesendet:\n- `2026-11-04-ai-enablement-brief.md`:"
+            "Done.\n\nAnhänge nicht gesendet:\n- `outline.md`:"
             " liegt außerhalb der erlaubten Ordner"
             " (der Agent kann die Datei nach TMPDIR kopieren und die Kopie anhängen)"
         ),

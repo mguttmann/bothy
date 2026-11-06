@@ -1,8 +1,8 @@
 # FIX-runner-hold-background Background work survives a resume after lost work
 
-Owner report of 2026-11-05: in one thread the Claude Code session started its workflows and
-background jobs again and again, and after every turn they were gone. The runner logged
-`stdin_held_for_background` for other threads that day, but not for any recent turn of this one.
+Owner report: in one thread the Claude Code session started its workflows and background jobs
+again and again, and after every turn they were gone. The runner logged
+`stdin_held_for_background` for other threads, but not for any recent turn of this one.
 
 Cause, read in the stream files and the CLI's stderr of the affected session: a run of the
 session had ended while background work ran (a runner restart interrupted it), so the CLI
@@ -21,7 +21,7 @@ queued.
 
 | No | Date | Ruling | Reason |
 |---|---|---|---|
-| D-FIX-runner-hold-background-1 | 2026-11-05 | The stream reader knows `command_lifecycle`; `BackgroundWork` keeps the `command_uuid`s whose last state is `queued`, and a `result` that comes while one is queued neither closes stdin nor counts as the last `result` of the stdin rule of note 5 (`input_waiting`, checked in `RunTurn._read` and `RunTurn._idle`), so the input's turn may think as long as it needs before it starts background work. Any other state (`started`, `completed`, `cancelled`) ends the wait. | The early results answer no input; the input's turn is still to come and may start background work, which the existing hold then covers. In every stream file the affected runner had stored on 2026-11-05, every queued command reached `started` and a terminal state, so the wait cannot keep stdin open for good. |
+| D-FIX-runner-hold-background-1 | 2026-11-05 | The stream reader knows `command_lifecycle`; `BackgroundWork` keeps the `command_uuid`s whose last state is `queued`, and a `result` that comes while one is queued neither closes stdin nor counts as the last `result` of the stdin rule of note 5 (`input_waiting`, checked in `RunTurn._read` and `RunTurn._idle`), so the input's turn may think as long as it needs before it starts background work. Any other state (`started`, `completed`, `cancelled`) ends the wait. | The early results answer no input; the input's turn is still to come and may start background work, which the existing hold then covers. In every stream file the affected runner had stored, every queued command reached `started` and a terminal state, so the wait cannot keep stdin open for good. |
 | D-FIX-runner-hold-background-2 | 2026-11-05 | A `result` with an error still closes stdin at once, also while an input is queued. | Unchanged recovery of 18.9 (D-FIX-runner-responsive-turns-6). |
 | D-FIX-runner-hold-background-3 | 2026-11-05 | No new log code: the turn of the input then logs `stdin_held_for_background` as any other turn with background work. | The fix restores the existing path; the stream files show the early results. |
 | D-FIX-runner-hold-background-4 | 2026-11-05 | When an input starts (`command_lifecycle` `started`), the last `result` of the stdin rule is cleared, so stdin stays open until that input's turn has its own `result`. | A follow-up written during the follow-up window starts a turn of its own after an earlier `result`; that turn may start background work too (review finding on the pull request). |

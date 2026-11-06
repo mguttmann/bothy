@@ -26,7 +26,7 @@ machine (translated): "but I want to run there as admin, I want to get things do
 app I want to work in the terminal on the server, that was the requirement, that was the plan". He
 wants a terminal from the apps on his own server machine, as his normal administrator account.
 
-The owner has no physical access to that machine. A setup that creates new local users, needs root
+The machine is remote, with nobody at it. A setup that creates new local users, needs root
 for a system service, shows a dialog or needs a person at the keyboard cannot be completed. The
 separate-user setup of ADR 0068 needs all of that (system services, new hidden users, a local
 confirmation), and its self-checks refuse an administrator account (HD1, HD2, HD3), a session user
@@ -94,7 +94,7 @@ user on the host, and it keeps the server as the decision point.
 ### Consequences
 
 * Good, because the owner can open a real administrator shell on his own machine from every app,
-  and the steering session can set it up remotely without root.
+  and an operator session over ssh can set it up remotely without root.
 * Good, because a non-owner cannot reach the shell: the server refuses the assignment and the
   opening, and the host refuses a token without `own = true` before it binds the account.
 * Bad, because a session in this mode can read the keys of the host and replace the host service.
@@ -153,5 +153,5 @@ user on the host, and it keeps the server as the decision point.
   a session in this mode stays attachable for `terminal.owner_account_detach_grace` (default 24
   hours) after a detach, idle pauses while it is detached, and its maximum is
   `terminal.owner_account_max_session_duration`; the idle timeout of an attached session and the
-  step-up on every reattach stay. Owner report of 2026-11-02: he detached on purpose and expected
+  step-up on every reattach stay. Owner report: he detached on purpose and expected
   to pick the shell up later from another device.

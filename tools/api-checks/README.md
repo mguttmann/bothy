@@ -166,7 +166,7 @@ an operation of `openapi.yaml` whose `operationId` fits the module name (`openap
 `enabled` in `services/server/api/operations.yaml` (`enabled`) and be registered with that method
 and path in `services/server/api/routes/routes.gen.go` (`router`). A documented operation that the
 server does not serve yet (it stands under `later`) is how the Hermes adapter's allow list broke
-in live use (SERVER-AGENT-TRIGGERERS); the end-to-end suites of the adapters
+in operation (SERVER-AGENT-TRIGGERERS); the end-to-end suites of the adapters
 (`plugins/*/tests/realserver`) find what this static rule cannot, such as a request the server
 refuses. Tests: `tests/test_client_routes.py`.
 

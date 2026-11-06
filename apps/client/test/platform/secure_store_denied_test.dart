@@ -2,7 +2,7 @@
 
 // A refused old item never loses the session (docs/decisions.d/FIX-macos-migration-denied.md).
 //
-// The live case of 2026-11-01: the macOS app with the move into the app scope (FIX-secure-store-
+// The reported case: the macOS app with the move into the app scope (FIX-secure-store-
 // migration, FIX-macos-legacy-keychain-prompt) did not take over the owner's session. The build
 // before the scope reads `app/server_address`, the database key and the session of the
 // remembered server at every start, so the keychain gives them to it; `app/instance` it only

@@ -1,8 +1,8 @@
 # RUNNER-NO-GIT Every runner forum is a Claude Code chat
 
-Owner expectation of 2026-10-30: every development forum works as a Claude Code chat, also when
+Owner expectation: every development forum works as a Claude Code chat, also when
 its folder is not a Git repository and also when the forum has no project folder. Before, a
-binding to a folder without `.git` was not ready (`not_a_git_worktree`, three forums in live
+binding to a folder without `.git` was not ready (`not_a_git_worktree`, seen for several forums in
 operation), and a forum with the runner as operator but without a binding failed at once with a
 bare "Error in the adapter". Normative text: 09 18.1, 18.9, 18.12, 18.13, 5.4, 21, R-AG-35;
 01 section 4, 6.9 item 5, R-PR-27.
