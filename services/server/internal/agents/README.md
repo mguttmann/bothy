@@ -601,7 +601,7 @@ stored.
   authorizes `agent.interview.respond` on the builder the request was sent to (every refusal is
   `404` like an unknown request), answers `410` after `expires_at` and `409 conflict` with reason `already_answered` for a
   second answer, and either accepts the answer or refuses it with `400` (a draft that reaches a
-  surface of 26 5.5, a text that is no display text, more than two questions), which ends the
+  surface of 26 5.5, a text that is no display text; the request validation of the API already refuses a member or a count outside the schema), which ends the
   request with `builder_invalid`. The fallbacks are `builder_not_configured`, `builder_offline`,
   `builder_timeout` and `builder_invalid`.
 - Every request that reaches the builder step writes one audit entry `agent.interview` (outcome,

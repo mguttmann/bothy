@@ -105,12 +105,13 @@ def sync_detailed(
     optional `channel_suggestion`; and the usage in `costs`. `404` for an unknown or forgotten request
     and for every principal but the builder agent the request was sent to, `410 gone` after
     `expires_at`, `409 conflict` with `reason: already_answered` for a second answer. The server decodes
-    the answer strictly and never trusts it: a member outside the schema is refused by the request
-    validation (`400`, the request stays open until `expires_at`); a draft that reaches a surface of 26
-    5.5 (a frontmatter, an inline shell form or an `@` import outside the agent folder), a text that is
-    no display text or more than two questions ends the request with `builder_invalid` and answers `400
-    validation_failed`. Any other finding of 26 4.3 or of the catalogue check (`mcp_not_in_catalogue`)
-    goes back to the person as a field error of the draft; nothing is stored.
+    the answer strictly and never trusts it: a member outside the schema, a wrong type or a count
+    outside the schema (no question, more than two) is refused by the request validation (`400`, the
+    request stays open until `expires_at`); a draft that reaches a surface of 26 5.5 (a frontmatter, an
+    inline shell form or an `@` import outside the agent folder) or a text that is no display text ends
+    the request with `builder_invalid` and answers `400 validation_failed`. Any other finding of 26 4.3
+    or of the catalogue check (`mcp_not_in_catalogue`) goes back to the person as a field error of the
+    draft; nothing is stored.
 
     Args:
         request_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -153,12 +154,13 @@ def sync(
     optional `channel_suggestion`; and the usage in `costs`. `404` for an unknown or forgotten request
     and for every principal but the builder agent the request was sent to, `410 gone` after
     `expires_at`, `409 conflict` with `reason: already_answered` for a second answer. The server decodes
-    the answer strictly and never trusts it: a member outside the schema is refused by the request
-    validation (`400`, the request stays open until `expires_at`); a draft that reaches a surface of 26
-    5.5 (a frontmatter, an inline shell form or an `@` import outside the agent folder), a text that is
-    no display text or more than two questions ends the request with `builder_invalid` and answers `400
-    validation_failed`. Any other finding of 26 4.3 or of the catalogue check (`mcp_not_in_catalogue`)
-    goes back to the person as a field error of the draft; nothing is stored.
+    the answer strictly and never trusts it: a member outside the schema, a wrong type or a count
+    outside the schema (no question, more than two) is refused by the request validation (`400`, the
+    request stays open until `expires_at`); a draft that reaches a surface of 26 5.5 (a frontmatter, an
+    inline shell form or an `@` import outside the agent folder) or a text that is no display text ends
+    the request with `builder_invalid` and answers `400 validation_failed`. Any other finding of 26 4.3
+    or of the catalogue check (`mcp_not_in_catalogue`) goes back to the person as a field error of the
+    draft; nothing is stored.
 
     Args:
         request_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -196,12 +198,13 @@ async def asyncio_detailed(
     optional `channel_suggestion`; and the usage in `costs`. `404` for an unknown or forgotten request
     and for every principal but the builder agent the request was sent to, `410 gone` after
     `expires_at`, `409 conflict` with `reason: already_answered` for a second answer. The server decodes
-    the answer strictly and never trusts it: a member outside the schema is refused by the request
-    validation (`400`, the request stays open until `expires_at`); a draft that reaches a surface of 26
-    5.5 (a frontmatter, an inline shell form or an `@` import outside the agent folder), a text that is
-    no display text or more than two questions ends the request with `builder_invalid` and answers `400
-    validation_failed`. Any other finding of 26 4.3 or of the catalogue check (`mcp_not_in_catalogue`)
-    goes back to the person as a field error of the draft; nothing is stored.
+    the answer strictly and never trusts it: a member outside the schema, a wrong type or a count
+    outside the schema (no question, more than two) is refused by the request validation (`400`, the
+    request stays open until `expires_at`); a draft that reaches a surface of 26 5.5 (a frontmatter, an
+    inline shell form or an `@` import outside the agent folder) or a text that is no display text ends
+    the request with `builder_invalid` and answers `400 validation_failed`. Any other finding of 26 4.3
+    or of the catalogue check (`mcp_not_in_catalogue`) goes back to the person as a field error of the
+    draft; nothing is stored.
 
     Args:
         request_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -242,12 +245,13 @@ async def asyncio(
     optional `channel_suggestion`; and the usage in `costs`. `404` for an unknown or forgotten request
     and for every principal but the builder agent the request was sent to, `410 gone` after
     `expires_at`, `409 conflict` with `reason: already_answered` for a second answer. The server decodes
-    the answer strictly and never trusts it: a member outside the schema is refused by the request
-    validation (`400`, the request stays open until `expires_at`); a draft that reaches a surface of 26
-    5.5 (a frontmatter, an inline shell form or an `@` import outside the agent folder), a text that is
-    no display text or more than two questions ends the request with `builder_invalid` and answers `400
-    validation_failed`. Any other finding of 26 4.3 or of the catalogue check (`mcp_not_in_catalogue`)
-    goes back to the person as a field error of the draft; nothing is stored.
+    the answer strictly and never trusts it: a member outside the schema, a wrong type or a count
+    outside the schema (no question, more than two) is refused by the request validation (`400`, the
+    request stays open until `expires_at`); a draft that reaches a surface of 26 5.5 (a frontmatter, an
+    inline shell form or an `@` import outside the agent folder) or a text that is no display text ends
+    the request with `builder_invalid` and answers `400 validation_failed`. Any other finding of 26 4.3
+    or of the catalogue check (`mcp_not_in_catalogue`) goes back to the person as a field error of the
+    draft; nothing is stored.
 
     Args:
         request_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
