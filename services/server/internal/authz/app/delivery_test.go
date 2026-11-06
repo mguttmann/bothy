@@ -5,6 +5,7 @@ package app_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/authz/domain"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
@@ -52,7 +53,6 @@ func TestWebhookOutDeliverRequirement(t *testing.T) {
 		{"personal event for another principal", w.deliveryApp(sub), other, authorize.OutcomeNotFound, "not_self"},
 		{"personal event for the app", w.deliveryApp(sub), self, authorize.OutcomeAllow, ""},
 		{"instance.updated needs only events:subscribe", w.deliveryApp(sub), instance, authorize.OutcomeAllow, ""},
-		{"agent principal", w.agent(w.lotse), inEsk, authorize.OutcomeForbidden, "subject_kind_not_allowed"},
 		{"person", w.user(w.owner), inEsk, authorize.OutcomeForbidden, "subject_kind_not_allowed"},
 	}
 	for _, c := range cases {
@@ -67,6 +67,36 @@ func TestWebhookOutDeliverRequirement(t *testing.T) {
 	} {
 		if _, err := w.az.Authorize(ctx, w.deliveryApp(sub, read), deliver, r); err == nil {
 			t.Errorf("%s: no internal error", name)
+		}
+	}
+}
+
+// TestWebhookOutDeliverAgent holds the delivery check for a subscription of an agent (V1-01, 09
+// section 4.2): an agent needs no app scope; a personal event goes to its audience only, and any
+// other event needs the receive action on the resource, as on the gateway.
+func TestWebhookOutDeliverAgent(t *testing.T) {
+	t.Parallel()
+	w := newWorld(t)
+	w.grant(t, domain.Subject{Kind: domain.SubjectAgent, PrincipalID: w.lotse}, domain.Target{Kind: domain.TargetChannel, ChannelID: w.eskalation},
+		domain.LevelRead, time.Time{})
+	deliver := authorize.ActionWebhookOutDeliver
+	ctx := authorize.Filter(context.Background())
+	cases := []struct {
+		name    string
+		r       authorize.Resource
+		outcome authorize.Outcome
+		reason  string
+	}{
+		{"read on the channel", delivery(w.msg(w.eskalation, w.alex), authorize.ActionMessageRead, ids.ID{}), authorize.OutcomeAllow, ""},
+		{"no grant on the channel", delivery(w.msg(w.kampagnen, w.sam), authorize.ActionMessageRead, ids.ID{}), authorize.OutcomeNotFound, "no_grant"},
+		{"own invocation", delivery(authorize.Resource{Kind: authorize.ResourceRun, ID: ids.New()}, "", w.lotse), authorize.OutcomeAllow, ""},
+		{"invocation of another agent", delivery(authorize.Resource{Kind: authorize.ResourceRun, ID: ids.New()}, "", w.alex),
+			authorize.OutcomeNotFound, "not_self"},
+	}
+	for _, c := range cases {
+		d := w.decide(t, ctx, w.agent(w.lotse), deliver, c.r)
+		if d.Outcome != c.outcome || string(d.Reason) != c.reason {
+			t.Errorf("%s: %s/%s, want %s/%s", c.name, d.Outcome, d.Reason, c.outcome, c.reason)
 		}
 	}
 }

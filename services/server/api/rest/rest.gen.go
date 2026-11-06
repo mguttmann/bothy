@@ -76,6 +76,12 @@ type ServerInterface interface {
 	// SetAgentToolClass Set the tool class of an agent
 	// (PUT /agents/{agent_id}/tool-class)
 	SetAgentToolClass(w http.ResponseWriter, r *http.Request, agentId AgentIdPath, params SetAgentToolClassParams)
+	// ListAgentWebhookSubscriptions List webhook subscriptions of an agent
+	// (GET /agents/{agent_id}/webhooks)
+	ListAgentWebhookSubscriptions(w http.ResponseWriter, r *http.Request, agentId AgentIdPath)
+	// CreateAgentWebhookSubscription Subscribe an agent to webhooks
+	// (POST /agents/{agent_id}/webhooks)
+	CreateAgentWebhookSubscription(w http.ResponseWriter, r *http.Request, agentId AgentIdPath, params CreateAgentWebhookSubscriptionParams)
 	// ValidateManifest Validate a manifest without installing
 	// (POST /app-manifests/validate)
 	ValidateManifest(w http.ResponseWriter, r *http.Request)
@@ -1772,6 +1778,82 @@ func (siw *ServerInterfaceWrapper) SetAgentToolClass(w http.ResponseWriter, r *h
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.SetAgentToolClass(w, r, agentId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAgentWebhookSubscriptions operation middleware
+func (siw *ServerInterfaceWrapper) ListAgentWebhookSubscriptions(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "agent_id" -------------
+	var agentId AgentIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "agent_id", r.PathValue("agent_id"), &agentId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "agent_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAgentWebhookSubscriptions(w, r, agentId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateAgentWebhookSubscription operation middleware
+func (siw *ServerInterfaceWrapper) CreateAgentWebhookSubscription(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "agent_id" -------------
+	var agentId AgentIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "agent_id", r.PathValue("agent_id"), &agentId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "agent_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateAgentWebhookSubscriptionParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateAgentWebhookSubscription(w, r, agentId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -14569,6 +14651,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/agents/{agent_id}/credential-holder", wrapper.SetCredentialHolder)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/agents/{agent_id}/tool-class", wrapper.SetAgentToolClass)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents/{agent_id}/project-folders", wrapper.ListAgentProjectFolders)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents/{agent_id}/webhooks", wrapper.ListAgentWebhookSubscriptions)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/agents/{agent_id}/webhooks", wrapper.CreateAgentWebhookSubscription)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/agents/me/heartbeat", wrapper.SendHeartbeat)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents/me/consumers/{consumer}", wrapper.GetConsumerState)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents/me/consumers/{consumer}/events", wrapper.PollAgentEvents)
@@ -14907,6 +14991,12 @@ type StrictServerInterface interface {
 	// SetAgentToolClass Set the tool class of an agent
 	// (PUT /agents/{agent_id}/tool-class)
 	SetAgentToolClass(ctx context.Context, request SetAgentToolClassRequestObject) (SetAgentToolClassResponseObject, error)
+	// ListAgentWebhookSubscriptions List webhook subscriptions of an agent
+	// (GET /agents/{agent_id}/webhooks)
+	ListAgentWebhookSubscriptions(ctx context.Context, request ListAgentWebhookSubscriptionsRequestObject) (ListAgentWebhookSubscriptionsResponseObject, error)
+	// CreateAgentWebhookSubscription Subscribe an agent to webhooks
+	// (POST /agents/{agent_id}/webhooks)
+	CreateAgentWebhookSubscription(ctx context.Context, request CreateAgentWebhookSubscriptionRequestObject) (CreateAgentWebhookSubscriptionResponseObject, error)
 	// ValidateManifest Validate a manifest without installing
 	// (POST /app-manifests/validate)
 	ValidateManifest(ctx context.Context, request ValidateManifestRequestObject) (ValidateManifestResponseObject, error)
@@ -16426,6 +16516,66 @@ func (sh *strictHandler) SetAgentToolClass(w http.ResponseWriter, r *http.Reques
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(SetAgentToolClassResponseObject); ok {
 		if err := validResponse.VisitSetAgentToolClassResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListAgentWebhookSubscriptions operation middleware
+func (sh *strictHandler) ListAgentWebhookSubscriptions(w http.ResponseWriter, r *http.Request, agentId AgentIdPath) {
+	var request ListAgentWebhookSubscriptionsRequestObject
+
+	request.AgentId = agentId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListAgentWebhookSubscriptions(ctx, request.(ListAgentWebhookSubscriptionsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListAgentWebhookSubscriptions")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListAgentWebhookSubscriptionsResponseObject); ok {
+		if err := validResponse.VisitListAgentWebhookSubscriptionsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateAgentWebhookSubscription operation middleware
+func (sh *strictHandler) CreateAgentWebhookSubscription(w http.ResponseWriter, r *http.Request, agentId AgentIdPath, params CreateAgentWebhookSubscriptionParams) {
+	var request CreateAgentWebhookSubscriptionRequestObject
+
+	request.AgentId = agentId
+	request.Params = params
+
+	var body CreateAgentWebhookSubscriptionJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateAgentWebhookSubscription(ctx, request.(CreateAgentWebhookSubscriptionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateAgentWebhookSubscription")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateAgentWebhookSubscriptionResponseObject); ok {
+		if err := validResponse.VisitCreateAgentWebhookSubscriptionResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

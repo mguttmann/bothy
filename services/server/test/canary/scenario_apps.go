@@ -56,6 +56,13 @@ func (sc *Scenario) apps() {
 	}
 	sc.post(o, "/webhook-deliveries/"+delivery+"/redeliver", nil, http.StatusAccepted, http.StatusNotFound)
 	sc.del(o, "/webhooks/"+sub, none...)
+	// The webhook transport of an agent (V1-01): subscribe, list and delete by id.
+	agent := sc.W.Agents["Lotse"].PrincipalID
+	agentSub := firstID(sc.post(o, "/agents/"+agent+"/webhooks", map[string]any{
+		"url": "https://hooks.example.com/" + sc.Reg.New(ClassContent, "", "agent webhook URL path"), "event_types": []string{"agent.invocation"},
+	}, created...), "id", "subscription.id")
+	sc.get(o, "/agents/"+agent+"/webhooks", ok...)
+	sc.del(o, "/webhooks/"+agentSub, none...)
 	sc.post(o, "/apps/"+app+"/suspend", nil, none...)
 	sc.post(o, "/apps/"+app+"/resume", nil, none...)
 	sc.post(o, "/apps/"+app+"/uninstall", map[string]any{"reason": sc.Reg.New(ClassAdminReason, "", "app uninstall reason")}, none...)

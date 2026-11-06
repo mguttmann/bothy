@@ -317,6 +317,14 @@ func (stubServer) UpdateUser(context.Context, rest.UpdateUserRequestObject) (res
 	return nil, nil
 }
 
+func (stubServer) ListAgentWebhookSubscriptions(context.Context, rest.ListAgentWebhookSubscriptionsRequestObject) (rest.ListAgentWebhookSubscriptionsResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) CreateAgentWebhookSubscription(context.Context, rest.CreateAgentWebhookSubscriptionRequestObject) (rest.CreateAgentWebhookSubscriptionResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) ListWebhookSubscriptions(context.Context, rest.ListWebhookSubscriptionsRequestObject) (rest.ListWebhookSubscriptionsResponseObject, error) {
 	return nil, nil
 }
@@ -1541,13 +1549,16 @@ func TestRealTable_Enabled(t *testing.T) {
 		"listRunHistory": {"GET /api/v1/run-history", "run.overview.read", "rl.read"},
 
 		// M2-26
-		"getWebhookKeys":            {"GET /api/v1/instance/webhook-keys", "instance.discovery.read", "rl.public_auth"},
-		"listWebhookSubscriptions":  {"GET /api/v1/apps/{app_id}/webhooks", "webhook_out.read", "rl.read"},
-		"createWebhookSubscription": {"POST /api/v1/apps/{app_id}/webhooks", "webhook_out.manage", "rl.admin"},
-		"updateWebhookSubscription": {"PATCH /api/v1/webhooks/{subscription_id}", "webhook_out.manage", "rl.admin"},
-		"deleteWebhookSubscription": {"DELETE /api/v1/webhooks/{subscription_id}", "webhook_out.manage", "rl.admin"},
-		"listWebhookDeliveries":     {"GET /api/v1/webhooks/{subscription_id}/deliveries", "webhook_out.read", "rl.read"},
-		"redeliverWebhook":          {"POST /api/v1/webhook-deliveries/{delivery_id}/redeliver", "webhook_out.redeliver", "rl.admin"},
+		"getWebhookKeys":           {"GET /api/v1/instance/webhook-keys", "instance.discovery.read", "rl.public_auth"},
+		"listWebhookSubscriptions": {"GET /api/v1/apps/{app_id}/webhooks", "webhook_out.read", "rl.read"},
+		// V1-01: the webhook transport of agents (09 section 4.2).
+		"listAgentWebhookSubscriptions":  {"GET /api/v1/agents/{agent_id}/webhooks", "webhook_out.read", "rl.read"},
+		"createAgentWebhookSubscription": {"POST /api/v1/agents/{agent_id}/webhooks", "webhook_out.manage", "rl.admin"},
+		"createWebhookSubscription":      {"POST /api/v1/apps/{app_id}/webhooks", "webhook_out.manage", "rl.admin"},
+		"updateWebhookSubscription":      {"PATCH /api/v1/webhooks/{subscription_id}", "webhook_out.manage", "rl.admin"},
+		"deleteWebhookSubscription":      {"DELETE /api/v1/webhooks/{subscription_id}", "webhook_out.manage", "rl.admin"},
+		"listWebhookDeliveries":          {"GET /api/v1/webhooks/{subscription_id}/deliveries", "webhook_out.read", "rl.read"},
+		"redeliverWebhook":               {"POST /api/v1/webhook-deliveries/{delivery_id}/redeliver", "webhook_out.redeliver", "rl.admin"},
 
 		// M2-09
 		"startRun":             {"POST /api/v1/runs/{run_id}/start", "run.start", "rl.agent_runtime"},

@@ -10,7 +10,7 @@ names (PLAN P-04). The normative sources are [06-api.md](../../../docs/spec/06-a
 
 | Path | Content | By hand? |
 |---|---|---|
-| `operations.yaml` | enable list: `enabled` and `later` with milestone | yes |
+| `operations.yaml` | enable list: `enabled` and `later` with milestone, reason and feature | yes |
 | `generate.go` | the two `go:generate` lines (real surface and fixture) | yes |
 | `rest/oapi-codegen.yaml` | settings of oapi-codegen (`std-http-server`, `strict-server`, `models`, `skip-prune`) | yes |
 | `rest/models.gen.go` | Go types of all schemas, parameters and request bodies (the part before `ServerInterface`) | generated |
@@ -76,17 +76,30 @@ call.
 version: 1
 enabled: []          # operationIds with a handler; sorted ascending
 later:               # every other operationId under paths; sorted by operation_id
-  - operation_id: addOwner
-    milestone: M1
-    ticket: M1-31    # optional
+  - operation_id: createDm
+    milestone: V3
+    ticket: V3-01    # optional
+    reason: Direct messages come after V1 behind the switch dm.enabled.
+    feature: Direct messages between people
 ```
 
 The generator rejects and names every entry: `version` other than 1, unknown keys, an operation
 under `paths` in no section, an entry in both sections, twice in one or not in `openapi.yaml`, a
 section not ascending in byte order, `milestone` not `M1` to `M8` or `V1` to `V3`, `ticket` not
-of the form `<milestone>-<two digits>` or of another milestone. Operations under `webhooks:` are
-not in the list: the server sends them, it does not serve them. How `later` was filled:
-DECISIONS.md, M1-17/4.
+of the form `<milestone>-<two digits>` or of another milestone, a blank or missing `reason` or
+`feature`. Operations under `webhooks:` are not in the list: the server sends them, it does not
+serve them. How `later` was filled: DECISIONS.md, M1-17/4.
+
+### Gate check: the list is complete (V1-01)
+
+Since V1-01 the list is complete (plan decision P-04): every operation of `openapi.yaml` and every
+gateway op of `asyncapi.yaml` is enabled, or stands under `later` because it belongs to a feature
+that [01-product.md](../../../docs/spec/01-product.md) section 3 lists with the milestone `later`.
+`TestEnableListComplete` in `routes/gen` holds this on the real files: the generator checks pass
+for both sections, and every `later` entry (REST and `gateway_ops`) names in `feature` the exact
+text of the first column of such a row, a non-blank `reason` and the milestone `V2` or `V3`. An
+operation of a core feature therefore cannot wait under `later`: build it and enable it, or change
+the product chapter first. Rulings: `docs/decisions.d/V1-01.md`.
 
 ### Gateway ops (`gateway_ops`, M1-64)
 
@@ -101,11 +114,13 @@ gateway_ops:
     - op: focus
       milestone: M1
       ticket: M1-66  # optional
+      reason: Why the op waits.
+      feature: The first column of its feature row in 01 section 3
 ```
 
 When the generator runs with `-asyncapi`, the section is required and checked like the REST
 sections: every entry is a client-to-server op of the channel, no op is missing or in both parts,
-both parts are sorted, `milestone` and `ticket` follow the same forms. The body schema of every
+both parts are sorted, `milestone`, `ticket`, `reason` and `feature` follow the same forms. The body schema of every
 client op must refuse unknown members (`additionalProperties: false`, W7). The enabled ops become
 `routes.GatewayOps()` with the action of their `x-authz-action` and the name of their body schema;
 the gateway registers exactly these. The terminal channels are not gateway ops and are not listed.
@@ -129,7 +144,9 @@ Checks and metadata come from the document that the loader of oapi-codegen
 ## Add an operation to openapi.yaml
 
 Every new operation under `paths` gets an entry under `later` in the same commit, with the
-milestone (and the ticket that builds it); otherwise the generator fails in `make codegen-check`.
+milestone (and the ticket that builds it), the reason and the feature of 01; otherwise the
+generator fails in `make codegen-check`. The gate check above admits it only for a feature that 01
+lists as `later`; an operation of a core feature is built and enabled in the same change.
 
 ## Enable an operation (handler ticket)
 

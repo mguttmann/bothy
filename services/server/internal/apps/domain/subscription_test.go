@@ -222,6 +222,44 @@ func TestAppSubscribableMatchesContract(t *testing.T) {
 	if domain.AppSubscribable("agent.invocation") || domain.AppSubscribable("") {
 		t.Fatal("agent-only or empty type subscribable")
 	}
+	// An agent subscription may name every key under webhooks: (webhooks.md section 7, V1-01).
+	all := make([]string, 0, len(spec.Webhooks))
+	for k := range spec.Webhooks {
+		all = append(all, k)
+	}
+	slices.Sort(all)
+	if got := domain.AgentSubscribableTypes(); !slices.Equal(got, all) {
+		t.Fatalf("AgentSubscribable differs from the contract\n got %s\nwant %s", strings.Join(got, " "), strings.Join(all, " "))
+	}
+	if !domain.AgentSubscribable("agent.invocation") || domain.AgentSubscribable("read_state.updated") || domain.AgentSubscribable("") {
+		t.Fatal("AgentSubscribable: agent.invocation refused, or a personal event of people or the empty type accepted")
+	}
+}
+
+// TestValidateAgentEventTypes: an agent subscription names at least one type, each once, each of
+// the agent list; there is no installation that narrows it (V1-01, 09 section 4.2).
+func TestValidateAgentEventTypes(t *testing.T) {
+	t.Parallel()
+	if fe := domain.ValidateAgentEventTypes([]string{"agent.invocation", "message.created"}); len(fe) != 0 {
+		t.Fatalf("valid list refused: %v", fe)
+	}
+	cases := []struct {
+		name    string
+		types   []string
+		pointer string
+		code    string
+	}{
+		{"empty", nil, "/event_types", domain.CodeTooFewItems},
+		{"duplicate", []string{"agent.followup", "agent.followup"}, "/event_types/1", domain.CodeInvalid},
+		{"personal event of people", []string{"agent.invocation", "draft.updated"}, "/event_types/1", domain.CodeNotSubscribable},
+		{"unknown", []string{"no.such_type"}, "/event_types/0", domain.CodeNotSubscribable},
+	}
+	for _, c := range cases {
+		fe := domain.ValidateAgentEventTypes(c.types)
+		if len(fe) != 1 || fe[0].Pointer != c.pointer || fe[0].Code != c.code {
+			t.Errorf("%s: %+v, want %s at %s", c.name, fe, c.code, c.pointer)
+		}
+	}
 }
 
 func TestAllowedHostEdgesAndHostOf(t *testing.T) {

@@ -36,6 +36,14 @@ learn about events.
    without HMAC is `400 validation_failed` with `hmac_not_enabled`. A response with a `whsec_`
    secret is a one-time secret: a replay with the same `Idempotency-Key` answers `409 conflict`
    with `reason: one_time_secret`.
+5. Agents (webhook as transport, [09-agents.md](../spec/09-agents.md) section 4.2): an owner
+   subscribes an agent with `createAgentWebhookSubscription` (`webhook_out.manage` on the agent,
+   step-up) and lists its subscriptions with `listAgentWebhookSubscriptions`; an unknown agent
+   answers `404`. Address, HMAC and the operations by subscription ID follow items 2 to 4; each
+   type of `event_types` is one of section 7 (`not_subscribable` otherwise), with no installation
+   that narrows the list. Every delivery of an event that carries an invocation, a retry
+   included, carries a freshly issued `invocation_token` (R-SY-07); a denied invocation is not
+   sent and its delivery ends `dead` with `not_authorized`.
 
 ## 2. Delivery
 

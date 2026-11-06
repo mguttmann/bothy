@@ -8,3 +8,5 @@ enabled:
 later:
   - operation_id: updateThing
     milestone: M9
+    reason: Fixture.
+    feature: Fixture feature

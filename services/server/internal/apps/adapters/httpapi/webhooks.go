@@ -13,7 +13,8 @@ import (
 )
 
 // Webhooks implements listWebhookSubscriptions, createWebhookSubscription,
-// updateWebhookSubscription, deleteWebhookSubscription, listWebhookDeliveries and redeliverWebhook
+// updateWebhookSubscription, deleteWebhookSubscription, listWebhookDeliveries, redeliverWebhook
+// and the agent transport listAgentWebhookSubscriptions and createAgentWebhookSubscription (V1-01)
 // of rest.StrictServerInterface over the port apps.Webhooks (M2-26). The use cases authorize; the
 // handlers convert, and mark a response with a v1 secret as a one-time secret (R-API-26).
 type Webhooks struct {
@@ -48,6 +49,35 @@ func (h *Webhooks) CreateWebhookSubscription(ctx context.Context, req rest.Creat
 		return nil, err
 	}
 	return rest.CreateWebhookSubscription201JSONResponse{Body: createdREST(ctx, res)}, nil
+}
+
+// ListAgentWebhookSubscriptions implements rest.StrictServerInterface (GET
+// /agents/{agent_id}/webhooks).
+func (h *Webhooks) ListAgentWebhookSubscriptions(ctx context.Context, req rest.ListAgentWebhookSubscriptionsRequestObject) (rest.ListAgentWebhookSubscriptionsResponseObject, error) {
+	list, err := h.hooks.ListAgentSubscriptions(ctx, principal(ctx), ids.ID(req.AgentId))
+	if err != nil {
+		return nil, err
+	}
+	out := rest.WebhookSubscriptionList{Items: make([]rest.WebhookSubscription, 0, len(list))}
+	for _, s := range list {
+		out.Items = append(out.Items, subscriptionREST(s))
+	}
+	return rest.ListAgentWebhookSubscriptions200JSONResponse{Body: out}, nil
+}
+
+// CreateAgentWebhookSubscription implements rest.StrictServerInterface (POST
+// /agents/{agent_id}/webhooks).
+func (h *Webhooks) CreateAgentWebhookSubscription(ctx context.Context, req rest.CreateAgentWebhookSubscriptionRequestObject) (rest.CreateAgentWebhookSubscriptionResponseObject, error) {
+	cmd := apps.CreateAgentSubscription{AgentID: ids.ID(req.AgentId)}
+	if req.Body != nil {
+		cmd.URL, cmd.EventTypes = req.Body.Url, append([]string{}, req.Body.EventTypes...)
+		cmd.EnableHMAC = req.Body.EnableHmac != nil && *req.Body.EnableHmac
+	}
+	res, err := h.hooks.CreateAgentSubscription(ctx, principal(ctx), cmd)
+	if err != nil {
+		return nil, err
+	}
+	return rest.CreateAgentWebhookSubscription201JSONResponse{Body: createdREST(ctx, res)}, nil
 }
 
 // UpdateWebhookSubscription implements rest.StrictServerInterface (PATCH
@@ -140,6 +170,10 @@ func subscriptionREST(s apps.Subscription) rest.WebhookSubscription {
 	if !s.AppID.IsZero() {
 		app := rest.Uuid(s.AppID)
 		out.AppId = &app
+	}
+	if !s.AgentID.IsZero() {
+		agent := rest.Uuid(s.AgentID)
+		out.AgentId = &agent
 	}
 	if !s.DisabledAt.IsZero() {
 		at := millis(s.DisabledAt)

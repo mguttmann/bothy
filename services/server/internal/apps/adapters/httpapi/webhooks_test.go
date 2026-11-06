@@ -29,3 +29,6 @@ func TestGetWebhookKeys(t *testing.T) { appsworld.ScenarioGetWebhookKeys(t) }
 
 // TestRedeliverWebhook runs appsworld.ScenarioRedeliverWebhook.
 func TestRedeliverWebhook(t *testing.T) { appsworld.ScenarioRedeliverWebhook(t) }
+
+// TestAgentWebhookSubscriptions runs appsworld.ScenarioAgentWebhookSubscriptions (V1-01).
+func TestAgentWebhookSubscriptions(t *testing.T) { appsworld.ScenarioAgentWebhookSubscriptions(t) }

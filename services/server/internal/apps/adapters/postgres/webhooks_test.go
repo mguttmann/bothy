@@ -60,3 +60,9 @@ func TestCreateWebhookSubscription(t *testing.T) { appsworld.ScenarioCreateWebho
 
 // TestAZM49 runs appsworld.ScenarioAZM49.
 func TestAZM49(t *testing.T) { appsworld.ScenarioAZM49(t) }
+
+// TestAgentWebhookSubscriptions runs appsworld.ScenarioAgentWebhookSubscriptions (V1-01).
+func TestAgentWebhookSubscriptions(t *testing.T) { appsworld.ScenarioAgentWebhookSubscriptions(t) }
+
+// TestAgentWebhookDelivery runs appsworld.ScenarioAgentWebhookDelivery (V1-01).
+func TestAgentWebhookDelivery(t *testing.T) { appsworld.ScenarioAgentWebhookDelivery(t) }

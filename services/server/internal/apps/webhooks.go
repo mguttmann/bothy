@@ -51,9 +51,11 @@ func LastErrorCodes() []string {
 		LastErrorNotSubscribed, LastErrorEventExpired}
 }
 
-// Subscription is an outgoing subscription as the API shows it (schema WebhookSubscription).
+// Subscription is an outgoing subscription as the API shows it (schema WebhookSubscription):
+// exactly one of AppID and AgentID is set (an agent subscription is the webhook transport of 09
+// section 4.2).
 type Subscription struct {
-	ID, AppID ids.ID
+	ID, AppID, AgentID ids.ID
 	// URL is the address; it appears in this response only, never in logs or the audit.
 	URL string
 	// EventTypes are the subscribed event types in the stored order.
@@ -84,6 +86,15 @@ type SubscriptionCreated struct {
 // CreateSubscription is the body of createWebhookSubscription (schema WebhookSubscriptionCreate).
 type CreateSubscription struct {
 	AppID      ids.ID
+	URL        string
+	EventTypes []string
+	EnableHMAC bool
+}
+
+// CreateAgentSubscription is the body of createAgentWebhookSubscription (schema
+// WebhookSubscriptionCreate) for the agent AgentID.
+type CreateAgentSubscription struct {
+	AgentID    ids.ID
 	URL        string
 	EventTypes []string
 	EnableHMAC bool
@@ -135,16 +146,23 @@ type DeliveryPage struct {
 }
 
 // Webhooks is the incoming port of the outgoing webhooks of the module apps (M2-26, 05 section
-// 4.11): the subscription operations of an owner and the redelivery. Every method takes the caller
-// and authorizes it first: webhook_out.manage (owner, step-up, audited) for create, update and
+// 4.11): the subscription operations of an owner and the redelivery, for apps and, as their
+// webhook transport, for agents (V1-01, 09 section 4.2). Every method takes the caller and
+// authorizes it first: webhook_out.manage (owner, step-up, audited) for create, update and
 // delete, webhook_out.read (owner) for the lists, webhook_out.redeliver (owner, audited) for a
-// redelivery. A subscription or delivery that is unknown or belongs to an app the caller cannot
-// see answers the same 404. Errors are kernel/errs errors: 400 validation_failed,
+// redelivery. A subscription or delivery that is unknown or belongs to an app or agent the caller
+// cannot see answers the same 404. Errors are kernel/errs errors: 400 validation_failed,
 // webhook_host_not_allowed or cursor_invalid, 401 step_up_required, 403 forbidden, 404 not_found,
 // 409 conflict (reasons app_not_installed and event_expired).
 type Webhooks interface {
 	// CreateSubscription subscribes an installed app (active or suspended) to event types.
 	CreateSubscription(ctx context.Context, a actor.Actor, cmd CreateSubscription) (SubscriptionCreated, error)
+	// CreateAgentSubscription subscribes an agent to event types (webhook_out.manage on the agent);
+	// an unknown id or a principal that is no agent is 404.
+	CreateAgentSubscription(ctx context.Context, a actor.Actor, cmd CreateAgentSubscription) (SubscriptionCreated, error)
+	// ListAgentSubscriptions returns every subscription of the agent, ordered by created_at, then
+	// id (webhook_out.read on the agent).
+	ListAgentSubscriptions(ctx context.Context, a actor.Actor, agentID ids.ID) ([]Subscription, error)
 	// UpdateSubscription changes address or event types, pauses, resumes, re-enables or rotates
 	// the HMAC secret.
 	UpdateSubscription(ctx context.Context, a actor.Actor, cmd UpdateSubscription) (SubscriptionCreated, error)

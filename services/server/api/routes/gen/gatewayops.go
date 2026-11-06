@@ -20,7 +20,7 @@ import (
 const gatewayChannelRef = "#/channels/gateway"
 
 // gatewayLaterKeys are the only keys of a later entry of gateway_ops.
-var gatewayLaterKeys = []string{"op", "milestone", "ticket"}
+var gatewayLaterKeys = []string{"op", "milestone", "ticket", "reason", "feature"}
 
 // gatewayOpsKeys are the only keys of the section gateway_ops.
 var gatewayOpsKeys = []string{sectionEnabled, sectionLater}
@@ -31,11 +31,13 @@ type gatewayOp struct {
 	Op, Action, Schema string
 }
 
-// gatewayLater is one later entry of gateway_ops.
+// gatewayLater is one later entry of gateway_ops, with the fields of laterEntry.
 type gatewayLater struct {
 	Op        string `yaml:"op"`
 	Milestone string `yaml:"milestone"`
 	Ticket    string `yaml:"ticket"`
+	Reason    string `yaml:"reason"`
+	Feature   string `yaml:"feature"`
 }
 
 // gatewayOpsList is the decoded section gateway_ops.
@@ -156,7 +158,7 @@ func checkGatewayLater(path string, i int, e gatewayLater, p *problemsError) {
 		p.add(path, "%s.later[%d]: missing op", sectionGatewayOps, i)
 		return
 	}
-	checkLaterEntry(path, i, laterEntry{OperationID: e.Op, Milestone: e.Milestone, Ticket: e.Ticket}, p)
+	checkLaterEntry(path, i, laterEntry{OperationID: e.Op, Milestone: e.Milestone, Ticket: e.Ticket, Reason: e.Reason, Feature: e.Feature}, p)
 }
 
 // readAsyncGatewayOps returns the client-to-server ops of the channel gateway of the AsyncAPI

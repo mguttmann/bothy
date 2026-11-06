@@ -251,9 +251,9 @@ The requirement entries of `domain.DeferredActions()` (held by `domain/testdata/
 
 `webhook_out.deliver` is no longer deferred: its requirement is `Delivery`, decided by
 `Authorizer.authorizeDelivery` with `domain.DeliveryGate` before the receive action. In this order:
-the liveness check of the receiving principal; a principal that is not an app is `forbidden
-subject_kind_not_allowed` (agents until the agent transport); an app without `events:subscribe`
-in its granted scopes is `forbidden scope_missing`; a personal event (`Resource.Audience` set) is
+the liveness check of the receiving principal; a principal that is neither an app nor an agent
+(the agent transport, V1-01) is `forbidden subject_kind_not_allowed`; an app without
+`events:subscribe` in its granted scopes is `forbidden scope_missing` (an agent has no scopes); a personal event (`Resource.Audience` set) is
 allowed for its audience and `not_found not_self` for anyone else; otherwise the full decision of
 the receive action `Resource.DeliveryOf` on the same resource (visibility, requirement and the app
 scope of the action, for example `messages:read` for `message.read`) is the result. A personal

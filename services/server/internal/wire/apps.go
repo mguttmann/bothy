@@ -34,6 +34,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/jobs"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	"github.com/OWNER/bothy/services/server/internal/platform/secrets"
+	"github.com/OWNER/bothy/services/server/internal/runs"
 	"github.com/OWNER/bothy/services/server/internal/sync"
 )
 
@@ -120,6 +121,9 @@ type WebhookDeps struct {
 	// Master is the master key of the v1 secrets; Sender sends the attempts.
 	Master appsapp.HMACMasterKey
 	Sender appsapp.WebhookSender
+	// Invocations prepares every attempt of an invocation-bearing event to an agent subscription
+	// with a fresh invocation token (runs.Delivery of the runs step, V1-01).
+	Invocations runs.Delivery
 	// Rand is the jitter source; nil means math/rand/v2 (tests inject one).
 	Rand func(n int64) int64
 	// Logger receives the delivery and state lines; nil discards them.
@@ -246,6 +250,7 @@ func NewApps(cfg appsapp.Config, pool *pg.Pool, d AppsDeps) (*Apps, error) {
 	hooks, err := appsapp.NewWebhooks(d.Webhooks.Config, appsapp.WebhookDeps{
 		Store: repo, Repo: repo, UoW: d.UoW, Authorizer: d.Authorizer, Audit: d.Audit, Scheduler: sched, Sender: d.Webhooks.Sender,
 		Master: d.Webhooks.Master, Keys: keys, State: d.Webhooks.State, Log: d.Webhooks.Log, Cursors: appshttp.Cursors{},
+		Agents: appsapp.IdentityPrincipals{Directory: d.Identity.Directory}, Invocations: d.Webhooks.Invocations,
 		Clock: d.Clock, Rand: d.Webhooks.Rand, Logger: d.Webhooks.Logger,
 	})
 	if err != nil {

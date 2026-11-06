@@ -12,11 +12,11 @@ import (
 )
 
 const candidates = `-- name: Candidates :many
-SELECT s.id, s.event_types, s.state, i.id AS installation_id, i.app_id, i.state AS installation_state,
+SELECT s.id, s.event_types, s.state, s.agent_id, i.id AS installation_id, i.app_id, i.state AS installation_state,
        i.event_subscriptions
 FROM webhook_subscriptions s
-JOIN app_installations i ON i.id = s.app_installation_id
-WHERE s.state IN ('active', 'paused') AND i.state IN ('active', 'suspended')
+LEFT JOIN app_installations i ON i.id = s.app_installation_id
+WHERE s.state IN ('active', 'paused') AND (s.agent_id IS NOT NULL OR i.state IN ('active', 'suspended'))
 ORDER BY s.id
 `
 
@@ -24,14 +24,16 @@ type CandidatesRow struct {
 	ID                 pgtype.UUID
 	EventTypes         []string
 	State              string
+	AgentID            pgtype.UUID
 	InstallationID     pgtype.UUID
 	AppID              pgtype.UUID
-	InstallationState  string
+	InstallationState  pgtype.Text
 	EventSubscriptions []string
 }
 
 // The candidates of a consumer round (M2-26 design note 3 b): app subscriptions in state active or
-// paused whose installation is active or suspended.
+// paused whose installation is active or suspended, and agent subscriptions in state active or
+// paused (V1-01; their installation columns are NULL).
 func (q *Queries) Candidates(ctx context.Context) ([]CandidatesRow, error) {
 	rows, err := q.db.Query(ctx, candidates)
 	if err != nil {
@@ -45,6 +47,7 @@ func (q *Queries) Candidates(ctx context.Context) ([]CandidatesRow, error) {
 			&i.ID,
 			&i.EventTypes,
 			&i.State,
+			&i.AgentID,
 			&i.InstallationID,
 			&i.AppID,
 			&i.InstallationState,
@@ -227,7 +230,7 @@ func (q *Queries) GetInstallation(ctx context.Context, id pgtype.UUID) (GetInsta
 
 const getSubscription = `-- name: GetSubscription :one
 SELECT s.id, s.app_installation_id, s.agent_id, s.url, s.event_types, s.signing_key_kid, s.hmac_enabled, s.hmac_generation, s.hmac_rotated_at, s.state, s.consecutive_failures, s.last_delivered_seq, s.created_by, s.created_at, s.disabled_at, i.app_id FROM webhook_subscriptions s
-JOIN app_installations i ON i.id = s.app_installation_id
+LEFT JOIN app_installations i ON i.id = s.app_installation_id
 WHERE s.id = $1
 `
 
@@ -236,6 +239,7 @@ type GetSubscriptionRow struct {
 	AppID               pgtype.UUID
 }
 
+// An agent subscription has no installation: app_id is NULL then.
 func (q *Queries) GetSubscription(ctx context.Context, id pgtype.UUID) (GetSubscriptionRow, error) {
 	row := q.db.QueryRow(ctx, getSubscription, id)
 	var i GetSubscriptionRow
@@ -317,15 +321,17 @@ func (q *Queries) InsertDelivery(ctx context.Context, arg InsertDeliveryParams) 
 
 const insertSubscription = `-- name: InsertSubscription :one
 
-INSERT INTO webhook_subscriptions (id, app_installation_id, url, event_types, signing_key_kid, hmac_enabled,
+INSERT INTO webhook_subscriptions (id, app_installation_id, agent_id, url, event_types, signing_key_kid, hmac_enabled,
     hmac_generation, state, created_by)
-VALUES ($1, $2, $3, $4, $5, $6, 0, 'active', $7)
+VALUES ($1, $2, $3, $4, $5, $6, $7, 0,
+    'active', $8)
 RETURNING id, app_installation_id, agent_id, url, event_types, signing_key_kid, hmac_enabled, hmac_generation, hmac_rotated_at, state, consecutive_failures, last_delivered_seq, created_by, created_at, disabled_at
 `
 
 type InsertSubscriptionParams struct {
 	ID                pgtype.UUID
 	AppInstallationID pgtype.UUID
+	AgentID           pgtype.UUID
 	Url               string
 	EventTypes        []string
 	SigningKeyKid     string
@@ -337,10 +343,12 @@ type InsertSubscriptionParams struct {
 // Queries on webhook_subscriptions and webhook_deliveries (apps module, M2-26,
 // docs/spec/03-data-model.md section 4.11). Lock order (03 section 6.3): the installation, then
 // the subscription row, then its delivery rows.
+// Exactly one of app_installation_id and agent_id is set (an agent subscription, V1-01).
 func (q *Queries) InsertSubscription(ctx context.Context, arg InsertSubscriptionParams) (WebhookSubscription, error) {
 	row := q.db.QueryRow(ctx, insertSubscription,
 		arg.ID,
 		arg.AppInstallationID,
+		arg.AgentID,
 		arg.Url,
 		arg.EventTypes,
 		arg.SigningKeyKid,
@@ -366,6 +374,48 @@ func (q *Queries) InsertSubscription(ctx context.Context, arg InsertSubscription
 		&i.DisabledAt,
 	)
 	return i, err
+}
+
+const listAgentSubscriptions = `-- name: ListAgentSubscriptions :many
+SELECT id, app_installation_id, agent_id, url, event_types, signing_key_kid, hmac_enabled, hmac_generation, hmac_rotated_at, state, consecutive_failures, last_delivered_seq, created_by, created_at, disabled_at FROM webhook_subscriptions
+WHERE agent_id = $1
+ORDER BY created_at, id
+`
+
+func (q *Queries) ListAgentSubscriptions(ctx context.Context, agentID pgtype.UUID) ([]WebhookSubscription, error) {
+	rows, err := q.db.Query(ctx, listAgentSubscriptions, agentID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []WebhookSubscription
+	for rows.Next() {
+		var i WebhookSubscription
+		if err := rows.Scan(
+			&i.ID,
+			&i.AppInstallationID,
+			&i.AgentID,
+			&i.Url,
+			&i.EventTypes,
+			&i.SigningKeyKid,
+			&i.HmacEnabled,
+			&i.HmacGeneration,
+			&i.HmacRotatedAt,
+			&i.State,
+			&i.ConsecutiveFailures,
+			&i.LastDeliveredSeq,
+			&i.CreatedBy,
+			&i.CreatedAt,
+			&i.DisabledAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listAppSubscriptions = `-- name: ListAppSubscriptions :many
@@ -528,8 +578,8 @@ func (q *Queries) LockInstallationSubscriptions(ctx context.Context, installatio
 
 const lockLiveSubscriptions = `-- name: LockLiveSubscriptions :many
 SELECT s.id, s.app_installation_id, s.agent_id, s.url, s.event_types, s.signing_key_kid, s.hmac_enabled, s.hmac_generation, s.hmac_rotated_at, s.state, s.consecutive_failures, s.last_delivered_seq, s.created_by, s.created_at, s.disabled_at, i.app_id FROM webhook_subscriptions s
-JOIN app_installations i ON i.id = s.app_installation_id
-WHERE s.state IN ('active', 'paused') AND i.state IN ('active', 'suspended')
+LEFT JOIN app_installations i ON i.id = s.app_installation_id
+WHERE s.state IN ('active', 'paused') AND (s.agent_id IS NOT NULL OR i.state IN ('active', 'suspended'))
 ORDER BY s.id
 FOR UPDATE OF s
 `
@@ -539,8 +589,8 @@ type LockLiveSubscriptionsRow struct {
 	AppID               pgtype.UUID
 }
 
-// The lost range of the consumer round: every app subscription that could have matched a lost
-// event (M2-26 design note 3 f).
+// The lost range of the consumer round: every app and agent subscription that could have matched
+// a lost event (M2-26 design note 3 f, V1-01).
 func (q *Queries) LockLiveSubscriptions(ctx context.Context) ([]LockLiveSubscriptionsRow, error) {
 	rows, err := q.db.Query(ctx, lockLiveSubscriptions)
 	if err != nil {
@@ -580,7 +630,7 @@ func (q *Queries) LockLiveSubscriptions(ctx context.Context) ([]LockLiveSubscrip
 
 const lockSubscription = `-- name: LockSubscription :one
 SELECT s.id, s.app_installation_id, s.agent_id, s.url, s.event_types, s.signing_key_kid, s.hmac_enabled, s.hmac_generation, s.hmac_rotated_at, s.state, s.consecutive_failures, s.last_delivered_seq, s.created_by, s.created_at, s.disabled_at, i.app_id FROM webhook_subscriptions s
-JOIN app_installations i ON i.id = s.app_installation_id
+LEFT JOIN app_installations i ON i.id = s.app_installation_id
 WHERE s.id = $1
 FOR UPDATE OF s
 `

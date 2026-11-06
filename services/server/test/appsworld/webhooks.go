@@ -217,6 +217,8 @@ type webhookParts struct {
 	Metrics    *Metrics
 	Config     appsapp.WebhookConfig
 	deps       appsapp.WebhookDeps
+	// Invocations is the fake runs.Delivery of the agent subscriptions (V1-01).
+	Invocations *Invocations
 }
 
 // writeMasterKey writes the master key of the v1 secrets into the secrets directory dir.

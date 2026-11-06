@@ -282,9 +282,10 @@ func (w *World) buildApps(o Options, pool *pg.Pool, hook *authzapp.RightsHook, a
 	w.SQL(`INSERT INTO instance (id, instance_id, schema_version, sync_epoch) VALUES (1, $1, 1, $2) ON CONFLICT (id) DO NOTHING`,
 		ids.New().String(), ids.New().String())
 	repo := appspg.NewRepository(pool)
+	w.web.Invocations = &Invocations{}
 	w.web.deps = appsapp.WebhookDeps{Store: repo, Repo: repo, UoW: w.uow, Authorizer: az, Audit: w.rec, Sender: sender, Master: master,
 		Keys: keys, State: instanceapp.NewState(instancepg.NewRepository(pool), w.uow), Log: syncRepo, Cursors: appshttp.Cursors{},
-		Clock: w.Clk, Logger: log}
+		Agents: appsapp.IdentityPrincipals{Directory: w.id.Directory}, Invocations: w.web.Invocations, Clock: w.Clk, Logger: log}
 	// Chat and messaging serve the incoming webhooks the module builds (M2-27); the tests of this
 	// world reach them only through uninstall, which revokes the webhooks of the app.
 	rights, ok := az.(authz.RightsQuery)
@@ -309,7 +310,7 @@ func (w *World) buildApps(o Options, pool *pg.Pool, hook *authzapp.RightsHook, a
 	Must(t, err)
 	w.apps, err = wire.NewApps(cfg, pool, wire.AppsDeps{UoW: w.uow, Rights: hook, Authorizer: az, Audit: w.rec, Identity: w.id, Grants: w.admin,
 		Clock: w.Clk, Webhooks: wire.WebhookDeps{Config: wcfg, Keys: keys, State: instanceapp.NewState(instancepg.NewRepository(pool), w.uow),
-			Log: syncRepo, Master: master, Sender: sender, Logger: log},
+			Log: syncRepo, Master: master, Sender: sender, Invocations: w.web.Invocations, Logger: log},
 		Incoming: appsapp.IncomingConfig{MaxContentBytes: 4096, FormatsEnabled: []string{"native", "alertmanager"},
 			LastUsedGranularity: idCfg.LastActiveGranularity, PublicURL: httpservertest.PublicURL},
 		Chat: ch, Messages: msgs, Commands: cmds, Components: noComponents{}})
@@ -630,9 +631,15 @@ func (w *World) Token(o *Client, app string) string {
 // Grant creates a grant for the app through authz.Admin as Robin (tier 1 of M2-24 design note 17).
 func (w *World) Grant(app ids.ID, target ids.ID, level string) ids.ID {
 	w.t.Helper()
+	return w.grantSubject("app", app, target, level)
+}
+
+// grantSubject grants the subject of kind level on the channel target as Robin.
+func (w *World) grantSubject(kind string, subject, target ids.ID, level string) ids.ID {
+	w.t.Helper()
 	robin := w.RobinPhone.Actor()
 	g, err := w.admin.CreateGrant(actor.WithActor(context.Background(), robin), robin, authz.CreateGrantCmd{
-		SubjectKind: "app", SubjectID: app, TargetKind: "channel", TargetID: target, Level: level, Reason: "Posts per ticket",
+		SubjectKind: kind, SubjectID: subject, TargetKind: "channel", TargetID: target, Level: level, Reason: "Posts per ticket",
 	})
 	Must(w.t, err)
 	return g.ID

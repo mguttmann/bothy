@@ -11,14 +11,15 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 )
 
-// SubscriptionRecord is a row of webhook_subscriptions with the app of its installation.
+// SubscriptionRecord is a row of webhook_subscriptions with the app of its installation. An agent
+// subscription (V1-01) has AgentID set and InstallationID and AppID zero.
 type SubscriptionRecord struct {
-	ID, InstallationID, AppID ids.ID
-	URL                       string
-	EventTypes                []string
-	SigningKeyKID             string
-	HMACEnabled               bool
-	HMACGeneration            int
+	ID, InstallationID, AppID, AgentID ids.ID
+	URL                                string
+	EventTypes                         []string
+	SigningKeyKID                      string
+	HMACEnabled                        bool
+	HMACGeneration                     int
 	// HMACRotatedAt is zero while the secret was never rotated.
 	HMACRotatedAt       time.Time
 	State               domain.SubscriptionState
@@ -43,12 +44,13 @@ type DeliveryRecord struct {
 }
 
 // Candidate is a subscription a consumer round may create rows for: an app subscription in state
-// active or paused whose installation is active or suspended (M2-26 design note 3 b).
+// active or paused whose installation is active or suspended (M2-26 design note 3 b), or an agent
+// subscription in state active or paused (V1-01; AgentID set, the installation fields zero).
 type Candidate struct {
-	SubscriptionID, InstallationID, AppID ids.ID
-	EventTypes                            []string
-	State                                 domain.SubscriptionState
-	InstallationState                     domain.State
+	SubscriptionID, InstallationID, AppID, AgentID ids.ID
+	EventTypes                                     []string
+	State                                          domain.SubscriptionState
+	InstallationState                              domain.State
 	// InstallationEvents are the event_subscriptions of the installation.
 	InstallationEvents []string
 }
@@ -61,7 +63,8 @@ type WebhookStore interface {
 	// InsertSubscription inserts r (state active, generation 0) and returns it with the times of
 	// the database.
 	InsertSubscription(ctx context.Context, r SubscriptionRecord) (SubscriptionRecord, error)
-	// Subscription returns the app subscription id; found is false for an unknown id.
+	// Subscription returns the subscription id of an app or an agent; found is false for an
+	// unknown id.
 	Subscription(ctx context.Context, id ids.ID) (SubscriptionRecord, bool, error)
 	// LockSubscription is Subscription with FOR UPDATE.
 	LockSubscription(ctx context.Context, id ids.ID) (SubscriptionRecord, bool, error)
@@ -73,10 +76,13 @@ type WebhookStore interface {
 	// AppSubscriptions returns the subscriptions of every installation of appID, ordered by
 	// created_at, then id.
 	AppSubscriptions(ctx context.Context, appID ids.ID) ([]SubscriptionRecord, error)
+	// AgentSubscriptions returns the subscriptions of agentID, ordered by created_at, then id.
+	AgentSubscriptions(ctx context.Context, agentID ids.ID) ([]SubscriptionRecord, error)
 	// LockInstallationSubscriptions returns the subscriptions of an installation FOR UPDATE.
 	LockInstallationSubscriptions(ctx context.Context, installationID ids.ID) ([]SubscriptionRecord, error)
 	// LockLiveSubscriptions returns every app subscription in state active or paused whose
-	// installation is active or suspended, FOR UPDATE.
+	// installation is active or suspended and every agent subscription in state active or paused,
+	// FOR UPDATE.
 	LockLiveSubscriptions(ctx context.Context) ([]SubscriptionRecord, error)
 	// ShareLiveInstallation returns the installation of appID in state active or suspended, FOR
 	// SHARE.
@@ -142,6 +148,13 @@ type SendResult struct {
 // timeout, TLS, connection): no response arrived; a refusal is converted to *domain.BlockedError.
 type WebhookSender interface {
 	Send(ctx context.Context, req SignedRequest) (SendResult, error)
+}
+
+// AgentPrincipals is the consumer port of identity that tells an agent from any other principal
+// (identity.Directory): an agent subscription names an agent (V1-01).
+type AgentPrincipals interface {
+	// Principal returns the principal id. Errors: not_found.
+	Principal(ctx context.Context, id ids.ID) (PrincipalFacts, error)
 }
 
 // HMACMasterKey returns the master key of the derived v1 secrets (webhook.hmac_master_key_ref,
