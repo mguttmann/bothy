@@ -9,7 +9,13 @@ from pathlib import Path
 
 import pytest
 
-from claude_code_runner.statedir import StateDirError, ensure_private_dir, sweep, write_private
+from claude_code_runner.statedir import (
+    StateDirError,
+    ensure_private_dir,
+    hosted_dir,
+    sweep,
+    write_private,
+)
 
 
 def test_private_dir_and_files(tmp_path: Path) -> None:
@@ -98,3 +104,21 @@ def test_sweep_outgoing_and_run_temp(tmp_path: Path) -> None:
     assert recorded.exists()
     assert mixed.exists()
     assert running.is_dir()
+
+
+def test_hosted_dir_is_private_and_per_agent(tmp_path: Path) -> None:
+    # 26 3.2 item 2: <runner.state_dir>/hosted/<agent_id>/ with mode 0700.
+    state = ensure_private_dir(tmp_path / "state")
+    one = hosted_dir(state, "0192d3a0-0000-7000-8000-0000000000b1")
+    two = hosted_dir(state, "0192d3a0-0000-7000-8000-0000000000b2")
+    assert one == state / "hosted" / "0192d3a0-0000-7000-8000-0000000000b1"
+    assert one != two
+    for path in (state / "hosted", one, two):
+        assert path.stat().st_mode & 0o777 == 0o700
+
+
+def test_hosted_dir_refuses_a_name_that_is_not_an_id(tmp_path: Path) -> None:
+    state = ensure_private_dir(tmp_path / "state")
+    for bad in ("..", "a/b", ""):
+        with pytest.raises(ValueError, match="agent id"):
+            hosted_dir(state, bad)

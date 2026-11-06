@@ -24,6 +24,7 @@ from claude_code_runner.heartbeat import (
     WAIT_THREAD_BUSY,
     Probe,
     billing_modes_supported,
+    capabilities,
     parse_version,
     probe_version,
     raised_minimum,
@@ -181,3 +182,18 @@ def test_runtime_status_carries_slots_and_waiting_runs() -> None:
     bare = runtime_status(Probe(PINNED_CLAUDE_CODE_VERSION, ()), [], None)
     assert bare.run_slots is None
     assert bare.waiting_runs is None
+
+
+def test_capabilities_without_hosting_are_the_ones_before_stage_a1() -> None:
+    # 26 11 item 3: without runner.hosted_agents the capabilities are byte-equal to before.
+    assert capabilities(voice_input=False) == {**CAPABILITIES, "voice_input": False}
+    assert list(capabilities(voice_input=True)) == list({**CAPABILITIES, "voice_input": True})
+    assert "hosts_agents" not in capabilities(voice_input=True)
+
+
+@pytest.mark.parametrize("ceiling", ["chat", "scoped", "host"])
+def test_capabilities_with_hosting_report_the_ceiling(ceiling: str) -> None:
+    # 26 3.1 item 3, 09 2.2: hosts_agents carries runner.hosted_max_tool_class.
+    caps = capabilities(voice_input=False, hosts_agents=ceiling)
+    assert caps["hosts_agents"] == ceiling
+    assert {k: v for k, v in caps.items() if k != "hosts_agents"} == capabilities(voice_input=False)

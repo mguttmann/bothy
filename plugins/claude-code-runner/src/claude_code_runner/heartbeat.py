@@ -36,6 +36,7 @@ __all__ = [
     "WAIT_THREAD_BUSY",
     "Probe",
     "billing_modes_supported",
+    "capabilities",
     "parse_version",
     "probe_version",
     "raised_minimum",
@@ -63,6 +64,30 @@ answers carry files (18.10, M3-12). The owner's switch ``supports_files_out`` is
 server at the send (``403 feature_disabled``), so the runner never reads ``operator_config``.
 ``voice_input`` is the default; the runner reports true when ``runner.transcribe_cmd`` is set
 (18.14)."""
+
+
+def capabilities(*, voice_input: bool, hosts_agents: str | None = None) -> dict[str, bool | str]:
+    """Return ``details.capabilities`` of one agent's heartbeat (09 2.2, 4.8).
+
+    Args:
+        voice_input: True when ``runner.transcribe_cmd`` is set (18.14).
+        hosts_agents: ``runner.hosted_max_tool_class`` for the runner's own agent with
+            ``runner.hosted_agents`` (26 3.1 item 3); ``None`` leaves the member out, as for a
+            hosted agent and for a runner without the key, whose capabilities then equal those
+            before stage A1 (26 11 item 3).
+
+    Returns:
+        The capabilities, in the order of `CAPABILITIES`.
+
+    Examples:
+        >>> capabilities(voice_input=False, hosts_agents="scoped")["hosts_agents"]
+        'scoped'
+    """
+    caps: dict[str, bool | str] = {**CAPABILITIES, "voice_input": voice_input}
+    if hosts_agents is not None:
+        caps["hosts_agents"] = hosts_agents
+    return caps
+
 
 WAIT_SLOTS_FULL = "slots_full"
 """Wait reason of a run in prepare while every slot of ``runner.max_parallel_runs`` is in use

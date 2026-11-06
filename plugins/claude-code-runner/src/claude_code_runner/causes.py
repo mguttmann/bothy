@@ -82,6 +82,10 @@ CAUSES: dict[str, str] = {
         "The runner was stopped (a restart or an update) while this run worked, so it ended "
         "the turn. Send a message to continue in the same session"
     ),
+    "definition_missing": (
+        "The runner has no agent definition it can run for this built-in agent yet, so the "
+        "run ended without a turn. Set up the agent's definition in the app"
+    ),
     "reply_refused": (
         "The server refused an answer of Claude Code, so the run could not deliver it. "
         "The runner log names the refusal"

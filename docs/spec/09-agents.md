@@ -3809,6 +3809,27 @@ interview requests (26 6.2); with `runner.channel_skills_dir` it loads channel s
 class `host` only, for its own agent and for hosted agents (26 5.9, R-BA-13).
 Without these keys nothing in 18.1 to 18.17 changes, held by the byte-equal fixtures (BA-T20).
 
+Details the build settled (A1-04, `docs/decisions.d/A1-04.md`):
+
+1. `runner.hosted_agents` needs `runner.dpop_key_ref`; the start is refused without it, because
+   every hosted token is bound to the runner's key.
+2. The runner lists the hosted set once its own connection is ready and its heartbeat with
+   `hosts_agents` was answered, then on `agent.hosting_changed`, on `agent.updated` of a hosted
+   agent's connection and every `runner.channels_resync_interval`. The class a hosted agent runs
+   with is the lower of the `tool_class` of its listed record and `runner.hosted_max_tool_class`.
+3. The runner fetches the next token when the share `TOKEN_REFRESH_FRACTION` (a constant of the
+   runner's `hosting.py`) of the token's lifetime, from `created_at` to `expires_at`, is left and
+   reconnects the agent with it, since the issue revokes the old token and closes its connection
+   with `4012`. Any other `4012` drops the agent until the next list names it; a failed issue is
+   logged with its problem code and retried with the SDK's backoff.
+4. Each hosted agent uses the consumer `default` of its own principal; its folder
+   `<runner.state_dir>/hosted/<agent_id>/` holds its inbox, outbox and thread locks. Its heartbeat
+   carries no `project_readiness`, `project_folders` or `project_trash_results`, and `run_slots`
+   with the shared totals and `waiting_runs` with its own runs.
+5. Until the runner runs definitions (A1-05), a hosted run takes its thread lock and a shared slot
+   like a turn, then ends `failed` with `adapter_error` and the cause `definition_missing`
+   without `run.start`.
+
 ## 19. Decisions of this chapter
 
 | No. | Decision | Reason |

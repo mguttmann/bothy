@@ -3,7 +3,9 @@
 Status: core (M2-34), follow-ups, stop, error paths and adoption after a crash (M2-35), answer
 attachments (M3-12), folder creation of new projects (M4-43), live reload of channels and
 optional transcription of voice messages (RUNNER-LIVE-RELOAD), Git optional, a default folder for
-forums without a binding and the cause of every refusal in the thread (RUNNER-NO-GIT).
+forums without a binding and the cause of every refusal in the thread (RUNNER-NO-GIT), hosting of
+built-in agents behind `runner.hosted_agents` (A1-04; their turns from definitions follow in
+A1-05).
 
 ## Purpose
 
@@ -23,8 +25,8 @@ the title once per new session and reports the cost of the run.
   class table, mode per run, live box, costs) and section 21 (configuration keys).
 - Backend policy per run: docs/spec/10-backend-policy.md 7 and 10.2.
 - Follow-ups, stop and error paths: 09 18.5, 18.6 and 18.9.
-- Rulings: docs/decisions.d/M2-34.md (`D-M2-34-0` to `D-M2-34-14`) and docs/decisions.d/M2-35.md
-  (`D-M2-35-1` to `D-M2-35-21`).
+- Hosting of built-in agents: docs/spec/26-builtin-agents.md 3 and 5.6 item 4, 09 18.18.
+- Rulings: docs/decisions.d/M2-34.md, docs/decisions.d/M2-35.md and docs/decisions.d/A1-04.md.
 
 ## Layout
 
@@ -39,6 +41,7 @@ the title once per new session and reports the cost of the run.
 | `followups.py`, `background.py`, `stop.py`, `adoption.py` | Follow-up check, line and stdin rule; the background work that holds stdin open; the stop schedule; identity check and adoption decision |
 | `channels.py`, `workspace.py` | Cache of the served forums and their bindings, reloaded while running (09 18.1); resolution of `workspace_ref` and `runner.default_workspace`, readiness and the project folder report (09 18.13, M4-44) |
 | `causes.py` | The sentence for the thread that names the cause of a refused run (09 18.9, RUNNER-NO-GIT) |
+| `hosting.py` | The hosted agents of `runner.hosted_agents`: the hosted set, a token in memory per agent and its renewal, one connection, channel cache, heartbeat and state folder per agent (26 3.2, 3.3) |
 | `transcribe.py` | The local transcriber of audio attachments and the note without a transcript (09 18.14) |
 | `searchassist.py` | The search assistant: one call without tools per question, the reply parsed into picks and terms (09 18.17) |
 | `provision.py` | Folder creation of a binding with `provision` `init` or `clone`, its creation record and the readiness reasons (09 18.12, M4-43) |
@@ -46,13 +49,15 @@ the title once per new session and reports the cost of the run.
 | `toolclass.py`, `commandline.py`, `environment.py` | Tool class order, the argument list of a turn, the allow-list environment |
 | `authcheck.py`, `heartbeat.py` | Pre-check `claude auth status`; version probe and the run-time heartbeat members |
 | `prompt.py`, `prompts/runner_prompt.md`, `attachments.py` | System prompt file and first stdin line; attachments as local files |
-| `locks.py`, `turn.py`, `statedir.py` | File locks, the turn process and `terminate` (through `stop.py`), private state files and retention |
+| `locks.py`, `turn.py`, `statedir.py` | File locks and the slot pool shared by every agent of the process, the turn process and `terminate` (through `stop.py`), private state files (also of each hosted agent) and retention |
 | `streamreader.py`, `livebox.py`, `usage.py`, `title.py` | Stream file reader, live box, cost difference, title proposal |
 | `reply_attachments.py`, `reply_upload.py` | Answer attachments: `ATTACH:` lines, roots, denied patterns, the checks of one file and of the set, the notice; staging, upload, sending and the persisted set (M3-12) |
 | `tests/unit/`, `tests/scenarios/` | Unit tests; scenarios with Fake-Claude and the SDK FakeServer |
 | `tests/fake_claude/` | Fake-Claude (plays `fixtures/*.jsonl`, constructed from the message shapes of 18.4 and the texts of the pinned CLI; see 09 16.1) |
 | `tests/real_cli/` | Tests against the installed CLI, only behind switches (see below) |
 | `tests/realserver/` | The end-to-end suite: the runner with Fake-Claude against the server of this tree (`make adapters-e2e`) |
+| `tests/fixtures/baseline/`, `tests/unit/test_byte_equal_baseline.py` | The command line, heartbeats and served channels of the runner without the keys of stage A1, recorded before A1-04 and compared byte for byte (BA-T20) |
+| `tests/hosting_world.py` | The scenario world of a hosting runner: the runner's FakeServer with the hosting operations and one FakeServer per hosted agent |
 
 ## Configuration
 
@@ -363,6 +368,51 @@ slot is in use; a heartbeat goes out at once when a run starts or stops waiting,
 shows why the run waits and which runs hold the slots (09 5.2.1). Raising
 `runner.max_parallel_runs` is the operator's remedy for long `slots_full` waits.
 
+## Hosting built-in agents (A1-04)
+
+With `runner.hosted_agents = true` (default `false`) the runner also serves the built-in agents
+whose hosting runner is its own agent (docs/spec/26-builtin-agents.md 3, 09 18.18). Without the
+key nothing of this runs: no hosted list, no further connection, and the command line, heartbeat
+and served channels are byte for byte those of the runner before stage A1 (the fixtures in
+`tests/fixtures/baseline/`).
+
+- **Keys.** `runner.hosted_agents`; `runner.hosted_max_tool_class` (`chat`, `scoped` or `host`,
+  default `scoped`), the highest class a hosted agent runs with, reported in the runner's own
+  heartbeat as the capability `hosts_agents`, so the server refuses a higher class for an agent of
+  this runner; `runner.hosted_agents_root`, read now, checked and used once hosted turns run
+  (A1-05). `runner.hosted_agents` needs `runner.dpop_key_ref`, because every hosted token is
+  bound to the runner's DPoP key.
+- **The set.** Once the runner's own connection is ready and its heartbeat with `hosts_agents`
+  is stored, the runner lists the agents it hosts (`listHostedAgents`), again on
+  `agent.hosting_changed`, on `agent.updated` of a hosted agent and every
+  `runner.channels_resync_interval`. A listed agent joins, an agent no longer listed is stopped
+  (its connection closed); log lines `hosted_agent_joined` and `hosted_agent_left` name the
+  agent ID only.
+- **Tokens stay in memory.** For each hosted agent the runner fetches a token with
+  `issueHostedAgentToken` with its own token and key. The token lives only in the runner's
+  memory: never in a file, a log line, a turn record, an environment or anything the runner
+  writes; a restart fetches new ones. The runner fetches the next token when the share
+  `TOKEN_REFRESH_FRACTION` (`hosting.py`) of the token's lifetime (the server's
+  `agents.hosted_token_ttl`) is left (`hosted_token_refreshed`);
+  the server revokes the old one, and the agent reconnects with the new one. A failed fetch logs
+  its problem code (`hosted_token_issue_failed`) and is tried again with the SDK's backoff. A
+  connection closed with `4012` (the agent was disabled, moved to another runner, or a token of
+  this runner was revoked) drops the agent until the next list names it again.
+- **What lives where.** Each hosted agent has its own gateway connection with the consumer
+  `default` of its own principal, its own cursor, channel cache and heartbeat, and its state in
+  `<runner.state_dir>/hosted/<agent_id>/` (mode `0700`): inbox, outbox and thread locks. The
+  runner's own state stays where it was. A hosted heartbeat carries the agent's
+  `reported_tool_class` (the lower of its class and `runner.hosted_max_tool_class`), the runner's
+  runtime state and billing modes and its capabilities without `hosts_agents`.
+- **Shared slots.** `runner.max_parallel_runs` bounds the turns of the runner's own agent and of
+  every hosted agent together. Each agent's heartbeat names its own waiting runs and the shared
+  `run_slots`, so a person sees that turns of another agent hold the slots.
+- **Until the definitions run (A1-05).** A hosted run takes its thread lock and a slot like a
+  turn, then ends `failed` with `adapter_error` and the cause `definition_missing` in the
+  summary, without `run.start` and without a turn.
+- **Turning it off** takes the hosted agents offline (their runs end like those of any offline
+  agent) and leaves the runner's own agent as before (26 11 item 4).
+
 ## Project folder report (M4-44)
 
 Every heartbeat carries `project_folders`: the names of the Git work trees directly under
@@ -479,6 +529,13 @@ the main thread answered in the auto thread, a reply that resumes the session, a
 into the running turn, an answer attachment, a voice message with a local transcriber, cancel
 and retry. It needs the Go tool chain and a container runtime (`make adapters-e2e` from the
 repository root).
+
+`tests/unit/test_byte_equal_baseline.py` compares the runner without the keys of stage A1 with
+the fixtures in `tests/fixtures/baseline/`; their README says how they were recorded and that they
+change only with a ruling. `tests/unit/test_hosting.py` and `tests/scenarios/test_hosted_agents.py`
+run a hosting runner against `tests/hosting_world.py`; `tests/realserver/test_hosting.py` hosts
+one built-in agent against the server of this tree (token issued, connection open, a message to
+the agent ends with `definition_missing`).
 
 Every test uses Fake-Claude through `runner.claude_bin` and a fake `HOME`; no installed CLI and
 no login of the developer is touched. The real CLI runs only behind switches:

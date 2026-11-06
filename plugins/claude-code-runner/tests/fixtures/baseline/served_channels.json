@@ -1,0 +1,77 @@
+[
+  {
+    "channel_id": "<allgemein>",
+    "behavior": {
+      "require_mention": true,
+      "thread_require_mention": false,
+      "free_response": false,
+      "auto_thread": true,
+      "allow_mentioned_agents": true,
+      "history_backfill_limit": 50,
+      "prompt": "",
+      "skills": [],
+      "settings_version": 1
+    },
+    "space_id": "<id-1>"
+  },
+  {
+    "channel_id": "<forum-a>",
+    "behavior": {
+      "require_mention": true,
+      "thread_require_mention": false,
+      "free_response": false,
+      "auto_thread": true,
+      "allow_mentioned_agents": true,
+      "history_backfill_limit": 50,
+      "prompt": "Answer in short sentences.",
+      "skills": [
+        "claude-code:review",
+        "other-adapter:notes"
+      ],
+      "settings_version": 1,
+      "project_binding": {
+        "workspace_ref": "website",
+        "runner_config": {},
+        "ready": false,
+        "version": 1
+      }
+    },
+    "space_id": "<id-1>"
+  },
+  {
+    "channel_id": "<forum-b>",
+    "behavior": {
+      "require_mention": true,
+      "thread_require_mention": false,
+      "free_response": false,
+      "auto_thread": true,
+      "allow_mentioned_agents": true,
+      "history_backfill_limit": 50,
+      "prompt": "",
+      "skills": [],
+      "settings_version": 1,
+      "project_binding": {
+        "workspace_ref": "docs",
+        "runner_config": {},
+        "ready": false,
+        "version": 1
+      }
+    },
+    "space_id": "<id-1>"
+  },
+  {
+    "channel_id": "<werkzeuge>",
+    "behavior": {
+      "require_mention": true,
+      "thread_require_mention": false,
+      "free_response": false,
+      "auto_thread": true,
+      "allow_mentioned_agents": true,
+      "history_backfill_limit": 50,
+      "prompt": "",
+      "skills": [],
+      "settings_version": 1
+    },
+    "space_id": "<id-1>"
+  }
+]

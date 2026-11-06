@@ -4,7 +4,9 @@
 Every directory the runner creates there has mode ``0700`` and every file ``0600``: the state
 holds transcripts, prompts, downloaded attachments and the inbox with its invocation tokens.
 Files older than ``runner.stream_log_retention`` under ``sessions/``, ``files/``, ``outgoing/``
-(staged answer attachments) and ``tmp/`` (temporary directories of runs) are swept.
+(staged answer attachments) and ``tmp/`` (temporary directories of runs) are swept. A hosted
+agent keeps its own state in ``hosted/<agent_id>/`` (`hosted_dir`, 26 3.2 item 2): its inbox,
+outbox and locks, never its token.
 
 Examples:
     >>> import tempfile, pathlib
@@ -23,8 +25,9 @@ import tempfile
 import time
 from collections.abc import Collection
 from pathlib import Path
+from uuid import UUID
 
-__all__ = ["StateDirError", "ensure_private_dir", "sweep", "write_private"]
+__all__ = ["StateDirError", "ensure_private_dir", "hosted_dir", "sweep", "write_private"]
 
 _OPEN_BITS = stat.S_IRWXG | stat.S_IRWXO
 _SWEPT = ("sessions", "files")
@@ -77,6 +80,30 @@ def ensure_private_dir(path: Path) -> Path:
     if info.st_mode & _OPEN_BITS:
         raise StateDirError("not_private")
     return path
+
+
+def hosted_dir(state_dir: Path, agent_id: object) -> Path:
+    """Create and return the private state folder of a hosted agent.
+
+    ``<runner.state_dir>/hosted/<agent_id>/`` with mode ``0700`` (docs/spec/26-builtin-agents.md
+    3.2 item 2); each hosted agent has its own, so one agent's state never mixes with another's.
+
+    Args:
+        state_dir: ``runner.state_dir``.
+        agent_id: The hosted agent's ID (a UUID or its text).
+
+    Returns:
+        The folder.
+
+    Raises:
+        ValueError: ``agent_id`` is not a UUID.
+        StateDirError: The folder exists and is not private.
+    """
+    try:
+        name = str(UUID(str(agent_id)))
+    except ValueError:
+        raise ValueError("not an agent id") from None
+    return ensure_private_dir(state_dir / "hosted" / name)
 
 
 def write_private(path: Path, data: str | bytes, *, atomic: bool = False) -> None:

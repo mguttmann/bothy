@@ -1,0 +1,55 @@
+{
+  "state": "online",
+  "runtime_version": "2.1.288",
+  "billing_modes_supported": [
+    "organization"
+  ],
+  "reported_tool_class": "scoped",
+  "details": {
+    "capabilities": {
+      "followups": "steer",
+      "components": false,
+      "voice_input": false,
+      "title": true,
+      "files_out": true
+    },
+    "active_runs": [
+      "<id-1>"
+    ],
+    "adapter": {
+      "name": "claude-code-runner",
+      "version": "<runner-version>"
+    },
+    "runtime": {
+      "name": "claude-code"
+    },
+    "protocol_version": 1
+  },
+  "project_readiness": [
+    {
+      "channel_id": "<forum-a>",
+      "ready": true,
+      "trash_check": {
+        "ok": false,
+        "reason": "check_failed"
+      }
+    },
+    {
+      "channel_id": "<forum-b>",
+      "ready": false,
+      "reason": "workspace_missing",
+      "trash_check": {
+        "ok": false,
+        "reason": "workspace_missing"
+      }
+    }
+  ],
+  "project_folders": [
+    "website"
+  ],
+  "run_slots": {
+    "used": 1,
+    "total": 4
+  },
+  "waiting_runs": []
+}
