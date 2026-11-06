@@ -4,7 +4,7 @@ Status: ready | Depends on: none (specification merged) | Milestone: AR
 
 ## Goal
 
-After this ticket an orderly stop of the Claude Code runner (SIGTERM, SIGINT) never leaves an orphaned turn. Today the cancellation arrives inside `_run_process`, whose `finally` has already set `self.process = None`, so the `except CancelledError` branch of `RunTurn.run` skips `terminate` and the outer `finally` deletes the turn record and the run files while the CLI lives on in its own session, holds the thread and session locks and loses its background work at the CLI's ceiling (design note 2.2, reproduced). The fix keeps the process handle until the turn is known to be gone, stops every live turn as 09 18.6 says, finishes its run `cancelled` with `runner_stopped`, and removes record and run files only after the process exited (09 18.19.2, R-AG-56). No key: this is today's behaviour corrected, and it may land before the rest of the stage.
+After this ticket an orderly stop of the Claude Code runner (SIGTERM, SIGINT) never leaves an orphaned turn. Today the cancellation arrives inside `_run_process`, whose `finally` has already set `self.process = None`, so the `except CancelledError` branch of `RunTurn.run` skips `terminate` and the outer `finally` deletes the turn record and the run files while the CLI lives on in its own session, holds the thread and session locks and loses its background work at the CLI's ceiling (design note 2.2, reproduced). The fix keeps the process handle until the turn is known to be gone, stops every live turn as 09 18.6 says, finishes its run `cancelled` with the reason `adapter_stopped` (09 5.2), and removes record and run files only after the process exited (09 18.19.2, R-AG-56). No key: this is today's behaviour corrected, and it may land before the rest of the stage. It did: #565 built it before this brief merged, with the rulings D-AR-02-1 to D-AR-02-3 in `docs/decisions.d/AR-02.md`; the text below follows what was built.
 
 ## Read first
 
@@ -43,9 +43,9 @@ Note on rule 1: "stages" are the milestones and the stages A1 and AR of the plan
 
 Product requirements implemented here:
 
-12. On SIGTERM or SIGINT of the runner, every live turn is stopped by the 18.6 escalation (SIGINT, SIGTERM after `runner.stop_grace`, SIGKILL after `runner.kill_grace`, each escalation logged `stop_escalated`), and only after `os.killpg(pgid, 0)` raises `ProcessLookupError` is its run finished `cancelled` with the summary code `runner_stopped` (R-AG-35 form) and its record and run files removed.
+12. On SIGTERM or SIGINT of the runner, every live turn is stopped by the 18.6 escalation (SIGINT, SIGTERM after `runner.stop_grace`, SIGKILL after `runner.kill_grace`, each escalation logged `stop_escalated`), and only after `os.killpg(pgid, 0)` raises `ProcessLookupError` is its run finished `cancelled` with the reason `adapter_stopped` (09 5.2) and a summary that names the cause and its record and run files removed.
 13. The handle the cancel path uses is never cleared before the turn is gone; a cancellation in any await of `_run_process` reaches the stop.
-14. The runner's own exit waits for these stops, bounded by `runner.stop_grace` plus `runner.kill_grace` per turn in parallel, then exits 0 as today. A turn whose group is still present at that bound is not finished: its record stays, `stop_escalated` names the remaining process, and the server ends its run as 09 5.5 says (`interrupted` or `stale`, 18.19.2); a test holds this with a process that ignores the escalation until after the bound.
+14. The runner's own exit waits for these stops, at most `runner.stop_grace` plus `runner.kill_grace` plus `runner.cli_probe_timeout`, logs `stop_turns_timeout` when that wait runs out, then exits 0 as today; a turn the stop did not reach or that outlived the wait is stopped by the cancel path the same way, and a turn whose cancellation is interrupted keeps its record for the next start (18.9, 18.19.2).
 15. A turn whose run the server already ended is stopped the same way without a finish (18.6).
 
 ## Scope
@@ -55,8 +55,8 @@ All paths under `plugins/claude-code-runner/` unless they start with `docs/` or 
 Change:
 
 - `src/claude_code_runner/runturn.py`: keep the process handle through the cancel path; stop, then finish, then remove.
-- `src/claude_code_runner/app.py`, `__main__.py`: wait for the stops at shutdown; log `runner_stopped` once per turn.
-- `src/claude_code_runner/causes.py`: the summary of `runner_stopped`.
+- `src/claude_code_runner/app.py`, `__main__.py`: wait for the stops at shutdown; log `stop_turns_timeout` when the wait runs out.
+- `src/claude_code_runner/causes.py`: the summary of `adapter_stopped`.
 - `tests/scenarios/test_orderly_stop.py` (new): AR-T01 with a real runner process and the fake CLI.
 - `README.md` of the runner (stop behaviour), `docs/spec/09-agents.md` only if a sentence of 18.19.2 must name a merged function differently.
 
@@ -88,13 +88,13 @@ Change:
 
 3. **Where to stop.** The stop runs in the task of the turn (shielded from a second cancellation), so its locks are released only after the group is gone; a second SIGTERM during the stop changes nothing.
 
-4. **Finish.** `finishRun` with `cancelled` and the summary of `runner_stopped`; when the server cannot be reached the decided end stays in the record as today (18.9) and the next start repeats it.
+4. **Finish.** `finishRun` with `cancelled` and the summary of `adapter_stopped`; when the server cannot be reached the decided end stays in the record as today (18.9) and the next start repeats it.
 
 5. **Rulings for `docs/decisions.d/AR-02.md`**: the bound of the shutdown wait, the summary text.
 
 ## Tests (write them first)
 
-- `tests/scenarios/test_orderly_stop.py` (AR-T01): SIGTERM and SIGINT to a runner with one and with two live turns (one with a running background job of the fake CLI); asserted: `stop_escalated` per escalation, every run finished `cancelled` with `runner_stopped`, record and run files removed only after the group is gone (checked by polling during the stop), no process of any turn group left, the locks free for a new runner.
+- `tests/scenarios/test_orderly_stop.py` (AR-T01): SIGTERM and SIGINT to a runner with one and with two live turns (one with a running background job of the fake CLI); asserted: `stop_escalated` per escalation, every run finished `cancelled` with `adapter_stopped`, record and run files removed only after the group is gone (checked by polling during the stop), no process of any turn group left, the locks free for a new runner.
 - A turn whose run the server already ended: stopped, not finished.
 - The existing crash scenarios (`tests/scenarios/test_crash.py`) stay green.
 
@@ -106,7 +106,7 @@ make check
 ## Acceptance criteria
 
 - [ ] AR-T01 was red before the change and is green after it.
-- [ ] No orphan, no record removed before its process exited, every run ends `cancelled` with `runner_stopped`.
+- [ ] No orphan, no record removed before its process exited, every run ends `cancelled` with `adapter_stopped`.
 - [ ] `make check` is green.
 
 ## Definition of done

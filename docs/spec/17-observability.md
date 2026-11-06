@@ -58,7 +58,7 @@ Autonomous runs (addendum of 2026-11-06, stage AR, R-OB-11, [09-agents.md](09-ag
 18.19). The Claude Code runner logs, by code: `turn_handed_over`, `turn_adopted`,
 `launch_check_refused`, `wake_created`, `wake_refused`, `wake_check_failed`, `wake_check_refused`,
 `wake_input_check_failed`, `wake_fired`, `wake_expired`, `recovery_wake`, `usage_limited`,
-`usage_warning`, `usage_status_unknown`, `continuation_without_wake`, `runner_stopped` and
+`usage_warning`, `usage_status_unknown`, `continuation_without_wake`, `stop_turns_timeout` and
 `durable_cron_present`. The server measures the number of pending wake-ups, wake-ups by end state
 and reason, and the chain and idle counts that reached their cap; AR-04 enters these metrics with
 their code into [signals.md](../observability/signals.md), which stays the only list of names.
