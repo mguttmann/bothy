@@ -9,6 +9,7 @@ directory name <rule> is the rule the gate must report, and no other.
 from __future__ import annotations
 
 import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -86,6 +87,25 @@ def test_every_surface_and_rule_has_a_fixture() -> None:
     have = {f"{p.parent.name}/{p.name}" for p in CASES}
     assert have >= REQUIRED
     assert {p.parent.name for p in CASES} == set(gate.RULES)
+
+
+def test_every_fixture_file_is_tracked() -> None:
+    # A local or global git exclude (such as ".claude/") can hide a fixture file from a commit
+    # while it stays on disk, so the gate tests pass locally and fail in a fresh checkout.
+    git = shutil.which("git")
+    if git is None or not (REPO / ".git").exists():
+        pytest.skip("not a git checkout")
+    listed = subprocess.run(
+        [git, "ls-files", "-z", "--", str(FIXTURES)],
+        cwd=REPO,
+        check=True,
+        capture_output=True,
+    ).stdout.split(b"\0")
+    tracked = {(REPO / p.decode()).resolve() for p in listed if p}
+    on_disk = {
+        p.resolve() for p in FIXTURES.rglob("*") if p.is_file() and "__pycache__" not in p.parts
+    }
+    assert sorted(str(p.relative_to(FIXTURES)) for p in on_disk - tracked) == []
 
 
 @pytest.mark.parametrize("case", CASES, ids=lambda p: f"{p.parent.name}/{p.name}")
