@@ -14,6 +14,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/agents/domain/interview"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // limits are the corpus defaults of 26 14 with a question limit for the tests.
@@ -383,7 +384,7 @@ func TestPayload(t *testing.T) {
 	}
 	cat := p["catalogue"].([]any)[0].(map[string]any)
 	srv := cat["mcp_servers"].([]any)[0].(map[string]any)
-	if cat["slug"] != "writing-helper" || srv["package"] != "@example/mcp-files@1.4.2" || strings.Contains(string(b), "null") {
+	if cat["slug"] != "writing-helper" || srv["package"] != "@example/mcp-files@1.4.2" || testkit.HasJSONNull(b) {
 		t.Fatalf("catalogue %s", b)
 	}
 	empty, err := interview.Payload(interview.PayloadInput{RequestID: req, Limits: limits, ExpiresAt: exp}, 1<<16)
