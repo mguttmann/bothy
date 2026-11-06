@@ -97,9 +97,10 @@ gateway op of `asyncapi.yaml` is enabled, or stands under `later` because it bel
 that [01-product.md](../../../docs/spec/01-product.md) section 3 lists with the milestone `later`.
 `TestEnableListComplete` in `routes/gen` holds this on the real files: the generator checks pass
 for both sections, and every `later` entry (REST and `gateway_ops`) names in `feature` the exact
-text of the first column of such a row, a non-blank `reason` and the milestone `V2` or `V3`. An
-operation of a core feature therefore cannot wait under `later`: build it and enable it, or change
-the product chapter first. Rulings: `docs/decisions.d/V1-01.md`.
+text of the first column of such a row, a non-blank `reason` and the milestone `V2` or `V3`. The gate
+checks the named feature, not that the operation belongs to it: a review of every `later` entry
+verifies that mapping. An operation of a core feature must not wait under `later`: build it and
+enable it, or change the product chapter first. Rulings: `docs/decisions.d/V1-01.md`.
 
 ### Gateway ops (`gateway_ops`, M1-64)
 

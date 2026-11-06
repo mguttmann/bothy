@@ -187,15 +187,16 @@ sections 6 and 7, ADR 0016 and 0051. Rulings: `docs/DECISIONS.md` D-M2-26-1 to D
   `listAgentWebhookSubscriptions` decide `webhook_out.manage` and `webhook_out.read` on the agent
   (owner; an unknown id or a principal that is no agent is the same `404`); the row sets
   `agent_id` instead of `app_installation_id`. `event_types` are the keys under `webhooks:` of
-  openapi.yaml (`domain.ValidateAgentEventTypes`); no installation narrows them. Update, delete,
-  deliveries and redelivery work by id as for an app, decided and audited on the agent. The
+  openapi.yaml (`domain.ValidateAgentEventTypes`); no installation narrows them. Update and delete
+  work by id as for an app, decided and audited on the agent; the delivery list decides
+  `webhook_out.read` on the agent, redelivery decides and audits on the `webhook_delivery`. The
   consumer adds rows for the agent's own personal events and for every other subscribed event;
   `webhook_out.deliver` decides the agent itself in filter mode (no app scope). Before every
   attempt of `agent.invocation`, `agent.followup`, `interaction.created` and `command.invoked`
   the job calls `runs.Delivery.Prepare`: an allow puts its fresh `invocation_token` into the body
   (a retry carries `redelivered`), a denial ends the row `dead` with `not_authorized` without a
   request, a hold (maintenance mode) keeps the head pending without an attempt for
-  `webhook.retry_backoff_base`. `2xx` moves `last_delivered_seq`, the agent's acknowledgement.
+  `webhook.retry_backoff_base` (`webhook.retry_max_age` still runs from `created_at`). `2xx` moves `last_delivered_seq`, the agent's acknowledgement.
 
 ## Incoming webhooks (M2-27)
 
