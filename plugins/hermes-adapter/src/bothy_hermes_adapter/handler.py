@@ -737,9 +737,10 @@ class HermesHandler(AgentHandler):
         turn.last_progress = time.monotonic()
         while not (turn.dropped or turn.abort_reason is not None or turn.failed_turn):
             open_work = await self._poll_work(turn)
-            if turn.seen_work and turn.own_turns == 0 and turn.pending:
+            if turn.seen_work and turn.own_turns == 0 and not turn.internal and turn.pending:
                 # A follow-up the first turn did not take, or one written while the run holds
-                # work: a turn of its own, one after the other (17.12 point 5).
+                # work: a turn of its own, one after the other (17.12 point 5); never while a
+                # turn Hermes started itself runs.
                 self._start_followup(turn, turn.pending.pop(0))
             now = time.monotonic()
             if open_work or turn.own_turns > 0 or turn.internal:
@@ -1574,9 +1575,15 @@ class HermesHandler(AgentHandler):
         self._touch(turn)
 
     def on_turn_ended(self, thread_id: UUID) -> None:
-        """A turn of the thread ended its agent loop (``on_session_end``)."""
+        """A turn of the thread ended its agent loop (``on_session_end``).
+
+        A turn Hermes started itself ends even while a turn of the adapter is counted: the run
+        must not wait for it any more (17.12).
+        """
         turn = self._turns.get(thread_id)
-        if turn is None or turn.dropped or not turn.held or turn.own_turns > 0:
+        if turn is None or turn.dropped or not turn.held:
+            return
+        if turn.own_turns > 0 and not turn.internal:
             return
         turn.internal = False
         if turn.live is not None and not turn.ended:

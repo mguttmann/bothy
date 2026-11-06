@@ -814,8 +814,9 @@ class ServerPlatform(BasePlatformAdapter):
           session variable, so a cancelled or aborted turn's answer never becomes a report.
         * The send belongs to a turn of its thread (`_turn_send`): one message of the run, or a
           failure when no run of the thread is active any more (a late answer is never posted).
-        * Anything else is a report of the agent (09 14): a cron job, a background notice, a
-          send into another channel or thread.
+        * Anything else is a report of the agent (09 14): a cron job, a send into another
+          channel or thread, or the answer of a turn Hermes ran while no run was open. The
+          result of background work a run holds is no report but a turn of that run (17.12).
         """
         if reply_to is not None and reply_to in self._replies:
             replies = self._replies[reply_to]

@@ -317,3 +317,40 @@ async def test_followup_without_background_work_stays_for_the_follow_on_run(
         await r.until(lambda: r.finished(triggered.run_id), "the end of the run")
         assert r.fake.followup_state(triggered.run_id, followup) == "queued"
     assert len(rt.turns) == 1
+
+
+async def test_followup_during_the_result_turn_waits_and_the_run_ends(tmp_path: Path) -> None:
+    async def script(turn: TurnRequest, rt: FakeRuntime) -> TurnOutcome:
+        if len(rt.turns) == 1:
+            rt.background[turn.thread_id] = [TEAM]
+            await rt.events.on_answer(turn.thread_id, "Started a team.", str(turn.message_id))
+            return TurnOutcome.COMPLETED
+        await rt.events.on_answer(turn.thread_id, f"About: {turn.user_text}", None)
+        rt.events.on_turn_ended(turn.thread_id)  # Hermes' on_session_end fires inside the turn
+        return TurnOutcome.COMPLETED
+
+    rt = FakeRuntime(script=script)
+    async with rig(tmp_path, runtime=rt, **FAST) as r:
+        triggered = await r.fake.trigger()
+        thread = triggered.thread_id
+        await r.until(lambda: _steps(r, triggered.run_id, "subagent"), "the subagent step")
+        await r.until(lambda: r.fake.messages, "the first answer")
+        rt.finish_background(thread, "deleg_1")
+        r.handler.on_turn_started(thread)  # Hermes' result turn runs
+        followup = await r.fake.deliver_followup(triggered.run_id, "Is it done?")
+        for _ in range(10):
+            await r.fake.pass_time(0.05)
+            await asyncio.sleep(0.02)
+        # One after the other (17.12 point 5): no turn of the adapter while the result turn runs.
+        assert len(rt.turns) == 1
+        await r.handler.on_answer(thread, "The team counted seven boats.", None)
+        r.handler.on_turn_ended(thread)
+        await r.until(lambda: len(rt.turns) == 2, "the follow-up's own turn")
+        await r.until(lambda: r.finished(triggered.run_id), "the end of the run")
+        assert r.fake.followup_state(triggered.run_id, followup) == "absorbed"
+    assert r.fake.run_state(triggered.run_id).state == "completed"
+    assert [m["content_md"] for m in r.fake.messages] == [
+        "Started a team.",
+        "The team counted seven boats.",
+        "About: Is it done?",
+    ]
