@@ -134,18 +134,20 @@ Future<void> _shareNewestPhoto(PatrolIntegrationTester $) async {
   await ios.openPlatformApp(iosAppId: AppleApp.photos);
   // Photos draws at its own pace: the welcome sheet and the notification prompt may appear at
   // any point of the walk, so each round answers whichever is shown. Photos opens where it was
-  // left: in the viewer of the sample after an earlier share of this test (its Share button is
-  // on screen), or in the library, maybe without photos on screen: a Library tab in some
-  // versions; on iOS 18 one scrolling view (with the "Library" element all_photos_grid) that
-  // opens scrolled down to the collections, below the grid, so the walk swipes it down towards
-  // the grid.
+  // left: in the viewer of the sample after an earlier share of this test, or in the library,
+  // maybe without photos on screen: a Library tab in some versions; on iOS 18 one scrolling view
+  // (with the "Library" element all_photos_grid) that opens scrolled down to the collections,
+  // below the grid, so the walk swipes it down towards the grid. The viewer may show the photo
+  // without its bars, so without the Share button; a tap in its middle shows them.
   //
-  // Each round tells PhotosWalk what it saw and carries out its steps (photos_walk.dart: when
-  // to tap a photo, and that a walk that sees none of its views acts by itself). Photos and the
-  // share button are tapped at the center of what is on screen (patrol taps an element it
-  // cannot hit at its top-left corner, and a tap that waits for a missing element ends the
-  // native automation). The rounds end at the share sheet or when nativeWait has passed; a
-  // failure names the steps.
+  // Each round takes one snapshot of the tree Photos shows and tells PhotosWalk what it saw
+  // (photos_walk.dart: readPhotosView, then when to tap a photo or the viewer, and that a walk
+  // that sees none of its views acts by itself). A query per element took Photos up to 25 s
+  // for its grid on the hosted simulator, so the walk saw each change late and ran out of time
+  // (V1-08); a snapshot takes a fraction of a second. The photo and the Share button are tapped
+  // at the center of what is on screen (patrol taps an element it cannot hit at its top-left
+  // corner, and a tap that waits for a missing element ends the native automation). The rounds
+  // end at the share sheet or when nativeWait has passed; a failure names the steps.
   final end = DateTime.now().add(nativeWait);
   final walk = PhotosWalk();
   var done = false;
@@ -162,42 +164,18 @@ Future<void> _shareNewestPhoto(PatrolIntegrationTester $) async {
     )) {
       answered = true;
     }
-    final screen = await _screen(ios);
-    if (screen != null) {
-      final share = await _onScreen(
-        ios,
-        const IOSSelector(label: 'Share'),
-        screen,
-      );
-      final newest = share == null
-          ? await _newestPhoto(ios, screen)
-          : (center: null, exists: false);
-      final others = share == null && newest.center == null && !newest.exists;
-      final view = PhotosView(
-        answeredPrompt: answered,
-        share: share,
-        newest: newest.center,
-        newestExists: newest.exists,
-        headerClose:
-            others &&
-            await _shown(
-              ios,
-              const IOSSelector(identifier: 'header.closeButton'),
-            ),
-        libraryTab:
-            others &&
-            await _shown(ios, const IOSSelector(identifier: 'LibraryTab')),
-        libraryAbove:
-            others &&
-            await _shown(ios, const IOSSelector(identifier: 'all_photos_grid')),
-      );
+    final tree = await _photosTree(ios);
+    if (tree != null) {
+      final view = readPhotosView(tree, answeredPrompt: answered);
       for (final step in walk.next(view)) {
         switch (step) {
           case PhotosStep.tapShare:
-            await ios.tapAt(share!, appId: photosApp);
+            await ios.tapAt(view.share!, appId: photosApp);
             done = true;
           case PhotosStep.tapPhoto:
-            await ios.tapAt(newest.center!, appId: photosApp);
+            await ios.tapAt(view.newest!, appId: photosApp);
+          case PhotosStep.showBars:
+            await ios.tapAt(const Offset(0.5, 0.5), appId: photosApp);
           case PhotosStep.swipeUp:
             await ios.swipe(
               from: const Offset(0.5, 0.7),
@@ -232,7 +210,7 @@ Future<void> _shareNewestPhoto(PatrolIntegrationTester $) async {
     if (DateTime.now().isAfter(end)) {
       fail('Photos shows no Share button (steps: ${walk.described})');
     }
-    await Future<void>.delayed(const Duration(milliseconds: 200));
+    await Future<void>.delayed(const Duration(milliseconds: 500));
   }
   await _tapAppInShareSheet($);
   await ios.waitUntilVisible(
@@ -242,17 +220,41 @@ Future<void> _shareNewestPhoto(PatrolIntegrationTester $) async {
   );
 }
 
-/// Whether Photos shows [selector] now, on screen or off.
-Future<bool> _shown(IOSAutomator ios, IOSSelector selector) async =>
-    (await ios.getNativeViews(selector, appId: photosApp)).roots.isNotEmpty;
+/// The tree Photos shows, taken at once while Photos is in the foreground; else the tree of the
+/// app in the foreground (patrol takes the home screen's then), in which the walk finds none of
+/// its views. Null while the tree has no frame.
+Future<PhotosElement?> _photosTree(IOSAutomator ios) async {
+  final views = await ios.getNativeViews(null, iosInstalledApps: [photosApp]);
+  if (views.roots.isEmpty) return null;
+  final root = views.roots.first;
+  if (root.frame.maxX <= 0 || root.frame.maxY <= 0) return null;
+  return _element(root);
+}
 
-/// The identifiers and labels of [views], one line per view that has either, for a failure
-/// message.
+PhotosElement _element(IOSNativeView view) => PhotosElement(
+  type: view.elementType.name,
+  identifier: view.identifier,
+  label: view.label,
+  frame: Rect.fromLTRB(
+    view.frame.minX,
+    view.frame.minY,
+    view.frame.maxX,
+    view.frame.maxY,
+  ),
+  children: [for (final child in view.children) _element(child)],
+);
+
+/// The identifiers, labels and frames of [views], one line per view that has an identifier or
+/// a label, for a failure message.
 String _describe(List<IOSNativeView> views, [String indent = '']) {
   final out = StringBuffer();
   for (final v in views) {
     if (v.identifier.isNotEmpty || v.label.isNotEmpty) {
-      out.writeln('$indent${v.elementType.name} ${v.identifier} "${v.label}"');
+      final f = v.frame;
+      out.writeln(
+        '$indent${v.elementType.name} ${v.identifier} "${v.label}" '
+        '[${f.minX.round()},${f.minY.round()},${f.maxX.round()},${f.maxY.round()}]',
+      );
     }
     out.write(_describe(v.children, '$indent '));
   }
@@ -612,23 +614,4 @@ Future<bool> _optionalTap(
   if (shown.roots.isEmpty) return false;
   await $.platform.ios.tap(selector, appId: appId, timeout: nativeWait);
   return true;
-}
-
-/// The newest photo: the last cell of the library grid, or else the last image labelled as a
-/// photo (the sample the wrapper added is the newest). [center] is its center as fractions of
-/// [screen] when it lies wholly on screen; [exists] tells whether Photos shows it at all, on
-/// screen or off (a grid of several pages holds cells off screen too).
-Future<({Offset? center, bool exists})> _newestPhoto(
-  IOSAutomator ios,
-  Rectangle screen,
-) async {
-  for (final selector in const [
-    IOSSelector(identifier: 'PXGGridLayout-Info'),
-    IOSSelector(elementType: IOSElementType.image, labelStartsWith: 'Photo,'),
-  ]) {
-    final views = await ios.getNativeViews(selector, appId: photosApp);
-    if (views.roots.isEmpty) continue;
-    return (center: _centerOnScreen(views.roots.last, screen), exists: true);
-  }
-  return (center: null, exists: false);
 }
