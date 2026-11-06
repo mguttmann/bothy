@@ -23,12 +23,10 @@ import asyncio
 import contextlib
 import json
 import logging
-import os
 import re
 import shutil
-import signal
 import uuid
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from importlib import resources
@@ -38,6 +36,7 @@ from typing import Any
 from bothy_sdk.search_assist import AssistChoice, AssistQuestion, AssistReply
 
 from claude_code_runner.commandline import class_flags
+from claude_code_runner.oneshot import run_once
 from claude_code_runner.statedir import ensure_private_dir
 from claude_code_runner.usage import cost_reports, parse_model_usage
 
@@ -224,44 +223,14 @@ class SearchAssistant:
                 "--system-prompt-file",
                 str(prompt),
             ]
-            out = await self._run(argv, env, folder, data_block(request).encode("utf-8"), timeout)
+            out = await run_once(
+                argv, env, folder, data_block(request).encode("utf-8"), timeout, failed=_failed
+            )
         finally:
             shutil.rmtree(folder, ignore_errors=True)
         if out is None:
             return None
         return self._reply(out, request)
-
-    async def _run(
-        self, argv: Sequence[str], env: Mapping[str, str], cwd: Path, data: bytes, timeout: float
-    ) -> bytes | None:
-        try:
-            proc = await asyncio.create_subprocess_exec(
-                *argv,
-                env=dict(env),
-                cwd=str(cwd),
-                stdin=asyncio.subprocess.PIPE,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.DEVNULL,
-                start_new_session=True,
-            )
-        except OSError:
-            _failed("runtime_unreachable")
-            return None
-        try:
-            out, _ = await asyncio.wait_for(proc.communicate(data), timeout)
-        except TimeoutError:
-            _kill_group(proc.pid)
-            await proc.wait()
-            _failed("timeout")
-            return None
-        except asyncio.CancelledError:
-            _kill_group(proc.pid)
-            await proc.wait()
-            raise
-        if proc.returncode != 0:
-            _failed("exit_" + str(proc.returncode))
-            return None
-        return out
 
     def _reply(self, out: bytes, request: AssistQuestion) -> AssistReply | None:
         try:
@@ -294,8 +263,3 @@ class SearchAssistant:
 
 def _failed(code: str) -> None:
     _LOG.info(json.dumps({"event": "search_assist_failed", "code": code}, separators=(",", ":")))
-
-
-def _kill_group(pid: int) -> None:
-    with contextlib.suppress(ProcessLookupError, PermissionError):
-        os.killpg(pid, signal.SIGKILL)

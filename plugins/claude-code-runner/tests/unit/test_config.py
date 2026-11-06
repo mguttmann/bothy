@@ -267,6 +267,32 @@ def test_search_assist_keys(tmp_path: Path) -> None:
         load_config(write(tmp_path, 'search_assist_timeout = "0s"\n'))
 
 
+def test_agent_builder_keys(tmp_path: Path) -> None:
+    """``runner.agent_builder``, ``runner.agent_builder_model`` and
+    ``runner.agent_builder_timeout`` (26 6.2): off by default."""
+    cfg = load_config(write(tmp_path, ""))
+    assert cfg.agent_builder is False
+    assert cfg.agent_builder_model == "sonnet"
+    assert cfg.agent_builder_timeout == 80.0
+    cfg = load_config(
+        write(
+            tmp_path,
+            'agent_builder = true\nagent_builder_model = "opus"\nagent_builder_timeout = "60s"\n',
+        )
+    )
+    assert (cfg.agent_builder, cfg.agent_builder_model, cfg.agent_builder_timeout) == (
+        True,
+        "opus",
+        60.0,
+    )
+    with pytest.raises(ConfigError, match="agent_builder_model"):
+        load_config(write(tmp_path, 'agent_builder_model = "-x"\n'))
+    with pytest.raises(ConfigError, match="agent_builder_timeout"):
+        load_config(write(tmp_path, 'agent_builder_timeout = "0s"\n'))
+    with pytest.raises(ConfigError, match="agent_builder"):
+        load_config(write(tmp_path, 'agent_builder = "yes"\n'))
+
+
 def test_default_workspace_is_off_by_default(tmp_path: Path) -> None:
     """RUNNER-NO-GIT: a forum without a binding gets no folder unless the operator names one."""
     assert load_config(write(tmp_path)).default_workspace is None

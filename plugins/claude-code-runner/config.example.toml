@@ -38,6 +38,12 @@ transcribe_timeout = "5m"
 # search.assist.timeout (default 10s), so keep the limit below it.
 search_assist_model = "haiku"
 search_assist_timeout = "9s"
+# The builder of the interview of "New agent" (26 6.2): off by default; on, this runner answers
+# the interview when it is the agent of the server's agents.builder_agent_id. The server waits
+# agents.interview.timeout, which the runner cannot read, so keep agent_builder_timeout below it.
+agent_builder = false
+agent_builder_model = "sonnet"
+agent_builder_timeout = "80s"
 projects_root = "/srv/projects"
 # Folder of a forum without a project binding (Git optional): "." is projects_root itself, a
 # name is a folder under it. Empty means off: such a forum gets a message to bind a folder.

@@ -39,6 +39,7 @@ from bothy_sdk.adapter import (
     RuntimeStatus,
     StartOptions,
 )
+from bothy_sdk.agent_interview import InterviewReply, InterviewRequest
 from bothy_sdk.auth import Credentials, FileDpopKey, Secret
 from bothy_sdk.client import Client
 from bothy_sdk.clock import Clock, SystemClock
@@ -70,6 +71,7 @@ from claude_code_runner.adoption import (
 )
 from claude_code_runner.attachments import fetch_attachments
 from claude_code_runner.authcheck import auth_status, decide, evidence
+from claude_code_runner.builder import AgentBuilder
 from claude_code_runner.causes import ADAPTER_STOPPED, cause
 from claude_code_runner.channels import ChannelCache
 from claude_code_runner.commandline import (
@@ -207,6 +209,14 @@ class RunnerHandler(AgentHandler):
             state_dir=config.state_dir,
             model=config.search_assist_model,
             timeout=config.search_assist_timeout,
+            now=self._now,
+        )
+        self.builder = AgentBuilder(
+            claude_bin=self.claude_bin,
+            env=self._assist_env,
+            state_dir=config.state_dir,
+            model=config.agent_builder_model,
+            timeout=config.agent_builder_timeout,
             now=self._now,
         )
         self.trash = FolderTrash(
@@ -671,11 +681,31 @@ class RunnerHandler(AgentHandler):
         """
         return await self.search_assistant.answer(request)
 
+    # ---- builder of the interview (26 6.2) --------------------------------------------------
+
+    async def on_agent_interview(self, request: InterviewRequest) -> InterviewReply | None:
+        """Answer the interview of "New agent" with one call without tools.
+
+        Only with ``runner.agent_builder`` on; the server sends the request only to the agent of
+        its ``agents.builder_agent_id``. The call runs with the billing rule of the search
+        assistant (09 18.17 item 1).
+
+        Args:
+            request: The interview so far with the catalogue and the limits.
+
+        Returns:
+            Questions or a draft that passed the runner's own check, or ``None`` (the server then
+            falls back).
+        """
+        if not self.config.agent_builder:
+            return None
+        return await self.builder.answer(request)
+
     def _now(self) -> Any:
         return (self.adapter.clock if self.adapter is not None else SystemClock()).now()
 
     def _assist_env(self) -> dict[str, str]:
-        """The environment of a search assistant call (09 18.17).
+        """The environment of a search assistant call (09 18.17) and of a builder call (26 6.2).
 
         ``organization`` with the API key when one is configured, else ``personal`` when allowed,
         never a fallback between them.

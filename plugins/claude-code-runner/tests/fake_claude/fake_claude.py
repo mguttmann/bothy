@@ -9,6 +9,8 @@ environment of a turn drops every control variable. Commands:
 * ``auth status``: ``{"loggedIn": ..., "authMethod": ...}`` with ``api_key`` when
   ``ANTHROPIC_API_KEY`` is set, else the content of ``$CLAUDE_CONFIG_DIR/fake-login`` (when
   ``CLAUDE_CONFIG_DIR`` is set) or of ``$HOME/.claude/fake-login``, else ``none``.
+* ``-p --output-format json`` with the system prompt file ``builder.md``: the builder call of the
+  interview (26 6.2), see `Fake.builder`; any other such call is the search assistant's.
 * ``-p``: records argv, cwd, environment, the system prompt file and every stdin line, emits
   ``system/init``, echoes the first stdin line with ``isReplay``, plays the fixture, emits the
   ``result`` and exits after stdin EOF. SIGINT ends it with ``error_during_execution``.
@@ -140,6 +142,43 @@ class Fake:
             }
         )
         return int(self.scenario.get("assist_exit", 0))
+
+    def builder(self) -> int:
+        """The builder call of the interview (26 6.2): one ``-p`` with ``--output-format json``.
+
+        Records argv, cwd, environment, the system prompt file and stdin, waits for
+        ``builder_gate`` when the scenario sets one, then prints the ``result`` with
+        ``builder_reply`` as its text (default: one question) and the usage of ``builder_usage``;
+        ``builder_exit`` sets the exit status.
+        """
+        argv = sys.argv[1:]
+        prompt_file = _after(argv, "--system-prompt-file")
+        self.record(
+            "builder",
+            argv=argv,
+            cwd=os.getcwd(),
+            env=dict(os.environ),
+            prompt=Path(prompt_file).read_text() if prompt_file else None,
+            stdin=sys.stdin.read(),
+        )
+        self.gate("builder_gate")
+        reply = self.scenario.get(
+            "builder_reply", json.dumps({"kind": "questions", "questions": ["Fake question?"]})
+        )
+        usage = self.scenario.get(
+            "builder_usage",
+            {"model-medium": {"inputTokens": 900, "outputTokens": 120, "costUSD": 0.0042}},
+        )
+        self.emit(
+            {
+                "type": "result",
+                "subtype": "success",
+                "is_error": False,
+                "result": reply,
+                "modelUsage": usage,
+            }
+        )
+        return int(self.scenario.get("builder_exit", 0))
 
     def turn(self) -> int:  # noqa: PLR0911, PLR0912 - one branch per scripted behaviour
         argv = sys.argv[1:]
@@ -808,7 +847,8 @@ def main(scenario_path: str, capture_path: str) -> int:
         print("fake help")
         return 0
     if "-p" in args and _after(args, "--output-format") == "json":
-        return fake.assist()
+        builder = Path(_after(args, "--system-prompt-file") or "").name == "builder.md"
+        return fake.builder() if builder else fake.assist()
     if "-p" in args:
         return fake.turn()
     fake.record("unknown", argv=args)

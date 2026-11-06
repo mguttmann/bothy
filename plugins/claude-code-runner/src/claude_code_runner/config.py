@@ -152,6 +152,12 @@ class RunnerConfig:
             call (09 18.17).
         search_assist_timeout: ``runner.search_assist_timeout``: time limit of one search
             assistant call; above zero.
+        agent_builder: ``runner.agent_builder``: answer the interview of "New agent" when this
+            runner is the server's builder agent (26 6.2); off by default.
+        agent_builder_model: ``runner.agent_builder_model``: the model of the builder call.
+        agent_builder_timeout: ``runner.agent_builder_timeout``: time limit of one builder call;
+            above zero and below the server's ``agents.interview.timeout``, which the runner
+            cannot read.
         trash_check_interval: ``runner.trash_check_interval``: the bound folders are checked for
             a move to the trash at most this often, and a heartbeat that can carry a folder move
             request is sent at this interval (09 18.15); above zero.
@@ -197,6 +203,9 @@ class RunnerConfig:
     transcribe_timeout: float = 300.0
     search_assist_model: str = "haiku"
     search_assist_timeout: float = 9.0
+    agent_builder: bool = False
+    agent_builder_model: str = "sonnet"
+    agent_builder_timeout: float = 80.0
     default_workspace: str | None = None
     trash_check_interval: float = 60.0
 
@@ -351,6 +360,14 @@ def _search_assist_model(r: _Reader) -> str:
     return model
 
 
+def _agent_builder_model(r: _Reader) -> str:
+    """``runner.agent_builder_model``: a model argument of the builder call (26 6.2)."""
+    model: str = r.get("agent_builder_model", str, default="sonnet")
+    if not check_argument(model):
+        raise r.fail("agent_builder_model", "empty, starts with - or has controls")
+    return model
+
+
 def _transcribe_cmd(r: _Reader) -> tuple[str, ...]:
     """``runner.transcribe_cmd``: a program and its arguments, no shell (09 18.14)."""
     cmd = r.strings("transcribe_cmd")
@@ -478,6 +495,9 @@ def load_config(path: Path) -> RunnerConfig:
         transcribe_timeout=_positive(r, "transcribe_timeout", "5m"),
         search_assist_model=_search_assist_model(r),
         search_assist_timeout=_positive(r, "search_assist_timeout", "9s"),
+        agent_builder=r.get("agent_builder", bool, False),
+        agent_builder_model=_agent_builder_model(r),
+        agent_builder_timeout=_positive(r, "agent_builder_timeout", "80s"),
         default_workspace=_default_workspace(r, projects_root),
         trash_check_interval=_positive(r, "trash_check_interval", "60s"),
     )
