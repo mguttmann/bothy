@@ -40,6 +40,7 @@ would only repeat that.
 | `context` | The run context with trust marks for the agent runtime. |
 | `components` | Message components of `component.v1`. |
 | `commands` | Slash commands: a declared list, reconciliation and autocomplete. |
+| `agent_interview` | The builder agent's side of the agent interview: the request, the reply and the guard until `expires_at` (A1-07). |
 | `outbox` | Writes that must never go out twice or get lost. |
 | `long_answers` | A long answer stays one message: the head as its text, the rest above `message_max_content_bytes` as one attachment `answer.txt` (M4-47). |
 | `heartbeat` | The heartbeat building block for `agent_heartbeat.v1`. |
@@ -86,6 +87,8 @@ would only repeat that.
 ::: bothy_sdk.commands
 
 ::: bothy_sdk.search_assist
+
+::: bothy_sdk.agent_interview
 
 ::: bothy_sdk.outbox
 
