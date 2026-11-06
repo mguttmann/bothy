@@ -12,6 +12,7 @@ FakeServer clock follows the real time, because the runner process uses the syst
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import json
 import os
 import signal
@@ -22,6 +23,8 @@ from uuid import UUID
 
 import pytest
 from bothy_sdk.testing._patience import PATIENCE
+
+from claude_code_runner.app import Runner
 
 from .conftest import LogLines, World
 
@@ -207,3 +210,50 @@ async def test_sdk_cancel_of_a_live_turn_stops_its_group_before_the_record_goes(
     escalated = [r.getMessage() for r in logs.records if "stop_escalated" in r.getMessage()]
     assert escalated
     assert all(str(run.run_id) in line for line in escalated)
+
+
+async def in_process_turn(world: World, **scenario: Any) -> tuple[Runner, UUID, int]:
+    """An in-process runner with a turn of its own paused on its gate; returns runner, run, PID."""
+    gate = world.gate("turn_gate")
+    world.scenario(fixture="happy", turn_gate=str(gate), **scenario)
+    runner = await world.start()
+    run = await world.fake.trigger("Fix it", channel_id=world.forum_a)
+    await world.until(lambda: len(world.calls("gate_wait")) == 1)
+    path = record_path(world, run.run_id)
+    await world.until(lambda: path.exists() and "pid" in json.loads(path.read_text()))
+    return runner, run.run_id, world.turns()[0]["pid"]
+
+
+async def test_runner_stop_waits_until_the_own_turn_ended(world: World, logs: LogLines) -> None:
+    # `Runner.stop` stops the own turn and returns only once its run ended: by then the group
+    # is gone, the record is gone and the run is finished cancelled.
+    runner, run_id, pid = await in_process_turn(world, ignore_sigint=True)
+
+    assert await runner.handler.stop_turns()
+
+    assert group_gone(pid)
+    assert not record_path(world, run_id).exists()
+    [finish] = finishes(world, run_id)
+    assert (finish["state"], finish["reason"]) == ("cancelled", "adapter_stopped")
+    assert "stop_turns_timeout" not in logs.text
+    await world.stop(runner)
+    assert len(finishes(world, run_id)) == 1
+
+
+async def test_runner_stop_past_its_wait_leaves_the_turn_to_the_cancel(
+    world: World, logs: LogLines
+) -> None:
+    # A turn that outlives the wait of the stop is logged with stop_turns_timeout and still
+    # stopped by the cancel of its run: no process of the group is left once its record went.
+    runner, run_id, pid = await in_process_turn(world, ignore_sigint=True)
+    runner.handler.config = dataclasses.replace(
+        runner.handler.config, stop_grace=0.0, kill_grace=0.0, cli_probe_timeout=0.0
+    )
+
+    await world.stop(runner)
+
+    assert "stop_turns_timeout" in logs.text
+    await world.until(lambda: not record_path(world, run_id).exists())
+    assert group_gone(pid)
+    [finish] = finishes(world, run_id)
+    assert (finish["state"], finish["reason"]) == ("cancelled", "adapter_stopped")

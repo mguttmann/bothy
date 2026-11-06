@@ -371,11 +371,12 @@ class RunnerHandler(AgentHandler):
             ``runner.stop_grace`` plus ``runner.kill_grace`` plus ``runner.cli_probe_timeout``.
         """
         stopping = [
-            s for s in self._runs.values() if s.turn is not None and s.turn.process is not None
+            (s.run_id, s.turn)
+            for s in self._runs.values()
+            if s.turn is not None and s.turn.process is not None
         ]
-        for state in stopping:
-            if state.turn is not None:
-                await state.turn.request_stop(ADAPTER_STOPPED)
+        for _, turn in stopping:
+            await turn.request_stop(ADAPTER_STOPPED)
         loop = asyncio.get_running_loop()
         deadline = (
             loop.time()
@@ -383,7 +384,7 @@ class RunnerHandler(AgentHandler):
             + self.config.kill_grace
             + self.config.cli_probe_timeout
         )
-        while any(s.run_id in self._runs for s in stopping):
+        while any(run_id in self._runs for run_id, _ in stopping):
             if loop.time() >= deadline:
                 return False
             await asyncio.sleep(self.config.poll_interval)
