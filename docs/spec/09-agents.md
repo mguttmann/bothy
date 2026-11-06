@@ -3108,6 +3108,11 @@ The line then lists the files after the text under `Attachments:`, one line `- <
 into `<runner.state_dir>/files/<thread_id>/<file_id>` and its text is `local file: <path>`; a
 blocked or failed one is `unavailable: file_blocked`, one still not ready after the wait
 `unavailable: file_not_ready`. A follow-up of attachments only is written with the list alone.
+An audio file of a follow-up is transcribed before the write like one of the trigger (18.14,
+addendum of 2026-11-06): the transcript stands after the text, a file without one carries
+`not transcribed: <code>` in the list and the thread gets the note. While one follow-up waits
+for its files or is transcribed, a later one waits for it, so the lines keep the order in which
+the follow-ups came.
 
 At the moment of writing the runner checks the follow-up's token again as before a start: expiry
 with `adapter.invocation_token_leeway` (4.5 point 5), the actual mode and tool class (points 8
@@ -3652,25 +3657,33 @@ attachment without a transcript would reach the turn only as a file path.
 1. **Which files.** Every attachment of the triggering message whose `mime_type` is `audio/*`,
    that carries no `transcript` in the run context (4.6; a transcript of the server, mode
    `service`, is used as it is) and that the runner stored as a local file (scan state `clean`
-   or `skipped`). Attachments of context messages and of follow-ups are not transcribed.
+   or `skipped`), and every `audio/*` attachment of a follow-up (18.5) that the runner stored
+   (a follow-up carries no transcript; addendum of 2026-11-06, FIX-followup-transcribe).
+   Attachments of context messages are not transcribed.
 2. **Transcriber.** `runner.transcribe_cmd` is the argument list of a local program (for
    example a wrapper around a whisper.cpp binary); empty means no transcription, the default.
    The runner appends the file path as the last argument and runs it without a shell, after
-   `startRun` and before the first input of the turn, with stdin closed, stderr discarded, the
-   allow-list environment of 18.2 without any mode part (no API key), its own process group and
-   the time limit `runner.transcribe_timeout`; a stop of the run ends it at once. Meanwhile the
-   live box shows the status line "Transcribing a voice message".
+   `startRun` and before the first input of the turn (for a follow-up: after its files are
+   stored and before its line is written, without holding the write lock, so the stop goes on;
+   a follow-up offered later is written after it, so follow-ups keep their order), with stdin
+   closed, stderr discarded, the allow-list environment of 18.2 without any mode part (no API
+   key), its own process group and the time limit `runner.transcribe_timeout`; a stop of the run
+   ends it at once and the follow-up is not written. Meanwhile the live box shows the status
+   line "Transcribing a voice message".
 3. **Transcript.** Exit status 0 and a stdout that is not empty after trimming: the text (UTF-8,
    at most 32768 bytes, cut at a character boundary) becomes the attachment's `transcript`, so it
    stands in the trigger part with the trust of the message like a transcript of the server
-   (13, ADR 0054). The runner then delivers it with `submitTranscript` (`If-Match` from
+   (13, ADR 0054); in a follow-up's line it stands after the text as `Transcript of attachment
+   "<name>":` and the text, before the `Attachments:` list. The runner then delivers it with `submitTranscript` (`If-Match` from
    `getFile`); a refusal (for example `409` in mode `service` or for a file that is not a voice
    format) is logged as `transcript_not_submitted` and changes nothing else.
 4. **No transcript.** Without a transcriber, or when it fails (`transcriber_unreachable`,
    `transcriber_failed`, `transcriber_timeout`, `transcript_empty`), the file entry in the
-   context gets the line `not transcribed: <code>` (or `transcriber_not_configured`) and the
-   runner posts one message in the thread before the turn starts, which says that the voice
-   message was not transcribed and Claude Code received only the audio file. The run goes on.
+   context (or in a follow-up's `Attachments:` list) gets the line `not transcribed: <code>`
+   (or `transcriber_not_configured`) and the runner posts one message in the thread before the
+   turn starts (before the follow-up's line is written), which says that the voice message was
+   not transcribed and Claude Code received only the audio file. The run goes on, and the
+   follow-up is written with its file.
 5. **Capability.** The runner reports `capabilities.voice_input` true exactly when
    `runner.transcribe_cmd` is set, so in mode `agent` a voice message reaches it only when it
    can transcribe (13); otherwise the server rejects it with `voice_unsupported`.

@@ -167,17 +167,18 @@ question nor a candidate nor the reply is logged.
 
 Claude Code cannot hear audio. With `runner.transcribe_cmd` set, every audio attachment
 (`audio/*`) of the triggering message that has no transcript of the server is given to that
-program before the turn starts: the runner appends the local file path as the last argument, runs
+program before the turn starts, and every audio attachment of a follow-up before its line is
+written to the running turn (a later follow-up waits, so the order holds): the runner appends the local file path as the last argument, runs
 it without a shell, with stdin closed, stderr discarded, the allow-list environment (no API key)
 and the time limit `runner.transcribe_timeout`, and takes its stdout as the transcript. The text
-stands in the trigger part like a server transcript and is also stored on the server with
+stands in the trigger part like a server transcript (in a follow-up's line after its text) and is also stored on the server with
 `submitTranscript` (only accepted for a voice message in mode `agent`; any refusal is only
 logged). The heartbeat reports `capabilities.voice_input` true exactly when a transcriber is set.
 
 Without a transcriber, or when it fails (`transcriber_unreachable`, `transcriber_failed`,
 `transcriber_timeout`, `transcript_empty`), the runner posts a note in the thread that the voice
-message was not transcribed and Claude Code received only the audio file, and the turn runs
-with the file entry marked `not transcribed: <code>`.
+message was not transcribed and Claude Code received only the audio file, and the turn (or the
+follow-up) gets the file entry marked `not transcribed: <code>`.
 
 Example with whisper.cpp: its `whisper-cli` reads WAV, so a small wrapper converts first.
 
