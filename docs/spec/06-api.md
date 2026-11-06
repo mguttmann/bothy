@@ -1054,6 +1054,9 @@ Generated from openapi.yaml.
 | PUT | `/api/v1/agents/{agent_id}/billing-mode` | `setAgentBillingMode` | `agent.billing_mode.set` | Switch the backend policy of an agent |
 | PUT | `/api/v1/agents/{agent_id}/credential-holder` | `setCredentialHolder` | `agent.credential_holder.set` | Change the credential holder |
 | PUT | `/api/v1/agents/{agent_id}/tool-class` | `setAgentToolClass` | `agent.tool_class.set` | Set the tool class of an agent |
+| GET | `/api/v1/agents/{agent_id}/definition` | `getAgentDefinition` | `agent.definition.read` | Read the current definition of a built-in agent |
+| PUT | `/api/v1/agents/{agent_id}/definition` | `putAgentDefinition` | `agent.update` | Store a new version of the definition of a built-in agent |
+| GET | `/api/v1/agents/{agent_id}/definition/versions` | `listAgentDefinitionVersions` | `agent.definition.read` | List the versions of the definition of a built-in agent |
 | GET | `/api/v1/agents/{agent_id}/project-folders` | `listAgentProjectFolders` | `agent.project_folders.read` | List the project folders of a runner that have no binding |
 
 #### Agent runtime
@@ -1321,6 +1324,7 @@ Events (receive action per 05, section 6; schema in openapi.yaml):
 | `interaction.created` | durable | `agent.events.consume` | self | `InteractionCreatedEvent` | yes |
 | `command.invoked` | durable | `agent.events.consume` | self | `CommandInvokedEvent` | yes |
 | `agent.config_changed` | durable | `agent.config.read` | self | `AgentConfigChangedEvent` | yes |
+| `agent.definition_changed` | durable | `agent.definition.read` | self | `AgentDefinitionChangedEvent` |  |
 | `host.updated` | durable | `host.read` |  | `HostUpdatedEvent` |  |
 | `terminal_session.changed` | durable | `self` | self | `TerminalSessionChangedEvent` |  |
 | `typing.started` | ephemeral | `thread.read` |  | `TypingStartedEvent` |  |

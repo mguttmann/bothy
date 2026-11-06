@@ -64,6 +64,15 @@ type ServerInterface interface {
 	// SetCredentialHolder Change the credential holder
 	// (PUT /agents/{agent_id}/credential-holder)
 	SetCredentialHolder(w http.ResponseWriter, r *http.Request, agentId AgentIdPath, params SetCredentialHolderParams)
+	// GetAgentDefinition Read the current definition of a built-in agent
+	// (GET /agents/{agent_id}/definition)
+	GetAgentDefinition(w http.ResponseWriter, r *http.Request, agentId AgentIdPath, params GetAgentDefinitionParams)
+	// PutAgentDefinition Store a new version of the definition of a built-in agent
+	// (PUT /agents/{agent_id}/definition)
+	PutAgentDefinition(w http.ResponseWriter, r *http.Request, agentId AgentIdPath, params PutAgentDefinitionParams)
+	// ListAgentDefinitionVersions List the versions of the definition of a built-in agent
+	// (GET /agents/{agent_id}/definition/versions)
+	ListAgentDefinitionVersions(w http.ResponseWriter, r *http.Request, agentId AgentIdPath, params ListAgentDefinitionVersionsParams)
 	// DisableAgent Disable an agent
 	// (POST /agents/{agent_id}/disable)
 	DisableAgent(w http.ResponseWriter, r *http.Request, agentId AgentIdPath, params DisableAgentParams)
@@ -1598,6 +1607,153 @@ func (siw *ServerInterfaceWrapper) SetCredentialHolder(w http.ResponseWriter, r 
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.SetCredentialHolder(w, r, agentId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAgentDefinition operation middleware
+func (siw *ServerInterfaceWrapper) GetAgentDefinition(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "agent_id" -------------
+	var agentId AgentIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "agent_id", r.PathValue("agent_id"), &agentId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "agent_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetAgentDefinitionParams
+
+	// ------------- Optional query parameter "version" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "version", r.URL.Query(), &params.Version, runtime.BindQueryParameterOptions{Type: "integer", Format: "int64"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "version"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "version", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAgentDefinition(w, r, agentId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PutAgentDefinition operation middleware
+func (siw *ServerInterfaceWrapper) PutAgentDefinition(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "agent_id" -------------
+	var agentId AgentIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "agent_id", r.PathValue("agent_id"), &agentId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "agent_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PutAgentDefinitionParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatchOptional
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PutAgentDefinition(w, r, agentId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAgentDefinitionVersions operation middleware
+func (siw *ServerInterfaceWrapper) ListAgentDefinitionVersions(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "agent_id" -------------
+	var agentId AgentIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "agent_id", r.PathValue("agent_id"), &agentId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "agent_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAgentDefinitionVersionsParams
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAgentDefinitionVersions(w, r, agentId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -14650,6 +14806,9 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/agents/{agent_id}/billing-mode", wrapper.SetAgentBillingMode)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/agents/{agent_id}/credential-holder", wrapper.SetCredentialHolder)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/agents/{agent_id}/tool-class", wrapper.SetAgentToolClass)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents/{agent_id}/definition", wrapper.GetAgentDefinition)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/agents/{agent_id}/definition", wrapper.PutAgentDefinition)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents/{agent_id}/definition/versions", wrapper.ListAgentDefinitionVersions)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents/{agent_id}/project-folders", wrapper.ListAgentProjectFolders)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents/{agent_id}/webhooks", wrapper.ListAgentWebhookSubscriptions)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/agents/{agent_id}/webhooks", wrapper.CreateAgentWebhookSubscription)
@@ -14979,6 +15138,15 @@ type StrictServerInterface interface {
 	// SetCredentialHolder Change the credential holder
 	// (PUT /agents/{agent_id}/credential-holder)
 	SetCredentialHolder(ctx context.Context, request SetCredentialHolderRequestObject) (SetCredentialHolderResponseObject, error)
+	// GetAgentDefinition Read the current definition of a built-in agent
+	// (GET /agents/{agent_id}/definition)
+	GetAgentDefinition(ctx context.Context, request GetAgentDefinitionRequestObject) (GetAgentDefinitionResponseObject, error)
+	// PutAgentDefinition Store a new version of the definition of a built-in agent
+	// (PUT /agents/{agent_id}/definition)
+	PutAgentDefinition(ctx context.Context, request PutAgentDefinitionRequestObject) (PutAgentDefinitionResponseObject, error)
+	// ListAgentDefinitionVersions List the versions of the definition of a built-in agent
+	// (GET /agents/{agent_id}/definition/versions)
+	ListAgentDefinitionVersions(ctx context.Context, request ListAgentDefinitionVersionsRequestObject) (ListAgentDefinitionVersionsResponseObject, error)
 	// DisableAgent Disable an agent
 	// (POST /agents/{agent_id}/disable)
 	DisableAgent(ctx context.Context, request DisableAgentRequestObject) (DisableAgentResponseObject, error)
@@ -16388,6 +16556,94 @@ func (sh *strictHandler) SetCredentialHolder(w http.ResponseWriter, r *http.Requ
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(SetCredentialHolderResponseObject); ok {
 		if err := validResponse.VisitSetCredentialHolderResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetAgentDefinition operation middleware
+func (sh *strictHandler) GetAgentDefinition(w http.ResponseWriter, r *http.Request, agentId AgentIdPath, params GetAgentDefinitionParams) {
+	var request GetAgentDefinitionRequestObject
+
+	request.AgentId = agentId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetAgentDefinition(ctx, request.(GetAgentDefinitionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetAgentDefinition")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetAgentDefinitionResponseObject); ok {
+		if err := validResponse.VisitGetAgentDefinitionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PutAgentDefinition operation middleware
+func (sh *strictHandler) PutAgentDefinition(w http.ResponseWriter, r *http.Request, agentId AgentIdPath, params PutAgentDefinitionParams) {
+	var request PutAgentDefinitionRequestObject
+
+	request.AgentId = agentId
+	request.Params = params
+
+	var body PutAgentDefinitionJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PutAgentDefinition(ctx, request.(PutAgentDefinitionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PutAgentDefinition")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PutAgentDefinitionResponseObject); ok {
+		if err := validResponse.VisitPutAgentDefinitionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListAgentDefinitionVersions operation middleware
+func (sh *strictHandler) ListAgentDefinitionVersions(w http.ResponseWriter, r *http.Request, agentId AgentIdPath, params ListAgentDefinitionVersionsParams) {
+	var request ListAgentDefinitionVersionsRequestObject
+
+	request.AgentId = agentId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListAgentDefinitionVersions(ctx, request.(ListAgentDefinitionVersionsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListAgentDefinitionVersions")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListAgentDefinitionVersionsResponseObject); ok {
+		if err := validResponse.VisitListAgentDefinitionVersionsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

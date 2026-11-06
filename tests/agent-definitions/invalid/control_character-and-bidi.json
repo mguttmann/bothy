@@ -1,0 +1,63 @@
+{
+  "tool_class": "host",
+  "definition": {
+    "instructions": "Line one\nTab\there\n",
+    "skills": [
+      {
+        "name": "notes",
+        "description": "Two\nlines",
+        "body": "Write short notes.\n"
+      },
+      {
+        "name": "b",
+        "description": "Writes short notes",
+        "body": "Hidden \u202e text\n"
+      }
+    ],
+    "mcp_servers": [
+      {
+        "name": "files",
+        "transport": "stdio",
+        "command": "npx",
+        "package": "@example/mcp-files@1.4.2",
+        "args": [
+          "--a\u0000"
+        ],
+        "env": [
+          {
+            "name": "LOG_LEVEL",
+            "value": "a\nb"
+          }
+        ]
+      }
+    ],
+    "settings": {
+      "tool_class_wish": "chat"
+    },
+    "origin": {
+      "kind": "manual"
+    }
+  },
+  "expect": [
+    {
+      "pointer": "/instructions",
+      "code": "control_character"
+    },
+    {
+      "pointer": "/skills/0/description",
+      "code": "control_character"
+    },
+    {
+      "pointer": "/skills/1/body",
+      "code": "bidi_control"
+    },
+    {
+      "pointer": "/mcp_servers/0/args/0",
+      "code": "control_character"
+    },
+    {
+      "pointer": "/mcp_servers/0/env/0/value",
+      "code": "control_character"
+    }
+  ]
+}

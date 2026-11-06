@@ -1,0 +1,34 @@
+{
+  "tool_class": "chat",
+  "definition": {
+    "instructions": 1,
+    "skills": {},
+    "mcp_servers": [
+      1
+    ],
+    "settings": [],
+    "origin": "manual"
+  },
+  "expect": [
+    {
+      "pointer": "/instructions",
+      "code": "invalid_type"
+    },
+    {
+      "pointer": "/skills",
+      "code": "invalid_type"
+    },
+    {
+      "pointer": "/mcp_servers/0",
+      "code": "invalid_type"
+    },
+    {
+      "pointer": "/settings",
+      "code": "invalid_type"
+    },
+    {
+      "pointer": "/origin",
+      "code": "invalid_type"
+    }
+  ]
+}

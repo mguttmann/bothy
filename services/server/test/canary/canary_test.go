@@ -105,7 +105,7 @@ func TestSEC_T10_DetectorFindsClearPrincipalIDInLog(t *testing.T) {
 // message delete left a redacted event, and the permitted places did see their values.
 func TestSEC_T10_CanaryAcrossAllOutputs(t *testing.T) {
 	res := scenario(t)
-	for _, c := range []Class{ClassContent, ClassAdminReason, ClassSecret, ClassNetwork, ClassIdentity, ClassManageOnly} {
+	for _, c := range []Class{ClassContent, ClassAdminReason, ClassSecret, ClassNetwork, ClassIdentity, ClassManageOnly, ClassDefinition} {
 		if res.run.Reg.Count(c) == 0 {
 			t.Errorf("no canary of class %s", c)
 		}
@@ -135,8 +135,12 @@ func TestSEC_T10_CanaryAcrossAllOutputs(t *testing.T) {
 	for _, m := range Matches(res.run.Reg, res.run.Sinks) {
 		seen[m.Sink+"/"+m.Class] = true
 	}
-	// The 412 of putChannelBehavior echoes the stored canary prompt in current (M2-02).
-	for _, want := range []string{SinkAudit + "/" + string(ClassAdminReason), SinkForeign + "/" + string(ClassContent), SinkError + "/" + string(ClassManageOnly)} {
+	// The 412 of putChannelBehavior echoes the stored canary prompt in current (M2-02), the 412
+	// of putAgentDefinition the stored definition (A1-02).
+	for _, want := range []string{
+		SinkAudit + "/" + string(ClassAdminReason), SinkForeign + "/" + string(ClassContent), SinkError + "/" + string(ClassManageOnly),
+		SinkError + "/" + string(ClassDefinition),
+	} {
 		if !seen[want] {
 			t.Errorf("no permitted match in %s: the sink was not exercised", want)
 		}

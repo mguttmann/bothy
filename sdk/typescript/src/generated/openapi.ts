@@ -3613,6 +3613,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/agents/{agent_id}/definition": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read the current definition of a built-in agent
+         * @description The current (highest) version of the definition of the built-in agent `agent_id` (26 4.1), or with `version` an older one, which the version list offers for undo (26 8.4). The owner reads it, and the agent itself through the hosted connection of its hosting runner, which reads only the current version; another agent and a person who is no owner get the refusal of 07 2.13. A built-in agent without a definition, any other agent and an unknown `version` answer `404`. The definition appears only in this answer, in `putAgentDefinition` and in `current` of its `412`, never in an event, a log line, telemetry or an audit entry. `ETag` is the version of the answer; the `If-Match` of the next `putAgentDefinition` is the current version.
+         */
+        get: operations["getAgentDefinition"];
+        /**
+         * Store a new version of the definition of a built-in agent
+         * @description Part of `agent.update` (owner, step-up, audit; 26 4.1, R-API-29). Stores the body as the next version of the definition, raises `agents.version` (`agent.updated`) and sends the durable personal event `agent.definition_changed` with `definition_version` only to the agent, all in one transaction. `If-Match` names the current definition version and is absent only for the first version: without it on an existing definition `428 precondition_required`, a stale one `412 version_conflict` with the current definition in `current`. Only a built-in agent (`adapter_kind = 'claude_agent'`) has a definition; another agent answers `409 conflict` with `reason: not_a_builtin_agent`. The server checks the body against 26 4.2 and 4.3 and answers every finding as one `errors[]` entry of `400 validation_failed` with the JSON Pointer and the field code (`unknown_member`, `skill_frontmatter`, `inline_shell`, `import_outside_folder`, `secret_value_not_allowed`, `env_name_reserved`, `mcp_command_not_allowed`, `mcp_package_unpinned`, `tool_class_too_low`, `too_long`, `too_many`, `invalid_name`, `duplicate_name`, and the shape codes of docs/decisions.d/A1-02.md); then it stores nothing. A body equal to the current definition stores no new version. The audit entry names the version and the changed parts, never their text. Undo writes the content of an older version as a new version.
+         */
+        put: operations["putAgentDefinition"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agents/{agent_id}/definition/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the versions of the definition of a built-in agent
+         * @description The stored versions of the definition of the built-in agent `agent_id`, newest first, without the definition text (26 4.1). The version list offers undo: the client reads the content of an older version with `getAgentDefinition` and `version`, and writes it as a new version with `putAgentDefinition` (26 8.4). Permissions as `getAgentDefinition`; a built-in agent without a definition answers an empty list, any other agent `404`.
+         */
+        get: operations["listAgentDefinitionVersions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/agents/{agent_id}/project-folders": {
         parameters: {
             query?: never;
@@ -10087,6 +10131,11 @@ export interface components {
             /** Format: int64 */
             settings_version: number;
         };
+        /** @description The new definition version of the receiving built-in agent; never the definition (26 4.1). */
+        AgentDefinitionChangedPayload: {
+            /** Format: int64 */
+            definition_version: number;
+        };
         TypingStartedPayload: {
             thread_id: components["schemas"]["Uuid"];
             principal_id: components["schemas"]["Uuid"];
@@ -11477,6 +11526,18 @@ export interface components {
              */
             type: "agent.config_changed";
         };
+        /** @description Durable event `agent.definition_changed`. */
+        AgentDefinitionChangedEvent: components["schemas"]["EventEnvelope"] & {
+            /** @enum {string} */
+            type: "agent.definition_changed";
+            payload: components["schemas"]["AgentDefinitionChangedPayload"];
+        } & {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "agent.definition_changed";
+        };
         /** @description Ephemeral event `typing.started` (no `seq`, at most once). */
         TypingStartedEvent: components["schemas"]["EventEnvelope"] & {
             /** @enum {string} */
@@ -11560,7 +11621,7 @@ export interface components {
             image_url?: string;
         };
         /** @description Any durable event, discriminated by `type`. Clients skip unknown types and still advance their cursor. */
-        Event: components["schemas"]["MessageCreatedEvent"] | components["schemas"]["MessageUpdatedEvent"] | components["schemas"]["MessageDeletedEvent"] | components["schemas"]["ReactionAddedEvent"] | components["schemas"]["ReactionRemovedEvent"] | components["schemas"]["PinAddedEvent"] | components["schemas"]["PinRemovedEvent"] | components["schemas"]["ThreadCreatedEvent"] | components["schemas"]["ThreadUpdatedEvent"] | components["schemas"]["ThreadClosedEvent"] | components["schemas"]["ThreadReopenedEvent"] | components["schemas"]["ThreadMovedEvent"] | components["schemas"]["ThreadMovedOutEvent"] | components["schemas"]["AgentSessionChangedEvent"] | components["schemas"]["RunStateChangedEvent"] | components["schemas"]["SpaceCreatedEvent"] | components["schemas"]["SpaceUpdatedEvent"] | components["schemas"]["SpaceArchivedEvent"] | components["schemas"]["ChannelCreatedEvent"] | components["schemas"]["ChannelUpdatedEvent"] | components["schemas"]["ChannelSettingsChangedEvent"] | components["schemas"]["ChannelArchivedEvent"] | components["schemas"]["CommandChangedEvent"] | components["schemas"]["FileUpdatedEvent"] | components["schemas"]["UserUpdatedEvent"] | components["schemas"]["AgentUpdatedEvent"] | components["schemas"]["InstanceUpdatedEvent"] | components["schemas"]["StatusUpdatedEvent"] | components["schemas"]["GrantChangedEvent"] | components["schemas"]["GroupChangedEvent"] | components["schemas"]["AccessChangedEvent"] | components["schemas"]["AccessExpiringEvent"] | components["schemas"]["DevicePendingEvent"] | components["schemas"]["SessionRevokedEvent"] | components["schemas"]["ReadStateUpdatedEvent"] | components["schemas"]["DraftUpdatedEvent"] | components["schemas"]["DraftDeletedEvent"] | components["schemas"]["SettingsUpdatedEvent"] | components["schemas"]["SidebarUpdatedEvent"] | components["schemas"]["SidebarChannelUpdatedEvent"] | components["schemas"]["NotificationPrefUpdatedEvent"] | components["schemas"]["QuietHoursUpdatedEvent"] | components["schemas"]["GdprRequestUpdatedEvent"] | components["schemas"]["GdprRequestDueEvent"] | components["schemas"]["ImportProgressEvent"] | components["schemas"]["AgentInvocationEvent"] | components["schemas"]["AgentFollowupEvent"] | components["schemas"]["RunCancelRequestedEvent"] | components["schemas"]["InteractionCreatedEvent"] | components["schemas"]["CommandInvokedEvent"] | components["schemas"]["AgentConfigChangedEvent"] | components["schemas"]["HostUpdatedEvent"] | components["schemas"]["TerminalSessionChangedEvent"];
+        Event: components["schemas"]["MessageCreatedEvent"] | components["schemas"]["MessageUpdatedEvent"] | components["schemas"]["MessageDeletedEvent"] | components["schemas"]["ReactionAddedEvent"] | components["schemas"]["ReactionRemovedEvent"] | components["schemas"]["PinAddedEvent"] | components["schemas"]["PinRemovedEvent"] | components["schemas"]["ThreadCreatedEvent"] | components["schemas"]["ThreadUpdatedEvent"] | components["schemas"]["ThreadClosedEvent"] | components["schemas"]["ThreadReopenedEvent"] | components["schemas"]["ThreadMovedEvent"] | components["schemas"]["ThreadMovedOutEvent"] | components["schemas"]["AgentSessionChangedEvent"] | components["schemas"]["RunStateChangedEvent"] | components["schemas"]["SpaceCreatedEvent"] | components["schemas"]["SpaceUpdatedEvent"] | components["schemas"]["SpaceArchivedEvent"] | components["schemas"]["ChannelCreatedEvent"] | components["schemas"]["ChannelUpdatedEvent"] | components["schemas"]["ChannelSettingsChangedEvent"] | components["schemas"]["ChannelArchivedEvent"] | components["schemas"]["CommandChangedEvent"] | components["schemas"]["FileUpdatedEvent"] | components["schemas"]["UserUpdatedEvent"] | components["schemas"]["AgentUpdatedEvent"] | components["schemas"]["InstanceUpdatedEvent"] | components["schemas"]["StatusUpdatedEvent"] | components["schemas"]["GrantChangedEvent"] | components["schemas"]["GroupChangedEvent"] | components["schemas"]["AccessChangedEvent"] | components["schemas"]["AccessExpiringEvent"] | components["schemas"]["DevicePendingEvent"] | components["schemas"]["SessionRevokedEvent"] | components["schemas"]["ReadStateUpdatedEvent"] | components["schemas"]["DraftUpdatedEvent"] | components["schemas"]["DraftDeletedEvent"] | components["schemas"]["SettingsUpdatedEvent"] | components["schemas"]["SidebarUpdatedEvent"] | components["schemas"]["SidebarChannelUpdatedEvent"] | components["schemas"]["NotificationPrefUpdatedEvent"] | components["schemas"]["QuietHoursUpdatedEvent"] | components["schemas"]["GdprRequestUpdatedEvent"] | components["schemas"]["GdprRequestDueEvent"] | components["schemas"]["ImportProgressEvent"] | components["schemas"]["AgentInvocationEvent"] | components["schemas"]["AgentFollowupEvent"] | components["schemas"]["RunCancelRequestedEvent"] | components["schemas"]["InteractionCreatedEvent"] | components["schemas"]["CommandInvokedEvent"] | components["schemas"]["AgentConfigChangedEvent"] | components["schemas"]["AgentDefinitionChangedEvent"] | components["schemas"]["HostUpdatedEvent"] | components["schemas"]["TerminalSessionChangedEvent"];
         /** @description One page. `next_cursor` is absent on the last page. */
         MentionItemPage: {
             items: components["schemas"]["MentionItem"][];
@@ -11734,6 +11795,132 @@ export interface components {
                 title: string;
                 last_activity_at: components["schemas"]["Timestamp"];
             }[];
+        };
+        /** @description Schema `agent_definition.v1` of a built-in agent (26 4.2), closed at every level. Every string is valid UTF-8 without control or bidi characters, except line feed and carriage return in `instructions`, a skill `body` and a file `content`. The limits are configuration values: `instructions` at most `agents.definition.instructions_max_bytes` bytes; at most `agents.definition.max_skills` skills and `agents.definition.max_mcp_servers` MCP servers. The text rules of 26 4.3 (frontmatter, inline shell, `@` imports outside the agent folder) and the rules of docs/decisions.d/A1-02.md apply; a finding is a field error of `400 validation_failed`. */
+        AgentDefinition: {
+            /** @description Markdown that becomes `CLAUDE.md` in the agent folder; at most `agents.definition.instructions_max_bytes` bytes. */
+            instructions: string;
+            /** @description At most `agents.definition.max_skills` skills, names unique. */
+            skills: components["schemas"]["AgentDefinitionSkill"][];
+            /** @description At most `agents.definition.max_mcp_servers` servers, names unique. A `stdio` server needs the tool class `host` (`tool_class_too_low` below it, 26 4.4). */
+            mcp_servers: components["schemas"]["AgentDefinitionMcpServer"][];
+            settings: components["schemas"]["AgentDefinitionSettings"];
+            origin: components["schemas"]["AgentDefinitionOrigin"];
+        };
+        /** @description One skill. The runner writes the frontmatter of `SKILL.md` from `name` and `description` only (26 5.2). */
+        AgentDefinitionSkill: {
+            /**
+             * @description `^[a-z0-9][a-z0-9-]{0,63}$`, unique among the skills (`invalid_name`, `duplicate_name`).
+             * @example summarize
+             */
+            name: string;
+            /** @description One line, not blank, at most `agents.definition.skill_description_max_chars` characters. */
+            description: string;
+            /** @description Markdown, at most `agents.definition.skill_body_max_bytes` bytes; its first line is never `---` (`skill_frontmatter`). */
+            body: string;
+            /** @description At most `agents.definition.max_skill_files` extra files, written flat next to `SKILL.md`. */
+            files?: components["schemas"]["AgentDefinitionSkillFile"][];
+        };
+        /** @description One extra file of a skill. */
+        AgentDefinitionSkillFile: {
+            /**
+             * @description A flat name matching `^[a-z0-9][a-z0-9._-]{0,63}\.md$`, never `SKILL.md` in any case, unique within the skill.
+             * @example checklist.md
+             */
+            name: string;
+            /** @description Markdown, at most `agents.definition.skill_body_max_bytes` bytes; its first line is never `---`. */
+            content: string;
+        };
+        /** @description One MCP server. `http` takes `url` and optional `headers`; `stdio` takes `command`, `package`, optional `args` and `env`. A member of the other transport is `unknown_member`. The runner places `package` directly after `command` and every entry of `args` after it. */
+        AgentDefinitionMcpServer: {
+            /**
+             * @description `^[a-z0-9][a-z0-9-]{0,63}$`, unique among the servers.
+             * @example docs
+             */
+            name: string;
+            /** @enum {string} */
+            transport: "http" | "stdio";
+            /**
+             * @description `http`: an `https` URL with a host, without user information and without fragment.
+             * @example https://mcp.example.com/v1
+             */
+            url?: string;
+            /** @description `http`: headers, names unique without case. */
+            headers?: components["schemas"]["AgentDefinitionEntry"][];
+            /**
+             * @description `stdio`: one of `agents.mcp_stdio_runners` (`mcp_command_not_allowed`).
+             * @example npx
+             */
+            command?: string;
+            /**
+             * @description `stdio`: `<name>@<exact version>`, a semantic version without range, wildcard or tag (`mcp_package_unpinned`).
+             * @example @example/mcp-files@1.4.2
+             */
+            package?: string;
+            /** @description `stdio`: arguments after the package. */
+            args?: string[];
+            /** @description `stdio`: environment entries, names `^[A-Z_][A-Z0-9_]*$`, unique, never a name the runner sets itself (`env_name_reserved`). */
+            env?: components["schemas"]["AgentDefinitionEntry"][];
+        };
+        /** @description A header or an environment entry with exactly one of `value` and `secret_ref`. A header named `Authorization`, `Cookie` or `Proxy-Authorization`, and every entry whose name contains `KEY`, `TOKEN`, `SECRET`, `PASSWORD`, `PASSWD`, `CREDENTIAL`, `AUTH` or `COOKIE` (any case), needs `secret_ref` (`secret_value_not_allowed`). The server never resolves a `secret_ref`. */
+        AgentDefinitionEntry: {
+            /** @example Authorization */
+            name: string;
+            /** @description A plain value, shown in the preview. */
+            value?: string;
+            /**
+             * @description A key of the secret provider of the hosting runner, `env:<NAME>` or `file:<absolute path>`.
+             * @example env:DOCS_MCP_TOKEN
+             */
+            secret_ref?: string;
+        };
+        /** @description Settings of the built-in agent; the tool class itself is the agent's `tool_class` (07 2.11), never set here. */
+        AgentDefinitionSettings: {
+            /**
+             * @description The pattern of `default_model` (09 2.2), not starting with `-`; absent means the runner's default model.
+             * @example claude-sonnet-4-5
+             */
+            model?: string;
+            tool_class_wish: components["schemas"]["ToolClass"];
+            /** @description At most `agents.definition.max_allowed_tools` distinct tool names (a CLI tool name, optionally with a rule in parentheses, or `mcp__<server>[__<tool>]` of a listed server). Under `scoped` it narrows `runner.scoped_allowed_tools` of the hosting runner; absent means no narrowing. */
+            allowed_tools?: string[];
+            /**
+             * Format: double
+             * @description Cost cap of one run in USD, above zero and at most `agents.definition.max_cost_usd_per_run`; absent means no cap.
+             * @example 2.5
+             */
+            max_cost_usd_per_run?: number;
+        };
+        /** @description Where the definition came from; display only. */
+        AgentDefinitionOrigin: {
+            /** @enum {string} */
+            kind: "template" | "interview" | "manual";
+            /**
+             * @description `^[a-z0-9][a-z0-9-]{0,63}$`.
+             * @example writing-helper
+             */
+            template_slug?: string;
+            /**
+             * @description `^[0-9A-Za-z][0-9A-Za-z.+-]{0,63}$`.
+             * @example 1.0.0
+             */
+            template_version?: string;
+        };
+        /** @description One stored version of the definition of a built-in agent; `definition` only in `getAgentDefinition` and `putAgentDefinition`. */
+        AgentDefinitionVersion: {
+            agent_id: components["schemas"]["Uuid"];
+            /** Format: int64 */
+            version: number;
+            /** @enum {string} */
+            origin_kind: "template" | "interview" | "manual";
+            created_at: components["schemas"]["Timestamp"];
+            created_by: components["schemas"]["Uuid"];
+            definition?: components["schemas"]["AgentDefinition"];
+        };
+        /** @description One page of versions, newest first. `next_cursor` is absent on the last page. */
+        AgentDefinitionVersionPage: {
+            items: components["schemas"]["AgentDefinitionVersion"][];
+            next_cursor?: components["schemas"]["Cursor"];
         };
         /** @description One page. `next_cursor` is absent on the last page. */
         AgentPage: {
@@ -20512,6 +20699,118 @@ export interface operations {
             409: components["responses"]["Conflict"];
             412: components["responses"]["PreconditionFailed"];
             428: components["responses"]["PreconditionRequired"];
+            429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
+    getAgentDefinition: {
+        parameters: {
+            query?: {
+                /** @description A stored version to read instead of the current one; owners only, the agent itself reads only its current version. */
+                version?: number;
+            };
+            header?: never;
+            path: {
+                agent_id: components["parameters"]["AgentIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK. */
+            200: {
+                headers: {
+                    "Correlation-Id": components["headers"]["Correlation-Id"];
+                    RateLimit: components["headers"]["RateLimit"];
+                    "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentDefinitionVersion"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
+    putAgentDefinition: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional ETag; when given, a mismatch gives 412 `version_conflict`. */
+                "If-Match"?: components["parameters"]["IfMatchOptional"];
+            };
+            path: {
+                agent_id: components["parameters"]["AgentIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgentDefinition"];
+            };
+        };
+        responses: {
+            /** @description OK. */
+            200: {
+                headers: {
+                    "Correlation-Id": components["headers"]["Correlation-Id"];
+                    RateLimit: components["headers"]["RateLimit"];
+                    "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentDefinitionVersion"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            428: components["responses"]["PreconditionRequired"];
+            429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
+    listAgentDefinitionVersions: {
+        parameters: {
+            query?: {
+                /** @description Cursor from `next_cursor` of the previous page. */
+                cursor?: components["parameters"]["Cursor"];
+                limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path: {
+                agent_id: components["parameters"]["AgentIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK. */
+            200: {
+                headers: {
+                    "Correlation-Id": components["headers"]["Correlation-Id"];
+                    RateLimit: components["headers"]["RateLimit"];
+                    "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentDefinitionVersionPage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
             429: components["responses"]["TooManyRequests"];
             default: components["responses"]["Error"];
         };

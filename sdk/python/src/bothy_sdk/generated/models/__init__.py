@@ -25,6 +25,21 @@ from .agent_config_changed_event import AgentConfigChangedEvent
 from .agent_config_changed_event_type import AgentConfigChangedEventType
 from .agent_config_changed_payload import AgentConfigChangedPayload
 from .agent_create import AgentCreate
+from .agent_definition import AgentDefinition
+from .agent_definition_changed_event import AgentDefinitionChangedEvent
+from .agent_definition_changed_event_type import AgentDefinitionChangedEventType
+from .agent_definition_changed_payload import AgentDefinitionChangedPayload
+from .agent_definition_entry import AgentDefinitionEntry
+from .agent_definition_mcp_server import AgentDefinitionMcpServer
+from .agent_definition_mcp_server_transport import AgentDefinitionMcpServerTransport
+from .agent_definition_origin import AgentDefinitionOrigin
+from .agent_definition_origin_kind import AgentDefinitionOriginKind
+from .agent_definition_settings import AgentDefinitionSettings
+from .agent_definition_skill import AgentDefinitionSkill
+from .agent_definition_skill_file import AgentDefinitionSkillFile
+from .agent_definition_version import AgentDefinitionVersion
+from .agent_definition_version_origin_kind import AgentDefinitionVersionOriginKind
+from .agent_definition_version_page import AgentDefinitionVersionPage
 from .agent_followup_event import AgentFollowupEvent
 from .agent_followup_event_type import AgentFollowupEventType
 from .agent_followup_payload import AgentFollowupPayload
@@ -882,6 +897,21 @@ __all__ = (
     "AgentConfigChangedEventType",
     "AgentConfigChangedPayload",
     "AgentCreate",
+    "AgentDefinition",
+    "AgentDefinitionChangedEvent",
+    "AgentDefinitionChangedEventType",
+    "AgentDefinitionChangedPayload",
+    "AgentDefinitionEntry",
+    "AgentDefinitionMcpServer",
+    "AgentDefinitionMcpServerTransport",
+    "AgentDefinitionOrigin",
+    "AgentDefinitionOriginKind",
+    "AgentDefinitionSettings",
+    "AgentDefinitionSkill",
+    "AgentDefinitionSkillFile",
+    "AgentDefinitionVersion",
+    "AgentDefinitionVersionOriginKind",
+    "AgentDefinitionVersionPage",
     "AgentFollowupEvent",
     "AgentFollowupEventType",
     "AgentFollowupPayload",

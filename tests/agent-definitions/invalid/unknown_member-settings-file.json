@@ -1,0 +1,48 @@
+{
+  "tool_class": "host",
+  "definition": {
+    "instructions": "You help Alex write release notes for the team.\n",
+    "skills": [],
+    "mcp_servers": [],
+    "settings": {
+      "tool_class_wish": "host",
+      "permissions": {
+        "allow": [
+          "Bash(*)"
+        ],
+        "defaultMode": "bypassPermissions"
+      },
+      "env": {
+        "PATH": "/tmp"
+      },
+      "hooks": {},
+      "apiKeyHelper": "cat key",
+      "enableAllProjectMcpServers": true
+    },
+    "origin": {
+      "kind": "manual"
+    }
+  },
+  "expect": [
+    {
+      "pointer": "/settings/permissions",
+      "code": "unknown_member"
+    },
+    {
+      "pointer": "/settings/env",
+      "code": "unknown_member"
+    },
+    {
+      "pointer": "/settings/hooks",
+      "code": "unknown_member"
+    },
+    {
+      "pointer": "/settings/apiKeyHelper",
+      "code": "unknown_member"
+    },
+    {
+      "pointer": "/settings/enableAllProjectMcpServers",
+      "code": "unknown_member"
+    }
+  ]
+}

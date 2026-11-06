@@ -44,6 +44,34 @@ type Store interface {
 	UpdateAgent(ctx context.Context, a domain.Agent) error
 }
 
+// DefinitionRow is one row of agent_definitions (03 section 4.4, R-DM-59).
+type DefinitionRow struct {
+	AgentID ids.ID
+	Version int64
+	// Definition is the stored agent_definition.v1 document; nil in a list of versions.
+	Definition []byte
+	OriginKind string
+	CreatedAt  time.Time
+	CreatedBy  ids.ID
+}
+
+// DefinitionStore is the outgoing port over agent_definitions (implemented by adapters/postgres).
+// Reads run in the ambient transaction of ctx when there is one and on the pool otherwise; the
+// insert runs only inside a unit of work, after the caller locked the agents row (03 section
+// 6.3). Rows are never updated. Errors are kernel/errs errors without SQL text or values.
+type DefinitionStore interface {
+	// CurrentDefinition returns the row with the highest version of agentID; found is false when
+	// the agent has none.
+	CurrentDefinition(ctx context.Context, agentID ids.ID) (row DefinitionRow, found bool, err error)
+	// DefinitionAt returns the row of version of agentID; found is false for an unknown version.
+	DefinitionAt(ctx context.Context, agentID ids.ID, version int64) (row DefinitionRow, found bool, err error)
+	// InsertDefinition inserts row.
+	InsertDefinition(ctx context.Context, row DefinitionRow) error
+	// DefinitionVersions returns up to limit rows of agentID with a version below before, newest
+	// first, without the definition document.
+	DefinitionVersions(ctx context.Context, agentID ids.ID, before int64, limit int) ([]DefinitionRow, error)
+}
+
 // Cursors is the outgoing port that encodes and checks the opaque cursors of listAgents
 // (implemented by adapters/httpapi with platform/httpserver).
 type Cursors interface {

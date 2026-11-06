@@ -13330,6 +13330,218 @@ paths:
         default:
           $ref: '#/components/responses/Error'
 
+  /agents/{agent_id}/definition:
+    get:
+      operationId: getAgentDefinition
+      summary: Read the current definition of a built-in agent
+      tags: [Agents]
+      description: |-
+        The current (highest) version of the definition of the built-in agent `agent_id` (26 4.1), or with `version` an older one, which the version list offers for undo (26 8.4). The owner reads it, and the agent itself through the hosted connection of its hosting runner, which reads only the current version; another agent and a person who is no owner get the refusal of 07 2.13. A built-in agent without a definition, any other agent and an unknown `version` answer `404`. The definition appears only in this answer, in `putAgentDefinition` and in `current` of its `412`, never in an event, a log line, telemetry or an audit entry. `ETag` is the version of the answer; the `If-Match` of the next `putAgentDefinition` is the current version.
+      x-authz-action: agent.definition.read
+      x-rate-limit-class: rl.read
+      parameters:
+      - $ref: '#/components/parameters/AgentIdPath'
+      - name: version
+        in: query
+        description: A stored version to read instead of the current one; owners only, the agent itself reads only its current version.
+        schema:
+          type: integer
+          format: int64
+          minimum: 1
+      responses:
+        '200':
+          description: OK.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentDefinitionVersion'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    agent_id: 0192f4a0-7b1c-7d07-84b0-358556a08a99
+                    version: 2
+                    origin_kind: template
+                    created_at: '2026-11-06T09:00:00.000Z'
+                    created_by: 0192f4a0-7b1c-7a11-9c0e-5d1e2f3a4b5c
+                    definition:
+                      instructions: You help Alex write release notes.
+                      skills:
+                      - name: summarize
+                        description: Summarizes a thread in three lines
+                        body: Read the thread and write three short lines.
+                      mcp_servers:
+                      - name: docs
+                        transport: http
+                        url: https://mcp.example.com/v1
+                        headers:
+                        - name: Authorization
+                          secret_ref: env:DOCS_MCP_TOKEN
+                      settings:
+                        model: claude-sonnet-4-5
+                        tool_class_wish: scoped
+                        allowed_tools: [Read, mcp__docs__search]
+                        max_cost_usd_per_run: 2.5
+                      origin:
+                        kind: template
+                        template_slug: writing-helper
+                        template_version: 1.0.0
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+    put:
+      operationId: putAgentDefinition
+      summary: Store a new version of the definition of a built-in agent
+      tags: [Agents]
+      description: |-
+        Part of `agent.update` (owner, step-up, audit; 26 4.1, R-API-29). Stores the body as the next version of the definition, raises `agents.version` (`agent.updated`) and sends the durable personal event `agent.definition_changed` with `definition_version` only to the agent, all in one transaction. `If-Match` names the current definition version and is absent only for the first version: without it on an existing definition `428 precondition_required`, a stale one `412 version_conflict` with the current definition in `current`. Only a built-in agent (`adapter_kind = 'claude_agent'`) has a definition; another agent answers `409 conflict` with `reason: not_a_builtin_agent`. The server checks the body against 26 4.2 and 4.3 and answers every finding as one `errors[]` entry of `400 validation_failed` with the JSON Pointer and the field code (`unknown_member`, `skill_frontmatter`, `inline_shell`, `import_outside_folder`, `secret_value_not_allowed`, `env_name_reserved`, `mcp_command_not_allowed`, `mcp_package_unpinned`, `tool_class_too_low`, `too_long`, `too_many`, `invalid_name`, `duplicate_name`, and the shape codes of docs/decisions.d/A1-02.md); then it stores nothing. A body equal to the current definition stores no new version. The audit entry names the version and the changed parts, never their text. Undo writes the content of an older version as a new version.
+      x-authz-action: agent.update
+      x-rate-limit-class: rl.admin
+      parameters:
+      - $ref: '#/components/parameters/AgentIdPath'
+      - $ref: '#/components/parameters/IfMatchOptional'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentDefinition'
+            examples:
+              default:
+                summary: Request
+                value:
+                  instructions: You help Alex write release notes.
+                  skills: []
+                  mcp_servers: []
+                  settings:
+                    tool_class_wish: chat
+                  origin:
+                    kind: manual
+      responses:
+        '200':
+          description: OK.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentDefinitionVersion'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    agent_id: 0192f4a0-7b1c-7d07-84b0-358556a08a99
+                    version: 1
+                    origin_kind: manual
+                    created_at: '2026-11-06T09:00:00.000Z'
+                    created_by: 0192f4a0-7b1c-7a11-9c0e-5d1e2f3a4b5c
+                    definition:
+                      instructions: You help Alex write release notes.
+                      skills: []
+                      mcp_servers: []
+                      settings:
+                        tool_class_wish: chat
+                      origin:
+                        kind: manual
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /agents/{agent_id}/definition/versions:
+    get:
+      operationId: listAgentDefinitionVersions
+      summary: List the versions of the definition of a built-in agent
+      tags: [Agents]
+      description: |-
+        The stored versions of the definition of the built-in agent `agent_id`, newest first, without the definition text (26 4.1). The version list offers undo: the client reads the content of an older version with `getAgentDefinition` and `version`, and writes it as a new version with `putAgentDefinition` (26 8.4). Permissions as `getAgentDefinition`; a built-in agent without a definition answers an empty list, any other agent `404`.
+      x-authz-action: agent.definition.read
+      x-rate-limit-class: rl.read
+      parameters:
+      - $ref: '#/components/parameters/AgentIdPath'
+      - $ref: '#/components/parameters/Cursor'
+      - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: OK.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentDefinitionVersionPage'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    items:
+                    - agent_id: 0192f4a0-7b1c-7d07-84b0-358556a08a99
+                      version: 2
+                      origin_kind: template
+                      created_at: '2026-11-06T09:00:00.000Z'
+                      created_by: 0192f4a0-7b1c-7a11-9c0e-5d1e2f3a4b5c
+                    - agent_id: 0192f4a0-7b1c-7d07-84b0-358556a08a99
+                      version: 1
+                      origin_kind: manual
+                      created_at: '2026-11-05T09:00:00.000Z'
+                      created_by: 0192f4a0-7b1c-7a11-9c0e-5d1e2f3a4b5c
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
   /agents/{agent_id}/project-folders:
     get:
       operationId: listAgentProjectFolders
@@ -30124,6 +30336,15 @@ components:
         settings_version:
           type: integer
           format: int64
+    AgentDefinitionChangedPayload:
+      type: object
+      description: The new definition version of the receiving built-in agent; never the definition (26 4.1).
+      required: [definition_version]
+      properties:
+        definition_version:
+          type: integer
+          format: int64
+          minimum: 1
     TypingStartedPayload:
       type: object
       required: [thread_id, principal_id, expires_at]
@@ -32023,6 +32244,18 @@ components:
             enum: [agent.config_changed]
           payload:
             $ref: '#/components/schemas/AgentConfigChangedPayload'
+    AgentDefinitionChangedEvent:
+      description: Durable event `agent.definition_changed`.
+      allOf:
+      - $ref: '#/components/schemas/EventEnvelope'
+      - type: object
+        required: [type, payload]
+        properties:
+          type:
+            type: string
+            enum: [agent.definition_changed]
+          payload:
+            $ref: '#/components/schemas/AgentDefinitionChangedPayload'
     TypingStartedEvent:
       description: Ephemeral event `typing.started` (no `seq`, at most once).
       allOf:
@@ -32221,6 +32454,7 @@ components:
       - $ref: '#/components/schemas/InteractionCreatedEvent'
       - $ref: '#/components/schemas/CommandInvokedEvent'
       - $ref: '#/components/schemas/AgentConfigChangedEvent'
+      - $ref: '#/components/schemas/AgentDefinitionChangedEvent'
       - $ref: '#/components/schemas/HostUpdatedEvent'
       - $ref: '#/components/schemas/TerminalSessionChangedEvent'
       discriminator:
@@ -32277,6 +32511,7 @@ components:
           interaction.created: '#/components/schemas/InteractionCreatedEvent'
           command.invoked: '#/components/schemas/CommandInvokedEvent'
           agent.config_changed: '#/components/schemas/AgentConfigChangedEvent'
+          agent.definition_changed: '#/components/schemas/AgentDefinitionChangedEvent'
           host.updated: '#/components/schemas/HostUpdatedEvent'
           terminal_session.changed: '#/components/schemas/TerminalSessionChangedEvent'
     MentionItemPage:
@@ -32653,6 +32888,192 @@ components:
                 examples: [Invoice export fails]
               last_activity_at:
                 $ref: '#/components/schemas/Timestamp'
+    AgentDefinition:
+      type: object
+      additionalProperties: false
+      description: |-
+        Schema `agent_definition.v1` of a built-in agent (26 4.2), closed at every level. Every string is valid UTF-8 without control or bidi characters, except line feed and carriage return in `instructions`, a skill `body` and a file `content`. The limits are configuration values: `instructions` at most `agents.definition.instructions_max_bytes` bytes; at most `agents.definition.max_skills` skills and `agents.definition.max_mcp_servers` MCP servers. The text rules of 26 4.3 (frontmatter, inline shell, `@` imports outside the agent folder) and the rules of docs/decisions.d/A1-02.md apply; a finding is a field error of `400 validation_failed`.
+      required: [instructions, skills, mcp_servers, settings, origin]
+      properties:
+        instructions:
+          type: string
+          description: Markdown that becomes `CLAUDE.md` in the agent folder; at most `agents.definition.instructions_max_bytes` bytes.
+        skills:
+          type: array
+          description: At most `agents.definition.max_skills` skills, names unique.
+          items:
+            $ref: '#/components/schemas/AgentDefinitionSkill'
+        mcp_servers:
+          type: array
+          description: At most `agents.definition.max_mcp_servers` servers, names unique. A `stdio` server needs the tool class `host` (`tool_class_too_low` below it, 26 4.4).
+          items:
+            $ref: '#/components/schemas/AgentDefinitionMcpServer'
+        settings:
+          $ref: '#/components/schemas/AgentDefinitionSettings'
+        origin:
+          $ref: '#/components/schemas/AgentDefinitionOrigin'
+    AgentDefinitionSkill:
+      type: object
+      additionalProperties: false
+      description: One skill. The runner writes the frontmatter of `SKILL.md` from `name` and `description` only (26 5.2).
+      required: [name, description, body]
+      properties:
+        name:
+          type: string
+          description: '`^[a-z0-9][a-z0-9-]{0,63}$`, unique among the skills (`invalid_name`, `duplicate_name`).'
+          examples: [summarize]
+        description:
+          type: string
+          description: One line, not blank, at most `agents.definition.skill_description_max_chars` characters.
+        body:
+          type: string
+          description: Markdown, at most `agents.definition.skill_body_max_bytes` bytes; its first line is never `---` (`skill_frontmatter`).
+        files:
+          type: array
+          description: At most `agents.definition.max_skill_files` extra files, written flat next to `SKILL.md`.
+          items:
+            $ref: '#/components/schemas/AgentDefinitionSkillFile'
+    AgentDefinitionSkillFile:
+      type: object
+      additionalProperties: false
+      description: One extra file of a skill.
+      required: [name, content]
+      properties:
+        name:
+          type: string
+          description: A flat name matching `^[a-z0-9][a-z0-9._-]{0,63}\.md$`, never `SKILL.md` in any case, unique within the skill.
+          examples: [checklist.md]
+        content:
+          type: string
+          description: Markdown, at most `agents.definition.skill_body_max_bytes` bytes; its first line is never `---`.
+    AgentDefinitionMcpServer:
+      type: object
+      additionalProperties: false
+      description: |-
+        One MCP server. `http` takes `url` and optional `headers`; `stdio` takes `command`, `package`, optional `args` and `env`. A member of the other transport is `unknown_member`. The runner places `package` directly after `command` and every entry of `args` after it.
+      required: [name, transport]
+      properties:
+        name:
+          type: string
+          description: '`^[a-z0-9][a-z0-9-]{0,63}$`, unique among the servers.'
+          examples: [docs]
+        transport:
+          type: string
+          enum: [http, stdio]
+        url:
+          type: string
+          description: '`http`: an `https` URL with a host, without user information and without fragment.'
+          examples: ['https://mcp.example.com/v1']
+        headers:
+          type: array
+          description: '`http`: headers, names unique without case.'
+          items:
+            $ref: '#/components/schemas/AgentDefinitionEntry'
+        command:
+          type: string
+          description: '`stdio`: one of `agents.mcp_stdio_runners` (`mcp_command_not_allowed`).'
+          examples: [npx]
+        package:
+          type: string
+          description: '`stdio`: `<name>@<exact version>`, a semantic version without range, wildcard or tag (`mcp_package_unpinned`).'
+          examples: ['@example/mcp-files@1.4.2']
+        args:
+          type: array
+          description: '`stdio`: arguments after the package.'
+          items:
+            type: string
+        env:
+          type: array
+          description: '`stdio`: environment entries, names `^[A-Z_][A-Z0-9_]*$`, unique, never a name the runner sets itself (`env_name_reserved`).'
+          items:
+            $ref: '#/components/schemas/AgentDefinitionEntry'
+    AgentDefinitionEntry:
+      type: object
+      additionalProperties: false
+      description: |-
+        A header or an environment entry with exactly one of `value` and `secret_ref`. A header named `Authorization`, `Cookie` or `Proxy-Authorization`, and every entry whose name contains `KEY`, `TOKEN`, `SECRET`, `PASSWORD`, `PASSWD`, `CREDENTIAL`, `AUTH` or `COOKIE` (any case), needs `secret_ref` (`secret_value_not_allowed`). The server never resolves a `secret_ref`.
+      required: [name]
+      properties:
+        name:
+          type: string
+          examples: [Authorization]
+        value:
+          type: string
+          description: A plain value, shown in the preview.
+        secret_ref:
+          type: string
+          description: A key of the secret provider of the hosting runner, `env:<NAME>` or `file:<absolute path>`.
+          examples: ['env:DOCS_MCP_TOKEN']
+    AgentDefinitionSettings:
+      type: object
+      additionalProperties: false
+      description: Settings of the built-in agent; the tool class itself is the agent's `tool_class` (07 2.11), never set here.
+      required: [tool_class_wish]
+      properties:
+        model:
+          type: string
+          description: The pattern of `default_model` (09 2.2), not starting with `-`; absent means the runner's default model.
+          examples: [claude-sonnet-4-5]
+        tool_class_wish:
+          $ref: '#/components/schemas/ToolClass'
+        allowed_tools:
+          type: array
+          description: At most `agents.definition.max_allowed_tools` distinct tool names (a CLI tool name, optionally with a rule in parentheses, or `mcp__<server>[__<tool>]` of a listed server). Under `scoped` it narrows `runner.scoped_allowed_tools` of the hosting runner; absent means no narrowing.
+          items:
+            type: string
+        max_cost_usd_per_run:
+          type: number
+          format: double
+          description: Cost cap of one run in USD, above zero and at most `agents.definition.max_cost_usd_per_run`; absent means no cap.
+          examples: [2.5]
+    AgentDefinitionOrigin:
+      type: object
+      additionalProperties: false
+      description: Where the definition came from; display only.
+      required: [kind]
+      properties:
+        kind:
+          type: string
+          enum: [template, interview, manual]
+        template_slug:
+          type: string
+          description: '`^[a-z0-9][a-z0-9-]{0,63}$`.'
+          examples: [writing-helper]
+        template_version:
+          type: string
+          description: '`^[0-9A-Za-z][0-9A-Za-z.+-]{0,63}$`.'
+          examples: [1.0.0]
+    AgentDefinitionVersion:
+      type: object
+      description: One stored version of the definition of a built-in agent; `definition` only in `getAgentDefinition` and `putAgentDefinition`.
+      required: [agent_id, version, origin_kind, created_at, created_by]
+      properties:
+        agent_id:
+          $ref: '#/components/schemas/Uuid'
+        version:
+          type: integer
+          format: int64
+          minimum: 1
+        origin_kind:
+          type: string
+          enum: [template, interview, manual]
+        created_at:
+          $ref: '#/components/schemas/Timestamp'
+        created_by:
+          $ref: '#/components/schemas/Uuid'
+        definition:
+          $ref: '#/components/schemas/AgentDefinition'
+    AgentDefinitionVersionPage:
+      type: object
+      description: One page of versions, newest first. `next_cursor` is absent on the last page.
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgentDefinitionVersion'
+        next_cursor:
+          $ref: '#/components/schemas/Cursor'
     AgentPage:
       type: object
       description: One page. `next_cursor` is absent on the last page.

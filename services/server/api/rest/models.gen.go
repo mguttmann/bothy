@@ -243,6 +243,96 @@ func (e AgentConfigChangedEventType) Valid() bool {
 	}
 }
 
+// Defines values for AgentDefinitionChangedEventAudience.
+const (
+	AgentDefinitionChangedEventAudienceSelf AgentDefinitionChangedEventAudience = "self"
+)
+
+// Valid indicates whether the value is a known member of the AgentDefinitionChangedEventAudience enum.
+func (e AgentDefinitionChangedEventAudience) Valid() bool {
+	switch e {
+	case AgentDefinitionChangedEventAudienceSelf:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AgentDefinitionChangedEventType.
+const (
+	AgentDefinitionChanged AgentDefinitionChangedEventType = "agent.definition_changed"
+)
+
+// Valid indicates whether the value is a known member of the AgentDefinitionChangedEventType enum.
+func (e AgentDefinitionChangedEventType) Valid() bool {
+	switch e {
+	case AgentDefinitionChanged:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AgentDefinitionMcpServerTransport.
+const (
+	Http  AgentDefinitionMcpServerTransport = "http"
+	Stdio AgentDefinitionMcpServerTransport = "stdio"
+)
+
+// Valid indicates whether the value is a known member of the AgentDefinitionMcpServerTransport enum.
+func (e AgentDefinitionMcpServerTransport) Valid() bool {
+	switch e {
+	case Http:
+		return true
+	case Stdio:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AgentDefinitionOriginKind.
+const (
+	AgentDefinitionOriginKindInterview AgentDefinitionOriginKind = "interview"
+	AgentDefinitionOriginKindManual    AgentDefinitionOriginKind = "manual"
+	AgentDefinitionOriginKindTemplate  AgentDefinitionOriginKind = "template"
+)
+
+// Valid indicates whether the value is a known member of the AgentDefinitionOriginKind enum.
+func (e AgentDefinitionOriginKind) Valid() bool {
+	switch e {
+	case AgentDefinitionOriginKindInterview:
+		return true
+	case AgentDefinitionOriginKindManual:
+		return true
+	case AgentDefinitionOriginKindTemplate:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AgentDefinitionVersionOriginKind.
+const (
+	AgentDefinitionVersionOriginKindInterview AgentDefinitionVersionOriginKind = "interview"
+	AgentDefinitionVersionOriginKindManual    AgentDefinitionVersionOriginKind = "manual"
+	AgentDefinitionVersionOriginKindTemplate  AgentDefinitionVersionOriginKind = "template"
+)
+
+// Valid indicates whether the value is a known member of the AgentDefinitionVersionOriginKind enum.
+func (e AgentDefinitionVersionOriginKind) Valid() bool {
+	switch e {
+	case AgentDefinitionVersionOriginKindInterview:
+		return true
+	case AgentDefinitionVersionOriginKindManual:
+		return true
+	case AgentDefinitionVersionOriginKindTemplate:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for AgentFollowupEventAudience.
 const (
 	AgentFollowupEventAudienceSelf AgentFollowupEventAudience = "self"
@@ -5192,16 +5282,16 @@ func (e ThreadKind) Valid() bool {
 
 // Defines values for ThreadTitleSource.
 const (
-	Auto   ThreadTitleSource = "auto"
-	Manual ThreadTitleSource = "manual"
+	ThreadTitleSourceAuto   ThreadTitleSource = "auto"
+	ThreadTitleSourceManual ThreadTitleSource = "manual"
 )
 
 // Valid indicates whether the value is a known member of the ThreadTitleSource enum.
 func (e ThreadTitleSource) Valid() bool {
 	switch e {
-	case Auto:
+	case ThreadTitleSourceAuto:
 		return true
-	case Manual:
+	case ThreadTitleSourceManual:
 		return true
 	default:
 		return false
@@ -6513,6 +6603,235 @@ type AgentCreate struct {
 
 	// OperatorConfig Free-form JSON object whose schema is named in the field description.
 	OperatorConfig *JsonObject `json:"operator_config,omitempty"`
+}
+
+// AgentDefinition Schema `agent_definition.v1` of a built-in agent (26 4.2), closed at every level. Every string is valid UTF-8 without control or bidi characters, except line feed and carriage return in `instructions`, a skill `body` and a file `content`. The limits are configuration values: `instructions` at most `agents.definition.instructions_max_bytes` bytes; at most `agents.definition.max_skills` skills and `agents.definition.max_mcp_servers` MCP servers. The text rules of 26 4.3 (frontmatter, inline shell, `@` imports outside the agent folder) and the rules of docs/decisions.d/A1-02.md apply; a finding is a field error of `400 validation_failed`.
+type AgentDefinition struct {
+	// Instructions Markdown that becomes `CLAUDE.md` in the agent folder; at most `agents.definition.instructions_max_bytes` bytes.
+	Instructions string `json:"instructions"`
+
+	// McpServers At most `agents.definition.max_mcp_servers` servers, names unique. A `stdio` server needs the tool class `host` (`tool_class_too_low` below it, 26 4.4).
+	McpServers []AgentDefinitionMcpServer `json:"mcp_servers"`
+
+	// Origin Where the definition came from; display only.
+	Origin AgentDefinitionOrigin `json:"origin"`
+
+	// Settings Settings of the built-in agent; the tool class itself is the agent's `tool_class` (07 2.11), never set here.
+	Settings AgentDefinitionSettings `json:"settings"`
+
+	// Skills At most `agents.definition.max_skills` skills, names unique.
+	Skills []AgentDefinitionSkill `json:"skills"`
+}
+
+// AgentDefinitionChangedEvent Durable event `agent.definition_changed`.
+type AgentDefinitionChangedEvent struct {
+	Actor    *EventActor                          `json:"actor,omitempty"`
+	Audience *AgentDefinitionChangedEventAudience `json:"audience,omitempty"`
+
+	// ClientMsgId UUIDv7 (RFC 9562), lowercase canonical form.
+	ClientMsgId *Uuid `json:"client_msg_id,omitempty"`
+
+	// CorrelationId W3C trace ID (16 bytes) of the request, written as a lowercase UUID; not a UUIDv7. Generated by the server.
+	//
+	// Examples: 4bf92f35-77b3-4da6-a3ce-929d0e0e4736
+	CorrelationId *CorrelationId `json:"correlation_id,omitempty"`
+
+	// Id UUIDv7 (RFC 9562), lowercase canonical form.
+	Id Uuid `json:"id"`
+
+	// InvocationToken Fresh invocation token (JWS, I3); only on agent-addressed invocation events.
+	InvocationToken *string `json:"invocation_token,omitempty"`
+
+	// OccurredAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+	OccurredAt Timestamp `json:"occurred_at"`
+
+	// Payload The new definition version of the receiving built-in agent; never the definition (26 4.1).
+	Payload           AgentDefinitionChangedPayload `json:"payload"`
+	PermissionVersion *int64                        `json:"permission_version,omitempty"`
+	Redacted          *bool                         `json:"redacted,omitempty"`
+
+	// Redelivered Set on redelivery to an agent consumer after `agent.ack_timeout`.
+	Redelivered *bool         `json:"redelivered,omitempty"`
+	Resource    EventResource `json:"resource"`
+
+	// SchemaVersion Examples: 1
+	SchemaVersion int `json:"schema_version"`
+
+	// Scope Location of the event. Members are absent where not applicable.
+	Scope EventScope `json:"scope"`
+
+	// Seq Global commit-ordered sequence; absent for ephemeral events.
+	//
+	// Examples: 5301
+	Seq *int64 `json:"seq,omitempty"`
+
+	// SyncEpoch Delivery-only member of outgoing webhooks; the time line of the event log (04, 7.5; ADR 0059). A receiver that sees a new epoch resets its `seq` state.
+	SyncEpoch *Uuid `json:"sync_epoch,omitempty"`
+
+	// TraceContext W3C `traceparent` of the triggering request; only in deliveries to agent adapters and only if the request was recorded.
+	//
+	// Examples: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01
+	TraceContext *string `json:"trace_context,omitempty"`
+
+	// Truncated The payload was cut to `sync.event_payload_max_bytes`; load the resource via REST.
+	Truncated *bool                           `json:"truncated,omitempty"`
+	Type      AgentDefinitionChangedEventType `json:"type"`
+}
+
+// AgentDefinitionChangedEventAudience defines model for AgentDefinitionChangedEvent.Audience.
+type AgentDefinitionChangedEventAudience string
+
+// AgentDefinitionChangedEventType defines model for AgentDefinitionChangedEvent.Type.
+type AgentDefinitionChangedEventType string
+
+// AgentDefinitionChangedPayload The new definition version of the receiving built-in agent; never the definition (26 4.1).
+type AgentDefinitionChangedPayload struct {
+	DefinitionVersion int64 `json:"definition_version"`
+}
+
+// AgentDefinitionEntry A header or an environment entry with exactly one of `value` and `secret_ref`. A header named `Authorization`, `Cookie` or `Proxy-Authorization`, and every entry whose name contains `KEY`, `TOKEN`, `SECRET`, `PASSWORD`, `PASSWD`, `CREDENTIAL`, `AUTH` or `COOKIE` (any case), needs `secret_ref` (`secret_value_not_allowed`). The server never resolves a `secret_ref`.
+type AgentDefinitionEntry struct {
+	// Name Examples: Authorization
+	Name string `json:"name"`
+
+	// SecretRef A key of the secret provider of the hosting runner, `env:<NAME>` or `file:<absolute path>`.
+	//
+	// Examples: env:DOCS_MCP_TOKEN
+	SecretRef *string `json:"secret_ref,omitempty"`
+
+	// Value A plain value, shown in the preview.
+	Value *string `json:"value,omitempty"`
+}
+
+// AgentDefinitionMcpServer One MCP server. `http` takes `url` and optional `headers`; `stdio` takes `command`, `package`, optional `args` and `env`. A member of the other transport is `unknown_member`. The runner places `package` directly after `command` and every entry of `args` after it.
+type AgentDefinitionMcpServer struct {
+	// Args `stdio`: arguments after the package.
+	Args *[]string `json:"args,omitempty"`
+
+	// Command `stdio`: one of `agents.mcp_stdio_runners` (`mcp_command_not_allowed`).
+	//
+	// Examples: npx
+	Command *string `json:"command,omitempty"`
+
+	// Env `stdio`: environment entries, names `^[A-Z_][A-Z0-9_]*$`, unique, never a name the runner sets itself (`env_name_reserved`).
+	Env *[]AgentDefinitionEntry `json:"env,omitempty"`
+
+	// Headers `http`: headers, names unique without case.
+	Headers *[]AgentDefinitionEntry `json:"headers,omitempty"`
+
+	// Name `^[a-z0-9][a-z0-9-]{0,63}$`, unique among the servers.
+	//
+	// Examples: docs
+	Name string `json:"name"`
+
+	// Package `stdio`: `<name>@<exact version>`, a semantic version without range, wildcard or tag (`mcp_package_unpinned`).
+	//
+	// Examples: @example/mcp-files@1.4.2
+	Package   *string                           `json:"package,omitempty"`
+	Transport AgentDefinitionMcpServerTransport `json:"transport"`
+
+	// Url `http`: an `https` URL with a host, without user information and without fragment.
+	//
+	// Examples: https://mcp.example.com/v1
+	Url *string `json:"url,omitempty"`
+}
+
+// AgentDefinitionMcpServerTransport defines model for AgentDefinitionMcpServer.Transport.
+type AgentDefinitionMcpServerTransport string
+
+// AgentDefinitionOrigin Where the definition came from; display only.
+type AgentDefinitionOrigin struct {
+	Kind AgentDefinitionOriginKind `json:"kind"`
+
+	// TemplateSlug `^[a-z0-9][a-z0-9-]{0,63}$`.
+	//
+	// Examples: writing-helper
+	TemplateSlug *string `json:"template_slug,omitempty"`
+
+	// TemplateVersion `^[0-9A-Za-z][0-9A-Za-z.+-]{0,63}$`.
+	//
+	// Examples: 1.0.0
+	TemplateVersion *string `json:"template_version,omitempty"`
+}
+
+// AgentDefinitionOriginKind defines model for AgentDefinitionOrigin.Kind.
+type AgentDefinitionOriginKind string
+
+// AgentDefinitionSettings Settings of the built-in agent; the tool class itself is the agent's `tool_class` (07 2.11), never set here.
+type AgentDefinitionSettings struct {
+	// AllowedTools At most `agents.definition.max_allowed_tools` distinct tool names (a CLI tool name, optionally with a rule in parentheses, or `mcp__<server>[__<tool>]` of a listed server). Under `scoped` it narrows `runner.scoped_allowed_tools` of the hosting runner; absent means no narrowing.
+	AllowedTools *[]string `json:"allowed_tools,omitempty"`
+
+	// MaxCostUsdPerRun Cost cap of one run in USD, above zero and at most `agents.definition.max_cost_usd_per_run`; absent means no cap.
+	//
+	// Examples: 2.5
+	MaxCostUsdPerRun *float64 `json:"max_cost_usd_per_run,omitempty"`
+
+	// Model The pattern of `default_model` (09 2.2), not starting with `-`; absent means the runner's default model.
+	//
+	// Examples: claude-sonnet-4-5
+	Model *string `json:"model,omitempty"`
+
+	// ToolClassWish Tool class of an agent runtime, ordered `chat` < `scoped` < `host` (07, 2.11).
+	ToolClassWish ToolClass `json:"tool_class_wish"`
+}
+
+// AgentDefinitionSkill One skill. The runner writes the frontmatter of `SKILL.md` from `name` and `description` only (26 5.2).
+type AgentDefinitionSkill struct {
+	// Body Markdown, at most `agents.definition.skill_body_max_bytes` bytes; its first line is never `---` (`skill_frontmatter`).
+	Body string `json:"body"`
+
+	// Description One line, not blank, at most `agents.definition.skill_description_max_chars` characters.
+	Description string `json:"description"`
+
+	// Files At most `agents.definition.max_skill_files` extra files, written flat next to `SKILL.md`.
+	Files *[]AgentDefinitionSkillFile `json:"files,omitempty"`
+
+	// Name `^[a-z0-9][a-z0-9-]{0,63}$`, unique among the skills (`invalid_name`, `duplicate_name`).
+	//
+	// Examples: summarize
+	Name string `json:"name"`
+}
+
+// AgentDefinitionSkillFile One extra file of a skill.
+type AgentDefinitionSkillFile struct {
+	// Content Markdown, at most `agents.definition.skill_body_max_bytes` bytes; its first line is never `---`.
+	Content string `json:"content"`
+
+	// Name A flat name matching `^[a-z0-9][a-z0-9._-]{0,63}\.md$`, never `SKILL.md` in any case, unique within the skill.
+	//
+	// Examples: checklist.md
+	Name string `json:"name"`
+}
+
+// AgentDefinitionVersion One stored version of the definition of a built-in agent; `definition` only in `getAgentDefinition` and `putAgentDefinition`.
+type AgentDefinitionVersion struct {
+	// AgentId UUIDv7 (RFC 9562), lowercase canonical form.
+	AgentId Uuid `json:"agent_id"`
+
+	// CreatedAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+	CreatedAt Timestamp `json:"created_at"`
+
+	// CreatedBy UUIDv7 (RFC 9562), lowercase canonical form.
+	CreatedBy Uuid `json:"created_by"`
+
+	// Definition Schema `agent_definition.v1` of a built-in agent (26 4.2), closed at every level. Every string is valid UTF-8 without control or bidi characters, except line feed and carriage return in `instructions`, a skill `body` and a file `content`. The limits are configuration values: `instructions` at most `agents.definition.instructions_max_bytes` bytes; at most `agents.definition.max_skills` skills and `agents.definition.max_mcp_servers` MCP servers. The text rules of 26 4.3 (frontmatter, inline shell, `@` imports outside the agent folder) and the rules of docs/decisions.d/A1-02.md apply; a finding is a field error of `400 validation_failed`.
+	Definition *AgentDefinition                 `json:"definition,omitempty"`
+	OriginKind AgentDefinitionVersionOriginKind `json:"origin_kind"`
+	Version    int64                            `json:"version"`
+}
+
+// AgentDefinitionVersionOriginKind defines model for AgentDefinitionVersion.OriginKind.
+type AgentDefinitionVersionOriginKind string
+
+// AgentDefinitionVersionPage One page of versions, newest first. `next_cursor` is absent on the last page.
+type AgentDefinitionVersionPage struct {
+	Items []AgentDefinitionVersion `json:"items"`
+
+	// NextCursor Opaque pagination cursor. Clients must not parse or build cursors.
+	//
+	// Examples: eyJrIjoiMDE5MmY0YTAtN2IxYy03MDAwLThhMDAtMDAwMDAwMDAwMDAxIn0
+	NextCursor *Cursor `json:"next_cursor,omitempty"`
 }
 
 // AgentFollowupEvent Durable event `agent.followup`.
@@ -18005,6 +18324,25 @@ type SetCredentialHolderParams struct {
 	IfMatch IfMatchRequired `json:"If-Match"`
 }
 
+// GetAgentDefinitionParams defines parameters for GetAgentDefinition.
+type GetAgentDefinitionParams struct {
+	// Version A stored version to read instead of the current one; owners only, the agent itself reads only its current version.
+	Version *int64 `form:"version,omitempty" json:"version,omitempty"`
+}
+
+// PutAgentDefinitionParams defines parameters for PutAgentDefinition.
+type PutAgentDefinitionParams struct {
+	// IfMatch Optional ETag; when given, a mismatch gives 412 `version_conflict`.
+	IfMatch *IfMatchOptional `json:"If-Match,omitempty"`
+}
+
+// ListAgentDefinitionVersionsParams defines parameters for ListAgentDefinitionVersions.
+type ListAgentDefinitionVersionsParams struct {
+	// Cursor Cursor from `next_cursor` of the previous page.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Limit  *Limit  `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
 // DisableAgentParams defines parameters for DisableAgent.
 type DisableAgentParams struct {
 	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
@@ -19412,6 +19750,9 @@ type SetAgentBillingModeJSONRequestBody = BillingModeSet
 
 // SetCredentialHolderJSONRequestBody defines body for SetCredentialHolder for application/json ContentType.
 type SetCredentialHolderJSONRequestBody = CredentialHolderSet
+
+// PutAgentDefinitionJSONRequestBody defines body for PutAgentDefinition for application/json ContentType.
+type PutAgentDefinitionJSONRequestBody = AgentDefinition
 
 // DisableAgentJSONRequestBody defines body for DisableAgent for application/json ContentType.
 type DisableAgentJSONRequestBody = ReasonBody
@@ -21863,6 +22204,40 @@ func (t *Event) MergeAgentConfigChangedEvent(v AgentConfigChangedEvent) error {
 	return err
 }
 
+// AsAgentDefinitionChangedEvent returns the union data inside the Event as a AgentDefinitionChangedEvent
+func (t Event) AsAgentDefinitionChangedEvent() (AgentDefinitionChangedEvent, error) {
+	var body AgentDefinitionChangedEvent
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromAgentDefinitionChangedEvent overwrites any union data inside the Event as the provided AgentDefinitionChangedEvent
+func (t *Event) FromAgentDefinitionChangedEvent(v AgentDefinitionChangedEvent) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"agent.definition_changed"}`))
+	t.union = b
+	return err
+}
+
+// MergeAgentDefinitionChangedEvent performs a merge with any union data inside the Event, using the provided AgentDefinitionChangedEvent
+func (t *Event) MergeAgentDefinitionChangedEvent(v AgentDefinitionChangedEvent) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"agent.definition_changed"}`))
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
 // AsHostUpdatedEvent returns the union data inside the Event as a HostUpdatedEvent
 func (t Event) AsHostUpdatedEvent() (HostUpdatedEvent, error) {
 	var body HostUpdatedEvent
@@ -21951,6 +22326,8 @@ func (t Event) ValueByDiscriminator() (interface{}, error) {
 		return t.AsAccessExpiringEvent()
 	case "agent.config_changed":
 		return t.AsAgentConfigChangedEvent()
+	case "agent.definition_changed":
+		return t.AsAgentDefinitionChangedEvent()
 	case "agent.followup":
 		return t.AsAgentFollowupEvent()
 	case "agent.invocation":

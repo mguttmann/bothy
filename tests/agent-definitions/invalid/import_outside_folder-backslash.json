@@ -1,0 +1,32 @@
+{
+  "tool_class": "chat",
+  "definition": {
+    "instructions": "You help Alex write release notes for the team.\n",
+    "skills": [
+      {
+        "name": "notes",
+        "description": "Writes short notes",
+        "body": "Write short notes.\n",
+        "files": [
+          {
+            "name": "a.md",
+            "content": "See @docs\\..\\..\\x.md\n"
+          }
+        ]
+      }
+    ],
+    "mcp_servers": [],
+    "settings": {
+      "tool_class_wish": "chat"
+    },
+    "origin": {
+      "kind": "manual"
+    }
+  },
+  "expect": [
+    {
+      "pointer": "/skills/0/files/0/content",
+      "code": "import_outside_folder"
+    }
+  ]
+}

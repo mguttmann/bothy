@@ -89,6 +89,7 @@ export const KNOWN_EVENT_TYPES = [
   "interaction.created",
   "command.invoked",
   "agent.config_changed",
+  "agent.definition_changed",
   "host.updated",
   "terminal_session.changed",
 ] as const satisfies readonly EventType[];

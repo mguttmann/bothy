@@ -1,0 +1,43 @@
+{
+  "tool_class": "host",
+  "definition": {
+    "instructions": "You help Alex write release notes for the team.\n",
+    "skills": [],
+    "mcp_servers": [
+      {
+        "name": "docs",
+        "transport": "http",
+        "url": "https://mcp.example.com/v1",
+        "command": "npx"
+      },
+      {
+        "name": "b",
+        "transport": "stdio",
+        "command": "npx",
+        "package": "@example/mcp-files@1.4.2",
+        "url": "https://mcp.example.com",
+        "headers": []
+      }
+    ],
+    "settings": {
+      "tool_class_wish": "chat"
+    },
+    "origin": {
+      "kind": "manual"
+    }
+  },
+  "expect": [
+    {
+      "pointer": "/mcp_servers/0/command",
+      "code": "unknown_member"
+    },
+    {
+      "pointer": "/mcp_servers/1/url",
+      "code": "unknown_member"
+    },
+    {
+      "pointer": "/mcp_servers/1/headers",
+      "code": "unknown_member"
+    }
+  ]
+}

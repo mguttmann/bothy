@@ -1,0 +1,51 @@
+{
+  "tool_class": "chat",
+  "definition": {
+    "instructions": "You help Alex write release notes for the team.\n",
+    "skills": [],
+    "mcp_servers": [],
+    "settings": {
+      "tool_class_wish": "chat"
+    },
+    "origin": {
+      "kind": "manual"
+    },
+    "claude_local_md": "x",
+    "commands": [],
+    "agents": [],
+    "workflows": [],
+    "rules": [],
+    "lsp_servers": {},
+    "mcp_json": {}
+  },
+  "expect": [
+    {
+      "pointer": "/claude_local_md",
+      "code": "unknown_member"
+    },
+    {
+      "pointer": "/commands",
+      "code": "unknown_member"
+    },
+    {
+      "pointer": "/agents",
+      "code": "unknown_member"
+    },
+    {
+      "pointer": "/workflows",
+      "code": "unknown_member"
+    },
+    {
+      "pointer": "/rules",
+      "code": "unknown_member"
+    },
+    {
+      "pointer": "/lsp_servers",
+      "code": "unknown_member"
+    },
+    {
+      "pointer": "/mcp_json",
+      "code": "unknown_member"
+    }
+  ]
+}

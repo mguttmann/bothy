@@ -1,11 +1,11 @@
 # Module `agents`
 
-Status: agent records, backend policy, credential holder and tool class built (M1-51); consumer cursors with fencing, the op `ack` and the REST consumer operations built (M2-07); presence and heartbeat built (M2-20); the read of persisted heartbeats for the stall check built (M2-09); the slash command register built (M2-16) and extended for apps (M2-25: the port `OwnedCommands`, app commands listed and resolved through the app-owner guard of `authz`); agent sessions per thread built (M2-12); the session sum of a booking built (M2-22); the allow list of the adapter (`getAgentTriggerers`) built; dev environments follow with the tickets of the milestone.
+Status: agent records, backend policy, credential holder and tool class built (M1-51); consumer cursors with fencing, the op `ack` and the REST consumer operations built (M2-07); presence and heartbeat built (M2-20); the read of persisted heartbeats for the stall check built (M2-09); the slash command register built (M2-16) and extended for apps (M2-25: the port `OwnedCommands`, app commands listed and resolved through the app-owner guard of `authz`); agent sessions per thread built (M2-12); the session sum of a booking built (M2-22); the allow list of the adapter (`getAgentTriggerers`) built; the definitions of built-in agents built (A1-02); dev environments follow with the tickets of the milestone.
 The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
 ## Purpose
 
-Agents, backend policy and tool class (configured), reported state, consumer cursors with fencing, command register, agent sessions, dev environments (milestone).
+Agents, backend policy and tool class (configured), reported state, consumer cursors with fencing, command register, agent sessions, definitions of built-in agents (stage A1), dev environments (milestone).
 
 ## Code
 
@@ -499,9 +499,40 @@ The handlers of `registerCommand`, `updateCommand`, `removeCommand`, `getCommand
     does; both return the IDs of the removed commands.
   - Callers: `installApp`, `upgradeAppManifest` and `uninstallApp` of `apps`.
 
+## Definitions of built-in agents (A1-02)
+
+A built-in agent (`adapter_kind = 'claude_agent'`, `agents.AdapterKindBuiltin`) has a versioned
+definition, schema `agent_definition.v1` of
+[26-builtin-agents.md](../../../../docs/spec/26-builtin-agents.md) 4.2, stored as one row of
+`agent_definitions` per version (R-DM-59); the highest version is the current one.
+
+- `domain/definition/` (pure): the types, `Validate` and `Parse` with every rule of 26 4.2 and
+  4.3 (one `FieldError` per finding with JSON Pointer and field code), `Decode` for a stored
+  version, `NeedsHost` (a `stdio` MCP server), `Parts` and `AllParts` (the changed top-level
+  parts for the audit) and `Intersect` (26 4.4 item 2, for the runner). Every limit comes from
+  `Limits`, bound from `agents.definition.*` and `agents.mcp_stdio_runners`
+  (`app.Config.DefinitionLimits`). The shared corpus `tests/agent-definitions` holds the same
+  rules for the runner, the template gate and the interview.
+- `app/definitions.go`: `PutDefinition` (`agent.update`: owner, step-up, audit; the agents row is
+  locked first, `If-Match` of the current definition version, absent only for the first;
+  `409 conflict` `not_a_builtin_agent` for another agent; then insert, `agents.version` raised with
+  `agent.updated`, the audit entry with `definition_version` and `changed_parts`, and the durable
+  personal event `agent.definition_changed {definition_version}` to the agent, all in one unit of
+  work), `GetDefinition` (`agent.definition.read`: owner or agent-self; owners may read an older
+  version for undo) and `ListDefinitionVersions` (newest first, keyset cursor, no text). The port
+  is `agents.Definitions`, the store `app.DefinitionStore` (`adapters/postgres/definitions.go`,
+  `queries/definitions.sql`), the handlers `adapters/httpapi/definitions.go`
+  (`getAgentDefinition`, `listAgentDefinitionVersions`, `putAgentDefinition`, bound with
+  `WithDefinitions`).
+- `SetToolClass` refuses a class below `host` while the current definition has a `stdio` server
+  with `409 conflict`, `definition_needs_host`, and an audit `deny` of that reason (R-BA-06).
+- A definition never appears in an event, a log line, telemetry or an audit entry; only owners
+  and the agent itself read it, and the canary test carries it as the class `definition`. The
+  rulings are [decisions.d/A1-02.md](../../../../docs/decisions.d/A1-02.md).
+
 ## Port (root package `internal/agents`)
 
-- Inbound: `Agents` (administration, policy, tool class; M1-51), `Facts` (run facts of runs; M2-05), `Presence` (heartbeat and presence; M2-20), `Consumers` (cursor, ack, takeover with fencing), `Commands` (register), `OwnedCommands` (the commands of an app for the owner actions of `apps`; M2-25), `Sessions`, `DevEnvironments` (milestone), `StatusAgents` (M7-09: the active agents with their stored presence for the status page, `app.StatusSource`; a stored online or degraded state older than `agent.presence_timeout` plus `agent.heartbeat_persist_interval` counts as offline; never authorized).
+- Inbound: `Agents` (administration, policy, tool class; M1-51), `Definitions` (definitions of built-in agents; A1-02), `Facts` (run facts of runs; M2-05), `Presence` (heartbeat and presence; M2-20), `Consumers` (cursor, ack, takeover with fencing), `Commands` (register), `OwnedCommands` (the commands of an app for the owner actions of `apps`; M2-25), `Sessions`, `DevEnvironments` (milestone), `StatusAgents` (M7-09: the active agents with their stored presence for the status page, `app.StatusSource`; a stored online or degraded state older than `agent.presence_timeout` plus `agent.heartbeat_persist_interval` counts as offline; never authorized).
 - Declares the source ports `ConsumerFeed` (M2-07) and `RunSource` (M2-12).
 - Emits in-tx events: `AgentDisabled`, `SessionAttached` (M2-12).
 - Subscribes to in-tx events: none.
@@ -524,11 +555,11 @@ Only this module writes and reads these tables by SQL (03-data-model.md, princip
 
 ## Actions (05-actions.md)
 
-`agent.read`, `agent.create`, `agent.update`, `agent.disable`, `agent.enable`, `agent.billing_mode.set`, `agent.billing_mode.set_all`, `agent.credential_holder.set`, `agent.tool_class.set`, `agent.heartbeat`, `agent.events.consume`, `agent.triggerers.read`, `agent.project_folders.read`, `agent_session.read`, `agent_session.reset`, `agent_session.bind`, `agent_session.report`, `command.read`, `command.register`, `command.remove`, `dev_environment.read`, `dev_environment.manage`, `dev_environment.report`.
+`agent.read`, `agent.create`, `agent.update`, `agent.disable`, `agent.enable`, `agent.billing_mode.set`, `agent.billing_mode.set_all`, `agent.credential_holder.set`, `agent.tool_class.set`, `agent.heartbeat`, `agent.events.consume`, `agent.triggerers.read`, `agent.project_folders.read`, `agent.definition.read`, `agent_session.read`, `agent_session.reset`, `agent_session.bind`, `agent_session.report`, `command.read`, `command.register`, `command.remove`, `dev_environment.read`, `dev_environment.manage`, `dev_environment.report`.
 
 ## Events and WebSocket ops
 
-- Durable: `agent_session.changed`, `command.changed`, `agent.updated`.
+- Durable: `agent_session.changed`, `command.changed`, `agent.updated`, `agent.definition_changed`.
 - Ephemeral: `agent.presence_changed`.
 - WebSocket ops (client to server): `ack`.
 
@@ -549,7 +580,7 @@ Only this module writes and reads these tables by SQL (03-data-model.md, princip
 
 ## Chapters
 
-[02-architecture.md](../../../../docs/spec/02-architecture.md), [09-agents.md](../../../../docs/spec/09-agents.md), [10-backend-policy.md](../../../../docs/spec/10-backend-policy.md)
+[02-architecture.md](../../../../docs/spec/02-architecture.md), [09-agents.md](../../../../docs/spec/09-agents.md), [10-backend-policy.md](../../../../docs/spec/10-backend-policy.md), [26-builtin-agents.md](../../../../docs/spec/26-builtin-agents.md)
 
 ## Backend source of stats (M6-14)
 

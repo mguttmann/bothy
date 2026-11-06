@@ -1,0 +1,140 @@
+{
+  "tool_class": "host",
+  "definition": {
+    "instructions": "You help Alex write release notes for the team.\n",
+    "skills": [
+      {
+        "name": "Notes",
+        "description": "Writes short notes",
+        "body": "Write short notes.\n"
+      },
+      {
+        "name": "-x",
+        "description": "Writes short notes",
+        "body": "Write short notes.\n"
+      },
+      {
+        "name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "description": "Writes short notes",
+        "body": "Write short notes.\n"
+      },
+      {
+        "name": "ok",
+        "description": "Writes short notes",
+        "body": "Write short notes.\n",
+        "files": [
+          {
+            "name": "../x.md",
+            "content": ""
+          },
+          {
+            "name": "dir/x.md",
+            "content": ""
+          },
+          {
+            "name": "SKILL.md",
+            "content": ""
+          },
+          {
+            "name": "skill.md",
+            "content": ""
+          },
+          {
+            "name": ".mcp.json",
+            "content": ""
+          },
+          {
+            "name": "settings.json",
+            "content": ""
+          }
+        ]
+      }
+    ],
+    "mcp_servers": [
+      {
+        "name": "Docs",
+        "transport": "http",
+        "url": "https://mcp.example.com/v1"
+      },
+      {
+        "name": "ok2",
+        "transport": "stdio",
+        "command": "npx",
+        "package": "@example/mcp-files@1.4.2",
+        "env": [
+          {
+            "name": "log_level",
+            "value": "x"
+          }
+        ]
+      },
+      {
+        "name": "ok3",
+        "transport": "http",
+        "url": "https://mcp.example.com/v1",
+        "headers": [
+          {
+            "name": "X Team",
+            "value": "x"
+          }
+        ]
+      }
+    ],
+    "settings": {
+      "tool_class_wish": "chat"
+    },
+    "origin": {
+      "kind": "manual"
+    }
+  },
+  "expect": [
+    {
+      "pointer": "/skills/0/name",
+      "code": "invalid_name"
+    },
+    {
+      "pointer": "/skills/1/name",
+      "code": "invalid_name"
+    },
+    {
+      "pointer": "/skills/2/name",
+      "code": "invalid_name"
+    },
+    {
+      "pointer": "/skills/3/files/0/name",
+      "code": "invalid_name"
+    },
+    {
+      "pointer": "/skills/3/files/1/name",
+      "code": "invalid_name"
+    },
+    {
+      "pointer": "/skills/3/files/2/name",
+      "code": "invalid_name"
+    },
+    {
+      "pointer": "/skills/3/files/3/name",
+      "code": "invalid_name"
+    },
+    {
+      "pointer": "/skills/3/files/4/name",
+      "code": "invalid_name"
+    },
+    {
+      "pointer": "/skills/3/files/5/name",
+      "code": "invalid_name"
+    },
+    {
+      "pointer": "/mcp_servers/0/name",
+      "code": "invalid_name"
+    },
+    {
+      "pointer": "/mcp_servers/1/env/0/name",
+      "code": "invalid_name"
+    },
+    {
+      "pointer": "/mcp_servers/2/headers/0/name",
+      "code": "invalid_name"
+    }
+  ]
+}

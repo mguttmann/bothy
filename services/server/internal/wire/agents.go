@@ -23,7 +23,9 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 )
 
-// AgentsConfig binds the keys of the agents use cases (api.page_size_default, api.page_size_max).
+// AgentsConfig binds the keys of the agents use cases (api.page_size_default, api.page_size_max,
+// audit.reason_max_chars and the definition limits agents.definition.* and
+// agents.mcp_stdio_runners of A1-02).
 // The error names the key whose binding failed, never a value.
 func AgentsConfig(v *config.Values) (agentsapp.Config, error) {
 	var c agentsapp.Config
@@ -121,8 +123,9 @@ func NewAgents(cfg agentsapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az autho
 	if !ok {
 		return nil, errors.New("wire: the Authorizer of agents does not answer the trigger set of an agent")
 	}
+	repo := agentspg.NewRepository(pool)
 	svc, err := agentsapp.New(cfg, agentsapp.Deps{
-		Store: agentspg.NewRepository(pool), Principals: id.Principals, Directory: identityapp.NewDirectory(identitypg.NewRepository(pool)),
+		Store: repo, Definitions: repo, Principals: id.Principals, Directory: identityapp.NewDirectory(identitypg.NewRepository(pool)),
 		Tokens: id.Tokens, Rights: rights, UoW: uow, Authorizer: az, Audit: w.Audit, Events: w.Events,
 		Cursors: agentshttp.Cursors{}, Clock: clk, Measure: w.Measure, Triggerers: tr,
 	})
@@ -133,5 +136,5 @@ func NewAgents(cfg agentsapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az autho
 	if err != nil {
 		return nil, err
 	}
-	return &Agents{Service: svc, Consumers: cons, Handlers: agentshttp.New(svc, cons), Switch: authzsource.NewSwitch(svc)}, nil
+	return &Agents{Service: svc, Consumers: cons, Handlers: agentshttp.New(svc, cons).WithDefinitions(svc), Switch: authzsource.NewSwitch(svc)}, nil
 }

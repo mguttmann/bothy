@@ -10,16 +10,23 @@ import (
 )
 
 // TestRegister_Events: agents declares the durable event it appends (M1-51): agent.updated, also
-// at creation, because 05 has no agent.created; and the ephemeral agent.presence_changed (M2-20,
-// AZ-P2) and command.changed of the command register (M2-16).
+// at creation, because 05 has no agent.created; the ephemeral agent.presence_changed (M2-20,
+// AZ-P2), command.changed of the command register (M2-16) and agent.definition_changed of the
+// definitions of built-in agents (A1-02).
 func TestRegister_Events(t *testing.T) {
 	t.Parallel()
 	r := authorize.NewRegistry()
 	agents.Register(r)
 	got := r.Events()
-	if len(got) != 3 || got[0].Module != "agents" || got[0].Type != authorize.EventAgentPresenceChanged ||
-		got[1].Module != "agents" || got[1].Type != authorize.EventAgentUpdated ||
-		got[2].Module != "agents" || got[2].Type != authorize.EventCommandChanged {
+	want := []authorize.EventType{
+		authorize.EventAgentDefinitionChanged, authorize.EventAgentPresenceChanged, authorize.EventAgentUpdated, authorize.EventCommandChanged,
+	}
+	if len(got) != len(want) {
 		t.Fatalf("events %+v", got)
+	}
+	for i, w := range want {
+		if got[i].Module != "agents" || got[i].Type != w {
+			t.Fatalf("events %+v, want %v", got, want)
+		}
 	}
 }

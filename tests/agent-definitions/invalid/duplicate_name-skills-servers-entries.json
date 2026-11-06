@@ -1,0 +1,102 @@
+{
+  "tool_class": "host",
+  "definition": {
+    "instructions": "You help Alex write release notes for the team.\n",
+    "skills": [
+      {
+        "name": "a",
+        "description": "Writes short notes",
+        "body": "Write short notes.\n",
+        "files": [
+          {
+            "name": "x.md",
+            "content": ""
+          },
+          {
+            "name": "x.md",
+            "content": ""
+          }
+        ]
+      },
+      {
+        "name": "a",
+        "description": "Writes short notes",
+        "body": "Write short notes.\n"
+      }
+    ],
+    "mcp_servers": [
+      {
+        "name": "m",
+        "transport": "http",
+        "url": "https://mcp.example.com/v1"
+      },
+      {
+        "name": "m",
+        "transport": "stdio",
+        "command": "npx",
+        "package": "@example/mcp-files@1.4.2",
+        "env": [
+          {
+            "name": "A",
+            "value": "1"
+          },
+          {
+            "name": "A",
+            "value": "2"
+          }
+        ]
+      },
+      {
+        "name": "n",
+        "transport": "http",
+        "url": "https://mcp.example.com/v1",
+        "headers": [
+          {
+            "name": "X-Team",
+            "value": "1"
+          },
+          {
+            "name": "x-team",
+            "value": "2"
+          }
+        ]
+      }
+    ],
+    "settings": {
+      "tool_class_wish": "chat",
+      "allowed_tools": [
+        "Read",
+        "Read"
+      ]
+    },
+    "origin": {
+      "kind": "manual"
+    }
+  },
+  "expect": [
+    {
+      "pointer": "/skills/0/files/1/name",
+      "code": "duplicate_name"
+    },
+    {
+      "pointer": "/skills/1/name",
+      "code": "duplicate_name"
+    },
+    {
+      "pointer": "/mcp_servers/1/name",
+      "code": "duplicate_name"
+    },
+    {
+      "pointer": "/mcp_servers/1/env/1/name",
+      "code": "duplicate_name"
+    },
+    {
+      "pointer": "/mcp_servers/2/headers/1/name",
+      "code": "duplicate_name"
+    },
+    {
+      "pointer": "/settings/allowed_tools/1",
+      "code": "duplicate_name"
+    }
+  ]
+}

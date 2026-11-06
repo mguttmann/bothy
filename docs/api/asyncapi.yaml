@@ -179,6 +179,8 @@ channels:
         $ref: '#/components/messages/event.command.invoked'
       event.agent.config_changed:
         $ref: '#/components/messages/event.agent.config_changed'
+      event.agent.definition_changed:
+        $ref: '#/components/messages/event.agent.definition_changed'
       event.typing.started:
         $ref: '#/components/messages/event.typing.started'
       event.run.updated:
@@ -738,6 +740,7 @@ operations:
     - $ref: '#/channels/gateway/messages/event.interaction.created'
     - $ref: '#/channels/gateway/messages/event.command.invoked'
     - $ref: '#/channels/gateway/messages/event.agent.config_changed'
+    - $ref: '#/channels/gateway/messages/event.agent.definition_changed'
     - $ref: '#/channels/gateway/messages/event.host.updated'
     - $ref: '#/channels/gateway/messages/event.terminal_session.changed'
     - $ref: '#/channels/gateway/messages/event.typing.started'
@@ -2009,6 +2012,22 @@ components:
             enum: [dispatch]
           d:
             $ref: ./openapi.yaml#/components/schemas/AgentConfigChangedEvent
+      x-audience: self
+    event.agent.definition_changed:
+      name: agent.definition_changed
+      title: dispatch agent.definition_changed
+      summary: Durable event, at least once, in `seq` order.
+      x-event-kind: durable
+      x-receive-action: agent.definition.read
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/AgentDefinitionChangedEvent
       x-audience: self
     event.typing.started:
       name: typing.started

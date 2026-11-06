@@ -1,0 +1,37 @@
+{
+  "tool_class": "chat",
+  "definition": {
+    "instructions": "You help Alex write release notes for the team.\n",
+    "skills": [],
+    "mcp_servers": [
+      {
+        "name": "a",
+        "transport": "stdio",
+        "command": "npx",
+        "package": "@example/mcp-files@1.4.2"
+      },
+      {
+        "name": "b",
+        "transport": "stdio",
+        "command": "npx",
+        "package": "@example/mcp-files@1.4.2"
+      }
+    ],
+    "settings": {
+      "tool_class_wish": "chat"
+    },
+    "origin": {
+      "kind": "manual"
+    }
+  },
+  "expect": [
+    {
+      "pointer": "/mcp_servers/0/transport",
+      "code": "tool_class_too_low"
+    },
+    {
+      "pointer": "/mcp_servers/1/transport",
+      "code": "tool_class_too_low"
+    }
+  ]
+}

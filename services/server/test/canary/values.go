@@ -46,6 +46,11 @@ const (
 	// and in the echo field current of a 412 of putChannelBehavior; never in an event, catch-up
 	// page or snapshot of any observer, readers of the channel and its operator included.
 	ClassManageOnly Class = "manage_only"
+	// ClassDefinition is text of the definition of a built-in agent (A1-02, 26 4.1): readable
+	// only by owners and the agent itself. Allowed only in success bodies of getAgentDefinition
+	// and putAgentDefinition (no sink captures them) and in the echo field current of a 412 of
+	// putAgentDefinition; never in an event, an audit entry, a log line or telemetry.
+	ClassDefinition Class = "definition"
 )
 
 // canaryPrefix starts every generated canary word; canaryHexLen is the number of random

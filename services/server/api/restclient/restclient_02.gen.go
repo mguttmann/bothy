@@ -171,6 +171,38 @@ type ClientInterface interface {
 	// Corresponds with PUT /agents/{agent_id}/credential-holder (the `SetCredentialHolder` operationId).
 	SetCredentialHolder(ctx context.Context, agentId AgentIdPath, params *SetCredentialHolderParams, body SetCredentialHolderJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetAgentDefinition Read the current definition of a built-in agent
+	//
+	// The current (highest) version of the definition of the built-in agent `agent_id` (26 4.1), or with `version` an older one, which the version list offers for undo (26 8.4). The owner reads it, and the agent itself through the hosted connection of its hosting runner, which reads only the current version; another agent and a person who is no owner get the refusal of 07 2.13. A built-in agent without a definition, any other agent and an unknown `version` answer `404`. The definition appears only in this answer, in `putAgentDefinition` and in `current` of its `412`, never in an event, a log line, telemetry or an audit entry. `ETag` is the version of the answer; the `If-Match` of the next `putAgentDefinition` is the current version.
+	//
+	// Corresponds with GET /agents/{agent_id}/definition (the `GetAgentDefinition` operationId).
+	GetAgentDefinition(ctx context.Context, agentId AgentIdPath, params *GetAgentDefinitionParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutAgentDefinitionWithBody Store a new version of the definition of a built-in agent
+	//
+	// Part of `agent.update` (owner, step-up, audit; 26 4.1, R-API-29). Stores the body as the next version of the definition, raises `agents.version` (`agent.updated`) and sends the durable personal event `agent.definition_changed` with `definition_version` only to the agent, all in one transaction. `If-Match` names the current definition version and is absent only for the first version: without it on an existing definition `428 precondition_required`, a stale one `412 version_conflict` with the current definition in `current`. Only a built-in agent (`adapter_kind = 'claude_agent'`) has a definition; another agent answers `409 conflict` with `reason: not_a_builtin_agent`. The server checks the body against 26 4.2 and 4.3 and answers every finding as one `errors[]` entry of `400 validation_failed` with the JSON Pointer and the field code (`unknown_member`, `skill_frontmatter`, `inline_shell`, `import_outside_folder`, `secret_value_not_allowed`, `env_name_reserved`, `mcp_command_not_allowed`, `mcp_package_unpinned`, `tool_class_too_low`, `too_long`, `too_many`, `invalid_name`, `duplicate_name`, and the shape codes of docs/decisions.d/A1-02.md); then it stores nothing. A body equal to the current definition stores no new version. The audit entry names the version and the changed parts, never their text. Undo writes the content of an older version as a new version.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /agents/{agent_id}/definition (the `PutAgentDefinition` operationId).
+	PutAgentDefinitionWithBody(ctx context.Context, agentId AgentIdPath, params *PutAgentDefinitionParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutAgentDefinition Store a new version of the definition of a built-in agent
+	//
+	// Part of `agent.update` (owner, step-up, audit; 26 4.1, R-API-29). Stores the body as the next version of the definition, raises `agents.version` (`agent.updated`) and sends the durable personal event `agent.definition_changed` with `definition_version` only to the agent, all in one transaction. `If-Match` names the current definition version and is absent only for the first version: without it on an existing definition `428 precondition_required`, a stale one `412 version_conflict` with the current definition in `current`. Only a built-in agent (`adapter_kind = 'claude_agent'`) has a definition; another agent answers `409 conflict` with `reason: not_a_builtin_agent`. The server checks the body against 26 4.2 and 4.3 and answers every finding as one `errors[]` entry of `400 validation_failed` with the JSON Pointer and the field code (`unknown_member`, `skill_frontmatter`, `inline_shell`, `import_outside_folder`, `secret_value_not_allowed`, `env_name_reserved`, `mcp_command_not_allowed`, `mcp_package_unpinned`, `tool_class_too_low`, `too_long`, `too_many`, `invalid_name`, `duplicate_name`, and the shape codes of docs/decisions.d/A1-02.md); then it stores nothing. A body equal to the current definition stores no new version. The audit entry names the version and the changed parts, never their text. Undo writes the content of an older version as a new version.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /agents/{agent_id}/definition (the `PutAgentDefinition` operationId).
+	PutAgentDefinition(ctx context.Context, agentId AgentIdPath, params *PutAgentDefinitionParams, body PutAgentDefinitionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListAgentDefinitionVersions List the versions of the definition of a built-in agent
+	//
+	// The stored versions of the definition of the built-in agent `agent_id`, newest first, without the definition text (26 4.1). The version list offers undo: the client reads the content of an older version with `getAgentDefinition` and `version`, and writes it as a new version with `putAgentDefinition` (26 8.4). Permissions as `getAgentDefinition`; a built-in agent without a definition answers an empty list, any other agent `404`.
+	//
+	// Corresponds with GET /agents/{agent_id}/definition/versions (the `ListAgentDefinitionVersions` operationId).
+	ListAgentDefinitionVersions(ctx context.Context, agentId AgentIdPath, params *ListAgentDefinitionVersionsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// DisableAgentWithBody Disable an agent
 	//
 	// Takes any type of body and a specified content type.
@@ -4357,6 +4389,78 @@ func (c *Client) SetCredentialHolderWithBody(ctx context.Context, agentId AgentI
 // Corresponds with PUT /agents/{agent_id}/credential-holder (the `SetCredentialHolder` operationId).
 func (c *Client) SetCredentialHolder(ctx context.Context, agentId AgentIdPath, params *SetCredentialHolderParams, body SetCredentialHolderJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewSetCredentialHolderRequest(c.Server, agentId, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetAgentDefinition Read the current definition of a built-in agent
+//
+// The current (highest) version of the definition of the built-in agent `agent_id` (26 4.1), or with `version` an older one, which the version list offers for undo (26 8.4). The owner reads it, and the agent itself through the hosted connection of its hosting runner, which reads only the current version; another agent and a person who is no owner get the refusal of 07 2.13. A built-in agent without a definition, any other agent and an unknown `version` answer `404`. The definition appears only in this answer, in `putAgentDefinition` and in `current` of its `412`, never in an event, a log line, telemetry or an audit entry. `ETag` is the version of the answer; the `If-Match` of the next `putAgentDefinition` is the current version.
+//
+// Corresponds with GET /agents/{agent_id}/definition (the `GetAgentDefinition` operationId).
+func (c *Client) GetAgentDefinition(ctx context.Context, agentId AgentIdPath, params *GetAgentDefinitionParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetAgentDefinitionRequest(c.Server, agentId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PutAgentDefinitionWithBody Store a new version of the definition of a built-in agent
+//
+// Part of `agent.update` (owner, step-up, audit; 26 4.1, R-API-29). Stores the body as the next version of the definition, raises `agents.version` (`agent.updated`) and sends the durable personal event `agent.definition_changed` with `definition_version` only to the agent, all in one transaction. `If-Match` names the current definition version and is absent only for the first version: without it on an existing definition `428 precondition_required`, a stale one `412 version_conflict` with the current definition in `current`. Only a built-in agent (`adapter_kind = 'claude_agent'`) has a definition; another agent answers `409 conflict` with `reason: not_a_builtin_agent`. The server checks the body against 26 4.2 and 4.3 and answers every finding as one `errors[]` entry of `400 validation_failed` with the JSON Pointer and the field code (`unknown_member`, `skill_frontmatter`, `inline_shell`, `import_outside_folder`, `secret_value_not_allowed`, `env_name_reserved`, `mcp_command_not_allowed`, `mcp_package_unpinned`, `tool_class_too_low`, `too_long`, `too_many`, `invalid_name`, `duplicate_name`, and the shape codes of docs/decisions.d/A1-02.md); then it stores nothing. A body equal to the current definition stores no new version. The audit entry names the version and the changed parts, never their text. Undo writes the content of an older version as a new version.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /agents/{agent_id}/definition (the `PutAgentDefinition` operationId).
+func (c *Client) PutAgentDefinitionWithBody(ctx context.Context, agentId AgentIdPath, params *PutAgentDefinitionParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPutAgentDefinitionRequestWithBody(c.Server, agentId, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PutAgentDefinition Store a new version of the definition of a built-in agent
+//
+// Part of `agent.update` (owner, step-up, audit; 26 4.1, R-API-29). Stores the body as the next version of the definition, raises `agents.version` (`agent.updated`) and sends the durable personal event `agent.definition_changed` with `definition_version` only to the agent, all in one transaction. `If-Match` names the current definition version and is absent only for the first version: without it on an existing definition `428 precondition_required`, a stale one `412 version_conflict` with the current definition in `current`. Only a built-in agent (`adapter_kind = 'claude_agent'`) has a definition; another agent answers `409 conflict` with `reason: not_a_builtin_agent`. The server checks the body against 26 4.2 and 4.3 and answers every finding as one `errors[]` entry of `400 validation_failed` with the JSON Pointer and the field code (`unknown_member`, `skill_frontmatter`, `inline_shell`, `import_outside_folder`, `secret_value_not_allowed`, `env_name_reserved`, `mcp_command_not_allowed`, `mcp_package_unpinned`, `tool_class_too_low`, `too_long`, `too_many`, `invalid_name`, `duplicate_name`, and the shape codes of docs/decisions.d/A1-02.md); then it stores nothing. A body equal to the current definition stores no new version. The audit entry names the version and the changed parts, never their text. Undo writes the content of an older version as a new version.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /agents/{agent_id}/definition (the `PutAgentDefinition` operationId).
+func (c *Client) PutAgentDefinition(ctx context.Context, agentId AgentIdPath, params *PutAgentDefinitionParams, body PutAgentDefinitionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPutAgentDefinitionRequest(c.Server, agentId, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListAgentDefinitionVersions List the versions of the definition of a built-in agent
+//
+// The stored versions of the definition of the built-in agent `agent_id`, newest first, without the definition text (26 4.1). The version list offers undo: the client reads the content of an older version with `getAgentDefinition` and `version`, and writes it as a new version with `putAgentDefinition` (26 8.4). Permissions as `getAgentDefinition`; a built-in agent without a definition answers an empty list, any other agent `404`.
+//
+// Corresponds with GET /agents/{agent_id}/definition/versions (the `ListAgentDefinitionVersions` operationId).
+func (c *Client) ListAgentDefinitionVersions(ctx context.Context, agentId AgentIdPath, params *ListAgentDefinitionVersionsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListAgentDefinitionVersionsRequest(c.Server, agentId, params)
 	if err != nil {
 		return nil, err
 	}
@@ -13659,6 +13763,202 @@ func NewSetCredentialHolderRequestWithBody(server string, agentId AgentIdPath, p
 
 		req.Header.Set("If-Match", headerParam0)
 
+	}
+
+	return req, nil
+}
+
+// NewGetAgentDefinitionRequest constructs an http.Request for the GetAgentDefinition method
+func NewGetAgentDefinitionRequest(server string, agentId AgentIdPath, params *GetAgentDefinitionParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "agent_id", agentId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/agents/%s/definition", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Version != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "version", *params.Version, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: "int64"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPutAgentDefinitionRequest calls the generic PutAgentDefinition builder with application/json body
+func NewPutAgentDefinitionRequest(server string, agentId AgentIdPath, params *PutAgentDefinitionParams, body PutAgentDefinitionJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPutAgentDefinitionRequestWithBody(server, agentId, params, "application/json", bodyReader)
+}
+
+// NewPutAgentDefinitionRequestWithBody constructs an http.Request for the PutAgentDefinition method, with any body, and a specified content type
+func NewPutAgentDefinitionRequestWithBody(server string, agentId AgentIdPath, params *PutAgentDefinitionParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "agent_id", agentId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/agents/%s/definition", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewListAgentDefinitionVersionsRequest constructs an http.Request for the ListAgentDefinitionVersions method
+func NewListAgentDefinitionVersionsRequest(server string, agentId AgentIdPath, params *ListAgentDefinitionVersionsParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "agent_id", agentId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/agents/%s/definition/versions", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Cursor != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
 	}
 
 	return req, nil
@@ -23029,675 +23329,4 @@ func NewCreateQuietHoursRuleRequest(server string, params *CreateQuietHoursRuleP
 	}
 	bodyReader = bytes.NewReader(buf)
 	return NewCreateQuietHoursRuleRequestWithBody(server, params, "application/json", bodyReader)
-}
-
-// NewCreateQuietHoursRuleRequestWithBody constructs an http.Request for the CreateQuietHoursRule method, with any body, and a specified content type
-func NewCreateQuietHoursRuleRequestWithBody(server string, params *CreateQuietHoursRuleParams, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/me/quiet-hours")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
-	}
-
-	return req, nil
-}
-
-// NewDeleteQuietHoursRuleRequest constructs an http.Request for the DeleteQuietHoursRule method
-func NewDeleteQuietHoursRuleRequest(server string, ruleId RuleIdPath) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "rule_id", ruleId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/me/quiet-hours/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewPutQuietHoursRuleRequest calls the generic PutQuietHoursRule builder with application/json body
-func NewPutQuietHoursRuleRequest(server string, ruleId RuleIdPath, body PutQuietHoursRuleJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewPutQuietHoursRuleRequestWithBody(server, ruleId, "application/json", bodyReader)
-}
-
-// NewPutQuietHoursRuleRequestWithBody constructs an http.Request for the PutQuietHoursRule method, with any body, and a specified content type
-func NewPutQuietHoursRuleRequestWithBody(server string, ruleId RuleIdPath, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "rule_id", ruleId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/me/quiet-hours/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewListMyReadStatesRequest constructs an http.Request for the ListMyReadStates method
-func NewListMyReadStatesRequest(server string, params *ListMyReadStatesParams) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/me/read-states")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-		// queryValues collects non-styled parameters (passthrough, JSON)
-		// that are safe to round-trip through url.Values.Encode().
-		queryValues := queryURL.Query()
-		// rawQueryFragments collects pre-encoded query fragments from
-		// styled parameters, preserving literal commas as delimiters
-		// per the OpenAPI spec (e.g. "color=blue,black,brown").
-		var rawQueryFragments []string
-
-		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "channel_id", params.ChannelId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
-			return nil, err
-		} else {
-			for _, qp := range strings.Split(queryFrag, "&") {
-				rawQueryFragments = append(rawQueryFragments, qp)
-			}
-		}
-
-		if encoded := queryValues.Encode(); encoded != "" {
-			rawQueryFragments = append(rawQueryFragments, encoded)
-		}
-		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewListMySessionsRequest constructs an http.Request for the ListMySessions method
-func NewListMySessionsRequest(server string, params *ListMySessionsParams) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/me/sessions")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-		// queryValues collects non-styled parameters (passthrough, JSON)
-		// that are safe to round-trip through url.Values.Encode().
-		queryValues := queryURL.Query()
-		// rawQueryFragments collects pre-encoded query fragments from
-		// styled parameters, preserving literal commas as delimiters
-		// per the OpenAPI spec (e.g. "color=blue,black,brown").
-		var rawQueryFragments []string
-
-		if params.Cursor != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if params.Limit != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if encoded := queryValues.Encode(); encoded != "" {
-			rawQueryFragments = append(rawQueryFragments, encoded)
-		}
-		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewCreateExtensionSessionRequest calls the generic CreateExtensionSession builder with application/json body
-func NewCreateExtensionSessionRequest(server string, body CreateExtensionSessionJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewCreateExtensionSessionRequestWithBody(server, "application/json", bodyReader)
-}
-
-// NewCreateExtensionSessionRequestWithBody constructs an http.Request for the CreateExtensionSession method, with any body, and a specified content type
-func NewCreateExtensionSessionRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/me/sessions/extensions")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewListMySettingsRequest constructs an http.Request for the ListMySettings method
-func NewListMySettingsRequest(server string) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/me/settings")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewDeleteMySettingRequest constructs an http.Request for the DeleteMySetting method
-func NewDeleteMySettingRequest(server string, key KeyPath) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "key", key, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/me/settings/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewPutMySettingRequest calls the generic PutMySetting builder with application/json body
-func NewPutMySettingRequest(server string, key KeyPath, body PutMySettingJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewPutMySettingRequestWithBody(server, key, "application/json", bodyReader)
-}
-
-// NewPutMySettingRequestWithBody constructs an http.Request for the PutMySetting method, with any body, and a specified content type
-func NewPutMySettingRequestWithBody(server string, key KeyPath, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "key", key, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/me/settings/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewGetMySidebarRequest constructs an http.Request for the GetMySidebar method
-func NewGetMySidebarRequest(server string) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/me/sidebar")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewPutMySidebarChannelRequest calls the generic PutMySidebarChannel builder with application/json body
-func NewPutMySidebarChannelRequest(server string, channelId ChannelIdPath, body PutMySidebarChannelJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewPutMySidebarChannelRequestWithBody(server, channelId, "application/json", bodyReader)
-}
-
-// NewPutMySidebarChannelRequestWithBody constructs an http.Request for the PutMySidebarChannel method, with any body, and a specified content type
-func NewPutMySidebarChannelRequestWithBody(server string, channelId ChannelIdPath, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "channel_id", channelId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/me/sidebar/channels/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewPutMySidebarSpaceRequest calls the generic PutMySidebarSpace builder with application/json body
-func NewPutMySidebarSpaceRequest(server string, spaceId SpaceIdPath, body PutMySidebarSpaceJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewPutMySidebarSpaceRequestWithBody(server, spaceId, "application/json", bodyReader)
-}
-
-// NewPutMySidebarSpaceRequestWithBody constructs an http.Request for the PutMySidebarSpace method, with any body, and a specified content type
-func NewPutMySidebarSpaceRequestWithBody(server string, spaceId SpaceIdPath, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "space_id", spaceId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/me/sidebar/spaces/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewListMyTemplatesRequest constructs an http.Request for the ListMyTemplates method
-func NewListMyTemplatesRequest(server string) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/me/templates")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewCreatePersonalTemplateRequest calls the generic CreatePersonalTemplate builder with application/json body
-func NewCreatePersonalTemplateRequest(server string, params *CreatePersonalTemplateParams, body CreatePersonalTemplateJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewCreatePersonalTemplateRequestWithBody(server, params, "application/json", bodyReader)
-}
-
-// NewCreatePersonalTemplateRequestWithBody constructs an http.Request for the CreatePersonalTemplate method, with any body, and a specified content type
-func NewCreatePersonalTemplateRequestWithBody(server string, params *CreatePersonalTemplateParams, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/me/templates")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
-	}
-
-	return req, nil
-}
-
-// NewDeleteMessageRequest constructs an http.Request for the DeleteMessage method
-func NewDeleteMessageRequest(server string, messageId MessageIdPath) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "message_id", messageId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/messages/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewGetMessageRequest constructs an http.Request for the GetMessage method
-func NewGetMessageRequest(server string, messageId MessageIdPath) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "message_id", messageId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/messages/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewUpdateMessageRequest calls the generic UpdateMessage builder with application/json body
-func NewUpdateMessageRequest(server string, messageId MessageIdPath, params *UpdateMessageParams, body UpdateMessageJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewUpdateMessageRequestWithBody(server, messageId, params, "application/json", bodyReader)
 }

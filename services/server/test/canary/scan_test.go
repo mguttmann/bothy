@@ -246,3 +246,34 @@ func TestSEC_T10_ScanAllowMatrixManageOnly(t *testing.T) {
 		}
 	}
 }
+
+// TestSEC_T10_ScanAllowMatrixDefinition: the rows of the class definition (A1-02, 26 4.1): text
+// of the definition of a built-in agent is a finding in every sink, the events of the agent
+// itself included, and allowed only in current of a 412 of putAgentDefinition.
+func TestSEC_T10_ScanAllowMatrixDefinition(t *testing.T) {
+	reg := NewRegistry()
+	text := reg.New(ClassDefinition, "", "definition instructions")
+	rules := AllowRules{Readable: map[string]map[string]bool{"Alex": {}}}
+	cases := []struct {
+		name               string
+		sink, viewer, loc  string
+		operation          string
+		echo, wantFindings bool
+	}{
+		{"log", SinkLog, "", "/msg", "", false, true},
+		{"trace", SinkTrace, "", "/attr", "", false, true},
+		{"metric", SinkMetric, "", "/attr", "", false, true},
+		{"audit details", SinkAudit, "", "/details/changed_parts", "", false, true},
+		{"event frame of an observer", SinkForeign, "Alex", "/d/payload", "", false, true},
+		{"error detail", SinkError, "", "/body/detail", opPutAgentDefinition, false, true},
+		{"current of putChannelBehavior", SinkError, "", "/body/current/prompt", opPutChannelBehavior, true, true},
+		{"current of putAgentDefinition", SinkError, "", "/body/current/definition/instructions", opPutAgentDefinition, true, false},
+	}
+	for _, c := range cases {
+		s := NewSinks()
+		s.Add(Record{Sink: c.sink, Viewer: c.viewer, Operation: c.operation, Fields: []Field{{Location: c.loc, Text: "x " + text + " y", Echo: c.echo}}})
+		if got := Scan(reg, s, rules); (len(got) > 0) != c.wantFindings {
+			t.Errorf("%s: findings %v, want findings=%v", c.name, got, c.wantFindings)
+		}
+	}
+}

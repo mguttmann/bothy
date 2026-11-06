@@ -1,0 +1,26 @@
+{
+  "tool_class": "chat",
+  "definition": {
+    "instructions": "You help Alex write release notes for the team.\n",
+    "skills": [],
+    "mcp_servers": [],
+    "settings": {
+      "tool_class_wish": "chat"
+    },
+    "origin": {
+      "kind": "manual"
+    },
+    "a/b": 1,
+    "c~d": 2
+  },
+  "expect": [
+    {
+      "pointer": "/a~1b",
+      "code": "unknown_member"
+    },
+    {
+      "pointer": "/c~0d",
+      "code": "unknown_member"
+    }
+  ]
+}

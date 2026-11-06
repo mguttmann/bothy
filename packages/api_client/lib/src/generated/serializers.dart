@@ -33,6 +33,17 @@ import 'package:api_client/src/generated/model/agent_channel_config_list.dart';
 import 'package:api_client/src/generated/model/agent_config_changed_event.dart';
 import 'package:api_client/src/generated/model/agent_config_changed_payload.dart';
 import 'package:api_client/src/generated/model/agent_create.dart';
+import 'package:api_client/src/generated/model/agent_definition.dart';
+import 'package:api_client/src/generated/model/agent_definition_changed_event.dart';
+import 'package:api_client/src/generated/model/agent_definition_changed_payload.dart';
+import 'package:api_client/src/generated/model/agent_definition_entry.dart';
+import 'package:api_client/src/generated/model/agent_definition_mcp_server.dart';
+import 'package:api_client/src/generated/model/agent_definition_origin.dart';
+import 'package:api_client/src/generated/model/agent_definition_settings.dart';
+import 'package:api_client/src/generated/model/agent_definition_skill.dart';
+import 'package:api_client/src/generated/model/agent_definition_skill_file.dart';
+import 'package:api_client/src/generated/model/agent_definition_version.dart';
+import 'package:api_client/src/generated/model/agent_definition_version_page.dart';
 import 'package:api_client/src/generated/model/agent_followup_event.dart';
 import 'package:api_client/src/generated/model/agent_followup_payload.dart';
 import 'package:api_client/src/generated/model/agent_invocation_event.dart';
@@ -669,6 +680,17 @@ part 'serializers.g.dart';
   AgentConfigChangedEvent,
   AgentConfigChangedPayload,
   AgentCreate,
+  AgentDefinition,
+  AgentDefinitionChangedEvent,
+  AgentDefinitionChangedPayload,
+  AgentDefinitionEntry,
+  AgentDefinitionMcpServer,
+  AgentDefinitionOrigin,
+  AgentDefinitionSettings,
+  AgentDefinitionSkill,
+  AgentDefinitionSkillFile,
+  AgentDefinitionVersion,
+  AgentDefinitionVersionPage,
   AgentFollowupEvent,
   AgentFollowupPayload,
   AgentInvocationEvent,
@@ -1292,6 +1314,14 @@ Serializers serializers =
             () => ListBuilder<UploadPart>(),
           )
           ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(AgentDefinitionVersion)]),
+            () => ListBuilder<AgentDefinitionVersion>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(AgentDefinitionSkillFile)]),
+            () => ListBuilder<AgentDefinitionSkillFile>(),
+          )
+          ..addBuilderFactory(
             const FullType(BuiltList, [FullType(ReconcileEntry)]),
             () => ListBuilder<ReconcileEntry>(),
           )
@@ -1647,6 +1677,10 @@ Serializers serializers =
             () => ListBuilder<SidebarState>(),
           )
           ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(AgentDefinitionSkill)]),
+            () => ListBuilder<AgentDefinitionSkill>(),
+          )
+          ..addBuilderFactory(
             const FullType(BuiltList, [FullType(RunContextAttachment)]),
             () => ListBuilder<RunContextAttachment>(),
           )
@@ -1677,6 +1711,10 @@ Serializers serializers =
           ..addBuilderFactory(
             const FullType(BuiltList, [FullType(ProjectFolder)]),
             () => ListBuilder<ProjectFolder>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(AgentDefinitionMcpServer)]),
+            () => ListBuilder<AgentDefinitionMcpServer>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, [FullType(AccessTarget)]),
@@ -1723,6 +1761,10 @@ Serializers serializers =
           ..addBuilderFactory(
             const FullType(BuiltList, [FullType(UserSetting)]),
             () => ListBuilder<UserSetting>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(AgentDefinitionEntry)]),
+            () => ListBuilder<AgentDefinitionEntry>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, [FullType(ImportSource)]),

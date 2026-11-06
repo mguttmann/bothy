@@ -1,0 +1,96 @@
+{
+  "tool_class": "host",
+  "definition": {
+    "instructions": "You help Alex write release notes for the team.\n",
+    "skills": [],
+    "mcp_servers": [
+      {
+        "name": "a",
+        "transport": "stdio",
+        "command": "npx",
+        "package": "@example/mcp-files@^1.4.2"
+      },
+      {
+        "name": "b",
+        "transport": "stdio",
+        "command": "npx",
+        "package": "mcp-files@latest"
+      },
+      {
+        "name": "c",
+        "transport": "stdio",
+        "command": "npx",
+        "package": "mcp-files"
+      },
+      {
+        "name": "d",
+        "transport": "stdio",
+        "command": "npx",
+        "package": "mcp-files@1.x"
+      },
+      {
+        "name": "e",
+        "transport": "stdio",
+        "command": "npx",
+        "package": "mcp-files@>=1.0.0"
+      },
+      {
+        "name": "f",
+        "transport": "stdio",
+        "command": "npx",
+        "package": "--from=git+https://example.com/x@1.0.0"
+      },
+      {
+        "name": "g",
+        "transport": "stdio",
+        "command": "uvx"
+      },
+      {
+        "name": "h",
+        "transport": "stdio",
+        "command": "npx",
+        "package": "mcp-files@1.2"
+      }
+    ],
+    "settings": {
+      "tool_class_wish": "chat"
+    },
+    "origin": {
+      "kind": "manual"
+    }
+  },
+  "expect": [
+    {
+      "pointer": "/mcp_servers/0/package",
+      "code": "mcp_package_unpinned"
+    },
+    {
+      "pointer": "/mcp_servers/1/package",
+      "code": "mcp_package_unpinned"
+    },
+    {
+      "pointer": "/mcp_servers/2/package",
+      "code": "mcp_package_unpinned"
+    },
+    {
+      "pointer": "/mcp_servers/3/package",
+      "code": "mcp_package_unpinned"
+    },
+    {
+      "pointer": "/mcp_servers/4/package",
+      "code": "mcp_package_unpinned"
+    },
+    {
+      "pointer": "/mcp_servers/5/package",
+      "code": "mcp_package_unpinned"
+    },
+    {
+      "pointer": "/mcp_servers/6/package",
+      "code": "mcp_package_unpinned"
+    },
+    {
+      "pointer": "/mcp_servers/7/package",
+      "code": "mcp_package_unpinned"
+    }
+  ]
+}

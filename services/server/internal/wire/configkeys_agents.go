@@ -35,6 +35,33 @@ func agentsConfigKeys() []config.Key {
 	}
 }
 
+// agentDefinitionConfigKeys returns the keys of the definitions of built-in agents from
+// docs/spec/26-builtin-agents.md "Configuration values of this chapter" that the server reads so far
+// (A1-02): the limits of agent_definition.v1 and the commands of a stdio MCP server. The maxima
+// keep a definition far below the JSON body limit of a request; zero for a count allows none.
+func agentDefinitionConfigKeys() []config.Key {
+	return []config.Key{
+		{Name: "agents.definition.instructions_max_bytes", Kind: config.KindInt, Default: "65536", Min: "1", Max: "1048576", Chapter: chapter26,
+			Doc: "Longest instructions of a definition of a built-in agent in bytes."},
+		{Name: "agents.definition.max_skills", Kind: config.KindInt, Default: "32", Min: "0", Max: "1024", Chapter: chapter26,
+			Doc: "Most skills of a definition."},
+		{Name: "agents.definition.skill_description_max_chars", Kind: config.KindInt, Default: "300", Min: "1", Max: "4096", Chapter: chapter26,
+			Doc: "Longest skill description in characters; it is one line."},
+		{Name: "agents.definition.skill_body_max_bytes", Kind: config.KindInt, Default: "65536", Min: "1", Max: "1048576", Chapter: chapter26,
+			Doc: "Longest skill body and extra skill file in bytes."},
+		{Name: "agents.definition.max_skill_files", Kind: config.KindInt, Default: "8", Min: "0", Max: "256", Chapter: chapter26,
+			Doc: "Most extra files of one skill."},
+		{Name: "agents.definition.max_mcp_servers", Kind: config.KindInt, Default: "16", Min: "0", Max: "256", Chapter: chapter26,
+			Doc: "Most MCP servers of a definition."},
+		{Name: "agents.definition.max_allowed_tools", Kind: config.KindInt, Default: "64", Min: "0", Max: "1024", Chapter: chapter26,
+			Doc: "Most entries of settings.allowed_tools of a definition."},
+		{Name: "agents.definition.max_cost_usd_per_run", Kind: config.KindFloat, Default: "50", Min: "0", Chapter: chapter26,
+			Doc: "Highest cost cap per run in USD that a definition may set."},
+		{Name: "agents.mcp_stdio_runners", Kind: config.KindStringList, Default: `["npx", "uvx"]`, Chapter: chapter26,
+			Doc: "Commands a stdio MCP server of a definition may use."},
+	}
+}
+
 // keyPresenceTimeout is agent.presence_timeout, which the cross-check
 // presence_timeout_above_heartbeat_interval compares with sync.heartbeat_interval.
 const keyPresenceTimeout = "agent.presence_timeout"

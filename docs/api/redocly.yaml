@@ -82,6 +82,7 @@ rules:
         - agent.config.read
         - agent.create
         - agent.credential_holder.set
+        - agent.definition.read
         - agent.disable
         - agent.enable
         - agent.events.consume
@@ -351,6 +352,7 @@ rules:
         - agent.config.read
         - agent.create
         - agent.credential_holder.set
+        - agent.definition.read
         - agent.disable
         - agent.enable
         - agent.events.consume

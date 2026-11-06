@@ -15,6 +15,7 @@ var catalogEntries = []CatalogEntry{
 	{ID: "agent.config.read", Right: "agent-self and effective operator", RateLimitClass: "rl.read"},
 	{ID: "agent.create", Right: "owner", RateLimitClass: "rl.admin"},
 	{ID: "agent.credential_holder.set", Right: "owner", RateLimitClass: "rl.admin"},
+	{ID: "agent.definition.read", Right: "owner or agent-self", RateLimitClass: "rl.read"},
 	{ID: "agent.disable", Right: "owner", RateLimitClass: "rl.admin"},
 	{ID: "agent.enable", Right: "owner", RateLimitClass: "rl.admin"},
 	{ID: "agent.events.consume", Right: "agent-self", RateLimitClass: "rl.agent_runtime"},

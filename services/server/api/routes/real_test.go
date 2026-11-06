@@ -897,6 +897,18 @@ func (stubServer) ListAgentProjectFolders(context.Context, rest.ListAgentProject
 	return nil, nil
 }
 
+func (stubServer) GetAgentDefinition(context.Context, rest.GetAgentDefinitionRequestObject) (rest.GetAgentDefinitionResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) ListAgentDefinitionVersions(context.Context, rest.ListAgentDefinitionVersionsRequestObject) (rest.ListAgentDefinitionVersionsResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) PutAgentDefinition(context.Context, rest.PutAgentDefinitionRequestObject) (rest.PutAgentDefinitionResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) ListAgentSessions(context.Context, rest.ListAgentSessionsRequestObject) (rest.ListAgentSessionsResponseObject, error) {
 	return nil, nil
 }
@@ -1415,6 +1427,10 @@ func TestRealTable_Enabled(t *testing.T) {
 		"setAgentToolClass":       {"PUT /api/v1/agents/{agent_id}/tool-class", "agent.tool_class.set", "rl.admin"},
 		// M4-44
 		"listAgentProjectFolders": {"GET /api/v1/agents/{agent_id}/project-folders", "agent.project_folders.read", "rl.read"},
+		// A1-02
+		"getAgentDefinition":          {"GET /api/v1/agents/{agent_id}/definition", "agent.definition.read", "rl.read"},
+		"listAgentDefinitionVersions": {"GET /api/v1/agents/{agent_id}/definition/versions", "agent.definition.read", "rl.read"},
+		"putAgentDefinition":          {"PUT /api/v1/agents/{agent_id}/definition", "agent.update", "rl.admin"},
 		// M2-07
 		"getConsumerState": {"GET /api/v1/agents/me/consumers/{consumer}", "agent.events.consume", "rl.agent_runtime"},
 		"pollAgentEvents":  {"GET /api/v1/agents/me/consumers/{consumer}/events", "agent.events.consume", "rl.agent_runtime"},
