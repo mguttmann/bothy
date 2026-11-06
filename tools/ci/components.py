@@ -72,6 +72,11 @@ GATE_COMPONENT_INPUTS: dict[str, tuple[str, ...]] = {
     # services/server/api/generate.go: route table and action catalogue of the server.
     "server": (
         "docs/spec/actions.yaml",
+        # Tests of the server read these files: the deferred lines of the agent registry, the
+        # brand rules (ADR 0044) and the signal catalogue (DOCS_READ below).
+        "docs/PLAN.md",
+        "docs/adr/0044-working-name-and-branding-as-configuration.md",
+        "docs/observability/signals.md",
         # services/server/internal/kernel/designkeys: go generate and its tests read the tokens.
         "design/build/tokens.resolved.json",
         # services/server/test/guide runs the guide against a fresh server and reads its step
@@ -82,28 +87,64 @@ GATE_COMPONENT_INPUTS: dict[str, tuple[str, ...]] = {
     ),
     # The guide shows the example adapter of the Python SDK, whose tests and lint gates run
     # with the SDK's (M2-37).
-    "sdk-python": ("docs/guides/connect-agent.md", "docs/spec/11-extensions.md"),
+    "sdk-python": (
+        "docs/guides/connect-agent.md",
+        "docs/spec/11-extensions.md",
+        # The settings and the component catalogue of the SDKs are held to these files.
+        "docs/operations/configuration.md",
+        "docs/spec/09-agents.md",
+    ),
+    "sdk-typescript": ("docs/operations/configuration.md", "docs/spec/09-agents.md"),
     # Chapter 09 is the contract of the adapters under plugins/; its section 17.10 is bound to the
     # recording evidence of plugins/hermes-adapter by the offline fixture tests.
     # The unit tests of plugins/grafana-bothy-live hold its dashboard to queries.yaml and its
     # Grafana pin to the Compose stack (M7-25).
     "plugins": (
         "docs/spec/09-agents.md",
+        # The manifests and settings of the apps are held to chapter 11, the configuration
+        # reference and the coverage floor of chapter 23.
+        "docs/spec/11-extensions.md",
+        "docs/spec/23-quality.md",
+        "docs/operations/configuration.md",
         "infra/observability/grafana/dashboards/bothy-live.json",
         "infra/compose/compose.yaml",
         "infra/compose/.env.example",
     ),
     # The root files of the Dart workspace: manifest with the Flutter pin, the one lock file and
     # the shared analysis rules (docs/DECISIONS.md D-M4-01-8).
-    "apps": ("pubspec.yaml", "pubspec.lock", "analysis_options.yaml"),
+    "apps": (
+        "pubspec.yaml",
+        "pubspec.lock",
+        "analysis_options.yaml",
+        # Tests of the Dart workspace read these files (DOCS_READ below).
+        "docs/operations/configuration.md",
+        "docs/adr/0044-working-name-and-branding-as-configuration.md",
+        "docs/observability/signals.md",
+        "docs/quality/accessibility-mobile.md",
+    ),
 }
 # Directories outside a component whose files feed its generated code: the SLI bounds generator
 # and the Sloth files it reads write services/server/internal/stats/domain/slibounds.gen.go and
 # packages/bothy_viz/lib/src/slo/slo_catalog.g.dart (brief M6-11); their checks `sli-bounds`
 # and `sli-labels` run in `make ops-check`, the generated files in the Go and Dart gates.
+#
+# DOCS_READ (CI-SPLIT-MERGE-QUEUE D-CSMQ-7): a file under docs/ that a test, build or generator
+# of a component reads is an input of that component, so a pull request that changes only it
+# still runs that component's jobs. The specification is read chapter by chapter by name and as
+# a whole (`docs/spec/$name`, the term table of packages/l10n), the operations guides by the
+# server's tests. tools/ci/tests/test_components.py scans the code of every component for the
+# docs paths it names and fails while one is missing here or in GATE_COMPONENT_INPUTS. Every
+# other file under docs/ (decisions, briefs, design notes, architecture, guides) and the site
+# configuration mkdocs.yml feed only the docs gates and the tools tests, which run on every
+# change: a pull request of only those runs no conditional job.
 GATE_COMPONENT_INPUT_PREFIXES: dict[str, tuple[str, ...]] = {
-    "server": ("tools/observability/", "infra/observability/slo/"),
-    "apps": ("tools/observability/", "infra/observability/slo/"),
+    "server": (
+        "tools/observability/",
+        "infra/observability/slo/",
+        "docs/spec/",
+        "docs/operations/",
+    ),
+    "apps": ("tools/observability/", "infra/observability/slo/", "docs/spec/"),
     # The panel plugin imports the TypeScript tokens and bundles their fonts (M7-24, M7-25). The
     # Hermes adapter imports the Python SDK from its source tree (M2-33), so an SDK change runs
     # the adapter's tests too.
@@ -163,7 +204,9 @@ TOOL_COMPONENTS: dict[str, tuple[str, ...]] = {
 SHARED_TOOL_FOLDERS = ("bin", "ci", "console-e2e", "hooks", "node")
 # Areas without component gates; their repository-wide gates always run.
 NO_COMPONENT_PREFIXES = ("docs/", "infra/")
-NO_COMPONENT_ROOT_FILES = re.compile(r"^[^/]+\.md$|^(?:LICENSE|NOTICE)$")
+# mkdocs.yml configures the documentation site: `make docs` (job gates (docs and contracts)) and
+# the tools tests read it, and the guide test of the server only looks for it to find the root.
+NO_COMPONENT_ROOT_FILES = re.compile(r"^[^/]+\.md$|^(?:LICENSE|NOTICE|mkdocs\.yml)$")
 
 # Source files of a component (component directory and source suffix). A push of only these
 # leaves the tools gates out of the pre-push plan (tools/hooks/push_plan.py), except the tools

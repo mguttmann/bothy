@@ -61,18 +61,21 @@ import pytest
         (["sdk/testdata/tolerance/unknown_field.json"], ["sdk-python", "sdk-typescript"]),
         (["docs/api/openapi.yaml"], ["apps", "plugins", "sdk-python", "sdk-typescript", "server"]),
         # The server generates its route table and action catalogue from the action catalogue
-        # (services/server/api/generate.go); `make catalog` also rewrites chapter 05.
-        (["docs/spec/actions.yaml"], ["server"]),
-        (["docs/spec/actions.yaml", "docs/spec/05-actions.md"], ["server"]),
-        (["docs/spec/05-actions.md"], []),
+        # (services/server/api/generate.go); the tests of both read the chapters of the
+        # specification (D-CSMQ-7).
+        (["docs/spec/actions.yaml"], ["apps", "server"]),
+        (["docs/spec/actions.yaml", "docs/spec/05-actions.md"], ["apps", "server"]),
+        (["docs/spec/05-actions.md"], ["apps", "server"]),
+        (["docs/decisions.d/M2-48.md"], []),
+        (["mkdocs.yml"], []),
         # The terminal suite of the server starts the Compose stack with its test overlays and
         # the collector configuration, so infra/compose/ and infra/otel/ run the server gates
         # (brief M2-48 Design note 14).
         (
-            ["docs/spec/07-permissions.md", "infra/compose/compose.yaml", "README.md"],
+            ["docs/design/palette.md", "infra/compose/compose.yaml", "README.md"],
             ["plugins", "server"],
         ),
-        (["docs/spec/07-permissions.md", "infra/compose/secrets.yaml", "README.md"], ["server"]),
+        (["docs/design/palette.md", "infra/compose/secrets.yaml", "README.md"], ["server"]),
         (["infra/compose/test/compose.terminal.yaml"], ["server"]),
         (["infra/otel/collector.yaml"], ["server"]),
         # The panel plugin reads the TypeScript tokens, its dashboard and the Grafana pin (M7-25).
@@ -80,10 +83,10 @@ import pytest
         (["infra/observability/grafana/dashboards/bothy-live.json"], ["plugins"]),
         (["infra/observability/grafana/dashboards/push.json"], []),
         # Chapter 09 is the contract of the adapters; its 17.10 is bound to their evidence.
-        (["docs/spec/09-agents.md"], ["plugins"]),
+        (["docs/spec/09-agents.md"], ["apps", "plugins", "sdk-python", "sdk-typescript", "server"]),
         # The guide's check run is a server test; its example belongs to the Python SDK (M2-37).
         (["docs/guides/connect-agent.md"], ["sdk-python", "server"]),
-        (["docs/spec/11-extensions.md"], ["sdk-python", "server"]),
+        (["docs/spec/11-extensions.md"], ["apps", "plugins", "sdk-python", "server"]),
         (["sdk/python/examples/guide/agent.py"], ["plugins", "sdk-python", "server"]),
         # The SLI bounds generator and the Sloth files feed generated files of the server and
         # of bothy_viz (brief M6-11); infra/ outside slo/ selects nothing.
@@ -317,7 +320,7 @@ EVERY_JOB = set(components.CONDITIONAL_JOBS) - TRIALS - HOST_TRIALS - MOBILE
         (["services/server/cmd/bothy/main.go"], TESTS_SERVER | CONSOLE | SDK),
         (["services/server/test/appsworld/scenarios_api.go"], TESTS_SERVER | SDK),
         (["services/host/internal/noise/noise.go"], TESTS_SERVER | HOST_TRIALS),
-        (["docs/spec/actions.yaml"], TESTS_SERVER),
+        (["docs/spec/actions.yaml"], TESTS_SERVER | {"test-apps"}),
         # Members of the Dart workspace (with their native code) and its root files run the
         # platform jobs; inputs of generated Dart files that are committed under packages/ do not.
         (["apps/client/lib/main.dart"], {"test-apps"} | PLATFORM),
@@ -341,8 +344,10 @@ EVERY_JOB = set(components.CONDITIONAL_JOBS) - TRIALS - HOST_TRIALS - MOBILE
         (["sdk/typescript/src/x.ts"], SDK),
         (["plugins/hermes-adapter/x.py"], SDK),
         (["plugins/hermes-adapter/pyproject.toml"], SDK),
-        # Documentation needs no conditional job; test (tools) runs on every change.
-        (["docs/spec/07-permissions.md"], set()),
+        # Documentation that no component reads needs no conditional job; test (tools) runs on
+        # every change (D-CSMQ-7).
+        (["docs/decisions.d/M2-48.md"], set()),
+        (["docs/spec/07-permissions.md"], TESTS_SERVER | {"test-apps"}),
         # The terminal suite of the server starts the Compose stack and its collector (M2-48).
         (["README.md", "infra/compose/secrets.yaml"], TESTS_SERVER),
         (["infra/otel/collector.yaml"], TESTS_SERVER),
@@ -645,7 +650,12 @@ def test_every_tool_folder_is_assigned_or_shared() -> None:
             ["tools/configdoc/planned.yaml", "services/host/internal/x.go"],
             {"test-server"} | HOST_TRIALS,
         ),
-        (["tools/configdoc/planned.yaml", "docs/operations/configuration.md"], set()),
+        (["tools/configdoc/planned.yaml", "docs/decisions.d/M2-48.md"], set()),
+        # The configuration reference is read by the tests of every component (D-CSMQ-7).
+        (
+            ["tools/configdoc/planned.yaml", "docs/operations/configuration.md"],
+            TESTS_SERVER | {"test-apps"} | SDK,
+        ),
         (["tools/sonarqube/compose.yaml"], {"test-server"}),
         (["tools/design-tokens/tokens.py"], {"test-apps", "test-server"}),
         (["tools/api-checks/breaking.py"], {"test-server"}),
@@ -716,7 +726,8 @@ SMOKE_PRIVATE = {"apps-windows", "apps-ios"}
         # Other components keep the jobs of their files.
         (["services/server/internal/chat/x.go"], TESTS_SERVER | POSTGRES | CONSOLE | SDK),
         (["sdk/python/src/x.py"], SDK | {"test-server"}),
-        (["docs/spec/07-permissions.md"], set()),
+        (["docs/decisions.d/M2-48.md"], set()),
+        (["docs/spec/07-permissions.md"], TESTS_SERVER | {"test-apps"}),
         # A shared input runs every component's tests, but of the platform jobs only the pair.
         (["Makefile"], (EVERY_JOB - PLATFORM) | SMOKE),
         ([".github/workflows/ci.yml"], (EVERY_JOB - PLATFORM) | SMOKE),
@@ -795,3 +806,161 @@ def test_cli_ci_plan_stage_needs_a_diff(capsys: pytest.CaptureFixture[str]) -> N
     with pytest.raises(SystemExit):
         components.main(["ci-plan", "--components", "all", "--public", "true", "--stage", "pr"])
     assert "needs --files" in capsys.readouterr().err
+
+
+# --- pull requests that change only documentation (CI-SPLIT-MERGE-QUEUE D-CSMQ-7) -------------
+
+# The documentation files a pull request may change without a conditional job: Markdown that no
+# build, test or generator of a component reads, the site configuration and root Markdown.
+PURE_DOCS = [
+    "docs/design/autonomous-runs.md",
+    "docs/decisions.d/CI-SPLIT-MERGE-QUEUE.md",
+    "docs/briefs/M3-22.md",
+    "docs/quality/gates.md",
+    "docs/DECISIONS.md",
+    "mkdocs.yml",
+    "README.md",
+]
+
+
+@pytest.mark.parametrize("files", [[f] for f in PURE_DOCS] + [PURE_DOCS])
+@pytest.mark.parametrize("stage", ["full", "pr"])
+def test_a_docs_only_pull_request_runs_no_conditional_job(files: list[str], stage: str) -> None:
+    # PR #555 changed docs/design/autonomous-runs.md and mkdocs.yml and ran every job, apps (iOS)
+    # included; the docs gates and test (tools) run on every change without the plan.
+    plan = components.ci_plan(files=files, public=True, stage=stage)
+    assert plan == components.CIPlan(components=[], jobs=[])
+
+
+@pytest.mark.parametrize("docs", PURE_DOCS)
+@pytest.mark.parametrize(
+    "code",
+    [
+        "services/server/internal/chat/x.go",
+        "apps/client/lib/main.dart",
+        "Makefile",
+        ".github/workflows/ci.yml",
+    ],
+)
+def test_a_mixed_pull_request_keeps_the_plan_of_its_other_files(docs: str, code: str) -> None:
+    for stage in ("full", "pr"):
+        mixed = components.ci_plan(files=[docs, code], public=True, stage=stage)
+        assert mixed == components.ci_plan(files=[code], public=True, stage=stage)
+
+
+@pytest.mark.parametrize(
+    ("doc", "expected"),
+    [
+        # Inputs of generators: the API contract feeds every client, the action catalogue the
+        # server's route table, chapter 01 the term table of packages/l10n (tool/term_table.dart).
+        ("docs/api/openapi.yaml", EVERY_JOB),
+        ("docs/spec/actions.yaml", TESTS_SERVER | {"test-apps"}),
+        ("docs/spec/01-product.md", TESTS_SERVER | {"test-apps"}),
+        # Files that the tests of a component read.
+        ("docs/spec/07-permissions.md", TESTS_SERVER | {"test-apps"}),
+        ("docs/spec/09-agents.md", TESTS_SERVER | {"test-apps"} | SDK),
+        ("docs/operations/configuration.md", TESTS_SERVER | {"test-apps"} | SDK),
+        ("docs/observability/signals.md", TESTS_SERVER | {"test-apps"}),
+        ("docs/quality/accessibility-mobile.md", {"test-apps"}),
+        ("docs/PLAN.md", TESTS_SERVER),
+    ],
+)
+def test_a_docs_file_that_a_component_reads_keeps_its_jobs(doc: str, expected: set[str]) -> None:
+    assert set(components.ci_plan(files=[doc], public=True).jobs) == expected
+    assert components.changed([doc]) != []
+
+
+def test_a_push_to_main_keeps_the_full_run() -> None:
+    plan = components.ci_plan(selected=["all"], public=True)
+    assert plan.components == ["all"]
+    assert set(plan.jobs) == EVERY_JOB
+
+
+# What a reference to a file under docs/ looks like in component code: a string that is the
+# path (`"docs/spec/01-product.md"`, `'../../docs/quality/x.md'`, `'${dir.path}/docs/spec/$name'`)
+# or path segments joined after "docs" (`REPO / "docs" / "spec" / "09-agents.md"`,
+# `filepath.Join(root, "docs", "PLAN.md")`). Comment lines only mention files.
+_DOC_LITERAL = re.compile(
+    r"""["'`](?:\$\{[^}]+\}/|\$\w+/|(?:\.\./)+)?docs/([\w.$-]+(?:/[\w.$-]+)*)/?["'`]"""
+)
+_DOC_JOIN = re.compile(
+    r"""["']docs["']\s*[,/)]\s*["']([\w.-]+)["'](?:\s*[,/]\s*["']([\w.-]+)["'])?"""
+)
+_COMMENT_LINE = re.compile(r"^\s*(?://|#|\*|/\*|<!--|--)")
+_BINARY = (".png", ".jpg", ".svg", ".ico", ".ttf", ".otf", ".woff2", ".gz", ".zip", ".jar")
+# The component whose tests run the code of a directory; the other owners of a directory (the
+# SDKs and plugins own services/server/ because their live tests start the server) do not run
+# the server's own tests.
+_READER = (
+    ("services/", "server"),
+    ("infra/", "server"),
+    ("sdk/python/", "sdk-python"),
+    ("sdk/typescript/", "sdk-typescript"),
+    ("plugins/", "plugins"),
+    ("apps/", "apps"),
+    ("packages/", "apps"),
+    ("design/", "apps"),
+)
+
+
+def _doc_references(repo: Path, tracked: list[str]) -> list[tuple[str, str, str]]:
+    """Return (reading file, its component, docs path) of every docs reference in component code."""
+    found = []
+    for path in tracked:
+        reader = next((c for prefix, c in _READER if path.startswith(prefix)), None)
+        if reader is None or path.endswith((".md", *_BINARY)):
+            continue
+        try:
+            text = (repo / path).read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError):
+            continue
+        for line in text.splitlines():
+            if _COMMENT_LINE.match(line):
+                continue
+            refs = [m.group(1) for m in _DOC_LITERAL.finditer(line)]
+            refs += ["/".join(g for g in m.groups() if g) for m in _DOC_JOIN.finditer(line)]
+            found += [(path, reader, "docs/" + ref.rstrip(".")) for ref in refs]
+    return found
+
+
+def test_every_docs_file_that_component_code_reads_selects_that_component() -> None:
+    # The real tree: a docs file that a test, build or generator of a component reads must select
+    # that component, so that a docs-only pull request never skips a job its diff can break. A
+    # reference to a directory (or a path with a variable, `docs/spec/$name`) covers every file
+    # in it. Strings that name no tracked path (test fixtures like "docs/website") are left out.
+    repo = Path(__file__).resolve().parents[3]
+    tracked = subprocess.run(
+        ["git", "ls-files", "-z"], cwd=repo, capture_output=True, text=True, check=True
+    ).stdout.split("\0")
+    docs = [f for f in tracked if f.startswith("docs/")]
+    missing = set()
+    for reader_file, reader, ref in _doc_references(repo, tracked):
+        path = ref.split("$")[0].rstrip("/")
+        if "$" not in ref and path in docs:
+            covered = [path]
+        else:
+            covered = [f for f in docs if f.startswith(path + "/")]
+        for doc in covered:
+            selected = components.changed([doc])
+            if reader not in selected and selected != ["all"]:
+                missing.add(f"{doc} is read by {reader_file} ({reader})")
+    assert not missing, "\n".join(sorted(missing))
+
+
+def test_the_reference_scan_finds_the_known_readers() -> None:
+    # The scan itself: it finds the reads the map above was built from.
+    repo = Path(__file__).resolve().parents[3]
+    files = [
+        "apps/client/test/a11y/phone/routes_checklist_test.dart",
+        "services/server/test/agents/registry_test.go",
+        "plugins/hermes-adapter/tests/unit/test_pin.py",
+        "packages/admin_ui/test/admin/access_fake.dart",
+    ]
+    refs = {(f, ref) for f, _, ref in _doc_references(repo, files)}
+    assert (
+        "apps/client/test/a11y/phone/routes_checklist_test.dart",
+        "docs/quality/accessibility-mobile.md",
+    ) in refs
+    assert ("services/server/test/agents/registry_test.go", "docs/PLAN.md") in refs
+    assert ("plugins/hermes-adapter/tests/unit/test_pin.py", "docs/spec/09-agents.md") in refs
+    assert ("packages/admin_ui/test/admin/access_fake.dart", "docs/spec/$name") in refs
