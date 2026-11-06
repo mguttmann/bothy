@@ -5,6 +5,7 @@ package integration_test
 import (
 	"context"
 	"net/http"
+	"net/url"
 	"slices"
 	"testing"
 	"time"
@@ -83,6 +84,18 @@ func TestHostedAgentsAPI(t *testing.T) {
 	list := w.wantOK(w.do("runner", http.MethodGet, "/api/v1/agents/me/hosted", ""))
 	if items, _ := list["items"].([]any); len(items) != 1 || items[0].(map[string]any)["id"] != writer.String() {
 		t.Fatalf("hosted list %v", list)
+	}
+	// A second built-in agent pages the list: limit 1 answers next_cursor, the cursor the rest.
+	w.want(w.do("owner", http.MethodPost, "/api/v1/agents",
+		`{"handle":"reader","display_name":"Reader","adapter_kind":"claude_agent","hosted_by":"`+w.runner.String()+`"}`, key()...), http.StatusCreated, "")
+	first := w.wantOK(w.do("runner", http.MethodGet, "/api/v1/agents/me/hosted?limit=1", ""))
+	cursor, _ := first["next_cursor"].(string)
+	if items, _ := first["items"].([]any); len(items) != 1 || cursor == "" {
+		t.Fatalf("first hosted page %v", first)
+	}
+	second := w.wantOK(w.do("runner", http.MethodGet, "/api/v1/agents/me/hosted?limit=1&cursor="+url.QueryEscape(cursor), ""))
+	if items, _ := second["items"].([]any); len(items) != 1 || items[0].(map[string]any)["id"] == first["items"].([]any)[0].(map[string]any)["id"] {
+		t.Fatalf("second hosted page %v after %v", second, first)
 	}
 	if items, _ := w.wantOK(w.do("lotse", http.MethodGet, "/api/v1/agents/me/hosted", ""))["items"].([]any); len(items) != 0 {
 		t.Fatalf("another agent's hosted list %v", items)

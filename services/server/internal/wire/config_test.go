@@ -1453,6 +1453,34 @@ func TestConfig_PresenceTimeoutAboveHeartbeatInterval(t *testing.T) {
 	}
 }
 
+// TestConfig_HostedTokenTTLWithinAPITokenMaxTTL: agents.hosted_token_ttl may not exceed
+// auth.api_token_max_ttl (cross-check hosted_token_ttl_within_api_token_max_ttl, A1-03): a longer
+// lifetime aborts the start with a problem naming both keys and no value.
+func TestConfig_HostedTokenTTLWithinAPITokenMaxTTL(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		ttl, max string
+		ok       bool
+	}{
+		{"1d", "1d", true},
+		{"2h", "1d", true},
+		{"2d", "1d", false},
+	} {
+		got := load(t, "BOTHY_AGENTS__HOSTED_TOKEN_TTL="+c.ttl, "BOTHY_AUTH__API_TOKEN_MAX_TTL="+c.max)
+		if (len(got) == 0) != c.ok {
+			t.Errorf("ttl %s, max %s: problems %v, want ok %v", c.ttl, c.max, got, c.ok)
+			continue
+		}
+		if len(got) == 0 {
+			continue
+		}
+		msg := got[0].String()
+		if !strings.Contains(msg, "agents.hosted_token_ttl") || !strings.Contains(msg, "auth.api_token_max_ttl") || strings.Contains(msg, " "+c.ttl) {
+			t.Errorf("problem %q", msg)
+		}
+	}
+}
+
 // TestConfigCheckBackupSchedules: every schedule of the backup service must be a five-field cron
 // expression (cross-check backup_schedules, M7-02); the problem names the key and no value.
 func TestConfigCheckBackupSchedules(t *testing.T) {
