@@ -191,8 +191,8 @@ Hermes runs every top-level `delegate_task` in the background, and `terminal` ca
 that outlives the turn (09 17.12, R-AG-44). The run of the turn that started such work stays
 running, with its stop button, until the work is done: each delegation is a `subagent` step, each
 process a `background_job` step, read from Hermes' registries. The turn Hermes starts by itself
-with a result runs inside that run, and a follow-up written meanwhile becomes a turn of its own in
-the run. Stop interrupts the delegations and ends the processes. A turn of a thread without an
+with a result runs inside that run (if it fails, the run ends `failed` with Hermes' error text),
+and a follow-up written meanwhile becomes a turn of its own in the run. Stop interrupts the delegations and ends the processes. A turn of a thread without an
 open run can call no tool (the hook `pre_tool_call` refuses it); its text is posted as a report.
 Design: [docs/design/hermes-background-work.md](../../docs/design/hermes-background-work.md).
 

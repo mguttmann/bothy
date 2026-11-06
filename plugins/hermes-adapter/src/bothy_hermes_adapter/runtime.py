@@ -512,6 +512,20 @@ class Runtime(Protocol):
         """
         ...
 
+    def turn_running(self, thread_id: UUID) -> bool | None:
+        """Whether a Hermes turn of the thread's session runs now (Hermes' busy state).
+
+        It ends on every way a turn ends (completed, failed, interrupted, raised), also where
+        Hermes calls no ``on_session_end`` (09 17.12 point 3).
+
+        Args:
+            thread_id: The thread.
+
+        Returns:
+            True while a turn runs, False when none does, ``None`` when Hermes cannot tell.
+        """
+        ...
+
 
 class RuntimeEvents(Protocol):
     """What Hermes reports during a turn; ``platform.py`` calls it on the adapter's loop."""

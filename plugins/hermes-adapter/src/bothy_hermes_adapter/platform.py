@@ -43,9 +43,10 @@ of 17.3 to `bothy_hermes_adapter.handler.HermesHandler` on the adapter's event l
 * Background work (09 17.12, R-AG-44): the delegation units of ``tools.async_delegation`` and the
   background processes of ``tools.process_registry`` of a thread's session are read for the
   handler, which keeps the run open while they run; stop interrupts and kills them. The hooks
-  ``pre_llm_call`` and ``on_session_end`` tell the start and end of every turn of a thread, also
-  of one Hermes starts by itself with a result, and ``pre_tool_call`` refuses every tool call of
-  a thread without an open run.
+  ``pre_llm_call`` and ``on_session_end`` tell the start and end of a turn of a thread, also of
+  one Hermes starts by itself with a result; the gateway's running-turn slot of the session
+  (``turn_running``) tells its end also where a failed turn skips ``on_session_end``; and
+  ``pre_tool_call`` refuses every tool call of a thread without an open run.
 * Session IDs and usage come from the plugin hooks ``pre_llm_call``, ``on_session_reset`` and
   ``post_api_request`` (``pre_llm_call`` also answers with the turn's user side); the thread of
   a hook or of ``set_status_text`` is the session's thread variable of the turn
@@ -59,6 +60,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import functools
 import logging
 import uuid
 from collections.abc import Mapping
@@ -737,24 +739,47 @@ class ServerPlatform(BasePlatformAdapter):
             return None
         return InboundMedia(str(cached.path), str(cached.media_type))
 
-    def _session_key(self, thread_id: uuid.UUID) -> str | None:
-        """Hermes' session key of a thread a turn of this process ran in (17.4), else ``None``."""
+    def _thread_source(self, thread_id: uuid.UUID) -> Any:
+        """Hermes' session source of a thread a turn of this process ran in (17.4), or ``None``."""
         source = self._sources.get(thread_id)
         if source is None:
             return None
         channel, user_id, user_name = source
-        event = MessageEvent(
-            text="",
-            message_type=MessageType.TEXT,
-            source=self.build_source(
-                chat_id=channel,
-                chat_type="thread",
-                thread_id=str(thread_id),
-                user_id=user_id,
-                user_name=user_name,
-            ),
+        return self.build_source(
+            chat_id=channel,
+            chat_type="thread",
+            thread_id=str(thread_id),
+            user_id=user_id,
+            user_name=user_name,
         )
+
+    def _session_key(self, thread_id: uuid.UUID) -> str | None:
+        """Hermes' session key of a thread a turn of this process ran in (17.4), else ``None``."""
+        source = self._thread_source(thread_id)
+        if source is None:
+            return None
+        event = MessageEvent(text="", message_type=MessageType.TEXT, source=source)
         return str(self._event_session_key(event))
+
+    def turn_running(self, thread_id: uuid.UUID) -> bool | None:
+        """Whether a turn of the thread's session runs: the gateway's running-turn slot (17.12).
+
+        The gateway claims the slot before a turn's agent runs and releases it in the turn's
+        ``finally``, on every way the turn ends; a turn the session authority's queue starts
+        (a result Hermes delivers by itself) holds it as well as one from ``handle_message``.
+        The platform's own busy guard (``_active_sessions``) is not used: the authority's turns
+        pass it by, and it outlives a turn's ``on_processing_complete``.
+        """
+        runner = self.gateway_runner
+        source = self._thread_source(thread_id)
+        if runner is None or source is None:
+            return None
+        try:
+            key = runner._session_key_for_source(source)
+            return bool(runner._is_session_running(key))
+        except Exception as exc:  # a Hermes without these internals: the hooks alone decide
+            _LOG.warning("thread %s: busy state not readable: %s", thread_id, type(exc).__name__)
+            return None
 
     async def background_work(
         self, thread_id: uuid.UUID, since: float
@@ -1131,10 +1156,12 @@ class ServerPlatform(BasePlatformAdapter):
         if thread is None:
             return None
         if name == "on_session_end":
-            # Only the thread's own session: a subagent's loop ends in its own session.
-            session_id = kwargs.get("session_id")
-            if self.handler is not None and session_id == self._sessions.get(thread):
-                self._post(self.handler.on_turn_ended, thread)
+            # A subagent's loop never reaches this platform (its hooks carry the platform
+            # ``subagent``), so every end of this platform's thread is the thread's own turn, also
+            # after a compression moved it to a new session ID.
+            if self.handler is not None:
+                failed = bool(kwargs.get("failed") or kwargs.get("interrupted"))
+                self._post(functools.partial(self.handler.on_turn_ended, thread, failed=failed))
             return None
         if name == "pre_llm_call" and self.handler is not None:
             self._post(self.handler.on_turn_started, thread)

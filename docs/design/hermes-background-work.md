@@ -1,9 +1,11 @@
 # Background work of a Hermes run
 
 Status: design of 2026-11-06 for the ticket FIX-hermes-hidden-background, built by the same
-ticket. This note explains the decisions; the normative text is in
+ticket; the end of a turn Hermes starts itself was extended the same day by
+FIX-hermes-result-turn-end. This note explains the decisions; the normative text is in
 [09-agents.md](../spec/09-agents.md) 17.12 (rule R-AG-44), 14, 17.3 and 17.9. Rulings:
-[decisions.d/FIX-hermes-hidden-background.md](../decisions.d/FIX-hermes-hidden-background.md).
+[decisions.d/FIX-hermes-hidden-background.md](../decisions.d/FIX-hermes-hidden-background.md) and
+[decisions.d/FIX-hermes-result-turn-end.md](../decisions.d/FIX-hermes-result-turn-end.md).
 
 ## 1. Goal
 
@@ -42,6 +44,16 @@ Done means:
 - Plugin hooks the adapter can use: `pre_llm_call` (a turn starts), `on_session_end` (a turn's
   agent loop ended), `pre_tool_call` (before every tool call, also of a subagent; a return value
   `{"action": "block", "message": ...}` refuses the call and gives the model the message).
+- `on_session_end` fires only at the end of `finalize_turn` (`agent/turn_finalizer.py`). The
+  error paths of `agent/conversation_loop.py` (a non-retryable client error such as HTTP 400,
+  exhausted retries, an interrupt) return without `finalize_turn`, and an exception skips it too;
+  the gateway then sends the error text as the turn's answer, after the turn. What ends on every
+  path is the gateway's running-turn slot of the session (`GatewayRunner._is_session_running`):
+  it is claimed before the agent runs and released in the `finally` of `_handle_message`, also for
+  a turn the session authority's queue starts. The platform's own busy guard
+  (`_active_sessions`) is not used: the queue's turns pass it by, and it outlives a turn's
+  `on_processing_complete`. A subagent's hooks carry the platform `subagent`, so its
+  `on_session_end` never reaches the adapter's platform.
 
 ## 3. Decisions
 
@@ -49,8 +61,9 @@ Done means:
 |---|---|---|
 | 1 | The background work of a run is the set of delegation units and background processes of the thread's Hermes session that started after the run started: a unit while it is live or its completion is not admitted yet, a process while it runs. The adapter reads it from Hermes' registries every `hermes_adapter.background_poll_interval`. | The registries are the only source that knows when work ends; Hermes reports no end of a unit to a platform. Work of earlier runs is not counted, so an old process cannot hold every later run. |
 | 2 | After the run's turn completes, the run stays `running` while the set is not empty. Each unit is a step `subagent` (title: the goal), each process a step `background_job` (title: the command), both with status `running` and then `completed`, `failed` or `cancelled`; `/metrics/subagents` and `/metrics/background_jobs` count the open ones; `/metrics/progress_events` rises once per `hermes_adapter.background_progress_interval` while work is open, so the stall notice of 5.5 does not fire. | Mirrors 18.5 of the runner; 5.4 already shows these steps and counts in the live box. |
-| 3 | A turn Hermes starts in the thread while the run is held (the completion turn, a notice of a finished process) is a turn of the run: the adapter takes it from `pre_llm_call` until `on_session_end`, its status sentences become steps, its usage counts, and its answer is a message of the run. | Hermes gives the platform no other signal of such a turn (section 2). |
+| 3 | A turn Hermes starts in the thread while the run is held (the completion turn, a notice of a finished process) is a turn of the run: the adapter takes it from `pre_llm_call`, or from the moment the session's running-turn slot is taken while no turn of the adapter runs, until `on_session_end` or the moment the slot is free again; its status sentences become steps, its usage counts, and its answer is a message of the run. | Hermes gives the platform no event for such a turn (section 2); the slot is the one signal that ends on every path, and it also catches a turn whose `pre_llm_call` came before the hold or during a turn of the adapter. |
 | 4 | The run finishes when the set is empty, no turn of the thread runs, and, for a run that saw background work, `hermes_adapter.background_settle` passed without a turn start, a tool call or an answer. A run without background work finishes at once, as before. | The gateway admits a completion a moment after the unit ended; the settle time keeps the run open for that turn and its answer. |
+| 4a | A turn of decision 3 that ended without `on_session_end`, or whose `on_session_end` reports it failed or interrupted, failed: the run ends `failed` (`runtime_error`) once the settle time passed after it, the open work is cancelled (decision 6), and a follow-up not yet started stays `queued` for the follow-on run. | As a failed follow-up turn (decision 5); the settle time lets Hermes' error text, sent after the turn, land in the run instead of a report; a silent `completed` would hide the failure. |
 | 5 | A follow-up written while the run is held, and one the first turn did not take once the run is held, starts a turn of its own in the run, one after the other, with the person's text and the format rules and channel instructions on the user side; it is `delivered` at the start and `absorbed` when the turn completed. A follow-up with a file, and every follow-up of a run without background work, stays `queued` for the follow-on run, as before. | Otherwise the person waits for the background work before the agent reads the next message (18.5 does the same for the runner). |
 | 6 | Stop (`run.cancel_requested`) interrupts the thread's turn as before, interrupts the session's live delegation units and kills the session's running processes (their output is consumed, so no completion turn follows a killed process). An early end of the run (a failed turn, an abort for a changed mode or a refused card) does the same. | A run must not end while work it covers goes on unseen. |
 | 7 | Every tool call of a session of the adapter's platform is refused while its thread has no open run of the adapter (`pre_tool_call` returns a block with the reason); a session without a thread is refused too. | The rule of the brief; it covers the completion turn after a stop or a restart, a delegation's subagents after their run ended, and a turn Hermes might start in a later version. Fail closed: a call whose thread cannot be told is refused. |
@@ -89,6 +102,7 @@ sequenceDiagram
   person stops it; that is the rule (visible, with a stop button), not a fault.
 - A gateway or adapter restart ends the hold: the server ends the run `interrupted` or `stale`,
   Hermes may replay a completion later, and that turn runs without a run (decision 8).
-- A turn of the thread whose `on_session_end` never comes keeps the run open until a stop.
+- A Hermes without the running-turn slot (`_is_session_running` of the gateway runner) leaves
+  only the hooks; there a turn whose `on_session_end` never comes keeps the run open until a stop.
 - Hermes' memory and skill review after a turn runs in the turn's session; while no run is open
   its tool calls are refused by decision 7.
