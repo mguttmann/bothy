@@ -36,7 +36,7 @@ character codes of the text check; the exact rules and patterns are the rulings 
 
 At least one invalid fixture per surface of 26 5.5 (frontmatter keys of `SKILL.md`, both inline
 shell forms, settings files, folder content, plugin parts, an MCP `headersHelper`, hooks and `@`
-imports with an absolute, a `~`, a `..` and a backslash path) and per field code of 26 4.3. The Go
+imports with an absolute, a `~`, a `..`, a backslash path and a `..` path behind an escaped space) and per field code of 26 4.3. The Go
 test `TestCorpusCoversEveryCode` fails when a code has no fixture; the wire test
 `TestAgentDefinitionLimitsEqualCorpus` fails when `limits.json` differs from the server defaults.
 

@@ -48,8 +48,10 @@ var (
 	// backtick, at least one character other than a backtick (line breaks included), a backtick.
 	inlineShellPattern = regexp.MustCompile("(?:^|[" + jsSpace + "])!`[^`]+`")
 	// importPattern finds a token @<path> at the start of the text or after white space (a line
-	// break included, so also at the start of every line).
-	importPattern = regexp.MustCompile("(?:^|[" + jsSpace + "])@([^" + jsSpace + "]+)")
+	// break included, so also at the start of every line). As in the pinned CLI's pattern
+	// (?:^|\s)@((?:[^\s\\]|\\ )+), a backslash followed by a space continues the path; unlike it,
+	// any other backslash stays in the token, so the token is never shorter than the CLI's path.
+	importPattern = regexp.MustCompile("(?:^|[" + jsSpace + "])@((?:\\\\ |[^" + jsSpace + "])+)")
 	// drivePattern is a Windows drive at the start of a path.
 	drivePattern = regexp.MustCompile(`^[A-Za-z]:`)
 )
@@ -73,10 +75,13 @@ func HasInlineShell(s string) bool {
 
 // HasImportOutsideFolder reports whether s holds an @ import whose path leaves the agent folder
 // (26 4.3 item 4): absolute (/, \ or a drive), starting with ~, or with a .. segment, with / or
-// \ as separator; a leading quote is ignored.
+// \ as separator; a leading quote is ignored. The path is read as the CLI reads it: an escaped
+// space (\ ) becomes a space and everything from # on is dropped.
 func HasImportOutsideFolder(s string) bool {
 	for _, m := range importPattern.FindAllStringSubmatch(s, -1) {
-		if outsideFolder(strings.TrimLeft(m[1], `"'`)) {
+		p := strings.ReplaceAll(m[1], `\ `, " ")
+		p, _, _ = strings.Cut(p, "#")
+		if outsideFolder(strings.TrimLeft(p, `"' `)) {
 			return true
 		}
 	}
@@ -88,7 +93,8 @@ func outsideFolder(p string) bool {
 	if strings.HasPrefix(p, "/") || strings.HasPrefix(p, `\`) || strings.HasPrefix(p, "~") || drivePattern.MatchString(p) {
 		return true
 	}
-	return slices.Contains(strings.FieldsFunc(p, func(r rune) bool { return r == '/' || r == '\\' }), "..")
+	return slices.ContainsFunc(strings.FieldsFunc(p, func(r rune) bool { return r == '/' || r == '\\' }),
+		func(seg string) bool { return strings.TrimSpace(seg) == ".." })
 }
 
 // ValidSkillName reports whether n is a skill name, an MCP server name or a template slug.

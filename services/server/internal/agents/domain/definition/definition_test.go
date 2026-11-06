@@ -191,8 +191,9 @@ func TestInlineShell(t *testing.T) {
 }
 
 // TestImports: an @ import at the start of a line or after white space whose path is absolute,
-// starts with ~ or has a .. segment (also with \ as separator) is refused; relative paths, mail
-// addresses and handles pass.
+// starts with ~ or has a .. segment (also with \ as separator) is refused, also when an escaped
+// space (\ ) continues the path the way the pinned CLI reads it; relative paths, mail addresses and
+// handles pass.
 func TestImports(t *testing.T) {
 	t.Parallel()
 	for _, c := range []struct {
@@ -202,6 +203,9 @@ func TestImports(t *testing.T) {
 		{"@/etc/hosts", true}, {"x @/a", true}, {"x\n@~/a", true}, {"@~", true}, {"@..", true}, {"@../a", true},
 		{"@a/../b", true}, {"@a/..", true}, {"@a\\..\\b", true}, {"@\\\\server\\share", true}, {"@C:\\x", true},
 		{"@c:/x", true}, {"see\t@/x", true},
+		{"See @x\\ /../../../../etc/passwd", true}, {"@notes\\ /../../../.ssh/id_ed25519", true},
+		{"@a/\\ ..\\ /b", true}, {"@\\ /etc/hosts", true}, {"@\"x\\ /../y", true},
+		{"@my\\ notes.md", false}, {"@a.md#/../x", false},
 		{"@a/b.md", false}, {"@./a", false}, {"alex@example.com", false}, {"@sam", false}, {"@a..b", false},
 		{"x@/etc/hosts", false}, {"@", false}, {"@...", false},
 	} {
