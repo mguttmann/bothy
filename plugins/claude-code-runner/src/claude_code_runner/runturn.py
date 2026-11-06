@@ -68,6 +68,7 @@ from bothy_sdk.generated.models import (
     JsonPatchOperationOp,
     Message,
     RunContext,
+    RunContextAttachment,
     RunFinish,
     RunFinishState,
     RunMetrics,
@@ -79,7 +80,11 @@ from bothy_sdk.outbox import OutboxState
 from bothy_sdk.runs import RunHandle, is_run_ended
 
 from claude_code_runner.adoption import read_identity
-from claude_code_runner.attachments import followup_file_texts, followup_files_final
+from claude_code_runner.attachments import (
+    describe_followup_files,
+    fetch_followup_files,
+    followup_files_final,
+)
 from claude_code_runner.background import BackgroundWork
 from claude_code_runner.causes import ADAPTER_STOPPED, cause, turn_end_cause
 from claude_code_runner.commandline import SessionChoice, build_argv, reported_model
@@ -290,6 +295,20 @@ class _Outcome:
     """Background tasks still running when the process ended after a failed turn."""
 
 
+_Prepared = tuple[list[str], list[tuple[str, str]]]
+"""The attachment texts of a follow-up and the name and transcript of each transcribed file."""
+
+
+@dataclass
+class _FollowupOrder:
+    """The order of the follow-ups of a run (FIX-followup-transcribe)."""
+
+    tail: asyncio.Event | None = None
+    """Set once the follow-up offered last is written or left; the next one waits for it."""
+    preparing: set[UUID] = field(default_factory=set)
+    """Follow-ups whose files are fetched and transcribed now (a redelivery is left)."""
+
+
 class RunTurn:
     """The turn processes of one started run (see the module docstring).
 
@@ -322,6 +341,8 @@ class RunTurn:
         self.cost_baseline = _bound_baseline(session)
         self.recovery = RecoveryState(compact_supported=COMPACT_IN_PRINT_MODE)
         self.followups = PendingFollowups()
+        # The order of the follow-ups while one waits for files or is transcribed.
+        self.followup_order = _FollowupOrder()
         self.background = BackgroundWork()
         """The background work of the current process (09 18.5, FIX-runner-responsive-turns)."""
         self._held_logged = False
@@ -485,13 +506,22 @@ class RunTurn:
         return self.stop_reason is not None
 
     async def _transcribe(self, context: RunContext) -> None:
-        """Transcripts of the trigger's audio attachments before the first input (09 18.14).
+        """Transcripts of the trigger's audio attachments before the first input (09 18.14)."""
+        if not any(text.startswith(LOCAL_FILE) for text in self.state.file_texts.values()):
+            return  # no stored attachment, nothing to transcribe
+        await self._transcribe_items(context.trigger_message.attachments, self.state.file_texts)
+
+    async def _transcribe_items(
+        self, attachments: Sequence[RunContextAttachment], file_texts: dict[UUID, str]
+    ) -> list[RunContextAttachment]:
+        """Transcribe the audio attachments of the trigger or of a follow-up (09 18.14).
 
         A transcript is set on its attachment and delivered to the server (09 13); an audio file
         without one gets a note in the thread. A stop ends the transcriber at once.
+
+        Returns:
+            The attachments that got a transcript (none after a stop).
         """
-        if not any(text.startswith(LOCAL_FILE) for text in self.state.file_texts.values()):
-            return  # no stored attachment, nothing to transcribe
         status: list[bool] = []
 
         async def on_start() -> None:
@@ -499,12 +529,7 @@ class RunTurn:
             await self._status_line("Transcribing a voice message")
 
         task = asyncio.ensure_future(
-            transcribe_attachments(
-                context.trigger_message.attachments,
-                self.state.file_texts,
-                self.h.transcriber,
-                on_start,
-            )
+            transcribe_attachments(attachments, file_texts, self.h.transcriber, on_start)
         )
         while not task.done():
             await asyncio.wait({task}, timeout=self.cfg.poll_interval)
@@ -512,7 +537,7 @@ class RunTurn:
                 task.cancel()
                 with contextlib.suppress(asyncio.CancelledError):
                     await task
-                return
+                return []
         done, missing = task.result()
         if status:
             await self._status_line(None)
@@ -522,6 +547,7 @@ class RunTurn:
             problem = await self._deliver(notice(missing), uuid4())
             if problem is not None:
                 _log("transcript_notice_refused", code=problem, **self.ids)
+        return done
 
     async def _submit_transcript(self, file_id: UUID, text: str) -> None:
         """``submitTranscript`` with the transcript ``ETag`` of ``getFile``; a refusal is logged.
@@ -911,8 +937,13 @@ class RunTurn:
 
     # ---- follow-ups ------------------------------------------------------------------------
 
-    async def offer_followup(self, inv: Invocation) -> None:  # noqa: PLR0911 - one exit per check
-        """Write a follow-up now, hold it, or leave it (design notes 2 to 4).
+    async def offer_followup(self, inv: Invocation) -> None:
+        """Write a follow-up now, hold it, or leave it (design notes 2 to 4), in their order.
+
+        Each follow-up is written only after the one offered before it is written or left, so
+        a follow-up that waits for its files or is transcribed keeps its place. Its token is
+        judged at the time of the offer (09 18.5), and a follow-up whose check fails is neither
+        stored nor transcribed.
 
         Args:
             inv: The ``agent.followup`` invocation (its claims were verified at acceptance).
@@ -921,10 +952,36 @@ class RunTurn:
         if not isinstance(message_id, UUID):
             return
         ids = {**self.ids, "message_id": message_id}
-        read: tuple[Message | None] | None = None
-        if self.phase == "open" and message_id not in self.followups:
-            # Outside the lock, so other follow-ups and the stop go on while a file is checked.
-            read = (await self._await_followup_files(message_id, ids),)
+        offered_at = self.handle.client.clock.now().timestamp()
+        order = self.followup_order
+        before, mine = order.tail, asyncio.Event()
+        order.tail = mine
+        try:
+            if before is not None and self.phase != "open":
+                await before.wait()  # offered before the turn opened: prepared in its order
+                before = None
+            read: tuple[Message | None] | None = None
+            prepared: _Prepared | None = None
+            if self.phase == "open" and message_id not in self.followups:
+                if message_id in order.preparing:
+                    return  # a redelivery of a follow-up that is being prepared
+                read, prepared = await self._prepare_followup(inv, ids, offered_at)
+            if before is not None:
+                await before.wait()
+            await self._write_followup(inv, ids, offered_at, read, prepared)
+        finally:
+            mine.set()
+
+    async def _write_followup(  # noqa: PLR0911 - one exit per check
+        self,
+        inv: Invocation,
+        ids: Mapping[str, Any],
+        offered_at: float,
+        read: tuple[Message | None] | None,
+        prepared: _Prepared | None,
+    ) -> None:
+        """Hold, leave or write one follow-up under the write lock (design notes 2 to 4)."""
+        message_id: UUID = ids["message_id"]
         async with self.write_lock:
             if self.stop_reason is not None or self.phase in ("closed", "ended"):
                 _log("followup_not_deliverable", **ids)
@@ -942,21 +999,7 @@ class RunTurn:
             if message is None:
                 return
             process = self.process
-            check = FollowupCheck(
-                claims=inv.claims,
-                now=self.handle.client.clock.now().timestamp(),
-                leeway=self.cfg.sdk.invocation_token_leeway,
-                turn_started=process is not None and self.phase == "open",
-                run_id=self.handle.run_id,
-                thread_id=self.state.thread_id,
-                billing_mode=self.state.mode,
-                tool_class=self.cfg.tool_class,
-                message_id=message_id,
-                author_id=message.author.id,
-                message_thread_id=message.thread_id,
-                written=set(self.followups.by_message),
-            )
-            verdict, code = followup_verdict(check)
+            verdict, code = self._followup_verdict(inv, message_id, message, offered_at)
             if verdict is FollowupVerdict.SKIP:
                 _warn(code, **ids)
                 return
@@ -964,12 +1007,10 @@ class RunTurn:
                 return
             author = message.author.to_dict()
             line_uuid = str(uuid4())
-            files = await followup_file_texts(
-                self.handle.client,
-                message.attachments,
-                self.cfg.state_dir / "files" / str(self.state.thread_id),
-            )
-            line = build_followup_line(author, message.content_md, line_uuid, files)
+            if prepared is None:  # the turn opened while it waited: prepared here
+                prepared = await self._followup_files(message)
+            files, transcripts = prepared
+            line = build_followup_line(author, message.content_md, line_uuid, files, transcripts)
             # The record knows the line before the CLI can: a runner that adopts the turn maps
             # its echo to the follow-up and patches it absorbed (design note 12 f 3).
             self.followups.add(message_id, line_uuid, line)
@@ -987,6 +1028,77 @@ class RunTurn:
         await self._followup_state(message_id, "delivered")
         if self.followups.delivered(message_id):
             await self._followup_state(message_id, "absorbed")
+
+    def _followup_verdict(
+        self, inv: Invocation, message_id: UUID, message: Message, offered_at: float
+    ) -> tuple[FollowupVerdict, str]:
+        """The checks of a follow-up (design note 2 b and c), its token judged at the offer."""
+        check = FollowupCheck(
+            claims=inv.claims,
+            now=offered_at,
+            leeway=self.cfg.sdk.invocation_token_leeway,
+            turn_started=self.process is not None and self.phase == "open",
+            run_id=self.handle.run_id,
+            thread_id=self.state.thread_id,
+            billing_mode=self.state.mode,
+            tool_class=self.cfg.tool_class,
+            message_id=message_id,
+            author_id=message.author.id,
+            message_thread_id=message.thread_id,
+            written=set(self.followups.by_message),
+        )
+        return followup_verdict(check)
+
+    async def _prepare_followup(
+        self, inv: Invocation, ids: Mapping[str, Any], offered_at: float
+    ) -> tuple[tuple[Message | None], _Prepared | None]:
+        """Read a follow-up once its files are final, then store and transcribe its files.
+
+        Outside the lock, so other follow-ups and the stop go on while a file is checked or
+        transcribed. The files are touched only when the checks of the follow-up pass; the
+        write checks again and logs a failed check.
+
+        Returns:
+            The message of the last read and the prepared files (``None`` when the follow-up
+            has none, cannot be written, fails its checks or a stop came).
+        """
+        message_id: UUID = ids["message_id"]
+        preparing = self.followup_order.preparing
+        preparing.add(message_id)
+        try:
+            message = await self._await_followup_files(message_id, ids)
+            if message is None or not message.attachments or self._stop_requested():
+                return (message,), None
+            verdict, _ = self._followup_verdict(inv, message_id, message, offered_at)
+            if verdict is not FollowupVerdict.WRITE:
+                return (message,), None
+            return (message,), await self._followup_files(message)
+        finally:
+            preparing.discard(message_id)
+
+    async def _followup_files(self, message: Message) -> _Prepared:
+        """The attachment texts of a follow-up and the transcripts of its audio files.
+
+        The files are stored like those of the trigger, and an audio file is transcribed like
+        an audio attachment of the trigger (09 18.5, 18.14; FIX-followup-transcribe).
+
+        Args:
+            message: The follow-up message.
+
+        Returns:
+            The texts for the ``Attachments:`` list and the name and transcript of each audio
+            file that got one.
+        """
+        if not message.attachments:
+            return [], []
+        items, texts = await fetch_followup_files(
+            self.handle.client,
+            message.attachments,
+            self.cfg.state_dir / "files" / str(self.state.thread_id),
+        )
+        done = await self._transcribe_items(items, texts)
+        transcripts = [(item.original_name, str(item.transcript)) for item in done]
+        return describe_followup_files(items, texts), transcripts
 
     async def _read_message(self, message_id: UUID, ids: Mapping[str, Any]) -> Message | None:
         try:

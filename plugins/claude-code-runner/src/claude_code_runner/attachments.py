@@ -17,7 +17,7 @@ from __future__ import annotations
 import json
 import logging
 import re
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from uuid import UUID
 
@@ -29,7 +29,13 @@ from bothy_sdk.generated.models import Attachment, RunContextAttachment
 
 from claude_code_runner.statedir import ensure_private_dir, write_private
 
-__all__ = ["FETCHED", "fetch_attachments", "followup_file_texts", "followup_files_final"]
+__all__ = [
+    "FETCHED",
+    "describe_followup_files",
+    "fetch_attachments",
+    "fetch_followup_files",
+    "followup_files_final",
+]
 
 _LOG = logging.getLogger("claude_code_runner")
 
@@ -116,15 +122,17 @@ def followup_files_final(attachments: Sequence[Attachment]) -> bool:
     return all(_final(item) for item in attachments)
 
 
-async def followup_file_texts(
+async def fetch_followup_files(
     client: Client, attachments: Sequence[Attachment], files_dir: Path
-) -> list[str]:
-    """Store the servable attachments of a follow-up and describe every attachment.
+) -> tuple[list[RunContextAttachment], dict[UUID, str]]:
+    """Store the servable attachments of a follow-up and give the text of every attachment.
 
-    A servable file goes to ``files_dir/<file_id>`` like an attachment of the trigger; the text
-    is ``<name> (<type>): local file: <path>``, or ``unavailable: <problem code>`` for a file
-    that is blocked, failed, still not ready or could not be downloaded. Control characters of
-    the name become spaces, so a name never breaks the line of the list.
+    A servable file goes to ``files_dir/<file_id>`` like an attachment of the trigger and its
+    text is ``local file: <path>``; a file that is blocked or failed is ``unavailable:
+    file_blocked``, one still not ready ``unavailable: file_not_ready``, one that could not be
+    downloaded ``unavailable: <problem code>``. Each attachment is also given in the shape of
+    the run context, so the transcriber takes it like an attachment of the trigger (09 18.14,
+    FIX-followup-transcribe): without a transcript, since a message carries none.
 
     Args:
         client: The SDK client, bound to the run by the caller (07 SR9).
@@ -132,31 +140,52 @@ async def followup_file_texts(
         files_dir: ``<runner.state_dir>/files/<thread_id>``.
 
     Returns:
-        One text per attachment, in position order.
+        The attachments in position order and the text per ``file_id``.
     """
-    out: list[str] = []
+    items: list[RunContextAttachment] = []
+    texts: dict[UUID, str] = {}
     for item in attachments:
         f = item.file
-        label = f"{_CONTROL.sub(' ', f.original_name)} ({f.mime_type})"
         upload, scan = _value(f.upload_state), _value(f.scan_status)
-        if upload == "failed" or scan in _BLOCKED:
-            out.append(f"{label}: unavailable: file_blocked")
-            continue
-        if not _final(item):
-            out.append(f"{label}: unavailable: file_not_ready")
-            continue
-        texts, _ = await fetch_attachments(
-            client,
-            [
-                RunContextAttachment(
-                    file_id=f.id,
-                    original_name=f.original_name,
-                    mime_type=f.mime_type,
-                    size_bytes=f.size_bytes,
-                    scan_status=scan,
-                )
-            ],
-            files_dir,
+        entry = RunContextAttachment(
+            file_id=f.id,
+            original_name=f.original_name,
+            mime_type=f.mime_type,
+            size_bytes=f.size_bytes,
+            scan_status=scan,
         )
-        out.append(f"{label}: {texts[f.id]}")
-    return out
+        items.append(entry)
+        if upload == "failed" or scan in _BLOCKED:
+            texts[f.id] = "unavailable: file_blocked"
+        elif not _final(item):
+            texts[f.id] = "unavailable: file_not_ready"
+        else:
+            fetched, _ = await fetch_attachments(client, [entry], files_dir)
+            texts.update(fetched)
+    return items, texts
+
+
+def describe_followup_files(
+    items: Sequence[RunContextAttachment], texts: Mapping[UUID, str]
+) -> list[str]:
+    r"""One text ``<name> (<type>): <text>`` per attachment of a follow-up, in position order.
+
+    Control characters of the name become spaces, so a name never breaks the line of the list.
+
+    Args:
+        items: The attachments of `fetch_followup_files`.
+        texts: Their texts, with the transcriber's ``not transcribed: <code>`` line if any.
+
+    Returns:
+        The texts for `claude_code_runner.followups.build_followup_line`.
+
+    Examples:
+        >>> from uuid import UUID
+        >>> item = RunContextAttachment(UUID(int=1), "a\nb.png", "image/png", 1, "clean")
+        >>> describe_followup_files([item], {UUID(int=1): "unavailable: file_blocked"})
+        ['a b.png (image/png): unavailable: file_blocked']
+    """
+    return [
+        f"{_CONTROL.sub(' ', item.original_name)} ({item.mime_type}): {texts[item.file_id]}"
+        for item in items
+    ]

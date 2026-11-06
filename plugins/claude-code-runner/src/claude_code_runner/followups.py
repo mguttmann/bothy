@@ -133,6 +133,7 @@ def build_followup_line(
     text: str,
     line_uuid: str | None = None,
     files: Sequence[str] = (),
+    transcripts: Sequence[tuple[str, str]] = (),
 ) -> bytes:
     r"""Build the stdin line of one follow-up (design note 3).
 
@@ -140,8 +141,11 @@ def build_followup_line(
         author: The message's author (``display_name``, ``handle``).
         text: ``content_md`` of the message; may be blank when the message has attachments.
         line_uuid: The ``uuid`` of the line; a fresh UUIDv4 when omitted.
-        files: One text per attachment (`attachments.followup_file_texts`), listed after the
-            text under ``Attachments:`` (FIX-scan-state-stale).
+        files: One text per attachment (`attachments.describe_followup_files`), listed after
+            the text under ``Attachments:`` (FIX-scan-state-stale).
+        transcripts: The name and transcript of each audio attachment the runner transcribed
+            (09 18.14), after the text as in the trigger part of the context
+            (FIX-followup-transcribe).
 
     Returns:
         One JSON line of type ``user`` with its line break.
@@ -155,10 +159,15 @@ def build_followup_line(
     name = str(author.get("display_name") or author.get("handle") or "")
     handle = str(author.get("handle") or "")
     parts = [LEAD_IN.format(name=name, handle=handle)]
-    if text.strip() or not files:
+    if text.strip() or not (files or transcripts):
         parts.append(text)
+    parts.extend(
+        f"Transcript of attachment {json.dumps(name, ensure_ascii=False)}:\n{transcript}"
+        for name, transcript in transcripts
+    )
     if files:
-        parts.append("Attachments:\n" + "\n".join(f"- {f}" for f in files))
+        items = (f"- {f}".replace("\n", "\n  ") for f in files)
+        parts.append("Attachments:\n" + "\n".join(items))
     doc = {
         "type": "user",
         "uuid": line_uuid or str(uuid.uuid4()),

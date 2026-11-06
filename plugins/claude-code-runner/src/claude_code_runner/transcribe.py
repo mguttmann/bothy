@@ -1,13 +1,14 @@
 # SPDX-License-Identifier: Apache-2.0
 """Transcripts of voice messages and audio attachments (docs/spec/09-agents.md 13 and 18.14).
 
-An audio attachment (``mime_type`` ``audio/*``) of the triggering message that has no transcript
-of the server and was stored as a local file is given to the local transcriber
+An audio attachment (``mime_type`` ``audio/*``) of the triggering message or of a follow-up that
+has no transcript of the server and was stored as a local file is given to the local transcriber
 ``runner.transcribe_cmd``: its argument list plus the file path, no shell, stdin closed, stderr
 discarded, the allow-list environment of 18.2 without any mode part, its own process group and
 the time limit ``runner.transcribe_timeout``. Its stdout (UTF-8, trimmed, at most
 `TRANSCRIPT_MAX_BYTES`) becomes the attachment's ``transcript``, which the context helper puts
-into the trigger part with the trust of the message, exactly like a transcript of the server.
+into the trigger part with the trust of the message, exactly like a transcript of the server
+(a follow-up's line carries it after the text, FIX-followup-transcribe).
 Without a transcriber, or when it fails, the file entry says so and the caller tells the person
 in the thread (`notice`). Neither the text nor the path is logged.
 
@@ -164,16 +165,17 @@ async def transcribe_attachments(
     transcriber: Transcriber,
     on_start: Callable[[], object] | None = None,
 ) -> tuple[list[RunContextAttachment], list[Untranscribed]]:
-    """Transcribe the audio attachments of the triggering message that need it.
+    """Transcribe the audio attachments of the triggering message or a follow-up that need it.
 
     An attachment counts when it is audio, carries no transcript of the server and its file
     text says it was stored locally. A transcript is set on the attachment in place; an
     attachment without one gets ``not transcribed: <code>`` added to its file text.
 
     Args:
-        attachments: ``trigger_message.attachments`` of the run context.
-        file_texts: The file texts of `claude_code_runner.attachments.fetch_attachments`;
-            changed in place.
+        attachments: ``trigger_message.attachments`` of the run context, or the attachments
+            of a follow-up (`claude_code_runner.attachments.fetch_followup_files`).
+        file_texts: The file texts of `claude_code_runner.attachments.fetch_attachments` (or
+            of ``fetch_followup_files``); changed in place.
         transcriber: The configured transcriber.
         on_start: Called once before the first transcription (the status line).
 
