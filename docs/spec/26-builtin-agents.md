@@ -483,7 +483,8 @@ and its CI secret by the owner before the first template lands (D-A1-16, PLAN se
 
 The template catalogue sent with an interview request holds slug, name, description, tool class
 wish and the MCP servers of each template (shipped and private). The builder suggests MCP servers
-only from it.
+only from it; the server checks the draft against it and reports an MCP server outside it as a
+field error at its JSON Pointer.
 
 ### 7.5 Topics
 

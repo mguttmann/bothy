@@ -94,7 +94,7 @@ Runner and SDK:
 
 2. **Shape.** Request: `turns[]` of `{role: "builder" | "owner", text}` in order, optional `want_draft` (the person asked for a draft early). Event payload: `request_id`, `turns`, `catalogue` (26 7.4), `limits` (the definition limits the draft must keep), `expires_at`. Answer: `kind` `questions` with one or two `questions[]`, or `kind` `draft` with `draft` (the definition shape plus `name`, `handle`, `description`, `channel_suggestion` with a space name and channel name), and `costs` (`CostReport`).
 
-3. **Validation.** The server decodes the answer strictly: an unknown member anywhere is `builder_invalid`; a draft runs through the Go validator with the agent's prospective class from the draft's `tool_class_wish` (the creation flow sets that class before it stores the definition, 26 8.2, so a draft valid here is stored); the response carries the draft and its field errors so the person can ask the builder to fix them, and never stores anything.
+3. **Validation.** The server decodes the answer strictly: an unknown member anywhere is `builder_invalid`; a draft runs through the Go validator with the agent's prospective class from the draft's `tool_class_wish` (the creation flow sets that class before it stores the definition, 26 8.2, so a draft valid here is stored); the response carries the draft and its field errors so the person can ask the builder to fix them, and never stores anything. An MCP server of the draft that is not in the catalogue sent with the request (26 7.4) is a field error at its JSON Pointer, so the prompt is not the only guard.
 
 4. **Deadline.** The route uses `agents.interview.timeout` through the response controller like uploads use `http.transfer_timeout`; the console's backend for frontend passes the request with the same deadline. A builder answer after the deadline is refused the way a late search assistant answer is (14 4.10) and changes nothing.
 
@@ -108,13 +108,13 @@ Runner and SDK:
 
 ## Tests (write them first)
 
-- Go unit and integration (container runtime) for the server (BA-T15): a question turn, a draft turn, a draft with field errors, a builder answer carrying each surface of 26 5.5 (refused), every fallback, a late answer, an answer from another agent (`404`), a second answer (`409`), a non-owner (`404` or `403` as 07 2.13 says), "view as" refused, `503 maintenance` in maintenance mode (effect `write`); one audit entry and one log line per request without content (canary).
+- Go unit and integration (container runtime) for the server (BA-T15): a question turn, a draft turn, a draft with field errors, a draft with an MCP server outside the catalogue (field error), a builder answer carrying each surface of 26 5.5 (refused), every fallback, a late answer, an answer from another agent (`404`), a second answer (`409`), a non-owner (`404` or `403` as 07 2.13 says), "view as" refused, `503 maintenance` in maintenance mode (effect `write`); one audit entry and one log line per request without content (canary).
 - Runner unit and scenario tests with fake Claude: the command line of the builder call, the billing choice, the private folder removed, an invalid reply sends nothing, a reply with a surface is not sent, the time limit.
 - SDK tests of the hook.
 
 ```sh
-cd services/server && go test -race -count=1 ./internal/agents/... ./internal/gateway/...
-cd plugins/claude-code-runner && uv run --locked pytest -q
+(cd services/server && go test -race -count=1 ./internal/agents/... ./internal/gateway/...)
+(cd plugins/claude-code-runner && uv run --locked pytest -q)
 make catalog && make catalog-check
 make config-reference && make config-doc-check
 make check
