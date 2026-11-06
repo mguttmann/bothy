@@ -2,7 +2,7 @@
 """The runner's own check of an agent definition (docs/spec/26-builtin-agents.md 4.2 to 4.4).
 
 The one place of the definition rules in the runner: a port of the server's validator
-(``services/server/internal/agents/domain/definition``, rulings of ``docs/decisions.d/A1-02.md``)
+(``services/server/internal/agents/domain/definition``, rulings of ``decisions.d/A1-02.md``)
 held equal to it by the shared corpus ``tests/agent-definitions`` at the repository root. The
 runner repeats the check before every turn of a hosted agent (26 5.6 item 1): a definition that
 fails ends the run with ``tool_class_mismatch`` before ``run.start``. The builder checks its draft
