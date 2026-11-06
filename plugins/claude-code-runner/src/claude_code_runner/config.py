@@ -158,6 +158,15 @@ class RunnerConfig:
         default_workspace: ``runner.default_workspace``: the folder of a forum without a binding
             (RUNNER-NO-GIT), ``.`` for the projects root or a reference under it; ``None`` (the
             default, empty in the file) leaves such a forum without a folder.
+        hosted_agents: ``runner.hosted_agents``: host the built-in agents whose ``hosted_by``
+            is this runner's agent (docs/spec/26-builtin-agents.md 3.2); off by default, and
+            off the runner reads no hosted list and opens no further connection.
+        hosted_agents_root: ``runner.hosted_agents_root``: the root of the agent and control
+            folders (26 5.1); ``None`` when empty. Only read here; its checks come with the
+            turns of hosted agents (26 5.6).
+        hosted_max_tool_class: ``runner.hosted_max_tool_class``: the highest tool class loaded
+            for a hosted agent (``chat``, ``scoped`` or ``host``), reported as the value of the
+            capability ``hosts_agents`` (26 3.1 item 3).
     """
 
     source: Path
@@ -199,6 +208,9 @@ class RunnerConfig:
     search_assist_timeout: float = 9.0
     default_workspace: str | None = None
     trash_check_interval: float = 60.0
+    hosted_agents: bool = False
+    hosted_agents_root: Path | None = None
+    hosted_max_tool_class: str = "scoped"
 
 
 _Parse = Callable[[Any], Any]
@@ -375,6 +387,20 @@ def _default_workspace(r: _Reader, projects_root: Path) -> str | None:
     return str(value)
 
 
+def _hosted_agents_root(r: _Reader) -> Path | None:
+    """``runner.hosted_agents_root``: empty is unset; the folder checks belong to 26 5.6."""
+    value = r.get("hosted_agents_root", str, "")
+    return Path(value) if value else None
+
+
+def _hosted_max_tool_class(r: _Reader) -> str:
+    """``runner.hosted_max_tool_class``: one of the tool classes, default ``scoped``."""
+    value: str = r.get("hosted_max_tool_class", str, "scoped")
+    if value not in ORDER:
+        raise r.fail("hosted_max_tool_class", "not chat, scoped or host")
+    return value
+
+
 def _plain(value: str) -> bool:
     """Not empty and without a control or bidi character (an argument may start with -)."""
     return check_argument("x" + value) and bool(value)
@@ -480,6 +506,12 @@ def load_config(path: Path) -> RunnerConfig:
         search_assist_timeout=_positive(r, "search_assist_timeout", "9s"),
         default_workspace=_default_workspace(r, projects_root),
         trash_check_interval=_positive(r, "trash_check_interval", "60s"),
+        hosted_agents=r.get("hosted_agents", bool, False),
+        hosted_agents_root=_hosted_agents_root(r),
+        hosted_max_tool_class=_hosted_max_tool_class(r),
     )
     r.unknown()
+    if config.hosted_agents and config.dpop_key_ref is None:
+        # Hosted tokens are bound to this key (26 3.3 item 1); the server refuses them without.
+        raise r.fail("dpop_key_ref", "required with runner.hosted_agents")
     return config

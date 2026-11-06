@@ -53,6 +53,18 @@ session_lock_wait = "10m"
 max_parallel_runs = 4
 stream_log_retention = "14d"
 progress_patch_interval = "2m"
+# Hosting of built-in agents (docs/spec/26-builtin-agents.md 3): off by default. With it on, the
+# runner also serves every agent whose hosting runner is this runner's agent, each with its own
+# connection, token (fetched from the server, kept in memory only), heartbeat and state folder
+# under state_dir/hosted/<agent id>/, sharing the slots of max_parallel_runs. Off, the runner
+# behaves exactly as without these keys.
+hosted_agents = false
+# Root of the agent and control folders of hosted agents; required with hosted_agents once hosted
+# turns run (never inside, equal to or above state_dir or projects_root).
+hosted_agents_root = ""
+# Highest tool class loaded for a hosted agent (chat, scoped or host); reported to the server as
+# the capability hosts_agents, which bounds the class an owner can give a hosted agent.
+hosted_max_tool_class = "scoped"
 # Roots of answer attachments by name only; an operator may narrow the list, never widen it.
 attach_allowed_roots = ["project", "thread_inbox", "runner_temp"]
 # Denied names of answer attachments; must contain the list of 09 18.10, may add more.

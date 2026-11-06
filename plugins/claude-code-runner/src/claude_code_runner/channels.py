@@ -33,9 +33,17 @@ from bothy_sdk.generated.models import (
 from claude_code_runner.provision import Provisioner, want_of
 from claude_code_runner.workspace import readiness
 
-__all__ = ["ChannelCache"]
+__all__ = ["RESYNC_EVENTS", "ChannelCache"]
 
 _LOG = logging.getLogger("claude_code_runner")
+
+RESYNC_EVENTS = frozenset(
+    {"access.changed", "channel.updated", "space.updated", "channel.archived", "space.archived"}
+)
+"""Events after which the served channels are loaded again (09 18.1): an operator change
+reaches the old and the new operator as ``access.changed`` (04 8.2) and an agent that reads the
+channel also as ``channel.updated`` or ``space.updated``; none is ``agent.config_changed``. The
+same for the runner's own agent and each hosted agent (26 3.2 item 2)."""
 
 
 class ChannelCache:

@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import pytest
 
-from claude_code_runner.toolclass import ORDER, exceeds, rank
+from claude_code_runner.toolclass import ORDER, exceeds, lower, rank
 
 
 def test_order() -> None:
@@ -22,3 +22,10 @@ def test_exceeds_all_nine_pairs(configured: str, token: str) -> None:
 def test_unknown_class_rejected() -> None:
     with pytest.raises(ValueError, match="tool class"):
         rank("full")
+
+
+@pytest.mark.parametrize("agent", ORDER)
+@pytest.mark.parametrize("ceiling", ORDER)
+def test_lower_is_the_loaded_class_of_a_hosted_agent(agent: str, ceiling: str) -> None:
+    # 26 3.1 item 3: a hosted agent runs with the lower of its class and the runner's ceiling.
+    assert lower(agent, ceiling) == ORDER[min(ORDER.index(agent), ORDER.index(ceiling))]

@@ -148,6 +148,7 @@ def test_closed_details_keys() -> None:
         "voice_input",
         "title",
         "files_out",
+        "hosts_agents",
     }
 
     # Required members, types, vocabularies and duplicates.
@@ -412,3 +413,32 @@ def test_run_slots_and_waiting_runs() -> None:
     raises_naming(
         "waiting_runs.run_id", lambda: build_heartbeat(waiting_runs=[("x", "slots_full")])
     )
+
+
+@pytest.mark.parametrize("ceiling", ["chat", "scoped", "host"])
+def test_hosts_agents_carries_a_tool_class(ceiling: str) -> None:
+    # 09 2.2, 26 3.1 item 3 (A1-04): a Claude Code runner with runner.hosted_agents reports the
+    # highest class it loads for a hosted agent.
+    beat = build_heartbeat(details={"capabilities": {"title": True, "hosts_agents": ceiling}})
+    assert beat.to_dict()["details"]["capabilities"] == {"title": True, "hosts_agents": ceiling}
+
+
+@pytest.mark.parametrize("bad", ["full", "", True, 1, None])
+def test_hosts_agents_refuses_another_value(bad: object) -> None:
+    raises_naming(
+        "details.capabilities.hosts_agents",
+        lambda: build_heartbeat(details={"capabilities": {"hosts_agents": bad}}),
+        bad,
+    )
+
+
+def test_capabilities_keep_their_order_without_hosts_agents() -> None:
+    # An adapter that does not host agents sends the capabilities as before (26 11 item 3).
+    caps = {"files_out": True, "title": True, "voice_input": False, "followups": "steer"}
+    beat = build_heartbeat(details={"capabilities": caps})
+    assert list(beat.to_dict()["details"]["capabilities"]) == [
+        "followups",
+        "voice_input",
+        "title",
+        "files_out",
+    ]

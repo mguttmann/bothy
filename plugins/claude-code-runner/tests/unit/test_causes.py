@@ -77,3 +77,14 @@ def test_lost_background_tasks_are_reported(lost: int, sentence: str) -> None:
 
 def test_an_error_without_lost_work_keeps_its_box_note_only() -> None:
     assert turn_end_cause("runtime_error", 0) is None
+
+
+def test_definition_missing_names_the_built_in_agent() -> None:
+    # 26 5.6 item 4: a hosted agent's run without a definition the runner runs ends with
+    # adapter_error and this cause in the summary (09 18.9).
+    text = cause("definition_missing")
+    assert text == (
+        "The runner has no agent definition it can run for this built-in agent yet, so the "
+        "run ended without a turn. Set up the agent's definition in the app "
+        "(`definition_missing`)"
+    )

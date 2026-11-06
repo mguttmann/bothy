@@ -8,7 +8,7 @@ Examples:
 
 from __future__ import annotations
 
-__all__ = ["ORDER", "exceeds", "rank"]
+__all__ = ["ORDER", "exceeds", "lower", "rank"]
 
 ORDER = ("chat", "scoped", "host")
 """The tool classes from the lowest to the highest."""
@@ -43,3 +43,26 @@ def exceeds(configured: str, token: str) -> bool:
         True when no turn may start.
     """
     return rank(configured) > rank(token)
+
+
+def lower(first: str, second: str) -> str:
+    """Return the lower of two tool classes.
+
+    The loaded class of a hosted agent is the lower of its own class and the runner's ceiling
+    ``runner.hosted_max_tool_class`` (docs/spec/26-builtin-agents.md 3.1 item 3).
+
+    Args:
+        first: A tool class.
+        second: Another tool class.
+
+    Returns:
+        The lower of both.
+
+    Raises:
+        ValueError: One is not a tool class.
+
+    Examples:
+        >>> lower("host", "scoped")
+        'scoped'
+    """
+    return first if rank(first) <= rank(second) else second

@@ -101,7 +101,7 @@ from claude_code_runner.followups import (
 from claude_code_runner.ledger import TurnLedger, is_success
 from claude_code_runner.livebox import LiveBox
 from claude_code_runner.livecost import LiveCost, load_prices
-from claude_code_runner.locks import LockTimeout, acquire, release
+from claude_code_runner.locks import LockTimeout, SlotPool, acquire, release
 from claude_code_runner.prompt import context_items, system_prompt, user_line
 from claude_code_runner.recovery import (
     RETRY_HINT,
@@ -215,7 +215,7 @@ class RunState:
         thread_id: Its thread.
         channel_id: Its channel.
         locks: The thread lock and the session lock (descriptors).
-        slot: The slot of ``runner.max_parallel_runs``.
+        slot: The pool of ``runner.max_parallel_runs`` while the run holds one of its slots.
         cwd: The resolved project folder.
         session: The Claude Code session of the first process.
         session_mode: ``new``, ``resume`` or ``bind`` of the payload (09 9.1).
@@ -238,7 +238,7 @@ class RunState:
     thread_id: UUID
     channel_id: UUID
     locks: list[int] = field(default_factory=list)
-    slot: asyncio.Semaphore | None = None
+    slot: SlotPool | None = None
     cwd: Path | None = None
     session: SessionChoice | None = None
     session_mode: str = "new"

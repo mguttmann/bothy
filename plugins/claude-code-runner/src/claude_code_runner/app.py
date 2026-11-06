@@ -23,7 +23,7 @@ import json
 import logging
 import os
 import sys
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any, NoReturn
 from uuid import UUID
@@ -71,7 +71,7 @@ from claude_code_runner.adoption import (
 from claude_code_runner.attachments import fetch_attachments
 from claude_code_runner.authcheck import auth_status, decide, evidence
 from claude_code_runner.causes import ADAPTER_STOPPED, cause
-from claude_code_runner.channels import ChannelCache
+from claude_code_runner.channels import RESYNC_EVENTS, ChannelCache
 from claude_code_runner.commandline import (
     ArgumentError,
     SessionChoice,
@@ -89,18 +89,19 @@ from claude_code_runner.environment import (
     kept_environment,
 )
 from claude_code_runner.heartbeat import (
-    CAPABILITIES,
     MIN_CLAUDE_CODE_VERSION,
     WAIT_SLOTS_FULL,
     WAIT_THREAD_BUSY,
     Probe,
     billing_modes_supported,
+    capabilities,
     parse_version,
     probe_version,
     raised_minimum,
     runtime_status,
 )
-from claude_code_runner.locks import LockTimeout, acquire, release
+from claude_code_runner.hosting import HostedAgents, HostingContext
+from claude_code_runner.locks import LockTimeout, SlotPool, acquire, release
 from claude_code_runner.provision import Provisioner
 from claude_code_runner.reply_upload import remove_run_files, run_temp_dir
 from claude_code_runner.runturn import RunState, RunTurn
@@ -123,13 +124,6 @@ from claude_code_runner.workspace import resolve as resolve_workspace
 __all__ = ["RESYNC_EVENTS", "Runner", "RunnerHandler", "StartError", "log", "warn"]
 
 _LOG = logging.getLogger("claude_code_runner")
-
-RESYNC_EVENTS = frozenset(
-    {"access.changed", "channel.updated", "space.updated", "channel.archived", "space.archived"}
-)
-"""Events after which the served channels are loaded again (09 18.1): an operator change
-reaches the old and the new operator as ``access.changed`` (04 8.2) and an agent that reads the
-channel also as ``channel.updated`` or ``space.updated``; none is ``agent.config_changed``."""
 
 
 def log(event: str, **ids: object) -> None:
@@ -228,7 +222,10 @@ class RunnerHandler(AgentHandler):
         self._adopting: set[asyncio.Task[None]] = set()
         self._resync_lock = asyncio.Lock()
         self._resyncing: asyncio.Task[None] | None = None
-        self._slots = asyncio.Semaphore(config.max_parallel_runs)
+        self.slots = SlotPool(config.max_parallel_runs)
+        """The slots of every turn of the process, shared with hosted agents (26 3.2 item 3)."""
+        self.hosting: HostedAgents | None = None
+        """The hosted agents with ``runner.hosted_agents``; ``None`` without (26 3.2 item 4)."""
         self._waiting: dict[UUID, str] = {}
         """The runs that wait in prepare, with their wait reason (09 5.2.1)."""
         self._beats: set[asyncio.Task[None]] = set()
@@ -275,15 +272,10 @@ class RunnerHandler(AgentHandler):
             self._modes,
             folders,
             self.trash.results(),
-            slots=(self._slots_used(), self.config.max_parallel_runs),
+            slots=(self.slots.used, self.slots.total),
             waiting=dict(self._waiting),
         )
         return dataclasses.replace(status, active_runs=sorted(self.adopted, key=str))
-
-    def _slots_used(self) -> int:
-        """The turns that hold a slot of ``runner.max_parallel_runs`` now."""
-        used = sum(1 for state in self._runs.values() if state.slot is not None)
-        return min(used, self.config.max_parallel_runs)
 
     def _wait(self, run_id: UUID, reason: str | None) -> None:
         """Note that a run in prepare waits for ``reason`` (``None``: no longer) and report it.
@@ -421,9 +413,16 @@ class RunnerHandler(AgentHandler):
             await self.adapter.send_heartbeat()
 
     async def on_ready(self) -> None:
-        """Send the first heartbeat as soon as the connection is ready (note 3)."""
+        """Send the first heartbeat as soon as the connection is ready (note 3).
+
+        With ``runner.hosted_agents`` the hosted set is listed after it: the server issues a
+        hosted token only to a runner whose stored heartbeat reports ``hosts_agents``
+        (26 3.3 item 1), and the heartbeat is stored when it is answered.
+        """
         if self.adapter is not None:
             await self.adapter.send_heartbeat()
+        if self.hosting is not None:
+            await self.hosting.start()
 
     async def on_event(self, envelope: Envelope) -> None:
         """``agent.config_changed`` reloads the forum, an operator change every served channel.
@@ -435,6 +434,8 @@ class RunnerHandler(AgentHandler):
         """
         if envelope.type == "run.cancel_requested":
             await self._cancel_adopted(envelope)
+            return
+        if self.hosting is not None and await self.hosting.on_event(envelope):
             return
         if envelope.type in RESYNC_EVENTS:
             await self.resync_channels(envelope.type)
@@ -734,10 +735,12 @@ class RunnerHandler(AgentHandler):
         return self.probe
 
     async def close(self) -> None:
-        """Cancel the probe, the follows, the timers, a folder creation and queued folder moves.
+        """Stop the hosted agents; cancel the probe, follows, timers, folder creations and moves.
 
         Adopted turns keep running; what a cancelled folder creation made is removed (09 18.12).
         """
+        if self.hosting is not None:
+            await self.hosting.close()
         await self.provisioner.close()
         await self.trash.close()
         for timer in (self._resyncing, self._trashing):
@@ -916,10 +919,10 @@ class RunnerHandler(AgentHandler):
                     )
             except LockTimeout:
                 refuse("session_busy", "adapter_error", ids)
-            if self._slots.locked():
+            if self.slots.full:
                 self._wait(run_id, WAIT_SLOTS_FULL)
-            await self._slots.acquire()
-            state.slot = self._slots
+            await self.slots.acquire()
+            state.slot = self.slots
         finally:
             self._wait(run_id, None)
 
@@ -1029,6 +1032,8 @@ class Runner:
         environ: The process environment.
         http_transport: An ``httpx`` transport for the SDK client (tests).
         clock: The SDK's time source (tests pass the FakeServer's clock).
+        hosted_url: The origin of a hosted agent's server (tests, where each hosted agent is
+            the agent of a FakeServer of its own); ``runner.server_url`` when omitted.
     """
 
     def __init__(
@@ -1038,12 +1043,14 @@ class Runner:
         *,
         http_transport: httpx.AsyncBaseTransport | None = None,
         clock: Clock | None = None,
+        hosted_url: Callable[[UUID], str] | None = None,
     ) -> None:
         """Create the runner; nothing connects before `run`."""
         self.clock = clock
         self.config = config
         self.handler = RunnerHandler(config, os.environ if environ is None else environ)
         self.http_transport = http_transport
+        self.hosted_url = hosted_url
         self.adapter: Adapter | None = None
 
     def _credentials(self) -> Credentials:
@@ -1102,7 +1109,12 @@ class Runner:
             adapter_name=ADAPTER_NAME,
             adapter_version=__version__,
             runtime_name=RUNTIME_NAME,
-            capabilities={**CAPABILITIES, "voice_input": bool(self.config.transcribe_cmd)},
+            capabilities=capabilities(
+                voice_input=bool(self.config.transcribe_cmd),
+                hosts_agents=(
+                    self.config.hosted_max_tool_class if self.config.hosted_agents else None
+                ),
+            ),
             settings=self.config.sdk,
         )
         self.adapter = Adapter(
@@ -1117,8 +1129,41 @@ class Runner:
         except (ProblemError, httpx.TransportError) as err:
             raise StartError("channels_unavailable") from err
         self.handler.channels = cache
+        if self.config.hosted_agents:
+            self.handler.hosting = self._hosting(self.adapter, credentials)
         self._startup_files()
         return self.adapter
+
+    def _hosting(self, adapter: Adapter, credentials: Credentials) -> HostedAgents:
+        """The hosted set of ``runner.hosted_agents`` (26 3.2), not started yet."""
+        config = self.config
+        if credentials.dpop is None:  # pragma: no cover - load_config requires the key
+            raise StartError("hosted_agents_need_dpop_key")
+        handler = self.handler
+        context = HostingContext(
+            client=adapter.client,
+            dpop=credentials.dpop,
+            instance_id=config.instance_id,
+            server_url=self.hosted_url or (lambda _agent: config.server_url),
+            state_dir=config.state_dir,
+            projects_root=config.projects_root,
+            ceiling=config.hosted_max_tool_class,
+            allow_personal=config.allow_personal,
+            modes=billing_modes_supported(
+                has_key_ref=config.anthropic_api_key_ref is not None,
+                allow_personal=config.allow_personal,
+            ),
+            probe=lambda: handler.probe,
+            capabilities=capabilities(voice_input=bool(config.transcribe_cmd)),
+            slots=handler.slots,
+            session_lock_wait=config.session_lock_wait,
+            poll_interval=config.poll_interval,
+            resync_interval=config.channels_resync_interval,
+            settings=config.sdk,
+            clock=adapter.clock,
+            http_transport=self.http_transport,
+        )
+        return HostedAgents(context)
 
     def _startup_files(self) -> None:
         sweep(self.config.state_dir, self.config.stream_log_retention)

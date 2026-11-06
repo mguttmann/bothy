@@ -288,3 +288,54 @@ def test_default_workspace_outside_the_root_refused(tmp_path: Path, value: str) 
     with pytest.raises(ConfigError) as err:
         load_config(write(tmp_path, runner=f'default_workspace = "{value}"'))
     assert err.value.key == "runner.default_workspace"
+
+
+def test_hosting_keys_default_off(tmp_path: Path) -> None:
+    # 26 14: every key of stage A1 is off by default (26 11 item 2).
+    cfg = load_config(write(tmp_path))
+    assert cfg.hosted_agents is False
+    assert cfg.hosted_agents_root is None
+    assert cfg.hosted_max_tool_class == "scoped"
+
+
+def test_hosting_keys_read(tmp_path: Path) -> None:
+    root = tmp_path / "agents"
+    runner = (
+        f'hosted_agents = true\nhosted_agents_root = "{root}"\nhosted_max_tool_class = "host"\n'
+        'dpop_key_ref = "file:/srv/secrets/dpop.pem"'
+    )
+    cfg = load_config(write(tmp_path, runner))
+    assert cfg.hosted_agents is True
+    assert cfg.hosted_agents_root == root
+    assert cfg.hosted_max_tool_class == "host"
+
+
+def test_hosting_root_empty_is_unset(tmp_path: Path) -> None:
+    cfg = load_config(write(tmp_path, 'hosted_agents_root = ""'))
+    assert cfg.hosted_agents_root is None
+
+
+@pytest.mark.parametrize("value", ["full", "", "Host", "scoped "])
+def test_hosted_max_tool_class_refuses_an_unknown_class(tmp_path: Path, value: str) -> None:
+    with pytest.raises(ConfigError) as err:
+        load_config(write(tmp_path, f'hosted_max_tool_class = "{value}"'))
+    assert err.value.key == "runner.hosted_max_tool_class"
+
+
+@pytest.mark.parametrize(
+    "runner",
+    ['hosted_agents = "yes"', "hosted_agents_root = 3", "hosted_max_tool_class = 1"],
+)
+def test_hosting_keys_wrong_type(tmp_path: Path, runner: str) -> None:
+    with pytest.raises(ConfigError) as err:
+        load_config(write(tmp_path, runner))
+    assert err.value.key.startswith("runner.hosted_")
+
+
+def test_hosting_needs_the_dpop_key(tmp_path: Path) -> None:
+    # 26 3.3 item 1: a hosted token is bound to the runner's DPoP key; without one the server
+    # refuses every token (dpop_required), so the start names the missing key instead.
+    with pytest.raises(ConfigError) as err:
+        load_config(write(tmp_path, "hosted_agents = true"))
+    assert err.value.key == "runner.dpop_key_ref"
+    assert "hosted_agents" in err.value.problem
