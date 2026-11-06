@@ -6,7 +6,8 @@ the [specification](SPEC.md); in case of a contradiction the chapter applies, an
 adjusted in the same change. The briefs of the milestones M1 to M8 with waves and dependency graph
 are in the [brief index](briefs/README.md); the briefs of M2 to M8 were written before M1 was
 closed (D-W-100, D-W-114, D-W-120, D-W-124, D-W-125). The stage A1 "Built-in agents" (section 21)
-follows the milestones with its own briefs in the same index (P-27).
+follows the milestones with its own briefs in the same index (P-27), and so does the stage AR
+"Autonomous runs" (section 22, P-29).
 
 Notation: references to chapters name the number and the section title in quotes, for
 example 02 "Request path", because section numbers can change. Test IDs come from the
@@ -1606,6 +1607,7 @@ holds the exclusion, the chapter names it.
 | P-26 | Demo data comes into being only through public use cases with `authorize` and audit; runs come from the test double of the SDK, the terminal from a host service in a container. | Images and video show real behavior; a second write path that bypasses the permission model would be a risk and a second truth. |
 | P-27 | Built-in agents are the stage A1 after the milestones, with ticket IDs `A1-<two-digit number>` and briefs in the same index and the same checks as the milestones (`brief_deps.py`, the brief format test); the plan section gets the next free number (21) so that no reference to sections 18 to 20 changes. | The owner request of 2026-11-05 came after M8; renumbering the sections would break every brief that cites "section 19" of this plan. |
 | P-28 | V1-07 to V1-12 run as tasks from their plan rows without a brief. | V1-07 waits for an owner ruling and changes files outside the repository; V1-08 and V1-09 are small and their cause is read on the day; V1-10 to V1-12 describe a state that exists only after A1-10, and a brief written now would describe what is not built yet. |
+| P-29 | Autonomous runs are the stage AR after the milestones, with ticket IDs `AR-<two-digit number>`, briefs in the same index and the same checks as A1 (P-27), and the plan section 22. A ticket ID never follows a letter, digit or dash, so decision IDs such as `D-AR-12` name no ticket. | The owner request of 2026-11-06 came after A1; a separate stage keeps its order and checks visible, and the design note already uses `D-AR-<n>` for its decisions. |
 
 ## 20. Defaults for questions to the owner
 
@@ -1737,6 +1739,115 @@ Launch arguments for the build workflow (brief files as in the [brief index](bri
     {"id": "A1-08", "brief": "docs/briefs/A1-08-new-agent-clients.md", "deps": ["A1-03", "A1-06", "A1-07"]},
     {"id": "A1-09", "brief": "docs/briefs/A1-09-edit-agent-clients.md", "deps": ["A1-08"]},
     {"id": "A1-10", "brief": "docs/briefs/A1-10-builtin-agents-end-to-end.md", "deps": ["A1-05", "A1-09"]}
+  ]
+}
+```
+
+## 22. AR Autonomous runs
+
+### Goal
+
+Every session, chat or development, keeps working on its own as long as it has work: an agent asks
+for a wake-up that survives its process and the runner, a runner restart hands live turns over
+instead of ending them, lost work leads to a recovery run, the usage window of the account wakes
+the thread at its reset, and no run ends silently. Autonomous work is limited by who may start it,
+a visible chain cap and an idle cap that cannot be switched off. An installation that turns
+nothing on keeps working byte for byte as before.
+
+### Scope
+
+[09-agents.md](spec/09-agents.md) 5.8 and 18.19, [07-permissions.md](spec/07-permissions.md) 2.14,
+03 `run_wakes`, `run_autonomy`, `runs.trigger_kind` and `channels.allow_autonomous_runs`,
+[01-product.md](spec/01-product.md) 6.21, 04 15.9, 10 10.4, 13 section 2, 16 10.1, 17 section 3;
+[ADR 0077](adr/0077-autonomous-runs-wake-ups-and-turn-handover.md); design note
+[autonomous-runs.md](design/autonomous-runs.md); rulings
+[decisions.d/AR-01.md](decisions.d/AR-01.md).
+
+### Out of scope
+
+A dollar budget for autonomous work (may come with the monthly budget left open by D-A1-20);
+`bothy-wake` for tool class `chat`; GitHub webhooks or a GitHub app; a supervisor service; any
+change to the adapter for another agent runtime beyond what the server requires of every adapter.
+
+### Exit criteria
+
+1. AR-T01 to AR-T16 of 09 18.19.13 are green, AR-T02 also as the macOS variant under a scratch
+   launchd job (AR-09).
+2. Without the new keys the runner's command line, environment, heartbeat and stdin handling equal
+   the fixtures of the version before AR-02 (AR-T16), and the server behaves as before.
+3. The end-to-end test on the demo stack waits for checks of a fake pull request across a runner
+   restart, reaches the chain cap and continues by a reply, and continues a usage-window end at the
+   reset (AR-10).
+4. The red team's verdict is `JA`.
+
+### Test strategy
+
+Runner: scenarios with a real runner process and the fake Claude, a test-only crash point after
+each step of the launch handshake, recorded fake streams replayed at every checkpoint position,
+byte-equal fixtures, and the CLI facts of 09 18.19.12 captured against a local stand-in for the
+API (no login, no cost). Server: one test per refusal and per end state of a wake-up, the caps,
+the launch check and the rollback behaviour, against PostgreSQL. Clients: widget and integration
+tests against the Dart fake server. Operations: the keeper probe as a macOS test under a scratch
+launchd job that never touches a runner job serving turns.
+
+### Red team
+
+No path lets a wake-up run host code or read GitHub without the checks of that moment; no input is
+answered twice and no CLI runs that no record names after a crash at any point; a restart with the
+handover on loses no background work; every end of autonomous work is visible; the caps cannot be
+bypassed through wake inputs, notification turns or another person's message; byte-equal behaviour
+without the keys.
+
+### Dependencies
+
+All product milestones are merged (M1 to M8). AR-01 is this specification; every later ticket
+starts after it is merged, so the column "Depends on" below does not repeat it. AR-05 also needs
+A1-05, because hosted agents get `bothy-wake` after the intersection of 26 4.4.
+
+### Owner
+
+The owner rulings of the design note section 11 are recorded as D-AR-01-1 to D-AR-01-5; none is
+open. The operator rule of D-AR-01-4 (restarts only while no turn runs until the handover is on)
+applies to every installation that updates through AR-02 and AR-03.
+
+### Risks
+
+The handover relies on the service's stop leaving the keeper alone (launchd probed, systemd needs
+`KillMode=process`); a later CLI version may change the background ceiling, the sweep or the
+usage frame (checked when the pin moves); an agent can still decide not to ask for a wake-up, which
+the end-state check makes visible but cannot prevent. RISKS.md is updated at the close of the
+stage (section 4 item 6).
+
+### Tickets
+
+| ID | Title | Goal | Files and modules | Acceptance tests | Depends on |
+|---|---|---|---|---|---|
+| AR-01 | Specification, ADR, decisions and briefs | The chapters of the design note section 7 carry its sections 4 to 6 as normative text; ADR 0077; R-AG-17 amended and the last clause of D-M2-35-3 replaced with dated entries; the owner rulings in `docs/decisions.d/`; the CLI facts read from the pinned CLI; briefs AR-02 to AR-10; the brief and configuration tools accept stage AR. | `docs/spec/`, `docs/adr/0077-*`, `docs/PLAN.md`, `docs/briefs/`, `docs/decisions.d/`, `tools/docs/brief_deps.py`, `tools/configdoc/` | `make docs`, `make catalog-check`, `make config-doc-check`, `make register-check` and the brief tests green | none |
+| AR-02 | Runner: orderly stop never orphans a turn | The cancel path keeps the process handle until the turn is gone; an orderly stop stops live turns as in 18.6 and finishes their runs `cancelled` with `runner_stopped` (09 18.19.2). | `plugins/claude-code-runner` | AR-T01 | none |
+| AR-03 | Runner: turn handover | Keeper, named pipe, launch handshake for every attempt, phases in the record, `ProcessState` and its replay, adoption with full rights, adoption rule, launch check, exit 75, `stop --turns`, capability `turn_handover` (09 18.19.3 to 18.19.7). | `plugins/claude-code-runner`, `sdk/python` (handover hook) | AR-T02 (portable), AR-T03, AR-T04, AR-T16 | AR-02, AR-04 |
+| AR-04 | Server: wake-ups | `run_wakes`, `run_autonomy`, `trigger_kind = 'wake'`, the operations of 09 5.8.2 with `run.launch.check`, the capabilities `turn_handover` and `wakes`, `run.wake_changed`, the wake input token, `runs.wake_due`, the caps, notes and notifications, `allow_autonomous_runs`, the reason `usage_limited`. | `internal/runs`, `internal/agents`, `internal/notify`, migrations, API documents, catalogue | one test per refusal and end state; AR-T13 and AR-T14 server parts | none |
+| AR-05 | Runner: bothy-wake | Command, request folder with nonce, outbox, condition checks with `run.wake.check` before every execution, pending list, fire, wake inputs, disallowed CLI timers, capability `wakes`, prompt text (09 18.19.8). | `plugins/claude-code-runner` | AR-T06 to AR-T10 | AR-03, A1-05 |
+| AR-06 | Runner: recovery and usage-window wake-ups | Lost-task detection for each case of 09 18.19.9, the usage mark of 18.19.10 with one wake-up per outage, `usage_limited`, `run.wake.recover` after a restart, the captured frame and `result` of the pinned CLI. | `plugins/claude-code-runner` | AR-T03 (keeper kill), AR-T05, AR-T11 | AR-05 |
+| AR-07 | Runner: end state | The `STATE:` marker, one nudge per waiting phase, the note, the idle flag per input and notification turn, `runner.cli_bg_wait_ceiling` (09 18.19.11, 18.19.12). | `plugins/claude-code-runner` | AR-T12, AR-T15; AR-T13 and AR-T14 with the server of AR-04 | AR-05 |
+| AR-08 | Clients: autonomous runs | Pending wake-ups with cancel, end state, notes, the channel switch, cap and usage-limit notices (01 6.21); desktop, phone and console. | `apps/client`, `packages/admin_ui`, `apps/console`, Dart client | widget and integration tests per platform | AR-04 |
+| AR-09 | Operations: runner service guide | The runner service guide of 16 10.1 with the operator checklist; AR-T02 under a scratch launchd job on macOS. | `docs/operations/`, `plugins/claude-code-runner/tests` | AR-T02 (macOS variant) | AR-03 |
+| AR-10 | End to end and rollout | Demo stack with fake Claude across a runner restart; chain cap continued by a reply; usage window continued at the reset; rollout steps 4 to 6 of the design note section 9. | `tests/e2e/`, `infra/compose/demo.yaml`, `docs/operations/` | the end-to-end tests of exit criterion 3 | AR-06, AR-07, AR-08, AR-09 |
+
+Launch arguments for the build workflow (brief files as in the [brief index](briefs/README.md)):
+
+```json
+{
+  "parallel": 3,
+  "tickets": [
+    {"id": "AR-02", "brief": "docs/briefs/AR-02-runner-orderly-stop.md", "deps": []},
+    {"id": "AR-04", "brief": "docs/briefs/AR-04-server-wake-ups.md", "deps": []},
+    {"id": "AR-03", "brief": "docs/briefs/AR-03-runner-turn-handover.md", "deps": ["AR-02", "AR-04"]},
+    {"id": "AR-08", "brief": "docs/briefs/AR-08-autonomous-runs-clients.md", "deps": ["AR-04"]},
+    {"id": "AR-05", "brief": "docs/briefs/AR-05-runner-bothy-wake.md", "deps": ["AR-03", "A1-05"]},
+    {"id": "AR-09", "brief": "docs/briefs/AR-09-runner-service-guide.md", "deps": ["AR-03"]},
+    {"id": "AR-06", "brief": "docs/briefs/AR-06-runner-recovery-usage.md", "deps": ["AR-05"]},
+    {"id": "AR-07", "brief": "docs/briefs/AR-07-runner-end-state.md", "deps": ["AR-05"]},
+    {"id": "AR-10", "brief": "docs/briefs/AR-10-autonomous-runs-end-to-end.md", "deps": ["AR-06", "AR-07", "AR-08", "AR-09"]}
   ]
 }
 ```

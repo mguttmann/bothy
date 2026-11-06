@@ -1134,6 +1134,34 @@ Targets: `dr.rpo_target` (data loss) and `dr.rto_target` (time until operation).
 
 Rules in detail and flow: [upgrade.md](../operations/upgrade.md).
 
+### 10.1 Claude Code runner: restart, update and turn handover
+
+Addendum of 2026-11-06 (stage AR, R-OP-21, [09-agents.md](09-agents.md) 18.19). The runner service
+guide (AR-09) describes the service form the handover relies on and these rules:
+
+1. **Service form.** The runner runs as a service that restarts it after a non-zero exit (launchd
+   `KeepAlive {SuccessfulExit: false}` without `AbandonProcessGroup`, or systemd
+   `Restart=on-failure`). Under systemd the unit needs `KillMode=process`; with the default
+   `control-group` a restart kills every turn's keeper, because a new session leaves the process
+   group but not the cgroup.
+2. **Restart and update with the handover.** With `runner.turn_handover` a restart or update needs
+   no wait: SIGTERM hands live turns over, the runner exits 75, and the next runner adopts them.
+   The operator's check after switching the key on: a harmless background command in a thread
+   survives a restart, shown by its notification turn and the log line `turn_adopted`.
+3. **Unloading and uninstall.** Before `launchctl bootout`, `systemctl disable --now` or an
+   uninstall the operator runs `claude-code-runner stop --turns`, which ends every turn and its run
+   `cancelled`; a skipped one leaves turns that the next install adopts or, after
+   `run.orphan_timeout`, stops with a recovery run.
+4. **Restart only while no turn runs, until the handover is on** (ruling D-AR-01-4). The restart
+   that installs AR-02, the one that installs AR-03 and the one that switches
+   `runner.turn_handover` on happen only while no turn runs, because until then a restart ends the
+   live turns and their background work.
+5. **Order of the rollout.** The server of AR-04 (capabilities `turn_handover` and `wakes`,
+   `run.launch.check`, `run.wake.check`) runs before any runner switches `runner.turn_handover` or
+   `runner.wakes` on; the operator checks the server version first. A server rollback below AR-04
+   turns both runner keys off first. Turning a key off returns to the earlier behaviour; pending
+   wake-ups stay on the server and can be cancelled from the thread.
+
 ## 11. Relocation and cloud portability
 
 A relocation is a restore on a different target without data loss:
@@ -1563,6 +1591,7 @@ Column "Place": Server = configuration reference of the server; Installation scr
 | R-OP-18 | The server generates signing keys in its own writable directory ([ADR 0066](../adr/0066-signing-keys-in-the-writable-key-store.md)). | Rotation without manual work on the host; all other secrets stay read-only. |
 | R-OP-19 | Hash routing over the session ID for both stream paths of the terminal as an operational requirement with several nodes. | No broker in the server; one node holds both ends of a session ([24-terminal.md](24-terminal.md), section 9). |
 | R-OP-20 | Setup wizard as the POSIX shell script `install.sh` on the host, a release artifact with built-in version, checksum and download address of the bundle (18 2.1); no wizard in the container. | Compose must run on the host; a wizard in the container would need the Docker socket, that is root permissions on the host. The shell exists everywhere Docker runs. |
+| R-OP-21 | The Claude Code runner runs as a service that restarts it after a non-zero exit, under systemd with `KillMode=process`; until `runner.turn_handover` is on, its restarts happen only while no turn runs, and the server of stage AR runs before a runner switches the stage's keys on (10.1, addendum of 2026-11-06). | The handover relies on the keeper surviving the service's stop; a restart before it is on still ends live turns; the closed heartbeat capabilities refuse unknown keys. |
 
 ## 16. Demo instance
 

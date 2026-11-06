@@ -273,6 +273,45 @@ agent whose definition has a `stdio` server (`definition_needs_host`, R-BA-06) a
 hosting runner's ceiling (`host_tool_class_ceiling`); `token.create` for a built-in agent is
 refused (`hosted_agent_token`).
 
+### 2.14 Wake-ups and autonomous runs
+
+Normative together with [09-agents.md](09-agents.md) 5.8 (stage AR, addendum of 2026-11-06). A
+wake-up acts on behalf of the person of its source run (`triggered_by`) and never with more rights
+than that person has at the moment of each check.
+
+1. An autonomous input (a wake run, a wake input, a recovery or usage-window wake-up) is allowed
+   when that person is an owner, or when the channel has `allow_autonomous_runs`; the switch is
+   changed with `manage` on the channel (`channel.autonomous_runs.set`, audited).
+2. `command` wake-ups need tool class `host` (SR2) at create and before every execution;
+   `pr_checks` wake-ups need an owner as the person, at create and before every read, and no tool
+   class. Before every execution `run.wake.check` checks `trigger` of the person on the agent in
+   the channel, that the agent is still allowed there, that the channel is neither archived nor
+   read-only, and for `command` the tool class and SR2; a failed check ends the wake-up `refused`
+   with an audit entry.
+3. Firing checks `trigger`, the channel, the billing rules (SR1) and the caps of 09 5.8.6, as for a
+   new message; a wake input into an active run additionally needs the run's `triggered_by` to be
+   the wake-up's person.
+4. `run.launch.check` checks before a launch by a runner that did not accept the run: the run is
+   `running`, the person still has `trigger`, the agent is allowed in the channel, the billing
+   rules, and for `host` the tool class and SR2 (09 18.19.6).
+5. A wake-up is cancelled by the agent, the wake-up's person or a person with `manage` on the
+   channel. The thread's wake-ups are visible to everyone who may read the thread.
+
+The actions below enter `docs/spec/actions.yaml` with the ticket that builds them, with exactly
+these values (R-AZ-37).
+
+| Action | Description | Resource | Permission | Owner | Step-up | Audit | Permissions | Rate-limit class | Effect | Ticket |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `run.wake.create` | create a wake-up for the active run of the calling agent in its thread | run | agent-self of the run's agent, run active | no | no | yes | no | `rl.agent_runtime` | write | AR-04 |
+| `run.wake.recover` | create a recovery or usage-limit wake-up for an ended run of the calling agent | run | agent-self of the run's agent, run `interrupted`, `stale` or `failed` | no | no | yes | no | `rl.agent_runtime` | write | AR-04 |
+| `run.wake.list_pending` | list the calling agent's pending wake-ups | agent | agent-self | no | no | no | no | `rl.agent_runtime` | read | AR-04 |
+| `run.wake.check` | allow or refuse the next execution of a pending check | run | agent-self of the wake-up's agent | no | no | denials | no | `rl.agent_runtime` | write | AR-04 |
+| `run.wake.fire` | fire a checked wake-up with its result, or end it `failed` | run | agent-self of the wake-up's agent | no | no | yes | no | `rl.agent_runtime` | write | AR-04 |
+| `run.wake.cancel` | cancel a pending wake-up | thread | agent-self of the wake-up's agent, the wake-up's person, or `manage` on the channel | no | no | yes | no | `rl.write` | write | AR-04 |
+| `run.wake.read` | list the wake-ups of a thread | thread | `read` on the thread | no | no | no | no | `rl.read` | read | AR-04 |
+| `run.launch.check` | allow or refuse a launch by a runner that did not accept the run | run | agent-self of the run's agent | no | no | denials | no | `rl.agent_runtime` | read | AR-04 |
+| `channel.autonomous_runs.set` | switch `allow_autonomous_runs` of a channel | channel | `manage` | no | no | yes | no | `rl.write` | write | AR-04 |
+
 ## 3. Principal context
 
 `authorize` receives not just an ID, but the verified context of the request. The
@@ -1396,6 +1435,7 @@ DM between Alex and Sam. The clock is controllable in tests.
 | R-RE-10 | Preview as a dry run in the real transaction with rollback. | The same logic as the real write; plain text from templates, not from a model. |
 | R-RE-11 | Host as its own target with only `terminal`; SR10, SR11 and SR12 as guard rules. | A terminal is remote access to a host; neither inheritance nor delegation may open it, and no account on the host is shared between people (Ruling T1, T2, T12). |
 | R-RE-12 | Built-in agents get no permission of their own: owner actions with step-up to create, edit and re-host them, an owner-only interview, a hosted token only for the hosting runner, and SR2 for a definition with a `stdio` MCP server (2.13, addendum of 2026-11-06). | An agent with tools runs with the host user's rights, which is an owner decision today; a definition must not widen what its class allows ([26-builtin-agents.md](26-builtin-agents.md), ADR 0076). |
+| R-RE-13 | Wake-ups act with the rights of the person of their source run at each check; autonomous inputs need an owner or the channel switch, `command` needs `host` and `pr_checks` an owner, each checked again before every host execution (2.14, addendum of 2026-11-06). | A wake-up runs long after its person acted; rights checked only at creation would outlive a revocation. |
 
 ## 13. Alignment with the core contract
 

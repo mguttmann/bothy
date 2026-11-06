@@ -553,3 +553,13 @@ nav:
           - "A1-08: Clients: New agent dialog": briefs/A1-08-new-agent-clients.md
           - "A1-09: Clients: edit and remove": briefs/A1-09-edit-agent-clients.md
           - "A1-10: End to end and documentation": briefs/A1-10-builtin-agents-end-to-end.md
+      - Stage AR:
+          - "AR-02: Runner: orderly stop never orphans a turn": briefs/AR-02-runner-orderly-stop.md
+          - "AR-03: Runner: turn handover": briefs/AR-03-runner-turn-handover.md
+          - "AR-04: Server: wake-ups": briefs/AR-04-server-wake-ups.md
+          - "AR-05: Runner: bothy-wake": briefs/AR-05-runner-bothy-wake.md
+          - "AR-06: Runner: recovery and usage-window wake-ups": briefs/AR-06-runner-recovery-usage.md
+          - "AR-07: Runner: end state": briefs/AR-07-runner-end-state.md
+          - "AR-08: Clients: autonomous runs": briefs/AR-08-autonomous-runs-clients.md
+          - "AR-09: Operations: runner service guide": briefs/AR-09-runner-service-guide.md
+          - "AR-10: End to end and rollout": briefs/AR-10-autonomous-runs-end-to-end.md

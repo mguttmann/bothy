@@ -6,9 +6,12 @@ scratch launchd job (section 2.4), the replay of a turn's state at a handover by
 the runner modules (section 2.5), the open owner decisions are recorded as rulings (section 11),
 and the minors are in section 12. Of it, only D-AR-1 is built (AR-02, with the run reason
 `adapter_stopped`, [AR-02 rulings](../decisions.d/AR-02.md)). This
-note records the goal, the evidence and the decisions with their reasons; the normative text goes
-into the chapters it names, written by ticket AR-01 (section 10) together with an ADR and the
-briefs. Where this note and a chapter disagree after AR-01, the chapter wins.
+note records the goal, the evidence and the decisions with their reasons. Ticket AR-01 wrote the
+normative text into the chapters it names (09 5.8 and 18.19, 07 2.14, 03 and the others of section
+7), [ADR 0077](../adr/0077-autonomous-runs-wake-ups-and-turn-handover.md), the rulings
+[decisions.d/AR-01.md](../decisions.d/AR-01.md) and the briefs AR-02 to AR-10, and recorded the CLI
+facts marked unverified below in 09 18.19.12. Where this note and a chapter disagree, the chapter
+wins.
 
 Why a design note and not an ADR: the decisions span the runner, the server (data model, actions,
 API, a periodic job), the clients and the operation of an installation, and some of them are
@@ -1271,24 +1274,16 @@ can switch the keys on from the start.
 
 ## 10. Ticket cut
 
-Stage **AR Autonomous runs**. Every ticket is one pull request from `main`; AR-01 writes the
-normative text, the ADR and the briefs of the others.
+Stage **AR Autonomous runs**. Every ticket is one pull request from `main`; AR-01 wrote the
+normative text, the ADR, the rulings, the plan section and the briefs of the others, so the later
+tickets run from briefs in `docs/briefs/` like every milestone.
 
-| Ticket | Goal | Done when | Depends on |
-|---|---|---|---|
-| AR-01 | Specification, ADR, decisions and briefs | chapters of section 7 carry sections 4 to 6 as normative text; ADR "Autonomous runs: wake-ups and turn handover"; R-AG-17 amended and the last clause of D-M2-35-3 replaced with dated entries; the rulings of section 11 in `docs/decisions.d/`; the CLI defaults and CLI behaviours of sections 2.3, 3 and 12 marked unverified (among them the usage-limit `result`, the order of the `rejected` frame and whether hooks of the host user's own CLI configuration reach runner turns) are read from the pinned CLI and recorded; briefs AR-02 to AR-10; `make docs`, `make catalog-check`, `make config-doc-check` green | none |
-| AR-02 | Runner: orderly stop never orphans a turn | D-AR-1 with test 1 of section 8 against a real runner process | none (may land before AR-01) |
-| AR-03 | Runner: turn handover | keeper as session leader with the named pipe, exit code and exit file, identities of keeper and CLI, the launch handshake of D-AR-3 for every attempt (record in phase `launching` with the attempt's number and kind, `<try>`, `process_start`, the initial inputs with their `uuid`, `inputs_written` and `go_sent`, keeper and CLI identity files and the named pipe named per launch, initial inputs fed by the keeper without blocking with `<launch>.fed` and `inputs_written` only after it, the runner's handling of a keeper that ends without `<launch>.fed`, go byte only after the keeper's identity is recorded, no CLI `exec` before its identity file, keeper exit `not_started` without a go, the next runner's cases for `launching`, with `<launch>.cli` read again after the keeper's group is gone and a recorded CLI never launched again), the adoption rule of D-AR-14 (an adopted process ends like an own one, with `_recover` and the once-per-run limits proven by the recovery flags in the record), the launch check `run.launch.check` before every launch by a runner that did not accept the run, 18.6 stop of the one group, `runner.turn_handover`, exit code 75 after a handover, `claude-code-runner stop --turns`, phases in the record (D-AR-14), `process_start` in the ledger's part of the record (kept by every adopter), `ProcessState` as the one object of all stream-derived state of the stdin and stop rules and the replay of it from `process_start` before the adopter reads on (D-AR-2: background tasks with `seen`, `turn_open` and queued inputs, `last_result_at`, the failure mark with the lost task count, task descriptions, usage mark with its outage number (counted per run, kept in the record across attempts), usage error mark kept apart from the failure mark, nudge mark, idle flag; replayed lines at the adoption time), adoption with follow-ups, wake inputs, the stdin rule and the stop after an error, no heartbeat after the handover, capability `turn_handover` (reported only with the key, against a server with AR-04, rollout step 2 of section 9); tests 2 (portable: a follow-up and a wake input after the restart while a background task started before it still runs, stdin stays open, the task ends with its notification; a second restart; a restart inside the quiet window with no input after it, stdin closes after `runner.followup_grace` and the run ends; an error `result` before the checkpoint, stopped after `runner.stop_grace`), 3, 4 (with the launch window of every attempt kind: a runner crash after each handshake step and between an attempt's end and the next `launching` record leaves one adopted CLI or none and one new launch of the same attempt, every initial input arrives exactly once, an adopted process that fills its context is compacted and retried within the once-per-run limits, a keeper ended before `<launch>.fed`, and the launch check) and 16 | AR-01, AR-02, AR-04 (the heartbeat capability `turn_handover` and `run.launch.check` must exist on the server before the key is on) |
-| AR-04 | Server: wake-ups | `run_wakes` with the reasons `agent`, `recovery` and `usage_limit`, `trigger_kind = 'wake'`, failure cause `usage_limited`, operations including `run.wake.recover`, `run.wake.list_pending`, `run.wake.check` (`trigger` and channel of that moment, plus tool class and SR2 for `command` and the owner check without tool class for `pr_checks`, audited `cancelled` on failure) and `run.launch.check` (D-AR-14), the heartbeat schema with the capabilities `turn_handover` and `wakes`, event to clients and adapter inbox, wake input token, job `runs.wake_due`, fire checks on both paths, notes and notifications, `allow_autonomous_runs`, chain and idle counts per thread and person, minimum delay, pending cap, expiry, `usage_limit` wake-ups keyed by run and outage number and capped by `run.usage_wake_max`; one test per refusal and per end state; rollback behaviour of D-AR-11; installed before any runner switches `runner.turn_handover` or `runner.wakes` on (rollout step 2 of section 9) | AR-01 |
-| AR-05 | Runner: `bothy-wake` | command and `PATH` folder, request file, outbox, condition checks for `pr_checks` (owner only) and `command`, each execution only after `run.wake.check` allowed it and the actual tool class matches (nothing runs on a refusal or without an answer), pending list at start and reconnect, fire, wake input checks, disallowed CLI timers, capability `wakes`, prompt text; tests 6 to 10 | AR-03, AR-04 |
-| AR-06 | Runner: recovery and usage-window wake-ups | lost-task detection for each case of D-AR-7 including the stop of an ended run and the runner's own end of a left run, the usage-limited mark of D-AR-12 (`rate_limit_event` in the reader's `KNOWN_TYPES`, frame rule, unknown status logged and allowed, held process, usage errors kept apart from the failure mark so no stop follows when the mark clears, one `run.wake.create` per outage keyed by its number, the pending one cancelled when the mark clears, `usage_limited` end, `run.wake.recover` after a restart), or the note; tests 3 (keeper kill), 5 and 11 | AR-05 |
-| AR-07 | Runner: end state and run-end line | D-AR-8 (`STATE:` marker, one nudge per waiting phase, note, idle flag per autonomous input and per notification turn on the run's patch, D-AR-9), `runner.cli_bg_wait_ceiling` (D-AR-10); tests 12 and 15; 13 and 14 with AR-04's server | AR-05 |
-| AR-08 | Clients | pending wake-ups in the thread with cancel, end state and pending flag, notes, channel switch, chain and idle cap notices, usage-limit notice; desktop, phone and console | AR-04 |
-| AR-09 | Operations | a runner service guide in 16 (the assumed launchd job form of section 2.4, restart, update, uninstall, `stop --turns` before `bootout`) that states the operator rule of ruling 4; test 2 under a scratch launchd job (macOS) built from the probe of section 2.4; rollout steps 1 to 3 of section 9 as the operator's checklist with the server version check of step 2 and the check of step 3 | AR-02, AR-03, AR-04 |
-| AR-10 | End to end and rollout | demo stack with fake Claude: an agent waits for checks of a fake pull request across a runner restart, wakes, and finishes; chain cap reached and continued by a reply; a usage-window end continued at the reset; rollout steps 4 to 6 of section 9 | AR-06, AR-07, AR-08, AR-09 |
-
-Waves: AR-02 at once; AR-01; then AR-04; then AR-03 and AR-08; then AR-05 and AR-09; then AR-06
-and AR-07; then AR-10.
+The ticket table (AR-01 to AR-10, with what each one is done with), the dependencies and the
+launch arguments live in [PLAN](../PLAN.md) section 22; the briefs are in the
+[brief index](../briefs/README.md). AR-05 also depends on A1-05, because hosted agents get
+`bothy-wake` after the intersection of 26 4.4. Waves: AR-02 and AR-04; then AR-03 and AR-08; then
+AR-09; then AR-05; then AR-06 and AR-07; then AR-10. AR-02 may land at any time. The launch
+arguments leave out AR-01 because it is merged before every other ticket starts.
 
 ## 11. Owner rulings
 

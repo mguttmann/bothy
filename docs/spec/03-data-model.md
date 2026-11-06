@@ -65,7 +65,7 @@ migration comes with that milestone, the contract already applies now.
 | `messaging` | Messages, revisions, mentions, reactions, pins, templates | yes |
 | `files` | Files, upload sessions, thumbnails, attachments, virus scan, transcripts, file text extracts | yes |
 | `agents` | Agents, definitions of built-in agents, agent sessions, consumer cursors of the agents, slash commands, dev environments | yes |
-| `runs` | Runs, steps, follow-ups, components, interactions | yes |
+| `runs` | Runs, steps, follow-ups, components, interactions, wake-ups, counts of autonomous inputs | yes |
 | `apps` | Apps, installations, incoming and outgoing webhooks | yes |
 | `billing` | Cost entries, price table | yes |
 | `sync` | Event log, cursors of the worker consumers, idempotency keys, read state, drafts, settings | yes |
@@ -1038,6 +1038,7 @@ Purpose: channel (text, forum or direct message) with operator and behavior. Mod
 | `free_response` | `boolean` | no | `false` | `true`: the operator answers everywhere without a mention; overrides both fields above |
 | `auto_thread` | `boolean` | no | `true` | a trigger in the main thread creates a thread |
 | `allow_mentioned_agents` | `boolean` | no | `false` | further agents allowed by mention (only if their grants match) |
+| `allow_autonomous_runs` | `boolean` | no | `false` | persons other than owners may let agents run on alone in this channel (wake-ups, recovery and usage-window wake-ups, 09 5.8.6); changed with `manage` (addendum of 2026-11-06) |
 | `history_backfill_limit` | `integer` | no | | number of earlier messages as context at thread start; default from `channel.history_backfill_limit_default`; `CHECK (history_backfill_limit BETWEEN 0 AND channel.history_backfill_limit_max)` by the application |
 | `prompt` | `text` | no | `''` | channel prompt for the operator; length up to `channel.prompt_max_bytes` |
 | `forum_default_sort` | `text` | yes | | forum only: `CHECK (forum_default_sort IN ('last_activity','created'))` |
@@ -1641,10 +1642,11 @@ Purpose: one agent turn; at the same time the live box. Module: `runs`.
 | `thread_id` | `uuid` | no | | |
 | `agent_id` | `uuid` | no | | |
 | `agent_session_id` | `uuid` | yes | | set at start or at the first `agent_session.report`; NULL for guest runs |
-| `trigger_kind` | `text` | no | | `CHECK (trigger_kind IN ('message','command','interaction'))` |
+| `trigger_kind` | `text` | no | | `CHECK (trigger_kind IN ('message','command','interaction','wake'))`; `wake` is a run started by a wake-up ([09-agents.md](09-agents.md) 5.8, addendum of 2026-11-06, R-DM-60) |
 | `triggering_message_id` | `uuid` | yes | | set when `trigger_kind = 'message'`; for a run from deferred follow-ups the first of these messages |
 | `triggering_command_id` | `uuid` | yes | | set exactly when `trigger_kind = 'command'` |
 | `triggering_interaction_id` | `uuid` | yes | | set exactly when `trigger_kind = 'interaction'` (interaction without a waiting run) |
+| `triggering_wake_id` | `uuid` | yes | | set exactly when `trigger_kind = 'wake'` (addendum of 2026-11-06) |
 | `triggered_by` | `uuid` | no | | person who triggered |
 | `state` | `text` | no | `'queued'` | `CHECK (state IN ('queued','running','waiting_input','completed','failed','cancelled'))` |
 | `state_reason` | `text` | yes | | reason code from [09-agents.md](09-agents.md), section 5.2, for example `billing_mode_mismatch`, `access_revoked`, `stale`, `user_cancelled`, `channel_read_only`; while `queued` the wait reason of 09 5.2.1 (`invocation_held`, `slots_full`, `thread_busy`) or NULL, cleared by `run.start` (addendum of 2026-11-04, R-AG-41) |
@@ -1660,7 +1662,7 @@ Purpose: one agent turn; at the same time the live box. Module: `runs`.
 | `status_line` | `text` | yes | | current status line |
 | `last_text_excerpt` | `text` | yes | | last text of the agent, shortened to `run.excerpt_max_chars` |
 | `plan` | `jsonb` | no | `'{}'` | schema `run_plan.v1`: `items` (`id`, `text`, `status`) for the live box |
-| `metrics` | `jsonb` | no | `'{}'` | schema `run_metrics.v1`: `context_pct`, `tokens_in`, `tokens_out`, `tokens_cache_read`, `tokens_cache_write`, `tokens_cache_write_1h`, `subagents`, `background_jobs`, `api_retries`, `last_api_retry` (`attempt`, `max_retries`, `retry_delay_ms`, `error`), `progress_events` (count of runtime progress messages without a visible change, addendum of 2026-10-24) |
+| `metrics` | `jsonb` | no | `'{}'` | schema `run_metrics.v1`: `context_pct`, `tokens_in`, `tokens_out`, `tokens_cache_read`, `tokens_cache_write`, `tokens_cache_write_1h`, `subagents`, `background_jobs`, `api_retries`, `last_api_retry` (`attempt`, `max_retries`, `retry_delay_ms`, `error`), `progress_events` (count of runtime progress messages without a visible change, addendum of 2026-10-24), `autonomy_last` (`input`, `idle`: the idle flag of the last autonomous input or notification turn, 09 5.8.6), `end_state` (`done`, `waiting` or `blocked`) and `wake_pending_until` (time of the next pending wake-up of the thread at the run's end) (09 18.19.11; addendum of 2026-11-06) |
 | `cost_micros` | `bigint` | no | `0` | |
 | `currency` | `text` | no | `'USD'` | |
 | `cost_is_estimate` | `boolean` | no | `true` | |
@@ -1677,10 +1679,10 @@ PK: `id`. FK: `thread_id` -> `threads(id)` ON DELETE RESTRICT; `agent_id` ->
 `agents(principal_id)` ON DELETE RESTRICT; `agent_session_id` -> `agent_sessions(id)` ON DELETE
 SET NULL; `triggering_message_id` -> `messages(id)` ON DELETE SET NULL;
 `triggering_command_id` -> `commands(id)` ON DELETE SET NULL; `triggering_interaction_id` ->
-`interactions(id)` ON DELETE SET NULL; `triggered_by` -> `principals(id)` ON DELETE RESTRICT;
+`interactions(id)` ON DELETE SET NULL; `triggering_wake_id` -> `run_wakes(id)` ON DELETE SET NULL; `triggered_by` -> `principals(id)` ON DELETE RESTRICT;
 `dev_environment_id` -> `dev_environments(id)` ON DELETE RESTRICT.
 Checks: `billing_mode_expected IN ('personal','organization')`; final states have
-`finished_at`; at most one of the three columns `triggering_*` is set, and only the one matching
+`finished_at`; at most one of the four columns `triggering_*` is set, and only the one matching
 `trigger_kind` (it may later become empty through `ON DELETE SET NULL`).
 Unique: `invocation_jti`; partial index `(thread_id) WHERE state IN ('queued','running',
 'waiting_input')` (at most one active run per thread, R-DM-14).
@@ -1735,6 +1737,67 @@ Purpose: follow-ups to a running run and their delivery state. Module: `runs`.
 PK: `(run_id, message_id)`. FK: `run_id` -> `runs(id)` ON DELETE CASCADE; `message_id` ->
 `messages(id)` ON DELETE CASCADE. Unique: `(message_id)` (a follow-up belongs to one run).
 Indexes: `(run_id, state)` for open follow-ups. Retention: `content`.
+
+#### `run_wakes`
+
+Purpose: a wake-up that continues a thread later without a new message ([09-agents.md](09-agents.md)
+5.8, addendum of 2026-11-06, stage AR). Module: `runs`.
+
+| Field | Type | Null | Default | Rules / notes |
+|---|---|---|---|---|
+| `id` | `uuid` | no | | UUIDv7 |
+| `agent_id` | `uuid` | no | | the agent of the source run |
+| `thread_id` | `uuid` | no | | |
+| `source_run_id` | `uuid` | no | | the run that asked for it, or the ended run of a recovery or usage-limit wake-up |
+| `triggered_by` | `uuid` | no | | the person of the source run; every check uses this person |
+| `kind` | `text` | no | | `CHECK (kind IN ('at','pr_checks','command'))` |
+| `condition` | `jsonb` | no | | schema `run_wake_condition.v1`: for `pr_checks` `repository`, `number` and `head_commit` at creation; for `command` `command_line`; for `at` nothing beyond `not_before` |
+| `label` | `text` | no | `''` | short text of the agent, at most `run.wake_label_max_chars` characters, without control and bidi characters |
+| `reason` | `text` | no | | `CHECK (reason IN ('agent','recovery','usage_limit'))` |
+| `outage` | `integer` | yes | | the run's outage number; set exactly when `reason = 'usage_limit'` and the wake-up came from `run.wake.create` |
+| `not_before` | `timestamptz` | no | | at least `created_at` plus `run.wake_min_delay` |
+| `deadline` | `timestamptz` | no | | at most `created_at` plus `run.wake_max_wait`, for `usage_limit` at most `not_before` plus `run.wake_max_wait` |
+| `state` | `text` | no | `'pending'` | `CHECK (state IN ('pending','fired','cancelled','expired','refused','failed'))` |
+| `state_reason` | `text` | yes | | reason code of the last state change (09 5.8.3, 5.8.6) |
+| `result_text` | `text` | no | `''` | result of a fired check, at most `runner.wake_result_max_bytes` as the runner cut it |
+| `fired_run_id` | `uuid` | yes | | the wake run it produced |
+| `fired_into_run_id` | `uuid` | yes | | the active run it reached as a wake input |
+| `created_at` | `timestamptz` | no | `now()` | |
+| `ended_at` | `timestamptz` | yes | | set with every state other than `pending` |
+| `version` | `bigint` | no | `1` | |
+
+PK: `id`. FK: `agent_id` -> `agents(principal_id)` ON DELETE RESTRICT; `thread_id` ->
+`threads(id)` ON DELETE CASCADE; `source_run_id` -> `runs(id)` ON DELETE CASCADE; `triggered_by` ->
+`principals(id)` ON DELETE RESTRICT; `fired_run_id` -> `runs(id)` ON DELETE SET NULL;
+`fired_into_run_id` -> `runs(id)` ON DELETE SET NULL.
+Checks: `(state = 'pending') = (ended_at IS NULL)`; `not_before <= deadline`; `(reason =
+'usage_limit') OR outage IS NULL`.
+Unique: partial index `(source_run_id, reason) WHERE reason = 'recovery' OR (reason =
+'usage_limit' AND outage IS NULL)` (one `run.wake.recover` per source run and reason); partial
+index `(source_run_id, outage) WHERE outage IS NOT NULL` (one wake-up per outage).
+Indexes: `(not_before) WHERE state = 'pending' AND kind = 'at'` for `runs.wake_due`; `(deadline)
+WHERE state = 'pending'` for the expiry; `(agent_id) WHERE state = 'pending'` for
+`run.wake.list_pending`; `(thread_id, created_at DESC)` for the thread's list and the pending cap.
+Retention: `content`.
+
+#### `run_autonomy`
+
+Purpose: the chain and idle counts of autonomous inputs per thread and person (09 5.8.6, addendum
+of 2026-11-06). Module: `runs`.
+
+| Field | Type | Null | Default | Rules / notes |
+|---|---|---|---|---|
+| `thread_id` | `uuid` | no | | |
+| `person_id` | `uuid` | no | | the `triggered_by` of the wake-ups counted here |
+| `chain_count` | `integer` | no | `0` | consecutive autonomous inputs since that person last triggered a run or wrote a follow-up in the thread |
+| `idle_count` | `integer` | no | `0` | consecutive autonomous inputs and notification turns that did no work |
+| `ended_reason` | `text` | yes | | `autonomous_chain_max` or `autonomous_idle_max` while the chain is ended; cleared with the counts |
+| `updated_at` | `timestamptz` | no | `now()` | |
+
+PK: `(thread_id, person_id)`. FK: `thread_id` -> `threads(id)` ON DELETE CASCADE; `person_id` ->
+`principals(id)` ON DELETE CASCADE. Checks: `chain_count >= 0 AND idle_count >= 0`. A run or a
+follow-up of the person sets both counts to `0` and clears `ended_reason` in the same transaction.
+Retention: `content`.
 
 #### `message_components`
 
@@ -2894,6 +2957,7 @@ section 4 applies, and the gate fails.
 | R-DM-56 | `agents.reported_project_folders` holds the folder names a runner reports under its projects root; `listAgentProjectFolders` shows the owner those that no binding names (`lower(workspace_ref)`, released bindings of deleted forums excluded since 2026-11-02), so the app offers a forum only for a folder without one (addendum of 2026-10-29). | The owner adds forums for the folders that already exist; the server never reads host files, and a folder already bound must never get a second forum (D-M4-44-1, D-M4-44-4). |
 | R-DM-58 | `agents.hosted_by` names the Claude Code runner that hosts a built-in agent; it is set exactly when `adapter_kind = 'claude_agent'` (addendum of 2026-11-06, [26-builtin-agents.md](26-builtin-agents.md) 3.1). | The server needs to know which runner may fetch the agent's token and definition; tying the column to the adapter kind keeps every existing agent unchanged (NULL) and makes a hosted agent without a host impossible. |
 | R-DM-59 | Definitions of built-in agents are rows of `agent_definitions`, one per version, never updated; the highest version is the current one (addendum of 2026-11-06, 26 4.1). | Audit and undo need the older versions; `operator_config` stays closed and small (09 2.2), and an insert-only table needs no lock beyond the agent row. |
+| R-DM-60 | A wake-up is a row of `run_wakes` with the person of its source run; a fired wake-up creates a run with `trigger_kind = 'wake'` and `triggering_wake_id`, and the counts of autonomous inputs are rows of `run_autonomy` per thread and person (addendum of 2026-11-06, 09 5.8). | Only the server can start a run and apply the trigger and billing rules at fire time; a count per thread and person keeps another person's message from extending an owner's chain. |
 
 ## 9. Configuration values of this chapter
 

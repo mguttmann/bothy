@@ -692,10 +692,18 @@ def test_planned_key_of_stage_a1_is_rendered(tmp_path: Path) -> None:
     assert "| Sum | planned (A1) |" in out
 
 
+def test_planned_key_of_stage_ar_is_rendered(tmp_path: Path) -> None:
+    """A planned key of stage AR (autonomous runs, PLAN section 22) carries its stage."""
+    planned = PLANNED.replace("milestone: M2\n", "milestone: AR\n", 1)
+    root = written(write_repo(tmp_path, planned=planned))
+    out = (root / "docs/operations/configuration.md").read_text(encoding="utf-8")
+    assert "| Sum | planned (AR) |" in out
+
+
 def test_unknown_milestone_is_refused(tmp_path: Path) -> None:
     planned = PLANNED.replace("milestone: M2\n", "milestone: A9\n", 1)
     root = write_repo(tmp_path, planned=planned)
-    with pytest.raises(configdoc.InputError, match="not M1 to M8, V1 to V3 or A1"):
+    with pytest.raises(configdoc.InputError, match="not M1 to M8, V1 to V3, A1 or AR"):
         configdoc.load_planned(root / "tools/configdoc/planned.yaml", "planned.yaml")
 
 

@@ -131,8 +131,8 @@ SCHEMA_FIELDS = (
 )
 # Milestones that build code (docs/PLAN.md "Milestone breakdown"); M0 is the planning stage.
 # Milestones M1 to M8, the publication steps V1 to V3 and the stages after the milestones (A1,
-# built-in agents, docs/PLAN.md section 21).
-MILESTONE = re.compile(r"^(M[1-8]|V[1-3]|A1)$")
+# built-in agents, docs/PLAN.md section 21; AR, autonomous runs, section 22).
+MILESTONE = re.compile(r"^(M[1-8]|V[1-3]|A1|AR)$")
 
 _SECTION = re.compile(
     r"^## (?P<num>[0-9]+(?:\.[0-9]+)*)\.? Configuration values of this chapter\s*$"
@@ -289,7 +289,7 @@ class Rule:
 
     Attributes:
         match: an exact key name, or a prefix ending in "." (for example `file.`).
-        milestone: the milestone that builds the consumer (`M1` to `M8`, `V1` to `V3`, `A1`).
+        milestone: the milestone that builds the consumer (`M1` to `M8`, `V1` to `V3`, `A1`, `AR`).
         line: 1-based line of the rule in planned.yaml.
     """
 
@@ -683,7 +683,8 @@ def load_planned(path: Path, rel: str) -> list[Rule]:
 
     Raises:
         InputError: the file is missing or malformed, a match is neither a key name nor a prefix
-            ending in ".", a milestone is not M1 to M8, V1 to V3 or A1, or a match appears twice.
+            ending in ".", a milestone is not M1 to M8, V1 to V3, A1 or AR, or a match appears
+            twice.
     """
     rules: list[Rule] = []
     for values, line in _list_of_mappings(path, rel, "rules", ("match", "milestone")):
@@ -694,7 +695,7 @@ def load_planned(path: Path, rel: str) -> list[Rule]:
             )
         if not MILESTONE.match(milestone):
             raise InputError(
-                f"{rel}:{line}: milestone {milestone!r} is not M1 to M8, V1 to V3 or A1"
+                f"{rel}:{line}: milestone {milestone!r} is not M1 to M8, V1 to V3, A1 or AR"
             )
         if any(r.match == match for r in rules):
             raise InputError(f"{rel}:{line}: match {match!r} twice")

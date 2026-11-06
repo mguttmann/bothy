@@ -452,6 +452,13 @@ Source: [09-agents.md](../spec/09-agents.md), section 21.
 | `component.form_max_fields` | `BOTHY_COMPONENT__FORM_MAX_FIELDS` | Server | int | `10` | fields per form | active |
 | `project.binding_text_max_chars` | `BOTHY_PROJECT__BINDING_TEXT_MAX_CHARS` | Server | int | `512` | longest `workspace_ref`, `repository_url`, `default_branch`, `runner_config.model` and tool name of a project binding in Unicode characters; 512 characters of at most 4 bytes in UTF-8, also after `lower()`, stay below the PostgreSQL B-tree entry limit of the unique index on `lower(workspace_ref)`, so an over-long reference is a field error, never an internal error (maximum `600`) | active |
 | `agent.session_ref_max_bytes` | `BOTHY_AGENT__SESSION_REF_MAX_BYTES` | Server | int | `1024` | longest `external_session_ref` and longest `model` of a session in bytes (bind, report, `run.start`; over it `too_long`); the maximum `2048` keeps an entry of the unique index on `(agent_id, external_session_ref)` within the PostgreSQL B-tree index entry limit, so an over-long reference is a field error, never an internal error | active |
+| `run.wake_max_pending` | `BOTHY_RUN__WAKE_MAX_PENDING` | Server |  | `5` | pending wake-ups per thread; a further create is refused with `wake_max_pending` (5.8.6, stage AR) | planned (AR) |
+| `run.wake_max_wait` | `BOTHY_RUN__WAKE_MAX_WAIT` | Server |  | `7d` | longest time from creation to the deadline of a wake-up, for a `usage_limit` wake-up from its `not_before`; the expiry posts a note (5.8.1) | planned (AR) |
+| `run.wake_min_delay` | `BOTHY_RUN__WAKE_MIN_DELAY` | Server |  | `60s` | earliest fire and first check of every wake-up after its creation (5.8.6) | planned (AR) |
+| `run.usage_wake_max` | `BOTHY_RUN__USAGE_WAKE_MAX` | Server |  | `20` | usage-limit wake-ups per run, every state counted; above it `refused` with a note (18.19.10) | planned (AR) |
+| `run.wake_label_max_chars` | `BOTHY_RUN__WAKE_LABEL_MAX_CHARS` | Server |  | `120` | longest label of a wake-up in Unicode characters; longer is `too_long` (5.8.1, 03 `run_wakes`) | planned (AR) |
+| `run.autonomous_chain_max` | `BOTHY_RUN__AUTONOMOUS_CHAIN_MAX` | Server |  | `25` | consecutive autonomous inputs per thread and person; `0` means no chain cap; at the cap `refused` with a note (5.8.6, ruling D-AR-01-1) | planned (AR) |
+| `run.autonomous_idle_max` | `BOTHY_RUN__AUTONOMOUS_IDLE_MAX` | Server |  | `3` | consecutive idle autonomous inputs per thread and person; minimum `1`, cannot be switched off (5.8.6) | planned (AR) |
 | `thread.placeholder_titles` | `BOTHY_THREAD__PLACEHOLDER_TITLES` | Server | list(string) | `["Neuer Chat", "Chat", "Ohne Titel", "Test", "New chat", "Untitled"]` | placeholders for the title detection; the empty title is always a placeholder (12 point 2), a list entry is never empty | active |
 | `adapter.invocation_token_leeway` |  | Adapter |  | `10s` | clock tolerance for `exp` and `iat`; at most the server's `auth.clock_leeway` (4.5) |  |
 | `adapter.jwks_refresh_min_interval` |  | Adapter |  | `60s` | reload JWKS at most this often |  |
@@ -501,6 +508,16 @@ Source: [09-agents.md](../spec/09-agents.md), section 21.
 | `runner.session_lock_wait` |  | Runner |  | `10m` | wait time for a busy session |  |
 | `runner.max_parallel_runs` |  | Runner |  | `4` | concurrent turns |  |
 | `runner.stream_log_retention` |  | Runner |  | `14d` | retention of the recordings |  |
+| `runner.turn_handover` |  | Runner |  | `false` | keeper, named pipe, launch handshake and handover at a restart (18.19.3 to 18.19.7); reports `turn_handover` |  |
+| `runner.wakes` |  | Runner |  | `false` | `bothy-wake`, condition checks, wake inputs, recovery and usage-window wake-ups (18.19.8 to 18.19.10); needs `runner.turn_handover`; reports `wakes` |  |
+| `runner.end_state` |  | Runner |  | `false` | the `STATE:` marker, the nudge and the note of 18.19.11 |  |
+| `runner.cli_bg_wait_ceiling` |  | Runner |  | empty | passed as `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS` when set; empty means the CLI's built-in default (18.19.12) |  |
+| `runner.wake_check_interval` |  | Runner |  | `60s` | interval of the checks of a pending `pr_checks` or `command` wake-up; failures back off up to ten times this value (18.19.8); above zero |  |
+| `runner.wake_check_timeout` |  | Runner |  | `5m` | time limit of one `command` check or `gh` read (18.19.8); above zero |  |
+| `runner.wake_checks_max_parallel` |  | Runner |  | `2` | checks of wake-ups running at once (18.19.8); at least `1` |  |
+| `runner.wake_check_failures` |  | Runner |  | `10` | failures in a row after which a check wake-up ends `failed` with a note and a notification (18.19.8); at least `1` |  |
+| `runner.wake_result_max_bytes` |  | Runner |  | `4096` | longest result text of a fired check (18.19.8) |  |
+| `runner.wake_request_timeout` |  | Runner |  | `30s` | longest wait of `bothy-wake` for the runner's answer (18.19.8) |  |
 | `runner.attach_allowed_roots` |  | Runner |  | `["project", "thread_inbox", "runner_temp"]` | roots for answer attachments, by name only (18.10) |  |
 | `runner.attach_denied_patterns` |  | Runner |  | list in 18.10 | denied patterns for answer attachments; must contain the list of 18.10 |  |
 

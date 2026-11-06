@@ -18,9 +18,9 @@ This check reads all of them and fails on:
   index;
 - a `make <target>` inside code of a brief whose target is neither in the Makefile nor in the
   table "Make targets created by tickets", or whose creating ticket is not the brief itself or
-  in its dependency closure (a stage ticket such as `A1-02` starts after the milestones, PLAN
-  P-27, so it may use the target of any milestone ticket, but only once that target is in the
-  Makefile);
+  in its dependency closure (a stage ticket such as `A1-02` or `AR-03` starts after the
+  milestones, PLAN P-27 and P-29, so it may use the target of any milestone ticket, but only
+  once that target is in the Makefile);
 - a ticket named in a start check of a brief (a paragraph or list item that ends the run with
   `Verdict: BLOCKED dependency ...` or `BLOCKED ... not merged`) that is not in the brief's
   dependency closure: the launcher could start the brief before that ticket is merged, and the
@@ -50,17 +50,18 @@ MAKEFILE = Path("Makefile")
 # split into one block per milestone of the dependent tickets to stay below it.
 MAX_GRAPH_EDGES = 500
 # A ticket ID is a milestone (`M1` to `M8`) or a stage after the milestones (`A1`, built-in agents,
-# PLAN section 21) and a two-digit number (PLAN P-19).
-_TID = r"[MA]\d-\d\d"
+# PLAN section 21; `AR`, autonomous runs, PLAN section 22) and a two-digit number (PLAN P-19).
+_TID = r"(?:[MA]\d|AR)-\d\d"
 # Graph blocks of the milestones come first, then those of the later stages, each in order.
 _GROUP_ORDER = "MA"
 
-_ID = re.compile(_TID)
+# A ticket ID never follows a letter, digit or dash: `D-AR-12` and `D-M2-35-3` name decisions.
+_ID = re.compile(rf"(?<![\w-]){_TID}")
 _FENCE = re.compile(r"^\s*(`{3,}|~{3,})")
 _INLINE_CODE = re.compile(r"(`+)((?:(?!\1)(?:[^\n]|\n(?![ \t]*\n)))+?)\1")
 _MAKE = re.compile(r"(?<![\w./-])make ([a-z][a-z0-9-]*)")
 _MAKE_TARGET = re.compile(r"^([a-zA-Z0-9][a-zA-Z0-9_-]*)\s*:(?!=)", re.MULTILINE)
-_EDGE = re.compile(r"^\s*([MA]\d_\d\d) --> ([MA]\d_\d\d)\s*$")
+_EDGE = re.compile(r"^\s*((?:[MA]\d|AR)_\d\d) --> ((?:[MA]\d|AR)_\d\d)\s*$")
 _BLOCK_START = re.compile(r"^\s*(?:[-*+]|\d+\.|[a-z]\.)\s")
 _START_CHECK = re.compile(r"BLOCKED dependency|BLOCKED [^`]*not merged")
 _SENTENCE = re.compile(r"(?<=[.;])\s+(?=[A-Z`])")
@@ -253,10 +254,10 @@ def closure(deps: dict[str, list[str]], tid: str) -> set[str]:
 def stage_base(deps: dict[str, list[str]], tid: str) -> set[str]:
     """Milestone tickets a stage ticket may rely on without naming them.
 
-    A stage after the milestones (`A1`) starts only when every milestone ticket is merged (PLAN
-    P-27, section 21 "Dependencies"), so its make targets and start checks may use what any
-    milestone ticket created; `check` still requires such a make target to be in the Makefile.
-    A milestone ticket gets nothing here.
+    A stage after the milestones (`A1`, `AR`) starts only when every milestone ticket is merged
+    (PLAN P-27 and P-29, sections 21 and 22 "Dependencies"), so its make targets and start
+    checks may use what any milestone ticket created; `check` still requires such a make target
+    to be in the Makefile. A milestone ticket gets nothing here.
     """
     if tid.startswith("M"):
         return set()
@@ -432,7 +433,7 @@ def write(root: Path) -> None:
     text = text[:start] + body + text[end:]
     start, end = _section(text, "Dependency graph")
     body = text[start:end]
-    intro = re.split(r"\nTickets of [MA]\d:", body.split("```mermaid", 1)[0], maxsplit=1)[0]
+    intro = re.split(r"\nTickets of (?:[MA]\d|AR):", body.split("```mermaid", 1)[0], maxsplit=1)[0]
     intro = intro.rstrip("\n")
     rest = text[end:]
     graph = render_graph(index.deps) + ("\n" if rest else "")

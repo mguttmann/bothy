@@ -22,6 +22,11 @@ names of merged code (D-W-100). A stage ticket starts only after every milestone
 so its briefs may use what any milestone ticket created; their column "Depends on" names only
 tickets of the stage. V1-07 to V1-12 run from their plan rows without a brief (P-28).
 
+The stage AR "Autonomous runs" ([PLAN](../PLAN.md) section 22, P-29) follows in the same way: its
+briefs AR-02 to AR-10 were written by its specification ticket AR-01, carry the same boundary for
+names of merged code (D-W-100), and name in "Depends on" the tickets of the stage and, for AR-05,
+the A1 ticket it builds on.
+
 ## How a brief runs
 
 1. The launcher starts a brief only when every ticket in "Depends on" is merged into the base
@@ -88,12 +93,12 @@ the waves before it are merged; many can start earlier, as soon as their own dep
 
 | Wave | Tickets that may run in parallel |
 |---|---|
-| 1 | A1-02, A1-03, M1-01, M1-02, M2-32, M4-03 |
-| 2 | A1-04, A1-06, A1-07, M1-03, M1-04, M1-05, M2-38, M4-01, M6-10 |
-| 3 | A1-05, A1-08, M1-06, M1-07, M1-17, M1-74, M3-17, M4-04, M4-06, M4-08, M4-10, M7-24 |
-| 4 | A1-09, M1-08, M1-09, M1-22, M2-23, M3-01, M4-02, M4-05, M4-11, M4-12, M4-16, M5-01, M7-19 |
-| 5 | A1-10, M1-10, M1-12, M3-02, M4-07, M4-09, M4-15, M6-11, M8-01 |
-| 6 | M1-11, M1-13, M4-13, M6-12, M8-02 |
+| 1 | A1-02, A1-03, AR-02, AR-04, M1-01, M1-02, M2-32, M4-03 |
+| 2 | A1-04, A1-06, A1-07, AR-03, AR-08, M1-03, M1-04, M1-05, M2-38, M4-01, M6-10 |
+| 3 | A1-05, A1-08, AR-09, M1-06, M1-07, M1-17, M1-74, M3-17, M4-04, M4-06, M4-08, M4-10, M7-24 |
+| 4 | A1-09, AR-05, M1-08, M1-09, M1-22, M2-23, M3-01, M4-02, M4-05, M4-11, M4-12, M4-16, M5-01, M7-19 |
+| 5 | A1-10, AR-06, AR-07, M1-10, M1-12, M3-02, M4-07, M4-09, M4-15, M6-11, M8-01 |
+| 6 | AR-10, M1-11, M1-13, M4-13, M6-12, M8-02 |
 | 7 | M1-14, M1-15, M1-18, M1-23, M1-26, M4-14 |
 | 8 | M1-16, M1-19, M1-21, M1-24, M1-25, M1-27, M4-17, M7-01 |
 | 9 | M1-20, M1-28, M2-01, M4-18, M7-10 |
@@ -137,7 +142,7 @@ the waves before it are merged; many can start earlier, as soon as their own dep
 
 Dependencies are minimal: a ticket implied through another dependency is not repeated. Brief files
 are added by the brief-writing steps (plan ticket M0-05 for M1, D-W-100 for M2 and M3, D-W-114 for
-M4, D-W-120 for M5 and M6, D-W-125 for M7, D-W-124 for M8, the stage specification for A1) under
+M4, D-W-120 for M5 and M6, D-W-125 for M7, D-W-124 for M8, the stage specifications for A1 and AR) under
 the names listed here.
 
 | Wave | ID | Title | Brief file | Depends on |
@@ -428,6 +433,15 @@ the names listed here.
 | 3 | A1-08 | Clients: New agent dialog | `A1-08-new-agent-clients.md` | A1-03, A1-06, A1-07 |
 | 4 | A1-09 | Clients: edit and remove | `A1-09-edit-agent-clients.md` | A1-08 |
 | 5 | A1-10 | End to end and documentation | `A1-10-builtin-agents-end-to-end.md` | A1-05, A1-09 |
+| 1 | AR-02 | Runner: orderly stop never orphans a turn | `AR-02-runner-orderly-stop.md` | none (specification merged) |
+| 2 | AR-03 | Runner: turn handover | `AR-03-runner-turn-handover.md` | AR-02, AR-04 |
+| 1 | AR-04 | Server: wake-ups | `AR-04-server-wake-ups.md` | none (specification merged) |
+| 4 | AR-05 | Runner: bothy-wake | `AR-05-runner-bothy-wake.md` | A1-05, AR-03 |
+| 5 | AR-06 | Runner: recovery and usage-window wake-ups | `AR-06-runner-recovery-usage.md` | AR-05 |
+| 5 | AR-07 | Runner: end state | `AR-07-runner-end-state.md` | AR-05 |
+| 2 | AR-08 | Clients: autonomous runs | `AR-08-autonomous-runs-clients.md` | AR-04 |
+| 3 | AR-09 | Operations: runner service guide | `AR-09-runner-service-guide.md` | AR-03 |
+| 6 | AR-10 | End to end and rollout | `AR-10-autonomous-runs-end-to-end.md` | AR-06, AR-07, AR-08, AR-09 |
 
 ## Make targets created by tickets
 
@@ -1523,4 +1537,32 @@ flowchart TB
   A1_08 --> A1_09
   A1_05 --> A1_10
   A1_09 --> A1_10
+```
+
+Tickets of AR:
+
+```mermaid
+flowchart TB
+  A1_05["A1-05"]
+  AR_02["AR-02"]
+  AR_03["AR-03"]
+  AR_04["AR-04"]
+  AR_05["AR-05"]
+  AR_06["AR-06"]
+  AR_07["AR-07"]
+  AR_08["AR-08"]
+  AR_09["AR-09"]
+  AR_10["AR-10"]
+  AR_02 --> AR_03
+  AR_04 --> AR_03
+  A1_05 --> AR_05
+  AR_03 --> AR_05
+  AR_05 --> AR_06
+  AR_05 --> AR_07
+  AR_04 --> AR_08
+  AR_03 --> AR_09
+  AR_06 --> AR_10
+  AR_07 --> AR_10
+  AR_08 --> AR_10
+  AR_09 --> AR_10
 ```
