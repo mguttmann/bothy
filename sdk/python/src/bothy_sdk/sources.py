@@ -47,6 +47,7 @@ from bothy_sdk.generated.api.agent_runtime import (
     send_heartbeat,
 )
 from bothy_sdk.generated.models import (
+    AgentInterviewRequestedEvent,
     AutocompleteAnswer,
     CommandAutocompleteRequestedEvent,
     CommandChoice,
@@ -73,6 +74,7 @@ __all__ = [
 _LOG = logging.getLogger("bothy_sdk")
 _AUTOCOMPLETE = "command.autocomplete_requested"
 _SEARCH_ASSIST = "search.assist_requested"
+_AGENT_INTERVIEW = "agent.interview_requested"
 _TOKEN_FIELD = "invocation_token"  # noqa: S105 - a member name, not a secret  # nosec B105
 
 
@@ -153,6 +155,8 @@ def envelope_from(data: Mapping[str, Any]) -> Envelope:
         event: KnownEvent | UnknownEvent = CommandAutocompleteRequestedEvent.from_dict(raw)
     elif event_type == _SEARCH_ASSIST:
         event = SearchAssistRequestedEvent.from_dict(raw)
+    elif event_type == _AGENT_INTERVIEW:
+        event = AgentInterviewRequestedEvent.from_dict(raw)
     else:
         event = decode_event(raw)
     return Envelope(

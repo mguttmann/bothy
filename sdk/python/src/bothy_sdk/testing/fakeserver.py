@@ -79,6 +79,20 @@ _PUBLIC = frozenset({"getDiscovery", "getJwks"})
 # Consumer operations judge the agent by its own grants: the run binding is ignored there.
 _DELIVERY = frozenset({"pollAgentEvents", "ackAgentEvents", "getConsumerState"})
 _THREAD_OPS = frozenset({"updateMessage"})
+
+DEFAULT_INTERVIEW_LIMITS: dict[str, Any] = {
+    "instructions_max_bytes": 65536,
+    "max_skills": 32,
+    "skill_description_max_chars": 300,
+    "skill_body_max_bytes": 65536,
+    "max_skill_files": 8,
+    "max_mcp_servers": 16,
+    "max_allowed_tools": 64,
+    "max_cost_usd_per_run": 50,
+    "mcp_stdio_runners": ["npx", "uvx"],
+    "question_max_chars": 4000,
+}
+"""The limits of ``agent.interview_requested``: the server defaults of 26 14."""
 _IDEMPOTENT_KEY_OPS = frozenset(
     {
         "updateComponent",
@@ -121,6 +135,7 @@ _ROUTES: tuple[tuple[str, str, str], ...] = (
     ("GET", "/channels/{channel_id}/commands", "listChannelCommands"),
     ("POST", "/command-autocompletions/{request_id}/answer", "answerAutocomplete"),
     ("POST", "/search-assist-requests/{request_id}/answer", "answerSearchAssist"),
+    ("POST", "/agent-interview-requests/{request_id}/answer", "answerAgentInterview"),
     ("GET", "/me", "getMe"),
     ("GET", "/messages/{message_id}", "getMessage"),
     ("GET", "/files/{file_id}/content", "downloadFile"),
@@ -1000,6 +1015,49 @@ class FakeServer:
             raise RuntimeError("no live gateway connection")
         return UUID(envelope["payload"]["request_id"])
 
+    async def request_agent_interview(
+        self,
+        turns: list[dict[str, str]],
+        *,
+        catalogue: list[dict[str, Any]] | None = None,
+        limits: dict[str, Any] | None = None,
+        want_draft: bool = False,
+        expires_in: float = 90.0,
+    ) -> UUID:
+        """Send ``agent.interview_requested`` to a live gateway connection of Lotse (26 6.1).
+
+        Args:
+            turns: The interview so far (``role`` and ``text``).
+            catalogue: The template catalogue; empty by default.
+            limits: The definition limits; the defaults of 26 14 by default.
+            want_draft: The person asks for a draft now.
+            expires_in: Seconds until ``expires_at``.
+
+        Returns:
+            The request ID.
+
+        Raises:
+            RuntimeError: No gateway connection of Lotse is live.
+        """
+        envelope = self.world.interview_event(
+            turns, catalogue or [], limits or dict(DEFAULT_INTERVIEW_LIMITS), want_draft, expires_in
+        )
+        if not await self.hub.ephemeral(envelope):
+            raise RuntimeError("no live gateway connection")
+        return UUID(envelope["payload"]["request_id"])
+
+    def agent_interview_answer(self, request_id: UUID) -> dict[str, Any] | None:
+        """What the adapter answered before ``expires_at``, if anything.
+
+        Args:
+            request_id: The request.
+
+        Returns:
+            The answer body, or ``None`` when none arrived in time.
+        """
+        answer: dict[str, Any] | None = self.world.interviews.get(request_id, {}).get("answer")
+        return answer
+
     def search_assist_answer(self, request_id: UUID) -> dict[str, Any] | None:
         """What the adapter answered before ``expires_at``, if anything.
 
@@ -1533,6 +1591,8 @@ class FakeServer:
             return self._thread_operation(op, p, request, body)
         if op == "answerSearchAssist":
             return self._answer_search_assist(p["request_id"], body)
+        if op == "answerAgentInterview":
+            return self._answer_agent_interview(p["request_id"], body)
         return self._answer_autocomplete(p["request_id"], body)
 
     def _create_message(self, thread_id: str, body: Any) -> _Answer:
@@ -1608,6 +1668,24 @@ class FakeServer:
             if pick.get("ref") not in pending["refs"]:
                 raise field_error(f"/picks/{i}/ref", "unknown_ref")
         self.world.search_assist_answers.setdefault(key, body)
+        return 204, None, {}
+
+    def _answer_agent_interview(self, request_id: str, body: Any) -> _Answer:
+        """``answerAgentInterview`` once per request before ``expires_at`` (26 6.1 item 2)."""
+        try:
+            key = UUID(request_id)
+        except ValueError:
+            raise FakeProblem("not_found") from None
+        pending = self.world.interviews.get(key)
+        if pending is None:
+            raise FakeProblem("not_found")
+        if self.world.now().timestamp() > pending["expires"]:
+            raise FakeProblem("gone")
+        if "answer" in pending:
+            raise FakeProblem("conflict", reason="already_answered")
+        if not isinstance(body, dict) or body.get("kind") not in ("questions", "draft"):
+            raise field_error("/kind", "invalid_enum")
+        pending["answer"] = body
         return 204, None, {}
 
     def _answer_autocomplete(self, request_id: str, body: Any) -> _Answer:

@@ -77,6 +77,8 @@ def _template(path: str) -> re.Pattern[str]:
 # Every operation of docs/api/openapi.yaml with `x-idempotency-exempt`; tests/test_client.py holds
 # this table equal to the specification.
 EXEMPT_ROUTES: tuple[ExemptRoute, ...] = (
+    ExemptRoute("POST", "/agent-interview-requests/{request_id}/answer", "agent_runtime"),
+    ExemptRoute("POST", "/agents/interview", "read_only"),
     ExemptRoute("POST", "/agents/me/consumers/{consumer}/ack", "agent_runtime"),
     ExemptRoute("POST", "/agents/me/heartbeat", "agent_runtime"),
     ExemptRoute("POST", "/app-manifests/validate", "read_only"),

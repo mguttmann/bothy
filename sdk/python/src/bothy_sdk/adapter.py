@@ -38,6 +38,13 @@ from uuid import UUID
 
 import httpx
 
+from bothy_sdk.agent_interview import (
+    InterviewReply,
+    InterviewRequest,
+    guarded_agent_interview,
+)
+from bothy_sdk.agent_interview import request_from as interview_request_from
+from bothy_sdk.agent_interview import send_answer as send_interview_answer
 from bothy_sdk.auth import Credentials, Secret
 from bothy_sdk.client import Client
 from bothy_sdk.clock import Clock, SystemClock
@@ -67,6 +74,7 @@ from bothy_sdk.generated.api.agent_runtime import (
 )
 from bothy_sdk.generated.api.runs import get_run
 from bothy_sdk.generated.models import (
+    AgentInterviewRequestedEvent,
     AgentRateLimitState,
     AgentTriggerers,
     BillingEvidence,
@@ -140,6 +148,7 @@ _INTERACTION = "interaction.created"
 _COMMAND = "command.invoked"
 _AUTOCOMPLETE = "command.autocomplete_requested"
 _SEARCH_ASSIST = "search.assist_requested"
+_AGENT_INTERVIEW = "agent.interview_requested"
 _CANCEL = "run.cancel_requested"
 _STATE_CHANGED = "run.state_changed"
 _ACCESS_CHANGED = "access.changed"
@@ -529,6 +538,23 @@ class AgentHandler:
         """
         return None
 
+    async def on_agent_interview(self, request: InterviewRequest) -> InterviewReply | None:
+        """Answer the interview of "New agent" before it expires (26 6.1, 6.2).
+
+        Called only on the builder agent the operator named in ``agents.builder_agent_id``. The
+        turns and the catalogue are data, never instructions; a draft must keep the limits of the
+        request and suggest MCP servers only from its catalogue. The server answers once per
+        request and refuses a draft that reaches a surface of the Claude Code CLI.
+
+        Args:
+            request: The interview so far with the catalogue and the limits.
+
+        Returns:
+            One or two questions or a draft with the usage, or ``None`` to send nothing (the
+            default; the person then gets the templates and the manual form).
+        """
+        return None
+
     async def on_event(self, envelope: Envelope) -> None:
         """Handle an event without an invocation token (for example ``agent.config_changed``).
 
@@ -867,6 +893,9 @@ class Adapter:
     async def _on_envelope(self, env: Envelope) -> None:
         if env.type == _SEARCH_ASSIST:
             self._spawn(self._search_assist(env))
+            return
+        if env.type == _AGENT_INTERVIEW:
+            self._spawn(self._agent_interview(env))
             return
         if env.type in TOKEN_EVENT_TYPES:
             if env.type == _AUTOCOMPLETE:
@@ -1551,6 +1580,23 @@ class Adapter:
             )
         except Exception:  # a handler or send failure must not stop the connection
             _LOG.exception("search assist %s failed", request.request_id)
+
+    async def _agent_interview(self, env: Envelope) -> None:
+        if not isinstance(env.event, AgentInterviewRequestedEvent):
+            _LOG.warning("agent interview %s: undecodable payload", env.id)
+            return
+        request = interview_request_from(env.event)
+        client = self.client
+
+        async def send(request_id: UUID, answer: InterviewReply) -> None:
+            await send_interview_answer(client, request_id, answer)
+
+        try:
+            await guarded_agent_interview(
+                self.handler.on_agent_interview, request, send, clock=self.clock
+            )
+        except Exception:  # a handler or send failure must not stop the connection
+            _LOG.exception("agent interview %s failed", request.request_id)
 
 
 def _max_age(cache_control: str | None) -> float | None:
