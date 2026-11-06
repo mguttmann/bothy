@@ -7,8 +7,6 @@
 rules:
   - match: "agent."  # M2-07 to M2-20
     milestone: M2
-  - match: "agents."  # A1-02, A1-03, A1-06, A1-07 (built-in agents, 26)
-    milestone: A1
   - match: "api."  # M1-03, M1-18, M1-31
     milestone: M1
   - match: api.major_version_overlap  # M7-11

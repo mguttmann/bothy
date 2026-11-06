@@ -51,6 +51,9 @@ type Config struct {
 	// (docs/spec/26-builtin-agents.md 3.3, A1-03). Zero leaves issueHostedAgentToken unbound: it
 	// answers internal_error, because the server never invents a lifetime.
 	HostedTokenTTL time.Duration `config:"agents.hosted_token_ttl"`
+	// TemplatesDir is agents.templates_dir, the folder of private templates read at start
+	// (docs/spec/26-builtin-agents.md 7.2, A1-06); empty means shipped templates only.
+	TemplatesDir string `config:"agents.templates_dir"`
 }
 
 // DefinitionLimits returns the limits of a definition from the configuration keys.

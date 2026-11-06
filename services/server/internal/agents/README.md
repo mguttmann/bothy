@@ -1,6 +1,6 @@
 # Module `agents`
 
-Status: agent records, backend policy, credential holder and tool class built (M1-51); consumer cursors with fencing, the op `ack` and the REST consumer operations built (M2-07); presence and heartbeat built (M2-20); the read of persisted heartbeats for the stall check built (M2-09); the slash command register built (M2-16) and extended for apps (M2-25: the port `OwnedCommands`, app commands listed and resolved through the app-owner guard of `authz`); agent sessions per thread built (M2-12); the session sum of a booking built (M2-22); the allow list of the adapter (`getAgentTriggerers`) built; the definitions of built-in agents built (A1-02); dev environments follow with the tickets of the milestone.
+Status: agent records, backend policy, credential holder and tool class built (M1-51); consumer cursors with fencing, the op `ack` and the REST consumer operations built (M2-07); presence and heartbeat built (M2-20); the read of persisted heartbeats for the stall check built (M2-09); the slash command register built (M2-16) and extended for apps (M2-25: the port `OwnedCommands`, app commands listed and resolved through the app-owner guard of `authz`); agent sessions per thread built (M2-12); the session sum of a booking built (M2-22); the allow list of the adapter (`getAgentTriggerers`) built; the definitions of built-in agents built (A1-02); the template catalogue built (A1-06); dev environments follow with the tickets of the milestone.
 The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
 ## Purpose
@@ -622,9 +622,38 @@ stored.
   every drafted MCP server is `mcp_not_in_catalogue`.
 - The rulings are [decisions.d/A1-07.md](../../../../docs/decisions.d/A1-07.md).
 
+## Templates of built-in agents (A1-06)
+
+The shipped templates live at the repository root under `templates/agents/<slug>/`
+([README](../../../../templates/agents/README.md)); the template gate `make templates-check`
+holds them generic and closed ([26-builtin-agents.md](../../../../docs/spec/26-builtin-agents.md)
+7.3). The server lists them with the private templates of `agents.templates_dir` (26 7.2).
+
+- `adapters/templates/` (generated): the copy of `templates/agents/` that `go generate` writes
+  with `tools/templatecopy` and `//go:embed` embeds (Go embeds only below its module);
+  `make codegen-check` and `TestCopyEqualsTheShippedTemplates` hold it equal to the source. It
+  stands below `adapters/` because go-arch-lint attaches only the layers of a module.
+- `adapters/templatefs/`: `Read` checks one template folder with the structural rules of the gate
+  (layout of 26 7.1, schema `agent_template.v1`, `SKILL.md` frontmatter of `name` and
+  `description` only, the draft through `domain/definition` for its tool class wish) and returns
+  the template with its draft as `agent_definition.v1` (`origin.kind` `template`); `Load` reads
+  the shipped templates (one that fails stops the start) and then the private folder: a slug a
+  shipped template has is skipped with the log reason `template_slug_taken`, a folder that fails
+  or whose name is no slug with `template_invalid` (attribute `bothy.reason`, no other value),
+  a file at its root is ignored, and a folder that cannot be read stops the start naming
+  `agents.templates_dir`. The folder is read once at start; a change needs a restart. The gate's
+  content rules (hosts, paths, names, secret-looking values, deny lists) run in the repository
+  only.
+- `app/templates.go`: `TemplateService` implements the port `agents.Templates`:
+  `ListTemplates` authorizes `agent.templates.read` on the instance (owner, no step-up, no audit
+  of an allow) and returns a copy of the catalogue, shipped by slug, then private by slug.
+- `adapters/httpapi/templates.go`: `listAgentTemplates` (`GET /api/v1/agent-templates`, bound with
+  `WithTemplates`); `wire.Agents.BindTemplates` loads and binds the catalogue at start. The
+  rulings are [decisions.d/A1-06.md](../../../../docs/decisions.d/A1-06.md).
+
 ## Port (root package `internal/agents`)
 
-- Inbound: `Agents` (administration, policy, tool class; M1-51), `Definitions` (definitions of built-in agents; A1-02), `Interviewer` (the interview of "New agent"; A1-07), `Facts` (run facts of runs; M2-05), `Presence` (heartbeat and presence; M2-20), `Consumers` (cursor, ack, takeover with fencing), `Commands` (register), `OwnedCommands` (the commands of an app for the owner actions of `apps`; M2-25), `Sessions`, `DevEnvironments` (milestone), `StatusAgents` (M7-09: the active agents with their stored presence for the status page, `app.StatusSource`; a stored online or degraded state older than `agent.presence_timeout` plus `agent.heartbeat_persist_interval` counts as offline; never authorized).
+- Inbound: `Agents` (administration, policy, tool class; M1-51), `Definitions` (definitions of built-in agents; A1-02), `Templates` (the template catalogue; A1-06), `Interviewer` (the interview of "New agent"; A1-07), `Facts` (run facts of runs; M2-05), `Presence` (heartbeat and presence; M2-20), `Consumers` (cursor, ack, takeover with fencing), `Commands` (register), `OwnedCommands` (the commands of an app for the owner actions of `apps`; M2-25), `Sessions`, `DevEnvironments` (milestone), `StatusAgents` (M7-09: the active agents with their stored presence for the status page, `app.StatusSource`; a stored online or degraded state older than `agent.presence_timeout` plus `agent.heartbeat_persist_interval` counts as offline; never authorized).
 - Declares the source ports `ConsumerFeed` (M2-07), `InterviewRelay` (A1-07, implemented by `gateway/adapters/interviewrelay`) and `RunSource` (M2-12).
 - Emits in-tx events: `AgentDisabled`, `SessionAttached` (M2-12).
 - Subscribes to in-tx events: none.
@@ -647,7 +676,7 @@ Only this module writes and reads these tables by SQL (03-data-model.md, princip
 
 ## Actions (05-actions.md)
 
-`agent.read`, `agent.create`, `agent.update`, `agent.disable`, `agent.enable`, `agent.billing_mode.set`, `agent.billing_mode.set_all`, `agent.credential_holder.set`, `agent.tool_class.set`, `agent.heartbeat`, `agent.events.consume`, `agent.triggerers.read`, `agent.project_folders.read`, `agent.definition.read`, `agent.host.set`, `agent.hosted.list`, `agent.hosted_token.issue`, `agent.interview`, `agent.interview.respond`, `agent_session.read`, `agent_session.reset`, `agent_session.bind`, `agent_session.report`, `command.read`, `command.register`, `command.remove`, `dev_environment.read`, `dev_environment.manage`, `dev_environment.report`.
+`agent.read`, `agent.create`, `agent.update`, `agent.disable`, `agent.enable`, `agent.billing_mode.set`, `agent.billing_mode.set_all`, `agent.credential_holder.set`, `agent.tool_class.set`, `agent.heartbeat`, `agent.events.consume`, `agent.triggerers.read`, `agent.project_folders.read`, `agent.definition.read`, `agent.host.set`, `agent.hosted.list`, `agent.hosted_token.issue`, `agent.interview`, `agent.interview.respond`, `agent.templates.read`, `agent_session.read`, `agent_session.reset`, `agent_session.bind`, `agent_session.report`, `command.read`, `command.register`, `command.remove`, `dev_environment.read`, `dev_environment.manage`, `dev_environment.report`.
 
 ## Events and WebSocket ops
 

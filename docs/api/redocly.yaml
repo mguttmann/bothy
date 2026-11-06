@@ -95,6 +95,7 @@ rules:
         - agent.invoke
         - agent.project_folders.read
         - agent.read
+        - agent.templates.read
         - agent.tool_class.set
         - agent.triggerers.read
         - agent.update
@@ -370,6 +371,7 @@ rules:
         - agent.invoke
         - agent.project_folders.read
         - agent.read
+        - agent.templates.read
         - agent.tool_class.set
         - agent.triggerers.read
         - agent.update

@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: Apache-2.0
+# Schema agent_template.v1 (docs/spec/26-builtin-agents.md 7.1).
+name: Research summarizer
+description: Searches sources through a search service and summarizes what they say.
+version: 1.0.0
+tool_class_wish: scoped
+required_secrets:
+  - SEARCH_MCP_TOKEN
+mcp_servers:
+  - name: search
+    transport: http
+    url: https://search.example.com/mcp
+    headers:
+      - name: Authorization
+        secret_ref: env:SEARCH_MCP_TOKEN
+skills:
+  - summarize-sources
+  - compare-findings

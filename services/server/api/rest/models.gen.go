@@ -744,6 +744,24 @@ func (e AgentSessionReportBindFailed) Valid() bool {
 	}
 }
 
+// Defines values for AgentTemplateSource.
+const (
+	Private AgentTemplateSource = "private"
+	Shipped AgentTemplateSource = "shipped"
+)
+
+// Valid indicates whether the value is a known member of the AgentTemplateSource enum.
+func (e AgentTemplateSource) Valid() bool {
+	switch e {
+	case Private:
+		return true
+	case Shipped:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for AgentUpdatedEventAudience.
 const (
 	AgentUpdatedEventAudienceSelf AgentUpdatedEventAudience = "self"
@@ -7778,6 +7796,44 @@ type AgentSessionReport struct {
 
 // AgentSessionReportBindFailed The bound session no longer exists in the runtime and the adapter started a new one (09, 9.5 item 4); only for a started session, otherwise 409 `conflict` with `reason` `session_not_bound`.
 type AgentSessionReportBindFailed string
+
+// AgentTemplate One agent template (26 7.1): its catalogue entry and the template as a definition draft. A shipped template comes from `templates/agents/<slug>/` of the release, a private one from the folder `agents.templates_dir` of the installation.
+type AgentTemplate struct {
+	// Definition Schema `agent_definition.v1` of a built-in agent (26 4.2), closed at every level. Every string is valid UTF-8 without control or bidi characters, except line feed and carriage return in `instructions`, a skill `body` and a file `content`. The limits are configuration values: `instructions` at most `agents.definition.instructions_max_bytes` bytes; at most `agents.definition.max_skills` skills and `agents.definition.max_mcp_servers` MCP servers. The text rules of 26 4.3 (frontmatter, inline shell, `@` imports outside the agent folder) and the rules of docs/decisions.d/A1-02.md apply; a finding is a field error of `400 validation_failed`.
+	Definition AgentDefinition `json:"definition"`
+
+	// Description One line on what an agent from this template does.
+	Description string `json:"description"`
+
+	// Name One line for the template picker.
+	//
+	// Examples: Writing helper
+	Name string `json:"name"`
+
+	// RequiredSecrets The names of the secrets the template's MCP servers name as `env:<NAME>`; the host operator provides them to the hosting runner. Names only, never a value.
+	RequiredSecrets []string `json:"required_secrets"`
+
+	// Slug The folder name of the template, `^[a-z0-9][a-z0-9-]{0,63}$`; unique across shipped and private templates.
+	//
+	// Examples: writing-helper
+	Slug string `json:"slug"`
+
+	// Source `shipped` for a template of the release, `private` for one of `agents.templates_dir`.
+	Source AgentTemplateSource `json:"source"`
+
+	// Version The version of the template, `^[0-9A-Za-z][0-9A-Za-z.+-]{0,63}$`; also `definition.origin.template_version`.
+	//
+	// Examples: 1.0.0
+	Version string `json:"version"`
+}
+
+// AgentTemplateSource `shipped` for a template of the release, `private` for one of `agents.templates_dir`.
+type AgentTemplateSource string
+
+// AgentTemplateList The shipped templates by `slug`, then the private templates by `slug`.
+type AgentTemplateList struct {
+	Items []AgentTemplate `json:"items"`
+}
 
 // AgentTriggerers Principals that may trigger the calling agent (allow list of the adapter).
 type AgentTriggerers struct {

@@ -13,6 +13,383 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// ParseListOwnersResponse parses an HTTP response from a ListOwnersWithResponse call
+func ParseListOwnersResponse(rsp *http.Response) (*ListOwnersResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListOwnersResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest OwnerList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers ListOwnersResponse200Headers
+		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
+			var value CorrelationId
+			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
+				return nil, err
+			}
+			headers.CorrelationId = &value
+		}
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers ListOwnersResponse401Headers
+		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
+			var value CorrelationId
+			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
+				return nil, err
+			}
+			headers.CorrelationId = &value
+		}
+		if values := rsp.Header.Values("DPoP-Nonce"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "DPoP-Nonce", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.DPoPNonce = &value
+		}
+		if values := rsp.Header.Values("Set-Cookie"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Set-Cookie", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.SetCookie = &value
+		}
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	case rsp.StatusCode == 403:
+		var headers ListOwnersResponse403Headers
+		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
+			var value CorrelationId
+			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
+				return nil, err
+			}
+			headers.CorrelationId = &value
+		}
+		response.Headers403 = &headers
+	case rsp.StatusCode == 429:
+		var headers ListOwnersResponse429Headers
+		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
+			var value CorrelationId
+			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
+				return nil, err
+			}
+			headers.CorrelationId = &value
+		}
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = &value
+		}
+		response.Headers429 = &headers
+	case true:
+		var headers ListOwnersResponseDefaultHeaders
+		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
+			var value CorrelationId
+			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
+				return nil, err
+			}
+			headers.CorrelationId = &value
+		}
+		response.HeadersDefault = &headers
+	}
+
+	return response, nil
+}
+
+// ParseAddOwnerResponse parses an HTTP response from a AddOwnerWithResponse call
+func ParseAddOwnerResponse(rsp *http.Response) (*AddOwnerResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &AddOwnerResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest Owner
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest UnprocessableEntity
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 201:
+		var headers AddOwnerResponse201Headers
+		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
+			var value CorrelationId
+			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
+				return nil, err
+			}
+			headers.CorrelationId = &value
+		}
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		response.Headers201 = &headers
+	case rsp.StatusCode == 400:
+		var headers AddOwnerResponse400Headers
+		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
+			var value CorrelationId
+			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
+				return nil, err
+			}
+			headers.CorrelationId = &value
+		}
+		response.Headers400 = &headers
+	case rsp.StatusCode == 401:
+		var headers AddOwnerResponse401Headers
+		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
+			var value CorrelationId
+			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
+				return nil, err
+			}
+			headers.CorrelationId = &value
+		}
+		if values := rsp.Header.Values("DPoP-Nonce"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "DPoP-Nonce", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.DPoPNonce = &value
+		}
+		if values := rsp.Header.Values("Set-Cookie"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Set-Cookie", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.SetCookie = &value
+		}
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	case rsp.StatusCode == 403:
+		var headers AddOwnerResponse403Headers
+		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
+			var value CorrelationId
+			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
+				return nil, err
+			}
+			headers.CorrelationId = &value
+		}
+		response.Headers403 = &headers
+	case rsp.StatusCode == 409:
+		var headers AddOwnerResponse409Headers
+		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
+			var value CorrelationId
+			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
+				return nil, err
+			}
+			headers.CorrelationId = &value
+		}
+		response.Headers409 = &headers
+	case rsp.StatusCode == 422:
+		var headers AddOwnerResponse422Headers
+		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
+			var value CorrelationId
+			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
+				return nil, err
+			}
+			headers.CorrelationId = &value
+		}
+		response.Headers422 = &headers
+	case rsp.StatusCode == 429:
+		var headers AddOwnerResponse429Headers
+		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
+			var value CorrelationId
+			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
+				return nil, err
+			}
+			headers.CorrelationId = &value
+		}
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = &value
+		}
+		response.Headers429 = &headers
+	case true:
+		var headers AddOwnerResponseDefaultHeaders
+		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
+			var value CorrelationId
+			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
+				return nil, err
+			}
+			headers.CorrelationId = &value
+		}
+		response.HeadersDefault = &headers
+	}
+
+	return response, nil
+}
+
 // ParseRevokeOwnerResponse parses an HTTP response from a RevokeOwnerWithResponse call
 func ParseRevokeOwnerResponse(rsp *http.Response) (*RevokeOwnerResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -22482,362 +22859,4 @@ func (p *WebhookInitiator) applyWebhookEditors(ctx context.Context, req *http.Re
 		}
 	}
 	return nil
-}
-
-// WebhookInitiatorInterface is the interface specification for the webhook initiator.
-type WebhookInitiatorInterface interface {
-	// OnAccessChangedEventWithBody fires the access.changed webhook with any body
-	OnAccessChangedEventWithBody(ctx context.Context, targetURL string, params *OnAccessChangedEventParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	OnAccessChangedEvent(ctx context.Context, targetURL string, params *OnAccessChangedEventParams, body OnAccessChangedEventJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// OnAgentConfigChangedEventWithBody fires the agent.config_changed webhook with any body
-	OnAgentConfigChangedEventWithBody(ctx context.Context, targetURL string, params *OnAgentConfigChangedEventParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	OnAgentConfigChangedEvent(ctx context.Context, targetURL string, params *OnAgentConfigChangedEventParams, body OnAgentConfigChangedEventJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// OnAgentFollowupEventWithBody fires the agent.followup webhook with any body
-	OnAgentFollowupEventWithBody(ctx context.Context, targetURL string, params *OnAgentFollowupEventParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	OnAgentFollowupEvent(ctx context.Context, targetURL string, params *OnAgentFollowupEventParams, body OnAgentFollowupEventJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// OnAgentInvocationEventWithBody fires the agent.invocation webhook with any body
-	OnAgentInvocationEventWithBody(ctx context.Context, targetURL string, params *OnAgentInvocationEventParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	OnAgentInvocationEvent(ctx context.Context, targetURL string, params *OnAgentInvocationEventParams, body OnAgentInvocationEventJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// OnAgentUpdatedEventWithBody fires the agent.updated webhook with any body
-	OnAgentUpdatedEventWithBody(ctx context.Context, targetURL string, params *OnAgentUpdatedEventParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	OnAgentUpdatedEvent(ctx context.Context, targetURL string, params *OnAgentUpdatedEventParams, body OnAgentUpdatedEventJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// OnAgentSessionChangedEventWithBody fires the agent_session.changed webhook with any body
-	OnAgentSessionChangedEventWithBody(ctx context.Context, targetURL string, params *OnAgentSessionChangedEventParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	OnAgentSessionChangedEvent(ctx context.Context, targetURL string, params *OnAgentSessionChangedEventParams, body OnAgentSessionChangedEventJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// OnChannelArchivedEventWithBody fires the channel.archived webhook with any body
-	OnChannelArchivedEventWithBody(ctx context.Context, targetURL string, params *OnChannelArchivedEventParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	OnChannelArchivedEvent(ctx context.Context, targetURL string, params *OnChannelArchivedEventParams, body OnChannelArchivedEventJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// OnChannelCreatedEventWithBody fires the channel.created webhook with any body
-	OnChannelCreatedEventWithBody(ctx context.Context, targetURL string, params *OnChannelCreatedEventParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	OnChannelCreatedEvent(ctx context.Context, targetURL string, params *OnChannelCreatedEventParams, body OnChannelCreatedEventJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// OnChannelSettingsChangedEventWithBody fires the channel.settings_changed webhook with any body
-	OnChannelSettingsChangedEventWithBody(ctx context.Context, targetURL string, params *OnChannelSettingsChangedEventParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	OnChannelSettingsChangedEvent(ctx context.Context, targetURL string, params *OnChannelSettingsChangedEventParams, body OnChannelSettingsChangedEventJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// OnChannelUpdatedEventWithBody fires the channel.updated webhook with any body
-	OnChannelUpdatedEventWithBody(ctx context.Context, targetURL string, params *OnChannelUpdatedEventParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	OnChannelUpdatedEvent(ctx context.Context, targetURL string, params *OnChannelUpdatedEventParams, body OnChannelUpdatedEventJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// OnCommandChangedEventWithBody fires the command.changed webhook with any body
-	OnCommandChangedEventWithBody(ctx context.Context, targetURL string, params *OnCommandChangedEventParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	OnCommandChangedEvent(ctx context.Context, targetURL string, params *OnCommandChangedEventParams, body OnCommandChangedEventJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// OnCommandInvokedEventWithBody fires the command.invoked webhook with any body
-	OnCommandInvokedEventWithBody(ctx context.Context, targetURL string, params *OnCommandInvokedEventParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	OnCommandInvokedEvent(ctx context.Context, targetURL string, params *OnCommandInvokedEventParams, body OnCommandInvokedEventJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// OnFileUpdatedEventWithBody fires the file.updated webhook with any body
-	OnFileUpdatedEventWithBody(ctx context.Context, targetURL string, params *OnFileUpdatedEventParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	OnFileUpdatedEvent(ctx context.Context, targetURL string, params *OnFileUpdatedEventParams, body OnFileUpdatedEventJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// OnInstanceUpdatedEventWithBody fires the instance.updated webhook with any body
-	OnInstanceUpdatedEventWithBody(ctx context.Context, targetURL string, params *OnInstanceUpdatedEventParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	OnInstanceUpdatedEvent(ctx context.Context, targetURL string, params *OnInstanceUpdatedEventParams, body OnInstanceUpdatedEventJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// OnInteractionCreatedEventWithBody fires the interaction.created webhook with any body
-	OnInteractionCreatedEventWithBody(ctx context.Context, targetURL string, params *OnInteractionCreatedEventParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	OnInteractionCreatedEvent(ctx context.Context, targetURL string, params *OnInteractionCreatedEventParams, body OnInteractionCreatedEventJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// OnMessageCreatedEventWithBody fires the message.created webhook with any body
-	OnMessageCreatedEventWithBody(ctx context.Context, targetURL string, params *OnMessageCreatedEventParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	OnMessageCreatedEvent(ctx context.Context, targetURL string, params *OnMessageCreatedEventParams, body OnMessageCreatedEventJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// OnMessageDeletedEventWithBody fires the message.deleted webhook with any body
-	OnMessageDeletedEventWithBody(ctx context.Context, targetURL string, params *OnMessageDeletedEventParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	OnMessageDeletedEvent(ctx context.Context, targetURL string, params *OnMessageDeletedEventParams, body OnMessageDeletedEventJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// OnMessageUpdatedEventWithBody fires the message.updated webhook with any body
-	OnMessageUpdatedEventWithBody(ctx context.Context, targetURL string, params *OnMessageUpdatedEventParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	OnMessageUpdatedEvent(ctx context.Context, targetURL string, params *OnMessageUpdatedEventParams, body OnMessageUpdatedEventJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// OnPinAddedEventWithBody fires the pin.added webhook with any body
-	OnPinAddedEventWithBody(ctx context.Context, targetURL string, params *OnPinAddedEventParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	OnPinAddedEvent(ctx context.Context, targetURL string, params *OnPinAddedEventParams, body OnPinAddedEventJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// OnPinRemovedEventWithBody fires the pin.removed webhook with any body
-	OnPinRemovedEventWithBody(ctx context.Context, targetURL string, params *OnPinRemovedEventParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	OnPinRemovedEvent(ctx context.Context, targetURL string, params *OnPinRemovedEventParams, body OnPinRemovedEventJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// OnReactionAddedEventWithBody fires the reaction.added webhook with any body
-	OnReactionAddedEventWithBody(ctx context.Context, targetURL string, params *OnReactionAddedEventParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	OnReactionAddedEvent(ctx context.Context, targetURL string, params *OnReactionAddedEventParams, body OnReactionAddedEventJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// OnReactionRemovedEventWithBody fires the reaction.removed webhook with any body
-	OnReactionRemovedEventWithBody(ctx context.Context, targetURL string, params *OnReactionRemovedEventParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	OnReactionRemovedEvent(ctx context.Context, targetURL string, params *OnReactionRemovedEventParams, body OnReactionRemovedEventJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// OnRunCancelRequestedEventWithBody fires the run.cancel_requested webhook with any body
-	OnRunCancelRequestedEventWithBody(ctx context.Context, targetURL string, params *OnRunCancelRequestedEventParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	OnRunCancelRequestedEvent(ctx context.Context, targetURL string, params *OnRunCancelRequestedEventParams, body OnRunCancelRequestedEventJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// OnRunStateChangedEventWithBody fires the run.state_changed webhook with any body
-	OnRunStateChangedEventWithBody(ctx context.Context, targetURL string, params *OnRunStateChangedEventParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	OnRunStateChangedEvent(ctx context.Context, targetURL string, params *OnRunStateChangedEventParams, body OnRunStateChangedEventJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// OnSpaceArchivedEventWithBody fires the space.archived webhook with any body
-	OnSpaceArchivedEventWithBody(ctx context.Context, targetURL string, params *OnSpaceArchivedEventParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	OnSpaceArchivedEvent(ctx context.Context, targetURL string, params *OnSpaceArchivedEventParams, body OnSpaceArchivedEventJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// OnSpaceCreatedEventWithBody fires the space.created webhook with any body
-	OnSpaceCreatedEventWithBody(ctx context.Context, targetURL string, params *OnSpaceCreatedEventParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	OnSpaceCreatedEvent(ctx context.Context, targetURL string, params *OnSpaceCreatedEventParams, body OnSpaceCreatedEventJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// OnSpaceUpdatedEventWithBody fires the space.updated webhook with any body
-	OnSpaceUpdatedEventWithBody(ctx context.Context, targetURL string, params *OnSpaceUpdatedEventParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	OnSpaceUpdatedEvent(ctx context.Context, targetURL string, params *OnSpaceUpdatedEventParams, body OnSpaceUpdatedEventJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// OnStatusUpdatedEventWithBody fires the status.updated webhook with any body
-	OnStatusUpdatedEventWithBody(ctx context.Context, targetURL string, params *OnStatusUpdatedEventParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	OnStatusUpdatedEvent(ctx context.Context, targetURL string, params *OnStatusUpdatedEventParams, body OnStatusUpdatedEventJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// OnThreadClosedEventWithBody fires the thread.closed webhook with any body
-	OnThreadClosedEventWithBody(ctx context.Context, targetURL string, params *OnThreadClosedEventParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	OnThreadClosedEvent(ctx context.Context, targetURL string, params *OnThreadClosedEventParams, body OnThreadClosedEventJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// OnThreadCreatedEventWithBody fires the thread.created webhook with any body
-	OnThreadCreatedEventWithBody(ctx context.Context, targetURL string, params *OnThreadCreatedEventParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	OnThreadCreatedEvent(ctx context.Context, targetURL string, params *OnThreadCreatedEventParams, body OnThreadCreatedEventJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// OnThreadMovedEventWithBody fires the thread.moved webhook with any body
-	OnThreadMovedEventWithBody(ctx context.Context, targetURL string, params *OnThreadMovedEventParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	OnThreadMovedEvent(ctx context.Context, targetURL string, params *OnThreadMovedEventParams, body OnThreadMovedEventJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// OnThreadMovedOutEventWithBody fires the thread.moved_out webhook with any body
-	OnThreadMovedOutEventWithBody(ctx context.Context, targetURL string, params *OnThreadMovedOutEventParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	OnThreadMovedOutEvent(ctx context.Context, targetURL string, params *OnThreadMovedOutEventParams, body OnThreadMovedOutEventJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// OnThreadReopenedEventWithBody fires the thread.reopened webhook with any body
-	OnThreadReopenedEventWithBody(ctx context.Context, targetURL string, params *OnThreadReopenedEventParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	OnThreadReopenedEvent(ctx context.Context, targetURL string, params *OnThreadReopenedEventParams, body OnThreadReopenedEventJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// OnThreadUpdatedEventWithBody fires the thread.updated webhook with any body
-	OnThreadUpdatedEventWithBody(ctx context.Context, targetURL string, params *OnThreadUpdatedEventParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	OnThreadUpdatedEvent(ctx context.Context, targetURL string, params *OnThreadUpdatedEventParams, body OnThreadUpdatedEventJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// OnUserUpdatedEventWithBody fires the user.updated webhook with any body
-	OnUserUpdatedEventWithBody(ctx context.Context, targetURL string, params *OnUserUpdatedEventParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	OnUserUpdatedEvent(ctx context.Context, targetURL string, params *OnUserUpdatedEventParams, body OnUserUpdatedEventJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-}
-
-func (p *WebhookInitiator) OnAccessChangedEventWithBody(ctx context.Context, targetURL string, params *OnAccessChangedEventParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewOnAccessChangedEventWebhookRequestWithBody(targetURL, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := p.applyWebhookEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return p.Client.Do(req)
-}
-
-func (p *WebhookInitiator) OnAccessChangedEvent(ctx context.Context, targetURL string, params *OnAccessChangedEventParams, body OnAccessChangedEventJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewOnAccessChangedEventWebhookRequest(targetURL, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := p.applyWebhookEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return p.Client.Do(req)
-}
-
-func (p *WebhookInitiator) OnAgentConfigChangedEventWithBody(ctx context.Context, targetURL string, params *OnAgentConfigChangedEventParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewOnAgentConfigChangedEventWebhookRequestWithBody(targetURL, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := p.applyWebhookEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return p.Client.Do(req)
-}
-
-func (p *WebhookInitiator) OnAgentConfigChangedEvent(ctx context.Context, targetURL string, params *OnAgentConfigChangedEventParams, body OnAgentConfigChangedEventJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewOnAgentConfigChangedEventWebhookRequest(targetURL, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := p.applyWebhookEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return p.Client.Do(req)
-}
-
-func (p *WebhookInitiator) OnAgentFollowupEventWithBody(ctx context.Context, targetURL string, params *OnAgentFollowupEventParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewOnAgentFollowupEventWebhookRequestWithBody(targetURL, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := p.applyWebhookEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return p.Client.Do(req)
-}
-
-func (p *WebhookInitiator) OnAgentFollowupEvent(ctx context.Context, targetURL string, params *OnAgentFollowupEventParams, body OnAgentFollowupEventJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewOnAgentFollowupEventWebhookRequest(targetURL, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := p.applyWebhookEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return p.Client.Do(req)
-}
-
-func (p *WebhookInitiator) OnAgentInvocationEventWithBody(ctx context.Context, targetURL string, params *OnAgentInvocationEventParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewOnAgentInvocationEventWebhookRequestWithBody(targetURL, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := p.applyWebhookEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return p.Client.Do(req)
-}
-
-func (p *WebhookInitiator) OnAgentInvocationEvent(ctx context.Context, targetURL string, params *OnAgentInvocationEventParams, body OnAgentInvocationEventJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewOnAgentInvocationEventWebhookRequest(targetURL, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := p.applyWebhookEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return p.Client.Do(req)
-}
-
-func (p *WebhookInitiator) OnAgentUpdatedEventWithBody(ctx context.Context, targetURL string, params *OnAgentUpdatedEventParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewOnAgentUpdatedEventWebhookRequestWithBody(targetURL, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := p.applyWebhookEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return p.Client.Do(req)
-}
-
-func (p *WebhookInitiator) OnAgentUpdatedEvent(ctx context.Context, targetURL string, params *OnAgentUpdatedEventParams, body OnAgentUpdatedEventJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewOnAgentUpdatedEventWebhookRequest(targetURL, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := p.applyWebhookEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return p.Client.Do(req)
-}
-
-func (p *WebhookInitiator) OnAgentSessionChangedEventWithBody(ctx context.Context, targetURL string, params *OnAgentSessionChangedEventParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewOnAgentSessionChangedEventWebhookRequestWithBody(targetURL, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := p.applyWebhookEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return p.Client.Do(req)
-}
-
-func (p *WebhookInitiator) OnAgentSessionChangedEvent(ctx context.Context, targetURL string, params *OnAgentSessionChangedEventParams, body OnAgentSessionChangedEventJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewOnAgentSessionChangedEventWebhookRequest(targetURL, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := p.applyWebhookEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return p.Client.Do(req)
-}
-
-func (p *WebhookInitiator) OnChannelArchivedEventWithBody(ctx context.Context, targetURL string, params *OnChannelArchivedEventParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewOnChannelArchivedEventWebhookRequestWithBody(targetURL, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := p.applyWebhookEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return p.Client.Do(req)
-}
-
-func (p *WebhookInitiator) OnChannelArchivedEvent(ctx context.Context, targetURL string, params *OnChannelArchivedEventParams, body OnChannelArchivedEventJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewOnChannelArchivedEventWebhookRequest(targetURL, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := p.applyWebhookEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return p.Client.Do(req)
-}
-
-func (p *WebhookInitiator) OnChannelCreatedEventWithBody(ctx context.Context, targetURL string, params *OnChannelCreatedEventParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewOnChannelCreatedEventWebhookRequestWithBody(targetURL, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := p.applyWebhookEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return p.Client.Do(req)
 }

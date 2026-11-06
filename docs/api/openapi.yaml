@@ -13743,6 +13743,62 @@ paths:
         default:
           $ref: '#/components/responses/Error'
 
+  /agent-templates:
+    get:
+      operationId: listAgentTemplates
+      summary: List the agent templates
+      tags: [Agents]
+      description: |-
+        The templates for a new built-in agent (26 7): the shipped templates of `templates/agents/`, embedded in the server, then the private templates of the folder `agents.templates_dir`, each ordered by `slug`. The server reads both once at start; a private template whose slug a shipped one already has, or that fails the schema `agent_template.v1` or the rules of 26 4.3, is left out and logged with `template_slug_taken` or `template_invalid` (26 7.2). `definition` is the template as a definition draft with `origin.kind` `template`, ready for `putAgentDefinition` (26 7.1). A small unpaginated list (06, 6 point 6). Owner only.
+      x-authz-action: agent.templates.read
+      x-rate-limit-class: rl.read
+      responses:
+        '200':
+          description: OK.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentTemplateList'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    items:
+                    - slug: writing-helper
+                      source: shipped
+                      name: Writing helper
+                      description: Drafts, shortens and polishes texts in the tone the person asks for.
+                      version: 1.0.0
+                      required_secrets: []
+                      definition:
+                        instructions: "# Writing helper\n\nYou help people in this chat write clear texts.\n"
+                        skills:
+                        - name: shorten
+                          description: Shortens a text to a target length without losing its main points.
+                          body: "# Shorten\n\n1. Find the main points of the text and keep each of them.\n"
+                        mcp_servers: []
+                        settings:
+                          tool_class_wish: chat
+                        origin:
+                          kind: template
+                          template_slug: writing-helper
+                          template_version: 1.0.0
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
   /agents/{agent_id}/project-folders:
     get:
       operationId: listAgentProjectFolders
@@ -33648,6 +33704,48 @@ components:
             $ref: '#/components/schemas/AgentDefinitionVersion'
         next_cursor:
           $ref: '#/components/schemas/Cursor'
+    AgentTemplate:
+      type: object
+      description: |-
+        One agent template (26 7.1): its catalogue entry and the template as a definition draft. A shipped template comes from `templates/agents/<slug>/` of the release, a private one from the folder `agents.templates_dir` of the installation.
+      required: [slug, source, name, description, version, required_secrets, definition]
+      properties:
+        slug:
+          type: string
+          description: The folder name of the template, `^[a-z0-9][a-z0-9-]{0,63}$`; unique across shipped and private templates.
+          examples: [writing-helper]
+        source:
+          type: string
+          enum: [shipped, private]
+          description: '`shipped` for a template of the release, `private` for one of `agents.templates_dir`.'
+        name:
+          type: string
+          description: One line for the template picker.
+          examples: [Writing helper]
+        description:
+          type: string
+          description: One line on what an agent from this template does.
+        version:
+          type: string
+          description: The version of the template, `^[0-9A-Za-z][0-9A-Za-z.+-]{0,63}$`; also `definition.origin.template_version`.
+          examples: [1.0.0]
+        required_secrets:
+          type: array
+          description: The names of the secrets the template's MCP servers name as `env:<NAME>`; the host operator provides them to the hosting runner. Names only, never a value.
+          items:
+            type: string
+            examples: [SEARCH_MCP_TOKEN]
+        definition:
+          $ref: '#/components/schemas/AgentDefinition'
+    AgentTemplateList:
+      type: object
+      description: The shipped templates by `slug`, then the private templates by `slug`.
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgentTemplate'
     AgentPage:
       type: object
       description: One page. `next_cursor` is absent on the last page.

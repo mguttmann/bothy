@@ -211,6 +211,14 @@ func newWorld(t *testing.T) *world {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// The template catalogue with the default limits of 26 14 and no private folder (A1-06).
+	if err := ag.BindTemplates(agentsapp.Config{
+		DefinitionInstructionsMaxBytes: 65536, DefinitionMaxSkills: 32, DefinitionSkillDescriptionMaxChars: 300,
+		DefinitionSkillBodyMaxBytes: 65536, DefinitionMaxSkillFiles: 8, DefinitionMaxMCPServers: 16, DefinitionMaxAllowedTools: 64,
+		DefinitionMaxCostUSDPerRun: 50, MCPStdioRunners: []string{"npx", "uvx"},
+	}, az, log); err != nil {
+		t.Fatal(err)
+	}
 	w.svc = ag.Service
 	if w.admin, err = authzapp.NewAdminService(authzapp.AdminDeps{
 		UoW: w.uow, Authorizer: az, Store: authzpg.NewRepository(pool), Principals: principals, Structure: w.structure,

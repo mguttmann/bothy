@@ -28,7 +28,8 @@ import (
 // setAgentBillingMode, setAllAgentsBillingMode, setCredentialHolder and setAgentToolClass, and the
 // consumer operations getConsumerState, pollAgentEvents and ackAgentEvents (M2-07),
 // sendHeartbeat (M2-20), getAgentTriggerers and the definitions of built-in agents
-// getAgentDefinition, listAgentDefinitionVersions and putAgentDefinition (A1-02).
+// getAgentDefinition, listAgentDefinitionVersions and putAgentDefinition (A1-02), and the template
+// catalogue listAgentTemplates (A1-06).
 type Agents struct {
 	agents    agents.Agents
 	consumers agents.ConsumerAPI
@@ -37,6 +38,8 @@ type Agents struct {
 	interval time.Duration
 	// definitions serves the definitions of built-in agents (A1-02, WithDefinitions).
 	definitions agents.Definitions
+	// templates serves listAgentTemplates (A1-06, WithTemplates).
+	templates agents.Templates
 }
 
 // New returns the handlers over the use cases of the records a and of the consumers c.

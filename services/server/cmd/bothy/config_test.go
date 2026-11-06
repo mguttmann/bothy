@@ -254,6 +254,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"agents.interview.max_turns = 12  # default\n" +
 		"agents.interview.timeout = 90s  # default\n" +
 		"agents.mcp_stdio_runners = npx, uvx  # default\n" +
+		"agents.templates_dir =   # default\n" +
 		"api.cors_allowed_origins =   # default\n" +
 		"api.page_size_default = 50  # default\n" +
 		"api.page_size_max = 200  # default\n" +

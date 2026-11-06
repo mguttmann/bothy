@@ -17,6 +17,7 @@ import 'package:api_client/src/generated/model/agent_definition_version_page.dar
 import 'package:api_client/src/generated/model/agent_interview_answer.dart';
 import 'package:api_client/src/generated/model/agent_interview_request.dart';
 import 'package:api_client/src/generated/model/agent_page.dart';
+import 'package:api_client/src/generated/model/agent_template_list.dart';
 import 'package:api_client/src/generated/model/agent_update.dart';
 import 'package:api_client/src/generated/model/billing_mode_set.dart';
 import 'package:api_client/src/generated/model/billing_mode_set_all.dart';
@@ -860,6 +861,87 @@ class AgentsApi {
     }
 
     return Response<ProjectFolderList>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// List the agent templates
+  /// The templates for a new built-in agent (26 7): the shipped templates of &#x60;templates/agents/&#x60;, embedded in the server, then the private templates of the folder &#x60;agents.templates_dir&#x60;, each ordered by &#x60;slug&#x60;. The server reads both once at start; a private template whose slug a shipped one already has, or that fails the schema &#x60;agent_template.v1&#x60; or the rules of 26 4.3, is left out and logged with &#x60;template_slug_taken&#x60; or &#x60;template_invalid&#x60; (26 7.2). &#x60;definition&#x60; is the template as a definition draft with &#x60;origin.kind&#x60; &#x60;template&#x60;, ready for &#x60;putAgentDefinition&#x60; (26 7.1). A small unpaginated list (06, 6 point 6). Owner only.
+  ///
+  /// Parameters:
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [AgentTemplateList] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<AgentTemplateList>> listAgentTemplates({
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/agent-templates';
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'apiKey',
+            'name': 'consoleSession',
+            'keyName': '__Host-console_session',
+            'where': '',
+          },
+          {'type': 'http', 'scheme': 'DPoP', 'name': 'dpopAuth'},
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearerAuth'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    AgentTemplateList? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(
+              rawResponse,
+              specifiedType: const FullType(AgentTemplateList),
+            ) as AgentTemplateList;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<AgentTemplateList>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,

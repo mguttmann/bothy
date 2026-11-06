@@ -40,8 +40,9 @@ func agentsConfigKeys() []config.Key {
 }
 
 // agentDefinitionConfigKeys returns the keys of the definitions of built-in agents from
-// docs/spec/26-builtin-agents.md "Configuration values of this chapter" that the server reads so far
-// (A1-02): the limits of agent_definition.v1 and the commands of a stdio MCP server. The maxima
+// docs/spec/26-builtin-agents.md "Configuration values of this chapter" that the server reads so far:
+// the limits of agent_definition.v1 and the commands of a stdio MCP server (A1-02), and the folder
+// of private templates (A1-06). The maxima
 // keep a definition far below the JSON body limit of a request; zero for a count allows none.
 func agentDefinitionConfigKeys() []config.Key {
 	return []config.Key{
@@ -63,6 +64,9 @@ func agentDefinitionConfigKeys() []config.Key {
 			Doc: "Highest cost cap per run in USD that a definition may set."},
 		{Name: "agents.mcp_stdio_runners", Kind: config.KindStringList, Default: `["npx", "uvx"]`, Chapter: chapter26,
 			Doc: "Commands a stdio MCP server of a definition may use."},
+		// A1-06: read once at start; a change needs a restart (26 7.2).
+		{Name: "agents.templates_dir", Kind: config.KindString, Default: "", Chapter: chapter26,
+			Doc: "Folder of private agent templates outside the repository, read at start; empty means shipped templates only."},
 	}
 }
 

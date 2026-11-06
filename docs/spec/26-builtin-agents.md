@@ -499,6 +499,13 @@ One folder per template under `templates/agents/<slug>/` (`<slug>` matching
 `skills[]` (names of the skill folders). A template becomes a definition draft one to one, with
 `origin.kind = template`.
 
+`name`, `description`, `version`, `tool_class_wish` and `skills` are required; `model_hint`
+(becomes `settings.model`), `required_secrets` and `mcp_servers` are optional, and no other key is
+allowed. A `secret_ref` of a template is `env:<NAME>` with `NAME` listed in `required_secrets`.
+The draft takes `CLAUDE.md` as `instructions` and, per skill, the frontmatter `description` and
+the text after the frontmatter as `body`; it is checked with 4.3 for the tool class
+`tool_class_wish` (decisions.d/A1-06.md).
+
 ### 7.2 Shipping and private templates
 
 1. A `go generate` step copies the shipped templates into the server module, where the binary
@@ -508,7 +515,12 @@ One folder per template under `templates/agents/<slug>/` (`<slug>` matching
 2. `agents.templates_dir` (default empty) names a folder outside the repository with private
    templates of the same layout, read at start. A private template whose slug equals a shipped one
    is skipped with the log code `template_slug_taken`; one that fails the schema is skipped with
-   `template_invalid`. Private templates never enter the repository (D-A1-25).
+   `template_invalid` (log attribute `bothy.reason`); a file at the root of the folder is
+   ignored, and a folder that cannot be read stops the start. Private templates never enter the
+   repository (D-A1-25).
+3. `listAgentTemplates` answers the shipped templates by slug, then the private ones by slug,
+   each with `source` (`shipped` or `private`), `name`, `description`, `version`,
+   `required_secrets` and the draft as `definition` (schema `AgentTemplate`).
 
 ### 7.3 Template gate
 
@@ -527,7 +539,10 @@ under `templates/agents/` and fails on:
 
 The private deny list runs over templates like over every other file, in `make denylist`, the pull
 request job and `denylist-main`. The gate's tests carry one failing fixture template per surface of
-5.5 and per rule above. The terms the maintainers know to be private are added to the private list
+5.5 and per rule above (`tools/templates/tests/fixtures/<rule>/`). Item 3 uses a port of the
+server's rules (`tools/templates/definition_rules.py`) that runs the corpus `tests/agent-definitions`;
+the person rule of item 4 is a heuristic over person positions (decisions.d/A1-06.md D-A1-06-1).
+The terms the maintainers know to be private are added to the private list
 and its CI secret by the owner before the first template lands (D-A1-16, PLAN section 21 "Owner").
 
 ### 7.4 Catalogue for the builder

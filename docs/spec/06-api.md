@@ -1061,6 +1061,7 @@ Generated from openapi.yaml.
 | PUT | `/api/v1/agents/{agent_id}/definition` | `putAgentDefinition` | `agent.update` | Store a new version of the definition of a built-in agent |
 | GET | `/api/v1/agents/{agent_id}/definition/versions` | `listAgentDefinitionVersions` | `agent.definition.read` | List the versions of the definition of a built-in agent |
 | PUT | `/api/v1/agents/{agent_id}/host` | `setAgentHost` | `agent.host.set` | Move a built-in agent to another runner |
+| GET | `/api/v1/agent-templates` | `listAgentTemplates` | `agent.templates.read` | List the agent templates |
 | GET | `/api/v1/agents/{agent_id}/project-folders` | `listAgentProjectFolders` | `agent.project_folders.read` | List the project folders of a runner that have no binding |
 
 #### Agent runtime
