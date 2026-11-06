@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -98,24 +99,93 @@ func ServerImage(ctx context.Context, d *Docker, root, tmp string) (string, erro
 	return tag, nil
 }
 
+// HostAptFallback is the marker file of a host image whose packages came from the current trixie
+// of deb.debian.org because snapshot.debian.org failed (docs/decisions.d/FIX-apt-snapshot-retry.md).
+const HostAptFallback = "/etc/termsuite-apt-fallback"
+
 // HostImage returns the tag termsuite-host:<first 12 hex of the SHA-256 of the host
-// Dockerfile> and builds the image with BuildKit when the tag is missing.
+// Dockerfile> and builds the image with BuildKit when the tag is missing. An existing image with
+// the marker HostAptFallback is built again without the build cache, so the pinned snapshot gets
+// another try; when the new image carries the marker as well, HostImage writes a warning to warn.
 //
-// Errors: a failed build.
-func HostImage(ctx context.Context, d *Docker, root string) (string, error) {
+// Errors: a failed build, with the last line of its output and the last APT errors (lines "E: ")
+// of the build log, because the last line names only the RUN instruction and is cut; a failed
+// check for the marker.
+func HostImage(ctx context.Context, d *Docker, root string, warn io.Writer) (string, error) {
 	file := filepath.Join(root, HostDockerfile)
 	sum, err := fileSHA256(file)
 	if err != nil {
 		return "", err
 	}
 	tag := "termsuite-host:" + sum[:12]
+	args := []string{"buildx", "build", "--load", "--tag", tag, "--file", file, filepath.Dir(file)}
 	if r, err := d.run(ctx, nil, nil, "image", "inspect", "--format", "{{.Id}}", tag); err == nil && r.code == 0 {
-		return tag, nil
+		fallback, err := hostAptFallback(ctx, d, tag)
+		if err != nil {
+			return "", err
+		}
+		if !fallback {
+			return tag, nil
+		}
+		args = append([]string{"buildx", "build", "--no-cache"}, args[2:]...)
 	}
-	if _, err := d.must(ctx, nil, "buildx", "build", "--load", "--tag", tag, "--file", file, filepath.Dir(file)); err != nil {
+	r, err := d.run(ctx, nil, nil, args...)
+	if err != nil {
+		return "", fmt.Errorf("stack: docker buildx build: %w", err)
+	}
+	if r.code != 0 {
+		return "", fmt.Errorf("%w: docker buildx build exited %d: %s%s", ErrDocker, r.code, lastLine(r.stderr), aptErrors(r.stderr))
+	}
+	fallback, err := hostAptFallback(ctx, d, tag)
+	if err != nil {
 		return "", err
 	}
+	if fallback {
+		_, _ = fmt.Fprintf(warn, "stack: warning: host image %s holds the current Debian packages, not the pinned snapshot of %s, because snapshot.debian.org failed; the next run builds it again\n", tag, HostDockerfile)
+	}
 	return tag, nil
+}
+
+// hostAptFallback reports whether the image tag carries the marker HostAptFallback.
+func hostAptFallback(ctx context.Context, d *Docker, tag string) (bool, error) {
+	r, err := d.run(ctx, nil, nil, "run", "--rm", "--entrypoint", "/usr/bin/test", tag, "-e", HostAptFallback)
+	if err != nil {
+		return false, fmt.Errorf("stack: docker run: %w", err)
+	}
+	switch r.code {
+	case 0:
+		return true, nil
+	case 1:
+		return false, nil
+	}
+	return false, fmt.Errorf("%w: docker run of %s exited %d: %s", ErrDocker, tag, r.code, lastLine(r.stderr))
+}
+
+// aptErrors returns the last three APT error lines ("E: ...") of a build log, each at most 300
+// bytes, as "; apt: <line> | <line>", or "" when the log has none.
+//
+// Example: a log line "#5 42.03 E: Failed to fetch http://h/a.deb  504  Gateway Timeout" gives
+// "; apt: E: Failed to fetch http://h/a.deb  504  Gateway Timeout".
+func aptErrors(log []byte) string {
+	var found []string
+	for _, l := range strings.Split(string(log), "\n") {
+		i := strings.Index(l, "E: ")
+		if i < 0 || (i > 0 && l[i-1] != ' ') {
+			continue
+		}
+		e := strings.TrimSpace(l[i:])
+		if len(e) > 300 {
+			e = e[:300]
+		}
+		found = append(found, e)
+	}
+	if len(found) == 0 {
+		return ""
+	}
+	if len(found) > 3 {
+		found = found[len(found)-3:]
+	}
+	return "; apt: " + strings.Join(found, " | ")
 }
 
 // fileSHA256 returns the lowercase hex SHA-256 of the file at path.
