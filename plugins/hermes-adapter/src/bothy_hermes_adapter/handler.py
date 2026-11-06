@@ -219,14 +219,18 @@ class _Turn:
     ended: bool = False
     # Background work of the run (09 17.12, R-AG-44): the run's start in wall time (the registry
     # filter), whether the first turn ended and the run holds work, the Hermes turns of the run
-    # that run now (own: started by the adapter; internal: started by Hermes itself), the steps
-    # of the work by Hermes' ID, and the monotonic time of the last sign of life.
+    # that run now (own: started by the adapter; internal: started by Hermes itself), whether a
+    # Hermes turn of the thread passed ``pre_llm_call`` without its ``on_session_end`` yet
+    # (``hermes_open``), whether a turn Hermes started itself failed, the steps of the work by
+    # Hermes' ID, and the monotonic time of the last sign of life.
     started_wall: float = field(default_factory=time.time)
     held: bool = False
     seen_work: bool = False
     own_turns: int = 1
     internal: bool = False
+    hermes_open: bool = False
     failed_turn: bool = False
+    failed_result: bool = False
     work_steps: dict[str, tuple[UUID, str]] = field(default_factory=dict)
     work_counts: tuple[int, int] = (0, 0)
     last_busy: float = field(default_factory=time.monotonic)
@@ -689,6 +693,7 @@ class HermesHandler(AgentHandler):
         if turn.dropped or handle.finished:
             return
         turn.own_turns -= 1
+        self._own_turn_ended(turn)
         if turn.live is not None:
             turn.live.end(failed=outcome is not TurnOutcome.COMPLETED)
         await self._flush_edits(turn)
@@ -699,7 +704,7 @@ class HermesHandler(AgentHandler):
                     handle.patch.followup_absorbed(message_id)
             # The run covers the work its turn left running (09 17.12, R-AG-44).
             await self._hold(turn)
-            if turn.failed_turn:
+            if turn.failed_turn or turn.failed_result:
                 outcome = TurnOutcome.FAILED
             if _gone(turn):
                 return  # cancelled or ended by the server while it held the work
@@ -729,7 +734,9 @@ class HermesHandler(AgentHandler):
         Hermes' registries are read every ``background_poll_interval``; each unit is a step. The
         run may end when no unit is open, no Hermes turn of the thread runs, and, after the run
         saw background work, ``background_settle`` passed without a sign of a turn: the gateway
-        admits the turn that reports a result a moment after the unit ended.
+        admits the turn that reports a result a moment after the unit ended. A turn Hermes started
+        itself that failed ends the run ``failed`` once the settle time passed after it (its
+        error text arrives after the turn).
         """
         settings = self.settings
         turn.held = True
@@ -737,13 +744,19 @@ class HermesHandler(AgentHandler):
         turn.last_progress = time.monotonic()
         while not (turn.dropped or turn.abort_reason is not None or turn.failed_turn):
             open_work = await self._poll_work(turn)
-            if turn.seen_work and turn.own_turns == 0 and not turn.internal and turn.pending:
+            self._watch_session(turn)
+            idle = turn.own_turns == 0 and not turn.internal
+            if turn.seen_work and idle and turn.pending and not turn.failed_result:
                 # A follow-up the first turn did not take, or one written while the run holds
                 # work: a turn of its own, one after the other (17.12 point 5); never while a
-                # turn Hermes started itself runs.
+                # turn Hermes started itself runs, and not after one failed (the follow-on run
+                # takes it).
                 self._start_followup(turn, turn.pending.pop(0))
             now = time.monotonic()
-            if open_work or turn.own_turns > 0 or turn.internal:
+            if turn.failed_result and idle:
+                if now - turn.last_busy >= settings.background_settle:
+                    return
+            elif open_work or turn.own_turns > 0 or turn.internal:
                 turn.last_busy = now
             elif not turn.seen_work or now - turn.last_busy >= settings.background_settle:
                 return
@@ -757,6 +770,47 @@ class HermesHandler(AgentHandler):
             turn.wake.clear()
             with contextlib.suppress(TimeoutError):
                 await asyncio.wait_for(turn.wake.wait(), settings.background_poll_interval)
+
+    def _watch_session(self, turn: _Turn) -> None:
+        """Follow the turns of the thread's Hermes session by its busy state (17.12 point 3).
+
+        Hermes calls ``on_session_end`` only when a turn's agent loop finalizes; a turn that ends
+        with an error (a refused model request, exhausted retries, an interrupt, an exception)
+        returns without it, while the session's busy state ends on every path. A busy session
+        while no turn of the adapter runs is a turn Hermes started itself, also one whose
+        ``pre_llm_call`` came before the hold or during a turn of the adapter; when the session
+        is free again, that turn ended, failed if its ``on_session_end`` did not come.
+        """
+        if turn.own_turns > 0 or not (turn.seen_work or turn.internal):
+            return
+        running = self.runtime.turn_running(turn.thread_id)
+        if running is None:
+            return  # Hermes cannot tell: the hooks alone decide, as before
+        if running:
+            turn.internal = True
+            return
+        if turn.internal:
+            self._internal_ended(turn, failed=turn.hermes_open)
+
+    def _own_turn_ended(self, turn: _Turn) -> None:
+        """A turn of the adapter returned: its ``pre_llm_call`` no longer counts as open.
+
+        Only while the session is free: a busy session already runs the next turn.
+        """
+        if self.runtime.turn_running(turn.thread_id) is False:
+            turn.hermes_open = False
+
+    def _internal_ended(self, turn: _Turn, *, failed: bool) -> None:
+        """A turn Hermes started itself ended; a failed one makes the run end ``failed``."""
+        turn.internal = False
+        turn.hermes_open = False
+        if failed:
+            turn.failed_result = True
+            _LOG.info("run %s: a turn Hermes started itself failed", turn.run_id)
+        if turn.live is not None and not turn.ended:
+            with self._bound(turn):
+                turn.live.end(failed=failed)
+        self._touch(turn)
 
     async def _poll_work(self, turn: _Turn) -> bool:
         """Read the thread's background work and show it; returns whether a unit is open."""
@@ -872,6 +926,7 @@ class HermesHandler(AgentHandler):
             outcome = await self.runtime.start_turn(request)
         finally:
             turn.own_turns -= 1
+            self._own_turn_ended(turn)
             self._touch(turn)
         if turn.dropped or turn.handle.finished:
             return
@@ -1562,34 +1617,38 @@ class HermesHandler(AgentHandler):
     def on_turn_started(self, thread_id: UUID) -> None:
         """Hermes started a turn of the thread (``pre_llm_call``).
 
-        While the run holds background work and no turn of the adapter runs, it is a turn Hermes
-        started itself (the result of a delegation or a process): a turn of the run (17.12).
-        Without an open run the turn has no run; its tool calls are refused (R-AG-44).
+        While no turn of the adapter runs (the run holds background work, or its first turn just
+        returned), it is a turn Hermes started itself (the result of a delegation or a process): a
+        turn of the run (17.12). Without an open run the turn has no run; its tool calls are
+        refused (R-AG-44).
         """
         turn = self._active(thread_id)
         if turn is None:
             _LOG.info("thread %s: a Hermes turn without a run", thread_id)
             return
-        if turn.held and turn.own_turns == 0:
+        turn.hermes_open = True
+        if turn.own_turns == 0:
             turn.internal = True
         self._touch(turn)
 
-    def on_turn_ended(self, thread_id: UUID) -> None:
+    def on_turn_ended(self, thread_id: UUID, *, failed: bool = False) -> None:
         """A turn of the thread ended its agent loop (``on_session_end``).
 
         A turn Hermes started itself ends even while a turn of the adapter is counted: the run
-        must not wait for it any more (17.12).
+        must not wait for it any more (17.12). One Hermes reports ``failed`` (or interrupted)
+        makes the run end ``failed``.
+
+        Args:
+            thread_id: The thread of the turn.
+            failed: Whether Hermes reports the turn failed or interrupted.
         """
         turn = self._turns.get(thread_id)
-        if turn is None or turn.dropped or not turn.held:
+        if turn is None or turn.dropped:
             return
-        if turn.own_turns > 0 and not turn.internal:
-            return
-        turn.internal = False
-        if turn.live is not None and not turn.ended:
-            with self._bound(turn):
-                turn.live.end()
-        self._touch(turn)
+        turn.hermes_open = False
+        if not turn.internal and (turn.own_turns > 0 or not turn.held):
+            return  # the end of a turn of the adapter: its outcome tells how it ended
+        self._internal_ended(turn, failed=failed)
 
     def tool_allowed(self, thread_id: UUID | None) -> bool:
         """Whether a tool may run now in the thread: only while a run of it is open (R-AG-44).

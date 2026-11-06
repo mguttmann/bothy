@@ -94,6 +94,8 @@ class FakeRuntime:
     background: dict[UUID, list[BackgroundTask]] = field(default_factory=dict)
     background_since: list[float] = field(default_factory=list)
     cancelled_background: list[UUID] = field(default_factory=list)
+    # Hermes' busy state of a thread's session (`turn_running`); ``None``: the fake cannot tell.
+    busy: set[UUID] | None = None
     _events: HermesHandler | None = None
     _scripts: set[asyncio.Task[TurnOutcome]] = field(default_factory=set)
 
@@ -162,6 +164,9 @@ class FakeRuntime:
             replace(t, state="cancelled", open=False) if t.open else t
             for t in self.background.get(thread_id, ())
         ]
+
+    def turn_running(self, thread_id: UUID) -> bool | None:
+        return None if self.busy is None else thread_id in self.busy
 
     def finish_background(self, thread_id: UUID, task_id: str, state: str = "completed") -> None:
         """End one background task as Hermes' registry would report it."""

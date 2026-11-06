@@ -2803,12 +2803,22 @@ the adapter). This section mirrors the background work of the runner (18.5) for 
    `/metrics/progress_events` rises once per `hermes_adapter.background_progress_interval` while a
    unit is open, so the stall notice of 5.5 does not fire.
 3. A turn Hermes starts in the thread while the run holds work (the result of a delegation, the
-   notice of a process) is a turn of the run: from its `pre_llm_call` to its `on_session_end` its
-   status sentences are steps of the run, its usage counts into the run's costs, and its answer is
-   a message of the run.
+   notice of a process) is a turn of the run: from its start to its end its status sentences are
+   steps of the run, its usage counts into the run's costs, and its answer is a message of the
+   run. It starts with its `pre_llm_call`, or when the gateway's running-turn slot of the
+   thread's session is taken while no turn of the adapter runs (also a turn whose `pre_llm_call`
+   came before the hold or during a turn of the adapter). It ends with its `on_session_end`, or
+   when that slot is free again: the pinned version returns from a turn that fails (a refused
+   model request, exhausted retries, an interrupt, an exception) without `on_session_end`, and
+   the slot ends on every path (addendum of 2026-11-06, FIX-hermes-result-turn-end).
 4. The run finishes when no unit is open, no turn of the thread runs, and, after the run saw
    background work, `hermes_adapter.background_settle` passed without a turn's start, status
-   sentence or answer; a run that saw none finishes at once, as before.
+   sentence or answer; a run that saw none finishes at once, as before. A turn of point 3 that
+   failed (it ended without `on_session_end`, or `on_session_end` reports it failed or
+   interrupted) ends the run `failed` (`runtime_error`) once `hermes_adapter.background_settle`
+   passed after it, so Hermes' error text, which arrives after the turn, is a message of the run;
+   the open work is cancelled by point 6, and a follow-up not yet started stays for the follow-on
+   run (section 7).
 5. A follow-up written while the run holds work, and one the run's first turn did not take (after
    its answer, or at `queue`, 17.5) once the run holds work, is a turn of its own in the run, one
    after the other: the person's text, the format rules and channel instructions on the user side
@@ -2831,9 +2841,12 @@ the adapter). This section mirrors the background work of the runner (18.5) for 
 
 Limits: a process that never ends keeps its run `running` until a person stops it; a restart of
 the gateway or the adapter ends the hold (the server ends the run `interrupted` or `stale`), and a
-result Hermes replays later runs by point 7; a turn whose `on_session_end` never comes keeps the
-run open until a stop. Evidence: `plugins/hermes-adapter/tests/unit/test_background_work.py` and
-the Fake-Hermes test `tests/fake_hermes/test_background_work.py` against the pinned version.
+result Hermes replays later runs by point 7. A Hermes without the running-turn slot of point 3
+(read through the gateway runner's `_is_session_running`) leaves only the hooks: a turn whose
+`on_session_end` never comes then keeps the run open until a stop. Evidence:
+`plugins/hermes-adapter/tests/unit/test_background_work.py` and the Fake-Hermes tests
+`tests/fake_hermes/test_background_work.py` and `tests/fake_hermes/test_result_turn_end.py`
+against the pinned version.
 
 ## 18. Reference adapter: Claude-Code-Runner (development forums)
 

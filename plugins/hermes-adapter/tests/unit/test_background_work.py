@@ -354,3 +354,134 @@ async def test_followup_during_the_result_turn_waits_and_the_run_ends(tmp_path: 
         "The team counted seven boats.",
         "About: Is it done?",
     ]
+
+
+# ---- the end of a result turn without on_session_end (FIX-hermes-result-turn-end) -----------
+
+FAILED_ANSWER = "Anthropic rejected the request and retrying won't help: HTTP 400"
+
+
+async def _held_with_finished_work(r: Rig, rt: FakeRuntime) -> tuple[UUID, UUID]:
+    """A run that started a team whose unit already finished; returns the run and its thread."""
+    triggered = await r.fake.trigger()
+    thread = triggered.thread_id
+    await r.until(lambda: _steps(r, triggered.run_id, "subagent"), "the subagent step")
+    await r.until(lambda: r.fake.messages, "the first answer")
+    rt.finish_background(thread, "deleg_1")
+    return triggered.run_id, thread
+
+
+async def _pass(r: Rig, seconds: float) -> None:
+    for _ in range(int(seconds / 0.05)):
+        await r.fake.pass_time(0.05)
+        await asyncio.sleep(0.05)
+
+
+async def test_failed_result_turn_without_session_end_fails_the_run(tmp_path: Path) -> None:
+    # Hermes v0.22.5 returns from a failed turn (a model error, exhausted retries, an interrupt,
+    # an exception) without finalize_turn, so on_session_end never comes; only its session's busy
+    # state tells that the turn ended.
+    rt = FakeRuntime(script=_starting(TEAM), busy=set())
+    async with rig(tmp_path, runtime=rt, **FAST) as r:
+        run_id, thread = await _held_with_finished_work(r, rt)
+        rt.busy.add(thread)
+        r.handler.on_turn_started(thread)
+        followup = await r.fake.deliver_followup(run_id, "Is it done?")
+        await _pass(r, 0.5)
+        assert r.fake.run_state(run_id).state == "running"
+        rt.busy.discard(thread)
+        # Hermes delivers the failed turn's text after the session is free again.
+        await asyncio.sleep(0.05)
+        await r.handler.on_answer(thread, FAILED_ANSWER, None)
+        await r.until(lambda: r.finished(run_id), "the end of the run")
+        # The follow-up gets its turn in the follow-on run, not in the failed run (09 7).
+        assert r.fake.followup_state(run_id, followup) == "queued"
+    view = r.fake.run_state(run_id)
+    assert (view.state, view.state_reason) == ("failed", "runtime_error")
+    assert len(rt.turns) == 1
+    assert [(m["content_md"], m["run_id"]) for m in r.fake.messages] == [
+        ("Started a team.", str(run_id)),
+        (FAILED_ANSWER, str(run_id)),
+    ]
+
+
+async def test_failed_result_turn_cancels_the_open_work(tmp_path: Path) -> None:
+    other = BackgroundTask("proc_1", BackgroundKind.JOB, "sleep 600", "running", True)
+    rt = FakeRuntime(script=_starting(TEAM, other), busy=set())
+    async with rig(tmp_path, runtime=rt, **FAST) as r:
+        run_id, thread = await _held_with_finished_work(r, rt)
+        rt.busy.add(thread)
+        r.handler.on_turn_started(thread)
+        await _pass(r, 0.1)
+        rt.busy.discard(thread)
+        await r.until(lambda: r.finished(run_id), "the end of the run")
+    view = r.fake.run_state(run_id)
+    assert (view.state, view.state_reason) == ("failed", "runtime_error")
+    assert rt.cancelled_background == [thread]
+    [job] = _steps(r, run_id, "background_job")
+    assert job["status"] == "cancelled"
+
+
+async def test_result_turn_hermes_reports_failed_fails_the_run(tmp_path: Path) -> None:
+    rt = FakeRuntime(script=_starting(TEAM), busy=set())
+    async with rig(tmp_path, runtime=rt, **FAST) as r:
+        run_id, thread = await _held_with_finished_work(r, rt)
+        rt.busy.add(thread)
+        r.handler.on_turn_started(thread)
+        r.handler.on_turn_ended(thread, failed=True)
+        rt.busy.discard(thread)
+        await r.until(lambda: r.finished(run_id), "the end of the run")
+    view = r.fake.run_state(run_id)
+    assert (view.state, view.state_reason) == ("failed", "runtime_error")
+
+
+async def test_result_turn_that_started_before_the_hold_keeps_the_run(tmp_path: Path) -> None:
+    # The result turn starts while the run's own turn still counts (pre_llm_call before the
+    # hold): only the session's busy state shows it.
+    async def script(turn: TurnRequest, rt: FakeRuntime) -> TurnOutcome:
+        rt.background[turn.thread_id] = [_ended(TEAM)]
+        await rt.events.on_answer(turn.thread_id, "Started a team.", str(turn.message_id))
+        assert rt.busy is not None
+        rt.busy.add(turn.thread_id)
+        rt.events.on_turn_started(turn.thread_id)
+        return TurnOutcome.COMPLETED
+
+    rt = FakeRuntime(script=script, busy=set())
+    async with rig(tmp_path, runtime=rt, **FAST) as r:
+        triggered = await r.fake.trigger()
+        thread = triggered.thread_id
+        await r.until(lambda: _steps(r, triggered.run_id, "subagent"), "the subagent step")
+        # Longer than the settle time: the result turn still runs, so the run stays open.
+        await _pass(r, 0.8)
+        assert r.fake.run_state(triggered.run_id).state == "running"
+        sent = await r.handler.on_answer(thread, "The team counted seven boats.", None)
+        assert sent is not None
+        r.handler.on_turn_ended(thread)
+        rt.busy.discard(thread)
+        await r.until(lambda: r.finished(triggered.run_id), "the end of the run")
+    assert r.fake.run_state(triggered.run_id).state == "completed"
+    assert [(m["content_md"], m["run_id"]) for m in r.fake.messages] == [
+        ("Started a team.", str(triggered.run_id)),
+        ("The team counted seven boats.", str(triggered.run_id)),
+    ]
+
+
+async def test_followup_runs_after_a_result_turn_seen_only_as_busy(tmp_path: Path) -> None:
+    rt = FakeRuntime(script=_starting(TEAM), busy=set())
+    async with rig(tmp_path, runtime=rt, **FAST) as r:
+        run_id, thread = await _held_with_finished_work(r, rt)
+        rt.busy.add(thread)  # a result turn whose pre_llm_call the run did not see
+        followup = await r.fake.deliver_followup(run_id, "Is it done?")
+        await _pass(r, 0.5)
+        assert len(rt.turns) == 1  # one after the other (17.12 point 5)
+        r.handler.on_turn_ended(thread)
+        rt.busy.discard(thread)
+        await r.until(lambda: len(rt.turns) == 2, "the follow-up's own turn")
+        await r.until(lambda: r.finished(run_id), "the end of the run")
+        assert r.fake.followup_state(run_id, followup) == "absorbed"
+    assert r.fake.run_state(run_id).state == "completed"
+
+
+def _ended(task: BackgroundTask) -> BackgroundTask:
+    """``task`` as Hermes reports it once the unit ended and its result turn was admitted."""
+    return BackgroundTask(task.task_id, task.kind, task.title, "completed", False)
