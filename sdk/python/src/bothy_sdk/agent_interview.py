@@ -240,12 +240,16 @@ async def guarded_agent_interview(
         return False
     work = asyncio.ensure_future(handler(request))
     guard = asyncio.ensure_future(clock.sleep(remaining))
-    done, _ = await asyncio.wait({work, guard}, return_when=asyncio.FIRST_COMPLETED)
+    try:
+        done, _ = await asyncio.wait({work, guard}, return_when=asyncio.FIRST_COMPLETED)
+    finally:
+        # Also when the guard itself is cancelled (the adapter closes): nothing outlives it.
+        guard.cancel()
+        if not work.done():
+            work.cancel()
     if work not in done:
-        work.cancel()
         _LOG.info("agent interview %s timed out; nothing sent", request.request_id)
         return False
-    guard.cancel()
     answer = work.result()
     if answer is None:
         return False

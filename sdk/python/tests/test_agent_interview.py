@@ -196,3 +196,28 @@ async def test_the_guard_sends_nothing_after_expiry() -> None:
     assert await guarded_agent_interview(none, _request(clock, 3), send, clock=clock) is False
     assert await guarded_agent_interview(none, _request(clock, 0), send, clock=clock) is False
     assert sent == []
+
+
+async def test_a_cancelled_guard_cancels_the_handler() -> None:
+    clock = FakeClock()
+    cancelled: list[bool] = []
+
+    async def send(_: UUID, __: InterviewReply) -> None:
+        raise AssertionError("nothing is sent")
+
+    async def slow(_: InterviewRequest) -> InterviewReply | None:
+        try:
+            await clock.sleep(10)
+        except asyncio.CancelledError:
+            cancelled.append(True)
+            raise
+        return InterviewReply.ask("late?")
+
+    task = asyncio.ensure_future(
+        guarded_agent_interview(slow, _request(clock, 3), send, clock=clock)
+    )
+    await eventually(lambda: clock.sleepers == 2, "both sleepers")
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    await eventually(lambda: cancelled == [True], "the handler cancelled")

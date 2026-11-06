@@ -105,3 +105,12 @@ def test_not_one_json_value() -> None:
         assert [(f.pointer, f.code) for f in validate(raw, _limits(), "chat")] == [
             ("", "invalid_type")
         ]
+
+
+def test_a_cost_beyond_a_float_is_invalid() -> None:
+    fixture = json.loads(sorted((CORPUS / "valid").glob("*.json"))[0].read_text(encoding="utf-8"))
+    definition = fixture["definition"]
+    definition.setdefault("settings", {})["max_cost_usd_per_run"] = 123.25
+    raw = json.dumps(definition).replace("123.25", "1" + "0" * 400)
+    got = [(f.pointer, f.code) for f in validate(raw, _limits(), fixture["tool_class"])]
+    assert got == [("/settings/max_cost_usd_per_run", "invalid")]

@@ -76,6 +76,12 @@ _AUTOCOMPLETE = "command.autocomplete_requested"
 _SEARCH_ASSIST = "search.assist_requested"
 _AGENT_INTERVIEW = "agent.interview_requested"
 _TOKEN_FIELD = "invocation_token"  # noqa: S105 - a member name, not a secret  # nosec B105
+# The ephemeral events by type: not part of the durable Event union of the core.
+_EPHEMERAL: Mapping[str, Callable[[Mapping[str, Any]], KnownEvent]] = {
+    _AUTOCOMPLETE: CommandAutocompleteRequestedEvent.from_dict,
+    _SEARCH_ASSIST: SearchAssistRequestedEvent.from_dict,
+    _AGENT_INTERVIEW: AgentInterviewRequestedEvent.from_dict,
+}
 
 
 @dataclass(frozen=True)
@@ -140,7 +146,8 @@ def envelope_from(data: Mapping[str, Any]) -> Envelope:
         The envelope.
 
     Raises:
-        ValueError: ``id`` or ``type`` is missing or malformed.
+        ValueError: ``id`` or ``type`` is missing or malformed, or an ephemeral event lacks a
+            required member.
     """
     raw = dict(data)
     token_text = raw.pop(_TOKEN_FIELD, None)
@@ -150,13 +157,13 @@ def envelope_from(data: Mapping[str, Any]) -> Envelope:
     if not isinstance(event_type, str) or "id" not in raw:
         raise ValueError("envelope without id or type")
     seq = raw.get("seq")
-    if event_type == _AUTOCOMPLETE:
-        # The ephemeral events are not part of the durable Event union of the core.
-        event: KnownEvent | UnknownEvent = CommandAutocompleteRequestedEvent.from_dict(raw)
-    elif event_type == _SEARCH_ASSIST:
-        event = SearchAssistRequestedEvent.from_dict(raw)
-    elif event_type == _AGENT_INTERVIEW:
-        event = AgentInterviewRequestedEvent.from_dict(raw)
+    if event_type in _EPHEMERAL:
+        # An ephemeral event carries no seq, so one without a required member is skipped like a
+        # malformed envelope.
+        try:
+            event: KnownEvent | UnknownEvent = _EPHEMERAL[event_type](raw)
+        except KeyError as exc:
+            raise ValueError(f"{event_type} without a required member") from exc
     else:
         event = decode_event(raw)
     return Envelope(

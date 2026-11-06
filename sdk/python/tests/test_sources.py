@@ -128,6 +128,12 @@ def test_envelope_without_id_or_type_raises(missing: str) -> None:
         envelope_from(data)
 
 
+def test_envelope_interview_without_a_required_member_raises_value_error() -> None:
+    data = {"id": "0192f4a0-7b1c-78f9-8074-fa94e84bab7d", "type": "agent.interview_requested"}
+    with pytest.raises(ValueError, match="required member"):
+        envelope_from(data)
+
+
 # Ack window ------------------------------------------------------------------------------------
 
 

@@ -620,7 +620,12 @@ class _Checker:
         if isinstance(value, bool) or not isinstance(value, int | float):
             self.add(cp, _INVALID_TYPE)
             return
-        amount = float(value)
+        try:
+            amount = float(value)
+        except OverflowError:
+            # An integer beyond the range of a float (10**400) is no amount, as on the server.
+            self.add(cp, _INVALID)
+            return
         if math.isinf(amount) or math.isnan(amount):
             self.add(cp, _INVALID)
         elif amount <= 0:
