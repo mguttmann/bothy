@@ -103,7 +103,8 @@ that this chapter names enter `docs/spec/actions.yaml`, `docs/api/openapi.yaml` 
    of the calling token (a calling token without `dpop_jkt` is refused with `409 conflict`, reason
    `dpop_required`) and `expires_at` after `agents.hosted_token_ttl`, revokes every older
    active token of the hosted agent created by the same runner, writes one audit entry (agent,
-   host, token prefix, never the value) and returns the token once.
+   host, token id, never the value; the token row holds the prefix, which is no code value of
+   the audit details, decisions.d/A1-03.md D-A1-03-9) and returns the token once.
 2. **Keep.** The runner keeps the token in memory only, never in a file, a log, the turn record or
    the environment of a turn, and fetches a new one before `expires_at` and after its own restart.
    Because the token is bound to the runner's DPoP key, a copy of it without that key connects to

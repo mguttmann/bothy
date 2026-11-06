@@ -18,10 +18,12 @@ import (
 var instanceResource = authorize.Resource{Kind: authorize.ResourceInstance}
 
 // Create implements agents.Agents. A first unit authorizes agent.create once (owner, step-up)
-// and validates the body, so a refused call never raises the rights version; a second unit,
-// declared as the rights change agent.create for the new agent, creates the principal through
-// identity (handle and display name rules of M1-26, case-insensitive uniqueness) and the record
-// with the defaults of 03, records the allow entry and appends agent.updated.
+// and validates the body, a built-in agent's hosting runner included (26 3.1 item 2), so a
+// refused call never raises the rights version; a second unit, declared as the rights change
+// agent.create for the new agent, locks and checks the runner again, creates the principal
+// through identity (handle and display name rules of M1-26, case-insensitive uniqueness) and the
+// record with the defaults of 03, records the allow entry and appends agent.updated, and for a
+// built-in agent agent.hosting_changed to its runner (26 9).
 func (s *Service) Create(ctx context.Context, a actor.Actor, cmd agents.CreateCmd) (agents.Agent, error) {
 	ctx, err := withCaller(ctx, a)
 	if err != nil {
@@ -29,11 +31,8 @@ func (s *Service) Create(ctx context.Context, a actor.Actor, cmd agents.CreateCm
 	}
 	var rec domain.Agent
 	err = s.d.UoW.Do(ctx, func(ctx context.Context) error {
-		if err := s.check(ctx, a, authorize.ActionAgentCreate, instanceResource); err != nil {
-			return err
-		}
 		var err error
-		rec, err = newRecord(cmd)
+		rec, err = s.createCheck(ctx, a, cmd)
 		return err
 	})
 	if err != nil {
@@ -41,24 +40,58 @@ func (s *Service) Create(ctx context.Context, a actor.Actor, cmd agents.CreateCm
 	}
 	var out agents.Agent
 	err = s.d.UoW.Do(ctx, func(ctx context.Context) error {
-		if _, err := s.d.Principals.CreatePrincipal(ctx, identity.CreatePrincipalCmd{
-			ID: rec.ID, Kind: actor.KindAgent, Handle: cmd.Handle, DisplayName: cmd.DisplayName,
-		}); err != nil {
-			return err
-		}
-		if err := s.d.Store.InsertAgent(ctx, rec); err != nil {
-			return err
-		}
 		var err error
-		out, err = s.recordAndEmit(ctx, authorize.ActionAgentCreate, rec, auditing.Attrs{attrAdapterKind: auditing.Code(rec.AdapterKind)})
+		out, err = s.createWrite(ctx, cmd, rec)
 		return err
 	}, rightsChange(authorize.ActionAgentCreate, agentRef(rec.ID), rec.ID))
 	return out, err
 }
 
-// newRecord validates the body of createAgent and returns the new record with a fresh id.
+// createCheck is the first unit of Create: authorize, the body and a built-in agent's runner.
+func (s *Service) createCheck(ctx context.Context, a actor.Actor, cmd agents.CreateCmd) (domain.Agent, error) {
+	if err := s.check(ctx, a, authorize.ActionAgentCreate, instanceResource); err != nil {
+		return domain.Agent{}, err
+	}
+	rec, err := newRecord(cmd)
+	if err != nil || rec.HostedBy.IsZero() {
+		return rec, err
+	}
+	_, err = s.capableHost(ctx, rec.ID, rec.HostedBy, false)
+	return rec, err
+}
+
+// createWrite is the second unit of Create: the runner again under its row lock, the principal,
+// the record, the allow entry, agent.updated and agent.hosting_changed.
+func (s *Service) createWrite(ctx context.Context, cmd agents.CreateCmd, rec domain.Agent) (agents.Agent, error) {
+	attrs := auditing.Attrs{attrAdapterKind: auditing.Code(rec.AdapterKind)}
+	if !rec.HostedBy.IsZero() {
+		if _, err := s.capableHost(ctx, rec.ID, rec.HostedBy, true); err != nil {
+			return agents.Agent{}, err
+		}
+		attrs[attrHostedBy] = auditing.ID(rec.HostedBy)
+	}
+	if _, err := s.d.Principals.CreatePrincipal(ctx, identity.CreatePrincipalCmd{
+		ID: rec.ID, Kind: actor.KindAgent, Handle: cmd.Handle, DisplayName: cmd.DisplayName,
+	}); err != nil {
+		return agents.Agent{}, err
+	}
+	if err := s.d.Store.InsertAgent(ctx, rec); err != nil {
+		return agents.Agent{}, err
+	}
+	out, err := s.recordAndEmit(ctx, authorize.ActionAgentCreate, rec, attrs)
+	if err != nil {
+		return agents.Agent{}, err
+	}
+	return out, s.emitHostingChanged(ctx, rec.ID, rec.HostedBy)
+}
+
+// newRecord validates the body of createAgent and returns the new record with a fresh id;
+// hosted_by goes with the adapter kind claude_agent only (R-DM-58).
 func newRecord(cmd agents.CreateCmd) (domain.Agent, error) {
 	if err := domain.CheckAdapterKind(cmd.AdapterKind); err != nil {
+		return domain.Agent{}, err
+	}
+	if err := domain.CheckHostedPairing(cmd.AdapterKind, cmd.HostedBy); err != nil {
 		return domain.Agent{}, err
 	}
 	if err := domain.CheckDescription(cmd.Description); err != nil {
@@ -68,7 +101,9 @@ func newRecord(cmd agents.CreateCmd) (domain.Agent, error) {
 	if err != nil {
 		return domain.Agent{}, err
 	}
-	return domain.NewAgent(ids.New(), cmd.AdapterKind, cmd.Description, cfg), nil
+	rec := domain.NewAgent(ids.New(), cmd.AdapterKind, cmd.Description, cfg)
+	rec.HostedBy = cmd.HostedBy
+	return rec, nil
 }
 
 // Update implements agents.Agents in one unit of work (agent.update is no rights change): it

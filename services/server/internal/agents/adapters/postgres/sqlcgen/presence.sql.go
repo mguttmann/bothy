@@ -14,7 +14,7 @@ import (
 const getPresenceRow = `-- name: GetPresenceRow :one
 
 SELECT principal_id, billing_mode, tool_class, reported_runtime_state, reported_billing_mode, reported_tool_class,
-       reported_runtime_version, reported_details, last_heartbeat_at
+       reported_runtime_version, reported_details, last_heartbeat_at, adapter_kind
 FROM agents WHERE principal_id = $1
 `
 
@@ -28,6 +28,7 @@ type GetPresenceRowRow struct {
 	ReportedRuntimeVersion pgtype.Text
 	ReportedDetails        []byte
 	LastHeartbeatAt        pgtype.Timestamptz
+	AdapterKind            string
 }
 
 // SPDX-License-Identifier: Apache-2.0
@@ -49,13 +50,14 @@ func (q *Queries) GetPresenceRow(ctx context.Context, principalID pgtype.UUID) (
 		&i.ReportedRuntimeVersion,
 		&i.ReportedDetails,
 		&i.LastHeartbeatAt,
+		&i.AdapterKind,
 	)
 	return i, err
 }
 
 const getPresenceRows = `-- name: GetPresenceRows :many
 SELECT principal_id, billing_mode, tool_class, reported_runtime_state, reported_billing_mode, reported_tool_class,
-       reported_runtime_version, reported_details, last_heartbeat_at
+       reported_runtime_version, reported_details, last_heartbeat_at, adapter_kind
 FROM agents WHERE principal_id = ANY ($1::uuid[]) ORDER BY principal_id
 `
 
@@ -69,6 +71,7 @@ type GetPresenceRowsRow struct {
 	ReportedRuntimeVersion pgtype.Text
 	ReportedDetails        []byte
 	LastHeartbeatAt        pgtype.Timestamptz
+	AdapterKind            string
 }
 
 // The configured and stored values of the given agents in ascending id: the targets of a change
@@ -92,6 +95,7 @@ func (q *Queries) GetPresenceRows(ctx context.Context, ids []pgtype.UUID) ([]Get
 			&i.ReportedRuntimeVersion,
 			&i.ReportedDetails,
 			&i.LastHeartbeatAt,
+			&i.AdapterKind,
 		); err != nil {
 			return nil, err
 		}
@@ -124,7 +128,7 @@ func (q *Queries) GetProjectFolders(ctx context.Context, principalID pgtype.UUID
 
 const listLivePresence = `-- name: ListLivePresence :many
 SELECT principal_id, billing_mode, tool_class, reported_runtime_state, reported_billing_mode, reported_tool_class,
-       reported_runtime_version, reported_details, last_heartbeat_at
+       reported_runtime_version, reported_details, last_heartbeat_at, adapter_kind
 FROM agents WHERE reported_runtime_state IN ('online', 'degraded') ORDER BY principal_id
 `
 
@@ -138,6 +142,7 @@ type ListLivePresenceRow struct {
 	ReportedRuntimeVersion pgtype.Text
 	ReportedDetails        []byte
 	LastHeartbeatAt        pgtype.Timestamptz
+	AdapterKind            string
 }
 
 // The agents stored as online or degraded, for the start rule (D-M2-20-6).
@@ -160,6 +165,7 @@ func (q *Queries) ListLivePresence(ctx context.Context) ([]ListLivePresenceRow, 
 			&i.ReportedRuntimeVersion,
 			&i.ReportedDetails,
 			&i.LastHeartbeatAt,
+			&i.AdapterKind,
 		); err != nil {
 			return nil, err
 		}
@@ -173,7 +179,7 @@ func (q *Queries) ListLivePresence(ctx context.Context) ([]ListLivePresenceRow, 
 
 const lockPresenceRow = `-- name: LockPresenceRow :one
 SELECT principal_id, billing_mode, tool_class, reported_runtime_state, reported_billing_mode, reported_tool_class,
-       reported_runtime_version, reported_details, last_heartbeat_at
+       reported_runtime_version, reported_details, last_heartbeat_at, adapter_kind
 FROM agents WHERE principal_id = $1 FOR UPDATE
 `
 
@@ -187,6 +193,7 @@ type LockPresenceRowRow struct {
 	ReportedRuntimeVersion pgtype.Text
 	ReportedDetails        []byte
 	LastHeartbeatAt        pgtype.Timestamptz
+	AdapterKind            string
 }
 
 // The same row locked for a change of the reported mode or class: exactly one process audits it.
@@ -203,6 +210,7 @@ func (q *Queries) LockPresenceRow(ctx context.Context, principalID pgtype.UUID) 
 		&i.ReportedRuntimeVersion,
 		&i.ReportedDetails,
 		&i.LastHeartbeatAt,
+		&i.AdapterKind,
 	)
 	return i, err
 }

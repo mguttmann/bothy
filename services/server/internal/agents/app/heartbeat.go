@@ -67,9 +67,9 @@ func (t *Tracker) Heartbeat(ctx context.Context, body json.RawMessage) (agents.P
 	e.mu.Lock()
 	changes := e.changes
 	e.mu.Unlock()
-	row, found, err := t.d.Store.GetPresenceRow(ctx, a.ID)
-	if err != nil || !found {
-		return agents.PresenceStatus{}, internal(err, "agents: the record of a heartbeat")
+	row, err := t.presenceRow(ctx, a.ID, report)
+	if err != nil {
+		return agents.PresenceStatus{}, err
 	}
 	now := t.d.Clock.Now()
 	takeover := t.takeover(e, row, now)
@@ -164,12 +164,15 @@ func (t *Tracker) takeover(e *entry, row domain.PresenceRow, now time.Time) bool
 	return over
 }
 
-// store writes a change of the reported mode or class (storeChange) and otherwise, on a takeover,
-// the heartbeat at once with the monotone PersistHeartbeat, so the node the agent left sees it
-// before its own deadline (D-M7-17-10). wrote is false when the heartbeat waits for the flush.
+// store writes a change of the reported mode or class (storeChange) and otherwise, on a takeover
+// or a change of the ceiling hosts_agents, the heartbeat at once with the monotone
+// PersistHeartbeat, so the node the agent left sees it before its own deadline (D-M7-17-10) and
+// the hosting rules read the runner's current ceiling (A1-03, 26 3.1 item 3). wrote is false when
+// the heartbeat waits for the flush.
 func (t *Tracker) store(ctx context.Context, id ids.ID, row domain.PresenceRow, r domain.Report, now time.Time, takeover bool) (bool, error) {
 	wrote, err := t.storeChange(ctx, id, row, r, now)
-	if err != nil || wrote || !takeover {
+	hostsChanged := row.Stored.Reported().HostsAgents != r.Reported().HostsAgents
+	if err != nil || wrote || (!takeover && !hostsChanged) {
 		return wrote, err
 	}
 	err = t.d.UoW.Do(ctx, func(ctx context.Context) error {
@@ -180,6 +183,30 @@ func (t *Tracker) store(ctx context.Context, id ids.ID, row domain.PresenceRow, 
 		return false, internal(err, "agents: storing the first heartbeat on this node")
 	}
 	return true, nil
+}
+
+// presenceRow reads the stored row of the agent id for its heartbeat r and refuses a capability
+// the agent may not report (hostsAgentsAllowed). Errors: internal_error; validation_failed.
+func (t *Tracker) presenceRow(ctx context.Context, id ids.ID, r domain.Report) (domain.PresenceRow, error) {
+	row, found, err := t.d.Store.GetPresenceRow(ctx, id)
+	if err != nil || !found {
+		return domain.PresenceRow{}, internal(err, "agents: the record of a heartbeat")
+	}
+	return row, hostsAgentsAllowed(row, r)
+}
+
+// hostsAgentsAllowed refuses the capability hosts_agents in the heartbeat of a built-in agent: its
+// runner sends the hosted agent's heartbeat with the runner's capabilities except hosts_agents
+// (26 3.2 item 2), and a hosted agent never hosts. Errors: validation_failed on
+// /details/capabilities/hosts_agents with not_allowed.
+func hostsAgentsAllowed(row domain.PresenceRow, r domain.Report) error {
+	c := r.Details.Capabilities
+	if row.AdapterKind != domain.AdapterClaudeAgent || c == nil || c.HostsAgents == "" {
+		return nil
+	}
+	const pointer = "/details/capabilities/hosts_agents"
+	return errs.New(errs.CodeValidationFailed, "The heartbeat is not valid.").
+		WithFields(errs.FieldError{Pointer: pointer, Code: domain.FieldNotAllowed, Detail: "a built-in agent does not host agents"})
 }
 
 // internal wraps a failure of the heartbeat as internal_error; a kernel/errs error of kind

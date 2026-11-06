@@ -29,6 +29,7 @@ part 'agent.g.dart';
 /// * [toolClass]
 /// * [presence]
 /// * [operatorConfig] - Schema `agent_operator_config.v1`. No secrets.
+/// * [hostedBy] - Built-in agents only (`adapter_kind` `claude_agent`, 26 3.1); the Claude Code runner agent that hosts it. Absent for every other agent.
 /// * [version]
 @BuiltValue()
 abstract class Agent implements Built<Agent, AgentBuilder> {
@@ -78,6 +79,10 @@ abstract class Agent implements Built<Agent, AgentBuilder> {
   /// Schema `agent_operator_config.v1`. No secrets.
   @BuiltValueField(wireName: r'operator_config')
   BuiltMap<String, JsonObject?> get operatorConfig;
+
+  /// Built-in agents only (`adapter_kind` `claude_agent`, 26 3.1); the Claude Code runner agent that hosts it. Absent for every other agent.
+  @BuiltValueField(wireName: r'hosted_by')
+  String? get hostedBy;
 
   @BuiltValueField(wireName: r'version')
   int get version;
@@ -179,6 +184,13 @@ class _$AgentSerializer implements PrimitiveSerializer<Agent> {
         FullType.nullable(JsonObject),
       ]),
     );
+    if (object.hostedBy != null) {
+      yield r'hosted_by';
+      yield serializers.serialize(
+        object.hostedBy,
+        specifiedType: const FullType(String),
+      );
+    }
     yield r'version';
     yield serializers.serialize(
       object.version,
@@ -307,6 +319,14 @@ class _$AgentSerializer implements PrimitiveSerializer<Agent> {
             ]),
           ) as BuiltMap<String, JsonObject?>;
           result.operatorConfig.replace(valueDes);
+          break;
+        case r'hosted_by':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(String),
+          ) as String?;
+          if (valueDes == null) continue;
+          result.hostedBy = valueDes;
           break;
         case r'version':
           final valueDes = serializers.deserialize(

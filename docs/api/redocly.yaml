@@ -87,6 +87,9 @@ rules:
         - agent.enable
         - agent.events.consume
         - agent.heartbeat
+        - agent.host.set
+        - agent.hosted.list
+        - agent.hosted_token.issue
         - agent.invoke
         - agent.project_folders.read
         - agent.read
@@ -357,6 +360,9 @@ rules:
         - agent.enable
         - agent.events.consume
         - agent.heartbeat
+        - agent.host.set
+        - agent.hosted.list
+        - agent.hosted_token.issue
         - agent.invoke
         - agent.project_folders.read
         - agent.read

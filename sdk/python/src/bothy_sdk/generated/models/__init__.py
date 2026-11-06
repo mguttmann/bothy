@@ -43,6 +43,9 @@ from .agent_definition_version_page import AgentDefinitionVersionPage
 from .agent_followup_event import AgentFollowupEvent
 from .agent_followup_event_type import AgentFollowupEventType
 from .agent_followup_payload import AgentFollowupPayload
+from .agent_hosting_changed_event import AgentHostingChangedEvent
+from .agent_hosting_changed_event_type import AgentHostingChangedEventType
+from .agent_hosting_changed_payload import AgentHostingChangedPayload
 from .agent_invocation_event import AgentInvocationEvent
 from .agent_invocation_event_type import AgentInvocationEventType
 from .agent_invocation_payload import AgentInvocationPayload
@@ -375,6 +378,7 @@ from .host_session_open import HostSessionOpen
 from .host_session_started import HostSessionStarted
 from .host_session_user import HostSessionUser
 from .host_session_user_assign import HostSessionUserAssign
+from .host_set import HostSet
 from .host_state import HostState
 from .host_state_set import HostStateSet
 from .host_state_set_state import HostStateSetState
@@ -915,6 +919,9 @@ __all__ = (
     "AgentFollowupEvent",
     "AgentFollowupEventType",
     "AgentFollowupPayload",
+    "AgentHostingChangedEvent",
+    "AgentHostingChangedEventType",
+    "AgentHostingChangedPayload",
     "AgentInvocationEvent",
     "AgentInvocationEventType",
     "AgentInvocationPayload",
@@ -1231,6 +1238,7 @@ __all__ = (
     "HostSessionStarted",
     "HostSessionUser",
     "HostSessionUserAssign",
+    "HostSet",
     "HostState",
     "HostStateSet",
     "HostStateSetState",

@@ -28,6 +28,7 @@ type Agent struct {
 	LastHeartbeatAt        pgtype.Timestamptz
 	Version                int64
 	ReportedProjectFolders []string
+	HostedBy               pgtype.UUID
 }
 
 type AgentConsumerCursor struct {

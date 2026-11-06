@@ -482,6 +482,8 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"agents.mcp_stdio_runners":                      {Kind: config.KindStringList, Default: `["npx", "uvx"]`, Chapter: "26-builtin-agents.md"},
 		// M2-12
 		"agent.session_ref_max_bytes": {Kind: config.KindInt, Default: "1024", Min: "1", Max: "2048", Chapter: "09-agents.md"},
+		// A1-03
+		"agents.hosted_token_ttl": {Kind: config.KindDuration, Default: "24h", Min: "1s", Chapter: "26-builtin-agents.md"},
 		// M1-64
 		"sync.ws_max_frame_bytes":   {Kind: config.KindInt, Default: "1048576", Min: "1024", Max: "16777216", Chapter: "04-sync-protocol.md"},
 		"sync.identify_timeout":     {Kind: config.KindDuration, Default: "10s", Min: "1ms", Chapter: "04-sync-protocol.md"},
@@ -1446,6 +1448,34 @@ func TestConfig_PresenceTimeoutAboveHeartbeatInterval(t *testing.T) {
 		msg := got[0].String()
 		if !strings.Contains(msg, "agent.presence_timeout") || !strings.Contains(msg, "sync.heartbeat_interval") ||
 			strings.Contains(msg, " "+c.timeout) {
+			t.Errorf("problem %q", msg)
+		}
+	}
+}
+
+// TestConfig_HostedTokenTTLWithinAPITokenMaxTTL: agents.hosted_token_ttl may not exceed
+// auth.api_token_max_ttl (cross-check hosted_token_ttl_within_api_token_max_ttl, A1-03): a longer
+// lifetime aborts the start with a problem naming both keys and no value.
+func TestConfig_HostedTokenTTLWithinAPITokenMaxTTL(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		ttl, max string
+		ok       bool
+	}{
+		{"1d", "1d", true},
+		{"2h", "1d", true},
+		{"2d", "1d", false},
+	} {
+		got := load(t, "BOTHY_AGENTS__HOSTED_TOKEN_TTL="+c.ttl, "BOTHY_AUTH__API_TOKEN_MAX_TTL="+c.max)
+		if (len(got) == 0) != c.ok {
+			t.Errorf("ttl %s, max %s: problems %v, want ok %v", c.ttl, c.max, got, c.ok)
+			continue
+		}
+		if len(got) == 0 {
+			continue
+		}
+		msg := got[0].String()
+		if !strings.Contains(msg, "agents.hosted_token_ttl") || !strings.Contains(msg, "auth.api_token_max_ttl") || strings.Contains(msg, " "+c.ttl) {
 			t.Errorf("problem %q", msg)
 		}
 	}

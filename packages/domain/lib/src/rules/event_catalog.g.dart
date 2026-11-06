@@ -10,6 +10,7 @@ const Map<String, EventInfo> _catalogue = <String, EventInfo>{
   'agent.config_changed': EventInfo(type: 'agent.config_changed', durable: true, carriesResourceVersion: false, resourceKind: 'channel', personal: true),
   'agent.definition_changed': EventInfo(type: 'agent.definition_changed', durable: true, carriesResourceVersion: false, resourceKind: 'agent', personal: true),
   'agent.followup': EventInfo(type: 'agent.followup', durable: true, carriesResourceVersion: false, resourceKind: 'run', personal: true),
+  'agent.hosting_changed': EventInfo(type: 'agent.hosting_changed', durable: true, carriesResourceVersion: false, resourceKind: 'agent', personal: true),
   'agent.invocation': EventInfo(type: 'agent.invocation', durable: true, carriesResourceVersion: false, resourceKind: 'run', personal: true),
   'agent.presence_changed': EventInfo(type: 'agent.presence_changed', durable: false, carriesResourceVersion: false, resourceKind: 'agent', personal: false),
   'agent.updated': EventInfo(type: 'agent.updated', durable: true, carriesResourceVersion: true, resourceKind: 'agent', personal: false),

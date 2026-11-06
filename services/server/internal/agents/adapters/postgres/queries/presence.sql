@@ -7,26 +7,26 @@
 -- The configured mode and class and the stored reported state of one agent, read on every
 -- heartbeat so a configured value changed in another process counts at once.
 SELECT principal_id, billing_mode, tool_class, reported_runtime_state, reported_billing_mode, reported_tool_class,
-       reported_runtime_version, reported_details, last_heartbeat_at
+       reported_runtime_version, reported_details, last_heartbeat_at, adapter_kind
 FROM agents WHERE principal_id = @principal_id;
 
 -- name: LockPresenceRow :one
 -- The same row locked for a change of the reported mode or class: exactly one process audits it.
 SELECT principal_id, billing_mode, tool_class, reported_runtime_state, reported_billing_mode, reported_tool_class,
-       reported_runtime_version, reported_details, last_heartbeat_at
+       reported_runtime_version, reported_details, last_heartbeat_at, adapter_kind
 FROM agents WHERE principal_id = @principal_id FOR UPDATE;
 
 -- name: GetPresenceRows :many
 -- The configured and stored values of the given agents in ascending id: the targets of a change
 -- of the configured values and the stored presence of untracked agents.
 SELECT principal_id, billing_mode, tool_class, reported_runtime_state, reported_billing_mode, reported_tool_class,
-       reported_runtime_version, reported_details, last_heartbeat_at
+       reported_runtime_version, reported_details, last_heartbeat_at, adapter_kind
 FROM agents WHERE principal_id = ANY (@ids::uuid[]) ORDER BY principal_id;
 
 -- name: ListLivePresence :many
 -- The agents stored as online or degraded, for the start rule (D-M2-20-6).
 SELECT principal_id, billing_mode, tool_class, reported_runtime_state, reported_billing_mode, reported_tool_class,
-       reported_runtime_version, reported_details, last_heartbeat_at
+       reported_runtime_version, reported_details, last_heartbeat_at, adapter_kind
 FROM agents WHERE reported_runtime_state IN ('online', 'degraded') ORDER BY principal_id;
 
 -- name: WriteReportedChange :exec

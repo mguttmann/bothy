@@ -13,7 +13,7 @@ import (
 
 const getAgent = `-- name: GetAgent :one
 
-SELECT principal_id, adapter_kind, description, operator_config, billing_mode, credential_holder_id, billing_mode_changed_at, billing_mode_changed_by, tool_class, reported_tool_class, reported_runtime_state, reported_billing_mode, reported_runtime_version, reported_details, last_heartbeat_at, version, reported_project_folders FROM agents WHERE principal_id = $1
+SELECT principal_id, adapter_kind, description, operator_config, billing_mode, credential_holder_id, billing_mode_changed_at, billing_mode_changed_by, tool_class, reported_tool_class, reported_runtime_state, reported_billing_mode, reported_runtime_version, reported_details, last_heartbeat_at, version, reported_project_folders, hosted_by FROM agents WHERE principal_id = $1
 `
 
 // SPDX-License-Identifier: Apache-2.0
@@ -40,12 +40,13 @@ func (q *Queries) GetAgent(ctx context.Context, principalID pgtype.UUID) (Agent,
 		&i.LastHeartbeatAt,
 		&i.Version,
 		&i.ReportedProjectFolders,
+		&i.HostedBy,
 	)
 	return i, err
 }
 
 const getAgents = `-- name: GetAgents :many
-SELECT principal_id, adapter_kind, description, operator_config, billing_mode, credential_holder_id, billing_mode_changed_at, billing_mode_changed_by, tool_class, reported_tool_class, reported_runtime_state, reported_billing_mode, reported_runtime_version, reported_details, last_heartbeat_at, version, reported_project_folders FROM agents WHERE principal_id = ANY ($1::uuid[]) ORDER BY principal_id
+SELECT principal_id, adapter_kind, description, operator_config, billing_mode, credential_holder_id, billing_mode_changed_at, billing_mode_changed_by, tool_class, reported_tool_class, reported_runtime_state, reported_billing_mode, reported_runtime_version, reported_details, last_heartbeat_at, version, reported_project_folders, hosted_by FROM agents WHERE principal_id = ANY ($1::uuid[]) ORDER BY principal_id
 `
 
 // The records of a list without a lock, ascending by id: the run facts of runs (M2-05).
@@ -76,6 +77,52 @@ func (q *Queries) GetAgents(ctx context.Context, ids []pgtype.UUID) ([]Agent, er
 			&i.LastHeartbeatAt,
 			&i.Version,
 			&i.ReportedProjectFolders,
+			&i.HostedBy,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const hostedAgentsOf = `-- name: HostedAgentsOf :many
+SELECT principal_id, adapter_kind, description, operator_config, billing_mode, credential_holder_id, billing_mode_changed_at, billing_mode_changed_by, tool_class, reported_tool_class, reported_runtime_state, reported_billing_mode, reported_runtime_version, reported_details, last_heartbeat_at, version, reported_project_folders, hosted_by FROM agents WHERE hosted_by = $1 ORDER BY principal_id
+`
+
+// Every agent a runner hosts, disabled ones included, for the billing rule of a change of the
+// runner's own mode or holder (10 section 10.3, BR-14).
+func (q *Queries) HostedAgentsOf(ctx context.Context, hostedBy pgtype.UUID) ([]Agent, error) {
+	rows, err := q.db.Query(ctx, hostedAgentsOf, hostedBy)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Agent
+	for rows.Next() {
+		var i Agent
+		if err := rows.Scan(
+			&i.PrincipalID,
+			&i.AdapterKind,
+			&i.Description,
+			&i.OperatorConfig,
+			&i.BillingMode,
+			&i.CredentialHolderID,
+			&i.BillingModeChangedAt,
+			&i.BillingModeChangedBy,
+			&i.ToolClass,
+			&i.ReportedToolClass,
+			&i.ReportedRuntimeState,
+			&i.ReportedBillingMode,
+			&i.ReportedRuntimeVersion,
+			&i.ReportedDetails,
+			&i.LastHeartbeatAt,
+			&i.Version,
+			&i.ReportedProjectFolders,
+			&i.HostedBy,
 		); err != nil {
 			return nil, err
 		}
@@ -88,8 +135,9 @@ func (q *Queries) GetAgents(ctx context.Context, ids []pgtype.UUID) ([]Agent, er
 }
 
 const insertAgent = `-- name: InsertAgent :exec
-INSERT INTO agents (principal_id, adapter_kind, description, operator_config, billing_mode, credential_holder_id, tool_class, version)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+INSERT INTO agents (principal_id, adapter_kind, description, operator_config, billing_mode, credential_holder_id, tool_class, hosted_by, version)
+VALUES ($1, $2, $3, $4, $5, $6, $7,
+        $8, $9)
 `
 
 type InsertAgentParams struct {
@@ -100,6 +148,7 @@ type InsertAgentParams struct {
 	BillingMode        string
 	CredentialHolderID pgtype.UUID
 	ToolClass          string
+	HostedBy           pgtype.UUID
 	Version            int64
 }
 
@@ -112,13 +161,14 @@ func (q *Queries) InsertAgent(ctx context.Context, arg InsertAgentParams) error 
 		arg.BillingMode,
 		arg.CredentialHolderID,
 		arg.ToolClass,
+		arg.HostedBy,
 		arg.Version,
 	)
 	return err
 }
 
 const listAgents = `-- name: ListAgents :many
-SELECT principal_id, adapter_kind, description, operator_config, billing_mode, credential_holder_id, billing_mode_changed_at, billing_mode_changed_by, tool_class, reported_tool_class, reported_runtime_state, reported_billing_mode, reported_runtime_version, reported_details, last_heartbeat_at, version, reported_project_folders FROM agents
+SELECT principal_id, adapter_kind, description, operator_config, billing_mode, credential_holder_id, billing_mode_changed_at, billing_mode_changed_by, tool_class, reported_tool_class, reported_runtime_state, reported_billing_mode, reported_runtime_version, reported_details, last_heartbeat_at, version, reported_project_folders, hosted_by FROM agents
 WHERE ($1::uuid IS NULL OR principal_id > $1::uuid)
 ORDER BY principal_id
 LIMIT $2
@@ -157,6 +207,62 @@ func (q *Queries) ListAgents(ctx context.Context, arg ListAgentsParams) ([]Agent
 			&i.LastHeartbeatAt,
 			&i.Version,
 			&i.ReportedProjectFolders,
+			&i.HostedBy,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listHostedAgents = `-- name: ListHostedAgents :many
+SELECT principal_id, adapter_kind, description, operator_config, billing_mode, credential_holder_id, billing_mode_changed_at, billing_mode_changed_by, tool_class, reported_tool_class, reported_runtime_state, reported_billing_mode, reported_runtime_version, reported_details, last_heartbeat_at, version, reported_project_folders, hosted_by FROM agents
+WHERE hosted_by = $1
+  AND ($2::uuid IS NULL OR principal_id > $2::uuid)
+ORDER BY principal_id
+LIMIT $3
+`
+
+type ListHostedAgentsParams struct {
+	HostedBy pgtype.UUID
+	AfterID  pgtype.UUID
+	RowLimit int32
+}
+
+// One batch of the agents a runner hosts (listHostedAgents, A1-03), keyset on principal_id
+// ascending over the partial index on hosted_by; the status filter runs through identity.
+func (q *Queries) ListHostedAgents(ctx context.Context, arg ListHostedAgentsParams) ([]Agent, error) {
+	rows, err := q.db.Query(ctx, listHostedAgents, arg.HostedBy, arg.AfterID, arg.RowLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Agent
+	for rows.Next() {
+		var i Agent
+		if err := rows.Scan(
+			&i.PrincipalID,
+			&i.AdapterKind,
+			&i.Description,
+			&i.OperatorConfig,
+			&i.BillingMode,
+			&i.CredentialHolderID,
+			&i.BillingModeChangedAt,
+			&i.BillingModeChangedBy,
+			&i.ToolClass,
+			&i.ReportedToolClass,
+			&i.ReportedRuntimeState,
+			&i.ReportedBillingMode,
+			&i.ReportedRuntimeVersion,
+			&i.ReportedDetails,
+			&i.LastHeartbeatAt,
+			&i.Version,
+			&i.ReportedProjectFolders,
+			&i.HostedBy,
 		); err != nil {
 			return nil, err
 		}
@@ -169,7 +275,7 @@ func (q *Queries) ListAgents(ctx context.Context, arg ListAgentsParams) ([]Agent
 }
 
 const listPersonalAgents = `-- name: ListPersonalAgents :many
-SELECT principal_id, adapter_kind, description, operator_config, billing_mode, credential_holder_id, billing_mode_changed_at, billing_mode_changed_by, tool_class, reported_tool_class, reported_runtime_state, reported_billing_mode, reported_runtime_version, reported_details, last_heartbeat_at, version, reported_project_folders FROM agents WHERE billing_mode = 'personal' ORDER BY principal_id
+SELECT principal_id, adapter_kind, description, operator_config, billing_mode, credential_holder_id, billing_mode_changed_at, billing_mode_changed_by, tool_class, reported_tool_class, reported_runtime_state, reported_billing_mode, reported_runtime_version, reported_details, last_heartbeat_at, version, reported_project_folders, hosted_by FROM agents WHERE billing_mode = 'personal' ORDER BY principal_id
 `
 
 // The personal records for the I1 list of the policy source; the status filter runs through
@@ -201,6 +307,7 @@ func (q *Queries) ListPersonalAgents(ctx context.Context) ([]Agent, error) {
 			&i.LastHeartbeatAt,
 			&i.Version,
 			&i.ReportedProjectFolders,
+			&i.HostedBy,
 		); err != nil {
 			return nil, err
 		}
@@ -213,7 +320,7 @@ func (q *Queries) ListPersonalAgents(ctx context.Context) ([]Agent, error) {
 }
 
 const lockAgent = `-- name: LockAgent :one
-SELECT principal_id, adapter_kind, description, operator_config, billing_mode, credential_holder_id, billing_mode_changed_at, billing_mode_changed_by, tool_class, reported_tool_class, reported_runtime_state, reported_billing_mode, reported_runtime_version, reported_details, last_heartbeat_at, version, reported_project_folders FROM agents WHERE principal_id = $1 FOR UPDATE
+SELECT principal_id, adapter_kind, description, operator_config, billing_mode, credential_holder_id, billing_mode_changed_at, billing_mode_changed_by, tool_class, reported_tool_class, reported_runtime_state, reported_billing_mode, reported_runtime_version, reported_details, last_heartbeat_at, version, reported_project_folders, hosted_by FROM agents WHERE principal_id = $1 FOR UPDATE
 `
 
 // The record locked for a change (03 section 6.3: domain rows after permission_version).
@@ -238,12 +345,13 @@ func (q *Queries) LockAgent(ctx context.Context, principalID pgtype.UUID) (Agent
 		&i.LastHeartbeatAt,
 		&i.Version,
 		&i.ReportedProjectFolders,
+		&i.HostedBy,
 	)
 	return i, err
 }
 
 const lockAgents = `-- name: LockAgents :many
-SELECT principal_id, adapter_kind, description, operator_config, billing_mode, credential_holder_id, billing_mode_changed_at, billing_mode_changed_by, tool_class, reported_tool_class, reported_runtime_state, reported_billing_mode, reported_runtime_version, reported_details, last_heartbeat_at, version, reported_project_folders FROM agents WHERE principal_id = ANY ($1::uuid[]) ORDER BY principal_id FOR UPDATE
+SELECT principal_id, adapter_kind, description, operator_config, billing_mode, credential_holder_id, billing_mode_changed_at, billing_mode_changed_by, tool_class, reported_tool_class, reported_runtime_state, reported_billing_mode, reported_runtime_version, reported_details, last_heartbeat_at, version, reported_project_folders, hosted_by FROM agents WHERE principal_id = ANY ($1::uuid[]) ORDER BY principal_id FOR UPDATE
 `
 
 // The records of a list locked in ascending id (BR-08, docs/DECISIONS.md M1-51).
@@ -274,6 +382,7 @@ func (q *Queries) LockAgents(ctx context.Context, ids []pgtype.UUID) ([]Agent, e
 			&i.LastHeartbeatAt,
 			&i.Version,
 			&i.ReportedProjectFolders,
+			&i.HostedBy,
 		); err != nil {
 			return nil, err
 		}
@@ -286,7 +395,7 @@ func (q *Queries) LockAgents(ctx context.Context, ids []pgtype.UUID) ([]Agent, e
 }
 
 const lockPersonalAgents = `-- name: LockPersonalAgents :many
-SELECT principal_id, adapter_kind, description, operator_config, billing_mode, credential_holder_id, billing_mode_changed_at, billing_mode_changed_by, tool_class, reported_tool_class, reported_runtime_state, reported_billing_mode, reported_runtime_version, reported_details, last_heartbeat_at, version, reported_project_folders FROM agents WHERE billing_mode = 'personal' ORDER BY principal_id FOR UPDATE
+SELECT principal_id, adapter_kind, description, operator_config, billing_mode, credential_holder_id, billing_mode_changed_at, billing_mode_changed_by, tool_class, reported_tool_class, reported_runtime_state, reported_billing_mode, reported_runtime_version, reported_details, last_heartbeat_at, version, reported_project_folders, hosted_by FROM agents WHERE billing_mode = 'personal' ORDER BY principal_id FOR UPDATE
 `
 
 // Every personal record locked in ascending id, disabled agents included (10 section 9.1).
@@ -317,6 +426,7 @@ func (q *Queries) LockPersonalAgents(ctx context.Context) ([]Agent, error) {
 			&i.LastHeartbeatAt,
 			&i.Version,
 			&i.ReportedProjectFolders,
+			&i.HostedBy,
 		); err != nil {
 			return nil, err
 		}
@@ -337,8 +447,9 @@ SET description = $1,
     billing_mode_changed_at = $5,
     billing_mode_changed_by = $6,
     tool_class = $7,
-    version = $8
-WHERE principal_id = $9
+    hosted_by = $8,
+    version = $9
+WHERE principal_id = $10
 `
 
 type UpdateAgentParams struct {
@@ -349,6 +460,7 @@ type UpdateAgentParams struct {
 	BillingModeChangedAt pgtype.Timestamptz
 	BillingModeChangedBy pgtype.UUID
 	ToolClass            string
+	HostedBy             pgtype.UUID
 	Version              int64
 	PrincipalID          pgtype.UUID
 }
@@ -362,6 +474,7 @@ func (q *Queries) UpdateAgent(ctx context.Context, arg UpdateAgentParams) error 
 		arg.BillingModeChangedAt,
 		arg.BillingModeChangedBy,
 		arg.ToolClass,
+		arg.HostedBy,
 		arg.Version,
 		arg.PrincipalID,
 	)

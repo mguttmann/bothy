@@ -37,6 +37,9 @@ type Reported struct {
 	// RateLimit is reported_details.rate_limit, the last reported rate-limit state (M6-14); nil
 	// when not reported.
 	RateLimit *RateLimit
+	// HostsAgents is reported_details.capabilities.hosts_agents, the ceiling of a Claude Code
+	// runner that hosts built-in agents (docs/spec/26-builtin-agents.md 3.1); "" when not reported.
+	HostsAgents ToolClass
 }
 
 // Agent is the operating record of an agent principal, a row of agents (03 section 4.4). The
@@ -58,6 +61,9 @@ type Agent struct {
 	BillingModeChangedBy ids.ID
 	// ToolClass is the target tool class.
 	ToolClass ToolClass
+	// HostedBy is agents.hosted_by, the Claude Code runner that hosts a built-in agent; zero for
+	// every other agent (R-DM-58, docs/spec/26-builtin-agents.md 3.1).
+	HostedBy ids.ID
 	// Reported is the actual state of the last heartbeat.
 	Reported Reported
 	// Version is agents.version, the ETag of the agent.
@@ -120,6 +126,17 @@ func (a *Agent) SetHolder(holder ids.ID) (changed bool, err error) {
 	a.Policy.HolderID = holder
 	a.Bump()
 	return true, nil
+}
+
+// SetHost moves a built-in agent to the runner host (agent.host.set); changed is false for the
+// same runner. The caller checked the runner (CheckHost) and the rules of the agent.
+func (a *Agent) SetHost(host ids.ID) (changed bool) {
+	if host == a.HostedBy {
+		return false
+	}
+	a.HostedBy = host
+	a.Bump()
+	return true
 }
 
 // SetToolClass sets the target tool class (agent.tool_class.set); changed is false for the same

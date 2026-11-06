@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, Self, TypeVar
+from uuid import UUID
 
 from attrs import define as _attrs_define
 
@@ -23,6 +24,7 @@ class AgentCreate:
         adapter_kind (str):
         description (str | Unset):
         operator_config (JsonObject | Unset): Free-form JSON object whose schema is named in the field description.
+        hosted_by (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
     """
 
     handle: str
@@ -30,6 +32,7 @@ class AgentCreate:
     adapter_kind: str
     description: str | Unset = UNSET
     operator_config: JsonObject | Unset = UNSET
+    hosted_by: UUID | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         handle = self.handle
@@ -44,6 +47,10 @@ class AgentCreate:
         if not isinstance(self.operator_config, Unset):
             operator_config = self.operator_config.to_dict()
 
+        hosted_by: str | Unset = UNSET
+        if not isinstance(self.hosted_by, Unset):
+            hosted_by = str(self.hosted_by)
+
         field_dict: dict[str, Any] = {}
 
         field_dict.update(
@@ -57,6 +64,8 @@ class AgentCreate:
             field_dict["description"] = description
         if operator_config is not UNSET:
             field_dict["operator_config"] = operator_config
+        if hosted_by is not UNSET:
+            field_dict["hosted_by"] = hosted_by
 
         return field_dict
 
@@ -80,12 +89,20 @@ class AgentCreate:
         else:
             operator_config = JsonObject.from_dict(_operator_config)
 
+        _hosted_by = d.pop("hosted_by", UNSET)
+        hosted_by: UUID | Unset
+        if isinstance(_hosted_by, Unset):
+            hosted_by = UNSET
+        else:
+            hosted_by = UUID(_hosted_by)
+
         agent_create = cls(
             handle=handle,
             display_name=display_name,
             adapter_kind=adapter_kind,
             description=description,
             operator_config=operator_config,
+            hosted_by=hosted_by,
         )
 
         return agent_create

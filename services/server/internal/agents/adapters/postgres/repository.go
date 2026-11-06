@@ -124,6 +124,20 @@ func (r *Repository) ListAgents(ctx context.Context, after ids.ID, limit int) ([
 	return many(rows, err, "listing agents")
 }
 
+// ListHostedAgents implements app.Store.
+func (r *Repository) ListHostedAgents(ctx context.Context, host, after ids.ID, limit int) ([]domain.Agent, error) {
+	rows, err := r.read(ctx).ListHostedAgents(ctx, sqlcgen.ListHostedAgentsParams{
+		HostedBy: uuid(host), AfterID: optionalUUID(after), RowLimit: int32(min(max(limit, 1), 1<<30)),
+	})
+	return many(rows, err, "listing the hosted agents")
+}
+
+// HostedAgentsOf implements app.Store.
+func (r *Repository) HostedAgentsOf(ctx context.Context, host ids.ID) ([]domain.Agent, error) {
+	rows, err := r.read(ctx).HostedAgentsOf(ctx, uuid(host))
+	return many(rows, err, "reading the hosted agents of a runner")
+}
+
 // PersonalAgents implements app.Store.
 func (r *Repository) PersonalAgents(ctx context.Context) ([]domain.Agent, error) {
 	rows, err := r.read(ctx).ListPersonalAgents(ctx)
@@ -139,7 +153,7 @@ func (r *Repository) InsertAgent(ctx context.Context, a domain.Agent) error {
 	err = q.InsertAgent(ctx, sqlcgen.InsertAgentParams{
 		PrincipalID: uuid(a.ID), AdapterKind: a.AdapterKind, Description: a.Description, OperatorConfig: a.Config.JSON(),
 		BillingMode: string(a.Policy.Mode), CredentialHolderID: optionalUUID(a.Policy.HolderID), ToolClass: string(a.ToolClass),
-		Version: a.Version,
+		HostedBy: optionalUUID(a.HostedBy), Version: a.Version,
 	})
 	return mapError(err, "inserting an agent")
 }
@@ -153,7 +167,8 @@ func (r *Repository) UpdateAgent(ctx context.Context, a domain.Agent) error {
 	err = q.UpdateAgent(ctx, sqlcgen.UpdateAgentParams{
 		PrincipalID: uuid(a.ID), Description: a.Description, OperatorConfig: a.Config.JSON(), BillingMode: string(a.Policy.Mode),
 		CredentialHolderID: optionalUUID(a.Policy.HolderID), BillingModeChangedAt: optionalTime(a.BillingModeChangedAt),
-		BillingModeChangedBy: optionalUUID(a.BillingModeChangedBy), ToolClass: string(a.ToolClass), Version: a.Version,
+		BillingModeChangedBy: optionalUUID(a.BillingModeChangedBy), ToolClass: string(a.ToolClass), HostedBy: optionalUUID(a.HostedBy),
+		Version: a.Version,
 	})
 	return mapError(err, "updating an agent")
 }
@@ -202,9 +217,9 @@ func toAgent(row sqlcgen.Agent) (domain.Agent, error) {
 		ID: idOf(row.PrincipalID), AdapterKind: row.AdapterKind, Description: row.Description, Config: cfg,
 		Policy:               domain.Policy{Mode: domain.BillingMode(row.BillingMode), HolderID: idOf(row.CredentialHolderID)},
 		BillingModeChangedAt: timeOf(row.BillingModeChangedAt), BillingModeChangedBy: idOf(row.BillingModeChangedBy),
-		ToolClass: domain.ToolClass(row.ToolClass),
-		Reported:  reportedOf(stored, timeOf(row.LastHeartbeatAt)),
-		Version:   row.Version,
+		ToolClass: domain.ToolClass(row.ToolClass), HostedBy: idOf(row.HostedBy),
+		Reported: reportedOf(stored, timeOf(row.LastHeartbeatAt)),
+		Version:  row.Version,
 	}, nil
 }
 
@@ -251,6 +266,9 @@ var constraintFields = map[string]string{
 	"agents_reported_runtime_state_check": "/reported_runtime_state",
 	"agents_reported_billing_mode_check":  "/reported_billing_mode",
 	"agents_reported_tool_class_check":    "/reported_tool_class",
+	"agents_hosted_by_fkey":               domain.PointerHostedBy,
+	"agents_hosted_by_check":              domain.PointerHostedBy,
+	"agents_hosted_by_not_self_check":     domain.PointerHostedBy,
 }
 
 // uuid converts an id for a parameter.

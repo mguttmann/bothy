@@ -11,9 +11,11 @@ import 'package:dio/dio.dart';
 import 'package:api_client/src/generated/api_util.dart';
 import 'package:api_client/src/generated/model/agent_channel_config.dart';
 import 'package:api_client/src/generated/model/agent_channel_config_list.dart';
+import 'package:api_client/src/generated/model/agent_page.dart';
 import 'package:api_client/src/generated/model/agent_session.dart';
 import 'package:api_client/src/generated/model/agent_session_report.dart';
 import 'package:api_client/src/generated/model/agent_triggerers.dart';
+import 'package:api_client/src/generated/model/api_token_created.dart';
 import 'package:api_client/src/generated/model/autocomplete_answer.dart';
 import 'package:api_client/src/generated/model/consumer_ack.dart';
 import 'package:api_client/src/generated/model/consumer_state.dart';
@@ -794,6 +796,204 @@ class AgentRuntimeApi {
     }
 
     return Response<AgentChannelConfig>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// Issue a token for a hosted agent
+  /// Issues an API token for the built-in agent &#x60;agent_id&#x60; to its hosting runner (26 3.3 item 1). Only the runner named in the agent&#39;s &#x60;hosted_by&#x60; may call it, with its own DPoP-bound agent token, while both are active and the runner&#39;s last stored heartbeat reports &#x60;hosts_agents&#x60;; every other caller and every other case get &#x60;404&#x60; like an unknown agent, audited as a denial. The token has kind &#x60;agt&#x60;, is bound to the &#x60;dpop_jkt&#x60; of the calling token (a calling token without one is &#x60;409 conflict&#x60; with &#x60;reason&#x60; &#x60;dpop_required&#x60;) and expires after &#x60;agents.hosted_token_ttl&#x60;; every older active token of the agent from the same runner is revoked in the same transaction. One audit entry names the agent, the runner and the token prefix, never the value. The secret is shown once; a replay with the same &#x60;Idempotency-Key&#x60; answers &#x60;409 conflict&#x60; with &#x60;reason&#x60; &#x60;one_time_secret&#x60; (06, 7). A person never receives such a token: &#x60;createToken&#x60; for a built-in agent is &#x60;409 conflict&#x60; with &#x60;reason&#x60; &#x60;hosted_agent_token&#x60;.
+  ///
+  /// Parameters:
+  /// * [agentId]
+  /// * [idempotencyKey] - UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [ApiTokenCreated] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<ApiTokenCreated>> issueHostedAgentToken({
+    required String agentId,
+    String? idempotencyKey,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/agents/me/hosted/{agent_id}/token'.replaceAll(
+      '{'
+      r'agent_id'
+      '}',
+      encodeQueryParameter(
+        _serializers,
+        agentId,
+        const FullType(String),
+      ).toString(),
+    );
+    final _options = Options(
+      method: r'POST',
+      headers: <String, dynamic>{
+        if (idempotencyKey != null) r'Idempotency-Key': idempotencyKey,
+        ...?headers,
+      },
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'apiKey',
+            'name': 'consoleSession',
+            'keyName': '__Host-console_session',
+            'where': '',
+          },
+          {'type': 'http', 'scheme': 'DPoP', 'name': 'dpopAuth'},
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearerAuth'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    ApiTokenCreated? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(
+              rawResponse,
+              specifiedType: const FullType(ApiTokenCreated),
+            ) as ApiTokenCreated;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<ApiTokenCreated>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// List the built-in agents this runner hosts
+  /// The active agents whose &#x60;hosted_by&#x60; is the calling agent (26 3.2), ascending by id. A Claude Code runner with &#x60;runner.hosted_agents&#x60; reads it at start, on &#x60;agent.hosting_changed&#x60; and every &#x60;runner.channels_resync_interval&#x60;; for any other agent the list is empty. Only the agent itself may call it (agent-self).
+  ///
+  /// Parameters:
+  /// * [cursor] - Cursor from `next_cursor` of the previous page.
+  /// * [limit]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [AgentPage] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<AgentPage>> listHostedAgents({
+    String? cursor,
+    int? limit,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/agents/me/hosted';
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'apiKey',
+            'name': 'consoleSession',
+            'keyName': '__Host-console_session',
+            'where': '',
+          },
+          {'type': 'http', 'scheme': 'DPoP', 'name': 'dpopAuth'},
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearerAuth'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _queryParameters = <String, dynamic>{
+      if (cursor != null)
+        r'cursor': encodeQueryParameter(
+          _serializers,
+          cursor,
+          const FullType(String),
+        ),
+      if (limit != null)
+        r'limit': encodeQueryParameter(
+          _serializers,
+          limit,
+          const FullType(int),
+        ),
+    };
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      queryParameters: _queryParameters,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    AgentPage? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(
+              rawResponse,
+              specifiedType: const FullType(AgentPage),
+            ) as AgentPage;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<AgentPage>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,

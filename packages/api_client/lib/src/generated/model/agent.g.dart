@@ -109,6 +109,8 @@ class _$Agent extends Agent {
   @override
   final BuiltMap<String, JsonObject?> operatorConfig;
   @override
+  final String? hostedBy;
+  @override
   final int version;
 
   factory _$Agent([void Function(AgentBuilder)? updates]) =>
@@ -128,6 +130,7 @@ class _$Agent extends Agent {
     required this.toolClass,
     required this.presence,
     required this.operatorConfig,
+    this.hostedBy,
     required this.version,
   }) : super._();
   @override
@@ -154,6 +157,7 @@ class _$Agent extends Agent {
         toolClass == other.toolClass &&
         presence == other.presence &&
         operatorConfig == other.operatorConfig &&
+        hostedBy == other.hostedBy &&
         version == other.version;
   }
 
@@ -173,6 +177,7 @@ class _$Agent extends Agent {
     _$hash = $jc(_$hash, toolClass.hashCode);
     _$hash = $jc(_$hash, presence.hashCode);
     _$hash = $jc(_$hash, operatorConfig.hashCode);
+    _$hash = $jc(_$hash, hostedBy.hashCode);
     _$hash = $jc(_$hash, version.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
@@ -194,6 +199,7 @@ class _$Agent extends Agent {
           ..add('toolClass', toolClass)
           ..add('presence', presence)
           ..add('operatorConfig', operatorConfig)
+          ..add('hostedBy', hostedBy)
           ..add('version', version))
         .toString();
   }
@@ -261,6 +267,10 @@ class AgentBuilder implements Builder<Agent, AgentBuilder> {
   set operatorConfig(MapBuilder<String, JsonObject?>? operatorConfig) =>
       _$this._operatorConfig = operatorConfig;
 
+  String? _hostedBy;
+  String? get hostedBy => _$this._hostedBy;
+  set hostedBy(String? hostedBy) => _$this._hostedBy = hostedBy;
+
   int? _version;
   int? get version => _$this._version;
   set version(int? version) => _$this._version = version;
@@ -285,6 +295,7 @@ class AgentBuilder implements Builder<Agent, AgentBuilder> {
       _toolClass = $v.toolClass;
       _presence = $v.presence.toBuilder();
       _operatorConfig = $v.operatorConfig.toBuilder();
+      _hostedBy = $v.hostedBy;
       _version = $v.version;
       _$v = null;
     }
@@ -351,6 +362,7 @@ class AgentBuilder implements Builder<Agent, AgentBuilder> {
             ),
             presence: presence.build(),
             operatorConfig: operatorConfig.build(),
+            hostedBy: hostedBy,
             version: BuiltValueNullFieldError.checkNotNull(
               version,
               r'Agent',

@@ -154,6 +154,8 @@ const EventTypeEnum _$eventTypeEnum_agentPeriodConfigChanged =
     const EventTypeEnum._('agentPeriodConfigChanged');
 const EventTypeEnum _$eventTypeEnum_agentPeriodDefinitionChanged =
     const EventTypeEnum._('agentPeriodDefinitionChanged');
+const EventTypeEnum _$eventTypeEnum_agentPeriodHostingChanged =
+    const EventTypeEnum._('agentPeriodHostingChanged');
 const EventTypeEnum _$eventTypeEnum_hostPeriodUpdated = const EventTypeEnum._(
   'hostPeriodUpdated',
 );
@@ -268,6 +270,8 @@ EventTypeEnum _$eventTypeEnumValueOf(String name) {
       return _$eventTypeEnum_agentPeriodConfigChanged;
     case 'agentPeriodDefinitionChanged':
       return _$eventTypeEnum_agentPeriodDefinitionChanged;
+    case 'agentPeriodHostingChanged':
+      return _$eventTypeEnum_agentPeriodHostingChanged;
     case 'hostPeriodUpdated':
       return _$eventTypeEnum_hostPeriodUpdated;
     case 'terminalSessionPeriodChanged':
@@ -333,6 +337,7 @@ final BuiltSet<EventTypeEnum> _$eventTypeEnumValues = BuiltSet<EventTypeEnum>(
     _$eventTypeEnum_commandPeriodInvoked,
     _$eventTypeEnum_agentPeriodConfigChanged,
     _$eventTypeEnum_agentPeriodDefinitionChanged,
+    _$eventTypeEnum_agentPeriodHostingChanged,
     _$eventTypeEnum_hostPeriodUpdated,
     _$eventTypeEnum_terminalSessionPeriodChanged,
     _$eventTypeEnum_unknownDefaultOpenApi,
@@ -431,6 +436,7 @@ class _$EventTypeEnumSerializer implements PrimitiveSerializer<EventTypeEnum> {
     'commandPeriodInvoked': 'command.invoked',
     'agentPeriodConfigChanged': 'agent.config_changed',
     'agentPeriodDefinitionChanged': 'agent.definition_changed',
+    'agentPeriodHostingChanged': 'agent.hosting_changed',
     'hostPeriodUpdated': 'host.updated',
     'terminalSessionPeriodChanged': 'terminal_session.changed',
     'unknownDefaultOpenApi': 'unknown_default_open_api',
@@ -488,6 +494,7 @@ class _$EventTypeEnumSerializer implements PrimitiveSerializer<EventTypeEnum> {
     'command.invoked': 'commandPeriodInvoked',
     'agent.config_changed': 'agentPeriodConfigChanged',
     'agent.definition_changed': 'agentPeriodDefinitionChanged',
+    'agent.hosting_changed': 'agentPeriodHostingChanged',
     'host.updated': 'hostPeriodUpdated',
     'terminal_session.changed': 'terminalSessionPeriodChanged',
     'unknown_default_open_api': 'unknownDefaultOpenApi',

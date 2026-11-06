@@ -111,6 +111,22 @@ func (r *Repository) RevokeAPITokensOfPrincipal(ctx context.Context, principalID
 	return int(n), nil
 }
 
+// RevokeIssuedAPITokens implements app.APITokenStore.
+func (r *Repository) RevokeIssuedAPITokens(ctx context.Context, issuer, holder ids.ID, dpopJKT string, by ids.ID, at time.Time) (int, error) {
+	q, err := r.write(ctx)
+	if err != nil {
+		return 0, err
+	}
+	n, err := q.RevokeIssuedAPITokens(ctx, sqlcgen.RevokeIssuedAPITokensParams{
+		Issuer: uuid(issuer), Holder: optionalUUID(holder), DpopJkt: pgtype.Text{String: dpopJKT, Valid: dpopJKT != ""},
+		RevokedBy: optionalUUID(by), RevokedAt: ts(at),
+	})
+	if err != nil {
+		return 0, mapError(err, "revoking the tokens a runner issued")
+	}
+	return int(n), nil
+}
+
 // TouchAPIToken implements app.APITokenStore. It runs on the pool, never in the request's unit of
 // work, so a failure cannot roll back the request.
 func (r *Repository) TouchAPIToken(ctx context.Context, id ids.ID, at, threshold time.Time) error {

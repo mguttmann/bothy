@@ -230,6 +230,18 @@
       "doc": "Longest skill description in characters; it is one line."
     },
     {
+      "name": "agents.hosted_token_ttl",
+      "env": "BOTHY_AGENTS__HOSTED_TOKEN_TTL",
+      "kind": "duration",
+      "default": "24h",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "26-builtin-agents.md",
+      "doc": "Lifetime of a token for a hosted agent; the hosting runner fetches a new one before it ends."
+    },
+    {
       "name": "agents.mcp_stdio_runners",
       "env": "BOTHY_AGENTS__MCP_STDIO_RUNNERS",
       "kind": "list(string)",

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io"
 	"slices"
+	"sync/atomic"
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/identity"
@@ -71,6 +72,9 @@ type Tokens struct {
 	cfg    Config
 	pepper []byte
 	d      TokensDeps
+	// hosted answers whether an agent is built in (BindHostedAgents, A1-03); nil until bound,
+	// which knows no built-in agent.
+	hosted atomic.Pointer[identity.HostedAgents]
 }
 
 // Compile-time checks: the two incoming ports.
@@ -361,7 +365,7 @@ func (s *Tokens) Revoke(ctx context.Context, tokenID, by ids.ID) error {
 		if !txn.InRightsChange(ctx) {
 			return errNoRightsChange()
 		}
-		_, err := s.revoke(ctx, tokenID, by)
+		_, _, err := s.revoke(ctx, tokenID, by)
 		return err
 	}
 	r, found, err := s.d.Store.APIToken(ctx, tokenID)
@@ -372,30 +376,40 @@ func (s *Tokens) Revoke(ctx context.Context, tokenID, by ids.ID) error {
 		return invisible()
 	}
 	return s.d.UoW.Do(ctx, func(ctx context.Context) error {
-		_, err := s.revoke(ctx, tokenID, by)
+		_, _, err := s.revoke(ctx, tokenID, by)
 		return err
 	}, tokenChange(tokenID, r.PrincipalID))
 }
 
-// revoke locks the token and revokes it when it is active; changed reports a revocation.
-func (s *Tokens) revoke(ctx context.Context, tokenID, by ids.ID) (APITokenRecord, error) {
+// revoke locks the token and revokes it when it is active; a zero record reports that nothing
+// changed. An agent token bound to a key also takes the tokens of built-in agents that its agent
+// issued with the same key, in the same transaction (26 3.3 item 3, A1-03); hosted is their
+// number.
+func (s *Tokens) revoke(ctx context.Context, tokenID, by ids.ID) (r APITokenRecord, hosted int, err error) {
 	r, found, err := s.d.Store.LockAPIToken(ctx, tokenID)
 	if err != nil {
-		return APITokenRecord{}, err
+		return APITokenRecord{}, 0, err
 	}
 	if !found {
-		return APITokenRecord{}, invisible()
+		return APITokenRecord{}, 0, invisible()
 	}
 	if !r.RevokedAt.IsZero() {
-		return APITokenRecord{}, nil
+		return APITokenRecord{}, 0, nil
 	}
 	now := s.now()
 	changed, err := s.d.Store.RevokeAPIToken(ctx, tokenID, by, now)
 	if err != nil || !changed {
-		return APITokenRecord{}, err
+		return APITokenRecord{}, 0, err
 	}
 	r.RevokedAt, r.RevokedBy = now, by
-	return r, nil
+	// Only an agent creates tokens for another agent, and only as a hosting runner, so a person's
+	// token never takes the agent tokens that person created.
+	if tokenView(r).Kind == identity.TokenKindAgent && r.DPoPJKT != "" {
+		if hosted, err = s.d.Store.RevokeIssuedAPITokens(ctx, r.PrincipalID, ids.ID{}, r.DPoPJKT, by, now); err != nil {
+			return APITokenRecord{}, 0, err
+		}
+	}
+	return r, hosted, nil
 }
 
 // RevokeAllForPrincipal implements identity.Tokens.
@@ -416,6 +430,8 @@ const (
 	attrDPoPBound    = "dpop_bound"
 	attrExpiresAt    = "expires_at"
 	attrScopes       = "scopes"
+	// attrRevokedHosted counts the tokens of built-in agents a revoked runner token took (A1-03).
+	attrRevokedHosted = "revoked_hosted_tokens"
 )
 
 // reasonAppNotInstalled is the reason of createToken for an app without an active installation
@@ -527,6 +543,15 @@ func (s *Tokens) admitKind(ctx context.Context, a actor.Actor, k tokenKind, prin
 			return nil, errs.New(errs.CodeFeatureDisabled, "Personal API tokens are switched off.")
 		}
 	case identity.TokenKindAgent:
+		// Only the hosting runner receives a token of a built-in agent (26 3.3 item 3).
+		hosted, err := s.isHosted(ctx, principalID)
+		if err != nil {
+			return nil, err
+		}
+		if hosted {
+			return nil, errs.New(errs.CodeConflict, "A built-in agent gets its tokens only from its hosting runner.").
+				WithReason(identity.ReasonHostedAgentToken)
+		}
 	}
 	return requested, nil
 }
@@ -582,13 +607,17 @@ func (s *Tokens) RevokeToken(ctx context.Context, a actor.Actor, tokenID ids.ID)
 		return err
 	}
 	return s.d.UoW.Do(ctx, func(ctx context.Context) error {
-		r, err := s.revoke(ctx, tokenID, a.ID)
+		r, hosted, err := s.revoke(ctx, tokenID, a.ID)
 		if err != nil || r.ID.IsZero() {
 			return err
 		}
+		attrs := auditing.Attrs{attrPrincipalID: auditing.ID(r.PrincipalID), attrKind: auditing.Code(string(tokenView(r).Kind))}
+		if hosted > 0 {
+			attrs[attrRevokedHosted] = auditing.Int(int64(hosted))
+		}
 		return s.d.Audit.Record(ctx, auditing.Entry{
 			Action: string(authorize.ActionTokenRevoke), Decision: auditing.DecisionAllow, ResourceKind: resourceAPIToken, ResourceID: tokenID,
-			Attrs: auditing.Attrs{attrPrincipalID: auditing.ID(r.PrincipalID), attrKind: auditing.Code(string(tokenView(r).Kind))},
+			Attrs: attrs,
 		})
 	}, tokenChange(tokenID, rec.PrincipalID))
 }

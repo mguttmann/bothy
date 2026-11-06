@@ -40,12 +40,16 @@ type ClientInterface interface {
 
 	// CreateAgentWithBody Create an agent
 	//
+	// Creates an agent principal with its record: `organization`, tool class `chat`, version 1. A built-in agent (26 3.1) carries `adapter_kind` `claude_agent` together with `hosted_by`; `hosted_by` is set exactly then. `claude_agent` without `hosted_by` is `400 validation_failed` with the field code `required` on `/hosted_by`, `hosted_by` with another adapter kind the field code `not_allowed`, and a `hosted_by` that names no active Claude Code runner (`adapter_kind` `code_runner`) that is not hosted itself and whose last heartbeat reports `hosts_agents` the field code `host_not_capable`. A built-in agent's creation writes the durable event `agent.hosting_changed` to its runner.
+	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with POST /agents (the `CreateAgent` operationId).
 	CreateAgentWithBody(ctx context.Context, params *CreateAgentParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CreateAgent Create an agent
+	//
+	// Creates an agent principal with its record: `organization`, tool class `chat`, version 1. A built-in agent (26 3.1) carries `adapter_kind` `claude_agent` together with `hosted_by`; `hosted_by` is set exactly then. `claude_agent` without `hosted_by` is `400 validation_failed` with the field code `required` on `/hosted_by`, `hosted_by` with another adapter kind the field code `not_allowed`, and a `hosted_by` that names no active Claude Code runner (`adapter_kind` `code_runner`) that is not hosted itself and whose last heartbeat reports `hosts_agents` the field code `host_not_capable`. A built-in agent's creation writes the durable event `agent.hosting_changed` to its runner.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -110,6 +114,20 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /agents/me/heartbeat (the `SendHeartbeat` operationId).
 	SendHeartbeat(ctx context.Context, body SendHeartbeatJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListHostedAgents List the built-in agents this runner hosts
+	//
+	// The active agents whose `hosted_by` is the calling agent (26 3.2), ascending by id. A Claude Code runner with `runner.hosted_agents` reads it at start, on `agent.hosting_changed` and every `runner.channels_resync_interval`; for any other agent the list is empty. Only the agent itself may call it (agent-self).
+	//
+	// Corresponds with GET /agents/me/hosted (the `ListHostedAgents` operationId).
+	ListHostedAgents(ctx context.Context, params *ListHostedAgentsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// IssueHostedAgentToken Issue a token for a hosted agent
+	//
+	// Issues an API token for the built-in agent `agent_id` to its hosting runner (26 3.3 item 1). Only the runner named in the agent's `hosted_by` may call it, with its own DPoP-bound agent token, while both are active and the runner's last stored heartbeat reports `hosts_agents`; every other caller and every other case get `404` like an unknown agent, audited as a denial. The token has kind `agt`, is bound to the `dpop_jkt` of the calling token (a calling token without one is `409 conflict` with `reason` `dpop_required`) and expires after `agents.hosted_token_ttl`; every older active token of the agent from the same runner is revoked in the same transaction. One audit entry names the agent, the runner and the token prefix, never the value. The secret is shown once; a replay with the same `Idempotency-Key` answers `409 conflict` with `reason` `one_time_secret` (06, 7). A person never receives such a token: `createToken` for a built-in agent is `409 conflict` with `reason` `hosted_agent_token`.
+	//
+	// Corresponds with POST /agents/me/hosted/{agent_id}/token (the `IssueHostedAgentToken` operationId).
+	IssueHostedAgentToken(ctx context.Context, agentId AgentIdPath, params *IssueHostedAgentTokenParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetAgentTriggerers List who may trigger this agent
 	//
@@ -230,6 +248,24 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /agents/{agent_id}/enable (the `EnableAgent` operationId).
 	EnableAgent(ctx context.Context, agentId AgentIdPath, params *EnableAgentParams, body EnableAgentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetAgentHostWithBody Move a built-in agent to another runner
+	//
+	// Changes `hosted_by` of a built-in agent (`adapter_kind` `claude_agent`, 26 3.1 item 4). The new runner follows the rules of `AgentCreate.hosted_by` (else `400 validation_failed` with the field code `host_not_capable` on `/hosted_by`, also for the agent itself); another agent is `409 conflict` with `reason` `not_a_builtin_agent`. A runner whose ceiling `hosts_agents` is below the agent's tool class is `409 conflict` with `reason` `host_tool_class_ceiling`; a `personal` agent needs a runner that is `personal` with the same `credential_holder_id` and reports `personal` in `billing_modes_supported`, else `409 conflict` with `reason` `hosted_holder_mismatch` (10 10.3). In the same transaction every token of the agent that the old runner holds is revoked (its connections close with `4012`), and the durable event `agent.hosting_changed` goes to the old and the new runner.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /agents/{agent_id}/host (the `SetAgentHost` operationId).
+	SetAgentHostWithBody(ctx context.Context, agentId AgentIdPath, params *SetAgentHostParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetAgentHost Move a built-in agent to another runner
+	//
+	// Changes `hosted_by` of a built-in agent (`adapter_kind` `claude_agent`, 26 3.1 item 4). The new runner follows the rules of `AgentCreate.hosted_by` (else `400 validation_failed` with the field code `host_not_capable` on `/hosted_by`, also for the agent itself); another agent is `409 conflict` with `reason` `not_a_builtin_agent`. A runner whose ceiling `hosts_agents` is below the agent's tool class is `409 conflict` with `reason` `host_tool_class_ceiling`; a `personal` agent needs a runner that is `personal` with the same `credential_holder_id` and reports `personal` in `billing_modes_supported`, else `409 conflict` with `reason` `hosted_holder_mismatch` (10 10.3). In the same transaction every token of the agent that the old runner holds is revoked (its connections close with `4012`), and the durable event `agent.hosting_changed` goes to the old and the new runner.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /agents/{agent_id}/host (the `SetAgentHost` operationId).
+	SetAgentHost(ctx context.Context, agentId AgentIdPath, params *SetAgentHostParams, body SetAgentHostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListAgentProjectFolders List the project folders of a runner that have no binding
 	//
@@ -4088,6 +4124,8 @@ func (c *Client) ListAgents(ctx context.Context, params *ListAgentsParams, reqEd
 
 // CreateAgentWithBody Create an agent
 //
+// Creates an agent principal with its record: `organization`, tool class `chat`, version 1. A built-in agent (26 3.1) carries `adapter_kind` `claude_agent` together with `hosted_by`; `hosted_by` is set exactly then. `claude_agent` without `hosted_by` is `400 validation_failed` with the field code `required` on `/hosted_by`, `hosted_by` with another adapter kind the field code `not_allowed`, and a `hosted_by` that names no active Claude Code runner (`adapter_kind` `code_runner`) that is not hosted itself and whose last heartbeat reports `hosts_agents` the field code `host_not_capable`. A built-in agent's creation writes the durable event `agent.hosting_changed` to its runner.
+//
 // Takes any type of body and a specified content type.
 //
 // Corresponds with POST /agents (the `CreateAgent` operationId).
@@ -4104,6 +4142,8 @@ func (c *Client) CreateAgentWithBody(ctx context.Context, params *CreateAgentPar
 }
 
 // CreateAgent Create an agent
+//
+// Creates an agent principal with its record: `organization`, tool class `chat`, version 1. A built-in agent (26 3.1) carries `adapter_kind` `claude_agent` together with `hosted_by`; `hosted_by` is set exactly then. `claude_agent` without `hosted_by` is `400 validation_failed` with the field code `required` on `/hosted_by`, `hosted_by` with another adapter kind the field code `not_allowed`, and a `hosted_by` that names no active Claude Code runner (`adapter_kind` `code_runner`) that is not hosted itself and whose last heartbeat reports `hosts_agents` the field code `host_not_capable`. A built-in agent's creation writes the durable event `agent.hosting_changed` to its runner.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -4249,6 +4289,40 @@ func (c *Client) SendHeartbeatWithBody(ctx context.Context, contentType string, 
 // Corresponds with POST /agents/me/heartbeat (the `SendHeartbeat` operationId).
 func (c *Client) SendHeartbeat(ctx context.Context, body SendHeartbeatJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewSendHeartbeatRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListHostedAgents List the built-in agents this runner hosts
+//
+// The active agents whose `hosted_by` is the calling agent (26 3.2), ascending by id. A Claude Code runner with `runner.hosted_agents` reads it at start, on `agent.hosting_changed` and every `runner.channels_resync_interval`; for any other agent the list is empty. Only the agent itself may call it (agent-self).
+//
+// Corresponds with GET /agents/me/hosted (the `ListHostedAgents` operationId).
+func (c *Client) ListHostedAgents(ctx context.Context, params *ListHostedAgentsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListHostedAgentsRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// IssueHostedAgentToken Issue a token for a hosted agent
+//
+// Issues an API token for the built-in agent `agent_id` to its hosting runner (26 3.3 item 1). Only the runner named in the agent's `hosted_by` may call it, with its own DPoP-bound agent token, while both are active and the runner's last stored heartbeat reports `hosts_agents`; every other caller and every other case get `404` like an unknown agent, audited as a denial. The token has kind `agt`, is bound to the `dpop_jkt` of the calling token (a calling token without one is `409 conflict` with `reason` `dpop_required`) and expires after `agents.hosted_token_ttl`; every older active token of the agent from the same runner is revoked in the same transaction. One audit entry names the agent, the runner and the token prefix, never the value. The secret is shown once; a replay with the same `Idempotency-Key` answers `409 conflict` with `reason` `one_time_secret` (06, 7). A person never receives such a token: `createToken` for a built-in agent is `409 conflict` with `reason` `hosted_agent_token`.
+//
+// Corresponds with POST /agents/me/hosted/{agent_id}/token (the `IssueHostedAgentToken` operationId).
+func (c *Client) IssueHostedAgentToken(ctx context.Context, agentId AgentIdPath, params *IssueHostedAgentTokenParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewIssueHostedAgentTokenRequest(c.Server, agentId, params)
 	if err != nil {
 		return nil, err
 	}
@@ -4529,6 +4603,44 @@ func (c *Client) EnableAgentWithBody(ctx context.Context, agentId AgentIdPath, p
 // Corresponds with POST /agents/{agent_id}/enable (the `EnableAgent` operationId).
 func (c *Client) EnableAgent(ctx context.Context, agentId AgentIdPath, params *EnableAgentParams, body EnableAgentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewEnableAgentRequest(c.Server, agentId, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SetAgentHostWithBody Move a built-in agent to another runner
+//
+// Changes `hosted_by` of a built-in agent (`adapter_kind` `claude_agent`, 26 3.1 item 4). The new runner follows the rules of `AgentCreate.hosted_by` (else `400 validation_failed` with the field code `host_not_capable` on `/hosted_by`, also for the agent itself); another agent is `409 conflict` with `reason` `not_a_builtin_agent`. A runner whose ceiling `hosts_agents` is below the agent's tool class is `409 conflict` with `reason` `host_tool_class_ceiling`; a `personal` agent needs a runner that is `personal` with the same `credential_holder_id` and reports `personal` in `billing_modes_supported`, else `409 conflict` with `reason` `hosted_holder_mismatch` (10 10.3). In the same transaction every token of the agent that the old runner holds is revoked (its connections close with `4012`), and the durable event `agent.hosting_changed` goes to the old and the new runner.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /agents/{agent_id}/host (the `SetAgentHost` operationId).
+func (c *Client) SetAgentHostWithBody(ctx context.Context, agentId AgentIdPath, params *SetAgentHostParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetAgentHostRequestWithBody(c.Server, agentId, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SetAgentHost Move a built-in agent to another runner
+//
+// Changes `hosted_by` of a built-in agent (`adapter_kind` `claude_agent`, 26 3.1 item 4). The new runner follows the rules of `AgentCreate.hosted_by` (else `400 validation_failed` with the field code `host_not_capable` on `/hosted_by`, also for the agent itself); another agent is `409 conflict` with `reason` `not_a_builtin_agent`. A runner whose ceiling `hosts_agents` is below the agent's tool class is `409 conflict` with `reason` `host_tool_class_ceiling`; a `personal` agent needs a runner that is `personal` with the same `credential_holder_id` and reports `personal` in `billing_modes_supported`, else `409 conflict` with `reason` `hosted_holder_mismatch` (10 10.3). In the same transaction every token of the agent that the old runner holds is revoked (its connections close with `4012`), and the durable event `agent.hosting_changed` goes to the old and the new runner.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /agents/{agent_id}/host (the `SetAgentHost` operationId).
+func (c *Client) SetAgentHost(ctx context.Context, agentId AgentIdPath, params *SetAgentHostParams, body SetAgentHostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetAgentHostRequest(c.Server, agentId, params, body)
 	if err != nil {
 		return nil, err
 	}
@@ -13516,6 +13628,121 @@ func NewSendHeartbeatRequestWithBody(server string, contentType string, body io.
 	return req, nil
 }
 
+// NewListHostedAgentsRequest constructs an http.Request for the ListHostedAgents method
+func NewListHostedAgentsRequest(server string, params *ListHostedAgentsParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/agents/me/hosted")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Cursor != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewIssueHostedAgentTokenRequest constructs an http.Request for the IssueHostedAgentToken method
+func NewIssueHostedAgentTokenRequest(server string, agentId AgentIdPath, params *IssueHostedAgentTokenParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "agent_id", agentId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/agents/me/hosted/%s/token", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
 // NewGetAgentTriggerersRequest constructs an http.Request for the GetAgentTriggerers method
 func NewGetAgentTriggerersRequest(server string) (*http.Request, error) {
 	var err error
@@ -14082,6 +14309,66 @@ func NewEnableAgentRequestWithBody(server string, agentId AgentIdPath, params *E
 
 			req.Header.Set("Idempotency-Key", headerParam0)
 		}
+
+	}
+
+	return req, nil
+}
+
+// NewSetAgentHostRequest calls the generic SetAgentHost builder with application/json body
+func NewSetAgentHostRequest(server string, agentId AgentIdPath, params *SetAgentHostParams, body SetAgentHostJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewSetAgentHostRequestWithBody(server, agentId, params, "application/json", bodyReader)
+}
+
+// NewSetAgentHostRequestWithBody constructs an http.Request for the SetAgentHost method, with any body, and a specified content type
+func NewSetAgentHostRequestWithBody(server string, agentId AgentIdPath, params *SetAgentHostParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "agent_id", agentId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/agents/%s/host", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		var headerParam0 string
+
+		headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("If-Match", headerParam0)
 
 	}
 
@@ -22708,625 +22995,4 @@ func NewRegisterPushRequest(server string, params *RegisterPushParams, body Regi
 	}
 	bodyReader = bytes.NewReader(buf)
 	return NewRegisterPushRequestWithBody(server, params, "application/json", bodyReader)
-}
-
-// NewRegisterPushRequestWithBody constructs an http.Request for the RegisterPush method, with any body, and a specified content type
-func NewRegisterPushRequestWithBody(server string, params *RegisterPushParams, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/me/devices/current/push-registrations")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
-	}
-
-	return req, nil
-}
-
-// NewApprovePairingRequest calls the generic ApprovePairing builder with application/json body
-func NewApprovePairingRequest(server string, params *ApprovePairingParams, body ApprovePairingJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewApprovePairingRequestWithBody(server, params, "application/json", bodyReader)
-}
-
-// NewApprovePairingRequestWithBody constructs an http.Request for the ApprovePairing method, with any body, and a specified content type
-func NewApprovePairingRequestWithBody(server string, params *ApprovePairingParams, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/me/devices/pairings")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
-	}
-
-	return req, nil
-}
-
-// NewListMyDmsRequest constructs an http.Request for the ListMyDms method
-func NewListMyDmsRequest(server string) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/me/dms")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewListMyDraftsRequest constructs an http.Request for the ListMyDrafts method
-func NewListMyDraftsRequest(server string) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/me/drafts")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewBeginIdentityLinkRequest calls the generic BeginIdentityLink builder with application/json body
-func NewBeginIdentityLinkRequest(server string, body BeginIdentityLinkJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewBeginIdentityLinkRequestWithBody(server, "application/json", bodyReader)
-}
-
-// NewBeginIdentityLinkRequestWithBody constructs an http.Request for the BeginIdentityLink method, with any body, and a specified content type
-func NewBeginIdentityLinkRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/me/identities/begin")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewCompleteIdentityLinkRequest calls the generic CompleteIdentityLink builder with application/json body
-func NewCompleteIdentityLinkRequest(server string, body CompleteIdentityLinkJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewCompleteIdentityLinkRequestWithBody(server, "application/json", bodyReader)
-}
-
-// NewCompleteIdentityLinkRequestWithBody constructs an http.Request for the CompleteIdentityLink method, with any body, and a specified content type
-func NewCompleteIdentityLinkRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/me/identities/complete")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewSetMyLocalCredentialRequest calls the generic SetMyLocalCredential builder with application/json body
-func NewSetMyLocalCredentialRequest(server string, body SetMyLocalCredentialJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewSetMyLocalCredentialRequestWithBody(server, "application/json", bodyReader)
-}
-
-// NewSetMyLocalCredentialRequestWithBody constructs an http.Request for the SetMyLocalCredential method, with any body, and a specified content type
-func NewSetMyLocalCredentialRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/me/local-credential")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewListMyMentionsRequest constructs an http.Request for the ListMyMentions method
-func NewListMyMentionsRequest(server string, params *ListMyMentionsParams) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/me/mentions")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-		// queryValues collects non-styled parameters (passthrough, JSON)
-		// that are safe to round-trip through url.Values.Encode().
-		queryValues := queryURL.Query()
-		// rawQueryFragments collects pre-encoded query fragments from
-		// styled parameters, preserving literal commas as delimiters
-		// per the OpenAPI spec (e.g. "color=blue,black,brown").
-		var rawQueryFragments []string
-
-		if params.Cursor != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if params.Limit != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if encoded := queryValues.Encode(); encoded != "" {
-			rawQueryFragments = append(rawQueryFragments, encoded)
-		}
-		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewListMyNotificationPreferencesRequest constructs an http.Request for the ListMyNotificationPreferences method
-func NewListMyNotificationPreferencesRequest(server string) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/me/notification-preferences")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewDeleteNotificationPreferenceRequest constructs an http.Request for the DeleteNotificationPreference method
-func NewDeleteNotificationPreferenceRequest(server string, targetKind DeleteNotificationPreferenceParamsTargetKind, targetId TargetIdPath) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "target_kind", targetKind, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
-	if err != nil {
-		return nil, err
-	}
-
-	var pathParam1 string
-
-	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "target_id", targetId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/me/notification-preferences/%s/%s", pathParam0, pathParam1)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewPutNotificationPreferenceRequest calls the generic PutNotificationPreference builder with application/json body
-func NewPutNotificationPreferenceRequest(server string, targetKind PutNotificationPreferenceParamsTargetKind, targetId TargetIdPath, body PutNotificationPreferenceJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewPutNotificationPreferenceRequestWithBody(server, targetKind, targetId, "application/json", bodyReader)
-}
-
-// NewPutNotificationPreferenceRequestWithBody constructs an http.Request for the PutNotificationPreference method, with any body, and a specified content type
-func NewPutNotificationPreferenceRequestWithBody(server string, targetKind PutNotificationPreferenceParamsTargetKind, targetId TargetIdPath, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "target_kind", targetKind, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
-	if err != nil {
-		return nil, err
-	}
-
-	var pathParam1 string
-
-	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "target_id", targetId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/me/notification-preferences/%s/%s", pathParam0, pathParam1)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewBeginPasskeyRegistrationRequest constructs an http.Request for the BeginPasskeyRegistration method
-func NewBeginPasskeyRegistrationRequest(server string) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/me/passkeys/begin")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewCompletePasskeyRegistrationRequest calls the generic CompletePasskeyRegistration builder with application/json body
-func NewCompletePasskeyRegistrationRequest(server string, body CompletePasskeyRegistrationJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewCompletePasskeyRegistrationRequestWithBody(server, "application/json", bodyReader)
-}
-
-// NewCompletePasskeyRegistrationRequestWithBody constructs an http.Request for the CompletePasskeyRegistration method, with any body, and a specified content type
-func NewCompletePasskeyRegistrationRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/me/passkeys/complete")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewUpdateMyProfileRequest calls the generic UpdateMyProfile builder with application/json body
-func NewUpdateMyProfileRequest(server string, params *UpdateMyProfileParams, body UpdateMyProfileJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewUpdateMyProfileRequestWithBody(server, params, "application/json", bodyReader)
-}
-
-// NewUpdateMyProfileRequestWithBody constructs an http.Request for the UpdateMyProfile method, with any body, and a specified content type
-func NewUpdateMyProfileRequestWithBody(server string, params *UpdateMyProfileParams, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/me/profile")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
-	}
-
-	return req, nil
-}
-
-// NewListMyQuietHoursRequest constructs an http.Request for the ListMyQuietHours method
-func NewListMyQuietHoursRequest(server string) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/me/quiet-hours")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewCreateQuietHoursRuleRequest calls the generic CreateQuietHoursRule builder with application/json body
-func NewCreateQuietHoursRuleRequest(server string, params *CreateQuietHoursRuleParams, body CreateQuietHoursRuleJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewCreateQuietHoursRuleRequestWithBody(server, params, "application/json", bodyReader)
 }

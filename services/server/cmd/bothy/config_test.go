@@ -248,6 +248,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"agents.definition.max_skills = 32  # default\n" +
 		"agents.definition.skill_body_max_bytes = 65536  # default\n" +
 		"agents.definition.skill_description_max_chars = 300  # default\n" +
+		"agents.hosted_token_ttl = 1d  # default\n" +
 		"agents.mcp_stdio_runners = npx, uvx  # default\n" +
 		"api.cors_allowed_origins =   # default\n" +
 		"api.page_size_default = 50  # default\n" +

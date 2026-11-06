@@ -13,6 +13,7 @@ const Set<String> skippedDurable = {
   'agent.config_changed',
   'agent.definition_changed',
   'agent.followup',
+  'agent.hosting_changed',
   'agent.invocation',
   'agent_session.changed',
   'channel.settings_changed',

@@ -37,6 +37,15 @@ WHERE id = @id AND revoked_at IS NULL;
 UPDATE api_tokens SET revoked_at = @revoked_at, revoked_by = @revoked_by
 WHERE principal_id = @principal_id AND revoked_at IS NULL;
 
+-- name: RevokeIssuedAPITokens :execrows
+-- The tokens of built-in agents (A1-03, 26 3.3): the active tokens that the hosting runner
+-- @issuer created for another principal, optionally only of one holder and only with one
+-- dpop_jkt (a revoked runner token takes the hosted tokens bound to the same key).
+UPDATE api_tokens SET revoked_at = @revoked_at, revoked_by = @revoked_by
+WHERE created_by = @issuer AND principal_id <> @issuer AND revoked_at IS NULL
+  AND (sqlc.narg(holder)::uuid IS NULL OR principal_id = sqlc.narg(holder)::uuid)
+  AND (sqlc.narg(dpop_jkt)::text IS NULL OR dpop_jkt = sqlc.narg(dpop_jkt)::text);
+
 -- name: TouchAPIToken :exec
 -- last_used_at at most once per identity.last_active_granularity (03 api_tokens).
 UPDATE api_tokens SET last_used_at = @used_at

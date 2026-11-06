@@ -55,11 +55,14 @@ func newWorld(t *testing.T) *world {
 	t.Helper()
 	logs := &logBuffer{}
 	s := harness.Start(t, harness.Options{EgressDenyAll: true, Config: harness.RaisedRateLimits(), LogWriter: logs})
+	// The built-in agents are hosted by a runner with the ceiling host (A1-03), so the class host
+	// is allowed and their tokens come from the runner.
+	runner := s.NewRunner(t, "runner", "host")
 	return &world{
 		t: t, s: s, logs: logs, owner: s.Owner,
 		alex:   s.NewUser(t, harness.UserSpec{Handle: "alex", DisplayName: "Alex", Email: "alex@example.com"}),
-		writer: s.NewAgent(t, harness.AgentSpec{Handle: "writer", DisplayName: "Writer", AdapterKind: "claude_agent"}),
-		other:  s.NewAgent(t, harness.AgentSpec{Handle: "other", DisplayName: "Other", AdapterKind: "claude_agent"}),
+		writer: s.NewAgent(t, harness.AgentSpec{Handle: "writer", DisplayName: "Writer", AdapterKind: "claude_agent", HostedBy: runner}),
+		other:  s.NewAgent(t, harness.AgentSpec{Handle: "other", DisplayName: "Other", AdapterKind: "claude_agent", HostedBy: runner}),
 		plain:  s.NewAgent(t, harness.AgentSpec{Handle: "plain", DisplayName: "Plain"}),
 	}
 }

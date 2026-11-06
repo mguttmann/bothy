@@ -46,6 +46,8 @@ import 'package:api_client/src/generated/model/agent_definition_version.dart';
 import 'package:api_client/src/generated/model/agent_definition_version_page.dart';
 import 'package:api_client/src/generated/model/agent_followup_event.dart';
 import 'package:api_client/src/generated/model/agent_followup_payload.dart';
+import 'package:api_client/src/generated/model/agent_hosting_changed_event.dart';
+import 'package:api_client/src/generated/model/agent_hosting_changed_payload.dart';
 import 'package:api_client/src/generated/model/agent_invocation_event.dart';
 import 'package:api_client/src/generated/model/agent_invocation_payload.dart';
 import 'package:api_client/src/generated/model/agent_page.dart';
@@ -285,6 +287,7 @@ import 'package:api_client/src/generated/model/host_session_open.dart';
 import 'package:api_client/src/generated/model/host_session_started.dart';
 import 'package:api_client/src/generated/model/host_session_user.dart';
 import 'package:api_client/src/generated/model/host_session_user_assign.dart';
+import 'package:api_client/src/generated/model/host_set.dart';
 import 'package:api_client/src/generated/model/host_state.dart';
 import 'package:api_client/src/generated/model/host_state_set.dart';
 import 'package:api_client/src/generated/model/host_update.dart';
@@ -693,6 +696,8 @@ part 'serializers.g.dart';
   AgentDefinitionVersionPage,
   AgentFollowupEvent,
   AgentFollowupPayload,
+  AgentHostingChangedEvent,
+  AgentHostingChangedPayload,
   AgentInvocationEvent,
   AgentInvocationPayload,
   AgentPage,
@@ -933,6 +938,7 @@ part 'serializers.g.dart';
   HostSessionStarted,
   HostSessionUser,
   HostSessionUserAssign,
+  HostSet,
   HostState,
   HostStateSet,
   HostUpdate,

@@ -44,6 +44,9 @@ func TestMain(m *testing.M) { os.Exit(pgtest.Main(m)) }
 // start is the clock of the use case world.
 var start = time.Date(2026, 10, 13, 9, 0, 0, 0, time.UTC)
 
+// hostedTTL is agents.hosted_token_ttl of the world (A1-03).
+const hostedTTL = 2 * time.Hour
+
 // testKEK is the key-encryption key of the audit recorder in these tests.
 type testKEK struct{}
 
@@ -150,11 +153,13 @@ func newWorld(t *testing.T) *world {
 	w.rec = rec
 	w.svc, err = app.New(testConfig(), app.Deps{
 		Store: agentspg.NewRepository(pool), Definitions: agentspg.NewRepository(pool), Principals: w.id.Principals, Directory: identityapp.NewDirectory(repo), Tokens: w.id.Tokens,
+		Hosted: w.id.Tokens,
 		Rights: hook, UoW: uow, Authorizer: az, Audit: rec, Events: appender, Cursors: agentshttp.Cursors{}, Clock: clk,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
+	w.id.Tokens.BindHostedAgents(w.svc)
 	return w
 }
 
@@ -165,7 +170,7 @@ func testConfig() app.Config {
 		PageSizeDefault: 2, PageSizeMax: 3, ReasonMaxChars: 40,
 		DefinitionInstructionsMaxBytes: 64, DefinitionMaxSkills: 32, DefinitionSkillDescriptionMaxChars: 300,
 		DefinitionSkillBodyMaxBytes: 65536, DefinitionMaxSkillFiles: 8, DefinitionMaxMCPServers: 16, DefinitionMaxAllowedTools: 64,
-		DefinitionMaxCostUSDPerRun: 50, MCPStdioRunners: []string{"npx", "uvx"},
+		DefinitionMaxCostUSDPerRun: 50, MCPStdioRunners: []string{"npx", "uvx"}, HostedTokenTTL: hostedTTL,
 	}
 }
 

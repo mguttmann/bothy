@@ -3495,7 +3495,10 @@ export interface paths {
         /** List visible agents */
         get: operations["listAgents"];
         put?: never;
-        /** Create an agent */
+        /**
+         * Create an agent
+         * @description Creates an agent principal with its record: `organization`, tool class `chat`, version 1. A built-in agent (26 3.1) carries `adapter_kind` `claude_agent` together with `hosted_by`; `hosted_by` is set exactly then. `claude_agent` without `hosted_by` is `400 validation_failed` with the field code `required` on `/hosted_by`, `hosted_by` with another adapter kind the field code `not_allowed`, and a `hosted_by` that names no active Claude Code runner (`adapter_kind` `code_runner`) that is not hosted itself and whose last heartbeat reports `hosts_agents` the field code `host_not_capable`. A built-in agent's creation writes the durable event `agent.hosting_changed` to its runner.
+         */
         post: operations["createAgent"];
         delete?: never;
         options?: never;
@@ -3650,6 +3653,26 @@ export interface paths {
          */
         get: operations["listAgentDefinitionVersions"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agents/{agent_id}/host": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Move a built-in agent to another runner
+         * @description Changes `hosted_by` of a built-in agent (`adapter_kind` `claude_agent`, 26 3.1 item 4). The new runner follows the rules of `AgentCreate.hosted_by` (else `400 validation_failed` with the field code `host_not_capable` on `/hosted_by`, also for the agent itself); another agent is `409 conflict` with `reason` `not_a_builtin_agent`. A runner whose ceiling `hosts_agents` is below the agent's tool class is `409 conflict` with `reason` `host_tool_class_ceiling`; a `personal` agent needs a runner that is `personal` with the same `credential_holder_id` and reports `personal` in `billing_modes_supported`, else `409 conflict` with `reason` `hosted_holder_mismatch` (10 10.3). In the same transaction every token of the agent that the old runner holds is revoked (its connections close with `4012`), and the durable event `agent.hosting_changed` goes to the old and the new runner.
+         */
+        put: operations["setAgentHost"];
         post?: never;
         delete?: never;
         options?: never;
@@ -3826,6 +3849,46 @@ export interface paths {
         get: operations["getAgentTriggerers"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agents/me/hosted": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the built-in agents this runner hosts
+         * @description The active agents whose `hosted_by` is the calling agent (26 3.2), ascending by id. A Claude Code runner with `runner.hosted_agents` reads it at start, on `agent.hosting_changed` and every `runner.channels_resync_interval`; for any other agent the list is empty. Only the agent itself may call it (agent-self).
+         */
+        get: operations["listHostedAgents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agents/me/hosted/{agent_id}/token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Issue a token for a hosted agent
+         * @description Issues an API token for the built-in agent `agent_id` to its hosting runner (26 3.3 item 1). Only the runner named in the agent's `hosted_by` may call it, with its own DPoP-bound agent token, while both are active and the runner's last stored heartbeat reports `hosts_agents`; every other caller and every other case get `404` like an unknown agent, audited as a denial. The token has kind `agt`, is bound to the `dpop_jkt` of the calling token (a calling token without one is `409 conflict` with `reason` `dpop_required`) and expires after `agents.hosted_token_ttl`; every older active token of the agent from the same runner is revoked in the same transaction. One audit entry names the agent, the runner and the token prefix, never the value. The secret is shown once; a replay with the same `Idempotency-Key` answers `409 conflict` with `reason` `one_time_secret` (06, 7). A person never receives such a token: `createToken` for a built-in agent is `409 conflict` with `reason` `hosted_agent_token`.
+         */
+        post: operations["issueHostedAgentToken"];
         delete?: never;
         options?: never;
         head?: never;
@@ -8495,6 +8558,8 @@ export interface components {
             presence: components["schemas"]["AgentRuntimeStatus"];
             /** @description Schema `agent_operator_config.v1`. No secrets. */
             operator_config: components["schemas"]["JsonObject"];
+            /** @description Built-in agents only (`adapter_kind` `claude_agent`, 26 3.1); the Claude Code runner agent that hosts it. Absent for every other agent. */
+            hosted_by?: components["schemas"]["Uuid"];
             /** Format: int64 */
             version: number;
         };
@@ -8526,6 +8591,14 @@ export interface components {
             /** @example Answers support tickets */
             description?: string;
             operator_config?: components["schemas"]["JsonObject"];
+            /** @description Required exactly when `adapter_kind` is `claude_agent` (a built-in agent, 26 3.1); names an active agent with `adapter_kind` `code_runner` that is not hosted itself and whose last heartbeat reports the capability `hosts_agents`. */
+            hosted_by?: components["schemas"]["Uuid"];
+        };
+        HostSet: {
+            /** @description The new hosting runner, with the rules of `AgentCreate.hosted_by`. */
+            hosted_by: components["schemas"]["Uuid"];
+            /** @example Move the agent to the build host */
+            reason: string;
         };
         AgentUpdate: {
             /** @example Support Agent */
@@ -8573,7 +8646,7 @@ export interface components {
             reported_tool_class?: components["schemas"]["ToolClass"];
             /** @description Stored in `agents.reported_details.rate_limit` as exactly `state` and `resets_at`; absent clears a stored one, because every heartbeat is the full reported state. Shown by `getStatsBackends`. */
             rate_limit?: components["schemas"]["AgentRateLimitState"];
-            /** @description Further fields of schema `agent_heartbeat.v1`, a closed object; any other key, also inside `capabilities`, `adapter` and `runtime`, is refused. Keys: `capabilities` (object: `followups` `steer` or `queue`; `components`, `voice_input`, `title`, `files_out` booleans), `active_runs` (distinct run ids), `degraded_reasons` (distinct codes), `adapter` (`name` required, `version` optional), `runtime` (`name` required), `protocol_version` (integer, at least 1). Names match `^[a-z0-9][a-z0-9._-]*$`, versions `^[0-9A-Za-z][0-9A-Za-z.+_-]*$`, codes `^[a-z0-9][a-z0-9_.:-]*$`. No secrets, no content, no paths. */
+            /** @description Further fields of schema `agent_heartbeat.v1`, a closed object; any other key, also inside `capabilities`, `adapter` and `runtime`, is refused. Keys: `capabilities` (object: `followups` `steer` or `queue`; `components`, `voice_input`, `title`, `files_out` booleans; for Claude Code runners only `hosts_agents` `chat`, `scoped` or `host`, the highest tool class the runner loads for a hosted agent (26 3.1), which a built-in agent's own heartbeat never carries), `active_runs` (distinct run ids), `degraded_reasons` (distinct codes), `adapter` (`name` required, `version` optional), `runtime` (`name` required), `protocol_version` (integer, at least 1). Names match `^[a-z0-9][a-z0-9._-]*$`, versions `^[0-9A-Za-z][0-9A-Za-z.+_-]*$`, codes `^[a-z0-9][a-z0-9_.:-]*$`. No secrets, no content, no paths. */
             details?: components["schemas"]["JsonObject"];
             /** @description Readiness per bound forum of a runner (M2-03); the channels must be distinct. Applied only when present and different from the last list this server process applied; absent means "unchanged". */
             project_readiness?: components["schemas"]["ProjectReadiness"][];
@@ -10126,6 +10199,10 @@ export interface components {
             invoked_by: components["schemas"]["PrincipalRef"];
             options: components["schemas"]["CommandOptionValue"][];
         };
+        /** @description Payload of `agent.hosting_changed` (26 9); only the id of the built-in agent, the runner reads the rest with `listHostedAgents`. */
+        AgentHostingChangedPayload: {
+            agent_id: components["schemas"]["Uuid"];
+        };
         AgentConfigChangedPayload: {
             channel_id: components["schemas"]["Uuid"];
             /** Format: int64 */
@@ -11538,6 +11615,18 @@ export interface components {
              */
             type: "agent.definition_changed";
         };
+        /** @description Durable event `agent.hosting_changed`. */
+        AgentHostingChangedEvent: components["schemas"]["EventEnvelope"] & {
+            /** @enum {string} */
+            type: "agent.hosting_changed";
+            payload: components["schemas"]["AgentHostingChangedPayload"];
+        } & {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "agent.hosting_changed";
+        };
         /** @description Ephemeral event `typing.started` (no `seq`, at most once). */
         TypingStartedEvent: components["schemas"]["EventEnvelope"] & {
             /** @enum {string} */
@@ -11621,7 +11710,7 @@ export interface components {
             image_url?: string;
         };
         /** @description Any durable event, discriminated by `type`. Clients skip unknown types and still advance their cursor. */
-        Event: components["schemas"]["MessageCreatedEvent"] | components["schemas"]["MessageUpdatedEvent"] | components["schemas"]["MessageDeletedEvent"] | components["schemas"]["ReactionAddedEvent"] | components["schemas"]["ReactionRemovedEvent"] | components["schemas"]["PinAddedEvent"] | components["schemas"]["PinRemovedEvent"] | components["schemas"]["ThreadCreatedEvent"] | components["schemas"]["ThreadUpdatedEvent"] | components["schemas"]["ThreadClosedEvent"] | components["schemas"]["ThreadReopenedEvent"] | components["schemas"]["ThreadMovedEvent"] | components["schemas"]["ThreadMovedOutEvent"] | components["schemas"]["AgentSessionChangedEvent"] | components["schemas"]["RunStateChangedEvent"] | components["schemas"]["SpaceCreatedEvent"] | components["schemas"]["SpaceUpdatedEvent"] | components["schemas"]["SpaceArchivedEvent"] | components["schemas"]["ChannelCreatedEvent"] | components["schemas"]["ChannelUpdatedEvent"] | components["schemas"]["ChannelSettingsChangedEvent"] | components["schemas"]["ChannelArchivedEvent"] | components["schemas"]["CommandChangedEvent"] | components["schemas"]["FileUpdatedEvent"] | components["schemas"]["UserUpdatedEvent"] | components["schemas"]["AgentUpdatedEvent"] | components["schemas"]["InstanceUpdatedEvent"] | components["schemas"]["StatusUpdatedEvent"] | components["schemas"]["GrantChangedEvent"] | components["schemas"]["GroupChangedEvent"] | components["schemas"]["AccessChangedEvent"] | components["schemas"]["AccessExpiringEvent"] | components["schemas"]["DevicePendingEvent"] | components["schemas"]["SessionRevokedEvent"] | components["schemas"]["ReadStateUpdatedEvent"] | components["schemas"]["DraftUpdatedEvent"] | components["schemas"]["DraftDeletedEvent"] | components["schemas"]["SettingsUpdatedEvent"] | components["schemas"]["SidebarUpdatedEvent"] | components["schemas"]["SidebarChannelUpdatedEvent"] | components["schemas"]["NotificationPrefUpdatedEvent"] | components["schemas"]["QuietHoursUpdatedEvent"] | components["schemas"]["GdprRequestUpdatedEvent"] | components["schemas"]["GdprRequestDueEvent"] | components["schemas"]["ImportProgressEvent"] | components["schemas"]["AgentInvocationEvent"] | components["schemas"]["AgentFollowupEvent"] | components["schemas"]["RunCancelRequestedEvent"] | components["schemas"]["InteractionCreatedEvent"] | components["schemas"]["CommandInvokedEvent"] | components["schemas"]["AgentConfigChangedEvent"] | components["schemas"]["AgentDefinitionChangedEvent"] | components["schemas"]["HostUpdatedEvent"] | components["schemas"]["TerminalSessionChangedEvent"];
+        Event: components["schemas"]["MessageCreatedEvent"] | components["schemas"]["MessageUpdatedEvent"] | components["schemas"]["MessageDeletedEvent"] | components["schemas"]["ReactionAddedEvent"] | components["schemas"]["ReactionRemovedEvent"] | components["schemas"]["PinAddedEvent"] | components["schemas"]["PinRemovedEvent"] | components["schemas"]["ThreadCreatedEvent"] | components["schemas"]["ThreadUpdatedEvent"] | components["schemas"]["ThreadClosedEvent"] | components["schemas"]["ThreadReopenedEvent"] | components["schemas"]["ThreadMovedEvent"] | components["schemas"]["ThreadMovedOutEvent"] | components["schemas"]["AgentSessionChangedEvent"] | components["schemas"]["RunStateChangedEvent"] | components["schemas"]["SpaceCreatedEvent"] | components["schemas"]["SpaceUpdatedEvent"] | components["schemas"]["SpaceArchivedEvent"] | components["schemas"]["ChannelCreatedEvent"] | components["schemas"]["ChannelUpdatedEvent"] | components["schemas"]["ChannelSettingsChangedEvent"] | components["schemas"]["ChannelArchivedEvent"] | components["schemas"]["CommandChangedEvent"] | components["schemas"]["FileUpdatedEvent"] | components["schemas"]["UserUpdatedEvent"] | components["schemas"]["AgentUpdatedEvent"] | components["schemas"]["InstanceUpdatedEvent"] | components["schemas"]["StatusUpdatedEvent"] | components["schemas"]["GrantChangedEvent"] | components["schemas"]["GroupChangedEvent"] | components["schemas"]["AccessChangedEvent"] | components["schemas"]["AccessExpiringEvent"] | components["schemas"]["DevicePendingEvent"] | components["schemas"]["SessionRevokedEvent"] | components["schemas"]["ReadStateUpdatedEvent"] | components["schemas"]["DraftUpdatedEvent"] | components["schemas"]["DraftDeletedEvent"] | components["schemas"]["SettingsUpdatedEvent"] | components["schemas"]["SidebarUpdatedEvent"] | components["schemas"]["SidebarChannelUpdatedEvent"] | components["schemas"]["NotificationPrefUpdatedEvent"] | components["schemas"]["QuietHoursUpdatedEvent"] | components["schemas"]["GdprRequestUpdatedEvent"] | components["schemas"]["GdprRequestDueEvent"] | components["schemas"]["ImportProgressEvent"] | components["schemas"]["AgentInvocationEvent"] | components["schemas"]["AgentFollowupEvent"] | components["schemas"]["RunCancelRequestedEvent"] | components["schemas"]["InteractionCreatedEvent"] | components["schemas"]["CommandInvokedEvent"] | components["schemas"]["AgentConfigChangedEvent"] | components["schemas"]["AgentDefinitionChangedEvent"] | components["schemas"]["AgentHostingChangedEvent"] | components["schemas"]["HostUpdatedEvent"] | components["schemas"]["TerminalSessionChangedEvent"];
         /** @description One page. `next_cursor` is absent on the last page. */
         MentionItemPage: {
             items: components["schemas"]["MentionItem"][];
@@ -20815,6 +20904,48 @@ export interface operations {
             default: components["responses"]["Error"];
         };
     };
+    setAgentHost: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description ETag of the version the change is based on, e.g. `"7"`. Mismatch gives 412 `version_conflict`. */
+                "If-Match": components["parameters"]["IfMatchRequired"];
+            };
+            path: {
+                agent_id: components["parameters"]["AgentIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HostSet"];
+            };
+        };
+        responses: {
+            /** @description OK. */
+            200: {
+                headers: {
+                    "Correlation-Id": components["headers"]["Correlation-Id"];
+                    RateLimit: components["headers"]["RateLimit"];
+                    "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Agent"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            428: components["responses"]["PreconditionRequired"];
+            429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
     listAgentProjectFolders: {
         parameters: {
             query?: never;
@@ -21130,6 +21261,74 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+            429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
+    listHostedAgents: {
+        parameters: {
+            query?: {
+                /** @description Cursor from `next_cursor` of the previous page. */
+                cursor?: components["parameters"]["Cursor"];
+                limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK. */
+            200: {
+                headers: {
+                    "Correlation-Id": components["headers"]["Correlation-Id"];
+                    RateLimit: components["headers"]["RateLimit"];
+                    "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentPage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
+    issueHostedAgentToken: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`. */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                agent_id: components["parameters"]["AgentIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Created. */
+            201: {
+                headers: {
+                    "Correlation-Id": components["headers"]["Correlation-Id"];
+                    RateLimit: components["headers"]["RateLimit"];
+                    "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiTokenCreated"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["UnprocessableEntity"];
             429: components["responses"]["TooManyRequests"];
             default: components["responses"]["Error"];
         };

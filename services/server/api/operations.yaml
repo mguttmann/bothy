@@ -172,6 +172,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - installApp
   - invokeCommand
   - issueHostPairingCode
+  - issueHostedAgentToken
   - listActiveRuns
   - listAgentDefinitionVersions
   - listAgentProjectFolders
@@ -191,6 +192,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - listGrants
   - listGroupMembers
   - listGroups
+  - listHostedAgents
   - listHosts
   - listIdentityProviders
   - listImportItems
@@ -291,6 +293,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - searchThreadTitles
   - sendHeartbeat
   - setAgentBillingMode
+  - setAgentHost
   - setAgentToolClass
   - setAllAgentsBillingMode
   - setAppScopes

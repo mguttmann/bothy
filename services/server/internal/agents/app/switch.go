@@ -103,5 +103,7 @@ func (s *Service) SwitchToOrganization(ctx context.Context, by actor.Actor, list
 			return err
 		}
 	}
-	return nil
+	// A runner switched away from personal while a hosted agent keeps its holder breaks 10
+	// section 10.3 (BR-14); the outer action rolls back.
+	return s.checkHostedBilling(ctx, want...)
 }

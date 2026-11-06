@@ -43,6 +43,12 @@ const (
 	ActionAgentEventsConsume Action = "agent.events.consume"
 	// ActionAgentHeartbeat is the action agent.heartbeat.
 	ActionAgentHeartbeat Action = "agent.heartbeat"
+	// ActionAgentHostSet is the action agent.host.set.
+	ActionAgentHostSet Action = "agent.host.set"
+	// ActionAgentHostedList is the action agent.hosted.list.
+	ActionAgentHostedList Action = "agent.hosted.list"
+	// ActionAgentHostedTokenIssue is the action agent.hosted_token.issue.
+	ActionAgentHostedTokenIssue Action = "agent.hosted_token.issue"
 	// ActionAgentInvoke is the action agent.invoke.
 	ActionAgentInvoke Action = "agent.invoke"
 	// ActionAgentProjectFoldersRead is the action agent.project_folders.read.
@@ -470,6 +476,9 @@ var actionByID = map[string]Action{
 	"agent.enable":                 ActionAgentEnable,
 	"agent.events.consume":         ActionAgentEventsConsume,
 	"agent.heartbeat":              ActionAgentHeartbeat,
+	"agent.host.set":               ActionAgentHostSet,
+	"agent.hosted.list":            ActionAgentHostedList,
+	"agent.hosted_token.issue":     ActionAgentHostedTokenIssue,
 	"agent.invoke":                 ActionAgentInvoke,
 	"agent.project_folders.read":   ActionAgentProjectFoldersRead,
 	"agent.read":                   ActionAgentRead,
@@ -693,6 +702,9 @@ var actionList = []Action{
 	ActionAgentEnable,
 	ActionAgentEventsConsume,
 	ActionAgentHeartbeat,
+	ActionAgentHostSet,
+	ActionAgentHostedList,
+	ActionAgentHostedTokenIssue,
 	ActionAgentInvoke,
 	ActionAgentProjectFoldersRead,
 	ActionAgentRead,
@@ -927,6 +939,8 @@ const (
 	EventAgentDefinitionChanged EventType = "agent.definition_changed"
 	// EventAgentFollowup is the event type agent.followup.
 	EventAgentFollowup EventType = "agent.followup"
+	// EventAgentHostingChanged is the event type agent.hosting_changed.
+	EventAgentHostingChanged EventType = "agent.hosting_changed"
 	// EventAgentInvocation is the event type agent.invocation.
 	EventAgentInvocation EventType = "agent.invocation"
 	// EventAgentPresenceChanged is the event type agent.presence_changed.
@@ -1050,6 +1064,7 @@ var eventTypeByID = map[string]EventType{
 	"agent.config_changed":           EventAgentConfigChanged,
 	"agent.definition_changed":       EventAgentDefinitionChanged,
 	"agent.followup":                 EventAgentFollowup,
+	"agent.hosting_changed":          EventAgentHostingChanged,
 	"agent.invocation":               EventAgentInvocation,
 	"agent.presence_changed":         EventAgentPresenceChanged,
 	"agent.updated":                  EventAgentUpdated,
@@ -1116,6 +1131,7 @@ var eventTypeList = []EventType{
 	EventAgentConfigChanged,
 	EventAgentDefinitionChanged,
 	EventAgentFollowup,
+	EventAgentHostingChanged,
 	EventAgentInvocation,
 	EventAgentPresenceChanged,
 	EventAgentUpdated,

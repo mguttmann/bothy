@@ -49,6 +49,12 @@ type ServerInterface interface {
 	// SendHeartbeat Report state and actual billing mode
 	// (POST /agents/me/heartbeat)
 	SendHeartbeat(w http.ResponseWriter, r *http.Request)
+	// ListHostedAgents List the built-in agents this runner hosts
+	// (GET /agents/me/hosted)
+	ListHostedAgents(w http.ResponseWriter, r *http.Request, params ListHostedAgentsParams)
+	// IssueHostedAgentToken Issue a token for a hosted agent
+	// (POST /agents/me/hosted/{agent_id}/token)
+	IssueHostedAgentToken(w http.ResponseWriter, r *http.Request, agentId AgentIdPath, params IssueHostedAgentTokenParams)
 	// GetAgentTriggerers List who may trigger this agent
 	// (GET /agents/me/triggerers)
 	GetAgentTriggerers(w http.ResponseWriter, r *http.Request)
@@ -79,6 +85,9 @@ type ServerInterface interface {
 	// EnableAgent Enable an agent
 	// (POST /agents/{agent_id}/enable)
 	EnableAgent(w http.ResponseWriter, r *http.Request, agentId AgentIdPath, params EnableAgentParams)
+	// SetAgentHost Move a built-in agent to another runner
+	// (PUT /agents/{agent_id}/host)
+	SetAgentHost(w http.ResponseWriter, r *http.Request, agentId AgentIdPath, params SetAgentHostParams)
 	// ListAgentProjectFolders List the project folders of a runner that have no binding
 	// (GET /agents/{agent_id}/project-folders)
 	ListAgentProjectFolders(w http.ResponseWriter, r *http.Request, agentId AgentIdPath)
@@ -1395,6 +1404,102 @@ func (siw *ServerInterfaceWrapper) SendHeartbeat(w http.ResponseWriter, r *http.
 	handler.ServeHTTP(w, r)
 }
 
+// ListHostedAgents operation middleware
+func (siw *ServerInterfaceWrapper) ListHostedAgents(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListHostedAgentsParams
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListHostedAgents(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// IssueHostedAgentToken operation middleware
+func (siw *ServerInterfaceWrapper) IssueHostedAgentToken(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "agent_id" -------------
+	var agentId AgentIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "agent_id", r.PathValue("agent_id"), &agentId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "agent_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params IssueHostedAgentTokenParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.IssueHostedAgentToken(w, r, agentId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetAgentTriggerers operation middleware
 func (siw *ServerInterfaceWrapper) GetAgentTriggerers(w http.ResponseWriter, r *http.Request) {
 
@@ -1854,6 +1959,60 @@ func (siw *ServerInterfaceWrapper) EnableAgent(w http.ResponseWriter, r *http.Re
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.EnableAgent(w, r, agentId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SetAgentHost operation middleware
+func (siw *ServerInterfaceWrapper) SetAgentHost(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "agent_id" -------------
+	var agentId AgentIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "agent_id", r.PathValue("agent_id"), &agentId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "agent_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params SetAgentHostParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatchRequired
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = IfMatch
+
+	} else {
+		err := fmt.Errorf("Header parameter If-Match is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "If-Match", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SetAgentHost(w, r, agentId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -14809,6 +14968,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents/{agent_id}/definition", wrapper.GetAgentDefinition)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/agents/{agent_id}/definition", wrapper.PutAgentDefinition)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents/{agent_id}/definition/versions", wrapper.ListAgentDefinitionVersions)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/agents/{agent_id}/host", wrapper.SetAgentHost)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents/{agent_id}/project-folders", wrapper.ListAgentProjectFolders)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents/{agent_id}/webhooks", wrapper.ListAgentWebhookSubscriptions)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/agents/{agent_id}/webhooks", wrapper.CreateAgentWebhookSubscription)
@@ -14819,6 +14979,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents/me/channels", wrapper.ListServedChannels)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents/me/channels/{channel_id}/config", wrapper.GetServedChannelConfig)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents/me/triggerers", wrapper.GetAgentTriggerers)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents/me/hosted", wrapper.ListHostedAgents)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/agents/me/hosted/{agent_id}/token", wrapper.IssueHostedAgentToken)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/runs", wrapper.ListActiveRuns)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/run-history", wrapper.ListRunHistory)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/runs/{run_id}", wrapper.GetRun)
@@ -15123,6 +15285,12 @@ type StrictServerInterface interface {
 	// SendHeartbeat Report state and actual billing mode
 	// (POST /agents/me/heartbeat)
 	SendHeartbeat(ctx context.Context, request SendHeartbeatRequestObject) (SendHeartbeatResponseObject, error)
+	// ListHostedAgents List the built-in agents this runner hosts
+	// (GET /agents/me/hosted)
+	ListHostedAgents(ctx context.Context, request ListHostedAgentsRequestObject) (ListHostedAgentsResponseObject, error)
+	// IssueHostedAgentToken Issue a token for a hosted agent
+	// (POST /agents/me/hosted/{agent_id}/token)
+	IssueHostedAgentToken(ctx context.Context, request IssueHostedAgentTokenRequestObject) (IssueHostedAgentTokenResponseObject, error)
 	// GetAgentTriggerers List who may trigger this agent
 	// (GET /agents/me/triggerers)
 	GetAgentTriggerers(ctx context.Context, request GetAgentTriggerersRequestObject) (GetAgentTriggerersResponseObject, error)
@@ -15153,6 +15321,9 @@ type StrictServerInterface interface {
 	// EnableAgent Enable an agent
 	// (POST /agents/{agent_id}/enable)
 	EnableAgent(ctx context.Context, request EnableAgentRequestObject) (EnableAgentResponseObject, error)
+	// SetAgentHost Move a built-in agent to another runner
+	// (PUT /agents/{agent_id}/host)
+	SetAgentHost(ctx context.Context, request SetAgentHostRequestObject) (SetAgentHostResponseObject, error)
 	// ListAgentProjectFolders List the project folders of a runner that have no binding
 	// (GET /agents/{agent_id}/project-folders)
 	ListAgentProjectFolders(ctx context.Context, request ListAgentProjectFoldersRequestObject) (ListAgentProjectFoldersResponseObject, error)
@@ -16411,6 +16582,59 @@ func (sh *strictHandler) SendHeartbeat(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// ListHostedAgents operation middleware
+func (sh *strictHandler) ListHostedAgents(w http.ResponseWriter, r *http.Request, params ListHostedAgentsParams) {
+	var request ListHostedAgentsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListHostedAgents(ctx, request.(ListHostedAgentsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListHostedAgents")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListHostedAgentsResponseObject); ok {
+		if err := validResponse.VisitListHostedAgentsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// IssueHostedAgentToken operation middleware
+func (sh *strictHandler) IssueHostedAgentToken(w http.ResponseWriter, r *http.Request, agentId AgentIdPath, params IssueHostedAgentTokenParams) {
+	var request IssueHostedAgentTokenRequestObject
+
+	request.AgentId = agentId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.IssueHostedAgentToken(ctx, request.(IssueHostedAgentTokenRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "IssueHostedAgentToken")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(IssueHostedAgentTokenResponseObject); ok {
+		if err := validResponse.VisitIssueHostedAgentTokenResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetAgentTriggerers operation middleware
 func (sh *strictHandler) GetAgentTriggerers(w http.ResponseWriter, r *http.Request) {
 	var request GetAgentTriggerersRequestObject
@@ -16712,6 +16936,40 @@ func (sh *strictHandler) EnableAgent(w http.ResponseWriter, r *http.Request, age
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(EnableAgentResponseObject); ok {
 		if err := validResponse.VisitEnableAgentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SetAgentHost operation middleware
+func (sh *strictHandler) SetAgentHost(w http.ResponseWriter, r *http.Request, agentId AgentIdPath, params SetAgentHostParams) {
+	var request SetAgentHostRequestObject
+
+	request.AgentId = agentId
+	request.Params = params
+
+	var body SetAgentHostJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SetAgentHost(ctx, request.(SetAgentHostRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SetAgentHost")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SetAgentHostResponseObject); ok {
+		if err := validResponse.VisitSetAgentHostResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

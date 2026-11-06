@@ -9,6 +9,9 @@ agent.disable
 agent.enable
 agent.events.consume
 agent.heartbeat
+agent.host.set
+agent.hosted.list
+agent.hosted_token.issue
 agent.invoke
 agent.tool_class.set
 agent.triggerers.read

@@ -32,6 +32,10 @@ func agentsConfigKeys() []config.Key {
 		// a field error (too_long), never a database error and a 500 (docs/DECISIONS.md D-M2-12-9).
 		{Name: "agent.session_ref_max_bytes", Kind: config.KindInt, Default: "1024", Min: "1", Max: "2048", Chapter: chapter09,
 			Doc: "Longest external_session_ref and model of an agent session in bytes; the maximum keeps an entry of the unique index on (agent_id, external_session_ref) within the PostgreSQL B-tree entry limit."},
+		// A1-03: the lifetime of a token of a built-in agent (26 3.3); at most
+		// auth.api_token_max_ttl (cross-check hosted_token_ttl_within_api_token_max_ttl).
+		{Name: keyHostedTokenTTL, Kind: config.KindDuration, Default: defaultDay, Min: "1s", Chapter: chapter26,
+			Doc: "Lifetime of a token for a hosted agent; the hosting runner fetches a new one before it ends."},
 	}
 }
 
@@ -61,6 +65,10 @@ func agentDefinitionConfigKeys() []config.Key {
 			Doc: "Commands a stdio MCP server of a definition may use."},
 	}
 }
+
+// keyHostedTokenTTL is agents.hosted_token_ttl, which the cross-check
+// hosted_token_ttl_within_api_token_max_ttl compares with auth.api_token_max_ttl.
+const keyHostedTokenTTL = "agents.hosted_token_ttl"
 
 // keyPresenceTimeout is agent.presence_timeout, which the cross-check
 // presence_timeout_above_heartbeat_interval compares with sync.heartbeat_interval.

@@ -15,13 +15,15 @@ import (
 // sections 6 and 7): the durable event agent.updated (M1-51), the ephemeral event
 // agent.presence_changed (M2-20), the durable event command.changed of the command register
 // (M2-16), the durable event agent.definition_changed of the definitions of built-in agents
-// (A1-02) and the client op ack of agent consumers (M2-07). internal/wire lists it in
+// (A1-02), the durable event agent.hosting_changed to a hosting runner (A1-03) and the client op
+// ack of agent consumers (M2-07). internal/wire lists it in
 // moduleRegistrations.
 func Register(r *authorize.Registry) {
 	r.Event("agents", authorize.EventAgentUpdated)
 	r.Event("agents", authorize.EventAgentDefinitionChanged)
 	r.Event("agents", authorize.EventAgentPresenceChanged)
 	r.Event("agents", authorize.EventCommandChanged)
+	r.Event("agents", authorize.EventAgentHostingChanged)
 	r.Op("agents", authorize.OpAck)
 }
 
@@ -68,6 +70,9 @@ type Agent struct {
 	Presence PresenceStatus
 	// OperatorConfig is agent_operator_config.v1 as a JSON object value.
 	OperatorConfig map[string]any
+	// HostedBy is the Claude Code runner that hosts a built-in agent; zero for every other agent
+	// (docs/spec/26-builtin-agents.md 3.1).
+	HostedBy ids.ID
 	// Version is the ETag.
 	Version int64
 }
@@ -93,10 +98,12 @@ type AgentPage struct {
 }
 
 // CreateCmd is the body of createAgent (schema AgentCreate). OperatorConfig nil means the empty
-// object.
+// object. HostedBy is the hosting runner of a built-in agent (adapter kind claude_agent); zero
+// for every other agent.
 type CreateCmd struct {
 	Handle, DisplayName, AdapterKind, Description string
 	OperatorConfig                                map[string]any
+	HostedBy                                      ids.ID
 }
 
 // UpdateCmd is the body of updateAgent (schema AgentUpdate); nil fields stay unchanged.

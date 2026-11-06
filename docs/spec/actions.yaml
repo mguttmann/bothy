@@ -1858,6 +1858,42 @@ actions:
   rights_change: false
   rl_class: rl.read
   effect: read
+- id: agent.host.set
+  section: agents
+  description: change the hosting runner of a built-in agent; revokes the tokens the old host holds
+    ([26-builtin-agents.md](26-builtin-agents.md) 3.1, A1-03)
+  resource: agent
+  right: owner
+  owner: true
+  step_up: true
+  audit: always
+  rights_change: false
+  rl_class: rl.admin
+  effect: write
+- id: agent.hosted.list
+  section: agents
+  description: list the agents whose `hosted_by` is the calling runner ([26-builtin-agents.md](26-builtin-agents.md)
+    3.2, A1-03)
+  resource: agent
+  right: agent-self (a runner reporting `hosts_agents`)
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.agent_runtime
+  effect: read
+- id: agent.hosted_token.issue
+  section: agents
+  description: issue a token for a hosted agent, bound to the caller's DPoP key ([26-builtin-agents.md](26-builtin-agents.md)
+    3.3, A1-03)
+  resource: agent
+  right: agent-self of the runner named in `hosted_by` of the target
+  owner: false
+  step_up: false
+  audit: always
+  rights_change: false
+  rl_class: rl.agent_runtime
+  effect: write
 - id: command.read
   section: agents
   description: see the command list and options (built-in commands, those of the operator, of allowed
@@ -2947,6 +2983,16 @@ events:
   receivers: agent
   receive_text: self (agent) and `agent.definition.read`
   note: a new definition version of a built-in agent; payload `definition_version` only, never the definition
+  resource_version: false
+- type: agent.hosting_changed
+  kind: durable
+  resource: agent
+  receive_action: agent.hosted.list
+  audience: self
+  receivers: agent
+  receive_text: self (the old and the new hosting runner) and `agent.hosted.list`
+  note: a built-in agent was created, moved to another runner or disabled; payload only `agent_id`
+    ([26-builtin-agents.md](26-builtin-agents.md) 9, A1-03)
   resource_version: false
 - type: host.updated
   kind: durable

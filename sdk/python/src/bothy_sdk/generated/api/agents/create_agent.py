@@ -95,6 +95,14 @@ def sync_detailed(
 ) -> Response[Agent | Problem]:
     """Create an agent
 
+     Creates an agent principal with its record: `organization`, tool class `chat`, version 1. A built-in
+    agent (26 3.1) carries `adapter_kind` `claude_agent` together with `hosted_by`; `hosted_by` is set
+    exactly then. `claude_agent` without `hosted_by` is `400 validation_failed` with the field code
+    `required` on `/hosted_by`, `hosted_by` with another adapter kind the field code `not_allowed`, and
+    a `hosted_by` that names no active Claude Code runner (`adapter_kind` `code_runner`) that is not
+    hosted itself and whose last heartbeat reports `hosts_agents` the field code `host_not_capable`. A
+    built-in agent's creation writes the durable event `agent.hosting_changed` to its runner.
+
     Args:
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
         body (AgentCreate):
@@ -127,6 +135,14 @@ def sync(
 ) -> Agent | Problem | None:
     """Create an agent
 
+     Creates an agent principal with its record: `organization`, tool class `chat`, version 1. A built-in
+    agent (26 3.1) carries `adapter_kind` `claude_agent` together with `hosted_by`; `hosted_by` is set
+    exactly then. `claude_agent` without `hosted_by` is `400 validation_failed` with the field code
+    `required` on `/hosted_by`, `hosted_by` with another adapter kind the field code `not_allowed`, and
+    a `hosted_by` that names no active Claude Code runner (`adapter_kind` `code_runner`) that is not
+    hosted itself and whose last heartbeat reports `hosts_agents` the field code `host_not_capable`. A
+    built-in agent's creation writes the durable event `agent.hosting_changed` to its runner.
+
     Args:
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
         body (AgentCreate):
@@ -153,6 +169,14 @@ async def asyncio_detailed(
     idempotency_key: UUID | Unset = UNSET,
 ) -> Response[Agent | Problem]:
     """Create an agent
+
+     Creates an agent principal with its record: `organization`, tool class `chat`, version 1. A built-in
+    agent (26 3.1) carries `adapter_kind` `claude_agent` together with `hosted_by`; `hosted_by` is set
+    exactly then. `claude_agent` without `hosted_by` is `400 validation_failed` with the field code
+    `required` on `/hosted_by`, `hosted_by` with another adapter kind the field code `not_allowed`, and
+    a `hosted_by` that names no active Claude Code runner (`adapter_kind` `code_runner`) that is not
+    hosted itself and whose last heartbeat reports `hosts_agents` the field code `host_not_capable`. A
+    built-in agent's creation writes the durable event `agent.hosting_changed` to its runner.
 
     Args:
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -183,6 +207,14 @@ async def asyncio(
     idempotency_key: UUID | Unset = UNSET,
 ) -> Agent | Problem | None:
     """Create an agent
+
+     Creates an agent principal with its record: `organization`, tool class `chat`, version 1. A built-in
+    agent (26 3.1) carries `adapter_kind` `claude_agent` together with `hosted_by`; `hosted_by` is set
+    exactly then. `claude_agent` without `hosted_by` is `400 validation_failed` with the field code
+    `required` on `/hosted_by`, `hosted_by` with another adapter kind the field code `not_allowed`, and
+    a `hosted_by` that names no active Claude Code runner (`adapter_kind` `code_runner`) that is not
+    hosted itself and whose last heartbeat reports `hosts_agents` the field code `host_not_capable`. A
+    built-in agent's creation writes the durable event `agent.hosting_changed` to its runner.
 
     Args:
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.

@@ -34,8 +34,9 @@ LIMIT @row_limit;
 SELECT * FROM agents WHERE billing_mode = 'personal' ORDER BY principal_id;
 
 -- name: InsertAgent :exec
-INSERT INTO agents (principal_id, adapter_kind, description, operator_config, billing_mode, credential_holder_id, tool_class, version)
-VALUES (@principal_id, @adapter_kind, @description, @operator_config, @billing_mode, sqlc.narg(credential_holder_id), @tool_class, @version);
+INSERT INTO agents (principal_id, adapter_kind, description, operator_config, billing_mode, credential_holder_id, tool_class, hosted_by, version)
+VALUES (@principal_id, @adapter_kind, @description, @operator_config, @billing_mode, sqlc.narg(credential_holder_id), @tool_class,
+        sqlc.narg(hosted_by), @version);
 
 -- name: UpdateAgent :exec
 UPDATE agents
@@ -46,5 +47,20 @@ SET description = @description,
     billing_mode_changed_at = sqlc.narg(billing_mode_changed_at),
     billing_mode_changed_by = sqlc.narg(billing_mode_changed_by),
     tool_class = @tool_class,
+    hosted_by = sqlc.narg(hosted_by),
     version = @version
 WHERE principal_id = @principal_id;
+
+-- name: ListHostedAgents :many
+-- One batch of the agents a runner hosts (listHostedAgents, A1-03), keyset on principal_id
+-- ascending over the partial index on hosted_by; the status filter runs through identity.
+SELECT * FROM agents
+WHERE hosted_by = @hosted_by
+  AND (sqlc.narg(after_id)::uuid IS NULL OR principal_id > sqlc.narg(after_id)::uuid)
+ORDER BY principal_id
+LIMIT @row_limit;
+
+-- name: HostedAgentsOf :many
+-- Every agent a runner hosts, disabled ones included, for the billing rule of a change of the
+-- runner's own mode or holder (10 section 10.3, BR-14).
+SELECT * FROM agents WHERE hosted_by = @hosted_by ORDER BY principal_id;

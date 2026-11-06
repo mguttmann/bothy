@@ -909,6 +909,18 @@ func (stubServer) PutAgentDefinition(context.Context, rest.PutAgentDefinitionReq
 	return nil, nil
 }
 
+func (stubServer) SetAgentHost(context.Context, rest.SetAgentHostRequestObject) (rest.SetAgentHostResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) ListHostedAgents(context.Context, rest.ListHostedAgentsRequestObject) (rest.ListHostedAgentsResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) IssueHostedAgentToken(context.Context, rest.IssueHostedAgentTokenRequestObject) (rest.IssueHostedAgentTokenResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) ListAgentSessions(context.Context, rest.ListAgentSessionsRequestObject) (rest.ListAgentSessionsResponseObject, error) {
 	return nil, nil
 }
@@ -1431,6 +1443,10 @@ func TestRealTable_Enabled(t *testing.T) {
 		"getAgentDefinition":          {"GET /api/v1/agents/{agent_id}/definition", "agent.definition.read", "rl.read"},
 		"listAgentDefinitionVersions": {"GET /api/v1/agents/{agent_id}/definition/versions", "agent.definition.read", "rl.read"},
 		"putAgentDefinition":          {"PUT /api/v1/agents/{agent_id}/definition", "agent.update", "rl.admin"},
+		// A1-03
+		"setAgentHost":          {"PUT /api/v1/agents/{agent_id}/host", "agent.host.set", "rl.admin"},
+		"listHostedAgents":      {"GET /api/v1/agents/me/hosted", "agent.hosted.list", "rl.agent_runtime"},
+		"issueHostedAgentToken": {"POST /api/v1/agents/me/hosted/{agent_id}/token", "agent.hosted_token.issue", "rl.agent_runtime"},
 		// M2-07
 		"getConsumerState": {"GET /api/v1/agents/me/consumers/{consumer}", "agent.events.consume", "rl.agent_runtime"},
 		"pollAgentEvents":  {"GET /api/v1/agents/me/consumers/{consumer}/events", "agent.events.consume", "rl.agent_runtime"},

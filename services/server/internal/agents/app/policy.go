@@ -90,6 +90,9 @@ type change struct {
 	write func(ctx context.Context, rec domain.Agent) (agents.Agent, error)
 	// limitReason checks the reason against audit.reason_max_chars as well (M2-21 design note 2).
 	limitReason bool
+	// hostedBilling holds the billing rule of built-in agents (10 section 10.3) for the agent
+	// after the write, in the same unit (A1-03).
+	hostedBilling bool
 }
 
 // run executes c for the agent id.
@@ -159,14 +162,20 @@ func (s *Service) runWrite(ctx context.Context, id ids.ID, c change) (agents.Age
 		out, _, err := s.unchanged(ctx, c, rec)
 		return out, err
 	}
+	var out agents.Agent
 	if c.write != nil {
-		return c.write(ctx, rec)
+		out, err = c.write(ctx, rec)
+	} else {
+		var attrs auditing.Attrs
+		if attrs, err = c.apply(&rec); err != nil {
+			return agents.Agent{}, err
+		}
+		out, err = s.changedAndEmit(ctx, c.act, rec, attrs)
 	}
-	attrs, err := c.apply(&rec)
-	if err != nil {
-		return agents.Agent{}, err
+	if err != nil || !c.hostedBilling {
+		return out, err
 	}
-	return s.changedAndEmit(ctx, c.act, rec, attrs)
+	return out, s.checkHostedBilling(ctx, id)
 }
 
 // unchanged records the call without effect of c and returns the current agent.
@@ -185,7 +194,7 @@ func (s *Service) unchanged(ctx context.Context, c change, rec domain.Agent) (ag
 func (s *Service) SetBillingMode(ctx context.Context, a actor.Actor, id ids.ID, cmd agents.BillingModeCmd) (agents.Agent, error) {
 	target := domain.Policy{Mode: domain.BillingMode(cmd.BillingMode), HolderID: cmd.CredentialHolderID}
 	c := change{
-		act: authorize.ActionAgentBillingModeSet, reason: cmd.Reason, match: cmd.IfMatch, limitReason: true,
+		act: authorize.ActionAgentBillingModeSet, reason: cmd.Reason, match: cmd.IfMatch, limitReason: true, hostedBilling: true,
 		decide: func(ctx context.Context, rec domain.Agent) (bool, error) {
 			changed, err := rec.Policy.To(target)
 			if err != nil || !changed {
@@ -231,7 +240,7 @@ func (s *Service) SetBillingMode(ctx context.Context, a actor.Actor, id ids.ID, 
 // the holder an active person; I1 is checked for the agent.
 func (s *Service) SetCredentialHolder(ctx context.Context, a actor.Actor, id ids.ID, cmd agents.CredentialHolderCmd) (agents.Agent, error) {
 	return s.run(ctx, a, id, change{
-		act: authorize.ActionAgentCredentialHolderSet, reason: cmd.Reason, match: cmd.IfMatch, limitReason: true,
+		act: authorize.ActionAgentCredentialHolderSet, reason: cmd.Reason, match: cmd.IfMatch, limitReason: true, hostedBilling: true,
 		decide: func(ctx context.Context, rec domain.Agent) (bool, error) {
 			probe := rec
 			changed, err := probe.SetHolder(cmd.CredentialHolderID)
@@ -256,7 +265,8 @@ func (s *Service) SetCredentialHolder(ctx context.Context, a actor.Actor, id ids
 // reads the effective class, so the change is a rights change for the agent. A class below host
 // for a built-in agent whose current definition has a stdio MCP server is refused with 409
 // conflict, reason definition_needs_host (26 4.4 item 5, R-BA-06); the check runs in both units,
-// the second under the row lock that every definition write takes first.
+// the second under the row lock that every definition write takes first. A built-in agent's
+// class may not exceed the ceiling its runner reports (26 3.1 item 3, host_tool_class_ceiling).
 func (s *Service) SetToolClass(ctx context.Context, a actor.Actor, id ids.ID, cmd agents.ToolClassCmd) (agents.Agent, error) {
 	return s.run(ctx, a, id, change{
 		act: authorize.ActionAgentToolClassSet, reason: cmd.Reason, match: cmd.IfMatch,
@@ -265,7 +275,10 @@ func (s *Service) SetToolClass(ctx context.Context, a actor.Actor, id ids.ID, cm
 			if err != nil || c == rec.ToolClass {
 				return false, err
 			}
-			return true, s.needsHost(ctx, rec, c)
+			if err := s.needsHost(ctx, rec, c); err != nil {
+				return true, err
+			}
+			return true, s.checkCeiling(ctx, rec, c)
 		},
 		apply: func(rec *domain.Agent) (auditing.Attrs, error) {
 			from := rec.ToolClass
@@ -417,6 +430,11 @@ func (s *Service) switchAll(ctx context.Context, a actor.Actor, cmd agents.Billi
 			return nil, err
 		}
 		sw.add(rec, from)
+	}
+	// The billing rule of built-in agents over the whole set at once (BR-14): a runner and its
+	// personal hosted agents switched together keep their holders equal.
+	if err := s.checkHostedBilling(ctx, sw.ids...); err != nil {
+		return nil, err
 	}
 	return sw.ids, s.d.Audit.Record(ctx, auditing.Entry{
 		Action: string(authorize.ActionAgentBillingModeSetAll), Decision: auditing.DecisionAllow, ResourceKind: resourceInstance,

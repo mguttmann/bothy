@@ -132,8 +132,10 @@ var reportedView = domain.AssumeValid{Unreported: true}
 // writesRightsState are the actions with "Permissions" no in 05 whose writes 03 still counts as rights
 // state (03 grants paragraph on permission_version: hosts.reported_session_users, M2-40): the
 // report of the session users of a host by host.pair (M2-41) and host.connect (M2-43). They may
-// declare a rights change (docs/DECISIONS.md D-M2-40-9).
-var writesRightsState = map[string]bool{"host.pair": true, "host.connect": true}
+// declare a rights change (docs/DECISIONS.md D-M2-40-9). agent.host.set and
+// agent.hosted_token.issue revoke API tokens of a hosted agent (26 3.3), which the Authorizer
+// caches by rights version, so they declare one as well (docs/decisions.d/A1-03.md D-A1-03-3).
+var writesRightsState = map[string]bool{"host.pair": true, "host.connect": true, "agent.host.set": true, "agent.hosted_token.issue": true}
 
 // stateKey keys the rightsState in the unit of work; a retry starts without it.
 var stateKey = txn.NewKey[*rightsState]("authz rights change")

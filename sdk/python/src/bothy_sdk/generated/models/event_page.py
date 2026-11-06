@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from ..models.agent_config_changed_event import AgentConfigChangedEvent
     from ..models.agent_definition_changed_event import AgentDefinitionChangedEvent
     from ..models.agent_followup_event import AgentFollowupEvent
+    from ..models.agent_hosting_changed_event import AgentHostingChangedEvent
     from ..models.agent_invocation_event import AgentInvocationEvent
     from ..models.agent_session_changed_event import AgentSessionChangedEvent
     from ..models.agent_updated_event import AgentUpdatedEvent
@@ -72,17 +73,17 @@ class EventPage:
     """
     Attributes:
         events (list[AccessChangedEvent | AccessExpiringEvent | AgentConfigChangedEvent | AgentDefinitionChangedEvent |
-            AgentFollowupEvent | AgentInvocationEvent | AgentSessionChangedEvent | AgentUpdatedEvent | ChannelArchivedEvent
-            | ChannelCreatedEvent | ChannelSettingsChangedEvent | ChannelUpdatedEvent | CommandChangedEvent |
-            CommandInvokedEvent | DevicePendingEvent | DraftDeletedEvent | DraftUpdatedEvent | FileUpdatedEvent |
-            GdprRequestDueEvent | GdprRequestUpdatedEvent | GrantChangedEvent | GroupChangedEvent | HostUpdatedEvent |
-            ImportProgressEvent | InstanceUpdatedEvent | InteractionCreatedEvent | MessageCreatedEvent | MessageDeletedEvent
-            | MessageUpdatedEvent | NotificationPrefUpdatedEvent | PinAddedEvent | PinRemovedEvent | QuietHoursUpdatedEvent
-            | ReactionAddedEvent | ReactionRemovedEvent | ReadStateUpdatedEvent | RunCancelRequestedEvent |
-            RunStateChangedEvent | SessionRevokedEvent | SettingsUpdatedEvent | SidebarChannelUpdatedEvent |
-            SidebarUpdatedEvent | SpaceArchivedEvent | SpaceCreatedEvent | SpaceUpdatedEvent | StatusUpdatedEvent |
-            TerminalSessionChangedEvent | ThreadClosedEvent | ThreadCreatedEvent | ThreadMovedEvent | ThreadMovedOutEvent |
-            ThreadReopenedEvent | ThreadUpdatedEvent | UserUpdatedEvent]):
+            AgentFollowupEvent | AgentHostingChangedEvent | AgentInvocationEvent | AgentSessionChangedEvent |
+            AgentUpdatedEvent | ChannelArchivedEvent | ChannelCreatedEvent | ChannelSettingsChangedEvent |
+            ChannelUpdatedEvent | CommandChangedEvent | CommandInvokedEvent | DevicePendingEvent | DraftDeletedEvent |
+            DraftUpdatedEvent | FileUpdatedEvent | GdprRequestDueEvent | GdprRequestUpdatedEvent | GrantChangedEvent |
+            GroupChangedEvent | HostUpdatedEvent | ImportProgressEvent | InstanceUpdatedEvent | InteractionCreatedEvent |
+            MessageCreatedEvent | MessageDeletedEvent | MessageUpdatedEvent | NotificationPrefUpdatedEvent | PinAddedEvent |
+            PinRemovedEvent | QuietHoursUpdatedEvent | ReactionAddedEvent | ReactionRemovedEvent | ReadStateUpdatedEvent |
+            RunCancelRequestedEvent | RunStateChangedEvent | SessionRevokedEvent | SettingsUpdatedEvent |
+            SidebarChannelUpdatedEvent | SidebarUpdatedEvent | SpaceArchivedEvent | SpaceCreatedEvent | SpaceUpdatedEvent |
+            StatusUpdatedEvent | TerminalSessionChangedEvent | ThreadClosedEvent | ThreadCreatedEvent | ThreadMovedEvent |
+            ThreadMovedOutEvent | ThreadReopenedEvent | ThreadUpdatedEvent | UserUpdatedEvent]):
         next_cursor (int): Highest checked `seq`; use as `after` for the next call even if `events` is empty.
         head_seq (int):
         sync_epoch (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -94,6 +95,7 @@ class EventPage:
         | AgentConfigChangedEvent
         | AgentDefinitionChangedEvent
         | AgentFollowupEvent
+        | AgentHostingChangedEvent
         | AgentInvocationEvent
         | AgentSessionChangedEvent
         | AgentUpdatedEvent
@@ -155,6 +157,7 @@ class EventPage:
         from ..models.agent_config_changed_event import AgentConfigChangedEvent
         from ..models.agent_definition_changed_event import AgentDefinitionChangedEvent
         from ..models.agent_followup_event import AgentFollowupEvent
+        from ..models.agent_hosting_changed_event import AgentHostingChangedEvent
         from ..models.agent_invocation_event import AgentInvocationEvent
         from ..models.agent_session_changed_event import AgentSessionChangedEvent
         from ..models.agent_updated_event import AgentUpdatedEvent
@@ -262,6 +265,7 @@ class EventPage:
                 or isinstance(events_item_data, CommandInvokedEvent)
                 or isinstance(events_item_data, AgentConfigChangedEvent)
                 or isinstance(events_item_data, AgentDefinitionChangedEvent)
+                or isinstance(events_item_data, AgentHostingChangedEvent)
                 or isinstance(events_item_data, HostUpdatedEvent)
             ):
                 events_item = events_item_data.to_dict()
@@ -296,6 +300,7 @@ class EventPage:
         from ..models.agent_config_changed_event import AgentConfigChangedEvent
         from ..models.agent_definition_changed_event import AgentDefinitionChangedEvent
         from ..models.agent_followup_event import AgentFollowupEvent
+        from ..models.agent_hosting_changed_event import AgentHostingChangedEvent
         from ..models.agent_invocation_event import AgentInvocationEvent
         from ..models.agent_session_changed_event import AgentSessionChangedEvent
         from ..models.agent_updated_event import AgentUpdatedEvent
@@ -361,6 +366,7 @@ class EventPage:
                 | AgentConfigChangedEvent
                 | AgentDefinitionChangedEvent
                 | AgentFollowupEvent
+                | AgentHostingChangedEvent
                 | AgentInvocationEvent
                 | AgentSessionChangedEvent
                 | AgentUpdatedEvent
@@ -886,18 +892,28 @@ class EventPage:
                 try:
                     if not isinstance(data, dict):
                         raise TypeError()
-                    componentsschemas_event_type_52 = HostUpdatedEvent.from_dict(data)
+                    componentsschemas_event_type_52 = (
+                        AgentHostingChangedEvent.from_dict(data)
+                    )
 
                     return componentsschemas_event_type_52
                 except (TypeError, ValueError, AttributeError, KeyError):
                     pass
+                try:
+                    if not isinstance(data, dict):
+                        raise TypeError()
+                    componentsschemas_event_type_53 = HostUpdatedEvent.from_dict(data)
+
+                    return componentsschemas_event_type_53
+                except (TypeError, ValueError, AttributeError, KeyError):
+                    pass
                 if not isinstance(data, dict):
                     raise TypeError()
-                componentsschemas_event_type_53 = TerminalSessionChangedEvent.from_dict(
+                componentsschemas_event_type_54 = TerminalSessionChangedEvent.from_dict(
                     data
                 )
 
-                return componentsschemas_event_type_53
+                return componentsschemas_event_type_54
 
             events_item = _parse_events_item(events_item_data)
 

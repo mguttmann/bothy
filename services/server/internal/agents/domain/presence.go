@@ -132,4 +132,7 @@ type PresenceRow struct {
 	Stored Report
 	// LastHeartbeatAt is last_heartbeat_at; zero for NULL.
 	LastHeartbeatAt time.Time
+	// AdapterKind is agents.adapter_kind: a built-in agent's heartbeat never reports hosts_agents
+	// (A1-03, docs/spec/26-builtin-agents.md 3.2 item 2).
+	AdapterKind string
 }

@@ -17,8 +17,9 @@ import (
 )
 
 // TestAgentsMigration_Schema holds agents against docs/spec/03-data-model.md section 4.4 column
-// by column, with the checks, the foreign keys and the two indexes (M1-51), and the column
-// reported_project_folders (M4-44, R-DM-56).
+// by column, with the checks, the foreign keys and the two indexes (M1-51), the column
+// reported_project_folders (M4-44, R-DM-56) and hosted_by with its foreign key, two checks and
+// partial index (A1-03, R-DM-58).
 func TestAgentsMigration_Schema(t *testing.T) {
 	t.Parallel()
 	conn := pgtest.New(t).SuperConn(t)
@@ -41,9 +42,13 @@ func TestAgentsMigration_Schema(t *testing.T) {
 		{"last_heartbeat_at", ts, true, ""},
 		{"version", "bigint", false, "1"},
 		{"reported_project_folders", "ARRAY", true, ""},
+		{"hosted_by", "uuid", true, ""},
 	}
 	constraints := []string{
 		"CHECK (((billing_mode = 'personal'::text) = (credential_holder_id IS NOT NULL)))",
+		"CHECK (((adapter_kind = 'claude_agent'::text) = (hosted_by IS NOT NULL)))",
+		"CHECK ((hosted_by <> principal_id))",
+		"FOREIGN KEY (hosted_by) REFERENCES agents(principal_id) ON DELETE RESTRICT",
 		"CHECK ((billing_mode = ANY (ARRAY['personal'::text, 'organization'::text])))",
 		"CHECK ((reported_billing_mode = ANY (ARRAY['personal'::text, 'organization'::text])))",
 		"CHECK ((reported_runtime_state = ANY (ARRAY['unknown'::text, 'online'::text, 'degraded'::text, 'offline'::text])))",
@@ -56,6 +61,7 @@ func TestAgentsMigration_Schema(t *testing.T) {
 	}
 	idx := []string{
 		"CREATE INDEX agents_credential_holder_personal_idx ON public.agents USING btree (credential_holder_id) WHERE (billing_mode = 'personal'::text)",
+		"CREATE INDEX agents_hosted_by_idx ON public.agents USING btree (hosted_by) WHERE (hosted_by IS NOT NULL)",
 		"CREATE INDEX agents_last_heartbeat_at_idx ON public.agents USING btree (last_heartbeat_at)",
 		"CREATE UNIQUE INDEX agents_pkey ON public.agents USING btree (principal_id)",
 	}

@@ -24,8 +24,8 @@ import (
 )
 
 // AgentsConfig binds the keys of the agents use cases (api.page_size_default, api.page_size_max,
-// audit.reason_max_chars and the definition limits agents.definition.* and
-// agents.mcp_stdio_runners of A1-02).
+// audit.reason_max_chars, the definition limits agents.definition.* and agents.mcp_stdio_runners
+// of A1-02, agents.hosted_token_ttl of A1-03).
 // The error names the key whose binding failed, never a value.
 func AgentsConfig(v *config.Values) (agentsapp.Config, error) {
 	var c agentsapp.Config
@@ -110,7 +110,8 @@ func (ag *Agents) BindCommands(cfg agentsapp.CommandConfig, pool *pg.Pool, d Com
 
 // NewAgents builds the agents module over pool with the unit of work uow, the Authorizer az, the
 // rights hook rights (it names agents as affected), the recorder and appender of w, the identity
-// module id (principal writer, directory and token revocation), the clock (nil means
+// module id (principal writer, directory, token revocation and the tokens of built-in agents,
+// whose createToken it answers which agents are built in), the clock (nil means
 // clock.System()) and log. It opens no connection. az must also answer the trigger set of an
 // agent (authorize.AgentTriggerers, getAgentTriggerers). Errors: a missing collaborator, an az
 // without that port or a page size the use cases refuse.
@@ -126,7 +127,7 @@ func NewAgents(cfg agentsapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az autho
 	repo := agentspg.NewRepository(pool)
 	svc, err := agentsapp.New(cfg, agentsapp.Deps{
 		Store: repo, Definitions: repo, Principals: id.Principals, Directory: identityapp.NewDirectory(identitypg.NewRepository(pool)),
-		Tokens: id.Tokens, Rights: rights, UoW: uow, Authorizer: az, Audit: w.Audit, Events: w.Events,
+		Tokens: id.Tokens, Hosted: id.Tokens, Rights: rights, UoW: uow, Authorizer: az, Audit: w.Audit, Events: w.Events,
 		Cursors: agentshttp.Cursors{}, Clock: clk, Measure: w.Measure, Triggerers: tr,
 	})
 	if err != nil {
@@ -136,5 +137,7 @@ func NewAgents(cfg agentsapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az autho
 	if err != nil {
 		return nil, err
 	}
+	// createToken asks the agents module whether an agent is built in (A1-03, 26 3.3 item 3).
+	id.Tokens.BindHostedAgents(svc)
 	return &Agents{Service: svc, Consumers: cons, Handlers: agentshttp.New(svc, cons).WithDefinitions(svc), Switch: authzsource.NewSwitch(svc)}, nil
 }
