@@ -81,7 +81,7 @@ from bothy_sdk.runs import RunHandle, is_run_ended
 from claude_code_runner.adoption import read_identity
 from claude_code_runner.attachments import followup_file_texts, followup_files_final
 from claude_code_runner.background import BackgroundWork
-from claude_code_runner.causes import cause, turn_end_cause
+from claude_code_runner.causes import ADAPTER_STOPPED, cause, turn_end_cause
 from claude_code_runner.commandline import SessionChoice, build_argv, reported_model
 from claude_code_runner.failures import (
     ErrorKind,
@@ -447,16 +447,38 @@ class RunTurn:
                     worked_before = outcome.worked
                 attempt = next_attempt
         except asyncio.CancelledError:
-            # A runtime never outlives the end of its run (09 1 point 4).
-            if self.process is not None:
-                await terminate(
-                    self.process, self.cfg.stop_grace, self.cfg.kill_grace, self.cfg.poll_interval
-                )
+            # The runner stops (its SDK cancels the run): the turn never outlives it (18.6,
+            # D-AR-1). `_run_process` keeps the handle while a process of the group lives.
+            await self._stop_on_cancel()
             raise
         finally:
             self.phase = "ended"
-            remove_turn_record(paths.record)
-            remove_run_files(self.cfg.state_dir, self.handle.run_id)
+            if self.process is None:
+                # Only once no process of the turn is left: a record of a live turn stays for
+                # the next start, which adopts or stops it (18.9).
+                remove_turn_record(paths.record)
+                remove_run_files(self.cfg.state_dir, self.handle.run_id)
+
+    async def _stop_on_cancel(self) -> None:
+        """Stop the live process of a cancelled run as in 18.6, then finish it ``cancelled``.
+
+        The reason is the stop that was requested, else ``adapter_stopped`` with its cause for
+        the thread. A run the server ended already is not finished (D-M2-35-6). A second
+        cancellation during the stop leaves the handle set, so the record stays.
+        """
+        process = self.process
+        if process is None:
+            return
+        if self.stop_reason is None:
+            self.stop_reason = ADAPTER_STOPPED
+            self._persist()
+        await terminate(
+            process, self.cfg.stop_grace, self.cfg.kill_grace, self.cfg.poll_interval, self.ids
+        )
+        self.process = None
+        if self.server_ended or self.handle.patch.ended or self.handle.finished:
+            return
+        await self._finish_cancelled()
 
     def _stop_requested(self) -> bool:
         """Whether a stop came (it can arrive at every ``await`` of the run)."""
@@ -677,7 +699,10 @@ class RunTurn:
                 evidence, self._worked, compacted=ledger.compacted, lost_tasks=self._lost_work()
             )
         finally:
-            self.process = None
+            if not _group_runs(process):
+                # The handle stays while a process of the group lives: a cancellation of the
+                # run stops the group with it (D-AR-1).
+                self.process = None
             if self.phase != "ended":
                 self.phase = "starting"
 
@@ -1320,8 +1345,14 @@ class RunTurn:
         await self._finish("failed", reason=reason, summary=summary)
 
     async def _finish_cancelled(self) -> None:
-        """``cancelled`` with the request's reason; no answer (note 6 b)."""
-        await self._finish("cancelled", reason=self.stop_reason or "user_cancelled")
+        """``cancelled`` with the request's reason; no answer (note 6 b).
+
+        An orderly stop of the runner (``adapter_stopped``, D-AR-1) names its cause for the
+        thread in the summary.
+        """
+        reason = self.stop_reason or "user_cancelled"
+        summary = cause(reason) if reason == ADAPTER_STOPPED else None
+        await self._finish("cancelled", reason=reason, summary=summary)
 
     def _report_cost(self) -> None:
         """Patch ``/cost`` with the run's amount so far when it changed (FIX-cost-display)."""

@@ -977,6 +977,7 @@ stateDiagram-v2
 | `runtime_error` | `failed` | Adapter | Runtime reports an error; details in the last step |
 | `adapter_error` | `failed` | Adapter | Error in the adapter itself |
 | `runtime_not_authenticated` | `failed` | Adapter | Runtime has no valid login |
+| `adapter_stopped` | `cancelled` | Adapter | An orderly stop of the adapter (a restart or an update) ended the run's turn (D-AR-1) |
 | `user_disabled` | `cancelled`; `failed` on denial before delivery | Server | The triggering person was disabled (`user.disable`, 02 section 4.3): `cancelled` on revocation, `failed` at delivery |
 
 The server stores a `failed` reason of an adapter that this table does not list for the adapter (an
@@ -3124,6 +3125,17 @@ ended run on `run.update`, or `401 unauthenticated` on any call of the run) has 
 the same way and is not finished (D-M2-35-6). `runner.stop_grace` plus `runner.kill_grace` must
 stay below `agent.cancel_grace` of the server, else the server ends the run with
 `cancel_timeout` first; the runner cannot read the server value (section 21).
+
+Addendum of 2026-11-06 (AR-02, `docs/decisions.d/AR-02.md`): An orderly stop of the runner (SIGTERM
+or SIGINT, for example at a restart or an update) stops every turn it started itself whose process
+runs the same way, with the reason `adapter_stopped` (5.2) and a summary that names the cause for
+the thread, before the SDK shuts down; the turn record and the run files are removed only once no
+process of the group is left (D-AR-1 of [autonomous-runs.md](../design/autonomous-runs.md)). A turn
+the SDK's shutdown cancels before that stop reached it (it started a process in between, or
+outlived the wait of `runner.stop_grace` plus `runner.kill_grace` plus `runner.cli_probe_timeout`)
+is stopped by the cancellation in the same way; the runner keeps its handle of the process until
+the group is gone, and if the cancellation itself is interrupted, the record stays for the next
+start (18.9). Adopted turns keep running (18.9).
 
 ### 18.7 Costs
 

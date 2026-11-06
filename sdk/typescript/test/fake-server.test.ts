@@ -805,6 +805,25 @@ describe("run rules (09 4.5 and 4.5.1)", () => {
     expect((await fake.runState(queued.runId)).state).toBe("cancelled");
   });
 
+  it("takes cancelled with adapter_stopped and refuses an unknown cancel reason", async () => {
+    // The adapter's own orderly stop (09 5.2, D-AR-1).
+    const [runId, token] = await queuedWithToken(fake, api);
+    await api.post(`/runs/${runId}/start`, startBody(token));
+    const refused = await api.post(`/runs/${runId}/finish`, {
+      state: "cancelled",
+      reason: "runner_gone",
+    });
+    expect(refused.status).toBe(400);
+    const done = await api.post(`/runs/${runId}/finish`, {
+      state: "cancelled",
+      reason: "adapter_stopped",
+    });
+    expect([done.body.state, done.body.state_reason]).toEqual([
+      "cancelled",
+      "adapter_stopped",
+    ]);
+  });
+
   it("ends a run with cancel_timeout after agent.cancel_grace", async () => {
     const [runId, token] = await queuedWithToken(fake, api);
     await api.post(`/runs/${runId}/start`, startBody(token));

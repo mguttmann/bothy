@@ -277,7 +277,7 @@ func finishError(err error) error {
 	case errors.Is(err, domain.ErrReasonRequired):
 		return fieldError("/reason", "required", "failed and cancelled need a reason")
 	case errors.Is(err, domain.ErrCancelReason):
-		return fieldError("/reason", "invalid_enum", "cancelled takes only the reason of a cancel request")
+		return fieldError("/reason", "invalid_enum", "cancelled takes only the reason of a cancel request or adapter_stopped")
 	case errors.Is(err, domain.ErrFinishTarget):
 		return fieldError("/state", "invalid_enum", "the state is not an end state")
 	}

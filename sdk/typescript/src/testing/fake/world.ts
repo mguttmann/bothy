@@ -83,6 +83,7 @@ const CANCEL_REASONS = new Set([
   "agent_disabled",
   "channel_read_only",
   "user_disabled",
+  "adapter_stopped",
 ]);
 const TOOL_RANK: Readonly<Record<string, number>> = { chat: 0, scoped: 1 };
 const CONSUMER = /^[a-z0-9][a-z0-9_-]*$/;

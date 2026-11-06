@@ -84,6 +84,8 @@ const (
 	RunReasonAdapterError = "adapter_error"
 	// RunReasonRuntimeNotAuthenticated: the runtime has no valid login.
 	RunReasonRuntimeNotAuthenticated = "runtime_not_authenticated"
+	// RunReasonAdapterStopped: an orderly stop of the adapter ended the run's turn (D-AR-1).
+	RunReasonAdapterStopped = "adapter_stopped"
 	// RunReasonUserDisabled: the triggering person was disabled (user.disable, 02 4.3).
 	RunReasonUserDisabled = "user_disabled"
 )
@@ -103,7 +105,7 @@ type ReasonRow struct {
 	AlsoFailed bool
 }
 
-// reasonTable is 09 5.2 in the order of the spec, plus user_disabled last (ruling D-M2-05-7).
+// reasonTable is 09 5.2 in the order of the spec, with user_disabled last (ruling D-M2-05-7).
 var reasonTable = []ReasonRow{
 	{RunReasonUserCancelled, StateCancelled, SetterServer, false},
 	{RunReasonAccessRevoked, StateCancelled, SetterServer, true},
@@ -122,6 +124,7 @@ var reasonTable = []ReasonRow{
 	{RunReasonRuntimeError, StateFailed, SetterAdapter, false},
 	{RunReasonAdapterError, StateFailed, SetterAdapter, false},
 	{RunReasonRuntimeNotAuthenticated, StateFailed, SetterAdapter, false},
+	{RunReasonAdapterStopped, StateCancelled, SetterAdapter, false},
 	{RunReasonUserDisabled, StateCancelled, SetterServer, true},
 }
 

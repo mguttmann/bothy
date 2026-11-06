@@ -70,7 +70,7 @@ from claude_code_runner.adoption import (
 )
 from claude_code_runner.attachments import fetch_attachments
 from claude_code_runner.authcheck import auth_status, decide, evidence
-from claude_code_runner.causes import cause
+from claude_code_runner.causes import ADAPTER_STOPPED, cause
 from claude_code_runner.channels import ChannelCache
 from claude_code_runner.commandline import (
     ArgumentError,
@@ -350,6 +350,41 @@ class RunnerHandler(AgentHandler):
             + self.config.cli_probe_timeout
         )
         while self._channel_busy(channel_id):
+            if loop.time() >= deadline:
+                return False
+            await asyncio.sleep(self.config.poll_interval)
+        return True
+
+    async def stop_turns(self) -> bool:
+        """An orderly stop of the runner: stop every own turn and wait until its run ended.
+
+        Each turn of this process with a live process is stopped as in 18.6 with the reason
+        ``adapter_stopped`` and its run finishes ``cancelled`` once no process of its group is
+        left (D-AR-1). A run between processes (an answer being posted, a recovery being
+        prepared) is left to the SDK's cancellation, which stops a process it started meanwhile
+        (`RunTurn.run`). Adopted turns keep running and keep their records for the next start
+        (18.9); a run that has no turn yet is started again from the inbox by the next process
+        (09 4.9).
+
+        Returns:
+            True once none of these runs is left; false when one still runs after
+            ``runner.stop_grace`` plus ``runner.kill_grace`` plus ``runner.cli_probe_timeout``.
+        """
+        stopping = [
+            (s.run_id, s.turn)
+            for s in self._runs.values()
+            if s.turn is not None and s.turn.process is not None
+        ]
+        for _, turn in stopping:
+            await turn.request_stop(ADAPTER_STOPPED)
+        loop = asyncio.get_running_loop()
+        deadline = (
+            loop.time()
+            + self.config.stop_grace
+            + self.config.kill_grace
+            + self.config.cli_probe_timeout
+        )
+        while any(run_id in self._runs for run_id, _ in stopping):
             if loop.time() >= deadline:
                 return False
             await asyncio.sleep(self.config.poll_interval)
@@ -1105,7 +1140,15 @@ class Runner:
             await self.handler.close()
 
     async def stop(self) -> None:
-        """Stop the adapter; running turns are cancelled by the SDK's shutdown."""
+        """Stop the own turns as in 18.6 (D-AR-1), then the adapter.
+
+        A turn is never left behind: each own turn is stopped and its run finished
+        ``cancelled`` with ``adapter_stopped`` before the SDK shuts down; a turn that starts in
+        between, or one that outlives the wait, is stopped by its run's cancellation
+        (`RunTurn.run`). Adopted turns keep running with their records (18.9).
+        """
+        if not await self.handler.stop_turns():
+            warn("stop_turns_timeout")
         if self.adapter is not None:
             await self.adapter.stop()
 

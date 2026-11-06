@@ -82,14 +82,14 @@ var (
 	pushProviders = []string{"apns", "fcm", "unifiedpush", "wns"}
 	// runEndStates are bothy.run.state of an ended run (09 5.1).
 	runEndStates = []string{"completed", valueFailed, valueCancelled}
-	// runReasons are bothy.reason of bothy.run.finished: the codes of runs.state_reason, the 18
-	// rows of 09 5.2 (user_disabled included, 02 4.3, D-M2-05-7). The platform cannot import the runs
+	// runReasons are bothy.reason of bothy.run.finished: the codes of runs.state_reason, the
+	// rows of 09 5.2 (user_disabled included, 02 4.3, D-M2-05-7; adapter_stopped, D-AR-1). The platform cannot import the runs
 	// domain, so the adapter test holds this list equal to domain's reason table.
 	runReasons = []string{
 		"user_cancelled", reasonAccessRevoked, "cancel_timeout", "agent_disabled", "billing_mode_personal_not_holder",
 		"channel_read_only", "billing_mode_mismatch", "tool_class_owner_only", "tool_class_mismatch",
 		"invalid_invocation_token", "project_not_ready", "agent_unavailable", "interrupted", "stale",
-		"runtime_error", "adapter_error", "runtime_not_authenticated", reasonUserDisabled,
+		"runtime_error", "adapter_error", "runtime_not_authenticated", "adapter_stopped", reasonUserDisabled,
 	}
 	// restoreChecks are bothy.reason of bothy.backup.restore_test.failures: the seven checks of
 	// docs/spec/16-operations.md 8.3 as internal/status/domain names them (M7-03).

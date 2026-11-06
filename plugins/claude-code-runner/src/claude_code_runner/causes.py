@@ -13,7 +13,10 @@ Examples:
 
 from __future__ import annotations
 
-__all__ = ["CAUSES", "cause", "turn_end_cause"]
+__all__ = ["ADAPTER_STOPPED", "CAUSES", "cause", "turn_end_cause"]
+
+ADAPTER_STOPPED = "adapter_stopped"
+"""The ``cancelled`` reason of a run whose turn an orderly stop of the runner ended (D-AR-1)."""
 
 CAUSES: dict[str, str] = {
     "project_not_bound": (
@@ -74,6 +77,10 @@ CAUSES: dict[str, str] = {
     ),
     "billing_mode_mismatch": (
         "Claude Code on the runner host is logged in for another billing mode than this run needs"
+    ),
+    "adapter_stopped": (
+        "The runner was stopped (a restart or an update) while this run worked, so it ended "
+        "the turn. Send a message to continue in the same session"
     ),
     "reply_refused": (
         "The server refused an answer of Claude Code, so the run could not deliver it. "

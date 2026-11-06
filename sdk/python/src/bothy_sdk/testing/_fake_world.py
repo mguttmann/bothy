@@ -57,7 +57,14 @@ _KEEP_FAILED = frozenset(
     }
 )
 _CANCEL_REASONS = frozenset(
-    {"user_cancelled", "access_revoked", "agent_disabled", "channel_read_only", "user_disabled"}
+    {
+        "user_cancelled",
+        "access_revoked",
+        "agent_disabled",
+        "channel_read_only",
+        "user_disabled",
+        "adapter_stopped",
+    }
 )
 _TOOL_RANK = {"chat": 0, "scoped": 1}
 _CONSUMER = re.compile(r"^[a-z0-9][a-z0-9_-]*$")

@@ -62,9 +62,13 @@ func TestFinishDecision(t *testing.T) {
 		{name: "failed without reason", current: r, req: domain.FinishRequest{Target: f}, wantErr: domain.ErrReasonRequired},
 		{name: "cancelled without reason", current: r, req: domain.FinishRequest{Target: x}, wantErr: domain.ErrReasonRequired},
 		{name: "missing reason before no change", current: f, req: domain.FinishRequest{Target: f}, wantErr: domain.ErrReasonRequired},
-		// Cancel reasons: only the five of a cancel request.
+		// Cancel reasons: the five of a cancel request and adapter_stopped.
 		{name: "cancelled channel_read_only", current: r, req: domain.FinishRequest{Target: x, Reason: "channel_read_only"}, want: transition("channel_read_only", "")},
 		{name: "cancelled user_disabled", current: r, req: domain.FinishRequest{Target: x, Reason: "user_disabled"}, want: transition("user_disabled", "")},
+		// adapter_stopped: the adapter's own orderly stop ended the turn (D-AR-1).
+		{name: "cancelled adapter_stopped", current: r, req: domain.FinishRequest{Target: x, Reason: "adapter_stopped"}, want: transition("adapter_stopped", "")},
+		{name: "cancelled adapter_stopped from waiting_input", current: w, req: domain.FinishRequest{Target: x, Reason: "adapter_stopped"}, want: transition("adapter_stopped", "")},
+		{name: "failed adapter_stopped", current: r, req: domain.FinishRequest{Target: f, Reason: "adapter_stopped"}, want: transition("adapter_error", "adapter_stopped")},
 		{name: "cancelled cancel_timeout", current: r, req: domain.FinishRequest{Target: x, Reason: "cancel_timeout"}, wantErr: domain.ErrCancelReason},
 		{name: "cancelled runtime_error", current: r, req: domain.FinishRequest{Target: x, Reason: "runtime_error"}, wantErr: domain.ErrCancelReason},
 		{name: "cancelled unknown", current: x, req: domain.FinishRequest{Target: x, Reason: "nope"}, wantErr: domain.ErrCancelReason},
@@ -112,5 +116,32 @@ func TestCancelReasons(t *testing.T) {
 	got[0] = "changed"
 	if domain.CancelReasons()[0] != "user_cancelled" {
 		t.Fatal("CancelReasons returned a shared slice")
+	}
+}
+
+// TestAdapterCancelReasons: the reasons finishRun accepts for cancelled are the five of a cancel
+// request plus adapter_stopped (D-AR-1), each a cancelled row of the reason table; adapter_stopped
+// is no reason of a cancel request; the result is a copy.
+func TestAdapterCancelReasons(t *testing.T) {
+	t.Parallel()
+	want := []string{"user_cancelled", "access_revoked", "agent_disabled", "channel_read_only", "user_disabled", "adapter_stopped"}
+	got := domain.AdapterCancelReasons()
+	if !slices.Equal(got, want) {
+		t.Fatalf("AdapterCancelReasons() = %v, want %v", got, want)
+	}
+	for _, code := range got {
+		if r, ok := domain.ReasonOf(code); !ok || r.State != domain.StateCancelled {
+			t.Errorf("%s is no cancelled reason of the table", code)
+		}
+	}
+	if r, _ := domain.ReasonOf(domain.RunReasonAdapterStopped); r.Setter != domain.SetterAdapter || r.AlsoFailed {
+		t.Errorf("adapter_stopped row = %v, want cancelled, adapter", r)
+	}
+	if slices.Contains(domain.CancelReasons(), domain.RunReasonAdapterStopped) {
+		t.Error("adapter_stopped is no reason of a cancel request")
+	}
+	got[0] = "changed"
+	if domain.AdapterCancelReasons()[0] != "user_cancelled" {
+		t.Fatal("AdapterCancelReasons returned a shared slice")
 	}
 }
