@@ -171,6 +171,7 @@ nav:
       - 23 Quality: spec/23-quality.md
       - 24 Terminal: spec/24-terminal.md
       - 25 Visualization: spec/25-visualization.md
+      - 26 Built-in agents: spec/26-builtin-agents.md
   - Architecture: architecture/README.md
   - API:
       - Overview: api/README.md

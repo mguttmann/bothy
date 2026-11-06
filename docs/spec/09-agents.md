@@ -41,6 +41,11 @@ Creating (`agent.create`), changing (`agent.update`), disabling (`agent.disable`
 (`token.create`) are owner actions with step-up. A disabled agent loses its tokens and
 connections immediately; its active runs end with `cancelled`, reason `agent_disabled`.
 
+Built-in agents (stage A1, [26-builtin-agents.md](26-builtin-agents.md)) are agents of this kind
+with `adapter_kind = 'claude_agent'`: a Claude Code runner named in `agents.hosted_by` runs their
+turns from a versioned definition that the owner writes with `agent.update`. Everything in this
+chapter applies to them; 26 adds the hosting, the definition, the interview and the templates.
+
 ### 2.2 Features
 
 A feature is effective when the owner allows it **and** the adapter reports it. The owner
@@ -57,6 +62,7 @@ keys of the column "Reported" below; any other key is refused.
 | Voice input | `supports_voice` | `voice_input: true` | Section 13 |
 | Title suggestion | `supports_title` | `title: true` | Section 12 |
 | Sending files | `supports_files_out` | `files_out: true` | Agent additionally needs `+upload` (an operator holds it by the operator rule, 2.3). If `supports_files_out` is off, the server rejects messages of an agent with attachments with `403 feature_disabled`. |
+| Hosting built-in agents | no key; reported only | `hosts_agents: chat`, `scoped` or `host` (the highest class it loads for a hosted agent) | Only a runner that reports it can be chosen as `hosted_by` ([26-builtin-agents.md](26-builtin-agents.md) 3.1); only a Claude Code runner with `runner.hosted_agents` reports it (addendum of 2026-11-06) |
 
 Schema `agent_operator_config.v1` (03, `agents`): a JSON object without further keys
 (`additionalProperties: false`); every key is optional. `operator_config` never contains
@@ -3708,6 +3714,18 @@ runner answers `search.assist_requested` when it is the agent of `search.assist.
 4. **Privacy.** Neither the question nor a candidate nor the reply is logged or stored; the
    private folder of the call is removed afterwards.
 
+### 18.18 Hosted agents
+
+Addendum of 2026-11-06 (stage A1, [26-builtin-agents.md](26-builtin-agents.md), ADR 0076). With
+`runner.hosted_agents` the runner also hosts the built-in agents whose `agents.hosted_by` is its
+own agent: one connection with each hosted agent's own token (fetched with
+`issueHostedAgentToken`, kept in memory only), its own cursor, channel cache, heartbeat and state
+under `<runner.state_dir>/hosted/<agent_id>/`, and the shared slots of `runner.max_parallel_runs`.
+A hosted turn follows 18.2 to 18.11 with the changes of 26 5.3 (working folder, settings, skills,
+MCP configuration, cost cap) and the rebuild of 26 5.6. With `runner.agent_builder` it answers
+interview requests (26 6.2); with `runner.channel_skills_dir` it loads channel skills (26 5.9).
+Without these keys nothing in 18.1 to 18.17 changes, held by the byte-equal fixtures (BA-T20).
+
 ## 19. Decisions of this chapter
 
 | No. | Decision | Reason |
@@ -3754,6 +3772,7 @@ runner answers `search.assist_requested` when it is the agent of `search.assist.
 | R-AG-40 | A message that failed with `project_not_ready`, `operator_cannot_serve_project` or `operator_not_in_channel` can be triggered again by its author once the cause is fixed; its thread takes the channel's operator when the old operator never completed a run in it (3.8, addendum of 2026-11-04). | Live use 2026-11-04: after the operator was corrected the first post stayed dead; it had no run that `retryRun` could start, and step 4a refused every new message in it. |
 | R-AG-41 | A queued run carries its wait reason in `runs.state_reason` (`invocation_held` from the server, `slots_full` and `thread_busy` from the adapter's heartbeat member `waiting_runs`), the runner reports its slot use as `run_slots`, and clients show an offline agent ahead of a runner reason or no reason, but after `invocation_held` (5.2.1, addendum of 2026-11-04). | Live use 2026-11-04: a run showed only "Queued" while four turns held every slot of `runner.max_parallel_runs`; the owner could see neither the reason nor the runs that held the slots (F-WARTESCHLANGE-GRUND). |
 | R-AG-42 | Every adapter hands its runtime the format rules for replies of the Python SDK on every run, as an instruction ([ADR 0074](../adr/0074-format-rules-for-agent-replies-from-the-sdk.md)). | One source for all adapters; the apps render Markdown, and a reply with hard line breaks or a hand-drawn table looks broken there and copies badly (F-AGENT-FORMAT). |
+| R-AG-43 | The Claude Code runner hosts built-in agents (`adapter_kind = 'claude_agent'`) behind `runner.hosted_agents`, reports the capability `hosts_agents` with its class ceiling, and runs their turns from their definitions as 26 says (2.2, 18.18, addendum of 2026-11-06). | Owner request 2026-11-05: an agent created inside Bothy runs on local Claude without a second runtime; the runner already speaks the adapter contract ([ADR 0076](../adr/0076-built-in-agents-hosted-by-the-claude-code-runner.md)). |
 
 ## 20. Alignment with the core contract
 

@@ -133,7 +133,8 @@ modules:
     depends_on: [identity, authz]
     adapter_vendors: [pgx]   # sqlc code and the repository (M1-52)
   agents:
-    tables: [agents, agent_consumer_cursors, commands, agent_sessions, dev_environments]
+    tables: [agents, agent_definitions, agent_consumer_cursors, commands, agent_sessions,
+             dev_environments]
     actions: [agent.read, agent.create, agent.update, agent.disable, agent.enable,
               agent.billing_mode.set, agent.billing_mode.set_all, agent.credential_holder.set,
               agent.tool_class.set, agent.heartbeat, agent.events.consume, agent.triggerers.read,

@@ -64,7 +64,7 @@ migration comes with that milestone, the contract already applies now.
 | `chat` | Spaces, channels, threads, tags, project binding, sidebar state | yes |
 | `messaging` | Messages, revisions, mentions, reactions, pins, templates | yes |
 | `files` | Files, upload sessions, thumbnails, attachments, virus scan, transcripts, file text extracts | yes |
-| `agents` | Agents, agent sessions, consumer cursors of the agents, slash commands, dev environments | yes |
+| `agents` | Agents, definitions of built-in agents, agent sessions, consumer cursors of the agents, slash commands, dev environments | yes |
 | `runs` | Runs, steps, follow-ups, components, interactions | yes |
 | `apps` | Apps, installations, incoming and outgoing webhooks | yes |
 | `billing` | Cost entries, price table | yes |
@@ -767,7 +767,7 @@ Module: `agents`.
 | Field | Type | Null | Default | Rules / notes |
 |---|---|---|---|---|
 | `principal_id` | `uuid` | no | | `kind = 'agent'` checked by a trigger |
-| `adapter_kind` | `text` | no | | free-form identifier of the adapter, for example `hermes`, `code_runner`, `custom` |
+| `adapter_kind` | `text` | no | | free-form identifier of the adapter, for example `hermes`, `code_runner`, `custom`; `claude_agent` marks a built-in agent ([26-builtin-agents.md](26-builtin-agents.md), R-DM-58) |
 | `description` | `text` | no | `''` | |
 | `operator_config` | `jsonb` | no | `'{}'` | schema `agent_operator_config.v1` ([09-agents.md](09-agents.md), section 2.2): default model (`default_model`) and allowed adapter features (`supports_followups`, `supports_components`, `supports_voice`, `supports_title`, `supports_files_out`); a missing key allows; no secrets. An adapter feature is effective only when the adapter also reports it ([09-agents.md](09-agents.md), section 2.2) |
 | `billing_mode` | `text` | no | `'organization'` | `CHECK (billing_mode IN ('personal','organization'))` |
@@ -782,14 +782,18 @@ Module: `agents`.
 | `reported_details` | `jsonb` | no | `'{}'` | schema `agent_heartbeat.v1` ([09-agents.md](09-agents.md), section 4.8): `capabilities`, `billing_modes_supported`, `billing_evidence` (`provider`, `key_type`, `method`, never a value), `active_runs`, `degraded_reasons`, `rate_limit`, `run_slots` (`used`, `total`, runners only, addendum of 2026-11-04); without secrets and without content |
 | `last_heartbeat_at` | `timestamptz` | yes | | |
 | `reported_project_folders` | `text[]` | yes | | runners only: the folder names of the heartbeat member `project_folders` ([09-agents.md](09-agents.md), section 18.13), sorted and distinct, each one segment of `^[A-Za-z0-9][A-Za-z0-9._-]*$`; NULL until the first report; names only, never a path (addendum of 2026-10-29, R-DM-56) |
+| `hosted_by` | `uuid` | yes | | built-in agents only: the Claude Code runner agent that hosts it ([26-builtin-agents.md](26-builtin-agents.md) 3.1); NULL for every other agent (addendum of 2026-11-06, R-DM-58) |
 | `version` | `bigint` | no | `1` | |
 
 PK: `principal_id`. FK: `principal_id` -> `principals(id)` ON DELETE RESTRICT;
-`credential_holder_id` -> `users(principal_id)` ON DELETE RESTRICT; `billing_mode_changed_by` ->
+`credential_holder_id` -> `users(principal_id)` ON DELETE RESTRICT; `hosted_by` ->
+`agents(principal_id)` ON DELETE RESTRICT; `billing_mode_changed_by` ->
 `principals(id)` ON DELETE RESTRICT.
-Checks: `(billing_mode = 'personal') = (credential_holder_id IS NOT NULL)`.
+Checks: `(billing_mode = 'personal') = (credential_holder_id IS NOT NULL)`;
+`(adapter_kind = 'claude_agent') = (hosted_by IS NOT NULL)`; `hosted_by <> principal_id`.
 Indexes: `(credential_holder_id) WHERE billing_mode = 'personal'` for the I1 check on
-changes to a person; `(last_heartbeat_at)` for the presence evaluation.
+changes to a person; `(last_heartbeat_at)` for the presence evaluation; `(hosted_by) WHERE
+hosted_by IS NOT NULL` for the hosted list of a runner.
 Retention: `account`.
 
 Heartbeat fields are written at most once per `agent.heartbeat_persist_interval`;
@@ -799,6 +803,30 @@ in between, the server keeps the state in memory. Exception: a change of
 `reported_project_folders` is written in its own transaction when a heartbeat carries a list
 that differs from the last one this server process wrote for the agent, never by the delayed
 write of the other fields, and never changes `version` (addendum of 2026-10-29, R-DM-56).
+
+#### `agent_definitions`
+
+Purpose: versioned definitions of built-in agents: instructions, skills, MCP servers, settings
+and origin ([26-builtin-agents.md](26-builtin-agents.md) 4; addendum of 2026-11-06, R-DM-59).
+Module: `agents`.
+
+| Field | Type | Null | Default | Rules / notes |
+|---|---|---|---|---|
+| `agent_id` | `uuid` | no | | a built-in agent (`adapter_kind = 'claude_agent'`), checked by the use case |
+| `version` | `bigint` | no | | 1, 2, 3 ... per agent; the highest is the current definition |
+| `definition` | `jsonb` | no | | schema `agent_definition.v1` (26 4.2), closed; never a secret value, only `secret_ref` names |
+| `origin_kind` | `text` | no | | `CHECK (origin_kind IN ('template','interview','manual'))`, copy of `definition.origin.kind` for the list of versions |
+| `created_at` | `timestamptz` | no | `now()` | |
+| `created_by` | `uuid` | no | | the owner who wrote the version |
+
+PK: `(agent_id, version)`. FK: `agent_id` -> `agents(principal_id)` ON DELETE RESTRICT;
+`created_by` -> `principals(id)` ON DELETE RESTRICT.
+Indexes: covered by the PK (the current version is the last entry of the PK per agent).
+Retention: `config`.
+
+A version is written in the transaction of `agent.update` together with `agents.version` and the
+durable event `agent.definition_changed`; rows are never updated. Undo writes the content of an
+older version as a new version.
 
 #### `agent_consumer_cursors`
 
@@ -2864,6 +2892,8 @@ section 4 applies, and the gate fails.
 | R-DM-55 | `project_bindings.provision` asks the serving runner to create the folder (`init`, `clone`) or nothing (`none`); `ready_reason` is the code the runner reported with `ready` false and is cleared with every effective binding change and every report of `ready` true (addendum of 2026-10-28). | A project created from the app needs its folder made where the runner works, and the person must see why a project is not ready (D-M4-43-2, D-M4-43-5). |
 | R-DM-57 | A delete of a space, channel or thread sets `deleted_at` and `deleted_by` (a space or channel is archived in the same rights change, keeping an earlier archive); a restore before `deleted_at` plus `chat.delete_undo_window` clears them and the archive the delete set; after the window the job `messaging.purge_deleted` deletes the messages through the deletion path of [20-privacy.md](20-privacy.md) 4.2, clears thread titles and channel topics and sets `purged_at`. Rows stay (principle 7). `project_bindings` holds the folder check of the serving runner and the folder move request of a deleted forum (addendum of 2026-11-01). A deleted forum keeps its binding until the deletion is final; the purge of the forum or its space, or the runner's outcome of a requested folder move, then sets `released_at`, which gives `workspace_ref` free for another forum; every run of the purge job also releases bindings purged earlier (addendum of 2026-11-02, FIX-delete-releases-binding). | The owner deletes spaces, channels, projects and chats with an undo for a slip; content goes for good, rows stay ([delete.md](../design/delete.md), D-DEL-1 to D-DEL-11). |
 | R-DM-56 | `agents.reported_project_folders` holds the folder names a runner reports under its projects root; `listAgentProjectFolders` shows the owner those that no binding names (`lower(workspace_ref)`, released bindings of deleted forums excluded since 2026-11-02), so the app offers a forum only for a folder without one (addendum of 2026-10-29). | The owner adds forums for the folders that already exist; the server never reads host files, and a folder already bound must never get a second forum (D-M4-44-1, D-M4-44-4). |
+| R-DM-58 | `agents.hosted_by` names the Claude Code runner that hosts a built-in agent; it is set exactly when `adapter_kind = 'claude_agent'` (addendum of 2026-11-06, [26-builtin-agents.md](26-builtin-agents.md) 3.1). | The server needs to know which runner may fetch the agent's token and definition; tying the column to the adapter kind keeps every existing agent unchanged (NULL) and makes a hosted agent without a host impossible. |
+| R-DM-59 | Definitions of built-in agents are rows of `agent_definitions`, one per version, never updated; the highest version is the current one (addendum of 2026-11-06, 26 4.1). | Audit and undo need the older versions; `operator_config` stays closed and small (09 2.2), and an insert-only table needs no lock beyond the agent row. |
 
 ## 9. Configuration values of this chapter
 

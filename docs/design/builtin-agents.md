@@ -1,9 +1,12 @@
 # Built-in agents
 
 Status: design of 2026-11-05 for the stage "A1 Built-in agents" and the rest of V1. Nothing in it
-is built yet. This note records the goal and the decisions with their reasons; the normative text
-goes into the chapters it names, written by ticket A1-01 (section 11) together with an ADR and the
-briefs. Where this note and a chapter disagree after A1-01, the chapter wins.
+is built yet. This note records the goal and the decisions with their reasons. The normative text
+is in [26-builtin-agents.md](../spec/26-builtin-agents.md) and the chapters it names, the decision in
+[ADR 0076](../adr/0076-built-in-agents-hosted-by-the-claude-code-runner.md), the tickets in
+[PLAN](../PLAN.md) sections 15 and 21 and their briefs in the [brief index](../briefs/README.md),
+all written by A1-01 (rulings: [decisions.d/A1-01.md](../decisions.d/A1-01.md)). Where this note
+and a chapter disagree, the chapter wins.
 
 Why a design note and not an ADR: the decisions span the data model, the actions, the adapter
 contract, the runner, the clients and the release work, and several of them are product rulings
@@ -404,53 +407,16 @@ These rows become tickets V1-07 to V1-12 in section 11; V1-01 to V1-06 keep thei
 
 ## 11. Ticket cut
 
-Stage **A1 Built-in agents**. Every ticket is one pull request from `main`; A1-01 writes the
+Stage **A1 Built-in agents**. Every ticket is one pull request from `main`; A1-01 wrote the
 normative text, the ADR, the plan section and the briefs of the others, so the later tickets run
 from briefs in `docs/briefs/` like every milestone.
 
-| Ticket | Goal | Done when | Depends on |
-|---|---|---|---|
-| A1-01 | Specification, ADR, plan section and briefs for A1 | chapters 01, 03, 05, 06, 07, 09, 10 and the configuration tables carry sections 3 to 9 as normative text; ADR "Built-in agents hosted by the Claude Code runner"; plan section A1 and briefs A1-02 to A1-10 pass the brief format, rules and dependency checks; `make docs`, `make catalog-check` and `make config-doc-check` green | none |
-| A1-02 | Server: agent definitions | table, versioning, owner write inside `agent.update`, adapter read, schema validation with field errors, secret references only, size limits as configuration values, `agent.config_changed` on change, audit; migration additive; tool class derived from the definition (D-A1-18): a `stdio` MCP server needs `tool_class = 'host'` and is refused below it, only `http` servers under `scoped`, `stdio` packages pinned as `name@version`; the closed schema of D-A1-18 (skills stored as name, description and body, a body with frontmatter or inline shell refused, an `@` import leaving the agent folder refused, no field for settings, hooks, permission rules, commands, subagents or plugin parts); tests for every refusal, one per surface of D-A1-18 | A1-01 |
-| A1-03 | Server: hosted agents | `hosted_by`, capability `hosts_agents`, host choice on create, token for the hosting runner bound to its key, replaced on disable and host change, `claude_agent` refused by R-AG-39 paths; tests for every refusal | A1-01 |
-| A1-04 | Runner: host many agents | `runner.hosted_agents` off by default; one connection, cursor, cache and state folder per hosted agent; shared slots; today's fixtures byte-equal without the key | A1-03 |
-| A1-05 | Runner: run the definition | agent folder from the definition, control folder outside it with the runner's settings file, the skills plugin (`plugin.json` with name and version, `skills/` only, frontmatter `name` and `description` only) and the strict MCP file, setting sources, cost cap, allowed tools of the definition intersected with `runner.scoped_allowed_tools` and passed also as `--tools` under `scoped`, no `stdio` MCP server in a turn below `host` (the turn is refused with `tool_class_mismatch`), tests for both; the runner settings of D-A1-18 (`disableSkillShellExecution`, `disableAllHooks`, `disableWorkflows`, deny rules for the control files, no allow rules, helpers, `env` or MCP and plugin switches) with a test of the file content; the runner's own schema check (refusal with `tool_class_mismatch`) and the rebuild before every turn that removes foreign control files, each with a test; a probe with a planted skill carrying `hooks`, `allowed-tools: Bash` and both inline shell forms, expecting none of them to act, plus the open points D-A1-18 lists as "to verify in A1-05"; channel skills behind `runner.channel_skills_dir` with the `claude-code:` resolution of D-A1-9; byte-equal fixtures without the key include a channel with bindings of both forms; a probe test against the pinned CLI records what each flag does headless, including whether the user-level `CLAUDE.md` is left out and whether `--mcp-config` in the chosen argument order swallows following arguments | A1-02, A1-04 |
-| A1-06 | Templates and their gate | `templates/agents/` with generic templates, schema, the template gate in `make check` and CI with the closed schema of D-A1-18 and a failing fixture template per surface, read operation, `agents.templates_dir`; private list extended first (D-A1-16) | A1-02 |
-| A1-07 | Interview | owner operation and short-lived event, `agents.builder_agent_id`, `runner.agent_builder`, structured answer whose schema has no field for the surfaces of D-A1-18, a builder answer carrying each surface refused with a test, fallback without a builder, cost estimate shown | A1-02 |
-| A1-08 | Clients: "New agent" | desktop, phone and console: template or interview, preview and edit, step-up, visible steps, channel with the agent as operator; hidden without a hosting runner | A1-03, A1-06, A1-07 |
-| A1-09 | Clients: edit and remove | edit instructions, skills, MCP servers and settings with preview and step-up; disable and delete through the existing actions | A1-08 |
-| A1-10 | End to end and documentation | an end-to-end test on the demo stack with a fake Claude: create from a template and from an interview, chat, cost shown, runner key off restores today's behaviour; guide for operators; README section for visitors | A1-05, A1-09 |
-| V1-07 | Deny list on `main` green | the identity rule of section 12 item 1 in the allow list and the landing step; `denylist-main` green on the next commit | owner decision |
-| V1-08 | `ci` on `main` green | the iOS job passes on `main` | none |
-| V1-09 | Install command everywhere | `release_prep` rewrites every page with the install command, held by a test | none |
-| V1-10 | Test from zero | a script and a recorded run on a fresh host following only the README; findings fixed | A1-10, V1-09 |
-| V1-11 | Showcase current | showcase regenerated with built-in agents; manifest check green | A1-10 |
-| V1-12 | Public texts | README, roadmap and site texts describe what a visitor can try; no description of a real installation | A1-10 |
-
-Waves: A1-01 alone; then A1-02 and A1-03; then A1-04, A1-06 and A1-07; then A1-05 and A1-08; then
-A1-09; then A1-10. V1-08 and V1-09 can run at any time; V1-07 after the owner's decision.
-
-Launch arguments for the build workflow, once A1-01 has merged and the briefs exist (the brief
-file names are fixed by A1-01; these are the planned ones):
-
-```json
-{
-  "parallel": 3,
-  "tickets": [
-    {"id": "A1-02", "brief": "docs/briefs/A1-02-agent-definitions.md", "deps": []},
-    {"id": "A1-03", "brief": "docs/briefs/A1-03-hosted-agents.md", "deps": []},
-    {"id": "A1-04", "brief": "docs/briefs/A1-04-runner-hosting.md", "deps": ["A1-03"]},
-    {"id": "A1-05", "brief": "docs/briefs/A1-05-runner-definition.md", "deps": ["A1-02", "A1-04"]},
-    {"id": "A1-06", "brief": "docs/briefs/A1-06-agent-templates.md", "deps": ["A1-02"]},
-    {"id": "A1-07", "brief": "docs/briefs/A1-07-agent-interview.md", "deps": ["A1-02"]},
-    {"id": "A1-08", "brief": "docs/briefs/A1-08-new-agent-clients.md", "deps": ["A1-03", "A1-06", "A1-07"]},
-    {"id": "A1-09", "brief": "docs/briefs/A1-09-edit-agent-clients.md", "deps": ["A1-08"]},
-    {"id": "A1-10", "brief": "docs/briefs/A1-10-builtin-agents-end-to-end.md", "deps": ["A1-05", "A1-09"]}
-  ]
-}
-```
-
-A1-01 itself runs as a task without a brief, pointing at this note.
+The ticket table, the waves and the launch arguments live in [PLAN](../PLAN.md) section 21 (A1-01
+to A1-10) and section 15 (V1-07 to V1-12, which run from their plan rows without a brief, P-28);
+the briefs are in the [brief index](../briefs/README.md). Waves: A1-02 and A1-03; then A1-04,
+A1-06 and A1-07; then A1-05 and A1-08; then A1-09; then A1-10. V1-08 and V1-09 can run at any
+time; V1-07 after the owner's ruling. The launch arguments leave out A1-01 because it is merged
+before every other ticket starts.
 
 ## 12. Owner decisions
 
@@ -476,36 +442,57 @@ Each with the recommendation this design builds on until the owner rules otherwi
 
 ## 13. Backlog (minors from the design review)
 
-Collected, not polished; the next run in this area (A1-01) takes them.
+Collected, not polished; the next run in this area (A1-01) takes them. Resolved by A1-01: each
+item names where, and [decisions.d/A1-01.md](../decisions.d/A1-01.md) records the ruling.
 
 1. V1-07 to V1-12 have no plan rows and no briefs yet: A1-01 adds their rows to `docs/PLAN.md`
    and writes their briefs (or records that they run in the operations runner as tasks without a
-   brief).
+   brief). Resolved: PLAN section 15 rows V1-07 to V1-12; they run from their rows without a brief
+   (P-28).
 2. Owner decision 1 (section 12) recommends the no-reply address, while the operations runner
    currently sets the maintainer's commit identity as author; when the owner rules, the operations
-   runner changes in the same step.
+   runner changes in the same step. Resolved: open as OQ-25 with V1-07, which names that step.
 3. The start arguments of section 11 leave out A1-01 although the table lists it as a dependency;
-   that is correct because A1-01 is merged first, and A1-01 states it in one sentence.
+   that is correct because A1-01 is merged first, and A1-01 states it in one sentence. Resolved:
+   PLAN section 21 "Dependencies" and section 11 above.
 4. Tokens of hosted agents sit next to each other in `<runner.state_dir>/hosted/` (D-A1-3, lines
    84 to 85): a `host` turn of one hosted agent can read the others, and concurrent turns as the
    same user may expose MCP secrets in the process environment; A1-01 decides tokens in memory or
    in the secret provider, `runner.hosted_agents_root` never under `runner.state_dir` (in the
-   way 09 18.10 keeps attachment roots apart), and a threat model entry.
+   way 09 18.10 keeps attachment roots apart), and a threat model entry. Resolved: tokens in memory
+   only (26 3.3), no token under `runner.state_dir`, `runner.hosted_agents_root` refused inside,
+   equal to or above `runner.state_dir` (26 5.1), MCP secrets only in a per-turn file (26 5.2),
+   T-BA-01 and T-BA-02.
 5. "replaced on `agent.disable`" (D-A1-4, line 96) should say revoked; A1-01 adds that blocking or
    revoking the host runner revokes the tokens of all its hosted agents, that the token operation
-   goes through `authorize` with `hosted_by` equal to the caller, and its audit.
+   goes through `authorize` with `hosted_by` equal to the caller, and its audit. Resolved: 26 3.3
+   and 07 2.13.
 6. Error paths of creation (D-A1-12, lines 211 to 213): what stays when `agent.create` succeeds
    but the definition or the host assignment fails, and whether the interview operation (it costs
-   money) is audited and logged; A1-01 states both with a test each.
+   money) is audited and logged; A1-01 states both with a test each. Resolved: 26 8.3 with BA-T16,
+   26 6.1 item 5 with BA-T15.
 7. Agent folder under `--setting-sources project,local` (D-A1-8, line 147): hooks a `scoped` agent
    writes into its own `.claude/` and the removal of foreign files are now part of D-A1-18 (deny
    rules, rebuild before every turn, tests); what stays for the A1-05 probe is whether `CLAUDE.md`
-   files of the folders above the agent folder are loaded (compare T-TM-13).
+   files of the folders above the agent folder are loaded (compare T-TM-13). Resolved: the runner
+   refuses a `runner.hosted_agents_root` with a `CLAUDE.md` above it (26 5.1), and the probe with its
+   fallback is in 26 5.7.
 8. "the credential holder" in D-A1-19 (line 333) is ambiguous: A1-01 writes the
-   `credential_holder` of the hosting runner, which equals that of the hosted agent.
+   `credential_holder` of the hosting runner, which equals that of the hosted agent. Resolved: 10
+   10.3 and R-BA-12.
 9. Commit identity of the commits of this note (review minor 7): no finding of the diff; it stays
-   with owner decision 1 (section 12).
+   with owner decision 1 (section 12). Resolved: OQ-25.
 10. `agent.tool_class.set` can set an agent whose definition has a `stdio` server below `host`
     again (D-A1-18, lines 269 to 275); the runner catches it with `tool_class_mismatch`, so there
     is no harm, but the preview or the action should refuse the downgrade or say what it breaks;
-    A1-01 decides which, with a test (delta review of round 2, minor 1).
+    A1-01 decides which, with a test (delta review of round 2, minor 1). Resolved: the action
+    refuses the downgrade (26 4.4 item 5, R-BA-06, BA-T03).
+11. Encoding of name, description and extra files (red team round 3, finding 1). Resolved: the
+    runner writes the frontmatter with a YAML serializer, the schema keeps `description` on one
+    line and skill names in kebab case, extra files are flat `*.md` names (26 4.2, 5.2, BA-T11).
+12. Surface table incomplete (round 3, finding 2): MCP `headersHelper`, `proxyAuthHelper`, the
+    hooks module of a plugin, developer modifications. Resolved: 26 5.4 and 5.5 name them.
+13. `--restricted` of the pinned CLI (round 3, finding 3). Resolved: used below `host` with a
+    fallback (26 5.3, 5.7, R-BA-07).
+14. `--tools` under `scoped` drops read-only shell and skills (round 3, finding 4). Resolved: the
+    class baseline plus `Skill` stays in `--tools` (26 5.3, R-BA-07).

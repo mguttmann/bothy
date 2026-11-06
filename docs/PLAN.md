@@ -5,7 +5,8 @@ test strategy, red team check and the build tickets. What is built is stated in 
 the [specification](SPEC.md); in case of a contradiction the chapter applies, and the plan is
 adjusted in the same change. The briefs of the milestones M1 to M8 with waves and dependency graph
 are in the [brief index](briefs/README.md); the briefs of M2 to M8 were written before M1 was
-closed (D-W-100, D-W-114, D-W-120, D-W-124, D-W-125).
+closed (D-W-100, D-W-114, D-W-120, D-W-124, D-W-125). The stage A1 "Built-in agents" (section 21)
+follows the milestones with its own briefs in the same index (P-27).
 
 Notation: references to chapters name the number and the section title in quotes, for
 example 02 "Request path", because section numbers can change. Test IDs come from the
@@ -76,6 +77,7 @@ landing pages, release template) is the last step of M7 before V1 (P-22).
 | V1 Publication | Repository public according to the checklist | M6, M7, build tickets of M8 (P-15) | none |
 | V2 Multi-user dev environment | Isolated dev environments per person | M2; by default after V1 | none |
 | V3 Expansion | Features that 01 lists as "later" | V1 | none |
+| A1 Built-in agents | Agents created inside Bothy from a template, an interview or a form and hosted by a Claude Code runner; additive and off until a runner hosts agents (section 21) | M8 (all product milestones merged) | none |
 
 Dependencies of the milestones (solid: closing needs the milestone; dashed: early
 tickets already start after M1, or default order):
@@ -94,6 +96,8 @@ flowchart LR
   M8 --> V1["V1 Publication"]
   V1 --> V3["V3 Expansion"]
   M2 --> V2["V2 Multi-user dev environment"]
+  M8 --> A1["A1 Built-in agents"]
+  A1 -. "V1-10 to V1-12" .-> V1
   V1 -. "default order" .-> V2
   M1 -. "early tickets" .-> M3
   M1 -. "early tickets" .-> M4
@@ -1284,7 +1288,7 @@ the change of the repository location.
 
 ### Owner
 
-Go for the switchover; location of the repository and name; costs of the external test. The commit identity is decided (D-W-06).
+Go for the switchover; location of the repository and name; costs of the external test. The commit identity of the commits so far is decided (D-W-06); the identity of new commits and the allow list of authors is open (OQ-25, V1-07). The test from zero by a third person needs a person the owner arranges (OQ-26, V1-10).
 
 ### Risks
 
@@ -1297,10 +1301,22 @@ remaining placeholders `OWNER` (V1-03).
 |---|---|---|---|---|---|
 | V1-01 | Enable list complete | Every operation from openapi.yaml and every gateway op from asyncapi.yaml is built and enabled or marked as later with a milestone (P-04). | `services/server/api/operations.yaml`, gate check | gate check: every operation of the spec is enabled or is in the section `later` with milestone and reason; `later` contains only operations of features that 01 lists as "later" | M8-08, M7-21, M6-09, M7-07 |
 | V1-02 | External penetration test (P2, owner) | An external test according to 19 "Penetration test plan" on a test instance with synthetic data. | Scope and rules, findings as tickets | no open finding with severity "high" or "critical"; threat register updated | V1-01 |
-| V1-03 | Replace module path and placeholders | `OWNER` and the preliminary Go module path are replaced by the location chosen by the owner. | `go.mod`, imports, `CODEOWNERS`, `mkdocs.yml`, community files | `grep -rn OWNER` without hits except in public-switch.md; `make check` green | V1-01 |
+| V1-03 | Replace module path and placeholders | `OWNER` and the preliminary Go module path are replaced by the location chosen by the owner. | `go.mod`, imports, `CODEOWNERS`, `mkdocs.yml`, community files | no placeholder `OWNER` remains: a test lists every remaining occurrence of the word with its reason (public-switch.md and identifiers in SQL, Windows and SDK code that are not the placeholder, design note of the built-in agents section 10) and fails on any other; `make check` green | V1-01 |
 | V1-04 | Publishing checklist, part A | Check and clean up before the first push according to public-switch.md part A. | Evidence in the ops repo | `make denylist-history` and `make gitleaks GITLEAKS_LOG_OPTS=--all` green; ScanCode without an unexpected license; red team `JA` | V1-02, V1-03 |
 | V1-05 | Push, switch to public and public services (owner go) | Parts B to E of public-switch.md after the owner's go. | Repository settings, evidence in the ops repo | all items of public-switch.md with evidence; probe pull requests from fork and repository green; the DCO probe fails as expected | V1-04 |
 | V1-06 | Name and trademark (owner) | Final product name after a trademark check; on a change only the places from ADR 0044 change. | Places from ADR 0044 | the list of name-bound places equals ADR 0044, held by a test; `make check` green | V1-01 |
+| V1-07 | Deny list on `main` green | `denylist-main` passes on every new squash commit: the allow list of authors and the landing step follow the owner's ruling on the commit identity (OQ-25). | allow list of authors (operations repository and its CI secret, owner), the landing step of the operations repository | `denylist-main` green on the next commit on `main`; a commit with an identity outside the allow list still fails | none (owner decision OQ-25) |
+| V1-08 | `ci` on `main` green | The job `apps (iOS)` of `ci.yml` passes on `main`. | `apps/client`, `.github/workflows/ci.yml` as the cause demands | `ci` green on `main` for the commit of the fix; no job skipped or weakened | none |
+| V1-09 | Install command everywhere | `make release-prep` rewrites every page that shows the install command with the released version, held by a test. | `tools/ci/release_prep.py` with tests, the pages with the command (`README.md`, `docs/index.md`, `docs/operations/install-compose.md` and every other page the test finds) | test: a fixture repository with the command on every listed page gets the new version on each; a page with the command outside the list fails the test | none |
+| V1-10 | Test from zero | A script and a recorded run on a fresh host that follows only the README, through install, first owner, a built-in agent from a template and its first answer; findings fixed. | `tests/from-zero/` (script and checklist), findings as fixes with tests | the recorded run passes on a fresh host; every finding fixed or ruled with a reason; the run by a third person is the owner's step (OQ-26) | A1-10, V1-09 |
+| V1-11 | Showcase current | The showcase of M7-28 shows built-in agents: "New agent", the preview and a first answer, regenerated from the demo instance. | `tools/showcase/`, `docs/assets/showcase/`, demo data `infra/demo/` | `make showcase` regenerates the images the build host can produce and the manifest check is green; no deny list hit | A1-10 |
+| V1-12 | Public texts | README, roadmap and site texts describe what a visitor can try, starting with built-in agents, and no real installation. | `README.md` ("How it is used today" and "Try it today"), `docs/index.md`, `docs/roadmap.md` | the one-minute test of M7-28 with a fresh reader; `make docs` and `make denylist` green; no sentence about a real installation | A1-10 |
+
+V1-07 to V1-12 come from the design note of the built-in agents ([builtin-agents.md](design/builtin-agents.md)
+section 10) and run as tasks from their rows here, without a brief (P-28): V1-07 waits for the
+owner's ruling OQ-25 and changes files outside this repository; V1-08 and V1-09 are small fixes
+whose cause is read on the day; V1-10 to V1-12 depend on the state after A1-10. A session that
+starts one of them reads its row, the design note and `AGENTS.md`.
 
 ## 16. V2 Multi-user dev environment
 
@@ -1451,6 +1467,7 @@ The numbered requirements of the owner, paraphrased and without instance-specifi
 | 24 | Addendum of 2026-10-10: terminal as a mandatory part (shell and Claude Code sessions on connected hosts) in desktop, phone with extra keys and web console; permission `terminal` per host, passkey confirmation on opening, private network or end-to-end tunnel, audit, termination on idle, separate user without admin permissions, own threat model and red team; core from M2 | 24, 07, 10 (I6), ADR 0068, 0070 | M2-38 to M2-48, M4-35 to M4-38, M5-12, M5-13, M6-18, M7-23, V2-07 |
 | 25 | Addendum of 2026-10-10: visualization on two levels in one design language: native views in apps and console from the own statistics, Grafana panel plugin for operations, no iframes in apps, embedding only optionally in the console; track from M1, kit and views in M6, plugin in M7 | 25, 17, ADR 0069 | M6-10 to M6-17, M7-24 to M7-26, V3-17 |
 | 26 | Addendum of 2026-10-10: showcase standard for everything visible (README with images and video, quick start in one command, docs site, architecture graphics, changelog, release pages; understandable in one minute); nothing is cut back; product description "command center for AI agents in chat form" | 01 "Vision", 16 section 3.1 | M7-27, M7-28, M7-29, V1 exit criterion 4 |
+| 27 | Addendum of 2026-11-05: an agent that lives in Bothy, created through an interview or from strictly anonymous templates with instructions, skills, MCP configuration and settings, running on local Claude through the Claude Code runner; only Claude; nothing breaks a running installation; finish V1 with the name kept | 26, 07 2.13, 09 18.18, 10 10.3, ADR 0076 | A1-01 to A1-10, V1-07 to V1-12 |
 
 ### 18.2 Fundamental decisions and invariants
 
@@ -1536,6 +1553,7 @@ holds the exclusion, the chapter names it.
 | | Grant wizard with preview and I1 | M1-48, M1-49, M4-27 |
 | | "Who has access?", "View as person" | M1-49, M4-27 |
 | | Agents with backend switch, costs, tokens, commands | M1-44, M1-51, M2-21, M2-22, M4-28 |
+| | New agent from a template, an interview or a form; edit, re-host, undo (built-in agents) | A1-02 to A1-09 |
 | | Filter the audit, verify the chain | M1-50, M4-29 |
 | | Statistics | M6-05, M6-06 |
 | | Status page | M7-09, M7-21 |
@@ -1586,6 +1604,8 @@ holds the exclusion, the chapter names it.
 | P-24 | The M1 briefs M1-02, M1-03, M1-05, M1-06, M1-25, M1-27, M1-28 and M1-64 are aligned only so far that catalogue, module register (module `terminal` with tables and lists, only `doc.go` and entry), grant table and gateway list know the entries of the addendum; the terminal actions stay deferred until M2 builds them. | The core contract is normative; without alignment these tickets would end with `BLOCKED` (P-11). Building more in M1 would mean code without users (P-13). |
 | P-25 | The multi-node relay of the terminal comes in M2 (M2-47), independent of the remaining multi-node operation in M7. | Ruling T6; without a check with two nodes the terminal contract would be only half checked, and the relay is part of the server side of the terminal. |
 | P-26 | Demo data comes into being only through public use cases with `authorize` and audit; runs come from the test double of the SDK, the terminal from a host service in a container. | Images and video show real behavior; a second write path that bypasses the permission model would be a risk and a second truth. |
+| P-27 | Built-in agents are the stage A1 after the milestones, with ticket IDs `A1-<two-digit number>` and briefs in the same index and the same checks as the milestones (`brief_deps.py`, the brief format test); the plan section gets the next free number (21) so that no reference to sections 18 to 20 changes. | The owner request of 2026-11-05 came after M8; renumbering the sections would break every brief that cites "section 19" of this plan. |
+| P-28 | V1-07 to V1-12 run as tasks from their plan rows without a brief. | V1-07 waits for an owner ruling and changes files outside the repository; V1-08 and V1-09 are small and their cause is read on the day; V1-10 to V1-12 describe a state that exists only after A1-10, and a brief written now would describe what is not built yet. |
 
 ## 20. Defaults for questions to the owner
 
@@ -1606,3 +1626,117 @@ defaults:
 | Personal subscription in dev environments | no; V2-06 is dropped without a decision | V2 |
 | Recording of terminal content for evidence obligations | no, only metadata (24 "Privacy") | M2-46 |
 | Grafana Cloud account for the signature of the plugin | unsigned and provisioned locally until V1; account at publication (ruling T11) | V3-17 |
+| Identity of new commits and the allow list of authors | the identity of the commits so far stays; `denylist-main` stays red on new commits until the ruling (OQ-25) | V1-07 |
+| Test from zero by a third person | the recorded run of the session on a fresh host; the third person after A1-10 and V1-09 (OQ-26) | V1-10 |
+
+## 21. A1 Built-in agents
+
+### Goal
+
+A person creates an agent inside Bothy, from a template, through an interview or with a form, sees
+everything it gets in a preview, and chats with it right away; its turns run on local Claude in the
+Claude Code runner, with its own instructions, skills, MCP servers, tool class, billing mode and
+cost cap. An installation that turns nothing on keeps working byte for byte as before.
+
+### Scope
+
+[26-builtin-agents.md](spec/26-builtin-agents.md), [07-permissions.md](spec/07-permissions.md)
+2.13, [09-agents.md](spec/09-agents.md) 2.2 and 18.18, [10-backend-policy.md](spec/10-backend-policy.md)
+10.3, [01-product.md](spec/01-product.md) 6.20, 03 `agents.hosted_by` and `agent_definitions`;
+[ADR 0076](adr/0076-built-in-agents-hosted-by-the-claude-code-runner.md); design note
+[builtin-agents.md](design/builtin-agents.md) with the owner decisions of its section 12.
+
+### Out of scope
+
+Other model vendors and other agent runtimes for built-in agents; the Agent SDK as a runtime;
+built-in agents in project forums (R-AG-39); approval cards for `scoped`; a monthly budget per
+agent; direct messages; any change to the adapter for another agent runtime.
+
+### Exit criteria
+
+1. BA-T01 to BA-T21 of 26 section 12 and BR-14 of 10 are green, BA-T14 against the pinned CLI
+   behind its switch with its results recorded in 26 5.7.
+2. Without the new keys the runner's command line, heartbeat and served channels equal the
+   fixtures of the version before A1-04 (BA-T20), and the adapter for another agent runtime has no
+   change in this stage.
+3. The template gate is part of `make check` and the pull request CI and passes on the shipped
+   templates; the private deny list scan passes over the whole repository.
+4. The end-to-end test on the demo stack creates an agent from a template and one from an
+   interview, chats with both and shows their costs (A1-10).
+5. The red team's verdict is `JA`.
+
+### Test strategy
+
+Server: refusal tests per surface and per field code, permission tests per action of 07 2.13,
+token issue and revocation, migrations as expand steps. Runner: fake Claude for every command line
+and stream, byte-equal fixtures, materializer and rebuild tests on a temporary folder, one probe
+against the pinned CLI behind the switch for real calls (PLAN 3 item 5). Templates: one failing
+fixture per surface. Interview: a fake builder with answers that carry each surface. Clients:
+widget and integration tests against the Dart fake server; desktop, phone and console. End to end:
+the demo stack with fake Claude.
+
+### Red team
+
+T-BA-01 to T-BA-06 of the [threat model](security/threat-model.md): a hosted token outside its
+runner, a secret in an environment or on the server, any content that reaches a CLI surface below
+`host`, a `stdio` server below `host`, interview cost, private names in templates. In addition:
+byte-equal behaviour of an installation without the new keys, and that a definition never widens
+`runner.scoped_allowed_tools`.
+
+### Dependencies
+
+All product milestones are merged (M1 to M8). A1-01 is this specification; every later ticket
+starts after it is merged, so the column "Depends on" below does not repeat it (the launch
+arguments of the design note leave it out for the same reason).
+
+### Owner
+
+The owner decisions of the design note section 12 stay with the owner, each with its
+recommendation: the identity of new commits (OQ-25, V1-07), the target of `OWNER` (OQ-12, V1-03),
+the penetration test (OQ-11, V1-02), the trademark check (OQ-16, V1-06), the repository settings
+and the first release (V1-05, after V1-07 and V1-08 are green, with a probe pull request before
+signed commits are required) and the test from zero by a third person (OQ-26, V1-10). Before
+A1-06 merges, the owner adds the terms the maintainers know to be private to the private deny list
+and its CI secret (26 7.3, D-A1-16).
+
+### Risks
+
+A crash of a runner takes all its hosted agents offline, and they share its host user (threat
+model section 7); a surface added by a later CLI version is closed only when the pin moves
+(T-BA-03, RK-14); a pinned public MCP package can still be malicious (T-BA-04, T-SC-01); a scan
+proves only what its list contains (T-BA-06, ADR 0042). RISKS.md is updated at the close of the
+stage (section 4 item 6).
+
+### Tickets
+
+| ID | Title | Goal | Files and modules | Acceptance tests | Depends on |
+|---|---|---|---|---|---|
+| A1-01 | Specification, ADR, plan section and briefs | Chapters 00, 01, 02, 03, 05, 06, 07, 09, 10 and 26 carry the design note as normative text; ADR 0076; this section; briefs A1-02 to A1-10; threat model entries; the brief and configuration tools accept stage A1. | `docs/spec/`, `docs/adr/0076-*`, `docs/PLAN.md`, `docs/briefs/`, `docs/security/threat-model.md`, `docs/OPEN-QUESTIONS.md`, `tools/docs/brief_deps.py`, `tools/configdoc/` | `make docs`, `make catalog-check`, `make config-doc-check`, `make register-check`, `make diagrams` and the brief tests green | none |
+| A1-02 | Server: agent definitions | `agent_definitions` with versions, `putAgentDefinition` inside `agent.update`, `agent.definition.read` for owner and agent-self, schema `agent_definition.v1` with every refusal of 26 4.3, secret references only, limits as configuration values, `agent.definition_changed`, audit; `agent.tool_class.set` refused below `host` with a `stdio` server. | `internal/agents`, migration `agents_agent_definitions`, `docs/api/openapi.yaml`, `docs/api/asyncapi.yaml`, `docs/spec/actions.yaml`, configuration schema | BA-T01 to BA-T04 (definition part); one refusal test per surface of 26 5.5 | none |
+| A1-03 | Server: hosted agents | `agents.hosted_by`, capability `hosts_agents` with its class ceiling, host choice on create, `agent.host.set`, `agent.hosted.list`, `agent.hosted_token.issue` with the revocation rules of 26 3.3, `token.create` refused, `claude_agent` refused by the R-AG-39 paths, the billing rule of 10 10.3. | `internal/agents`, `internal/identity` (tokens), `internal/authz`, migration `agents_hosted_by`, API documents, catalogue | BA-T04 (hosting part) to BA-T08, BR-14 | none |
+| A1-04 | Runner: host many agents | `runner.hosted_agents` off by default; one connection, cursor, cache, heartbeat and state folder per hosted agent; tokens in memory only; shared slots; today's fixtures byte-equal without the key. | `plugins/claude-code-runner` | BA-T09, BA-T20 (hosting part) | A1-03 |
+| A1-05 | Runner: run the definition | Agent and control folders, materializer, runner settings, command line per class, per-turn MCP file, rebuild and own schema check, cost cap, channel skills behind their key, the probe of 26 5.7 with its fallbacks. | `plugins/claude-code-runner`, runner README, 26 5.7 (results) | BA-T10 to BA-T14, BA-T19, BA-T20 | A1-02, A1-04 |
+| A1-06 | Templates and their gate | `templates/agents/` with generic templates, `agent_template.v1`, the template gate in `make check` and CI with a failing fixture per surface, the copy into the image, `listAgentTemplates`, `agents.templates_dir`. | `templates/agents/`, `tools/templates/`, `Makefile`, `.github/workflows/ci.yml`, `internal/agents`, API documents | BA-T17, BA-T18; private list extended by the owner before the merge | A1-02 |
+| A1-07 | Interview | `interviewAgent`, `agent.interview_requested`, `answerAgentInterview`, `agents.builder_agent_id`, the builder in the runner behind `runner.agent_builder`, every draft validated, fallbacks, audit and log with counts only, cost estimate. | `internal/agents`, `internal/gateway`, `plugins/claude-code-runner`, `sdk/python` (hook), API documents | BA-T15 | A1-02 |
+| A1-08 | Clients: "New agent" | Desktop, phone and console: template, interview or form, preview with edit, step-up, visible steps with "Try again", channel with the agent as operator; hidden without a hosting runner or on an older server. | `apps/client`, `packages/admin_ui`, `apps/console`, Dart client | BA-T16; widget and integration tests per platform | A1-03, A1-06, A1-07 |
+| A1-09 | Clients: edit and remove | Edit with the same preview, versions with undo, change runner, disable, "Not set up" with "Continue setup". | `apps/client`, `packages/admin_ui`, `apps/console` | widget and integration tests per platform | A1-08 |
+| A1-10 | End to end and documentation | End-to-end test on the demo stack with fake Claude; operator guide; README section for visitors; showcase input for V1-11. | `tests/e2e/`, `infra/compose/demo.yaml`, `docs/operations/builtin-agents.md`, `README.md` | BA-T21 | A1-05, A1-09 |
+
+Launch arguments for the build workflow (brief files as in the [brief index](briefs/README.md)):
+
+```json
+{
+  "parallel": 3,
+  "tickets": [
+    {"id": "A1-02", "brief": "docs/briefs/A1-02-agent-definitions.md", "deps": []},
+    {"id": "A1-03", "brief": "docs/briefs/A1-03-hosted-agents.md", "deps": []},
+    {"id": "A1-04", "brief": "docs/briefs/A1-04-runner-hosting.md", "deps": ["A1-03"]},
+    {"id": "A1-05", "brief": "docs/briefs/A1-05-runner-definition.md", "deps": ["A1-02", "A1-04"]},
+    {"id": "A1-06", "brief": "docs/briefs/A1-06-agent-templates.md", "deps": ["A1-02"]},
+    {"id": "A1-07", "brief": "docs/briefs/A1-07-agent-interview.md", "deps": ["A1-02"]},
+    {"id": "A1-08", "brief": "docs/briefs/A1-08-new-agent-clients.md", "deps": ["A1-03", "A1-06", "A1-07"]},
+    {"id": "A1-09", "brief": "docs/briefs/A1-09-edit-agent-clients.md", "deps": ["A1-08"]},
+    {"id": "A1-10", "brief": "docs/briefs/A1-10-builtin-agents-end-to-end.md", "deps": ["A1-05", "A1-09"]}
+  ]
+}
+```

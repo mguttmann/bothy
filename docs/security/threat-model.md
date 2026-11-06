@@ -1,12 +1,13 @@
 # Threat model
 
-Status: draft M0, as of milestone M0 (planning), terminal addendum of 2026-10-10; as of milestone M2 (terminal across several api nodes, M2-47, 2026-10-20). Living document; maintenance rule in section 9.
+Status: draft M0, as of milestone M0 (planning), terminal addendum of 2026-10-10; as of milestone M2 (terminal across several api nodes, M2-47, 2026-10-20); as of stage A1 (built-in agents, specification A1-01, 2026-11-06). Living document; maintenance rule in section 9.
 Controls with IDs `SEC-...`: [../spec/19-security.md](../spec/19-security.md). Permissions and
 guard rules `SR1` to `SR12`: [../spec/07-permissions.md](../spec/07-permissions.md). Identity:
 [../spec/08-identity.md](../spec/08-identity.md). Privacy:
 [../spec/20-privacy.md](../spec/20-privacy.md). Dev isolation:
 [../spec/21-dev-isolation.md](../spec/21-dev-isolation.md). Terminal:
-[../spec/24-terminal.md](../spec/24-terminal.md).
+[../spec/24-terminal.md](../spec/24-terminal.md). Built-in agents:
+[../spec/26-builtin-agents.md](../spec/26-builtin-agents.md).
 
 Method: system boundaries and data flows, assets, attackers, STRIDE per component, then a register
 of the most important threats with rating, mitigation, test and residual risk. AI-specific
@@ -300,6 +301,26 @@ Pairing, relay, host service and terminal view ([24-terminal.md](../spec/24-term
 | Console | I | Browser extension reads an open session | passkey required, CSP, recommendation of a separate browser profile | T-TM-07 |
 | Console | S | A foreign page opens the stream path with the console cookie (cross-site WebSocket hijacking) | origin check on upgrade (08, section 7.5), `SameSite=Strict`; without the server's terminal session token and the tab's Noise key no PTY is created | T-TM-07 |
 
+### 5.17 Built-in agents
+
+Hosting, definitions, interview and templates ([26-builtin-agents.md](../spec/26-builtin-agents.md),
+stage A1). New data flows: definition from the owner's app to the server and from the server to
+the hosting runner; hosted agent tokens from the server to the hosting runner; interview text from
+the owner's app through the server to the builder agent; MCP secrets from the runner's secret
+provider into a per-turn file; templates from the repository and a private folder into the server.
+
+| Part | STRIDE | Threat | Mitigation | Register |
+|---|---|---|---|---|
+| Hosting | S | A stolen hosted agent token connects as that agent | token bound to the hosting runner's DPoP key, kept in memory only, short-lived, revoked with the agent, a host change, the runner and the runner's token (26 3.3) | T-BA-01 |
+| Hosting | E | A runner that does not host an agent fetches its token, or a person asks for one | `agent.hosted_token.issue` only for the runner named in `hosted_by`, `404` otherwise; `token.create` refused for built-in agents (07 2.13) | T-BA-01 |
+| Hosting | I | A `host` turn of one hosted agent reads the tokens, state or secrets of another | no token on disk; agent folders outside `runner.state_dir`; secrets only in a per-turn file of mode `0600` outside every working folder; `host` triggered only by owners (SR2) | T-BA-01, T-BA-02 |
+| Definition | E | A definition, template or model draft carries hooks, `allowed-tools`, inline shell, settings, plugin parts or an import from outside the folder and so runs host code or widens tools below `host` | closed schema checked by the server, the template gate, the interview and the runner; the runner writes every control file itself, with restrictive settings, and rebuilds before every turn (26 4.3, 5.2 to 5.6) | T-BA-03 |
+| Definition | E | A `stdio` MCP server runs an arbitrary package as the host user for a person with `trigger` | `stdio` needs `tool_class = 'host'` and so SR2; pinned packages from an allow list of runners; refused by the runner under a lower token class (26 4.4) | T-BA-04 |
+| Definition | I | A secret pasted as a plain value is stored on the server | secret names need `secret_ref`; the preview shows every plain value (26 4.3 item 5) | T-BA-02 |
+| Interview | D | Interviews spend money on the builder's account | owners only, `rl.trigger`, one call per request with its own time limit, audited with counts and cost estimate (26 6.1) | T-BA-05 |
+| Interview | T | A crafted answer of the builder carries a surface of 5.5 | the answer schema has no member for it, and the server validates every draft like a definition (26 6.1 item 3) | T-BA-03 |
+| Templates | I | A template names private agents, profiles, companies, hosts or people | templates written for the repository, template gate without the private list, private deny list over the whole repository (26 7.3) | T-BA-06 |
+
 ## 6. Threat register
 
 ### 6.1 Rating
@@ -420,6 +441,20 @@ Normative together with [25-visualization.md](../spec/25-visualization.md); cont
 | T-VZ-05 | **Malicious or modified Grafana plugin.** | low | medium | plugin from the own repository with supply chain checks; unsigned only allowed with its own ID (SEC-VZ-5); signature after V1 | VZ-T13 | low |
 | T-VZ-06 | **Overload from many viewers** of the live stream. | medium | low | one base frame per node and interval, maximum number of subscriptions per node, rate limit `rl.read` for the REST query, cached frame | VZ-T08 | low |
 
+### 6.9 Built-in agents
+
+Normative together with [26-builtin-agents.md](../spec/26-builtin-agents.md) (stage A1); the tests
+are BA-T01 to BA-T21 of section 12 there.
+
+| ID | Threat | L | I | Mitigations | Tests | Residual risk |
+|---|---|---|---|---|---|---|
+| T-BA-01 | **Hosted agent tokens.** A hosted agent's token leaks from the runner host (a file, a log, another hosted agent's `host` turn) or is issued to a principal other than its hosting runner, and someone acts as that agent in its spaces. | medium | high | issue only to the runner named in `hosted_by`, bound to its DPoP key, in memory only, `agents.hosted_token_ttl`, revoked with the hosted agent, a host change, the runner and the runner's token; audit of every issue without the value; `token.create` refused for built-in agents (26 3.3) | BA-T05, BA-T06, BA-T09 | low: a `host` turn runs as the runner user and can reach the runner's own key and memory, as today for the runner itself (T-DEV-01); `host` stays owner-only (SR2) |
+| T-BA-02 | **MCP secrets and plain values.** Secrets of one hosted agent reach another agent's turn through the environment of concurrent processes of the host user, or a secret is stored on the server as a plain value. | medium | medium | secret references only, resolved per turn into a file of mode `0600` in the control folder outside every working folder, deleted after the turn; nothing in any turn's environment; secret-looking names need `secret_ref` (26 4.3, 5.2) | BA-T02, BA-T11 | medium: a `host` turn can read the per-turn files of concurrent turns of the same user; a secret pasted under an innocent name reaches the server; A1-05 probes whether a read-only shell command under `dontAsk` reads another process's environment (26 5.7) |
+| T-BA-03 | **Definition surfaces of the CLI.** Content of a definition, a template or an interview draft that the CLI interprets as code or a grant (skill frontmatter `hooks` and `allowed-tools`, inline shell, settings files, folder content, plugin parts, MCP `headersHelper`, `@` imports) lets a `chat` or `scoped` agent run host code or widen its tools without SR2. | high | high | closed schema with one refusal per surface in the server, the template gate, the interview and the runner; the runner writes `SKILL.md` frontmatter by a serializer with `name` and `description` only, extra files flat, the plugin manifest with name and version only, its own settings with `disableAllHooks`, `disableSkillShellExecution`, `disableWorkflows` and deny rules; `--restricted` below `host`; rebuild before every turn (26 4.3, 5.2 to 5.6) | BA-T01, BA-T11 to BA-T15, BA-T17 | low, after the A1-05 probe of every point of 26 5.7; a surface added by a later CLI version is closed only when the pin moves (RK-14) |
+| T-BA-04 | **`stdio` MCP servers.** A `stdio` server starts an arbitrary or swapped package as the host user, triggered by any person with `trigger`. | high | high | `stdio` needs `tool_class = 'host'`, so only owners trigger (SR2); packages pinned as `name@version` from an allow list of runners; the runner refuses the turn under a lower token class; `agent.tool_class.set` below `host` refused while the definition has one (26 4.4) | BA-T02, BA-T03, BA-T13 | medium: a pinned package from a public registry can still be malicious (T-SC-01); the owner chooses it in the preview |
+| T-BA-05 | **Interview cost.** Repeated or crafted interviews spend money on the builder agent's account. (OWASP LLM10) | medium | low | owners only, `rl.trigger`, one model call without tools per request, `runner.agent_builder_timeout`, audit entry with the cost estimate and counts (26 6.1, 6.2) | BA-T15 | low |
+| T-BA-06 | **Private names in templates.** A template copied from a real installation names its agents, profiles, companies, hosts, people or internal scripts in the public repository. | medium | medium | templates written for the repository; template gate with the generic deny rules, example domains and example persons, without the private list; private deny list over the whole repository in `make denylist`, the pull request job and `denylist-main`; private list extended by the owner before the first template (26 7.3) | BA-T17 | low: a scan proves only what its list contains (ADR 0042) |
+
 ## 7. What remains open
 
 - Prompt injection is unsolved. The product does not rely on detection, but on
@@ -441,6 +476,9 @@ Normative together with [25-visualization.md](../spec/25-visualization.md); cont
   operator removes it; likewise with a long-running process that reopens the home of their former
   session user after `bothy-host session-user remove` (HD9), until the instance operator deletes
   this user (T-TM-14).
+- Built-in agents share their hosting runner's host user, slots and process: a `host` turn of one
+  hosted agent reaches what the runner user reaches, and a crash of the runner takes all hosted
+  agents offline at once (T-BA-01, T-BA-02).
 - One host carries everything (T-DS-01). More availability means several roles on several hosts
   (Baseline B1), not part of M1.
 

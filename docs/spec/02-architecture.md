@@ -158,7 +158,7 @@ Diagram: [c4-3-server-components.svg](../architecture/c4-3-server-components.svg
 | `billing` | price table, cost postings, totals per run, thread, space, agent, reconciliation | `price_table`, `cost_entries` | 10 |
 | `identity` | principals, people, owners, login drivers, identities, local credentials, enrollment codes, login flows, device pairing, passkeys, devices and device keys, sessions, refresh families, API tokens, step-up, access tokens | `principals`, `users`, `owners`, `identity_providers`, `user_identities`, `local_credentials`, `enrollment_codes`, `auth_login_flows`, `auth_challenges`, `device_pairings`, `passkey_credentials`, `devices`, `device_keys`, `auth_sessions`, `refresh_token_families`, `refresh_tokens`, `api_tokens` | 08 |
 | `chat` | spaces, sidebar state, channels with behavior, skills, project binding, DM participants, forum tags, threads with thread sequence | `spaces`, `user_space_states`, `user_channel_states`, `channels`, `channel_skill_bindings`, `project_bindings`, `dm_participants`, `forum_tags`, `threads`, `thread_tags` | 01, 07, 09 |
-| `agents` | agents, backend policy and tool class (configured), reported state, consumer cursors with fencing, command register, agent sessions, dev environments (milestone) | `agents`, `agent_consumer_cursors`, `commands`, `agent_sessions`, `dev_environments` | 09, 10, 21 |
+| `agents` | agents, backend policy and tool class (configured), reported state, consumer cursors with fencing, command register, agent sessions, dev environments (milestone), definitions and hosting of built-in agents (stage A1) | `agents`, `agent_definitions`, `agent_consumer_cursors`, `commands`, `agent_sessions`, `dev_environments` | 09, 10, 21, 26 |
 | `files` | upload sessions in parts, object storage drivers, scan, metadata removal, thumbnails, attachments, transcripts, file text extracts | `files`, `file_upload_sessions`, `file_upload_parts`, `file_thumbnails`, `message_attachments`, `file_text_extracts` | 12, 14 |
 | `messaging` | messages, revisions, mentions, reactions, pins, templates, channel export | `messages`, `message_revisions`, `mentions`, `reactions`, `pins`, `message_templates` | 06, 14 |
 | `runs` | trigger decision, runs and run document, steps, follow-ups, components, interactions, command execution, invocation tokens | `runs`, `run_steps`, `run_followups`, `message_components`, `interactions` | 09, 10 |
@@ -1350,6 +1350,7 @@ response.
 | waiting for a lock | `database.lock_timeout` | counter locks never unbounded |
 | open transaction without work | `database.idle_in_tx_timeout` | protects the serialized commit phase |
 | WebSocket write | `gateway.write_timeout` | slow readers do not block |
+| agent interview (`interviewAgent`) | `agents.interview.timeout` ([26-builtin-agents.md](26-builtin-agents.md) 6.1) | a builder answer with a whole draft takes longer than a normal request |
 | outbound calls | `egress.timeout` ([19-security.md](19-security.md)) or a name of the domain chapter | every network call has a deadline |
 
 The context of an aborted client cancels the transaction. If it has already committed, idempotency
