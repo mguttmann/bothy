@@ -7,6 +7,11 @@ import (
 	"net/http"
 )
 
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r PutChannelDraftResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
 // GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
 func (r PutChannelDraftResponse) GetApplicationproblemJSON429() *TooManyRequests {
 	return r.ApplicationproblemJSON429
@@ -26008,9 +26013,4 @@ type AnswerSearchAssistResponse204Headers struct {
 	CorrelationId   *CorrelationId
 	RateLimit       *string
 	RateLimitPolicy *string
-}
-
-// AnswerSearchAssistResponse400Headers the declared response headers of an HTTP 400 response for AnswerSearchAssist
-type AnswerSearchAssistResponse400Headers struct {
-	CorrelationId *CorrelationId
 }

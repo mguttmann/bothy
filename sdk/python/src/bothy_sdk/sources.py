@@ -147,7 +147,7 @@ def envelope_from(data: Mapping[str, Any]) -> Envelope:
 
     Raises:
         ValueError: ``id`` or ``type`` is missing or malformed, or an ephemeral event lacks a
-            required member.
+            required member or has one of a wrong type.
     """
     raw = dict(data)
     token_text = raw.pop(_TOKEN_FIELD, None)
@@ -158,12 +158,13 @@ def envelope_from(data: Mapping[str, Any]) -> Envelope:
         raise ValueError("envelope without id or type")
     seq = raw.get("seq")
     if event_type in _EPHEMERAL:
-        # An ephemeral event carries no seq, so one without a required member is skipped like a
-        # malformed envelope.
+        # An ephemeral event carries no seq, so one without a required member or with a member of
+        # a wrong type is skipped like a malformed envelope.
         try:
             event: KnownEvent | UnknownEvent = _EPHEMERAL[event_type](raw)
-        except KeyError as exc:
-            raise ValueError(f"{event_type} without a required member") from exc
+        except (KeyError, AttributeError) as exc:
+            # A member of the wrong type (a number where a UUID string belongs) raises the latter.
+            raise ValueError(f"{event_type} without a required member or of a wrong type") from exc
     else:
         event = decode_event(raw)
     return Envelope(

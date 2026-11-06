@@ -379,12 +379,15 @@ func checkUpstreams(t *testing.T, httpCtx *directive) {
 // streamLocation is the location argument of the stream paths in the example edge.
 const streamLocation = "^/api/v1/(?:terminal|hosts)/sessions/[^/]+/stream$"
 
-// checkLocations checks listen 8080 and the proxy directives of both locations.
+// interviewLocation is the exact location of interviewAgent, whose deadline is longer (A1-07).
+const interviewLocation = "/api/v1/agents/interview"
+
+// checkLocations checks listen 8080 and the proxy directives of the three locations.
 func checkLocations(t *testing.T, server *directive) {
 	t.Helper()
 	wantArgs(t, one(t, server.block, "listen"), "8080")
-	stream, root := locations(t, server)
-	for _, loc := range []*directive{stream, root} {
+	stream, interview, root := locations(t, server)
+	for _, loc := range []*directive{stream, interview, root} {
 		wantArgs(t, one(t, loc.block, "proxy_http_version"), "1.1")
 		headers := map[string]string{}
 		for _, h := range find(loc.block, "proxy_set_header") {
@@ -405,41 +408,46 @@ func checkLocations(t *testing.T, server *directive) {
 	wantArgs(t, one(t, stream.block, "proxy_pass"), "http://bothy_terminal_stream")
 	wantArgs(t, one(t, stream.block, "proxy_buffering"), "off")
 	wantArgs(t, one(t, stream.block, "proxy_request_buffering"), "off")
-	wantArgs(t, one(t, root.block, "proxy_pass"), "http://bothy_api")
-	// Bodies and responses stream through, so nothing fills the tmpfs /tmp before the server
-	// applies its limits.
-	wantArgs(t, one(t, root.block, "proxy_request_buffering"), "off")
-	wantArgs(t, one(t, root.block, "proxy_max_temp_file_size"), "0")
+	for _, loc := range []*directive{interview, root} {
+		wantArgs(t, one(t, loc.block, "proxy_pass"), "http://bothy_api")
+		// Bodies and responses stream through, so nothing fills the tmpfs /tmp before the server
+		// applies its limits.
+		wantArgs(t, one(t, loc.block, "proxy_request_buffering"), "off")
+		wantArgs(t, one(t, loc.block, "proxy_max_temp_file_size"), "0")
+	}
 }
 
-// locations returns the stream location and location /, the only two.
-func locations(t *testing.T, server *directive) (stream, root *directive) {
+// locations returns the stream location, the interview location and location /, the only three.
+func locations(t *testing.T, server *directive) (stream, interview, root *directive) {
 	t.Helper()
 	locs := find(server.block, "location")
-	if len(locs) != 2 {
-		t.Fatalf("%d locations, want the stream location and /", len(locs))
+	if len(locs) != 3 {
+		t.Fatalf("%d locations, want the stream location, the interview location and /", len(locs))
 	}
 	for _, loc := range locs {
 		switch {
 		case slices.Equal(loc.args, []string{"~", streamLocation}):
 			stream = loc
+		case slices.Equal(loc.args, []string{"=", interviewLocation}):
+			interview = loc
 		case slices.Equal(loc.args, []string{"/"}):
 			root = loc
 		}
 	}
-	if stream == nil || root == nil {
-		t.Fatalf("locations %v and %v, want ~ %s and /", locs[0].args, locs[1].args, streamLocation)
+	if stream == nil || interview == nil || root == nil {
+		t.Fatalf("locations %v, want ~ %s, = %s and /", locs, streamLocation, interviewLocation)
 	}
-	return stream, root
+	return stream, interview, root
 }
 
 // timeoutDirectives are the idle timeouts of a proxied connection.
 var timeoutDirectives = []string{"proxy_read_timeout", "proxy_send_timeout"}
 
 // checkTimeouts compares the timeouts with the defaults in docs/operations/configuration.md:
-// the stream location keeps terminal.idle_timeout plus terminal.idle_grace, every other
-// timeout is terminal.host_heartbeat_interval times terminal.host_heartbeat_miss_limit, which
-// lies above sync.heartbeat_interval.
+// the stream location keeps terminal.idle_timeout plus terminal.idle_grace, the interview
+// location agents.interview.timeout plus http.request_timeout (the deadline of interviewAgent,
+// A1-07), every other timeout is terminal.host_heartbeat_interval times
+// terminal.host_heartbeat_miss_limit, which lies above sync.heartbeat_interval.
 func checkTimeouts(t *testing.T, conf []*directive) {
 	t.Helper()
 	streamWant := configDuration(t, "terminal.idle_timeout") + configDuration(t, "terminal.idle_grace")
@@ -451,15 +459,19 @@ func checkTimeouts(t *testing.T, conf []*directive) {
 	if gateway := configDuration(t, "sync.heartbeat_interval"); otherWant <= gateway {
 		t.Errorf("control connection timeout %s is not above sync.heartbeat_interval %s", otherWant, gateway)
 	}
-	stream, root := locations(t, one(t, one(t, conf, "http").block, "server"))
+	interviewWant := configDuration(t, "agents.interview.timeout") + configDuration(t, "http.request_timeout")
+	stream, interview, root := locations(t, one(t, one(t, conf, "http").block, "server"))
 	for _, name := range timeoutDirectives {
 		if got := nginxDuration(t, one(t, stream.block, name)); got != streamWant {
 			t.Errorf("stream location %s %s, want %s", name, got, streamWant)
 		}
+		if got := nginxDuration(t, one(t, interview.block, name)); got != interviewWant {
+			t.Errorf("interview location %s %s, want %s", name, got, interviewWant)
+		}
 		one(t, root.block, name)
 	}
 	for _, d := range walk(conf) {
-		if !slices.Contains(timeoutDirectives, d.name) || slices.Contains(stream.block, d) {
+		if !slices.Contains(timeoutDirectives, d.name) || slices.Contains(stream.block, d) || slices.Contains(interview.block, d) {
 			continue
 		}
 		if got := nginxDuration(t, d); got != otherWant {

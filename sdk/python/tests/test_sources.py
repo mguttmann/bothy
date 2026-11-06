@@ -134,6 +134,18 @@ def test_envelope_interview_without_a_required_member_raises_value_error() -> No
         envelope_from(data)
 
 
+def test_envelope_interview_with_a_member_of_a_wrong_type_raises_value_error() -> None:
+    data = {
+        "id": "0192f4a0-7b1c-78f9-8074-fa94e84bab7d",
+        "type": "agent.interview_requested",
+        "schema_version": 1,
+        "occurred_at": "2026-11-06T12:00:00Z",
+        "scope": {"space_id": 123},
+    }
+    with pytest.raises(ValueError, match="wrong type"):
+        envelope_from(data)
+
+
 # Ack window ------------------------------------------------------------------------------------
 
 

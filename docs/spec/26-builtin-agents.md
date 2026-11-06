@@ -418,11 +418,12 @@ byte-equal to the fixtures, also for a channel with bindings of both forms (BA-T
 3. The server validates a draft with the rules of 4.3 and the catalogue check of 7.4, never
    trusting model output: a draft that
    fails is answered with the field errors and the person can ask the builder to fix it. A builder
-   answer that reaches a surface of 5.5 (a member outside the answer schema, a frontmatter, an
-   inline shell form or an `@` import outside the folder) or carries a text that is no display
-   text is refused as a whole with `400` to the builder and the fallback `builder_invalid` for
-   the person; a member outside the schema is already refused by the request validation of the
-   API, and the request then stays open until `expires_at`. It stores nothing of the interview;
+   answer that reaches a surface of 5.5 (a frontmatter, an inline shell form or an `@` import
+   outside the folder), carries a text that is no display text or pairs `kind` with a missing or
+   the other member is refused as a whole with `400` to the builder and the fallback
+   `builder_invalid` for the person. A member outside the answer schema, the remaining surface of
+   5.5, never gets that far: the request validation of the API refuses it with `400`, and the
+   request stays open until `expires_at`. It stores nothing of the interview;
    the answer shows the cost as an estimate like the search assistant (D-IS-8) and books no cost
    entry.
 4. Fallbacks: no `agents.builder_agent_id`, no live connection, no valid answer within the
