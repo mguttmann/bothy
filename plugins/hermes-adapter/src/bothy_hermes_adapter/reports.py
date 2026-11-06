@@ -4,8 +4,9 @@ r"""Reports without a trigger: Hermes cron jobs and other proactive posts (09 14
 Hermes sends a message without an invocation in two ways, and both end here:
 
 * in the gateway process, through the platform's ``send`` (a cron job of the gateway's
-  scheduler, a notice of a background task): `bothy_hermes_adapter.handler.HermesHandler`
-  posts with the adapter loop's client;
+  scheduler, a turn Hermes ran while no run was open; the result of background work a run
+  holds is a turn of that run, 09 17.12): `bothy_hermes_adapter.handler.HermesHandler` posts
+  with the adapter loop's client;
 * in another process (``hermes cron run``, ``hermes send``), through the plugin's
   ``standalone_sender_fn``: `standalone_send` opens a client of its own with the profile's
   platform configuration and posts once.

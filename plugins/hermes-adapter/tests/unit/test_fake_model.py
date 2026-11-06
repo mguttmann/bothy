@@ -439,3 +439,20 @@ def test_paced_answer_pauses_after_every_chunk(
             status, _ = _post(m, "/anthropic/v1/messages", _anthropic_body(), auth)
     assert status == 200
     assert len(pauses) == len(paced.text)
+
+
+def test_script_turns_can_be_bound_to_a_tool(creds: FakeCredentials) -> None:
+    from fake_hermes_kit import BoundTurn, RawFakeModel
+
+    # A delegation's subagent asks the model at the same time as its parent: a turn bound to a
+    # tool the request offers (or lacks) answers only such a request, in script order.
+    parent = BoundTurn(text=("parent",), requires_tool="delegate_task")
+    child = BoundTurn(text=("child",), without_tool="delegate_task")
+    plain = ScriptTurn(text=("plain",))
+    with RawFakeModel([parent, child, plain], creds) as m:
+        assert m.next_turn({"tools": ["todo_list"]}) is child
+        assert m.next_turn({"tools": ["todo_list"]}) is plain
+        assert m.next_turn({"tools": ["todo_list"]}) is None
+        assert m.next_turn({"tools": ["delegate_task", "todo_list"]}) is parent
+        assert m.next_turn({"tools": []}) is None
+    assert [r["turn"] for r in m.requests()] == [2, 3, None, 1, None]

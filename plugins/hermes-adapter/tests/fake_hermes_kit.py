@@ -375,13 +375,62 @@ class _RawHandler(_fake_model._Handler):
         return raw
 
 
+@dataclass(frozen=True)
+class BoundTurn(ScriptTurn):
+    """A script turn that answers only a request offering, or lacking, a tool.
+
+    A delegation's subagent asks the model at the same time as its parent; the subagent's
+    requests do not offer ``delegate_task``, so the turns of each side can be told apart.
+
+    Attributes:
+        requires_tool: Answer only a request that offers this tool.
+        without_tool: Answer only a request that does not offer this tool.
+    """
+
+    requires_tool: str | None = None
+    without_tool: str | None = None
+
+
+def _fits(turn: ScriptTurn, tools: Sequence[str]) -> bool:
+    if not isinstance(turn, BoundTurn):
+        return True
+    if turn.requires_tool is not None and turn.requires_tool not in tools:
+        return False
+    return turn.without_tool is None or turn.without_tool not in tools
+
+
 class RawFakeModel(FakeModel):
-    """`FakeModel` of M2-32 plus the raw request bodies (``raw``)."""
+    """`FakeModel` of M2-32 plus the raw request bodies (``raw``) and `BoundTurn` routing."""
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.raw: list[dict[str, Any]] = []
         self._server.RequestHandlerClass = _RawHandler
+        self._used: set[int] = set()
+
+    def next_turn(self, shape: dict[str, Any]) -> ScriptTurn | None:
+        """The first unused script turn that fits a request offering tools (script order)."""
+        turn: ScriptTurn | None = None
+        with self._lock:
+            tools = list(shape["tools"] or ())
+            index = next(
+                (
+                    i
+                    for i, candidate in enumerate(self._script)
+                    if i not in self._used and _fits(candidate, tools)
+                ),
+                None,
+            )
+            if tools and index is not None:
+                turn = self._script[index]
+                self._used.add(index)
+                self._turns += 1
+                shape["turn"] = index + 1
+            else:
+                shape["turn"] = None
+            shape["scripted"] = turn is not None
+        self.record(shape)
+        return turn
 
 
 @dataclass

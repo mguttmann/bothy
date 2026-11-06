@@ -1407,8 +1407,9 @@ disabling of the agent or of the triggering person.
    takes the same path with `access_revoked`, `user_disabled` or `channel_read_only`, also for a
    `queued` run; a disabled agent's runs end `cancelled` with `agent_disabled` at once (2.1).
 3. The adapter ends the turn (Hermes: `/stop` via `handle_message`, after which Hermes reports
-   `on_processing_complete` with `CANCELLED` and calls the model no further; Runner: SIGINT,
-   18.6) and reports `run.finish` with `cancelled`.
+   `on_processing_complete` with `CANCELLED` and calls the model no further, and the background
+   work of the run is cancelled, 17.12; Runner: SIGINT, 18.6) and reports `run.finish` with
+   `cancelled`.
 4. Without a report within `agent.cancel_grace` the server sets `cancelled` with `cancel_timeout`. It
    rejects later patches of this run (04 section 15.5).
 5. Open components of the run become `disabled`; follow-ups are handled according to section 7.
@@ -2234,7 +2235,7 @@ point 4).
 
 ## 14. Reports without a trigger
 
-Cron jobs and background work of a runtime report results without a human trigger:
+Cron jobs of a runtime report results without a human trigger:
 
 1. The agent writes with `message.create` without `run_id` into a report channel on which it has
    `write`. There is no run (`runs.triggered_by` is a person) and no token.
@@ -2243,6 +2244,11 @@ Cron jobs and background work of a runtime report results without a human trigge
 3. Notification according to the settings of the channel ([13-push-notifications.md](13-push-notifications.md)).
 4. Rate limit `rl.message` of the agent.
 5. A reply of a person in such a thread triggers according to the normal rules.
+
+Background work that a turn of a run started (a background subagent, a delegation, a background
+process) is no report: it belongs to that run, which stays `running` until the work is done, and
+the turn the runtime starts with its result is a turn of that run (runner 18.5, Hermes 17.12,
+R-AG-44; addendum of 2026-11-06, FIX-hermes-hidden-background).
 
 Limit: the server checks only where the agent writes, not what it knows. A report can
 contain knowledge from other spaces. Therefore a report channel belongs in a space whose
@@ -2414,7 +2420,7 @@ compatibility test runs against the pinned and the newest version (16.1, fake He
 | `connect()` | Gateway `identify` (token, `consumer` = `hermes_adapter.consumer`), load JWKS, reconcile commands, start heartbeat, load allowlist (17.7) |
 | `disconnect()` | close the connection with `1000`; the next heartbeat no longer reports open runs |
 | Inbound (`agent.invocation`, `agent.followup`) | check the token (4.5), `run.start`, then `MessageEvent` via `build_source` and `handle_message` (17.6) |
-| `send(chat_id, content, reply_to, metadata)` | Three cases (as built in HERMES-CRON-COMMANDS). A send whose `reply_to` names a running control command is that command's reply (row "Hermes commands"). A send whose `reply_to` names a message the adapter handed to Hermes is decided by that message, because Hermes sends a turn's final answer after it cleared its session variable: a turn's message makes it the answer of the run that turn belongs to, and it fails when that run is no longer active (cancelled, aborted, ended or replaced by a later run); an ended adapter command's message makes it fail. Otherwise, a send that belongs to a turn of its thread is the turn's answer: `message.create` (`origin = agent`, `run_id` of the run) in the thread from `chat_id`/`thread_id`, `client_msg_id` from the adapter outbox, quoting (`reply_to_message_id`) only a message that lies in the run's thread (03 `messages`: a reply names a message of its own thread, else `400 validation_failed` `not_in_thread`): the triggering message when it lies there, which the adapter reads once before the start (`message.read`), and a follow-up passed into the turn; with `auto_thread` the trigger stays in the main thread while the run lives in the thread opened on it (3.4 point 5), so that answer quotes nothing (addendum of 2026-10-30, HERMES-E2E-REAL-SERVER); inside a turn (Hermes' session variable names a thread) only that thread's own sends count, outside any turn only a thread whose run is active; a late send of a thread whose run has ended fails and is never posted. A send that carries the notice of Hermes' delivery ledger ("Recovered reply", a reply Hermes sends again after a failed send or a restart) whose reply the adapter took over as an answer in that thread is acknowledged as delivered and never posted: the adapter's outbox delivers that answer, also after a restart, and an answer the server refused ended its run with the error; the adapter keeps a digest of each answer (thread and text, never the text) for longer than Hermes keeps a delivery obligation (addendum of 2026-10-30). Every other send is a report without a run (17.9): a cron job of the gateway's scheduler, a notice of a background task, a send into another channel or thread; a turn's answer above `hermes_adapter.max_message_bytes` is one message with the head and the rest as one attachment `answer.txt` (`bothy_sdk.long_answers`, 01 6.13) |
+| `send(chat_id, content, reply_to, metadata)` | Three cases (as built in HERMES-CRON-COMMANDS). A send whose `reply_to` names a running control command is that command's reply (row "Hermes commands"). A send whose `reply_to` names a message the adapter handed to Hermes is decided by that message, because Hermes sends a turn's final answer after it cleared its session variable: a turn's message makes it the answer of the run that turn belongs to, and it fails when that run is no longer active (cancelled, aborted, ended or replaced by a later run); an ended adapter command's message makes it fail. Otherwise, a send that belongs to a turn of its thread is the turn's answer: `message.create` (`origin = agent`, `run_id` of the run) in the thread from `chat_id`/`thread_id`, `client_msg_id` from the adapter outbox, quoting (`reply_to_message_id`) only a message that lies in the run's thread (03 `messages`: a reply names a message of its own thread, else `400 validation_failed` `not_in_thread`): the triggering message when it lies there, which the adapter reads once before the start (`message.read`), and a follow-up passed into the turn; with `auto_thread` the trigger stays in the main thread while the run lives in the thread opened on it (3.4 point 5), so that answer quotes nothing (addendum of 2026-10-30, HERMES-E2E-REAL-SERVER); inside a turn (Hermes' session variable names a thread) only that thread's own sends count, outside any turn only a thread whose run is active; a late send of a thread whose run has ended fails and is never posted. A send that carries the notice of Hermes' delivery ledger ("Recovered reply", a reply Hermes sends again after a failed send or a restart) whose reply the adapter took over as an answer in that thread is acknowledged as delivered and never posted: the adapter's outbox delivers that answer, also after a restart, and an answer the server refused ended its run with the error; the adapter keeps a digest of each answer (thread and text, never the text) for longer than Hermes keeps a delivery obligation (addendum of 2026-10-30). Every other send is a report without a run (17.9): a cron job of the gateway's scheduler, a send into another channel or thread, and the answer of a turn Hermes ran in the thread while no run of the adapter was open there (17.12: such a turn could call no tool, and its text is posted so that nothing it says is hidden); the result of background work a turn started is no report but a turn of that run (17.12, addendum of 2026-11-06); a turn's answer above `hermes_adapter.max_message_bytes` is one message with the head and the rest as one attachment `answer.txt` (`bothy_sdk.long_answers`, 01 6.13) |
 | `edit_message(..., finalize)` | own reply message: buffer the content, a `message.update` only on `finalize=True` or at the end of the run; reason: every edit would be a durable event and a revision. Measured: without draft streaming Hermes first sends the reply as `send` with a typing cursor, edits it with `finalize=False` and closes it with exactly one `edit_message(finalize=True)` carrying the finished text; with draft streaming there is no `finalize=True`. If `send_draft` is off, the buffered content is the source of `/last_text_excerpt` |
 | `supports_draft_streaming()` = true, `send_draft(...)` | draft text of a running turn as `run.update` on `/last_text_excerpt`; the finished reply comes via `send`. Measured: the text is cumulative (each draft contains the previous one), the last draft equals the reply except for leading spaces; after a tool it starts with a paragraph |
 | `supports_status_text` = true, `set_status_text(chat_id, text)` | `run.update` on `/status_line`. Measured: Hermes sets a status sentence when a tool starts and `None` when it ends; that is the only signal about tool steps. The adapter creates the step `tool_call` at the status sentence, takes the text verbatim as the step title (never parsed, D-L7) and completes it at `None`, at the next status sentence, at the next draft or the reply, or at `on_processing_complete`, whichever comes first |
@@ -2429,6 +2435,8 @@ compatibility test runs against the pinned and the newest version (16.1, fake He
 | `send_model_picker`, `send_choice_picker` | selection component; missing from the base class in `v2026.9.24` and `v0.22.5` (Hermes then falls back to text, which arrives as `send`) |
 | Interaction (`interaction.created`) | the SDK resumes the run with the interaction's token; the adapter passes the callback ID to the Hermes resolver exactly once per prompt (a stored record of resolved IDs, so a redelivery resolves nothing) and answers with `interaction.respond` (`acknowledged`, the chosen label as `response.text`). No `component.update` after an interaction: the server disables the other single-use components of the card in the same transaction (11.3). Every card is a message `kind = card` of the run with `single_use` components, followed by `run.await_input` with the question's first line as status line |
 | `on_processing_start(event)` | no operation (the start is already `run.start`) |
+| Plugin hooks `pre_llm_call` and `on_session_end` | the start and the end of a turn of the thread, also of a turn Hermes starts by itself (17.12); `pre_llm_call` also answers with the turn's user side (17.6) |
+| Plugin hook `pre_tool_call` | refuses every tool call of a session of the platform whose thread has no open run of the adapter, and of a session whose thread cannot be told, with a message that names the reason (17.12, R-AG-44) |
 | `on_processing_complete(event, outcome)` | `run.finish` with `completed`, `failed` or `cancelled`, `costs`. Measured: after `/stop` comes `ProcessingOutcome.CANCELLED` |
 | `get_chat_info(chat_id)` | read thread and channel (`thread.read`) |
 | Hermes commands | Built (HERMES-CRON-COMMANDS). At connect the adapter declares its complete command list and the SDK reconciles it (10.2, D-M2-29-12). The Hermes commands that the server has as built-in commands (10.1) stay the server's and are never registered: `/stop` is the stop of section 8 (`/stop` via `handle_message`, item 3), `/new` a new session (`session.mode = new` after a reset, `/new` via `handle_message`; Hermes asks via `send_slash_confirm`, and the adapter answers through `tools.slash_confirm.resolve(session_key, confirm_id, "once")`, because the server has already checked the reset), `/resume` the rebinding (`bind`, `/resume <session ID> --all`, 17.4, 9.5), `/title` and `/status` the server's. A follow-up without configuration also works with `/steer <text>` (17.5), which the adapter does not use. The adapter's command table (`hermes_commands.COMMAND_CLASSES`) names every gateway command of the pinned version with its class and reason; a test fails when a pin update brings a command the table does not name, and commands of other Hermes plugins are never offered. Control commands (`control = true`, instance-wide, no options): `/context` and `/version`, which read the thread's Hermes session or Hermes itself and call no model. On `command.invoked` the adapter sends the bare `/<name>` (never an option value) via `handle_message` from its control sender (17.4) in the thread's session; Hermes answers an idle session through its normal processing and a busy one inline, both with `reply_to` = the command's message, and each text Hermes answers becomes a message of the agent in the thread without a run (`message.create` without `run_id` and without an invocation token, 10.4), also during a run of the thread. Every other gateway command is refused: it calls the model outside a run, changes the thread's session outside the server's session record, bypasses the server's follow-up, approval or card rules, reaches the host, or acts on the whole profile. Skill commands: every skill Hermes offers for the platform (its skill scan without the skills `skills.platform_disabled` turns off for the platform key) becomes a model command (`control = false`, instance-wide) with the optional `string` option `input`; a name that is no valid command name or that a built-in, a table row or a control command uses is left out, and the list never exceeds `command.max_per_principal`. A run with `trigger_kind = command` of such a skill is a turn whose text is Hermes' own skill invocation message for the skill and the `input` (`build_skill_invocation_message`, as Hermes' gateway builds it for `/<skill>`), with the format rules of 4.11 and the channel instructions on the user side of the turn (17.6) and no reply anchor: a command run has no run context (4.6 defines it for a triggering message, and the server answers `run.context.read` of any other trigger kind with `500 internal_error`), so the adapter does not read it (addendum of 2026-10-30, found by the end-to-end suite of HERMES-E2E-REAL-SERVER); any other command run is refused before the start (`failed`, `adapter_error`). Skills installed after the gateway start are declared at the next start. Evidence: the Fake-Hermes tests `test_commands_and_reports.py` and `test_command_table_covers_pinned_commands` against the pinned version, and the end-to-end suite `plugins/hermes-adapter/tests/realserver` against the server of this tree |
@@ -2736,6 +2744,9 @@ writing: a new message of a person or of the agent reopens a done thread (01 6.1
 message there triggers the agent like in an open thread, so a skill decides whether the answer
 needs work. Evidence: `test_ticket_flow.py` (Fake-Hermes) and `operator_done_test.go` (server).
 
+A notice of background work that a turn started is no report: it belongs to the run of that turn
+(17.12, addendum of 2026-11-06).
+
 ### 17.10 To check before building
 
 Measured in M2-32 against Hermes Agent `v2026.9.24` (recorded on 2026-10-12) and recorded again
@@ -2764,6 +2775,65 @@ card would give `scoped` (the pinned version has none), and every other toolset,
 name or an MCP server, gives `host`. The adapter's table names every toolset of the pinned version
 with its class and reason; a test fails when a pin update brings a toolset the table does not
 name. Reason: fail closed; a too high report only blocks starts whose token carries a lower class.
+
+### 17.12 Background work
+
+Addendum of 2026-11-06 (FIX-hermes-hidden-background, R-AG-44,
+[design note](../design/hermes-background-work.md), docs/decisions.d/FIX-hermes-hidden-background.md).
+Owner rule: nothing an agent does may run without being visible in the app, and an agent must
+not be able to work in the background without a visible run. In the pinned `v0.22.5` every
+top-level `delegate_task` runs in the background: the tool returns a handle at once and the turn
+ends; a `terminal` call with `background` starts a process that outlives the turn. When a
+delegation unit or a notifying process finishes, the gateway admits an internal event that starts
+a full turn with tools in the thread's session, through the session authority's queue and not
+through the platform's `handle_message` (measured with the Fake-Hermes rig: only the hooks reach
+the adapter). This section mirrors the background work of the runner (18.5) for Hermes:
+
+1. Background work of a run: the delegation units (`tools.async_delegation`) and background
+   processes (`tools.process_registry`) of the thread's Hermes session that started after the run
+   started. A unit is open while it is live (`running`, `stalling`, `finalizing`) or while Hermes
+   has not admitted the turn that reports its result (`delivery_state` `pending`), a process
+   while it runs. The adapter reads both registries every
+   `hermes_adapter.background_poll_interval`.
+2. When the run's turn completed, the run stays `running`, with its stop button, while a unit is
+   open. Each delegation unit is a step `subagent` (name `delegate_task`, title its goal) and each
+   process a step `background_job` (name `terminal`, title its command), both one line and at most
+   `thread.title_max_chars` characters, `running` and then `completed`, `failed` or `cancelled`;
+   `/metrics/subagents` and `/metrics/background_jobs` count the open ones (5.4), and
+   `/metrics/progress_events` rises once per `hermes_adapter.background_progress_interval` while a
+   unit is open, so the stall notice of 5.5 does not fire.
+3. A turn Hermes starts in the thread while the run holds work (the result of a delegation, the
+   notice of a process) is a turn of the run: from its `pre_llm_call` to its `on_session_end` its
+   status sentences are steps of the run, its usage counts into the run's costs, and its answer is
+   a message of the run.
+4. The run finishes when no unit is open, no turn of the thread runs, and, after the run saw
+   background work, `hermes_adapter.background_settle` passed without a turn's start, status
+   sentence or answer; a run that saw none finishes at once, as before.
+5. A follow-up written while the run holds work, and one the run's first turn did not take (after
+   its answer, or at `queue`, 17.5) once the run holds work, is a turn of its own in the run, one
+   after the other: the person's text, the format rules and channel instructions on the user side
+   (the run context rode the first turn), `delivered` at its start and `absorbed` when it
+   completed; a failed one ends the run `failed` (`runtime_error`). A follow-up with a file stays
+   `queued` for the follow-on run (17.6), and so does every follow-up of a run without background
+   work, as before.
+6. Stop (section 8) interrupts the thread's turn, interrupts the session's live delegation units
+   (`interrupt_for_session`) and kills its running processes with their output consumed, so no
+   turn follows a killed process. Every other end before the work is done (a failed turn, an
+   abort of 17.8 or of a card) does the same, and the open steps end `cancelled` (after a stop the
+   server takes no patch of the run any more, section 8).
+7. No tool runs in a thread without an open run: the plugin hook `pre_tool_call` refuses every
+   tool call of a session of the platform whose thread has no open run of the adapter, and of a
+   session whose thread cannot be told (17.3). This covers the turn Hermes starts after a stop, a
+   restart or the end of the hold, and the subagents of a delegation whose run ended. Hermes runs
+   such a turn without asking the platform, so the adapter cannot refuse the model call itself;
+   the turn can call no tool (no delegation, no scheduled job, no terminal), and its text is
+   posted as a report without a run (17.3).
+
+Limits: a process that never ends keeps its run `running` until a person stops it; a restart of
+the gateway or the adapter ends the hold (the server ends the run `interrupted` or `stale`), and a
+result Hermes replays later runs by point 7; a turn whose `on_session_end` never comes keeps the
+run open until a stop. Evidence: `plugins/hermes-adapter/tests/unit/test_background_work.py` and
+the Fake-Hermes test `tests/fake_hermes/test_background_work.py` against the pinned version.
 
 ## 18. Reference adapter: Claude-Code-Runner (development forums)
 
@@ -3786,6 +3856,7 @@ Without these keys nothing in 18.1 to 18.17 changes, held by the byte-equal fixt
 | R-AG-41 | A queued run carries its wait reason in `runs.state_reason` (`invocation_held` from the server, `slots_full` and `thread_busy` from the adapter's heartbeat member `waiting_runs`), the runner reports its slot use as `run_slots`, and clients show an offline agent ahead of a runner reason or no reason, but after `invocation_held` (5.2.1, addendum of 2026-11-04). | In operation: a run showed only "Queued" while running turns held every slot of `runner.max_parallel_runs`; the owner could see neither the reason nor the runs that held the slots (F-WARTESCHLANGE-GRUND). |
 | R-AG-42 | Every adapter hands its runtime the format rules for replies of the Python SDK on every run, as an instruction ([ADR 0074](../adr/0074-format-rules-for-agent-replies-from-the-sdk.md)). | One source for all adapters; the apps render Markdown, and a reply with hard line breaks or a hand-drawn table looks broken there and copies badly (F-AGENT-FORMAT). |
 | R-AG-43 | The Claude Code runner hosts built-in agents (`adapter_kind = 'claude_agent'`) behind `runner.hosted_agents`, reports the capability `hosts_agents` with its class ceiling, and runs their turns from their definitions as 26 says (2.2, 18.18, addendum of 2026-11-06). | Owner request 2026-11-05: an agent created inside Bothy runs on local Claude without a second runtime; the runner already speaks the adapter contract ([ADR 0076](../adr/0076-built-in-agents-hosted-by-the-claude-code-runner.md)). |
+| R-AG-44 | A Hermes run holds the background work its turns started: it stays `running` with a step per delegation unit and process until the work is done, the turn Hermes starts with a result runs inside it, stop cancels the work, and no tool runs in a thread without an open run (17.12, addendum of 2026-11-06). | Owner rule 2026-11-06: nothing an agent does may run without being visible; live use showed subagents working for half an hour and a result turn changing a scheduled job while the app showed no run and no stop button (docs/decisions.d/FIX-hermes-hidden-background.md). |
 
 ## 20. Alignment with the core contract
 
@@ -3864,6 +3935,9 @@ configuration of the respective program outside the server.
 | `hermes_adapter.dpop_key_file` | Hermes adapter | no default | private key of the DPoP proofs; without it no DPoP |
 | `hermes_adapter.max_message_bytes` | Hermes adapter | `262144` | longest answer text; the rest of a longer answer goes as one attachment of the same message (17.3, 01 6.13); the default equals `message.max_content_bytes`, both change together |
 | `hermes_adapter.attachment_text_max_bytes` | Hermes adapter | `32768` | longest attachment text the adapter inlines as a data block; the default equals `agent.context_message_max_bytes` |
+| `hermes_adapter.background_poll_interval` | Hermes adapter | `2s` | how often a run that holds background work reads Hermes' registries (17.12) |
+| `hermes_adapter.background_settle` | Hermes adapter | `15s` | how long a run that saw background work stays open after the work ended and no turn of the thread ran, for the turn Hermes starts with the result (17.12) |
+| `hermes_adapter.background_progress_interval` | Hermes adapter | `2m` | while background work runs, `/metrics/progress_events` rises once per interval; must stay below the server's `run.stall_after` (17.12) |
 | `runner.claude_bin` | Runner | `claude` | program, searched in the cleaned `PATH` |
 | `runner.git_bin` | Runner | `git` | program for the folder creation of 18.12, searched in the cleaned `PATH` |
 | `runner.provision_timeout` | Runner | `10m` | time limit of one folder creation (`git init` or `git clone`, 18.12) |

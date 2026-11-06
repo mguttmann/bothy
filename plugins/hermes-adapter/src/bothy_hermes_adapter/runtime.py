@@ -6,11 +6,12 @@ Two directions, both without a Hermes import:
 * `Runtime` is what the logic asks of Hermes: start a turn, steer it, interrupt it, resolve a
   card's callback, switch or read the session of a thread, run a control command in a thread,
   name the skill commands and build a skill's turn text, tell which credential and which
-  toolsets the next turn uses, transcribe audio and put an attachment into Hermes's media
-  cache. ``platform.py`` implements it on the pinned Hermes version; unit
-  tests fake it.
+  toolsets the next turn uses, transcribe audio, put an attachment into Hermes's media
+  cache, and read or cancel the background work of a thread's session (09 17.12).
+  ``platform.py`` implements it on the pinned Hermes version; unit tests fake it.
 * `RuntimeEvents` is what Hermes tells the logic during a turn (status sentences, drafts, the
-  answer, edits, cards, usage, session IDs). ``platform.py`` forwards the Hermes callbacks to it on
+  answer, edits, cards, usage, session IDs, the start and end of every turn of a thread), and
+  whether a tool may run in a thread now. ``platform.py`` forwards the Hermes callbacks to it on
   the adapter's event loop; `bothy_hermes_adapter.handler.HermesHandler` implements it.
 
 Every type here keeps message contents and credential values out of ``repr`` (SEC-LOG-2).
@@ -33,6 +34,8 @@ from uuid import UUID
 from bothy_hermes_adapter.context_format import UserSideContext
 
 __all__ = [
+    "BackgroundKind",
+    "BackgroundTask",
     "CardKind",
     "CardRequest",
     "CommandRequest",
@@ -85,6 +88,35 @@ class MediaKind(StrEnum):
     IMAGE = "image"
     VOICE = "voice"
     VIDEO = "video"
+
+
+class BackgroundKind(StrEnum):
+    """What a unit of background work is, as the step kind that shows it (09 5.4, 17.12)."""
+
+    SUBAGENT = "subagent"
+    """An asynchronous delegation unit of ``delegate_task`` (one or more subagents)."""
+    JOB = "background_job"
+    """A background process of the ``terminal`` tool."""
+
+
+@dataclass(frozen=True)
+class BackgroundTask:
+    """One unit of a thread's background work, as Hermes' registries report it (09 17.12).
+
+    Attributes:
+        task_id: Hermes' ID of the unit (stable while it is known).
+        kind: Delegation or process.
+        title: The delegation's goal or the process's command (shown as the step title).
+        state: ``running``, ``completed``, ``failed`` or ``cancelled``.
+        open: Whether the unit still holds its run: it runs, or Hermes has not admitted the turn
+            that reports its result yet.
+    """
+
+    task_id: str
+    kind: BackgroundKind
+    title: str = field(repr=False)
+    state: str
+    open: bool
 
 
 @dataclass(frozen=True)
@@ -144,6 +176,9 @@ class TurnRequest:
         media: The attachments of the triggering message in Hermes's media cache.
         new_session: Whether the turn starts a new Hermes session of the thread (the channel's
             bound skills are loaded then, never again in the same session).
+        context_taken: Whether an earlier turn of the run took the run context already (a
+            follow-up's own turn while the run holds background work, 09 17.12): the user side
+            then carries the format rules and channel instructions only.
     """
 
     run_id: UUID
@@ -156,6 +191,7 @@ class TurnRequest:
     user_side: UserSideContext = field(repr=False)
     media: tuple[InboundMedia, ...] = ()
     new_session: bool = False
+    context_taken: bool = False
 
 
 @dataclass(frozen=True)
@@ -452,6 +488,27 @@ class Runtime(Protocol):
 
         Returns:
             The cached file, or ``None`` when Hermes refuses the bytes (an image that is none).
+        """
+        ...
+
+    async def background_work(self, thread_id: UUID, since: float) -> Sequence[BackgroundTask]:
+        """Read the background work of the thread's Hermes session from Hermes' registries.
+
+        Args:
+            thread_id: The thread.
+            since: Wall time in seconds since the epoch: only work that started at or after it
+                counts (the start of the run, 09 17.12).
+
+        Returns:
+            Every such unit Hermes still knows, open or ended.
+        """
+        ...
+
+    async def cancel_background(self, thread_id: UUID) -> None:
+        """Interrupt the thread session's delegations and kill its running processes.
+
+        Args:
+            thread_id: The thread.
         """
         ...
 

@@ -31,10 +31,13 @@ from typing import Any, Final
 from uuid import UUID
 
 from bothy_sdk.auth import Secret
-from bothy_sdk.settings import SdkSettings
+from bothy_sdk.settings import SdkSettings, parse_duration
 
 from bothy_hermes_adapter.defaults import (
     DEFAULT_ATTACHMENT_TEXT_MAX_BYTES,
+    DEFAULT_BACKGROUND_POLL_INTERVAL,
+    DEFAULT_BACKGROUND_PROGRESS_INTERVAL,
+    DEFAULT_BACKGROUND_SETTLE,
     DEFAULT_MAX_MESSAGE_BYTES,
 )
 
@@ -66,6 +69,9 @@ _OWN_KEYS: Final = (
     "hermes_adapter.dpop_key_file",
     "hermes_adapter.max_message_bytes",
     "hermes_adapter.attachment_text_max_bytes",
+    "hermes_adapter.background_poll_interval",
+    "hermes_adapter.background_settle",
+    "hermes_adapter.background_progress_interval",
 )
 KNOWN_KEYS: Final = frozenset((*_OWN_KEYS, *_SDK_KEYS))
 """Every dotted key the adapter reads from ``PlatformConfig.extra``."""
@@ -97,6 +103,10 @@ class AdapterSettings:
         max_message_bytes: ``hermes_adapter.max_message_bytes``, the longest answer.
         attachment_text_max_bytes: ``hermes_adapter.attachment_text_max_bytes``, the longest
             attachment text inlined into the context.
+        background_poll_interval: ``hermes_adapter.background_poll_interval`` in seconds.
+        background_settle: ``hermes_adapter.background_settle`` in seconds.
+        background_progress_interval: ``hermes_adapter.background_progress_interval`` in
+            seconds.
         sdk: The SDK settings of ``adapter.*`` and ``sdk.*``.
     """
 
@@ -108,6 +118,9 @@ class AdapterSettings:
     dpop_key_file: Path | None = None
     max_message_bytes: int = DEFAULT_MAX_MESSAGE_BYTES
     attachment_text_max_bytes: int = DEFAULT_ATTACHMENT_TEXT_MAX_BYTES
+    background_poll_interval: float = DEFAULT_BACKGROUND_POLL_INTERVAL
+    background_settle: float = DEFAULT_BACKGROUND_SETTLE
+    background_progress_interval: float = DEFAULT_BACKGROUND_PROGRESS_INTERVAL
     sdk: SdkSettings = field(default_factory=SdkSettings)
 
 
@@ -131,6 +144,20 @@ def _positive(extra: Mapping[str, Any], key: str, default: int) -> int:
     if number < 1:
         raise ConfigError(f"{key}: must be a positive integer")
     return number
+
+
+def _duration(extra: Mapping[str, Any], key: str, default: float) -> float:
+    """A positive duration: a number of seconds or a text such as ``2s``, ``500ms`` or ``2m``."""
+    value = extra.get(key, default)
+    if isinstance(value, bool):
+        raise ConfigError(f"{key}: must be a positive duration")
+    try:
+        seconds = float(value) if isinstance(value, int | float) else parse_duration(str(value))
+    except ValueError:
+        raise ConfigError(f"{key}: must be a positive duration") from None
+    if not seconds > 0:
+        raise ConfigError(f"{key}: must be a positive duration")
+    return seconds
 
 
 def load_settings(extra: Mapping[str, Any]) -> AdapterSettings:
@@ -181,6 +208,17 @@ def load_settings(extra: Mapping[str, Any]) -> AdapterSettings:
         ),
         attachment_text_max_bytes=_positive(
             extra, "hermes_adapter.attachment_text_max_bytes", DEFAULT_ATTACHMENT_TEXT_MAX_BYTES
+        ),
+        background_poll_interval=_duration(
+            extra, "hermes_adapter.background_poll_interval", DEFAULT_BACKGROUND_POLL_INTERVAL
+        ),
+        background_settle=_duration(
+            extra, "hermes_adapter.background_settle", DEFAULT_BACKGROUND_SETTLE
+        ),
+        background_progress_interval=_duration(
+            extra,
+            "hermes_adapter.background_progress_interval",
+            DEFAULT_BACKGROUND_PROGRESS_INTERVAL,
         ),
         sdk=sdk,
     )
