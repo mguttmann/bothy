@@ -174,7 +174,7 @@ enum PhotosStep {
 /// it at the same place (not while the grid still scrolls, and not in the round that answered a
 /// prompt, whose sheet may have covered the grid).
 ///
-/// The viewer of a photo comes before the grid: Photos keeps the grid in the tree under its
+/// The viewer of a photo comes before the grid: Photos may keep the grid in the tree under its
 /// viewer, and its viewer may open without its bars, so without the Share button on screen
 /// (PR run 42178688293: the walk saw the grid's cells under the viewer, waited two rounds of
 /// 20 s each and tapped the photo again, which showed the bars, only at its bound). A viewer
