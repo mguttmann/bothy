@@ -1,0 +1,19 @@
+[
+  "-p",
+  "--input-format",
+  "stream-json",
+  "--output-format",
+  "stream-json",
+  "--verbose",
+  "--replay-user-messages",
+  "--model",
+  "model-large",
+  "--session-id",
+  "<id-1>",
+  "--permission-mode",
+  "bypassPermissions",
+  "--permission-prompts",
+  "none",
+  "--append-system-prompt-file",
+  "<root>/state/sessions/<id-1>/<id-2>.system-prompt.md"
+]
