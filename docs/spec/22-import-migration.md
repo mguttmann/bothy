@@ -870,7 +870,7 @@ The import interface is source-neutral. A Zulip import would be a further comman
 | R-IM-10 | Binding of earlier sessions on the first trigger, exactly once, fail open. | Matches `/resume`; a failure must never silence the person. |
 | R-IM-11 | Archived only with `archived = true` and not in the active list. | A thread wrongly left open does no harm, a thread wrongly closed hides work. |
 | R-IM-12 | Reverting copies nothing to Discord. | The tool never writes to Discord; the owner decides about the few messages. |
-| R-IM-13 | `switch` refuses, unless forced, when imported threads name an operator the channel will not have, and the server starts no run for a thread operator outside its channel (13.3.1, addendum of 2026-10-30). | Live use 2026-10-30: a switch-over without the planned operator left every imported thread starting runs that failed at once. |
+| R-IM-13 | `switch` refuses, unless forced, when imported threads name an operator the channel will not have, and the server starts no run for a thread operator outside its channel (13.3.1, addendum of 2026-10-30). | In operation: a switch-over without the planned operator left every imported thread starting runs that failed at once. |
 
 ## 18. Alignment with the core contract
 

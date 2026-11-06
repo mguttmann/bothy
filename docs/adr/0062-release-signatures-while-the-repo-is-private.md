@@ -66,7 +66,7 @@ signed and verifiable releases without publishing anything, and it costs nothing
 - Good, because no public log entry gives away the private repository.
 - Good, because the owner's instance can verify images against the public key before the start
   and the signing path is in operation before going public.
-- Bad, because a long-lived key must be protected. On GitHub Pro, private repositories get no
+- Bad, because a long-lived key must be protected. On the plan of the repository's account, private repositories get no
   required reviewers on environments, only environment secrets and rules for branches
   and tags [Q6, verified]; whoever can set tags can have releases signed. In the private state
   that is only the owner.

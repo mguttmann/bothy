@@ -9,7 +9,7 @@
 // decided by securityd from the item's access list and the app's code signature, which no fake
 // has. Here the app's own runner channel (`bothy/legacy_keychain`) reads a real old item whose
 // access list trusts only another program, and one this app wrote itself, the way a debug build
-// keeps its secrets (the login keychain). The owner's case of 2026-11-01 runs as well: the session
+// keeps its secrets (the login keychain). The owner's reported case runs as well: the session
 // the build before the app scope wrote, an `app/instance` only another app may read, and the final
 // marker a failed move left in the scope; the session must move without any dialog.
 

@@ -9,5 +9,6 @@
   The run stays `running` until the background work is done and reports progress meanwhile, so
   it is not shown as stalled. The system prompt now tells Claude Code to start long work in the
   background, end its turn at once and never wait for background work inside a turn.
-  Every turn now also carries `CLAUDE_PRODUCT_RUN=1`, so a user-level hook that keeps headless
-  turns open while background tasks run lets the turn end.
+  Every turn now also carries the marker `CLAUDE_PRODUCT_RUN=1`, by which a user-level hook that
+  would keep headless turns open while background tasks run can recognise a product turn and let
+  it end.

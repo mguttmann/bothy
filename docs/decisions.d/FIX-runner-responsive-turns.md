@@ -1,8 +1,8 @@
 # FIX-runner-responsive-turns A working session stays reachable
 
-Owner request of 2026-11-01: a run showed "running 30:00" while Claude Code sat in blocking
-foreground waits ("Wait for merge, push and control run to finish"), and the owner's message got
-no answer. Normative text: 09 18.5 (addendum "Background work"), `prompts/runner_prompt.md`.
+Owner request: a run showed "running" for a long time while Claude Code sat in blocking
+foreground waits (a step that waited for other work to finish), and the owner's message got no
+answer. Normative text: 09 18.5 (addendum "Background work"), `prompts/runner_prompt.md`.
 
 Cause, read in the code and in the stream of the run: the runner closed stdin after every
 `result` without pending follow-ups (`followups.stdin_close_due`, called from
@@ -13,17 +13,16 @@ commands up to their 600 s timeout, foreground subagents, until-loops and a Moni
 waited), and the thread saw no answer until the whole turn ended. Follow-ups wait in the CLI's
 queue until the next tool boundary of the running turn.
 
-Second cause, read in the live transcript of the affected session (entrypoint `sdk-cli`): in
+Second cause, read in the transcript of the affected session (entrypoint `sdk-cli`): in
 personal mode the turn loads the user's own Claude Code settings, and a user-level Stop hook
-there answered every attempt to end a turn while background tasks ran with `decision: block`
+there can answer every attempt to end a turn while background tasks run with `decision: block`
 and the instruction to wait for them inside the turn with the Monitor tool or a Bash
-until-loop. The transcript shows that block nine times, a compaction summary that keeps it as a
-working rule ("wait inside the same turn with foreground Bash until-loops"), and then exactly
-the foreground wait the owner saw. The hook skips any turn whose environment carries
-`CLAUDE_PRODUCT_RUN`, but the runner's allow list (`environment.py`, `_KEPT` and
-`build_environment`) dropped that variable even when the runner's own environment had it. A
-prompt sentence alone cannot beat a hook that blocks the stop: the runner now sets the marker
-itself.
+until-loop. The transcript showed such blocks, a compaction summary that kept the instruction
+as a working rule, and then exactly the foreground wait the owner saw. A hook of that kind
+needs a marker in the environment to recognise a product turn and let it end, but the runner's
+allow list (`environment.py`, `_KEPT` and `build_environment`) drops every variable it does not
+name, so no such marker could reach a turn. A prompt sentence alone cannot beat a hook that
+blocks the stop: the runner now sets a fixed marker, `CLAUDE_PRODUCT_RUN=1`, itself.
 
 | No | Date | Ruling | Reason |
 |---|---|---|---|
@@ -35,9 +34,9 @@ itself.
 | D-FIX-runner-responsive-turns-6 | 2026-11-01 | A `result` with an error still closes stdin at once (the recovery of 18.9 stays as it is), which ends running background work. | Keeping the process after an error would need a recovery that cannot restart the CLI; out of the scope of this fix. |
 | D-FIX-runner-responsive-turns-7 | 2026-11-01 | `build_environment` sets `CLAUDE_PRODUCT_RUN=1` in every turn's environment, in both modes, independent of the runner's own environment. Place: `environment.py`; normative text 09 18.2 "Environment". | It is the marker by which user-level hooks recognise a product conversation and let its turn end; set by the runner, it needs no deploy step and survives the allow list. It is no secret and widens nothing a turn may do. |
 
-Addendum of 2026-11-01 to D-FIX-runner-responsive-turns-6: live, the pinned CLI kept a process
-with background work for about ten minutes after its stdin ended, so a failed turn held the run
-and its follow-ups that long. docs/decisions.d/FIX-runner-auth-failed-held.md bounds that wait.
+Addendum to D-FIX-runner-responsive-turns-6: in operation, the pinned CLI kept a process with
+background work for many minutes after its stdin ended, so a failed turn held the run and its
+follow-ups that long. docs/decisions.d/FIX-runner-auth-failed-held.md bounds that wait.
 
 Limits (not built, recorded for a later ticket):
 

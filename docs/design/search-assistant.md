@@ -13,8 +13,8 @@ Owner request of 2026-11-04 (translated and shortened): "I have very many projec
 search at the top, but not just over words: I type what I am looking for, a short-lived chat or
 popup opens, I tell it what or which session I am looking for. That can be a chat session or a
 development session. It searches everything, the whole history, code sessions and chat sessions,
-and gives me the link to the session. When I say: I am looking for the takeover of Bothy on
-Hermes, I get a link, click it and our chat opens."
+and gives me the link to the session. When I say what I am looking for, I get a link, click it
+and our chat opens." (Example in this note: the takeover of the steering session by a new tool.)
 
 Done means:
 
@@ -57,7 +57,7 @@ SQL and the page check, so the assistant adds no second permission logic.
 
 ### 2.1 Terms and queries
 
-The question is natural language ("I am looking for the takeover of Bothy on Hermes"). As a
+The question is natural language ("I am looking for the takeover of the steering session by the new tool"). As a
 `websearch_to_tsquery` text it would be an AND of every word and find nothing. The server therefore
 turns it into terms: words of at least `search.prefix_min_chars` letters that are not on the stop
 word list of the instance languages (German and English, a fixed data file of the module), at most

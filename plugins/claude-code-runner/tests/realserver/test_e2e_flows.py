@@ -285,7 +285,7 @@ def _field(answer: ApiAnswer) -> tuple[str, str]:
 async def test_project_forum_with_a_chat_agent_says_why_and_is_triggered_again(
     world: RealWorld,
 ) -> None:
-    """F-PROJEKT-BEREIT, the live case of 2026-11-04 (09 3.8, 18.16): a chat agent cannot become
+    """F-PROJEKT-BEREIT, the reported case (09 3.8, 18.16): a chat agent cannot become
     the operator of a project forum; a bound forum that a chat agent operates anyway (through its
     space) explains itself, its post fails with that reason, and after the owner made the runner
     the operator the post is triggered again and the runner completes it."""

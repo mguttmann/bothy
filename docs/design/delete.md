@@ -171,9 +171,8 @@ starts a new chat: the client builds a forum's "+", the forum menu entry "New ch
 their own. Evidence in the code: the only client labels of that kind are `sidebarNewChatIn` (the "+"
 of a forum row, the forum menu and the new chat view) and `sidebarNewChat` (the draft row and the
 fallback for a blank thread title), and the server uses "New chat" only as a placeholder title. The
-entry the owner saw is therefore a text channel in the instance's data, most likely the former helper
-channel of the old setup (lesson L24 of [REUSE.md](../REUSE.md)), which "+" replaced (not verified
-against the instance's data in this repository). With this feature the owner removes it by deleting
+entry the owner saw is therefore a text channel in the instance's data, for example a helper channel
+carried over from an imported setup (lesson L24 of [REUSE.md](../REUSE.md)), which "+" replaced. With this feature the owner removes it by deleting
 that channel, which takes it out of every client at once; "+", the forum menu entry and Cmd+N stay
 the ways to start a chat. Reason: the entry is data, not code; the new delete removes it everywhere.
 

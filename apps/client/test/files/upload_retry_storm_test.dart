@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// FIX-upload-retry-storm (live report of 2026-10-30): one message with four attachments hung
+// FIX-upload-retry-storm (owner report): one message with four attachments hung
 // for minutes because every retry of an upload started at `createUpload`, the status read was
 // retried twice (the read retry inside one attempt and the outbox around it), every lane woke
 // at the exact `Retry-After` and all uploads ran at once against one bucket of `rl.upload`.

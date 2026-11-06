@@ -15,9 +15,9 @@ Usage (token only from the environment variable SONAR_TOKEN, never printed):
   quality_sync.py new-code --url https://sonarcloud.io --organization <org> --project <key>
   quality_sync.py ce-error --url https://sonarcloud.io --organization <org>
 
-`visibility` makes the project public (api/projects/update_visibility) when it is private: the
-free plan of SonarQube Cloud caps the lines of code of a private project and refuses a larger
-analysis, while a public project has no such cap. The repository is public anyway.
+`visibility` makes the project public (api/projects/update_visibility) when it is private:
+SonarQube Cloud may cap the lines of code of a private project and refuse a larger analysis,
+while a public project has no such cap. The repository is public anyway.
 
 `new-code` gives the project a new code definition of the last NEW_CODE_DAYS days when the
 project has none of its own. Without one SonarQube Cloud falls back to the previous version,

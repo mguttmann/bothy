@@ -102,7 +102,7 @@ def test_the_ruleset_requires_a_batching_squash_queue_on_main() -> None:
     assert params["min_entries_to_merge"] == 1
     # Only the head of a group must pass: one full run covers the whole batch.
     assert params["grouping_strategy"] == "HEADGREEN"
-    # Two full runs at a time: each takes two macOS jobs of the five GitHub gives a free account,
+    # Two full runs at a time: each takes two macOS jobs of the few GitHub runs at once,
     # and the run of the push to main needs two more.
     assert params["max_entries_to_build"] == 2
     # The longest job (test (server contract)) may take 240 minutes, plus waiting for a runner.

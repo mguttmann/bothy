@@ -23,7 +23,7 @@ def test_the_package_exports_the_same_rules() -> None:
 def test_every_rule_the_clients_rely_on_is_stated() -> None:
     flat = _flat(MESSAGE_FORMAT_RULES)
     for phrase in (
-        # Running text: no hard line breaks inside a paragraph (the live case of the ticket).
+        # Running text: no hard line breaks inside a paragraph (the reported case of the ticket).
         "no line breaks inside a paragraph",
         # Code only fenced, with a language tag.
         "fenced code block with a language tag",

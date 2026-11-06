@@ -6,7 +6,7 @@
 // the keys without the app prefix) into the scope of the app identity, the old items stay until
 // the first successful refresh with them, and a build of another app identity never takes them.
 //
-// The live case of 2026-10-31: after the update a macOS build without the Data Protection
+// The reported case: after the update a macOS build without the Data Protection
 // keychain (login keychain) started on the connect screen although its device was active on
 // the server. `readAll` of the login keychain fails with -50 (errSecParam), so the move of the
 // old secrets threw before the first call and every read of the store failed with it.
@@ -51,7 +51,7 @@ typedef Build = ({
 });
 
 const List<Build> _builds = [
-  // The live case: a release build with an ad-hoc signature keeps its secrets in the login
+  // The reported case: a release build with an ad-hoc signature keeps its secrets in the login
   // keychain (docs/decisions.d/FIX-macos-keychain.md).
   (
     name: 'macOS without keychain entitlements',

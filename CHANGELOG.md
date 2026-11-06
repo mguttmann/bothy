@@ -581,8 +581,8 @@ operated, and the order of the build.
   of `main` had no status.
 - `make sonar-visibility` (`quality_sync.py visibility`, also a step of the manual workflow
   `sonar-config.yml`) makes the SonarQube Cloud project public through
-  `api/projects/update_visibility` when it is private: the free plan caps the lines of code of a
-  private project and refused the analysis of `main`. `make sonar-config-check` resolves
+  `api/projects/update_visibility` when it is private: SonarQube Cloud capped the lines of code of
+  the private project and refused the analysis of `main`. `make sonar-config-check` resolves
   the parent of each quality profile by its key: `api/qualityprofiles/search` filtered to one
   profile names the parent only by `parentKey`, so the check failed with "parent is None" for
   every language although the parent was set.

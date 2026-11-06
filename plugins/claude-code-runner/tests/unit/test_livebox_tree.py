@@ -4,7 +4,8 @@
 ``agent_tree_2.1.288.jsonl`` is one turn of the pinned CLI 2.1.288 as the runner recorded it
 (a workflow with three agents, background and foreground shell tasks, foreground commands of the
 workflow agents, and an Agent tool subagent with its own tool calls), reduced to the messages the
-live box reads; every text, path and ID is replaced, field names and structure are unchanged.
+live box reads; every text, path, ID, agent label, count and time is replaced by a synthetic
+value (counts and times keep their order), field names and structure are unchanged.
 """
 
 from __future__ import annotations
@@ -105,7 +106,7 @@ def test_recording_workflow_agents_are_children_of_the_workflow() -> None:
     _replay(live, _recording())
     ((flow_id, flow),) = _of(patch, kind="workflow")
     agents = _of(patch, name="workflow_agent")
-    assert [s["title"] for _, s in agents] == ["build:docs", "build:checks", "review"]
+    assert [s["title"] for _, s in agents] == ["writer", "checker", "review"]
     for _, step in agents:
         assert step["kind"] == "subagent"
         assert step["parent_step_id"] == flow_id

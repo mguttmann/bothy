@@ -18,8 +18,8 @@ but I have no sessions. Each project should be able to have several chats at the
 Discord I see them in the sidebar. Here the posts open in an extra column that takes far too much
 space. What is the difference between the ones with # and the ones with the chat bubble?"
 
-His Discord setup: one forum channel per project in the sidebar, its active posts nested directly
-below it, indented with a tree line, clickable there.
+The reference is a Discord setup: one forum channel per project in the sidebar, its active posts
+nested directly below it, indented with a tree line, clickable there.
 
 Clarification of the same day: several agents in one project are fine as they are; he can tell an
 agent himself to open an extra git worktree. What matters is that starting another chat in a
@@ -153,7 +153,7 @@ tool class `host` can create a worktree itself when the person asks it to; the r
 nor prevents that. Reason: the owner's clarification of 2026-10-27; worktrees per post would change
 the runner contract, readiness and cleanup for a need he does not have. Locks per thread and session
 and `runner.max_parallel_runs` already make parallel sessions safe for the runner itself; what two
-agents do in the same folder is the person's call, as in his Discord setup.
+agents do in the same folder is the person's call, as in the reference Discord setup.
 
 **D-SB-13 Phone.** The spaces screen M1 shows the same groups with the same rules and the "+" action
 at forum rows (touch target `density.target-min`); a tap on a thread row opens the history directly

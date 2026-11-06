@@ -128,7 +128,7 @@ patrol_cmd() {
 failed=0
 results=""
 # The host ports of patrol's servers: the runner picks free ones (MOBILE_E2E_PATROL_PORTS, "test
-# app"), because patrol's defaults are reserved by the host rules of the build host.
+# app"), because patrol's defaults are fixed ports that another service of the host may hold.
 patrol_ports=""
 if [ -n "${MOBILE_E2E_PATROL_PORTS:-}" ]; then
   set -f

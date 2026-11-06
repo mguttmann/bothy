@@ -1,13 +1,14 @@
 # FIX-hermes-user-side-context Everything the Hermes adapter gives the model rides the user side
 
-Found on the Anthropic OAuth route: a host may shorten the system text after the identity block to
-a fixed character budget (the `providers.anthropic.oauth_system_budget_chars` setting of a host
-patch, after upstream PR NousResearch/hermes-agent#72173). Everything the adapter put in the
-event's ephemeral channel prompt (the fixed note, the format rules of 09 4.11, the channel
-instructions, the rendered run context with its trust marks, the profile's `channel_prompts`) lies
-after that budget and never reached the model: replies ignored the format rules (texts to copy as
-block quotes), a help desk lost its channel prompt, and the model never saw the thread context.
-Moving the rules to the user side of the turn made the same requests follow them in every try.
+Found on the Anthropic OAuth route: a host may shorten the system text after the identity block to a
+fixed character budget (the `providers.anthropic.oauth_system_budget_chars` setting proposed
+upstream in NousResearch/hermes-agent#72173, which a host can carry as a patch). Everything the
+adapter put in the event's ephemeral channel prompt (the fixed note, the format rules of 09 4.11,
+the channel instructions, the rendered run context with its trust marks, the profile's
+`channel_prompts`) lies after that budget and never reached the model: replies ignored the format
+rules (texts to copy as block quotes), a channel lost the instructions of its channel prompt, and
+the model never saw the thread context. Moving the rules to the user side of the turn made the same
+requests follow them in every try.
 
 | No | Date | Ruling | Reason |
 |---|---|---|---|

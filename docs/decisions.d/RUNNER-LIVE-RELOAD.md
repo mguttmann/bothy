@@ -1,6 +1,6 @@
 # RUNNER-LIVE-RELOAD Live channel reload and transcription in the Claude Code runner
 
-Two gaps found in live operation on 2026-10-29. Normative text: 09 18.1, 18.2 "Input", 18.14,
+Two gaps found in operation. Normative text: 09 18.1, 18.2 "Input", 18.14,
 21, R-AG-31, R-AG-32.
 
 | No | Date | Ruling | Reason |

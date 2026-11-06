@@ -14,13 +14,13 @@ import (
 )
 
 // personalOnlyReader holds the valid sums of an instance whose runs all ran on a personal
-// subscription (the live case of FIX-COST/1) and applies the display rule of the query in
+// subscription (the case of FIX-COST/1) and applies the display rule of the query in
 // queries/stats.sql: entries of mode personal count only with showPersonal.
 type personalOnlyReader struct{}
 
 var personalSums = []billing.CostStatsValue{
-	{Group: "agent-a", BillingMode: "personal", Currency: "USD", AmountMicros: 3279543, IsEstimate: true},
-	{Group: "agent-b", BillingMode: "personal", Currency: "USD", AmountMicros: 278094, IsEstimate: true},
+	{Group: "agent-a", BillingMode: "personal", Currency: "USD", AmountMicros: 2500000, IsEstimate: true},
+	{Group: "agent-b", BillingMode: "personal", Currency: "USD", AmountMicros: 400000, IsEstimate: true},
 }
 
 func (personalOnlyReader) CostStats(_ context.Context, _ billing.CostStatsQuery, showPersonal bool) ([]billing.CostStatsValue, error) {
@@ -67,7 +67,7 @@ func TestCostDisplay_PersonalEstimatesShownByDefault(t *testing.T) {
 	for _, g := range got {
 		sum += g.AmountMicros
 	}
-	if len(got) != len(personalSums) || sum != 3279543+278094 {
+	if len(got) != len(personalSums) || sum != 2500000+400000 {
 		t.Errorf("CostStats with the default configuration = %+v, want both personal sums", got)
 	}
 	cur, err := s.CostCurrencies(context.Background(), q)

@@ -1,27 +1,27 @@
 # FIX-runner-auth-failed-held A failed turn never holds the run open for background work
 
-Found by the red team of FIX-runner-reachable-2 and seen live on 2026-11-01. Normative text:
-09 18.5 (addendum "Background work") and 18.9.
+Found by the red team of FIX-runner-reachable-2 and seen in operation. Normative text: 09
+18.5 (addendum "Background work") and 18.9.
 
 Evidence, read in the runner log, the session transcript and the server's rows (read only):
 
-- At 21:36:14 (local time) a turn of a long thread ended with a short answer and left
-  background work running (a workflow and subagents); the run stayed `running` for it
-  (FIX-runner-responsive-turns).
-- At 21:36:48 a subagent's notification started a turn by itself; the login of Claude Code on the
-  host was briefly gone, and the turn ended with the API error "Not logged in" (`error:
-  authentication_failed`, an `assistant` message with the API error flag) and an error `result`.
+- A turn of a long thread ended with a short answer and left background work running (a
+  workflow and subagents); the run stayed `running` for it (FIX-runner-responsive-turns).
+- Shortly after, a subagent's notification started a turn by itself; the login of Claude Code
+  on the runner host was briefly gone, and the turn ended with the API error "Not logged in"
+  (`error: authentication_failed`, an `assistant` message with the API error flag) and an error
+  `result`.
 - The runner closed stdin at that `result` (`RunTurn._read`: a failed turn absorbs nothing more)
   and set the phase `closed` (`RunTurn._close_stdin`). The pinned CLI did not exit: it kept the
-  process for its background work for about ten minutes (task notifications kept arriving in its
-  queue until 21:46:49).
-- At 21:37:54 the owner asked a question. The runner logged `followup_not_deliverable`
+  process for its background work for many minutes (task notifications kept arriving in its
+  queue).
+- The owner then asked a question. The runner logged `followup_not_deliverable`
   (`RunTurn.offer_followup` refuses every follow-up in phase `closed`); the follow-up stayed
   `queued`, and nothing answered.
-- At 21:46:49 the process ended and the run finished `failed` with `runtime_not_authenticated`
-  and no summary; the server deferred the question into a new run (09 section 7), which resumed
-  the same session and answered at 21:47:27, more than nine minutes late. The thread never said
-  that the login had failed, and the background work of the old process was gone without notice.
+- When the process ended, the run finished `failed` with `runtime_not_authenticated` and no
+  summary; the server deferred the question into a new run (09 section 7), which resumed the
+  same session and answered many minutes late. The thread never said that the login had
+  failed, and the background work of the old process was gone without notice.
 
 | No | Date | Ruling | Reason |
 |---|---|---|---|

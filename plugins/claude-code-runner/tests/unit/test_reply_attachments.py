@@ -414,15 +414,15 @@ def test_check_set_best_effort() -> None:
         ("b/.env", Rejection("denied_pattern")),
         ("c", None),
     ]
-    # The live case: one file outside the roots no longer drops the valid one.
-    live = check_set(
+    # The reported case: one file outside the roots no longer drops the valid one.
+    mixed = check_set(
         [
-            _cand("review-model-proposal.md"),
-            ("2026-11-04-ai-enablement-brief.md", Rejection("outside_allowed_roots")),
+            _cand("findings.md"),
+            ("outline.md", Rejection("outside_allowed_roots")),
         ],
         limits,
     )
-    assert [c.announced for c in live.accepted] == ["review-model-proposal.md"]
+    assert [c.announced for c in mixed.accepted] == ["findings.md"]
     # Only files that pass count against the limit; the first ones go, the later get too_many.
     many = check_set([_cand(n) for n in "abcd"], limits)
     assert [c.announced for c in many.accepted] == ["a", "b", "c"]
@@ -490,7 +490,7 @@ def test_build_notice_follows_the_instance_language() -> None:
     """
     outcomes = [
         Outcome(
-            "docs/review-model-proposal.md",
+            "docs/findings.md",
             Rejection("upload_refused", "forbidden", "capability_missing"),
         ),
         Outcome("b.md", Rejection("upload_refused", "forbidden", "acting_for_insufficient")),
@@ -502,7 +502,7 @@ def test_build_notice_follows_the_instance_language() -> None:
     # language-check: off
     assert german == (
         "Anhänge nicht gesendet:\n"
-        "- `review-model-proposal.md`: Hochladen nicht erlaubt (Recht fehlt)\n"
+        "- `findings.md`: Hochladen nicht erlaubt (Recht fehlt)\n"
         "- `b.md`: Hochladen nicht erlaubt (der auslösenden Person fehlt das Recht)\n"
         "- `c.md`: Hochladen abgelehnt (conflict, something_new)\n"
         "- `d.md`: nicht gesendet, weil eine andere Datei nicht gesendet werden konnte\n"
@@ -512,8 +512,7 @@ def test_build_notice_follows_the_instance_language() -> None:
     assert build_notice(outcomes, 4, "de-AT") == german
     english = build_notice(outcomes[:1], 4)
     assert english == (
-        "Attachments not sent:\n"
-        "- `review-model-proposal.md`: upload_refused (forbidden, capability_missing)"
+        "Attachments not sent:\n- `findings.md`: upload_refused (forbidden, capability_missing)"
     )
     for other in ("en", "fr", "", None):
         assert build_notice(outcomes[:1], 4, other) == english
@@ -523,18 +522,18 @@ def test_build_notice_follows_the_instance_language() -> None:
 def test_notice_tells_how_to_send_a_file_from_elsewhere() -> None:
     """FIX-attach-partial-and-roots: outside_allowed_roots names the file and the way out."""
     outcomes = [
-        Outcome("review-model-proposal.md"),
-        Outcome("/home/x/2026-11-04-ai-enablement-brief.md", Rejection("outside_allowed_roots")),
+        Outcome("findings.md"),
+        Outcome("/home/x/outline.md", Rejection("outside_allowed_roots")),
     ]
     assert build_notice(outcomes, 3) == (
         "Attachments not sent:\n"
-        "- `2026-11-04-ai-enablement-brief.md`: outside_allowed_roots"
+        "- `outline.md`: outside_allowed_roots"
         " (copy it into TMPDIR and attach the copy)"
     )
     # language-check: off
     assert build_notice(outcomes, 3, "de") == (
         "Anhänge nicht gesendet:\n"
-        "- `2026-11-04-ai-enablement-brief.md`: liegt außerhalb der erlaubten Ordner"
+        "- `outline.md`: liegt außerhalb der erlaubten Ordner"
         " (der Agent kann die Datei nach TMPDIR kopieren und die Kopie anhängen)"
     )
     # language-check: on

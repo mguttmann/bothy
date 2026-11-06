@@ -1,8 +1,8 @@
 # F-WARTESCHLANGE-GRUND Why a queued run waits
 
 The owner saw a run that showed only "Queued" with an hourglass. The cause was the runner limit
-`runner.max_parallel_runs`: four turns ran, two runs waited for a slot, and `runs.state_reason`
-was empty. Nobody could see the reason or the runs that held the slots.
+`runner.max_parallel_runs`: every slot was taken by a running turn, further runs waited for a
+slot, and `runs.state_reason` was empty. Nobody could see the reason or the runs that held the slots.
 
 Wait reasons found in the code before the change:
 

@@ -39,7 +39,7 @@ func wantNotReady(t *testing.T, what string, r harness.Response) {
 	}
 }
 
-// TestVoice_GenericBrandFromWindows (FIX-voice-send, live report of 2026-10-31): the recording
+// TestVoice_GenericBrandFromWindows (FIX-voice-send, owner report): the recording
 // of the Windows app, declared audio/mp4, is a voice message. Sent right after completeUpload it
 // answers 409 file_not_ready, also after the scan while the container phase has not read its
 // duration; after files.thumbnail the row is audio/mp4, complete with duration_ms, and the same

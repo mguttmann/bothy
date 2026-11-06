@@ -68,7 +68,7 @@ an automatic level keeps the order it showed last, as forum posts do since M4-46
 no row moves under the pointer. Writing a message therefore moves its post to the top of its forum
 and the forum to the top of its space, once the person is back in the history. A key press outside
 the sidebar (not a lone modifier key) counts as being back, even when the pointer still rests on the
-sidebar; the hold returns when the pointer moves over the sidebar (owner report of 2026-11-01, brief
+sidebar; the hold returns when the pointer moves over the sidebar (owner report, brief
 FIX-autoarrange-channels: a forum clicked in the sidebar and then written into with the keyboard
 stayed low, because the resting pointer held the order).
 

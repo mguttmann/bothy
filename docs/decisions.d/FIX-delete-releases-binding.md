@@ -1,6 +1,6 @@
 # FIX-delete-releases-binding The project binding of a deleted forum gives its folder free
 
-Fix of a Major found in operation on 2026-11-02: a project forum deleted without the folder box
+Fix of a Major found in operation: a project forum deleted without the folder box
 kept its project binding after the purge, so its folder could never be bound to a new forum
 (`putProjectBinding` answered `409 conflict` "bound to another forum", and
 `deleteProjectBinding` on the deleted forum `409 conflict` "the channel is archived"). It closes

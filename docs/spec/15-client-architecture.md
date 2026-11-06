@@ -949,7 +949,7 @@ Package `record` (7.1.2, publisher cow-level.ovh): AAC-LC is the only compressed
 records on all targets; on iOS, Opus is usable only in the CAF container
 (https://pub.dev/packages/record, retrieved 2026-10-10 [verified according to research]). Therefore: AAC-LC in an
 MP4 container (`.m4a`), mono, bitrate `client.voice.bitrate`, maximum duration `voice.max_duration` ([12-files.md](12-files.md)).
-The container is not the same on every target (live report of 2026-10-31): macOS and iOS write
+The container is not the same on every target (owner report): macOS and iOS write
 the MP4 brand `M4A `, Windows writes `mp42` through Media Foundation, and Android's `MediaMuxer`
 probably a generic brand too (not verified). The app therefore declares every recording as
 `audio/mp4`, and the server stores a generic-brand MP4 declared as audio as `audio/mp4`

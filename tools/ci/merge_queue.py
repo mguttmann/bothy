@@ -39,11 +39,10 @@ BRANCH = "main"
 GH_TIMEOUT = 120
 # Up to five pull requests per batch, merged with squash as before. Only the head of a group must
 # pass (HEADGREEN), so one full run covers the batch; when it fails, GitHub drops the pull request
-# at its head and rebuilds the groups behind it. Two
-# full runs at a time: each holds two macOS jobs (apps (macOS), apps (iOS)) of the five that
-# GitHub runs at once for a free account, and the run of each push to main needs two more. The
-# longest job, test (server contract), may take 240 minutes; the rest of the timeout is the wait
-# for a runner.
+# at its head and rebuilds the groups behind it. Two full runs at a time: each holds two macOS
+# jobs (apps (macOS), apps (iOS)) of the few that GitHub runs at once for the repository's
+# account, and the run of each push to main needs two more. The longest job, test (server
+# contract), may take 240 minutes; the rest of the timeout is the wait for a runner.
 QUEUE_PARAMETERS: dict[str, Any] = {
     "merge_method": "SQUASH",
     "max_entries_to_merge": 5,

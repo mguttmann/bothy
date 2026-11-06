@@ -1,24 +1,24 @@
-# FIX-terminal-session-lifecycle Detach, reattach and close in the owner account mode (2026-11-02)
+# FIX-terminal-session-lifecycle Detach, reattach and close in the owner account mode
 
-Owner report of 2026-11-02 (desktop app on macOS, terminal to his own server host in the owner
-account mode of [ADR 0073](../adr/0073-terminal-in-the-owners-own-account.md)): he pressed
-"Detach" on purpose, left, and expected to pick the same shell up later from any of his devices, the way `tmux` or `screen` work. Instead the tab said "The terminal session ended: it
-was detached for too long", offered no way back, and "End" did nothing, so he had to open a second
-session.
+Owner report (desktop app on macOS, terminal to the owner's own server host in the owner account
+mode of [ADR 0073](../adr/0073-terminal-in-the-owners-own-account.md)): the owner pressed
+"Detach" on purpose, left, and expected to pick the same shell up later from any of the owner's
+devices, the way `tmux` or `screen` work. Instead the tab said "The terminal session ended: it
+was detached for too long", offered no way back, and "End" did nothing, so a second session had
+to be opened.
 
-## What the live system showed
+## What the evidence showed
 
-Read-only evidence from the owner's instance (the API log, the rows of `terminal_sessions`, the
-audit and the host service process), no change and no terminal session opened:
+Read-only evidence (the API log, the rows of `terminal_sessions`, the audit and the host service
+process), no change and no terminal session opened:
 
-- The session was opened after a step-up with the device key (`terminal.open` allowed); about ten
-  minutes later the stream of the device and the data connection of the host closed with `1000`
-  (the explicit "Detach"), and the session was closed with `detach_expired` exactly
-  `terminal.detach_grace` (15 minutes) after that. The audit entry `terminal.terminate` names
-  `detach_expired`.
+- The session was opened after a step-up with the device key (`terminal.open` allowed); later
+  the stream of the device and the data connection of the host closed with `1000` (the explicit
+  "Detach"), and the session was closed with `detach_expired` exactly `terminal.detach_grace`
+  after that. The audit entry `terminal.terminate` names `detach_expired`.
 - The host service process ran without a restart from before the opening until after the end, so
-  no `host_restarted`; no other error was logged. The second session about an hour later is the
-  one the owner opened instead.
+  no `host_restarted`; no other error was logged. A later second session is the one the owner
+  opened instead.
 - Cause: the windows of ADR 0068 (15 minutes detach grace, 30 minutes idle counted across a detach,
   12 hours maximum) were made for separate session users on shared hosts and also applied to the
   owner's own administrator shell. The client then left the ended tab with two disabled buttons.

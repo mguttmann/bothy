@@ -4,10 +4,10 @@
 # Runs integration_test/legacy_keychain_test.dart on macOS (platform-tests.json,
 # FIX-macos-legacy-keychain-prompt, FIX-macos-migration-denied): the move of the old secrets
 # against the real login keychain. Before the test old items go into the login keychain whose
-# access list trusts only another program (/usr/bin/true), as the old items of the live cases trust
+# access list trusts only another program (/usr/bin/true), as the old items of the reported cases trust
 # only the build of an older bundle identifier; a plain read of one from the app shows a keychain
 # dialog. One is the database key of an instance of its own; the other is `app/instance` of the
-# owner's case of 2026-11-01, which the build before the app scope never read at a normal start.
+# owner's reported case, which the build before the app scope never read at a normal start.
 # `app/instance` and `app/server_address` have fixed names, so the owner's case runs only on a
 # keychain that has neither (a CI runner); on a machine with them it is skipped and nothing of
 # them is touched. The items are removed again when the script ends.

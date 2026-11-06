@@ -90,8 +90,8 @@ func TestProjectOperator_Refused(t *testing.T) {
 	}
 }
 
-// TestProjectNotReady_ExplainedAndTriggeredAgain (09 3.8, 18.16 items 2 and 3; the live case of
-// 2026-11-04): a bound forum whose operator became a chat agent reads ready_reason
+// TestProjectNotReady_ExplainedAndTriggeredAgain (09 3.8, 18.16 items 2 and 3; the reported
+// case): a bound forum whose operator became a chat agent reads ready_reason
 // operator_cannot_serve_project, a new post fails with that reason instead of a bare
 // project_not_ready, and after the owner made the runner the operator again and the runner
 // reported the project ready, the author triggers the post again: its thread takes the runner and

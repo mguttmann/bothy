@@ -26,7 +26,7 @@ import '../support/thread_fixtures.dart';
 import '../support/thread_host.dart';
 import '../support/widgets.dart';
 
-/// The live case: one long sentence as a fenced block "to copy".
+/// The reported case: one long sentence as a fenced block "to copy".
 const _sentence =
     'Please copy this long sentence into the ticket, so that everyone involved '
     'knows exactly which steps are still open tonight and who takes them over '

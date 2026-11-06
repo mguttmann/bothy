@@ -1,31 +1,31 @@
 # FIX-runner-reachable-2 Reachable even against conflicting user instructions
 
-Owner report of 2026-11-01, after FIX-runner-responsive-turns went live: in a long thread the
-run showed "running" for about three hours, the live box showed foreground waits (a Bash
-until-loop on result files, a Monitor "evidence runs finished", "Block until evidence runs
-finish"), and the question for the current state seemed to get no answer. Normative text: 09
-18.5 (addenda "Background work"), `prompts/runner_prompt.md`.
+Owner report, after FIX-runner-responsive-turns was in operation: in a long thread the run
+showed "running" for a long time, the live box showed foreground waits (a Bash until-loop on
+result files, a Monitor that waited for other runs to finish), and the question for the
+current state seemed to get no answer. Normative text: 09 18.5 (addenda "Background work"),
+`prompts/runner_prompt.md`.
 
 Evidence, read in the transcript of the affected session, its subagent transcripts and the
 runner log (read only), and with the pinned CLI 2.1.288:
 
 - The waits ran in a background subagent, not in the session's own turn. The subagent was
-  started with `run_in_background` at the end of a turn; its Bash until-loop, its Monitor and
-  its second until-loop came 21 seconds before the owner's question and ended two minutes
-  later. The live box shows the steps of a subagent under its step while the run is held
-  `running` for background work (09 18.5), so they looked like the session waiting.
-- The session itself ended all of its turns after the update: sixteen turns, each started
-  background work and ended with a short reply. The owner's question arrived between turns:
-  the CLI took it at once (queue `enqueue` and `dequeue` in the same tenth of a second), the
-  runner logged `followup_written`, and the reply was posted 55 seconds later, 40 of them an
+  started with `run_in_background` at the end of a turn; its until-loops and its Monitor ran
+  shortly before the owner's question and ended a little later. The live box shows the steps
+  of a subagent under its step while the run is held `running` for background work (09 18.5),
+  so they looked like the session waiting.
+- The session itself ended all of its turns after the update: each turn started background
+  work and ended with a short reply. The owner's question arrived between turns: the CLI took
+  it at once (queue `enqueue` and `dequeue` at the same moment), the runner logged
+  `followup_written`, and the reply was posted within about a minute, most of it spent in an
   automatic compaction. The owner's next message answered that reply.
-- Suspected cause 1 (user instructions): the machine-wide user instructions file is loaded into
-  every session (an `instructions` attachment of type `User` after each compaction) and has a
-  rule that headless sessions must not end a turn while background jobs run and must wait for
-  them with Monitor or a wait loop. The prompt of FIX-runner-responsive-turns overrode only the
-  first half and only "a rule"; the subagent, which does not get the runner's appended system
-  prompt (not verified with the CLI), followed the rule. Holds as a risk, not as the cause of
-  the session's answer delay.
+- Suspected cause 1 (user instructions): a user instructions file of the account the runner
+  uses is loaded into every session (an `instructions` attachment of type `User` after each
+  compaction), and such a file can carry a rule that headless sessions must not end a turn
+  while background jobs run and must wait for them with Monitor or a wait loop. The prompt of
+  FIX-runner-responsive-turns overrode only the first half and only "a rule"; a subagent, which
+  does not get the runner's appended system prompt (not verified with the CLI), follows such a
+  rule. Holds as a risk, not as the cause of the session's answer delay.
 - Suspected cause 2 (compaction summaries): the summaries of this run name no wait rule; the
   earlier one that did (FIX-runner-responsive-turns) was replaced. Refuted for this run.
 - Suspected cause 3 (follow-ups only at the turn end): refuted. A probe with the pinned CLI and
@@ -48,4 +48,4 @@ Limits (not built):
   run in the background), but the live box shows their waits under the run.
 - Nothing enforces the bound of a minute; a turn that ignores it still delays a follow-up to the
   end of its running tool call.
-- An automatic compaction before the answer adds its own time (40 seconds in this run).
+- An automatic compaction before the answer adds its own time.
