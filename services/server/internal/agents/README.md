@@ -547,16 +547,16 @@ Built-in agents (`adapter_kind` `claude_agent`, [26-builtin-agents.md](../../../
   runner; a change of it is stored at once, not with the delayed flush. A built-in agent's own
   heartbeat with it is `400` on `/details/capabilities/hosts_agents` (`not_allowed`).
 - **Ceiling.** `agent.tool_class.set` above the runner's ceiling and `agent.host.set` to a runner
-  below the agent's class are `409 host_tool_class_ceiling`; a runner without a reported ceiling
+  below the agent's class are `409 conflict` with reason `host_tool_class_ceiling`; a runner without a reported ceiling
   admits only `chat`.
 - **Billing (10 10.3, BR-14).** `checkHostedBilling` runs after the write in the same unit of
   `agent.billing_mode.set` (and its `set_all` form and the guided switch),
   `agent.credential_holder.set` and `agent.host.set`: a `personal` built-in agent needs a
   `personal` runner with the same holder that reports `personal`, and a runner may not leave a
-  `personal` hosted agent with another holder (`409 hosted_holder_mismatch`). It locks the runner
+  `personal` hosted agent with another holder (`409 conflict` with reason `hosted_holder_mismatch`). It locks the runner
   row, so a change of the agent and one of its runner serialize.
 - **Move.** `setAgentHost` (owner, step-up, If-Match) refuses an agent that is not built in
-  (`409 not_a_builtin_agent`) and moves it; in the same unit identity revokes the agent's tokens
+  (`409 conflict` with reason `not_a_builtin_agent`) and moves it; in the same unit identity revokes the agent's tokens
   that the old runner holds, and both runners get `agent.hosting_changed`.
 - **List.** `listHostedAgents` (agent-self) pages the active agents whose `hosted_by` is the
   caller; it does not ask for `hosts_agents`, so a runner may read it before its first heartbeat
@@ -574,7 +574,7 @@ Built-in agents (`adapter_kind` `claude_agent`, [26-builtin-agents.md](../../../
   it too. A revoked runner token takes the hosted tokens of its key inside identity. The gateway
   closes the connections of revoked tokens with `4012` through its existing revocation path.
 - **identity.** `IsHostedAgent` implements `identity.HostedAgents`, bound by `internal/wire`, so
-  `createToken` refuses a built-in agent (`409 hosted_agent_token`).
+  `createToken` refuses a built-in agent (`409 conflict` with reason `hosted_agent_token`).
 
 Tests: `domain/hosting_test.go`, `app/hosting_test.go`, `test/integration/hosting_test.go`,
 `internal/wire/serve_hosted_test.go` (the `4012` closes) and `migrations/agents_hosted_by_test.go`.

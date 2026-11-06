@@ -500,7 +500,7 @@ is the runner (docs/decisions.d/A1-01.md D-A1-01-4).
   `agent.hosted_token.issue`, `agent.host.set` or `agent.disable`; every method needs a unit
   declared as a rights change, like every revocation. `IssueHosted` locks the runner's calling
   token (not found, another principal or inactive: `not_found`; without `dpop_jkt`:
-  `409 dpop_required`), revokes the runner's older tokens of the agent and inserts a token of kind
+  `409 conflict` with reason `dpop_required`), revokes the runner's older tokens of the agent and inserts a token of kind
   `agt` bound to the calling token's `dpop_jkt`, `created_by` the runner, with the expiry the
   caller computed from `agents.hosted_token_ttl`; the secret is an `identity.Token` like every
   other.
