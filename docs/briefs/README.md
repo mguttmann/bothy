@@ -16,6 +16,12 @@ code that differs only in names and stops with `Verdict: BLOCKED` where it behav
 from the specification. Briefs of the milestones after these are written when the owner asks for
 them or when the milestone before them closes.
 
+The stage A1 "Built-in agents" ([PLAN](../PLAN.md) section 21, P-27) follows the milestones: its
+briefs A1-02 to A1-10 were written by its specification ticket and carry the same boundary for
+names of merged code (D-W-100). A stage ticket starts only after every milestone ticket is merged,
+so its briefs may use what any milestone ticket created; their column "Depends on" names only
+tickets of the stage. V1-07 to V1-12 run from their plan rows without a brief (P-28).
+
 ## How a brief runs
 
 1. The launcher starts a brief only when every ticket in "Depends on" is merged into the base
@@ -82,11 +88,11 @@ the waves before it are merged; many can start earlier, as soon as their own dep
 
 | Wave | Tickets that may run in parallel |
 |---|---|
-| 1 | M1-01, M1-02, M2-32, M4-03 |
-| 2 | M1-03, M1-04, M1-05, M2-38, M4-01, M6-10 |
-| 3 | M1-06, M1-07, M1-17, M1-74, M3-17, M4-04, M4-06, M4-08, M4-10, M7-24 |
-| 4 | M1-08, M1-09, M1-22, M2-23, M3-01, M4-02, M4-05, M4-11, M4-12, M4-16, M5-01, M7-19 |
-| 5 | M1-10, M1-12, M3-02, M4-07, M4-09, M4-15, M6-11, M8-01 |
+| 1 | A1-02, A1-03, M1-01, M1-02, M2-32, M4-03 |
+| 2 | A1-04, A1-06, A1-07, M1-03, M1-04, M1-05, M2-38, M4-01, M6-10 |
+| 3 | A1-05, A1-08, M1-06, M1-07, M1-17, M1-74, M3-17, M4-04, M4-06, M4-08, M4-10, M7-24 |
+| 4 | A1-09, M1-08, M1-09, M1-22, M2-23, M3-01, M4-02, M4-05, M4-11, M4-12, M4-16, M5-01, M7-19 |
+| 5 | A1-10, M1-10, M1-12, M3-02, M4-07, M4-09, M4-15, M6-11, M8-01 |
 | 6 | M1-11, M1-13, M4-13, M6-12, M8-02 |
 | 7 | M1-14, M1-15, M1-18, M1-23, M1-26, M4-14 |
 | 8 | M1-16, M1-19, M1-21, M1-24, M1-25, M1-27, M4-17, M7-01 |
@@ -131,8 +137,8 @@ the waves before it are merged; many can start earlier, as soon as their own dep
 
 Dependencies are minimal: a ticket implied through another dependency is not repeated. Brief files
 are added by the brief-writing steps (plan ticket M0-05 for M1, D-W-100 for M2 and M3, D-W-114 for
-M4, D-W-120 for M5 and M6, D-W-125 for M7, D-W-124 for M8) under the
-names listed here.
+M4, D-W-120 for M5 and M6, D-W-125 for M7, D-W-124 for M8, the stage specification for A1) under
+the names listed here.
 
 | Wave | ID | Title | Brief file | Depends on |
 |---|---|---|---|---|
@@ -413,6 +419,15 @@ names listed here.
 | 40 | M8-09 | Carry out the migration of an existing installation (owner go) | `M8-09-migration-execution.md` | M8-07, M8-08 |
 | 23 | M8-10 | Login and API client of the import tool | `M8-10-import-login-client.md` | M1-38, M1-71 |
 | 36 | M8-11 | Thread, message, pin and file items of the import interface | `M8-11-import-content-items.md` | M1-59, M2-18, M3-07, M3-13, M8-03 |
+| 1 | A1-02 | Server: agent definitions | `A1-02-agent-definitions.md` | none (specification merged) |
+| 1 | A1-03 | Server: hosted agents | `A1-03-hosted-agents.md` | none (specification merged) |
+| 2 | A1-04 | Runner: host many agents | `A1-04-runner-hosting.md` | A1-03 |
+| 3 | A1-05 | Runner: run the definition | `A1-05-runner-definition.md` | A1-02, A1-04 |
+| 2 | A1-06 | Templates and their gate | `A1-06-agent-templates.md` | A1-02 |
+| 2 | A1-07 | Interview | `A1-07-agent-interview.md` | A1-02 |
+| 3 | A1-08 | Clients: New agent dialog | `A1-08-new-agent-clients.md` | A1-03, A1-06, A1-07 |
+| 4 | A1-09 | Clients: edit and remove | `A1-09-edit-agent-clients.md` | A1-08 |
+| 5 | A1-10 | End to end and documentation | `A1-10-builtin-agents-end-to-end.md` | A1-05, A1-09 |
 
 ## Make targets created by tickets
 
@@ -457,6 +472,7 @@ waves, the graph and the column "Depends on" of the plan against the index.
 | `tofu-check` | M7-15 |
 | `tofu-vm-test` | M7-15 |
 | `showcase` | M7-28 |
+| `templates-check` | A1-06 |
 
 To change a dependency, edit the column "Depends on" of the index and the row in the plan, then
 run `uv run --project tools --locked --quiet python tools/docs/brief_deps.py --write`; it
@@ -1481,4 +1497,30 @@ flowchart TB
   M3_07 --> M8_11
   M3_13 --> M8_11
   M8_03 --> M8_11
+```
+
+Tickets of A1:
+
+```mermaid
+flowchart TB
+  A1_02["A1-02"]
+  A1_03["A1-03"]
+  A1_04["A1-04"]
+  A1_05["A1-05"]
+  A1_06["A1-06"]
+  A1_07["A1-07"]
+  A1_08["A1-08"]
+  A1_09["A1-09"]
+  A1_10["A1-10"]
+  A1_03 --> A1_04
+  A1_02 --> A1_05
+  A1_04 --> A1_05
+  A1_02 --> A1_06
+  A1_02 --> A1_07
+  A1_03 --> A1_08
+  A1_06 --> A1_08
+  A1_07 --> A1_08
+  A1_08 --> A1_09
+  A1_05 --> A1_10
+  A1_09 --> A1_10
 ```

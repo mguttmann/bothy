@@ -407,6 +407,24 @@ None of this circumvents the terms: the runner never logs in for another person,
 no credentials and, with `personal`, runs only for the triggering person, who is also the
 logged-in person.
 
+### 10.3 Built-in agents
+
+Addendum of 2026-11-06 ([26-builtin-agents.md](26-builtin-agents.md) 10, R-BA-12). A built-in
+agent is an agent like every other here: I1 to I5 apply unchanged, and the hosting runner builds
+the environment of each of its turns by 18.3 of [09-agents.md](09-agents.md) from the claim
+`billing_mode` of the hosted agent's token.
+
+1. A new built-in agent is `organization`.
+2. `personal` is allowed only when the hosting runner itself is `personal` and the hosted agent's
+   `credential_holder_id` equals the runner's, because the turn runs with the login of the
+   runner's host user; the runner must also report `personal` in `billing_modes_supported`.
+   `agent.billing_mode.set`, `agent.credential_holder.set` and `agent.host.set` refuse any other
+   combination with `409 conflict`, reason `hosted_holder_mismatch`. A change of the runner's own
+   mode or holder is refused with the same reason while one of its hosted agents is `personal`
+   with the old holder.
+3. The creation flow offers `personal` only when the creating owner is that credential holder and
+   the only owner (SR1), and says so otherwise.
+
 ## 11. Guided flow "Grant a person access in a personal space"
 
 Starting point: a space is operated by a personal agent. The owner wants to give another person
@@ -775,6 +793,7 @@ meaning.
 | BR-11 | Display in mode `personal` | no amounts, badge visible |
 | BR-12 | Runner in mode `organization` without key | no fallback to a subscription; `runtime_not_authenticated` |
 | BR-13 | Search responses and logs for key values (secret text in all fields) | Value appears nowhere |
+| BR-14 | Built-in agent in `personal` under a runner in `organization`, under a runner with another holder, and a runner switch away while a hosted agent is `personal` | `409 conflict`, `hosted_holder_mismatch`, nothing changed (A1-03) |
 
 ## 16. Alignment with the core contract
 

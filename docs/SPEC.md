@@ -201,6 +201,7 @@ the change that finds it.
 | [23 Quality](spec/23-quality.md) | Gates behind `make check`, identical locally and in CI, component contract, push discipline, docs in code, white label, SonarQube, supply chain. Plus the independent review per push and the red-team gate per milestone. | Checks of every change |
 | [24 Terminal](spec/24-terminal.md) | Terminal on connected hosts through the host service `bothy-host` with a Noise-encrypted stream. Plus pairing, sessions, permissions, invariant I6, multi-node operation and tests. | Module `terminal`, host service, terminal views |
 | [25 Visualization](spec/25-visualization.md) | Own measurement of the server, live stream `stats.live`, native views in the package `bothy_viz` and the Grafana panel plugin "Bothy Live". Plus the optional embedding in the web console. | Statistics views and plugin |
+| [26 Built-in agents](spec/26-builtin-agents.md) | Agents created inside Bothy and hosted by a Claude Code runner: hosting and tokens, the versioned definition as closed data, its materialization in the runner, the interview with a builder agent, templates and their gate. Stage A1. | Built-in agents, module `agents` (definitions), runner hosting |
 
 ## 9. Where the API is defined normatively
 

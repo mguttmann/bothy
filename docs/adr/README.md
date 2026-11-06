@@ -87,4 +87,5 @@ if it is out of date. Do not edit it by hand.
 | [0073](0073-terminal-in-the-owners-own-account.md) | Terminal in the owner's own account (owner account mode) | accepted | 2026-11-01 |
 | [0074](0074-format-rules-for-agent-replies-from-the-sdk.md) | Format rules for agent replies from the SDK | accepted | 2026-11-04 |
 | [0075](0075-search-assistant-through-an-agent-over-the-full-text-search.md) | Search assistant through an agent over the full-text search | accepted | 2026-11-04 |
+| [0076](0076-built-in-agents-hosted-by-the-claude-code-runner.md) | Built-in agents hosted by the Claude Code runner | accepted | 2026-11-06 |
 <!-- adr-index:end -->

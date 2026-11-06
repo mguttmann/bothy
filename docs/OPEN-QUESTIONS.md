@@ -46,6 +46,8 @@ Sorted by deadline.
 | OQ-14 | Public commitments on deprecation and version overlap | default values from chapter 06 | before V1-05 |
 | OQ-15 | Commitments in SECURITY.md and GOVERNANCE.md | default values from chapter 23 | before V1-05 |
 | OQ-16 | Final name and trademark check | Bothy stays the working name | before V1-06 |
+| OQ-25 | Identity of new commits and the allow list of authors | the identity of the commits so far stays; `denylist-main` stays red on new commits until the ruling; recommendation: the hosting service's no-reply address | before V1-07 |
+| OQ-26 | Test from zero by a third person | the session's recorded run on a fresh host; a third person after A1-10 and V1-09 | before V1-10 |
 | OQ-17 | Package names and accounts for SDKs at PyPI and npm | reserve only after the choice of name | before the first SDK publication, at the latest V1-06 |
 | OQ-18 | Personal subscription in dev environments | no; V2-06 is not built | before V2-06 |
 | OQ-19 | Direct messages invisible to owners | yes, access only through the legal route | before V3-01 |
@@ -357,6 +359,35 @@ Sorted by deadline.
   example an instance setting that enables the terminal only with an edge in the private
   network), a change of [chapter 24](spec/24-terminal.md) and a change of M2-43 and M2-44.
 - **Due by:** before M2-43.
+
+### OQ-25: Identity of new commits and the allow list of authors
+
+- **Question:** Which identity do author and sign-off of new commits on `main` carry, and which
+  identities does the allow list of authors of the deny list scan accept?
+- **Why only the owner:** A personal or company identity in a public history is a public effect,
+  and the allow list lives in the operations repository and a CI secret that only the owner
+  changes. The commits so far carry the identity of the decision of 2026-10-10 (section
+  "Decided"); `denylist-main` fails on the latest squash commits because author and sign-off use
+  different identities (design note of the built-in agents, section 10).
+- **Default:** The identity of the commits so far stays, and `denylist-main` stays red on new
+  commits until the ruling. Recommendation: from now on the hosting service's no-reply address for
+  author and sign-off, added to the allow list (operations repository and CI secret), with the
+  existing history left as it is; rewriting a public `main` is irreversible and breaks every
+  clone.
+- **What the plan does with it:** V1-07 changes the allow list and the landing step of the
+  operations repository in the same step as the ruling.
+- **Due by:** before V1-07.
+
+### OQ-26: Test from zero by a third person
+
+- **Question:** Who runs the test from zero: a person who has never seen the project, a fresh
+  host, only the README?
+- **Why only the owner:** It needs a person outside the project and their time.
+- **Default:** The session records its own run on a fresh host (V1-10); the third person's run
+  follows after A1-10 and V1-09.
+- **What the plan does with it:** V1-10 prepares the script and the checklist; findings of the
+  third person become fixes with tests.
+- **Due by:** before V1-10.
 
 ## Decided
 

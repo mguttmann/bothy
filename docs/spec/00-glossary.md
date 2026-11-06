@@ -14,8 +14,10 @@ Code names are English and apply in API, database and code.
 | Action catalogue | `action catalogue` | Closed, normative list of all actions in docs/spec/05-actions.md. |
 | Agent | `agent` | Principal for a bot account that an adapter runs outside the server; at most level `write` and at most `upload` as a capability; never triggers agents itself. |
 | Agent adapter | `adapter` | Program outside the server that connects an agent to its runtime through the public API (for example the reference adapter for Hermes Agent). |
+| Agent definition | `agent_definition` | Versioned, closed description of a built-in agent: instructions, skills, MCP servers by secret reference, settings and origin; data that the hosting runner turns into the files of the agent's turns, never configuration of the runtime ([26-builtin-agents.md](26-builtin-agents.md) 4). |
 | Agent runtime | `runtime` | Software that actually executes an agent turn; never runs in the server process (B6, B10). |
 | Agent session | `agent_session` | Mapping of a thread to an external session of an agent; older rows of the same thread are the earlier session references. |
+| Agent template | `agent_template` | Generic, versioned starting point for an agent definition under `templates/agents/<slug>/`, or private from `agents.templates_dir`; never exported from an installation (26 7). |
 | API token | `api_token` | Long-lived access token for agents, apps or personal tools in the format `bothy_<kind>_<random>_<checksum>` ([ADR 0061](../adr/0061-token-format-with-a-fixed-prefix-and-checksum.md)); stored only as a hash. |
 | App | `app` | Principal of an installed integration with a manifest; acts only through the public API, at most level `write` and capability `upload`. |
 | App installation | `app_installation` | Installation of an app in the instance with granted scopes and event subscriptions. |
@@ -27,6 +29,8 @@ Code names are English and apply in API, database and code.
 | Backend policy | `billing_mode` | Setting per agent of what it runs on: `personal` (subscription of exactly one person) or `organization` (organization API key). |
 | Backup run | `backup_run` | Run of a backup or of an automatic restore test, with a result per check. |
 | Branding | `branding` | Display name, logo and colors of the instance as a setting (`branding.*`). |
+| Builder agent | `agents.builder_agent_id` | The agent that answers the interview of "New agent" with questions or a draft, one model call without tools per request (26 6). |
+| Built-in agent | `claude_agent` | Agent created inside Bothy with `adapter_kind = 'claude_agent'`; a Claude Code runner named in `agents.hosted_by` runs its turns from its definition (26). |
 | Capability | `capability` | Permission besides the level: `approve_actions`, `upload`, `export`, `manage`; on hosts only `terminal`. |
 | Catch-up | `catch-up` | Fetch of all visible durable events after a cursor, filtered by `authorize`. |
 | Channel | `channel` | Place for conversations; kinds `text`, `forum`, `dm`. `text` and `forum` are in exactly one space, `dm` in none (`space_id` NULL, 03); optionally read-only (`read_only`). |
@@ -80,6 +84,7 @@ Code names are English and apply in API, database and code.
 | Heartbeat | `heartbeat` | Regular sign of life of a client or agent; for agents with state and reported mode. |
 | Host | `host` | Connected computer (macOS, Linux, Windows, also a dev VM) with the host service; target of grants with the capability `terminal`. |
 | Host assignee | `hosts.assigned_user_id` | Person to whom a host is assigned; as a non-owner, only they get a terminal there (SR10). |
+| Hosting runner | `agents.hosted_by` | The Claude Code runner agent that hosts a built-in agent: it holds the agent's token, writes its folder and runs its turns (26 3). |
 | Host fingerprint | `key_fingerprint` | Check value over the Noise key and the authentication key of a host; the owner types its beginning during pairing ([24-terminal.md](24-terminal.md), section 4.3). |
 | Host pairing code | `host pairing code` | One-time code `bothy_hpc_...` of the owner with which the host service registers its public keys with the server. |
 | Host service | `bothy-host` | Separate program on a host that holds the keys of the host as a service user without administrator rights and talks to the server only outbound; for each person a PTY helper starts the PTYs as their session user. In the owner account mode (24 section 2.4) it runs as the instance owner's own account instead. |

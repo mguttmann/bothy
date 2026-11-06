@@ -102,6 +102,8 @@ milestones from the [plan](../PLAN.md).
 | Typing indicator (people); the agent "types" through the live box | core | D, M | `typing.start` | |
 | Presence of agents (online, degraded, offline) | core | D, M | `agent.read` | people have no presence |
 | Presence of people ("online") | never | | | reveals working hours; privacy and co-determination (study C, R5) |
+| Create a built-in agent from a template, an interview or a form, with a preview of everything it gets | core | D, M, W | `agent.create`, `agent.update`, `agent.interview`, `agent.templates.read` | section 6.20; stage A1 ([26-builtin-agents.md](26-builtin-agents.md)), only with a runner that hosts agents |
+| Edit, re-host and disable a built-in agent; undo a definition change | core | D, M, W | `agent.update`, `agent.definition.read`, `agent.host.set`, `agent.disable` | section 6.20; stage A1 |
 
 ### 3.3 Messages
 
@@ -2164,6 +2166,36 @@ console shows no attachments.
    beginning. A file above 1 MB opens as raw text with a notice and "Show formatted"; both forms
    build lazily, block by block, so a long file opens without freezing.
 
+### 6.20 New agent
+
+Addendum of 2026-11-06 (stage A1, R-PR-36, [26-builtin-agents.md](26-builtin-agents.md) 8,
+[design note](../design/builtin-agents.md)). Applies to the desktop, the phone and the web
+console.
+
+1. **Entry.** The agent list of the administration and the space menu have "New agent", shown
+   only to owners and only when at least one runner reports that it hosts agents (26 8.1); on an
+   older server the entry is missing.
+2. **Start.** Three ways: "From a template" (the list of 26 7 with name, description and the
+   secrets each needs), "Interview" (the builder asks one or two questions at a time; the person
+   answers in their own words; "Use what we have" asks for the draft early) and "Empty form". Without
+   a builder, or when it does not answer, the interview says why and offers the other two.
+3. **Preview.** One editable page with everything that will be created: name, handle,
+   description, avatar, instructions, each skill, each MCP server with the secret names to add on
+   the runner host, the hosting runner, the tool class with what it does and does not load, the
+   billing mode, the model and the cost cap per run, and the channel to create (space and name) or
+   none. The cost estimate of the interview so far is shown.
+4. **Steps.** "Create" runs the steps of 26 8.2 in their order (create the agent, set a class
+   above `chat`, store the definition, billing, channel and operator) with the states waiting,
+   running, done and failed, and a step-up prompt where one is needed. The class comes before the
+   definition, so a definition with a local (`stdio`) MCP server is accepted. A failed step shows
+   one sentence for its cause and the editable preview; "Try again" runs the steps not done yet in
+   that order, a lowered class after the definition (26 8.3), and creates nothing twice, "Close" keeps what exists (26 8.3).
+5. **Done.** The dialog opens the new channel, or the agent card when no channel was created.
+6. **Edit.** The agent card of a built-in agent offers "Edit" (the same preview, saved as a new
+   version with step-up; a raised class is set before saving, a lowered one after it, 26 8.4),
+   "Versions" (undo by saving an older version again), "Change runner" and "Disable". An agent
+   without a definition shows "Not set up" with "Continue setup".
+
 ## 7. Keyboard shortcuts
 
 Shortcuts apply on desktop. They avoid system assignments (Cmd+H, Cmd+M, Cmd+Q, Alt+F4,
@@ -2432,6 +2464,7 @@ Rules:
 | R-PR-33 | Spaces, channels, project forums and chats are deleted from "Delete..." at the end of their menus (owner for a space, `manage` for a channel or forum, the creator or `manage` for a chat, never a main thread) after a dialog that names the non-zero counts of what goes; an owner may also move the project folder to the trash of the runner's host when the runner's check allows it; a toast offers "Undo" within the undo window, and every client removes a deleted item at once and brings it back on undo (6.18, addendum of 2026-11-01). | Owner request 2026-11-01: nothing could be deleted in the app; the confirmation must name what goes, a slip needs a quick undo, and a project folder must never be lost (docs/decisions.d/FEAT-delete-spaces-chats.md). |
 | R-PR-34 | A servable Markdown, text, log, JSON, YAML or CSV attachment opens in an in-app document viewer instead of the system app: Markdown rendered by the renderer of messages, JSON pretty, a small CSV as a table, text raw, with raw and formatted view, search with marks, copy all, Save as, Open in another app, a table of contents, the mouse selection of the desktop and reading keys; a file that is not servable never opens, and web images load only on a click (6.19, addendum of 2026-11-02). | Owner request 2026-11-02: most of what agents send are Markdown files and had to be viewed outside the app (docs/decisions.d/FEAT-markdown-viewer.md). |
 | R-PR-35 | A code block without a language or with a text language (`text`, `plaintext`, `txt`, `markdown`, `md`) also offers "Copy as text", which joins the line breaks inside a paragraph with a space and keeps paragraphs, list items, headings and Markdown hard breaks; a block in a programming language never offers it and "Copy code" stays exact; the toggle of 6.14 reads "Wrap display" with a tooltip that it changes only the display (6.12 item 7, addendum of 2026-11-04). | Owner report 2026-11-04: a reply an agent had written to forward, broken by hand after about 60 to 70 characters in a fenced block, arrived as a packet of short lines in a mail or another chat whether "Wrap lines" was on or off (docs/decisions.d/F-KOPIER-FLIESSTEXT.md). |
+| R-PR-36 | Owners create a built-in agent with "New agent" from a template, an interview with the builder agent or an empty form, see and edit everything in one preview before anything is created, and confirm visible steps with step-up; the entry shows only when a runner hosts agents (6.20, addendum of 2026-11-06). | Owner request 2026-11-05: Bothy should be worth trying without another agent runtime; the preview is the only place where a person sees what a model drafted before it runs on their host ([26-builtin-agents.md](26-builtin-agents.md)). |
 
 ## 14. Configuration values of this chapter
 

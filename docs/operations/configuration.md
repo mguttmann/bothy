@@ -991,6 +991,36 @@ Source: [25-visualization.md](../spec/25-visualization.md), section 15.
 | `viz.tv_show_costs` |  | App |  | `false` | show costs in TV mode |  |
 | `viz.perf.frame_build_p95` |  | App |  | `8ms` | target: build of one frame of the live topology with `stats.live_max_runs` runs |  |
 | `viz.perf.frame_build_p95_ci` |  | App |  | `50ms` | budget of the same test on a shared hosted CI runner (measured p95 about 23 ms on the macOS runner, about twice that as headroom); the reference target above holds on reference hardware through `make perf` |  |
+
+### 26 Built-in agents
+
+Source: [26-builtin-agents.md](../spec/26-builtin-agents.md), section 14.
+
+| Key | Environment | Place | Type | Default | Meaning | Status |
+|---|---|---|---|---|---|---|
+| `agents.builder_agent_id` | `BOTHY_AGENTS__BUILDER_AGENT_ID` | Server |  | empty | agent that answers interview requests (6); empty means no interview, templates and the manual form only | planned (A1) |
+| `agents.templates_dir` | `BOTHY_AGENTS__TEMPLATES_DIR` | Server |  | empty | folder of private templates outside the repository (7.2); empty means shipped templates only | planned (A1) |
+| `agents.interview.timeout` | `BOTHY_AGENTS__INTERVIEW__TIMEOUT` | Server |  | `90s` | longest wait for the builder's answer; the deadline of `interviewAgent` instead of `http.request_timeout` (6.1) | planned (A1) |
+| `agents.interview.max_turns` | `BOTHY_AGENTS__INTERVIEW__MAX_TURNS` | Server |  | `12` | most turns of the interview history in one request | planned (A1) |
+| `agents.interview.answer_max_chars` | `BOTHY_AGENTS__INTERVIEW__ANSWER_MAX_CHARS` | Server |  | `4000` | longest answer of the person in one turn | planned (A1) |
+| `agents.hosted_token_ttl` | `BOTHY_AGENTS__HOSTED_TOKEN_TTL` | Server |  | `24h` | lifetime of a token for a hosted agent (3.3) | planned (A1) |
+| `agents.mcp_stdio_runners` | `BOTHY_AGENTS__MCP_STDIO_RUNNERS` | Server |  | `["npx", "uvx"]` | commands a `stdio` MCP server may use (4.2) | planned (A1) |
+| `agents.definition.instructions_max_bytes` | `BOTHY_AGENTS__DEFINITION__INSTRUCTIONS_MAX_BYTES` | Server |  | `65536` | longest `instructions` | planned (A1) |
+| `agents.definition.max_skills` | `BOTHY_AGENTS__DEFINITION__MAX_SKILLS` | Server |  | `32` | most skills of a definition | planned (A1) |
+| `agents.definition.skill_description_max_chars` | `BOTHY_AGENTS__DEFINITION__SKILL_DESCRIPTION_MAX_CHARS` | Server |  | `300` | longest skill description, one line | planned (A1) |
+| `agents.definition.skill_body_max_bytes` | `BOTHY_AGENTS__DEFINITION__SKILL_BODY_MAX_BYTES` | Server |  | `65536` | longest skill body and extra skill file | planned (A1) |
+| `agents.definition.max_skill_files` | `BOTHY_AGENTS__DEFINITION__MAX_SKILL_FILES` | Server |  | `8` | most extra files of one skill | planned (A1) |
+| `agents.definition.max_mcp_servers` | `BOTHY_AGENTS__DEFINITION__MAX_MCP_SERVERS` | Server |  | `16` | most MCP servers of a definition | planned (A1) |
+| `agents.definition.max_allowed_tools` | `BOTHY_AGENTS__DEFINITION__MAX_ALLOWED_TOOLS` | Server |  | `64` | most entries of `settings.allowed_tools` | planned (A1) |
+| `agents.definition.max_cost_usd_per_run` | `BOTHY_AGENTS__DEFINITION__MAX_COST_USD_PER_RUN` | Server |  | `50` | highest cost cap per run a definition may set | planned (A1) |
+| `runner.hosted_agents` |  | Runner |  | `false` | host the agents whose `hosted_by` is this runner (3.2) |  |
+| `runner.hosted_agents_root` |  | Runner |  | empty | root of the agent and control folders; required with `runner.hosted_agents`; never inside, equal to or above `runner.state_dir` or `runner.projects_root` (5.1) |  |
+| `runner.hosted_max_tool_class` |  | Runner |  | `scoped` | highest tool class loaded for a hosted agent, reported as the value of `hosts_agents` (3.1) |  |
+| `runner.mcp_stdio_runners` |  | Runner |  | `["npx", "uvx"]` | commands the runner starts for a `stdio` MCP server; a definition naming another command is refused before the turn (5.6) |  |
+| `runner.agent_builder` |  | Runner |  | `false` | answer interview requests when this runner is the builder agent (6.2) |  |
+| `runner.agent_builder_model` |  | Runner |  | `sonnet` | model of the builder call (6.2) |  |
+| `runner.agent_builder_timeout` |  | Runner |  | `80s` | time limit of one builder call; below the server's `agents.interview.timeout` (6.2) |  |
+| `runner.channel_skills_dir` |  | Runner |  | empty | folder of channel skills for `claude-code:<name>` references, loaded only in `host` turns; empty means channel skills off (5.9) |  |
 <!-- config-reference:end -->
 
 ## 5. Secrets

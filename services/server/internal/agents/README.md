@@ -518,7 +518,7 @@ Checked by go-arch-lint (ADR 0008).
 
 ## Tables
 
-`agents`, `agent_consumer_cursors`, `commands`, `agent_sessions`, `dev_environments`.
+`agents`, `agent_definitions`, `agent_consumer_cursors`, `commands`, `agent_sessions`, `dev_environments`.
 
 Only this module writes and reads these tables by SQL (03-data-model.md, principle 12).
 

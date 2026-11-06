@@ -233,6 +233,46 @@ Normative together with [24-terminal.md](24-terminal.md), section 8.
    anyone with a valid grant `terminal` on it, even if SR10 blocks it (so that the
    person sees the reason). Otherwise `404`.
 
+### 2.13 Built-in agents
+
+Normative together with [26-builtin-agents.md](26-builtin-agents.md) (stage A1). A built-in agent
+is an agent principal like every other (2.9): grants, the operator rule, SR1, SR2, SR4 and SR9 apply
+to it unchanged, and its tool class is its own `agents.tool_class` (2.11), never its definition.
+
+1. Creating, editing, re-hosting and disabling a built-in agent are owner actions with step-up,
+   because an agent with tools runs on a host with the host user's rights. Writing a definition is
+   part of `agent.update`.
+2. The interview spends money on the builder agent's account like a trigger: owners only, class
+   `rl.trigger`, and it counts as writing for the read-only rule of "view as" (9.2). Its effect
+   is `write` (05 2.7: it writes an audit entry), so the maintenance mode refuses it; the builder's
+   answer `agent.interview.respond` is not in the closed list of `read` actions of 05 2.7 and is
+   `write` as well.
+3. A hosted agent's token goes only to its hosting runner: `agent.hosted_token.issue` is
+   agent-self of the runner named in `hosted_by`, and every other caller gets `404` like for an
+   unknown agent. No person ever receives such a token (26 3.3).
+4. SR2 applies to built-in agents unchanged; a definition with a `stdio` MCP server needs
+   `tool_class = 'host'` (26 4.4), so only owners trigger it. The tool list of a definition only
+   narrows `runner.scoped_allowed_tools` of the hosting runner.
+
+The actions below enter `docs/spec/actions.yaml` with the ticket that builds them, with exactly
+these values (R-BA-14); 05 4.10 then carries them as generated rows.
+
+| Action | Description | Resource | Permission | Owner | Step-up | Audit | Permissions | Rate-limit class | Effect | Ticket |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `agent.definition.read` | read the current definition and its versions | agent | owner or agent-self | no | no | no | no | `rl.read` | read | A1-02 |
+| `agent.host.set` | change the hosting runner of a built-in agent; revokes the tokens the old host holds | agent | owner | yes | yes | yes | no | `rl.admin` | write | A1-03 |
+| `agent.hosted.list` | list the agents whose `hosted_by` is the calling runner | agent | agent-self (a runner reporting `hosts_agents`) | no | no | no | no | `rl.agent_runtime` | read | A1-03 |
+| `agent.hosted_token.issue` | issue a token for a hosted agent, bound to the caller's DPoP key | agent | agent-self of the runner named in `hosted_by` of the target | no | no | yes | no | `rl.agent_runtime` | write | A1-03 |
+| `agent.interview` | send the interview so far to the builder agent and return its questions or draft | instance | owner | yes | no | yes | no | `rl.trigger` | write | A1-07 |
+| `agent.interview.respond` | answer an open `agent.interview_requested` | agent | agent-self, the builder agent the request was sent to | no | no | no | no | `rl.agent_runtime` | write | A1-07 |
+| `agent.templates.read` | list the shipped and private templates | instance | owner | yes | no | no | no | `rl.read` | read | A1-06 |
+
+`agent.create` gains the optional member `hosted_by` (26 3.1) and `agent.update` the definition
+(26 4.1), each with their present columns. `agent.tool_class.set` is refused below `host` for an
+agent whose definition has a `stdio` server (`definition_needs_host`, R-BA-06) and above the
+hosting runner's ceiling (`host_tool_class_ceiling`); `token.create` for a built-in agent is
+refused (`hosted_agent_token`).
+
 ## 3. Principal context
 
 `authorize` receives not just an ID, but the verified context of the request. The
@@ -622,6 +662,8 @@ An agent with `tool_class = 'host'` may only be triggered by:
   is executed.
 
 Otherwise `tool_class_owner_only`. Checked in `agent.invoke` on acceptance and before every delivery.
+For a built-in agent the class is its own `agents.tool_class` like for every agent; a `stdio` MCP
+server in its definition requires `host` and therefore this rule (2.13, R-RE-12).
 A grant with `trigger` on a channel with a `host` operator is not rejected; the preview
 (section 9.3) says in plain text that it does not enable triggering. Reason for the check at the
 invocation instead of at creation: the readiness of an environment changes without a permission
@@ -1352,6 +1394,7 @@ DM between Alex and Sam. The clock is controllable in tests.
 | R-RE-09 | The expiry job only reports; the decision never depends on it. | Study C: expiry is checked on every call; clients still clean up. |
 | R-RE-10 | Preview as a dry run in the real transaction with rollback. | The same logic as the real write; plain text from templates, not from a model. |
 | R-RE-11 | Host as its own target with only `terminal`; SR10, SR11 and SR12 as guard rules. | A terminal is remote access to a host; neither inheritance nor delegation may open it, and no account on the host is shared between people (Ruling T1, T2, T12). |
+| R-RE-12 | Built-in agents get no permission of their own: owner actions with step-up to create, edit and re-host them, an owner-only interview, a hosted token only for the hosting runner, and SR2 for a definition with a `stdio` MCP server (2.13, addendum of 2026-11-06). | An agent with tools runs with the host user's rights, which is an owner decision today; a definition must not widen what its class allows ([26-builtin-agents.md](26-builtin-agents.md), ADR 0076). |
 
 ## 13. Alignment with the core contract
 

@@ -684,6 +684,21 @@ def test_planned_key_rendered_with_milestone(tmp_path: Path) -> None:
     )
 
 
+def test_planned_key_of_stage_a1_is_rendered(tmp_path: Path) -> None:
+    """A planned key of stage A1 (built-in agents, PLAN section 21) carries its stage."""
+    planned = PLANNED.replace("milestone: M2\n", "milestone: A1\n", 1)
+    root = written(write_repo(tmp_path, planned=planned))
+    out = (root / "docs/operations/configuration.md").read_text(encoding="utf-8")
+    assert "| Sum | planned (A1) |" in out
+
+
+def test_unknown_milestone_is_refused(tmp_path: Path) -> None:
+    planned = PLANNED.replace("milestone: M2\n", "milestone: A9\n", 1)
+    root = write_repo(tmp_path, planned=planned)
+    with pytest.raises(configdoc.InputError, match="not M1 to M8, V1 to V3 or A1"):
+        configdoc.load_planned(root / "tools/configdoc/planned.yaml", "planned.yaml")
+
+
 def test_planned_key_without_rule_fails(tmp_path: Path) -> None:
     planned = PLANNED.replace('  - match: "agent."\n    milestone: M2\n', "")
     root = write_repo(tmp_path, planned=planned)

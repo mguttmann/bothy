@@ -39,7 +39,11 @@ def test_canonical_block_has_five_rules() -> None:
     ]
 
 
-@pytest.mark.parametrize("brief", sorted(BRIEFS.glob("M*.md")), ids=lambda p: p.name)
+# Briefs of the milestones (M*) and of the stages after them (A1, PLAN section 21).
+BRIEF_FILES = sorted([*BRIEFS.glob("M*.md"), *BRIEFS.glob("A*.md")])
+
+
+@pytest.mark.parametrize("brief", BRIEF_FILES, ids=lambda p: p.name)
 def test_brief_quotes_the_rules_verbatim(brief: Path) -> None:
     text = brief.read_text(encoding="utf-8")
     assert text.count(canonical_rules()) == 1, f"{brief.name}: fixed build rules differ"
