@@ -108,8 +108,25 @@ def test_every_fixture_file_is_tracked() -> None:
     assert sorted(str(p.relative_to(FIXTURES)) for p in on_disk - tracked) == []
 
 
+# The deny rule fixture holds a placeholder for its 18-digit chat id: the private deny list
+# carries the same rule without the fixture exclusion of tools/denylist/generic.rules, so the id
+# is written into a copy at test time and never committed.
+ROOM_ID = str(123456789 * 10**9 + 12345678)
+
+
+def _materialize(case: Path, tmp_path: Path) -> Path:
+    if f"{case.parent.name}/{case.name}" != "denylist/generic-rule":
+        return case
+    copy = tmp_path / case.parent.name / case.name
+    shutil.copytree(case, copy)
+    md = copy / "CLAUDE.md"
+    md.write_text(md.read_text(encoding="utf-8").replace("{room_id}", ROOM_ID), encoding="utf-8")
+    return copy
+
+
 @pytest.mark.parametrize("case", CASES, ids=lambda p: f"{p.parent.name}/{p.name}")
-def test_each_fixture_fails_with_its_rule(case: Path) -> None:
+def test_each_fixture_fails_with_its_rule(case: Path, tmp_path: Path) -> None:
+    case = _materialize(case, tmp_path)
     findings = gate.check_template(case, f"templates/agents/{case.name}", _context())
     assert findings, "the fixture passed the gate"
     assert {f.rule for f in findings} == {case.parent.name}
