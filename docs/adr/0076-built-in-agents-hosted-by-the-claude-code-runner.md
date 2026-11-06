@@ -91,9 +91,11 @@ pattern of the search assistant ([ADR 0075](0075-search-assistant-through-an-age
   runner and the runner's token (BA-T01 to BA-T08).
 - Runner tests: byte-equal fixtures without the new keys; materializer, rebuild and command line
   per class; the probe against the pinned CLI with a planted skill carrying hooks,
-  `allowed-tools: Bash` and both inline shell forms (BA-T09 to BA-T14, BA-T19, BA-T20).
+  `allowed-tools: Bash` and both inline shell forms; channel skills only in `host` turns
+  (BA-T09 to BA-T14, BA-T19, BA-T20, BA-T22).
 - Template gate with one failing fixture per surface; interview tests where a builder answer
   carrying each surface is refused (BA-T15, BA-T17).
+- Creation flow that sets the class before the definition, also for a `stdio` template (BA-T16).
 - End to end on the demo stack with a fake Claude (BA-T21).
 
 ## Pros and Cons of the Options

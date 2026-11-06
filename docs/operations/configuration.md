@@ -1020,7 +1020,7 @@ Source: [26-builtin-agents.md](../spec/26-builtin-agents.md), section 14.
 | `runner.agent_builder` |  | Runner |  | `false` | answer interview requests when this runner is the builder agent (6.2) |  |
 | `runner.agent_builder_model` |  | Runner |  | `sonnet` | model of the builder call (6.2) |  |
 | `runner.agent_builder_timeout` |  | Runner |  | `80s` | time limit of one builder call; below the server's `agents.interview.timeout` (6.2) |  |
-| `runner.channel_skills_dir` |  | Runner |  | empty | folder of channel skills for `claude-code:<name>` references; empty means channel skills off (5.9) |  |
+| `runner.channel_skills_dir` |  | Runner |  | empty | folder of channel skills for `claude-code:<name>` references, loaded only in `host` turns; empty means channel skills off (5.9) |  |
 <!-- config-reference:end -->
 
 ## 5. Secrets

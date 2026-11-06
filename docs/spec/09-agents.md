@@ -706,7 +706,7 @@ an unknown member):
 
 | Key | Content |
 |---|---|
-| `capabilities` | object, section 2.2: `followups` (`steer` or `queue`), `components`, `voice_input`, `title`, `files_out` (booleans) |
+| `capabilities` | object, section 2.2: `followups` (`steer` or `queue`), `components`, `voice_input`, `title`, `files_out` (booleans), and for runners only `hosts_agents` (`chat`, `scoped` or `host`, sent only with `runner.hosted_agents`; addendum of 2026-11-06, [26-builtin-agents.md](26-builtin-agents.md) 3.1; a server before stage A1 refuses it as an unknown member, 26 11 item 4) |
 | `active_runs` | distinct ids (UUID, R-DM-01) of the runs in `running` or `waiting_input` the adapter holds |
 | `degraded_reasons` | distinct codes, for example `runtime_unreachable`, `busy_mode_invalid`, `billing_evidence_unknown` |
 | `adapter` | `name` (required, name form), `version` (optional, version form): the adapter's own version ([18-release.md](18-release.md) section 9 point 5) |
@@ -3723,7 +3723,8 @@ own agent: one connection with each hosted agent's own token (fetched with
 under `<runner.state_dir>/hosted/<agent_id>/`, and the shared slots of `runner.max_parallel_runs`.
 A hosted turn follows 18.2 to 18.11 with the changes of 26 5.3 (working folder, settings, skills,
 MCP configuration, cost cap) and the rebuild of 26 5.6. With `runner.agent_builder` it answers
-interview requests (26 6.2); with `runner.channel_skills_dir` it loads channel skills (26 5.9).
+interview requests (26 6.2); with `runner.channel_skills_dir` it loads channel skills in turns of
+class `host` only, for its own agent and for hosted agents (26 5.9, R-BA-13).
 Without these keys nothing in 18.1 to 18.17 changes, held by the byte-equal fixtures (BA-T20).
 
 ## 19. Decisions of this chapter

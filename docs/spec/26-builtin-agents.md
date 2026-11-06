@@ -212,7 +212,8 @@ template gate, on every template (section 7); the runner repeats it before every
    preview says so. Under `scoped` only `http` servers are loaded.
 4. A `stdio` MCP server starts a local process with the rights of the host user, so it needs
    `host`: the server refuses the definition below `host` (4.3 item 7) and the preview offers
-   `agent.tool_class.set` to `host`, after which SR2 limits triggering to owners.
+   `agent.tool_class.set` to `host`, after which SR2 limits triggering to owners. The apps run
+   that class step before they write such a definition, on create and on edit (8.2, 8.4).
 5. `agent.tool_class.set` below `host` for an agent whose current definition has a `stdio` server
    is refused with `409 conflict`, reason `definition_needs_host`; the owner first removes the
    server (R-BA-06). The runner also refuses a turn that would start a `stdio` server under a token
@@ -261,7 +262,7 @@ else `runner.default_model`) and the flags of its tool class, with these changes
 
 | Class | Tool flags | Added directly after `--permission-prompts none`, before `--add-dir` |
 |---|---|---|
-| `chat` | `--tools` gets `Skill` when the definition has skills, else stays `""`; `--disallowedTools "mcp__*"` stays | `--restricted --settings <control>/settings.json`, and with skills `--plugin-dir <control>/plugin` |
+| `chat` | `--tools` gets `Skill` and `--allowedTools Skill` follows it when the definition has skills, else `--tools` stays `""`; `--disallowedTools "mcp__*"` stays | `--restricted --settings <control>/settings.json`, with skills `--plugin-dir <control>/plugin`, then `--strict-mcp-config` |
 | `scoped` | `--tools <baseline and intersected tools>` before `--allowedTools`; `--allowedTools` names the intersected tools of 4.4 item 2 plus `Skill` when the definition has skills | `--restricted --settings <control>/settings.json --plugin-dir <control>/plugin --mcp-config <turn MCP file> --strict-mcp-config` |
 | `host` | unchanged | `--setting-sources project,local --settings <control>/settings.json --plugin-dir <control>/plugin --mcp-config <turn MCP file> --strict-mcp-config` |
 
@@ -271,9 +272,13 @@ it, directly before `--append-system-prompt-file`. Under `scoped` the baseline o
 limits to read-only commands) plus `Skill` when the definition has skills, followed by the
 intersected tools. `--mcp-config` takes several values, so it is always followed by
 `--strict-mcp-config`, never by a positional argument; `--plugin-dir` and `--mcp-config` are left
-out when there is nothing to load. `--restricted` keeps user, project and local settings files out
-and confines the file tools to the working folder (help text of the pinned CLI 2.1.288, read on
-2026-11-06); its fallback is in 5.7. A test compares the whole list per class (BA-T13).
+out when there is nothing to load. `--strict-mcp-config` stands in every class, also under `chat`
+without `--mcp-config`, because `--restricted` alone still starts the MCP servers of the host
+user's configuration ("add --strict-mcp-config to skip MCP servers too", help text of the pinned
+CLI). `dontAsk` refuses a tool that is not allowed in advance, so `Skill` is named in
+`--allowedTools` wherever `--tools` carries it. `--restricted` keeps user, project and local
+settings files out and confines the file tools to the working folder (help text of the pinned CLI
+2.1.288, read on 2026-11-06); its fallback is in 5.7. A test compares the whole list per class (BA-T13).
 
 ### 5.4 Runner settings
 
@@ -330,12 +335,15 @@ and applies the fallback when the probe fails:
 |---|---|---|
 | `--restricted` with `--settings`, `--plugin-dir` and the working folder's `CLAUDE.md` under `chat` and `scoped` | settings and plugin skills apply, `CLAUDE.md` of the working folder is read | `--setting-sources project,local` with `.claude/settings.local.json` for every class |
 | A skill outside the plugin folder (user or project skills of the host user) | not reachable through `Skill` | below `host` the runner loads no skills and leaves out `Skill`; the preview says so |
+| A plugin skill under `chat` and under `scoped` with `dontAsk`, `--tools` and `--allowedTools` naming `Skill` | the skill loads and its text reaches the turn | below `host` the runner loads no skills and leaves out `Skill`; the preview says so |
+| `--strict-mcp-config` without `--mcp-config` under `chat`, with an MCP server in the host user's configuration | no MCP server process starts | below `host` the runner passes `--mcp-config` with an empty server list before `--strict-mcp-config` |
 | `--tools` against `allowed-tools` of a planted skill | no tool outside `--tools` | skills only under `host`, as above |
 | `disableAllHooks` against hooks of a planted skill or plugin | no hook runs | the closed schema alone; recorded as a residual risk |
 | A plugin `bin/` folder | not on the turn's `PATH` | the runner never writes `bin/` and removes it (5.6) |
 | The user-level `CLAUDE.md` of the host user and a `CLAUDE.md` above the agent folder | not loaded | named in the runner README and in the preview of the creation flow; the runner keeps the start refusal of 5.1 item 1 |
 | A settings file changed during a turn | not reloaded with wider rights | the deny rules of 5.4 and the rebuild before the next turn |
 | A read-only shell command under `dontAsk` reading another process's environment | refused | recorded as a residual risk of T-BA-02; secrets stay out of every environment (5.2) |
+| `Read` and a read-only shell command (`cat`) under `scoped` reading the per-turn MCP file of its own turn and of a concurrent turn in the control folder | refused, the path lies outside the working folder | below `host` the runner loads only MCP servers without a `secret_ref`; the preview says so, and the gap is recorded as a residual risk of T-BA-02 |
 | The end of a turn stopped by `--max-budget-usd` | a `result` the runner recognizes | the run ends `failed` with `runtime_error` and the cause `cost_cap_reached` in the summary either way (5.8) |
 
 ### 5.8 Cost cap
@@ -348,19 +356,33 @@ per agent is not part of this stage.
 ### 5.9 Channel skills behind their own key
 
 `runner.channel_skills_dir` (default empty, off) turns on skills of `channel_skill_bindings` for
-the runner's own agent and for hosted agents. A `skill_ref` of the form `claude-code:<name>` with
-`<name>` matching `^[a-z0-9-]{1,64}$` resolves to `<runner.channel_skills_dir>/<name>/` (a folder
-with a `SKILL.md`), handed to the turn as one more `--plugin-dir`; every other reference belongs to
-another adapter and is skipped with a debug log line only. A `claude-code:` reference without a
-folder is logged and named in the live box, not fatal. Without the key the runner reads no
-bindings, and its command line, heartbeat and live box are byte-equal to the fixtures, also for a
-channel with bindings of both forms (BA-T20).
+turns of class `host` only, of the runner's own agent and of hosted agents. A `skill_ref` of the
+form `claude-code:<name>` with `<name>` matching `^[a-z0-9-]{1,64}$` resolves to
+`<runner.channel_skills_dir>/<name>/` (a folder with a `SKILL.md`), handed to a `host` turn as one
+more `--plugin-dir`; every other reference belongs to another adapter and is skipped with a debug
+log line only. A `claude-code:` reference without a folder is logged and named in the live box, not
+fatal. A turn of class `chat` or `scoped` loads no channel skill: the runner adds no `--plugin-dir`
+for it, logs the skipped references and names them in the live box once per run with the reason
+that channel skills need `host` (R-BA-13, BA-T22).
+
+Reason for `host` only: a channel skill folder is the host operator's own content, not data that 4.3
+checks; its frontmatter (`allowed-tools`, `hooks`), its inline shell and any plugin part in it would
+widen a `chat` or `scoped` turn, and which skill a channel gets is decided by a person with `manage`
+on the channel, not by an owner (T-BA-03). A `host` turn already runs with the rights of the host
+user and only owners trigger it (SR2), so a channel skill adds nothing such a turn could not do.
+The key is new in this stage, so no running installation loads channel skills today and the rule
+changes no existing setup; a `host` agent of the runner loads them as soon as the operator sets the
+key.
+
+Without the key the runner reads no bindings, and its command line, heartbeat and live box are
+byte-equal to the fixtures, also for a channel with bindings of both forms (BA-T20).
 
 ## 6. Interview
 
 ### 6.1 Request and answer
 
-1. `interviewAgent` (action `agent.interview`, owner, `rl.trigger`, effect `read`) carries the
+1. `interviewAgent` (action `agent.interview`, owner, `rl.trigger`, effect `write`, so the
+   maintenance mode refuses it like every audited action, 05 2.7) carries the
    interview so far, kept by the client: the person's answers and the builder's earlier
    questions, at most `agents.interview.max_turns` turns of at most
    `agents.interview.answer_max_chars` characters each. The server sends the ephemeral event
@@ -484,17 +506,24 @@ The dialog offers a template, the interview or the manual form, then a preview o
 instructions, each skill, each MCP server with the secret names it needs, tool class (with what
 the class does not load, 4.4 and 5.7), billing mode, model and cost cap, all editable. "Create"
 runs, in this order and each visible with its state (01 6.9 pattern): `agent.create` with
-`hosted_by` and `adapter_kind = 'claude_agent'` (step-up); `putAgentDefinition`;
-`agent.tool_class.set` when the class is not `chat`; `agent.billing_mode.set` when `personal` is
-chosen (10 10.3); on request `channel.create` in the chosen space and `channel.operator.set` with
-the new agent. A step-up prompt appears where an action needs one.
+`hosted_by` and `adapter_kind = 'claude_agent'` (step-up); `agent.tool_class.set` when the class
+is not `chat`; `putAgentDefinition`; `agent.billing_mode.set` when `personal` is chosen
+(10 10.3); on request `channel.create` in the chosen space and `channel.operator.set` with the new
+agent. A step-up prompt appears where an action needs one. The class comes before the definition
+because the server refuses a definition with a `stdio` server for an agent below `host` (4.3
+item 7); until the definition is stored the agent is "not set up" and runs no turn (8.3), so the
+raised class serves nothing in between.
 
 ### 8.3 Failure of a step
 
 Every step is its own action with its own audit entry; nothing is rolled back. When a step after
-`agent.create` fails, the agent stays without definition, without channel or with `chat`, as far as
-the steps went. The dialog shows the failed step with one sentence for its cause; "Try again"
-resumes at that step with the edited fields and creates nothing twice; "Close" keeps what exists.
+`agent.create` fails, the agent stays with `chat`, without definition or without channel, as far as
+the steps went. The dialog shows the failed step with one sentence for its cause and lets the owner
+edit the preview. "Try again" compares each step's target from the edited fields with what the
+agent has (class, current definition, billing mode, channel and operator) and runs, in the order
+of 8.2, every step whose target is not reached yet, so a class raised in the preview after a
+refused definition is set before the definition is written again; it creates nothing twice.
+"Close" keeps what exists.
 The agent list marks a built-in agent without a definition as "not set up" with "Continue setup"
 and "Disable". Its hosting runner serves no turn for it (5.6 item 4). A test per step holds that a
 failure leaves exactly the earlier steps and their audit entries (BA-T16).
@@ -503,7 +532,12 @@ failure leaves exactly the earlier steps and their audit entries (BA-T16).
 
 Owners edit instructions, skills, MCP servers and settings with the same preview and step-up
 (`putAgentDefinition`), change the host (`agent.host.set`), and disable or delete through the
-existing actions (`agent.disable`; 09 2.1). The version list offers undo (4.1 item 2).
+existing actions (`agent.disable`; 09 2.1). The version list offers undo (4.1 item 2). When an
+edit also changes the class, saving runs two visible steps: a raised class is set before the
+definition is written (`agent.tool_class.set`, then `putAgentDefinition`), so a newly added
+`stdio` server is accepted; a lowered class is set after it (`putAgentDefinition`, then
+`agent.tool_class.set`), so a removed `stdio` server no longer blocks the downgrade of R-BA-06. A
+failed step keeps the earlier one and offers "Try again" as in 8.3.
 
 ## 9. Actions, operations and events
 
@@ -552,7 +586,10 @@ hosted agent in `personal` always equals that of its hosting runner (R-BA-12).
    on an older server.
 4. **Rollback.** Turning `runner.hosted_agents` off takes the hosted agents offline (their runs end
    like those of any offline agent) and leaves the runner's own agent as before; their definitions
-   stay. Going back one server version leaves the new table and column unread.
+   stay. Going back one server version needs `runner.hosted_agents` off on every runner first: the
+   older server knows no capability `hosts_agents`, so it refuses such a heartbeat as an unknown
+   member (09 4.8), while a runner with the key off sends the heartbeat of the version before this
+   stage (item 3). The older server then leaves the new table and column unread.
 
 ## 12. Tests
 
@@ -573,12 +610,13 @@ hosted agent in `personal` always equals that of its hosting runner (R-BA-12).
 | BA-T13 | command line per class against 5.3 with fake Claude; `stdio` server under a token below `host`; a definition failing 4.3 | exact list; `tool_class_mismatch` before `run.start` (A1-05) |
 | BA-T14 | probe against the pinned CLI with a planted skill carrying `hooks`, `allowed-tools: Bash` and both inline shell forms, and every point of 5.7 | no hook, no `Bash`, the placeholder "[shell command execution disabled by policy]"; results recorded in 5.7 (A1-05, real CLI behind its switch) |
 | BA-T15 | interview: question turn, draft turn, a builder answer carrying each surface of 5.5, each fallback, timeout | draft validated; surfaces refused; fallback reason named; one audit entry and one log line without content (A1-07) |
-| BA-T16 | creation flow: a failure at each step after `agent.create` | earlier steps and their audit entries stay, nothing more; "Try again" creates nothing twice (A1-08) |
+| BA-T16 | creation flow: a failure at each step after `agent.create`; a template with a `stdio` server created with class `host`; a definition refused with `tool_class_too_low`, the class raised in the preview, "Try again"; an edit that adds a `stdio` server and raises the class, and one that removes it and lowers the class | earlier steps and their audit entries stay, nothing more; `agent.tool_class.set` runs before `putAgentDefinition` when the class rises and after it when it falls, so the `stdio` cases are stored without `tool_class_too_low` or `definition_needs_host`; "Try again" runs the missing steps in the order of 8.2 and creates nothing twice (A1-08, A1-09) |
 | BA-T17 | template gate: one failing fixture template per surface of 5.5 and per rule of 7.3; the shipped templates | each fixture fails with its rule; shipped templates pass (A1-06) |
 | BA-T18 | private templates folder with a taken slug and an invalid template | skipped with their log codes (A1-06) |
 | BA-T19 | cost cap reached in a turn (fake Claude) | run `failed`, `runtime_error`, cause `cost_cap_reached` in the summary, costs reported (A1-05) |
 | BA-T20 | runner without the new keys, with channels carrying `channel_skill_bindings` of both forms | command line, heartbeat and served channels byte-equal to the fixtures before this stage (A1-04, A1-05) |
 | BA-T21 | end to end on the demo stack with fake Claude: create from a template and from an interview, chat, costs shown, `runner.hosted_agents` off | as 8.2; with the key off the runner behaves as before (A1-10) |
+| BA-T22 | runner with `runner.channel_skills_dir` and a channel skill folder carrying `allowed-tools: Bash`, `hooks`, both inline shell forms and a `hooks/` folder, bound to channels served by a `chat`, a `scoped` and a `host` turn (the runner's own agent and a hosted agent) | the folder reaches only the `host` turns as `--plugin-dir`; the `chat` and `scoped` command lines carry no `--plugin-dir` for it and their live box names the skipped reference (A1-05) |
 
 ## 13. Decisions of this chapter
 
@@ -590,13 +628,13 @@ hosted agent in `personal` always equals that of its hosting runner (R-BA-12).
 | R-BA-04 | A definition is closed data: no member reaches a settings file, hook, permission rule, command, subagent, plugin part or command helper of the CLI; the runner writes every control file itself, frontmatter by a serializer with `name` and `description` only, extra files flat, and rebuilds before every turn (4.2, 4.3, 5.2, 5.6). | Below `host` any such content would let a `chat` or `scoped` agent run host code or widen its tools without SR2 (D-A1-7, D-A1-8, D-A1-18; red team r3 finding 1). |
 | R-BA-05 | `stdio` MCP servers need `tool_class = 'host'`; `scoped` loads only `http` servers; `chat` loads none; the definition's tool list only narrows `runner.scoped_allowed_tools` (4.4). | A local process as the host user is the `host` case of 07 2.11; the host operator keeps the ceiling (D-A1-18). |
 | R-BA-06 | `agent.tool_class.set` below `host` is refused while the current definition has a `stdio` server (4.4 item 5). | A silent downgrade would leave an agent that fails every turn with `tool_class_mismatch`; the owner removes the server first (design backlog item 10). |
-| R-BA-07 | Below `host` a hosted turn runs with `--restricted`, `--settings` of the runner and an explicit `--tools` whose baseline is what 09 18.2 grants `scoped` already, plus `Skill` only with skills; `host` uses `--setting-sources project,local`; each point of 5.7 has a probe and a fallback (5.3, 5.7). | `--restricted` drops user, project and local settings and confines file tools; an explicit `--tools` keeps the class baseline instead of removing read-only shell and skills (red team r3 findings 3 and 4). |
+| R-BA-07 | Below `host` a hosted turn runs with `--restricted`, `--settings` of the runner and an explicit `--tools` whose baseline is what 09 18.2 grants `scoped` already, plus `Skill` only with skills, then also named in `--allowedTools`; every class gets `--strict-mcp-config`; `host` uses `--setting-sources project,local`; each point of 5.7 has a probe and a fallback (5.3, 5.7). | `--restricted` drops user, project and local settings and confines file tools; an explicit `--tools` keeps the class baseline instead of removing read-only shell and skills (red team r3 findings 3 and 4); `--restricted` alone still starts the host user's MCP servers, and `dontAsk` refuses a tool not allowed in advance (red team of A1-01, minors 2 and 3). |
 | R-BA-08 | Secret values reach a turn only through a per-turn MCP file of mode `0600` in the control folder, never through the environment (5.2). | Concurrent turns of one host user can read each other's environment; a file outside the working folder is out of reach of `chat` and `scoped` file tools (design backlog item 4, T-BA-02). |
 | R-BA-09 | The interview is one owner request with its own deadline to the builder agent, short-lived, nothing stored, every draft validated like a definition, audited and logged with counts only (6.1). | The search assistant pattern is built and tested; an interview costs money, so it is audited, but its content is the owner's text and stays out of audit and logs (D-A1-10, D-A1-12; design backlog item 6). |
 | R-BA-10 | Templates are written for the repository, shipped in the image, listed by an owner read, held by a template gate that works without the private deny list; private templates come from `agents.templates_dir` (7). | Exporting a real agent is how private names leak; forks have no private list (D-A1-14 to D-A1-16). |
-| R-BA-11 | Creation composes visible steps, each its own action and audit entry, without rollback; a built-in agent without a definition is "not set up" and never served (8.3). | The pattern of "New project" (01 6.9); a rollback across actions would need a second write path (design backlog item 6). |
+| R-BA-11 | Creation composes visible steps, each its own action and audit entry, without rollback; the class is set before the definition, and on edit a raised class before and a lowered class after the definition; "Try again" runs the steps not reached yet in that order; a built-in agent without a definition is "not set up" and never served (8.2 to 8.4). | The pattern of "New project" (01 6.9); a rollback across actions would need a second write path (design backlog item 6); the server refuses a `stdio` server below `host` (4.3 item 7) and a downgrade while one is there (R-BA-06), so any other order cannot store such a definition (red team of A1-01, finding 1). |
 | R-BA-12 | A hosted agent in `personal` has the `credential_holder_id` of its hosting runner; a runner without one hosts only `organization` agents (10). | The turn runs with the login of the runner's host user; I1 to I5 apply as they are (D-A1-19; design backlog item 8). |
-| R-BA-13 | Channel skills only behind `runner.channel_skills_dir`, resolved from `claude-code:<name>` (5.9). | A served channel may carry references of another adapter; turning them on without a key would change a running installation (D-A1-9). |
+| R-BA-13 | Channel skills only behind `runner.channel_skills_dir`, resolved from `claude-code:<name>`, and only in turns of class `host`; below `host` they are skipped and named in the live box (5.9). | A served channel may carry references of another adapter; turning them on without a key would change a running installation (D-A1-9); a channel skill folder is not checked like a definition and would widen a `chat` or `scoped` turn, while `host` adds nothing to a turn of the host user that only owners trigger (red team of A1-01, finding 2, decisions.d/A1-01.md). |
 | R-BA-14 | Actions, operations and events of this chapter enter the catalogue and the API documents with the ticket that builds them, with the values of 07 2.13 and section 9. | A catalogue entry generates Go constants and route checks; an entry without its code would be a second truth until the build (decisions.d/A1-01.md). |
 
 ## 14. Configuration values of this chapter
@@ -628,4 +666,4 @@ Claude Code runner.
 | `runner.agent_builder` | Runner | `false` | answer interview requests when this runner is the builder agent (6.2) |
 | `runner.agent_builder_model` | Runner | `sonnet` | model of the builder call (6.2) |
 | `runner.agent_builder_timeout` | Runner | `80s` | time limit of one builder call; below the server's `agents.interview.timeout` (6.2) |
-| `runner.channel_skills_dir` | Runner | empty | folder of channel skills for `claude-code:<name>` references; empty means channel skills off (5.9) |
+| `runner.channel_skills_dir` | Runner | empty | folder of channel skills for `claude-code:<name>` references, loaded only in `host` turns; empty means channel skills off (5.9) |

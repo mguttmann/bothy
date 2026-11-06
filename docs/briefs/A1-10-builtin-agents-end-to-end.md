@@ -82,7 +82,7 @@ Product requirements implemented here:
 
 2. **Stack.** The runner container gets `runner.hosted_agents`, a `runner.hosted_agents_root` outside its state folder, `runner.agent_builder` for a second runner agent that acts as the builder (or the same runner, when the configuration allows both), and fake Claude as `runner.claude_bin`. Fake Claude answers a turn with a fixed reply and a fixed `result` usage, and the builder call with a fixed questions answer, then a fixed draft.
 
-3. **Driver.** Through the public API only (P-26): owner login with step-up as the demo does, `listAgentTemplates`, `createAgent` with `hosted_by`, `putAgentDefinition`, `channel.create`, `channel.operator.set`, a message, the reply, the run's costs; then `interviewAgent` twice and the same creation path with the draft. Then restart the runner with `runner.hosted_agents` off and compare its served channels and heartbeat with the A1-04 baseline fixtures; read both definitions back.
+3. **Driver.** Through the public API only (P-26): owner login with step-up as the demo does, `listAgentTemplates`, `createAgent` with `hosted_by`, `agent.tool_class.set` when the class is not `chat`, `putAgentDefinition` (the order of 26 8.2), `channel.create`, `channel.operator.set`, a message, the reply, the run's costs; then `interviewAgent` twice and the same creation path with the draft. Then restart the runner with `runner.hosted_agents` off and compare its served channels and heartbeat with the A1-04 baseline fixtures; read both definitions back.
 
 4. **Rulings for `docs/decisions.d/A1-10.md`**: the stack layout and the fake builder answers.
 

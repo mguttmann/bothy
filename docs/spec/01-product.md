@@ -2184,13 +2184,17 @@ console.
    the runner host, the hosting runner, the tool class with what it does and does not load, the
    billing mode, the model and the cost cap per run, and the channel to create (space and name) or
    none. The cost estimate of the interview so far is shown.
-4. **Steps.** "Create" runs the steps of 26 8.2 with the states waiting, running, done and failed,
-   and a step-up prompt where one is needed; a failed step shows one sentence for its cause,
-   "Try again" resumes there and creates nothing twice, "Close" keeps what exists (26 8.3).
+4. **Steps.** "Create" runs the steps of 26 8.2 in their order (create the agent, set a class
+   above `chat`, store the definition, billing, channel and operator) with the states waiting,
+   running, done and failed, and a step-up prompt where one is needed. The class comes before the
+   definition, so a definition with a local (`stdio`) MCP server is accepted. A failed step shows
+   one sentence for its cause and the editable preview; "Try again" runs the steps not done yet in
+   that order and creates nothing twice, "Close" keeps what exists (26 8.3).
 5. **Done.** The dialog opens the new channel, or the agent card when no channel was created.
 6. **Edit.** The agent card of a built-in agent offers "Edit" (the same preview, saved as a new
-   version with step-up), "Versions" (undo by saving an older version again), "Change runner" and
-   "Disable". An agent without a definition shows "Not set up" with "Continue setup".
+   version with step-up; a raised class is set before saving, a lowered one after it, 26 8.4),
+   "Versions" (undo by saving an older version again), "Change runner" and "Disable". An agent
+   without a definition shows "Not set up" with "Continue setup".
 
 ## 7. Keyboard shortcuts
 

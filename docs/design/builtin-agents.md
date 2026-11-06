@@ -159,7 +159,9 @@ creation flow instead of claiming isolation.
 
 **D-A1-9 Channel skills only behind their own key.** A new key `runner.channel_skills_dir`
 (default unset) turns channel skills on. Only then does the runner add skills of
-`channel_skill_bindings` to a turn, for its own agent and for hosted agents. Resolution: a
+`channel_skill_bindings` to a turn, for its own agent and for hosted agents, and only to a turn
+of class `host` (26 5.9: a channel skill folder is not checked like a definition and would widen a
+`chat` or `scoped` turn; red team of A1-01, finding 2). Resolution: a
 `skill_ref` of the form `claude-code:<name>` resolves to `<runner.channel_skills_dir>/<name>/`
 (a folder with a `SKILL.md`, handed to the turn as one more `--plugin-dir`); `<name>` must match
 `[a-z0-9-]{1,64}`, so a reference never leaves that folder. Every other reference belongs to
@@ -211,9 +213,10 @@ shell, or an `@` import that leaves the agent folder is refused with a field err
 schema of D-A1-18). The builder's structured output schema itself has no field for settings,
 hooks, permission rules, commands, subagents or plugin parts, so a crafted answer cannot carry
 them; the server check holds even if it did.
-Creating composes existing and new actions in the order of 01 6.9: `agent.create` (step-up), the
-definition, the hosting assignment, then the channel and operator when asked for, each step
-visible with its result.
+Creating composes existing and new actions in the pattern of 01 6.9: `agent.create` (step-up)
+with the hosting assignment, the tool class when it is not `chat`, the definition, then the channel
+and operator when asked for, each step visible with its result. The class comes before the
+definition, because the server refuses a `stdio` server below `host` (26 8.2).
 
 **D-A1-13 The builder writes no files and holds no tools.** Reason: the builder reads only the
 owner's own answers and the template catalogue; it has no need for tools, and a tool-free call
@@ -368,7 +371,9 @@ with a test against today's artifacts.
 
 **D-A1-24 Rollback.** Turning `runner.hosted_agents` off takes hosted agents offline (their runs
 end like with any offline agent) and leaves the runner's own agent as before; their definitions
-stay on the server. Going back one server version leaves the new tables unread. Reason: an owner
+stay on the server. Going back one server version needs `runner.hosted_agents` off first,
+because an older server refuses the capability `hosts_agents` in a heartbeat (26 11 item 4); it
+then leaves the new tables unread. Reason: an owner
 can undo the feature without losing data or touching the database.
 
 ## 9. One `main`, no public branch

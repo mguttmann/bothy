@@ -48,7 +48,7 @@ Product requirements implemented here:
 
 12. "New agent" shows only to owners and only when the server answers `listAgentTemplates` and at least one active runner reports `hosts_agents`; on an older server or without such a runner it is hidden (26 8.1).
 13. The preview shows and lets the owner edit every part of 01 6.20 item 3, says what the chosen class does not load (MCP servers under `chat`, skills where 26 5.7 says so), names the secret names to add on the runner host, and offers `personal` only under the conditions of 10 10.3.
-14. "Create" runs the steps of 26 8.2 in order, each with its state and its own action; step-up prompts where an action needs one; a failure leaves exactly the earlier steps; "Try again" resumes and creates nothing twice; "Close" keeps what exists (BA-T16).
+14. "Create" runs the steps of 26 8.2 in order (`agent.create`, `agent.tool_class.set` when the class is not `chat`, then `putAgentDefinition`, so a definition with a `stdio` MCP server under class `host` is accepted), each with its state and its own action; step-up prompts where an action needs one; a failure leaves exactly the earlier steps; "Try again" runs the steps whose target is not reached yet in the order of 26 8.2 (also after the owner raised the class in the preview) and creates nothing twice; "Close" keeps what exists (26 8.3, BA-T16).
 15. The interview shows the builder's questions and the person's answers as a conversation, the cost estimate so far, and the fallback reason with the way to templates and the empty form.
 16. Desktop, phone and console behave the same; the console talks to the server only through its backend for frontend (15).
 
@@ -89,7 +89,7 @@ Product requirements implemented here:
 
 2. **Visibility.** The client reads the agent list it already has; a runner hosts agents when its reported capabilities carry `hosts_agents`. `listAgentTemplates` answering `404` or a missing operation in the server's discovery hides the entry (an older server).
 
-3. **Step machine.** Steps: create agent, store definition, set class (only above `chat`), set billing (only `personal`), create channel, set operator (only when a channel is asked for). Each step stores its result (agent ID, definition version, channel ID) in the flow state, so "Try again" skips done steps; idempotency keys per step come from the outbox rules of the client. A step-up prompt appears where the action needs one; a refused step-up fails that step with its sentence.
+3. **Step machine.** Steps: create agent, set class (only above `chat`), store definition, set billing (only `personal`), create channel, set operator (only when a channel is asked for). The class step comes before the definition step because the server refuses a `stdio` server below `host` (26 4.3 item 7). Each step stores its result (agent ID, class, definition version, channel ID) in the flow state; "Try again" compares each step's target from the edited preview with that state and runs the steps not reached, in this order, so a class raised after a refused definition is set before the definition is sent again; idempotency keys per step come from the outbox rules of the client. A step-up prompt appears where the action needs one; a refused step-up fails that step with its sentence.
 
 4. **Preview.** One page, sections for identity, instructions (a Markdown editor), skills (list with add, edit, remove), MCP servers (transport, URL or command and package, secret names), settings (model, class with an explanation of what it allows and does not load, billing, cost cap), channel. Field errors of the server (from the interview's draft or from `putAgentDefinition`) show at their field by JSON Pointer.
 
@@ -102,7 +102,7 @@ Product requirements implemented here:
 ## Tests (write them first)
 
 - Widget tests (desktop, phone, console): entry hidden without a hosting runner, hidden on an older server, shown otherwise; template, interview and form paths lead to the same preview; preview edits reach the request; `personal` offered only under 10 10.3.
-- Flow tests (BA-T16): a failure at each step after `agent.create` leaves exactly the earlier steps; "Try again" resumes without a second create; "Close" keeps the agent, which the list shows as "Not set up".
+- Flow tests (BA-T16): a failure at each step after `agent.create` leaves exactly the earlier steps; "Try again" resumes without a second create; "Close" keeps the agent, which the list shows as "Not set up". A template with a `stdio` MCP server and class `host`: the fake server sees `agent.tool_class.set` before `putAgentDefinition` and stores the definition (the fake server refuses a `stdio` definition below `host` with `tool_class_too_low` like the real one). A definition refused with `tool_class_too_low`, the class raised in the preview, "Try again": the class step runs, then the definition step, nothing is created twice.
 - Interview tests: questions, draft with field errors, each fallback.
 - Integration tests with the fake server on desktop, phone and console; goldens of the dialog in light and dark.
 

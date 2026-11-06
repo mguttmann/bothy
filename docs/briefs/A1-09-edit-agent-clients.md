@@ -8,7 +8,7 @@ After this ticket an owner edits a built-in agent in the desktop app, the phone 
 
 ## Read first
 
-- `docs/spec/01-product.md` 6.20 items 6 and 1; `docs/spec/26-builtin-agents.md` 3.1, 3.3 item 3, 4.1, 4.4 item 5, 8.3, 8.4, 10; `docs/spec/07-permissions.md` 2.13; `docs/spec/10-backend-policy.md` 10.3.
+- `docs/spec/01-product.md` 6.20 items 6 and 1; `docs/spec/26-builtin-agents.md` 3.1, 3.3 item 3, 4.1, 4.3 item 7, 4.4 items 4 and 5, 8.2 to 8.4, 10, 12 (BA-T16 edit part), R-BA-06, R-BA-11; `docs/spec/07-permissions.md` 2.13; `docs/spec/10-backend-policy.md` 10.3.
 - `docs/spec/06-api.md` 8 (`If-Match`, `412 version_conflict`).
 - The dialog of A1-08 (`apps/client/lib/new_agent/`, the shared parts in `packages/admin_ui`), the agent page of `packages/admin_ui/lib/src/agents/agent_page.dart`.
 - The operations `getAgentDefinition`, `listAgentDefinitionVersions`, `putAgentDefinition`, `setAgentHost` in `docs/api/openapi.yaml` and the generated Dart client.
@@ -43,11 +43,11 @@ Note on rule 1: "stages" are the milestones and the stage A1 of the plan (PLAN P
 
 Product requirements implemented here:
 
-12. "Edit" opens the preview of A1-08 with the current definition and saves with `putAgentDefinition`, `If-Match` and step-up; a `412` shows that another device changed the agent and offers to reload (26 4.1).
+12. "Edit" opens the preview of A1-08 with the current definition and saves with `putAgentDefinition`, `If-Match` and step-up; a `412` shows that another device changed the agent and offers to reload (26 4.1). When the edit also changes the class, a raised class is set with `agent.tool_class.set` before `putAgentDefinition` (so an added `stdio` server is accepted) and a lowered class after it (so a removed `stdio` server no longer blocks the downgrade), each a visible step with "Try again" as in 26 8.3 (26 8.4, BA-T16).
 13. "Versions" lists the versions newest first; "Restore" saves the chosen version's content as a new version (26 4.1 item 2).
 14. "Change runner" offers the runners that report `hosts_agents`, says that the agent's connections restart, and shows `host_tool_class_ceiling` and `hosted_holder_mismatch` as sentences (26 3.1, 10 10.3).
 15. Lowering the class below `host` with a `stdio` server shows `definition_needs_host` with the way to remove the server first (R-BA-06).
-16. "Disable" uses `agent.disable`; "Continue setup" resumes the steps of 26 8.2 for an agent without a definition.
+16. "Disable" uses `agent.disable`; "Continue setup" resumes the steps of 26 8.2 for an agent without a definition, in their order (class before definition).
 
 ## Scope
 
@@ -92,7 +92,7 @@ Product requirements implemented here:
 
 ## Tests (write them first)
 
-- Widget tests per platform: edit and save with step-up; `412` with reload; versions list and restore; change runner with each refusal; class lowering with `definition_needs_host`; disable; continue setup resumes at the first missing step.
+- Widget tests per platform: edit and save with step-up; `412` with reload; versions list and restore; change runner with each refusal; class lowering with `definition_needs_host`; an edit that adds a `stdio` server and raises the class to `host` (the fake server sees `agent.tool_class.set` before `putAgentDefinition` and stores it) and one that removes it and lowers the class (`putAgentDefinition` first, then the class, no `definition_needs_host`) (BA-T16 edit part); disable; continue setup resumes at the first missing step.
 - Integration tests with the fake server on desktop, phone and console.
 
 ```sh

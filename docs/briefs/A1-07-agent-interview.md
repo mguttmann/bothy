@@ -46,7 +46,7 @@ Note on rule 1: "stages" are the milestones and the stage A1 of the plan (PLAN P
 
 Product requirements implemented here:
 
-12. `interviewAgent` is owner-only, class `rl.trigger`, effect `read`, counts as writing for "view as", carries at most `agents.interview.max_turns` turns of at most `agents.interview.answer_max_chars` characters, and uses `agents.interview.timeout` as its own deadline (26 6.1, 02 14.2).
+12. `interviewAgent` is owner-only, class `rl.trigger`, effect `write` (it writes an audit entry, so the maintenance mode refuses it, 05 2.7), counts as writing for "view as", carries at most `agents.interview.max_turns` turns of at most `agents.interview.answer_max_chars` characters, and uses `agents.interview.timeout` as its own deadline (26 6.1, 02 14.2).
 13. The event `agent.interview_requested` goes to one live gateway connection of the builder agent without a token; `answerAgentInterview` is accepted only from that agent and only once per request, before `expires_at`.
 14. A draft is validated with the Go validator of A1-02; a draft that fails is answered with its field errors; the builder's answer schema has no member for any surface of 26 5.5, and a builder answer that carries one is refused (BA-T15).
 15. Fallbacks `builder_not_configured`, `builder_offline`, `builder_timeout`, `builder_invalid` are named in the answer; nothing of the interview is stored; one audit entry `agent.interview` and one log line per request with outcome, fallback reason, turn count and cost estimate, never content (R-BA-09).
@@ -94,7 +94,7 @@ Runner and SDK:
 
 2. **Shape.** Request: `turns[]` of `{role: "builder" | "owner", text}` in order, optional `want_draft` (the person asked for a draft early). Event payload: `request_id`, `turns`, `catalogue` (26 7.4), `limits` (the definition limits the draft must keep), `expires_at`. Answer: `kind` `questions` with one or two `questions[]`, or `kind` `draft` with `draft` (the definition shape plus `name`, `handle`, `description`, `channel_suggestion` with a space name and channel name), and `costs` (`CostReport`).
 
-3. **Validation.** The server decodes the answer strictly: an unknown member anywhere is `builder_invalid`; a draft runs through the Go validator with the agent's prospective class from the draft's `tool_class_wish`; the response carries the draft and its field errors so the person can ask the builder to fix them, and never stores anything.
+3. **Validation.** The server decodes the answer strictly: an unknown member anywhere is `builder_invalid`; a draft runs through the Go validator with the agent's prospective class from the draft's `tool_class_wish` (the creation flow sets that class before it stores the definition, 26 8.2, so a draft valid here is stored); the response carries the draft and its field errors so the person can ask the builder to fix them, and never stores anything.
 
 4. **Deadline.** The route uses `agents.interview.timeout` through the response controller like uploads use `http.transfer_timeout`; the console's backend for frontend passes the request with the same deadline. A builder answer after the deadline is refused the way a late search assistant answer is (14 4.10) and changes nothing.
 
@@ -108,7 +108,7 @@ Runner and SDK:
 
 ## Tests (write them first)
 
-- Go unit and integration (container runtime) for the server (BA-T15): a question turn, a draft turn, a draft with field errors, a builder answer carrying each surface of 26 5.5 (refused), every fallback, a late answer, an answer from another agent (`404`), a second answer (`409`), a non-owner (`404` or `403` as 07 2.13 says), "view as" refused; one audit entry and one log line per request without content (canary).
+- Go unit and integration (container runtime) for the server (BA-T15): a question turn, a draft turn, a draft with field errors, a builder answer carrying each surface of 26 5.5 (refused), every fallback, a late answer, an answer from another agent (`404`), a second answer (`409`), a non-owner (`404` or `403` as 07 2.13 says), "view as" refused, `503 maintenance` in maintenance mode (effect `write`); one audit entry and one log line per request without content (canary).
 - Runner unit and scenario tests with fake Claude: the command line of the builder call, the billing choice, the private folder removed, an invalid reply sends nothing, a reply with a surface is not sent, the time limit.
 - SDK tests of the hook.
 

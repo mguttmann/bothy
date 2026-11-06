@@ -243,7 +243,10 @@ to it unchanged, and its tool class is its own `agents.tool_class` (2.11), never
    because an agent with tools runs on a host with the host user's rights. Writing a definition is
    part of `agent.update`.
 2. The interview spends money on the builder agent's account like a trigger: owners only, class
-   `rl.trigger`, and it counts as writing for the read-only rule of "view as" (9.2).
+   `rl.trigger`, and it counts as writing for the read-only rule of "view as" (9.2). Its effect
+   is `write` (05 2.7: it writes an audit entry), so the maintenance mode refuses it; the builder's
+   answer `agent.interview.respond` is not in the closed list of `read` actions of 05 2.7 and is
+   `write` as well.
 3. A hosted agent's token goes only to its hosting runner: `agent.hosted_token.issue` is
    agent-self of the runner named in `hosted_by`, and every other caller gets `404` like for an
    unknown agent. No person ever receives such a token (26 3.3).
@@ -260,8 +263,8 @@ these values (R-BA-14); 05 4.10 then carries them as generated rows.
 | `agent.host.set` | change the hosting runner of a built-in agent; revokes the tokens the old host holds | agent | owner | yes | yes | yes | no | `rl.admin` | write | A1-03 |
 | `agent.hosted.list` | list the agents whose `hosted_by` is the calling runner | agent | agent-self (a runner reporting `hosts_agents`) | no | no | no | no | `rl.agent_runtime` | read | A1-03 |
 | `agent.hosted_token.issue` | issue a token for a hosted agent, bound to the caller's DPoP key | agent | agent-self of the runner named in `hosted_by` of the target | no | no | yes | no | `rl.agent_runtime` | write | A1-03 |
-| `agent.interview` | send the interview so far to the builder agent and return its questions or draft | instance | owner | yes | no | yes | no | `rl.trigger` | read | A1-07 |
-| `agent.interview.respond` | answer an open `agent.interview_requested` | agent | agent-self, the builder agent the request was sent to | no | no | no | no | `rl.agent_runtime` | read | A1-07 |
+| `agent.interview` | send the interview so far to the builder agent and return its questions or draft | instance | owner | yes | no | yes | no | `rl.trigger` | write | A1-07 |
+| `agent.interview.respond` | answer an open `agent.interview_requested` | agent | agent-self, the builder agent the request was sent to | no | no | no | no | `rl.agent_runtime` | write | A1-07 |
 | `agent.templates.read` | list the shipped and private templates | instance | owner | yes | no | no | no | `rl.read` | read | A1-06 |
 
 `agent.create` gains the optional member `hosted_by` (26 3.1) and `agent.update` the definition

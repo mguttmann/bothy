@@ -18,8 +18,9 @@ This check reads all of them and fails on:
   index;
 - a `make <target>` inside code of a brief whose target is neither in the Makefile nor in the
   table "Make targets created by tickets", or whose creating ticket is not the brief itself or
-  in its dependency closure (for a stage ticket such as `A1-02` every milestone ticket counts as
-  merged, because a stage starts after the milestones, PLAN P-27);
+  in its dependency closure (a stage ticket such as `A1-02` starts after the milestones, PLAN
+  P-27, so it may use the target of any milestone ticket, but only once that target is in the
+  Makefile);
 - a ticket named in a start check of a brief (a paragraph or list item that ends the run with
   `Verdict: BLOCKED dependency ...` or `BLOCKED ... not merged`) that is not in the brief's
   dependency closure: the launcher could start the brief before that ticket is merged, and the
@@ -254,7 +255,8 @@ def stage_base(deps: dict[str, list[str]], tid: str) -> set[str]:
 
     A stage after the milestones (`A1`) starts only when every milestone ticket is merged (PLAN
     P-27, section 21 "Dependencies"), so its make targets and start checks may use what any
-    milestone ticket created. A milestone ticket gets nothing here.
+    milestone ticket created; `check` still requires such a make target to be in the Makefile.
+    A milestone ticket gets nothing here.
     """
     if tid.startswith("M"):
         return set()
@@ -354,7 +356,9 @@ def check(root: Path) -> list[str]:
         header = re.search(r"^Status: .*?\| Depends on: ([^|]*)\|", brief, re.MULTILINE)
         if header is None or sorted(_ID.findall(header.group(1))) != sorted(index.deps[tid]):
             problems.append(f"{name}: header 'Depends on' differs from the index")
-        reach = closure(index.deps, tid) | {tid} | stage_base(index.deps, tid)
+        own = closure(index.deps, tid) | {tid}
+        base = stage_base(index.deps, tid)
+        reach = own | base
         for named in sorted(called_optional_tickets(brief) & (reach - {tid})):
             problems.append(
                 f"{name}: {named} is a dependency of {tid}, but the brief calls it optional"
@@ -364,15 +368,35 @@ def check(root: Path) -> list[str]:
             problems.append(
                 f"{name}: start check needs {needed}, which is not a dependency of {tid}"
             )
-        for target in sorted(make_calls(brief)):
-            maker = targets.get(target)
-            if maker is None:
-                if target not in existing:
-                    problems.append(f"{name}: make {target}: no Makefile target and no creator")
-            elif maker not in reach:
+        problems.extend(_make_problems(name, tid, make_calls(brief), targets, existing, own, base))
+    return problems
+
+
+def _make_problems(
+    name: str,
+    tid: str,
+    calls: Iterable[str],
+    targets: dict[str, str],
+    existing: set[str],
+    own: set[str],
+    base: set[str],
+) -> list[str]:
+    """One message per `make` call of a brief that its ticket cannot rely on."""
+    problems = []
+    for target in sorted(calls):
+        maker = targets.get(target)
+        if maker is None:
+            if target not in existing:
+                problems.append(f"{name}: make {target}: no Makefile target and no creator")
+        elif maker in base - own:
+            # A stage relies on milestone targets only once they are in the Makefile, so the
+            # rule "every milestone is merged" is checked, not assumed.
+            if target not in existing:
                 problems.append(
-                    f"{name}: make {target}: created by {maker}, not a dependency of {tid}"
+                    f"{name}: make {target}: created by {maker}, not yet in the Makefile"
                 )
+        elif maker not in own:
+            problems.append(f"{name}: make {target}: created by {maker}, not a dependency of {tid}")
     return problems
 
 

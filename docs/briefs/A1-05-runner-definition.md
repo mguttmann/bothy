@@ -4,11 +4,11 @@ Status: ready | Depends on: A1-02, A1-04 | Milestone: A1
 
 ## Goal
 
-After this ticket a hosted agent's turns run from its definition. The runner checks `runner.hosted_agents_root`, writes the agent folder and the control folder from the current definition (never copying a file from it), builds the command line of 26 5.3 per tool class with its own restrictive settings, the skills plugin, the per-turn MCP file and the cost cap, rebuilds every control file and removes every foreign one before each turn, and refuses a turn whose definition breaks the closed schema or would start a `stdio` server below `host`. It probes every open point of 26 5.7 against the pinned CLI behind the real CLI switch and applies the fallback where a probe fails, and it loads channel skills only behind `runner.channel_skills_dir`. Without the new keys the runner stays byte-equal to the fixtures of A1-04.
+After this ticket a hosted agent's turns run from its definition. The runner checks `runner.hosted_agents_root`, writes the agent folder and the control folder from the current definition (never copying a file from it), builds the command line of 26 5.3 per tool class with its own restrictive settings, the skills plugin, the per-turn MCP file and the cost cap, rebuilds every control file and removes every foreign one before each turn, and refuses a turn whose definition breaks the closed schema or would start a `stdio` server below `host`. It probes every open point of 26 5.7 against the pinned CLI behind the real CLI switch and applies the fallback where a probe fails, and it loads channel skills only behind `runner.channel_skills_dir` and only in `host` turns. Without the new keys the runner stays byte-equal to the fixtures of A1-04.
 
 ## Read first
 
-- `docs/spec/26-builtin-agents.md`: 1, 4 (all), 5 (all), 11, 12 (BA-T10 to BA-T14, BA-T19, BA-T20), 13 (R-BA-04 to R-BA-08, R-BA-13), 14 (runner keys).
+- `docs/spec/26-builtin-agents.md`: 1, 4 (all), 5 (all), 11, 12 (BA-T10 to BA-T14, BA-T19, BA-T20, BA-T22), 13 (R-BA-04 to R-BA-08, R-BA-13), 14 (runner keys).
 - `docs/spec/09-agents.md` 18.1 (`allowed_tools` intersection), 18.2 (argument list, environment, tool class flags), 18.3, 18.7, 18.9, 18.10 (roots), 18.18; R-AG-35, R-AG-43.
 - `docs/spec/07-permissions.md` 2.11, 2.13, SR2.
 - `docs/security/threat-model.md` 5.17 and T-BA-02 to T-BA-04.
@@ -51,7 +51,7 @@ Product requirements implemented here:
 14. Before every turn: the runner's own check of 26 4.3 against the corpus, refusal with `tool_class_mismatch` before `run.start` for a failing definition or a `stdio` server under a token class below `host`, rewrite of every owned file and removal of every foreign surface file of 26 5.5 in the agent and control folders, the agent's other files kept (26 5.6, BA-T12, BA-T13).
 15. The command line per class is exactly 26 5.3; the tool list of the definition only narrows `runner.scoped_allowed_tools` (BA-T13).
 16. `--max-budget-usd` from the definition; a run stopped by it ends `failed` with `runtime_error` and the cause `cost_cap_reached` (26 5.8, BA-T19).
-17. Channel skills only with `runner.channel_skills_dir` and the `claude-code:<name>` resolution of 26 5.9; without the key the baseline fixtures of A1-04 still match, also for channels with bindings of both forms (BA-T20).
+17. Channel skills only with `runner.channel_skills_dir`, the `claude-code:<name>` resolution of 26 5.9 and only in turns of class `host` (the runner's own agent and hosted agents alike); a `chat` or `scoped` turn gets no `--plugin-dir` for a channel skill and its live box names the skipped reference (R-BA-13, BA-T22); without the key the baseline fixtures of A1-04 still match, also for channels with bindings of both forms (BA-T20).
 18. Every point of 26 5.7 is probed against the pinned CLI behind the real CLI switch; the result and the applied fallback stand in 26 5.7 and the runner README (BA-T14).
 
 ## Scope
@@ -112,7 +112,7 @@ Change:
 
 7. **Cost cap.** Map the `result` the pinned CLI sends when `--max-budget-usd` stops a turn (find its `subtype` in the probe or in the recorded strings) to `cost_cap_reached`; when the probe cannot run, any end of a turn with a set cap and a cost at or above it maps to the same cause.
 
-8. **Channel skills.** Read `channel_skill_bindings` through `agent.config.read` only when `runner.channel_skills_dir` is set; a `claude-code:` reference whose name fails the pattern is skipped like a foreign one; a missing folder is named in the live box status line once per run.
+8. **Channel skills.** Read `channel_skill_bindings` through `agent.config.read` only when `runner.channel_skills_dir` is set; decide by the tool class the turn runs with (the class whose flags of 09 18.2 and 26 5.3 the command line carries), and add a channel skill's `--plugin-dir` only for `host`; below `host` skip every `claude-code:` reference and name the skipped ones in the live box status line once per run; a `claude-code:` reference whose name fails the pattern is skipped like a foreign one; a missing folder is named in the live box status line once per run.
 
 9. **Rulings for `docs/decisions.d/A1-05.md`**: the probe results and every fallback taken; the deny rule syntax; the cost cap mapping.
 
@@ -123,6 +123,7 @@ Change:
 - `tests/unit/test_hosted_commandline.py` (BA-T13): the argument list per class equal to 26 5.3 (with and without skills, with and without MCP servers, with a cap); the intersection keeps the order of `runner.scoped_allowed_tools`; a `stdio` server under a token class below `host` and a definition failing the check end with `tool_class_mismatch` before `run.start`.
 - `tests/unit/test_config.py` (BA-T10): every refused placement of `runner.hosted_agents_root`.
 - `tests/scenarios/test_hosted_turns.py` with fake Claude and the fake server: a hosted turn answers in its folder; a definition change between turns is applied before the next; the cost cap end (BA-T19); channel skills with and without the key.
+- `tests/unit/test_channel_skills.py` (BA-T22): a channel skill folder with `allowed-tools: Bash`, `hooks`, both inline shell forms and a `hooks/` folder, bound to channels of a `chat`, a `scoped` and a `host` turn, for the runner's own agent and for a hosted agent: the folder reaches only the `host` command lines; the others carry no `--plugin-dir` for it and name the skipped reference in the live box.
 - `tests/unit/test_byte_equal_baseline.py` of A1-04 stays green (BA-T20).
 - `tests/real_cli/test_hosted_probe.py` (BA-T14), behind the switch.
 
@@ -136,7 +137,7 @@ make check
 ## Acceptance criteria
 
 - [ ] The corpus passes in the runner's own check.
-- [ ] BA-T10 to BA-T13, BA-T19 and BA-T20 are green with fake Claude.
+- [ ] BA-T10 to BA-T13, BA-T19, BA-T20 and BA-T22 are green with fake Claude.
 - [ ] BA-T14 ran against the pinned CLI behind the switch, or is reported as not proven; 26 5.7 and the README carry the results and the fallbacks taken.
 - [ ] No secret value in any environment, log, turn record or file outside the per-turn MCP file.
 - [ ] `make check` is green.
@@ -148,7 +149,7 @@ make check
 - An entry `changelog.d/A1-<nn>.md` next to the `CHANGELOG.md` of every component you changed (`docs/quality/gates.md` "Fragments"); rulings in `docs/decisions.d/<ticket>.md`, one row each with date, ruling and reason.
 - An ADR only if you take an architecture decision beyond ADR 0076 and this brief (MADR 4 as in `docs/adr/0000-template-madr-4.md`, next free number, `make adr-index`).
 - `make check` green.
-- An independent code review over the diff, then the red team gate (`docs/quality/red-team-gate.md`, verdict `JA` or `NEIN`); on `NEIN` fix with a test per finding and have the delta checked again. Record both verdicts. The red team checks at least: no content of a definition reaches a surface of 26 5.5 below `host`; the settings file holds nothing beyond 26 5.4; foreign files are removed before every turn; secrets stay out of every environment; the tool list only narrows the runner's; without the keys the baseline fixtures match.
+- An independent code review over the diff, then the red team gate (`docs/quality/red-team-gate.md`, verdict `JA` or `NEIN`); on `NEIN` fix with a test per finding and have the delta checked again. Record both verdicts. The red team checks at least: no content of a definition reaches a surface of 26 5.5 below `host`; no channel skill reaches a turn below `host`; the settings file holds nothing beyond 26 5.4; foreign files are removed before every turn; secrets stay out of every environment; the tool list only narrows the runner's; without the keys the baseline fixtures match.
 - Land the change as `AGENTS.md` ("How work lands on `main`") describes: a pull request from this branch, squash-merged only when review, red team, `make check`, `ci-ok` and the review threads are green; then `git worktree remove`.
 
 ## Report
