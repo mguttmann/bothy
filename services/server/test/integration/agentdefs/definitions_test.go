@@ -170,7 +170,7 @@ func TestDefinition_PutGetAndEvent(t *testing.T) {
 	w.want(w.do(w.alex, http.MethodPut, path(w.writer), definition("x"), nil), http.StatusNotFound, "not_found")
 
 	var changed []map[string]any
-	deadline := time.Now().Add(testkit.Patience)
+	deadline := testkit.Deadline()
 	for len(changed) == 0 && time.Now().Before(deadline) {
 		for _, e := range w.poll(w.writer) {
 			if e["type"] == "agent.definition_changed" {

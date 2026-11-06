@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/OWNER/bothy/services/server/internal/agents/domain/definition"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // small are limits small enough to test every boundary by hand.
@@ -378,7 +379,7 @@ func TestParseRoundTrip(t *testing.T) {
 	if len(fs) != 0 || plain.NeedsHost() || plain.Settings.AllowedTools != nil {
 		t.Fatalf("plain %+v %v", plain, fs)
 	}
-	if o, _ := json.Marshal(plain); strings.Contains(string(o), "allowed_tools") || strings.Contains(string(o), "null") {
+	if o, _ := json.Marshal(plain); strings.Contains(string(o), "allowed_tools") || testkit.HasJSONNull(o) {
 		t.Fatalf("plain JSON %s", o)
 	}
 	if got := definition.Parts(plain, d); !slices.Equal(got, []string{"instructions", "skills", "mcp_servers", "settings", "origin"}) {
