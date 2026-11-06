@@ -210,6 +210,7 @@ nav:
       - Terminal in the owner's own account: design/terminal-owner-account.md
       - Search assistant: design/search-assistant.md
       - Built-in agents: design/builtin-agents.md
+      - Autonomous runs: design/autonomous-runs.md
   - Operations:
       - Configuration: operations/configuration.md
       - Installation with Compose: operations/install-compose.md
