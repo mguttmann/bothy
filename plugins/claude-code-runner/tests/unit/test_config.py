@@ -447,6 +447,67 @@ def test_root_unchecked_without_hosted_agents(tmp_path: Path) -> None:
     assert cfg.hosted_agents is False
 
 
+def _secrets(tmp_path: Path, secrets: Path, extra: str = "") -> Path:
+    return _hosted(tmp_path, tmp_path / "agents", f'hosted_secrets_dir = "{secrets}"\n{extra}')
+
+
+def test_hosted_secrets_dir_default_unset(tmp_path: Path) -> None:
+    assert load_config(_hosted(tmp_path, tmp_path / "agents")).hosted_secrets_dir is None
+
+
+def test_hosted_secrets_dir_read(tmp_path: Path) -> None:
+    secrets = tmp_path / "hosted-secrets"
+    secrets.mkdir(mode=0o700)
+    assert load_config(_secrets(tmp_path, secrets)).hosted_secrets_dir == secrets
+
+
+@pytest.mark.parametrize(
+    "place", ["missing", "relative", "group_writable", "link", "agents", "state", "projects"]
+)
+def test_hosted_secrets_dir_refused(tmp_path: Path, place: str) -> None:
+    # 26 5.1 item 3: an absolute private folder apart from the root, the state and the projects.
+    (tmp_path / "state").mkdir(mode=0o700)
+    (tmp_path / "agents").mkdir(mode=0o700)
+    real = tmp_path / "hosted-secrets"
+    real.mkdir(mode=0o700)
+    secrets = {
+        "missing": tmp_path / "nowhere",
+        "relative": Path("hosted-secrets"),
+        "group_writable": real,
+        "link": tmp_path / "link",
+        "agents": tmp_path / "agents" / "secrets",
+        "state": tmp_path / "state",
+        "projects": tmp_path / "projects",
+    }[place]
+    if place == "group_writable":
+        real.chmod(0o770)
+    if place == "link":
+        secrets.symlink_to(real)
+    if place == "agents":
+        secrets.mkdir(mode=0o700)
+    with pytest.raises(ConfigError) as err:
+        load_config(_secrets(tmp_path, secrets))
+    assert err.value.key == "runner.hosted_secrets_dir"
+
+
+@pytest.mark.parametrize("key", ["agent_token_ref", "dpop_key_ref", "anthropic_api_key_ref"])
+def test_hosted_secrets_dir_refused_around_a_runner_credential(tmp_path: Path, key: str) -> None:
+    # The runner's own credentials never lie where a definition may name a file.
+    secrets = tmp_path / "hosted-secrets"
+    (secrets / "a").mkdir(parents=True, mode=0o700)
+    own = secrets / "a" / "credential"
+    path = _secrets(tmp_path, secrets, "" if key == "agent_token_ref" else f'{key} = "file:{own}"')
+    text = path.read_text()
+    if key == "agent_token_ref":
+        text = text.replace("file:/srv/secrets/agent_token", f"file:{own}")
+    else:
+        text = text.replace(f"{DPOP}\n", "") if key == "dpop_key_ref" else text
+    path.write_text(text)
+    with pytest.raises(ConfigError) as err:
+        load_config(path)
+    assert err.value.key == "runner.hosted_secrets_dir"
+
+
 def test_mcp_stdio_runners_read(tmp_path: Path) -> None:
     cfg = load_config(write(tmp_path, 'mcp_stdio_runners = ["npx"]'))
     assert cfg.mcp_stdio_runners == ("npx",)

@@ -483,11 +483,20 @@ never copying a file of it, and checks it itself before every turn.
   (`hosted_definition_refused`).
 - **Order of a turn.** Locks and a shared slot; the definition (`getAgentDefinition` with the
   hosted token); the check; the rebuild; the billing pre-check; `run.start`; the per-turn MCP file
-  `<control>/turns/<run_id>.mcp.json` (mode `0600`) with every `secret_ref` resolved from the
-  runner's secret provider; the turn in the agent folder; the file is deleted when the turn ends,
-  also on a stop, and leftovers of a crashed runner are swept at start. A secret that cannot be
-  read ends the run `adapter_error` with the cause `mcp_reference_unavailable`. Secret values are
-  never in the environment of a turn, a log line or another file.
+  `<control>/turns/<run_id>.mcp.json` (mode `0600`) with every `secret_ref` resolved; the turn in
+  the agent folder; the file is deleted when the turn ends, also on a stop, and leftovers of a
+  crashed runner are swept at start. A secret that cannot be read, or one out of scope, ends the
+  run `adapter_error` with the cause `mcp_reference_unavailable` and writes no file. Secret values
+  are never in the environment of a turn, a log line or another file.
+- **Secret scope** (26 5.1 item 3). A definition's `secret_ref` resolves only as
+  `file:<runner.hosted_secrets_dir>/<agent_id>/<name>`, also after following links, and never to
+  a credential of the runner (`agent_token_ref`, `dpop_key_ref`, `anthropic_api_key_ref`); `env:`
+  references and other agents' subfolders are out of scope. The host operator places each
+  agent's secrets there (mode `0600` or `0400`). Without the key no reference of a definition
+  resolves. The start is refused, naming the key, when it is not an absolute folder (a link is
+  refused), when group or others may write it, when it overlaps `runner.hosted_agents_root`,
+  `runner.state_dir` or `runner.projects_root`, or when a `file:` credential of the runner lies
+  in it.
 - **Command line** (26 5.3): `chat` gets `--tools ""` (or `Skill` with `--allowedTools Skill` when
   the definition has skills); `scoped` gets `--tools Read Grep Glob Bash [Skill] <tools>` and
   `--allowedTools <tools> [Skill]`, where `<tools>` is `runner.scoped_allowed_tools` narrowed by

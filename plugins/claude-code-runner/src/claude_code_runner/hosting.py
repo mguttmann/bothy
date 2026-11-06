@@ -93,7 +93,7 @@ from claude_code_runner.commandline import (
     choose_session,
     reported_model,
 )
-from claude_code_runner.config import RunnerConfig
+from claude_code_runner.config import RunnerConfig, own_credential_files
 from claude_code_runner.definition import Definition, Limits, intersect, parse
 from claude_code_runner.heartbeat import WAIT_SLOTS_FULL, WAIT_THREAD_BUSY, Probe, runtime_status
 from claude_code_runner.locks import LockTimeout, SlotPool, acquire
@@ -101,9 +101,9 @@ from claude_code_runner.materialize import (
     AgentFolders,
     Materialized,
     MaterializeError,
+    definition_resolver,
     materialize,
     remove_turn_mcp,
-    resolve_ref,
     write_turn_mcp,
 )
 from claude_code_runner.reply_upload import remove_run_files
@@ -774,6 +774,15 @@ class HostedHandler(AgentHandler):
             state.close()
             remove_run_files(self._state_dir, state.run_id)
 
+    def _resolver(self) -> Callable[[str], str]:
+        """The resolver of this agent's ``secret_ref`` values (26 5.1 item 3)."""
+        runner = self._ctx.runner
+        if runner is None:
+            return definition_resolver(None, self.agent_id, ())
+        config = runner.config
+        refused = own_credential_files(config)
+        return definition_resolver(config.hosted_secrets_dir, self.agent_id, refused)
+
     async def execute(self, inv: Invocation, run: RunHandle) -> None:
         """Write the per-turn MCP file, run the turn in the agent folder, then delete the file.
 
@@ -792,7 +801,7 @@ class HostedHandler(AgentHandler):
             hosted = state.hosted
             if folders is not None and done is not None and hosted and hosted.mcp_config:
                 try:
-                    write_turn_mcp(folders, run.run_id, done.servers, resolve_ref)
+                    write_turn_mcp(folders, run.run_id, done.servers, self._resolver())
                 except (MaterializeError, OSError) as err:
                     code = getattr(err, "code", type(err).__name__)
                     _warn("mcp_reference_unavailable", run_id=run.run_id, code=code)

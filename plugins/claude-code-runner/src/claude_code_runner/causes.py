@@ -102,8 +102,9 @@ CAUSES: dict[str, str] = {
         "runner.hosted_agents_root. The runner log names the problem"
     ),
     "mcp_reference_unavailable": (
-        "The runner cannot read a secret that an MCP server of this built-in agent names. "
-        "Check the secret on the runner host or change the server in the agent's definition"
+        "The runner cannot read a secret that an MCP server of this built-in agent names, or "
+        "the secret lies outside the agent's folder under runner.hosted_secrets_dir. Check the "
+        "secret on the runner host or change the server in the agent's definition"
     ),
     "cost_cap_reached": (
         "The run reached the cost cap of this built-in agent's definition, so Claude Code "

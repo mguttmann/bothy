@@ -46,6 +46,7 @@ __all__ = [
     "RunnerConfig",
     "check_argument",
     "load_config",
+    "own_credential_files",
     "parse_duration",
 ]
 
@@ -188,6 +189,12 @@ class RunnerConfig:
         hosted_max_tool_class: ``runner.hosted_max_tool_class``: the highest tool class loaded
             for a hosted agent (``chat``, ``scoped`` or ``host``), reported as the value of the
             capability ``hosts_agents`` (26 3.1 item 3).
+        hosted_secrets_dir: ``runner.hosted_secrets_dir``: the folder whose subfolder
+            ``<agent_id>/`` holds the only files a hosted agent's ``secret_ref`` may name (26 5.1
+            item 3); ``None`` (empty, the default) resolves no reference of a definition. With
+            ``hosted_agents`` refused when it is not an absolute folder of its own, when group or
+            others may write it, when it overlaps the root, ``state_dir`` or ``projects_root``,
+            or when one of the runner's own ``file:`` credentials lies in it.
         mcp_stdio_runners: ``runner.mcp_stdio_runners``: the commands the runner starts for a
             ``stdio`` MCP server of a definition (26 5.6); a definition naming another one is
             refused before the turn.
@@ -241,6 +248,7 @@ class RunnerConfig:
     hosted_agents: bool = False
     hosted_agents_root: Path | None = None
     hosted_max_tool_class: str = "scoped"
+    hosted_secrets_dir: Path | None = None
     mcp_stdio_runners: tuple[str, ...] = DEFAULT_STDIO_RUNNERS
     channel_skills_dir: Path | None = None
 
@@ -467,6 +475,47 @@ def _check_hosted_root(r: _Reader, config: RunnerConfig) -> None:
             raise r.fail(name, "it or a folder above it holds a CLAUDE.md")
 
 
+def _hosted_secrets_dir(r: _Reader) -> Path | None:
+    """``runner.hosted_secrets_dir``: empty is unset; `_check_hosted_secrets` checks the place."""
+    value = r.get("hosted_secrets_dir", str, "")
+    return Path(value) if value else None
+
+
+def own_credential_files(config: RunnerConfig) -> tuple[Path, ...]:
+    """The files of the runner's own ``file:`` credentials (agent token, DPoP key, API key)."""
+    refs = (config.agent_token_ref, config.dpop_key_ref, config.anthropic_api_key_ref)
+    return tuple(Path(ref.target) for ref in refs if ref is not None and ref.scheme == "file")
+
+
+def _check_hosted_secrets(r: _Reader, config: RunnerConfig) -> None:
+    """The start checks of ``runner.hosted_secrets_dir`` (26 5.1 item 3).
+
+    A definition names a ``secret_ref`` that the runner sends to a URL of the owner's choice, so
+    the files it may name lie in a folder of their own, apart from the runner's state, the bound
+    projects, the agents' working folders and the runner's own credentials.
+    """
+    name = "hosted_secrets_dir"
+    folder = config.hosted_secrets_dir
+    if folder is None:
+        return
+    if not folder.is_absolute() or folder.is_symlink() or not folder.is_dir():
+        raise r.fail(name, "must be an absolute path of a folder that exists, not a link")
+    if stat.S_IMODE(folder.stat().st_mode) & (stat.S_IWGRP | stat.S_IWOTH):
+        raise r.fail(name, "group or others may write it")
+    others = (
+        (config.hosted_agents_root, "hosted_agents_root"),
+        (config.state_dir, "state_dir"),
+        (config.projects_root, "projects_root"),
+    )
+    for other, key in others:
+        if other is not None and _overlaps(folder, other):
+            raise r.fail(name, f"is equal to, inside or above runner.{key}")
+    inside = folder.resolve()
+    for own in own_credential_files(config):
+        if own.resolve().is_relative_to(inside):
+            raise r.fail(name, "holds a credential of the runner itself")
+
+
 def _stdio_runners(r: _Reader) -> tuple[str, ...]:
     """``runner.mcp_stdio_runners``: bare command names, looked up in the cleaned ``PATH``."""
     values = r.strings("mcp_stdio_runners", DEFAULT_STDIO_RUNNERS)
@@ -605,6 +654,7 @@ def load_config(path: Path) -> RunnerConfig:
         hosted_agents=r.get("hosted_agents", bool, False),
         hosted_agents_root=_hosted_agents_root(r),
         hosted_max_tool_class=_hosted_max_tool_class(r),
+        hosted_secrets_dir=_hosted_secrets_dir(r),
         mcp_stdio_runners=_stdio_runners(r),
         channel_skills_dir=_channel_skills_dir(r),
     )
@@ -620,3 +670,4 @@ def _check_hosting(r: _Reader, config: RunnerConfig) -> None:
         # Hosted tokens are bound to this key (26 3.3 item 1); the server refuses them without.
         raise r.fail("dpop_key_ref", "required with runner.hosted_agents")
     _check_hosted_root(r, config)
+    _check_hosted_secrets(r, config)

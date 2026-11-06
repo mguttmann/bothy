@@ -321,6 +321,11 @@ class HostingWorld(World):
         return self.root / "agents"
 
     @property
+    def secrets_dir(self) -> Path:
+        """``runner.hosted_secrets_dir`` of the world (the folders of each agent's secrets)."""
+        return self.root / "hosted-secrets"
+
+    @property
     def server(self) -> HostingServer:
         """The runner's server."""
         assert isinstance(self.fake, HostingServer)
@@ -333,6 +338,7 @@ class HostingWorld(World):
             "hosted_agents": True,
             "hosted_max_tool_class": "scoped",
             "hosted_agents_root": str(self.agents_root),
+            "hosted_secrets_dir": str(self.secrets_dir),
         }
         values.update(runner)
         return super().config(**values)
@@ -375,6 +381,7 @@ async def hosting_world(
 ) -> AsyncIterator[HostingWorld]:
     """Build a `HostingWorld` in ``root`` (like the scenario world, with the runner's key)."""
     root.mkdir(mode=0o700)
+    (root / "hosted-secrets").mkdir(mode=0o700)
     projects = root / "projects"
     (projects / "website" / ".git").mkdir(parents=True)
     home = root / "home"

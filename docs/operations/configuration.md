@@ -1019,6 +1019,7 @@ Source: [26-builtin-agents.md](../spec/26-builtin-agents.md), section 14.
 | `runner.hosted_agents` |  | Runner |  | `false` | host the agents whose `hosted_by` is this runner (3.2) |  |
 | `runner.hosted_agents_root` |  | Runner |  | empty | root of the agent and control folders; required with `runner.hosted_agents`; never inside, equal to or above `runner.state_dir` or `runner.projects_root` (5.1) |  |
 | `runner.hosted_max_tool_class` |  | Runner |  | `scoped` | highest tool class loaded for a hosted agent, reported as the value of `hosts_agents` (3.1) |  |
+| `runner.hosted_secrets_dir` |  | Runner |  | empty | folder with one subfolder `<agent_id>/` per hosted agent; a definition's `secret_ref` resolves only to a file there; empty means no reference of a definition resolves (5.1) |  |
 | `runner.mcp_stdio_runners` |  | Runner |  | `["npx", "uvx"]` | commands the runner starts for a `stdio` MCP server; a definition naming another command is refused before the turn (5.6) |  |
 | `runner.agent_builder` |  | Runner |  | `false` | answer interview requests when this runner is the builder agent (6.2) |  |
 | `runner.agent_builder_model` |  | Runner |  | `sonnet` | model of the builder call (6.2) |  |

@@ -40,7 +40,7 @@ from typing import Any
 from uuid import UUID
 
 from claude_code_runner.definition import Definition, Entry, McpServer
-from claude_code_runner.secrets import SecretError, parse_secret_ref, resolve
+from claude_code_runner.secrets import SecretError, SecretRef, parse_secret_ref, resolve
 from claude_code_runner.statedir import write_private
 
 __all__ = [
@@ -48,11 +48,11 @@ __all__ = [
     "AgentFolders",
     "MaterializeError",
     "Materialized",
+    "definition_resolver",
     "frontmatter",
     "loaded_servers",
     "materialize",
     "remove_turn_mcp",
-    "resolve_ref",
     "sweep_turn_files",
     "write_turn_mcp",
 ]
@@ -97,7 +97,8 @@ class MaterializeError(Exception):
     """A definition the runner cannot write, or a secret it cannot resolve.
 
     Attributes:
-        code: ``invalid_name``, ``not_a_folder`` or ``secret_unavailable``; never a value.
+        code: ``invalid_name``, ``not_a_folder``, ``secret_unavailable`` or
+            ``secret_out_of_scope``; never a value.
     """
 
     def __init__(self, code: str) -> None:
@@ -259,22 +260,49 @@ def mcp_document(
     return {"mcpServers": out}
 
 
-def resolve_ref(ref: str) -> str:
-    """Read a ``secret_ref`` of a definition from the runner's secret provider (16 5.2).
+def definition_resolver(
+    secrets_dir: Path | None, agent_id: UUID, refused: Iterable[Path]
+) -> Callable[[str], str]:
+    """The resolver of a hosted agent's ``secret_ref`` values (26 4.2, 5.1 item 3).
+
+    A definition may name only ``file:`` references whose file lies, also after following every
+    link, in ``<secrets_dir>/<agent_id>/``; never ``env:`` (the runner's own environment), never
+    another agent's folder and never one of ``refused`` (the runner's own credentials). Without
+    ``secrets_dir`` no reference resolves. The file is then read as any ``secret_ref`` (16 5.2).
 
     Args:
-        ref: ``env:<NAME>`` or ``file:<absolute path>``.
+        secrets_dir: ``runner.hosted_secrets_dir``.
+        agent_id: The hosted agent.
+        refused: The files of the runner's own credentials.
 
     Returns:
-        The value.
-
-    Raises:
-        MaterializeError: ``secret_unavailable``; the reference and the value stay out of it.
+        A function from a reference to its value; it raises `MaterializeError` with
+        ``secret_out_of_scope`` or ``secret_unavailable``, never naming the reference or a value.
     """
-    try:
-        return resolve(parse_secret_ref(ref)).reveal()
-    except SecretError:
-        raise MaterializeError("secret_unavailable") from None
+    refused_paths = tuple(refused)
+
+    def resolve_value(ref: str) -> str:
+        try:
+            parsed = parse_secret_ref(ref)
+        except SecretError:
+            raise MaterializeError("secret_unavailable") from None
+        if secrets_dir is None or parsed.scheme != "file":
+            raise MaterializeError("secret_out_of_scope")
+        scope = secrets_dir / str(agent_id)
+        try:
+            real = Path(parsed.target).resolve(strict=True)
+            inside = real.is_relative_to(scope.resolve(strict=True))
+            own = any(real == p.resolve() for p in refused_paths)
+        except (OSError, RuntimeError):
+            raise MaterializeError("secret_unavailable") from None
+        if not inside or own:
+            raise MaterializeError("secret_out_of_scope")
+        try:
+            return resolve(SecretRef("file", str(real))).reveal()
+        except SecretError:
+            raise MaterializeError("secret_unavailable") from None
+
+    return resolve_value
 
 
 def _json(document: Any) -> str:
@@ -449,7 +477,7 @@ def write_turn_mcp(
         folders: The agent's folders.
         run_id: The run.
         servers: The servers of the turn's class (`loaded_servers`).
-        resolve_value: Resolves a ``secret_ref`` (`resolve_ref`).
+        resolve_value: Resolves a ``secret_ref`` (`definition_resolver`).
 
     Returns:
         The file (mode ``0600``), or ``None`` when there is no server to load.

@@ -39,14 +39,18 @@ async def world(tmp_path: Path) -> AsyncIterator[HostingWorld]:
         yield w
 
 
-def _secret_file(world: HostingWorld) -> Path:
-    path = world.root / "docs_token"
+def _secret_file(world: HostingWorld, agent_id: Any = None) -> Path:
+    # A definition may name only files under <runner.hosted_secrets_dir>/<agent_id>/.
+    folder = world.secrets_dir / str(agent_id) if agent_id else world.root
+    folder.mkdir(mode=0o700, exist_ok=True)
+    path = folder / "docs_token"
     path.write_text(SECRET + "\n")
     path.chmod(0o600)
     return path
 
 
-def _definition(world: HostingWorld, **changes: Any) -> dict[str, Any]:
+def _definition(world: HostingWorld, agent_id: Any = None, **changes: Any) -> dict[str, Any]:
+    ref = f"file:{_secret_file(world, agent_id)}"
     definition: dict[str, Any] = {
         "instructions": "You help Alex write release notes.\n",
         "skills": [
@@ -58,7 +62,7 @@ def _definition(world: HostingWorld, **changes: Any) -> dict[str, Any]:
                 "transport": "http",
                 "url": "https://mcp.example.com/v1",
                 "headers": [
-                    {"name": "Authorization", "secret_ref": f"file:{_secret_file(world)}"},
+                    {"name": "Authorization", "secret_ref": ref},
                     {"name": "X-Team", "value": "release"},
                 ],
             }
@@ -113,7 +117,7 @@ def _status_lines(fake: Any) -> list[str]:
 
 async def test_a_hosted_turn_answers_in_its_folder(world: HostingWorld) -> None:
     backend = await _hosted(world, "scoped", None)
-    backend.fake.set_definition(_definition(world), announce=False)
+    backend.fake.set_definition(_definition(world, backend.agent_id), announce=False)
     world.scenario(fixture="plain")
     await world.start()
     await world.until(lambda: bool(_beats(backend)))
@@ -166,7 +170,7 @@ async def test_the_per_turn_mcp_file_holds_the_secret_during_the_turn(
     world: HostingWorld,
 ) -> None:
     backend = await _hosted(world, "scoped", None)
-    backend.fake.set_definition(_definition(world), announce=False)
+    backend.fake.set_definition(_definition(world, backend.agent_id), announce=False)
     gate = world.gate("turn_gate")
     world.scenario(fixture="plain", turn_gate=str(gate))
     await world.start()
@@ -181,12 +185,13 @@ async def test_the_per_turn_mcp_file_holds_the_secret_during_the_turn(
     assert servers["docs"]["headers"]["Authorization"] == SECRET
     world.release(gate)
     assert await _ended(world, backend, run.run_id) == "completed"
-    assert not turn_mcp.exists()
+    # The file goes in the turn's finally, which runs after run.finish reached the server.
+    await world.until(lambda: not turn_mcp.exists())
 
 
 async def test_a_definition_change_is_applied_before_the_next_turn(world: HostingWorld) -> None:
     backend = await _hosted(world, "scoped", None)
-    backend.fake.set_definition(_definition(world, skills=[]), announce=False)
+    backend.fake.set_definition(_definition(world, backend.agent_id, skills=[]), announce=False)
     world.scenario(fixture="plain")
     await world.start()
     await world.until(lambda: bool(_beats(backend)))
@@ -198,7 +203,7 @@ async def test_a_definition_change_is_applied_before_the_next_turn(world: Hostin
     assert await _ended(world, backend, first.run_id) == "completed"
     assert "--plugin-dir" not in world.turns()[0]["argv"]
     (agent / ".mcp.json").write_text('{"mcpServers": {}}')  # planted by the turn
-    changed = _definition(world, instructions="Answer in one line.\n")
+    changed = _definition(world, backend.agent_id, instructions="Answer in one line.\n")
     backend.fake.set_definition(changed)
     # The event alone rewrites the folders.
     await world.until(lambda: (agent / "CLAUDE.md").read_text() == "Answer in one line.\n")
@@ -263,8 +268,10 @@ async def test_a_definition_failing_the_check_is_refused_before_start(
 
 async def test_the_cost_cap_ends_the_run_with_its_cause(world: HostingWorld) -> None:
     # BA-T19: the result the pinned CLI sends when --max-budget-usd stops a turn.
-    capped = _definition(world, settings={"tool_class_wish": "chat", "max_cost_usd_per_run": 0.5})
-    backend = await _hosted(world, "scoped", capped)
+    backend = await _hosted(world, "scoped", None)
+    settings = {"tool_class_wish": "chat", "max_cost_usd_per_run": 0.5}
+    capped = _definition(world, backend.agent_id, settings=settings)
+    backend.fake.set_definition(capped, announce=False)
     world.scenario(
         fixture="plain",
         result_override={
@@ -404,3 +411,34 @@ async def test_an_unreadable_secret_ends_the_run_without_a_turn(world: HostingWo
     assert world.turns() == []
     turns = world.agents_root / f"{backend.agent_id}.control" / "turns"
     assert not any(turns.glob("*.mcp.json")) if turns.exists() else True
+
+
+@pytest.mark.parametrize("place", ["runner_token", "runner_env", "other_agent"])
+async def test_a_secret_outside_the_agent_s_scope_ends_the_run_without_a_turn(
+    world: HostingWorld, monkeypatch: pytest.MonkeyPatch, place: str
+) -> None:
+    # Red team of A1-05: a definition must not send the runner's own credentials, its
+    # environment or another hosted agent's secrets to a URL of the owner's choice.
+    other = world.secrets_dir / "0192f4a0-7b1c-7d07-84b0-358556a08a98"
+    other.mkdir(mode=0o700)
+    other_file = other / "docs_token"
+    other_file.write_text("other-agent-canary\n")
+    other_file.chmod(0o600)
+    ref = {
+        "runner_token": f"file:{world.token_file}",
+        "runner_env": "env:RUNNER_CANARY",
+        "other_agent": f"file:{other_file}",
+    }[place]
+    backend = await _hosted(world, "scoped", None)
+    definition = _definition(world, backend.agent_id)
+    definition["mcp_servers"][0]["headers"][0]["secret_ref"] = ref
+    backend.fake.set_definition(definition, announce=False)
+    monkeypatch.setenv("RUNNER_CANARY", "runner-env-canary")  # secrets read the process env
+    await world.start()
+    await world.until(lambda: bool(_beats(backend)))
+    run = await backend.fake.trigger("Hello")
+    assert await _ended(world, backend, run.run_id) == "failed"
+    assert _finish(backend)["summary"] == cause("mcp_reference_unavailable")
+    assert world.turns() == []
+    turns = world.agents_root / f"{backend.agent_id}.control" / "turns"
+    assert not turns.exists() or not any(turns.glob("*.mcp.json"))

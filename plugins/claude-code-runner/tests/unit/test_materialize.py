@@ -26,6 +26,7 @@ from claude_code_runner.materialize import (
     SETTINGS,
     AgentFolders,
     MaterializeError,
+    definition_resolver,
     frontmatter,
     loaded_servers,
     materialize,
@@ -382,6 +383,70 @@ def test_a_resolve_failure_writes_nothing(folders: AgentFolders) -> None:
     with pytest.raises(MaterializeError):
         write_turn_mcp(folders, RUN, loaded_servers(_full(), "host"), fail)
     assert not folders.turn_mcp(RUN).exists()
+
+
+# ---- Which secrets a definition may name (26 4.2, 5.1 item 3; red team of A1-05) ----
+
+
+def _scope(tmp_path: Path) -> tuple[Path, Path]:
+    secrets = tmp_path / "hosted-secrets"
+    own = secrets / str(AGENT)
+    own.mkdir(parents=True, mode=0o700)
+    value = own / "docs_token"
+    value.write_text("docs-value\n")
+    value.chmod(0o600)
+    return secrets, value
+
+
+def test_a_file_in_the_agent_s_own_scope_resolves(tmp_path: Path) -> None:
+    secrets, value = _scope(tmp_path)
+    assert definition_resolver(secrets, AGENT, ())(f"file:{value}") == "docs-value"
+
+
+def _private(path: Path, text: str = "runner-credential\n") -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    path.write_text(text)
+    path.chmod(0o600)
+    return path
+
+
+@pytest.mark.parametrize("place", ["outside", "other_agent", "link_out", "env", "dotdot"])
+def test_a_reference_outside_the_scope_is_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, place: str
+) -> None:
+    secrets, _value = _scope(tmp_path)
+    monkeypatch.setenv("RUNNER_ONLY", "runner-credential")
+    token = _private(tmp_path / "agent_token")
+    other = _private(secrets / "0192f4a0-7b1c-7d07-84b0-358556a08a98" / "docs_token")
+    link = secrets / str(AGENT) / "link"
+    link.symlink_to(token)
+    ref = {
+        "outside": f"file:{token}",
+        "other_agent": f"file:{other}",
+        "link_out": f"file:{link}",
+        "env": "env:RUNNER_ONLY",
+        "dotdot": f"file:{secrets / str(AGENT) / '..' / 'x'}",
+    }[place]
+    with pytest.raises(MaterializeError) as err:
+        definition_resolver(secrets, AGENT, ())(ref)
+    assert err.value.code == ("secret_unavailable" if place == "dotdot" else "secret_out_of_scope")
+    assert "runner-credential" not in str(err.value)
+
+
+def test_without_the_key_no_reference_resolves(tmp_path: Path) -> None:
+    _secrets, value = _scope(tmp_path)
+    with pytest.raises(MaterializeError) as err:
+        definition_resolver(None, AGENT, ())(f"file:{value}")
+    assert err.value.code == "secret_out_of_scope"
+
+
+def test_a_runner_credential_in_the_scope_is_refused(tmp_path: Path) -> None:
+    secrets, value = _scope(tmp_path)
+    link = secrets / str(AGENT) / "alias"
+    link.symlink_to(value)
+    with pytest.raises(MaterializeError) as err:
+        definition_resolver(secrets, AGENT, (value,))(f"file:{link}")
+    assert err.value.code == "secret_out_of_scope"
 
 
 def test_skills_absent_leave_the_plugin_without_skills(folders: AgentFolders) -> None:

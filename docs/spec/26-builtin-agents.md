@@ -157,7 +157,10 @@ All limits are configuration values (section 14).
 | `origin` | `kind`, optional `template_slug`, `template_version` | `kind` one of `template`, `interview`, `manual`; display only |
 
 A `secret_ref` names a key in the secret provider of the hosting runner (16, the `secret_ref`
-form of `runner.anthropic_api_key_ref`); the server never resolves it.
+form of `runner.anthropic_api_key_ref`); the server never resolves it. The runner resolves only a
+`file:` reference whose file lies, also after following every link, in
+`<runner.hosted_secrets_dir>/<agent_id>/` of the same agent (5.1 item 3); an `env:` reference,
+another file and every reference without that key are out of scope.
 
 Optional are only `files[]`, `headers[]`, `args[]`, `env[]`, `settings.model` (absent: the runner's
 default model), `settings.allowed_tools` (absent: no narrowing; empty: no named tool),
@@ -248,6 +251,17 @@ at the repository root is the conformance set of every writer (A1-02).
 2. The agent folder `<root>/<agent_id>/` (mode `0700`) is the working folder of every turn of the
    agent. The control folder `<root>/<agent_id>.control/` (mode `0700`) lies outside it, out of
    reach of the file tools of a `chat` or `scoped` turn.
+3. `runner.hosted_secrets_dir` (default empty) holds the secrets of hosted agents, one subfolder
+   `<agent_id>/` per agent, filled by the host operator. A definition's `secret_ref` resolves only
+   to a file in its own agent's subfolder (4.2); never to the runner's environment, another
+   agent's subfolder or a credential of the runner itself (`agent_token_ref`, `dpop_key_ref`,
+   `anthropic_api_key_ref`). Empty, no reference of a definition resolves. With
+   `runner.hosted_agents` the runner refuses to start when the key is not an absolute folder (a
+   link is refused), when group or others may write it, when it is equal to, inside or above
+   `runner.hosted_agents_root`, `runner.state_dir` or `runner.projects_root`, or when a `file:`
+   credential of the runner lies in it. Reason: a definition sends the value as a header or an
+   environment value to a server of the owner's choice, also under `scoped`, so without a scope
+   it could carry out any secret of the runner user (red team of A1-05).
 
 ### 5.2 Files the runner writes
 
@@ -264,7 +278,7 @@ the definition:
 | `<control>/plugin/skills/<name>/SKILL.md` | YAML frontmatter with exactly `name` and `description`, written by a YAML serializer as quoted scalars (a line break in a value cannot start a new key), then `body` |
 | `<control>/plugin/skills/<name>/<file name>` | each `files[]` entry, flat, under its validated name |
 | `<control>/mcp.json` | the `http` servers, and under `host` also the `stdio` servers, with `secret_ref` entries unresolved |
-| `<control>/turns/<run_id>.mcp.json` | per turn: `mcp.json` with every `secret_ref` resolved from the runner's secret provider, mode `0600`, deleted when the turn ends and swept at start |
+| `<control>/turns/<run_id>.mcp.json` | per turn: `mcp.json` with every `secret_ref` resolved within the agent's scope of 5.1 item 3, mode `0600`, deleted when the turn ends and swept at start; a reference out of scope or unreadable ends the run with the cause `mcp_reference_unavailable` and writes no file |
 
 Secret values reach a turn only through the per-turn MCP file, never through the environment of
 the turn and never through a file in the agent folder or in the turn's `TMPDIR` (T-BA-02).
@@ -658,7 +672,7 @@ hosted agent in `personal` always equals that of its hosting runner (R-BA-12).
 | BA-T08 | `putProjectBinding` and `setChannelOperator` on a bound forum with a built-in agent | `operator_cannot_serve_project` (R-AG-39, A1-03) |
 | BA-T09 | runner with `runner.hosted_agents`: two hosted agents, shared slots, separate cursors and state folders; no token in any file under `runner.state_dir` or `runner.hosted_agents_root` | as 3.2 and 3.3 (A1-04) |
 | BA-T10 | runner start with `runner.hosted_agents_root` inside or above `runner.state_dir` or `runner.projects_root`, with a `CLAUDE.md` above it, writable by others | start refused, naming the key (A1-05) |
-| BA-T11 | materializer: files of 5.2 from a definition; frontmatter with a line break in `description`; a file name with `/` or `..`; settings file content exactly 5.4 | as 5.2 and 5.4; injection and path escape impossible (A1-05) |
+| BA-T11 | materializer: files of 5.2 from a definition; frontmatter with a line break in `description`; a file name with `/` or `..`; settings file content exactly 5.4; a `secret_ref` naming the runner's own token, an `env:` variable, another agent's file or a link out of the agent's subfolder of `runner.hosted_secrets_dir` | as 5.2 and 5.4; injection and path escape impossible; an out-of-scope reference ends the run with `mcp_reference_unavailable` without a per-turn file (A1-05) |
 | BA-T12 | rebuild: planted files of every surface of 5.5 in the agent folder and the control folder | removed before the turn; the agent's other files stay (A1-05) |
 | BA-T13 | command line per class against 5.3 with fake Claude; `stdio` server under a token below `host`; a definition failing 4.3 | exact list; `tool_class_mismatch` before `run.start` (A1-05) |
 | BA-T14 | probe against the pinned CLI with a planted skill carrying `hooks`, `allowed-tools: Bash` and both inline shell forms, and every point of 5.7 | no hook, no `Bash`, the placeholder "[shell command execution disabled by policy]"; results recorded in 5.7 (A1-05, real CLI behind its switch) |
@@ -682,7 +696,7 @@ hosted agent in `personal` always equals that of its hosting runner (R-BA-12).
 | R-BA-05 | `stdio` MCP servers need `tool_class = 'host'`; `scoped` loads only `http` servers; `chat` loads none; the definition's tool list only narrows `runner.scoped_allowed_tools` (4.4). | A local process as the host user is the `host` case of 07 2.11; the host operator keeps the ceiling (D-A1-18). |
 | R-BA-06 | `agent.tool_class.set` below `host` is refused while the current definition has a `stdio` server (4.4 item 5). | A silent downgrade would leave an agent that fails every turn with `tool_class_mismatch`; the owner removes the server first (design backlog item 10). |
 | R-BA-07 | Below `host` a hosted turn runs with `--restricted`, `--settings` of the runner and an explicit `--tools` whose baseline is what 09 18.2 grants `scoped` already, plus `Skill` only with skills, then also named in `--allowedTools`; every class gets `--strict-mcp-config`; `host` uses `--setting-sources project,local`; each point of 5.7 has a probe and a fallback (5.3, 5.7). | `--restricted` drops user, project and local settings and confines file tools; an explicit `--tools` keeps the class baseline instead of removing read-only shell and skills (red team r3 findings 3 and 4); `--restricted` alone still starts the host user's MCP servers, and `dontAsk` refuses a tool not allowed in advance (red team of A1-01, minors 2 and 3). |
-| R-BA-08 | Secret values reach a turn only through a per-turn MCP file of mode `0600` in the control folder, never through the environment (5.2). | Concurrent turns of one host user can read each other's environment; a file outside the working folder is out of reach of `chat` and `scoped` file tools (design backlog item 4, T-BA-02). |
+| R-BA-08 | Secret values reach a turn only through a per-turn MCP file of mode `0600` in the control folder, never through the environment (5.2), and only from the agent's own subfolder of `runner.hosted_secrets_dir` (5.1 item 3). | Concurrent turns of one host user can read each other's environment; a file outside the working folder is out of reach of `chat` and `scoped` file tools (design backlog item 4, T-BA-02). |
 | R-BA-09 | The interview is one owner request with its own deadline to the builder agent, short-lived, nothing stored, every draft validated like a definition, audited and logged with counts only (6.1). | The search assistant pattern is built and tested; an interview costs money, so it is audited, but its content is the owner's text and stays out of audit and logs (D-A1-10, D-A1-12; design backlog item 6). |
 | R-BA-10 | Templates are written for the repository, shipped in the image, listed by an owner read, held by a template gate that works without the private deny list; private templates come from `agents.templates_dir` (7). | Exporting a real agent is how private names leak; forks have no private list (D-A1-14 to D-A1-16). |
 | R-BA-11 | Creation composes visible steps, each its own action and audit entry, without rollback; at creation, on "Try again" and on edit a raised class is set before and a lowered class after the definition; "Try again" runs the steps not reached yet in that order; a built-in agent without a definition is "not set up" and never served (8.2 to 8.4). | The pattern of "New project" (01 6.9); a rollback across actions would need a second write path (design backlog item 6); the server refuses a `stdio` server below `host` (4.3 item 7) and a downgrade while one is there (R-BA-06), so any other order cannot store such a definition (red team of A1-01, finding 1). |
@@ -715,6 +729,7 @@ Claude Code runner.
 | `runner.hosted_agents` | Runner | `false` | host the agents whose `hosted_by` is this runner (3.2) |
 | `runner.hosted_agents_root` | Runner | empty | root of the agent and control folders; required with `runner.hosted_agents`; never inside, equal to or above `runner.state_dir` or `runner.projects_root` (5.1) |
 | `runner.hosted_max_tool_class` | Runner | `scoped` | highest tool class loaded for a hosted agent, reported as the value of `hosts_agents` (3.1) |
+| `runner.hosted_secrets_dir` | Runner | empty | folder with one subfolder `<agent_id>/` per hosted agent; a definition's `secret_ref` resolves only to a file there; empty means no reference of a definition resolves (5.1) |
 | `runner.mcp_stdio_runners` | Runner | `["npx", "uvx"]` | commands the runner starts for a `stdio` MCP server; a definition naming another command is refused before the turn (5.6) |
 | `runner.agent_builder` | Runner | `false` | answer interview requests when this runner is the builder agent (6.2) |
 | `runner.agent_builder_model` | Runner | `sonnet` | model of the builder call (6.2) |
