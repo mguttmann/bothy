@@ -55,6 +55,11 @@ func TestHostedTokens(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	// closing sends a heartbeat to a connection the revocation is closing: the revocation path
+	// may close it before the heartbeat is written, so the close decides, not the write.
+	closing := func(c *wstest.Client) {
+		_ = c.Send("heartbeat", map[string]any{"last_seq": 0})
+	}
 	// runnerToken returns the id of the runner's own token bound to its key.
 	runnerToken := func(r consumerAgent) string {
 		var id string
@@ -77,7 +82,7 @@ func TestHostedTokens(t *testing.T) {
 		a := hosted(t, runner)
 		c, _ := w.ready(t, w.agentParams(a, ""))
 		w.must(w.owner, http.MethodDelete, "/api/v1/tokens/"+runnerToken(runner), nil)
-		beat(t, c)
+		closing(c)
 		w.expectClose(t, c, 4012)
 		runner.tok = w.agentToken(runner.id, runner.key, time.Now().Add(time.Hour))
 	})
@@ -94,7 +99,7 @@ func TestHostedTokens(t *testing.T) {
 		if code != http.StatusOK {
 			t.Fatalf("setAgentHost = %d %s", code, b)
 		}
-		beat(t, c)
+		closing(c)
 		w.expectClose(t, c, 4012)
 	})
 
@@ -103,7 +108,7 @@ func TestHostedTokens(t *testing.T) {
 		c, _ := w.ready(t, w.agentParams(a, ""))
 		rc, _ := w.ready(t, w.agentParams(runner, ""))
 		w.must(w.owner, http.MethodPost, "/api/v1/agents/"+a.id.String()+"/disable", map[string]any{"reason": "Pause"})
-		beat(t, c)
+		closing(c)
 		w.expectClose(t, c, 4012)
 		// The runner's own connection and token are untouched.
 		beat(t, rc)
@@ -116,7 +121,7 @@ func TestHostedTokens(t *testing.T) {
 		a := hosted(t, runner)
 		c, _ := w.ready(t, w.agentParams(a, ""))
 		w.must(w.owner, http.MethodPost, "/api/v1/agents/"+runner.id.String()+"/disable", map[string]any{"reason": "Retired"})
-		beat(t, c)
+		closing(c)
 		w.expectClose(t, c, 4012)
 	})
 }
