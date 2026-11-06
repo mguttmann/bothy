@@ -71,7 +71,7 @@ from claude_code_runner.heartbeat import WAIT_SLOTS_FULL, WAIT_THREAD_BUSY, Prob
 from claude_code_runner.locks import LockTimeout, SlotPool, acquire
 from claude_code_runner.runturn import RunState
 from claude_code_runner.statedir import hosted_dir
-from claude_code_runner.toolclass import lower
+from claude_code_runner.toolclass import ORDER, lower
 
 __all__ = [
     "HOSTED_CONSUMER",
@@ -104,6 +104,9 @@ issues few tokens."""
 
 _REVOKED = 4012
 """The close code of a revoked token (04 6): the agent waits for the next list."""
+
+_EXPIRED = 4011
+"""The close code of an expired token (04 6): the agent fetches the next one at once."""
 
 
 def _log(event: str, **ids: object) -> None:
@@ -516,6 +519,11 @@ class HostedConnection:
                     attempt += 1
                     continue
                 attempt = 0
+                if self._token is token and closed.code == _EXPIRED:
+                    # The token expired before its renewal point: fetch the next one now.
+                    self._token = None
+                    _warn("hosted_token_expired", agent_id=self.agent_id)
+                    continue
                 if self._token is token:  # not a renewal: the connection ended for good
                     self._token = None
                     reason = "revoked" if closed.code == _REVOKED else "closed"
@@ -658,7 +666,7 @@ class HostedAgents:
         """
         if envelope.type != HOSTING_CHANGED:
             return False
-        await self.sync(envelope.type)
+        self._sync_in_background(envelope.type)
         return True
 
     async def sync_soon(self) -> None:
@@ -667,9 +675,23 @@ class HostedAgents:
         In the background because the listing may stop the very connection that delivered the
         event.
         """
-        task = asyncio.get_running_loop().create_task(self.sync("agent.updated"))
+        self._sync_in_background("agent.updated")
+
+    def _sync_in_background(self, reason: str) -> None:
+        """Run `sync` as a tracked task, so a slow list never holds up the delivering events."""
+        task = asyncio.get_running_loop().create_task(
+            self._guarded(lambda: self.sync(reason), reason)
+        )
         self._syncs.add(task)
         task.add_done_callback(self._syncs.discard)
+
+    @staticmethod
+    async def _guarded(step: Callable[[], Awaitable[None]], reason: str) -> None:
+        """Run one step of the set; an unexpected error is logged and the next try still runs."""
+        try:
+            await step()
+        except Exception as err:  # the timer and the next event must survive any one failure
+            _warn("hosted_sync_failed", cause=reason, error=type(err).__name__)
 
     async def sync(self, reason: str) -> None:
         """List the hosted agents and start, keep or stop their connections.
@@ -715,7 +737,11 @@ class HostedAgents:
                     AgentPage, list_hosted_agents.asyncio_detailed, cursor=cursor
                 )
             for agent in page.items:
-                found[agent.id] = str(agent.tool_class.value)
+                tool_class = str(agent.tool_class.value)
+                if tool_class not in ORDER:  # a class of a newer server: its order is unknown
+                    _warn("hosted_agent_skipped", agent_id=agent.id, code="unknown_tool_class")
+                    continue
+                found[agent.id] = tool_class
             if isinstance(page.next_cursor, Unset) or not page.next_cursor:
                 return found
             cursor = page.next_cursor
@@ -724,9 +750,9 @@ class HostedAgents:
         """List the set and reload every agent's channels each ``channels_resync_interval``."""
         while True:
             await asyncio.sleep(self._ctx.resync_interval)
-            await self.sync("timer")
+            await self._guarded(lambda: self.sync("timer"), "timer")
             for connection in list(self._connections.values()):
-                await connection.resync_channels()
+                await self._guarded(connection.resync_channels, "timer")
 
     async def close(self) -> None:
         """Stop the timer and every hosted connection."""

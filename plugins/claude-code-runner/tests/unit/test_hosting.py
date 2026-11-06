@@ -9,11 +9,13 @@ names it again. The world is `hosting_world.HostingWorld`.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from collections.abc import AsyncIterator, Iterator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from types import SimpleNamespace
 from uuid import UUID
 
 import pytest
@@ -24,6 +26,8 @@ from scenarios.conftest import LogLines
 
 from claude_code_runner.hosting import (
     TOKEN_REFRESH_FRACTION,
+    HostedAgents,
+    HostedConnection,
     HostedToken,
     refresh_at,
 )
@@ -247,3 +251,78 @@ async def test_a_failed_connection_is_logged_and_tried_again(
     failed = _events(logs, "hosted_connection_failed")
     assert [line["code"] for line in failed] == ["forbidden", "forbidden"]
     assert len(backend.tokens) == 1
+
+
+async def test_4011_fetches_the_next_token_at_once(world: HostingWorld, logs: LogLines) -> None:
+    # A token the server expired before the renewal point is replaced at once, without
+    # waiting for the next list.
+    backend = await world.server.add_backend()
+    world.server.host(backend, announce=False)
+    await world.start()
+    await world.until(lambda: _connected(backend))
+    count = len(backend.fake.heartbeats)
+    await backend.fake.close_connections(4011)
+    await world.until(lambda: len(world.server.issue_calls) == 2)
+    await world.until(lambda: len(backend.fake.heartbeats) > count)
+    assert [line["agent_id"] for line in _events(logs, "hosted_token_expired")] == [
+        str(backend.agent_id)
+    ]
+    assert not _events(logs, "hosted_agent_left")
+
+
+async def test_an_unknown_tool_class_skips_only_that_agent(
+    world: HostingWorld, logs: LogLines
+) -> None:
+    # A class of a newer server has no known order: that agent is not served, the others are.
+    newer = await world.server.add_backend()
+    newer.tool_class = "future"
+    known = await world.server.add_backend()
+    world.server.host(newer, announce=False)
+    world.server.host(known, announce=False)
+    await world.start()
+    await world.until(lambda: _connected(known))
+    assert newer.agent_id not in world.server.issue_calls
+    assert _events(logs, "hosted_agent_skipped")[0] == {
+        "event": "hosted_agent_skipped",
+        "agent_id": str(newer.agent_id),
+        "code": "unknown_tool_class",
+    }
+
+
+async def test_the_timer_survives_a_failed_step(
+    world: HostingWorld, logs: LogLines, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def broken(self: HostedConnection) -> None:
+        raise RuntimeError("malformed channel answer")
+
+    monkeypatch.setattr(HostedConnection, "resync_channels", broken)
+    backend = await world.server.add_backend()
+    world.server.host(backend, announce=False)
+    await world.start(world.config(channels_resync_interval="2s"))
+    await world.until(lambda: _connected(backend))
+    await world.until(lambda: len(_events(logs, "hosted_sync_failed")) >= 1)
+    calls = world.server.list_calls
+    await world.until(lambda: world.server.list_calls > calls)  # the timer still lists
+    assert _events(logs, "hosted_sync_failed")[0] == {
+        "event": "hosted_sync_failed",
+        "cause": "timer",
+        "error": "RuntimeError",
+    }
+
+
+async def test_hosting_changed_does_not_hold_up_the_runner_s_events(
+    world: HostingWorld, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The list runs in the background: a slow list never delays the runner's next event.
+    runner = await world.start()
+    hosting = runner.handler.hosting
+    assert hosting is not None
+    release = asyncio.Event()
+
+    async def slow(self: HostedAgents, reason: str) -> None:
+        await release.wait()
+
+    monkeypatch.setattr(HostedAgents, "sync", slow)
+    envelope = SimpleNamespace(type="agent.hosting_changed")
+    assert await asyncio.wait_for(hosting.on_event(envelope), 1.0)  # type: ignore[arg-type]
+    release.set()
