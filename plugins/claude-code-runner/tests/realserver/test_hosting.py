@@ -95,7 +95,13 @@ async def _operated_forum(real: RealServer, agent_id: UUID) -> UUID:
 
 async def test_runner_hosts_a_built_in_agent(world: RealWorld) -> None:
     real = world.real
-    await world.start(world.config(hosted_agents=True, hosted_max_tool_class="scoped"))
+    await world.start(
+        world.config(
+            hosted_agents=True,
+            hosted_max_tool_class="scoped",
+            hosted_agents_root=str(world.root / "agents"),
+        )
+    )
     agent_id = await _create_hosted(real)
 
     async def online() -> bool:

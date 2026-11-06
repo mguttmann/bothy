@@ -4,8 +4,8 @@ Status: core (M2-34), follow-ups, stop, error paths and adoption after a crash (
 attachments (M3-12), folder creation of new projects (M4-43), live reload of channels and
 optional transcription of voice messages (RUNNER-LIVE-RELOAD), Git optional, a default folder for
 forums without a binding and the cause of every refusal in the thread (RUNNER-NO-GIT), hosting of
-built-in agents behind `runner.hosted_agents` (A1-04; their turns from definitions follow in
-A1-05).
+built-in agents behind `runner.hosted_agents` (A1-04) and runs their turns from their
+definitions (A1-05).
 
 ## Purpose
 
@@ -41,7 +41,10 @@ the title once per new session and reports the cost of the run.
 | `followups.py`, `background.py`, `stop.py`, `adoption.py` | Follow-up check, line and stdin rule; the background work that holds stdin open; the stop schedule; identity check and adoption decision |
 | `channels.py`, `workspace.py` | Cache of the served forums and their bindings, reloaded while running (09 18.1); resolution of `workspace_ref` and `runner.default_workspace`, readiness and the project folder report (09 18.13, M4-44) |
 | `causes.py` | The sentence for the thread that names the cause of a refused run (09 18.9, RUNNER-NO-GIT) |
-| `hosting.py` | The hosted agents of `runner.hosted_agents`: the hosted set, a token in memory per agent and its renewal, one connection, channel cache, heartbeat and state folder per agent (26 3.2, 3.3) |
+| `hosting.py` | The hosted agents of `runner.hosted_agents`: the hosted set, a token in memory per agent and its renewal, one connection, channel cache, heartbeat and state folder per agent (26 3.2, 3.3), and their turns from the definition (26 5) |
+| `definition.py` | The runner's own check of a definition (26 4.2, 4.3), held equal to the server's by the corpus `tests/agent-definitions`; the class a definition needs and the tool intersection (26 4.4) |
+| `materialize.py` | The agent and control folders: every file of 26 5.2, the runner settings of 26 5.4, the rebuild before each turn and the per-turn MCP file (26 5.6) |
+| `channel_skills.py` | Channel skills behind `runner.channel_skills_dir`, only in `host` turns (26 5.9) |
 | `transcribe.py` | The local transcriber of audio attachments and the note without a transcript (09 18.14) |
 | `searchassist.py` | The search assistant: one call without tools per question, the reply parsed into picks and terms (09 18.17) |
 | `provision.py` | Folder creation of a binding with `provision` `init` or `clone`, its creation record and the readiness reasons (09 18.12, M4-43) |
@@ -409,9 +412,8 @@ and served channels are byte for byte those of the runner before stage A1 (the f
 - **Keys.** `runner.hosted_agents`; `runner.hosted_max_tool_class` (`chat`, `scoped` or `host`,
   default `scoped`), the highest class a hosted agent runs with, reported in the runner's own
   heartbeat as the capability `hosts_agents`, so the server refuses a higher class for an agent of
-  this runner; `runner.hosted_agents_root`, read now, checked and used once hosted turns run
-  (A1-05). `runner.hosted_agents` needs `runner.dpop_key_ref`, because every hosted token is
-  bound to the runner's DPoP key.
+  this runner; `runner.hosted_agents_root` (see "Turns of built-in agents"). `runner.hosted_agents`
+  needs `runner.dpop_key_ref`, because every hosted token is bound to the runner's DPoP key.
 - **The set.** Once the runner's own connection is ready and its heartbeat with `hosts_agents`
   is stored, the runner lists the agents it hosts (`listHostedAgents`), again on
   `agent.hosting_changed`, on `agent.updated` of a hosted agent and every
@@ -437,11 +439,86 @@ and served channels are byte for byte those of the runner before stage A1 (the f
 - **Shared slots.** `runner.max_parallel_runs` bounds the turns of the runner's own agent and of
   every hosted agent together. Each agent's heartbeat names its own waiting runs and the shared
   `run_slots`, so a person sees that turns of another agent hold the slots.
-- **Until the definitions run (A1-05).** A hosted run takes its thread lock and a slot like a
-  turn, then ends `failed` with `adapter_error` and the cause `definition_missing` in the
-  summary, without `run.start` and without a turn.
+- **Without a definition** a hosted run takes its locks and a slot like a turn, then ends
+  `failed` with `adapter_error` and the cause `definition_missing` in the summary, without
+  `run.start` and without a turn (26 5.6 item 4).
 - **Turning it off** takes the hosted agents offline (their runs end like those of any offline
   agent) and leaves the runner's own agent as before (26 11 item 4).
+
+## Turns of built-in agents (A1-05)
+
+A hosted agent's turns run from its definition (docs/spec/26-builtin-agents.md 4 and 5). The
+server stores the definition as closed data; the runner writes every file the CLI reads from it,
+never copying a file of it, and checks it itself before every turn.
+
+- **Root.** `runner.hosted_agents_root` is required with `runner.hosted_agents` and created with
+  mode `0700` when missing. The start is refused, naming the key, when it is equal to, inside or
+  above `runner.state_dir` or `runner.projects_root`, when it or any folder above it holds a
+  `CLAUDE.md` (it would reach every agent's prompt), or when group or others may write it.
+- **Folders.** Per agent `<root>/<agent_id>/` (mode `0700`), the working folder of every turn,
+  and next to it, outside the turn's reach below `host`, the control folder
+  `<root>/<agent_id>.control/`.
+- **Files.** `CLAUDE.md` (the instructions) in the agent folder, and under `host` also
+  `.claude/settings.local.json` (the turn reads `--setting-sources project,local`); in the control
+  folder `settings.json`, `plugin/.claude-plugin/plugin.json` (name `bothy-agent-<agent_id>`, the
+  definition version, nothing else), `plugin/skills/<name>/SKILL.md` (frontmatter with exactly
+  `name` and `description` as double-quoted scalars, then the body) with the skill's extra files
+  flat beside it, and `mcp.json` with the servers of the class (none under `chat`, `http` ones
+  under `scoped`, all under `host`) and every `secret_ref` unresolved.
+- **Settings.** Exactly `disableSkillShellExecution`, `disableAllHooks`, `disableWorkflows` and
+  edit and write deny rules (`Edit(<pattern>)`, `Write(<pattern>)`) for `CLAUDE.md`,
+  `CLAUDE.local.md`, `.claude/**`, `.mcp.json`, `.lsp.json` and `.claude-plugin/**` (26 5.4).
+- **Rebuild before every turn**, on start of the agent's connection and on
+  `agent.definition_changed`: a symbolic link anywhere in both folders is removed
+  (`hosted_link_removed`); every `.claude`, `.claude-plugin`, `.mcp.json`, `.lsp.json` and
+  `CLAUDE.local.md` the runner did not write is removed at any depth of the agent folder
+  (`hosted_surface_removed`); the agent's other files stay; the control folder keeps only what
+  the runner wrote. Owned files are written atomically, so a concurrent turn of the same agent
+  never reads half a file.
+- **Own check.** `definition.py` repeats the rules of 26 4.2 and 4.3 (the server's size limits
+  are server keys the runner cannot read and are left out) with `runner.mcp_stdio_runners` as the
+  allowed `stdio` commands and the class of the invocation token. A finding, or a `stdio` server
+  under a token class below `host`, ends the run `failed` with `tool_class_mismatch` before
+  `run.start`; the summary names the field codes, never the content
+  (`hosted_definition_refused`).
+- **Order of a turn.** Locks and a shared slot; the definition (`getAgentDefinition` with the
+  hosted token); the check; the rebuild; the billing pre-check; `run.start`; the per-turn MCP file
+  `<control>/turns/<run_id>.mcp.json` (mode `0600`) with every `secret_ref` resolved from the
+  runner's secret provider; the turn in the agent folder; the file is deleted when the turn ends,
+  also on a stop, and leftovers of a crashed runner are swept at start. A secret that cannot be
+  read ends the run `adapter_error` with the cause `mcp_reference_unavailable`. Secret values are
+  never in the environment of a turn, a log line or another file.
+- **Command line** (26 5.3): `chat` gets `--tools ""` (or `Skill` with `--allowedTools Skill` when
+  the definition has skills); `scoped` gets `--tools Read Grep Glob Bash [Skill] <tools>` and
+  `--allowedTools <tools> [Skill]`, where `<tools>` is `runner.scoped_allowed_tools` narrowed by
+  the definition's tool list in the order of the key; `host` keeps `bypassPermissions`. Directly
+  after `--permission-prompts none`: `--restricted` (below `host`) or `--setting-sources
+  project,local` (`host`), `--settings <control>/settings.json`, `--plugin-dir <control>/plugin`
+  with skills, `--mcp-config <turn file>` with servers, always `--strict-mcp-config`. The cost
+  cap `settings.max_cost_usd_per_run` becomes `--max-budget-usd` before
+  `--append-system-prompt-file`; a run it stops ends `runtime_error` with the cause
+  `cost_cap_reached` (the CLI's `result` subtype `error_max_budget_usd`, or a cost at or above
+  the cap).
+- **State.** A hosted agent's turn records, sessions, streams, attachments, scratch places and
+  (billing `organization`) CLI configuration live under `<runner.state_dir>/hosted/<agent_id>/`.
+- **Channel skills** (26 5.9). With `runner.channel_skills_dir` set, a channel's skill reference
+  `claude-code:<name>` loads `<channel_skills_dir>/<name>/` (a folder with a `SKILL.md`) as one
+  more `--plugin-dir`, only in a turn of class `host`, for the runner's own agent and for hosted
+  agents. Below `host` every such reference is skipped, logged (`channel_skill_skipped`) and named
+  once per run in the live box status line; a missing folder is named the same way. References
+  of another adapter are skipped with a debug line. Without the key no reference is read.
+
+### Probe results of 26 5.7 (pinned CLI 2.1.288)
+
+`tests/real_cli/test_hosted_probe.py` has one probe per row of 26 5.7. Level one (free) ran on
+2026-11-06 against 2.1.288 and passed: `--help` names every flag of 26 5.3 (`--tools` takes
+several values), and the CLI holds `disableSkillShellExecution`, `disableAllHooks`,
+`disableWorkflows`, the result subtype `error_max_budget_usd` and the placeholder "[shell command
+execution disabled by policy]". Level two (one real turn per row, costs money) has not run: it
+needs the owner's `CLAUDE_CODE_RUNNER_REAL_TURN=1`. Until it runs, every row of 26 5.7 is not
+proven, no fallback is taken, and the runner uses the expected behaviour of each row. The cost
+cap is recognised by the result subtype read from the binary and, as the fallback of the last
+row, by a cost at or above the cap.
 
 ## Project folder report (M4-44)
 
@@ -565,7 +642,11 @@ the fixtures in `tests/fixtures/baseline/`; their README says how they were reco
 change only with a ruling. `tests/unit/test_hosting.py` and `tests/scenarios/test_hosted_agents.py`
 run a hosting runner against `tests/hosting_world.py`; `tests/realserver/test_hosting.py` hosts
 one built-in agent against the server of this tree (token issued, connection open, a message to
-the agent ends with `definition_missing`).
+the agent ends with `definition_missing`). `tests/unit/test_definition.py` runs the whole corpus
+`tests/agent-definitions` through the runner's own check; `tests/unit/test_materialize.py`,
+`tests/unit/test_hosted_commandline.py`, `tests/unit/test_channel_skills.py` and
+`tests/scenarios/test_hosted_turns.py` hold the folders, the command line, channel skills and
+hosted turns of A1-05.
 
 Every test uses Fake-Claude through `runner.claude_bin` and a fake `HOME`; no installed CLI and
 no login of the developer is touched. The real CLI runs only behind switches:

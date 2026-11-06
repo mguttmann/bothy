@@ -360,6 +360,16 @@ and applies the fallback when the probe fails:
 | `Read` and a read-only shell command (`cat`) under `scoped` reading the per-turn MCP file of its own turn and of a concurrent turn in the control folder | refused, the path lies outside the working folder | below `host` the runner loads only MCP servers without a `secret_ref`; the preview says so, and the gap is recorded as a residual risk of T-BA-02 |
 | The end of a turn stopped by `--max-budget-usd` | a `result` the runner recognizes | the run ends `failed` with `runtime_error` and the cause `cost_cap_reached` in the summary either way (5.8) |
 
+Results (A1-05, pinned CLI 2.1.288, `tests/real_cli/test_hosted_probe.py`): the free level of the
+probe ran on 2026-11-06 and passed: `--help` names every flag of 5.3 (`--tools` takes several
+values), and the CLI holds the three switches of 5.4, the `result` subtype
+`error_max_budget_usd` that a turn stopped by `--max-budget-usd` ends with, and the placeholder
+"[shell command execution disabled by policy]". The probe turns of each row (one real turn per
+row, behind the owner's switch for paid turns) have not run yet, so no row is proven and no
+fallback is taken; the runner builds the expected behaviour of each row. The runner recognises
+the cost cap by that subtype and, as the fallback of the last row, by a cost at or above the cap
+(decisions.d/A1-05.md).
+
 ### 5.8 Cost cap
 
 `settings.max_cost_usd_per_run` becomes `--max-budget-usd`. A run stopped by it ends `failed` with

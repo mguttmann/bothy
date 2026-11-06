@@ -65,12 +65,21 @@ progress_patch_interval = "2m"
 # under state_dir/hosted/<agent id>/, sharing the slots of max_parallel_runs. Off, the runner
 # behaves exactly as without these keys.
 hosted_agents = false
-# Root of the agent and control folders of hosted agents; required with hosted_agents once hosted
-# turns run (never inside, equal to or above state_dir or projects_root).
+# Root of the agent and control folders of hosted agents (26 5.1); required with hosted_agents.
+# The start is refused when it is equal to, inside or above state_dir or projects_root, when it
+# or a folder above it holds a CLAUDE.md, or when group or others may write it.
 hosted_agents_root = ""
 # Highest tool class loaded for a hosted agent (chat, scoped or host); reported to the server as
 # the capability hosts_agents, which bounds the class an owner can give a hosted agent.
 hosted_max_tool_class = "scoped"
+# Commands the runner starts for a stdio MCP server of a hosted agent's definition (26 5.6); a
+# definition naming another command is refused before the turn. Equal to the server's
+# agents.mcp_stdio_runners by default.
+mcp_stdio_runners = ["npx", "uvx"]
+# Folder of channel skills (26 5.9): a skill reference claude-code:<name> of a channel loads the
+# folder <channel_skills_dir>/<name>/ as a plugin, only in turns of tool class host. Empty (the
+# default) turns channel skills off, and the runner then reads no skill references at all.
+channel_skills_dir = ""
 # Roots of answer attachments by name only; an operator may narrow the list, never widen it.
 attach_allowed_roots = ["project", "thread_inbox", "runner_temp"]
 # Denied names of answer attachments; must contain the list of 09 18.10, may add more.

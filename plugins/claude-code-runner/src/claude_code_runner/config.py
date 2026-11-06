@@ -17,6 +17,7 @@ Examples:
 from __future__ import annotations
 
 import re
+import stat
 import tomllib
 import unicodedata
 from collections.abc import Callable, Mapping
@@ -39,11 +40,23 @@ from claude_code_runner.statedir import StateDirError, ensure_private_dir
 from claude_code_runner.toolclass import ORDER
 from claude_code_runner.workspace import WorkspaceError, resolve_default
 
-__all__ = ["ConfigError", "RunnerConfig", "check_argument", "load_config", "parse_duration"]
+__all__ = [
+    "DEFAULT_STDIO_RUNNERS",
+    "ConfigError",
+    "RunnerConfig",
+    "check_argument",
+    "load_config",
+    "parse_duration",
+]
 
 _DURATION = re.compile(r"(\d+(?:\.\d+)?)(ms|s|m|h|d)")
 _UNIT = {"ms": 0.001, "s": 1.0, "m": 60.0, "h": 3600.0, "d": 86400.0}
 _CONSUMER = re.compile(r"[a-z0-9][a-z0-9_-]*")
+_COMMAND = re.compile(r"[A-Za-z0-9_][A-Za-z0-9._-]*")
+"""A bare command name of ``runner.mcp_stdio_runners``: no path, no option, no blank."""
+
+DEFAULT_STDIO_RUNNERS = ("npx", "uvx")
+"""The default of ``runner.mcp_stdio_runners`` (26 14), equal to ``agents.mcp_stdio_runners``."""
 _BIDI = frozenset("\u061c\u200e\u200f\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069")
 
 
@@ -168,11 +181,19 @@ class RunnerConfig:
             is this runner's agent (docs/spec/26-builtin-agents.md 3.2); off by default, and
             off the runner reads no hosted list and opens no further connection.
         hosted_agents_root: ``runner.hosted_agents_root``: the root of the agent and control
-            folders (26 5.1); ``None`` when empty. Only read here; its checks come with the
-            turns of hosted agents (26 5.6).
+            folders (26 5.1); ``None`` when empty. Required with ``hosted_agents``, and then
+            refused when it is equal to, inside or above ``state_dir`` or ``projects_root``,
+            when it or a folder above it holds a ``CLAUDE.md``, or when group or others may
+            write it; created with mode ``0700`` when missing.
         hosted_max_tool_class: ``runner.hosted_max_tool_class``: the highest tool class loaded
             for a hosted agent (``chat``, ``scoped`` or ``host``), reported as the value of the
             capability ``hosts_agents`` (26 3.1 item 3).
+        mcp_stdio_runners: ``runner.mcp_stdio_runners``: the commands the runner starts for a
+            ``stdio`` MCP server of a definition (26 5.6); a definition naming another one is
+            refused before the turn.
+        channel_skills_dir: ``runner.channel_skills_dir``: the folder of channel skills for
+            ``claude-code:<name>`` references, loaded only in ``host`` turns (26 5.9); ``None``
+            (empty in the file, the default) turns channel skills off.
     """
 
     source: Path
@@ -220,6 +241,8 @@ class RunnerConfig:
     hosted_agents: bool = False
     hosted_agents_root: Path | None = None
     hosted_max_tool_class: str = "scoped"
+    mcp_stdio_runners: tuple[str, ...] = DEFAULT_STDIO_RUNNERS
+    channel_skills_dir: Path | None = None
 
 
 _Parse = Callable[[Any], Any]
@@ -405,9 +428,62 @@ def _default_workspace(r: _Reader, projects_root: Path) -> str | None:
 
 
 def _hosted_agents_root(r: _Reader) -> Path | None:
-    """``runner.hosted_agents_root``: empty is unset; the folder checks belong to 26 5.6."""
+    """``runner.hosted_agents_root``: empty is unset; `_check_hosted_root` checks the place."""
     value = r.get("hosted_agents_root", str, "")
     return Path(value) if value else None
+
+
+def _overlaps(first: Path, second: Path) -> bool:
+    """True when one folder is equal to, inside or above the other (both resolved)."""
+    a, b = first.resolve(), second.resolve()
+    return a == b or a.is_relative_to(b) or b.is_relative_to(a)
+
+
+def _check_hosted_root(r: _Reader, config: RunnerConfig) -> None:
+    """The start checks of ``runner.hosted_agents_root`` (26 5.1 item 1, BA-T10).
+
+    A ``host`` turn of a hosted agent works in its folder under the root, so the root must not
+    reach the runner's state or the bound projects, a ``CLAUDE.md`` in it or above it would
+    reach every agent's prompt (compare T-TM-13), and a folder others may write could receive a
+    planted file between the rebuild and the turn.
+    """
+    name = "hosted_agents_root"
+    root = config.hosted_agents_root
+    if root is None:
+        raise r.fail(name, "required with runner.hosted_agents")
+    if not root.is_absolute() or not root.parent.is_dir():
+        raise r.fail(name, "must be an absolute path whose parent exists")
+    for other, key in ((config.state_dir, "state_dir"), (config.projects_root, "projects_root")):
+        if _overlaps(root, other):
+            raise r.fail(name, f"is equal to, inside or above runner.{key}")
+    if not root.exists():
+        root.mkdir(mode=0o700)
+    if not root.is_dir() or root.is_symlink():
+        raise r.fail(name, "is not a folder")
+    if stat.S_IMODE(root.stat().st_mode) & (stat.S_IWGRP | stat.S_IWOTH):
+        raise r.fail(name, "group or others may write it")
+    for folder in (root.resolve(), *root.resolve().parents):
+        if (folder / "CLAUDE.md").exists():
+            raise r.fail(name, "it or a folder above it holds a CLAUDE.md")
+
+
+def _stdio_runners(r: _Reader) -> tuple[str, ...]:
+    """``runner.mcp_stdio_runners``: bare command names, looked up in the cleaned ``PATH``."""
+    values = r.strings("mcp_stdio_runners", DEFAULT_STDIO_RUNNERS)
+    if not all(_COMMAND.fullmatch(v) for v in values):
+        raise r.fail("mcp_stdio_runners", "an entry is not a bare command name")
+    return values
+
+
+def _channel_skills_dir(r: _Reader) -> Path | None:
+    """``runner.channel_skills_dir``: empty is off, else an absolute folder that exists."""
+    value = r.get("channel_skills_dir", str, "")
+    if not value:
+        return None
+    path = Path(value)
+    if not path.is_absolute() or not path.is_dir():
+        raise r.fail("channel_skills_dir", "must be an absolute path of a folder that exists")
+    return path
 
 
 def _hosted_max_tool_class(r: _Reader) -> str:
@@ -529,9 +605,18 @@ def load_config(path: Path) -> RunnerConfig:
         hosted_agents=r.get("hosted_agents", bool, False),
         hosted_agents_root=_hosted_agents_root(r),
         hosted_max_tool_class=_hosted_max_tool_class(r),
+        mcp_stdio_runners=_stdio_runners(r),
+        channel_skills_dir=_channel_skills_dir(r),
     )
     r.unknown()
-    if config.hosted_agents and config.dpop_key_ref is None:
+    if config.hosted_agents:
+        _check_hosting(r, config)
+    return config
+
+
+def _check_hosting(r: _Reader, config: RunnerConfig) -> None:
+    """The keys ``runner.hosted_agents`` needs: the DPoP key and a safe root (26 3.3, 5.1)."""
+    if config.dpop_key_ref is None:
         # Hosted tokens are bound to this key (26 3.3 item 1); the server refuses them without.
         raise r.fail("dpop_key_ref", "required with runner.hosted_agents")
-    return config
+    _check_hosted_root(r, config)

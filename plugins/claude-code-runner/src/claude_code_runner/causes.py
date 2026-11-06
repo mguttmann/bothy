@@ -13,7 +13,14 @@ Examples:
 
 from __future__ import annotations
 
-__all__ = ["ADAPTER_STOPPED", "CAUSES", "cause", "turn_end_cause"]
+__all__ = [
+    "ADAPTER_STOPPED",
+    "CAUSES",
+    "TOOL_CLASS_MISMATCH",
+    "cause",
+    "definition_refused",
+    "turn_end_cause",
+]
 
 ADAPTER_STOPPED = "adapter_stopped"
 """The ``cancelled`` reason of a run whose turn an orderly stop of the runner ended (D-AR-1)."""
@@ -86,6 +93,22 @@ CAUSES: dict[str, str] = {
         "The runner has no agent definition it can run for this built-in agent yet, so the "
         "run ended without a turn. Set up the agent's definition in the app"
     ),
+    "definition_unavailable": (
+        "The runner could not read this built-in agent's definition from the server, so the "
+        "run ended without a turn. Send again in a moment"
+    ),
+    "definition_unwritable": (
+        "The runner could not write the files of this built-in agent's definition under "
+        "runner.hosted_agents_root. The runner log names the problem"
+    ),
+    "mcp_reference_unavailable": (
+        "The runner cannot read a secret that an MCP server of this built-in agent names. "
+        "Check the secret on the runner host or change the server in the agent's definition"
+    ),
+    "cost_cap_reached": (
+        "The run reached the cost cap of this built-in agent's definition, so Claude Code "
+        "stopped. Raise the cap in the agent's settings or ask for less in one message"
+    ),
     "reply_refused": (
         "The server refused an answer of Claude Code, so the run could not deliver it. "
         "The runner log names the refusal"
@@ -110,6 +133,12 @@ _DEFAULT_CAUSES: dict[str, str] = {
 
 _FALLBACK = "The runner could not start Claude Code; its log has the details"
 
+TOOL_CLASS_MISMATCH = "tool_class_mismatch"
+"""The reason of a run whose definition fails the runner's own check (26 5.6 item 1)."""
+
+_MAX_CODES = 6
+"""Most field codes one summary names; the summary stays short (the runner log has them all)."""
+
 
 def cause(code: str, *, default_workspace: bool = False) -> str:
     """The sentence for the thread about log code ``code``.
@@ -124,6 +153,32 @@ def cause(code: str, *, default_workspace: bool = False) -> str:
     """
     table = _DEFAULT_CAUSES if default_workspace and code in _DEFAULT_CAUSES else CAUSES
     return f"{table.get(code, _FALLBACK)} (`{code}`)"
+
+
+def definition_refused(codes: list[str]) -> str:
+    """The summary of a run refused because its definition fails the check (26 5.6 item 1).
+
+    It names the field codes, never the content of the definition.
+
+    Args:
+        codes: The field codes of the findings, in their order.
+
+    Returns:
+        The text with the reason ``tool_class_mismatch`` in backticks at the end.
+
+    Examples:
+        >>> definition_refused(["inline_shell"]).startswith("This built-in agent's definition")
+        True
+    """
+    distinct = list(dict.fromkeys(codes))
+    named = ", ".join(f"`{c}`" for c in distinct[:_MAX_CODES])
+    if len(distinct) > _MAX_CODES:
+        named += " and more"
+    return (
+        "This built-in agent's definition claims more than its tool class allows or breaks "
+        f"a rule of the definition check ({named}), so the run ended without a turn. Fix the "
+        f"definition in the app (`{TOOL_CLASS_MISMATCH}`)"
+    )
 
 
 _LOGIN_LOST = "Claude Code lost its login on the runner host during this run, so the run ended."

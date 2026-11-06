@@ -73,6 +73,7 @@ from claude_code_runner.attachments import fetch_attachments
 from claude_code_runner.authcheck import auth_status, decide, evidence
 from claude_code_runner.builder import AgentBuilder
 from claude_code_runner.causes import ADAPTER_STOPPED, cause
+from claude_code_runner.channel_skills import resolve_channel_skills
 from claude_code_runner.channels import RESYNC_EVENTS, ChannelCache
 from claude_code_runner.commandline import (
     ArgumentError,
@@ -104,6 +105,7 @@ from claude_code_runner.heartbeat import (
 )
 from claude_code_runner.hosting import HostedAgents, HostingContext
 from claude_code_runner.locks import LockTimeout, SlotPool, acquire, release
+from claude_code_runner.materialize import sweep_turn_files
 from claude_code_runner.provision import Provisioner
 from claude_code_runner.reply_upload import remove_run_files, run_temp_dir
 from claude_code_runner.runturn import RunState, RunTurn
@@ -877,6 +879,15 @@ class RunnerHandler(AgentHandler):
             refuse(err.code, "adapter_error", ids)
         config = self.channels.get(state.channel_id) if self.channels else None
         state.channel_prompt = config.behavior.prompt if config is not None else ""
+        if self.config.channel_skills_dir is not None and config is not None:
+            # 26 5.9: read only with the key; loaded only by a host turn, named otherwise.
+            found = resolve_channel_skills(
+                list(config.behavior.skills),
+                self.config.channel_skills_dir,
+                self.config.tool_class,
+                **ids,
+            )
+            state.plugin_dirs, state.notice = found.plugin_dirs, found.notice()
         await self._take_locks(state, ids)
         state.context = await self._context(run, ids)
         files_dir = self.config.state_dir / "files" / str(state.thread_id)
@@ -968,22 +979,33 @@ class RunnerHandler(AgentHandler):
                 raise RunRefused(None) from None
             raise
 
-    async def precheck(self, state: RunState, desired: str, ids: Mapping[str, Any]) -> None:
+    async def precheck(
+        self,
+        state: RunState,
+        desired: str,
+        ids: Mapping[str, Any],
+        *,
+        config: RunnerConfig | None = None,
+    ) -> None:
         """The environment and the pre-check ``claude auth status`` of 18.3 (also per restart).
 
         Args:
             state: The run; its ``env``, ``mode`` and ``evidence`` are set.
             desired: The token's ``billing_mode``.
             ids: IDs for log lines.
+            config: The configuration of the turn: a hosted agent's has its own state folder
+                (its CLI configuration and the run's scratch place live there); the runner's
+                own when omitted.
 
         Raises:
             RunRefused: ``runtime_not_authenticated``, ``billing_mode_mismatch``,
                 ``adapter_error`` or ``runtime_error``.
         """
+        cfg = config or self.config
         api_key: Secret | None = None
         config_dir: Path | None = None
         if desired == "organization":
-            ref = self.config.anthropic_api_key_ref
+            ref = cfg.anthropic_api_key_ref
             try:
                 if ref is None:
                     raise SecretError("missing")
@@ -994,10 +1016,8 @@ class RunnerHandler(AgentHandler):
                 raise RunRefused(
                     "runtime_not_authenticated", summary=cause("api_key_unavailable")
                 ) from None
-            config_dir = ensure_private_dir(
-                self.config.state_dir / "claude-config" / "organization"
-            )
-        elif not (desired == "personal" and self.config.allow_personal):
+            config_dir = ensure_private_dir(cfg.state_dir / "claude-config" / "organization")
+        elif not (desired == "personal" and cfg.allow_personal):
             refuse("billing_mode_not_allowed", "billing_mode_mismatch", ids)
         try:
             state.env = build_environment(
@@ -1005,16 +1025,16 @@ class RunnerHandler(AgentHandler):
                 mode=desired,
                 api_key=api_key,
                 config_dir=config_dir,
-                forward_ssh_agent=self.config.forward_ssh_agent,
+                forward_ssh_agent=cfg.forward_ssh_agent,
                 # The run's own scratch place, a root of answer attachments (M3-12 note 3 c).
-                tmpdir=ensure_private_dir(run_temp_dir(self.config.state_dir, state.run_id)),
+                tmpdir=ensure_private_dir(run_temp_dir(cfg.state_dir, state.run_id)),
             )
         except RunEnvironmentError as err:
             refuse(err.code, "adapter_error", ids)
         if self.claude_bin is None:
             refuse("runtime_unreachable", "runtime_error", ids)
-        cwd = state.cwd or self.config.projects_root
-        method = await auth_status(self.claude_bin, state.env, cwd, self.config.cli_probe_timeout)
+        cwd = state.cwd or cfg.projects_root
+        method = await auth_status(self.claude_bin, state.env, cwd, cfg.cli_probe_timeout)
         outcome = decide(desired, method)
         if outcome != "start":
             log("precheck_refused", reason=outcome, **ids)
@@ -1170,6 +1190,12 @@ class Runner:
         if credentials.dpop is None:  # pragma: no cover - load_config requires the key
             raise StartError("hosted_agents_need_dpop_key")
         handler = self.handler
+        root = config.hosted_agents_root
+        if root is None:  # pragma: no cover - load_config requires the root
+            raise StartError("hosted_agents_need_a_root")
+        removed = sweep_turn_files(root)
+        if removed:
+            warn("hosted_turn_files_swept", count=removed)
         context = HostingContext(
             client=adapter.client,
             dpop=credentials.dpop,
@@ -1192,6 +1218,8 @@ class Runner:
             settings=config.sdk,
             clock=adapter.clock,
             http_transport=self.http_transport,
+            runner=handler,
+            root=root,
         )
         return HostedAgents(context)
 

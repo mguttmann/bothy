@@ -34,6 +34,7 @@ __all__ = [
     "TurnEvidence",
     "api_error_text",
     "classify_turn_end",
+    "cost_cap_reached",
     "result_errors",
 ]
 
@@ -269,6 +270,40 @@ def classify_turn_end(evidence: TurnEvidence) -> TurnEnd:
                 return _too_old(evidence.assistant_text, label)
             return TurnEnd(entry.kind.value, exit_label=label)
     return TurnEnd("runtime_error", errors=result_errors(result), exit_label=label)
+
+
+BUDGET_SUBTYPE = "error_max_budget_usd"
+"""The ``subtype`` of the ``result`` the pinned CLI sends when ``--max-budget-usd`` stops a turn
+(claude 2.1.288: the result schema lists it, and the print mode writes "Exceeded USD budget" for
+it; read from the binary on 2026-11-06, decisions.d/A1-05.md)."""
+
+
+def cost_cap_reached(result: Mapping[str, Any] | None, cap: float | None) -> bool:
+    """Whether a failed turn was stopped by the cost cap of a hosted definition (26 5.8).
+
+    The ``result`` with `BUDGET_SUBTYPE` decides; any other end with a cap and a
+    ``total_cost_usd`` at or above it counts too, so a changed text of a later CLI still names
+    the cause.
+
+    Args:
+        result: The last ``result`` of the process, if any.
+        cap: ``settings.max_cost_usd_per_run``; ``None`` without a cap.
+
+    Returns:
+        True when the run ends with the cause ``cost_cap_reached``.
+
+    Examples:
+        >>> cost_cap_reached({"subtype": "error_max_budget_usd"}, 1.0)
+        True
+        >>> cost_cap_reached({"subtype": "error_max_budget_usd"}, None)
+        False
+    """
+    if cap is None or result is None:
+        return False
+    if result.get("subtype") == BUDGET_SUBTYPE:
+        return True
+    cost = result.get("total_cost_usd")
+    return isinstance(cost, int | float) and not isinstance(cost, bool) and cost >= cap
 
 
 def _too_old(text: str, label: str) -> TurnEnd:

@@ -365,3 +365,109 @@ def test_hosting_needs_the_dpop_key(tmp_path: Path) -> None:
         load_config(write(tmp_path, "hosted_agents = true"))
     assert err.value.key == "runner.dpop_key_ref"
     assert "hosted_agents" in err.value.problem
+
+
+# ---- A1-05: the hosted agents root and the keys of the definition turns (26 5.1, 5.9, 14) ----
+
+DPOP = 'dpop_key_ref = "file:/srv/secrets/dpop.pem"'
+
+
+def _hosted(tmp_path: Path, root: Path, extra: str = "") -> Path:
+    runner = f'hosted_agents = true\nhosted_agents_root = "{root}"\n{DPOP}\n{extra}'
+    return write(tmp_path, runner)
+
+
+def test_new_keys_default_off(tmp_path: Path) -> None:
+    cfg = load_config(write(tmp_path))
+    assert cfg.mcp_stdio_runners == ("npx", "uvx")
+    assert cfg.channel_skills_dir is None
+
+
+def test_hosted_agents_need_the_root(tmp_path: Path) -> None:
+    with pytest.raises(ConfigError) as err:
+        load_config(write(tmp_path, f"hosted_agents = true\n{DPOP}"))
+    assert err.value.key == "runner.hosted_agents_root"
+
+
+def test_a_missing_root_is_created_private(tmp_path: Path) -> None:
+    root = tmp_path / "agents"
+    cfg = load_config(_hosted(tmp_path, root))
+    assert cfg.hosted_agents_root == root
+    assert root.stat().st_mode & 0o777 == 0o700
+
+
+@pytest.mark.parametrize(
+    "place",
+    ["state", "state/agents", "projects", "projects/agents", ".", "relative"],
+)
+def test_root_refused_at_state_or_projects(tmp_path: Path, place: str) -> None:
+    # BA-T10: equal to, inside or above runner.state_dir or runner.projects_root.
+    (tmp_path / "state").mkdir(mode=0o700)
+    root = Path("agents") if place == "relative" else tmp_path / place
+    with pytest.raises(ConfigError) as err:
+        load_config(_hosted(tmp_path, root))
+    assert err.value.key == "runner.hosted_agents_root"
+
+
+@pytest.mark.parametrize("where", ["root", "parent", "grandparent"])
+def test_root_refused_below_a_claude_md(tmp_path: Path, where: str) -> None:
+    # BA-T10: a CLAUDE.md in the root or above it would reach every agent's prompt.
+    base = tmp_path / "hosting"
+    root = base / "a" / "agents"
+    root.mkdir(parents=True, mode=0o700)
+    holder = {"root": root, "parent": root.parent, "grandparent": base}[where]
+    (holder / "CLAUDE.md").write_text("Be brief.\n")
+    with pytest.raises(ConfigError) as err:
+        load_config(_hosted(tmp_path, root))
+    assert err.value.key == "runner.hosted_agents_root"
+    assert "CLAUDE.md" in err.value.problem
+
+
+@pytest.mark.parametrize("mode", [0o720, 0o702, 0o777])
+def test_root_refused_when_others_may_write(tmp_path: Path, mode: int) -> None:
+    # BA-T10: writable by group or others.
+    root = tmp_path / "agents"
+    root.mkdir()
+    root.chmod(mode)
+    with pytest.raises(ConfigError) as err:
+        load_config(_hosted(tmp_path, root))
+    assert err.value.key == "runner.hosted_agents_root"
+
+
+def test_root_readable_by_group_is_taken(tmp_path: Path) -> None:
+    root = tmp_path / "agents"
+    root.mkdir()
+    root.chmod(0o750)
+    assert load_config(_hosted(tmp_path, root)).hosted_agents_root == root
+
+
+def test_root_unchecked_without_hosted_agents(tmp_path: Path) -> None:
+    # Without runner.hosted_agents the key is not used, so it never stops a start (26 11).
+    cfg = load_config(write(tmp_path, f'hosted_agents_root = "{tmp_path / "state"}"'))
+    assert cfg.hosted_agents is False
+
+
+def test_mcp_stdio_runners_read(tmp_path: Path) -> None:
+    cfg = load_config(write(tmp_path, 'mcp_stdio_runners = ["npx"]'))
+    assert cfg.mcp_stdio_runners == ("npx",)
+
+
+@pytest.mark.parametrize("value", ['["-x"]', '[""]', '["a b"]', '["npx/x"]', "3"])
+def test_mcp_stdio_runners_refused(tmp_path: Path, value: str) -> None:
+    with pytest.raises(ConfigError) as err:
+        load_config(write(tmp_path, f"mcp_stdio_runners = {value}"))
+    assert err.value.key == "runner.mcp_stdio_runners"
+
+
+def test_channel_skills_dir_read(tmp_path: Path) -> None:
+    skills = tmp_path / "skills"
+    skills.mkdir()
+    cfg = load_config(write(tmp_path, f'channel_skills_dir = "{skills}"'))
+    assert cfg.channel_skills_dir == skills
+
+
+@pytest.mark.parametrize("value", ["relative/skills", "/does/not/exist"])
+def test_channel_skills_dir_refused(tmp_path: Path, value: str) -> None:
+    with pytest.raises(ConfigError) as err:
+        load_config(write(tmp_path, f'channel_skills_dir = "{value}"'))
+    assert err.value.key == "runner.channel_skills_dir"
