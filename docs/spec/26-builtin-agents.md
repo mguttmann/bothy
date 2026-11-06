@@ -484,10 +484,15 @@ and its CI secret by the owner before the first template lands (D-A1-16, PLAN se
 
 The template catalogue sent with an interview request holds slug, name, description, tool class
 wish and the MCP servers of each template (shipped and private). The builder suggests MCP servers
-only from it; the server checks the draft against it: an `http` server must match a catalogue
-server in transport and URL, a `stdio` server in transport, command, package, every argument and
-the set of environment names (an argument can carry an endpoint), else it is the
-field error `mcp_not_in_catalogue` at its JSON Pointer (6.1 item 3).
+only from it; the server checks the draft against it: a drafted server matches a catalogue server
+only if its whole entry except `name` is exactly equal. For `stdio` that is transport, command,
+package, the full argument list (same order and count) and every `env[]` entry; for `http` it is
+transport, URL and every `headers[]` entry. An `env[]` or `headers[]` entry is equal when it has
+the same name and the same `value` or the same `secret_ref`; a switch between `value` and
+`secret_ref` is a difference. Any other field could redirect traffic or swap credentials (an
+argument or an environment value can carry an endpoint, a `secret_ref` names another key). A
+server without such a match is the field error `mcp_not_in_catalogue` at its JSON Pointer (6.1
+item 3).
 
 ### 7.5 Topics
 
@@ -508,7 +513,8 @@ server or without such a runner the entry is hidden.
 
 The dialog offers a template, the interview or the manual form, then a preview of the whole draft:
 instructions, each skill, each MCP server with the secret names it needs, tool class (with what
-the class does not load, 4.4 and 5.7), billing mode, model and cost cap, all editable. "Create"
+the class does not load, 4.4 and 5.7), billing mode, model and cost cap, all editable, and the
+hosting runner, editable until `agent.create` succeeded and read-only afterwards (8.3). "Create"
 runs, in this order and each visible with its state (01 6.9 pattern): `agent.create` with
 `hosted_by` and `adapter_kind = 'claude_agent'` (step-up); `agent.tool_class.set` when the class
 is not `chat`; `putAgentDefinition`; `agent.billing_mode.set` when `personal` is chosen
@@ -618,8 +624,8 @@ hosted agent in `personal` always equals that of its hosting runner (R-BA-12).
 | BA-T12 | rebuild: planted files of every surface of 5.5 in the agent folder and the control folder | removed before the turn; the agent's other files stay (A1-05) |
 | BA-T13 | command line per class against 5.3 with fake Claude; `stdio` server under a token below `host`; a definition failing 4.3 | exact list; `tool_class_mismatch` before `run.start` (A1-05) |
 | BA-T14 | probe against the pinned CLI with a planted skill carrying `hooks`, `allowed-tools: Bash` and both inline shell forms, and every point of 5.7 | no hook, no `Bash`, the placeholder "[shell command execution disabled by policy]"; results recorded in 5.7 (A1-05, real CLI behind its switch) |
-| BA-T15 | interview: question turn, draft turn, a draft with an MCP server outside the catalogue (`mcp_not_in_catalogue`), a builder answer carrying each surface of 5.5, each fallback, timeout | draft validated; surfaces refused; fallback reason named; one audit entry and one log line without content (A1-07) |
-| BA-T16 | creation flow: a failure at each step after `agent.create`; a template with a `stdio` server created with class `host`; a definition refused with `tool_class_too_low`, the class raised in the preview, "Try again"; a step after the definition failing for a definition with a `stdio` server under `host`, the server removed and the class set to `chat` in the preview, "Try again"; an edit that adds a `stdio` server and raises the class, and one that removes it and lowers the class | earlier steps and their audit entries stay, nothing more; `agent.tool_class.set` runs before `putAgentDefinition` when the class rises and after it when it falls, so the `stdio` cases are stored without `tool_class_too_low` or `definition_needs_host`; "Try again" runs the missing steps in the order of 8.2 and creates nothing twice (A1-08, A1-09) |
+| BA-T15 | interview: question turn, draft turn, a draft with an MCP server outside the catalogue (`mcp_not_in_catalogue`), a catalogue `stdio` server with only its endpoint argument changed, a catalogue `stdio` server with only the value of one `env[]` entry changed, a builder answer carrying each surface of 5.5, each fallback, timeout | draft validated; both changed servers `mcp_not_in_catalogue`; surfaces refused; fallback reason named; one audit entry and one log line without content (A1-07) |
+| BA-T16 | creation flow: a failure at each step after `agent.create`; a template with a `stdio` server created with class `host`; a definition refused with `tool_class_too_low`, the class raised in the preview, "Try again"; a step after the definition failing for a definition with a `stdio` server under `host`, the server removed and the class set to `chat` in the preview, "Try again"; an edit that adds a `stdio` server and raises the class, and one that removes it and lowers the class; the hosting runner field after `agent.create` succeeded | earlier steps and their audit entries stay, nothing more; the hosting runner is read-only after `agent.create`, so "Try again" runs on the runner shown; `agent.tool_class.set` runs before `putAgentDefinition` when the class rises and after it when it falls, so the `stdio` cases are stored without `tool_class_too_low` or `definition_needs_host`; "Try again" runs the missing steps in the order of 8.2 and creates nothing twice (A1-08, A1-09) |
 | BA-T17 | template gate: one failing fixture template per surface of 5.5 and per rule of 7.3; the shipped templates | each fixture fails with its rule; shipped templates pass (A1-06) |
 | BA-T18 | private templates folder with a taken slug and an invalid template | skipped with their log codes (A1-06) |
 | BA-T19 | cost cap reached in a turn (fake Claude) | run `failed`, `runtime_error`, cause `cost_cap_reached` in the summary, costs reported (A1-05) |
