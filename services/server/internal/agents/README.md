@@ -579,10 +579,48 @@ Built-in agents (`adapter_kind` `claude_agent`, [26-builtin-agents.md](../../../
 Tests: `domain/hosting_test.go`, `app/hosting_test.go`, `test/integration/hosting_test.go`,
 `internal/wire/serve_hosted_test.go` (the `4012` closes) and `migrations/agents_hosted_by_test.go`.
 
+## Interview (A1-07)
+
+The interview of "New agent" ([26-builtin-agents.md](../../../../docs/spec/26-builtin-agents.md)
+6.1, R-BA-09): the owner's client sends the interview so far, the builder agent named in
+`agents.builder_agent_id` answers with one or two questions or a draft, and nothing of it is
+stored.
+
+- `domain/interview/` (pure): `CheckTurns` (at most `agents.interview.max_turns` turns of at most
+  `agents.interview.answer_max_chars` characters, role `builder` or `owner`, display text with line
+  breaks), `Payload` (the event payload with the turns, `want_draft`, the template catalogue, the
+  definition limits and `expires_at`; `ErrPayloadTooLarge` at `sync.event_payload_max_bytes`),
+  `ParseAnswer` (the builder's answer decoded strictly; a draft is checked with
+  `domain/definition` for the class of its `settings.tool_class_wish` and against the catalogue
+  with `SameServer`), `Estimate` and the state machine `Request` (open, answered, invalid,
+  expired).
+- `app/interview.go`: `Interviewer` implements `agents.Interviewer`. `Interview` authorizes
+  `agent.interview` (owner, effect `write`: "view as" and the maintenance mode refuse it), checks
+  the turns, sends `agent.interview_requested` through the bound `agents.InterviewRelay` to one live
+  connection of the builder and waits at most `agents.interview.timeout`. `AnswerInterview`
+  authorizes `agent.interview.respond` on the builder the request was sent to (every refusal is
+  `404` like an unknown request), answers `410` after `expires_at` and `409 conflict` with reason `already_answered` for a
+  second answer, and either accepts the answer or refuses it with `400` (a draft that reaches a
+  surface of 26 5.5, a text that is no display text, more than two questions), which ends the
+  request with `builder_invalid`. The fallbacks are `builder_not_configured`, `builder_offline`,
+  `builder_timeout` and `builder_invalid`.
+- Every request that reaches the builder step writes one audit entry `agent.interview` (outcome,
+  `fallback_reason`, `turns`, `draft_errors`, `cost_micros`) and one log line `agents: interview`
+  with the same counts, never a question, an answer or a draft; a refusal before (authorize, the
+  turns, the payload size) writes no allow entry and no such log line and reaches no builder (the
+  Authorizer records its own denial).
+- `adapters/httpapi/interview.go`: `interviewAgent` and `answerAgentInterview` (`Interview`
+  handlers). internal/wire builds the interviewer in the agents step (`BindInterview`), binds the
+  relay in the gateway step and gives `interviewAgent` the deadline `agents.interview.timeout`
+  plus `http.request_timeout` (`InterviewDeadline`). The template catalogue is the
+  `app.CatalogueSource` of the templates of A1-06; until it is bound the catalogue is empty, so
+  every drafted MCP server is `mcp_not_in_catalogue`.
+- The rulings are [decisions.d/A1-07.md](../../../../docs/decisions.d/A1-07.md).
+
 ## Port (root package `internal/agents`)
 
-- Inbound: `Agents` (administration, policy, tool class; M1-51), `Definitions` (definitions of built-in agents; A1-02), `Facts` (run facts of runs; M2-05), `Presence` (heartbeat and presence; M2-20), `Consumers` (cursor, ack, takeover with fencing), `Commands` (register), `OwnedCommands` (the commands of an app for the owner actions of `apps`; M2-25), `Sessions`, `DevEnvironments` (milestone), `StatusAgents` (M7-09: the active agents with their stored presence for the status page, `app.StatusSource`; a stored online or degraded state older than `agent.presence_timeout` plus `agent.heartbeat_persist_interval` counts as offline; never authorized).
-- Declares the source ports `ConsumerFeed` (M2-07) and `RunSource` (M2-12).
+- Inbound: `Agents` (administration, policy, tool class; M1-51), `Definitions` (definitions of built-in agents; A1-02), `Interviewer` (the interview of "New agent"; A1-07), `Facts` (run facts of runs; M2-05), `Presence` (heartbeat and presence; M2-20), `Consumers` (cursor, ack, takeover with fencing), `Commands` (register), `OwnedCommands` (the commands of an app for the owner actions of `apps`; M2-25), `Sessions`, `DevEnvironments` (milestone), `StatusAgents` (M7-09: the active agents with their stored presence for the status page, `app.StatusSource`; a stored online or degraded state older than `agent.presence_timeout` plus `agent.heartbeat_persist_interval` counts as offline; never authorized).
+- Declares the source ports `ConsumerFeed` (M2-07), `InterviewRelay` (A1-07, implemented by `gateway/adapters/interviewrelay`) and `RunSource` (M2-12).
 - Emits in-tx events: `AgentDisabled`, `SessionAttached` (M2-12).
 - Subscribes to in-tx events: none.
 - Implements source ports and cross-cutting ports: `authz.AgentPolicySource` (policy, tool class, readiness of the dev environment; M1-51), `chat.SessionCounter` (`adapters/postgres`, the sessions of `DeletionInfo`, FEAT-delete-spaces-chats), kernel `personaldata.Participant`.
@@ -604,12 +642,12 @@ Only this module writes and reads these tables by SQL (03-data-model.md, princip
 
 ## Actions (05-actions.md)
 
-`agent.read`, `agent.create`, `agent.update`, `agent.disable`, `agent.enable`, `agent.billing_mode.set`, `agent.billing_mode.set_all`, `agent.credential_holder.set`, `agent.tool_class.set`, `agent.heartbeat`, `agent.events.consume`, `agent.triggerers.read`, `agent.project_folders.read`, `agent.definition.read`, `agent.host.set`, `agent.hosted.list`, `agent.hosted_token.issue`, `agent_session.read`, `agent_session.reset`, `agent_session.bind`, `agent_session.report`, `command.read`, `command.register`, `command.remove`, `dev_environment.read`, `dev_environment.manage`, `dev_environment.report`.
+`agent.read`, `agent.create`, `agent.update`, `agent.disable`, `agent.enable`, `agent.billing_mode.set`, `agent.billing_mode.set_all`, `agent.credential_holder.set`, `agent.tool_class.set`, `agent.heartbeat`, `agent.events.consume`, `agent.triggerers.read`, `agent.project_folders.read`, `agent.definition.read`, `agent.host.set`, `agent.hosted.list`, `agent.hosted_token.issue`, `agent.interview`, `agent.interview.respond`, `agent_session.read`, `agent_session.reset`, `agent_session.bind`, `agent_session.report`, `command.read`, `command.register`, `command.remove`, `dev_environment.read`, `dev_environment.manage`, `dev_environment.report`.
 
 ## Events and WebSocket ops
 
 - Durable: `agent_session.changed`, `command.changed`, `agent.updated`, `agent.definition_changed`, `agent.hosting_changed`.
-- Ephemeral: `agent.presence_changed`.
+- Ephemeral: `agent.presence_changed`, `agent.interview_requested`.
 - WebSocket ops (client to server): `ack`.
 
 ## Notes for the build

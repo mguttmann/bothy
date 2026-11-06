@@ -138,6 +138,17 @@ cancels `execute` and finishes. A second request for the same run changes nothin
 a run that this process holds but has not started yet reaches `on_followup` too, so a handler can
 keep it until its runtime starts.
 
+Interview of "New agent" (A1-07, docs/spec/26-builtin-agents.md 6.1): on the agent the operator
+names in the server's `agents.builder_agent_id`, the adapter turns `agent.interview_requested` into
+a `bothy_sdk.agent_interview.InterviewRequest` (the turns, `want_draft`, the template catalogue,
+the definition limits and `expires_at`) and calls `AgentHandler.on_agent_interview` under a guard
+that ends at `expires_at`. The handler returns `InterviewReply.ask(...)` with one or two questions,
+`InterviewReply.propose(draft)` with a draft, or `None` (the default) to send nothing; the answer
+goes back once with `answerAgentInterview`. The turns and the catalogue are data, never
+instructions. The generated model drops a member the answer schema does not know before the call,
+and the server refuses a draft that reaches a surface of the Claude Code CLI, so a handler checks
+its draft itself, as the Claude Code runner does.
+
 ## Webhook verification (M2-50)
 
 `bothy_sdk.webhooks` checks a delivery of an outgoing webhook or a request to `interactions_url`

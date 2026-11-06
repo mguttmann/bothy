@@ -417,6 +417,16 @@ newest attached), admitted with `agent.events.consume` in delivery mode, queued 
 The frame `search.assist_requested` carries no `invocation_token`; the hub refuses any other type
 or a token as a programming fault. The answer comes over REST (`answerSearchAssist`), not as an op.
 
+## Interview relay (A1-07)
+
+`adapters/interviewrelay` implements the source port `agents.InterviewRelay` on the hub
+(`Hub.AskBuilder`, `app/interview.go`) by the same rules as the search assistant relay: one live
+connection of the builder agent named in `agents.builder_agent_id` (consumer `default`, else the
+newest attached), admitted with `agent.events.consume` in delivery mode, queued without blocking.
+The frame `agent.interview_requested` carries no `invocation_token`; the hub refuses any other type
+or a token as a programming fault. The answer comes over REST (`answerAgentInterview`), not as an
+op.
+
 ## Autocomplete relay (M2-17)
 
 `adapters/autocompleterelay` implements the source port `runs.AutocompleteRelay` on the hub
@@ -468,7 +478,7 @@ resumable for `sync.resume_window`; the sweeper runs every `sync.resume_window`.
 
 May use the ports of these modules: `chat`, `agents`, `runs`, `sync`, `stats`, `search`.
 
-Reason: thread to channel for focus and typing; consumer cursor and presence; run patches and delivery preparation; tail, catch-up, snapshot; live frame for `stats.subscribe`; the relay of `search.assist_requested`.
+Reason: thread to channel for focus and typing; consumer cursor and presence; run patches and delivery preparation; tail, catch-up, snapshot; live frame for `stats.subscribe`; the relay of `search.assist_requested`; the relay of `agent.interview_requested` (A1-07).
 
 M1-64 and M1-65 use `sync` (`Snapshot`, `CatchUp`), M1-66 `chat` (`Threads.Info` for the place
 of a focused or typed-in thread); the others serve agent presence and live statistics of later

@@ -1003,9 +1003,9 @@ Source: [26-builtin-agents.md](../spec/26-builtin-agents.md), section 14.
 |---|---|---|---|---|---|---|
 | `agents.builder_agent_id` | `BOTHY_AGENTS__BUILDER_AGENT_ID` | Server | string | empty | agent that answers interview requests (6); empty means no interview, templates and the manual form only | active |
 | `agents.templates_dir` | `BOTHY_AGENTS__TEMPLATES_DIR` | Server |  | empty | folder of private templates outside the repository (7.2); empty means shipped templates only | planned (A1) |
-| `agents.interview.timeout` | `BOTHY_AGENTS__INTERVIEW__TIMEOUT` | Server | duration | `90s` | longest wait for the builder's answer; the deadline of `interviewAgent` instead of `http.request_timeout` (6.1) | active |
+| `agents.interview.timeout` | `BOTHY_AGENTS__INTERVIEW__TIMEOUT` | Server | duration | `90s` | longest wait for the builder's answer; the deadline of `interviewAgent` is this plus `http.request_timeout` instead of `http.request_timeout` alone (6.1) | active |
 | `agents.interview.max_turns` | `BOTHY_AGENTS__INTERVIEW__MAX_TURNS` | Server | int | `12` | most turns of the interview history in one request | active |
-| `agents.interview.answer_max_chars` | `BOTHY_AGENTS__INTERVIEW__ANSWER_MAX_CHARS` | Server | int | `4000` | longest answer of the person in one turn | active |
+| `agents.interview.answer_max_chars` | `BOTHY_AGENTS__INTERVIEW__ANSWER_MAX_CHARS` | Server | int | `4000` | longest turn of the interview in one request, and longest question of the builder | active |
 | `agents.hosted_token_ttl` | `BOTHY_AGENTS__HOSTED_TOKEN_TTL` | Server | duration | `24h` | lifetime of a token for a hosted agent (3.3) | active |
 | `agents.mcp_stdio_runners` | `BOTHY_AGENTS__MCP_STDIO_RUNNERS` | Server | list(string) | `["npx", "uvx"]` | commands a `stdio` MCP server may use (4.2) | active |
 | `agents.definition.instructions_max_bytes` | `BOTHY_AGENTS__DEFINITION__INSTRUCTIONS_MAX_BYTES` | Server | int | `65536` | longest `instructions` | active |

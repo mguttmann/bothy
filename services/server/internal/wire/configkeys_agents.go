@@ -84,7 +84,7 @@ func agentInterviewConfigKeys() []config.Key {
 		{Name: "agents.builder_agent_id", Kind: config.KindString, Default: "", Chapter: chapter26,
 			Doc: "Agent that answers interview requests (its id); empty means no interview, templates and the manual form only."},
 		{Name: keyInterviewTimeout, Kind: config.KindDuration, Default: "90s", Min: minDeadline, Chapter: chapter26,
-			Doc: "Longest wait of interviewAgent for the builder's answer; the deadline of that request instead of http.request_timeout."},
+			Doc: "Longest wait of interviewAgent for the builder's answer; that request's deadline is this plus http.request_timeout."},
 		{Name: "agents.interview.max_turns", Kind: config.KindInt, Default: "12", Min: "1", Max: "64", Chapter: chapter26,
 			Doc: "Most turns of the interview history in one request."},
 		{Name: "agents.interview.answer_max_chars", Kind: config.KindInt, Default: "4000", Min: "1", Max: "16000", Chapter: chapter26,

@@ -402,19 +402,29 @@ byte-equal to the fixtures, also for a channel with bindings of both forms (BA-T
    `agents.interview.answer_max_chars` characters each. The server sends the ephemeral event
    `agent.interview_requested` to one live gateway connection of the builder agent named in
    `agents.builder_agent_id` (consumer `default`, else the most recently attached one), with the
-   history, the template catalogue of 7.4 and `expires_at`, without a token, and waits at most
-   `agents.interview.timeout`, which this request uses as its deadline instead of
-   `http.request_timeout` (02 14.2).
+   history, `want_draft`, the template catalogue of 7.4, the definition limits and `expires_at`,
+   without a token, and waits at most `agents.interview.timeout`. The request's own deadline is
+   `agents.interview.timeout` plus `http.request_timeout` instead of `http.request_timeout`
+   (02 14.2), so the wait ends before the request does. An interview that does not fit
+   `sync.event_payload_max_bytes` is `400 validation_failed` with `too_large` on `/turns`
+   (decisions.d/A1-07.md).
 2. The builder answers once with `answerAgentInterview` (action `agent.interview.respond`,
    agent-self, only the builder the request was sent to, `rl.agent_runtime`): either
    `{"kind": "questions", "questions": [...]}` with one or two questions, or
    `{"kind": "draft", "draft": {...}}` with a draft of the shape of 4.2 plus `name`, `handle`,
-   `description` and a channel suggestion; and `costs` (09 4.10).
+   `description` and a channel suggestion; and `costs` (09 4.10). A second answer is
+   `409 conflict` with `already_answered`, an answer after `expires_at` `410 gone`, and every
+   principal but the builder the request was sent to gets `404`.
 3. The server validates a draft with the rules of 4.3 and the catalogue check of 7.4, never
    trusting model output: a draft that
-   fails is answered with the field errors and the person can ask the builder to fix it. It stores
-   nothing of the interview; the answer shows the cost as an estimate like the search assistant
-   (D-IS-8) and books no cost entry.
+   fails is answered with the field errors and the person can ask the builder to fix it. A builder
+   answer that reaches a surface of 5.5 (a member outside the answer schema, a frontmatter, an
+   inline shell form or an `@` import outside the folder) or carries a text that is no display
+   text is refused as a whole with `400` to the builder and the fallback `builder_invalid` for
+   the person; a member outside the schema is already refused by the request validation of the
+   API, and the request then stays open until `expires_at`. It stores nothing of the interview;
+   the answer shows the cost as an estimate like the search assistant (D-IS-8) and books no cost
+   entry.
 4. Fallbacks: no `agents.builder_agent_id`, no live connection, no valid answer within the
    deadline. The answer then names the reason (`builder_not_configured`, `builder_offline`,
    `builder_timeout`, `builder_invalid`) and the apps offer the templates and the manual form.
@@ -678,9 +688,9 @@ Claude Code runner.
 |---|---|---|---|
 | `agents.builder_agent_id` | Server | empty | agent that answers interview requests (6); empty means no interview, templates and the manual form only |
 | `agents.templates_dir` | Server | empty | folder of private templates outside the repository (7.2); empty means shipped templates only |
-| `agents.interview.timeout` | Server | `90s` | longest wait for the builder's answer; the deadline of `interviewAgent` instead of `http.request_timeout` (6.1) |
+| `agents.interview.timeout` | Server | `90s` | longest wait for the builder's answer; the deadline of `interviewAgent` is this plus `http.request_timeout` instead of `http.request_timeout` alone (6.1) |
 | `agents.interview.max_turns` | Server | `12` | most turns of the interview history in one request |
-| `agents.interview.answer_max_chars` | Server | `4000` | longest answer of the person in one turn |
+| `agents.interview.answer_max_chars` | Server | `4000` | longest turn of the interview in one request, and longest question of the builder |
 | `agents.hosted_token_ttl` | Server | `24h` | lifetime of a token for a hosted agent (3.3) |
 | `agents.mcp_stdio_runners` | Server | `["npx", "uvx"]` | commands a `stdio` MCP server may use (4.2) |
 | `agents.definition.instructions_max_bytes` | Server | `65536` | longest `instructions` |

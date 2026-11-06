@@ -287,7 +287,7 @@
       "min": "1ms",
       "max": "",
       "chapter": "26-builtin-agents.md",
-      "doc": "Longest wait of interviewAgent for the builder's answer; the deadline of that request instead of http.request_timeout."
+      "doc": "Longest wait of interviewAgent for the builder's answer; that request's deadline is this plus http.request_timeout."
     },
     {
       "name": "agents.mcp_stdio_runners",
