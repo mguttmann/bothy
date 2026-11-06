@@ -63,3 +63,21 @@ func TestCopyRefusesALinkAndBadUsage(t *testing.T) {
 		t.Fatalf("usage: exit %d", code)
 	}
 }
+
+// TestCopyErrors: a missing source and a symbolic link at the root of the source fail with exit 1.
+func TestCopyErrors(t *testing.T) {
+	t.Parallel()
+	var stderr bytes.Buffer
+	missing := filepath.Join(t.TempDir(), "none")
+	if code := run([]string{"-src", missing, "-out", filepath.Join(t.TempDir(), "agents")}, &stderr); code != 1 {
+		t.Fatalf("missing source: exit %d: %s", code, stderr.String())
+	}
+	src := t.TempDir()
+	write(t, src, "notes/CLAUDE.md", "x\n")
+	if err := os.Symlink(filepath.Join(src, "notes"), filepath.Join(src, "linked")); err != nil {
+		t.Fatal(err)
+	}
+	if err := Copy(src, filepath.Join(t.TempDir(), "agents")); err == nil || !strings.Contains(err.Error(), "linked is a symbolic link") {
+		t.Fatalf("root link: %v", err)
+	}
+}

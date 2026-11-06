@@ -68,3 +68,35 @@ func TestListTemplates(t *testing.T) {
 		t.Fatal("NewTemplates without an Authorizer")
 	}
 }
+
+// failingAuthorizer fails every check with err.
+type failingAuthorizer struct {
+	allowAgents
+	err error
+}
+
+func (z failingAuthorizer) Authorize(context.Context, authorize.Principal, authorize.Action, authorize.Resource) (authorize.Decision, error) {
+	return authorize.Decision{}, z.err
+}
+
+// TestListTemplatesErrors: an authorize error is returned unchanged, and a caller that is not
+// the principal of the request is an internal error; neither returns the catalogue.
+func TestListTemplatesErrors(t *testing.T) {
+	t.Parallel()
+	items := []agents.Template{{Slug: "notes", Source: agents.TemplateShipped, Definition: json.RawMessage(`{}`)}}
+	boom := errors.New("authorize down")
+	svc, err := app.NewTemplates(failingAuthorizer{err: boom}, items)
+	if err != nil {
+		t.Fatal(err)
+	}
+	caller := actor.Actor{ID: ids.New(), Kind: actor.KindUser}
+	if got, err := svc.ListTemplates(context.Background(), caller); !errors.Is(err, boom) || got != nil {
+		t.Fatalf("authorize error: %+v, %v", got, err)
+	}
+	ctx := actor.WithActor(context.Background(), actor.Actor{ID: ids.New(), Kind: actor.KindUser})
+	got, err := svc.ListTemplates(ctx, caller)
+	var e *errs.Error
+	if !errors.As(err, &e) || e.Code != errs.CodeInternalError || got != nil {
+		t.Fatalf("other principal: %+v, %v", got, err)
+	}
+}
