@@ -13,23 +13,30 @@ import (
 // validation_failed with the pointer named here. A missing reason of failed or cancelled is
 // ErrReasonRequired (pointer /reason, errors[].code required).
 var (
-	// ErrCancelReason: cancelled with a reason outside CancelReasons; pointer /reason.
-	ErrCancelReason = errors.New("runs: the reason is not a reason of a cancel request")
+	// ErrCancelReason: cancelled with a reason outside AdapterCancelReasons; pointer /reason.
+	ErrCancelReason = errors.New("runs: the reason is neither a reason of a cancel request nor adapter_stopped")
 	// ErrFinishTarget: the target is not completed, failed or cancelled; pointer /state.
 	ErrFinishTarget = errors.New("runs: finishRun targets completed, failed or cancelled")
 )
 
-// cancelReasons are the reasons of a cancel request (09 5.2, 04 15.5), the only reasons an
-// adapter may report for cancelled (brief M2-09 note 6c).
+// cancelReasons are the reasons of a cancel request (09 5.2, 04 15.5).
 var cancelReasons = []string{
 	RunReasonUserCancelled, RunReasonAccessRevoked, RunReasonAgentDisabled, RunReasonChannelReadOnly, RunReasonUserDisabled,
 }
+
+// adapterCancelReasons are the reasons an adapter may report for cancelled: those of a cancel
+// request (brief M2-09 note 6c) and adapter_stopped, its own orderly stop (D-AR-1).
+var adapterCancelReasons = append(slices.Clone(cancelReasons), RunReasonAdapterStopped)
 
 // CancelReasons returns the reasons of a cancel request in this order: user_cancelled,
 // access_revoked, agent_disabled, channel_read_only, user_disabled. They are the values of
 // RunCancelRequestedPayload.reason and the only reasons finishRun accepts for cancelled. The
 // slice is a copy: the caller may change it.
 func CancelReasons() []string { return slices.Clone(cancelReasons) }
+
+// AdapterCancelReasons returns the reasons finishRun accepts for cancelled: CancelReasons in their
+// order, then adapter_stopped (D-AR-1). The slice is a copy: the caller may change it.
+func AdapterCancelReasons() []string { return slices.Clone(adapterCancelReasons) }
 
 // FinishRequest is the part of a RunFinish body that FinishDecision decides on.
 type FinishRequest struct {
@@ -67,7 +74,7 @@ type FinishOutcome struct {
 //
 //  1. a target other than completed, failed or cancelled: ErrFinishTarget.
 //  2. failed or cancelled without a reason: ErrReasonRequired.
-//  3. cancelled with a reason outside CancelReasons: ErrCancelReason.
+//  3. cancelled with a reason outside AdapterCancelReasons: ErrCancelReason.
 //  4. current equals the target: FinishNoChange.
 //  5. an ended run, or completed from anything but running: an *errs.Error with
 //     errs.CodeInvalidStateTransition (409).
@@ -87,7 +94,7 @@ func FinishDecision(current State, req FinishRequest) (FinishOutcome, error) {
 	if req.Target != StateCompleted && req.Reason == "" {
 		return FinishOutcome{}, ErrReasonRequired
 	}
-	if req.Target == StateCancelled && !slices.Contains(cancelReasons, req.Reason) {
+	if req.Target == StateCancelled && !slices.Contains(adapterCancelReasons, req.Reason) {
 		return FinishOutcome{}, ErrCancelReason
 	}
 	if current == req.Target {

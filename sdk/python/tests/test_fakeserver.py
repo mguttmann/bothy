@@ -485,6 +485,23 @@ async def test_cancel_running_and_queued(fake: FakeServer) -> None:
     assert fake.run_state(queued.run_id).state == "cancelled"
 
 
+async def test_finish_cancelled_adapter_stopped(fake: FakeServer) -> None:
+    # The adapter's own orderly stop (09 5.2, D-AR-1); a reason outside the list stays refused.
+    async with _api(fake) as api:
+        run_id, token = await _queued_with_token(fake, api)
+        await api.post(f"/runs/{run_id}/start", json=_start_body(token))
+        refused = await api.post(
+            f"/runs/{run_id}/finish", json={"state": "cancelled", "reason": "runner_gone"}
+        )
+        assert refused.status_code == 400
+        r = await api.post(
+            f"/runs/{run_id}/finish", json={"state": "cancelled", "reason": "adapter_stopped"}
+        )
+    assert r.status_code == 200
+    view = fake.run_state(run_id)
+    assert (view.state, view.state_reason) == ("cancelled", "adapter_stopped")
+
+
 # Patches ------------------------------------------------------------------------------------
 
 

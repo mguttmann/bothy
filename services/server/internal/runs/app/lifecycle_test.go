@@ -108,6 +108,26 @@ func TestTransition_Rules(t *testing.T) {
 			t.Fatalf("trigger %+v", tr)
 		}
 	})
+	t.Run("adapter cancelled adapter_stopped", func(t *testing.T) {
+		// The adapter's orderly stop ended the turn (D-AR-1): stored as reported, no step.
+		t.Parallel()
+		w := newWorld(t)
+		id := w.open(t)
+		if err := w.transition(app.TransitionCmd{RunID: id, From: domain.StateQueued, Version: 1, To: domain.StateRunning, SetBy: domain.SetterServer}, false); err != nil {
+			t.Fatal(err)
+		}
+		if err := w.transition(app.TransitionCmd{RunID: id, From: domain.StateRunning, Version: 2, To: domain.StateCancelled,
+			Reason: "adapter_stopped", SetBy: domain.SetterAdapter}, false); err != nil {
+			t.Fatal(err)
+		}
+		if r := w.repo.runs[0]; r.State != domain.StateCancelled || r.StateReason != "adapter_stopped" || len(w.repo.steps) != 0 {
+			t.Fatalf("run %+v steps %+v", r, w.repo.steps)
+		}
+		tr := w.triggers()
+		if last := tr[len(tr)-1]; last.State != "cancelled" || last.Reason != "adapter_stopped" {
+			t.Fatalf("trigger %+v", tr)
+		}
+	})
 	t.Run("lost swap", func(t *testing.T) {
 		t.Parallel()
 		w := newWorld(t)

@@ -105,7 +105,8 @@ type TransitionCmd struct {
 	To     domain.State
 	Reason string
 	// SetBy is the setter of the reason: the server, or the adapter (failed with the reason rules
-	// of 09 5.2, cancelled with a reason of a cancel request, M2-09 design note 6 c).
+	// of 09 5.2, cancelled with a reason of a cancel request, M2-09 design note 6 c, or with
+	// adapter_stopped, D-AR-1).
 	SetBy domain.Setter
 	// Store are the columns the same swap stores (M2-09); the zero value stores none.
 	Store TransitionStore
@@ -300,8 +301,9 @@ func (s *Service) reasonOf(cmd TransitionCmd) (reason, original string, err erro
 		return "", "", nil
 	case cmd.SetBy == domain.SetterAdapter && cmd.To == domain.StateCompleted && cmd.Reason == "":
 		return "", "", nil
-	case cmd.SetBy == domain.SetterAdapter && cmd.To == domain.StateCancelled && slices.Contains(domain.CancelReasons(), cmd.Reason):
-		// The adapter confirms a cancel request with its reason (M2-09 design note 6 c).
+	case cmd.SetBy == domain.SetterAdapter && cmd.To == domain.StateCancelled && slices.Contains(domain.AdapterCancelReasons(), cmd.Reason):
+		// The adapter confirms a cancel request with its reason (M2-09 design note 6 c), or
+		// reports its own orderly stop (D-AR-1).
 		return cmd.Reason, "", nil
 	}
 	return "", "", errs.New(errs.CodeInternalError, "runs: no reason rule for this setter and state")

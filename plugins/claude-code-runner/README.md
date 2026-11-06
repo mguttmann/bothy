@@ -325,7 +325,11 @@ uv run --locked claude-code-runner run --config /etc/claude-code-runner.toml
 
 `check-config` contacts no server; it prints one code per check (`ok`, `unset` or the problem).
 `run` logs JSON lines on stderr (event codes and IDs, never content, tokens or keys) and stops on
-SIGINT or SIGTERM; running turns are ended with SIGINT, SIGTERM and SIGKILL to their group.
+SIGINT or SIGTERM. Before it stops, every turn it started itself is ended as a stop by a person
+ends it (SIGINT, SIGTERM and SIGKILL to its group, each escalation logged as `stop_escalated`), and
+its run finishes `cancelled` with the reason `adapter_stopped` and a note in the thread; the turn
+record goes only once no process of the turn is left. Turns adopted after a crash keep running and
+keep their records for the next start (docs/spec/09-agents.md 18.6, 18.9).
 
 ## Folder creation (M4-43)
 

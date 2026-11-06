@@ -4,7 +4,8 @@ Status: design of 2026-11-06, revised six times the same day after red team revi
 blockers and majors are resolved in the text, the keeper of D-AR-3 is proven by a probe under a
 scratch launchd job (section 2.4), the replay of a turn's state at a handover by a probe against
 the runner modules (section 2.5), the open owner decisions are recorded as rulings (section 11),
-and the minors are in section 12. Nothing in it is built yet. This
+and the minors are in section 12. Of it, only D-AR-1 is built (AR-02, with the run reason
+`adapter_stopped`, [AR-02 rulings](../decisions.d/AR-02.md)). This
 note records the goal, the evidence and the decisions with their reasons; the normative text goes
 into the chapters it names, written by ticket AR-01 (section 10) together with an ADR and the
 briefs. Where this note and a chapter disagree after AR-01, the chapter wins.
