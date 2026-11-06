@@ -485,7 +485,8 @@ and its CI secret by the owner before the first template lands (D-A1-16, PLAN se
 The template catalogue sent with an interview request holds slug, name, description, tool class
 wish and the MCP servers of each template (shipped and private). The builder suggests MCP servers
 only from it; the server checks the draft against it: an `http` server must match a catalogue
-server in transport and URL, a `stdio` server in transport, command and package, else it is the
+server in transport and URL, a `stdio` server in transport, command, package, every argument and
+the set of environment names (an argument can carry an endpoint), else it is the
 field error `mcp_not_in_catalogue` at its JSON Pointer (6.1 item 3).
 
 ### 7.5 Topics
@@ -529,7 +530,9 @@ agent's current one is set before the definition, a lower one after it. So a cla
 preview after a refused definition is set before the definition is written again, and a class
 lowered after a stored definition with a `stdio` server waits until the definition without it
 is stored (R-BA-06); it creates nothing twice.
-"Close" keeps what exists.
+"Close" keeps what exists. Once `agent.create` succeeded, the hosting runner is shown but not
+editable in the preview; moving the agent to another runner is `agent.host.set` of 8.4, so
+"Try again" never finishes on a runner other than the one shown.
 The agent list marks a built-in agent without a definition as "not set up" with "Continue setup"
 and "Disable". Its hosting runner serves no turn for it (5.6 item 4). A test per step holds that a
 failure leaves exactly the earlier steps and their audit entries (BA-T16).
