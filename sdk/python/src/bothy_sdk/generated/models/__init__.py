@@ -40,12 +40,31 @@ from .agent_definition_skill_file import AgentDefinitionSkillFile
 from .agent_definition_version import AgentDefinitionVersion
 from .agent_definition_version_origin_kind import AgentDefinitionVersionOriginKind
 from .agent_definition_version_page import AgentDefinitionVersionPage
+from .agent_draft import AgentDraft
+from .agent_draft_channel import AgentDraftChannel
 from .agent_followup_event import AgentFollowupEvent
 from .agent_followup_event_type import AgentFollowupEventType
 from .agent_followup_payload import AgentFollowupPayload
 from .agent_hosting_changed_event import AgentHostingChangedEvent
 from .agent_hosting_changed_event_type import AgentHostingChangedEventType
 from .agent_hosting_changed_payload import AgentHostingChangedPayload
+from .agent_interview_answer import AgentInterviewAnswer
+from .agent_interview_answer_fallback_reason import AgentInterviewAnswerFallbackReason
+from .agent_interview_answer_outcome import AgentInterviewAnswerOutcome
+from .agent_interview_builder_answer import AgentInterviewBuilderAnswer
+from .agent_interview_builder_answer_kind import AgentInterviewBuilderAnswerKind
+from .agent_interview_catalogue_entry import AgentInterviewCatalogueEntry
+from .agent_interview_catalogue_entry_tool_class_wish import (
+    AgentInterviewCatalogueEntryToolClassWish,
+)
+from .agent_interview_cost import AgentInterviewCost
+from .agent_interview_limits import AgentInterviewLimits
+from .agent_interview_request import AgentInterviewRequest
+from .agent_interview_requested_event import AgentInterviewRequestedEvent
+from .agent_interview_requested_event_type import AgentInterviewRequestedEventType
+from .agent_interview_requested_payload import AgentInterviewRequestedPayload
+from .agent_interview_turn import AgentInterviewTurn
+from .agent_interview_turn_role import AgentInterviewTurnRole
 from .agent_invocation_event import AgentInvocationEvent
 from .agent_invocation_event_type import AgentInvocationEventType
 from .agent_invocation_payload import AgentInvocationPayload
@@ -916,12 +935,29 @@ __all__ = (
     "AgentDefinitionVersion",
     "AgentDefinitionVersionOriginKind",
     "AgentDefinitionVersionPage",
+    "AgentDraft",
+    "AgentDraftChannel",
     "AgentFollowupEvent",
     "AgentFollowupEventType",
     "AgentFollowupPayload",
     "AgentHostingChangedEvent",
     "AgentHostingChangedEventType",
     "AgentHostingChangedPayload",
+    "AgentInterviewAnswer",
+    "AgentInterviewAnswerFallbackReason",
+    "AgentInterviewAnswerOutcome",
+    "AgentInterviewBuilderAnswer",
+    "AgentInterviewBuilderAnswerKind",
+    "AgentInterviewCatalogueEntry",
+    "AgentInterviewCatalogueEntryToolClassWish",
+    "AgentInterviewCost",
+    "AgentInterviewLimits",
+    "AgentInterviewRequest",
+    "AgentInterviewRequestedEvent",
+    "AgentInterviewRequestedEventType",
+    "AgentInterviewRequestedPayload",
+    "AgentInterviewTurn",
+    "AgentInterviewTurnRole",
     "AgentInvocationEvent",
     "AgentInvocationEventType",
     "AgentInvocationPayload",

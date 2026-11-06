@@ -23,6 +23,8 @@ var catalogEntries = []CatalogEntry{
 	{ID: "agent.host.set", Right: "owner", RateLimitClass: "rl.admin"},
 	{ID: "agent.hosted.list", Right: "agent-self (a runner reporting `hosts_agents`)", RateLimitClass: "rl.agent_runtime"},
 	{ID: "agent.hosted_token.issue", Right: "agent-self of the runner named in `hosted_by` of the target", RateLimitClass: "rl.agent_runtime"},
+	{ID: "agent.interview", Right: "owner", RateLimitClass: "rl.trigger"},
+	{ID: "agent.interview.respond", Right: "agent-self, the builder agent the request was sent to", RateLimitClass: "rl.agent_runtime"},
 	{ID: "agent.invoke", Right: "trigger and rules from 5", RateLimitClass: "rl.trigger"},
 	{ID: "agent.project_folders.read", Right: "owner", RateLimitClass: "rl.read"},
 	{ID: "agent.read", Right: "owner or agent-self or read on a channel that the agent operates", RateLimitClass: "rl.read"},

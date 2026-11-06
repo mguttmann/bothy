@@ -50,12 +50,29 @@ Serializers _$serializers =
           ..add(AgentDefinitionVersion.serializer)
           ..add(AgentDefinitionVersionOriginKindEnum.serializer)
           ..add(AgentDefinitionVersionPage.serializer)
+          ..add(AgentDraft.serializer)
+          ..add(AgentDraftChannel.serializer)
           ..add(AgentFollowupEvent.serializer)
           ..add(AgentFollowupEventTypeEnum.serializer)
           ..add(AgentFollowupPayload.serializer)
           ..add(AgentHostingChangedEvent.serializer)
           ..add(AgentHostingChangedEventTypeEnum.serializer)
           ..add(AgentHostingChangedPayload.serializer)
+          ..add(AgentInterviewAnswer.serializer)
+          ..add(AgentInterviewAnswerFallbackReasonEnum.serializer)
+          ..add(AgentInterviewAnswerOutcomeEnum.serializer)
+          ..add(AgentInterviewBuilderAnswer.serializer)
+          ..add(AgentInterviewBuilderAnswerKindEnum.serializer)
+          ..add(AgentInterviewCatalogueEntry.serializer)
+          ..add(AgentInterviewCatalogueEntryToolClassWishEnum.serializer)
+          ..add(AgentInterviewCost.serializer)
+          ..add(AgentInterviewLimits.serializer)
+          ..add(AgentInterviewRequest.serializer)
+          ..add(AgentInterviewRequestedEvent.serializer)
+          ..add(AgentInterviewRequestedEventTypeEnum.serializer)
+          ..add(AgentInterviewRequestedPayload.serializer)
+          ..add(AgentInterviewTurn.serializer)
+          ..add(AgentInterviewTurnRoleEnum.serializer)
           ..add(AgentInvocationEvent.serializer)
           ..add(AgentInvocationEventTypeEnum.serializer)
           ..add(AgentInvocationPayload.serializer)
@@ -892,6 +909,24 @@ Serializers _$serializers =
           )
           ..addBuilderFactory(
             const FullType(BuiltList, const [
+              const FullType(AgentDefinitionMcpServer),
+            ]),
+            () => ListBuilder<AgentDefinitionMcpServer>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [
+              const FullType(AgentDefinitionSkill),
+            ]),
+            () => ListBuilder<AgentDefinitionSkill>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [
+              const FullType(AgentDefinitionMcpServer),
+            ]),
+            () => ListBuilder<AgentDefinitionMcpServer>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [
               const FullType(AgentDefinitionSkill),
             ]),
             () => ListBuilder<AgentDefinitionSkill>(),
@@ -913,6 +948,24 @@ Serializers _$serializers =
               const FullType(AgentDefinitionVersion),
             ]),
             () => ListBuilder<AgentDefinitionVersion>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [
+              const FullType(AgentInterviewTurn),
+            ]),
+            () => ListBuilder<AgentInterviewTurn>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [
+              const FullType(AgentInterviewTurn),
+            ]),
+            () => ListBuilder<AgentInterviewTurn>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [
+              const FullType(AgentInterviewCatalogueEntry),
+            ]),
+            () => ListBuilder<AgentInterviewCatalogueEntry>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(AgentSession)]),
@@ -1792,6 +1845,10 @@ Serializers _$serializers =
             () => ListBuilder<String>(),
           )
           ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(String)]),
+            () => ListBuilder<String>(),
+          )
+          ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(CommandRegister)]),
             () => ListBuilder<CommandRegister>(),
           )
@@ -1812,6 +1869,22 @@ Serializers _$serializers =
               const FullType(AppManifestIncomingWebhooksInner),
             ]),
             () => ListBuilder<AppManifestIncomingWebhooksInner>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(String)]),
+            () => ListBuilder<String>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(CostReport)]),
+            () => ListBuilder<CostReport>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(String)]),
+            () => ListBuilder<String>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(FieldError)]),
+            () => ListBuilder<FieldError>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(String)]),

@@ -33,6 +33,24 @@ type ClientInterface interface {
 	// Corresponds with GET /access/hints (the `ListPermissionHints` operationId).
 	ListPermissionHints(ctx context.Context, params *ListPermissionHintsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// AnswerAgentInterviewWithBody Answer an interview request
+	//
+	// The builder agent answers an open `agent.interview_requested` once (26 6.1 item 2, 6.2): `kind = questions` with one or two questions of at most `agents.interview.answer_max_chars` characters, or `kind = draft` with a draft of the shape of 26 4.2 plus `name`, `handle`, `description` and an optional `channel_suggestion`; and the usage in `costs`. `404` for an unknown or forgotten request and for every principal but the builder agent the request was sent to, `410 gone` after `expires_at`, `409 conflict` with `reason: already_answered` for a second answer. The server decodes the answer strictly and never trusts it: a member outside the schema, a wrong type or a count outside the schema (no question, more than two) is refused by the request validation (`400`, the request stays open until `expires_at`); a draft that reaches a surface of 26 5.5 (a frontmatter, an inline shell form or an `@` import outside the agent folder) or a text that is no display text ends the request with `builder_invalid` and answers `400 validation_failed`. Any other finding of 26 4.3 or of the catalogue check (`mcp_not_in_catalogue`) goes back to the person as a field error of the draft; nothing is stored.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /agent-interview-requests/{request_id}/answer (the `AnswerAgentInterview` operationId).
+	AnswerAgentInterviewWithBody(ctx context.Context, requestId RequestIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// AnswerAgentInterview Answer an interview request
+	//
+	// The builder agent answers an open `agent.interview_requested` once (26 6.1 item 2, 6.2): `kind = questions` with one or two questions of at most `agents.interview.answer_max_chars` characters, or `kind = draft` with a draft of the shape of 26 4.2 plus `name`, `handle`, `description` and an optional `channel_suggestion`; and the usage in `costs`. `404` for an unknown or forgotten request and for every principal but the builder agent the request was sent to, `410 gone` after `expires_at`, `409 conflict` with `reason: already_answered` for a second answer. The server decodes the answer strictly and never trusts it: a member outside the schema, a wrong type or a count outside the schema (no question, more than two) is refused by the request validation (`400`, the request stays open until `expires_at`); a draft that reaches a surface of 26 5.5 (a frontmatter, an inline shell form or an `@` import outside the agent folder) or a text that is no display text ends the request with `builder_invalid` and answers `400 validation_failed`. Any other finding of 26 4.3 or of the catalogue check (`mcp_not_in_catalogue`) goes back to the person as a field error of the draft; nothing is stored.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /agent-interview-requests/{request_id}/answer (the `AnswerAgentInterview` operationId).
+	AnswerAgentInterview(ctx context.Context, requestId RequestIdPath, body AnswerAgentInterviewJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListAgents List visible agents
 	//
 	// Corresponds with GET /agents (the `ListAgents` operationId).
@@ -55,6 +73,24 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /agents (the `CreateAgent` operationId).
 	CreateAgent(ctx context.Context, params *CreateAgentParams, body CreateAgentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// InterviewAgentWithBody Let the builder agent interview the owner for a new agent
+	//
+	// The interview of "New agent" (26 6.1, R-API-29): the client sends the interview so far, at most `agents.interview.max_turns` turns of at most `agents.interview.answer_max_chars` characters each, and the server sends it as the ephemeral event `agent.interview_requested` to one live gateway connection of the builder agent named in `agents.builder_agent_id`, with the template catalogue (26 7.4), the definition limits and `expires_at`, and waits at most `agents.interview.timeout`; the deadline of this request is `agents.interview.timeout` plus `http.request_timeout` instead of `http.request_timeout` (02 14.2). The answer is `outcome = questions` with one or two questions, `outcome = draft` with a draft that the server checked with the rules of 26 4.3 and the catalogue check of 26 7.4 (its findings in `errors`, empty when it passes), or `outcome = fallback` with `fallback_reason` (`builder_not_configured`, `builder_offline`, `builder_timeout`, `builder_invalid`); the apps then offer the templates and the manual form. `cost_estimate` is the builder's estimate, never booked. Nothing of the interview is stored; every request writes one audit entry `agent.interview` with outcome, fallback reason and counts, never a text. Owners only (`403` for everyone else, also in "view as"), `503 maintenance` in maintenance mode. More turns than `agents.interview.max_turns` is `400 validation_failed` with `too_many_items` on `/turns`, a longer turn `too_long` on `/turns/<index>/text`, an interview that no longer fits `sync.event_payload_max_bytes` `too_large` on `/turns`.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /agents/interview (the `InterviewAgent` operationId).
+	InterviewAgentWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// InterviewAgent Let the builder agent interview the owner for a new agent
+	//
+	// The interview of "New agent" (26 6.1, R-API-29): the client sends the interview so far, at most `agents.interview.max_turns` turns of at most `agents.interview.answer_max_chars` characters each, and the server sends it as the ephemeral event `agent.interview_requested` to one live gateway connection of the builder agent named in `agents.builder_agent_id`, with the template catalogue (26 7.4), the definition limits and `expires_at`, and waits at most `agents.interview.timeout`; the deadline of this request is `agents.interview.timeout` plus `http.request_timeout` instead of `http.request_timeout` (02 14.2). The answer is `outcome = questions` with one or two questions, `outcome = draft` with a draft that the server checked with the rules of 26 4.3 and the catalogue check of 26 7.4 (its findings in `errors`, empty when it passes), or `outcome = fallback` with `fallback_reason` (`builder_not_configured`, `builder_offline`, `builder_timeout`, `builder_invalid`); the apps then offer the templates and the manual form. `cost_estimate` is the builder's estimate, never booked. Nothing of the interview is stored; every request writes one audit entry `agent.interview` with outcome, fallback reason and counts, never a text. Owners only (`403` for everyone else, also in "view as"), `503 maintenance` in maintenance mode. More turns than `agents.interview.max_turns` is `400 validation_failed` with `too_many_items` on `/turns`, a longer turn `too_long` on `/turns/<index>/text`, an interview that no longer fits `sync.event_payload_max_bytes` `too_large` on `/turns`.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /agents/interview (the `InterviewAgent` operationId).
+	InterviewAgent(ctx context.Context, body InterviewAgentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListServedChannels List channels the agent serves
 	//
@@ -4107,6 +4143,44 @@ func (c *Client) ListPermissionHints(ctx context.Context, params *ListPermission
 	return c.Client.Do(req)
 }
 
+// AnswerAgentInterviewWithBody Answer an interview request
+//
+// The builder agent answers an open `agent.interview_requested` once (26 6.1 item 2, 6.2): `kind = questions` with one or two questions of at most `agents.interview.answer_max_chars` characters, or `kind = draft` with a draft of the shape of 26 4.2 plus `name`, `handle`, `description` and an optional `channel_suggestion`; and the usage in `costs`. `404` for an unknown or forgotten request and for every principal but the builder agent the request was sent to, `410 gone` after `expires_at`, `409 conflict` with `reason: already_answered` for a second answer. The server decodes the answer strictly and never trusts it: a member outside the schema, a wrong type or a count outside the schema (no question, more than two) is refused by the request validation (`400`, the request stays open until `expires_at`); a draft that reaches a surface of 26 5.5 (a frontmatter, an inline shell form or an `@` import outside the agent folder) or a text that is no display text ends the request with `builder_invalid` and answers `400 validation_failed`. Any other finding of 26 4.3 or of the catalogue check (`mcp_not_in_catalogue`) goes back to the person as a field error of the draft; nothing is stored.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /agent-interview-requests/{request_id}/answer (the `AnswerAgentInterview` operationId).
+func (c *Client) AnswerAgentInterviewWithBody(ctx context.Context, requestId RequestIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewAnswerAgentInterviewRequestWithBody(c.Server, requestId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// AnswerAgentInterview Answer an interview request
+//
+// The builder agent answers an open `agent.interview_requested` once (26 6.1 item 2, 6.2): `kind = questions` with one or two questions of at most `agents.interview.answer_max_chars` characters, or `kind = draft` with a draft of the shape of 26 4.2 plus `name`, `handle`, `description` and an optional `channel_suggestion`; and the usage in `costs`. `404` for an unknown or forgotten request and for every principal but the builder agent the request was sent to, `410 gone` after `expires_at`, `409 conflict` with `reason: already_answered` for a second answer. The server decodes the answer strictly and never trusts it: a member outside the schema, a wrong type or a count outside the schema (no question, more than two) is refused by the request validation (`400`, the request stays open until `expires_at`); a draft that reaches a surface of 26 5.5 (a frontmatter, an inline shell form or an `@` import outside the agent folder) or a text that is no display text ends the request with `builder_invalid` and answers `400 validation_failed`. Any other finding of 26 4.3 or of the catalogue check (`mcp_not_in_catalogue`) goes back to the person as a field error of the draft; nothing is stored.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /agent-interview-requests/{request_id}/answer (the `AnswerAgentInterview` operationId).
+func (c *Client) AnswerAgentInterview(ctx context.Context, requestId RequestIdPath, body AnswerAgentInterviewJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewAnswerAgentInterviewRequest(c.Server, requestId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // ListAgents List visible agents
 //
 // Corresponds with GET /agents (the `ListAgents` operationId).
@@ -4150,6 +4224,44 @@ func (c *Client) CreateAgentWithBody(ctx context.Context, params *CreateAgentPar
 // Corresponds with POST /agents (the `CreateAgent` operationId).
 func (c *Client) CreateAgent(ctx context.Context, params *CreateAgentParams, body CreateAgentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCreateAgentRequest(c.Server, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// InterviewAgentWithBody Let the builder agent interview the owner for a new agent
+//
+// The interview of "New agent" (26 6.1, R-API-29): the client sends the interview so far, at most `agents.interview.max_turns` turns of at most `agents.interview.answer_max_chars` characters each, and the server sends it as the ephemeral event `agent.interview_requested` to one live gateway connection of the builder agent named in `agents.builder_agent_id`, with the template catalogue (26 7.4), the definition limits and `expires_at`, and waits at most `agents.interview.timeout`; the deadline of this request is `agents.interview.timeout` plus `http.request_timeout` instead of `http.request_timeout` (02 14.2). The answer is `outcome = questions` with one or two questions, `outcome = draft` with a draft that the server checked with the rules of 26 4.3 and the catalogue check of 26 7.4 (its findings in `errors`, empty when it passes), or `outcome = fallback` with `fallback_reason` (`builder_not_configured`, `builder_offline`, `builder_timeout`, `builder_invalid`); the apps then offer the templates and the manual form. `cost_estimate` is the builder's estimate, never booked. Nothing of the interview is stored; every request writes one audit entry `agent.interview` with outcome, fallback reason and counts, never a text. Owners only (`403` for everyone else, also in "view as"), `503 maintenance` in maintenance mode. More turns than `agents.interview.max_turns` is `400 validation_failed` with `too_many_items` on `/turns`, a longer turn `too_long` on `/turns/<index>/text`, an interview that no longer fits `sync.event_payload_max_bytes` `too_large` on `/turns`.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /agents/interview (the `InterviewAgent` operationId).
+func (c *Client) InterviewAgentWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewInterviewAgentRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// InterviewAgent Let the builder agent interview the owner for a new agent
+//
+// The interview of "New agent" (26 6.1, R-API-29): the client sends the interview so far, at most `agents.interview.max_turns` turns of at most `agents.interview.answer_max_chars` characters each, and the server sends it as the ephemeral event `agent.interview_requested` to one live gateway connection of the builder agent named in `agents.builder_agent_id`, with the template catalogue (26 7.4), the definition limits and `expires_at`, and waits at most `agents.interview.timeout`; the deadline of this request is `agents.interview.timeout` plus `http.request_timeout` instead of `http.request_timeout` (02 14.2). The answer is `outcome = questions` with one or two questions, `outcome = draft` with a draft that the server checked with the rules of 26 4.3 and the catalogue check of 26 7.4 (its findings in `errors`, empty when it passes), or `outcome = fallback` with `fallback_reason` (`builder_not_configured`, `builder_offline`, `builder_timeout`, `builder_invalid`); the apps then offer the templates and the manual form. `cost_estimate` is the builder's estimate, never booked. Nothing of the interview is stored; every request writes one audit entry `agent.interview` with outcome, fallback reason and counts, never a text. Owners only (`403` for everyone else, also in "view as"), `503 maintenance` in maintenance mode. More turns than `agents.interview.max_turns` is `400 validation_failed` with `too_many_items` on `/turns`, a longer turn `too_long` on `/turns/<index>/text`, an interview that no longer fits `sync.event_payload_max_bytes` `too_large` on `/turns`.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /agents/interview (the `InterviewAgent` operationId).
+func (c *Client) InterviewAgent(ctx context.Context, body InterviewAgentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewInterviewAgentRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -13264,6 +13376,53 @@ func NewListPermissionHintsRequest(server string, params *ListPermissionHintsPar
 	return req, nil
 }
 
+// NewAnswerAgentInterviewRequest calls the generic AnswerAgentInterview builder with application/json body
+func NewAnswerAgentInterviewRequest(server string, requestId RequestIdPath, body AnswerAgentInterviewJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewAnswerAgentInterviewRequestWithBody(server, requestId, "application/json", bodyReader)
+}
+
+// NewAnswerAgentInterviewRequestWithBody constructs an http.Request for the AnswerAgentInterview method, with any body, and a specified content type
+func NewAnswerAgentInterviewRequestWithBody(server string, requestId RequestIdPath, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "request_id", requestId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/agent-interview-requests/%s/answer", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewListAgentsRequest constructs an http.Request for the ListAgents method
 func NewListAgentsRequest(server string, params *ListAgentsParams) (*http.Request, error) {
 	var err error
@@ -13381,6 +13540,46 @@ func NewCreateAgentRequestWithBody(server string, params *CreateAgentParams, con
 		}
 
 	}
+
+	return req, nil
+}
+
+// NewInterviewAgentRequest calls the generic InterviewAgent builder with application/json body
+func NewInterviewAgentRequest(server string, body InterviewAgentJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewInterviewAgentRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewInterviewAgentRequestWithBody constructs an http.Request for the InterviewAgent method, with any body, and a specified content type
+func NewInterviewAgentRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/agents/interview")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -22339,660 +22538,4 @@ func NewStartImportRequest(server string, importId ImportIdPath, params *StartIm
 	}
 
 	return req, nil
-}
-
-// NewRevokeIncomingWebhookRequest constructs an http.Request for the RevokeIncomingWebhook method
-func NewRevokeIncomingWebhookRequest(server string, webhookId WebhookIdPath) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "webhook_id", webhookId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/incoming-webhooks/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewGetInstanceRequest constructs an http.Request for the GetInstance method
-func NewGetInstanceRequest(server string) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/instance")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewSetAllAgentsBillingModeRequest calls the generic SetAllAgentsBillingMode builder with application/json body
-func NewSetAllAgentsBillingModeRequest(server string, body SetAllAgentsBillingModeJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewSetAllAgentsBillingModeRequestWithBody(server, "application/json", bodyReader)
-}
-
-// NewSetAllAgentsBillingModeRequestWithBody constructs an http.Request for the SetAllAgentsBillingMode method, with any body, and a specified content type
-func NewSetAllAgentsBillingModeRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/instance/agent-billing-mode")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewUpdateBrandingRequest calls the generic UpdateBranding builder with application/json body
-func NewUpdateBrandingRequest(server string, params *UpdateBrandingParams, body UpdateBrandingJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewUpdateBrandingRequestWithBody(server, params, "application/json", bodyReader)
-}
-
-// NewUpdateBrandingRequestWithBody constructs an http.Request for the UpdateBranding method, with any body, and a specified content type
-func NewUpdateBrandingRequestWithBody(server string, params *UpdateBrandingParams, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/instance/branding")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	if params != nil {
-
-		var headerParam0 string
-
-		headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
-		if err != nil {
-			return nil, err
-		}
-
-		req.Header.Set("If-Match", headerParam0)
-
-	}
-
-	return req, nil
-}
-
-// NewDeleteBrandingLogoRequest constructs an http.Request for the DeleteBrandingLogo method
-func NewDeleteBrandingLogoRequest(server string) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/instance/branding/logo")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewGetBrandingLogoRequest constructs an http.Request for the GetBrandingLogo method
-func NewGetBrandingLogoRequest(server string) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/instance/branding/logo")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewUploadBrandingLogoRequestWithBody constructs an http.Request for the UploadBrandingLogo method, with any body, and a specified content type
-func NewUploadBrandingLogoRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/instance/branding/logo")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewGetDiscoveryRequest constructs an http.Request for the GetDiscovery method
-func NewGetDiscoveryRequest(server string) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/instance/discovery")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewGetJwksRequest constructs an http.Request for the GetJwks method
-func NewGetJwksRequest(server string) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/instance/jwks")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewListInstanceSettingsRequest constructs an http.Request for the ListInstanceSettings method
-func NewListInstanceSettingsRequest(server string) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/instance/settings")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewPutInstanceSettingRequest calls the generic PutInstanceSetting builder with application/json body
-func NewPutInstanceSettingRequest(server string, key KeyPath, params *PutInstanceSettingParams, body PutInstanceSettingJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewPutInstanceSettingRequestWithBody(server, key, params, "application/json", bodyReader)
-}
-
-// NewPutInstanceSettingRequestWithBody constructs an http.Request for the PutInstanceSetting method, with any body, and a specified content type
-func NewPutInstanceSettingRequestWithBody(server string, key KeyPath, params *PutInstanceSettingParams, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "key", key, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/instance/settings/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	if params != nil {
-
-		if params.IfMatch != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("If-Match", headerParam0)
-		}
-
-	}
-
-	return req, nil
-}
-
-// NewGetWebhookKeysRequest constructs an http.Request for the GetWebhookKeys method
-func NewGetWebhookKeysRequest(server string) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/instance/webhook-keys")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewRespondToInteractionRequest calls the generic RespondToInteraction builder with application/json body
-func NewRespondToInteractionRequest(server string, interactionId InteractionIdPath, params *RespondToInteractionParams, body RespondToInteractionJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewRespondToInteractionRequestWithBody(server, interactionId, params, "application/json", bodyReader)
-}
-
-// NewRespondToInteractionRequestWithBody constructs an http.Request for the RespondToInteraction method, with any body, and a specified content type
-func NewRespondToInteractionRequestWithBody(server string, interactionId InteractionIdPath, params *RespondToInteractionParams, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "interaction_id", interactionId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/interactions/%s/respond", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
-	}
-
-	return req, nil
-}
-
-// NewGetMeRequest constructs an http.Request for the GetMe method
-func NewGetMeRequest(server string) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/me")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewDeleteMyAvatarRequest constructs an http.Request for the DeleteMyAvatar method
-func NewDeleteMyAvatarRequest(server string) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/me/avatar")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewSetMyAvatarRequestWithBody constructs an http.Request for the SetMyAvatar method, with any body, and a specified content type
-func NewSetMyAvatarRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/me/avatar")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewGetMyCredentialsRequest constructs an http.Request for the GetMyCredentials method
-func NewGetMyCredentialsRequest(server string) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/me/credentials")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewListMyDevicesRequest constructs an http.Request for the ListMyDevices method
-func NewListMyDevicesRequest(server string, params *ListMyDevicesParams) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/me/devices")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-		// queryValues collects non-styled parameters (passthrough, JSON)
-		// that are safe to round-trip through url.Values.Encode().
-		queryValues := queryURL.Query()
-		// rawQueryFragments collects pre-encoded query fragments from
-		// styled parameters, preserving literal commas as delimiters
-		// per the OpenAPI spec (e.g. "color=blue,black,brown").
-		var rawQueryFragments []string
-
-		if params.Cursor != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if params.Limit != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if encoded := queryValues.Encode(); encoded != "" {
-			rawQueryFragments = append(rawQueryFragments, encoded)
-		}
-		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewRegisterPushRequest calls the generic RegisterPush builder with application/json body
-func NewRegisterPushRequest(server string, params *RegisterPushParams, body RegisterPushJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewRegisterPushRequestWithBody(server, params, "application/json", bodyReader)
 }
