@@ -326,6 +326,11 @@ def test_a_decision_id_is_no_ticket() -> None:
     assert brief_deps._ID.findall("D-AR-12, D-M2-35-3 and R-AR-01, then AR-03") == ["AR-03"]
 
 
+def test_a_longer_number_is_no_ticket() -> None:
+    """A typo such as `AR-030` must not pass as `AR-03`."""
+    assert brief_deps._ID.findall("AR-030, M1-011 and AR-03") == ["AR-03"]
+
+
 def test_milestone_ticket_gets_no_stage_base() -> None:
     deps = {"M1-01": [], "M1-02": ["M1-01"], "A1-02": []}
     assert brief_deps.stage_base(deps, "M1-02") == set()

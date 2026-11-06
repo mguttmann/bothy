@@ -1308,9 +1308,9 @@ condition, a short label written by the agent, the reason (`agent`, `recovery`, 
 `not_before` (at least creation plus `run.wake_min_delay`), `deadline`, state (`pending`, `fired`,
 `cancelled`, `expired`, `refused`, `failed`), the reason of the last state change, and the run or
 wake input it produced. For `pr_checks` it also stores the head commit of the pull request at
-creation. The deadline is at most `run.wake_max_wait` after creation, and for a `usage_limit`
-wake-up at most `run.wake_max_wait` after its `not_before`, so a weekly window that resets close to
-the limit still fires.
+creation. The deadline of a `usage_limit` wake-up is at most `run.wake_max_wait` after its
+`not_before` (not after its creation), so a weekly window that resets close to the limit still
+fires; for every other reason it is at most `run.wake_max_wait` after creation.
 
 | Kind | Condition | Evaluated by | Allowed when |
 |---|---|---|---|
@@ -1326,7 +1326,7 @@ another person could otherwise read any repository the owner can read. A refused
 
 | Operation (action) | Caller | Effect |
 |---|---|---|
-| `run.wake.create` | adapter with the agent's token, only for an active run of that agent in that thread | creates a wake-up with reason `agent` (from `bothy-wake`) or `usage_limit`; a `usage_limit` request carries the run's outage number as idempotency key, so a repeated request of one outage updates its pending wake-up (`not_before`) and a new outage gets its own, bounded by `run.usage_wake_max` |
+| `run.wake.create` | adapter with the agent's token, only for an active run of that agent in that thread | creates a wake-up with reason `agent` (from `bothy-wake`) or `usage_limit`; a `usage_limit` request carries the run's outage number as idempotency key, so a repeated request of one outage updates its pending wake-up (`not_before`) and a new outage gets its own, bounded by `run.usage_wake_max`; a refused create stores nothing, except a request the SDK outbox sent later (`deferred: true`, 18.19.8), which is stored directly in state `refused` with the reason so that 5.8.4 posts the note and notifies the person |
 | `run.wake.recover` | adapter with the agent's token | creates a wake-up of kind `at` with reason `recovery` or `usage_limit` for an ended source run of that agent and thread in state `interrupted`, `stale` or `failed`, at most one per source run and reason (idempotency key) |
 | `run.wake.list_pending` | adapter | the agent's pending wake-ups of every kind; called at start and after every reconnect |
 | `run.wake.check` | adapter with the agent's token | before every execution of a `command` check and every read of a `pr_checks` check: allow, or end the wake-up (5.8.3) |
@@ -4089,12 +4089,16 @@ controls only when the thread's agent reports `wakes`.
 #### 18.19.2 Orderly stop without the handover
 
 With `runner.turn_handover` off, an orderly stop of the runner (SIGTERM, SIGINT) never leaves an
-orphan: the cancel path keeps the handle of every live turn's process until the process is known
-to be gone, stops each turn as in 18.6 (SIGINT, SIGTERM, SIGKILL to the group, each escalation
-logged `stop_escalated`), finishes its run `cancelled` with the reason `runner_stopped` in the
-`summary` (R-AG-35 form, log code `runner_stopped`), and removes the turn record and the run
-files only after the process exited. This also holds before stage AR is switched on (AR-02,
-R-AG-56).
+orphan. Built by AR-02 as the addendum of 18.6 says ([AR-02 rulings](../decisions.d/AR-02.md)):
+the runner stops every own turn whose process runs as in 18.6 (SIGINT, SIGTERM, SIGKILL to the
+group, each escalation logged `stop_escalated`) and finishes its run `cancelled` with the reason
+`adapter_stopped` (5.2) and a summary that names the cause, before the SDK shuts down; it waits at
+most `runner.stop_grace` plus `runner.kill_grace` plus `runner.cli_probe_timeout` and logs
+`stop_turns_timeout` when that wait runs out. A turn the stop did not reach or that outlived the
+wait is stopped by the cancel path the same way, which keeps the process handle while a process of
+the group lives; the turn record and the run files are removed only when no process of the group
+is left, and a turn whose cancellation is interrupted keeps its record for the next start (18.9).
+This also holds before stage AR is switched on (R-AG-56).
 
 #### 18.19.3 Handover at a restart
 
@@ -4381,7 +4385,11 @@ turn cannot file wake-ups for another run. The runner sends `run.wake.create` wi
 token and writes the answer file next to the request; the command waits for it at most
 `runner.wake_request_timeout` and prints the wake-up's id and fire time (exit 0), the refusal
 with its reason (exit 1), or "accepted, not confirmed" when the server could not be reached and
-the request waits in the SDK outbox (exit 0). The token never reaches the turn.
+the request waits in the SDK outbox (exit 0). A request the outbox sends later carries
+`deferred: true`; when the server refuses it (for example because the source run has ended in the
+meantime), it stores the wake-up directly in state `refused` with the reason, so the person sees
+the note and the notification of 5.8.4 although the turn was told "accepted, not confirmed". The
+token never reaches the turn.
 
 Condition checks (`pr_checks`, `command`): the runner learns every pending wake-up of its agents
 from `run.wake.list_pending` at start and after every reconnect, and new, cancelled and expired
@@ -4565,7 +4573,7 @@ PostgreSQL. Each test asserts what is stored, logged and shown.
 | AR-T05 | A runner returns after `run.orphan_timeout` with a live turn | adoption stops it; a recovery run or the note follows through `run.wake.recover` |
 | AR-T06 | `bothy-wake --after`, `--at`, `--pr`, `--until-success` | stored, listed, fired once; the wake run resumes the same session and its first input names label and result |
 | AR-T07 | A wake-up of each kind created before a runner restart and before a crash | fires after it; every pending one is known from `run.wake.list_pending`, so a `waiting` end after the restart gets no nudge; a cancel during the outage arrives through `run.wake_changed` |
-| AR-T08 | Error paths of wake-ups | server unreachable at create ("accepted, not confirmed", sent from the outbox later); create refused (not allowed, pending cap, `command` below `host`, `pr_checks` by a non-owner: nothing stored, exit 1, `wake_refused`); a failing check (`gh` missing) backs off and ends `failed` after `runner.wake_check_failures` with note and notification; `run.wake.check` refused between two executions (person lost `trigger`, tool class below `host`, SR2 fails, channel archived, `pr_checks` person no longer owner): the command does not run again, the wake-up ends `refused` with the reason, audit entry, `wake_check_refused`, note and notification; a `pr_checks` of an owner's `scoped` run passes; server unreachable before an execution: nothing runs; fire refused (`trigger` lost, channel archived, chain cap): `refused`, note, notification; deadline: `expired`, note; runner offline at fire time: the run waits `queued`; cancel by the person: `cancelled`, no run |
+| AR-T08 | Error paths of wake-ups | server unreachable at create ("accepted, not confirmed", sent from the outbox later with `deferred: true`); the source run ends before the outbox sends: the create is refused and stored `refused`, note and notification; create refused (not allowed, pending cap, `command` below `host`, `pr_checks` by a non-owner: nothing stored, exit 1, `wake_refused`); a failing check (`gh` missing) backs off and ends `failed` after `runner.wake_check_failures` with note and notification; `run.wake.check` refused between two executions (person lost `trigger`, tool class below `host`, SR2 fails, channel archived, `pr_checks` person no longer owner): the command does not run again, the wake-up ends `refused` with the reason, audit entry, `wake_check_refused`, note and notification; a `pr_checks` of an owner's `scoped` run passes; server unreachable before an execution: nothing runs; fire refused (`trigger` lost, channel archived, chain cap): `refused`, note, notification; deadline: `expired`, note; runner offline at fire time: the run waits `queued`; cancel by the person: `cancelled`, no run |
 | AR-T09 | A wake-up fires into an active run of the same person; each failed check (run, thread, wake, person, billing mode, tool class, expired token); an active run of another person | one input line with its token; a failed check skips it with `wake_input_check_failed` and the wake-up returns to `pending`; another person's run keeps it `pending` until the run ends |
 | AR-T10 | Command line with `runner.wakes` | the five timer tools in `--disallowedTools`; without the key byte-equal to today's fixture |
 | AR-T11 | Usage window with a synthetic `rejected` frame (`overageStatus` `rejected`), an error `result`, a running task | the task is not stopped, the run stays `running`; `run.wake.create` once with `usage_limit` and `not_before` after `resetsAt`; the run ends `usage_limited` when the task ends; without permission no wake-up and the note. Variants: fire while held (one wake input); `overageStatus: allowed` changes nothing; an unknown `status` logs `usage_status_unknown` and sets no mark; an `allowed` frame clears the mark and cancels the pending wake-up, and no stop follows after `runner.stop_grace`; repeated frames of one outage call once with the same number; a second outage gets a new wake-up; a compaction attempt with a second outage gets the next number; at `run.usage_wake_max` the next is `refused` with the note; the mark found after a restart leads to `run.wake.recover`; a frame before the checkpoint is restored by the replay; `allowed_warning` changes only the log |

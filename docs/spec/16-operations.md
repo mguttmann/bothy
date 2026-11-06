@@ -1143,7 +1143,15 @@ guide (AR-09) describes the service form the handover relies on and these rules:
    `KeepAlive {SuccessfulExit: false}` without `AbandonProcessGroup`, or systemd
    `Restart=on-failure`). Under systemd the unit needs `KillMode=process`; with the default
    `control-group` a restart kills every turn's keeper, because a new session leaves the process
-   group but not the cgroup.
+   group but not the cgroup. Sources: launchd.plist(5), `SuccessfulExit` restarts on a non-zero
+   exit when false, and `AbandonProcessGroup` unset kills only processes of the job's own process
+   group (https://keith.github.io/xcode-man-pages/launchd.plist.5.html, retrieved 2026-11-06);
+   systemd.service(5), `Restart=on-failure` restarts on a non-zero exit code
+   (https://www.freedesktop.org/software/systemd/man/latest/systemd.service.html, retrieved
+   2026-11-06); systemd.kill(5), `control-group` kills every remaining process of the unit's
+   cgroup, `process` only the main process
+   (https://www.freedesktop.org/software/systemd/man/latest/systemd.kill.html, retrieved
+   2026-11-06).
 2. **Restart and update with the handover.** With `runner.turn_handover` a restart or update needs
    no wait: SIGTERM hands live turns over, the runner exits 75, and the next runner adopts them.
    The operator's check after switching the key on: a harmless background command in a thread

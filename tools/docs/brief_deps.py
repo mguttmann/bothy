@@ -56,7 +56,8 @@ _TID = r"(?:[MA]\d|AR)-\d\d"
 _GROUP_ORDER = "MA"
 
 # A ticket ID never follows a letter, digit or dash: `D-AR-12` and `D-M2-35-3` name decisions.
-_ID = re.compile(rf"(?<![\w-]){_TID}")
+# Nor is it followed by a digit, so a typo such as `AR-030` never passes as `AR-03`.
+_ID = re.compile(rf"(?<![\w-]){_TID}(?!\d)")
 _FENCE = re.compile(r"^\s*(`{3,}|~{3,})")
 _INLINE_CODE = re.compile(r"(`+)((?:(?!\1)(?:[^\n]|\n(?![ \t]*\n)))+?)\1")
 _MAKE = re.compile(r"(?<![\w./-])make ([a-z][a-z0-9-]*)")

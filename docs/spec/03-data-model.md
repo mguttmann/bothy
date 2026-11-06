@@ -1756,7 +1756,7 @@ Purpose: a wake-up that continues a thread later without a new message ([09-agen
 | `reason` | `text` | no | | `CHECK (reason IN ('agent','recovery','usage_limit'))` |
 | `outage` | `integer` | yes | | the run's outage number; set exactly when `reason = 'usage_limit'` and the wake-up came from `run.wake.create` |
 | `not_before` | `timestamptz` | no | | at least `created_at` plus `run.wake_min_delay` |
-| `deadline` | `timestamptz` | no | | at most `created_at` plus `run.wake_max_wait`, for `usage_limit` at most `not_before` plus `run.wake_max_wait` |
+| `deadline` | `timestamptz` | no | | for `usage_limit` at most `not_before` plus `run.wake_max_wait`; for every other reason at most `created_at` plus `run.wake_max_wait` |
 | `state` | `text` | no | `'pending'` | `CHECK (state IN ('pending','fired','cancelled','expired','refused','failed'))` |
 | `state_reason` | `text` | yes | | reason code of the last state change (09 5.8.3, 5.8.6) |
 | `result_text` | `text` | no | `''` | result of a fired check, at most `runner.wake_result_max_bytes` as the runner cut it |

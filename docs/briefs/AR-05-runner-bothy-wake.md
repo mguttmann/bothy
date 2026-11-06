@@ -45,7 +45,7 @@ Product requirements implemented here:
 
 12. `runner.wakes` (default off) needs `runner.turn_handover` (the runner refuses to start with only `runner.wakes`); it reports `wakes: true` only while on; AR-T10 without the key holds byte for byte.
 13. The command folder first on the cleaned `PATH` (owned by the runner user, not writable by group or others), `Bash(bothy-wake:*)` in `--allowedTools` under `scoped` (for a hosted agent after the intersection), the five timer tools in `--disallowedTools`.
-14. The request folder `<runner.state_dir>/wake-requests/<run_id>/` with the per-run nonce of `BOTHY_WAKE_NONCE`; requests with another nonce are refused and logged; the answer file and the exit codes of 18.19.8; "accepted, not confirmed" when the request waits in the SDK outbox.
+14. The request folder `<runner.state_dir>/wake-requests/<run_id>/` with the per-run nonce of `BOTHY_WAKE_NONCE`; requests with another nonce are refused and logged; the answer file and the exit codes of 18.19.8; "accepted, not confirmed" when the request waits in the SDK outbox, which sends it later with `deferred: true` (18.19.8).
 15. Condition checks exactly as 18.19.8: `run.wake.check` before every execution, the `command` environment, folder, group, timeout, output cut, backoff, `runner.wake_check_failures`, the head-commit rule of `pr_checks`, the stop of running checks at a handover.
 16. `run.wake.list_pending` at start and after every reconnect, per hosted agent connection too; `run.wake_changed` between reads.
 17. Wake inputs written with the checks of 09 5.8.3 like follow-ups, a skip reported to the server; a wake input's `result` leaves stdin open while a task runs (18.19.7).

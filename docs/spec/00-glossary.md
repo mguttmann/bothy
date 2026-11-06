@@ -183,7 +183,7 @@ Code names are English and apply in API, database and code.
 | Tombstone | `tombstone` | Kept row of a deleted message without content; keeps the thread sequence gapless. |
 | Tool class | `tool_class` | What the runtime of an agent may do: `chat` < `scoped` < `host`; configured on the agent, reported in the heartbeat. |
 | Transcript | `transcript` | Text of a voice message, created by the agent or a transcription service. |
-| Trigger kind | `trigger_kind` | Origin of a run or a token: `message`, `followup`, `interaction`, `command`, `autocomplete`. |
+| Trigger kind | `trigger_kind` | Origin of a run or a token: `message`, `followup`, `interaction`, `command`, `autocomplete`, `wake`. |
 | Trigger state | `trigger_state` | State on the triggering message: `received`, `queued`, `working`, `done`, `failed`, `cancelled`, `followup_delivered`; replaces status emoji; the reason is in `trigger_state_reason`. |
 | Turn handover | `runner.turn_handover` | A restart of the Claude Code runner that leaves live turns running for the next runner to adopt with full rights (09 18.19.3). |
 | TV mode | `tv mode` | Full-screen display of the visualizations without controls, in the session of a person, costs hidden by default. |

@@ -45,7 +45,7 @@ Product requirements implemented here:
 
 12. On SIGTERM or SIGINT of the runner, every live turn is stopped by the 18.6 escalation (SIGINT, SIGTERM after `runner.stop_grace`, SIGKILL after `runner.kill_grace`, each escalation logged `stop_escalated`), and only after `os.killpg(pgid, 0)` raises `ProcessLookupError` is its run finished `cancelled` with the summary code `runner_stopped` (R-AG-35 form) and its record and run files removed.
 13. The handle the cancel path uses is never cleared before the turn is gone; a cancellation in any await of `_run_process` reaches the stop.
-14. The runner's own exit waits for these stops, bounded by `runner.stop_grace` plus `runner.kill_grace` per turn in parallel, then exits 0 as today.
+14. The runner's own exit waits for these stops, bounded by `runner.stop_grace` plus `runner.kill_grace` per turn in parallel, then exits 0 as today. A turn whose group is still present at that bound is not finished: its record stays, `stop_escalated` names the remaining process, and the server ends its run as 09 5.5 says (`interrupted` or `stale`, 18.19.2); a test holds this with a process that ignores the escalation until after the bound.
 15. A turn whose run the server already ended is stopped the same way without a finish (18.6).
 
 ## Scope
