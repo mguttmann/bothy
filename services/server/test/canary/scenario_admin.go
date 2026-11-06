@@ -300,7 +300,8 @@ func (sc *Scenario) cspReport() {
 // definitions drives the definition of a built-in agent (A1-02) with canary values of class
 // definition in the instructions, a skill body and a header value: the owner writes two
 // versions, reads the current and the first and lists the versions, sends a stale PUT (412 with
-// current) and a refused PUT whose finding names only the pointer and the code.
+// current) and a refused PUT whose finding names only the pointer and the code; it also lists
+// the agent templates (A1-06).
 func (sc *Scenario) definitions() {
 	sc.T.Helper()
 	o, runner := sc.W.Owner, sc.W.Agents["Runner"]
@@ -331,6 +332,8 @@ func (sc *Scenario) definitions() {
 	bad := def(" (400)")
 	bad["instructions"] = "!`id` " + sc.Reg.New(ClassDefinition, "", "definition instructions (400)")
 	sc.call(o, req{method: http.MethodPut, path: path, header: ifMatch(2), body: bad}, http.StatusBadRequest)
+	// The agent templates (A1-06): the owner lists the shipped templates with their drafts.
+	sc.get(o, "/agent-templates", ok...)
 }
 
 // interview drives the interview of "New agent" (A1-07, 26 6.1) with a content canary in an owner
