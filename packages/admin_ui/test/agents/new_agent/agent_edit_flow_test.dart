@@ -234,6 +234,51 @@ void main() {
       },
     );
 
+    test('another device changed only the class: an edit that keeps the class leaves it as it is', () async {
+      port.addAgent(
+        'a',
+        toolClass: AgentToolClass.scoped,
+        definitions: [_plain],
+      );
+      final flow = await open('a');
+      port.changeClassBehind('a', AgentToolClass.chat);
+      flow.edit((d) => d.instructions = 'Keep the notes of Robin.');
+      expect(flow.changes.map((c) => c.kind), [
+        DefinitionChangeKind.instructions,
+      ]);
+      await flow.run();
+      expect(flow.failure, isNull);
+      expect(flow.finished, isTrue);
+      expect(flow.steps, [NewAgentStep.storeDefinition]);
+      expect(port.writes, ['putDefinition']);
+      expect(port.classOf('a'), AgentToolClass.chat);
+    });
+
+    test('another device changed the class an edit changes too: version_conflict, Reload '
+        'starts from its class', () async {
+      port.addAgent(
+        'a',
+        toolClass: AgentToolClass.scoped,
+        definitions: [_plain],
+      );
+      final flow = await open('a');
+      port.changeClassBehind('a', AgentToolClass.chat);
+      flow.edit((d) => d.pickClass(AgentToolClass.host));
+      expect(flow.changes.map((c) => (c.kind, c.name)).last, (
+        DefinitionChangeKind.toolClass,
+        'host',
+      ));
+      await flow.run();
+      expect(flow.failedStep, NewAgentStep.setClass);
+      expect(flow.failure?.code, 'version_conflict');
+      expect(port.writes, isEmpty);
+      expect(port.classOf('a'), AgentToolClass.chat);
+      await flow.reload();
+      expect(flow.failure, isNull);
+      expect(flow.draft!.toolClass, AgentToolClass.chat);
+      expect(flow.hasChanges, isFalse);
+    });
+
     test('names every changed part', () async {
       port.addAgent(
         'a',

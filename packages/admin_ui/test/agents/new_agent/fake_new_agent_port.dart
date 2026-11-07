@@ -240,6 +240,13 @@ class FakeNewAgentPort implements NewAgentPort {
       ..version += 1;
   }
 
+  /// Sets the tool class of [id] the way another device would.
+  void changeClassBehind(String id, AgentToolClass toolClass) {
+    _agents[id]!
+      ..toolClass = toolClass
+      ..version += 1;
+  }
+
   List<HostingRunner> get _runners => [
     ...(offerValue ?? standardOffer).runners,
     ...extraRunners,

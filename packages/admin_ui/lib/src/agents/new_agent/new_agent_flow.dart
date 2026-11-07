@@ -193,6 +193,7 @@ final class NewAgentFlow extends ChangeNotifier {
        _stored = stored,
        _base = stored?.version,
        _baseJson = stored?.json,
+       _baseClass = agent.toolClass,
        _billing = agent.billingMode {
     final json = content ?? stored?.json;
     if (json != null) _draft = _draftOf(json, agent);
@@ -222,6 +223,11 @@ final class NewAgentFlow extends ChangeNotifier {
   /// the "before" of [changes].
   int? _base;
   Map<String, Object?>? _baseJson;
+
+  /// The tool class an edit started from: an edit sets the class only when the preview
+  /// differs from it, and a class another device changed meanwhile is never overwritten
+  /// (26 8.4, D-A1-09-5).
+  AgentToolClass? _baseClass;
   bool _ran = false;
   bool _classRan = false;
   bool _definitionRan = false;
@@ -418,7 +424,7 @@ final class NewAgentFlow extends ChangeNotifier {
     if (mode != NewAgentMode.edit || d == null || before == null) {
       return const [];
     }
-    final from = currentClass;
+    final from = _baseClass ?? currentClass;
     return [
       ...definitionChanges(before, d.definitionJson()),
       if (d.toolClass != from)
@@ -487,8 +493,9 @@ final class NewAgentFlow extends ChangeNotifier {
   List<NewAgentStep> get steps {
     final d = _draft;
     final target = targetClass;
-    final current = currentClass;
     if (mode == NewAgentMode.edit || mode == NewAgentMode.view) {
+      // An edit compares with the class it started from, not with what the server has now.
+      final current = _baseClass ?? currentClass;
       // 26 8.4: only what the edit changes, each a visible step; a raised class before the
       // definition, a lowered one after it.
       final classShown = target != current || _classRan;
@@ -502,6 +509,7 @@ final class NewAgentFlow extends ChangeNotifier {
         if (classShown && after) NewAgentStep.setClass,
       ];
     }
+    final current = currentClass;
     final classShown =
         target != AgentToolClass.chat ||
         current != AgentToolClass.chat ||
@@ -654,6 +662,7 @@ final class NewAgentFlow extends ChangeNotifier {
       _stored = stored;
       _base = stored?.version;
       _baseJson = stored?.json;
+      _baseClass = agent.toolClass;
       if (stored != null) _draft = _draftOf(stored.json, agent);
       _failedStep = null;
       _failure = null;
@@ -734,17 +743,29 @@ final class NewAgentFlow extends ChangeNotifier {
         );
       case NewAgentStep.setClass:
         // A lower class goes after the definition and stays there in the list once done.
-        _classAfter = currentClass.isAbove(d.toolClass);
+        final from = mode == NewAgentMode.edit
+            ? _baseClass ?? currentClass
+            : currentClass;
+        _classAfter = from.isAbove(d.toolClass);
         _classRan = true;
         final fresh = await _port.agent(_agent!.id);
         _agent = fresh;
-        if (fresh.toolClass == d.toolClass) return;
+        if (fresh.toolClass == d.toolClass) {
+          if (mode == NewAgentMode.edit) _baseClass = fresh.toolClass;
+          return;
+        }
+        // Another device changed the class since the edit started: the person decides with
+        // "Reload" instead of the edit overwriting it (26 4.1 item 2, D-A1-09-5).
+        if (mode == NewAgentMode.edit && fresh.toolClass != _baseClass) {
+          throw const NewAgentFailure.problem('version_conflict');
+        }
         _agent = await _port.setToolClass(
           fresh,
           d.toolClass,
           name: name,
           change: _change,
         );
+        if (mode == NewAgentMode.edit) _baseClass = _agent!.toolClass;
       case NewAgentStep.storeDefinition:
         _definitionRan = true;
         _stored = await _port.putDefinition(
