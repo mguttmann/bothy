@@ -32,7 +32,9 @@ With --history additionally every blob and path ever committed on any ref, and e
 commit on any ref.
 
 Output names the location and the rule's line number, never the matched text, so that
-CI logs do not reveal the list. --reveal prints the match (local use only).
+CI logs do not reveal the list. --reveal prints the match (local use only). --summary
+(or BOTHY_DENYLIST_SUMMARY) writes a JSON summary for the issue of denylist-main.yml:
+exit code, finding count per kind and the masked locations without column, rule or match.
 Exit codes: 0 clean, 1 findings, 2 configuration error.
 """
 
@@ -41,6 +43,7 @@ from __future__ import annotations
 import argparse
 import bisect
 import fnmatch
+import json
 import os
 import re
 import struct
@@ -62,6 +65,9 @@ ENV_NAMES = "BOTHY_DENYLIST_NAMES"
 ENV_PR_TITLE = "PR_TITLE"
 ENV_PR_BODY = "PR_BODY"
 ENV_PR_BODY_FILE = "PR_BODY_FILE"
+# Path of the JSON summary (the issue of denylist-main.yml reads it; see --summary).
+ENV_SUMMARY = "BOTHY_DENYLIST_SUMMARY"
+SUMMARY_LOCATIONS = 50
 DOTFILE = ".denylist-path"
 DEFAULT_GENERIC = Path(__file__).resolve().parent / "generic.rules"
 # An identity trailer is exactly "Key: Name <email>"; any other text on such a line makes it
@@ -73,6 +79,7 @@ _IDENTITY_TRAILER = re.compile(
 )
 _SHA = re.compile(r"^[0-9a-f]{40}$")
 _EMAIL = re.compile(r"<([^>]+)>")
+_COLUMN = re.compile(r":([0-9]+):[0-9]+$")
 
 
 class ConfigError(Exception):
@@ -537,6 +544,12 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         "--name", action="append", default=[], help="extra name to check, e.g. a PR branch"
     )
     parser.add_argument("--reveal", action="store_true", help="print matched text (never in CI)")
+    parser.add_argument(
+        "--summary",
+        type=Path,
+        default=None,
+        help=f"write a JSON summary without matches or rules (else ${ENV_SUMMARY})",
+    )
     return parser.parse_args(argv)
 
 
@@ -570,14 +583,56 @@ def scan(args: argparse.Namespace) -> Report:
     return Report(scanner.findings, private is not None, scanner.rulesets)
 
 
+def summary(report: Report | None) -> dict[str, object]:
+    """Return the summary of a scan (None: configuration error) for the denylist-main issue.
+
+    It holds the exit code, the number of findings per kind and up to SUMMARY_LOCATIONS
+    distinct masked locations without the column (file:line, path, commit id), never the
+    match or the rule, so that it can go into a public issue.
+    """
+    if report is None:
+        return {
+            "exit": 2,
+            "error": "configuration",
+            "findings": 0,
+            "kinds": {},
+            "locations": [],
+            "truncated": 0,
+        }
+    kinds: dict[str, int] = {}
+    locations: list[str] = []
+    for f in report.findings:
+        kinds[f.kind] = kinds.get(f.kind, 0) + 1
+        location = _COLUMN.sub(r":\1", report.mask(f.location))
+        if location not in locations:
+            locations.append(location)
+    return {
+        "exit": 1 if report.findings else 0,
+        "findings": len(report.findings),
+        "kinds": dict(sorted(kinds.items())),
+        "locations": locations[:SUMMARY_LOCATIONS],
+        "truncated": max(0, len(locations) - SUMMARY_LOCATIONS),
+    }
+
+
+def _write_summary(path: Path | None, report: Report | None) -> None:
+    if path is not None:
+        path.write_text(json.dumps(summary(report)) + "\n", encoding="utf-8")
+
+
 def main(argv: list[str] | None = None) -> int:
     """Command line entry point; exit code 0 clean, 1 findings, 2 configuration error."""
     args = parse_args(sys.argv[1:] if argv is None else argv)
+    summary_path = args.summary or (
+        Path(os.environ[ENV_SUMMARY]) if os.environ.get(ENV_SUMMARY) else None
+    )
     try:
         report = scan(args)
     except ConfigError as exc:
         print(f"denylist: {exc}", file=sys.stderr)
+        _write_summary(summary_path, None)
         return 2
+    _write_summary(summary_path, report)
     if not report.private_loaded:
         print("denylist: WARNING private deny list absent (--allow-missing); generic rules only")
     for f in report.findings:

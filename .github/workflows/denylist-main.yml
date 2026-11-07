@@ -7,7 +7,12 @@
 # protected environment "denylist". A finding fails the run; the owner then follows
 # docs/quality/push-discipline.md, section "Deny-list hit on `main`".
 #
-# Runs only for pushes to main (tools/ci/check_runners.py, POST_MERGE_WORKFLOWS). The code
+# A manual run (workflow_dispatch) scans what a push run scans: the tree of main, plus the
+# commits of the optional input `range`, never the whole history (tools/denylist/main_range.py).
+# A failed run on main opens or updates an issue with the label `denylist-main` (job `alert`,
+# tools/denylist/main_alert.py): run link, finding counts and locations only, never a term.
+#
+# Runs only for pushes to main and manual runs (tools/ci/check_runners.py, POST_MERGE_WORKFLOWS). The code
 # that runs is the merged, reviewed commit, on a GitHub-hosted runner like every job (ADR 0039).
 
 name: denylist-main
@@ -16,6 +21,12 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      range:
+        description: "Commits to scan besides the tree of main, as BASE..TIP with two commit ids (empty: no commits)"
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: read
@@ -30,6 +41,8 @@ jobs:
     environment: denylist
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    outputs:
+      summary: ${{ steps.summary.outputs.summary }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -42,8 +55,11 @@ jobs:
         env:
           LIST: ${{ secrets.BOTHY_DENYLIST }}
           ALLOW: ${{ secrets.BOTHY_DENYLIST_ALLOW_AUTHORS }}
+          EVENT_NAME: ${{ github.event_name }}
           BEFORE: ${{ github.event.before }}
           AFTER: ${{ github.sha }}
+          INPUT_RANGE: ${{ inputs.range }}
+          BOTHY_DENYLIST_SUMMARY: ${{ runner.temp }}/denylist-summary.json
         run: |
           umask 077
           dir=$(mktemp -d "$RUNNER_TEMP/denylist.XXXXXX")
@@ -51,12 +67,38 @@ jobs:
           printf '%s\n' "$LIST" > "$dir/denylist.txt"
           printf '%s\n' "$ALLOW" > "$dir/allow-authors.txt"
           export BOTHY_DENYLIST_FILE="$dir/denylist.txt"
-          # A manual run or the first push of main has no usable "before": scan every
-          # commit reachable from main.
-          if [ -n "$BEFORE" ] && [ "$BEFORE" != 0000000000000000000000000000000000000000 ] \
-             && git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
-            export DENYLIST_RANGE="$BEFORE..$AFTER"
-          else
-            export DENYLIST_RANGE="$AFTER"
-          fi
+          # A push scans before..after (all reachable commits without a usable "before");
+          # a manual run scans the tree and only the commits of the input range.
+          DENYLIST_RANGE=$(python3 tools/denylist/main_range.py)
+          export DENYLIST_RANGE
           make denylist
+      - name: Summary for the issue
+        id: summary
+        if: failure()
+        env:
+          SUMMARY_FILE: ${{ runner.temp }}/denylist-summary.json
+        run: python3 tools/denylist/main_alert.py output "$SUMMARY_FILE" >> "$GITHUB_OUTPUT"
+
+  alert:
+    name: alert (issue on a red run)
+    needs: denylist
+    # Only a failed scan of main; the token may write issues in this job only.
+    if: failure() && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Open or update the issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SUMMARY: ${{ needs.denylist.outputs.summary }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          REPO: ${{ github.repository }}
+          EVENT_NAME: ${{ github.event_name }}
+          SHA: ${{ github.sha }}
+        run: python3 tools/denylist/main_alert.py issue

@@ -270,13 +270,39 @@ squash commit on `main` carries the maintainer's sign-off from the body.
 `denylist-main.yml` checks every push to `main` with the private list (D-W-34). If it
 fails, a term of the list has reached `main`, for example from a
 fork contribution or from a commit message changed during the squash (see the list of
-what the pull request text gate does not cover). Flow:
+what the pull request text gate does not cover).
+
+A red run must not go unnoticed: the next push scans only its own range and can be green
+while the earlier hit stays on `main`. So a failed run on `main` opens an issue with the label
+`denylist-main`, or comments on the open one (job `alert`, `tools/denylist/main_alert.py`).
+The issue is public and the list is a secret, so it names only the run link, the commit, the
+number of findings per kind and the locations (file:line, a masked path or a commit id from
+the scanner's `--summary`), never a matched term, a rule or its line in the list. A run that
+failed before the scan (a missing list, a rejected input range) opens the issue without
+counts. Only this job gets `issues: write`, with the default `GITHUB_TOKEN`; the scan job keeps
+`contents: read` and the job `alert` sees no secret. `python3 tools/denylist/main_alert.py
+issue --dry-run` (with `SUMMARY`, `RUN_URL`, `REPO`, `EVENT_NAME` and `SHA` set) prints the
+`gh` calls and the text instead of running them.
+
+What a run scans (`tools/denylist/main_range.py`, DENYLIST_RANGE of `make denylist`): every
+run scans the tree of `main`, the refs and their names. A push adds its commits
+`before..after`, or every commit reachable from `main` when `before` is missing or unknown
+(the first push). A manual run ("Run workflow", `workflow_dispatch`) scans what a push run
+scans and no older history: without input it checks no commit at all, and with the input
+`range` (`BASE..TIP`, two commit ids, nothing else is accepted) it checks exactly those
+commits. Old commits on `main` are public and accepted (the earlier commit identity and two
+commit messages of 2026-10-12), so a manual run is not red on them; the whole history is
+`make denylist-history` (docs/quality/public-switch.md).
+
+Flow:
 
 1. Look at the hit locally with `make denylist DENYLIST_RANGE=<before>..<after> DENYLIST_FLAGS=--reveal`
    (locally only, never in CI).
 2. The repository is public (ADR 0039), so the term is published: remove it, inform the owner,
    analysis as an entry in `docs/DECISIONS.md` as for a process failure. Only the owner decides
    whether the public history is rewritten.
+3. Close the issue with the label `denylist-main` once a run on `main` is green again; a later
+   red run opens a new one.
 
 ## CodeRabbit CLI and data outflow
 
