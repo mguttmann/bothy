@@ -167,3 +167,20 @@ func TestGateRuns(t *testing.T) {
 		t.Errorf("a passing periodic run lifts the findings: %q", d)
 	}
 }
+
+// TestGateAdmitWindowEnded: a gate run cut short by the end of the opening window refuses the
+// opening with open_timeout and applies nothing: no report, no end of running sessions.
+func TestGateAdmitWindowEnded(t *testing.T) {
+	gr := &gateRunner{res: with(doctor.HD6, doctor.Entry{Status: doctor.Fail, Code: doctor.CodeSubscriptionLogin, SessionUser: samOSU}), lightUser: map[string]int{}}
+	var published, enforced int
+	g := NewGate(gr, clocktest.New(time.Unix(0, 0)), time.Minute, func(context.Context, *doctor.Result) { published++ },
+		func(context.Context, Policy) { enforced++ })
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if d := g.Admit(ctx, alexOSU); d != DetailOpenTimeout {
+		t.Errorf("admit after the window: %q", d)
+	}
+	if gr.lightUser[alexOSU] != 1 || published != 0 || enforced != 0 {
+		t.Errorf("runs %v, reports %d, enforcements %d", gr.lightUser, published, enforced)
+	}
+}

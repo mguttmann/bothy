@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -53,6 +54,20 @@ func TestOpenShellHappyPath(t *testing.T) {
 	}
 	if r.startCount() != 1 {
 		t.Errorf("PTYs started: %d", r.startCount())
+	}
+}
+
+// TestOpenGateBoundByTheWindow: the gate run of an opening gets the rest of the opening window as
+// its deadline, so it ends with the window instead of running on (and overlapping the next try).
+func TestOpenGateBoundByTheWindow(t *testing.T) {
+	r := newRig(t)
+	r.open(sessA, "shell")
+	r.note.wait(t, "session.started", func() bool { return r.note.startedCount(sessA) == 1 })
+	r.runner.mu.Lock()
+	left := slices.Clone(r.runner.left)
+	r.runner.mu.Unlock()
+	if len(left) != 1 || left[0] <= 0 || left[0] > 20*time.Second {
+		t.Errorf("time left of the gate run %v, want within the window of 20s", left)
 	}
 }
 

@@ -80,13 +80,4 @@ func unixGroups(r Runner, name string) ([]Group, error) {
 	return ParseIDGroups(ids.Stdout, names.Stdout)
 }
 
-func lookupIn(accounts []Account, name string) (Account, error) {
-	for _, a := range accounts {
-		if a.Name == name {
-			return a, nil
-		}
-	}
-	return Account{}, ErrUnknownUser
-}
-
 func trimNL(b []byte) string { return strings.TrimSpace(string(b)) }

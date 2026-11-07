@@ -1349,8 +1349,11 @@ Diagram: [seq-8-open-terminal.svg](../architecture/seq-8-open-terminal.svg) (sou
    HD11 of 7.4), then the local confirmation with `host_service.require_local_confirm` (6.4),
    then the PTY in the helper of `osu`, then `session.started` once; an attach sends none.
    Without `start` until `expires_at` no PTY starts, and the host service sends `session.ended`
-   with `open_failed` and `open_timeout`. Every failure after message 2 and before the PTY runs
-   sends `session.ended` with `open_failed` and its `close_detail`, and the host service keeps
+   with `open_failed` and `open_timeout`. The gate run ends at `expires_at` as well
+   ([FIX-HOGS/2](../decisions.d/FIX-host-open-gate-slow.md)): a run not finished by then gives
+   `open_failed` with `open_timeout` and applies nothing (no `report`, no end of running
+   sessions). Every failure after message 2 and before the PTY runs sends `session.ended` with
+   `open_failed` and its `close_detail`, and the host service keeps
    the data connection open: the server ends the session and closes both sides (host side
    `4100`), so the device gets the code of the end (`4104` for `handshake_failed`, else `4100`)
    and not `4102`. Only when the server has not closed the data connection within the length of
@@ -1930,7 +1933,9 @@ records this.
   one session user gives `shared_location` for that session user only; any other finding that
   refuses a start refuses new sessions with `pty_failed` and ends no running session (the
   `doctor` run of the administrator ends the service for those, M2-42). Every change of the
-  result sends `report`.
+  result sends `report`. The run of an opening ends with its window (`expires_at`, 6.1 step 7)
+  and reads each answer of the user database once
+  ([FIX-HOGS/1 and FIX-HOGS/2](../decisions.d/FIX-host-open-gate-slow.md)).
 - Fail closed and unknown declaration (D-M2-42-9): a value of `authMethod` outside the six of
   the list, an output that is not JSON, a timeout after `host_service.auth_status_timeout` or an
   exit code other than `0` and `1` gives `auth_status_unknown`, which counts like a finding. Before

@@ -65,6 +65,13 @@ func (h ChannelHelpers) Open(ctx context.Context, user string) (*localchan.Conn,
 	return c, nil
 }
 
+// WithUsers implements doctor.UsersHelpers: the peer check looks the session user up in users,
+// the cached users of one run of the checks.
+func (h ChannelHelpers) WithUsers(users hostos.Users) doctor.Helpers {
+	h.Users = users
+	return h
+}
+
 // Check implements doctor.Helpers.
 func (h ChannelHelpers) Check(ctx context.Context, user string, req doctor.Request) (doctor.HelperResult, error) {
 	c, err := h.Open(ctx, user)
