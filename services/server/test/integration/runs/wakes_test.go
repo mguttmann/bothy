@@ -242,6 +242,19 @@ func TestWake_CheckFireAndWakeInput(t *testing.T) {
 	if v := w.wake(id); v.State != "pending" {
 		t.Fatalf("the skipped input fired into the same run: %+v", v)
 	}
+	// The runner keeps checking the pending wake-up (09 18.19.8) and reports the condition again:
+	// the skip is kept, nothing fires into the same run and the chain count stays.
+	w.wantOK(check())
+	again := w.wantOK(w.do("lotse", http.MethodPost, "/api/v1/wakes/"+id+"/fire", `{"outcome":"fired","result_text":"head abc1234: build success"}`))
+	if again["state"] != "pending" || again["state_reason"] != "wake_input_skipped" {
+		t.Fatalf("a fire after the skip %v", again)
+	}
+	if n := w.count(`SELECT count(*) FROM event_log WHERE type = 'agent.wake_input' AND resource_id = $1`, r.ID); n != 1 {
+		t.Fatalf("wake inputs into the skipped run %d", n)
+	}
+	if n := w.count(`SELECT chain_count FROM run_autonomy WHERE thread_id = $1 AND person_id = $2`, r.Thread, w.owner.String()); n != 1 {
+		t.Fatalf("chain count after a fire of the skipped wake-up %d", n)
+	}
 	// The run ends; the job fires the wake-up as a wake run.
 	jobsBefore := len(w.jobs.of(id))
 	w.wantOK(w.finish("lotse", r.ID, `"state":"completed"`))

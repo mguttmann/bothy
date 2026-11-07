@@ -852,9 +852,15 @@ func (w *Wakes) fireTx(ctx context.Context, b *wakeBox, a actor.Actor, in runs.F
 		return wakeResult{}, conflict(domain.WakeCodeNotDue)
 	}
 	// The condition holds: the result and the mark stay with the pending wake-up, so a fire that
-	// must wait for another person's run still fires later with the result (job runs.wake_due).
+	// must wait for another person's run still fires later with the result (job runs.wake_due). A
+	// wake-up returned by a skipped input keeps wake_input_skipped, so a later fire of the runner's
+	// check waits for the end of that run instead of firing into it again (09 5.8.3).
+	reason := domain.WakeCodeConditionMet
+	if r.StateReason == domain.WakeCodeInputSkipped {
+		reason = domain.WakeCodeInputSkipped
+	}
 	row, changed, err := b.d.Repo.UpdateWake(ctx, WakeWrite{ID: r.ID, Version: r.Version, State: domain.WakePending,
-		StateReason: domain.WakeCodeConditionMet, ResultText: in.ResultText})
+		StateReason: reason, ResultText: in.ResultText})
 	if err != nil {
 		return wakeResult{}, err
 	}
