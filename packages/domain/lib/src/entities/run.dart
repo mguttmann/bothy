@@ -51,6 +51,9 @@ enum RunTriggerKind implements Coded {
   /// An interaction.
   interaction('interaction'),
 
+  /// A fired wake-up (09 5.8.3, stage AR).
+  wake('wake'),
+
   /// A value of a newer server.
   unknown('');
 

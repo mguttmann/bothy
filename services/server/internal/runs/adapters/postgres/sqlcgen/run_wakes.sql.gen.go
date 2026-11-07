@@ -35,6 +35,39 @@ func (q *Queries) CountUsageWakes(ctx context.Context, sourceRunID pgtype.UUID) 
 	return count, err
 }
 
+const getWake = `-- name: GetWake :one
+SELECT id, agent_id, thread_id, source_run_id, triggered_by, kind, condition, label, reason, outage, not_before, deadline, state, state_reason, result_text, fired_run_id, fired_into_run_id, created_at, ended_at, version FROM run_wakes WHERE id = $1
+`
+
+// One wake-up without a lock: the thread a fire must lock first (runs before run_wakes, 03 6.3).
+func (q *Queries) GetWake(ctx context.Context, id pgtype.UUID) (RunWake, error) {
+	row := q.db.QueryRow(ctx, getWake, id)
+	var i RunWake
+	err := row.Scan(
+		&i.ID,
+		&i.AgentID,
+		&i.ThreadID,
+		&i.SourceRunID,
+		&i.TriggeredBy,
+		&i.Kind,
+		&i.Condition,
+		&i.Label,
+		&i.Reason,
+		&i.Outage,
+		&i.NotBefore,
+		&i.Deadline,
+		&i.State,
+		&i.StateReason,
+		&i.ResultText,
+		&i.FiredRunID,
+		&i.FiredIntoRunID,
+		&i.CreatedAt,
+		&i.EndedAt,
+		&i.Version,
+	)
+	return i, err
+}
+
 const insertWake = `-- name: InsertWake :one
 
 INSERT INTO run_wakes (id, agent_id, thread_id, source_run_id, triggered_by, kind, condition, label, reason, outage,

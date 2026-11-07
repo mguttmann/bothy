@@ -3983,6 +3983,30 @@
       "doc": "How long finished delivery attempts of outgoing webhooks are kept."
     },
     {
+      "name": "run.autonomous_chain_max",
+      "env": "BOTHY_RUN__AUTONOMOUS_CHAIN_MAX",
+      "kind": "int",
+      "default": "25",
+      "required": false,
+      "enum": [],
+      "min": "0",
+      "max": "100000",
+      "chapter": "09-agents.md",
+      "doc": "Consecutive autonomous inputs per thread and person; 0 means no chain cap."
+    },
+    {
+      "name": "run.autonomous_idle_max",
+      "env": "BOTHY_RUN__AUTONOMOUS_IDLE_MAX",
+      "kind": "int",
+      "default": "3",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "1000",
+      "chapter": "09-agents.md",
+      "doc": "Consecutive idle autonomous inputs per thread and person; at least 1, cannot be switched off."
+    },
+    {
       "name": "run.excerpt_max_chars",
       "env": "BOTHY_RUN__EXCERPT_MAX_CHARS",
       "kind": "int",
@@ -4053,6 +4077,66 @@
       "max": "1048576",
       "chapter": "03-data-model.md",
       "doc": "Largest encoded run_steps.detail in bytes; a longer detail is cut."
+    },
+    {
+      "name": "run.usage_wake_max",
+      "env": "BOTHY_RUN__USAGE_WAKE_MAX",
+      "kind": "int",
+      "default": "20",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "10000",
+      "chapter": "09-agents.md",
+      "doc": "Usage-limit wake-ups per run, every state counted; above it refused with a note."
+    },
+    {
+      "name": "run.wake_label_max_chars",
+      "env": "BOTHY_RUN__WAKE_LABEL_MAX_CHARS",
+      "kind": "int",
+      "default": "120",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "1000",
+      "chapter": "09-agents.md",
+      "doc": "Longest label of a wake-up in Unicode characters; longer is too_long."
+    },
+    {
+      "name": "run.wake_max_pending",
+      "env": "BOTHY_RUN__WAKE_MAX_PENDING",
+      "kind": "int",
+      "default": "5",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "1000",
+      "chapter": "09-agents.md",
+      "doc": "Pending wake-ups per thread; a further create is refused with wake_max_pending."
+    },
+    {
+      "name": "run.wake_max_wait",
+      "env": "BOTHY_RUN__WAKE_MAX_WAIT",
+      "kind": "duration",
+      "default": "7d",
+      "required": false,
+      "enum": [],
+      "min": "1m",
+      "max": "",
+      "chapter": "09-agents.md",
+      "doc": "Longest time from creation to the deadline of a wake-up, for a usage_limit wake-up from its not_before."
+    },
+    {
+      "name": "run.wake_min_delay",
+      "env": "BOTHY_RUN__WAKE_MIN_DELAY",
+      "kind": "duration",
+      "default": "60s",
+      "required": false,
+      "enum": [],
+      "min": "0s",
+      "max": "",
+      "chapter": "09-agents.md",
+      "doc": "Earliest fire and first check of every wake-up after its creation."
     },
     {
       "name": "search.assist.agent_id",

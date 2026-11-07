@@ -76,6 +76,7 @@ const KEEP_FAILED = new Set([
   "runtime_error",
   "adapter_error",
   "runtime_not_authenticated",
+  "usage_limited",
 ]);
 const CANCEL_REASONS = new Set([
   "user_cancelled",
@@ -109,6 +110,7 @@ const RUN_MEMBERS = members<RunDoc>()([
   "triggering_message_id",
   "triggering_command_id",
   "triggering_interaction_id",
+  "triggering_wake_id",
   "triggered_by",
   "state",
   "state_reason",

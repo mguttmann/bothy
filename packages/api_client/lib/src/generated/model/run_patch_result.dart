@@ -12,11 +12,16 @@ part 'run_patch_result.g.dart';
 ///
 /// Properties:
 /// * [version]
+/// * [autonomyCapReached] - Set when the patch's `/metrics/autonomy_last` made the idle count of the run's thread and person reach `run.autonomous_idle_max` (09 5.8.6); the runner closes stdin at that turn's `result`.
 @BuiltValue()
 abstract class RunPatchResult
     implements Built<RunPatchResult, RunPatchResultBuilder> {
   @BuiltValueField(wireName: r'version')
   int get version;
+
+  /// Set when the patch's `/metrics/autonomy_last` made the idle count of the run's thread and person reach `run.autonomous_idle_max` (09 5.8.6); the runner closes stdin at that turn's `result`.
+  @BuiltValueField(wireName: r'autonomy_cap_reached')
+  bool? get autonomyCapReached;
 
   RunPatchResult._();
 
@@ -49,6 +54,13 @@ class _$RunPatchResultSerializer
       object.version,
       specifiedType: const FullType(int),
     );
+    if (object.autonomyCapReached != null) {
+      yield r'autonomy_cap_reached';
+      yield serializers.serialize(
+        object.autonomyCapReached,
+        specifiedType: const FullType(bool),
+      );
+    }
   }
 
   @override
@@ -82,6 +94,14 @@ class _$RunPatchResultSerializer
             specifiedType: const FullType(int),
           ) as int;
           result.version = valueDes;
+          break;
+        case r'autonomy_cap_reached':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(bool),
+          ) as bool?;
+          if (valueDes == null) continue;
+          result.autonomyCapReached = valueDes;
           break;
         default:
           unhandled.add(key);

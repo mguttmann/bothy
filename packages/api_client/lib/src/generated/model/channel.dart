@@ -26,6 +26,7 @@ part 'channel.g.dart';
 /// * [forumDefaultSort]
 /// * [defaultNotificationLevel] - Default for people without an own setting (13, 3.1); absent means none.
 /// * [readOnly] - Write-protected for every principal including owners; only a running import writes (05, rule 1.8).
+/// * [allowAutonomousRuns] - Persons other than owners may let agents run on alone here (09 5.8.6); changed with `setChannelAutonomousRuns`. Absent from an older server, which means `false`.
 /// * [projectBound] - True exactly when a project binding exists for the forum (03 `project_bindings`, R-DM-54); derived, never stored. Creating or deleting a binding raises `version` and writes `channel.updated`; changing a binding and a readiness report do not.
 /// * [mainThreadId] - Thread with `kind = main` of text and DM channels.
 /// * [dmParticipantIds]
@@ -72,6 +73,10 @@ abstract class Channel implements Built<Channel, ChannelBuilder> {
   /// Write-protected for every principal including owners; only a running import writes (05, rule 1.8).
   @BuiltValueField(wireName: r'read_only')
   bool get readOnly;
+
+  /// Persons other than owners may let agents run on alone here (09 5.8.6); changed with `setChannelAutonomousRuns`. Absent from an older server, which means `false`.
+  @BuiltValueField(wireName: r'allow_autonomous_runs')
+  bool? get allowAutonomousRuns;
 
   /// True exactly when a project binding exists for the forum (03 `project_bindings`, R-DM-54); derived, never stored. Creating or deleting a binding raises `version` and writes `channel.updated`; changing a binding and a readiness report do not.
   @BuiltValueField(wireName: r'project_bound')
@@ -181,6 +186,13 @@ class _$ChannelSerializer implements PrimitiveSerializer<Channel> {
       object.readOnly,
       specifiedType: const FullType(bool),
     );
+    if (object.allowAutonomousRuns != null) {
+      yield r'allow_autonomous_runs';
+      yield serializers.serialize(
+        object.allowAutonomousRuns,
+        specifiedType: const FullType(bool),
+      );
+    }
     yield r'project_bound';
     yield serializers.serialize(
       object.projectBound,
@@ -328,6 +340,14 @@ class _$ChannelSerializer implements PrimitiveSerializer<Channel> {
             specifiedType: const FullType(bool),
           ) as bool;
           result.readOnly = valueDes;
+          break;
+        case r'allow_autonomous_runs':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(bool),
+          ) as bool?;
+          if (valueDes == null) continue;
+          result.allowAutonomousRuns = valueDes;
           break;
         case r'project_bound':
           final valueDes = serializers.deserialize(

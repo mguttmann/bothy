@@ -97,6 +97,10 @@ from .agent_triggerers import AgentTriggerers
 from .agent_update import AgentUpdate
 from .agent_updated_event import AgentUpdatedEvent
 from .agent_updated_event_type import AgentUpdatedEventType
+from .agent_wake_facts import AgentWakeFacts
+from .agent_wake_input_event import AgentWakeInputEvent
+from .agent_wake_input_event_type import AgentWakeInputEventType
+from .agent_wake_input_payload import AgentWakeInputPayload
 from .alertmanager_alert import AlertmanagerAlert
 from .alertmanager_alert_status import AlertmanagerAlertStatus
 from .api_token import ApiToken
@@ -145,6 +149,7 @@ from .capability import Capability
 from .channel import Channel
 from .channel_archived_event import ChannelArchivedEvent
 from .channel_archived_event_type import ChannelArchivedEventType
+from .channel_autonomous_runs_set import ChannelAutonomousRunsSet
 from .channel_behavior import ChannelBehavior
 from .channel_behavior_put import ChannelBehaviorPut
 from .channel_create import ChannelCreate
@@ -633,6 +638,7 @@ from .reconcile_entry import ReconcileEntry
 from .resolve_i1 import ResolveI1
 from .run import Run
 from .run_api_retry import RunApiRetry
+from .run_autonomy_last import RunAutonomyLast
 from .run_await_input import RunAwaitInput
 from .run_cancel import RunCancel
 from .run_cancel_requested_event import RunCancelRequestedEvent
@@ -675,6 +681,24 @@ from .run_trigger_kind import RunTriggerKind
 from .run_updated_event import RunUpdatedEvent
 from .run_updated_event_type import RunUpdatedEventType
 from .run_updated_payload import RunUpdatedPayload
+from .run_wake import RunWake
+from .run_wake_cancel import RunWakeCancel
+from .run_wake_changed_event import RunWakeChangedEvent
+from .run_wake_changed_event_type import RunWakeChangedEventType
+from .run_wake_changed_payload import RunWakeChangedPayload
+from .run_wake_check_result import RunWakeCheckResult
+from .run_wake_condition import RunWakeCondition
+from .run_wake_create import RunWakeCreate
+from .run_wake_create_reason import RunWakeCreateReason
+from .run_wake_fire import RunWakeFire
+from .run_wake_fire_outcome import RunWakeFireOutcome
+from .run_wake_kind import RunWakeKind
+from .run_wake_list import RunWakeList
+from .run_wake_page import RunWakePage
+from .run_wake_reason import RunWakeReason
+from .run_wake_recover import RunWakeRecover
+from .run_wake_recover_reason import RunWakeRecoverReason
+from .run_wake_state import RunWakeState
 from .search_assist_answer import SearchAssistAnswer
 from .search_assist_candidate import SearchAssistCandidate
 from .search_assist_cost import SearchAssistCost
@@ -993,6 +1017,10 @@ __all__ = (
     "AgentUpdate",
     "AgentUpdatedEvent",
     "AgentUpdatedEventType",
+    "AgentWakeFacts",
+    "AgentWakeInputEvent",
+    "AgentWakeInputEventType",
+    "AgentWakeInputPayload",
     "AlertmanagerAlert",
     "AlertmanagerAlertStatus",
     "ApiToken",
@@ -1039,6 +1067,7 @@ __all__ = (
     "Channel",
     "ChannelArchivedEvent",
     "ChannelArchivedEventType",
+    "ChannelAutonomousRunsSet",
     "ChannelBehavior",
     "ChannelBehaviorPut",
     "ChannelCreate",
@@ -1503,6 +1532,7 @@ __all__ = (
     "ResolveI1",
     "Run",
     "RunApiRetry",
+    "RunAutonomyLast",
     "RunAwaitInput",
     "RunCancel",
     "RunCancelRequestedEvent",
@@ -1545,6 +1575,24 @@ __all__ = (
     "RunUpdatedEvent",
     "RunUpdatedEventType",
     "RunUpdatedPayload",
+    "RunWake",
+    "RunWakeCancel",
+    "RunWakeChangedEvent",
+    "RunWakeChangedEventType",
+    "RunWakeChangedPayload",
+    "RunWakeCheckResult",
+    "RunWakeCondition",
+    "RunWakeCreate",
+    "RunWakeCreateReason",
+    "RunWakeFire",
+    "RunWakeFireOutcome",
+    "RunWakeKind",
+    "RunWakeList",
+    "RunWakePage",
+    "RunWakeReason",
+    "RunWakeRecover",
+    "RunWakeRecoverReason",
+    "RunWakeState",
     "SearchAssistAnswer",
     "SearchAssistCandidate",
     "SearchAssistCost",

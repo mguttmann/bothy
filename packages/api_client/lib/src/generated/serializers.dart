@@ -80,6 +80,9 @@ import 'package:api_client/src/generated/model/agent_template_list.dart';
 import 'package:api_client/src/generated/model/agent_triggerers.dart';
 import 'package:api_client/src/generated/model/agent_update.dart';
 import 'package:api_client/src/generated/model/agent_updated_event.dart';
+import 'package:api_client/src/generated/model/agent_wake_facts.dart';
+import 'package:api_client/src/generated/model/agent_wake_input_event.dart';
+import 'package:api_client/src/generated/model/agent_wake_input_payload.dart';
 import 'package:api_client/src/generated/model/alertmanager_alert.dart';
 import 'package:api_client/src/generated/model/api_token.dart';
 import 'package:api_client/src/generated/model/api_token_create.dart';
@@ -117,6 +120,7 @@ import 'package:api_client/src/generated/model/branding_update.dart';
 import 'package:api_client/src/generated/model/capability.dart';
 import 'package:api_client/src/generated/model/channel.dart';
 import 'package:api_client/src/generated/model/channel_archived_event.dart';
+import 'package:api_client/src/generated/model/channel_autonomous_runs_set.dart';
 import 'package:api_client/src/generated/model/channel_behavior.dart';
 import 'package:api_client/src/generated/model/channel_behavior_put.dart';
 import 'package:api_client/src/generated/model/channel_create.dart';
@@ -478,6 +482,7 @@ import 'package:api_client/src/generated/model/reconcile_entry.dart';
 import 'package:api_client/src/generated/model/resolve_i1.dart';
 import 'package:api_client/src/generated/model/run.dart';
 import 'package:api_client/src/generated/model/run_api_retry.dart';
+import 'package:api_client/src/generated/model/run_autonomy_last.dart';
 import 'package:api_client/src/generated/model/run_await_input.dart';
 import 'package:api_client/src/generated/model/run_cancel.dart';
 import 'package:api_client/src/generated/model/run_cancel_requested_event.dart';
@@ -506,6 +511,20 @@ import 'package:api_client/src/generated/model/run_summary.dart';
 import 'package:api_client/src/generated/model/run_summary_page.dart';
 import 'package:api_client/src/generated/model/run_updated_event.dart';
 import 'package:api_client/src/generated/model/run_updated_payload.dart';
+import 'package:api_client/src/generated/model/run_wake.dart';
+import 'package:api_client/src/generated/model/run_wake_cancel.dart';
+import 'package:api_client/src/generated/model/run_wake_changed_event.dart';
+import 'package:api_client/src/generated/model/run_wake_changed_payload.dart';
+import 'package:api_client/src/generated/model/run_wake_check_result.dart';
+import 'package:api_client/src/generated/model/run_wake_condition.dart';
+import 'package:api_client/src/generated/model/run_wake_create.dart';
+import 'package:api_client/src/generated/model/run_wake_fire.dart';
+import 'package:api_client/src/generated/model/run_wake_kind.dart';
+import 'package:api_client/src/generated/model/run_wake_list.dart';
+import 'package:api_client/src/generated/model/run_wake_page.dart';
+import 'package:api_client/src/generated/model/run_wake_reason.dart';
+import 'package:api_client/src/generated/model/run_wake_recover.dart';
+import 'package:api_client/src/generated/model/run_wake_state.dart';
 import 'package:api_client/src/generated/model/search_assist_answer.dart';
 import 'package:api_client/src/generated/model/search_assist_candidate.dart';
 import 'package:api_client/src/generated/model/search_assist_cost.dart';
@@ -743,6 +762,9 @@ part 'serializers.g.dart';
   AgentTriggerers,
   AgentUpdate,
   AgentUpdatedEvent,
+  AgentWakeFacts,
+  AgentWakeInputEvent,
+  AgentWakeInputPayload,
   AlertmanagerAlert,
   ApiToken,
   ApiTokenCreate,
@@ -780,6 +802,7 @@ part 'serializers.g.dart';
   Capability,
   Channel,
   ChannelArchivedEvent,
+  ChannelAutonomousRunsSet,
   ChannelBehavior,
   ChannelBehaviorPut,
   ChannelCreate,
@@ -1143,6 +1166,7 @@ part 'serializers.g.dart';
   ResolveI1,
   Run,
   RunApiRetry,
+  RunAutonomyLast,
   RunAwaitInput,
   RunCancel,
   RunCancelRequestedEvent,
@@ -1171,6 +1195,20 @@ part 'serializers.g.dart';
   RunSummaryPage,
   RunUpdatedEvent,
   RunUpdatedPayload,
+  RunWake,
+  RunWakeCancel,
+  RunWakeChangedEvent,
+  RunWakeChangedPayload,
+  RunWakeCheckResult,
+  RunWakeCondition,
+  RunWakeCreate,
+  RunWakeFire,
+  RunWakeKind,
+  RunWakeList,
+  RunWakePage,
+  RunWakeReason,
+  RunWakeRecover,
+  RunWakeState,
   SearchAssistAnswer,
   SearchAssistCandidate,
   SearchAssistCost,
@@ -1542,6 +1580,10 @@ Serializers serializers =
           ..addBuilderFactory(
             const FullType(BuiltMap, [FullType(String), FullType(RunFollowup)]),
             () => MapBuilder<String, RunFollowup>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(RunWake)]),
+            () => ListBuilder<RunWake>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, [FullType(MessageRevision)]),

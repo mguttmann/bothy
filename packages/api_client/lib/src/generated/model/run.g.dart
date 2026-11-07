@@ -12,6 +12,9 @@ const RunTriggerKindEnum _$runTriggerKindEnum_command =
     const RunTriggerKindEnum._('command');
 const RunTriggerKindEnum _$runTriggerKindEnum_interaction =
     const RunTriggerKindEnum._('interaction');
+const RunTriggerKindEnum _$runTriggerKindEnum_wake = const RunTriggerKindEnum._(
+  'wake',
+);
 const RunTriggerKindEnum _$runTriggerKindEnum_unknownDefaultOpenApi =
     const RunTriggerKindEnum._('unknownDefaultOpenApi');
 
@@ -23,6 +26,8 @@ RunTriggerKindEnum _$runTriggerKindEnumValueOf(String name) {
       return _$runTriggerKindEnum_command;
     case 'interaction':
       return _$runTriggerKindEnum_interaction;
+    case 'wake':
+      return _$runTriggerKindEnum_wake;
     case 'unknownDefaultOpenApi':
       return _$runTriggerKindEnum_unknownDefaultOpenApi;
     default:
@@ -35,6 +40,7 @@ final BuiltSet<RunTriggerKindEnum> _$runTriggerKindEnumValues =
       _$runTriggerKindEnum_message,
       _$runTriggerKindEnum_command,
       _$runTriggerKindEnum_interaction,
+      _$runTriggerKindEnum_wake,
       _$runTriggerKindEnum_unknownDefaultOpenApi,
     ]);
 
@@ -47,12 +53,14 @@ class _$RunTriggerKindEnumSerializer
     'message': 'message',
     'command': 'command',
     'interaction': 'interaction',
+    'wake': 'wake',
     'unknownDefaultOpenApi': 'unknown_default_open_api',
   };
   static const Map<Object, String> _fromWire = const <Object, String>{
     'message': 'message',
     'command': 'command',
     'interaction': 'interaction',
+    'wake': 'wake',
     'unknown_default_open_api': 'unknownDefaultOpenApi',
   };
 
@@ -97,6 +105,8 @@ class _$Run extends Run {
   final String? triggeringCommandId;
   @override
   final String? triggeringInteractionId;
+  @override
+  final String? triggeringWakeId;
   @override
   final String triggeredBy;
   @override
@@ -151,6 +161,7 @@ class _$Run extends Run {
     this.triggeringMessageId,
     this.triggeringCommandId,
     this.triggeringInteractionId,
+    this.triggeringWakeId,
     required this.triggeredBy,
     required this.state,
     this.stateReason,
@@ -192,6 +203,7 @@ class _$Run extends Run {
         triggeringMessageId == other.triggeringMessageId &&
         triggeringCommandId == other.triggeringCommandId &&
         triggeringInteractionId == other.triggeringInteractionId &&
+        triggeringWakeId == other.triggeringWakeId &&
         triggeredBy == other.triggeredBy &&
         state == other.state &&
         stateReason == other.stateReason &&
@@ -226,6 +238,7 @@ class _$Run extends Run {
     _$hash = $jc(_$hash, triggeringMessageId.hashCode);
     _$hash = $jc(_$hash, triggeringCommandId.hashCode);
     _$hash = $jc(_$hash, triggeringInteractionId.hashCode);
+    _$hash = $jc(_$hash, triggeringWakeId.hashCode);
     _$hash = $jc(_$hash, triggeredBy.hashCode);
     _$hash = $jc(_$hash, state.hashCode);
     _$hash = $jc(_$hash, stateReason.hashCode);
@@ -262,6 +275,7 @@ class _$Run extends Run {
           ..add('triggeringMessageId', triggeringMessageId)
           ..add('triggeringCommandId', triggeringCommandId)
           ..add('triggeringInteractionId', triggeringInteractionId)
+          ..add('triggeringWakeId', triggeringWakeId)
           ..add('triggeredBy', triggeredBy)
           ..add('state', state)
           ..add('stateReason', stateReason)
@@ -329,6 +343,11 @@ class RunBuilder implements Builder<Run, RunBuilder> {
   String? get triggeringInteractionId => _$this._triggeringInteractionId;
   set triggeringInteractionId(String? triggeringInteractionId) =>
       _$this._triggeringInteractionId = triggeringInteractionId;
+
+  String? _triggeringWakeId;
+  String? get triggeringWakeId => _$this._triggeringWakeId;
+  set triggeringWakeId(String? triggeringWakeId) =>
+      _$this._triggeringWakeId = triggeringWakeId;
 
   String? _triggeredBy;
   String? get triggeredBy => _$this._triggeredBy;
@@ -433,6 +452,7 @@ class RunBuilder implements Builder<Run, RunBuilder> {
       _triggeringMessageId = $v.triggeringMessageId;
       _triggeringCommandId = $v.triggeringCommandId;
       _triggeringInteractionId = $v.triggeringInteractionId;
+      _triggeringWakeId = $v.triggeringWakeId;
       _triggeredBy = $v.triggeredBy;
       _state = $v.state;
       _stateReason = $v.stateReason;
@@ -498,6 +518,7 @@ class RunBuilder implements Builder<Run, RunBuilder> {
             triggeringMessageId: triggeringMessageId,
             triggeringCommandId: triggeringCommandId,
             triggeringInteractionId: triggeringInteractionId,
+            triggeringWakeId: triggeringWakeId,
             triggeredBy: BuiltValueNullFieldError.checkNotNull(
               triggeredBy,
               r'Run',

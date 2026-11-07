@@ -184,6 +184,10 @@ type world struct {
 	heartbeats *heartbeatReads
 	// expiries records the jobs runs.component_expiry the runs module schedules (M2-15).
 	expiries *expiryJobs
+	// rn is the runs module of wire and msgs the messaging use cases: the wake-up tests bind the
+	// wake-ups to them (AR-04).
+	rn   *wire.Runs
+	msgs *messagingapp.Service
 
 	owner, alex, sam, robin                    ids.ID
 	support, marketing, engineering, research  ids.ID
@@ -343,7 +347,7 @@ func newEmptyWorldWithChat(t *testing.T, search searchlang.Map, chatCfg chatapp.
 	must(t, err)
 	must(t, mods.RunsAcceptor.Bind(rn.Service))
 	m.Handlers.BindRetriggers(rn.Service)
-	w.runs = rn.Service
+	w.runs, w.rn, w.msgs = rn.Service, rn, m.Service
 	// The invocation tokens of M2-06 over in-memory keys and a fixed issuer (M2-09).
 	w.keys = newTestKeys(t)
 	must(t, rn.BindInvocationTokens(tokenConfig, w.keys, fixedInstance{id: w.issuer}, w.clk))
@@ -354,6 +358,7 @@ func newEmptyWorldWithChat(t *testing.T, search searchlang.Map, chatCfg chatapp.
 	must(t, err)
 	built, err := routes.Build(wire.Handlers{Access: authzhttp.New(w.admin), Agents: ag.Handlers, Spaces: c.Handlers, Channels: c.ChannelHandlers,
 		People: w.id.PeopleHandlers, Threads: c.ThreadHandlers, Deletion: c.DeletionHandlers, Behavior: c.BehaviorHandlers, Messages: m.Handlers, Admin: settings.Handlers, Personal: personal.Handlers,
+		AutonomousRuns: c.AutonomousRunsHandlers, ReadOnly: c.ReadOnlyHandlers,
 		Runs: rn.Handlers, Sync: reads.Handlers},
 		wire.RouteOptions(), routes.SpecCatalog())
 	must(t, err)

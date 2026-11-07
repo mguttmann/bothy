@@ -34,6 +34,8 @@ content_tables:
   - runs
   - run_steps
   - run_followups
+  - run_wakes
+  - run_autonomy
   - message_components
   - interactions
   - read_states
@@ -572,6 +574,39 @@ exceptions:
   - query: runs.FollowupOfMessage
     category: after_authorize
     reason: "the follow-up of the one message whose message.delete authorize allowed in the same unit of work; nothing of the row leaves the server (07 7.4 rule 1, M2-11)"
+  - query: runs.GetWake
+    category: after_authorize
+    reason: "the one wake-up whose thread a fire locks first (runs before run_wakes, 03 6.3); the use case then locks the wake-up and authorizes run.wake.fire on it before anything of the row leaves, or the job runs.wake_due reads it without a principal (07 7.4 rule 1, AR-04)"
+  - query: runs.LockWake
+    category: after_authorize
+    reason: "the one wake-up a wake-up operation locks; run_wakes has no channel_id, and the use case authorizes run.wake.check, run.wake.fire or run.wake.cancel on it before anything of the row leaves, or the job runs.wake_due reads it without a principal (07 7.4 rule 1, AR-04)"
+  - query: runs.WakeByOutage
+    category: after_authorize
+    reason: "the wake-up of one outage of the one run whose run.wake.create authorize allowed in the same unit of work (agent-self); run_wakes has no channel_id (07 7.4 rule 1, AR-04)"
+  - query: runs.WakeBySourceReason
+    category: after_authorize
+    reason: "the recovery wake-up of the one run whose run.wake.recover authorize allowed in the same unit of work (agent-self); run_wakes has no channel_id (07 7.4 rule 1, AR-04)"
+  - query: runs.CountPendingWakes
+    category: after_authorize
+    reason: "a count of the pending wake-ups of the thread of the one run whose run.wake.create or run.wake.recover authorize allowed; only the number is used, nothing leaves (AR-04)"
+  - query: runs.CountUsageWakes
+    category: after_authorize
+    reason: "a count of the usage-limit wake-ups of the one run whose run.wake.create or run.wake.recover authorize allowed; only the number is used, nothing leaves (AR-04)"
+  - query: runs.PendingWakesOfAgent
+    category: after_authorize
+    reason: "the pending wake-ups of the calling agent itself after run.wake.list_pending (agent-self) allowed; run_wakes has no channel_id and every row is the agent's own (07 7.4 rule 1, AR-04)"
+  - query: runs.ThreadWakes
+    category: thread_scope
+    reason: "listThreadWakes reads the wake-ups of the one thread whose channel is in Scope(run.wake.read).ChannelIDs, checked before the read; run_wakes has no channel_id (D-M2-05-9, AR-04)"
+  - query: runs.ReadyWakesOfThread
+    category: system_job
+    reason: "the end of a run schedules runs.wake_due for the ready wake-ups of its own thread; only the ids go into job arguments, nothing leaves the server (AR-04)"
+  - query: runs.PendingWakeCounts
+    category: system_aggregate
+    reason: "the gauge bothy.run.wake.pending counts the pending wake-ups by kind without a principal; only counts leave (signals.md 4.3, AR-04)"
+  - query: runs.LockAutonomy
+    category: after_authorize
+    reason: "the counts of the person of the one wake-up or run that the use case authorized or the job fires; run_autonomy has no channel_id and only numbers are used (07 7.4 rule 1, AR-04)"
   - query: files.StorageStats
     category: system_aggregate
     reason: "getUsageStats storage_bytes: sums size_bytes of the attachments whose scope_channel_id is in the channel set the stats use case built from Scope(message.read); only a sum per space leaves (M6-05)"

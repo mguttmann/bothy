@@ -225,34 +225,45 @@ func checkLabel(f *wakeFindings, label string, maxChars int) {
 func checkCondition(f *wakeFindings, kind WakeKind, c WakeCondition, maxBytes int) {
 	switch kind {
 	case WakePRChecks:
-		if !repositoryPattern.MatchString(c.Repository) {
-			f.add("/condition/repository", "invalid", "the repository is not owner/name")
-		}
-		if c.Number < 1 {
-			f.add("/condition/number", "invalid", "the pull request number is below 1")
-		}
-		if c.HeadCommit != "" && !commitPattern.MatchString(c.HeadCommit) {
-			f.add("/condition/head_commit", "invalid", "the head commit is not a hexadecimal commit id")
-		}
-		if c.CommandLine != "" {
-			f.add("/condition/command_line", "not_allowed", "a pr_checks wake-up has no command")
-		}
+		checkPRCondition(f, c)
 	case WakeCommand:
-		switch {
-		case strings.TrimSpace(c.CommandLine) == "":
-			f.add("/condition/command_line", "required", "a command wake-up needs a command line")
-		case len(c.CommandLine) > maxBytes:
-			f.add("/condition/command_line", "too_long", "the command line is longer than message.max_content_bytes")
-		case MultiLineText(c.CommandLine) != nil:
-			f.add("/condition/command_line", "invalid", "the command line contains characters that are not allowed")
-		}
-		if c.Repository != "" || c.Number != 0 || c.HeadCommit != "" {
-			f.add("/condition", "not_allowed", "a command wake-up has no pull request")
-		}
+		checkCommandCondition(f, c, maxBytes)
 	case WakeAt:
 		if c != (WakeCondition{}) {
 			f.add("/condition", "not_allowed", "an at wake-up has no condition")
 		}
+	}
+}
+
+// checkPRCondition checks the condition of pr_checks: owner/name, a number, an optional commit.
+func checkPRCondition(f *wakeFindings, c WakeCondition) {
+	if !repositoryPattern.MatchString(c.Repository) {
+		f.add("/condition/repository", "invalid", "the repository is not owner/name")
+	}
+	if c.Number < 1 {
+		f.add("/condition/number", "invalid", "the pull request number is below 1")
+	}
+	if c.HeadCommit != "" && !commitPattern.MatchString(c.HeadCommit) {
+		f.add("/condition/head_commit", "invalid", "the head commit is not a hexadecimal commit id")
+	}
+	if c.CommandLine != "" {
+		f.add("/condition/command_line", "not_allowed", "a pr_checks wake-up has no command")
+	}
+}
+
+// checkCommandCondition checks the condition of command: a command line of at most maxBytes
+// bytes (message.max_content_bytes) and no pull request.
+func checkCommandCondition(f *wakeFindings, c WakeCondition, maxBytes int) {
+	switch {
+	case strings.TrimSpace(c.CommandLine) == "":
+		f.add("/condition/command_line", "required", "a command wake-up needs a command line")
+	case len(c.CommandLine) > maxBytes:
+		f.add("/condition/command_line", "too_long", "the command line is longer than message.max_content_bytes")
+	case MultiLineText(c.CommandLine) != nil:
+		f.add("/condition/command_line", "invalid", "the command line contains characters that are not allowed")
+	}
+	if c.Repository != "" || c.Number != 0 || c.HeadCommit != "" {
+		f.add("/condition", "not_allowed", "a command wake-up has no pull request")
 	}
 }
 

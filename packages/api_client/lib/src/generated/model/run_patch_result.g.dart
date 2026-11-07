@@ -9,11 +9,14 @@ part of 'run_patch_result.dart';
 class _$RunPatchResult extends RunPatchResult {
   @override
   final int version;
+  @override
+  final bool? autonomyCapReached;
 
   factory _$RunPatchResult([void Function(RunPatchResultBuilder)? updates]) =>
       (RunPatchResultBuilder()..update(updates))._build();
 
-  _$RunPatchResult._({required this.version}) : super._();
+  _$RunPatchResult._({required this.version, this.autonomyCapReached})
+    : super._();
   @override
   RunPatchResult rebuild(void Function(RunPatchResultBuilder) updates) =>
       (toBuilder()..update(updates)).build();
@@ -24,22 +27,26 @@ class _$RunPatchResult extends RunPatchResult {
   @override
   bool operator ==(Object other) {
     if (identical(other, this)) return true;
-    return other is RunPatchResult && version == other.version;
+    return other is RunPatchResult &&
+        version == other.version &&
+        autonomyCapReached == other.autonomyCapReached;
   }
 
   @override
   int get hashCode {
     var _$hash = 0;
     _$hash = $jc(_$hash, version.hashCode);
+    _$hash = $jc(_$hash, autonomyCapReached.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
 
   @override
   String toString() {
-    return (newBuiltValueToStringHelper(
-      r'RunPatchResult',
-    )..add('version', version)).toString();
+    return (newBuiltValueToStringHelper(r'RunPatchResult')
+          ..add('version', version)
+          ..add('autonomyCapReached', autonomyCapReached))
+        .toString();
   }
 }
 
@@ -51,6 +58,11 @@ class RunPatchResultBuilder
   int? get version => _$this._version;
   set version(int? version) => _$this._version = version;
 
+  bool? _autonomyCapReached;
+  bool? get autonomyCapReached => _$this._autonomyCapReached;
+  set autonomyCapReached(bool? autonomyCapReached) =>
+      _$this._autonomyCapReached = autonomyCapReached;
+
   RunPatchResultBuilder() {
     RunPatchResult._defaults(this);
   }
@@ -59,6 +71,7 @@ class RunPatchResultBuilder
     final $v = _$v;
     if ($v != null) {
       _version = $v.version;
+      _autonomyCapReached = $v.autonomyCapReached;
       _$v = null;
     }
     return this;
@@ -86,6 +99,7 @@ class RunPatchResultBuilder
             r'RunPatchResult',
             'version',
           ),
+          autonomyCapReached: autonomyCapReached,
         );
     replace(_$result);
     return _$result;

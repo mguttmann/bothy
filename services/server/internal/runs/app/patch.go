@@ -6,6 +6,7 @@ import (
 	"context"
 	"log/slog"
 	"slices"
+	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
@@ -127,17 +128,9 @@ func (s *Service) patchLocked(ctx context.Context, a actor.Actor, in runs.PatchR
 	if err != nil {
 		return patchOutcome{}, err
 	}
-	stored, err := s.d.Repo.WritePatch(ctx, PatchWrite{ID: row.ID, Change: ch, At: now})
+	stored, capReached, err := s.writePatch(ctx, row, ch, ops, now)
 	if err != nil {
 		return patchOutcome{}, err
-	}
-	var capReached bool
-	if slices.ContainsFunc(ops, func(o domain.Op) bool { return o.Target == domain.TargetAutonomyLast }) {
-		// The idle flag of an autonomous input counts once per input in the counts of the run's
-		// thread and person (09 5.8.6), in the unit of the patch, after the run row (03 6.3).
-		if capReached, err = s.idleReport(ctx, row, row.Metrics, stored.Metrics); err != nil {
-			return patchOutcome{}, err
-		}
 	}
 	for _, f := range ch.Followups {
 		if err := s.followups().SetState(ctx, row.ID, f.MessageID, f.State); err != nil {
@@ -165,6 +158,19 @@ func (s *Service) patchLocked(ctx context.Context, a actor.Actor, in runs.PatchR
 			OccurredAt: now, Payload: payload,
 		},
 	}, nil
+}
+
+// writePatch stores the change ch of row and, when ops name /metrics/autonomy_last, counts its
+// idle flag once per input in the counts of the run's thread and person (09 5.8.6, AR-04), in the
+// unit of the patch and after the run row (03 6.3). capReached is the answer's
+// autonomy_cap_reached.
+func (s *Service) writePatch(ctx context.Context, row RunRow, ch domain.Change, ops []domain.Op, now time.Time) (RunRow, bool, error) {
+	stored, err := s.d.Repo.WritePatch(ctx, PatchWrite{ID: row.ID, Change: ch, At: now})
+	if err != nil || !slices.ContainsFunc(ops, func(o domain.Op) bool { return o.Target == domain.TargetAutonomyLast }) {
+		return stored, false, err
+	}
+	capReached, err := s.idleReport(ctx, row, row.Metrics, stored.Metrics)
+	return stored, capReached, err
 }
 
 // updatedPayload builds the payload of run.updated from the normalized ops; when its encoded form

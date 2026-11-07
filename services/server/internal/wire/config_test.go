@@ -462,6 +462,14 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"agent.cancel_grace": {Kind: config.KindDuration, Default: "30s", Min: "1ms", Chapter: "04-sync-protocol.md"},
 		"run.orphan_timeout": {Kind: config.KindDuration, Default: "15m", Min: "1ms", Chapter: "09-agents.md"},
 		"run.stall_after":    {Kind: config.KindDuration, Default: "10m", Min: "1ms", Chapter: "03-data-model.md"},
+		// AR-04: the wake-ups and the caps of autonomous inputs (09 21).
+		"run.wake_max_pending":     {Kind: config.KindInt, Default: "5", Min: "1", Max: "1000", Chapter: "09-agents.md"},
+		"run.wake_max_wait":        {Kind: config.KindDuration, Default: "7d", Min: "1m", Chapter: "09-agents.md"},
+		"run.wake_min_delay":       {Kind: config.KindDuration, Default: "60s", Min: "0s", Chapter: "09-agents.md"},
+		"run.usage_wake_max":       {Kind: config.KindInt, Default: "20", Min: "1", Max: "10000", Chapter: "09-agents.md"},
+		"run.wake_label_max_chars": {Kind: config.KindInt, Default: "120", Min: "1", Max: "1000", Chapter: "09-agents.md"},
+		"run.autonomous_chain_max": {Kind: config.KindInt, Default: "25", Min: "0", Max: "100000", Chapter: "09-agents.md"},
+		"run.autonomous_idle_max":  {Kind: config.KindInt, Default: "3", Min: "1", Max: "1000", Chapter: "09-agents.md"},
 		// M2-13: the byte bounds of the run context (09 4.6 and 21).
 		"agent.context_max_bytes":         {Kind: config.KindInt, Default: "262144", Min: "1", Chapter: "09-agents.md"},
 		"agent.context_message_max_bytes": {Kind: config.KindInt, Default: "32768", Min: "1", Chapter: "09-agents.md"},

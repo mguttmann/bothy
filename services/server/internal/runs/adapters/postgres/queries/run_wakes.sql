@@ -18,6 +18,10 @@ VALUES (sqlc.arg(id), sqlc.arg(agent_id), sqlc.arg(thread_id), sqlc.arg(source_r
 ON CONFLICT DO NOTHING
 RETURNING *;
 
+-- name: GetWake :one
+-- One wake-up without a lock: the thread a fire must lock first (runs before run_wakes, 03 6.3).
+SELECT * FROM run_wakes WHERE id = sqlc.arg(id);
+
 -- name: LockWake :one
 -- One wake-up with its row lock.
 SELECT * FROM run_wakes WHERE id = sqlc.arg(id) FOR UPDATE;

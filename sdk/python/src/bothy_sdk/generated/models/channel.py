@@ -41,6 +41,8 @@ class Channel:
         space_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
         forum_default_sort (ForumSort | Unset): Sort order of forum posts.
         default_notification_level (NotificationLevel | Unset):
+        allow_autonomous_runs (bool | Unset): Persons other than owners may let agents run on alone here (09 5.8.6);
+            changed with `setChannelAutonomousRuns`. Absent from an older server, which means `false`.
         main_thread_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
         dm_participant_ids (list[UUID] | Unset):
         archived_at (datetime.datetime | Unset): RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
@@ -61,6 +63,7 @@ class Channel:
     space_id: UUID | Unset = UNSET
     forum_default_sort: ForumSort | Unset = UNSET
     default_notification_level: NotificationLevel | Unset = UNSET
+    allow_autonomous_runs: bool | Unset = UNSET
     main_thread_id: UUID | Unset = UNSET
     dm_participant_ids: list[UUID] | Unset = UNSET
     archived_at: datetime.datetime | Unset = UNSET
@@ -101,6 +104,8 @@ class Channel:
         default_notification_level: str | Unset = UNSET
         if not isinstance(self.default_notification_level, Unset):
             default_notification_level = self.default_notification_level.value
+
+        allow_autonomous_runs = self.allow_autonomous_runs
 
         main_thread_id: str | Unset = UNSET
         if not isinstance(self.main_thread_id, Unset):
@@ -144,6 +149,8 @@ class Channel:
             field_dict["forum_default_sort"] = forum_default_sort
         if default_notification_level is not UNSET:
             field_dict["default_notification_level"] = default_notification_level
+        if allow_autonomous_runs is not UNSET:
+            field_dict["allow_autonomous_runs"] = allow_autonomous_runs
         if main_thread_id is not UNSET:
             field_dict["main_thread_id"] = main_thread_id
         if dm_participant_ids is not UNSET:
@@ -203,6 +210,8 @@ class Channel:
         else:
             default_notification_level = NotificationLevel(_default_notification_level)
 
+        allow_autonomous_runs = d.pop("allow_autonomous_runs", UNSET)
+
         _main_thread_id = d.pop("main_thread_id", UNSET)
         main_thread_id: UUID | Unset
         if isinstance(_main_thread_id, Unset):
@@ -248,6 +257,7 @@ class Channel:
             space_id=space_id,
             forum_default_sort=forum_default_sort,
             default_notification_level=default_notification_level,
+            allow_autonomous_runs=allow_autonomous_runs,
             main_thread_id=main_thread_id,
             dm_participant_ids=dm_participant_ids,
             archived_at=archived_at,

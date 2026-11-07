@@ -200,19 +200,21 @@ func (s *Service) Open(ctx context.Context, cmd OpenCmd) (runs.RunSummary, error
 			return runs.RunSummary{}, err
 		}
 	}
-	// The run fails with agent_unavailable when nobody starts it within run.queued_max_age
-	// (M2-08 design note 11); every run of this creation function gets the job.
+	return sum, s.afterOpen(ctx, row)
+}
+
+// afterOpen schedules runs.queued_expiry of the new run row: it fails with agent_unavailable when
+// nobody starts it within run.queued_max_age (M2-08 design note 11), every run of Open gets the
+// job. A run of the person that is not a wake run also ends the person's chain of autonomous
+// inputs in the thread (03 run_autonomy, 09 5.8.6), in the transaction that creates it.
+func (s *Service) afterOpen(ctx context.Context, row RunRow) error {
 	if err := s.scheduleExpiry(ctx, row); err != nil {
-		return runs.RunSummary{}, err
+		return err
 	}
-	// A run of the person that is not a wake run ends the person's chain of autonomous inputs in
-	// the thread (03 run_autonomy, 09 5.8.6), in the transaction that creates it.
-	if row.TriggerKind != triggerKindWake {
-		if err := s.resetAutonomy(ctx, row.ThreadID, row.TriggeredBy); err != nil {
-			return runs.RunSummary{}, err
-		}
+	if row.TriggerKind == triggerKindWake {
+		return nil
 	}
-	return sum, nil
+	return s.resetAutonomy(ctx, row.ThreadID, row.TriggeredBy)
 }
 
 // activeExists returns the ActiveRunExistsError of a thread whose insert met the partial unique

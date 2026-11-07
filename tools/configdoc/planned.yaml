@@ -33,20 +33,6 @@ rules:
     milestone: M7
   - match: "retention."  # M7-05
     milestone: M7
-  - match: run.autonomous_chain_max  # AR-04 (autonomous runs, 09 5.8)
-    milestone: AR
-  - match: run.autonomous_idle_max  # AR-04 (autonomous runs, 09 5.8)
-    milestone: AR
-  - match: run.usage_wake_max  # AR-04 (autonomous runs, 09 5.8)
-    milestone: AR
-  - match: run.wake_label_max_chars  # AR-04 (autonomous runs, 09 5.8)
-    milestone: AR
-  - match: run.wake_max_pending  # AR-04 (autonomous runs, 09 5.8)
-    milestone: AR
-  - match: run.wake_max_wait  # AR-04 (autonomous runs, 09 5.8)
-    milestone: AR
-  - match: run.wake_min_delay  # AR-04 (autonomous runs, 09 5.8)
-    milestone: AR
   - match: search.extract.tika_url  # M3 out of scope defers Tika to V3; no ticket yet
     milestone: V3
   - match: sync.reconnect_backoff_base  # M2-29

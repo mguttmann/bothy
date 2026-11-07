@@ -277,9 +277,7 @@ func (a *applier) apply(op Op) error {
 		}
 		a.setMetric("last_api_retry", raw)
 	case TargetAutonomyLast:
-		if l, ok := op.Value.(AutonomyLast); ok {
-			a.setMetric(metricAutonomyLast, encodeCanonical(map[string]any{"input": l.Input, "idle": l.Idle}))
-		}
+		a.setAutonomyLast(op)
 	case TargetCost:
 		if m, ok := op.Value.(Money); ok && m != a.cost {
 			a.emit(OpReplace, "/cost", encodeCanonical(moneyJSON(m)))
@@ -299,6 +297,13 @@ func (a *applier) apply(op Op) error {
 		return a.setFollowup(op)
 	}
 	return nil
+}
+
+// setAutonomyLast stores the object of /metrics/autonomy_last (09 5.8.6).
+func (a *applier) setAutonomyLast(op Op) {
+	if l, ok := op.Value.(AutonomyLast); ok {
+		a.setMetric(metricAutonomyLast, encodeCanonical(map[string]any{"input": l.Input, "idle": l.Idle}))
+	}
 }
 
 // setText sets a text column; "" is NULL, so setting "" removes the member.

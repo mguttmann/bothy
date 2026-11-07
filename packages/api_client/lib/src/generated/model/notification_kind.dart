@@ -26,6 +26,8 @@ class NotificationKind extends EnumClass {
   static const NotificationKind security = _$security;
   @BuiltValueEnumConst(wireName: r'admin')
   static const NotificationKind admin = _$admin;
+  @BuiltValueEnumConst(wireName: r'wake_ended')
+  static const NotificationKind wakeEnded = _$wakeEnded;
   @BuiltValueEnumConst(wireName: r'unknown_default_open_api', fallback: true)
   static const NotificationKind unknownDefaultOpenApi = _$unknownDefaultOpenApi;
 

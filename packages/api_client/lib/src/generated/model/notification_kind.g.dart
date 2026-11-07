@@ -14,6 +14,7 @@ const NotificationKind _$runFailed = const NotificationKind._('runFailed');
 const NotificationKind _$inputNeeded = const NotificationKind._('inputNeeded');
 const NotificationKind _$security = const NotificationKind._('security');
 const NotificationKind _$admin = const NotificationKind._('admin');
+const NotificationKind _$wakeEnded = const NotificationKind._('wakeEnded');
 const NotificationKind _$unknownDefaultOpenApi = const NotificationKind._(
   'unknownDefaultOpenApi',
 );
@@ -36,6 +37,8 @@ NotificationKind _$valueOf(String name) {
       return _$security;
     case 'admin':
       return _$admin;
+    case 'wakeEnded':
+      return _$wakeEnded;
     case 'unknownDefaultOpenApi':
       return _$unknownDefaultOpenApi;
     default:
@@ -53,6 +56,7 @@ final BuiltSet<NotificationKind> _$values = BuiltSet<NotificationKind>(
     _$inputNeeded,
     _$security,
     _$admin,
+    _$wakeEnded,
     _$unknownDefaultOpenApi,
   ],
 );
@@ -67,6 +71,7 @@ class _$NotificationKindMeta {
   NotificationKind get inputNeeded => _$inputNeeded;
   NotificationKind get security => _$security;
   NotificationKind get admin => _$admin;
+  NotificationKind get wakeEnded => _$wakeEnded;
   NotificationKind get unknownDefaultOpenApi => _$unknownDefaultOpenApi;
   NotificationKind valueOf(String name) => _$valueOf(name);
   BuiltSet<NotificationKind> get values => _$values;
@@ -91,6 +96,7 @@ class _$NotificationKindSerializer
     'inputNeeded': 'input_needed',
     'security': 'security',
     'admin': 'admin',
+    'wakeEnded': 'wake_ended',
     'unknownDefaultOpenApi': 'unknown_default_open_api',
   };
   static const Map<Object, String> _fromWire = const <Object, String>{
@@ -102,6 +108,7 @@ class _$NotificationKindSerializer
     'input_needed': 'inputNeeded',
     'security': 'security',
     'admin': 'admin',
+    'wake_ended': 'wakeEnded',
     'unknown_default_open_api': 'unknownDefaultOpenApi',
   };
 

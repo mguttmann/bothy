@@ -9,6 +9,7 @@ from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
     from ..models.run_api_retry import RunApiRetry
+    from ..models.run_autonomy_last import RunAutonomyLast
 
 
 T = TypeVar("T", bound="RunMetrics")
@@ -32,6 +33,8 @@ class RunMetrics:
             nothing visible (for example a long running tool); a patch of it counts as progress against `run.stall_after`
             (09 5.5, 18.4).
         last_api_retry (RunApiRetry | Unset): Last retry of a model API call, shown in the live box while set.
+        autonomy_last (RunAutonomyLast | Unset): The idle flag of the last autonomous input or notification turn (09
+            5.8.6); the server counts each distinct `input` once in the idle count of the run's thread and person.
     """
 
     context_pct: float | Unset = UNSET
@@ -45,6 +48,7 @@ class RunMetrics:
     api_retries: int | Unset = UNSET
     progress_events: int | Unset = UNSET
     last_api_retry: RunApiRetry | Unset = UNSET
+    autonomy_last: RunAutonomyLast | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         context_pct = self.context_pct
@@ -71,6 +75,10 @@ class RunMetrics:
         if not isinstance(self.last_api_retry, Unset):
             last_api_retry = self.last_api_retry.to_dict()
 
+        autonomy_last: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.autonomy_last, Unset):
+            autonomy_last = self.autonomy_last.to_dict()
+
         field_dict: dict[str, Any] = {}
 
         field_dict.update({})
@@ -96,12 +104,15 @@ class RunMetrics:
             field_dict["progress_events"] = progress_events
         if last_api_retry is not UNSET:
             field_dict["last_api_retry"] = last_api_retry
+        if autonomy_last is not UNSET:
+            field_dict["autonomy_last"] = autonomy_last
 
         return field_dict
 
     @classmethod
     def from_dict(cls, src_dict: Mapping[str, Any]) -> Self:
         from ..models.run_api_retry import RunApiRetry
+        from ..models.run_autonomy_last import RunAutonomyLast
 
         d = dict(src_dict)
         context_pct = d.pop("context_pct", UNSET)
@@ -131,6 +142,13 @@ class RunMetrics:
         else:
             last_api_retry = RunApiRetry.from_dict(_last_api_retry)
 
+        _autonomy_last = d.pop("autonomy_last", UNSET)
+        autonomy_last: RunAutonomyLast | Unset
+        if isinstance(_autonomy_last, Unset):
+            autonomy_last = UNSET
+        else:
+            autonomy_last = RunAutonomyLast.from_dict(_autonomy_last)
+
         run_metrics = cls(
             context_pct=context_pct,
             tokens_in=tokens_in,
@@ -143,6 +161,7 @@ class RunMetrics:
             api_retries=api_retries,
             progress_events=progress_events,
             last_api_retry=last_api_retry,
+            autonomy_last=autonomy_last,
         )
 
         return run_metrics

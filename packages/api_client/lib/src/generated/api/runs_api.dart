@@ -18,6 +18,9 @@ import 'package:api_client/src/generated/model/run_history_page.dart';
 import 'package:api_client/src/generated/model/run_step_page.dart';
 import 'package:api_client/src/generated/model/run_summary.dart';
 import 'package:api_client/src/generated/model/run_summary_page.dart';
+import 'package:api_client/src/generated/model/run_wake.dart';
+import 'package:api_client/src/generated/model/run_wake_cancel.dart';
+import 'package:api_client/src/generated/model/run_wake_page.dart';
 
 class RunsApi {
   final Dio _dio;
@@ -130,6 +133,121 @@ class RunsApi {
     }
 
     return Response<RunSummary>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// Cancel a pending wake-up
+  /// Ends a pending wake-up &#x60;cancelled&#x60; (09 5.8.2): the agent of the wake-up (for example with &#x60;bothy-wake --cancel&#x60; or &#x60;usage_cleared&#x60;), the wake-up&#39;s person, or a person with &#x60;manage&#x60; on the channel. The thread gets the note; a cancel sends no notification (09 5.8.4). A wake-up that already ended answers itself without a change. Audited.
+  ///
+  /// Parameters:
+  /// * [wakeId]
+  /// * [runWakeCancel]
+  /// * [idempotencyKey] - UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [RunWake] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<RunWake>> cancelRunWake({
+    required String wakeId,
+    required RunWakeCancel runWakeCancel,
+    String? idempotencyKey,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/wakes/{wake_id}/cancel'.replaceAll(
+      '{'
+      r'wake_id'
+      '}',
+      encodeQueryParameter(
+        _serializers,
+        wakeId,
+        const FullType(String),
+      ).toString(),
+    );
+    final _options = Options(
+      method: r'POST',
+      headers: <String, dynamic>{
+        if (idempotencyKey != null) r'Idempotency-Key': idempotencyKey,
+        ...?headers,
+      },
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'apiKey',
+            'name': 'consoleSession',
+            'keyName': '__Host-console_session',
+            'where': '',
+          },
+          {'type': 'http', 'scheme': 'DPoP', 'name': 'dpopAuth'},
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearerAuth'},
+        ],
+        ...?extra,
+      },
+      contentType: 'application/json',
+      validateStatus: validateStatus,
+    );
+
+    dynamic _bodyData;
+
+    try {
+      const _type = FullType(RunWakeCancel);
+      _bodyData = _serializers.serialize(runWakeCancel, specifiedType: _type);
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _options.compose(_dio.options, _path),
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    final _response = await _dio.request<Object>(
+      _path,
+      data: _bodyData,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    RunWake? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(
+              rawResponse,
+              specifiedType: const FullType(RunWake),
+            ) as RunWake;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<RunWake>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,
@@ -772,6 +890,118 @@ class RunsApi {
     }
 
     return Response<RunSummaryPage>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// List the wake-ups of a thread
+  /// The wake-ups of the thread, newest first (09 5.8.2), for everyone who may read the thread: pending ones with their cancel, and the ended ones with their state and reason. Clients show wake-up controls only when the thread&#39;s agent reports &#x60;wakes&#x60;; pending wake-ups stay visible without it (01 6.21).
+  ///
+  /// Parameters:
+  /// * [threadId]
+  /// * [cursor] - Cursor from `next_cursor` of the previous page.
+  /// * [limit]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [RunWakePage] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<RunWakePage>> listThreadWakes({
+    required String threadId,
+    String? cursor,
+    int? limit,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/threads/{thread_id}/wakes'.replaceAll(
+      '{'
+      r'thread_id'
+      '}',
+      encodeQueryParameter(
+        _serializers,
+        threadId,
+        const FullType(String),
+      ).toString(),
+    );
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'apiKey',
+            'name': 'consoleSession',
+            'keyName': '__Host-console_session',
+            'where': '',
+          },
+          {'type': 'http', 'scheme': 'DPoP', 'name': 'dpopAuth'},
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearerAuth'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _queryParameters = <String, dynamic>{
+      if (cursor != null)
+        r'cursor': encodeQueryParameter(
+          _serializers,
+          cursor,
+          const FullType(String),
+        ),
+      if (limit != null)
+        r'limit': encodeQueryParameter(
+          _serializers,
+          limit,
+          const FullType(int),
+        ),
+    };
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      queryParameters: _queryParameters,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    RunWakePage? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(
+              rawResponse,
+              specifiedType: const FullType(RunWakePage),
+            ) as RunWakePage;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<RunWakePage>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,

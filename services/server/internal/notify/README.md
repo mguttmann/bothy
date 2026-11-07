@@ -37,7 +37,7 @@ Evaluated in this order; the first row that decides wins.
 |---|---|---|---|
 | validate | input invalid (D-M3-17-7) | error, zero `Decision` | |
 | allowed | `Allowed` is false | `none` | `not_allowed` |
-| recipient | `message`, `mention` or `dm` and `Author`; `run_done`, `run_failed` or `input_needed` and not `RunStarter` | `none` | `not_recipient` |
+| recipient | `message`, `mention` or `dm` and `Author`; `run_done`, `run_failed`, `input_needed` or `wake_ended` and not `RunStarter` | `none` | `not_recipient` |
 | level | kind with thread and the effective level does not allow it | `none` | `level` |
 | level | `admin` and not `Switches.AdminEnabled` | `none` | `admin_disabled` |
 | activity | kind with thread and a device is active in the thread | `none` | `active_in_thread` |
@@ -121,7 +121,8 @@ Migration `00059_notify_push_registrations.sql` creates the table exactly as 03 
 | Event | Hint | Candidates |
 |---|---|---|
 | `message.created` | `dm` in a DM channel; else `mention`, and `message` unless the message is an agent message during an active run (13 2.1) | in a DM channel its readers from `authz.Recipients.Readers` (participants and grant holders, no owners); else the mentioned people; the readers of the channel from `authz.Recipients.Readers`; never the author, one hint per person and event, precedence `dm`, `mention`, `message`; nothing for a redacted event, `silent`, `origin` `import` or `system`, and the kinds `run` and `system` |
-| `run.state_changed` | `input_needed` at `waiting_input`, `run_done` at `completed`, `run_failed` at `failed` to the starter; at `completed`, `failed` and `cancelled` one `message` to the other readers (the starter included at `cancelled`), in a DM channel one `dm` instead, all pointing at the last agent message of the run | `runs.triggered_by` and the readers of the channel; a run without agent message gives no `message` hint |
+| `run.state_changed` | `input_needed` at `waiting_input`, `run_done` at `completed`, `run_failed` at `failed` (`wake_ended` instead for the reason `usage_limited`, AR-04) to the starter; at `completed`, `failed` and `cancelled` one `message` to the other readers (the starter included at `cancelled`), in a DM channel one `dm` instead, all pointing at the last agent message of the run | `runs.triggered_by` and the readers of the channel; a run without agent message gives no `message` hint |
+| `run.wake_changed` | `wake_ended` at `refused`, `expired` and `failed` to the wake-up's person, pointing at the note (`note_message_id`); nothing at `pending`, `fired` and `cancelled` (13 section 2, R-PN-12, AR-04) | `triggered_by` of the payload |
 | `access.expiring` | `admin` with the grant or group as target | the audience of the event |
 | `gdpr.request_due` (M7-06, R-AZ-35) | `admin` with the privacy request (`request_id`) as target, no thread and no text | the audience of the event (the owner the privacy module reminds) |
 | `device.pending` | `security` with the device as target | the audience of the event, routed only to its other active devices |

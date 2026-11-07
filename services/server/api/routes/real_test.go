@@ -1670,6 +1670,16 @@ func TestRealTable_Enabled(t *testing.T) {
 		"applyImportBatch":   {"POST /api/v1/imports/{import_id}/batches", "import.apply", "rl.import"},
 		"setImportCursor":    {"PUT /api/v1/imports/{import_id}/cursor", "import.apply", "rl.import"},
 		"setChannelReadOnly": {"PUT /api/v1/channels/{channel_id}/read-only", "channel.read_only.set", "rl.admin"},
+		// The wake-ups of stage AR (AR-04, docs/spec/09-agents.md 5.8.2) and the channel switch.
+		"createRunWake":            {"POST /api/v1/runs/{run_id}/wakes", "run.wake.create", "rl.agent_runtime"},
+		"recoverRunWake":           {"POST /api/v1/runs/{run_id}/wakes/recover", "run.wake.recover", "rl.agent_runtime"},
+		"checkRunLaunch":           {"POST /api/v1/runs/{run_id}/launch-check", "run.launch.check", "rl.agent_runtime"},
+		"listPendingRunWakes":      {"GET /api/v1/agents/me/wakes", "run.wake.list_pending", "rl.agent_runtime"},
+		"checkRunWake":             {"POST /api/v1/wakes/{wake_id}/check", "run.wake.check", "rl.agent_runtime"},
+		"fireRunWake":              {"POST /api/v1/wakes/{wake_id}/fire", "run.wake.fire", "rl.agent_runtime"},
+		"cancelRunWake":            {"POST /api/v1/wakes/{wake_id}/cancel", "run.wake.cancel", "rl.write"},
+		"listThreadWakes":          {"GET /api/v1/threads/{thread_id}/wakes", "run.wake.read", "rl.read"},
+		"setChannelAutonomousRuns": {"PUT /api/v1/channels/{channel_id}/autonomous-runs", "channel.autonomous_runs.set", "rl.write"},
 		// M2-12
 		"listAgentSessions":  {"GET /api/v1/threads/{thread_id}/agent-sessions", "agent_session.read", "rl.read"},
 		"resetAgentSession":  {"POST /api/v1/threads/{thread_id}/agent-sessions/reset", "agent_session.reset", "rl.trigger"},

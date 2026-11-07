@@ -28,6 +28,8 @@ class _$Channel extends Channel {
   @override
   final bool readOnly;
   @override
+  final bool? allowAutonomousRuns;
+  @override
   final bool projectBound;
   @override
   final String? mainThreadId;
@@ -58,6 +60,7 @@ class _$Channel extends Channel {
     this.forumDefaultSort,
     this.defaultNotificationLevel,
     required this.readOnly,
+    this.allowAutonomousRuns,
     required this.projectBound,
     this.mainThreadId,
     this.dmParticipantIds,
@@ -88,6 +91,7 @@ class _$Channel extends Channel {
         forumDefaultSort == other.forumDefaultSort &&
         defaultNotificationLevel == other.defaultNotificationLevel &&
         readOnly == other.readOnly &&
+        allowAutonomousRuns == other.allowAutonomousRuns &&
         projectBound == other.projectBound &&
         mainThreadId == other.mainThreadId &&
         dmParticipantIds == other.dmParticipantIds &&
@@ -111,6 +115,7 @@ class _$Channel extends Channel {
     _$hash = $jc(_$hash, forumDefaultSort.hashCode);
     _$hash = $jc(_$hash, defaultNotificationLevel.hashCode);
     _$hash = $jc(_$hash, readOnly.hashCode);
+    _$hash = $jc(_$hash, allowAutonomousRuns.hashCode);
     _$hash = $jc(_$hash, projectBound.hashCode);
     _$hash = $jc(_$hash, mainThreadId.hashCode);
     _$hash = $jc(_$hash, dmParticipantIds.hashCode);
@@ -136,6 +141,7 @@ class _$Channel extends Channel {
           ..add('forumDefaultSort', forumDefaultSort)
           ..add('defaultNotificationLevel', defaultNotificationLevel)
           ..add('readOnly', readOnly)
+          ..add('allowAutonomousRuns', allowAutonomousRuns)
           ..add('projectBound', projectBound)
           ..add('mainThreadId', mainThreadId)
           ..add('dmParticipantIds', dmParticipantIds)
@@ -196,6 +202,11 @@ class ChannelBuilder implements Builder<Channel, ChannelBuilder> {
   bool? get readOnly => _$this._readOnly;
   set readOnly(bool? readOnly) => _$this._readOnly = readOnly;
 
+  bool? _allowAutonomousRuns;
+  bool? get allowAutonomousRuns => _$this._allowAutonomousRuns;
+  set allowAutonomousRuns(bool? allowAutonomousRuns) =>
+      _$this._allowAutonomousRuns = allowAutonomousRuns;
+
   bool? _projectBound;
   bool? get projectBound => _$this._projectBound;
   set projectBound(bool? projectBound) => _$this._projectBound = projectBound;
@@ -248,6 +259,7 @@ class ChannelBuilder implements Builder<Channel, ChannelBuilder> {
       _forumDefaultSort = $v.forumDefaultSort;
       _defaultNotificationLevel = $v.defaultNotificationLevel;
       _readOnly = $v.readOnly;
+      _allowAutonomousRuns = $v.allowAutonomousRuns;
       _projectBound = $v.projectBound;
       _mainThreadId = $v.mainThreadId;
       _dmParticipantIds = $v.dmParticipantIds?.toBuilder();
@@ -310,6 +322,7 @@ class ChannelBuilder implements Builder<Channel, ChannelBuilder> {
               r'Channel',
               'readOnly',
             ),
+            allowAutonomousRuns: allowAutonomousRuns,
             projectBound: BuiltValueNullFieldError.checkNotNull(
               projectBound,
               r'Channel',

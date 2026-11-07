@@ -13,6 +13,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
+	"github.com/OWNER/bothy/services/server/internal/kernel/idempotency"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	"github.com/OWNER/bothy/services/server/internal/runs"
@@ -150,15 +151,18 @@ func (w *Wakes) Create(ctx context.Context, in runs.CreateWake) (runs.WakeResult
 		res, err = w.createTx(ctx, b, a, in, req)
 		return err
 	})
-	return res.answer(err)
+	return res.answer(ctx, err)
 }
 
-// answer turns the result of a unit of work into the answer of an operation.
-func (r wakeResult) answer(err error) (runs.WakeResult, error) {
+// answer turns the result of a unit of work into the answer of an operation. A refusal whose unit
+// committed (its audit entry, a wake-up stored refused with its note) keeps that effect also under
+// an Idempotency-Key (02 8.4, idempotency.KeepEffectOnFinal).
+func (r wakeResult) answer(ctx context.Context, err error) (runs.WakeResult, error) {
 	if err != nil {
 		return runs.WakeResult{}, err
 	}
 	if r.committed != nil {
+		idempotency.KeepEffectOnFinal(ctx)
 		return runs.WakeResult{}, r.committed
 	}
 	return runs.WakeResult{Wake: wakeView(r.wake), Created: r.created}, nil
@@ -167,16 +171,9 @@ func (r wakeResult) answer(err error) (runs.WakeResult, error) {
 // createTx is Create inside its unit of work.
 func (w *Wakes) createTx(ctx context.Context, b *wakeBox, a actor.Actor, in runs.CreateWake, req domain.WakeRequest) (wakeResult, error) {
 	s := w.s
-	run, found, err := s.d.Repo.LockRun(ctx, in.RunID)
+	run, err := s.lockOwnRun(ctx, a, authorize.ActionRunWakeCreate, in.RunID)
 	if err != nil {
 		return wakeResult{}, err
-	}
-	d, err := s.authorizeAgent(ctx, a, authorize.ActionRunWakeCreate, run, found, in.RunID, nil)
-	if err != nil {
-		return wakeResult{}, err
-	}
-	if !d.Allowed() {
-		return wakeResult{}, d.Err()
 	}
 	now := s.now()
 	if req.Reason == domain.WakeReasonUsageLimit {
@@ -202,33 +199,66 @@ func (w *Wakes) createTx(ctx context.Context, b *wakeBox, a actor.Actor, in runs
 		return wakeResult{}, err
 	}
 	if refusal != "" {
-		if err := s.auditWake(ctx, a, authorize.ActionRunWakeCreate, refusal, run.ID, nw.ID, req.Kind, req.Reason, ""); err != nil {
-			return wakeResult{}, err
-		}
-		if !in.Deferred && refusal != domain.WakeCodeUsageWakeMax {
-			return wakeResult{committed: conflict(refusal)}, nil
-		}
-		if _, err := w.storeRefused(ctx, b, nw, refusal); err != nil {
-			return wakeResult{}, err
-		}
-		return wakeResult{committed: conflict(refusal)}, nil
+		// A deferred request and usage_wake_max are stored refused, so the person sees them (09
+		// 5.8.2, 18.19.10); every other refusal stores nothing.
+		return w.refuse(ctx, b, a, authorize.ActionRunWakeCreate, nw, refusal, in.Deferred || refusal == domain.WakeCodeUsageWakeMax)
 	}
+	return w.insertPending(ctx, b, a, authorize.ActionRunWakeCreate, nw, func(ctx context.Context) (WakeRow, bool, error) {
+		return b.d.Repo.WakeByOutage(ctx, run.ID, req.Outage)
+	})
+}
+
+// lockOwnRun locks the run id and authorizes act for the agent a on it (agent-self of the run's
+// agent). Errors: 404 for an unknown or another agent's run, the denial of authorize.
+func (s *Service) lockOwnRun(ctx context.Context, a actor.Actor, act authorize.Action, id ids.ID) (RunRow, error) {
+	run, found, err := s.d.Repo.LockRun(ctx, id)
+	if err != nil {
+		return RunRow{}, err
+	}
+	d, err := s.authorizeAgent(ctx, a, act, run, found, id, nil)
+	if err != nil {
+		return RunRow{}, err
+	}
+	if !d.Allowed() {
+		return RunRow{}, d.Err()
+	}
+	return run, nil
+}
+
+// refuse audits a refused create or recover and answers 409 with the reason after the commit;
+// with store the wake-up is stored in state refused with its note and run.wake_changed.
+func (w *Wakes) refuse(ctx context.Context, b *wakeBox, a actor.Actor, act authorize.Action, nw NewWake, refusal string, store bool) (wakeResult, error) {
+	if err := w.s.auditWake(ctx, a, act, refusal, nw.SourceRunID, nw.ID, nw.Kind, nw.Reason, ""); err != nil {
+		return wakeResult{}, err
+	}
+	if store {
+		if err := w.storeRefused(ctx, b, nw, refusal); err != nil {
+			return wakeResult{}, err
+		}
+	}
+	return wakeResult{committed: conflict(refusal)}, nil
+}
+
+// insertPending stores the pending wake-up nw with its jobs, run.wake_changed and the audit entry
+// of act; when its idempotency key exists (a concurrent request of the same outage or recovery)
+// existing reads and answers that wake-up.
+func (w *Wakes) insertPending(ctx context.Context, b *wakeBox, a actor.Actor, act authorize.Action, nw NewWake,
+	existing func(context.Context) (WakeRow, bool, error)) (wakeResult, error) {
 	stored, inserted, err := b.d.Repo.InsertWake(ctx, nw)
 	if err != nil {
 		return wakeResult{}, err
 	}
 	if !inserted {
-		// The same outage was stored by a concurrent request after the read above.
-		ex, found, err := b.d.Repo.WakeByOutage(ctx, run.ID, req.Outage)
+		ex, found, err := existing(ctx)
 		if err != nil || !found {
-			return wakeResult{}, errs.New(errs.CodeConflict, "runs: the wake-up of this outage changed concurrently")
+			return wakeResult{}, errors.Join(err, errs.New(errs.CodeConflict, "runs: the wake-up of this key changed concurrently"))
 		}
 		return wakeResult{wake: ex}, nil
 	}
 	if err := w.afterInsert(ctx, b, stored); err != nil {
 		return wakeResult{}, err
 	}
-	if err := s.auditWake(ctx, a, authorize.ActionRunWakeCreate, "", run.ID, stored.ID, stored.Kind, stored.Reason, ""); err != nil {
+	if err := w.s.auditWake(ctx, a, act, "", nw.SourceRunID, stored.ID, stored.Kind, stored.Reason, ""); err != nil {
 		return wakeResult{}, err
 	}
 	return wakeResult{wake: stored, created: true}, nil
@@ -325,22 +355,9 @@ func (w *Wakes) capRefusal(ctx context.Context, b *wakeBox, threadID, runID ids.
 // an owner or the channel switch; pr_checks needs an owner; command needs an agent of tool class
 // host where hostNeeded (at create and before every execution, not at the fire).
 func (s *Service) kindRefusal(ctx context.Context, b *wakeBox, agentID, threadID, person ids.ID, kind domain.WakeKind, hostNeeded bool) (string, error) {
-	owner, err := b.d.Owners.IsActiveOwner(ctx, person)
-	if err != nil {
-		return "", err
-	}
-	if !owner {
-		info, err := s.d.Threads.Info(ctx, threadID)
-		if err != nil {
-			return "", err
-		}
-		ch, err := s.d.Channels.TriggerChannel(ctx, info.ChannelID)
-		if err != nil {
-			return "", err
-		}
-		if !ch.AllowAutonomousRuns {
-			return domain.WakeCodeAutonomousNotAllowed, nil
-		}
+	owner, refusal, err := s.autonomyRule(ctx, b, threadID, person)
+	if err != nil || refusal != "" {
+		return refusal, err
 	}
 	switch kind {
 	case domain.WakePRChecks:
@@ -348,17 +365,42 @@ func (s *Service) kindRefusal(ctx context.Context, b *wakeBox, agentID, threadID
 			return domain.WakeCodePRChecksOwnerOnly, nil
 		}
 	case domain.WakeCommand:
-		if !hostNeeded {
-			return "", nil
-		}
-		facts, err := s.d.Agents.RunFacts(ctx, []ids.ID{agentID})
-		if err != nil {
-			return "", err
-		}
-		if facts[agentID].ToolClass != toolClassHost {
-			return domain.WakeCodeToolClassMismatch, nil
+		if hostNeeded {
+			return s.hostRefusal(ctx, agentID)
 		}
 	case domain.WakeAt:
+	}
+	return "", nil
+}
+
+// autonomyRule reports whether person is an active owner and refuses an autonomous input of a
+// person who is no owner in a channel without allow_autonomous_runs (07 2.14 item 1).
+func (s *Service) autonomyRule(ctx context.Context, b *wakeBox, threadID, person ids.ID) (owner bool, refusal string, err error) {
+	if owner, err = b.d.Owners.IsActiveOwner(ctx, person); err != nil || owner {
+		return owner, "", err
+	}
+	info, err := s.d.Threads.Info(ctx, threadID)
+	if err != nil {
+		return false, "", err
+	}
+	ch, err := s.d.Channels.TriggerChannel(ctx, info.ChannelID)
+	if err != nil {
+		return false, "", err
+	}
+	if !ch.AllowAutonomousRuns {
+		return false, domain.WakeCodeAutonomousNotAllowed, nil
+	}
+	return false, "", nil
+}
+
+// hostRefusal refuses a command wake-up of an agent whose configured tool class is not host.
+func (s *Service) hostRefusal(ctx context.Context, agentID ids.ID) (string, error) {
+	facts, err := s.d.Agents.RunFacts(ctx, []ids.ID{agentID})
+	if err != nil {
+		return "", err
+	}
+	if facts[agentID].ToolClass != toolClassHost {
+		return domain.WakeCodeToolClassMismatch, nil
 	}
 	return "", nil
 }
@@ -401,19 +443,16 @@ func (s *Service) wakeInvokeDenial(ctx context.Context, agentID, threadID, perso
 // storeRefused stores a wake-up directly in state refused with its reason (a deferred request,
 // usage_wake_max, a refused recovery; 09 5.8.2), with the note and run.wake_changed, so the person
 // sees it and is notified (5.8.4).
-func (w *Wakes) storeRefused(ctx context.Context, b *wakeBox, nw NewWake, reason string) (WakeRow, error) {
+func (w *Wakes) storeRefused(ctx context.Context, b *wakeBox, nw NewWake, reason string) error {
 	nw.State, nw.StateReason = domain.WakeRefused, reason
 	if nw.NotBefore.After(nw.Deadline) {
 		nw.Deadline = nw.NotBefore
 	}
 	row, inserted, err := b.d.Repo.InsertWake(ctx, nw)
-	if err != nil {
-		return WakeRow{}, err
+	if err != nil || !inserted {
+		return err
 	}
-	if !inserted {
-		return row, nil
-	}
-	return row, w.s.afterEnd(ctx, b, row)
+	return w.s.afterEnd(ctx, b, row)
 }
 
 // endWake ends the locked wake-up r in state with reason: the compare-and-swap, the note of 5.8.4
@@ -434,8 +473,13 @@ func (s *Service) endWake(ctx context.Context, b *wakeBox, r WakeRow, state doma
 // end after the commit.
 func (s *Service) afterEnd(ctx context.Context, b *wakeBox, row WakeRow) error {
 	var note noteRef
-	if row.State != domain.WakeFired {
-		var err error
+	info, err := s.d.Threads.Info(ctx, row.ThreadID)
+	if err != nil {
+		return err
+	}
+	// A deleted thread takes no new message (D-DEL-3); its wake-ups end without a note, which
+	// nobody could read.
+	if row.State != domain.WakeFired && !info.Deleted {
 		if note.id, note.seq, err = b.d.Notes.AppendSystemNote(ctx, row.ThreadID, row.AgentID, domain.WakeNoteText(row.Label, row.State, row.StateReason)); err != nil {
 			return err
 		}
@@ -534,27 +578,23 @@ func (w *Wakes) Recover(ctx context.Context, in runs.RecoverWake) (runs.WakeResu
 		res, err = w.recoverTx(ctx, b, a, in, reason)
 		return err
 	})
-	return res.answer(err)
+	return res.answer(ctx, err)
 }
 
 // recoverTx is Recover inside its unit of work.
 func (w *Wakes) recoverTx(ctx context.Context, b *wakeBox, a actor.Actor, in runs.RecoverWake, reason domain.WakeReason) (wakeResult, error) {
 	s := w.s
-	run, found, err := s.d.Repo.LockRun(ctx, in.RunID)
+	run, err := s.lockOwnRun(ctx, a, authorize.ActionRunWakeRecover, in.RunID)
 	if err != nil {
 		return wakeResult{}, err
-	}
-	d, err := s.authorizeAgent(ctx, a, authorize.ActionRunWakeRecover, run, found, in.RunID, nil)
-	if err != nil {
-		return wakeResult{}, err
-	}
-	if !d.Allowed() {
-		return wakeResult{}, d.Err()
 	}
 	if run.State != domain.StateFailed {
 		return wakeResult{}, conflict(domain.WakeCodeRunNotEnded)
 	}
-	if ex, found, err := b.d.Repo.WakeBySourceReason(ctx, run.ID, reason); err != nil || found {
+	existing := func(ctx context.Context) (WakeRow, bool, error) {
+		return b.d.Repo.WakeBySourceReason(ctx, run.ID, reason)
+	}
+	if ex, found, err := existing(ctx); err != nil || found {
 		return wakeResult{wake: ex}, err
 	}
 	now := s.now()
@@ -572,29 +612,10 @@ func (w *Wakes) recoverTx(ctx context.Context, b *wakeBox, a actor.Actor, in run
 		return wakeResult{}, err
 	}
 	if refusal != "" {
-		if err := s.auditWake(ctx, a, authorize.ActionRunWakeRecover, refusal, run.ID, nw.ID, nw.Kind, reason, ""); err != nil {
-			return wakeResult{}, err
-		}
-		if _, err := w.storeRefused(ctx, b, nw, refusal); err != nil {
-			return wakeResult{}, err
-		}
-		return wakeResult{committed: conflict(refusal)}, nil
+		// Without permission the thread gets the visible note instead (18.19.9).
+		return w.refuse(ctx, b, a, authorize.ActionRunWakeRecover, nw, refusal, true)
 	}
-	stored, inserted, err := b.d.Repo.InsertWake(ctx, nw)
-	if err != nil {
-		return wakeResult{}, err
-	}
-	if !inserted {
-		ex, _, err := b.d.Repo.WakeBySourceReason(ctx, run.ID, reason)
-		return wakeResult{wake: ex}, err
-	}
-	if err := w.afterInsert(ctx, b, stored); err != nil {
-		return wakeResult{}, err
-	}
-	if err := s.auditWake(ctx, a, authorize.ActionRunWakeRecover, "", run.ID, stored.ID, stored.Kind, reason, ""); err != nil {
-		return wakeResult{}, err
-	}
-	return wakeResult{wake: stored, created: true}, nil
+	return w.insertPending(ctx, b, a, authorize.ActionRunWakeRecover, nw, existing)
 }
 
 // recoverRefusal applies the autonomy rule, agent.invoke of the person (with the thread's active
@@ -685,40 +706,52 @@ func (w *Wakes) Check(ctx context.Context, wakeID ids.ID) (runs.WakeCheck, error
 	a := caller(ctx)
 	var res wakeResult
 	err = s.d.UoW.Do(ctx, func(ctx context.Context) error {
-		r, err := s.lockWake(ctx, b, a, authorize.ActionRunWakeCheck, wakeID)
-		if err != nil {
-			return err
-		}
-		if r.State != domain.WakePending {
-			return conflict(domain.WakeCodeNotPending)
-		}
-		if s.now().Before(r.NotBefore) {
-			return conflict(domain.WakeCodeNotDue)
-		}
-		reason, err := s.checkRefusal(ctx, b, r)
-		if err != nil {
-			return err
-		}
-		if reason != "" {
-			if err := s.auditWake(ctx, a, authorize.ActionRunWakeCheck, reason, r.SourceRunID, r.ID, r.Kind, r.Reason, reason); err != nil {
-				return err
-			}
-			if _, err := s.endWake(ctx, b, r, domain.WakeRefused, reason, WakeWrite{}); err != nil {
-				return err
-			}
-			res.committed = conflict(reason)
-			return nil
-		}
-		res.check, err = s.configured(ctx, r.AgentID)
+		var err error
+		res, err = w.checkTx(ctx, b, a, wakeID)
 		return err
 	})
+	return res.checkAnswer(err)
+}
+
+// checkAnswer turns the result of a unit of work into the answer of a check.
+func (r wakeResult) checkAnswer(err error) (runs.WakeCheck, error) {
 	if err != nil {
 		return runs.WakeCheck{}, err
 	}
-	if res.committed != nil {
-		return runs.WakeCheck{}, res.committed
+	if r.committed != nil {
+		return runs.WakeCheck{}, r.committed
 	}
-	return res.check, nil
+	return r.check, nil
+}
+
+// checkTx is Check inside its unit of work.
+func (w *Wakes) checkTx(ctx context.Context, b *wakeBox, a actor.Actor, wakeID ids.ID) (wakeResult, error) {
+	s := w.s
+	r, err := s.lockWake(ctx, b, a, authorize.ActionRunWakeCheck, wakeID)
+	if err != nil {
+		return wakeResult{}, err
+	}
+	switch {
+	case r.State != domain.WakePending:
+		return wakeResult{}, conflict(domain.WakeCodeNotPending)
+	case s.now().Before(r.NotBefore):
+		return wakeResult{}, conflict(domain.WakeCodeNotDue)
+	}
+	reason, err := s.checkRefusal(ctx, b, r)
+	if err != nil {
+		return wakeResult{}, err
+	}
+	if reason == "" {
+		check, err := s.configured(ctx, r.AgentID)
+		return wakeResult{check: check}, err
+	}
+	if err := s.auditWake(ctx, a, authorize.ActionRunWakeCheck, reason, r.SourceRunID, r.ID, r.Kind, r.Reason, reason); err != nil {
+		return wakeResult{}, err
+	}
+	if _, err := s.endWake(ctx, b, r, domain.WakeRefused, reason, WakeWrite{}); err != nil {
+		return wakeResult{}, err
+	}
+	return wakeResult{committed: conflict(reason)}, nil
 }
 
 // configured returns the configured tool class and billing mode of the agent (compare_actual).
@@ -784,9 +817,15 @@ func (w *Wakes) Fire(ctx context.Context, in runs.FireWake) (runs.Wake, error) {
 	return wakeView(res.wake), nil
 }
 
-// fireTx is Fire inside its unit of work.
+// fireTx is Fire inside its unit of work. The thread's active run is locked before the wake-up
+// (lock order of 03 6.3: runs before run_wakes), so a fire never waits on a delivery that holds
+// the run and waits on the wake-up.
 func (w *Wakes) fireTx(ctx context.Context, b *wakeBox, a actor.Actor, in runs.FireWake, outcome domain.FireOutcome) (wakeResult, error) {
 	s := w.s
+	active, err := s.lockThreadRunOfWake(ctx, b, in.WakeID)
+	if err != nil {
+		return wakeResult{}, err
+	}
 	r, err := s.lockWake(ctx, b, a, authorize.ActionRunWakeFire, in.WakeID)
 	if err != nil {
 		return wakeResult{}, err
@@ -825,8 +864,26 @@ func (w *Wakes) fireTx(ctx context.Context, b *wakeBox, a actor.Actor, in runs.F
 	if err := s.auditWake(ctx, a, authorize.ActionRunWakeFire, "", r.SourceRunID, r.ID, r.Kind, r.Reason, ""); err != nil {
 		return wakeResult{}, err
 	}
-	row, err = s.fireLocked(ctx, b, row)
+	row, err = s.fireLocked(ctx, b, row, active)
 	return wakeResult{wake: row}, err
+}
+
+// threadRun is the active run of a wake-up's thread, locked before the wake-up; found is false
+// for a thread without one.
+type threadRun struct {
+	row   RunRow
+	found bool
+}
+
+// lockThreadRunOfWake reads the wake-up id without a lock and locks the active run of its
+// thread; an unknown wake-up gives no run (the locked read that follows answers it).
+func (s *Service) lockThreadRunOfWake(ctx context.Context, b *wakeBox, id ids.ID) (threadRun, error) {
+	r, found, err := b.d.Repo.Wake(ctx, id)
+	if err != nil || !found {
+		return threadRun{}, err
+	}
+	row, found, err := s.d.Repo.LockActiveRunOfThread(ctx, r.ThreadID)
+	return threadRun{row: row, found: found}, err
 }
 
 // returnSkipped puts a wake-up that fired as a wake input into runID back to pending with
@@ -866,22 +923,19 @@ func (s *Service) reopenWake(ctx context.Context, b *wakeBox, r WakeRow, reason 
 // the wake-up was not returned by a skipped input, and stays pending otherwise (the end of that run
 // schedules runs.wake_due); without one it starts a wake run. Both paths run the checks of a new
 // run and the caps first.
-func (s *Service) fireLocked(ctx context.Context, b *wakeBox, r WakeRow) (WakeRow, error) {
+func (s *Service) fireLocked(ctx context.Context, b *wakeBox, r WakeRow, active threadRun) (WakeRow, error) {
 	if !s.now().Before(r.Deadline) {
 		return s.endWake(ctx, b, r, domain.WakeExpired, domain.WakeCodeDeadline, WakeWrite{})
 	}
-	active, found, err := s.d.Repo.LockActiveRunOfThread(ctx, r.ThreadID)
-	if err != nil {
-		return WakeRow{}, err
-	}
-	if !found {
+	if !active.found {
 		return s.fireRun(ctx, b, r)
 	}
-	if active.State != domain.StateRunning || active.TriggeredBy != r.TriggeredBy || active.AgentID != r.AgentID ||
+	run := active.row
+	if run.State != domain.StateRunning || run.TriggeredBy != r.TriggeredBy || run.AgentID != r.AgentID ||
 		r.StateReason == domain.WakeCodeInputSkipped {
 		return r, nil
 	}
-	return s.fireInput(ctx, b, r, active)
+	return s.fireInput(ctx, b, r, run)
 }
 
 // fireRefusal applies the checks of a fire (09 5.8.3, 5.8.6): the autonomy rule and pr_checks for
@@ -1008,48 +1062,67 @@ func (w *Wakes) Cancel(ctx context.Context, in runs.CancelWake) (runs.Wake, erro
 	a := caller(ctx)
 	var out WakeRow
 	err = s.d.UoW.Do(ctx, func(ctx context.Context) error {
-		r, found, err := b.d.Repo.LockWake(ctx, in.WakeID)
-		if err != nil {
-			return err
-		}
-		res := authorize.Resource{Kind: authorize.ResourceThread, ID: in.WakeID}
-		if found {
-			owner := r.TriggeredBy
-			if a.Kind == actor.KindAgent {
-				owner = r.AgentID
-			}
-			res = authorize.Resource{Kind: authorize.ResourceThread, ID: r.ThreadID, OwnerID: owner}
-		}
-		d, err := s.d.Authorizer.Authorize(ctx, a, authorize.ActionRunWakeCancel, res)
-		if err != nil {
-			return err
-		}
-		if d.Outcome == authorize.OutcomeNotFound || (d.Allowed() && !found) {
-			return invisible()
-		}
-		if !d.Allowed() {
-			return d.Err()
-		}
-		if r.State != domain.WakePending {
-			out = r
-			return nil
-		}
-		reason := in.Reason
-		switch {
-		case a.Kind == actor.KindAgent && reason == "":
-			reason = domain.WakeCodeCancelledByAgent
-		case a.Kind != actor.KindAgent:
-			reason = domain.WakeCodeCancelledByPerson
-		}
-		if out, err = s.endWake(ctx, b, r, domain.WakeCancelled, reason, WakeWrite{}); err != nil {
-			return err
-		}
-		return s.auditWake(ctx, a, authorize.ActionRunWakeCancel, "", r.SourceRunID, r.ID, r.Kind, r.Reason, "")
+		var err error
+		out, err = w.cancelTx(ctx, b, a, in)
+		return err
 	})
 	if err != nil {
 		return runs.Wake{}, err
 	}
 	return wakeView(out), nil
+}
+
+// cancelTx is Cancel inside its unit of work.
+func (w *Wakes) cancelTx(ctx context.Context, b *wakeBox, a actor.Actor, in runs.CancelWake) (WakeRow, error) {
+	s := w.s
+	r, found, err := b.d.Repo.LockWake(ctx, in.WakeID)
+	if err != nil {
+		return WakeRow{}, err
+	}
+	d, err := s.d.Authorizer.Authorize(ctx, a, authorize.ActionRunWakeCancel, cancelResource(a, r, found, in.WakeID))
+	if err != nil {
+		return WakeRow{}, err
+	}
+	if d.Outcome == authorize.OutcomeNotFound || (d.Allowed() && !found) {
+		return WakeRow{}, invisible()
+	}
+	if !d.Allowed() {
+		return WakeRow{}, d.Err()
+	}
+	if r.State != domain.WakePending {
+		return r, nil
+	}
+	out, err := s.endWake(ctx, b, r, domain.WakeCancelled, cancelReason(a, in.Reason), WakeWrite{})
+	if err != nil {
+		return WakeRow{}, err
+	}
+	return out, s.auditWake(ctx, a, authorize.ActionRunWakeCancel, "", r.SourceRunID, r.ID, r.Kind, r.Reason, "")
+}
+
+// cancelResource is the resource of run.wake.cancel: the thread of the wake-up with its agent as
+// owner for an agent caller and its person for a person, so AgentSelf and Self each name their
+// subject; an unknown wake-up a path that cannot resolve.
+func cancelResource(a actor.Actor, r WakeRow, found bool, id ids.ID) authorize.Resource {
+	if !found {
+		return authorize.Resource{Kind: authorize.ResourceThread, ID: id}
+	}
+	owner := r.TriggeredBy
+	if a.Kind == actor.KindAgent {
+		owner = r.AgentID
+	}
+	return authorize.Resource{Kind: authorize.ResourceThread, ID: r.ThreadID, OwnerID: owner}
+}
+
+// cancelReason is the stored reason of a cancel: the agent's code (cancelled_by_agent without one),
+// cancelled_by_person for a person.
+func cancelReason(a actor.Actor, reason string) string {
+	if a.Kind != actor.KindAgent {
+		return domain.WakeCodeCancelledByPerson
+	}
+	if reason == "" {
+		return domain.WakeCodeCancelledByAgent
+	}
+	return reason
 }
 
 // wakeKey is the cursor key of listThreadWakes.
@@ -1068,46 +1141,63 @@ func (w *Wakes) ListByThread(ctx context.Context, q runs.ThreadWakesQuery) (runs
 		return runs.WakePage{}, err
 	}
 	a := caller(ctx)
-	sc, err := s.d.Authorizer.Scope(ctx, a, authorize.ActionRunWakeRead)
+	threadID, err := s.visibleThread(ctx, a, authorize.ActionRunWakeRead, q.ThreadID)
 	if err != nil {
 		return runs.WakePage{}, err
 	}
-	info, err := s.d.Threads.Info(ctx, q.ThreadID)
+	binding := []byte(a.ID.String() + "|" + threadID.String())
+	after, err := s.wakeCursor(binding, q.Cursor)
 	if err != nil {
-		if errs.KindOf(err) == errs.KindNotFound {
-			return runs.WakePage{}, invisible()
-		}
 		return runs.WakePage{}, err
-	}
-	if _, ok := slices.BinarySearchFunc(sc.ChannelIDs, info.ChannelID, compareIDs); !ok || info.Deleted {
-		return runs.WakePage{}, invisible()
-	}
-	binding := []byte(a.ID.String() + "|" + info.ID.String())
-	var after *WakeKey
-	if q.Cursor != "" {
-		var k wakeKey
-		if err := s.d.Cursors.Decode(listThreadWakes, binding, q.Cursor, &k); err != nil {
-			return runs.WakePage{}, err
-		}
-		after = &WakeKey{CreatedAt: k.CreatedAt, ID: k.ID}
 	}
 	limit := s.pageSize(q.Limit)
-	rows, err := b.d.Repo.ThreadWakes(ctx, info.ID, after, limit+1)
+	rows, err := b.d.Repo.ThreadWakes(ctx, threadID, after, limit+1)
 	if err != nil {
 		return runs.WakePage{}, err
 	}
 	out := runs.WakePage{Items: make([]runs.Wake, 0, min(len(rows), limit))}
-	for i, r := range rows {
-		if i == limit {
-			last := rows[limit-1]
-			if out.NextCursor, err = s.d.Cursors.Encode(listThreadWakes, binding, wakeKey{CreatedAt: last.CreatedAt, ID: last.ID}); err != nil {
-				return runs.WakePage{}, errs.Wrap(errs.CodeInternalError, err, "runs: wake-up list cursor")
-			}
-			break
-		}
+	for _, r := range rows[:min(len(rows), limit)] {
 		out.Items = append(out.Items, wakeView(r))
 	}
+	if len(rows) > limit {
+		last := rows[limit-1]
+		if out.NextCursor, err = s.d.Cursors.Encode(listThreadWakes, binding, wakeKey{CreatedAt: last.CreatedAt, ID: last.ID}); err != nil {
+			return runs.WakePage{}, errs.Wrap(errs.CodeInternalError, err, "runs: wake-up list cursor")
+		}
+	}
 	return out, nil
+}
+
+// visibleThread returns the thread id when its channel is in the Scope of act for a and it is not
+// deleted; an unknown, invisible or deleted thread is the same not_found.
+func (s *Service) visibleThread(ctx context.Context, a actor.Actor, act authorize.Action, id ids.ID) (ids.ID, error) {
+	sc, err := s.d.Authorizer.Scope(ctx, a, act)
+	if err != nil {
+		return ids.ID{}, err
+	}
+	info, err := s.d.Threads.Info(ctx, id)
+	if errs.KindOf(err) == errs.KindNotFound {
+		return ids.ID{}, invisible()
+	}
+	if err != nil {
+		return ids.ID{}, err
+	}
+	if _, ok := slices.BinarySearchFunc(sc.ChannelIDs, info.ChannelID, compareIDs); !ok || info.Deleted {
+		return ids.ID{}, invisible()
+	}
+	return info.ID, nil
+}
+
+// wakeCursor decodes the cursor of listThreadWakes; nil for the first page.
+func (s *Service) wakeCursor(binding []byte, cursor string) (*WakeKey, error) {
+	if cursor == "" {
+		return nil, nil
+	}
+	var k wakeKey
+	if err := s.d.Cursors.Decode(listThreadWakes, binding, cursor, &k); err != nil {
+		return nil, err
+	}
+	return &WakeKey{CreatedAt: k.CreatedAt, ID: k.ID}, nil
 }
 
 // LaunchCheck implements runs.Wakes (checkRunLaunch, run.launch.check; 09 18.19.6, R-AG-48):
@@ -1119,43 +1209,44 @@ func (w *Wakes) LaunchCheck(ctx context.Context, runID ids.ID) (runs.WakeCheck, 
 	a := caller(ctx)
 	var res wakeResult
 	err := s.d.UoW.Do(ctx, func(ctx context.Context) error {
-		run, found, err := s.d.Repo.Run(ctx, runID)
-		if err != nil {
-			return err
-		}
-		d, err := s.authorizeAgent(ctx, a, authorize.ActionRunLaunchCheck, run, found, runID, nil)
-		if err != nil {
-			return err
-		}
-		if !d.Allowed() {
-			return d.Err()
-		}
-		reason := ""
-		if run.State != domain.StateRunning {
-			reason = domain.WakeCodeRunNotRunning
-		} else if reason, err = s.wakeInvokeDenial(ctx, run.AgentID, run.ThreadID, run.TriggeredBy, run.AgentID); err != nil {
-			return err
-		}
-		if reason != "" {
-			if s.d.Audit == nil {
-				return errs.New(errs.CodeInternalError, "runs: the launch check has no audit recorder")
-			}
-			res.committed = conflict(reason)
-			return s.d.Audit.Record(actor.WithActor(ctx, a), auditing.Entry{
-				Action: string(authorize.ActionRunLaunchCheck), Decision: auditing.DecisionDeny, Reason: auditing.Reason(reason),
-				ResourceKind: resourceRun, ResourceID: run.ID,
-			})
-		}
-		res.check, err = s.configured(ctx, run.AgentID)
+		var err error
+		res, err = w.launchTx(ctx, a, runID)
 		return err
 	})
+	return res.checkAnswer(err)
+}
+
+// launchTx is LaunchCheck inside its unit of work.
+func (w *Wakes) launchTx(ctx context.Context, a actor.Actor, runID ids.ID) (wakeResult, error) {
+	s := w.s
+	run, found, err := s.d.Repo.Run(ctx, runID)
 	if err != nil {
-		return runs.WakeCheck{}, err
+		return wakeResult{}, err
 	}
-	if res.committed != nil {
-		return runs.WakeCheck{}, res.committed
+	d, err := s.authorizeAgent(ctx, a, authorize.ActionRunLaunchCheck, run, found, runID, nil)
+	if err != nil {
+		return wakeResult{}, err
 	}
-	return res.check, nil
+	if !d.Allowed() {
+		return wakeResult{}, d.Err()
+	}
+	reason := domain.WakeCodeRunNotRunning
+	if run.State == domain.StateRunning {
+		if reason, err = s.wakeInvokeDenial(ctx, run.AgentID, run.ThreadID, run.TriggeredBy, run.AgentID); err != nil {
+			return wakeResult{}, err
+		}
+	}
+	if reason == "" {
+		check, err := s.configured(ctx, run.AgentID)
+		return wakeResult{check: check}, err
+	}
+	if s.d.Audit == nil {
+		return wakeResult{}, errs.New(errs.CodeInternalError, "runs: the launch check has no audit recorder")
+	}
+	return wakeResult{committed: conflict(reason)}, s.d.Audit.Record(actor.WithActor(ctx, a), auditing.Entry{
+		Action: string(authorize.ActionRunLaunchCheck), Decision: auditing.DecisionDeny, Reason: auditing.Reason(reason),
+		ResourceKind: resourceRun, ResourceID: run.ID,
+	})
 }
 
 // WakeDue is the use case of the job runs.wake_due (09 5.8.4) in one unit of work: the wake-up is
@@ -1168,31 +1259,38 @@ func (s *Service) WakeDue(ctx context.Context, wakeID ids.ID) error {
 	if err != nil {
 		return err
 	}
-	// The job is the server's own step, not a request of a principal.
-	ctx = actor.WithActor(ctx, actor.Anonymous())
-	return s.d.UoW.Do(ctx, func(ctx context.Context) error {
-		r, found, err := b.d.Repo.LockWake(ctx, wakeID)
-		if err != nil || !found || r.State != domain.WakePending {
-			return err
-		}
-		now := s.now()
-		if !now.Before(r.Deadline) {
-			_, err := s.endWake(ctx, b, r, domain.WakeExpired, domain.WakeCodeDeadline, WakeWrite{})
-			return err
-		}
-		if now.Before(r.NotBefore) {
-			if r.Kind == domain.WakeAt {
-				return b.d.Schedule.ScheduleWakeDue(ctx, r.ID, r.NotBefore)
-			}
-			return nil
-		}
-		if r.Kind != domain.WakeAt && r.StateReason != domain.WakeCodeConditionMet && r.StateReason != domain.WakeCodeInputSkipped &&
-			r.StateReason != domain.WakeCodeRunNotRunning {
-			return nil
-		}
-		_, err = s.fireLocked(ctx, b, r)
+	// The job is the server's own step without a principal: ctx carries no actor, so the run
+	// anchor and the notes are written as the agent (messaging, chat).
+	return s.d.UoW.Do(ctx, func(ctx context.Context) error { return s.wakeDueTx(ctx, b, wakeID) })
+}
+
+// wakeDueTx is the unit of work of WakeDue: the thread's run before the wake-up (03 6.3).
+func (s *Service) wakeDueTx(ctx context.Context, b *wakeBox, wakeID ids.ID) error {
+	active, err := s.lockThreadRunOfWake(ctx, b, wakeID)
+	if err != nil {
 		return err
-	})
+	}
+	r, found, err := b.d.Repo.LockWake(ctx, wakeID)
+	if err != nil || !found || r.State != domain.WakePending {
+		return err
+	}
+	now := s.now()
+	if !now.Before(r.Deadline) {
+		_, err := s.endWake(ctx, b, r, domain.WakeExpired, domain.WakeCodeDeadline, WakeWrite{})
+		return err
+	}
+	if now.Before(r.NotBefore) {
+		if r.Kind == domain.WakeAt {
+			return b.d.Schedule.ScheduleWakeDue(ctx, r.ID, r.NotBefore)
+		}
+		return nil
+	}
+	if r.Kind != domain.WakeAt && r.StateReason != domain.WakeCodeConditionMet && r.StateReason != domain.WakeCodeInputSkipped &&
+		r.StateReason != domain.WakeCodeRunNotRunning {
+		return nil
+	}
+	_, err = s.fireLocked(ctx, b, r, active)
+	return err
 }
 
 // onThreadFree schedules runs.wake_due now for every pending wake-up of the thread that could fire

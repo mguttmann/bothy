@@ -35,6 +35,12 @@ func (r *Repository) InsertWake(ctx context.Context, w app.NewWake) (app.WakeRow
 	return oneWake(row, err, "inserting a wake-up")
 }
 
+// Wake implements app.WakeRepository.
+func (r *Repository) Wake(ctx context.Context, id ids.ID) (app.WakeRow, bool, error) {
+	row, err := r.read(ctx).GetWake(ctx, uuid(id))
+	return oneWake(row, err, "reading a wake-up")
+}
+
 // LockWake implements app.WakeRepository.
 func (r *Repository) LockWake(ctx context.Context, id ids.ID) (app.WakeRow, bool, error) {
 	q, err := r.write(ctx)

@@ -4,6 +4,7 @@
 
 // ignore_for_file: unused_element
 import 'package:api_client/src/generated/model/command_option_value.dart';
+import 'package:api_client/src/generated/model/agent_wake_facts.dart';
 import 'package:built_collection/built_collection.dart';
 import 'package:api_client/src/generated/model/billing_mode.dart';
 import 'package:api_client/src/generated/model/principal_ref.dart';
@@ -23,6 +24,8 @@ part 'agent_invocation_payload.g.dart';
 /// * [triggerKind]
 /// * [messageId] - Triggering message; the adapter reads its content with `run.context.read` (09, 4.6). Events outside resource `message` never carry message content (04, 2.2).
 /// * [interactionId] - UUIDv7 (RFC 9562), lowercase canonical form.
+/// * [wakeId] - The wake-up of a wake run; set exactly for `trigger_kind = wake` (09 5.8.3, 5.8.5).
+/// * [wake] - The wake-up's kind, reason, label and result, which the first input names; set exactly for `trigger_kind = wake`.
 /// * [commandInvocationId] - UUIDv7 (RFC 9562), lowercase canonical form.
 /// * [commandId] - Triggering command; set exactly for `trigger_kind = command`.
 /// * [commandName] - Name of the triggering command; set exactly for `trigger_kind = command`.
@@ -53,7 +56,7 @@ abstract class AgentInvocationPayload
 
   @BuiltValueField(wireName: r'trigger_kind')
   AgentInvocationPayloadTriggerKindEnum get triggerKind;
-  // enum triggerKindEnum {  message,  interaction,  command,  };
+  // enum triggerKindEnum {  message,  interaction,  command,  wake,  };
 
   /// Triggering message; the adapter reads its content with `run.context.read` (09, 4.6). Events outside resource `message` never carry message content (04, 2.2).
   @BuiltValueField(wireName: r'message_id')
@@ -62,6 +65,14 @@ abstract class AgentInvocationPayload
   /// UUIDv7 (RFC 9562), lowercase canonical form.
   @BuiltValueField(wireName: r'interaction_id')
   String? get interactionId;
+
+  /// The wake-up of a wake run; set exactly for `trigger_kind = wake` (09 5.8.3, 5.8.5).
+  @BuiltValueField(wireName: r'wake_id')
+  String? get wakeId;
+
+  /// The wake-up's kind, reason, label and result, which the first input names; set exactly for `trigger_kind = wake`.
+  @BuiltValueField(wireName: r'wake')
+  AgentWakeFacts? get wake;
 
   /// UUIDv7 (RFC 9562), lowercase canonical form.
   @BuiltValueField(wireName: r'command_invocation_id')
@@ -168,6 +179,20 @@ class _$AgentInvocationPayloadSerializer
       yield serializers.serialize(
         object.interactionId,
         specifiedType: const FullType(String),
+      );
+    }
+    if (object.wakeId != null) {
+      yield r'wake_id';
+      yield serializers.serialize(
+        object.wakeId,
+        specifiedType: const FullType(String),
+      );
+    }
+    if (object.wake != null) {
+      yield r'wake';
+      yield serializers.serialize(
+        object.wake,
+        specifiedType: const FullType(AgentWakeFacts),
       );
     }
     if (object.commandInvocationId != null) {
@@ -312,6 +337,22 @@ class _$AgentInvocationPayloadSerializer
           if (valueDes == null) continue;
           result.interactionId = valueDes;
           break;
+        case r'wake_id':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(String),
+          ) as String?;
+          if (valueDes == null) continue;
+          result.wakeId = valueDes;
+          break;
+        case r'wake':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(AgentWakeFacts),
+          ) as AgentWakeFacts?;
+          if (valueDes == null) continue;
+          result.wake.replace(valueDes);
+          break;
         case r'command_invocation_id':
           final valueDes = serializers.deserialize(
             value,
@@ -425,6 +466,9 @@ class AgentInvocationPayloadTriggerKindEnum extends EnumClass {
   @BuiltValueEnumConst(wireName: r'command')
   static const AgentInvocationPayloadTriggerKindEnum command =
       _$agentInvocationPayloadTriggerKindEnum_command;
+  @BuiltValueEnumConst(wireName: r'wake')
+  static const AgentInvocationPayloadTriggerKindEnum wake =
+      _$agentInvocationPayloadTriggerKindEnum_wake;
   @BuiltValueEnumConst(wireName: r'unknown_default_open_api', fallback: true)
   static const AgentInvocationPayloadTriggerKindEnum unknownDefaultOpenApi =
       _$agentInvocationPayloadTriggerKindEnum_unknownDefaultOpenApi;

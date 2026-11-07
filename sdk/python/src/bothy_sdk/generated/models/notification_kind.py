@@ -10,6 +10,7 @@ class NotificationKind(StrEnum):
     RUN_DONE = "run_done"
     RUN_FAILED = "run_failed"
     SECURITY = "security"
+    WAKE_ENDED = "wake_ended"
 
     def __str__(self) -> str:
         return str(self.value)

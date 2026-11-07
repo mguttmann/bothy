@@ -11,6 +11,7 @@ import 'package:api_client/src/generated/model/event_resource.dart';
 import 'package:api_client/src/generated/model/access_changed_event.dart';
 import 'package:api_client/src/generated/model/gdpr_request_updated_event.dart';
 import 'package:api_client/src/generated/model/thread_reopened_event.dart';
+import 'package:api_client/src/generated/model/agent_wake_input_event.dart';
 import 'package:api_client/src/generated/model/draft_deleted_event.dart';
 import 'package:api_client/src/generated/model/agent_config_changed_event.dart';
 import 'package:api_client/src/generated/model/thread_updated_event.dart';
@@ -30,6 +31,7 @@ import 'package:api_client/src/generated/model/thread_closed_event.dart';
 import 'package:api_client/src/generated/model/sidebar_updated_event.dart';
 import 'package:api_client/src/generated/model/space_created_event.dart';
 import 'package:api_client/src/generated/model/terminal_session.dart';
+import 'package:api_client/src/generated/model/run_wake_changed_event.dart';
 import 'package:api_client/src/generated/model/run_cancel_requested_event.dart';
 import 'package:api_client/src/generated/model/agent_session_changed_event.dart';
 import 'package:api_client/src/generated/model/gdpr_request_due_event.dart';
@@ -93,7 +95,7 @@ part 'event.g.dart';
 /// * [payload]
 @BuiltValue()
 abstract class Event implements Built<Event, EventBuilder> {
-  /// One Of [AccessChangedEvent], [AccessExpiringEvent], [AgentConfigChangedEvent], [AgentDefinitionChangedEvent], [AgentFollowupEvent], [AgentHostingChangedEvent], [AgentInvocationEvent], [AgentSessionChangedEvent], [AgentUpdatedEvent], [ChannelArchivedEvent], [ChannelCreatedEvent], [ChannelSettingsChangedEvent], [ChannelUpdatedEvent], [CommandChangedEvent], [CommandInvokedEvent], [DevicePendingEvent], [DraftDeletedEvent], [DraftUpdatedEvent], [FileUpdatedEvent], [GdprRequestDueEvent], [GdprRequestUpdatedEvent], [GrantChangedEvent], [GroupChangedEvent], [HostUpdatedEvent], [ImportProgressEvent], [InstanceUpdatedEvent], [InteractionCreatedEvent], [MessageCreatedEvent], [MessageDeletedEvent], [MessageUpdatedEvent], [NotificationPrefUpdatedEvent], [PinAddedEvent], [PinRemovedEvent], [QuietHoursUpdatedEvent], [ReactionAddedEvent], [ReactionRemovedEvent], [ReadStateUpdatedEvent], [RunCancelRequestedEvent], [RunStateChangedEvent], [SessionRevokedEvent], [SettingsUpdatedEvent], [SidebarChannelUpdatedEvent], [SidebarUpdatedEvent], [SpaceArchivedEvent], [SpaceCreatedEvent], [SpaceUpdatedEvent], [StatusUpdatedEvent], [TerminalSessionChangedEvent], [ThreadClosedEvent], [ThreadCreatedEvent], [ThreadMovedEvent], [ThreadMovedOutEvent], [ThreadReopenedEvent], [ThreadUpdatedEvent], [UserUpdatedEvent]
+  /// One Of [AccessChangedEvent], [AccessExpiringEvent], [AgentConfigChangedEvent], [AgentDefinitionChangedEvent], [AgentFollowupEvent], [AgentHostingChangedEvent], [AgentInvocationEvent], [AgentSessionChangedEvent], [AgentUpdatedEvent], [AgentWakeInputEvent], [ChannelArchivedEvent], [ChannelCreatedEvent], [ChannelSettingsChangedEvent], [ChannelUpdatedEvent], [CommandChangedEvent], [CommandInvokedEvent], [DevicePendingEvent], [DraftDeletedEvent], [DraftUpdatedEvent], [FileUpdatedEvent], [GdprRequestDueEvent], [GdprRequestUpdatedEvent], [GrantChangedEvent], [GroupChangedEvent], [HostUpdatedEvent], [ImportProgressEvent], [InstanceUpdatedEvent], [InteractionCreatedEvent], [MessageCreatedEvent], [MessageDeletedEvent], [MessageUpdatedEvent], [NotificationPrefUpdatedEvent], [PinAddedEvent], [PinRemovedEvent], [QuietHoursUpdatedEvent], [ReactionAddedEvent], [ReactionRemovedEvent], [ReadStateUpdatedEvent], [RunCancelRequestedEvent], [RunStateChangedEvent], [RunWakeChangedEvent], [SessionRevokedEvent], [SettingsUpdatedEvent], [SidebarChannelUpdatedEvent], [SidebarUpdatedEvent], [SpaceArchivedEvent], [SpaceCreatedEvent], [SpaceUpdatedEvent], [StatusUpdatedEvent], [TerminalSessionChangedEvent], [ThreadClosedEvent], [ThreadCreatedEvent], [ThreadMovedEvent], [ThreadMovedOutEvent], [ThreadReopenedEvent], [ThreadUpdatedEvent], [UserUpdatedEvent]
   OneOf get oneOf;
 
   static const String discriminatorFieldName = r'type';
@@ -107,6 +109,7 @@ abstract class Event implements Built<Event, EventBuilder> {
     r'agent.hosting_changed': AgentHostingChangedEvent,
     r'agent.invocation': AgentInvocationEvent,
     r'agent.updated': AgentUpdatedEvent,
+    r'agent.wake_input': AgentWakeInputEvent,
     r'agent_session.changed': AgentSessionChangedEvent,
     r'channel.archived': ChannelArchivedEvent,
     r'channel.created': ChannelCreatedEvent,
@@ -138,6 +141,7 @@ abstract class Event implements Built<Event, EventBuilder> {
     r'read_state.updated': ReadStateUpdatedEvent,
     r'run.cancel_requested': RunCancelRequestedEvent,
     r'run.state_changed': RunStateChangedEvent,
+    r'run.wake_changed': RunWakeChangedEvent,
     r'session.revoked': SessionRevokedEvent,
     r'settings.updated': SettingsUpdatedEvent,
     r'sidebar.updated': SidebarUpdatedEvent,
@@ -192,6 +196,9 @@ extension EventDiscriminatorExt on Event {
     }
     if (this is AgentUpdatedEvent) {
       return r'agent.updated';
+    }
+    if (this is AgentWakeInputEvent) {
+      return r'agent.wake_input';
     }
     if (this is AgentSessionChangedEvent) {
       return r'agent_session.changed';
@@ -286,6 +293,9 @@ extension EventDiscriminatorExt on Event {
     if (this is RunStateChangedEvent) {
       return r'run.state_changed';
     }
+    if (this is RunWakeChangedEvent) {
+      return r'run.wake_changed';
+    }
     if (this is SessionRevokedEvent) {
       return r'session.revoked';
     }
@@ -363,6 +373,9 @@ extension EventBuilderDiscriminatorExt on EventBuilder {
     }
     if (this is AgentUpdatedEventBuilder) {
       return r'agent.updated';
+    }
+    if (this is AgentWakeInputEventBuilder) {
+      return r'agent.wake_input';
     }
     if (this is AgentSessionChangedEventBuilder) {
       return r'agent_session.changed';
@@ -456,6 +469,9 @@ extension EventBuilderDiscriminatorExt on EventBuilder {
     }
     if (this is RunStateChangedEventBuilder) {
       return r'run.state_changed';
+    }
+    if (this is RunWakeChangedEventBuilder) {
+      return r'run.wake_changed';
     }
     if (this is SessionRevokedEventBuilder) {
       return r'session.revoked';
@@ -559,6 +575,7 @@ class _$EventSerializer implements PrimitiveSerializer<Event> {
       AgentHostingChangedEvent,
       AgentInvocationEvent,
       AgentUpdatedEvent,
+      AgentWakeInputEvent,
       AgentSessionChangedEvent,
       ChannelArchivedEvent,
       ChannelCreatedEvent,
@@ -590,6 +607,7 @@ class _$EventSerializer implements PrimitiveSerializer<Event> {
       ReadStateUpdatedEvent,
       RunCancelRequestedEvent,
       RunStateChangedEvent,
+      RunWakeChangedEvent,
       SessionRevokedEvent,
       SettingsUpdatedEvent,
       SidebarUpdatedEvent,
@@ -665,6 +683,13 @@ class _$EventSerializer implements PrimitiveSerializer<Event> {
           specifiedType: FullType(AgentUpdatedEvent),
         ) as AgentUpdatedEvent;
         oneOfType = AgentUpdatedEvent;
+        break;
+      case r'agent.wake_input':
+        oneOfResult = serializers.deserialize(
+          oneOfDataSrc,
+          specifiedType: FullType(AgentWakeInputEvent),
+        ) as AgentWakeInputEvent;
+        oneOfType = AgentWakeInputEvent;
         break;
       case r'agent_session.changed':
         oneOfResult = serializers.deserialize(
@@ -882,6 +907,13 @@ class _$EventSerializer implements PrimitiveSerializer<Event> {
           specifiedType: FullType(RunStateChangedEvent),
         ) as RunStateChangedEvent;
         oneOfType = RunStateChangedEvent;
+        break;
+      case r'run.wake_changed':
+        oneOfResult = serializers.deserialize(
+          oneOfDataSrc,
+          specifiedType: FullType(RunWakeChangedEvent),
+        ) as RunWakeChangedEvent;
+        oneOfType = RunWakeChangedEvent;
         break;
       case r'session.revoked':
         oneOfResult = serializers.deserialize(
@@ -1185,6 +1217,12 @@ class EventTypeEnum extends EnumClass {
   @BuiltValueEnumConst(wireName: r'agent.hosting_changed')
   static const EventTypeEnum agentPeriodHostingChanged =
       _$eventTypeEnum_agentPeriodHostingChanged;
+  @BuiltValueEnumConst(wireName: r'run.wake_changed')
+  static const EventTypeEnum runPeriodWakeChanged =
+      _$eventTypeEnum_runPeriodWakeChanged;
+  @BuiltValueEnumConst(wireName: r'agent.wake_input')
+  static const EventTypeEnum agentPeriodWakeInput =
+      _$eventTypeEnum_agentPeriodWakeInput;
   @BuiltValueEnumConst(wireName: r'host.updated')
   static const EventTypeEnum hostPeriodUpdated =
       _$eventTypeEnum_hostPeriodUpdated;

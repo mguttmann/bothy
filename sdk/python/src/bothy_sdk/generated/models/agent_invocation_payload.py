@@ -18,6 +18,7 @@ from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
     from ..models.agent_session import AgentSession
+    from ..models.agent_wake_facts import AgentWakeFacts
     from ..models.command_option_value import CommandOptionValue
     from ..models.principal_ref import PrincipalRef
 
@@ -40,6 +41,9 @@ class AgentInvocationPayload:
         space_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
         message_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
         interaction_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
+        wake_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
+        wake (AgentWakeFacts | Unset): The wake-up of a wake run or a wake input; the runner writes its label, reason
+            and result as the input (09 5.8.3).
         command_invocation_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
         command_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
         command_name (str | Unset): Name of the triggering command; set exactly for `trigger_kind = command`.
@@ -62,6 +66,8 @@ class AgentInvocationPayload:
     space_id: UUID | Unset = UNSET
     message_id: UUID | Unset = UNSET
     interaction_id: UUID | Unset = UNSET
+    wake_id: UUID | Unset = UNSET
+    wake: AgentWakeFacts | Unset = UNSET
     command_invocation_id: UUID | Unset = UNSET
     command_id: UUID | Unset = UNSET
     command_name: str | Unset = UNSET
@@ -95,6 +101,14 @@ class AgentInvocationPayload:
         interaction_id: str | Unset = UNSET
         if not isinstance(self.interaction_id, Unset):
             interaction_id = str(self.interaction_id)
+
+        wake_id: str | Unset = UNSET
+        if not isinstance(self.wake_id, Unset):
+            wake_id = str(self.wake_id)
+
+        wake: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.wake, Unset):
+            wake = self.wake.to_dict()
 
         command_invocation_id: str | Unset = UNSET
         if not isinstance(self.command_invocation_id, Unset):
@@ -141,6 +155,10 @@ class AgentInvocationPayload:
             field_dict["message_id"] = message_id
         if interaction_id is not UNSET:
             field_dict["interaction_id"] = interaction_id
+        if wake_id is not UNSET:
+            field_dict["wake_id"] = wake_id
+        if wake is not UNSET:
+            field_dict["wake"] = wake
         if command_invocation_id is not UNSET:
             field_dict["command_invocation_id"] = command_invocation_id
         if command_id is not UNSET:
@@ -161,6 +179,7 @@ class AgentInvocationPayload:
     @classmethod
     def from_dict(cls, src_dict: Mapping[str, Any]) -> Self:
         from ..models.agent_session import AgentSession
+        from ..models.agent_wake_facts import AgentWakeFacts
         from ..models.command_option_value import CommandOptionValue
         from ..models.principal_ref import PrincipalRef
 
@@ -197,6 +216,20 @@ class AgentInvocationPayload:
             interaction_id = UNSET
         else:
             interaction_id = UUID(_interaction_id)
+
+        _wake_id = d.pop("wake_id", UNSET)
+        wake_id: UUID | Unset
+        if isinstance(_wake_id, Unset):
+            wake_id = UNSET
+        else:
+            wake_id = UUID(_wake_id)
+
+        _wake = d.pop("wake", UNSET)
+        wake: AgentWakeFacts | Unset
+        if isinstance(_wake, Unset):
+            wake = UNSET
+        else:
+            wake = AgentWakeFacts.from_dict(_wake)
 
         _command_invocation_id = d.pop("command_invocation_id", UNSET)
         command_invocation_id: UUID | Unset
@@ -249,6 +282,8 @@ class AgentInvocationPayload:
             space_id=space_id,
             message_id=message_id,
             interaction_id=interaction_id,
+            wake_id=wake_id,
+            wake=wake,
             command_invocation_id=command_invocation_id,
             command_id=command_id,
             command_name=command_name,

@@ -27,7 +27,7 @@ part 'push_preview.g.dart';
 abstract class PushPreview implements Built<PushPreview, PushPreviewBuilder> {
   @BuiltValueField(wireName: r'kind')
   NotificationKind get kind;
-  // enum kindEnum {  message,  mention,  dm,  run_done,  run_failed,  input_needed,  security,  admin,  };
+  // enum kindEnum {  message,  mention,  dm,  run_done,  run_failed,  input_needed,  security,  admin,  wake_ended,  };
 
   /// UUIDv7 (RFC 9562), lowercase canonical form.
   @BuiltValueField(wireName: r'thread_id')

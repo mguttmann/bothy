@@ -100,6 +100,8 @@ type WakeRepository interface {
 	// inserted is false when a wake-up of the same source run and reason (recover) or outage
 	// exists, which the caller then reads.
 	InsertWake(ctx context.Context, w NewWake) (row WakeRow, inserted bool, err error)
+	// Wake reads the wake-up id without a lock; found is false for an unknown id.
+	Wake(ctx context.Context, id ids.ID) (row WakeRow, found bool, err error)
 	// LockWake reads the wake-up id with its row lock; found is false for an unknown id.
 	LockWake(ctx context.Context, id ids.ID) (row WakeRow, found bool, err error)
 	// WakeByOutage locks the wake-up of the source run's outage; found is false for none.

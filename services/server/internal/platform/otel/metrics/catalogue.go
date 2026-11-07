@@ -31,7 +31,10 @@ var droppedScopes = map[string]bool{LibraryOtelPGX: true}
 
 // The values failed and cancelled of bothy.outcome and bothy.run.state.
 const (
-	valueFailed    = "failed"
+	valueFailed = "failed"
+	// valueAgent is the value agent of bothy.principal.kind, bothy.message.origin and the reason
+	// of a wake-up.
+	valueAgent     = "agent"
 	valueCancelled = "cancelled"
 )
 
@@ -62,8 +65,10 @@ const (
 
 // Closed literal sets shared by several instruments.
 var (
+	// wakeReasons are bothy.reason of bothy.run.wake.ended: the reason of a wake-up (09 5.8.1).
+	wakeReasons = []string{valueAgent, "recovery", "usage_limit"}
 	// principalKinds are bothy.principal.kind of an identified connection.
-	principalKinds = []string{"user", "agent", "app"}
+	principalKinds = []string{"user", valueAgent, "app"}
 	// httpMethods are http.request.method: the methods of the HTTP semantic conventions and
 	// _OTHER for every other method (platform/otel Middleware).
 	// scanOutcomes are bothy.outcome of bothy.file.scan and bothy.file.scan.duration.
@@ -212,7 +217,7 @@ var (
 		Name: "bothy.message.created", Kind: KindCounter, Unit: "{message}",
 		Description: "Messages created, counted after the commit.",
 		Attrs: []Attr{
-			{Key: "bothy.message.origin", Values: []string{"human", "agent", "app", "import", "system"}},
+			{Key: "bothy.message.origin", Values: []string{"human", valueAgent, "app", "import", "system"}},
 			{Key: "bothy.message.kind", Values: []string{"text", "voice", "run", "card", "system"}},
 		},
 	}
@@ -506,7 +511,7 @@ var (
 		Description: "Wake-ups that reached an end state.",
 		Attrs: []Attr{
 			{Key: keyOutcome, Values: []string{"fired", valueCancelled, "expired", "refused", valueFailed}},
-			{Key: keyReason, Values: []string{"agent", "recovery", "usage_limit"}},
+			{Key: keyReason, Values: wakeReasons},
 		},
 	}
 	// RunAutonomyCapReached is bothy.run.autonomy.cap_reached (4.3, AR-04): a chain of autonomous

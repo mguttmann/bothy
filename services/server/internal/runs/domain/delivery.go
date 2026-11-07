@@ -376,10 +376,7 @@ func setTrigger(p *invocationPayload, in InvocationPayloadInput) error {
 	}
 	switch TriggerKind(in.TriggerKind) {
 	case TriggerWake:
-		if !in.MessageID.IsZero() || !in.InteractionID.IsZero() || commandSet || in.Wake == nil || in.Wake.ID.IsZero() {
-			return errPayload
-		}
-		p.TriggerKind, p.WakeID, p.Wake = string(TriggerWake), in.Wake.ID.String(), in.Wake.payloadOf()
+		return setWakeTrigger(p, in, commandSet)
 	case "", TriggerMessage:
 		if in.MessageID.IsZero() || !in.InteractionID.IsZero() || !in.CommandID.IsZero() || !in.CommandInvocationID.IsZero() || in.CommandName != "" || in.Options != nil {
 			return errPayload
@@ -439,6 +436,16 @@ func WakeInputWakeID(payload []byte) (ids.ID, error) {
 		return ids.ID{}, errPayload
 	}
 	return id, nil
+}
+
+// setWakeTrigger sets the trigger of a wake run: the wake-up and its facts, no message, command or
+// interaction (09 5.8.5). Errors: the members of another trigger kind or no wake-up.
+func setWakeTrigger(p *invocationPayload, in InvocationPayloadInput, commandSet bool) error {
+	if !in.MessageID.IsZero() || !in.InteractionID.IsZero() || commandSet || in.Wake == nil || in.Wake.ID.IsZero() {
+		return errPayload
+	}
+	p.TriggerKind, p.WakeID, p.Wake = string(TriggerWake), in.Wake.ID.String(), in.Wake.payloadOf()
+	return nil
 }
 
 // followupPayload is AgentFollowupPayload.

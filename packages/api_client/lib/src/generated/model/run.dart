@@ -24,10 +24,11 @@ part 'run.g.dart';
 /// * [channelId] - UUIDv7 (RFC 9562), lowercase canonical form.
 /// * [agentId] - UUIDv7 (RFC 9562), lowercase canonical form.
 /// * [agentSessionId] - UUIDv7 (RFC 9562), lowercase canonical form.
-/// * [triggerKind]
+/// * [triggerKind] - `wake` is a run started by a fired wake-up (09 5.8.3); it names the wake-up in `triggering_wake_id`.
 /// * [triggeringMessageId] - UUIDv7 (RFC 9562), lowercase canonical form.
 /// * [triggeringCommandId] - UUIDv7 (RFC 9562), lowercase canonical form.
 /// * [triggeringInteractionId] - UUIDv7 (RFC 9562), lowercase canonical form.
+/// * [triggeringWakeId] - The wake-up of a wake run; absent otherwise and after the wake-up was deleted with its thread.
 /// * [triggeredBy] - UUIDv7 (RFC 9562), lowercase canonical form.
 /// * [state]
 /// * [stateReason] - The reason of `failed` and `cancelled` (09 5.2); while `queued` the wait reason of 09 5.2.1, `invocation_held` (the server holds the invocation until an attachment or transcript is final), `slots_full` (every slot of the runner is in use) or `thread_busy` (the runner waits for the thread or session lock); absent while queued when the agent has not reported a wait.
@@ -70,9 +71,10 @@ abstract class Run implements Built<Run, RunBuilder> {
   @BuiltValueField(wireName: r'agent_session_id')
   String? get agentSessionId;
 
+  /// `wake` is a run started by a fired wake-up (09 5.8.3); it names the wake-up in `triggering_wake_id`.
   @BuiltValueField(wireName: r'trigger_kind')
   RunTriggerKindEnum? get triggerKind;
-  // enum triggerKindEnum {  message,  command,  interaction,  };
+  // enum triggerKindEnum {  message,  command,  interaction,  wake,  };
 
   /// UUIDv7 (RFC 9562), lowercase canonical form.
   @BuiltValueField(wireName: r'triggering_message_id')
@@ -85,6 +87,10 @@ abstract class Run implements Built<Run, RunBuilder> {
   /// UUIDv7 (RFC 9562), lowercase canonical form.
   @BuiltValueField(wireName: r'triggering_interaction_id')
   String? get triggeringInteractionId;
+
+  /// The wake-up of a wake run; absent otherwise and after the wake-up was deleted with its thread.
+  @BuiltValueField(wireName: r'triggering_wake_id')
+  String? get triggeringWakeId;
 
   /// UUIDv7 (RFC 9562), lowercase canonical form.
   @BuiltValueField(wireName: r'triggered_by')
@@ -232,6 +238,13 @@ class _$RunSerializer implements PrimitiveSerializer<Run> {
       yield r'triggering_interaction_id';
       yield serializers.serialize(
         object.triggeringInteractionId,
+        specifiedType: const FullType(String),
+      );
+    }
+    if (object.triggeringWakeId != null) {
+      yield r'triggering_wake_id';
+      yield serializers.serialize(
+        object.triggeringWakeId,
         specifiedType: const FullType(String),
       );
     }
@@ -458,6 +471,14 @@ class _$RunSerializer implements PrimitiveSerializer<Run> {
           if (valueDes == null) continue;
           result.triggeringInteractionId = valueDes;
           break;
+        case r'triggering_wake_id':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(String),
+          ) as String?;
+          if (valueDes == null) continue;
+          result.triggeringWakeId = valueDes;
+          break;
         case r'triggered_by':
           final valueDes = serializers.deserialize(
             value,
@@ -644,6 +665,7 @@ class _$RunSerializer implements PrimitiveSerializer<Run> {
   }
 }
 
+/// `wake` is a run started by a fired wake-up (09 5.8.3); it names the wake-up in `triggering_wake_id`.
 class RunTriggerKindEnum extends EnumClass {
   @BuiltValueEnumConst(wireName: r'message')
   static const RunTriggerKindEnum message = _$runTriggerKindEnum_message;
@@ -652,6 +674,8 @@ class RunTriggerKindEnum extends EnumClass {
   @BuiltValueEnumConst(wireName: r'interaction')
   static const RunTriggerKindEnum interaction =
       _$runTriggerKindEnum_interaction;
+  @BuiltValueEnumConst(wireName: r'wake')
+  static const RunTriggerKindEnum wake = _$runTriggerKindEnum_wake;
   @BuiltValueEnumConst(wireName: r'unknown_default_open_api', fallback: true)
   static const RunTriggerKindEnum unknownDefaultOpenApi =
       _$runTriggerKindEnum_unknownDefaultOpenApi;

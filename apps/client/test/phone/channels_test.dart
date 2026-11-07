@@ -75,7 +75,7 @@ void main() {
           ),
         )
         .toSet();
-    expect(kinds, hasLength(8));
+    expect(kinds, hasLength(9));
     final mapped = [for (final c in PushChannel.values) ...c.kinds];
     expect(mapped.toSet(), kinds);
     expect(mapped, hasLength(kinds.length), reason: 'no kind in two channels');
@@ -87,6 +87,7 @@ void main() {
     expect(PushChannel.ofKind('message'), PushChannel.messages);
     expect(PushChannel.ofKind('run_done'), PushChannel.runs);
     expect(PushChannel.ofKind('run_failed'), PushChannel.runs);
+    expect(PushChannel.ofKind('wake_ended'), PushChannel.runs);
   });
 
   test('a kind of a newer server goes to All messages', () {
@@ -110,7 +111,7 @@ void main() {
       expect(channels.first.description, de.pushChannelMentionsDescription);
       expect(channels.map((c) => c.high), [true, true, false, false]);
       expect(channels.first.kinds, ['mention', 'dm']);
-      expect(channels.last.kinds, ['run_done', 'run_failed']);
+      expect(channels.last.kinds, ['run_done', 'run_failed', 'wake_ended']);
     },
   );
 }

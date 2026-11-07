@@ -54,7 +54,7 @@ func TestCheckWakeRequest(t *testing.T) {
 		{domain.WakeRequest{Kind: domain.WakeCommand, Reason: domain.WakeReasonUsageLimit, Outage: 1,
 			Condition: domain.WakeCondition{CommandLine: "true"}}, "/kind not_allowed"},
 		{domain.WakeRequest{Kind: domain.WakeAt, Reason: domain.WakeReasonAgent, Label: "eleven char"}, "/label too_long"},
-		{domain.WakeRequest{Kind: domain.WakeAt, Reason: domain.WakeReasonAgent, Label: "a‮b"}, "/label invalid"},
+		{domain.WakeRequest{Kind: domain.WakeAt, Reason: domain.WakeReasonAgent, Label: "a\u202eb"}, "/label invalid"},
 		{domain.WakeRequest{Kind: domain.WakePRChecks, Reason: domain.WakeReasonAgent, Condition: domain.WakeCondition{Repository: "app", Number: 1}},
 			"/condition/repository invalid"},
 		{domain.WakeRequest{Kind: domain.WakePRChecks, Reason: domain.WakeReasonAgent, Condition: domain.WakeCondition{Repository: "a/b"}},

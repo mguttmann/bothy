@@ -419,6 +419,12 @@ carries them.
 
 ## System lines of other modules (M2-12)
 
+`AppendSystemNote(ctx, threadID, authorID, text)` (AR-04) writes the note of a wake-up end or an
+ended chain of autonomous inputs (09 5.8.4, 5.8.6) in the caller's unit of work: origin `system`,
+kind `text`, silent, the content `text` of runs, the agent as author, the next `thread_seq`
+through `chat.AppendToThread` without reopening, `message.created` and `MessagePosted` like a
+system line; it never triggers and creates no hint. It returns the note's id and `thread_seq`.
+
 `AppendSystemLine(ctx, SystemLine{ThreadID, AuthorID, Code})` writes a system line inside the
 caller's unit of work and never authorizes; runs calls it from `OnSessionAttached` when an
 adapter reports `bind_failed: session_missing` (09 9.5 item 4), with the code
