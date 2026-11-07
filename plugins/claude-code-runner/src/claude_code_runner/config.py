@@ -465,7 +465,10 @@ def _check_hosted_root(r: _Reader, config: RunnerConfig) -> None:
         if _overlaps(root, other):
             raise r.fail(name, f"is equal to, inside or above runner.{key}")
     if not root.exists():
-        root.mkdir(mode=0o700)
+        try:
+            root.mkdir(mode=0o700)
+        except OSError:
+            raise r.fail(name, "cannot create the folder") from None
     if not root.is_dir() or root.is_symlink():
         raise r.fail(name, "is not a folder")
     if stat.S_IMODE(root.stat().st_mode) & (stat.S_IWGRP | stat.S_IWOTH):

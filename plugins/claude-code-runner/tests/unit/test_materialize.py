@@ -449,6 +449,20 @@ def test_a_runner_credential_in_the_scope_is_refused(tmp_path: Path) -> None:
     assert err.value.code == "secret_out_of_scope"
 
 
+def test_an_agent_s_scope_that_is_a_link_is_refused(tmp_path: Path) -> None:
+    """A link at the agent's subfolder must not move the scope to another folder."""
+    secrets = tmp_path / "hosted-secrets"
+    secrets.mkdir(mode=0o700)
+    elsewhere = _private(tmp_path / "elsewhere" / "docs_token", "elsewhere-value\n")
+    (secrets / str(AGENT)).symlink_to(elsewhere.parent)
+    with pytest.raises(MaterializeError) as err:
+        definition_resolver(secrets, AGENT, ())(f"file:{secrets / str(AGENT) / 'docs_token'}")
+    assert err.value.code == "secret_out_of_scope"
+    with pytest.raises(MaterializeError) as err:
+        definition_resolver(secrets, AGENT, ())(f"file:{elsewhere}")
+    assert err.value.code == "secret_out_of_scope"
+
+
 def test_skills_absent_leave_the_plugin_without_skills(folders: AgentFolders) -> None:
     done = materialize(folders, _small(), 1, "chat")
     assert done.has_skills is False

@@ -396,6 +396,17 @@ def test_a_missing_root_is_created_private(tmp_path: Path) -> None:
     assert root.stat().st_mode & 0o777 == 0o700
 
 
+def test_a_root_that_cannot_be_created_is_a_config_error(tmp_path: Path) -> None:
+    locked = tmp_path / "locked"
+    locked.mkdir(mode=0o500)
+    try:
+        with pytest.raises(ConfigError) as err:
+            load_config(_hosted(tmp_path, locked / "agents"))
+    finally:
+        locked.chmod(0o700)
+    assert err.value.key == "runner.hosted_agents_root"
+
+
 @pytest.mark.parametrize(
     "place",
     ["state", "state/agents", "projects", "projects/agents", ".", "relative"],

@@ -266,8 +266,9 @@ def definition_resolver(
     """The resolver of a hosted agent's ``secret_ref`` values (26 4.2, 5.1 item 3).
 
     A definition may name only ``file:`` references whose file lies, also after following every
-    link, in ``<secrets_dir>/<agent_id>/``; never ``env:`` (the runner's own environment), never
-    another agent's folder and never one of ``refused`` (the runner's own credentials). Without
+    link, in ``<secrets_dir>/<agent_id>/`` (that subfolder itself never a link); never ``env:``
+    (the runner's own environment), never another agent's folder and never one of ``refused``
+    (the runner's own credentials). Without
     ``secrets_dir`` no reference resolves. The file is then read as any ``secret_ref`` (16 5.2).
 
     Args:
@@ -288,10 +289,11 @@ def definition_resolver(
             raise MaterializeError("secret_unavailable") from None
         if secrets_dir is None or parsed.scheme != "file":
             raise MaterializeError("secret_out_of_scope")
-        scope = secrets_dir / str(agent_id)
         try:
+            # Anchored to the configured folder: a link at the agent's subfolder moves nothing.
+            scope = secrets_dir.resolve(strict=True) / str(agent_id)
             real = Path(parsed.target).resolve(strict=True)
-            inside = real.is_relative_to(scope.resolve(strict=True))
+            inside = not scope.is_symlink() and real.is_relative_to(scope)
             own = any(real == p.resolve() for p in refused_paths)
         except (OSError, RuntimeError):
             raise MaterializeError("secret_unavailable") from None

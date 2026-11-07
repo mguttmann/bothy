@@ -253,7 +253,8 @@ at the repository root is the conformance set of every writer (A1-02).
    reach of the file tools of a `chat` or `scoped` turn.
 3. `runner.hosted_secrets_dir` (default empty) holds the secrets of hosted agents, one subfolder
    `<agent_id>/` per agent, filled by the host operator. A definition's `secret_ref` resolves only
-   to a file in its own agent's subfolder (4.2); never to the runner's environment, another
+   to a file in its own agent's subfolder (4.2), read below the real path of the folder, so a
+   subfolder that is a link resolves nothing; never to the runner's environment, another
    agent's subfolder or a credential of the runner itself (`agent_token_ref`, `dpop_key_ref`,
    `anthropic_api_key_ref`). Empty, no reference of a definition resolves. With
    `runner.hosted_agents` the runner refuses to start when the key is not an absolute folder (a
