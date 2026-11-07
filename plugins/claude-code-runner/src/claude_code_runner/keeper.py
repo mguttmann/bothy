@@ -18,7 +18,8 @@ runner leaves it and its CLI alive. ``<launch>`` is
 * ``<launch>.keeper`` and ``<launch>.cli``: the identity files (``pid`` and ``pgid``), written
   atomically by rename; the CLI is released from its release pipe only after ``<launch>.cli``.
 * ``<launch>.inputs``: the attempt's initial input lines; written once into the CLI's stdin before
-  any relayed line, without blocking, in a loop that also watches the CLI's exit, and ``<launch>.fed`` after the last byte.
+  any relayed line, without blocking, in a loop that also watches the CLI's exit, and
+  ``<launch>.fed`` after the last byte.
 * ``<launch>.exit``: the CLI's wait status (``status``, ``code``, ``label``), or the label
   ``not_started`` when no CLI started.
 
