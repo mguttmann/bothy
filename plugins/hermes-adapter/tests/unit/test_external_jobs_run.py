@@ -59,8 +59,8 @@ class Jobs:
         self.tmp = tmp
         self.started: list[tuple[Detached, tuple[str | None, str | None]]] = []
 
-    def spawn(self) -> Detached:
-        job = spawn_detached(self.tmp)
+    def spawn(self, on_term: str = "exit") -> Detached:
+        job = spawn_detached(self.tmp, on_term)
         self.started.append(
             (job, (jobs.process_start(job.supervisor), jobs.process_start(job.worker)))
         )
@@ -203,6 +203,68 @@ async def test_an_early_end_of_the_run_kills_the_job(
         assert wait_gone(job.worker, starts[1])
     view = r.fake.run_state(triggered.run_id)
     assert (view.state, view.state_reason) == ("failed", "runtime_error")
+
+
+def _notices(r: Rig) -> list[dict[str, Any]]:
+    return [m for m in r.fake.messages if m.get("run_id") is None]
+
+
+async def test_a_stopping_run_still_covers_a_job_that_ignores_sigterm(
+    tmp_path: Path, registry: JobRegistry, detached: Jobs
+) -> None:
+    box: list[Any] = []
+
+    async def script(turn: TurnRequest, rt: FakeRuntime) -> TurnOutcome:
+        job = detached.spawn("ignore")
+        box.append(job)
+        registry.register(turn.thread_id, job.supervisor, TITLE)
+        await rt.events.on_answer(turn.thread_id, "Started the job.", str(turn.message_id))
+        return TurnOutcome.COMPLETED
+
+    rt = FakeRuntime(script=script)
+    async with rig(tmp_path, runtime=rt, jobs=registry, **FAST) as r:
+        watch = r.handler.start_job_watch()
+        try:
+            triggered = await r.fake.trigger()
+            await r.until(lambda: _steps(r, triggered.run_id, "background_job"), "the job step")
+            await r.fake.cancel(triggered.run_id)
+            await r.until(lambda: r.finished(triggered.run_id), "the end of the run")
+            [job] = box
+            starts = detached.starts(job)
+            assert wait_gone(job.supervisor, starts[0])
+            await r.handler.sweep_jobs()
+        finally:
+            watch.cancel()
+    # The job was being stopped by its run: no notice of a job without a run.
+    assert _notices(r) == []
+    assert registry.records() == []
+
+
+async def test_an_ending_run_still_covers_a_job_that_cleans_up_after_sigterm(
+    tmp_path: Path, registry: JobRegistry, detached: Jobs
+) -> None:
+    box: list[Any] = []
+
+    async def script(turn: TurnRequest, rt: FakeRuntime) -> TurnOutcome:
+        job = detached.spawn("slow")
+        box.append(job)
+        registry.register(turn.thread_id, job.supervisor, TITLE)
+        return TurnOutcome.FAILED
+
+    rt = FakeRuntime(script=script)
+    async with rig(tmp_path, runtime=rt, jobs=registry, **FAST) as r:
+        watch = r.handler.start_job_watch()
+        try:
+            triggered = await r.fake.trigger()
+            await r.until(lambda: r.finished(triggered.run_id), "the end of the run")
+            [job] = box
+            starts = detached.starts(job)
+            assert wait_gone(job.supervisor, starts[0])
+            await r.handler.sweep_jobs()
+        finally:
+            watch.cancel()
+    assert _notices(r) == []
+    assert registry.records() == []
 
 
 async def test_a_reused_pid_neither_holds_the_run_nor_is_killed(

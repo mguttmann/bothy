@@ -21,17 +21,27 @@ from pathlib import Path
 from bothy_hermes_adapter import jobs
 
 _SUPERVISOR = """
-import subprocess, sys, time
+import os, signal, subprocess, sys, time
+on_term = sys.argv[2]
 worker = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(600)"])
+if on_term == "ignore":
+    signal.signal(signal.SIGTERM, signal.SIG_IGN)
+elif on_term == "slow":
+    def _slow(*_):
+        time.sleep(1.0)
+        os._exit(0)
+    signal.signal(signal.SIGTERM, _slow)
 open(sys.argv[1] + ".tmp", "w").write(str(worker.pid))
-__import__("os").replace(sys.argv[1] + ".tmp", sys.argv[1])
+os.replace(sys.argv[1] + ".tmp", sys.argv[1])
 worker.wait()
+if on_term == "ignore":
+    time.sleep(600)
 """
 
 _LAUNCHER = """
 import json, os, subprocess, sys
 sup = subprocess.Popen(
-    [sys.executable, "-c", sys.argv[1], sys.argv[2]],
+    [sys.executable, "-c", sys.argv[1], sys.argv[2], sys.argv[3]],
     stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
     start_new_session=True,
 )
@@ -47,11 +57,15 @@ class Detached:
     worker: int
 
 
-def spawn_detached(tmp: Path) -> Detached:
-    """Start a detached supervisor with a worker; return both PIDs once both run."""
+def spawn_detached(tmp: Path, on_term: str = "exit") -> Detached:
+    """Start a detached supervisor with a worker; return both PIDs once both run.
+
+    ``on_term`` is what the supervisor does on ``SIGTERM``: ``exit`` (the default action),
+    ``slow`` (it cleans up for a second, then exits) or ``ignore`` (only ``SIGKILL`` ends it).
+    """
     marker = tmp / f"worker-{time.monotonic_ns()}"
     out = subprocess.run(
-        [sys.executable, "-c", _LAUNCHER, _SUPERVISOR, str(marker)],
+        [sys.executable, "-c", _LAUNCHER, _SUPERVISOR, str(marker), on_term],
         capture_output=True,
         text=True,
         check=True,

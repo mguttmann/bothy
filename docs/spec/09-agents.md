@@ -3021,8 +3021,8 @@ the adapter). This section mirrors the background work of the runner (18.5) for 
    the stall notice; its end (the process gone, a different start time, or its record removed)
    completes the step. Stop and every early end send `SIGTERM` and after 5 seconds `SIGKILL` to
    the job's process group when the job leads one, else to the process, each only after the
-   PID's start time matched again, never to the adapter's own process or group. A live job no
-   open run covers (its run ended at a restart, or it was registered outside a run) is not
+   PID's start time matched again, never to the adapter's own process or group. A run that
+   stops its jobs covers them until the stop returns. A live job no open run covers (its run ended at a restart, or it was registered outside a run) is not
    adopted by a later run: the adapter posts it once in its thread as a message of the agent
    without a run (section 14), with its title, PID, start time, job ID and the operator's stop
    command `job stop --profile-home <home> --job-id <ID>`, and removes the records of ended

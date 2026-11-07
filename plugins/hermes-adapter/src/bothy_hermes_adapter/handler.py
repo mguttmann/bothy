@@ -297,6 +297,9 @@ class HermesHandler(AgentHandler):
         self._anchors: dict[UUID, bool] = {}
         self._inbound: dict[UUID, tuple[RunContext, ChannelBehavior | None]] = {}
         self._channels: dict[UUID, tuple[int, ChannelBehavior]] = {}
+        # Runs that stop their work now, by thread: the run's start in wall time. Such a run
+        # still covers its jobs until they are stopped (09 17.12 point 8).
+        self._stopping: dict[UUID, float] = {}
         self._tool_class = self._read_tool_class()
         self._voice_input = self._read_voice_input()
         self._tasks: set[asyncio.Task[Any]] = set()
@@ -733,13 +736,19 @@ class HermesHandler(AgentHandler):
                 outcome = TurnOutcome.FAILED
             if _gone(turn):
                 return  # cancelled or ended by the server while it held the work
-        turn.ended = True
-        if turn.live is not None:
-            turn.live.end(failed=outcome is not TurnOutcome.COMPLETED)
-        await self._flush_edits(turn)
-        if turn.abort_reason is not None or outcome is not TurnOutcome.COMPLETED:
-            # A run never ends while work it covers goes on unseen (R-AG-44).
-            await self._cancel_work(turn)
+        cancel = turn.abort_reason is not None or outcome is not TurnOutcome.COMPLETED
+        if cancel:
+            self._stopping[turn.thread_id] = turn.started_wall
+        try:
+            turn.ended = True
+            if turn.live is not None:
+                turn.live.end(failed=outcome is not TurnOutcome.COMPLETED)
+            await self._flush_edits(turn)
+            if cancel:
+                # A run never ends while work it covers goes on unseen (R-AG-44).
+                await self._cancel_work(turn)
+        finally:
+            self._stopped(turn)
         metrics, costs = self._usage(turn)
         if turn.abort_reason is not None:
             await handle.finish("failed", reason=turn.abort_reason, metrics=metrics, costs=costs)
@@ -942,7 +951,23 @@ class HermesHandler(AgentHandler):
         turn.handle.patch.set_metric("background_jobs", counts[1])
 
     async def _cancel_work(self, turn: _Turn) -> None:
-        """Stop the work of the run: delegations interrupted, processes killed (R-AG-44)."""
+        """Stop the work of the run: delegations interrupted, processes killed (R-AG-44).
+
+        The run covers its registered jobs until they are stopped, so the job watch never takes
+        a job being stopped for one without a run.
+        """
+        self._stopping[turn.thread_id] = turn.started_wall
+        try:
+            await self._stop_work(turn)
+        finally:
+            self._stopped(turn)
+
+    def _stopped(self, turn: _Turn) -> None:
+        """The run no longer stops its work; a job still alive now is one without a run."""
+        if self._stopping.get(turn.thread_id) == turn.started_wall:
+            del self._stopping[turn.thread_id]
+
+    async def _stop_work(self, turn: _Turn) -> None:
         try:
             await self.runtime.cancel_background(turn.thread_id)
         except Exception as exc:  # the run still ends; the log names the failure
@@ -1018,6 +1043,9 @@ class HermesHandler(AgentHandler):
 
     def _covers(self, record: JobRecord) -> bool:
         """Whether an open run of the job's thread started before the job (17.12 point 8)."""
+        stopping = self._stopping.get(record.thread_id)
+        if stopping is not None and record.started_at >= stopping:
+            return True  # its run stops it now
         turn = self._turns.get(record.thread_id)
         return (
             turn is not None
@@ -1208,11 +1236,15 @@ class HermesHandler(AgentHandler):
 
     async def _abandon(self, turn: _Turn) -> None:
         """A cancelled run: interrupt the turn, cancel its work, drop later callbacks (09 8)."""
-        turn.dropped = True
-        if turn.live is not None:
-            turn.live.drop()
-        await self._interrupt(turn)
-        await self._cancel_work(turn)
+        self._stopping[turn.thread_id] = turn.started_wall
+        try:
+            turn.dropped = True
+            if turn.live is not None:
+                turn.live.drop()
+            await self._interrupt(turn)
+            await self._cancel_work(turn)
+        finally:
+            self._stopped(turn)
 
     async def _interrupt(self, turn: _Turn) -> None:
         if turn.interrupted:
