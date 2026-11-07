@@ -469,7 +469,7 @@ outside the launchd job's group, and:
    its own write end and sends SIGUSR1 to the keeper after `process_matches`.
 
 The runner opens its own write end with `O_WRONLY | O_NONBLOCK`; `ENXIO` (no reader) means the
-turn is gone and is never a hang. After a restart the next runner opens the recorded named pipe
+turn takes no more input and is never a hang. After a restart the next runner opens the recorded named pipe
 of the turn's current launch again and writes follow-ups as before; the last clause of D-M2-35-3 ("an adopted turn takes no follow-up")
 is replaced, and the rest of D-M2-35-3 (follow-ups held before the turn starts, rewritten with
 their original `uuid`) stays.

@@ -87,6 +87,12 @@ mcp_stdio_runners = ["npx", "uvx"]
 # folder <channel_skills_dir>/<name>/ as a plugin, only in turns of tool class host. Empty (the
 # default) turns channel skills off, and the runner then reads no skill references at all.
 channel_skills_dir = ""
+# Turn handover (docs/spec/09-agents.md 18.19.3 to 18.19.7): off by default. On, every turn runs
+# under a keeper with a named pipe as stdin, SIGTERM hands live turns over instead of ending them
+# (exit 75), the next runner adopts them with full rights, and the heartbeat reports the
+# capability turn_handover. Switch it on only against a server that accepts that capability
+# (16 10.1); `claude-code-runner stop --turns` ends every turn on purpose.
+turn_handover = false
 # Roots of answer attachments by name only; an operator may narrow the list, never widen it.
 attach_allowed_roots = ["project", "thread_inbox", "runner_temp"]
 # Denied names of answer attachments; must contain the list of 09 18.10, may add more.

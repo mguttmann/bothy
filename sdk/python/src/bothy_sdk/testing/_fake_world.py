@@ -158,7 +158,7 @@ class World:
         costs: Accept ``RunFinish.costs`` (the server books them from M2-22 on).
     """
 
-    def __init__(  # noqa: PLR0913 - the world's inputs are explicit
+    def __init__(  # noqa: PLR0913, PLR0915 - the world's inputs and members are explicit
         self,
         clock: FakeClock,
         timings: Mapping[str, float],
@@ -174,6 +174,8 @@ class World:
         self.billing_mode = billing_mode
         self.tool_class = tool_class
         self.append = append
+        self.launch_refusal: str | None = None
+        """The reason ``checkRunLaunch`` refuses with, ``None`` to allow (09 18.19.6)."""
         self.instance_id = uuid7()
         self.sync_epoch = uuid7()
         self.space_id = uuid7()
@@ -1039,6 +1041,26 @@ class World:
             run.live["status_line"] = body["status_line"]
         self.transition(run, "waiting_input")
         return self.run_doc(run)
+
+    def launch_check(self, run_id: str) -> dict[str, Any]:
+        """``checkRunLaunch`` (09 18.19.6, R-AG-48): allowed while the run is ``running``.
+
+        ``launch_refusal`` scripts a failed check (for example ``agent_not_reachable`` after the
+        person lost ``trigger``, or ``tool_class_owner_only``); a run that is no longer
+        ``running`` answers ``run_not_running``. Both are ``409 conflict`` with the reason.
+
+        Returns:
+            The configured tool class and billing mode (``RunWakeCheckResult``).
+
+        Raises:
+            FakeProblem: ``conflict`` with the reason of the failed check.
+        """
+        run = self.run_or_404(run_id)
+        if run.state != "running":
+            raise FakeProblem("conflict", reason="run_not_running")
+        if self.launch_refusal is not None:
+            raise FakeProblem("conflict", reason=self.launch_refusal)
+        return {"tool_class": self.tool_class, "billing_mode": self.billing_mode}
 
     def finish(self, run_id: str, body: Any) -> dict[str, Any]:
         """``finishRun`` with the server's reason rules."""

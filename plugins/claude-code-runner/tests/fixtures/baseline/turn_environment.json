@@ -1,0 +1,13 @@
+{
+  "ANTHROPIC_API_KEY": "<api-key>",
+  "CLAUDE_CONFIG_DIR": "<root>/state/claude-config/organization",
+  "CLAUDE_PRODUCT_RUN": "1",
+  "HOME": "<root>/home",
+  "LANG": "C.UTF-8",
+  "LOGNAME": "alex",
+  "PATH": "<root>/bin:/usr/bin:/bin",
+  "SHELL": "/bin/sh",
+  "TERM": "dumb",
+  "TMPDIR": "<root>/state/tmp/<id-1>",
+  "USER": "alex"
+}

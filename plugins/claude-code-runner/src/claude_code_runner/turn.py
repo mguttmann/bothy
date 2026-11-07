@@ -24,10 +24,10 @@ import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import IO, Any
+from typing import IO, Any, Protocol
 
 from claude_code_runner.statedir import ensure_private_dir, write_private
-from claude_code_runner.stop import stop_group
+from claude_code_runner.stop import StoppableGroup, stop_group
 
 __all__ = [
     "Turn",
@@ -247,8 +247,15 @@ class Turn:
         return str(code)
 
 
+class _Ending(StoppableGroup, Protocol):
+    """A turn `terminate` can end: a group to stop that can be awaited."""
+
+    async def wait(self, timeout: float, poll: float = 0.02) -> bool:
+        """Wait for the exit (True once it ended)."""
+
+
 async def terminate(
-    turn: Turn,
+    turn: _Ending,
     stop_grace: float,
     kill_grace: float,
     poll: float,

@@ -39,6 +39,7 @@ __all__ = [
     "RecoveryState",
     "ResumeSameReference",
     "Retry",
+    "attempt_kind",
     "box_note",
     "next_action",
 ]
@@ -80,6 +81,37 @@ class RecoveryState:
             The new state.
         """
         return replace(self, **changes)
+
+    def to_record(self) -> dict[str, bool]:
+        """The flags of the turn record (``recovery``), part of every ``launching`` record.
+
+        Returns:
+            ``compacted``, ``session_replaced`` and ``session_resumed``.
+        """
+        return {
+            "compacted": self.compacted,
+            "session_replaced": self.session_replaced,
+            "session_resumed": self.session_resumed,
+        }
+
+    @classmethod
+    def from_record(cls, raw: object, *, compact_supported: bool = True) -> RecoveryState:
+        """The flags a turn record proves (09 18.19.6: a kind is never used twice).
+
+        Args:
+            raw: The record's ``recovery`` member.
+            compact_supported: Whether the pinned CLI takes ``/compact`` in print mode.
+
+        Returns:
+            The state; a missing flag counts as unused.
+        """
+        flags = raw if isinstance(raw, Mapping) else {}
+        return cls(
+            compacted=flags.get("compacted") is True,
+            session_replaced=flags.get("session_replaced") is True,
+            session_resumed=flags.get("session_resumed") is True,
+            compact_supported=compact_supported,
+        )
 
 
 @dataclass(frozen=True)
@@ -198,6 +230,32 @@ def next_action(  # noqa: PLR0911, PLR0913 - one answer per row; every input is 
             return Fail("runtime_error", end.errors)
         return ResumeSameReference()
     return Fail("runtime_error", end.errors)
+
+
+def attempt_kind(action: Action | None) -> str:
+    """The kind of the attempt an action starts, as its ``launching`` record names it (18.19.5).
+
+    Args:
+        action: The recovery action, ``None`` for the run's first attempt.
+
+    Returns:
+        ``first``, ``compaction``, ``retry``, ``resume_same_reference`` or ``new_session``.
+
+    Raises:
+        ValueError: An action that starts no process.
+    """
+    if action is None:
+        return "first"
+    kinds: dict[type[Any], str] = {
+        Compact: "compaction",
+        Retry: "retry",
+        ResumeSameReference: "resume_same_reference",
+        NewSession: "new_session",
+    }
+    kind = kinds.get(type(action))
+    if kind is None:
+        raise ValueError(type(action).__name__)
+    return kind
 
 
 def box_note(

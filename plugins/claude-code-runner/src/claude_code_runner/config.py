@@ -201,6 +201,10 @@ class RunnerConfig:
         channel_skills_dir: ``runner.channel_skills_dir``: the folder of channel skills for
             ``claude-code:<name>`` references, loaded only in ``host`` turns (26 5.9); ``None``
             (empty in the file, the default) turns channel skills off.
+        turn_handover: ``runner.turn_handover``: the keeper, the named pipe, the launch
+            handshake, the phases in the turn record, the handover at SIGTERM and the adoption
+            with full rights (09 18.19.3 to 18.19.7), and the capability ``turn_handover``; off
+            by default, and off the runner behaves exactly as before stage AR (AR-T16).
     """
 
     source: Path
@@ -251,6 +255,7 @@ class RunnerConfig:
     hosted_secrets_dir: Path | None = None
     mcp_stdio_runners: tuple[str, ...] = DEFAULT_STDIO_RUNNERS
     channel_skills_dir: Path | None = None
+    turn_handover: bool = False
 
 
 _Parse = Callable[[Any], Any]
@@ -660,6 +665,7 @@ def load_config(path: Path) -> RunnerConfig:
         hosted_secrets_dir=_hosted_secrets_dir(r),
         mcp_stdio_runners=_stdio_runners(r),
         channel_skills_dir=_channel_skills_dir(r),
+        turn_handover=r.get("turn_handover", bool, False),
     )
     r.unknown()
     if config.hosted_agents:

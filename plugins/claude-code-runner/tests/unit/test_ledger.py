@@ -172,3 +172,27 @@ def test_finishing_keeps_its_summary() -> None:
         "reason": "adapter_error",
         "summary": None,
     }
+
+
+def test_process_start_is_set_at_begin_and_never_moved_by_a_checkpoint() -> None:
+    # 09 18.19.7: process_start is where the process's lines begin; a checkpoint moves only
+    # the offset, and every adopter writes process_start again (AR-T02 (a)).
+    ledger = TurnLedger.begin("turn", 120)
+    ledger.line({"type": "result", "subtype": "success"}, 150, 190)
+    ledger.checkpoint(190)
+    record = ledger.to_record()
+    assert record["process_start"] == 120
+    assert record["offset"] == 150
+    adopted = TurnLedger.from_record(record)
+    assert adopted.process_start == 120
+    again = TurnLedger.from_record(adopted.to_record())
+    assert again.process_start == 120
+
+
+def test_process_start_of_a_later_process_and_of_an_old_record() -> None:
+    first = TurnLedger.begin("turn", 0)
+    second = TurnLedger.begin("compaction", 300, first)
+    assert second.process_start == 300
+    # A record written before process_start existed replays nothing: its start is its offset.
+    assert TurnLedger.from_record({"kind": "turn", "offset": 77}).process_start == 77
+    assert TurnLedger.from_record({"offset": 77, "process_start": -3}).process_start == 77

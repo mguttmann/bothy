@@ -1,11 +1,15 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Byte-equal fixtures of the runner without the hosting keys (BA-T20, hosting part).
+"""Byte-equal fixtures of the runner without the hosting keys (BA-T20, hosting part, AR-T16).
 
 docs/spec/26-builtin-agents.md 3.2 item 4 and 11 item 3: without ``runner.hosted_agents`` the
 runner's command line per tool class, its heartbeat bodies and its served channels equal the
 fixtures recorded from the version before stage A1 (``tests/fixtures/baseline``, its README says
 how). The served forum carries channel skills of both forms (``claude-code:<name>`` and a
 reference of another adapter), which the runner without a key ignores.
+
+AR-T16 (docs/spec/09-agents.md 18.19.13) adds the turn's environment and its stdin handling (the
+lines a turn gets, in their order, and the end of its input) without any key of stage AR
+(``runner.turn_handover``); those fixtures were recorded from the runner before ticket AR-03.
 
 Values that differ between two runs of the same scenario are replaced by stable names before the
 comparison: the scenario's temporary folder by ``<root>``, the forums, agent and instance by
@@ -152,3 +156,59 @@ async def test_served_channels(world: World) -> None:
         for channel_id in cache._configs  # the cache as the runner holds it
     ]
     check("served_channels.json", normalized(served, world))
+
+
+def _environment(world: World, env: dict[str, str]) -> dict[str, str]:
+    """The turn's environment with the test's API key canary named (never a real key).
+
+    Variables the host's C library adds to every child (``__CF_*`` on macOS) are no part of
+    the runner's environment and are left out.
+    """
+    from scenarios.conftest import API_KEY
+
+    return {
+        k: ("<api-key>" if v == API_KEY else v)
+        for k, v in sorted(env.items())
+        if not k.startswith("__CF_")
+    }
+
+
+_AT = re.compile(r"at=\d{4}-\d\d-\d\dT[0-9:.]+Z")
+
+
+async def test_turn_environment(world: World) -> None:
+    # AR-T16: without runner.turn_handover the turn's environment equals the fixture.
+    world.scenario(fixture="plain")
+    await world.start()
+    run = await world.fake.trigger("Hello", channel_id=world.forum_a)
+    assert await world.ended(run.run_id) == "completed"
+    [turn] = world.turns()
+    check("turn_environment.json", normalized(_environment(world, turn["env"]), world))
+
+
+async def test_stdin_handling(world: World) -> None:
+    # AR-T16: the stdin lines of a turn with a follow-up, in their order, and the end of input
+    # after the last result, equal the fixture without runner.turn_handover.
+    gate = world.gate("turn_gate")
+    world.scenario(fixture="plain", turn_gate=str(gate))
+    await world.start()
+    run = await world.fake.trigger("Fix the form", channel_id=world.forum_a)
+    await world.until(lambda: len(world.calls("gate_wait")) == 1)
+    message_id = await world.fake.deliver_followup(run.run_id, "Also the footer", author="sam")
+    await world.until(lambda: world.fake.followup_state(run.run_id, message_id) == "delivered")
+    world.release(gate)
+    assert await world.ended(run.run_id) == "completed"
+    [turn] = world.turns()
+    calls = [c for c in world.calls("stdin") + world.calls("stdin_eof") if c["pid"] == turn["pid"]]
+    # The fixture holds the parsed lines (their ids and times named); the bytes of each line are
+    # held here: compact JSON, non-ASCII unescaped, members in their order.
+    for c in calls:
+        if c["kind"] == "stdin":
+            raw = c["line"].rstrip("\n")
+            assert raw == json.dumps(json.loads(raw), ensure_ascii=False, separators=(",", ":"))
+    events = [
+        {"kind": c["kind"], **({"line": json.loads(c["line"])} if c["kind"] == "stdin" else {})}
+        for c in calls
+    ]
+    # The FakeServer's clock moves with the machine: the message times are named.
+    check("stdin_handling.json", _AT.sub("at=<time>", normalized(events, world)))

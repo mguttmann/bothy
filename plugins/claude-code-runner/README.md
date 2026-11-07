@@ -32,7 +32,7 @@ the title once per new session and reports the cost of the run.
 
 | Path | Content |
 |---|---|
-| `src/claude_code_runner/__main__.py` | Commands `run --config <path>` and `check-config --config <path>` |
+| `src/claude_code_runner/__main__.py` | Commands `run --config <path>`, `check-config --config <path>` and `stop --turns --config <path>` |
 | `config.py`, `secrets.py` | TOML configuration with its checks; `secret_ref` values (`file`, `env`) read fresh per use |
 | `app.py` | Handler of the SDK run loop (acceptance answers, prepare, execute, follow-ups, stop hook), adoption at start, start and stop |
 | `runturn.py` | The turn processes of one run: recovery, follow-ups on stdin, stop, answers, box notes, finish, turn record |
@@ -60,6 +60,10 @@ the title once per new session and reports the cost of the run.
 | `tests/real_cli/` | Tests against the installed CLI, only behind switches (see below) |
 | `tests/realserver/` | The end-to-end suite: the runner with Fake-Claude against the server of this tree (`make adapters-e2e`) |
 | `tests/fixtures/baseline/`, `tests/unit/test_byte_equal_baseline.py` | The command line, heartbeats and served channels of the runner without the keys of stage A1, recorded before A1-04 and compared byte for byte (BA-T20) |
+| `keeper.py`, `launch.py` | With `runner.turn_handover`: the keeper program of one launch, and the runner's side of the launch handshake, the group of keeper and CLI, the named pipe writer and the cases of a `launching` record (09 18.19.4, 18.19.5) |
+| `processstate.py` | `ProcessState`: every stream-derived value of the stdin and stop rule, and its replay (09 18.19.7) |
+| `handover.py` | The handover at SIGTERM (exit 75) and `stop --turns` (09 18.19.3) |
+| `tests/unit/test_keeper.py`, `test_launch.py`, `test_processstate.py`, `tests/scenarios/test_handover.py`, `test_launch_crash_points.py` | The keeper, the handshake, the replay with the class test over every Fake-Claude stream and checkpoint, AR-T02, AR-T03 and AR-T04 against real runner processes |
 | `tests/hosting_world.py` | The scenario world of a hosting runner: the runner's FakeServer with the hosting operations and one FakeServer per hosted agent |
 
 ## Configuration
@@ -317,6 +321,58 @@ level-one switch test holds them against the installed CLI.
   `client_msg_id` is stored before the send, an input counts as answered by its own `uuid`, the
   decided end is stored before the costs, and a process keeps its kind.
   `tests/unit/test_crash_points.py` enumerates every first and second crash point.
+
+## Turn handover (09 18.19.3 to 18.19.7, AR-03)
+
+Off by default (`runner.turn_handover = false`); without the key the runner behaves exactly as
+before, held by the byte-equal fixtures of `tests/fixtures/baseline` (AR-T16). Switch it on only
+against a server that accepts the heartbeat capability `turn_handover` and has
+`run.launch.check` (16 10.1); the runner then reports `turn_handover: true`.
+
+- **Keeper.** Every process of a run (an attempt) runs under `python -m
+  claude_code_runner.keeper`, started with `start_new_session=True`, so keeper and CLI live in
+  their own session and process group outside the service. The keeper opens the attempt's named
+  pipe (`<launch>.stdin`) for reading, then for writing (it holds that write end for the turn's
+  life), forks the CLI, names it in `<launch>.cli` before it releases it, writes the attempt's
+  initial inputs once without blocking and then `<launch>.fed`, ignores SIGINT, SIGTERM, SIGHUP and
+  SIGPIPE, closes its write end on SIGUSR1, writes the CLI's wait status to `<launch>.exit` and
+  exits with the CLI's code (128 plus the signal number when a signal ended it). It holds no lock
+  descriptor after the fork. The pinned CLI does not end its input when the last writer of a named
+  pipe closes (macOS, 09 18.19.12), so the keeper relays the named pipe into an anonymous pipe that
+  is the CLI's stdin and closes that pipe when the named pipe's last writer is gone.
+- **Launch files.** `<launch>` is `<runner.state_dir>/turns/<run_id>.<attempt>.<try>`:
+  `.inputs` (the initial input lines), `.spec` (the CLI's argument list, environment, folder and
+  files, mode `0600`; the keeper removes it at once, because the environment can hold the API key),
+  `.stdin`, `.keeper`, `.cli`, `.exit` and `.fed`; `turns/<run_id>.lines` keeps the run's input
+  lines for a next runner. All of them go when the run ends.
+- **Handshake.** The record is written before each step: phase `launching` with the attempt
+  (number, kind `first`, `compaction`, `retry`, `resume_same_reference` or `new_session`, try,
+  initial input ids, recovery flags, outage number, `process_start`), then the keeper's identity
+  with `go_sent`, and only then the go byte; the CLI's identity in phase `process`. Follow-ups
+  wait for `<launch>.fed`. A next runner settles a `launching` record by the four cases of 18.19.5
+  (`launch_settled`).
+- **Phases.** The record carries `preparing`, `waiting_lock`, `transcribing`, `launching`,
+  `process` or `compaction_retry`. A next runner removes a `preparing` or `waiting_lock` record (the
+  inbox restart starts the run again with one `run.start`), starts a `transcribing` run over,
+  launches a recorded retry, and adopts or relaunches by the cases above.
+- **Handover.** SIGTERM takes no new run, sends no further heartbeat, finishes an input line in
+  flight within `runner.kill_grace` or records its byte count (`partial_input`), closes a launch
+  pipe whose go byte is not recorded, logs `turn_handed_over` per turn and exits 75 when at least
+  one turn was handed over, else 0. Hosted agents' turns are stopped as before.
+- **Adoption with full rights.** The adopter replays the stream lines from `process_start` to the
+  stored offset into `ProcessState` with the adoption time (nothing is posted or patched again,
+  `turn_replayed`), then reads on, takes follow-ups and further inputs, applies the stdin rule and
+  the stop after an error, and handles the end like its own (classification from the stream and
+  `<launch>.exit`, then compaction or session recovery within the once-per-run limits the record
+  proves). Before any launch of a run it did not accept it calls `run.launch.check`
+  (`launch_check_allowed`, `launch_check_refused`, `launch_check_unreachable`). A turn whose stdin
+  was closed and a compaction are adopted with reading rights only; a record without a named pipe
+  is adopted as before.
+- **`claude-code-runner stop --turns --config <path>`.** Stops every turn on purpose: a running
+  runner (named in `<runner.state_dir>/runner.pid`) gets the marker `stop-turns` and SIGTERM and
+  stops its own and adopted turns as in 18.6; the command then stops the turns of the records left
+  itself, each run ending `cancelled` with `adapter_stopped`, and exits 0. Run it before unloading
+  or uninstalling the service.
 
 ## Costs
 
@@ -666,6 +722,8 @@ no login of the developer is touched. The real CLI runs only behind switches:
   reads occur in the files of the installed CLI (`test_pinned_cli.py`); a missing CLI fails. The
   pinned CLI can be installed into a temporary folder from the npm package of the platform
   (`@anthropic-ai/claude-code-<platform>` at the pinned version) without a login.
+  `test_named_pipe.py` runs the pinned CLI with a named pipe as stdin against a local stand-in for
+  the API on loopback (no login, no model call), directly and under the keeper (09 18.19.12).
 - Level two, additionally `CLAUDE_CODE_RUNNER_REAL_TURN=1` and `CLAUDE_CODE_RUNNER_REAL_KEY_FILE`:
   `auth status` per mode, two short real turns (one `--resume`) and one turn with a background
   command that checks what 09 18.5 "Background work" relies on. It uses the operator's key or
