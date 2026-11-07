@@ -161,7 +161,7 @@ def test_plugin_entry_imports_neither_hermes_nor_the_platform() -> None:
     )
     assert done.stdout.strip() == (
         "['bothy', 'pre_llm_call', 'on_session_reset', 'post_api_request', 'on_session_end', "
-        "'pre_tool_call'] []"
+        "'pre_tool_call', 'post_llm_call', 'post_tool_call'] []"
     ), done.stdout + done.stderr
 
 

@@ -29,6 +29,7 @@ from bothy_hermes_adapter.config import AdapterSettings
 from bothy_hermes_adapter.handler import HermesHandler
 from bothy_hermes_adapter.heartbeat import HermesAdapterLoop
 from bothy_hermes_adapter.jobs import JobRegistry
+from bothy_hermes_adapter.mirror import MirrorMap
 from bothy_hermes_adapter.runtime import (
     BackgroundTask,
     CardRequest,
@@ -280,6 +281,7 @@ async def rig(
     tamper: Rewrite | None = None,
     commands: Any = None,
     jobs: JobRegistry | None = None,
+    mirror: MirrorMap | None = None,
     **settings: Any,
 ) -> AsyncIterator[Rig]:
     """Start everything; stop and close on exit.
@@ -299,7 +301,9 @@ async def rig(
     state.parent.chmod(0o700)
     adapter_settings = settings_for(server, root, **settings)
     store = CallbackStore(state / "hermes.sqlite3")
-    handler = HermesHandler(rt, adapter_settings, store, busy_mode=busy_mode, jobs=jobs)
+    handler = HermesHandler(
+        rt, adapter_settings, store, busy_mode=busy_mode, jobs=jobs, mirror=mirror
+    )
     rt._events = handler
     config = AdapterConfig(
         base_url=server.base_url,

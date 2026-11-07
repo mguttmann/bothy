@@ -27,6 +27,7 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID
 
+from bothy_hermes_adapter.config import platform_extra
 from bothy_hermes_adapter.installer import (
     InstallError,
     InstallRequest,
@@ -144,19 +145,6 @@ def locate(name: str) -> Path | None:
     if spec is None or not spec.submodule_search_locations:
         return None
     return Path(next(iter(spec.submodule_search_locations)))
-
-
-def platform_extra(config: Any, platform_key: str) -> dict[str, Any]:
-    """The ``extra`` mapping of ``gateway.platforms.<platform_key>`` (empty when missing).
-
-    Examples:
-        >>> platform_extra({"gateway": {"platforms": {"bothy": {"extra": {"a": 1}}}}}, "bothy")
-        {'a': 1}
-    """
-    node: Any = config
-    for key in ("gateway", "platforms", platform_key, "extra"):
-        node = node.get(key) if isinstance(node, dict) else None
-    return dict(node) if isinstance(node, dict) else {}
 
 
 def run_thread_action(bridge: Any, args: argparse.Namespace) -> int:

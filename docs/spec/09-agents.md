@@ -2609,6 +2609,7 @@ pin is a commit without a release tag, the newest release is older than the pin 
 | `on_processing_start(event)` | no operation (the start is already `run.start`) |
 | Plugin hooks `pre_llm_call` and `on_session_end` | the start and the end of a turn of the thread, also of a turn Hermes starts by itself (17.12); `pre_llm_call` also answers with the turn's user side (17.6) |
 | Plugin hook `pre_tool_call` | refuses every tool call of a session of the platform whose thread has no open run of the adapter, and of a session whose thread cannot be told, with a message that names the reason (17.12, R-AG-44) |
+| Plugin hooks of other platforms | `pre_llm_call`, `post_llm_call`, `post_tool_call` and `on_session_end` of a session of a platform `hermes_adapter.mirror_platforms` lists go to the session mirror (17.13, R-AG-57); without a mirror nothing happens |
 | `on_processing_complete(event, outcome)` | `run.finish` with `completed`, `failed` or `cancelled`, `costs`. Measured: after `/stop` comes `ProcessingOutcome.CANCELLED` |
 | `get_chat_info(chat_id)` | read thread and channel (`thread.read`) |
 | Hermes commands | Built (HERMES-CRON-COMMANDS). At connect the adapter declares its complete command list and the SDK reconciles it (10.2, D-M2-29-12). The Hermes commands that the server has as built-in commands (10.1) stay the server's and are never registered: `/stop` is the stop of section 8 (`/stop` via `handle_message`, item 3), `/new` a new session (`session.mode = new` after a reset, `/new` via `handle_message`; Hermes asks via `send_slash_confirm`, and the adapter answers through `tools.slash_confirm.resolve(session_key, confirm_id, "once")`, because the server has already checked the reset), `/resume` the rebinding (`bind`, `/resume <session ID> --all`, 17.4, 9.5), `/title` and `/status` the server's. A follow-up without configuration also works with `/steer <text>` (17.5), which the adapter does not use. The adapter's command table (`hermes_commands.COMMAND_CLASSES`) names every gateway command of the pinned version with its class and reason; a test fails when a pin update brings a command the table does not name, and commands of other Hermes plugins are never offered. Control commands (`control = true`, instance-wide, no options): `/context` and `/version`, which read the thread's Hermes session or Hermes itself and call no model. On `command.invoked` the adapter sends the bare `/<name>` (never an option value) via `handle_message` from its control sender (17.4) in the thread's session; Hermes answers an idle session through its normal processing and a busy one inline, both with `reply_to` = the command's message, and each text Hermes answers becomes a message of the agent in the thread without a run (`message.create` without `run_id` and without an invocation token, 10.4), also during a run of the thread. Every other gateway command is refused: it calls the model outside a run, changes the thread's session outside the server's session record, bypasses the server's follow-up, approval or card rules, reaches the host, or acts on the whole profile. Skill commands: every skill Hermes offers for the platform (its skill scan without the skills `skills.platform_disabled` turns off for the platform key) becomes a model command (`control = false`, instance-wide) with the optional `string` option `input`; a name that is no valid command name or that a built-in, a table row or a control command uses is left out, and the list never exceeds `command.max_per_principal`. A run with `trigger_kind = command` of such a skill is a turn whose text is Hermes' own skill invocation message for the skill and the `input` (`build_skill_invocation_message`, as Hermes' gateway builds it for `/<skill>`), with the format rules of 4.11 and the channel instructions on the user side of the turn (17.6) and no reply anchor: a command run has no run context (4.6 defines it for a triggering message, and the server answers `run.context.read` of any other trigger kind with `500 internal_error`), so the adapter does not read it (addendum of 2026-10-30, found by the end-to-end suite of HERMES-E2E-REAL-SERVER); any other command run is refused before the start (`failed`, `adapter_error`). Skills installed after the gateway start are declared at the next start. Evidence: the Fake-Hermes tests `test_commands_and_reports.py` and `test_command_table_covers_pinned_commands` against the pinned version, and the end-to-end suite `plugins/hermes-adapter/tests/realserver` against the server of this tree |
@@ -3056,6 +3057,79 @@ processes) and the Fake-Hermes tests
 `tests/fake_hermes/test_background_work.py` (also a detached job a `terminal` call registers with
 the helper, its thread and profile home taken from the shell Hermes gives the tool) and
 `tests/fake_hermes/test_result_turn_end.py` against the pinned version.
+
+### 17.13 Mirror of sessions outside the platform
+
+Addendum of 2026-11-07 (FEAT-hermes-mirror-sessions, R-AG-57,
+[design note](../design/hermes-session-mirror.md),
+docs/decisions.d/FEAT-hermes-mirror-sessions.md). Owner goal: a Hermes session that is not started
+from the server (a session another program drives over `hermes acp`, a `hermes` CLI session, a
+cron job) shows up as a chat of its own, so the owner sees every session of an agent. The mirror
+is off unless the profile turns it on.
+
+1. Configuration: `hermes_adapter.mirror_channel` (a forum where the agent writes, as a rule its
+   operator) and `hermes_adapter.mirror_platforms` (the foreign platform keys, a list or a comma
+   separated text, for example `acp`, `cli`, `cron`), both or neither in the platform section's
+   `extra`; the adapter's own platform key is refused in the list.
+2. Where it runs: Hermes loads the plugin in every process of the profile that runs an agent, and
+   the hooks fire in the process of the turn (in the pinned version the CLI and `hermes acp`
+   attach to the profile's gateway and run their turns there, `hermes cron run` runs in a process
+   of its own). The plugin entry passes the hooks `pre_llm_call`,
+   `post_llm_call` and `on_session_end` of a listed platform, and `post_tool_call` of a session
+   the mirror follows, to `bothy_hermes_adapter.mirror`, imported at the first such hook. The
+   mirror reads `gateway.platforms.<platform key>.extra` with Hermes' reader once per profile home
+   and process, at the hook, from the home Hermes resolves for the turn: a gateway that serves
+   several profiles (multiplex operation) runs their turns in one process, so each profile keeps
+   its own mirror, forum, agent identity and map, and a profile without the mirror stays off beside
+   one with it. The mirror writes with a client of its own (`User-Agent` adapter name `hermes-adapter-mirror`), like the
+   standalone sender of 17.9.
+3. Post per session: the first turn of a session opens a new post in the forum (`thread.create`,
+   title `<platform>: <first line of the prompt>`, at most `TITLE_CHARS` of the module, cut at a word) with the
+   request as its first message; every later turn of the same Hermes session ID goes into that
+   post. The map from session ID to post lives in `<profile home>/<platform key>/mirror.sqlite3`
+   (mode `0600` in the adapter's `0700` folder), so a restart of any process and a resume (ACP
+   `session/load`, CLI `--resume`, the same session ID) stay in the post; a session whose
+   `parent_session_id` is mapped (a compression) goes into the parent's post.
+4. Messages: the request is a message of the agent that starts with the line `**Request**
+   (<platform> session)` and quotes the prompt (the agent cannot write as the person or program
+   that sent it); the reply is the agent's text, followed by one line `Tools: <name> x<count>, ...`
+   when the turn called tools (names and counts only, never arguments or results). A turn that
+   ends without a reply posts `The turn ended without an answer (failed)` or `(interrupted)`, an
+   empty reply `The turn ended without a text answer.` All of them are messages without a run
+   (section 14), cut to `hermes_adapter.max_message_bytes` with a closing `(cut)` line;
+   attachments and non-text parts of a prompt are not mirrored (the request says how many parts
+   were left out).
+5. No run: a mirrored turn has no run and no steps; the tool line is its trace. The server opens
+   runs only for a person's message, a command or an interaction (03 `runs.trigger_kind`), and
+   rule 7 of 17.12 governs the sessions of the adapter's own platform, not a session another
+   program drives.
+6. Read-only: a person's message in a mirror post triggers a run of the operator by 3.4; the
+   adapter answers it without Hermes, the first time per post with the notice that the post is
+   read-only and messages do not reach the session, later without a message, and ends the run
+   `completed`. A model command there runs no skill, and a control command posts the same notice
+   once instead of running.
+7. Fail open: a hook never raises and never waits; it puts the event on a bounded queue
+   (`QUEUE_MAX` of the module) that one worker thread posts in order, and a full queue drops the
+   event and logs a count. A configuration that does not load, a mirror channel that is no forum,
+   or a refused `thread.create` with `403` or `404` turns the mirror off for the process with one
+   error line. A refused message in a mapped post with `404` or `410` forgets the post, so the
+   next turn opens a new one. Any other refusal, or a server that stays unreachable after the
+   client's retries, drops the event with a log line that names the code or the error type, never
+   a content; a session whose post could not be opened tries again at its next turn. Nothing is
+   buffered on disk; at the exit of the process the worker gets `EXIT_FLUSH_S` seconds, the
+   rest is dropped and counted.
+8. Nothing of a mirrored session goes anywhere but the mirror forum and the posts the mirror
+   opened there. Like a report channel (section 14), the mirror forum belongs in a space whose
+   readers may see what the sessions of the agent carry.
+
+Limits: a turn that fails before `post_llm_call` and without `on_session_end` leaves its request
+without an answer; the title stays the first prompt's; a process killed without its exit handlers
+loses the queued events; a root-level `<platform key>:` block is not read by the mirror. Evidence:
+`plugins/hermes-adapter/tests/unit/test_mirror.py` (several rounds, restart, resume and
+compression, an unreachable server, a wrong channel, a full queue, a person's message and a
+command in a mirror post) and the Fake-Hermes test `tests/fake_hermes/test_session_mirror.py` (a
+`hermes -z` session with a tool call and its resume with `hermes -r <session> -z` against the
+pinned version).
 
 ## 18. Reference adapter: Claude-Code-Runner (development forums)
 
@@ -4690,6 +4764,7 @@ PostgreSQL. Each test asserts what is stored, logged and shown.
 | R-AG-54 | A usage-window end keeps the run's background work and wakes the thread at the reset (18.19.10). | A session that runs on reaches the window by construction. |
 | R-AG-55 | Every run end carries the agent's end state and whether a wake-up is pending; a `waiting` end with nothing pending gets one nudge and then a visible note (18.19.11). | Freedom from silent ends as a data field, not a text heuristic. |
 | R-AG-56 | Without `runner.turn_handover` an orderly stop of the runner stops its live turns as in 18.6 and finishes their runs `cancelled` with `adapter_stopped`; it never orphans a turn (18.19.2). | Reproduced: SIGTERM left an orphan that held the locks and lost its work at the CLI's background ceiling, against 18.2 "Detachment". |
+| R-AG-57 | A Hermes session of a platform the profile lists for the mirror shows as one post of the mirror forum per session, without a run, read-only for people, and never holds or fails the session (17.13, addendum of 2026-11-07). | Owner goal: every session of an agent visible, also one another program drives; the foreign session must run on when the server is away. |
 
 ## 20. Alignment with the core contract
 
@@ -4778,6 +4853,8 @@ configuration of the respective program outside the server.
 | `hermes_adapter.background_poll_interval` | Hermes adapter | `2s` | how often a run that holds background work reads Hermes' registries (17.12) |
 | `hermes_adapter.background_settle` | Hermes adapter | `15s` | how long a run that saw background work stays open after the work ended and no turn of the thread ran, for the turn Hermes starts with the result (17.12) |
 | `hermes_adapter.background_progress_interval` | Hermes adapter | `2m` | while background work runs, `/metrics/progress_events` rises once per interval; must stay below the server's `run.stall_after` (17.12) |
+| `hermes_adapter.mirror_channel` | Hermes adapter | no default (mirror off) | forum of the session mirror; only with `hermes_adapter.mirror_platforms` (17.13) |
+| `hermes_adapter.mirror_platforms` | Hermes adapter | no default (mirror off) | foreign platform keys whose sessions are mirrored, for example `acp`, `cli`, `cron`; never the adapter's own key; only with `hermes_adapter.mirror_channel` (17.13) |
 | `runner.claude_bin` | Runner | `claude` | program, searched in the cleaned `PATH` |
 | `runner.git_bin` | Runner | `git` | program for the folder creation of 18.12, searched in the cleaned `PATH` |
 | `runner.provision_timeout` | Runner | `10m` | time limit of one folder creation (`git init` or `git clone`, 18.12) |

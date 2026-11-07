@@ -49,6 +49,7 @@ __all__ = [
     "ConfigError",
     "load_settings",
     "load_token",
+    "platform_extra",
 ]
 
 
@@ -72,6 +73,8 @@ _OWN_KEYS: Final = (
     "hermes_adapter.background_poll_interval",
     "hermes_adapter.background_settle",
     "hermes_adapter.background_progress_interval",
+    "hermes_adapter.mirror_channel",
+    "hermes_adapter.mirror_platforms",
 )
 KNOWN_KEYS: Final = frozenset((*_OWN_KEYS, *_SDK_KEYS))
 """Every dotted key the adapter reads from ``PlatformConfig.extra``."""
@@ -107,6 +110,10 @@ class AdapterSettings:
         background_settle: ``hermes_adapter.background_settle`` in seconds.
         background_progress_interval: ``hermes_adapter.background_progress_interval`` in
             seconds.
+        mirror_channel: ``hermes_adapter.mirror_channel``, the forum of the session mirror
+            (09 17.13), ``None`` without a mirror.
+        mirror_platforms: ``hermes_adapter.mirror_platforms``, the foreign platform keys whose
+            sessions are mirrored; empty without a mirror.
         sdk: The SDK settings of ``adapter.*`` and ``sdk.*``.
     """
 
@@ -121,6 +128,8 @@ class AdapterSettings:
     background_poll_interval: float = DEFAULT_BACKGROUND_POLL_INTERVAL
     background_settle: float = DEFAULT_BACKGROUND_SETTLE
     background_progress_interval: float = DEFAULT_BACKGROUND_PROGRESS_INTERVAL
+    mirror_channel: UUID | None = None
+    mirror_platforms: frozenset[str] = frozenset()
     sdk: SdkSettings = field(default_factory=SdkSettings)
 
 
@@ -160,6 +169,34 @@ def _duration(extra: Mapping[str, Any], key: str, default: float) -> float:
     return seconds
 
 
+def _mirror(extra: Mapping[str, Any], platform_key: str) -> tuple[UUID | None, frozenset[str]]:
+    """``hermes_adapter.mirror_channel`` and ``hermes_adapter.mirror_platforms`` (09 17.13).
+
+    Both or neither: half a mirror configuration is a typo, never a default.
+    """
+    channel_key, platforms_key = "hermes_adapter.mirror_channel", "hermes_adapter.mirror_platforms"
+    raw_channel, raw_platforms = extra.get(channel_key), extra.get(platforms_key)
+    if raw_channel is None and raw_platforms is None:
+        return None, frozenset()
+    if raw_platforms is None:
+        raise ConfigError(f"{platforms_key}: required with {channel_key}")
+    if raw_channel is None:
+        raise ConfigError(f"{channel_key}: required with {platforms_key}")
+    try:
+        channel = UUID(str(raw_channel).strip())
+    except ValueError:
+        raise ConfigError(f"{channel_key}: must be a UUID") from None
+    items = raw_platforms.split(",") if isinstance(raw_platforms, str) else raw_platforms
+    if not isinstance(items, list | tuple):
+        raise ConfigError(f"{platforms_key}: must be platform keys")
+    platforms = frozenset(str(item).strip().lower() for item in items)
+    if not platforms or not all(_PLATFORM_KEY.fullmatch(p) for p in platforms):
+        raise ConfigError(f"{platforms_key}: must be platform keys")
+    if platform_key in platforms:
+        raise ConfigError(f"{platforms_key}: the adapter's own platform is never mirrored")
+    return channel, platforms
+
+
 def load_settings(extra: Mapping[str, Any]) -> AdapterSettings:
     """Validate the adapter's keys of ``PlatformConfig.extra``.
 
@@ -196,6 +233,7 @@ def load_settings(extra: Mapping[str, Any]) -> AdapterSettings:
         # The SDK's message names the key; keep only the key part, never a value.
         name = next((k for k in sdk_values if k in str(exc)), "sdk")
         raise ConfigError(f"{name}: invalid value") from None
+    mirror_channel, mirror_platforms = _mirror(extra, platform_key)
     return AdapterSettings(
         platform_key=platform_key,
         consumer=consumer,
@@ -220,8 +258,30 @@ def load_settings(extra: Mapping[str, Any]) -> AdapterSettings:
             "hermes_adapter.background_progress_interval",
             DEFAULT_BACKGROUND_PROGRESS_INTERVAL,
         ),
+        mirror_channel=mirror_channel,
+        mirror_platforms=mirror_platforms,
         sdk=sdk,
     )
+
+
+def platform_extra(config: Any, platform_key: str) -> dict[str, Any]:
+    """The ``extra`` mapping of ``gateway.platforms.<platform_key>`` (empty when missing).
+
+    Args:
+        config: The profile's ``config.yaml`` as Hermes' reader returns it.
+        platform_key: `hermes_adapter.platform_key`.
+
+    Returns:
+        A copy of the mapping.
+
+    Examples:
+        >>> platform_extra({"gateway": {"platforms": {"bothy": {"extra": {"a": 1}}}}}, "bothy")
+        {'a': 1}
+    """
+    node: Any = config
+    for key in ("gateway", "platforms", platform_key, "extra"):
+        node = node.get(key) if isinstance(node, dict) else None
+    return dict(node) if isinstance(node, dict) else {}
 
 
 def load_token(path: Path) -> Secret:

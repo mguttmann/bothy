@@ -117,6 +117,7 @@ from bothy_hermes_adapter.hermes_commands import declared_commands
 from bothy_hermes_adapter.installer import CONTROL_SENDER
 from bothy_hermes_adapter.jobs import JOBS_DIR, JobError, JobRegistry
 from bothy_hermes_adapter.media import audio_cache_ext
+from bothy_hermes_adapter.mirror import MIRROR_DB, MirrorMap
 from bothy_hermes_adapter.reports import ReportError
 from bothy_hermes_adapter.runtime import (
     BackgroundKind,
@@ -286,7 +287,14 @@ class ServerPlatform(BasePlatformAdapter):
             jobs.prepare()
         except (JobError, OSError) as exc:  # no folder: a helper's registration is refused
             _LOG.exception("jobs folder refused: %s", exc)
-        self.handler = HermesHandler(self, settings, store, busy_mode=busy, jobs=jobs)
+        self.handler = HermesHandler(
+            self,
+            settings,
+            store,
+            busy_mode=busy,
+            jobs=jobs,
+            mirror=MirrorMap(state_dir / MIRROR_DB),
+        )
         config = AdapterConfig(
             base_url=settings.server_url,
             instance_id=settings.instance_id,
