@@ -484,7 +484,7 @@ def _parse(data: bytes, stem: str) -> JobRecord | None:
         return None
     if not isinstance(started, int | float) or isinstance(started, bool):
         return None
-    if not _valid_start(float(started)):
+    if not _valid_start(started):
         return None
     if log is not None and not isinstance(log, str):
         return None
@@ -496,7 +496,12 @@ def _parse(data: bytes, stem: str) -> JobRecord | None:
 
 
 def _valid_start(started: float) -> bool:
-    """Whether a job start is a time a date can show (finite, not before the epoch)."""
+    """Whether a job start is a time a date can show (finite, not before the epoch).
+
+    An integer is compared as it is: one too large for a float would overflow its conversion.
+    """
+    if isinstance(started, int):
+        return 0 <= started <= _STARTED_MAX
     return math.isfinite(started) and 0.0 <= started <= _STARTED_MAX
 
 

@@ -104,8 +104,9 @@ def test_a_record_with_a_start_no_date_shows_is_skipped(registry: JobRegistry) -
     good = registry.register(uuid4(), os.getpid(), "good")
     path = registry.directory / f"{good.job_id}.json"
     payload = json.loads(path.read_text())
-    path.write_text(json.dumps(payload | {"started_at": 1e20}))
-    assert registry.records() == []
+    for started in (1e20, 10**400):
+        path.write_text(json.dumps(payload | {"started_at": started}))
+        assert registry.records() == []
 
 
 def test_register_needs_the_adapters_state_directory(tmp_path: Path) -> None:
