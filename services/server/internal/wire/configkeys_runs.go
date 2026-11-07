@@ -46,8 +46,26 @@ func runsConfigKeys() []config.Key {
 			Doc: "Longest custom_id of a component in Unicode characters."},
 		{Name: "component.form_max_fields", Kind: config.KindInt, Default: "10", Min: "1", Chapter: chapter09,
 			Doc: "Most fields of one form component."},
+		// AR-04: the wake-ups and the caps of autonomous inputs (09 5.8 and 21, stage AR).
+		{Name: "run.wake_max_pending", Kind: config.KindInt, Default: "5", Min: "1", Max: "1000", Chapter: chapter09,
+			Doc: "Pending wake-ups per thread; a further create is refused with wake_max_pending."},
+		{Name: "run.wake_max_wait", Kind: config.KindDuration, Default: "7d", Min: "1m", Chapter: chapter09,
+			Doc: "Longest time from creation to the deadline of a wake-up, for a usage_limit wake-up from its not_before."},
+		{Name: "run.wake_min_delay", Kind: config.KindDuration, Default: defaultWakeMinDelay, Min: "0s", Chapter: chapter09,
+			Doc: "Earliest fire and first check of every wake-up after its creation."},
+		{Name: "run.usage_wake_max", Kind: config.KindInt, Default: "20", Min: "1", Max: "10000", Chapter: chapter09,
+			Doc: "Usage-limit wake-ups per run, every state counted; above it refused with a note."},
+		{Name: "run.wake_label_max_chars", Kind: config.KindInt, Default: "120", Min: "1", Max: "1000", Chapter: chapter09,
+			Doc: "Longest label of a wake-up in Unicode characters; longer is too_long."},
+		{Name: "run.autonomous_chain_max", Kind: config.KindInt, Default: "25", Min: "0", Max: "100000", Chapter: chapter09,
+			Doc: "Consecutive autonomous inputs per thread and person; 0 means no chain cap."},
+		{Name: "run.autonomous_idle_max", Kind: config.KindInt, Default: "3", Min: "1", Max: "1000", Chapter: chapter09,
+			Doc: "Consecutive idle autonomous inputs per thread and person; at least 1, cannot be switched off."},
 	}
 }
+
+// defaultWakeMinDelay is the default of run.wake_min_delay (09 21, AR-04).
+const defaultWakeMinDelay = "60s"
 
 // defaultStallAfter is the default of run.stall_after (03 section 9).
 const defaultStallAfter = "10m"

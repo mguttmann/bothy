@@ -247,7 +247,7 @@ func TestPersonalDataErase(t *testing.T) {
 	if after := snapshot(t, owner, tables); !slices.Equal(after, before) {
 		t.Errorf("erase changed the tables of runs:\nbefore %v\nafter  %v", before, after)
 	}
-	if want := []string{"runs", "run_steps", "run_followups", "message_components", "interactions"}; !slices.Equal(tables, want) || p.Module() != "runs" {
+	if want := []string{"runs", "run_steps", "run_followups", "run_wakes", "run_autonomy", "message_components", "interactions"}; !slices.Equal(tables, want) || p.Module() != "runs" {
 		t.Errorf("module %s, tables %v", p.Module(), tables)
 	}
 }

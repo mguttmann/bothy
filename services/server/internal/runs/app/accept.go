@@ -409,7 +409,12 @@ func (s *Service) followup(ctx context.Context, ev messaging.MessagePosted, info
 	if active == nil || active.ID != d.RunID {
 		return errs.New(errs.CodeInternalError, "runs: a follow-up decision without the locked active run")
 	}
-	return s.fu.Accept(ctx, ev, info, d, *active, p)
+	if err := s.fu.Accept(ctx, ev, info, d, *active, p); err != nil {
+		return err
+	}
+	// A follow-up of the person ends the person's chain of autonomous inputs in the thread (03
+	// run_autonomy, 09 5.8.6), in the transaction that accepts it.
+	return s.resetAutonomy(ctx, active.ThreadID, ev.AuthorID)
 }
 
 // withoutTriggerRight checks a candidate that M does not mention in filter mode first: a person

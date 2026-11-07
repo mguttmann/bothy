@@ -54,6 +54,7 @@ _KEEP_FAILED = frozenset(
         "runtime_error",
         "adapter_error",
         "runtime_not_authenticated",
+        "usage_limited",
     }
 )
 _CANCEL_REASONS = frozenset(

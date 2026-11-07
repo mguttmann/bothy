@@ -123,7 +123,7 @@ func (p *Push) threadFacts(ctx context.Context, f domain.RecipientFacts, g group
 
 // runKind reports the kinds of the run starter (RecipientFacts.RunStarter).
 func runKind(k domain.Kind) bool {
-	return k == domain.KindRunDone || k == domain.KindRunFailed || k == domain.KindInputNeeded
+	return k == domain.KindRunDone || k == domain.KindRunFailed || k == domain.KindInputNeeded || k == domain.KindWakeEnded
 }
 
 // allowed returns the fact Allowed of user for g (design note 7): push.deliver with the principal

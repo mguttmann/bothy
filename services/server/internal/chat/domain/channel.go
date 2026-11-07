@@ -78,6 +78,9 @@ type Channel struct {
 	ForumDefaultSort, DefaultNotificationLevel string
 	// ReadOnly is channels.read_only (set by M8-03).
 	ReadOnly bool
+	// AllowAutonomousRuns is channels.allow_autonomous_runs (stage AR, AR-04): persons other than
+	// owners may let agents run on alone here (09 5.8.6); false by default.
+	AllowAutonomousRuns bool
 	// MainThreadID is the main thread of a text channel; zero for a forum.
 	MainThreadID ids.ID
 	// CreatedBy is the creator; CreatedAt the creation time.

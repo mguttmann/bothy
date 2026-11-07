@@ -31,7 +31,11 @@ func (h *Runs) PatchRun(ctx context.Context, req rest.PatchRunRequestObject) (re
 	if err != nil {
 		return nil, conflictDocument(err)
 	}
-	return rest.PatchRun200JSONResponse{Body: rest.RunPatchResult{Version: res.Version}}, nil
+	out := rest.RunPatchResult{Version: res.Version}
+	if res.AutonomyCapReached {
+		out.AutonomyCapReached = &res.AutonomyCapReached
+	}
+	return rest.PatchRun200JSONResponse{Body: out}, nil
 }
 
 // rawPatch is the body RunPatch with the values of the ops as raw JSON.

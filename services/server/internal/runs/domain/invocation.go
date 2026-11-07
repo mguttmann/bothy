@@ -37,11 +37,16 @@ const (
 	TriggerCommand TriggerKind = "command"
 	// TriggerAutocomplete: the server asks for suggestions (command.autocomplete_requested).
 	TriggerAutocomplete TriggerKind = "autocomplete"
+	// TriggerWake: a fired wake-up, as a wake run (agent.invocation) or a wake input into the
+	// active run of its person (agent.wake_input); the triggering object is the wake-up, claim
+	// wake_id (04 15.9, 09 5.8.3, stage AR).
+	TriggerWake TriggerKind = "wake"
 )
 
-// TriggerKinds returns the trigger kinds in the order of 05 section 5.
+// TriggerKinds returns the trigger kinds in the order of 05 section 5, followed by wake (stage AR,
+// 00 glossary "Trigger kind").
 func TriggerKinds() []TriggerKind {
-	return []TriggerKind{TriggerMessage, TriggerFollowup, TriggerInteraction, TriggerCommand, TriggerAutocomplete}
+	return []TriggerKind{TriggerMessage, TriggerFollowup, TriggerInteraction, TriggerCommand, TriggerAutocomplete, TriggerWake}
 }
 
 // The values of the claims level, billing_mode and tool_class: exactly the enums Level,
@@ -71,6 +76,7 @@ var ErrInvocationExpired = errors.New("runs: invocation token expired")
 //	interaction:       RunID and InteractionID
 //	command:           RunID and CommandID; RunID may be zero only with Control (R-AZ-25)
 //	autocomplete:      CommandID, never RunID
+//	wake:              RunID and WakeID (stage AR, 04 15.9)
 type InvocationGrant struct {
 	// AgentID becomes aud, TriggeredBy sub.
 	AgentID, TriggeredBy ids.ID
@@ -78,8 +84,9 @@ type InvocationGrant struct {
 	TriggerKind TriggerKind
 	// RunID is the run; zero only for autocomplete.
 	RunID ids.ID
-	// MessageID, InteractionID and CommandID: exactly one, the triggering object of the kind.
-	MessageID, InteractionID, CommandID ids.ID
+	// MessageID, InteractionID, CommandID and WakeID: exactly one, the triggering object of the
+	// kind.
+	MessageID, InteractionID, CommandID, WakeID ids.ID
 	// ThreadID, ChannelID and SpaceID are the location; never zero.
 	ThreadID, ChannelID, SpaceID ids.ID
 	// Level is the effective level of TriggeredBy on the channel at delivery time.
@@ -110,6 +117,7 @@ type InvocationClaims struct {
 	MessageID         string `json:"message_id,omitzero"`
 	InteractionID     string `json:"interaction_id,omitzero"`
 	CommandID         string `json:"command_id,omitzero"`
+	WakeID            string `json:"wake_id,omitzero"`
 	ThreadID          string `json:"thread_id"`
 	ChannelID         string `json:"channel_id"`
 	SpaceID           string `json:"space_id"`
@@ -155,7 +163,7 @@ func NewInvocationClaims(g InvocationGrant, jti ids.ID, now time.Time, ttl time.
 	c := InvocationClaims{
 		Aud: idText(g.AgentID), Sub: idText(g.TriggeredBy), Jti: jti.String(), Iat: iat, Exp: iat + int64(ttl/time.Second),
 		TriggerKind: string(g.TriggerKind), RunID: idText(g.RunID), MessageID: idText(g.MessageID),
-		InteractionID: idText(g.InteractionID), CommandID: idText(g.CommandID), ThreadID: idText(g.ThreadID),
+		InteractionID: idText(g.InteractionID), CommandID: idText(g.CommandID), WakeID: idText(g.WakeID), ThreadID: idText(g.ThreadID),
 		ChannelID: idText(g.ChannelID), SpaceID: idText(g.SpaceID), Level: g.Level, BillingMode: g.BillingMode,
 		ToolClass: g.ToolClass, PermissionVersion: g.PermissionVersion,
 	}
@@ -224,7 +232,7 @@ func (c InvocationClaims) validateIDs(issued bool) error {
 			return fmt.Errorf("%w: a required ID is missing or not canonical", ErrInvocationInvalid)
 		}
 	}
-	for _, s := range []string{c.RunID, c.MessageID, c.InteractionID, c.CommandID} {
+	for _, s := range []string{c.RunID, c.MessageID, c.InteractionID, c.CommandID, c.WakeID} {
 		if s != "" && !canonicalID(s) {
 			return fmt.Errorf("%w: an ID is not canonical", ErrInvocationInvalid)
 		}
@@ -246,11 +254,13 @@ func (c InvocationClaims) validateTrigger() error {
 		object = c.InteractionID
 	case TriggerCommand, TriggerAutocomplete:
 		object = c.CommandID
+	case TriggerWake:
+		object = c.WakeID
 	default:
 		return fmt.Errorf("%w: unknown trigger_kind", ErrInvocationInvalid)
 	}
 	set := 0
-	for _, s := range []string{c.MessageID, c.InteractionID, c.CommandID} {
+	for _, s := range []string{c.MessageID, c.InteractionID, c.CommandID, c.WakeID} {
 		if s != "" {
 			set++
 		}
@@ -339,7 +349,8 @@ func (p ParsedInvocationToken) Claims() (InvocationClaims, error) {
 	}{
 		{"iss", &c.Iss, true}, {"aud", &c.Aud, true}, {"sub", &c.Sub, true}, {"jti", &c.Jti, true},
 		{"trigger_kind", &c.TriggerKind, true}, {"run_id", &c.RunID, false}, {"message_id", &c.MessageID, false},
-		{"interaction_id", &c.InteractionID, false}, {"command_id", &c.CommandID, false}, {"thread_id", &c.ThreadID, true},
+		{"interaction_id", &c.InteractionID, false}, {"command_id", &c.CommandID, false}, {"wake_id", &c.WakeID, false},
+		{"thread_id", &c.ThreadID, true},
 		{"channel_id", &c.ChannelID, true}, {"space_id", &c.SpaceID, true}, {"level", &c.Level, true},
 		{"billing_mode", &c.BillingMode, true}, {"tool_class", &c.ToolClass, true},
 		{"dev_environment_id", &c.DevEnvironmentID, false},

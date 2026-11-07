@@ -10,6 +10,7 @@ import 'package:dio/dio.dart';
 
 import 'package:api_client/src/generated/api_util.dart';
 import 'package:api_client/src/generated/model/channel.dart';
+import 'package:api_client/src/generated/model/channel_autonomous_runs_set.dart';
 import 'package:api_client/src/generated/model/channel_behavior.dart';
 import 'package:api_client/src/generated/model/channel_behavior_put.dart';
 import 'package:api_client/src/generated/model/channel_create.dart';
@@ -2161,6 +2162,121 @@ class ChannelsApi {
 
     final _response = await _dio.request<Object>(
       _path,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    Channel? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(
+              rawResponse,
+              specifiedType: const FullType(Channel),
+            ) as Channel;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<Channel>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// Switch autonomous runs of a channel
+  /// Switches &#x60;allow_autonomous_runs&#x60; (09 5.8.6, 07 2.14 item 1): persons other than owners may let agents run on alone in this channel (wake-ups, recovery and usage-window wake-ups); owners may always. Off by default. Every create and every fire reads the switch at its moment, so switching it off refuses the next fire of a pending wake-up of a person who is no owner. An archived channel is &#x60;409 conflict&#x60; with &#x60;reason&#x60; &#x60;channel_archived&#x60;, a DM &#x60;409 conflict&#x60; with &#x60;reason&#x60; &#x60;dm_channel&#x60;. Audited; the same value answers without a change.
+  ///
+  /// Parameters:
+  /// * [channelId]
+  /// * [ifMatch] - ETag of the version the change is based on, e.g. `\"7\"`. Mismatch gives 412 `version_conflict`.
+  /// * [channelAutonomousRunsSet]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [Channel] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<Channel>> setChannelAutonomousRuns({
+    required String channelId,
+    required String ifMatch,
+    required ChannelAutonomousRunsSet channelAutonomousRunsSet,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/channels/{channel_id}/autonomous-runs'.replaceAll(
+      '{'
+      r'channel_id'
+      '}',
+      encodeQueryParameter(
+        _serializers,
+        channelId,
+        const FullType(String),
+      ).toString(),
+    );
+    final _options = Options(
+      method: r'PUT',
+      headers: <String, dynamic>{r'If-Match': ifMatch, ...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'apiKey',
+            'name': 'consoleSession',
+            'keyName': '__Host-console_session',
+            'where': '',
+          },
+          {'type': 'http', 'scheme': 'DPoP', 'name': 'dpopAuth'},
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearerAuth'},
+        ],
+        ...?extra,
+      },
+      contentType: 'application/json',
+      validateStatus: validateStatus,
+    );
+
+    dynamic _bodyData;
+
+    try {
+      const _type = FullType(ChannelAutonomousRunsSet);
+      _bodyData = _serializers.serialize(
+        channelAutonomousRunsSet,
+        specifiedType: _type,
+      );
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _options.compose(_dio.options, _path),
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    final _response = await _dio.request<Object>(
+      _path,
+      data: _bodyData,
       options: _options,
       cancelToken: cancelToken,
       onSendProgress: onSendProgress,

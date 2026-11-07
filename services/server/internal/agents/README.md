@@ -551,6 +551,10 @@ Built-in agents (`adapter_kind` `claude_agent`, [26-builtin-agents.md](../../../
   (26 8.1). `Service.isOwner` reads the caller's owners row through `identity.Directory`;
   readers of a served channel, the agent itself, `agent.updated`, the `412` body and the
   heartbeat answer carry no such member.
+- **Stage AR (AR-04, 09 18.19.1).** `details.capabilities` also takes `turn_handover` and `wakes`
+  (booleans, closed list), which a Claude Code runner sends only while `runner.turn_handover` or
+  `runner.wakes` is on; both are kept in `reported_details` (`Capabilities.TurnHandover`,
+  `Capabilities.Wakes`). A server before AR-04 refuses them as unknown members.
 - **Ceiling.** `agent.tool_class.set` above the runner's ceiling and `agent.host.set` to a runner
   below the agent's class are `409 conflict` with reason `host_tool_class_ceiling`; a runner without a reported ceiling
   admits only `chat`.

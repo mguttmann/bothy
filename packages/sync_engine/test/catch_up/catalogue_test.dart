@@ -15,6 +15,7 @@ const Set<String> skippedDurable = {
   'agent.followup',
   'agent.hosting_changed',
   'agent.invocation',
+  'agent.wake_input',
   'agent_session.changed',
   'channel.settings_changed',
   'command.invoked',
@@ -26,6 +27,7 @@ const Set<String> skippedDurable = {
   'import.progress',
   'interaction.created',
   'run.cancel_requested',
+  'run.wake_changed',
 };
 
 /// Ephemeral types the dispatcher hands to the ephemeral store, the run store hook or the

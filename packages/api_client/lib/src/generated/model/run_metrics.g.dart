@@ -29,6 +29,8 @@ class _$RunMetrics extends RunMetrics {
   final int? progressEvents;
   @override
   final RunApiRetry? lastApiRetry;
+  @override
+  final RunAutonomyLast? autonomyLast;
 
   factory _$RunMetrics([void Function(RunMetricsBuilder)? updates]) =>
       (RunMetricsBuilder()..update(updates))._build();
@@ -45,6 +47,7 @@ class _$RunMetrics extends RunMetrics {
     this.apiRetries,
     this.progressEvents,
     this.lastApiRetry,
+    this.autonomyLast,
   }) : super._();
   @override
   RunMetrics rebuild(void Function(RunMetricsBuilder) updates) =>
@@ -67,7 +70,8 @@ class _$RunMetrics extends RunMetrics {
         backgroundJobs == other.backgroundJobs &&
         apiRetries == other.apiRetries &&
         progressEvents == other.progressEvents &&
-        lastApiRetry == other.lastApiRetry;
+        lastApiRetry == other.lastApiRetry &&
+        autonomyLast == other.autonomyLast;
   }
 
   @override
@@ -84,6 +88,7 @@ class _$RunMetrics extends RunMetrics {
     _$hash = $jc(_$hash, apiRetries.hashCode);
     _$hash = $jc(_$hash, progressEvents.hashCode);
     _$hash = $jc(_$hash, lastApiRetry.hashCode);
+    _$hash = $jc(_$hash, autonomyLast.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -101,7 +106,8 @@ class _$RunMetrics extends RunMetrics {
           ..add('backgroundJobs', backgroundJobs)
           ..add('apiRetries', apiRetries)
           ..add('progressEvents', progressEvents)
-          ..add('lastApiRetry', lastApiRetry))
+          ..add('lastApiRetry', lastApiRetry)
+          ..add('autonomyLast', autonomyLast))
         .toString();
   }
 }
@@ -160,6 +166,12 @@ class RunMetricsBuilder implements Builder<RunMetrics, RunMetricsBuilder> {
   set lastApiRetry(RunApiRetryBuilder? lastApiRetry) =>
       _$this._lastApiRetry = lastApiRetry;
 
+  RunAutonomyLastBuilder? _autonomyLast;
+  RunAutonomyLastBuilder get autonomyLast =>
+      _$this._autonomyLast ??= RunAutonomyLastBuilder();
+  set autonomyLast(RunAutonomyLastBuilder? autonomyLast) =>
+      _$this._autonomyLast = autonomyLast;
+
   RunMetricsBuilder() {
     RunMetrics._defaults(this);
   }
@@ -178,6 +190,7 @@ class RunMetricsBuilder implements Builder<RunMetrics, RunMetricsBuilder> {
       _apiRetries = $v.apiRetries;
       _progressEvents = $v.progressEvents;
       _lastApiRetry = $v.lastApiRetry?.toBuilder();
+      _autonomyLast = $v.autonomyLast?.toBuilder();
       _$v = null;
     }
     return this;
@@ -213,12 +226,15 @@ class RunMetricsBuilder implements Builder<RunMetrics, RunMetricsBuilder> {
             apiRetries: apiRetries,
             progressEvents: progressEvents,
             lastApiRetry: _lastApiRetry?.build(),
+            autonomyLast: _autonomyLast?.build(),
           );
     } catch (_) {
       late String _$failedField;
       try {
         _$failedField = 'lastApiRetry';
         _lastApiRetry?.build();
+        _$failedField = 'autonomyLast';
+        _autonomyLast?.build();
       } catch (e) {
         throw BuiltValueNestedFieldError(
           r'RunMetrics',

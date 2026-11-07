@@ -15,6 +15,7 @@ import (
 // sections 6 and 7): the durable run.state_changed (M2-05), agent.invocation (M2-08),
 // command.invoked (M2-16), run.cancel_requested (M2-09) and interaction.created (M2-15), the
 // ephemeral command.autocomplete_requested and the gateway op command.autocomplete_result (M2-17),
+// the durable run.wake_changed and agent.wake_input (AR-04),
 // whose handler the gateway runs on CommandExec, and the gateway op run.update it serves (M2-10).
 // internal/wire lists it in moduleRegistrations.
 func Register(r *authorize.Registry) {
@@ -24,6 +25,10 @@ func Register(r *authorize.Registry) {
 	r.Event("runs", authorize.EventRunCancelRequested)
 	r.Event("runs", authorize.EventInteractionCreated)
 	r.Event("runs", authorize.EventCommandAutocompleteRequested)
+	// The wake-ups of stage AR (AR-04): run.wake_changed to the thread's readers and the agent,
+	// agent.wake_input to the agent of a running run.
+	r.Event("runs", authorize.EventRunWakeChanged)
+	r.Event("runs", authorize.EventAgentWakeInput)
 	r.Op("runs", authorize.OpCommandAutocompleteResult)
 	// The live-box op of the adapter (M2-10); run.updated is ephemeral and needs no declaration.
 	r.Op("runs", authorize.OpRunUpdate)
@@ -87,11 +92,11 @@ type Run struct {
 	RunSummary
 	// AgentSessionID is the agent session (M2-12); zero for none.
 	AgentSessionID ids.ID
-	// TriggerKind is message, command or interaction.
+	// TriggerKind is message, command, interaction or wake (AR-04).
 	TriggerKind string
-	// TriggeringMessageID, TriggeringCommandID and TriggeringInteractionID name the trigger; zero
-	// for none (at most one is set).
-	TriggeringMessageID, TriggeringCommandID, TriggeringInteractionID ids.ID
+	// TriggeringMessageID, TriggeringCommandID, TriggeringInteractionID and TriggeringWakeID name
+	// the trigger; zero for none (at most one is set).
+	TriggeringMessageID, TriggeringCommandID, TriggeringInteractionID, TriggeringWakeID ids.ID
 	// Model and LastTextExcerpt are "" while unset.
 	Model, LastTextExcerpt string
 	// Metrics is the object run_metrics.v1 as stored; never nil.
@@ -456,8 +461,13 @@ type PatchRun struct {
 	Ops         []PatchOp
 }
 
-// PatchResult carries the new runs.version (schema RunPatchResult).
-type PatchResult struct{ Version int64 }
+// PatchResult carries the new runs.version (schema RunPatchResult) and whether the chain of
+// autonomous inputs of the run's thread and person is ended after the patch's
+// /metrics/autonomy_last (09 5.8.6, AR-04).
+type PatchResult struct {
+	Version            int64
+	AutonomyCapReached bool
+}
 
 // RunUpdated is the payload of the ephemeral event run.updated as runs publishes it after the
 // commit of a patch (schema RunUpdatedPayload, M2-10 design note 8). Ops are the normalized ops

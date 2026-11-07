@@ -83,6 +83,59 @@ type Runs struct {
 	// AppDispatches schedules runs.app_dispatch (M2-25); the jobs step binds its inserter
 	// (BindJobs).
 	AppDispatches *runsjobs.DispatchScheduler
+	// Wakes schedules runs.wake_due (AR-04); BindWakes creates it and the jobs step binds its
+	// inserter (BindJobs). nil until BindWakes.
+	Wakes *runsjobs.WakeScheduler
+	// wakeRepo is the repository of the wake-ups, the source of bothy.run.wake.pending.
+	wakeRepo *runspg.Repository
+}
+
+// WakesConfig binds the keys of the wake-ups (09 21, stage AR): run.wake_max_pending,
+// run.wake_max_wait, run.wake_min_delay, run.usage_wake_max, run.wake_label_max_chars,
+// run.autonomous_chain_max and run.autonomous_idle_max. The error names the key whose binding
+// failed, never a value.
+func WakesConfig(v *config.Values) (runsapp.WakeConfig, error) {
+	var c runsapp.WakeConfig
+	if err := config.Bind(v, &c); err != nil {
+		return runsapp.WakeConfig{}, err
+	}
+	return c, nil
+}
+
+// WakeDeps are the collaborators of the wake-ups from the other steps: the notes of messaging and
+// the owner role of authz.
+type WakeDeps struct {
+	Notes  runsapp.WakeNotes
+	Owners runsapp.Owners
+}
+
+// BindWakes binds the wake-ups of stage AR (AR-04) to the use cases and the REST handlers: the
+// repository over pool, the scheduler of runs.wake_due (bound to the job runtime by BindJobs),
+// the notes, the owner role and the counters of signals.md 4.3. Errors: those of BindWakes and of
+// the meter provider.
+func (r *Runs) BindWakes(cfg runsapp.WakeConfig, pool *pg.Pool, d WakeDeps) error {
+	m, err := runsmetrics.NewWakes(nil)
+	if err != nil {
+		return err
+	}
+	sched := &runsjobs.WakeScheduler{}
+	repo := runspg.NewRepository(pool)
+	if err := r.Service.BindWakes(cfg, runsapp.WakeDeps{Repo: repo, Schedule: sched, Notes: d.Notes, Owners: d.Owners, Metrics: m}); err != nil {
+		return err
+	}
+	r.Wakes, r.wakeRepo = sched, repo
+	r.Handlers.BindWakes(r.Service.Wakes())
+	return nil
+}
+
+// RegisterWakeGauge registers the gauge bothy.run.wake.pending (AR-04) on the global meter
+// provider; nothing happens before BindWakes.
+func (r *Runs) RegisterWakeGauge() error {
+	if r.wakeRepo == nil {
+		return nil
+	}
+	_, err := runsmetrics.RegisterWakePendingGauge(nil, r.wakeRepo)
+	return err
 }
 
 // RunsDeps are the collaborators of the runs module from the other steps of the start: the
@@ -346,6 +399,9 @@ func (r *Runs) BindJobs(ins jobs.Inserter) {
 	}
 	if r.Holds != nil {
 		r.Holds.Bind(ins)
+	}
+	if r.Wakes != nil {
+		r.Wakes.Bind(ins)
 	}
 	if r.AppDispatches != nil {
 		r.AppDispatches.Bind(ins)

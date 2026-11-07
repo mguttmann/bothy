@@ -58,6 +58,8 @@ func TestChatChannelsMigration_Schema(t *testing.T) {
 			{"deleted_at", ts, true, ""},
 			{"deleted_by", "uuid", true, ""},
 			{"purged_at", ts, true, ""},
+			// AR-04 (migration 00101): the switch of autonomous runs, off by default.
+			{"allow_autonomous_runs", "boolean", false, "false"},
 		}, []string{
 			"CHECK (((deleted_at IS NULL) = (deleted_by IS NULL)))",
 			"CHECK (((deleted_at IS NULL) OR (archived_at IS NOT NULL)))",

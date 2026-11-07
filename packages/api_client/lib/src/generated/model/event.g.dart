@@ -156,6 +156,10 @@ const EventTypeEnum _$eventTypeEnum_agentPeriodDefinitionChanged =
     const EventTypeEnum._('agentPeriodDefinitionChanged');
 const EventTypeEnum _$eventTypeEnum_agentPeriodHostingChanged =
     const EventTypeEnum._('agentPeriodHostingChanged');
+const EventTypeEnum _$eventTypeEnum_runPeriodWakeChanged =
+    const EventTypeEnum._('runPeriodWakeChanged');
+const EventTypeEnum _$eventTypeEnum_agentPeriodWakeInput =
+    const EventTypeEnum._('agentPeriodWakeInput');
 const EventTypeEnum _$eventTypeEnum_hostPeriodUpdated = const EventTypeEnum._(
   'hostPeriodUpdated',
 );
@@ -272,6 +276,10 @@ EventTypeEnum _$eventTypeEnumValueOf(String name) {
       return _$eventTypeEnum_agentPeriodDefinitionChanged;
     case 'agentPeriodHostingChanged':
       return _$eventTypeEnum_agentPeriodHostingChanged;
+    case 'runPeriodWakeChanged':
+      return _$eventTypeEnum_runPeriodWakeChanged;
+    case 'agentPeriodWakeInput':
+      return _$eventTypeEnum_agentPeriodWakeInput;
     case 'hostPeriodUpdated':
       return _$eventTypeEnum_hostPeriodUpdated;
     case 'terminalSessionPeriodChanged':
@@ -338,6 +346,8 @@ final BuiltSet<EventTypeEnum> _$eventTypeEnumValues = BuiltSet<EventTypeEnum>(
     _$eventTypeEnum_agentPeriodConfigChanged,
     _$eventTypeEnum_agentPeriodDefinitionChanged,
     _$eventTypeEnum_agentPeriodHostingChanged,
+    _$eventTypeEnum_runPeriodWakeChanged,
+    _$eventTypeEnum_agentPeriodWakeInput,
     _$eventTypeEnum_hostPeriodUpdated,
     _$eventTypeEnum_terminalSessionPeriodChanged,
     _$eventTypeEnum_unknownDefaultOpenApi,
@@ -437,6 +447,8 @@ class _$EventTypeEnumSerializer implements PrimitiveSerializer<EventTypeEnum> {
     'agentPeriodConfigChanged': 'agent.config_changed',
     'agentPeriodDefinitionChanged': 'agent.definition_changed',
     'agentPeriodHostingChanged': 'agent.hosting_changed',
+    'runPeriodWakeChanged': 'run.wake_changed',
+    'agentPeriodWakeInput': 'agent.wake_input',
     'hostPeriodUpdated': 'host.updated',
     'terminalSessionPeriodChanged': 'terminal_session.changed',
     'unknownDefaultOpenApi': 'unknown_default_open_api',
@@ -495,6 +507,8 @@ class _$EventTypeEnumSerializer implements PrimitiveSerializer<EventTypeEnum> {
     'agent.config_changed': 'agentPeriodConfigChanged',
     'agent.definition_changed': 'agentPeriodDefinitionChanged',
     'agent.hosting_changed': 'agentPeriodHostingChanged',
+    'run.wake_changed': 'runPeriodWakeChanged',
+    'agent.wake_input': 'agentPeriodWakeInput',
     'host.updated': 'hostPeriodUpdated',
     'terminal_session.changed': 'terminalSessionPeriodChanged',
     'unknown_default_open_api': 'unknownDefaultOpenApi',

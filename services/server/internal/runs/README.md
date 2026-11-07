@@ -1,11 +1,11 @@
 # Module `runs`
 
-Status: the trigger decision as pure functions in `domain/` (M2-04); runs, the state machine, the acceptance of a triggering message and the run reads (M2-05). The invocation tokens and the reference verifier of the adapter check (M2-06). The delivery check `runs.Delivery` with the fresh token and the job `runs.queued_expiry` (M2-08). Start, renewal, end and cancellation of runs, the revocation and disabled-agent subscribers and the jobs `runs.cancel_timeout` and `runs.stall_check` (M2-09). The booking of costs in the finish, the cost columns and the metric `bothy.run.cost` (M2-22). Components and interactions: the tables `message_components` and `interactions`, the port `Interactions`, the source ports of `messaging` in `adapters/messagingsource`, the job `runs.component_expiry` and the resolvers of `interaction.created` and of `agent.invocation` with `trigger_kind = interaction` (M2-15). Patches (M2-10) and follow-ups (M2-11) build on `app.Open`, `app.Transition`, the end-of-run function `endRun` and `app.Service.Prepare`. The hold of an agent invocation while an attachment of the triggering message is not final, `ReleaseInvocation`, the subscriber of `files.FileFinalized`, the job `runs.invocation_hold_timeout` and the owner's switch `supports_files_out` (M3-07). Commands and interactions of apps: the source port `AppDispatcher`, the app branches of `CommandExec`, `Interactions` and the autocompletion, `Interactions.DisableAuthoredBy` and the job `runs.app_dispatch` (M2-25). Voice messages at acceptance, the hold window of a pending transcript and the attachments of the run context (M3-09).
+Status: the trigger decision as pure functions in `domain/` (M2-04); runs, the state machine, the acceptance of a triggering message and the run reads (M2-05). The invocation tokens and the reference verifier of the adapter check (M2-06). The delivery check `runs.Delivery` with the fresh token and the job `runs.queued_expiry` (M2-08). Start, renewal, end and cancellation of runs, the revocation and disabled-agent subscribers and the jobs `runs.cancel_timeout` and `runs.stall_check` (M2-09). The booking of costs in the finish, the cost columns and the metric `bothy.run.cost` (M2-22). Components and interactions: the tables `message_components` and `interactions`, the port `Interactions`, the source ports of `messaging` in `adapters/messagingsource`, the job `runs.component_expiry` and the resolvers of `interaction.created` and of `agent.invocation` with `trigger_kind = interaction` (M2-15). Patches (M2-10) and follow-ups (M2-11) build on `app.Open`, `app.Transition`, the end-of-run function `endRun` and `app.Service.Prepare`. The hold of an agent invocation while an attachment of the triggering message is not final, `ReleaseInvocation`, the subscriber of `files.FileFinalized`, the job `runs.invocation_hold_timeout` and the owner's switch `supports_files_out` (M3-07). Commands and interactions of apps: the source port `AppDispatcher`, the app branches of `CommandExec`, `Interactions` and the autocompletion, `Interactions.DisableAuthoredBy` and the job `runs.app_dispatch` (M2-25). Voice messages at acceptance, the hold window of a pending transcript and the attachments of the run context (M3-09). Wake-ups, wake runs and wake inputs, the caps of autonomous inputs, `run.launch.check` and the job `runs.wake_due` (AR-04, section "Wake-ups and autonomous inputs (AR-04)").
 The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); where they differ, the chapter applies.
 
 ## Purpose
 
-Trigger decision, runs and run document, steps, follow-ups, components, interactions, command execution, invocation tokens.
+Trigger decision, runs and run document, steps, follow-ups, components, interactions, command execution, invocation tokens, wake-ups and the counts of autonomous inputs (stage AR).
 
 ## Code
 
@@ -721,9 +721,67 @@ An agent that calls the server API inside a run sends the run's invocation token
 - Configuration keys: `agent.context_max_bytes`, `agent.context_message_max_bytes`.
 - Rulings: docs/decisions.d/M2-13.md.
 
+## Wake-ups and autonomous inputs (AR-04)
+
+Normative: [09-agents.md](../../../../docs/spec/09-agents.md) 5.8 and 18.19, 07 2.14, 03 `run_wakes`
+and `run_autonomy`, 04 15.9, [ADR 0077](../../../../docs/adr/0077-autonomous-runs-wake-ups-and-turn-handover.md);
+rulings in [docs/decisions.d/AR-04.md](../../../../docs/decisions.d/AR-04.md). Everything is off until
+a runner asks for it: only a runner that reports `wakes` in its heartbeat calls the operations, so
+an installation without such a runner creates no wake-up, and every new column defaults to "as
+before" (ADR 0077, 09 18.19.1).
+
+Code:
+
+- `wakes.go`: the port `Wakes` (create, recover, list pending, check, fire, cancel, read, launch
+  check) and its DTOs; `app.Service.Wakes()` implements it.
+- `domain/wake.go`: kinds, reasons, states, the reason codes, `CheckWakeRequest`, `WakeWindow` (the
+  minimum delay and the deadline, for `usage_limit` from `not_before`), the caps
+  (`AutonomyRefusal`, `AfterInput`, `AfterIdleReport`), `AutonomyLastOf` and the note texts;
+  `domain/delivery.go` adds `agent.wake_input` (matrix, payload, grant) and the payload of a wake
+  run; `domain/invocation.go` the trigger kind `wake` with the claim `wake_id`; `domain/reason.go`
+  the adapter reason `usage_limited`; `domain/patch.go` the member `/metrics/autonomy_last`.
+- `app/wakes.go` and `app/wakes_ports.go`: the use cases, `BindWakes`, the job's use case `WakeDue`,
+  the hooks `onThreadFree` (the end of a run schedules the ready wake-ups of its thread),
+  `resetAutonomy` (a run of the person that is not a wake run, or a follow-up) and `idleReport`
+  (the idle flag of a patch); `adapters/postgres/wakes.go` with `queries/run_wakes.sql`;
+  `adapters/jobs/wake_due.go`; `adapters/otelmetrics/wakes.go`; `adapters/httpapi/wakes.go`.
+
+Fire (09 5.8.3): in one unit of work the wake-up and then the thread's active run are locked. Past
+the deadline the wake-up expires. With no active run the checks of a new run run (the autonomy
+rule, `pr_checks` for an owner, `agent.invoke` of the person with the agent counted as addressed,
+the caps under the lock of the counts) and `Open` writes the wake run (`trigger_kind = wake`,
+`triggering_wake_id`, the person as `triggered_by`) with `agent.invocation` naming the wake-up;
+with a running run of the same person and agent the same checks run and `agent.wake_input` goes to
+the agent (the delivery adds the token of trigger kind `wake` with `wake_id`); with another
+person's run, a queued or waiting run, or a wake-up a skipped input returned, it stays `pending`
+and the end of that run schedules `runs.wake_due`. At most one active run per thread stays true
+(R-DM-14): the wake run is opened with the same `ON CONFLICT` as every run. A refused fire, a
+refused `run.wake.check` and a refused wake input at delivery end the wake-up `refused` with an
+audit entry, the note and `run.wake_changed`.
+
+Visible ends (09 5.8.4): every end other than `fired` writes a note through
+`messaging.AppendSystemNote` (origin `system`, kind `text`, silent, authored by the agent; never
+triggers) and carries `note_message_id` in `run.wake_changed`; notify turns `refused`, `expired`
+and `failed` into `wake_ended` for the wake-up's person (13 section 2), a cancel into nothing.
+
+Caps (09 5.8.6): `run_autonomy` per thread and person. A fire counts one autonomous input on both
+paths and is refused at `run.autonomous_chain_max` (0: no cap); the idle flag of a distinct input
+in `/metrics/autonomy_last` raises the idle count, work resets it, and at `run.autonomous_idle_max`
+the chain ends (note, counter, `autonomy_cap_reached` in the patch answer); further fires and wake
+inputs are refused until a run or follow-up of that person resets both counts. Another person's
+message resets only that person's own counts. `run.wake_min_delay`, `run.wake_max_pending`,
+`run.wake_max_wait` and `run.usage_wake_max` bound the rest.
+
+Rollback (requirement 19, ruling D-AR-04-1): an older server does not know `trigger_kind = wake`,
+the operations, the job and the event; it fires nothing, and a pending wake-up would wait unseen.
+Before a rollback below AR-04, let the pending wake-ups fire or cancel them (`cancelRunWake`) and
+switch `runner.wakes` and `runner.turn_handover` off first (09 18.19.1). A database rollback of
+00099 refuses while a run with `trigger_kind = wake` exists and names their count
+(`TestMigration_WakesDown`); the expand-only migrations stay in place for a binary rollback.
+
 ## Visibility of `runs`, `run_steps` and `run_followups`
 
-The tables have no `channel_id` (07 7.4 rule 1, D-M2-05-9): every query reads the rows of one thread or run whose visibility the use case checked first, or (the active-run lists) the active runs whose threads `chat.Threads.Locate` resolves, kept only when the channel is in `Scope.ChannelIDs` and `run.read` allows each row in filter mode (category `thread_scope` of `tools/lint/sql_visibility.yaml`); the gauge query has no principal. The run-context queries `EarlierSessionRun` and `DeliveredFollowupsOfSession` read rows of the one run, thread and session row whose `run.context.read` the use case authorized first (category `after_authorize`, M2-13).
+The tables have no `channel_id` (07 7.4 rule 1, D-M2-05-9): every query reads the rows of one thread or run whose visibility the use case checked first, or (the active-run lists) the active runs whose threads `chat.Threads.Locate` resolves, kept only when the channel is in `Scope.ChannelIDs` and `run.read` allows each row in filter mode (category `thread_scope` of `tools/lint/sql_visibility.yaml`); the gauge query has no principal. The run-context queries `EarlierSessionRun` and `DeliveredFollowupsOfSession` read rows of the one run, thread and session row whose `run.context.read` the use case authorized first (category `after_authorize`, M2-13). The reads of `run_wakes` and `run_autonomy` (AR-04) name one wake-up, run, thread or agent the use case authorized in the same unit, or are the job `runs.wake_due` and the gauge without a principal (categories `after_authorize`, `system_job`).
 
 ## Dependencies
 
@@ -738,18 +796,18 @@ Checked by go-arch-lint (ADR 0008).
 
 `runs`, `run_steps`, `run_followups`, `run_wakes`, `run_autonomy`, `message_components`, `interactions`.
 
-`run_wakes` and `run_autonomy` (wake-ups and the counts of autonomous inputs, 09 5.8) are
-specified for stage AR and do not exist yet; AR-04 creates them.
+`run_wakes` and `run_autonomy` (wake-ups and the counts of autonomous inputs, 09 5.8) come with
+AR-04 (migrations 00097 to 00100; the channel switch with 00101).
 
 Only this module writes and reads these tables via SQL (03-data-model.md, principle 12).
 
 ## Actions (05-actions.md)
 
-`agent.invoke`, `run.read`, `run.overview.read`, `run.context.read`, `run.start`, `run.token.renew`, `run.update`, `run.finish`, `run.cancel`, `run.followup.create`, `component.update`, `interaction.create`, `interaction.respond`, `command.autocomplete`, `command.autocomplete.respond`, `command.invoke`.
+`agent.invoke`, `run.read`, `run.overview.read`, `run.context.read`, `run.start`, `run.token.renew`, `run.update`, `run.finish`, `run.cancel`, `run.followup.create`, `component.update`, `interaction.create`, `interaction.respond`, `command.autocomplete`, `command.autocomplete.respond`, `command.invoke`, `run.wake.create`, `run.wake.recover`, `run.wake.list_pending`, `run.wake.check`, `run.wake.fire`, `run.wake.cancel`, `run.wake.read`, `run.launch.check` (AR-04).
 
 ## Events and WebSocket ops
 
-- Durable: `run.state_changed`, `agent.invocation`, `agent.followup`, `run.cancel_requested`, `interaction.created`, `command.invoked`. Since M2-05 the first of them is written, since M2-08 also `agent.invocation`, since M2-16 `command.invoked`, since M2-09 `run.cancel_requested`, since M2-11 `agent.followup`, since M2-15 `interaction.created`; the others come with their tickets.
+- Durable: `run.state_changed`, `agent.invocation`, `agent.followup`, `run.cancel_requested`, `interaction.created`, `command.invoked`, `run.wake_changed`, `agent.wake_input`. Since M2-05 the first of them is written, since M2-08 also `agent.invocation`, since M2-16 `command.invoked`, since M2-09 `run.cancel_requested`, since M2-11 `agent.followup`, since M2-15 `interaction.created`, since AR-04 `run.wake_changed` and `agent.wake_input`.
 - Ephemeral: `run.updated`, `command.autocomplete_requested`.
 - WebSocket ops (client to server): `run.update`, `command.autocomplete_result`.
 
@@ -763,6 +821,7 @@ Only this module writes and reads these tables via SQL (03-data-model.md, princi
 | `runs.invocation_hold_timeout` | scheduled, `file.invocation_hold_max` (M3-07) or `voice.transcript_hold_max` | `default` |
 | `runs.queued_expiry` | scheduled, `run.queued_max_age` (M2-08) | `default` |
 | `runs.app_dispatch` | `InsertTx` on `command.invoked` and `interaction.created` for an app, one request, no retry after it (M2-25) | `default` |
+| `runs.wake_due` | scheduled per wake-up at `not_before` (kind `at`) and at its `deadline`, and at the end of a run for the wake-ups of its thread that could fire (AR-04) | `default` |
 
 ## Notes for the build
 
@@ -796,8 +855,9 @@ statistics source; both queries stand in `tools/lint/sql_visibility.yaml` with t
 
 ## Personal data (M7-06)
 
-`adapters/postgres.PersonalData` (`NewPersonalData(pool)`) is the participant of runs in the privacy requests (`kernel/personaldata`, docs/spec/20-privacy.md sections 2, 4.4 and 5.2). Tables: `runs`, `run_steps`, `run_followups`, `message_components`, `interactions`.
+`adapters/postgres.PersonalData` (`NewPersonalData(pool)`) is the participant of runs in the privacy requests (`kernel/personaldata`, docs/spec/20-privacy.md sections 2, 4.4 and 5.2). Tables: `runs`, `run_steps`, `run_followups`, `run_wakes`, `run_autonomy`, `message_components`, `interactions`.
 
 - Export: `runs.jsonl`, one line per run the person triggered (`triggered_by`): ID, thread and agent ID, trigger kind, state, `queued_at`, `started_at`, `finished_at`, `cost_micros`, `currency`, `cost_is_estimate` and the numeric members of the metrics (`docs/api/gdpr-export/v1/lines/runs.schema.json`). Left out are the status line, the last text excerpt, the summary, the plan, the state reason, the last API retry and the run steps: the agent writes them from the whole thread, so they can carry contents of other people (Art. 15(4) GDPR). `runs` has no channel column and the participant reads no table of chat, so a run names only its thread ID. `interactions.jsonl`, one line per own interaction: ID, component and message ID, state, `created_at` and the submitted values, never the response of the app or agent (`lines/interactions.schema.json`).
-- Erase: nothing in any step. The rows go with their thread or message (20 section 2); with `privacy.account_deletion_content = delete` the message deletion deletes the components of each deleted message, and their interactions follow by cascade.
+- Wake-ups are not exported: their label, condition and result are written by the agent from the whole thread. `run_autonomy` holds only counts.
+- Erase: nothing in any step. The rows go with their thread or message (20 section 2), `run_wakes` with their thread or source run and `run_autonomy` with the thread or the person (ON DELETE CASCADE); with `privacy.account_deletion_content = delete` the message deletion deletes the components of each deleted message, and their interactions follow by cascade.
 - The two reads (`PersonalDataRuns`, `PersonalDataInteractions`) carry no visibility predicate: they run in the job `privacy.export` without a principal and are named by the person.

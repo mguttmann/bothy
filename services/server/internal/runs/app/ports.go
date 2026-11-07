@@ -21,8 +21,9 @@ type RunRow struct {
 	AgentSessionID ids.ID
 	// TriggerKind is message, command or interaction.
 	TriggerKind string
-	// TriggeringMessageID, TriggeringCommandID and TriggeringInteractionID name the trigger.
-	TriggeringMessageID, TriggeringCommandID, TriggeringInteractionID ids.ID
+	// TriggeringMessageID, TriggeringCommandID, TriggeringInteractionID and TriggeringWakeID (a wake
+	// run, AR-04) name the trigger.
+	TriggeringMessageID, TriggeringCommandID, TriggeringInteractionID, TriggeringWakeID ids.ID
 	// TriggeredBy is the person who triggered.
 	TriggeredBy ids.ID
 	State       domain.State
@@ -80,6 +81,8 @@ type NewRun struct {
 	// TriggeringCommandID for command (M2-16) and TriggeringInteractionID for interaction (M2-15).
 	TriggerKind                                                       string
 	TriggeringMessageID, TriggeringCommandID, TriggeringInteractionID ids.ID
+	// TriggeringWakeID is the wake-up of a wake run (AR-04); zero otherwise.
+	TriggeringWakeID ids.ID
 	// BillingModeExpected is the agent's billing mode at the acceptance (ruling D-M2-05-5).
 	BillingModeExpected string
 	// InvocationJTI is a fresh UUIDv7 that no token carries (ruling D-M2-05-4).

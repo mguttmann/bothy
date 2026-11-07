@@ -103,8 +103,10 @@ func OneTimeSecretMarked(ctx context.Context) bool {
 // (02 section 8.4, the exception of M2-41): the Idempotency-Key stage stores the answer with
 // Store.Complete in the same unit of work and commits it with the handler's writes, instead of
 // rolling back and storing it with SaveFinal. Only statuses the stage stores as final (06 section 7
-// point 2) are kept; a 401 or 5xx still rolls back. The one caller is confirmHost before its 409
-// fingerprint_mismatch, so every failed attempt counts also under a key (TM-T19). Outside a scope
+// point 2) are kept; a 401 or 5xx still rolls back. The callers are confirmHost before its 409
+// fingerprint_mismatch, so every failed attempt counts also under a key (TM-T19), and the refused
+// createRunWake and recoverRunWake of runs, whose audit entry and stored refusal with its note stay
+// (AR-04, 09 5.8.2). Outside a scope
 // of WithSecretScope the call does nothing: without a key the use case commits its own unit.
 func KeepEffectOnFinal(ctx context.Context) {
 	if m, ok := ctx.Value(secretKey{}).(*secretMark); ok {

@@ -2058,6 +2058,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/channels/{channel_id}/autonomous-runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Switch autonomous runs of a channel
+         * @description Switches `allow_autonomous_runs` (09 5.8.6, 07 2.14 item 1): persons other than owners may let agents run on alone in this channel (wake-ups, recovery and usage-window wake-ups); owners may always. Off by default. Every create and every fire reads the switch at its moment, so switching it off refuses the next fire of a pending wake-up of a person who is no owner. An archived channel is `409 conflict` with `reason` `channel_archived`, a DM `409 conflict` with `reason` `dm_channel`. Audited; the same value answers without a change.
+         */
+        put: operations["setChannelAutonomousRuns"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/channels/{channel_id}/project-binding": {
         parameters: {
             query?: never;
@@ -2642,6 +2662,26 @@ export interface paths {
         };
         /** List runs of a thread */
         get: operations["listThreadRuns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/threads/{thread_id}/wakes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the wake-ups of a thread
+         * @description The wake-ups of the thread, newest first (09 5.8.2), for everyone who may read the thread: pending ones with their cancel, and the ended ones with their state and reason. Clients show wake-up controls only when the thread's agent reports `wakes`; pending wake-ups stay visible without it (01 6.21).
+         */
+        get: operations["listThreadWakes"];
         put?: never;
         post?: never;
         delete?: never;
@@ -4227,6 +4267,146 @@ export interface paths {
          *     answer is that run and nothing is written.
          */
         post: operations["retryRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/runs/{run_id}/wakes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create a wake-up for an active run
+         * @description Creates a wake-up of the run's thread for the active run of the calling agent (09 5.8.2, stage AR): kind `at`, `pr_checks` or `command`, reason `agent` (from `bothy-wake`) or `usage_limit`. The wake-up acts for the run's `triggered_by`; it fires no earlier than `run.wake_min_delay` after its creation and no later than its `deadline` (at most `run.wake_max_wait`, for `usage_limit` counted from `not_before`). A `usage_limit` request carries the run's `outage`; a second request with the outage of a pending wake-up moves its `not_before` and answers it with `200`, a new outage gets its own wake-up, at most `run.usage_wake_max` per run. A refusal is `409 conflict` with the reason: `run_not_active`, `autonomous_not_allowed` (the person is no owner and the channel has no `allow_autonomous_runs`), `pr_checks_owner_only`, `tool_class_mismatch` (a `command` of an agent whose tool class is not `host`), `wake_max_pending`, `usage_wake_max`, or the reason of a refused `agent.invoke` of the person (for example `tool_class_owner_only`, `agent_not_reachable`, `channel_read_only`). A refused request stores nothing, except one with `deferred: true` and a refusal with `usage_wake_max`, which are stored in state `refused` with the note in the thread and the notification `wake_ended` (09 5.8.4). A wrong field is `400 validation_failed`. Audited.
+         */
+        post: operations["createRunWake"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/runs/{run_id}/wakes/recover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create the recovery or usage-limit wake-up of an ended run
+         * @description Creates a wake-up of kind `at` with reason `recovery` (lost background work, 09 18.19.9) or `usage_limit` (the usage window ended the run, 18.19.10) for an ended run of the calling agent in state `failed` (which `interrupted` and `stale` runs are), at most one per run and reason: a repetition answers the first one with `200`. A run that did not fail is `409 conflict` with `reason` `run_not_ended`. A refusal of the checks of 09 5.8.6 (`autonomous_not_allowed`, `wake_max_pending`, `usage_wake_max`, a refused `agent.invoke`) stores the wake-up in state `refused` with the note in the thread and the notification `wake_ended`, and answers `409 conflict` with the reason. Audited.
+         */
+        post: operations["recoverRunWake"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/runs/{run_id}/launch-check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check a launch by a runner that did not accept the run
+         * @description Before a runner launches any process of a run it did not accept itself (a repeated try, the next attempt of an adopted run, the retry of a compaction, a start over), it asks the server (09 18.19.6, R-AG-48): the run is still `running`, its person still has `trigger` on the agent in the channel and the agent is still allowed there, the billing rules of 10 hold, and for tool class `host` the agent's `tool_class` is still `host` and SR2 holds for that person. On allow the answer carries the configured tool class and billing mode, which the runner compares with its own (`compare_actual`). A refusal is `409 conflict` with the reason of the failed check (`run_not_running` or the reason of a refused `agent.invoke`), audited as a denial; the server changes nothing, the runner finishes the run.
+         */
+        post: operations["checkRunLaunch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agents/me/wakes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the pending wake-ups of this agent
+         * @description Every pending wake-up of the calling agent, ascending by id (09 5.8.5): a runner calls it at start and after every reconnect and learns changes in between from `run.wake_changed`. Only the agent itself may call it (agent-self).
+         */
+        get: operations["listPendingRunWakes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/wakes/{wake_id}/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check the next execution of a pending check
+         * @description Before every execution of a pending `command` and every `gh` read of a pending `pr_checks` the runner asks the server (09 5.8.3, R-AG-50): the wake-up is still `pending` and its `not_before` has passed; its person still has `trigger` on the agent in the channel and the agent is still allowed there; the channel is neither archived nor read-only; for `command` the agent's `tool_class` is still `host` and SR2 holds for that person; for `pr_checks` the person is still an owner. On allow the answer carries the configured tool class and billing mode (`compare_actual`). A failed check ends the wake-up `refused` with the reason of the check (for example `agent_not_reachable`, `channel_read_only`, `tool_class_owner_only`, `tool_class_mismatch`, `pr_checks_owner_only`), an audit entry, the note in the thread and the notification `wake_ended`, and answers `409 conflict` with that reason. A wake-up that already ended is `409 conflict` with `reason` `wake_not_pending`, one before its `not_before` `409 conflict` with `reason` `wake_not_due` (the wake-up stays pending).
+         */
+        post: operations["checkRunWake"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/wakes/{wake_id}/fire": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Fire a checked wake-up, end it failed or return a skipped wake input
+         * @description The runner reports the outcome of a `pr_checks` or `command` wake-up (09 5.8.2): `fired` with the result text fires it with the checks of a new run, as a wake run when the thread has no active run, as a wake input `agent.wake_input` into the running run of the same person, and keeps it `pending` while another person's run is active; a refused fire ends it `refused` with note and notification. `failed` ends it `failed` with the reason after `runner.wake_check_failures` failures in a row. `input_skipped` reports a delivered wake input the runner did not write (`wake_input_check_failed`): the wake-up returns to `pending` and fires after that run as a wake run. A wake-up that ended is `409 conflict` with `reason` `wake_not_pending`; a fire before `not_before` is `409 conflict` with `reason` `wake_not_due`; an `at` wake-up is fired by the server only (`409 conflict`, `reason` `wake_fired_by_server`). Audited.
+         */
+        post: operations["fireRunWake"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/wakes/{wake_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel a pending wake-up
+         * @description Ends a pending wake-up `cancelled` (09 5.8.2): the agent of the wake-up (for example with `bothy-wake --cancel` or `usage_cleared`), the wake-up's person, or a person with `manage` on the channel. The thread gets the note; a cancel sends no notification (09 5.8.4). A wake-up that already ended answers itself without a change. Audited.
+         */
+        post: operations["cancelRunWake"];
         delete?: never;
         options?: never;
         head?: never;
@@ -7513,6 +7693,8 @@ export interface components {
             default_notification_level?: components["schemas"]["NotificationLevel"];
             /** @description Write-protected for every principal including owners; only a running import writes (05, rule 1.8). */
             read_only: boolean;
+            /** @description Persons other than owners may let agents run on alone here (09 5.8.6); changed with `setChannelAutonomousRuns`. Absent from an older server, which means `false`. */
+            allow_autonomous_runs?: boolean;
             /** @description True exactly when a project binding exists for the forum (03 `project_bindings`, R-DM-54); derived, never stored. Creating or deleting a binding raises `version` and writes `channel.updated`; changing a binding and a readiness report do not. */
             project_bound: boolean;
             /** @description Thread with `kind = main` of text and DM channels. */
@@ -8708,7 +8890,7 @@ export interface components {
             reported_tool_class?: components["schemas"]["ToolClass"];
             /** @description Stored in `agents.reported_details.rate_limit` as exactly `state` and `resets_at`; absent clears a stored one, because every heartbeat is the full reported state. Shown by `getStatsBackends`. */
             rate_limit?: components["schemas"]["AgentRateLimitState"];
-            /** @description Further fields of schema `agent_heartbeat.v1`, a closed object; any other key, also inside `capabilities`, `adapter` and `runtime`, is refused. Keys: `capabilities` (object: `followups` `steer` or `queue`; `components`, `voice_input`, `title`, `files_out` booleans; for Claude Code runners only `hosts_agents` `chat`, `scoped` or `host`, the highest tool class the runner loads for a hosted agent (26 3.1), which a built-in agent's own heartbeat never carries), `active_runs` (distinct run ids), `degraded_reasons` (distinct codes), `adapter` (`name` required, `version` optional), `runtime` (`name` required), `protocol_version` (integer, at least 1). Names match `^[a-z0-9][a-z0-9._-]*$`, versions `^[0-9A-Za-z][0-9A-Za-z.+_-]*$`, codes `^[a-z0-9][a-z0-9_.:-]*$`. No secrets, no content, no paths. */
+            /** @description Further fields of schema `agent_heartbeat.v1`, a closed object; any other key, also inside `capabilities`, `adapter` and `runtime`, is refused. Keys: `capabilities` (object: `followups` `steer` or `queue`; `components`, `voice_input`, `title`, `files_out` booleans; for Claude Code runners only `hosts_agents` `chat`, `scoped` or `host`, the highest tool class the runner loads for a hosted agent (26 3.1), which a built-in agent's own heartbeat never carries, and `turn_handover` and `wakes`, `true`, sent only while `runner.turn_handover` or `runner.wakes` is on (09 18.19.1)), `active_runs` (distinct run ids), `degraded_reasons` (distinct codes), `adapter` (`name` required, `version` optional), `runtime` (`name` required), `protocol_version` (integer, at least 1). Names match `^[a-z0-9][a-z0-9._-]*$`, versions `^[0-9A-Za-z][0-9A-Za-z.+_-]*$`, codes `^[a-z0-9][a-z0-9_.:-]*$`. No secrets, no content, no paths. */
             details?: components["schemas"]["JsonObject"];
             /** @description Readiness per bound forum of a runner (M2-03); the channels must be distinct. Applied only when present and different from the last list this server process applied; absent means "unchanged". */
             project_readiness?: components["schemas"]["ProjectReadiness"][];
@@ -8815,6 +8997,14 @@ export interface components {
             /** @description Count of progress messages of the runtime in the current turn that changed nothing visible (for example a long running tool); a patch of it counts as progress against `run.stall_after` (09 5.5, 18.4). */
             progress_events?: number;
             last_api_retry?: components["schemas"]["RunApiRetry"];
+            autonomy_last?: components["schemas"]["RunAutonomyLast"];
+        };
+        /** @description The idle flag of the last autonomous input or notification turn (09 5.8.6); the server counts each distinct `input` once in the idle count of the run's thread and person. */
+        RunAutonomyLast: {
+            /** @description The wake-up id of a wake run or wake input, or the runner's id of a notification turn. */
+            input: string;
+            /** @description True when the input made no tool call other than `bothy-wake` and started no background task. */
+            idle: boolean;
         };
         /** @description Last retry of a model API call, shown in the live box while set. */
         RunApiRetry: {
@@ -8941,11 +9131,16 @@ export interface components {
             channel_id: components["schemas"]["Uuid"];
             agent_id: components["schemas"]["Uuid"];
             agent_session_id?: components["schemas"]["Uuid"];
-            /** @enum {string} */
-            trigger_kind?: "message" | "command" | "interaction";
+            /**
+             * @description `wake` is a run started by a fired wake-up (09 5.8.3); it names the wake-up in `triggering_wake_id`.
+             * @enum {string}
+             */
+            trigger_kind?: "message" | "command" | "interaction" | "wake";
             triggering_message_id?: components["schemas"]["Uuid"];
             triggering_command_id?: components["schemas"]["Uuid"];
             triggering_interaction_id?: components["schemas"]["Uuid"];
+            /** @description The wake-up of a wake run; absent otherwise and after the wake-up was deleted with its thread. */
+            triggering_wake_id?: components["schemas"]["Uuid"];
             triggered_by: components["schemas"]["Uuid"];
             state: components["schemas"]["RunState"];
             /**
@@ -9022,6 +9217,8 @@ export interface components {
              * @example 8
              */
             version: number;
+            /** @description Set when the patch's `/metrics/autonomy_last` made the idle count of the run's thread and person reach `run.autonomous_idle_max` (09 5.8.6); the runner closes stdin at that turn's `result`. */
+            autonomy_cap_reached?: boolean;
         };
         RunStart: {
             /**
@@ -10203,10 +10400,14 @@ export interface components {
             channel_id: components["schemas"]["Uuid"];
             space_id?: components["schemas"]["Uuid"];
             /** @enum {string} */
-            trigger_kind: "message" | "interaction" | "command";
+            trigger_kind: "message" | "interaction" | "command" | "wake";
             /** @description Triggering message; the adapter reads its content with `run.context.read` (09, 4.6). Events outside resource `message` never carry message content (04, 2.2). */
             message_id?: components["schemas"]["Uuid"];
             interaction_id?: components["schemas"]["Uuid"];
+            /** @description The wake-up of a wake run; set exactly for `trigger_kind = wake` (09 5.8.3, 5.8.5). */
+            wake_id?: components["schemas"]["Uuid"];
+            /** @description The wake-up's kind, reason, label and result, which the first input names; set exactly for `trigger_kind = wake`. */
+            wake?: components["schemas"]["AgentWakeFacts"];
             command_invocation_id?: components["schemas"]["Uuid"];
             /** @description Triggering command; set exactly for `trigger_kind = command`. */
             command_id?: components["schemas"]["Uuid"];
@@ -10231,6 +10432,37 @@ export interface components {
              * @description Channel settings version; reload `agent.config.read` when newer than cached.
              */
             settings_version?: number;
+        };
+        /** @description Payload of `run.wake_changed` (09 5.8.2); ids and codes only, never the label, the condition or the result. Clients reload the thread's wake-ups with `listThreadWakes`, a runner with `listPendingRunWakes`. */
+        RunWakeChangedPayload: {
+            wake_id: components["schemas"]["Uuid"];
+            thread_id: components["schemas"]["Uuid"];
+            agent_id: components["schemas"]["Uuid"];
+            triggered_by: components["schemas"]["Uuid"];
+            state: components["schemas"]["RunWakeState"];
+            /** @description Reason code of the change. */
+            state_reason?: string;
+            /** @description The note in the thread of an end other than `fired` (09 5.8.4). */
+            note_message_id?: components["schemas"]["Uuid"];
+            /**
+             * Format: int64
+             * @description The `thread_seq` of the note; set with `note_message_id`.
+             */
+            note_thread_seq?: number;
+        };
+        /** @description The wake-up of a wake run or a wake input; the runner writes its label, reason and result as the input (09 5.8.3). */
+        AgentWakeFacts: {
+            kind: components["schemas"]["RunWakeKind"];
+            reason: components["schemas"]["RunWakeReason"];
+            label: string;
+            result_text: string;
+        };
+        /** @description Payload of `agent.wake_input` (04 15.9); the envelope carries a fresh `invocation_token` with `trigger_kind = wake`, `run_id`, `thread_id`, `wake_id` and `sub` per delivery. */
+        AgentWakeInputPayload: {
+            run_id: components["schemas"]["Uuid"];
+            thread_id: components["schemas"]["Uuid"];
+            wake_id: components["schemas"]["Uuid"];
+            wake: components["schemas"]["AgentWakeFacts"];
         };
         AgentFollowupPayload: {
             run_id: components["schemas"]["Uuid"];
@@ -11605,6 +11837,30 @@ export interface components {
              */
             type: "agent.invocation";
         };
+        /** @description Durable event `run.wake_changed`. */
+        RunWakeChangedEvent: components["schemas"]["EventEnvelope"] & {
+            /** @enum {string} */
+            type: "run.wake_changed";
+            payload: components["schemas"]["RunWakeChangedPayload"];
+        } & {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "run.wake_changed";
+        };
+        /** @description Durable event `agent.wake_input`. */
+        AgentWakeInputEvent: components["schemas"]["EventEnvelope"] & {
+            /** @enum {string} */
+            type: "agent.wake_input";
+            payload: components["schemas"]["AgentWakeInputPayload"];
+        } & {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "agent.wake_input";
+        };
         /** @description Durable event `agent.followup`. */
         AgentFollowupEvent: components["schemas"]["EventEnvelope"] & {
             /** @enum {string} */
@@ -11758,7 +12014,7 @@ export interface components {
             image_url?: string;
         };
         /** @enum {string} */
-        NotificationKind: "message" | "mention" | "dm" | "run_done" | "run_failed" | "input_needed" | "security" | "admin";
+        NotificationKind: "message" | "mention" | "dm" | "run_done" | "run_failed" | "input_needed" | "security" | "admin" | "wake_ended";
         /** @description Preview for the notification extension, fields depend on `notify.preview_mode` (13, 6.4). */
         PushPreview: {
             kind: components["schemas"]["NotificationKind"];
@@ -11778,7 +12034,7 @@ export interface components {
             image_url?: string;
         };
         /** @description Any durable event, discriminated by `type`. Clients skip unknown types and still advance their cursor. */
-        Event: components["schemas"]["MessageCreatedEvent"] | components["schemas"]["MessageUpdatedEvent"] | components["schemas"]["MessageDeletedEvent"] | components["schemas"]["ReactionAddedEvent"] | components["schemas"]["ReactionRemovedEvent"] | components["schemas"]["PinAddedEvent"] | components["schemas"]["PinRemovedEvent"] | components["schemas"]["ThreadCreatedEvent"] | components["schemas"]["ThreadUpdatedEvent"] | components["schemas"]["ThreadClosedEvent"] | components["schemas"]["ThreadReopenedEvent"] | components["schemas"]["ThreadMovedEvent"] | components["schemas"]["ThreadMovedOutEvent"] | components["schemas"]["AgentSessionChangedEvent"] | components["schemas"]["RunStateChangedEvent"] | components["schemas"]["SpaceCreatedEvent"] | components["schemas"]["SpaceUpdatedEvent"] | components["schemas"]["SpaceArchivedEvent"] | components["schemas"]["ChannelCreatedEvent"] | components["schemas"]["ChannelUpdatedEvent"] | components["schemas"]["ChannelSettingsChangedEvent"] | components["schemas"]["ChannelArchivedEvent"] | components["schemas"]["CommandChangedEvent"] | components["schemas"]["FileUpdatedEvent"] | components["schemas"]["UserUpdatedEvent"] | components["schemas"]["AgentUpdatedEvent"] | components["schemas"]["InstanceUpdatedEvent"] | components["schemas"]["StatusUpdatedEvent"] | components["schemas"]["GrantChangedEvent"] | components["schemas"]["GroupChangedEvent"] | components["schemas"]["AccessChangedEvent"] | components["schemas"]["AccessExpiringEvent"] | components["schemas"]["DevicePendingEvent"] | components["schemas"]["SessionRevokedEvent"] | components["schemas"]["ReadStateUpdatedEvent"] | components["schemas"]["DraftUpdatedEvent"] | components["schemas"]["DraftDeletedEvent"] | components["schemas"]["SettingsUpdatedEvent"] | components["schemas"]["SidebarUpdatedEvent"] | components["schemas"]["SidebarChannelUpdatedEvent"] | components["schemas"]["NotificationPrefUpdatedEvent"] | components["schemas"]["QuietHoursUpdatedEvent"] | components["schemas"]["GdprRequestUpdatedEvent"] | components["schemas"]["GdprRequestDueEvent"] | components["schemas"]["ImportProgressEvent"] | components["schemas"]["AgentInvocationEvent"] | components["schemas"]["AgentFollowupEvent"] | components["schemas"]["RunCancelRequestedEvent"] | components["schemas"]["InteractionCreatedEvent"] | components["schemas"]["CommandInvokedEvent"] | components["schemas"]["AgentConfigChangedEvent"] | components["schemas"]["AgentDefinitionChangedEvent"] | components["schemas"]["AgentHostingChangedEvent"] | components["schemas"]["HostUpdatedEvent"] | components["schemas"]["TerminalSessionChangedEvent"];
+        Event: components["schemas"]["MessageCreatedEvent"] | components["schemas"]["MessageUpdatedEvent"] | components["schemas"]["MessageDeletedEvent"] | components["schemas"]["ReactionAddedEvent"] | components["schemas"]["ReactionRemovedEvent"] | components["schemas"]["PinAddedEvent"] | components["schemas"]["PinRemovedEvent"] | components["schemas"]["ThreadCreatedEvent"] | components["schemas"]["ThreadUpdatedEvent"] | components["schemas"]["ThreadClosedEvent"] | components["schemas"]["ThreadReopenedEvent"] | components["schemas"]["ThreadMovedEvent"] | components["schemas"]["ThreadMovedOutEvent"] | components["schemas"]["AgentSessionChangedEvent"] | components["schemas"]["RunStateChangedEvent"] | components["schemas"]["SpaceCreatedEvent"] | components["schemas"]["SpaceUpdatedEvent"] | components["schemas"]["SpaceArchivedEvent"] | components["schemas"]["ChannelCreatedEvent"] | components["schemas"]["ChannelUpdatedEvent"] | components["schemas"]["ChannelSettingsChangedEvent"] | components["schemas"]["ChannelArchivedEvent"] | components["schemas"]["CommandChangedEvent"] | components["schemas"]["FileUpdatedEvent"] | components["schemas"]["UserUpdatedEvent"] | components["schemas"]["AgentUpdatedEvent"] | components["schemas"]["InstanceUpdatedEvent"] | components["schemas"]["StatusUpdatedEvent"] | components["schemas"]["GrantChangedEvent"] | components["schemas"]["GroupChangedEvent"] | components["schemas"]["AccessChangedEvent"] | components["schemas"]["AccessExpiringEvent"] | components["schemas"]["DevicePendingEvent"] | components["schemas"]["SessionRevokedEvent"] | components["schemas"]["ReadStateUpdatedEvent"] | components["schemas"]["DraftUpdatedEvent"] | components["schemas"]["DraftDeletedEvent"] | components["schemas"]["SettingsUpdatedEvent"] | components["schemas"]["SidebarUpdatedEvent"] | components["schemas"]["SidebarChannelUpdatedEvent"] | components["schemas"]["NotificationPrefUpdatedEvent"] | components["schemas"]["QuietHoursUpdatedEvent"] | components["schemas"]["GdprRequestUpdatedEvent"] | components["schemas"]["GdprRequestDueEvent"] | components["schemas"]["ImportProgressEvent"] | components["schemas"]["AgentInvocationEvent"] | components["schemas"]["AgentFollowupEvent"] | components["schemas"]["RunCancelRequestedEvent"] | components["schemas"]["InteractionCreatedEvent"] | components["schemas"]["CommandInvokedEvent"] | components["schemas"]["AgentConfigChangedEvent"] | components["schemas"]["AgentDefinitionChangedEvent"] | components["schemas"]["AgentHostingChangedEvent"] | components["schemas"]["RunWakeChangedEvent"] | components["schemas"]["AgentWakeInputEvent"] | components["schemas"]["HostUpdatedEvent"] | components["schemas"]["TerminalSessionChangedEvent"];
         /** @description One page. `next_cursor` is absent on the last page. */
         MentionItemPage: {
             items: components["schemas"]["MentionItem"][];
@@ -11891,6 +12147,139 @@ export interface components {
         ThreadPage: {
             items: components["schemas"]["Thread"][];
             next_cursor?: components["schemas"]["Cursor"];
+        };
+        /**
+         * @description What makes a wake-up fire (09 5.8.1); `at` the server job `runs.wake_due`, `pr_checks` and `command` the runner after `run.wake.check`.
+         * @enum {string}
+         */
+        RunWakeKind: "at" | "pr_checks" | "command";
+        /**
+         * @description Why the wake-up exists (09 5.8.1); `agent` from `bothy-wake`, `recovery` after lost background work, `usage_limit` at the reset of the account's usage window.
+         * @enum {string}
+         */
+        RunWakeReason: "agent" | "recovery" | "usage_limit";
+        /**
+         * @description State of a wake-up (09 5.8.1); every state other than `pending` is an end, and every end other than `fired` posts a note in the thread (09 5.8.4).
+         * @enum {string}
+         */
+        RunWakeState: "pending" | "fired" | "cancelled" | "expired" | "refused" | "failed";
+        /** @description Schema `run_wake_condition.v1` (03 `run_wakes`); `repository`, `number` and `head_commit` for `pr_checks`, `command_line` for `command`, nothing for `at`. */
+        RunWakeCondition: {
+            /** @example example/app */
+            repository?: string;
+            /** @example 123 */
+            number?: number;
+            /**
+             * @description The head commit of the pull request at the creation.
+             * @example 4f2c9e1
+             */
+            head_commit?: string;
+            /**
+             * @description Run with `/bin/sh -c` in the turn's working folder; fires on exit code 0. At most `message.max_content_bytes` bytes, no control or bidi characters except line feed and tab.
+             * @example test -f build/done
+             */
+            command_line?: string;
+        };
+        /** @description A wake-up (03 `run_wakes`, 09 5.8.1): a server record that continues a thread later without a new message, on behalf of the person of its source run. */
+        RunWake: {
+            id: components["schemas"]["Uuid"];
+            agent_id: components["schemas"]["Uuid"];
+            thread_id: components["schemas"]["Uuid"];
+            /** @description The run that asked for it, or the ended run of a recovery or usage-limit wake-up. */
+            source_run_id: components["schemas"]["Uuid"];
+            /** @description The person of the source run; every check uses this person. */
+            triggered_by: components["schemas"]["Uuid"];
+            kind: components["schemas"]["RunWakeKind"];
+            reason: components["schemas"]["RunWakeReason"];
+            /**
+             * @description Short text of the agent, at most `run.wake_label_max_chars` characters; may be empty.
+             * @example CI of #123
+             */
+            label: string;
+            condition: components["schemas"]["RunWakeCondition"];
+            /** @description The run's outage number of a `usage_limit` wake-up of `createRunWake`. */
+            outage?: number;
+            not_before: components["schemas"]["Timestamp"];
+            deadline: components["schemas"]["Timestamp"];
+            state: components["schemas"]["RunWakeState"];
+            /**
+             * @description Reason code of the last state change (09 5.8.3, 5.8.6), for example `autonomous_chain_max`, `deadline_passed` or `wake_input_skipped`.
+             * @example deadline_passed
+             */
+            state_reason?: string;
+            /** @description The result of a fired check, as the runner cut it. */
+            result_text?: string;
+            /** @description The wake run it started. */
+            fired_run_id?: components["schemas"]["Uuid"];
+            /** @description The active run it reached as a wake input. */
+            fired_into_run_id?: components["schemas"]["Uuid"];
+            created_at: components["schemas"]["Timestamp"];
+            ended_at?: components["schemas"]["Timestamp"];
+            /** Format: int64 */
+            version: number;
+        };
+        RunWakeCreate: {
+            kind: components["schemas"]["RunWakeKind"];
+            /** @enum {string} */
+            reason: "agent" | "usage_limit";
+            /**
+             * @description At most `run.wake_label_max_chars` characters, no control or bidi characters.
+             * @example CI of #123
+             */
+            label?: string;
+            condition?: components["schemas"]["RunWakeCondition"];
+            /** @description The fire time of an `at` wake-up; never earlier than `run.wake_min_delay` after now. For `usage_limit` the reset time plus `run.wake_min_delay`. */
+            not_before?: components["schemas"]["Timestamp"];
+            /** @description At most `run.wake_max_wait` after now, for `usage_limit` after `not_before`; absent means that longest deadline. */
+            deadline?: components["schemas"]["Timestamp"];
+            /** @description The run's outage number; required exactly for `usage_limit` (18.19.10). */
+            outage?: number;
+            /** @description Set by the SDK outbox for a request it sends later; a refusal is then stored in state `refused` with the note and the notification (18.19.8). */
+            deferred?: boolean;
+        };
+        RunWakeRecover: {
+            /** @enum {string} */
+            reason: "recovery" | "usage_limit";
+            /**
+             * @description At most `run.wake_label_max_chars` characters, no control or bidi characters.
+             * @example Lost background work
+             */
+            label?: string;
+            /** @description The earliest fire time, for `usage_limit` the reset plus `run.wake_min_delay`; never earlier than `run.wake_min_delay` after now. */
+            not_before?: components["schemas"]["Timestamp"];
+        };
+        RunWakeFire: {
+            /** @enum {string} */
+            outcome: "fired" | "failed" | "input_skipped";
+            /** @description The result of `fired`; at most `message.max_content_bytes` bytes, no control or bidi characters except line feed and tab. */
+            result_text?: string;
+            /** @description The reason of `failed` (the last failure, for example `gh_missing`); absent means `wake_check_failed`. */
+            reason?: string;
+            /** @description The run of a skipped wake input; required for `input_skipped`. */
+            run_id?: components["schemas"]["Uuid"];
+        };
+        RunWakeCancel: {
+            /**
+             * @description Reason code of a cancel by the agent, for example `usage_cleared`; a person's cancel has `cancelled_by_person`.
+             * @example usage_cleared
+             */
+            reason?: string;
+        };
+        /** @description Allowed; the configured values the runner compares with its own (`compare_actual`). */
+        RunWakeCheckResult: {
+            tool_class: components["schemas"]["ToolClass"];
+            billing_mode: components["schemas"]["BillingMode"];
+        };
+        RunWakeList: {
+            items: components["schemas"]["RunWake"][];
+        };
+        /** @description One page. `next_cursor` is absent on the last page. */
+        RunWakePage: {
+            items: components["schemas"]["RunWake"][];
+            next_cursor?: components["schemas"]["Cursor"];
+        };
+        ChannelAutonomousRunsSet: {
+            allow_autonomous_runs: boolean;
         };
         /** @description One page. `next_cursor` is absent on the last page. */
         RunSummaryPage: {
@@ -12961,6 +13350,7 @@ export interface components {
         TerminalSessionStateQuery: components["schemas"]["TerminalSessionState"];
         ConsumerPath: string;
         RunIdPath: components["schemas"]["Uuid"];
+        WakeIdPath: components["schemas"]["Uuid"];
         CommandIdPath: components["schemas"]["Uuid"];
         RequestIdPath: components["schemas"]["Uuid"];
         AppIdPath: components["schemas"]["Uuid"];
@@ -17341,6 +17731,48 @@ export interface operations {
             default: components["responses"]["Error"];
         };
     };
+    setChannelAutonomousRuns: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description ETag of the version the change is based on, e.g. `"7"`. Mismatch gives 412 `version_conflict`. */
+                "If-Match": components["parameters"]["IfMatchRequired"];
+            };
+            path: {
+                channel_id: components["parameters"]["ChannelIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChannelAutonomousRunsSet"];
+            };
+        };
+        responses: {
+            /** @description OK. */
+            200: {
+                headers: {
+                    "Correlation-Id": components["headers"]["Correlation-Id"];
+                    RateLimit: components["headers"]["RateLimit"];
+                    "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Channel"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            428: components["responses"]["PreconditionRequired"];
+            429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
     putProjectBinding: {
         parameters: {
             query?: never;
@@ -18665,6 +19097,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RunSummaryPage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
+    listThreadWakes: {
+        parameters: {
+            query?: {
+                /** @description Cursor from `next_cursor` of the previous page. */
+                cursor?: components["parameters"]["Cursor"];
+                limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path: {
+                thread_id: components["parameters"]["ThreadIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK. */
+            200: {
+                headers: {
+                    "Correlation-Id": components["headers"]["Correlation-Id"];
+                    RateLimit: components["headers"]["RateLimit"];
+                    "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunWakePage"];
                 };
             };
             400: components["responses"]["BadRequest"];
@@ -22100,6 +22567,274 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
+    createRunWake: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`. */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                run_id: components["parameters"]["RunIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RunWakeCreate"];
+            };
+        };
+        responses: {
+            /** @description The pending wake-up of the same outage, with the later `not_before`. */
+            200: {
+                headers: {
+                    "Correlation-Id": components["headers"]["Correlation-Id"];
+                    RateLimit: components["headers"]["RateLimit"];
+                    "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunWake"];
+                };
+            };
+            /** @description Created. */
+            201: {
+                headers: {
+                    "Correlation-Id": components["headers"]["Correlation-Id"];
+                    RateLimit: components["headers"]["RateLimit"];
+                    "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunWake"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["UnprocessableEntity"];
+            429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
+    recoverRunWake: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`. */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                run_id: components["parameters"]["RunIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RunWakeRecover"];
+            };
+        };
+        responses: {
+            /** @description The wake-up of this run and reason that already exists. */
+            200: {
+                headers: {
+                    "Correlation-Id": components["headers"]["Correlation-Id"];
+                    RateLimit: components["headers"]["RateLimit"];
+                    "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunWake"];
+                };
+            };
+            /** @description Created. */
+            201: {
+                headers: {
+                    "Correlation-Id": components["headers"]["Correlation-Id"];
+                    RateLimit: components["headers"]["RateLimit"];
+                    "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunWake"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["UnprocessableEntity"];
+            429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
+    checkRunLaunch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: components["parameters"]["RunIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK. */
+            200: {
+                headers: {
+                    "Correlation-Id": components["headers"]["Correlation-Id"];
+                    RateLimit: components["headers"]["RateLimit"];
+                    "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunWakeCheckResult"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
+    listPendingRunWakes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK. */
+            200: {
+                headers: {
+                    "Correlation-Id": components["headers"]["Correlation-Id"];
+                    RateLimit: components["headers"]["RateLimit"];
+                    "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunWakeList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
+    checkRunWake: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wake_id: components["parameters"]["WakeIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK. */
+            200: {
+                headers: {
+                    "Correlation-Id": components["headers"]["Correlation-Id"];
+                    RateLimit: components["headers"]["RateLimit"];
+                    "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunWakeCheckResult"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
+    fireRunWake: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wake_id: components["parameters"]["WakeIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RunWakeFire"];
+            };
+        };
+        responses: {
+            /** @description OK. */
+            200: {
+                headers: {
+                    "Correlation-Id": components["headers"]["Correlation-Id"];
+                    RateLimit: components["headers"]["RateLimit"];
+                    "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunWake"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
+    cancelRunWake: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`. */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                wake_id: components["parameters"]["WakeIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RunWakeCancel"];
+            };
+        };
+        responses: {
+            /** @description OK. */
+            200: {
+                headers: {
+                    "Correlation-Id": components["headers"]["Correlation-Id"];
+                    RateLimit: components["headers"]["RateLimit"];
+                    "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunWake"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["UnprocessableEntity"];
             429: components["responses"]["TooManyRequests"];
             default: components["responses"]["Error"];
         };

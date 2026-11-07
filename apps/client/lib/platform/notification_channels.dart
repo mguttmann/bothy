@@ -38,7 +38,7 @@ enum PushChannel {
   messages('messages', high: false, kinds: ['message']),
 
   /// The end of a run the person started.
-  runs('runs', high: false, kinds: ['run_done', 'run_failed']);
+  runs('runs', high: false, kinds: ['run_done', 'run_failed', 'wake_ended']);
 
   const PushChannel(this.id, {required this.high, required this.kinds});
 

@@ -36,7 +36,7 @@ abstract class NotificationCreatedPayload
 
   @BuiltValueField(wireName: r'kind')
   NotificationKind get kind;
-  // enum kindEnum {  message,  mention,  dm,  run_done,  run_failed,  input_needed,  security,  admin,  };
+  // enum kindEnum {  message,  mention,  dm,  run_done,  run_failed,  input_needed,  security,  admin,  wake_ended,  };
 
   /// Thread of the hint; absent for hints without a thread.
   @BuiltValueField(wireName: r'thread_id')

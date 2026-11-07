@@ -74,6 +74,8 @@ personal data, also of third parties and also special categories under Art. 9),
 | `runs` | content | trigger, status line, last text excerpt, metrics | `content` | with the thread |
 | `run_steps` | content | tool names, details (can contain paths, commands, data) | `content` | with the run |
 | `run_followups` | indirect | assignment | `content` | with the run |
+| `run_wakes` | content | the person a wake-up acts for, the agent's label, condition and result (stage AR, 09 5.8) | `content` | with the thread or the source run |
+| `run_autonomy` | indirect | counts of autonomous inputs per thread and person (stage AR, 09 5.8.6) | `content` | with the thread or the person |
 | `message_components` | content | definition, used by | `content` | with the message |
 | `interactions` | content | form values, principal | `content` | with the message |
 | `price_table` | no | prices | `cost` | `retention.cost` |

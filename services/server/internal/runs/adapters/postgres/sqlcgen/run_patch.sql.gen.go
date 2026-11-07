@@ -12,7 +12,7 @@ import (
 )
 
 const activeRunsOfThreads = `-- name: ActiveRunsOfThreads :many
-SELECT id, thread_id, agent_id, agent_session_id, trigger_kind, triggering_message_id, triggering_command_id, triggering_interaction_id, triggered_by, state, state_reason, version, billing_mode_expected, billing_mode_used, billing_evidence, invocation_jti, started_jti, renewed_from_jti, dev_environment_id, model, status_line, last_text_excerpt, plan, metrics, cost_micros, currency, cost_is_estimate, summary, stall_warned_at, queued_at, invocation_held_until, started_at, finished_at, duration_ms, last_progress_at FROM runs
+SELECT id, thread_id, agent_id, agent_session_id, trigger_kind, triggering_message_id, triggering_command_id, triggering_interaction_id, triggered_by, state, state_reason, version, billing_mode_expected, billing_mode_used, billing_evidence, invocation_jti, started_jti, renewed_from_jti, dev_environment_id, model, status_line, last_text_excerpt, plan, metrics, cost_micros, currency, cost_is_estimate, summary, stall_warned_at, queued_at, invocation_held_until, started_at, finished_at, duration_ms, last_progress_at, triggering_wake_id FROM runs
 WHERE thread_id = ANY ($1::uuid[]) AND state IN ('queued', 'running', 'waiting_input')
 `
 
@@ -63,6 +63,7 @@ func (q *Queries) ActiveRunsOfThreads(ctx context.Context, threadIds []pgtype.UU
 			&i.FinishedAt,
 			&i.DurationMs,
 			&i.LastProgressAt,
+			&i.TriggeringWakeID,
 		); err != nil {
 			return nil, err
 		}
@@ -145,7 +146,7 @@ SET status_line = CASE WHEN $1::boolean
     stall_warned_at = NULL,
     last_progress_at = $13::timestamptz
 WHERE id = $14
-RETURNING id, thread_id, agent_id, agent_session_id, trigger_kind, triggering_message_id, triggering_command_id, triggering_interaction_id, triggered_by, state, state_reason, version, billing_mode_expected, billing_mode_used, billing_evidence, invocation_jti, started_jti, renewed_from_jti, dev_environment_id, model, status_line, last_text_excerpt, plan, metrics, cost_micros, currency, cost_is_estimate, summary, stall_warned_at, queued_at, invocation_held_until, started_at, finished_at, duration_ms, last_progress_at
+RETURNING id, thread_id, agent_id, agent_session_id, trigger_kind, triggering_message_id, triggering_command_id, triggering_interaction_id, triggered_by, state, state_reason, version, billing_mode_expected, billing_mode_used, billing_evidence, invocation_jti, started_jti, renewed_from_jti, dev_environment_id, model, status_line, last_text_excerpt, plan, metrics, cost_micros, currency, cost_is_estimate, summary, stall_warned_at, queued_at, invocation_held_until, started_at, finished_at, duration_ms, last_progress_at, triggering_wake_id
 `
 
 type PatchRunParams struct {
@@ -223,6 +224,7 @@ func (q *Queries) PatchRun(ctx context.Context, arg PatchRunParams) (Run, error)
 		&i.FinishedAt,
 		&i.DurationMs,
 		&i.LastProgressAt,
+		&i.TriggeringWakeID,
 	)
 	return i, err
 }

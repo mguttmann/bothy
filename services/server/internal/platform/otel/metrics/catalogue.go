@@ -31,7 +31,10 @@ var droppedScopes = map[string]bool{LibraryOtelPGX: true}
 
 // The values failed and cancelled of bothy.outcome and bothy.run.state.
 const (
-	valueFailed    = "failed"
+	valueFailed = "failed"
+	// valueAgent is the value agent of bothy.principal.kind, bothy.message.origin and the reason
+	// of a wake-up.
+	valueAgent     = "agent"
 	valueCancelled = "cancelled"
 )
 
@@ -62,8 +65,10 @@ const (
 
 // Closed literal sets shared by several instruments.
 var (
+	// wakeReasons are bothy.reason of bothy.run.wake.ended: the reason of a wake-up (09 5.8.1).
+	wakeReasons = []string{valueAgent, "recovery", "usage_limit"}
 	// principalKinds are bothy.principal.kind of an identified connection.
-	principalKinds = []string{"user", "agent", "app"}
+	principalKinds = []string{"user", valueAgent, "app"}
 	// httpMethods are http.request.method: the methods of the HTTP semantic conventions and
 	// _OTHER for every other method (platform/otel Middleware).
 	// scanOutcomes are bothy.outcome of bothy.file.scan and bothy.file.scan.duration.
@@ -89,7 +94,7 @@ var (
 		"user_cancelled", reasonAccessRevoked, "cancel_timeout", "agent_disabled", "billing_mode_personal_not_holder",
 		"channel_read_only", "billing_mode_mismatch", "tool_class_owner_only", "tool_class_mismatch",
 		"invalid_invocation_token", "project_not_ready", "agent_unavailable", "interrupted", "stale",
-		"runtime_error", "adapter_error", "runtime_not_authenticated", "adapter_stopped", reasonUserDisabled,
+		"runtime_error", "adapter_error", "runtime_not_authenticated", "adapter_stopped", reasonUserDisabled, "usage_limited",
 	}
 	// restoreChecks are bothy.reason of bothy.backup.restore_test.failures: the seven checks of
 	// docs/spec/16-operations.md 8.3 as internal/status/domain names them (M7-03).
@@ -212,7 +217,7 @@ var (
 		Name: "bothy.message.created", Kind: KindCounter, Unit: "{message}",
 		Description: "Messages created, counted after the commit.",
 		Attrs: []Attr{
-			{Key: "bothy.message.origin", Values: []string{"human", "agent", "app", "import", "system"}},
+			{Key: "bothy.message.origin", Values: []string{"human", valueAgent, "app", "import", "system"}},
 			{Key: "bothy.message.kind", Values: []string{"text", "voice", "run", "card", "system"}},
 		},
 	}
@@ -493,6 +498,29 @@ var (
 			{Key: keyRunState, Values: []string{"queued", "running", "waiting_input"}},
 		},
 	}
+	// RunWakePending is bothy.run.wake.pending (4.3, AR-04, 17 section 3): the pending wake-ups,
+	// observed per collection from run_wakes.
+	RunWakePending = Spec{
+		Name: "bothy.run.wake.pending", Kind: KindGauge, Unit: "{wake}",
+		Description: "Wake-ups in the state pending.",
+	}
+	// RunWakeEnded is bothy.run.wake.ended (4.3, AR-04): every end of a wake-up by its end state
+	// (bothy.outcome) and the reason of the wake-up (bothy.reason: agent, recovery, usage_limit).
+	RunWakeEnded = Spec{
+		Name: "bothy.run.wake.ended", Kind: KindCounter, Unit: "{wake}",
+		Description: "Wake-ups that reached an end state.",
+		Attrs: []Attr{
+			{Key: keyOutcome, Values: []string{"fired", valueCancelled, "expired", "refused", valueFailed}},
+			{Key: keyReason, Values: wakeReasons},
+		},
+	}
+	// RunAutonomyCapReached is bothy.run.autonomy.cap_reached (4.3, AR-04): a chain of autonomous
+	// inputs of one person in one thread that reached a cap of 09 5.8.6.
+	RunAutonomyCapReached = Spec{
+		Name: "bothy.run.autonomy.cap_reached", Kind: KindCounter, Unit: "{chain}",
+		Description: "Chains of autonomous inputs that reached run.autonomous_chain_max or run.autonomous_idle_max.",
+		Attrs:       []Attr{{Key: keyReason, Values: []string{"autonomous_chain_max", "autonomous_idle_max"}}},
+	}
 	// RunStartLatency is bothy.run.start.latency (4.3, M2-05): queued_at until the run left
 	// queued, per outcome and billing mode (the reported mode, else the expected one).
 	RunStartLatency = Spec{
@@ -642,6 +670,7 @@ func All() []Spec {
 		JobDuration, JobQueue, EgressBlocked, FileUploadSize, FileScan, FileScanDuration, FileScanQueue, FilePurgeBacklog, RetentionDeleted,
 		PushSent, PushSendDuration, PushSkipped, PushRegistrationsActive, PushFetch, SearchDuration,
 		RunActive, RunStartLatency, RunDuration, RunFinished, RunSteps, RunCost, AgentInvocationDenied, AgentBillingModeMismatch,
+		RunWakePending, RunWakeEnded, RunAutonomyCapReached,
 		StatsFlushDropped, StatsFlushDuration, StatsLiveSubscribers,
 		DBClientOperationDuration, DBPoolConnections,
 		BackupLastSuccess, BackupWALLastArchived, BackupDuration, BackupSize,

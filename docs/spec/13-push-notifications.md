@@ -39,6 +39,7 @@ A notification has a kind (`kind`). The kind determines the recipients and the m
 | `input_needed` | run changes to `waiting_input` (question, approval) | the run's triggering person | always, even with `mute` | rationale in 2.1 |
 | `security` | a new device of the person waits for device approval | all other active devices of this person | always | account protection: a foreign device is noticed immediately |
 | `admin` | reminders from the administration (grant expires, GDPR deadline) | owner or administrators according to [07-permissions.md](07-permissions.md) and [20-privacy.md](20-privacy.md) | switch `notify.admin_enabled` | content only kind and target ID |
+| `wake_ended` | a wake-up of the person ends `refused`, `expired` or `failed` ([09-agents.md](09-agents.md) 5.8.4), or a run of the person ends `failed` with `usage_limited` (09 18.19.10) | the wake-up's person (`run_wakes.triggered_by`); for `usage_limited` the run's triggering person | `mentions` | points to the note in the thread; a cancel by a person sends none, and a usage-limited run gets no second `run_failed` (stage AR, AR-04) |
 
 A message in a DM channel gives r the kind `dm` and never `message` or `mention`, also when it
 mentions r: both kinds need the same level and go at once, and DM channels trigger no agent, so
@@ -48,12 +49,9 @@ never gets `message`, `mention` or `dm` for their own message, `run_done`, `run_
 or another kind with thread inside one is invalid input (docs/DECISIONS.md D-M3-17-2).
 
 Stage AR (addendum of 2026-11-06, R-PN-12, [09-agents.md](09-agents.md) 5.8.4 and 18.19.10)
-adds the kind `wake_ended`: trigger, a wake-up of the person ends `refused`, `expired` or `failed`,
-or a run of the person ends `usage_limited`; recipient, the wake-up's person
-(`run_wakes.triggered_by`), for `usage_limited` the run's triggering person; level `mentions`; it
-points to the note in the thread, a cancel by a person sends none, and a usage-limited run gets no
-second `run_failed`. The kind enters the table above, the enum `NotificationKind` and the code
-together with AR-04, which builds the ends it reports.
+added the kind `wake_ended` with AR-04 (the row above, the enum `NotificationKind` and the code); it
+goes at once like `run_failed` (4.5 point 3), and its code of the job `notify.push_send` is 10,
+after the badge sync, because stored codes are never renumbered (D-M3-19-10).
 
 No notification is created for: edits, deletions, reactions, pins, typing, live box patches,
 messages with `silent = true` and messages with `origin IN ('import','system')`. An edit

@@ -72,9 +72,9 @@ func (r *Repository) InsertRun(ctx context.Context, n app.NewRun) (app.RunRow, b
 	row, err := q.InsertRun(ctx, sqlcgen.InsertRunParams{
 		ID: uuid(n.ID), ThreadID: uuid(n.ThreadID), AgentID: uuid(n.AgentID), TriggerKind: n.TriggerKind,
 		TriggeringMessageID: optionalUUID(n.TriggeringMessageID), TriggeringCommandID: optionalUUID(n.TriggeringCommandID),
-		TriggeringInteractionID: optionalUUID(n.TriggeringInteractionID),
-		TriggeredBy:             uuid(n.TriggeredBy),
-		BillingModeExpected:     n.BillingModeExpected, InvocationJti: uuid(n.InvocationJTI), QueuedAt: ts(n.QueuedAt),
+		TriggeringInteractionID: optionalUUID(n.TriggeringInteractionID), TriggeringWakeID: optionalUUID(n.TriggeringWakeID),
+		TriggeredBy:         uuid(n.TriggeredBy),
+		BillingModeExpected: n.BillingModeExpected, InvocationJti: uuid(n.InvocationJTI), QueuedAt: ts(n.QueuedAt),
 		InvocationHeldUntil: optionalTS(n.InvocationHeldUntil), StateReason: optionalText(n.StateReason),
 	})
 	return one(row, err, "inserting a run")
@@ -546,7 +546,7 @@ func toRun(row sqlcgen.Run) app.RunRow {
 		ID: idOf(row.ID), ThreadID: idOf(row.ThreadID), AgentID: idOf(row.AgentID), AgentSessionID: idOf(row.AgentSessionID),
 		TriggerKind: row.TriggerKind, TriggeringMessageID: idOf(row.TriggeringMessageID),
 		TriggeringCommandID: idOf(row.TriggeringCommandID), TriggeringInteractionID: idOf(row.TriggeringInteractionID),
-		TriggeredBy: idOf(row.TriggeredBy), State: domain.State(row.State), StateReason: row.StateReason.String,
+		TriggeringWakeID: idOf(row.TriggeringWakeID), TriggeredBy: idOf(row.TriggeredBy), State: domain.State(row.State), StateReason: row.StateReason.String,
 		Version: row.Version, BillingModeExpected: row.BillingModeExpected, BillingModeUsed: row.BillingModeUsed.String,
 		InvocationJTI: idOf(row.InvocationJti), RenewedFromJTI: idOf(row.RenewedFromJti), StartedJTI: idOf(row.StartedJti),
 		BillingEvidence: row.BillingEvidence, Model: row.Model.String, StatusLine: row.StatusLine.String,

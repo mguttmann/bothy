@@ -209,6 +209,7 @@ func (c *PushConsumer) HandleEvent(ctx context.Context, ev sync.Event) error {
 	handlers := map[authorize.EventType]func(context.Context, sync.Event) error{
 		authorize.EventMessageCreated:   c.p.onMessage,
 		authorize.EventRunStateChanged:  c.p.onRun,
+		authorize.EventRunWakeChanged:   c.p.onWake,
 		authorize.EventAccessExpiring:   c.p.onAccessExpiring,
 		authorize.EventDevicePending:    c.p.onDevicePending,
 		authorize.EventGdprRequestDue:   c.p.onRequestDue,

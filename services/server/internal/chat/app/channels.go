@@ -81,7 +81,7 @@ func channelDTO(c ChannelRow) chat.Channel {
 		ID: ch.ID, SpaceID: ch.SpaceID, Kind: string(ch.Kind), Name: ch.Name, Topic: ch.Topic, SortKey: ch.SortKey,
 		Operator:         chat.ChannelOperator{Mode: string(op.Mode), AgentID: op.AgentID, EffectiveAgentID: op.EffectiveAgentID},
 		ForumDefaultSort: ch.ForumDefaultSort, DefaultNotificationLevel: ch.DefaultNotificationLevel, ReadOnly: ch.ReadOnly,
-		ProjectBound: c.ProjectBound, MainThreadID: ch.MainThreadID, CreatedAt: ch.CreatedAt, ArchivedAt: ch.ArchivedAt, Version: ch.Version,
+		AllowAutonomousRuns: ch.AllowAutonomousRuns, ProjectBound: c.ProjectBound, MainThreadID: ch.MainThreadID, CreatedAt: ch.CreatedAt, ArchivedAt: ch.ArchivedAt, Version: ch.Version,
 		SettingsVersion: ch.SettingsVersion, DeletedAt: ch.Deletion.At,
 	}
 }

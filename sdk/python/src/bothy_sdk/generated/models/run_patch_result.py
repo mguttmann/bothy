@@ -6,6 +6,8 @@ from typing import Any, Self, TypeVar
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
+from ..types import UNSET, Unset
+
 T = TypeVar("T", bound="RunPatchResult")
 
 
@@ -14,13 +16,19 @@ class RunPatchResult:
     """
     Attributes:
         version (int):
+        autonomy_cap_reached (bool | Unset): Set when the patch's `/metrics/autonomy_last` made the idle count of the
+            run's thread and person reach `run.autonomous_idle_max` (09 5.8.6); the runner closes stdin at that turn's
+            `result`.
     """
 
     version: int
+    autonomy_cap_reached: bool | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         version = self.version
+
+        autonomy_cap_reached = self.autonomy_cap_reached
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
@@ -29,6 +37,8 @@ class RunPatchResult:
                 "version": version,
             }
         )
+        if autonomy_cap_reached is not UNSET:
+            field_dict["autonomy_cap_reached"] = autonomy_cap_reached
 
         return field_dict
 
@@ -37,8 +47,11 @@ class RunPatchResult:
         d = dict(src_dict)
         version = d.pop("version")
 
+        autonomy_cap_reached = d.pop("autonomy_cap_reached", UNSET)
+
         run_patch_result = cls(
             version=version,
+            autonomy_cap_reached=autonomy_cap_reached,
         )
 
         run_patch_result.additional_properties = d

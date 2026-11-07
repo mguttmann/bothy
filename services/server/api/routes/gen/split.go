@@ -68,14 +68,41 @@ func typeDecl(f *ast.File, match func(name string) bool) *ast.GenDecl {
 }
 
 // splitAll is splitRest with objects.gen.go halved into objects.gen.go and objects2.gen.go
-// (halveObjects).
-func splitAll(src []byte) (models, server, objects, objects2 []byte, err error) {
+// (halveObjects) and rest.gen.go cut into rest.gen.go and rest2.gen.go (halveServer).
+func splitAll(src []byte) (models, server, server2, objects, objects2 []byte, err error) {
 	models, server, objects, err = splitRest(src)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
 	}
-	objects, objects2, err = halveObjects(objects)
-	return models, server, objects, objects2, err
+	if objects, objects2, err = halveObjects(objects); err != nil {
+		return nil, nil, nil, nil, nil, err
+	}
+	server, server2, err = halveServer(server)
+	return models, server, server2, objects, objects2, err
+}
+
+// halveServer cuts rest.gen.go (the server part of splitRest) at the type StrictServerInterface:
+// the std-http server stays in rest.gen.go, the strict interface and its handler go to
+// rest2.gen.go, so neither reaches repo.max_file_kb as the contract grows (AR-04: the server part
+// passed it with the operations of stage AR). Each file keeps the header and only the imports it
+// uses. Without StrictServerInterface the first file keeps everything and the second holds only
+// the package clause. Errors: server is not valid Go.
+func halveServer(server []byte) (head, tail []byte, err error) {
+	f, err := gosplit.Parse("rest.gen.go", server)
+	if err != nil {
+		return nil, nil, err
+	}
+	cut := len(server)
+	if d := typeDecl(f.AST, func(n string) bool { return n == "StrictServerInterface" }); d != nil {
+		cut = f.DeclStart(d)
+	}
+	if head, err = f.Assemble(server[f.BodyStart:cut]); err != nil {
+		return nil, nil, err
+	}
+	if tail, err = f.Assemble(server[cut:]); err != nil {
+		return nil, nil, err
+	}
+	return head, tail, nil
 }
 
 // halveObjects cuts objects.gen.go (the output of splitRest) into two files at the start of the

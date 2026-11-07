@@ -17,6 +17,9 @@ const (
 	EventAgentFollowup      = "agent.followup"
 	EventInteractionCreated = "interaction.created"
 	EventCommandInvoked     = "command.invoked"
+	// EventAgentWakeInput is a wake-up that fired into the running run of its person (09 5.8.3,
+	// 04 15.9, stage AR); it goes over the follow-up path with a token of trigger kind wake.
+	EventAgentWakeInput = "agent.wake_input"
 )
 
 // DeliveryDenial says what a denial of agent.invoke before a delivery changes (M2-08 design note
@@ -33,6 +36,9 @@ const (
 	// DenyFailFollowup refuses the follow-up: its message gets trigger_state failed, the run is
 	// unchanged (ruling D-M2-08-5).
 	DenyFailFollowup
+	// DenyRefuseWake refuses a wake input: the wake-up ends refused with the reason, the note and
+	// the notification of 09 5.8.4; the run is unchanged (stage AR).
+	DenyRefuseWake
 )
 
 // DeliveryRule is one cell of the delivery matrix: whether the delivery is checked at all, whether
@@ -44,6 +50,9 @@ type DeliveryRule struct {
 	Record bool
 	// Denial is the consequence of a denial; zero when Skip.
 	Denial DeliveryDenial
+	// ReturnWake: a skipped agent.wake_input puts its wake-up back to pending, so it fires after
+	// the run as a wake run (09 5.8.3): the run no longer runs at the delivery.
+	ReturnWake bool
 }
 
 // ErrUnknownDelivery is the error of DeliveryMatrix for an event type that bears no invocation or
@@ -66,7 +75,7 @@ func DeliveryMatrix(eventType string, state State) (DeliveryRule, error) {
 		if !InvocationBearing(eventType) {
 			return DeliveryRule{}, ErrUnknownDelivery
 		}
-		return DeliveryRule{Skip: true}, nil
+		return DeliveryRule{Skip: true, ReturnWake: eventType == EventAgentWakeInput}, nil
 	case StateQueued, StateRunning, StateWaitingInput:
 	default:
 		return DeliveryRule{}, ErrUnknownDelivery
@@ -81,16 +90,25 @@ func DeliveryMatrix(eventType string, state State) (DeliveryRule, error) {
 		return DeliveryRule{Record: state == StateWaitingInput, Denial: DenyFailFollowup}, nil
 	case EventCommandInvoked:
 		return DeliveryRule{Denial: DenyKeepRun}, nil
+	case EventAgentWakeInput:
+		// A wake input goes only into a running run: a queued run has no process to write into, and
+		// a waiting run waits for its person's answer, which a wake-up must not give (ruling
+		// D-AR-04-4). It never records its jti: it starts nothing.
+		if state != StateRunning {
+			return DeliveryRule{Skip: true, ReturnWake: true}, nil
+		}
+		return DeliveryRule{Denial: DenyRefuseWake}, nil
 	}
 	return DeliveryRule{}, ErrUnknownDelivery
 }
 
 // InvocationBearing reports whether an event of eventType carries an invocation and therefore
 // passes runs.Delivery before every delivery to an agent: agent.invocation, agent.followup,
-// interaction.created and command.invoked (04 section 15.3, 05 section 6).
+// interaction.created, command.invoked (04 section 15.3, 05 section 6) and agent.wake_input (04
+// 15.9, stage AR).
 func InvocationBearing(eventType string) bool {
 	switch eventType {
-	case EventAgentInvocation, EventAgentFollowup, EventInteractionCreated, EventCommandInvoked:
+	case EventAgentInvocation, EventAgentFollowup, EventInteractionCreated, EventCommandInvoked, EventAgentWakeInput:
 		return true
 	}
 	return false
@@ -169,7 +187,8 @@ type DeliveryFacts struct {
 	// RunID, AgentID and TriggeredBy are the run, its agent (aud) and the trigger (sub).
 	RunID, AgentID, TriggeredBy ids.ID
 	// ObjectID is the triggering object of the resolver: the message of agent.invocation and
-	// agent.followup, the interaction or the command of the others.
+	// agent.followup, the interaction or the command of the others, the wake-up of a wake run and
+	// of agent.wake_input.
 	ObjectID ids.ID
 	// ThreadID, ChannelID and SpaceID are the run's thread now and its channel and space.
 	ThreadID, ChannelID, SpaceID ids.ID
@@ -202,10 +221,14 @@ func DeliveryGrant(f DeliveryFacts) (InvocationGrant, error) {
 		g.TriggerKind = TriggerInteraction
 	case EventCommandInvoked:
 		g.TriggerKind = TriggerCommand
+	case EventAgentWakeInput:
+		g.TriggerKind = TriggerWake
 	default:
 		return InvocationGrant{}, ErrUnknownDelivery
 	}
 	switch g.TriggerKind {
+	case TriggerWake:
+		g.WakeID = f.ObjectID
 	case TriggerMessage, TriggerFollowup:
 		g.MessageID = f.ObjectID
 	case TriggerInteraction:
@@ -253,6 +276,31 @@ type InvocationPayloadInput struct {
 	CommandInvocationID, CommandID ids.ID
 	CommandName                    string
 	Options                        []OptionValue
+	// Wake is the wake-up of trigger kind wake (stage AR); nil otherwise.
+	Wake *WakeFacts
+}
+
+// WakeFacts are the members of the wake-up in agent.invocation of a wake run and in
+// agent.wake_input (09 5.8.3: the first input names the label, the reason and the result).
+type WakeFacts struct {
+	ID         ids.ID
+	Kind       WakeKind
+	Reason     WakeReason
+	Label      string
+	ResultText string
+}
+
+// wakePayload is the member wake of AgentInvocationPayload and AgentWakeInputPayload.
+type wakePayload struct {
+	Kind       string `json:"kind"`
+	Reason     string `json:"reason"`
+	Label      string `json:"label"`
+	ResultText string `json:"result_text"`
+}
+
+// payloadOf returns the member wake of w.
+func (w WakeFacts) payloadOf() *wakePayload {
+	return &wakePayload{Kind: string(w.Kind), Reason: string(w.Reason), Label: w.Label, ResultText: w.ResultText}
 }
 
 // invocationPayload is AgentInvocationPayload in schema order.
@@ -264,6 +312,8 @@ type invocationPayload struct {
 	TriggerKind         string                `json:"trigger_kind"`
 	MessageID           string                `json:"message_id,omitzero"`
 	InteractionID       string                `json:"interaction_id,omitzero"`
+	WakeID              string                `json:"wake_id,omitzero"`
+	Wake                *wakePayload          `json:"wake,omitempty"`
 	CommandInvocationID string                `json:"command_invocation_id,omitzero"`
 	CommandID           string                `json:"command_id,omitzero"`
 	CommandName         string                `json:"command_name,omitzero"`
@@ -321,7 +371,12 @@ func InvocationPayload(in InvocationPayloadInput, session SessionDecision) ([]by
 // Errors: the members of another trigger kind, or a kind that agent.invocation never carries.
 func setTrigger(p *invocationPayload, in InvocationPayloadInput) error {
 	commandSet := !in.CommandID.IsZero() || !in.CommandInvocationID.IsZero() || in.CommandName != "" || in.Options != nil
+	if in.Wake != nil && TriggerKind(in.TriggerKind) != TriggerWake {
+		return errPayload
+	}
 	switch TriggerKind(in.TriggerKind) {
+	case TriggerWake:
+		return setWakeTrigger(p, in, commandSet)
 	case "", TriggerMessage:
 		if in.MessageID.IsZero() || !in.InteractionID.IsZero() || !in.CommandID.IsZero() || !in.CommandInvocationID.IsZero() || in.CommandName != "" || in.Options != nil {
 			return errPayload
@@ -345,6 +400,51 @@ func setTrigger(p *invocationPayload, in InvocationPayloadInput) error {
 	default:
 		return errPayload
 	}
+	return nil
+}
+
+// wakeInputPayload is AgentWakeInputPayload (04 15.9).
+type wakeInputPayload struct {
+	RunID    string       `json:"run_id"`
+	ThreadID string       `json:"thread_id"`
+	WakeID   string       `json:"wake_id"`
+	Wake     *wakePayload `json:"wake"`
+}
+
+// WakeInputPayload encodes the payload of agent.wake_input: the run, its thread, the wake-up and
+// its kind, reason, label and result text (09 5.8.3). Errors: a zero ID.
+//
+// Example:
+//
+//	p, err := domain.WakeInputPayload(run, thread, domain.WakeFacts{ID: wake, Kind: domain.WakeAt, Reason: domain.WakeReasonAgent})
+func WakeInputPayload(runID, threadID ids.ID, w WakeFacts) ([]byte, error) {
+	if runID.IsZero() || threadID.IsZero() || w.ID.IsZero() {
+		return nil, errPayload
+	}
+	return json.Marshal(wakeInputPayload{RunID: runID.String(), ThreadID: threadID.String(), WakeID: w.ID.String(), Wake: w.payloadOf()})
+}
+
+// WakeInputWakeID reads wake_id of an AgentWakeInputPayload. Errors: a payload that is not the
+// schema or names no valid ID.
+func WakeInputWakeID(payload []byte) (ids.ID, error) {
+	var p wakeInputPayload
+	if err := json.Unmarshal(payload, &p); err != nil {
+		return ids.ID{}, errPayload
+	}
+	id, err := ids.Parse(p.WakeID)
+	if err != nil || id.IsZero() {
+		return ids.ID{}, errPayload
+	}
+	return id, nil
+}
+
+// setWakeTrigger sets the trigger of a wake run: the wake-up and its facts, no message, command or
+// interaction (09 5.8.5). Errors: the members of another trigger kind or no wake-up.
+func setWakeTrigger(p *invocationPayload, in InvocationPayloadInput, commandSet bool) error {
+	if !in.MessageID.IsZero() || !in.InteractionID.IsZero() || commandSet || in.Wake == nil || in.Wake.ID.IsZero() {
+		return errPayload
+	}
+	p.TriggerKind, p.WakeID, p.Wake = string(TriggerWake), in.Wake.ID.String(), in.Wake.payloadOf()
 	return nil
 }
 

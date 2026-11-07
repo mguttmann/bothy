@@ -428,6 +428,9 @@ all texts of the YAML files (R-API-15); every response component names its statu
 | `renewInvocationToken` | POST | `/api/v1/runs/{run_id}/invocation-token` | agent runtime: monotonic or compare-and-swap |
 | `awaitRunInput` | POST | `/api/v1/runs/{run_id}/await-input` | agent runtime: monotonic or compare-and-swap |
 | `finishRun` | POST | `/api/v1/runs/{run_id}/finish` | agent runtime: monotonic or compare-and-swap |
+| `checkRunLaunch` | POST | `/api/v1/runs/{run_id}/launch-check` | agent runtime: monotonic or compare-and-swap |
+| `checkRunWake` | POST | `/api/v1/wakes/{wake_id}/check` | agent runtime: monotonic or compare-and-swap |
+| `fireRunWake` | POST | `/api/v1/wakes/{wake_id}/fire` | agent runtime: monotonic or compare-and-swap |
 | `answerAutocomplete` | POST | `/api/v1/command-autocompletions/{request_id}/answer` | agent runtime: monotonic or compare-and-swap |
 | `postIncomingWebhookWithBearer` | POST | `/api/v1/hooks/{webhook_id}` | client ID in the body (table above) |
 | `postIncomingWebhook` | POST | `/api/v1/hooks/{webhook_id}/{token}` | client ID in the body (table above) |
@@ -926,6 +929,7 @@ Generated from openapi.yaml.
 | PUT | `/api/v1/channels/{channel_id}/behavior` | `putChannelBehavior` | `channel.behavior.update` | Change prompt, skills and mention rules |
 | PUT | `/api/v1/channels/{channel_id}/operator` | `setChannelOperator` | `channel.operator.set` | Set or inherit the operator of a channel |
 | PUT | `/api/v1/channels/{channel_id}/read-only` | `setChannelReadOnly` | `channel.read_only.set` | Switch the read-only state of a channel |
+| PUT | `/api/v1/channels/{channel_id}/autonomous-runs` | `setChannelAutonomousRuns` | `channel.autonomous_runs.set` | Switch autonomous runs of a channel |
 | PUT | `/api/v1/channels/{channel_id}/project-binding` | `putProjectBinding` | `channel.project.bind` | Bind a forum to a project |
 | DELETE | `/api/v1/channels/{channel_id}/project-binding` | `deleteProjectBinding` | `channel.project.bind` | Remove the project binding |
 | GET | `/api/v1/channels/{channel_id}/tags` | `listForumTags` | `channel.read` | List forum tags |
@@ -1088,6 +1092,12 @@ Generated from openapi.yaml.
 | POST | `/api/v1/runs/{run_id}/invocation-token` | `renewInvocationToken` | `run.token.renew` | Get a fresh invocation token for an own waiting run |
 | POST | `/api/v1/runs/{run_id}/await-input` | `awaitRunInput` | `run.finish` | Wait for input from a person |
 | POST | `/api/v1/runs/{run_id}/finish` | `finishRun` | `run.finish` | End a run |
+| POST | `/api/v1/runs/{run_id}/wakes` | `createRunWake` | `run.wake.create` | Create a wake-up for an active run |
+| POST | `/api/v1/runs/{run_id}/wakes/recover` | `recoverRunWake` | `run.wake.recover` | Create the recovery or usage-limit wake-up of an ended run |
+| POST | `/api/v1/runs/{run_id}/launch-check` | `checkRunLaunch` | `run.launch.check` | Check a launch by a runner that did not accept the run |
+| GET | `/api/v1/agents/me/wakes` | `listPendingRunWakes` | `run.wake.list_pending` | List the pending wake-ups of this agent |
+| POST | `/api/v1/wakes/{wake_id}/check` | `checkRunWake` | `run.wake.check` | Check the next execution of a pending check |
+| POST | `/api/v1/wakes/{wake_id}/fire` | `fireRunWake` | `run.wake.fire` | Fire a checked wake-up, end it failed or return a skipped wake input |
 | POST | `/api/v1/command-autocompletions/{request_id}/answer` | `answerAutocomplete` | `command.autocomplete.respond` | Answer an autocomplete request |
 
 #### Runs
@@ -1095,6 +1105,7 @@ Generated from openapi.yaml.
 | Method | Path | operationId | Action | Purpose (from openapi.yaml) |
 |---|---|---|---|---|
 | GET | `/api/v1/threads/{thread_id}/runs` | `listThreadRuns` | `run.read` | List runs of a thread |
+| GET | `/api/v1/threads/{thread_id}/wakes` | `listThreadWakes` | `run.wake.read` | List the wake-ups of a thread |
 | GET | `/api/v1/runs` | `listActiveRuns` | `run.overview.read` | Running now |
 | GET | `/api/v1/run-history` | `listRunHistory` | `run.overview.read` | Finished runs, newest first |
 | GET | `/api/v1/runs/{run_id}` | `getRun` | `run.read` | Read the run document |
@@ -1102,6 +1113,7 @@ Generated from openapi.yaml.
 | GET | `/api/v1/runs/{run_id}/context` | `getRunContext` | `run.context.read` | Load the context of an own active run |
 | POST | `/api/v1/runs/{run_id}/cancel` | `cancelRun` | `run.cancel` | Cancel a run |
 | POST | `/api/v1/runs/{run_id}/retry` | `retryRun` | `agent.invoke` | Retry a failed or cancelled run |
+| POST | `/api/v1/wakes/{wake_id}/cancel` | `cancelRunWake` | `run.wake.cancel` | Cancel a pending wake-up |
 | POST | `/api/v1/messages/{message_id}/retrigger` | `retriggerMessage` | `agent.invoke` | Trigger a failed message again |
 
 #### Commands
@@ -1296,6 +1308,7 @@ Events (receive action per 05, section 6; schema in openapi.yaml):
 | `thread.moved_out` | durable | `channel.read` |  | `ThreadMovedOutEvent` | yes |
 | `agent_session.changed` | durable | `thread.read` |  | `AgentSessionChangedEvent` | yes |
 | `run.state_changed` | durable | `run.read` |  | `RunStateChangedEvent` | yes |
+| `run.wake_changed` | durable | `run.wake.read` |  | `RunWakeChangedEvent` |  |
 | `space.created` | durable | `space.read` |  | `SpaceCreatedEvent` | yes |
 | `space.updated` | durable | `space.read` |  | `SpaceUpdatedEvent` | yes |
 | `space.archived` | durable | `space.read` |  | `SpaceArchivedEvent` | yes |
@@ -1328,6 +1341,7 @@ Events (receive action per 05, section 6; schema in openapi.yaml):
 | `import.progress` | durable | `import.read` |  | `ImportProgressEvent` |  |
 | `agent.invocation` | durable | `agent.events.consume` | self | `AgentInvocationEvent` | yes |
 | `agent.followup` | durable | `agent.events.consume` | self | `AgentFollowupEvent` | yes |
+| `agent.wake_input` | durable | `agent.events.consume` | self | `AgentWakeInputEvent` |  |
 | `run.cancel_requested` | durable | `agent.events.consume` | self | `RunCancelRequestedEvent` | yes |
 | `interaction.created` | durable | `agent.events.consume` | self | `InteractionCreatedEvent` | yes |
 | `command.invoked` | durable | `agent.events.consume` | self | `CommandInvokedEvent` | yes |

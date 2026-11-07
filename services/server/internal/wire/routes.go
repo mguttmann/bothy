@@ -95,6 +95,8 @@ type Handlers struct {
 	*chathttp.Behavior
 	// ReadOnly implements setChannelReadOnly (chat, M8-03).
 	*chathttp.ReadOnly
+	// AutonomousRuns implements setChannelAutonomousRuns (chat, AR-04).
+	*chathttp.AutonomousRuns
 	// Deletion implements deleteSpace, restoreSpace, getSpaceDeletion, deleteChannel,
 	// restoreChannel, getChannelDeletion, deleteThread, restoreThread and getThreadDeletion (chat,
 	// FEAT-delete-spaces-chats).

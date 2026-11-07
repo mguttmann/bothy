@@ -440,6 +440,7 @@ invocation token (https://www.rfc-editor.org/rfc/rfc8725.html, retrieved 2026-10
 | `iat`, `exp` | Issued at, expiry (`iat + agent.invocation_token_ttl`) | 05 |
 | `run_id` | Run; missing for `trigger_kind = autocomplete` and for `command.invoked` when the owner of the control command has no active run in the thread at execution time (otherwise its run) | 05, R-AZ-25 |
 | `message_id` or `interaction_id` or `command_id` | triggering object | 05, `command_id` new |
+| `wake_id` | the wake-up of `trigger_kind = wake` (5.8.3; addendum of 2026-11-06, AR-04) | 04 15.9 |
 | `thread_id`, `channel_id` | Location; for `trigger_kind = autocomplete` the thread of the request, without one the main timeline of the text channel; in a forum channel without a thread no token | 05, R-AZ-26 |
 | `space_id` | Space of the channel | new |
 | `level` | effective level of `sub` on the channel at delivery time | 05 |
@@ -447,7 +448,7 @@ invocation token (https://www.rfc-editor.org/rfc/rfc8725.html, retrieved 2026-10
 | `tool_class` | configured tool class from `agents.tool_class` at delivery time (SR2, section 2.4) | 05 |
 | `dev_environment_id` | Dev environment of the run; only in the dev environment milestone | 05 |
 | `permission_version` | Permission version at delivery time | 05 |
-| `trigger_kind` | `message`, `followup`, `interaction`, `command`, `autocomplete` | new |
+| `trigger_kind` | `message`, `followup`, `interaction`, `command`, `autocomplete`, `wake` (5.8.3, AR-04) | new |
 
 **Check in the adapter.** The adapter processes an event with a token only if all items
 hold. If only item 5 fails because `exp` has passed, it fetches a fresh token (4.5.1).
@@ -992,11 +993,10 @@ stateDiagram-v2
 | `runtime_not_authenticated` | `failed` | Adapter | Runtime has no valid login |
 | `adapter_stopped` | `cancelled` | Adapter | An orderly stop of the adapter (a restart or an update) ended the run's turn (D-AR-1) |
 | `user_disabled` | `cancelled`; `failed` on denial before delivery | Server | The triggering person was disabled (`user.disable`, 02 section 4.3): `cancelled` on revocation, `failed` at delivery |
+| `usage_limited` | `failed` | Adapter | The usage window of the runtime's account was used up while the run ran (18.19.10); the `summary` names the reset time and whether a wake-up is pending (stage AR, addendum of 2026-11-06, AR-04) |
 
-Stage AR (addendum of 2026-11-06, 18.19.10) adds the reason `usage_limited` (`failed`, set by the
-adapter): the usage window of the runtime's account was used up while the run ran; the `summary`
-names the reset time and whether a wake-up is pending. It enters the table above and the reason
-table of the code with AR-04; until then the server stores it as `adapter_error` by the rule below.
+Stage AR (addendum of 2026-11-06, 18.19.10) added the reason `usage_limited` with AR-04; a server
+before AR-04 stores it as `adapter_error` by the rule below.
 
 The server stores a `failed` reason of an adapter that this table does not list for the adapter (an
 unknown code, or a server code such as `stale`) as `adapter_error` (D-M2-05-8). It keeps the

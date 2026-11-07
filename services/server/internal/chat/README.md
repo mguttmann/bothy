@@ -593,6 +593,12 @@ canary scenario `test/canary/scenario_project.go`.
   source port `ReadOnlyGuard` (implemented by `importer`) reports the channel as controlled by the
   ownership list of an import that is neither completed nor failed, the switch answers `409
   conflict` with `reason` `import_lead_controls` (22 12.1).
+- `chat.AutonomousRunsSwitch` is `setChannelAutonomousRuns` (`channel.autonomous_runs.set`,
+  manage, If-Match, audit with `allow_autonomous_runs`; AR-04, 09 5.8.6): it writes
+  `channels.allow_autonomous_runs` (migration 00101, default `false`) with a new version and
+  `channel.updated`; an archived channel is `409 conflict` with reason `channel_archived`, a DM `409 conflict` with reason `dm_channel`; the
+  same value records `no_change`. `TriggerChannel` carries the switch, `read_only` and the archive
+  state to `runs`, which reads them at every wake-up create and fire.
 
 ## Imported threads (M8-11)
 
@@ -669,7 +675,7 @@ Only this module writes and reads these tables by SQL (03-data-model.md, princip
 
 ## Actions (05-actions.md)
 
-`space.read`, `space.create`, `space.update`, `space.reorder`, `space.archive`, `space.delete`, `space.restore`, `space.operator.set`, `sidebar.update`, `channel.read`, `channel.create`, `channel.update`, `channel.reorder`, `channel.behavior.read`, `channel.behavior.update`, `channel.operator.set`, `channel.project.bind`, `channel.read_only.set`, `channel.archive`, `channel.delete`, `channel.restore`, `channel.project.trash`, `forum_tag.manage`, `dm.create`, `dm.leave`, `thread.read`, `thread.title.update`, `thread.close`, `thread.reopen`, `thread.delete`, `thread.restore`, `thread.move`, `thread.tags.set`, `agent.config.read`.
+`space.read`, `space.create`, `space.update`, `space.reorder`, `space.archive`, `space.delete`, `space.restore`, `space.operator.set`, `sidebar.update`, `channel.read`, `channel.create`, `channel.update`, `channel.reorder`, `channel.behavior.read`, `channel.behavior.update`, `channel.operator.set`, `channel.project.bind`, `channel.read_only.set`, `channel.autonomous_runs.set`, `channel.archive`, `channel.delete`, `channel.restore`, `channel.project.trash`, `forum_tag.manage`, `dm.create`, `dm.leave`, `thread.read`, `thread.title.update`, `thread.close`, `thread.reopen`, `thread.delete`, `thread.restore`, `thread.move`, `thread.tags.set`, `agent.config.read`.
 
 ## Events and WebSocket ops
 

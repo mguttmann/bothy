@@ -84,6 +84,12 @@ type Capabilities struct {
 	// HostsAgents is hosts_agents, the highest tool class a Claude Code runner loads for a hosted
 	// agent (09 section 2.2, docs/spec/26-builtin-agents.md 3.1); "" when not reported.
 	HostsAgents ToolClass `json:"hosts_agents,omitempty"`
+	// TurnHandover and Wakes are turn_handover and wakes of a Claude Code runner (09 18.19.1, stage
+	// AR): true only while runner.turn_handover or runner.wakes is on; nil when not reported. The
+	// server stores them in reported_details; clients show wake-up controls only for an agent
+	// that reports wakes (01 6.21).
+	TurnHandover *bool `json:"turn_handover,omitempty"`
+	Wakes        *bool `json:"wakes,omitempty"`
 }
 
 // Adapter is details.adapter: the adapter's name and optional version (18 section 9 point 5).
@@ -757,7 +763,7 @@ func (d *decoder) evidence(raw json.RawMessage) *Evidence {
 // The keys of details and of its objects (D-M2-20-2).
 var (
 	detailsKeys      = []string{"capabilities", "active_runs", "degraded_reasons", "adapter", "runtime", "protocol_version"}
-	capabilitiesKeys = []string{"followups", "components", "voice_input", "title", "files_out", "hosts_agents"}
+	capabilitiesKeys = []string{"followups", "components", "voice_input", "title", "files_out", "hosts_agents", "turn_handover", "wakes"}
 )
 
 // details reads the closed object details.
@@ -834,6 +840,10 @@ func (d *decoder) capabilities(raw json.RawMessage) *Capabilities {
 		s, _ := d.enum(p+"/hosts_agents", v, toolClasses)
 		c.HostsAgents = ToolClass(s)
 	}
+	v, has = get("turn_handover")
+	c.TurnHandover = d.optBool(p+"/turn_handover", v, has)
+	v, has = get("wakes")
+	c.Wakes = d.optBool(p+"/wakes", v, has)
 	return &c
 }
 

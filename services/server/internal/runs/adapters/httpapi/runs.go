@@ -30,6 +30,8 @@ import (
 type Runs struct {
 	runs         runs.Runs
 	interactions runs.Interactions
+	// wakes are the wake-up operations (AR-04), bound with BindWakes; nil answers internal_error.
+	wakes runs.Wakes
 }
 
 // Ports are the incoming ports of runs the handlers call: the runs (M2-05, M2-09) and the
@@ -207,7 +209,7 @@ func RunREST(r runs.Run) (rest.Run, error) {
 		StatusLine: s.StatusLine, Summary: s.Summary, Cost: s.Cost, DurationMs: s.DurationMs, QueuedAt: s.QueuedAt, StartedAt: s.StartedAt,
 		FinishedAt: s.FinishedAt, StallWarnedAt: s.StallWarnedAt, AgentSessionId: optionalID(r.AgentSessionID), TriggeringMessageId: optionalID(r.TriggeringMessageID),
 		TriggeringCommandId: optionalID(r.TriggeringCommandID), TriggeringInteractionId: optionalID(r.TriggeringInteractionID),
-		Model: optionalString(r.Model), LastTextExcerpt: optionalString(r.LastTextExcerpt),
+		TriggeringWakeId: optionalID(r.TriggeringWakeID), Model: optionalString(r.Model), LastTextExcerpt: optionalString(r.LastTextExcerpt),
 		Steps: make(map[string]rest.RunStep, len(r.Steps)), Followups: make(map[string]rest.RunFollowup, len(r.Followups)),
 	}
 	for _, f := range r.Followups {

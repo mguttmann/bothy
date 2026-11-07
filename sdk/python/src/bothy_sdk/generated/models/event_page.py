@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     from ..models.agent_invocation_event import AgentInvocationEvent
     from ..models.agent_session_changed_event import AgentSessionChangedEvent
     from ..models.agent_updated_event import AgentUpdatedEvent
+    from ..models.agent_wake_input_event import AgentWakeInputEvent
     from ..models.channel_archived_event import ChannelArchivedEvent
     from ..models.channel_created_event import ChannelCreatedEvent
     from ..models.channel_settings_changed_event import ChannelSettingsChangedEvent
@@ -47,6 +48,7 @@ if TYPE_CHECKING:
     from ..models.read_state_updated_event import ReadStateUpdatedEvent
     from ..models.run_cancel_requested_event import RunCancelRequestedEvent
     from ..models.run_state_changed_event import RunStateChangedEvent
+    from ..models.run_wake_changed_event import RunWakeChangedEvent
     from ..models.session_revoked_event import SessionRevokedEvent
     from ..models.settings_updated_event import SettingsUpdatedEvent
     from ..models.sidebar_channel_updated_event import SidebarChannelUpdatedEvent
@@ -74,16 +76,17 @@ class EventPage:
     Attributes:
         events (list[AccessChangedEvent | AccessExpiringEvent | AgentConfigChangedEvent | AgentDefinitionChangedEvent |
             AgentFollowupEvent | AgentHostingChangedEvent | AgentInvocationEvent | AgentSessionChangedEvent |
-            AgentUpdatedEvent | ChannelArchivedEvent | ChannelCreatedEvent | ChannelSettingsChangedEvent |
-            ChannelUpdatedEvent | CommandChangedEvent | CommandInvokedEvent | DevicePendingEvent | DraftDeletedEvent |
-            DraftUpdatedEvent | FileUpdatedEvent | GdprRequestDueEvent | GdprRequestUpdatedEvent | GrantChangedEvent |
-            GroupChangedEvent | HostUpdatedEvent | ImportProgressEvent | InstanceUpdatedEvent | InteractionCreatedEvent |
-            MessageCreatedEvent | MessageDeletedEvent | MessageUpdatedEvent | NotificationPrefUpdatedEvent | PinAddedEvent |
-            PinRemovedEvent | QuietHoursUpdatedEvent | ReactionAddedEvent | ReactionRemovedEvent | ReadStateUpdatedEvent |
-            RunCancelRequestedEvent | RunStateChangedEvent | SessionRevokedEvent | SettingsUpdatedEvent |
-            SidebarChannelUpdatedEvent | SidebarUpdatedEvent | SpaceArchivedEvent | SpaceCreatedEvent | SpaceUpdatedEvent |
-            StatusUpdatedEvent | TerminalSessionChangedEvent | ThreadClosedEvent | ThreadCreatedEvent | ThreadMovedEvent |
-            ThreadMovedOutEvent | ThreadReopenedEvent | ThreadUpdatedEvent | UserUpdatedEvent]):
+            AgentUpdatedEvent | AgentWakeInputEvent | ChannelArchivedEvent | ChannelCreatedEvent |
+            ChannelSettingsChangedEvent | ChannelUpdatedEvent | CommandChangedEvent | CommandInvokedEvent |
+            DevicePendingEvent | DraftDeletedEvent | DraftUpdatedEvent | FileUpdatedEvent | GdprRequestDueEvent |
+            GdprRequestUpdatedEvent | GrantChangedEvent | GroupChangedEvent | HostUpdatedEvent | ImportProgressEvent |
+            InstanceUpdatedEvent | InteractionCreatedEvent | MessageCreatedEvent | MessageDeletedEvent | MessageUpdatedEvent
+            | NotificationPrefUpdatedEvent | PinAddedEvent | PinRemovedEvent | QuietHoursUpdatedEvent | ReactionAddedEvent |
+            ReactionRemovedEvent | ReadStateUpdatedEvent | RunCancelRequestedEvent | RunStateChangedEvent |
+            RunWakeChangedEvent | SessionRevokedEvent | SettingsUpdatedEvent | SidebarChannelUpdatedEvent |
+            SidebarUpdatedEvent | SpaceArchivedEvent | SpaceCreatedEvent | SpaceUpdatedEvent | StatusUpdatedEvent |
+            TerminalSessionChangedEvent | ThreadClosedEvent | ThreadCreatedEvent | ThreadMovedEvent | ThreadMovedOutEvent |
+            ThreadReopenedEvent | ThreadUpdatedEvent | UserUpdatedEvent]):
         next_cursor (int): Highest checked `seq`; use as `after` for the next call even if `events` is empty.
         head_seq (int):
         sync_epoch (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -99,6 +102,7 @@ class EventPage:
         | AgentInvocationEvent
         | AgentSessionChangedEvent
         | AgentUpdatedEvent
+        | AgentWakeInputEvent
         | ChannelArchivedEvent
         | ChannelCreatedEvent
         | ChannelSettingsChangedEvent
@@ -129,6 +133,7 @@ class EventPage:
         | ReadStateUpdatedEvent
         | RunCancelRequestedEvent
         | RunStateChangedEvent
+        | RunWakeChangedEvent
         | SessionRevokedEvent
         | SettingsUpdatedEvent
         | SidebarChannelUpdatedEvent
@@ -161,6 +166,7 @@ class EventPage:
         from ..models.agent_invocation_event import AgentInvocationEvent
         from ..models.agent_session_changed_event import AgentSessionChangedEvent
         from ..models.agent_updated_event import AgentUpdatedEvent
+        from ..models.agent_wake_input_event import AgentWakeInputEvent
         from ..models.channel_archived_event import ChannelArchivedEvent
         from ..models.channel_created_event import ChannelCreatedEvent
         from ..models.channel_settings_changed_event import ChannelSettingsChangedEvent
@@ -193,6 +199,7 @@ class EventPage:
         from ..models.read_state_updated_event import ReadStateUpdatedEvent
         from ..models.run_cancel_requested_event import RunCancelRequestedEvent
         from ..models.run_state_changed_event import RunStateChangedEvent
+        from ..models.run_wake_changed_event import RunWakeChangedEvent
         from ..models.session_revoked_event import SessionRevokedEvent
         from ..models.settings_updated_event import SettingsUpdatedEvent
         from ..models.sidebar_channel_updated_event import SidebarChannelUpdatedEvent
@@ -266,6 +273,8 @@ class EventPage:
                 or isinstance(events_item_data, AgentConfigChangedEvent)
                 or isinstance(events_item_data, AgentDefinitionChangedEvent)
                 or isinstance(events_item_data, AgentHostingChangedEvent)
+                or isinstance(events_item_data, RunWakeChangedEvent)
+                or isinstance(events_item_data, AgentWakeInputEvent)
                 or isinstance(events_item_data, HostUpdatedEvent)
             ):
                 events_item = events_item_data.to_dict()
@@ -304,6 +313,7 @@ class EventPage:
         from ..models.agent_invocation_event import AgentInvocationEvent
         from ..models.agent_session_changed_event import AgentSessionChangedEvent
         from ..models.agent_updated_event import AgentUpdatedEvent
+        from ..models.agent_wake_input_event import AgentWakeInputEvent
         from ..models.channel_archived_event import ChannelArchivedEvent
         from ..models.channel_created_event import ChannelCreatedEvent
         from ..models.channel_settings_changed_event import ChannelSettingsChangedEvent
@@ -336,6 +346,7 @@ class EventPage:
         from ..models.read_state_updated_event import ReadStateUpdatedEvent
         from ..models.run_cancel_requested_event import RunCancelRequestedEvent
         from ..models.run_state_changed_event import RunStateChangedEvent
+        from ..models.run_wake_changed_event import RunWakeChangedEvent
         from ..models.session_revoked_event import SessionRevokedEvent
         from ..models.settings_updated_event import SettingsUpdatedEvent
         from ..models.sidebar_channel_updated_event import SidebarChannelUpdatedEvent
@@ -370,6 +381,7 @@ class EventPage:
                 | AgentInvocationEvent
                 | AgentSessionChangedEvent
                 | AgentUpdatedEvent
+                | AgentWakeInputEvent
                 | ChannelArchivedEvent
                 | ChannelCreatedEvent
                 | ChannelSettingsChangedEvent
@@ -400,6 +412,7 @@ class EventPage:
                 | ReadStateUpdatedEvent
                 | RunCancelRequestedEvent
                 | RunStateChangedEvent
+                | RunWakeChangedEvent
                 | SessionRevokedEvent
                 | SettingsUpdatedEvent
                 | SidebarChannelUpdatedEvent
@@ -902,18 +915,38 @@ class EventPage:
                 try:
                     if not isinstance(data, dict):
                         raise TypeError()
-                    componentsschemas_event_type_53 = HostUpdatedEvent.from_dict(data)
+                    componentsschemas_event_type_53 = RunWakeChangedEvent.from_dict(
+                        data
+                    )
 
                     return componentsschemas_event_type_53
                 except (TypeError, ValueError, AttributeError, KeyError):
                     pass
+                try:
+                    if not isinstance(data, dict):
+                        raise TypeError()
+                    componentsschemas_event_type_54 = AgentWakeInputEvent.from_dict(
+                        data
+                    )
+
+                    return componentsschemas_event_type_54
+                except (TypeError, ValueError, AttributeError, KeyError):
+                    pass
+                try:
+                    if not isinstance(data, dict):
+                        raise TypeError()
+                    componentsschemas_event_type_55 = HostUpdatedEvent.from_dict(data)
+
+                    return componentsschemas_event_type_55
+                except (TypeError, ValueError, AttributeError, KeyError):
+                    pass
                 if not isinstance(data, dict):
                     raise TypeError()
-                componentsschemas_event_type_54 = TerminalSessionChangedEvent.from_dict(
+                componentsschemas_event_type_56 = TerminalSessionChangedEvent.from_dict(
                     data
                 )
 
-                return componentsschemas_event_type_54
+                return componentsschemas_event_type_56
 
             events_item = _parse_events_item(events_item_data)
 

@@ -17,11 +17,13 @@ func TestRegister_Events(t *testing.T) {
 	r := authorize.NewRegistry()
 	runs.Register(r)
 	ev := r.Events()
-	if len(ev) != 6 || ev[0].Module != "runs" || ev[0].Type != authorize.EventAgentInvocation ||
-		ev[1].Module != "runs" || ev[1].Type != authorize.EventCommandAutocompleteRequested ||
-		ev[2].Module != "runs" || ev[2].Type != authorize.EventCommandInvoked ||
-		ev[3].Type != authorize.EventInteractionCreated || ev[4].Type != authorize.EventRunCancelRequested ||
-		ev[5].Type != authorize.EventRunStateChanged {
+	// AR-04 adds agent.wake_input and run.wake_changed.
+	if len(ev) != 8 || ev[0].Module != "runs" || ev[0].Type != authorize.EventAgentInvocation ||
+		ev[1].Type != authorize.EventAgentWakeInput ||
+		ev[2].Module != "runs" || ev[2].Type != authorize.EventCommandAutocompleteRequested ||
+		ev[3].Module != "runs" || ev[3].Type != authorize.EventCommandInvoked ||
+		ev[4].Type != authorize.EventInteractionCreated || ev[5].Type != authorize.EventRunCancelRequested ||
+		ev[6].Type != authorize.EventRunStateChanged || ev[7].Type != authorize.EventRunWakeChanged {
 		t.Fatalf("events %+v", ev)
 	}
 	// M2-17 and M2-10: runs serves the gateway ops command.autocomplete_result and run.update.
@@ -31,10 +33,11 @@ func TestRegister_Events(t *testing.T) {
 	}
 }
 
-// TestInvocationBearing: the four types of 04 15.3 and nothing else.
+// TestInvocationBearing: the four types of 04 15.3 and agent.wake_input (04 15.9, AR-04), nothing
+// else.
 func TestInvocationBearing(t *testing.T) {
 	t.Parallel()
-	for _, typ := range []string{"agent.invocation", "agent.followup", "interaction.created", "command.invoked"} {
+	for _, typ := range []string{"agent.invocation", "agent.followup", "interaction.created", "command.invoked", "agent.wake_input"} {
 		if !runs.InvocationBearing(typ) {
 			t.Errorf("%s", typ)
 		}

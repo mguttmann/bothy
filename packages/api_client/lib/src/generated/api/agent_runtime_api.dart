@@ -34,6 +34,12 @@ import 'package:api_client/src/generated/model/run_finish.dart';
 import 'package:api_client/src/generated/model/run_patch.dart';
 import 'package:api_client/src/generated/model/run_patch_result.dart';
 import 'package:api_client/src/generated/model/run_start.dart';
+import 'package:api_client/src/generated/model/run_wake.dart';
+import 'package:api_client/src/generated/model/run_wake_check_result.dart';
+import 'package:api_client/src/generated/model/run_wake_create.dart';
+import 'package:api_client/src/generated/model/run_wake_fire.dart';
+import 'package:api_client/src/generated/model/run_wake_list.dart';
+import 'package:api_client/src/generated/model/run_wake_recover.dart';
 import 'package:api_client/src/generated/model/search_assist_answer.dart';
 import 'package:api_client/src/generated/model/transcript.dart';
 import 'package:api_client/src/generated/model/transcript_submit.dart';
@@ -517,6 +523,305 @@ class AgentRuntimeApi {
     );
   }
 
+  /// Check a launch by a runner that did not accept the run
+  /// Before a runner launches any process of a run it did not accept itself (a repeated try, the next attempt of an adopted run, the retry of a compaction, a start over), it asks the server (09 18.19.6, R-AG-48): the run is still &#x60;running&#x60;, its person still has &#x60;trigger&#x60; on the agent in the channel and the agent is still allowed there, the billing rules of 10 hold, and for tool class &#x60;host&#x60; the agent&#39;s &#x60;tool_class&#x60; is still &#x60;host&#x60; and SR2 holds for that person. On allow the answer carries the configured tool class and billing mode, which the runner compares with its own (&#x60;compare_actual&#x60;). A refusal is &#x60;409 conflict&#x60; with the reason of the failed check (&#x60;run_not_running&#x60; or the reason of a refused &#x60;agent.invoke&#x60;), audited as a denial; the server changes nothing, the runner finishes the run.
+  ///
+  /// Parameters:
+  /// * [runId]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [RunWakeCheckResult] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<RunWakeCheckResult>> checkRunLaunch({
+    required String runId,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/runs/{run_id}/launch-check'.replaceAll(
+      '{'
+      r'run_id'
+      '}',
+      encodeQueryParameter(
+        _serializers,
+        runId,
+        const FullType(String),
+      ).toString(),
+    );
+    final _options = Options(
+      method: r'POST',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'apiKey',
+            'name': 'consoleSession',
+            'keyName': '__Host-console_session',
+            'where': '',
+          },
+          {'type': 'http', 'scheme': 'DPoP', 'name': 'dpopAuth'},
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearerAuth'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    RunWakeCheckResult? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(
+              rawResponse,
+              specifiedType: const FullType(RunWakeCheckResult),
+            ) as RunWakeCheckResult;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<RunWakeCheckResult>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// Check the next execution of a pending check
+  /// Before every execution of a pending &#x60;command&#x60; and every &#x60;gh&#x60; read of a pending &#x60;pr_checks&#x60; the runner asks the server (09 5.8.3, R-AG-50): the wake-up is still &#x60;pending&#x60; and its &#x60;not_before&#x60; has passed; its person still has &#x60;trigger&#x60; on the agent in the channel and the agent is still allowed there; the channel is neither archived nor read-only; for &#x60;command&#x60; the agent&#39;s &#x60;tool_class&#x60; is still &#x60;host&#x60; and SR2 holds for that person; for &#x60;pr_checks&#x60; the person is still an owner. On allow the answer carries the configured tool class and billing mode (&#x60;compare_actual&#x60;). A failed check ends the wake-up &#x60;refused&#x60; with the reason of the check (for example &#x60;agent_not_reachable&#x60;, &#x60;channel_read_only&#x60;, &#x60;tool_class_owner_only&#x60;, &#x60;tool_class_mismatch&#x60;, &#x60;pr_checks_owner_only&#x60;), an audit entry, the note in the thread and the notification &#x60;wake_ended&#x60;, and answers &#x60;409 conflict&#x60; with that reason. A wake-up that already ended is &#x60;409 conflict&#x60; with &#x60;reason&#x60; &#x60;wake_not_pending&#x60;, one before its &#x60;not_before&#x60; &#x60;409 conflict&#x60; with &#x60;reason&#x60; &#x60;wake_not_due&#x60; (the wake-up stays pending).
+  ///
+  /// Parameters:
+  /// * [wakeId]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [RunWakeCheckResult] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<RunWakeCheckResult>> checkRunWake({
+    required String wakeId,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/wakes/{wake_id}/check'.replaceAll(
+      '{'
+      r'wake_id'
+      '}',
+      encodeQueryParameter(
+        _serializers,
+        wakeId,
+        const FullType(String),
+      ).toString(),
+    );
+    final _options = Options(
+      method: r'POST',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'apiKey',
+            'name': 'consoleSession',
+            'keyName': '__Host-console_session',
+            'where': '',
+          },
+          {'type': 'http', 'scheme': 'DPoP', 'name': 'dpopAuth'},
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearerAuth'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    RunWakeCheckResult? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(
+              rawResponse,
+              specifiedType: const FullType(RunWakeCheckResult),
+            ) as RunWakeCheckResult;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<RunWakeCheckResult>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// Create a wake-up for an active run
+  /// Creates a wake-up of the run&#39;s thread for the active run of the calling agent (09 5.8.2, stage AR): kind &#x60;at&#x60;, &#x60;pr_checks&#x60; or &#x60;command&#x60;, reason &#x60;agent&#x60; (from &#x60;bothy-wake&#x60;) or &#x60;usage_limit&#x60;. The wake-up acts for the run&#39;s &#x60;triggered_by&#x60;; it fires no earlier than &#x60;run.wake_min_delay&#x60; after its creation and no later than its &#x60;deadline&#x60; (at most &#x60;run.wake_max_wait&#x60;, for &#x60;usage_limit&#x60; counted from &#x60;not_before&#x60;). A &#x60;usage_limit&#x60; request carries the run&#39;s &#x60;outage&#x60;; a second request with the outage of a pending wake-up moves its &#x60;not_before&#x60; and answers it with &#x60;200&#x60;, a new outage gets its own wake-up, at most &#x60;run.usage_wake_max&#x60; per run. A refusal is &#x60;409 conflict&#x60; with the reason: &#x60;run_not_active&#x60;, &#x60;autonomous_not_allowed&#x60; (the person is no owner and the channel has no &#x60;allow_autonomous_runs&#x60;), &#x60;pr_checks_owner_only&#x60;, &#x60;tool_class_mismatch&#x60; (a &#x60;command&#x60; of an agent whose tool class is not &#x60;host&#x60;), &#x60;wake_max_pending&#x60;, &#x60;usage_wake_max&#x60;, or the reason of a refused &#x60;agent.invoke&#x60; of the person (for example &#x60;tool_class_owner_only&#x60;, &#x60;agent_not_reachable&#x60;, &#x60;channel_read_only&#x60;). A refused request stores nothing, except one with &#x60;deferred: true&#x60; and a refusal with &#x60;usage_wake_max&#x60;, which are stored in state &#x60;refused&#x60; with the note in the thread and the notification &#x60;wake_ended&#x60; (09 5.8.4). A wrong field is &#x60;400 validation_failed&#x60;. Audited.
+  ///
+  /// Parameters:
+  /// * [runId]
+  /// * [runWakeCreate]
+  /// * [idempotencyKey] - UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [RunWake] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<RunWake>> createRunWake({
+    required String runId,
+    required RunWakeCreate runWakeCreate,
+    String? idempotencyKey,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/runs/{run_id}/wakes'.replaceAll(
+      '{'
+      r'run_id'
+      '}',
+      encodeQueryParameter(
+        _serializers,
+        runId,
+        const FullType(String),
+      ).toString(),
+    );
+    final _options = Options(
+      method: r'POST',
+      headers: <String, dynamic>{
+        if (idempotencyKey != null) r'Idempotency-Key': idempotencyKey,
+        ...?headers,
+      },
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'apiKey',
+            'name': 'consoleSession',
+            'keyName': '__Host-console_session',
+            'where': '',
+          },
+          {'type': 'http', 'scheme': 'DPoP', 'name': 'dpopAuth'},
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearerAuth'},
+        ],
+        ...?extra,
+      },
+      contentType: 'application/json',
+      validateStatus: validateStatus,
+    );
+
+    dynamic _bodyData;
+
+    try {
+      const _type = FullType(RunWakeCreate);
+      _bodyData = _serializers.serialize(runWakeCreate, specifiedType: _type);
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _options.compose(_dio.options, _path),
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    final _response = await _dio.request<Object>(
+      _path,
+      data: _bodyData,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    RunWake? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(
+              rawResponse,
+              specifiedType: const FullType(RunWake),
+            ) as RunWake;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<RunWake>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
   /// End a run
   /// Repeating the same final state is idempotent and returns 200.
   ///
@@ -616,6 +921,116 @@ class AgentRuntimeApi {
     }
 
     return Response<Run>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// Fire a checked wake-up, end it failed or return a skipped wake input
+  /// The runner reports the outcome of a &#x60;pr_checks&#x60; or &#x60;command&#x60; wake-up (09 5.8.2): &#x60;fired&#x60; with the result text fires it with the checks of a new run, as a wake run when the thread has no active run, as a wake input &#x60;agent.wake_input&#x60; into the running run of the same person, and keeps it &#x60;pending&#x60; while another person&#39;s run is active; a refused fire ends it &#x60;refused&#x60; with note and notification. &#x60;failed&#x60; ends it &#x60;failed&#x60; with the reason after &#x60;runner.wake_check_failures&#x60; failures in a row. &#x60;input_skipped&#x60; reports a delivered wake input the runner did not write (&#x60;wake_input_check_failed&#x60;): the wake-up returns to &#x60;pending&#x60; and fires after that run as a wake run. A wake-up that ended is &#x60;409 conflict&#x60; with &#x60;reason&#x60; &#x60;wake_not_pending&#x60;; a fire before &#x60;not_before&#x60; is &#x60;409 conflict&#x60; with &#x60;reason&#x60; &#x60;wake_not_due&#x60;; an &#x60;at&#x60; wake-up is fired by the server only (&#x60;409 conflict&#x60;, &#x60;reason&#x60; &#x60;wake_fired_by_server&#x60;). Audited.
+  ///
+  /// Parameters:
+  /// * [wakeId]
+  /// * [runWakeFire]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [RunWake] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<RunWake>> fireRunWake({
+    required String wakeId,
+    required RunWakeFire runWakeFire,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/wakes/{wake_id}/fire'.replaceAll(
+      '{'
+      r'wake_id'
+      '}',
+      encodeQueryParameter(
+        _serializers,
+        wakeId,
+        const FullType(String),
+      ).toString(),
+    );
+    final _options = Options(
+      method: r'POST',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'apiKey',
+            'name': 'consoleSession',
+            'keyName': '__Host-console_session',
+            'where': '',
+          },
+          {'type': 'http', 'scheme': 'DPoP', 'name': 'dpopAuth'},
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearerAuth'},
+        ],
+        ...?extra,
+      },
+      contentType: 'application/json',
+      validateStatus: validateStatus,
+    );
+
+    dynamic _bodyData;
+
+    try {
+      const _type = FullType(RunWakeFire);
+      _bodyData = _serializers.serialize(runWakeFire, specifiedType: _type);
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _options.compose(_dio.options, _path),
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    final _response = await _dio.request<Object>(
+      _path,
+      data: _bodyData,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    RunWake? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(
+              rawResponse,
+              specifiedType: const FullType(RunWake),
+            ) as RunWake;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<RunWake>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,
@@ -1090,6 +1505,87 @@ class AgentRuntimeApi {
     );
   }
 
+  /// List the pending wake-ups of this agent
+  /// Every pending wake-up of the calling agent, ascending by id (09 5.8.5): a runner calls it at start and after every reconnect and learns changes in between from &#x60;run.wake_changed&#x60;. Only the agent itself may call it (agent-self).
+  ///
+  /// Parameters:
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [RunWakeList] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<RunWakeList>> listPendingRunWakes({
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/agents/me/wakes';
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'apiKey',
+            'name': 'consoleSession',
+            'keyName': '__Host-console_session',
+            'where': '',
+          },
+          {'type': 'http', 'scheme': 'DPoP', 'name': 'dpopAuth'},
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearerAuth'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    RunWakeList? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(
+              rawResponse,
+              specifiedType: const FullType(RunWakeList),
+            ) as RunWakeList;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<RunWakeList>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
   /// List channels the agent serves
   ///
   ///
@@ -1374,6 +1870,121 @@ class AgentRuntimeApi {
     }
 
     return Response<EventPage>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// Create the recovery or usage-limit wake-up of an ended run
+  /// Creates a wake-up of kind &#x60;at&#x60; with reason &#x60;recovery&#x60; (lost background work, 09 18.19.9) or &#x60;usage_limit&#x60; (the usage window ended the run, 18.19.10) for an ended run of the calling agent in state &#x60;failed&#x60; (which &#x60;interrupted&#x60; and &#x60;stale&#x60; runs are), at most one per run and reason: a repetition answers the first one with &#x60;200&#x60;. A run that did not fail is &#x60;409 conflict&#x60; with &#x60;reason&#x60; &#x60;run_not_ended&#x60;. A refusal of the checks of 09 5.8.6 (&#x60;autonomous_not_allowed&#x60;, &#x60;wake_max_pending&#x60;, &#x60;usage_wake_max&#x60;, a refused &#x60;agent.invoke&#x60;) stores the wake-up in state &#x60;refused&#x60; with the note in the thread and the notification &#x60;wake_ended&#x60;, and answers &#x60;409 conflict&#x60; with the reason. Audited.
+  ///
+  /// Parameters:
+  /// * [runId]
+  /// * [runWakeRecover]
+  /// * [idempotencyKey] - UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [RunWake] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<RunWake>> recoverRunWake({
+    required String runId,
+    required RunWakeRecover runWakeRecover,
+    String? idempotencyKey,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/runs/{run_id}/wakes/recover'.replaceAll(
+      '{'
+      r'run_id'
+      '}',
+      encodeQueryParameter(
+        _serializers,
+        runId,
+        const FullType(String),
+      ).toString(),
+    );
+    final _options = Options(
+      method: r'POST',
+      headers: <String, dynamic>{
+        if (idempotencyKey != null) r'Idempotency-Key': idempotencyKey,
+        ...?headers,
+      },
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'apiKey',
+            'name': 'consoleSession',
+            'keyName': '__Host-console_session',
+            'where': '',
+          },
+          {'type': 'http', 'scheme': 'DPoP', 'name': 'dpopAuth'},
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearerAuth'},
+        ],
+        ...?extra,
+      },
+      contentType: 'application/json',
+      validateStatus: validateStatus,
+    );
+
+    dynamic _bodyData;
+
+    try {
+      const _type = FullType(RunWakeRecover);
+      _bodyData = _serializers.serialize(runWakeRecover, specifiedType: _type);
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _options.compose(_dio.options, _path),
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    final _response = await _dio.request<Object>(
+      _path,
+      data: _bodyData,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    RunWake? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(
+              rawResponse,
+              specifiedType: const FullType(RunWake),
+            ) as RunWake;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<RunWake>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,

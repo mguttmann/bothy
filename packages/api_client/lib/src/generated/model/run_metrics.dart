@@ -3,6 +3,7 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:api_client/src/generated/model/run_autonomy_last.dart';
 import 'package:api_client/src/generated/model/run_api_retry.dart';
 import 'package:built_value/built_value.dart';
 import 'package:built_value/serializer.dart';
@@ -23,6 +24,7 @@ part 'run_metrics.g.dart';
 /// * [apiRetries]
 /// * [progressEvents] - Count of progress messages of the runtime in the current turn that changed nothing visible (for example a long running tool); a patch of it counts as progress against `run.stall_after` (09 5.5, 18.4).
 /// * [lastApiRetry]
+/// * [autonomyLast]
 @BuiltValue()
 abstract class RunMetrics implements Built<RunMetrics, RunMetricsBuilder> {
   @BuiltValueField(wireName: r'context_pct')
@@ -60,6 +62,9 @@ abstract class RunMetrics implements Built<RunMetrics, RunMetricsBuilder> {
 
   @BuiltValueField(wireName: r'last_api_retry')
   RunApiRetry? get lastApiRetry;
+
+  @BuiltValueField(wireName: r'autonomy_last')
+  RunAutonomyLast? get autonomyLast;
 
   RunMetrics._();
 
@@ -159,6 +164,13 @@ class _$RunMetricsSerializer implements PrimitiveSerializer<RunMetrics> {
       yield serializers.serialize(
         object.lastApiRetry,
         specifiedType: const FullType(RunApiRetry),
+      );
+    }
+    if (object.autonomyLast != null) {
+      yield r'autonomy_last';
+      yield serializers.serialize(
+        object.autonomyLast,
+        specifiedType: const FullType(RunAutonomyLast),
       );
     }
   }
@@ -275,6 +287,14 @@ class _$RunMetricsSerializer implements PrimitiveSerializer<RunMetrics> {
           ) as RunApiRetry?;
           if (valueDes == null) continue;
           result.lastApiRetry.replace(valueDes);
+          break;
+        case r'autonomy_last':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(RunAutonomyLast),
+          ) as RunAutonomyLast?;
+          if (valueDes == null) continue;
+          result.autonomyLast.replace(valueDes);
           break;
         default:
           unhandled.add(key);

@@ -40,6 +40,7 @@ func (sc *Scenario) runs() {
 		sc.get(alex, "/runs/"+jsonText(foreign[0]["id"]), http.StatusNotFound)
 	}
 	sc.runLifecycle(run)
+	sc.runWakes(run, thread)
 	sc.agentSessions(thread)
 	sc.costs(thread)
 	sc.runContext(run)
@@ -124,4 +125,30 @@ func (sc *Scenario) agentSessions(thread string) {
 		header: header("Idempotency-Key", newID())}, append([]int{http.StatusCreated}, refused...)...)
 	sc.call(lotse, req{method: http.MethodPost, path: base + "/report", body: map[string]any{"external_session_ref": "sess-canary-run"},
 		header: header("Idempotency-Key", newID())}, append([]int{http.StatusOK, http.StatusCreated, http.StatusPreconditionFailed}, refused...)...)
+}
+
+// runWakes drives the wake-up operations of AR-04 without creating one: the run of Lotse is
+// queued, so a wake-up, a recovery and a launch check of it are refused, the operations on an
+// unknown wake-up answer 404, Lotse lists its pending wake-ups, Alex the wake-ups of the thread,
+// and the owner sets the autonomy switch of Support/Allgemein to its default.
+func (sc *Scenario) runWakes(run, thread string) {
+	sc.T.Helper()
+	owner, lotse, alex := sc.W.Owner, sc.W.Agents["Lotse"], sc.W.People["Alex"]
+	refused := []int{http.StatusBadRequest, http.StatusForbidden, http.StatusNotFound, http.StatusConflict, http.StatusUnprocessableEntity}
+	sc.call(lotse, req{method: http.MethodPost, path: "/runs/" + run + "/wakes", body: map[string]any{
+		"kind": "at", "reason": "agent", "label": "canary wake", "condition": map[string]any{"at": "2030-01-01T00:00:00Z"}},
+		header: header("Idempotency-Key", newID())}, refused...)
+	sc.call(lotse, req{method: http.MethodPost, path: "/runs/" + run + "/wakes/recover", body: map[string]any{
+		"reason": "recovery", "label": "canary recovery"}, header: header("Idempotency-Key", newID())}, refused...)
+	sc.post(lotse, "/runs/"+run+"/launch-check", nil, append([]int{http.StatusOK}, refused...)...)
+	sc.get(lotse, "/agents/me/wakes", ok...)
+	sc.get(alex, "/threads/"+thread+"/wakes", ok...)
+	wake := newID()
+	sc.post(lotse, "/wakes/"+wake+"/check", nil, http.StatusNotFound)
+	sc.post(lotse, "/wakes/"+wake+"/fire", map[string]any{"outcome": "fired", "result_text": "done"}, http.StatusNotFound)
+	sc.call(lotse, req{method: http.MethodPost, path: "/wakes/" + wake + "/cancel", body: map[string]any{"reason": "usage_cleared"},
+		header: header("Idempotency-Key", newID())}, http.StatusNotFound)
+	allgemein := "/channels/" + sc.W.Channels["Support/Allgemein"]
+	sc.matched(owner, allgemein, req{method: http.MethodPut, path: allgemein + "/autonomous-runs",
+		body: map[string]any{"allow_autonomous_runs": false}}, http.StatusOK)
 }

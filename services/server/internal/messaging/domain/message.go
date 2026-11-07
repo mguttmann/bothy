@@ -291,6 +291,17 @@ func SystemLine(code string, thread, channel, author ids.ID, seq int64) Message 
 	}
 }
 
+// SystemNote returns a note of the server with text in the thread at seq (stage AR, 09 5.8.4):
+// origin system, kind text, silent, a new server client_msg_id and the hash of its own canonical
+// form; it never triggers and creates no hint.
+func SystemNote(text string, thread, channel, author ids.ID, seq int64) Message {
+	return Message{
+		ID: ids.New(), ThreadID: thread, ChannelID: channel, ThreadSeq: seq, AuthorID: author, ClientMsgID: ids.New(),
+		PayloadSHA256: RequestHash(HashInput{Context: "system-note", Kind: string(KindText), Content: text}),
+		Origin:        OriginSystem, Kind: KindText, ContentMD: text, ContentFormat: ContentFormat, Silent: true, Version: 1,
+	}
+}
+
 // RunAnchor returns the live box anchor of run by agent at seq in the thread (09 section 5.4,
 // M2-05): kind run, origin agent, empty content, silent (the anchor notifies nobody), a new server
 // client_msg_id and the hash of its own canonical form, whose context names the run.

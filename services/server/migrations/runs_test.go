@@ -68,6 +68,8 @@ func TestMigration_RunsAndRunSteps(t *testing.T) {
 		{"duration_ms", "bigint", true, ""},
 		// 00077 (M2-51, R-DM-53): the time of the last start or stored patch, for the stall marking.
 		{"last_progress_at", tz, true, ""},
+		// 00099 (AR-04, R-DM-60): the wake-up of a wake run.
+		{"triggering_wake_id", "uuid", true, ""},
 	}
 	if got := principalColumns(t, conn, "runs"); !reflect.DeepEqual(got, wantRuns) {
 		t.Errorf("runs columns:\n got %+v\nwant %+v", got, wantRuns)
@@ -79,7 +81,9 @@ func TestMigration_RunsAndRunSteps(t *testing.T) {
 		"CHECK ((((triggering_message_id IS NULL) OR (trigger_kind = 'message'::text)) AND ((triggering_command_id IS NULL) OR (trigger_kind = 'command'::text)) AND ((triggering_interaction_id IS NULL) OR (trigger_kind = 'interaction'::text))))",
 		"CHECK ((billing_mode_expected = ANY (ARRAY['personal'::text, 'organization'::text])))",
 		"CHECK ((state = ANY (ARRAY['queued'::text, 'running'::text, 'waiting_input'::text, 'completed'::text, 'failed'::text, 'cancelled'::text])))",
-		"CHECK ((trigger_kind = ANY (ARRAY['message'::text, 'command'::text, 'interaction'::text])))",
+		"CHECK ((trigger_kind = ANY (ARRAY['message'::text, 'command'::text, 'interaction'::text, 'wake'::text])))",
+		"CHECK (((triggering_wake_id IS NULL) OR (trigger_kind = 'wake'::text)))",
+		"FOREIGN KEY (triggering_wake_id) REFERENCES run_wakes(id) ON DELETE SET NULL",
 		"FOREIGN KEY (agent_id) REFERENCES agents(principal_id) ON DELETE RESTRICT",
 		"FOREIGN KEY (agent_session_id) REFERENCES agent_sessions(id) ON DELETE SET NULL",
 		"FOREIGN KEY (thread_id) REFERENCES threads(id) ON DELETE RESTRICT",

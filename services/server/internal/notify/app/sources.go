@@ -59,8 +59,26 @@ type runPayload struct {
 		AgentID     ids.ID `json:"agent_id"`
 		TriggeredBy ids.ID `json:"triggered_by"`
 		State       string `json:"state"`
+		StateReason string `json:"state_reason"`
 	} `json:"run"`
 }
+
+// wakePayload is the part of RunWakeChangedPayload the consumer reads (AR-04).
+type wakePayload struct {
+	ThreadID      ids.ID `json:"thread_id"`
+	TriggeredBy   ids.ID `json:"triggered_by"`
+	State         string `json:"state"`
+	NoteMessageID ids.ID `json:"note_message_id"`
+	NoteThreadSeq int64  `json:"note_thread_seq"`
+}
+
+// The values of the wake-ups and runs the consumer reads (09 5.2, 5.8.4).
+const (
+	reasonUsageLimited = "usage_limited"
+	wakeRefused        = "refused"
+	wakeExpired        = "expired"
+	wakeFailed         = "failed"
+)
 
 // expiringPayload is the part of AccessExpiringPayload the consumer reads.
 type expiringPayload struct {
@@ -188,6 +206,11 @@ func (p *Push) onRun(ctx context.Context, ev sync.Event) error {
 		starterKind = domain.KindRunDone
 	case runFailed:
 		starterKind = domain.KindRunFailed
+		if r.StateReason == reasonUsageLimited {
+			// A usage-limited run notifies its person with wake_ended and no second run_failed
+			// (13 section 2, R-PN-12, AR-04).
+			starterKind = domain.KindWakeEnded
+		}
 	case runCancelled:
 	default:
 		return nil
@@ -230,6 +253,27 @@ func (p *Push) onRun(ctx context.Context, ev sync.Event) error {
 		g.kind, g.directMessage = domain.KindDM, true
 	}
 	return p.run(ctx, g)
+}
+
+// onWake maps run.wake_changed (13 section 2, R-PN-12, AR-04): a wake-up that ended refused,
+// expired or failed gives wake_ended to its person, pointing at the note in the thread; every other
+// state, a cancel included, gives nothing.
+func (p *Push) onWake(ctx context.Context, ev sync.Event) error {
+	var pl wakePayload
+	if err := decode(ev, &pl); err != nil {
+		return err
+	}
+	switch pl.State {
+	case wakeRefused, wakeExpired, wakeFailed:
+	default:
+		return nil
+	}
+	info, err := p.d.Threads.Info(ctx, pl.ThreadID)
+	if err != nil {
+		return err
+	}
+	return p.run(ctx, group{kind: domain.KindWakeEnded, users: []ids.ID{pl.TriggeredBy}, threadID: pl.ThreadID, channelID: info.ChannelID,
+		spaceID: info.SpaceID, messageID: pl.NoteMessageID, messageSeq: pl.NoteThreadSeq, ev: ev})
 }
 
 // onAccessExpiring maps access.expiring (design note 4 c): admin to the audience, with the grant

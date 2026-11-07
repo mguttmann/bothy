@@ -105,6 +105,10 @@ Serializers _$serializers =
           ..add(AgentUpdate.serializer)
           ..add(AgentUpdatedEvent.serializer)
           ..add(AgentUpdatedEventTypeEnum.serializer)
+          ..add(AgentWakeFacts.serializer)
+          ..add(AgentWakeInputEvent.serializer)
+          ..add(AgentWakeInputEventTypeEnum.serializer)
+          ..add(AgentWakeInputPayload.serializer)
           ..add(AlertmanagerAlert.serializer)
           ..add(AlertmanagerAlertStatusEnum.serializer)
           ..add(ApiToken.serializer)
@@ -150,6 +154,7 @@ Serializers _$serializers =
           ..add(Channel.serializer)
           ..add(ChannelArchivedEvent.serializer)
           ..add(ChannelArchivedEventTypeEnum.serializer)
+          ..add(ChannelAutonomousRunsSet.serializer)
           ..add(ChannelBehavior.serializer)
           ..add(ChannelBehaviorPut.serializer)
           ..add(ChannelCreate.serializer)
@@ -600,6 +605,7 @@ Serializers _$serializers =
           ..add(ResolveI1.serializer)
           ..add(Run.serializer)
           ..add(RunApiRetry.serializer)
+          ..add(RunAutonomyLast.serializer)
           ..add(RunAwaitInput.serializer)
           ..add(RunCancel.serializer)
           ..add(RunCancelRequestedEvent.serializer)
@@ -640,6 +646,24 @@ Serializers _$serializers =
           ..add(RunUpdatedEvent.serializer)
           ..add(RunUpdatedEventTypeEnum.serializer)
           ..add(RunUpdatedPayload.serializer)
+          ..add(RunWake.serializer)
+          ..add(RunWakeCancel.serializer)
+          ..add(RunWakeChangedEvent.serializer)
+          ..add(RunWakeChangedEventTypeEnum.serializer)
+          ..add(RunWakeChangedPayload.serializer)
+          ..add(RunWakeCheckResult.serializer)
+          ..add(RunWakeCondition.serializer)
+          ..add(RunWakeCreate.serializer)
+          ..add(RunWakeCreateReasonEnum.serializer)
+          ..add(RunWakeFire.serializer)
+          ..add(RunWakeFireOutcomeEnum.serializer)
+          ..add(RunWakeKind.serializer)
+          ..add(RunWakeList.serializer)
+          ..add(RunWakePage.serializer)
+          ..add(RunWakeReason.serializer)
+          ..add(RunWakeRecover.serializer)
+          ..add(RunWakeRecoverReasonEnum.serializer)
+          ..add(RunWakeState.serializer)
           ..add(SearchAssistAnswer.serializer)
           ..add(SearchAssistCandidate.serializer)
           ..add(SearchAssistCost.serializer)
@@ -1566,6 +1590,14 @@ Serializers _$serializers =
           ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(RunSummary)]),
             () => ListBuilder<RunSummary>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(RunWake)]),
+            () => ListBuilder<RunWake>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(RunWake)]),
+            () => ListBuilder<RunWake>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(SearchAssistHit)]),

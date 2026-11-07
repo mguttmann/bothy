@@ -46,6 +46,7 @@ func runsWiring() moduleWiring {
 			if rn != nil {
 				m.QueuedExpiry, m.RunsLifecycle, m.ComponentExpiry, m.InvocationHolds = rn.Service, rn.Service, rn.Service, rn.Service
 				m.AppDispatch = rn.Service
+				m.WakeDue = rn.Service
 			}
 			// runs.stall_check runs every agent.presence_timeout (M2-09, D-M2-09-19).
 			m.StallInterval = s.values.Duration(keyPresenceTimeout)
@@ -111,10 +112,8 @@ func (s *server) startRuns(context.Context) error {
 	}
 	// retriggerMessage is a messaging route decided by runs (F-PROJEKT-BEREIT).
 	m.Handlers.BindRetriggers(rn.Service)
-	if s.worker() {
-		if err := rn.RegisterActiveGauge(); err != nil {
-			return err
-		}
+	if err := s.bindWakes(rn, pool, az, m); err != nil {
+		return err
 	}
 	pub, err := s.runsPublisher(gatewaypg.NewSignalSender(pool))
 	if err != nil {
@@ -127,6 +126,30 @@ func (s *server) startRuns(context.Context) error {
 	s.runs = rn
 	s.mu.Unlock()
 	return nil
+}
+
+// bindWakes binds the wake-ups of stage AR (AR-04) to rn in every role: a runner asks for them
+// only while it reports wakes, so an installation without such a runner never creates one. In the
+// worker role it registers the gauges bothy.run.active and bothy.run.wake.pending.
+func (s *server) bindWakes(rn *Runs, pool *pg.Pool, az authorize.Authorizer, m *Messaging) error {
+	wcfg, err := WakesConfig(s.values)
+	if err != nil {
+		return err
+	}
+	owners, ok := az.(authorize.Owners)
+	if !ok {
+		return errors.New("wire: the Authorizer of runs does not answer the owner role")
+	}
+	if err := rn.BindWakes(wcfg, pool, WakeDeps{Notes: m.Service, Owners: owners}); err != nil {
+		return err
+	}
+	if !s.worker() {
+		return nil
+	}
+	if err := rn.RegisterActiveGauge(); err != nil {
+		return err
+	}
+	return rn.RegisterWakeGauge()
 }
 
 // runsPublisher returns the publisher of the run.updated events a process without a gateway hub

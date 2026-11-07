@@ -99,6 +99,8 @@ type trigger struct {
 	// gone reports an interaction.created whose interaction no longer exists (its card was
 	// deleted): nothing is sent, without a check or an audit entry (design note 11 a).
 	gone bool
+	// wake is the wake-up of a wake run or a wake input (AR-04); zero for every other trigger.
+	wake ids.ID
 }
 
 // resolver reads the trigger of one delivery of the locked run.
@@ -110,8 +112,9 @@ type resolver func(s *Service, ctx context.Context, run RunRow, in runs.Delivery
 // interaction.created and the trigger kind interaction come with M2-15.
 var resolvers = map[string]map[string]resolver{
 	domain.EventAgentInvocation: {triggerKindMessage: resolveInvocationMessage, triggerKindCommand: resolveInvocationCommand,
-		triggerKindInteraction: resolveInvocationInteraction},
+		triggerKindInteraction: resolveInvocationInteraction, triggerKindWake: resolveInvocationWake},
 	domain.EventAgentFollowup:      {"": resolveFollowup},
+	domain.EventAgentWakeInput:     {"": resolveWakeInput},
 	domain.EventCommandInvoked:     {},
 	domain.EventInteractionCreated: {"": resolveInteraction},
 }
@@ -403,6 +406,10 @@ func (s *Service) prepare(ctx context.Context, in runs.DeliveryInput, issuer Tok
 		return outcome{}, errs.Wrap(errs.CodeInternalError, err, "runs: delivery matrix")
 	}
 	if rule.Skip {
+		if rule.ReturnWake {
+			// A wake input reaches only a running run; the wake-up waits for the run's end (09 5.8.3).
+			return outcome{}, s.returnWakeInput(ctx, run, in.Payload)
+		}
 		return outcome{}, nil
 	}
 	res := resolverFor(in.Type, run)
@@ -498,6 +505,11 @@ func (s *Service) deny(ctx context.Context, in runs.DeliveryInput, run RunRow, r
 		if err := s.failTrigger(ctx, in, run, tr, reason); err != nil {
 			return err
 		}
+	case domain.DenyRefuseWake:
+		// A refused wake input ends its wake-up refused, like a refused fire (09 5.8.3).
+		if err := s.refuseWakeInput(ctx, tr.wake, authzReason); err != nil {
+			return err
+		}
 	case domain.DenyKeepRun:
 	}
 	return s.auditDenial(ctx, tr.person, authzReason, run.ThreadID, auditing.Attrs{
@@ -547,6 +559,8 @@ func triggerKindOf(typ string, run RunRow) string {
 		return string(domain.TriggerFollowup)
 	case domain.EventInteractionCreated:
 		return string(domain.TriggerInteraction)
+	case domain.EventAgentWakeInput:
+		return string(domain.TriggerWake)
 	}
 	return string(domain.TriggerCommand)
 }

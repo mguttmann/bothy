@@ -54,7 +54,7 @@ SET invocation_held_until = NULL,
     state_reason = CASE WHEN state_reason = 'invocation_held' THEN NULL ELSE state_reason END,
     version = version + 1
 WHERE id = $1 AND state = 'queued' AND invocation_held_until IS NOT NULL
-RETURNING id, thread_id, agent_id, agent_session_id, trigger_kind, triggering_message_id, triggering_command_id, triggering_interaction_id, triggered_by, state, state_reason, version, billing_mode_expected, billing_mode_used, billing_evidence, invocation_jti, started_jti, renewed_from_jti, dev_environment_id, model, status_line, last_text_excerpt, plan, metrics, cost_micros, currency, cost_is_estimate, summary, stall_warned_at, queued_at, invocation_held_until, started_at, finished_at, duration_ms, last_progress_at
+RETURNING id, thread_id, agent_id, agent_session_id, trigger_kind, triggering_message_id, triggering_command_id, triggering_interaction_id, triggered_by, state, state_reason, version, billing_mode_expected, billing_mode_used, billing_evidence, invocation_jti, started_jti, renewed_from_jti, dev_environment_id, model, status_line, last_text_excerpt, plan, metrics, cost_micros, currency, cost_is_estimate, summary, stall_warned_at, queued_at, invocation_held_until, started_at, finished_at, duration_ms, last_progress_at, triggering_wake_id
 `
 
 // The release: the column and the wait reason invocation_held (09 5.2.1) are cleared and version
@@ -100,6 +100,7 @@ func (q *Queries) ReleaseHeldInvocation(ctx context.Context, id pgtype.UUID) (Ru
 		&i.FinishedAt,
 		&i.DurationMs,
 		&i.LastProgressAt,
+		&i.TriggeringWakeID,
 	)
 	return i, err
 }

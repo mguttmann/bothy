@@ -16,6 +16,9 @@ const AgentInvocationPayloadTriggerKindEnum
 _$agentInvocationPayloadTriggerKindEnum_command =
     const AgentInvocationPayloadTriggerKindEnum._('command');
 const AgentInvocationPayloadTriggerKindEnum
+_$agentInvocationPayloadTriggerKindEnum_wake =
+    const AgentInvocationPayloadTriggerKindEnum._('wake');
+const AgentInvocationPayloadTriggerKindEnum
 _$agentInvocationPayloadTriggerKindEnum_unknownDefaultOpenApi =
     const AgentInvocationPayloadTriggerKindEnum._('unknownDefaultOpenApi');
 
@@ -28,6 +31,8 @@ _$agentInvocationPayloadTriggerKindEnumValueOf(String name) {
       return _$agentInvocationPayloadTriggerKindEnum_interaction;
     case 'command':
       return _$agentInvocationPayloadTriggerKindEnum_command;
+    case 'wake':
+      return _$agentInvocationPayloadTriggerKindEnum_wake;
     case 'unknownDefaultOpenApi':
       return _$agentInvocationPayloadTriggerKindEnum_unknownDefaultOpenApi;
     default:
@@ -42,6 +47,7 @@ _$agentInvocationPayloadTriggerKindEnumValues =
         _$agentInvocationPayloadTriggerKindEnum_message,
         _$agentInvocationPayloadTriggerKindEnum_interaction,
         _$agentInvocationPayloadTriggerKindEnum_command,
+        _$agentInvocationPayloadTriggerKindEnum_wake,
         _$agentInvocationPayloadTriggerKindEnum_unknownDefaultOpenApi,
       ],
     );
@@ -99,12 +105,14 @@ class _$AgentInvocationPayloadTriggerKindEnumSerializer
     'message': 'message',
     'interaction': 'interaction',
     'command': 'command',
+    'wake': 'wake',
     'unknownDefaultOpenApi': 'unknown_default_open_api',
   };
   static const Map<Object, String> _fromWire = const <Object, String>{
     'message': 'message',
     'interaction': 'interaction',
     'command': 'command',
+    'wake': 'wake',
     'unknown_default_open_api': 'unknownDefaultOpenApi',
   };
 
@@ -187,6 +195,10 @@ class _$AgentInvocationPayload extends AgentInvocationPayload {
   @override
   final String? interactionId;
   @override
+  final String? wakeId;
+  @override
+  final AgentWakeFacts? wake;
+  @override
   final String? commandInvocationId;
   @override
   final String? commandId;
@@ -217,6 +229,8 @@ class _$AgentInvocationPayload extends AgentInvocationPayload {
     required this.triggerKind,
     this.messageId,
     this.interactionId,
+    this.wakeId,
+    this.wake,
     this.commandInvocationId,
     this.commandId,
     this.commandName,
@@ -247,6 +261,8 @@ class _$AgentInvocationPayload extends AgentInvocationPayload {
         triggerKind == other.triggerKind &&
         messageId == other.messageId &&
         interactionId == other.interactionId &&
+        wakeId == other.wakeId &&
+        wake == other.wake &&
         commandInvocationId == other.commandInvocationId &&
         commandId == other.commandId &&
         commandName == other.commandName &&
@@ -268,6 +284,8 @@ class _$AgentInvocationPayload extends AgentInvocationPayload {
     _$hash = $jc(_$hash, triggerKind.hashCode);
     _$hash = $jc(_$hash, messageId.hashCode);
     _$hash = $jc(_$hash, interactionId.hashCode);
+    _$hash = $jc(_$hash, wakeId.hashCode);
+    _$hash = $jc(_$hash, wake.hashCode);
     _$hash = $jc(_$hash, commandInvocationId.hashCode);
     _$hash = $jc(_$hash, commandId.hashCode);
     _$hash = $jc(_$hash, commandName.hashCode);
@@ -291,6 +309,8 @@ class _$AgentInvocationPayload extends AgentInvocationPayload {
           ..add('triggerKind', triggerKind)
           ..add('messageId', messageId)
           ..add('interactionId', interactionId)
+          ..add('wakeId', wakeId)
+          ..add('wake', wake)
           ..add('commandInvocationId', commandInvocationId)
           ..add('commandId', commandId)
           ..add('commandName', commandName)
@@ -337,6 +357,14 @@ class AgentInvocationPayloadBuilder
   String? get interactionId => _$this._interactionId;
   set interactionId(String? interactionId) =>
       _$this._interactionId = interactionId;
+
+  String? _wakeId;
+  String? get wakeId => _$this._wakeId;
+  set wakeId(String? wakeId) => _$this._wakeId = wakeId;
+
+  AgentWakeFactsBuilder? _wake;
+  AgentWakeFactsBuilder get wake => _$this._wake ??= AgentWakeFactsBuilder();
+  set wake(AgentWakeFactsBuilder? wake) => _$this._wake = wake;
 
   String? _commandInvocationId;
   String? get commandInvocationId => _$this._commandInvocationId;
@@ -398,6 +426,8 @@ class AgentInvocationPayloadBuilder
       _triggerKind = $v.triggerKind;
       _messageId = $v.messageId;
       _interactionId = $v.interactionId;
+      _wakeId = $v.wakeId;
+      _wake = $v.wake?.toBuilder();
       _commandInvocationId = $v.commandInvocationId;
       _commandId = $v.commandId;
       _commandName = $v.commandName;
@@ -454,6 +484,8 @@ class AgentInvocationPayloadBuilder
             ),
             messageId: messageId,
             interactionId: interactionId,
+            wakeId: wakeId,
+            wake: _wake?.build(),
             commandInvocationId: commandInvocationId,
             commandId: commandId,
             commandName: commandName,
@@ -471,6 +503,9 @@ class AgentInvocationPayloadBuilder
     } catch (_) {
       late String _$failedField;
       try {
+        _$failedField = 'wake';
+        _wake?.build();
+
         _$failedField = 'options';
         _options?.build();
         _$failedField = 'triggeredBy';

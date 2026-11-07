@@ -66,7 +66,17 @@ const (
 	ReasonHostDuplicateConnection          Reason = "host_duplicate_connection"
 	ReasonUnknownAction                    Reason = "unknown_action"
 	ReasonTrustedHeaderRequiresLoopback    Reason = "trusted_header_requires_loopback"
-	ReasonDefinitionNeedsHost              Reason = "definition_needs_host"
+	// The refusals of the wake-ups of stage AR (07 2.14, AR-04): no authorize result, the reasons
+	// of the audit entries of runs.
+	ReasonAutonomousNotAllowed Reason = "autonomous_not_allowed"
+	ReasonAutonomousChainMax   Reason = "autonomous_chain_max"
+	ReasonAutonomousIdleMax    Reason = "autonomous_idle_max"
+	ReasonPRChecksOwnerOnly    Reason = "pr_checks_owner_only"
+	ReasonWakeMaxPending       Reason = "wake_max_pending"
+	ReasonUsageWakeMax         Reason = "usage_wake_max"
+	ReasonRunNotActive         Reason = "run_not_active"
+	ReasonRunNotRunning        Reason = "run_not_running"
+	ReasonDefinitionNeedsHost  Reason = "definition_needs_host"
 )
 
 // reasons is the list of 07 section 4.1 in table order.
@@ -127,6 +137,14 @@ var reasons = []Reason{
 	ReasonHostDuplicateConnection,
 	ReasonUnknownAction,
 	ReasonTrustedHeaderRequiresLoopback,
+	ReasonAutonomousNotAllowed,
+	ReasonAutonomousChainMax,
+	ReasonAutonomousIdleMax,
+	ReasonPRChecksOwnerOnly,
+	ReasonWakeMaxPending,
+	ReasonUsageWakeMax,
+	ReasonRunNotActive,
+	ReasonRunNotRunning,
 	ReasonDefinitionNeedsHost,
 }
 

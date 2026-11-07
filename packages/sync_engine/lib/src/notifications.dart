@@ -42,6 +42,10 @@ enum HintKind {
   /// A reminder of the administration.
   admin('admin'),
 
+  /// A wake-up of the person ended refused, expired or failed, or a run of the person ended
+  /// usage-limited (13 2, stage AR); it points at the note in the thread.
+  wakeEnded('wake_ended'),
+
   /// A kind this client does not know (04 6.1: unknown values are tolerated).
   unknown('unknown');
 

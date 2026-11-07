@@ -74,7 +74,7 @@ func generate(ctx context.Context, c config) (err error) {
 	if err != nil {
 		return err
 	}
-	models, rest, objects, objects2, err := splitAll(rest)
+	models, rest, rest2, objects, objects2, err := splitAll(rest)
 	if err != nil {
 		return err
 	}
@@ -84,6 +84,7 @@ func generate(ctx context.Context, c config) (err error) {
 	outputs := map[string][]byte{
 		filepath.Join(c.restDir, "models.gen.go"):    models,
 		filepath.Join(c.restDir, "rest.gen.go"):      rest,
+		filepath.Join(c.restDir, "rest2.gen.go"):     rest2,
 		filepath.Join(c.restDir, "objects.gen.go"):   objects,
 		filepath.Join(c.restDir, "objects2.gen.go"):  objects2,
 		filepath.Join(c.restDir, "openapi.gen.yaml"): in.specData,

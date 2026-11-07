@@ -119,7 +119,7 @@ modules:
               space.delete, space.restore,
               space.operator.set, sidebar.update, channel.read, channel.create, channel.update,
               channel.reorder, channel.behavior.read, channel.behavior.update, channel.operator.set,
-              channel.project.bind, channel.read_only.set, channel.archive, channel.delete,
+              channel.project.bind, channel.read_only.set, channel.autonomous_runs.set, channel.archive, channel.delete,
               channel.restore, channel.project.trash, forum_tag.manage,
               dm.create, dm.leave, thread.read, thread.title.update, thread.close, thread.reopen,
               thread.delete, thread.restore,
@@ -221,9 +221,10 @@ modules:
               run.token.renew, run.update, run.finish, run.cancel, run.followup.create,
               component.update, interaction.create,
               interaction.respond, command.autocomplete, command.autocomplete.respond,
-              command.invoke]
+              command.invoke, run.wake.create, run.wake.recover, run.wake.list_pending,
+              run.wake.check, run.wake.fire, run.wake.cancel, run.wake.read, run.launch.check]
     events: [run.state_changed, agent.invocation, agent.followup, run.cancel_requested,
-             interaction.created, command.invoked]
+             interaction.created, command.invoked, run.wake_changed, agent.wake_input]
     ephemeral_events: [run.updated, command.autocomplete_requested]
     ws_ops: [run.update, command.autocomplete_result]
     # M3-07: files for the held agent.invocation (subscriber of files.FileFinalized) and the

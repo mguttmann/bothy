@@ -44,10 +44,12 @@ class Run:
         followups (RunFollowups): Follow-ups keyed by message ID.
         queued_at (datetime.datetime): RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
         agent_session_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
-        trigger_kind (RunTriggerKind | Unset):
+        trigger_kind (RunTriggerKind | Unset): `wake` is a run started by a fired wake-up (09 5.8.3); it names the wake-
+            up in `triggering_wake_id`.
         triggering_message_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
         triggering_command_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
         triggering_interaction_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
+        triggering_wake_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
         state_reason (str | Unset): The reason of `failed` and `cancelled` (09 5.2); while `queued` the wait reason of
             09 5.2.1, `invocation_held` (the server holds the invocation until an attachment or transcript is final),
             `slots_full` (every slot of the runner is in use) or `thread_busy` (the runner waits for the thread or session
@@ -84,6 +86,7 @@ class Run:
     triggering_message_id: UUID | Unset = UNSET
     triggering_command_id: UUID | Unset = UNSET
     triggering_interaction_id: UUID | Unset = UNSET
+    triggering_wake_id: UUID | Unset = UNSET
     state_reason: str | Unset = UNSET
     billing_mode_used: BillingMode | Unset = UNSET
     model: str | Unset = UNSET
@@ -143,6 +146,10 @@ class Run:
         triggering_interaction_id: str | Unset = UNSET
         if not isinstance(self.triggering_interaction_id, Unset):
             triggering_interaction_id = str(self.triggering_interaction_id)
+
+        triggering_wake_id: str | Unset = UNSET
+        if not isinstance(self.triggering_wake_id, Unset):
+            triggering_wake_id = str(self.triggering_wake_id)
 
         state_reason = self.state_reason
 
@@ -205,6 +212,8 @@ class Run:
             field_dict["triggering_command_id"] = triggering_command_id
         if triggering_interaction_id is not UNSET:
             field_dict["triggering_interaction_id"] = triggering_interaction_id
+        if triggering_wake_id is not UNSET:
+            field_dict["triggering_wake_id"] = triggering_wake_id
         if state_reason is not UNSET:
             field_dict["state_reason"] = state_reason
         if billing_mode_used is not UNSET:
@@ -300,6 +309,13 @@ class Run:
         else:
             triggering_interaction_id = UUID(_triggering_interaction_id)
 
+        _triggering_wake_id = d.pop("triggering_wake_id", UNSET)
+        triggering_wake_id: UUID | Unset
+        if isinstance(_triggering_wake_id, Unset):
+            triggering_wake_id = UNSET
+        else:
+            triggering_wake_id = UUID(_triggering_wake_id)
+
         state_reason = d.pop("state_reason", UNSET)
 
         _billing_mode_used = d.pop("billing_mode_used", UNSET)
@@ -366,6 +382,7 @@ class Run:
             triggering_message_id=triggering_message_id,
             triggering_command_id=triggering_command_id,
             triggering_interaction_id=triggering_interaction_id,
+            triggering_wake_id=triggering_wake_id,
             state_reason=state_reason,
             billing_mode_used=billing_mode_used,
             model=model,
