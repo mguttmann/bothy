@@ -5,6 +5,7 @@
 /// of the server, the explanation of each tool class and the changed parts of an edit.
 library;
 
+import 'package:api_client/api_client.dart' show ApiClient;
 import 'package:l10n/l10n.dart';
 
 import 'agent_edit_changes.dart';
@@ -134,3 +135,45 @@ String agentEditChangeText(AppLocalizations l, DefinitionChange change) {
     _ => l.agentEditChange(kind.name, change.name, ''),
   };
 }
+
+/// The step-up purpose of a write of [change] for the agent [name] in the person's language.
+String agentChangePurpose(
+  AppLocalizations l,
+  AgentChangeKind change,
+  String name,
+) => switch (change) {
+  AgentChangeKind.create => l.stepUpPurposeNewAgent(name),
+  AgentChangeKind.setup => l.stepUpPurposeSetUpAgent(name),
+  AgentChangeKind.edit => l.stepUpPurposeEditAgent(name),
+  AgentChangeKind.host => l.stepUpPurposeMoveAgent(name),
+  AgentChangeKind.disable => l.stepUpPurposeDisableAgent(name),
+};
+
+/// The audit reason of a write of [change] for the agent [name]; "Disable" sends the reason
+/// the person typed instead.
+String agentChangeReason(
+  AppLocalizations l,
+  AgentChangeKind change,
+  String name,
+) => switch (change) {
+  AgentChangeKind.create => l.newAgentAuditReason(name),
+  AgentChangeKind.setup => l.agentSetupAuditReason(name),
+  AgentChangeKind.host => l.agentMoveAuditReason(name),
+  AgentChangeKind.edit || AgentChangeKind.disable => l.agentEditAuditReason(
+    name,
+  ),
+};
+
+/// The [ApiNewAgentPort] over [api] with the purposes and reasons of every
+/// [AgentChangeKind] in the person's language; the desktop, the phones and the console use it,
+/// so the step-up prompt says what is changed.
+///
+/// Example: `final port = localizedAgentPort(session.api, AppLocalizations.of(context));`
+ApiNewAgentPort localizedAgentPort(ApiClient api, AppLocalizations l) =>
+    ApiNewAgentPort(
+      api,
+      purpose: l.stepUpPurposeNewAgent,
+      reason: l.newAgentAuditReason,
+      purposeOf: (change, name) => agentChangePurpose(l, change, name),
+      reasonOf: (change, name) => agentChangeReason(l, change, name),
+    );
