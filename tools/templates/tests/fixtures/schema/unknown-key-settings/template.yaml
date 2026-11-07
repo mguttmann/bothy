@@ -1,0 +1,9 @@
+name: Fixture
+description: A fixture template of the template gate.
+version: 1.0.0
+tool_class_wish: chat
+settings:
+  permissions:
+    allow: [Bash]
+skills:
+  - note

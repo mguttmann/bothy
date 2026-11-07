@@ -75,6 +75,8 @@ import 'package:api_client/src/generated/model/agent_session_changed_event.dart'
 import 'package:api_client/src/generated/model/agent_session_changed_payload.dart';
 import 'package:api_client/src/generated/model/agent_session_list.dart';
 import 'package:api_client/src/generated/model/agent_session_report.dart';
+import 'package:api_client/src/generated/model/agent_template.dart';
+import 'package:api_client/src/generated/model/agent_template_list.dart';
 import 'package:api_client/src/generated/model/agent_triggerers.dart';
 import 'package:api_client/src/generated/model/agent_update.dart';
 import 'package:api_client/src/generated/model/agent_updated_event.dart';
@@ -736,6 +738,8 @@ part 'serializers.g.dart';
   AgentSessionChangedPayload,
   AgentSessionList,
   AgentSessionReport,
+  AgentTemplate,
+  AgentTemplateList,
   AgentTriggerers,
   AgentUpdate,
   AgentUpdatedEvent,
@@ -1661,6 +1665,10 @@ Serializers serializers =
           ..addBuilderFactory(
             const FullType(BuiltList, [FullType(PreviewHint)]),
             () => ListBuilder<PreviewHint>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(AgentTemplate)]),
+            () => ListBuilder<AgentTemplate>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, [FullType(AgentSession)]),

@@ -165,7 +165,7 @@ TOOLS_SOURCE_TESTS := ci/tests/test_product_name_places.py docs/tests/test_confi
         sonar sonar-scan sonar-up sonar-down sonar-config sonar-config-check sonar-main-branch sonar-visibility sonar-new-code semgrep trivy osv gitleaks \
         gitleaks-staged denylist denylist-history licenses docs adr-index config-reference config-doc-check app-config event-catalog contract-documents apple-strings catalog catalog-check linkcheck \
         trivy-image portability portability-trial load-capacity console-e2e alert-e2e adapters-e2e linkcheck-external diagrams tokens api-lint api-checks api-breaking api-tables api-clients \
-        runners-check release-pins install-options tofu-check tofu-vm-test commitlint fragments-check changelog-preview \
+        runners-check release-pins install-options tofu-check tofu-vm-test templates-check commitlint fragments-check changelog-preview \
         review labels-check labels-sync tools-lock release-build release-prep release-trial scancode install-test clean \
         codegen-check arch register-check migrations-lint migrations-lock sql-visibility flag-check perf bench-search ops-check signal-check \
         image image-test postgres-image postgres-image-test apps-platform runner-test contract-test e2e-desktop e2e-mobile perf-desktop \
@@ -218,7 +218,7 @@ gates: ## All gates except denylist and sonar (CI job "gates")
 # reported as drift and not as a confusing compile error. `perf` is not a gate (P-07).
 gates: fmt-check codegen-check lint typecheck arch register-check migrations-lint sql-visibility flag-check test coverage contract-test commitlint fragments-check \
        docs config-doc-check linkcheck diagrams catalog-check api-lint api-checks api-breaking ops-check signal-check \
-       api-clients tokens runners-check labels-check release-pins install-options tofu-check gitleaks semgrep trivy osv licenses
+       api-clients tokens runners-check labels-check release-pins install-options tofu-check gitleaks semgrep trivy osv licenses templates-check
 
 # ---- code quality ---------------------------------------------------------------------
 fmt: ## Format all code in place
@@ -245,7 +245,7 @@ lint: ## Linters: file hygiene hooks, ruff, bandit, Dockerfile pins, actionlint,
 	@if [ -z "$(TOOLS_ON)" ]; then $(call tools_skip,tools-lint); else $(UVRUN) ruff check tools tests/portability; fi
 	@# Every FROM of a tracked Dockerfile is pinned by digest (SEC-SC-4, docs/spec/18-release.md "Server images").
 	$(UVRUN) python tools/ci/dockerfile_pins.py
-	@if [ -z "$(TOOLS_ON)" ]; then $(call tools_skip,tools-bandit); else $(UVRUN) bandit -q -c tools/pyproject.toml -r tools/api-checks tools/arch-check tools/bin tools/catalog tools/ci tools/console-e2e tools/configdoc tools/contract tools/denylist tools/design-tokens tools/doccheck tools/docs tools/e2e tools/hooks tools/lint tools/observability tools/opscheck tools/portability tools/load tools/showcase tools/signalcheck tools/sonarqube; fi
+	@if [ -z "$(TOOLS_ON)" ]; then $(call tools_skip,tools-bandit); else $(UVRUN) bandit -q -c tools/pyproject.toml -r tools/api-checks tools/arch-check tools/bin tools/catalog tools/ci tools/console-e2e tools/configdoc tools/contract tools/denylist tools/design-tokens tools/doccheck tools/docs tools/e2e tools/hooks tools/lint tools/observability tools/opscheck tools/portability tools/load tools/showcase tools/signalcheck tools/sonarqube tools/templates; fi
 	$(UVRUN) check-jsonschema --builtin-schema vendor.github-issue-forms $(filter-out %/config.yml,$(wildcard .github/ISSUE_TEMPLATE/*.yml))
 	$(UVRUN) check-jsonschema --builtin-schema vendor.github-issue-config .github/ISSUE_TEMPLATE/config.yml
 	$(UVRUN) check-jsonschema --builtin-schema vendor.renovate renovate.json
@@ -764,6 +764,9 @@ denylist: ## White-label scan with the private deny list (fails without the list
 	elif git rev-parse --verify -q origin/main >/dev/null; then base=origin/main; fi; \
 	range="$${DENYLIST_RANGE:-$${base:+$$base..HEAD}}"; \
 	$(UVRUN) python tools/denylist/denylist_scan.py $${range:+--range "$$range"} $(DENYLIST_FLAGS)
+
+templates-check: ## Template gate (26 7.3): every template under templates/agents generic and closed; needs no private deny list
+	$(UVRUN) python tools/templates/template_gate.py
 
 denylist-history: ## White-label scan of every object and commit on every ref (public switch)
 	$(UVRUN) python tools/denylist/denylist_scan.py --history $(DENYLIST_FLAGS)

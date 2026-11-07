@@ -90,6 +90,9 @@ from .agent_session_list import AgentSessionList
 from .agent_session_report import AgentSessionReport
 from .agent_session_report_bind_failed import AgentSessionReportBindFailed
 from .agent_status import AgentStatus
+from .agent_template import AgentTemplate
+from .agent_template_list import AgentTemplateList
+from .agent_template_source import AgentTemplateSource
 from .agent_triggerers import AgentTriggerers
 from .agent_update import AgentUpdate
 from .agent_updated_event import AgentUpdatedEvent
@@ -983,6 +986,9 @@ __all__ = (
     "AgentSessionReport",
     "AgentSessionReportBindFailed",
     "AgentStatus",
+    "AgentTemplate",
+    "AgentTemplateList",
+    "AgentTemplateSource",
     "AgentTriggerers",
     "AgentUpdate",
     "AgentUpdatedEvent",

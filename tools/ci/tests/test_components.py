@@ -574,6 +574,7 @@ ALL_COMPONENTS = ["apps", "plugins", "sdk-python", "sdk-typescript", "server"]
         ("tools/scancode/Dockerfile", []),
         ("tools/sonarqube/quality_sync.py", []),
         ("tools/testing/git_fixtures.py", []),
+        ("tools/templates/template_gate.py", []),
         ("tools/api-checks/api_checks.py", []),
         ("tools/README.md", []),
         # make api-breaking runs only for the component server.
@@ -587,6 +588,8 @@ ALL_COMPONENTS = ["apps", "plugins", "sdk-python", "sdk-typescript", "server"]
         ("design/tokens/color.json", ["apps"]),
         ("tools/arch-check/rules.yaml", ["apps"]),
         ("tools/observability/sli_bounds.py", ["apps", "server"]),
+        # The server embeds a generated copy of the shipped agent templates (A1-06).
+        ("templates/agents/writing-helper/CLAUDE.md", ["server"]),
     ],
 )
 def test_a_tool_folder_selects_the_components_that_read_it(path: str, expected: list[str]) -> None:

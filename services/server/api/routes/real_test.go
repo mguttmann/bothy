@@ -929,6 +929,10 @@ func (stubServer) AnswerAgentInterview(context.Context, rest.AnswerAgentIntervie
 	return nil, nil
 }
 
+func (stubServer) ListAgentTemplates(context.Context, rest.ListAgentTemplatesRequestObject) (rest.ListAgentTemplatesResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) ListAgentSessions(context.Context, rest.ListAgentSessionsRequestObject) (rest.ListAgentSessionsResponseObject, error) {
 	return nil, nil
 }
@@ -1458,6 +1462,8 @@ func TestRealTable_Enabled(t *testing.T) {
 		// A1-07
 		"interviewAgent":       {"POST /api/v1/agents/interview", "agent.interview", "rl.trigger"},
 		"answerAgentInterview": {"POST /api/v1/agent-interview-requests/{request_id}/answer", "agent.interview.respond", "rl.agent_runtime"},
+		// A1-06
+		"listAgentTemplates": {"GET /api/v1/agent-templates", "agent.templates.read", "rl.read"},
 		// M2-07
 		"getConsumerState": {"GET /api/v1/agents/me/consumers/{consumer}", "agent.events.consume", "rl.agent_runtime"},
 		"pollAgentEvents":  {"GET /api/v1/agents/me/consumers/{consumer}/events", "agent.events.consume", "rl.agent_runtime"},

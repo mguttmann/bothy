@@ -510,6 +510,7 @@ make sure that clients clear their cache and runs end (R-AZ-15).
 | `agent.hosted.list` | list the agents whose `hosted_by` is the calling runner ([26-builtin-agents.md](26-builtin-agents.md) 3.2, A1-03) | agent | agent-self (a runner reporting `hosts_agents`) | no | no | no | no | `rl.agent_runtime` |
 | `agent.hosted_token.issue` | issue a token for a hosted agent, bound to the caller's DPoP key ([26-builtin-agents.md](26-builtin-agents.md) 3.3, A1-03) | agent | agent-self of the runner named in `hosted_by` of the target | no | no | yes | no | `rl.agent_runtime` |
 | `agent.interview` | send the interview so far to the builder agent and return its questions or draft ([26-builtin-agents.md](26-builtin-agents.md) 6.1) | instance | owner | yes | no | yes | no | `rl.trigger` |
+| `agent.templates.read` | list the shipped and private templates ([26-builtin-agents.md](26-builtin-agents.md) 7.2) | instance | owner | yes | no | no | no | `rl.read` |
 | `command.read` | see the command list and options (built-in commands, those of the operator, of allowed guests and of apps with `write`) | channel | read | no | no | no | no | `rl.read` |
 | `command.register` | register or change a command; it may apply only to targets that its owner operates or on which the owner has `write` | command | agent-self or app-self with scope | no | no | yes | no | `rl.admin` |
 | `command.remove` | remove a command | command | agent-self or app-self with scope | no | no | yes | no | `rl.admin` |

@@ -138,11 +138,14 @@ GATE_COMPONENT_INPUTS: dict[str, tuple[str, ...]] = {
 # configuration mkdocs.yml feed only the docs gates and the tools tests, which run on every
 # change: a pull request of only those runs no conditional job.
 GATE_COMPONENT_INPUT_PREFIXES: dict[str, tuple[str, ...]] = {
+    # The server embeds a copy of the shipped agent templates that `go generate` writes and
+    # codegen-check holds equal (docs/spec/26-builtin-agents.md 7.2, A1-06).
     "server": (
         "tools/observability/",
         "infra/observability/slo/",
         "docs/spec/",
         "docs/operations/",
+        "templates/agents/",
     ),
     "apps": ("tools/observability/", "infra/observability/slo/", "docs/spec/"),
     # The panel plugin imports the TypeScript tokens and bundles their fonts (M7-24, M7-25). The
@@ -196,6 +199,8 @@ TOOL_COMPONENTS: dict[str, tuple[str, ...]] = {
     "tools/sonarqube/": (),
     # The test of services/server/internal/platform/pg/pgtest reads the image pin of this file.
     "tools/sonarqube/compose.yaml": ("server",),
+    # The template gate runs in the repository-wide job gates on every change (A1-06).
+    "tools/templates/": (),
     "tools/testing/": (),
     "tools/README.md": (),
 }

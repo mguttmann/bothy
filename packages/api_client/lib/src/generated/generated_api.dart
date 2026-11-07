@@ -103,6 +103,8 @@ export 'package:api_client/src/generated/model/agent_session_changed_event.dart'
 export 'package:api_client/src/generated/model/agent_session_changed_payload.dart';
 export 'package:api_client/src/generated/model/agent_session_list.dart';
 export 'package:api_client/src/generated/model/agent_session_report.dart';
+export 'package:api_client/src/generated/model/agent_template.dart';
+export 'package:api_client/src/generated/model/agent_template_list.dart';
 export 'package:api_client/src/generated/model/agent_triggerers.dart';
 export 'package:api_client/src/generated/model/agent_update.dart';
 export 'package:api_client/src/generated/model/agent_updated_event.dart';

@@ -51,6 +51,13 @@ type ClientInterface interface {
 	// Corresponds with POST /agent-interview-requests/{request_id}/answer (the `AnswerAgentInterview` operationId).
 	AnswerAgentInterview(ctx context.Context, requestId RequestIdPath, body AnswerAgentInterviewJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListAgentTemplates List the agent templates
+	//
+	// The templates for a new built-in agent (26 7): the shipped templates of `templates/agents/`, embedded in the server, then the private templates of the folder `agents.templates_dir`, each ordered by `slug`. The server reads both once at start; a private template whose slug a shipped one already has, or that fails the schema `agent_template.v1` or the rules of 26 4.3, is left out and logged with `template_slug_taken` or `template_invalid` (26 7.2). `definition` is the template as a definition draft with `origin.kind` `template`, ready for `putAgentDefinition` (26 7.1). A small unpaginated list (06, 6 point 6). Owner only.
+	//
+	// Corresponds with GET /agent-templates (the `ListAgentTemplates` operationId).
+	ListAgentTemplates(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListAgents List visible agents
 	//
 	// Corresponds with GET /agents (the `ListAgents` operationId).
@@ -4171,6 +4178,23 @@ func (c *Client) AnswerAgentInterviewWithBody(ctx context.Context, requestId Req
 // Corresponds with POST /agent-interview-requests/{request_id}/answer (the `AnswerAgentInterview` operationId).
 func (c *Client) AnswerAgentInterview(ctx context.Context, requestId RequestIdPath, body AnswerAgentInterviewJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewAnswerAgentInterviewRequest(c.Server, requestId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListAgentTemplates List the agent templates
+//
+// The templates for a new built-in agent (26 7): the shipped templates of `templates/agents/`, embedded in the server, then the private templates of the folder `agents.templates_dir`, each ordered by `slug`. The server reads both once at start; a private template whose slug a shipped one already has, or that fails the schema `agent_template.v1` or the rules of 26 4.3, is left out and logged with `template_slug_taken` or `template_invalid` (26 7.2). `definition` is the template as a definition draft with `origin.kind` `template`, ready for `putAgentDefinition` (26 7.1). A small unpaginated list (06, 6 point 6). Owner only.
+//
+// Corresponds with GET /agent-templates (the `ListAgentTemplates` operationId).
+func (c *Client) ListAgentTemplates(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListAgentTemplatesRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -13423,6 +13447,33 @@ func NewAnswerAgentInterviewRequestWithBody(server string, requestId RequestIdPa
 	return req, nil
 }
 
+// NewListAgentTemplatesRequest constructs an http.Request for the ListAgentTemplates method
+func NewListAgentTemplatesRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/agent-templates")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewListAgentsRequest constructs an http.Request for the ListAgents method
 func NewListAgentsRequest(server string, params *ListAgentsParams) (*http.Request, error) {
 	var err error
@@ -22438,104 +22489,6 @@ func NewSetImportLeadRequestWithBody(server string, importId ImportIdPath, conte
 	}
 
 	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewPauseImportRequest constructs an http.Request for the PauseImport method
-func NewPauseImportRequest(server string, importId ImportIdPath, params *PauseImportParams) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "import_id", importId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/imports/%s/pause", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
-	}
-
-	return req, nil
-}
-
-// NewStartImportRequest constructs an http.Request for the StartImport method
-func NewStartImportRequest(server string, importId ImportIdPath, params *StartImportParams) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "import_id", importId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/imports/%s/start", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
-	}
 
 	return req, nil
 }

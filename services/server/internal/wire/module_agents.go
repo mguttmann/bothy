@@ -119,6 +119,9 @@ func (s *server) startAgents(context.Context) error {
 	if err != nil {
 		return err
 	}
+	if err := ag.BindTemplates(cfg, az, s.logger()); err != nil {
+		return err
+	}
 	s.mu.Lock()
 	admin := s.authzAdmin
 	s.mu.Unlock()

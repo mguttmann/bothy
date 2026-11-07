@@ -59,6 +59,8 @@ const (
 	ActionAgentProjectFoldersRead Action = "agent.project_folders.read"
 	// ActionAgentRead is the action agent.read.
 	ActionAgentRead Action = "agent.read"
+	// ActionAgentTemplatesRead is the action agent.templates.read.
+	ActionAgentTemplatesRead Action = "agent.templates.read"
 	// ActionAgentToolClassSet is the action agent.tool_class.set.
 	ActionAgentToolClassSet Action = "agent.tool_class.set"
 	// ActionAgentTriggerersRead is the action agent.triggerers.read.
@@ -488,6 +490,7 @@ var actionByID = map[string]Action{
 	"agent.invoke":                 ActionAgentInvoke,
 	"agent.project_folders.read":   ActionAgentProjectFoldersRead,
 	"agent.read":                   ActionAgentRead,
+	"agent.templates.read":         ActionAgentTemplatesRead,
 	"agent.tool_class.set":         ActionAgentToolClassSet,
 	"agent.triggerers.read":        ActionAgentTriggerersRead,
 	"agent.update":                 ActionAgentUpdate,
@@ -716,6 +719,7 @@ var actionList = []Action{
 	ActionAgentInvoke,
 	ActionAgentProjectFoldersRead,
 	ActionAgentRead,
+	ActionAgentTemplatesRead,
 	ActionAgentToolClassSet,
 	ActionAgentTriggerersRead,
 	ActionAgentUpdate,

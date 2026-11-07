@@ -9,6 +9,8 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/agents/adapters/authzsource"
 	agentshttp "github.com/OWNER/bothy/services/server/internal/agents/adapters/httpapi"
 	agentspg "github.com/OWNER/bothy/services/server/internal/agents/adapters/postgres"
+	"github.com/OWNER/bothy/services/server/internal/agents/adapters/templatefs"
+	"github.com/OWNER/bothy/services/server/internal/agents/adapters/templates"
 	agentsapp "github.com/OWNER/bothy/services/server/internal/agents/app"
 	"github.com/OWNER/bothy/services/server/internal/authz"
 	"github.com/OWNER/bothy/services/server/internal/chat"
@@ -25,7 +27,7 @@ import (
 
 // AgentsConfig binds the keys of the agents use cases (api.page_size_default, api.page_size_max,
 // audit.reason_max_chars, the definition limits agents.definition.* and agents.mcp_stdio_runners
-// of A1-02, agents.hosted_token_ttl of A1-03).
+// of A1-02, agents.hosted_token_ttl of A1-03 and agents.templates_dir of A1-06).
 // The error names the key whose binding failed, never a value.
 func AgentsConfig(v *config.Values) (agentsapp.Config, error) {
 	var c agentsapp.Config
@@ -72,6 +74,8 @@ type Agents struct {
 	// nil until BindInterview. The gateway step binds its relay (bindInterviewRelay).
 	Interviewer       *agentsapp.Interviewer
 	InterviewHandlers *agentshttp.Interview
+	// Templates is the template catalogue (A1-06); nil until BindTemplates.
+	Templates *agentsapp.TemplateService
 }
 
 // InterviewConfigFrom binds the keys of the interview (agents.builder_agent_id,
@@ -109,6 +113,24 @@ func (ag *Agents) BindInterview(cfg agentsapp.InterviewConfig, limits agentsapp.
 		return err
 	}
 	ag.Interviewer, ag.InterviewHandlers = iv, agentshttp.NewInterview(iv)
+	return nil
+}
+
+// BindTemplates reads the shipped templates and the private ones of agents.templates_dir once
+// (docs/spec/26-builtin-agents.md 7.2) and binds listAgentTemplates, authorized by az. A private
+// template with a taken slug or one that fails is skipped and logged on log. Errors: a shipped
+// template that fails and an agents.templates_dir that is no readable folder (the start stops).
+func (ag *Agents) BindTemplates(cfg agentsapp.Config, az authorize.Authorizer, log *slog.Logger) error {
+	items, err := templatefs.Load(templates.FS(), cfg.TemplatesDir, cfg.DefinitionLimits(), log)
+	if err != nil {
+		return err
+	}
+	t, err := agentsapp.NewTemplates(az, items)
+	if err != nil {
+		return err
+	}
+	ag.Templates = t
+	ag.Handlers.WithTemplates(t)
 	return nil
 }
 

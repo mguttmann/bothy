@@ -98,6 +98,9 @@ Serializers _$serializers =
           ..add(AgentSessionReport.serializer)
           ..add(AgentSessionReportBindFailedEnum.serializer)
           ..add(AgentStatusEnum.serializer)
+          ..add(AgentTemplate.serializer)
+          ..add(AgentTemplateList.serializer)
+          ..add(AgentTemplateSource_Enum.serializer)
           ..add(AgentTriggerers.serializer)
           ..add(AgentUpdate.serializer)
           ..add(AgentUpdatedEvent.serializer)
@@ -972,6 +975,10 @@ Serializers _$serializers =
             () => ListBuilder<AgentSession>(),
           )
           ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(AgentTemplate)]),
+            () => ListBuilder<AgentTemplate>(),
+          )
+          ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(ApiToken)]),
             () => ListBuilder<ApiToken>(),
           )
@@ -1723,6 +1730,10 @@ Serializers _$serializers =
           ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(StatusIncident)]),
             () => ListBuilder<StatusIncident>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(String)]),
+            () => ListBuilder<String>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(String)]),

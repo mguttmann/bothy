@@ -485,6 +485,7 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"agents.interview.timeout":          {Kind: config.KindDuration, Default: "90s", Min: "1ms", Chapter: "26-builtin-agents.md"},
 		"agents.interview.max_turns":        {Kind: config.KindInt, Default: "12", Min: "1", Max: "64", Chapter: "26-builtin-agents.md"},
 		"agents.interview.answer_max_chars": {Kind: config.KindInt, Default: "4000", Min: "1", Max: "16000", Chapter: "26-builtin-agents.md"},
+		"agents.templates_dir":              {Kind: config.KindString, Default: "", Chapter: "26-builtin-agents.md"},
 		// M2-12
 		"agent.session_ref_max_bytes": {Kind: config.KindInt, Default: "1024", Min: "1", Max: "2048", Chapter: "09-agents.md"},
 		// A1-03

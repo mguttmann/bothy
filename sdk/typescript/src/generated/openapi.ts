@@ -3720,6 +3720,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/agent-templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the agent templates
+         * @description The templates for a new built-in agent (26 7): the shipped templates of `templates/agents/`, embedded in the server, then the private templates of the folder `agents.templates_dir`, each ordered by `slug`. The server reads both once at start; a private template whose slug a shipped one already has, or that fails the schema `agent_template.v1` or the rules of 26 4.3, is left out and logged with `template_slug_taken` or `template_invalid` (26 7.2). `definition` is the template as a definition draft with `origin.kind` `template`, ready for `putAgentDefinition` (26 7.1). A small unpaginated list (06, 6 point 6). Owner only.
+         */
+        get: operations["listAgentTemplates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/agents/{agent_id}/project-folders": {
         parameters: {
             query?: never;
@@ -12172,6 +12192,38 @@ export interface components {
         AgentDefinitionVersionPage: {
             items: components["schemas"]["AgentDefinitionVersion"][];
             next_cursor?: components["schemas"]["Cursor"];
+        };
+        /** @description One agent template (26 7.1): its catalogue entry and the template as a definition draft. A shipped template comes from `templates/agents/<slug>/` of the release, a private one from the folder `agents.templates_dir` of the installation. */
+        AgentTemplate: {
+            /**
+             * @description The folder name of the template, `^[a-z0-9][a-z0-9-]{0,63}$`; unique across shipped and private templates.
+             * @example writing-helper
+             */
+            slug: string;
+            /**
+             * @description `shipped` for a template of the release, `private` for one of `agents.templates_dir`.
+             * @enum {string}
+             */
+            source: "shipped" | "private";
+            /**
+             * @description One line for the template picker.
+             * @example Writing helper
+             */
+            name: string;
+            /** @description One line on what an agent from this template does. */
+            description: string;
+            /**
+             * @description The version of the template, `^[0-9A-Za-z][0-9A-Za-z.+-]{0,63}$`; also `definition.origin.template_version`.
+             * @example 1.0.0
+             */
+            version: string;
+            /** @description The names of the secrets the template's MCP servers name as `env:<NAME>`; the host operator provides them to the hosting runner. Names only, never a value. */
+            required_secrets: string[];
+            definition: components["schemas"]["AgentDefinition"];
+        };
+        /** @description The shipped templates by `slug`, then the private templates by `slug`. */
+        AgentTemplateList: {
+            items: components["schemas"]["AgentTemplate"][];
         };
         /** @description One page. `next_cursor` is absent on the last page. */
         AgentPage: {
@@ -21172,6 +21224,33 @@ export interface operations {
             409: components["responses"]["Conflict"];
             412: components["responses"]["PreconditionFailed"];
             428: components["responses"]["PreconditionRequired"];
+            429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
+    listAgentTemplates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK. */
+            200: {
+                headers: {
+                    "Correlation-Id": components["headers"]["Correlation-Id"];
+                    RateLimit: components["headers"]["RateLimit"];
+                    "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentTemplateList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             429: components["responses"]["TooManyRequests"];
             default: components["responses"]["Error"];
         };

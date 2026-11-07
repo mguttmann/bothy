@@ -139,7 +139,7 @@ modules:
               agent.billing_mode.set, agent.billing_mode.set_all, agent.credential_holder.set,
               agent.tool_class.set, agent.heartbeat, agent.events.consume, agent.triggerers.read,
               agent.project_folders.read, agent.definition.read, agent.host.set, agent.hosted.list,
-              agent.hosted_token.issue, agent.interview, agent.interview.respond,
+              agent.hosted_token.issue, agent.interview, agent.interview.respond, agent.templates.read,
               agent_session.read, agent_session.reset, agent_session.bind, agent_session.report,
               command.read, command.register, command.remove, dev_environment.read,
               dev_environment.manage, dev_environment.report]
@@ -150,7 +150,7 @@ modules:
     ephemeral_events: [agent.presence_changed, agent.interview_requested]
     ws_ops: [ack]
     depends_on: [identity, authz, chat]
-    adapter_vendors: [otel, pgx]   # sqlc code and the repository (M1-51); adapters/otelmetrics observes the presence gauges (M2-20)
+    adapter_vendors: [otel, pgx, yaml]   # sqlc code and the repository (M1-51); adapters/otelmetrics observes the presence gauges (M2-20); adapters/templatefs reads template.yaml (A1-06)
   files:
     tables: [files, file_upload_sessions, file_upload_parts, file_thumbnails, message_attachments,
              file_text_extracts]

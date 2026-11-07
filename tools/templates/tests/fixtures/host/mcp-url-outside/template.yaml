@@ -1,0 +1,10 @@
+name: Fixture
+description: A fixture template of the template gate.
+version: 1.0.0
+tool_class_wish: scoped
+mcp_servers:
+  - name: docs
+    transport: http
+    url: https://docs.test/mcp
+skills:
+  - note

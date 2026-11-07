@@ -28,6 +28,9 @@ type ServerInterface interface {
 	// AnswerAgentInterview Answer an interview request
 	// (POST /agent-interview-requests/{request_id}/answer)
 	AnswerAgentInterview(w http.ResponseWriter, r *http.Request, requestId RequestIdPath)
+	// ListAgentTemplates List the agent templates
+	// (GET /agent-templates)
+	ListAgentTemplates(w http.ResponseWriter, r *http.Request)
 	// ListAgents List visible agents
 	// (GET /agents)
 	ListAgents(w http.ResponseWriter, r *http.Request, params ListAgentsParams)
@@ -1192,6 +1195,20 @@ func (siw *ServerInterfaceWrapper) AnswerAgentInterview(w http.ResponseWriter, r
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.AnswerAgentInterview(w, r, requestId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAgentTemplates operation middleware
+func (siw *ServerInterfaceWrapper) ListAgentTemplates(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAgentTemplates(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -15017,6 +15034,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/agents/{agent_id}/definition", wrapper.PutAgentDefinition)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents/{agent_id}/definition/versions", wrapper.ListAgentDefinitionVersions)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/agents/{agent_id}/host", wrapper.SetAgentHost)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agent-templates", wrapper.ListAgentTemplates)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents/{agent_id}/project-folders", wrapper.ListAgentProjectFolders)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents/{agent_id}/webhooks", wrapper.ListAgentWebhookSubscriptions)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/agents/{agent_id}/webhooks", wrapper.CreateAgentWebhookSubscription)
@@ -15312,6 +15330,9 @@ type StrictServerInterface interface {
 	// AnswerAgentInterview Answer an interview request
 	// (POST /agent-interview-requests/{request_id}/answer)
 	AnswerAgentInterview(ctx context.Context, request AnswerAgentInterviewRequestObject) (AnswerAgentInterviewResponseObject, error)
+	// ListAgentTemplates List the agent templates
+	// (GET /agent-templates)
+	ListAgentTemplates(ctx context.Context, request ListAgentTemplatesRequestObject) (ListAgentTemplatesResponseObject, error)
 	// ListAgents List visible agents
 	// (GET /agents)
 	ListAgents(ctx context.Context, request ListAgentsRequestObject) (ListAgentsResponseObject, error)
@@ -16436,6 +16457,30 @@ func (sh *strictHandler) AnswerAgentInterview(w http.ResponseWriter, r *http.Req
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(AnswerAgentInterviewResponseObject); ok {
 		if err := validResponse.VisitAnswerAgentInterviewResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListAgentTemplates operation middleware
+func (sh *strictHandler) ListAgentTemplates(w http.ResponseWriter, r *http.Request) {
+	var request ListAgentTemplatesRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListAgentTemplates(ctx, request.(ListAgentTemplatesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListAgentTemplates")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListAgentTemplatesResponseObject); ok {
+		if err := validResponse.VisitListAgentTemplatesResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
