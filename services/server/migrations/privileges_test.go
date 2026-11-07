@@ -206,6 +206,10 @@ var appPrivileges = map[string][]string{
 	// M2-10).
 	"runs":      {"SELECT", "INSERT", "UPDATE"},
 	"run_steps": {"SELECT", "INSERT", "UPDATE", "DELETE"},
+	// 03 run_wakes and run_autonomy (AR-04): a wake-up ends with a state, never with a delete, and
+	// a count is reset by an update; both go with their thread (ON DELETE CASCADE).
+	"run_wakes":    {"SELECT", "INSERT", "UPDATE"},
+	"run_autonomy": {"SELECT", "INSERT", "UPDATE"},
 	// 03 message_components and interactions (M2-15): runs deletes the components of a deleted
 	// message (its tombstone keeps the row, so the cascade never fires); interactions go only with
 	// their component or message (cascade).
