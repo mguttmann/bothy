@@ -67,6 +67,12 @@ Only the location and the line of the rule, never the match; matches in paths ar
 `--reveal` shows the match (only locally, never in CI). Exit codes: 0 clean, 1 findings,
 2 configuration error (missing list, broken expression).
 
+`--summary FILE` (or `BOTHY_DENYLIST_SUMMARY`) also writes a JSON summary: exit code, number
+of findings per kind and the masked locations without column, rule or match. The workflow
+`denylist-main.yml` puts it into the issue of a red run (`main_alert.py`); `main_range.py`
+picks the commits that workflow scans (docs/quality/push-discipline.md, section "Deny-list hit
+on `main`").
+
 ## Fixing
 
 * Match in the current state: replace the term (example domains example.com, people

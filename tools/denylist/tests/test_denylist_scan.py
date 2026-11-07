@@ -7,6 +7,7 @@ tools/denylist/testdata/example-denylist.txt (invented, neutral words).
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import denylist_scan as ds
@@ -26,6 +27,7 @@ def _isolated_environment(monkeypatch: pytest.MonkeyPatch) -> None:
         "BOTHY_DENYLIST_FILE",
         "BOTHY_DENYLIST_ALLOW_AUTHORS",
         "BOTHY_DENYLIST_NAMES",
+        "BOTHY_DENYLIST_SUMMARY",
         "PR_TITLE",
         "PR_BODY",
         "PR_BODY_FILE",
@@ -619,3 +621,79 @@ def test_identity_trailer_address_does_not_hide_text(
 def test_record_separators_in_a_message_do_not_hide_text(repo: Path) -> None:
     commit(repo, "feat: x\n\n\x1e\x1fglobex.test")
     assert any(f.rule.source == "private" for f in run(repo).findings)
+
+
+# --- summary for the issue of denylist-main.yml -------------------------------
+
+
+def summary_of(repo: Path, tmp_path: Path, *extra: str) -> tuple[int, dict[str, object]]:
+    out = tmp_path / "summary.json"
+    rc = ds.main(
+        [
+            "--repo",
+            str(repo),
+            "--list",
+            str(EXAMPLE_LIST),
+            "--generic",
+            str(GENERIC),
+            "--summary",
+            str(out),
+            *extra,
+        ]
+    )
+    return rc, json.loads(out.read_text(encoding="utf-8"))
+
+
+def test_summary_names_counts_and_locations_never_terms(repo: Path, tmp_path: Path) -> None:
+    (repo / "a.md").write_text("ok\nsee acme-widgets\n")
+    (repo / "acme-widgets-notes.md").write_text("clean\n")
+    commit(repo, "docs: about globex.test")
+    sha = git(repo, "rev-parse", "HEAD").strip()[:12]
+    rc, summary = summary_of(repo, tmp_path, "--range", "HEAD~1..HEAD")
+    assert rc == 1
+    assert summary["exit"] == 1
+    assert summary["findings"] == 3
+    assert summary["kinds"] == {"commit-message": 1, "content": 1, "path": 1}
+    assert summary["locations"] == [
+        "a.md:2",
+        "path ************-notes.md",
+        f"commit {sha} message:1",
+    ]
+    text = json.dumps(summary).lower()
+    for term in ("acme", "globex", "rule", "line 5"):
+        assert term not in text
+
+
+def test_summary_of_a_clean_scan(repo: Path, tmp_path: Path) -> None:
+    rc, summary = summary_of(repo, tmp_path)
+    assert rc == 0
+    assert summary == {"exit": 0, "findings": 0, "kinds": {}, "locations": [], "truncated": 0}
+
+
+def test_summary_is_capped_and_deduplicated(repo: Path, tmp_path: Path) -> None:
+    lines = "".join("acme-widgets acme-widgets\n" for _ in range(ds.SUMMARY_LOCATIONS + 5))
+    (repo / "a.md").write_text(lines)
+    commit(repo, "docs: a")
+    rc, summary = summary_of(repo, tmp_path)
+    assert rc == 1
+    assert summary["findings"] == 2 * (ds.SUMMARY_LOCATIONS + 5)
+    assert len(summary["locations"]) == ds.SUMMARY_LOCATIONS
+    assert summary["truncated"] == 5
+
+
+def test_summary_of_a_configuration_error(
+    repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    out = tmp_path / "summary.json"
+    monkeypatch.setenv("BOTHY_DENYLIST_SUMMARY", str(out))
+    rc = ds.main(["--repo", str(repo), "--generic", str(GENERIC)])
+    assert rc == 2
+    summary = json.loads(out.read_text(encoding="utf-8"))
+    assert summary == {
+        "exit": 2,
+        "error": "configuration",
+        "findings": 0,
+        "kinds": {},
+        "locations": [],
+        "truncated": 0,
+    }
