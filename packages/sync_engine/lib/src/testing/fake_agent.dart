@@ -32,6 +32,8 @@ final class FakeAgent {
     this.adapterKind = 'hermes',
     this.toolClass = 'chat',
     this.description = '',
+    this.hostsAgents,
+    this.hostedBy,
   });
 
   /// The principal ID (the ID of the `FakePerson` of kind `agent`).
@@ -67,6 +69,19 @@ final class FakeAgent {
 
   /// The description of the agent card.
   String description;
+
+  /// The capability `hosts_agents` of a Claude Code runner's last heartbeat: the highest tool
+  /// class it loads for a hosted agent (`chat`, `scoped`, `host`), or null when it hosts none
+  /// (26 3.1, A1-03b). `getAgent` and `listAgents` show it to owners only.
+  String? hostsAgents;
+
+  /// The runner that hosts this built-in agent (`hosted_by`, 26 3.1), or null for every other
+  /// agent.
+  String? hostedBy;
+
+  /// The stored versions of the definition of a built-in agent (`agent_definition.v1`, 26 4.1),
+  /// oldest first; version `n` is at index `n - 1`. Empty while the agent is "not set up".
+  final List<Map<String, Object?>> definitions = [];
 
   /// The version of the agent row; every change of the configured values raises it, and
   /// `If-Match` compares against it.

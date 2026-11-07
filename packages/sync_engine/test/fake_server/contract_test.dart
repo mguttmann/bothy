@@ -946,6 +946,68 @@ void main() {
     await deleteSpaces.deleteSpace(spaceId: w.space);
     await deleteSpaces.restoreSpace(spaceId: w.space);
 
+    // A1-08: the built-in agent operations of "New agent" (26 8.2).
+    final hostRunner = h.server.world.addAgent(
+      handle: 'contract-runner',
+      displayName: 'Contract runner',
+      adapterKind: 'code_runner',
+      hostsAgents: 'host',
+    );
+    final builtin = api.getAgentsApi();
+    await builtin.listAgentTemplates();
+    await builtin.interviewAgent(
+      agentInterviewRequest: AgentInterviewRequest((b) => b.turns.clear()),
+    );
+    final hosted = (await builtin.createAgent(
+      idempotencyKey: h.server.world.nextId(),
+      agentCreate: AgentCreate(
+        (b) => b
+          ..handle = 'contract-notes'
+          ..displayName = 'Notes'
+          ..adapterKind = 'claude_agent'
+          ..hostedBy = hostRunner.id,
+      ),
+    )).data!;
+    final raised = (await builtin.setAgentToolClass(
+      agentId: hosted.id,
+      ifMatch: '"${hosted.version}"',
+      toolClassSet: ToolClassSet(
+        (b) => b
+          ..toolClass = ToolClass.scoped
+          ..reason = 'New agent',
+      ),
+    )).data!;
+    expect(raised.toolClass, ToolClass.scoped);
+    await builtin.putAgentDefinition(
+      agentId: hosted.id,
+      agentDefinition: AgentDefinition(
+        (b) => b
+          ..instructions = 'Keep notes.'
+          ..settings.toolClassWish = ToolClass.scoped
+          ..origin.kind = AgentDefinitionOriginKindEnum.manual,
+      ),
+    );
+    await builtin.getAgentDefinition(agentId: hosted.id);
+    final hostedChannel = (await api.getChannelsApi().createChannel(
+      spaceId: w.space,
+      idempotencyKey: h.server.world.nextId(),
+      channelCreate: ChannelCreate(
+        (b) => b
+          ..kind = ChannelCreateKindEnum.text
+          ..name = 'contract-notes',
+      ),
+    )).data!;
+    await api.getChannelsApi().setChannelOperator(
+      channelId: hostedChannel.id,
+      ifMatch: '"${hostedChannel.version}"',
+      operatorSet: OperatorSet(
+        (b) => b
+          ..mode = OperatorMode.agent
+          ..agentId = hosted.id
+          ..reason = 'New agent',
+      ),
+    );
+
     // M5-06: the child session of the Share Extension (08 7.4).
     await api.getDevicesApi().createExtensionSession(
       extensionSessionCreate: ExtensionSessionCreate(
