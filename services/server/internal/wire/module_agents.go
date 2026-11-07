@@ -133,7 +133,7 @@ func (s *server) startAgents(context.Context) error {
 		return err
 	}
 	if err := ag.BindInterview(icfg, cfg, InterviewDeps{UoW: a.UoW(), Authorizer: az, Audit: a.Recorder(), Clock: s.deps.Clock,
-		Log: s.logger()}); err != nil {
+		Log: s.logger(), Catalogue: ag.Templates}); err != nil {
 		return err
 	}
 	pcfg, err := PresenceConfigFrom(s.values)

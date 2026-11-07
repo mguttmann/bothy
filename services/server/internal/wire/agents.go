@@ -96,8 +96,8 @@ type InterviewDeps struct {
 	Audit      auditing.Recorder
 	Clock      clock.Clock
 	Log        *slog.Logger
-	// Catalogue is the template catalogue of 26 7.4; nil until the templates of A1-06 exist, which
-	// sends an empty catalogue.
+	// Catalogue is the template catalogue of 26 7.4: the start passes the templates of
+	// BindTemplates (A1-06); nil sends an empty catalogue, so every drafted MCP server is refused.
 	Catalogue agentsapp.CatalogueSource
 }
 

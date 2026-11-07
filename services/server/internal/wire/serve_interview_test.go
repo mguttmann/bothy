@@ -162,3 +162,71 @@ func TestInterviewThroughTheGateway(t *testing.T) {
 		t.Fatalf("interviewAgent = %d %s", got.code, got.body)
 	}
 }
+
+// searchTokenRef is the secret reference of the shipped template research-summarizer.
+const searchTokenRef = "env:SEARCH_MCP_TOKEN" //nolint:gosec // G101: a secret reference, no secret
+
+// TestInterviewDraftUsesTheTemplateCatalogue: the server sends the catalogue of the shipped
+// templates (A1-06) with agent.interview_requested and checks a draft against it (26 7.4): a
+// drafted MCP server equal to the one of the shipped template research-summarizer except its name
+// passes, a server the catalogue does not hold comes back as mcp_not_in_catalogue.
+func TestInterviewDraftUsesTheTemplateCatalogue(t *testing.T) {
+	builderID := ids.New()
+	w := newACWorld(t, "BOTHY_AGENTS__BUILDER_AGENT_ID="+builderID.String(),
+		"BOTHY_AGENTS__INTERVIEW__TIMEOUT="+strconv.FormatInt((testkit.Patience/2).Milliseconds(), 10)+"ms")
+	w.sql(`INSERT INTO principals (id, kind, status, handle, display_name) VALUES ($1, 'agent', 'active', 'builder', 'Builder')`, builderID.String())
+	w.sql(`INSERT INTO agents (principal_id, adapter_kind) VALUES ($1, 'code_runner')`, builderID.String())
+	key, _ := identitytest.NewDeviceKey(jose.AlgES256)
+	builder := consumerAgent{id: builderID, tok: w.agentToken(builderID, key, time.Now().Add(time.Hour)), key: key}
+	c := w.connectAs(t, builder, "default")
+
+	turns := []any{map[string]any{"role": "owner", "text": "Summarize what sources say"}}
+	draftWith := func(url string) map[string]any {
+		return map[string]any{"kind": "draft", "draft": map[string]any{
+			"instructions": "Summarize the sources.", "skills": []any{},
+			"mcp_servers": []any{map[string]any{"name": "web-search", "transport": "http", "url": url,
+				"headers": []any{map[string]any{"name": "Authorization", "secret_ref": searchTokenRef}}}},
+			"settings": map[string]any{"tool_class_wish": "scoped"}, "origin": map[string]any{"kind": "interview"},
+			"name": "Research helper", "handle": "research-helper", "description": "Summarizes sources",
+		}}
+	}
+	for _, tc := range []struct {
+		name, url string
+		errors    []string
+	}{
+		{"catalogue server", "https://search.example.com/mcp", nil},
+		{"unknown server", "https://other.example.com/mcp", []string{"mcp_not_in_catalogue"}},
+	} {
+		out := make(chan acReply, 1)
+		go func() {
+			out <- w.rawRequest(&w.owner, nil, "/api/v1/agents/interview", map[string]any{"turns": turns, "want_draft": true})
+		}()
+		f, ok := nextInterview(t, c)
+		if !ok {
+			t.Fatalf("%s: the builder got no agent.interview_requested", tc.name)
+		}
+		if !strings.Contains(f.raw, `"slug":"research-summarizer"`) || !strings.Contains(f.raw, `"url":"https://search.example.com/mcp"`) {
+			t.Fatalf("%s: the frame carries no template catalogue: %s", tc.name, f.raw)
+		}
+		path := "/api/v1/agent-interview-requests/" + f.Payload.RequestID + "/answer"
+		if r := w.rawRequest(nil, &builder, path, draftWith(tc.url)); r.code != http.StatusNoContent {
+			t.Fatalf("%s: answer = %d %s", tc.name, r.code, r.body)
+		}
+		got := w.got(out)
+		var res struct {
+			Outcome string `json:"outcome"`
+			Errors  []struct {
+				Pointer string `json:"pointer"`
+				Code    string `json:"code"`
+			} `json:"errors"`
+		}
+		if got.code != http.StatusOK || json.Unmarshal(got.body, &res) != nil || res.Outcome != "draft" || len(res.Errors) != len(tc.errors) {
+			t.Fatalf("%s: interviewAgent = %d %s", tc.name, got.code, got.body)
+		}
+		for i, code := range tc.errors {
+			if res.Errors[i].Code != code || res.Errors[i].Pointer != "/mcp_servers/0" {
+				t.Fatalf("%s: errors %s", tc.name, got.body)
+			}
+		}
+	}
+}
