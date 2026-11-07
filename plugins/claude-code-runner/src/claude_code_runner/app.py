@@ -91,6 +91,12 @@ from claude_code_runner.environment import (
     find_program,
     kept_environment,
 )
+from claude_code_runner.handover import (
+    hand_over,
+    remove_pid_file,
+    stop_turns_requested,
+    write_pid_file,
+)
 from claude_code_runner.heartbeat import (
     MIN_CLAUDE_CODE_VERSION,
     WAIT_SLOTS_FULL,
@@ -104,6 +110,7 @@ from claude_code_runner.heartbeat import (
     runtime_status,
 )
 from claude_code_runner.hosting import HostedAgents, HostingContext
+from claude_code_runner.launch import KeeperGroup, LaunchFiles, read_json, remove_launch_files
 from claude_code_runner.locks import LockTimeout, SlotPool, acquire, release
 from claude_code_runner.materialize import sweep_turn_files
 from claude_code_runner.provision import Provisioner
@@ -115,7 +122,7 @@ from claude_code_runner.statedir import ensure_private_dir, sweep
 from claude_code_runner.stop import stop_group
 from claude_code_runner.transcribe import Transcriber
 from claude_code_runner.trash import FolderTrash, GitRunner, TrashPlaces
-from claude_code_runner.turn import remove_turn_record
+from claude_code_runner.turn import remove_turn_record, write_turn_record
 from claude_code_runner.workspace import (
     WorkspaceError,
     default_readiness,
@@ -245,6 +252,12 @@ class RunnerHandler(AgentHandler):
             has_key_ref=config.anthropic_api_key_ref is not None,
             allow_personal=config.allow_personal,
         )
+        self.turn_handover = config.turn_handover
+        """``runner.turn_handover``: turns run under a keeper and are handed over (18.19)."""
+        self.handing_over = False
+        """SIGTERM began a handover: live turns are left running with their records (18.19.3)."""
+        self.stopping_all = False
+        """``stop --turns``: every adopted turn is stopped and its run finished ``cancelled``."""
 
     # ---- answers to the SDK ---------------------------------------------------------------
 
@@ -359,7 +372,7 @@ class RunnerHandler(AgentHandler):
             await asyncio.sleep(self.config.poll_interval)
         return True
 
-    async def stop_turns(self) -> bool:
+    async def stop_turns(self, *, adopted: bool = False) -> bool:
         """An orderly stop of the runner: stop every own turn and wait until its run ended.
 
         Each turn of this process with a live process is stopped as in 18.6 with the reason
@@ -367,8 +380,11 @@ class RunnerHandler(AgentHandler):
         left (D-AR-1). A run between processes (an answer being posted, a recovery being
         prepared) is left to the SDK's cancellation, which stops a process it started meanwhile
         (`RunTurn.run`). Adopted turns keep running and keep their records for the next start
-        (18.9); a run that has no turn yet is started again from the inbox by the next process
-        (09 4.9).
+        (18.9), unless ``adopted`` (``stop --turns``, 18.19.3); a run that has no turn yet is
+        started again from the inbox by the next process (09 4.9).
+
+        Args:
+            adopted: Stop the adopted turns too and wait for their runs.
 
         Returns:
             True once none of these runs is left; false when one still runs after
@@ -379,6 +395,8 @@ class RunnerHandler(AgentHandler):
             for s in self._runs.values()
             if s.turn is not None and s.turn.process is not None
         ]
+        if adopted:
+            stopping += list(self.adopted.items())
         for _, turn in stopping:
             await turn.request_stop(ADAPTER_STOPPED)
         loop = asyncio.get_running_loop()
@@ -388,7 +406,7 @@ class RunnerHandler(AgentHandler):
             + self.config.kill_grace
             + self.config.cli_probe_timeout
         )
-        while any(run_id in self._runs for run_id, _ in stopping):
+        while any(run_id in self._runs or run_id in self.adopted for run_id, _ in stopping):
             if loop.time() >= deadline:
                 return False
             await asyncio.sleep(self.config.poll_interval)
@@ -502,6 +520,10 @@ class RunnerHandler(AgentHandler):
         """
         state = self._runs.get(run.run_id)
         message_id = getattr(inv.payload, "message_id", "")
+        adopted = self.adopted.get(run.run_id)
+        if state is None and adopted is not None and adopted.takes_followups():
+            await adopted.offer_followup(inv)  # adoption with full rights (18.19.7)
+            return
         if state is None:
             log("followup_not_deliverable", run_id=run.run_id, message_id=message_id)
             return
@@ -511,6 +533,21 @@ class RunnerHandler(AgentHandler):
             log("followup_held", run_id=run.run_id, message_id=message_id)
             return
         await state.turn.offer_followup(inv)
+
+    def adopted_run(self, run_id: UUID) -> RunHandle | None:
+        """The handle of a turn adopted with full rights, for its follow-ups (18.19.7).
+
+        Args:
+            run_id: The run of a follow-up.
+
+        Returns:
+            The handle while the adopted turn takes follow-ups, else ``None`` (the follow-up
+            stays ``queued`` and the server defers it).
+        """
+        turn = self.adopted.get(run_id)
+        if turn is None or not turn.takes_followups():
+            return None
+        return turn.handle
 
     async def on_cancel(self, run: RunHandle, reason: str) -> None:
         """Stop the turn of a started run; it finishes ``cancelled`` once its group is gone.
@@ -560,6 +597,9 @@ class RunnerHandler(AgentHandler):
         self, adapter: Adapter, path: Path, record: dict[str, Any], run_id: UUID, thread_id: UUID
     ) -> None:
         ids = {"run_id": run_id, "thread_id": thread_id}
+        if self.turn_handover and "phase" in record:
+            await self._adopt_handover(adapter, path, record, run_id, thread_id)
+            return
         timeout = self.config.cli_probe_timeout
         alive = process_matches(record, timeout)
         held: list[int] = []
@@ -638,6 +678,8 @@ class RunnerHandler(AgentHandler):
             with adapter.client.bind_run(run_id, token):
                 await turn.adopted(record, group, known)
             return
+        if self.stopping_all:
+            turn.stop_reason = ADAPTER_STOPPED  # stop --turns: stopped as in 18.6 at once
         self.adopted[run_id] = turn
         task = asyncio.ensure_future(
             self._follow_adopted(adapter, turn, record, group, token, known)
@@ -660,6 +702,96 @@ class RunnerHandler(AgentHandler):
                 await turn.adopted(record, group, known)
         finally:
             self.adopted.pop(run_id, None)
+            adapter.client.release_run(run_id)
+
+    async def _adopt_handover(
+        self, adapter: Adapter, path: Path, record: dict[str, Any], run_id: UUID, thread_id: UUID
+    ) -> None:
+        """A record written with ``runner.turn_handover``, by its phase (09 18.19.6).
+
+        ``preparing`` and ``waiting_lock``: the record is removed; the inbox restart of 4.9
+        prepares the run again. Every other phase is continued by `RunTurn.take_over` while the
+        server shows the run ``running``; a live turn of a run the server already ended is
+        stopped as in 18.6 without a finish.
+        """
+        ids = {"run_id": run_id, "thread_id": thread_id}
+        phase = str(record.get("phase"))
+        if phase in ("preparing", "waiting_lock"):
+            remove_turn_record(path)
+            log("turn_adopted", action="restart_from_inbox", phase=phase, **ids)
+            return
+        token = await _newest_token(adapter, run_id)
+        try:
+            with adapter.client.unbound():
+                run = await adapter.client.call_as(Run, get_run.asyncio_detailed, run_id=run_id)
+        except (ProblemError, httpx.TransportError) as err:
+            log("adoption_run_unreadable", code=getattr(err, "code", "transport_error"), **ids)
+            run = None
+        if token is None or run is None or str(run.state.value) != "running":
+            await self._end_unowned(path, record, ids)
+            return
+        log("turn_adopted", action="take_over", phase=phase, **ids)
+        handle = RunHandle(
+            adapter.client, run_id, thread_id, outbox=adapter.outbox, settings=self.config.sdk
+        )
+        handle.started(run, stored_claims(token).jti)
+        state = _state_of(record, run_id, thread_id, run.channel_id)
+        cached = self.channels.get(run.channel_id) if self.channels is not None else None
+        state.channel_prompt = cached.behavior.prompt if cached is not None else ""
+        turn = RunTurn(self, state, handle)
+        if self.stopping_all:
+            turn.stop_reason = ADAPTER_STOPPED  # stop --turns: stopped as in 18.6
+        known = {
+            key: str(step.status.value) for key, step in run.steps.additional_properties.items()
+        }
+        self.adopted[run_id] = turn
+        task = asyncio.ensure_future(self._take_over(adapter, turn, record, token, known))
+        self._adopting.add(task)
+        task.add_done_callback(self._adopting.discard)
+
+    async def _end_unowned(
+        self, path: Path, record: Mapping[str, Any], ids: Mapping[str, Any]
+    ) -> None:
+        """A record whose run the server ended (or cannot show): stop a live turn, no finish."""
+        prefix = (record.get("launch") or {}).get("prefix")
+        keeper = record.get("keeper")
+        if isinstance(prefix, str) and isinstance(keeper, Mapping):
+            group = KeeperGroup(
+                LaunchFiles(Path(prefix)),
+                keeper=keeper,
+                cli=record.get("cli") or read_json(LaunchFiles(Path(prefix)).cli) or {},
+                session_ref=str(record.get("session_ref")),
+                timeout=self.config.cli_probe_timeout,
+            )
+            if group.may_signal():
+                log("turn_adopted", action="stop", **ids)
+                await stop_group(
+                    group,
+                    self.config.stop_grace,
+                    self.config.kill_grace,
+                    self.config.poll_interval,
+                    ids,
+                )
+        else:
+            log("turn_adopted", action="leave", **ids)
+        remove_turn_record(path)
+        remove_launch_files(self.config.state_dir, str(ids["run_id"]))
+
+    async def _take_over(
+        self,
+        adapter: Adapter,
+        turn: RunTurn,
+        record: dict[str, Any],
+        token: Secret,
+        known: Mapping[str, str],
+    ) -> None:
+        run_id = turn.handle.run_id
+        try:
+            with adapter.client.bind_run(run_id, token):
+                await turn.take_over(record, known)
+        finally:
+            self.adopted.pop(run_id, None)
+            turn.state.close()  # the locks an adopter took before a launch
             adapter.client.release_run(run_id)
 
     async def _cancel_adopted(self, envelope: Envelope) -> None:
@@ -847,6 +979,7 @@ class RunnerHandler(AgentHandler):
         state = RunState(run.run_id, payload.thread_id, payload.channel_id)
         self._runs[run.run_id] = state
         ids = {"run_id": run.run_id, "thread_id": state.thread_id, "channel_id": state.channel_id}
+        self._phase(state, "preparing")  # with the key: written when the run is accepted
         if str(payload.trigger_kind) != "message":
             refuse("trigger_kind_unsupported", "adapter_error", ids)
         binding = await self._binding(payload)
@@ -955,17 +1088,41 @@ class RunnerHandler(AgentHandler):
                             locks / f"{name}.lock",
                             self.config.session_lock_wait,
                             self.config.poll_interval,
-                            on_busy=lambda: self._wait(run_id, WAIT_THREAD_BUSY),
+                            on_busy=lambda: self._lock_wait(state),
                         )
                     )
             except LockTimeout:
                 refuse("session_busy", "adapter_error", ids)
+            self._phase(state, "preparing")
             if self.slots.full:
                 self._wait(run_id, WAIT_SLOTS_FULL)
             await self.slots.acquire()
             state.slot = self.slots
         finally:
             self._wait(run_id, None)
+
+    def _lock_wait(self, state: RunState) -> None:
+        """A ``thread_busy`` or ``session_busy`` wait: reported, and phase ``waiting_lock``."""
+        self._wait(state.run_id, WAIT_THREAD_BUSY)
+        self._phase(state, "waiting_lock")
+
+    def _phase(self, state: RunState, phase: str) -> None:
+        """With ``runner.turn_handover`` the record carries the phase before ``run.start``.
+
+        ``preparing`` and ``waiting_lock`` lie before ``run.start`` (4.9): a next runner removes
+        such a record and the inbox restart prepares the run again (09 18.19.6).
+        """
+        if not self.turn_handover:
+            return
+        write_turn_record(
+            self.config.state_dir / "turns" / f"{state.run_id}.json",
+            {
+                "run_id": str(state.run_id),
+                "thread_id": str(state.thread_id),
+                "channel_id": str(state.channel_id),
+                "phase": phase,
+            },
+        )
 
     async def _context(self, run: RunHandle, ids: Mapping[str, Any]) -> RunContext:
         try:
@@ -1053,6 +1210,10 @@ class RunnerHandler(AgentHandler):
         if state is not None:
             state.close()
             remove_run_files(self.config.state_dir, state.run_id)
+            if self.turn_handover and not self.handing_over:
+                # A handover leaves the record of a run in prepare to the next runner, which
+                # removes it and starts the run again from the inbox (18.19.6).
+                remove_turn_record(self.config.state_dir / "turns" / f"{state.run_id}.json")
 
     # ---- execute --------------------------------------------------------------------------
 
@@ -1102,6 +1263,8 @@ class Runner:
         self.http_transport = http_transport
         self.hosted_url = hosted_url
         self.adapter: Adapter | None = None
+        self.handed_over = 0
+        """The turns the last SIGTERM handed over (exit 75 when above zero, 18.19.3)."""
 
     def _credentials(self) -> Credentials:
         try:
@@ -1164,6 +1327,7 @@ class Runner:
                 hosts_agents=(
                     self.config.hosted_max_tool_class if self.config.hosted_agents else None
                 ),
+                turn_handover=self.config.turn_handover,
             ),
             settings=self.config.sdk,
         )
@@ -1233,6 +1397,8 @@ class Runner:
             The SDK's close reason.
         """
         adapter = self.adapter or await self.build()
+        if self.config.turn_handover:
+            write_pid_file(self.config.state_dir)  # for `stop --turns`
         try:
             # Before the first event of the inbox and the first heartbeat (design note 12 d).
             await self.handler.adopt_turns(adapter)
@@ -1241,16 +1407,25 @@ class Runner:
             return await adapter.run()
         finally:
             await self.handler.close()
+            if self.config.turn_handover:
+                remove_pid_file(self.config.state_dir)
 
     async def stop(self) -> None:
-        """Stop the own turns as in 18.6 (D-AR-1), then the adapter.
+        """Stop the own turns as in 18.6 (D-AR-1), then the adapter; or hand them over.
 
-        A turn is never left behind: each own turn is stopped and its run finished
-        ``cancelled`` with ``adapter_stopped`` before the SDK shuts down; a turn that starts in
-        between, or one that outlives the wait, is stopped by its run's cancellation
-        (`RunTurn.run`). Adopted turns keep running with their records (18.9).
+        Without ``runner.turn_handover`` a turn is never left behind: each own turn is stopped
+        and its run finished ``cancelled`` with ``adapter_stopped`` before the SDK shuts down; a
+        turn that starts in between, or one that outlives the wait, is stopped by its run's
+        cancellation (`RunTurn.run`). Adopted turns keep running with their records (18.9).
+
+        With the key, SIGTERM hands every live turn over (18.19.3, `hand_over`), unless
+        ``claude-code-runner stop --turns`` asked for the stop of every turn: then own and
+        adopted turns are stopped as above.
         """
-        if not await self.handler.stop_turns():
+        if self.config.turn_handover and not stop_turns_requested(self.config.state_dir):
+            self.handed_over = await hand_over(self.handler, self.adapter)
+            return
+        if not await self.handler.stop_turns(adopted=self.config.turn_handover):
             warn("stop_turns_timeout")
         if self.adapter is not None:
             await self.adapter.stop()
@@ -1275,6 +1450,33 @@ async def _newest_token(adapter: Adapter, run_id: UUID) -> Secret | None:
     entries = [e for e in await adapter.inbox.for_run(run_id) if e.token is not None]
     entries.sort(key=lambda e: e.token_iat or 0)
     return entries[-1].token if entries else None
+
+
+def _state_of(
+    record: Mapping[str, Any], run_id: UUID, thread_id: UUID, channel_id: UUID
+) -> RunState:
+    """The prepared state of a run from its record with ``runner.turn_handover`` (18.19.6).
+
+    The record carries what a next runner needs to build the command line again (model,
+    tools, billing mode, plugin folders, whether files were stored), never the environment;
+    the pre-check before a launch builds that again (18.9).
+    """
+    state = RunState(run_id, thread_id, channel_id)
+    if record.get("cwd"):
+        state.cwd = Path(str(record["cwd"]))
+    state.session = SessionChoice(str(record.get("session_ref")), resume=True, new=False)
+    state.session_mode = str(record.get("session_mode") or "resume")
+    run = record.get("run")
+    run = run if isinstance(run, Mapping) else {}
+    state.model = str(run.get("model") or "")
+    tools = run.get("tools")
+    state.tools = [str(t) for t in tools] if isinstance(tools, list) else []
+    state.mode = str(run.get("mode") or "unknown")
+    dirs = run.get("plugin_dirs")
+    state.plugin_dirs = tuple(Path(str(d)) for d in dirs) if isinstance(dirs, list) else ()
+    stored = run.get("stored_files")
+    state.stored_files = stored if isinstance(stored, int) and not isinstance(stored, bool) else 0
+    return state
 
 
 def end_in_record_or_log(record: Mapping[str, Any]) -> bool:
