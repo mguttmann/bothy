@@ -306,13 +306,14 @@ class JobRegistry:
         """
         if not _JOB_ID.fullmatch(job_id):
             raise JobError("no job ID")
-        folder = self._folder()
-        (folder / f"{job_id}.reported").unlink(missing_ok=True)
-        try:
-            (folder / f"{job_id}.json").unlink()
-        except FileNotFoundError:
-            return False
-        return True
+        # Only entries the folder lists are removed, so no name from outside forms a path.
+        names = {f"{job_id}.reported", f"{job_id}.json"}
+        found = False
+        for entry in self._folder().iterdir():
+            if entry.name in names:
+                entry.unlink(missing_ok=True)
+                found = found or entry.suffix == ".json"
+        return found
 
     def reported(self, job_id: str) -> bool:
         """Whether the adapter already posted the job as one without a run (09 17.12 point 8)."""
@@ -527,6 +528,56 @@ def _emit(value: dict[str, Any]) -> None:
     sys.stdout.write(json.dumps(value) + "\n")
 
 
+def _register(registry: JobRegistry, args: argparse.Namespace) -> int:
+    try:
+        thread = uuid.UUID(args.thread)
+    except ValueError:
+        raise JobError("the thread is no thread ID") from None
+    record = registry.register(
+        thread, args.pid, args.title, log_path=args.log, started_at=args.started_at
+    )
+    _emit({"ok": True, "job_id": record.job_id})
+    return 0
+
+
+def _stop(registry: JobRegistry, args: argparse.Namespace) -> int:
+    matching = [r for r in registry.records() if r.job_id == args.job_id]
+    stopped = bool(matching) and registry.stop(matching[0])
+    if matching:
+        registry.deregister(args.job_id)
+    _emit({"ok": stopped, "job_id": args.job_id})
+    return 0 if stopped else 1
+
+
+def _deregister(registry: JobRegistry, args: argparse.Namespace) -> int:
+    found = registry.deregister(args.job_id)
+    _emit({"ok": found, "job_id": args.job_id})
+    return 0 if found else 1
+
+
+def _list(registry: JobRegistry, _args: argparse.Namespace) -> int:
+    for record in registry.records():
+        try:
+            alive: bool | None = registry.alive(record)
+        except JobError:
+            alive = None
+        _emit(
+            {
+                "job_id": record.job_id,
+                "thread_id": str(record.thread_id),
+                "pid": record.pid,
+                "title": record.title,
+                "started_at": record.started_at,
+                "log_path": record.log_path,
+                "alive": alive,
+            }
+        )
+    return 0
+
+
+_ACTIONS: Final = {"register": _register, "stop": _stop, "deregister": _deregister, "list": _list}
+
+
 def main(argv: Sequence[str] | None = None, prog: str | None = None) -> int:
     """Run one command and print its result as JSON lines.
 
@@ -537,44 +588,7 @@ def main(argv: Sequence[str] | None = None, prog: str | None = None) -> int:
     args = build_parser(prog or "python -m bothy_hermes_adapter.jobs").parse_args(argv)
     registry = JobRegistry(jobs_dir(args.profile_home, args.platform_key))
     try:
-        if args.action == "register":
-            try:
-                thread = uuid.UUID(args.thread)
-            except ValueError:
-                raise JobError("the thread is no thread ID") from None
-            record = registry.register(
-                thread, args.pid, args.title, log_path=args.log, started_at=args.started_at
-            )
-            _emit({"ok": True, "job_id": record.job_id})
-            return 0
-        if args.action == "stop":
-            matching = [r for r in registry.records() if r.job_id == args.job_id]
-            stopped = bool(matching) and registry.stop(matching[0])
-            if matching:
-                registry.deregister(args.job_id)
-            _emit({"ok": stopped, "job_id": args.job_id})
-            return 0 if stopped else 1
-        if args.action == "deregister":
-            found = registry.deregister(args.job_id)
-            _emit({"ok": found, "job_id": args.job_id})
-            return 0 if found else 1
-        for record in registry.records():
-            try:
-                alive: bool | None = registry.alive(record)
-            except JobError:
-                alive = None
-            _emit(
-                {
-                    "job_id": record.job_id,
-                    "thread_id": str(record.thread_id),
-                    "pid": record.pid,
-                    "title": record.title,
-                    "started_at": record.started_at,
-                    "log_path": record.log_path,
-                    "alive": alive,
-                }
-            )
-        return 0
+        return _ACTIONS[args.action](registry, args)
     except (JobError, OSError) as exc:
         message = str(exc) if isinstance(exc, JobError) else type(exc).__name__
         _emit({"ok": False, "error": message})

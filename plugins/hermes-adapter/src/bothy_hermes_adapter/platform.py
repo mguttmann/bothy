@@ -285,7 +285,7 @@ class ServerPlatform(BasePlatformAdapter):
         try:
             jobs.prepare()
         except (JobError, OSError) as exc:  # no folder: a helper's registration is refused
-            _LOG.error("jobs folder refused: %s", exc)
+            _LOG.exception("jobs folder refused: %s", exc)
         self.handler = HermesHandler(self, settings, store, busy_mode=busy, jobs=jobs)
         config = AdapterConfig(
             base_url=settings.server_url,

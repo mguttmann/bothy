@@ -913,7 +913,7 @@ class HermesHandler(AgentHandler):
 
     def _end_vanished_jobs(self, turn: _Turn, seen: set[str]) -> None:
         """A job whose record was removed (deregistered at its end) completed its step."""
-        for task_id, (step, shown) in list(turn.work_steps.items()):
+        for task_id, (step, shown) in turn.work_steps.items():
             if task_id.startswith(_JOB_TASK) and shown == "running" and task_id not in seen:
                 turn.handle.patch.update_step(step, status="completed", finished_at=self._now())
                 turn.work_steps[task_id] = (step, "completed")

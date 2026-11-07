@@ -356,3 +356,44 @@ def test_command_line_registers_lists_and_deregisters(home: Path, tmp_path: Path
     finally:
         worker.kill()
         worker.wait()
+
+
+def test_command_line_in_process(
+    home: Path, registry: JobRegistry, capsys: pytest.CaptureFixture[str]
+) -> None:
+    common = ["--profile-home", str(home), "--platform-key", "bothy"]
+
+    def run(*argv: str) -> tuple[int, list[dict[str, object]]]:
+        code = jobs.main([*argv, *common])
+        return code, [json.loads(line) for line in capsys.readouterr().out.splitlines()]
+
+    thread = uuid4()
+    worker = _sleeper(start_new_session=True)
+    try:
+        code, [made] = run(
+            "register", "--thread", str(thread), "--pid", str(worker.pid), "--title", "t"
+        )
+        assert (code, made["ok"]) == (0, True)
+        code, [entry] = run("list")
+        assert (code, entry["job_id"], entry["alive"]) == (0, made["job_id"], True)
+        assert run("deregister", "--job-id", str(made["job_id"])) == (
+            0,
+            [{"ok": True, "job_id": made["job_id"]}],
+        )
+        assert run("deregister", "--job-id", str(made["job_id"]))[0] == 1
+        code, [made] = run(
+            "register", "--thread", str(thread), "--pid", str(worker.pid), "--title", "t"
+        )
+        assert run("stop", "--job-id", str(made["job_id"])) == (
+            0,
+            [{"ok": True, "job_id": made["job_id"]}],
+        )
+        assert worker.wait(timeout=10) == -signal.SIGTERM
+        assert run("list") == (0, [])
+        code, [refused] = run("register", "--thread", "x", "--pid", "5", "--title", "t")
+        assert (code, refused) == (2, {"ok": False, "error": "the thread is no thread ID"})
+        code, [refused] = run("deregister", "--job-id", "../../escape")
+        assert (code, refused) == (2, {"ok": False, "error": "no job ID"})
+    finally:
+        worker.kill()
+        worker.wait()

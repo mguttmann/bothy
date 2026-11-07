@@ -179,6 +179,30 @@ def run_thread_action(bridge: Any, args: argparse.Namespace) -> int:
     return 0 if result.get("ok") else 1
 
 
+def _install(bridge: _Bridge, args: argparse.Namespace) -> list[str]:
+    """Run ``install``: create the DPoP key when asked, then install; returns the summary."""
+    if args.create_dpop_key:
+        if args.dpop_key_file is None:
+            raise InstallError("--create-dpop-key needs --dpop-key-file")
+        if not args.dpop_key_file.exists():
+            from bothy_sdk.auth import FileDpopKey  # noqa: PLC0415
+
+            FileDpopKey.generate(args.dpop_key_file)
+    request = InstallRequest(
+        server_url=args.server_url,
+        instance_id=args.instance_id,
+        token_file=args.token_file,
+        busy_input_mode=args.busy_input_mode,
+        platform_key=args.platform_key,
+        consumer=args.consumer,
+        dpop_key_file=args.dpop_key_file,
+        report_channel=args.report_channel,
+        report_thread=args.report_thread,
+    )
+    packages = locate_packages(locate, Path(sys.prefix))
+    return install(bridge, request, place_file, packages, copy_package)
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run one command.
 
@@ -202,26 +226,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         return run_thread_action(bridge, args)
     try:
         if args.command == "install":
-            if args.create_dpop_key:
-                if args.dpop_key_file is None:
-                    raise InstallError("--create-dpop-key needs --dpop-key-file")
-                if not args.dpop_key_file.exists():
-                    from bothy_sdk.auth import FileDpopKey  # noqa: PLC0415
-
-                    FileDpopKey.generate(args.dpop_key_file)
-            request = InstallRequest(
-                server_url=args.server_url,
-                instance_id=args.instance_id,
-                token_file=args.token_file,
-                busy_input_mode=args.busy_input_mode,
-                platform_key=args.platform_key,
-                consumer=args.consumer,
-                dpop_key_file=args.dpop_key_file,
-                report_channel=args.report_channel,
-                report_thread=args.report_thread,
-            )
-            packages = locate_packages(locate, Path(sys.prefix))
-            lines = install(bridge, request, place_file, packages, copy_package)
+            lines = _install(bridge, args)
         elif args.command == "switch-mode":
             lines = switch_mode(bridge, args.mode, args.credential_holder)
         else:
