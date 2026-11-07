@@ -797,7 +797,9 @@ jobs:
     needs: plan
     if: contains(format(' {0} ', needs.plan.outputs.jobs), ' test-sdk-plugins ')
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    # About 41 minutes on main when every plugin runs (the hermes-adapter suite alone about 31),
+    # so 45 cancelled healthy runs (docs/decisions.d/AR-03.md D-AR-03-15, as PL/6).
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
