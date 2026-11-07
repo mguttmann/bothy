@@ -7,6 +7,7 @@ sessions in mode ``direct``.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any
 from uuid import UUID
@@ -525,6 +526,26 @@ def test_inline_text_is_a_data_block_the_content_cannot_close() -> None:
     # Invalid UTF-8 becomes U+FFFD; the text holds the boundary only in the two markers.
     assert "line \ufffd one" in out
     assert out.count(boundary) == 2
+
+
+# Hermes's patterns of ``agent.context_references`` (pinned main): built in and plugin kinds.
+_HERMES_REFERENCE = re.compile(
+    r"(?<![\w/])@(?:(?:diff|staged)\b|(?:file|folder|git|url):\S+|[a-zA-Z][a-zA-Z0-9_-]*:\S+)"
+)
+
+
+def test_inline_text_neutralises_hermes_references() -> None:
+    item = _attachment("paste.txt", "text/plain")
+    text = (
+        "see @file:secret.txt and @folder:/etc, run @diff or @staged,\n"
+        "fetch @url:https://example.org/x, @git:3, @issue:12, (@FILE:a)\n"
+        "mail me at someone@example.org, path a/@file:b"
+    )
+    out = inline_text(item, text.encode())
+    assert not _HERMES_REFERENCE.search(out)
+    # Only an invisible word joiner is added; the text reads the same.
+    assert out.replace("⁠", "").split("\n")[3:6] == text.split("\n")
+    assert "someone@example.org" in out
 
 
 def test_too_long_note_names_file_size_and_limit() -> None:

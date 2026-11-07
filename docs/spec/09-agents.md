@@ -2797,7 +2797,9 @@ tells nothing, none or `application/octet-stream`, a text suffix such as `.txt`,
 `.yaml`, `.csv`, `.log`, `.diff`, `.patch`) of at most `hermes_adapter.max_message_bytes` also
 stands in the turn's text, as Hermes' platforms inline one: `[Content of <name>]:`, the SDK's data
 notice and a data block with a random boundary (4.6), the text decoded as UTF-8 with replacement,
-after the notes and before the person's text in the attachments' order; the file has
+after the notes and before the person's text in the attachments' order, with a word joiner after
+every `@` that could start one of Hermes' context references (`@file:`, `@url:`, `@diff`, ...), so
+Hermes never expands a reference in file text; the file has
 `media_text_inlined` true and a `text/*` type in `media_types` (`text/plain` for another text
 type), so Hermes' note says its content is included below, and the user side lists it without its
 text. Every other file has `media_text_inlined` false. A longer text attachment keeps Hermes' note

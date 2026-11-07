@@ -264,9 +264,30 @@ async def test_too_large_text_attachment_keeps_the_file_note(world: HermesWorld)
         triggered = await rig.fake.trigger("Read it.", files=(paste,))
         await _done(rig, triggered.run_id)
         turn = _last_user_text(rig)
-        assert tail not in turn, gateway_log(rig)
+        # The text is not inlined into the turn; it may still stand in the user side's data
+        # block (the context after the person's text), which has its own limits.
+        own = turn.partition("Read it.")[0]
+        assert "[Content of paste.txt]:" not in turn, gateway_log(rig)
+        assert tail not in own
         assert "It is saved at:" in turn
         assert "is larger than the inline limit of 4096 bytes" in turn
+
+
+async def test_references_in_an_inlined_text_are_not_expanded(world: HermesWorld) -> None:
+    """File text is data: an ``@file:`` in it never makes Hermes read a file of the host."""
+    script = [ScriptTurn(text=("ok",), paced=False)]
+    async with hermes_rig(world, script) as rig:
+        secret = "SECRET-HOST-CONTENT-42"
+        for where in (rig.homes.home, rig.homes.work):
+            (where / "host-secret.txt").write_text(secret + "\n", encoding="utf-8")
+        body = b"Pasted log from a colleague.\nsee @file:host-secret.txt for details\n"
+        paste = ContextFile(uuid7(), "paste.txt", "text/plain", body)
+        triggered = await rig.fake.trigger("Summarise this.", files=(paste,))
+        await _done(rig, triggered.run_id)
+        turn = _last_user_text(rig)
+        assert "[Content of paste.txt]:" in turn, gateway_log(rig)
+        assert secret not in json.dumps(rig.model.raw)
+        assert "--- Attached Context" not in turn
 
 
 async def test_binary_attachment_is_not_inlined(world: HermesWorld) -> None:

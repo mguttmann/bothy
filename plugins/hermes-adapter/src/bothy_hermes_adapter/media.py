@@ -134,6 +134,11 @@ _TEXT_SUFFIXES: Final = frozenset(
     }
 )  # fmt: skip
 _BOUNDARY_BYTES: Final = 8
+#: An ``@`` where Hermes's ``@file:``, ``@url:``, ``@diff`` or plugin references can start
+#: (``agent.context_references``: not after a word character or ``/``, a letter follows).
+#: Hermes expands them in the turn's text with the gateway's own rights; in file text they are
+#: data, so a word joiner after the ``@`` keeps them from matching (D-FHTAI-5).
+_REFERENCE_TRIGGER: Final = re.compile(r"(?<![\w/])@(?=[A-Za-z])")
 
 
 def audio_cache_ext(name: str, mime_type: str) -> str:
@@ -410,7 +415,8 @@ def inline_text(item: RunContextAttachment, data: bytes) -> str:
 
     Hermes's Discord heading (``[Content of <name>]:``), then a data block in the format of
     `bothy_sdk.context` with a random boundary the text does not contain. The bytes are decoded
-    as UTF-8, an invalid sequence becomes U+FFFD.
+    as UTF-8, an invalid sequence becomes U+FFFD; a word joiner (U+2060) follows every ``@``
+    that could start one of Hermes's references, so Hermes never expands one in file text.
 
     Args:
         item: The attachment.
@@ -419,7 +425,7 @@ def inline_text(item: RunContextAttachment, data: bytes) -> str:
     Returns:
         The text to put before the person's text.
     """
-    text = data.decode("utf-8", errors="replace")
+    text = _REFERENCE_TRIGGER.sub("@⁠", data.decode("utf-8", errors="replace"))
     boundary = secrets.token_hex(_BOUNDARY_BYTES)
     while boundary in text:
         boundary = secrets.token_hex(_BOUNDARY_BYTES)
