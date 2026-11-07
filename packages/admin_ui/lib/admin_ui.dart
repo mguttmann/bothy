@@ -123,6 +123,7 @@ export 'src/agents/agent_tokens.dart';
 export 'src/agents/agents_list.dart';
 export 'src/agents/builtin/agent_versions_dialog.dart';
 export 'src/agents/builtin/builtin_agent_section.dart';
+export 'src/agents/builtin/builtin_agents_view.dart';
 export 'src/agents/builtin/change_runner_dialog.dart';
 export 'src/agents/guided_flow.dart';
 export 'src/agents/holder_dialog.dart';
