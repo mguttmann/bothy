@@ -11,13 +11,22 @@ only (`HostedToken`, 26 3.3 item 2), an SDK adapter with its own gateway connect
 its own channel cache and heartbeat, signed with the runner's DPoP key because the token is bound
 to it. Turns of every agent share the runner's `SlotPool` (26 3.2 item 3).
 
-Until the runner runs definitions (26 5), `HostedHandler` accepts a hosted run, takes its thread
-lock and a shared slot like a turn would, and ends it ``failed`` with ``adapter_error`` and the
-cause ``definition_missing`` without ``run.start`` (26 5.6 item 4).
+`HostedHandler` runs the agent's turns from its definition (26 5): it takes the thread and
+session locks under the agent's state folder and a shared slot, fetches the current definition
+with the hosted token (``getAgentDefinition`` as agent-self), checks it with the runner's own
+copy of the rules (`claude_code_runner.definition`) against the class of the invocation token,
+rebuilds the agent and control folders (`claude_code_runner.materialize`), and after the billing
+pre-check and ``run.start`` writes the per-turn MCP file and runs the turn in the agent folder
+with the command line of 26 5.3. A definition that fails the check, or one with a ``stdio``
+server under a token class below ``host``, ends the run ``failed`` with ``tool_class_mismatch``
+before ``run.start``; an agent without a definition ends ``adapter_error`` with the cause
+``definition_missing`` (26 5.6). The folders are also written once the agent's connection is
+ready and on ``agent.definition_changed``.
 
-Log lines name agent IDs and problem codes, never a token: ``hosted_agent_joined``,
+Log lines name agent IDs and problem codes, never a token or content: ``hosted_agent_joined``,
 ``hosted_agent_left`` (with ``reason`` ``unlisted``, ``revoked`` or ``closed``),
-``hosted_token_refreshed`` and ``hosted_token_issue_failed`` (with ``code``).
+``hosted_token_refreshed``, ``hosted_token_issue_failed`` (with ``code``),
+``hosted_definition_refused`` (with the field codes) and ``hosted_definition_written``.
 
 Examples:
     >>> from datetime import UTC, datetime, timedelta
@@ -38,7 +47,7 @@ from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, NoReturn, Protocol
 from uuid import UUID
 
 import httpx
@@ -55,9 +64,16 @@ from bothy_sdk.adapter import (
 from bothy_sdk.auth import Credentials, DpopKeySource, Secret
 from bothy_sdk.client import Client
 from bothy_sdk.clock import Clock
-from bothy_sdk.errors import ProblemError
+from bothy_sdk.errors import InvocationTokenInvalid, NotFoundError, ProblemError
 from bothy_sdk.generated.api.agent_runtime import issue_hosted_agent_token, list_hosted_agents
-from bothy_sdk.generated.models import AgentPage, ApiTokenCreated, ToolClass
+from bothy_sdk.generated.api.agents import get_agent_definition
+from bothy_sdk.generated.models import (
+    AgentPage,
+    AgentSession,
+    ApiTokenCreated,
+    RunContext,
+    ToolClass,
+)
 from bothy_sdk.generated.types import UNSET, Unset
 from bothy_sdk.retry import backoff
 from bothy_sdk.runs import RunHandle
@@ -65,23 +81,49 @@ from bothy_sdk.settings import SdkSettings
 from bothy_sdk.sources import Envelope
 
 from claude_code_runner import ADAPTER_NAME, RUNTIME_NAME, __version__
-from claude_code_runner.causes import cause
+from claude_code_runner.attachments import fetch_attachments
+from claude_code_runner.causes import TOOL_CLASS_MISMATCH, cause, definition_refused
+from claude_code_runner.channel_skills import resolve_channel_skills
 from claude_code_runner.channels import RESYNC_EVENTS, ChannelCache
+from claude_code_runner.commandline import (
+    ArgumentError,
+    HostedArgs,
+    budget_argument,
+    choose_model,
+    choose_session,
+    reported_model,
+)
+from claude_code_runner.config import RunnerConfig, own_credential_files
+from claude_code_runner.definition import Definition, Limits, intersect, parse
 from claude_code_runner.heartbeat import WAIT_SLOTS_FULL, WAIT_THREAD_BUSY, Probe, runtime_status
 from claude_code_runner.locks import LockTimeout, SlotPool, acquire
-from claude_code_runner.runturn import RunState
-from claude_code_runner.statedir import hosted_dir
+from claude_code_runner.materialize import (
+    AgentFolders,
+    Materialized,
+    MaterializeError,
+    definition_resolver,
+    materialize,
+    remove_turn_mcp,
+    write_turn_mcp,
+)
+from claude_code_runner.reply_upload import remove_run_files
+from claude_code_runner.runturn import RunState, RunTurn
+from claude_code_runner.statedir import hosted_dir, sweep
 from claude_code_runner.toolclass import ORDER, lower
+from claude_code_runner.transcribe import Transcriber
 
 __all__ = [
+    "DEFINITION_CHANGED",
     "HOSTED_CONSUMER",
     "HOSTING_CHANGED",
     "TOKEN_REFRESH_FRACTION",
     "HostedAgents",
     "HostedConnection",
     "HostedHandler",
+    "HostedRuntime",
     "HostedToken",
     "HostingContext",
+    "RunnerParts",
     "issue_token",
     "refresh_at",
 ]
@@ -90,6 +132,9 @@ _LOG = logging.getLogger("claude_code_runner")
 
 HOSTING_CHANGED = "agent.hosting_changed"
 """The durable event that changes the hosted set (26 9); its payload names one agent."""
+
+DEFINITION_CHANGED = "agent.definition_changed"
+"""The durable event of a new definition version (26 4.1 item 2): the folders are rewritten."""
 
 HOSTED_CONSUMER = "default"
 """The consumer of every hosted agent: each is a principal of its own (brief A1-04 note 3)."""
@@ -111,6 +156,12 @@ _EXPIRED = 4011
 
 def _log(event: str, **ids: object) -> None:
     _LOG.info(json.dumps({"event": event, **{k: str(v) for k, v in ids.items()}}))
+
+
+def _refuse(code: str, reason: str, ids: Mapping[str, Any]) -> NoReturn:
+    """Log ``code`` and end the run without a start, naming the cause in the thread."""
+    _log(code, **ids)
+    raise RunRefused(reason, summary=cause(code))
 
 
 def _warn(event: str, **ids: object) -> None:
@@ -179,6 +230,107 @@ async def issue_token(client: Client, agent_id: UUID) -> HostedToken:
     )
 
 
+class RunnerParts(Protocol):
+    """What a hosted turn takes from the runner's own handler (`claude_code_runner.app`)."""
+
+    @property
+    def config(self) -> RunnerConfig:
+        """The runner's configuration."""
+        ...
+
+    @property
+    def claude_bin(self) -> str | None:
+        """The CLI found in the cleaned ``PATH``."""
+        ...
+
+    @property
+    def transcriber(self) -> Transcriber:
+        """The transcriber of 09 18.14."""
+        ...
+
+    async def precheck(
+        self,
+        state: RunState,
+        desired: str,
+        ids: Mapping[str, Any],
+        *,
+        config: RunnerConfig | None = None,
+    ) -> None:
+        """The pre-check of 09 18.3 with the configuration of the turn."""
+        ...
+
+    async def runtime_too_old(self, required: str | None) -> None:
+        """The API refused the model to the CLI as too old (09 18.9)."""
+        ...
+
+
+class HostedRuntime:
+    """The runner's turn parts as one hosted agent sees them (`claude_code_runner.runturn`).
+
+    The configuration is the runner's with the agent's state folder
+    (``<runner.state_dir>/hosted/<agent_id>/``: turn records, sessions, streams, the CLI
+    configuration and the scratch place of its runs) and the agent's loaded tool class.
+
+    Args:
+        runner: The runner's own handler.
+        config: The runner's configuration for this agent.
+    """
+
+    def __init__(self, runner: RunnerParts, config: RunnerConfig) -> None:
+        """Wrap the runner's parts."""
+        self._runner = runner
+        self._config = config
+
+    @property
+    def config(self) -> RunnerConfig:
+        """The agent's view of the configuration."""
+        return self._config
+
+    @property
+    def claude_bin(self) -> str | None:
+        """The runner's CLI."""
+        return self._runner.claude_bin
+
+    @property
+    def transcriber(self) -> Transcriber:
+        """The runner's transcriber."""
+        return self._runner.transcriber
+
+    async def precheck(self, state: RunState, desired: str, ids: Mapping[str, Any]) -> None:
+        """The runner's pre-check with the agent's configuration.
+
+        Args:
+            state: The run.
+            desired: The token's ``billing_mode``.
+            ids: IDs for log lines.
+        """
+        await self._runner.precheck(state, desired, ids, config=self._config)
+
+    async def runtime_too_old(self, required: str | None) -> None:
+        """Raise the runner's minimum CLI version (one CLI serves every agent).
+
+        Args:
+            required: The version the API named, if any.
+        """
+        await self._runner.runtime_too_old(required)
+
+
+@dataclass(frozen=True)
+class _Loaded:
+    """A checked definition with its version, as fetched for one turn or one rebuild."""
+
+    definition: Definition
+    version: int
+
+
+class _Refused(Exception):  # noqa: N818 - a refusal of a definition, not an error of the runner
+    """The definition fails the runner's own check; ``codes`` are its field codes."""
+
+    def __init__(self, codes: list[str]) -> None:
+        super().__init__("definition refused")
+        self.codes = codes
+
+
 @dataclass(frozen=True)
 class HostingContext:
     """What every hosted connection takes from the runner.
@@ -203,6 +355,8 @@ class HostingContext:
         settings: The SDK settings.
         clock: The SDK's time source.
         http_transport: An ``httpx`` transport for the SDK clients (tests).
+        runner: The runner's own handler: configuration, CLI, transcriber and pre-check.
+        root: ``runner.hosted_agents_root``.
     """
 
     client: Client
@@ -223,6 +377,8 @@ class HostingContext:
     settings: SdkSettings
     clock: Clock
     http_transport: httpx.AsyncBaseTransport | None = None
+    runner: RunnerParts | None = None
+    root: Path | None = None
 
 
 class HostedHandler(AgentHandler):
@@ -253,7 +409,10 @@ class HostedHandler(AgentHandler):
         self._runs: dict[UUID, RunState] = {}
         self._waiting: dict[UUID, str] = {}
         self._beats: set[asyncio.Task[None]] = set()
-        self._locks = hosted_dir(context.state_dir, agent_id) / "locks"
+        self._state_dir = hosted_dir(context.state_dir, agent_id)
+        self._locks = self._state_dir / "locks"
+        self._folders = AgentFolders(context.root, agent_id) if context.root else None
+        self._servers: dict[UUID, Materialized] = {}
 
     def actual_tool_class(self) -> ToolClass:
         """The loaded class: the lower of the agent's class and ``runner.hosted_max_tool_class``."""
@@ -292,20 +451,26 @@ class HostedHandler(AgentHandler):
     async def on_ready(self) -> None:
         """Send the agent's heartbeat as soon as its connection is ready; load its channels.
 
-        A failed load is logged and tried again by the next event or the timer.
+        The agent's folders are written from its current definition then (26 5.2). A failed
+        load is logged and tried again by the next event or the timer.
         """
         if self.adapter is not None:
             await self.adapter.send_heartbeat()
         await self.resync_channels("ready")
+        await self.refresh_definition("ready")
 
     async def on_event(self, envelope: Envelope) -> None:
         """Reload the agent's channels on their events; list the set again on ``agent.updated``.
+
+        ``agent.definition_changed`` rewrites the agent's folders (26 5.2).
 
         Args:
             envelope: The event.
         """
         cache = self.channels
-        if envelope.type == "agent.updated":
+        if envelope.type == DEFINITION_CHANGED:
+            await self.refresh_definition(envelope.type)
+        elif envelope.type == "agent.updated":
             await self._on_agent_updated()
         elif envelope.type in RESYNC_EVENTS and cache is not None:
             await self.resync_channels(envelope.type)
@@ -348,68 +513,348 @@ class HostedHandler(AgentHandler):
         self._beats.add(task)
         task.add_done_callback(self._beats.discard)
 
-    async def prepare(self, inv: Invocation, run: RunHandle) -> StartOptions:
-        """Take the thread lock and a shared slot, then refuse: no definition runs yet.
+    # ---- the definition (26 5.2, 5.6) ----------------------------------------------------
 
-        The lock and the slot are what a hosted turn holds (26 3.2 item 3), so the agent's run
-        waits with ``thread_busy`` or ``slots_full`` like any turn; the definition check of
-        26 5.6 item 4 then ends it without ``run.start``.
+    def _config(self) -> RunnerConfig:
+        """The runner's configuration as this agent's turns see it (`HostedRuntime`)."""
+        runner = self._ctx.runner
+        if runner is None:  # pragma: no cover - the runner always passes its handler
+            raise RuntimeError("no runner parts")
+        return dataclasses.replace(
+            runner.config, state_dir=self._state_dir, tool_class=self._tool_class()
+        )
+
+    async def _fetch(self, tool_class: str) -> _Loaded:
+        """Fetch the current definition with the hosted token and check it (26 5.6 item 1).
+
+        Args:
+            tool_class: The class the check runs for: the invocation token's before a turn.
+
+        Returns:
+            The checked definition.
+
+        Raises:
+            NotFoundError: The agent has no definition.
+            ProblemError: The server refused otherwise.
+            httpx.TransportError: The server was not reachable.
+            _Refused: The definition fails the check.
+        """
+        adapter = self.adapter
+        if adapter is None:  # pragma: no cover - a run comes only over the connection
+            raise RuntimeError("no connection")
+        with adapter.client.unbound():
+            answer = await adapter.client.call_detailed(
+                get_agent_definition.asyncio_detailed, agent_id=self.agent_id
+            )
+        try:
+            body = json.loads(answer.content)
+            raw = json.dumps(body["definition"]).encode("utf-8")
+            version = int(body["version"])
+        except (ValueError, KeyError, TypeError):
+            raise _Refused(["invalid_type"]) from None
+        config = self._config()
+        limits = Limits.runner(config.mcp_stdio_runners)
+        definition, found = parse(raw, limits, tool_class)
+        if definition is None:
+            raise _Refused([f.code for f in found])
+        return _Loaded(definition, version)
+
+    def _write(self, loaded: _Loaded) -> Materialized:
+        """Rebuild the agent's folders for the loaded class (26 5.6 items 2 and 3)."""
+        if self._folders is None:  # pragma: no cover - load_config requires the root
+            raise MaterializeError("not_a_folder")
+        done = materialize(
+            self._folders,
+            loaded.definition,
+            loaded.version,
+            self._tool_class(),
+            active_runs=set(self._runs),
+        )
+        _log("hosted_definition_written", agent_id=self.agent_id, version=loaded.version)
+        return done
+
+    async def refresh_definition(self, reason: str) -> None:
+        """Write the agent's folders from its current definition (start and event, 26 5.2).
+
+        A missing or refused definition and every failure are logged and leave the folders as
+        they are; the next turn fetches and checks again.
+
+        Args:
+            reason: ``ready`` or the event type, for the log line.
+        """
+        if self._folders is None or self._ctx.runner is None:
+            return
+        try:
+            loaded = await self._fetch(self._tool_class())
+            self._write(loaded)
+        except NotFoundError:
+            _log("definition_missing", agent_id=self.agent_id, cause=reason)
+        except _Refused as refused:
+            _warn(
+                "hosted_definition_refused",
+                agent_id=self.agent_id,
+                cause=reason,
+                codes=",".join(sorted(set(refused.codes))),
+            )
+        except (ProblemError, httpx.TransportError) as err:
+            _warn(
+                "hosted_definition_unavailable",
+                agent_id=self.agent_id,
+                cause=reason,
+                code=getattr(err, "code", "transport"),
+            )
+        except (MaterializeError, OSError) as err:
+            _warn(
+                "hosted_definition_unwritable",
+                agent_id=self.agent_id,
+                cause=reason,
+                code=getattr(err, "code", type(err).__name__),
+            )
+
+    # ---- a turn -------------------------------------------------------------------------
+
+    async def prepare(self, inv: Invocation, run: RunHandle) -> StartOptions:
+        """The steps of a hosted turn before ``run.start`` (brief A1-05 design note 2).
+
+        Locks and a shared slot (26 3.2 item 3); the current definition, checked against the
+        class of the invocation token and written to the agent's folders; the session, model,
+        tools and channel skills; the run context, attachments and the billing pre-check.
 
         Args:
             inv: The invocation.
             run: The queued run.
 
+        Returns:
+            ``model``, ``external_session_ref`` and ``billing_evidence`` of ``startRun``.
+
         Raises:
-            RunRefused: Always: ``adapter_error`` with the cause ``definition_missing``, or
-                ``session_busy`` when the thread stayed locked for ``runner.session_lock_wait``.
+            RunRefused: The run ends without a start: ``tool_class_mismatch`` for a definition
+                that fails the check, ``adapter_error`` with ``definition_missing`` and the
+                other causes of the runner, or the reasons of the pre-check.
         """
         payload = inv.payload
         state = RunState(run.run_id, payload.thread_id, payload.channel_id)
         self._runs[run.run_id] = state
         ids = {"run_id": run.run_id, "agent_id": self.agent_id, "thread_id": state.thread_id}
+        if str(payload.trigger_kind) != "message":
+            _refuse("trigger_kind_unsupported", "adapter_error", ids)
+        session = payload.agent_session
+        state.agent_session = session if isinstance(session, AgentSession) else None
+        mode = getattr(payload.session_mode, "value", None)
+        started = state.agent_session is not None and state.agent_session.started is True
+        state.session_mode = str(mode) if mode else ("resume" if started else "new")
+        try:
+            state.session = choose_session(state.agent_session)
+        except ArgumentError as err:
+            _refuse(err.code, "adapter_error", ids)
+        await self._take_locks(state, run.run_id, ids)
+        if self._ctx.probe().blocking:
+            _refuse("runtime_unavailable", "runtime_error", ids)
+        loaded = await self._definition_for(inv, ids)
+        try:
+            done = self._write(loaded)
+        except (MaterializeError, OSError) as err:
+            code = getattr(err, "code", type(err).__name__)
+            _warn("hosted_definition_unwritable", code=code, **ids)
+            raise RunRefused("adapter_error", summary=cause("definition_unwritable")) from None
+        self._servers[run.run_id] = done
+        self._turn_parts(state, loaded, done, ids)
+        state.context = await self._context(run, ids)
+        files_dir = self._state_dir / "files" / str(state.thread_id)
+        state.file_texts, state.stored_files = await fetch_attachments(
+            run.client, state.context.trigger_message.attachments, files_dir
+        )
+        await self._runtime().precheck(state, inv.claims.billing_mode, ids)
+        _log("run_prepared", **ids)
+        return StartOptions(
+            model=reported_model(state.model),
+            external_session_ref=state.session.ref,
+            billing_evidence=state.evidence,
+        )
+
+    def _runtime(self) -> HostedRuntime:
+        runner = self._ctx.runner
+        if runner is None:  # pragma: no cover - the runner always passes its handler
+            raise RuntimeError("no runner parts")
+        return HostedRuntime(runner, self._config())
+
+    async def _take_locks(self, state: RunState, run_id: UUID, ids: Mapping[str, Any]) -> None:
+        """The thread lock, the session lock and a shared slot; each wait is reported."""
         try:
             try:
-                state.locks.append(
-                    await acquire(
-                        self._locks / f"thread-{state.thread_id}.lock",
-                        self._ctx.session_lock_wait,
-                        self._ctx.poll_interval,
-                        on_busy=lambda: self._wait(run.run_id, WAIT_THREAD_BUSY),
+                for name in (f"thread-{state.thread_id}", f"session-{state.session.ref}"):  # type: ignore[union-attr]
+                    state.locks.append(
+                        await acquire(
+                            self._locks / f"{name}.lock",
+                            self._ctx.session_lock_wait,
+                            self._ctx.poll_interval,
+                            on_busy=lambda: self._wait(run_id, WAIT_THREAD_BUSY),
+                        )
                     )
-                )
             except LockTimeout:
-                _log("session_busy", **ids)
-                raise RunRefused("adapter_error", summary=cause("session_busy")) from None
+                _refuse("session_busy", "adapter_error", ids)
             slots = self._ctx.slots
             if slots.full:
-                self._wait(run.run_id, WAIT_SLOTS_FULL)
+                self._wait(run_id, WAIT_SLOTS_FULL)
             await slots.acquire()
             state.slot = slots
         finally:
-            self._wait(run.run_id, None)
-        _log("definition_missing", **ids)
-        raise RunRefused("adapter_error", summary=cause("definition_missing"))
+            self._wait(run_id, None)
+
+    async def _definition_for(self, inv: Invocation, ids: Mapping[str, Any]) -> _Loaded:
+        """The definition of the turn, checked against the token's class (26 5.6 item 1)."""
+        try:
+            return await self._fetch(str(inv.claims.tool_class))
+        except NotFoundError:
+            _refuse("definition_missing", "adapter_error", ids)
+        except _Refused as refused:
+            codes = list(dict.fromkeys(refused.codes))
+            _warn("hosted_definition_refused", codes=",".join(sorted(codes)), **ids)
+            raise RunRefused(TOOL_CLASS_MISMATCH, summary=definition_refused(codes)) from None
+        except (ProblemError, httpx.TransportError) as err:
+            _warn("hosted_definition_unavailable", code=getattr(err, "code", "transport"), **ids)
+            raise RunRefused("adapter_error", summary=cause("definition_unavailable")) from None
+
+    def _turn_parts(
+        self, state: RunState, loaded: _Loaded, done: Materialized, ids: Mapping[str, Any]
+    ) -> None:
+        """Model, tools, folder, command line parts and channel skills of the turn (26 5.3)."""
+        definition = loaded.definition
+        config = self._config()
+        folders = self._folders
+        if folders is None:  # pragma: no cover - load_config requires the root
+            raise RuntimeError("no root")
+        settings = definition.settings
+        try:
+            state.model = choose_model(settings.model, config.default_model)
+        except ArgumentError as err:
+            _refuse(err.code, "adapter_error", ids)
+        state.tools = intersect(config.scoped_allowed_tools, settings.allowed_tools)
+        state.cwd = folders.agent
+        state.hosted = HostedArgs(
+            settings=folders.settings,
+            plugin=folders.plugin if done.has_skills else None,
+            mcp_config=folders.turn_mcp(state.run_id) if done.servers else None,
+            has_skills=done.has_skills,
+        )
+        cap = settings.max_cost_usd_per_run
+        state.cost_cap = cap
+        state.max_budget_usd = None if cap is None else budget_argument(cap)
+        channel = self.channels.get(state.channel_id) if self.channels else None
+        state.channel_prompt = channel.behavior.prompt if channel is not None else ""
+        if config.channel_skills_dir is not None and channel is not None:
+            found = resolve_channel_skills(
+                list(channel.behavior.skills), config.channel_skills_dir, config.tool_class, **ids
+            )
+            state.plugin_dirs, state.notice = found.plugin_dirs, found.notice()
+
+    async def _context(self, run: RunHandle, ids: Mapping[str, Any]) -> RunContext:
+        try:
+            return await run.load_context()
+        except NotFoundError:
+            _log("run_inactive", **ids)
+            raise RunRefused(None) from None
+        except InvocationTokenInvalid as err:
+            if err.reason == "run_inactive":
+                _log("run_inactive", **ids)
+                raise RunRefused(None) from None
+            raise
 
     async def on_not_started(self, inv: Invocation) -> None:
-        """Give back the slot and the lock of a run that ended in prepare.
+        """Give back the slot and the locks of a run that ended in prepare.
 
         Args:
             inv: The invocation.
         """
         run_id = inv.claims.run_id
         state = self._runs.pop(run_id, None) if run_id else None
+        if run_id:
+            self._servers.pop(run_id, None)
         if state is not None:
             state.close()
+            remove_run_files(self._state_dir, state.run_id)
+
+    def _resolver(self) -> Callable[[str], str]:
+        """The resolver of this agent's ``secret_ref`` values (26 5.1 item 3)."""
+        runner = self._ctx.runner
+        if runner is None:
+            return definition_resolver(None, self.agent_id, ())
+        config = runner.config
+        refused = own_credential_files(config)
+        return definition_resolver(config.hosted_secrets_dir, self.agent_id, refused)
 
     async def execute(self, inv: Invocation, run: RunHandle) -> None:
-        """Not reached (prepare always refuses); ends a started run like prepare would.
+        """Write the per-turn MCP file, run the turn in the agent folder, then delete the file.
+
+        The file is deleted in a ``finally``, also when the turn is stopped or the runner's
+        stop cancels it (26 5.2); a crash leaves it to the sweep at the next start.
 
         Args:
             inv: The invocation.
             run: The started run.
         """
         del inv
-        await run.finish("failed", reason="adapter_error", summary=cause("definition_missing"))
+        state = self._runs[run.run_id]
+        done = self._servers.get(run.run_id)
+        folders = self._folders
+        try:
+            hosted = state.hosted
+            if folders is not None and done is not None and hosted and hosted.mcp_config:
+                try:
+                    write_turn_mcp(folders, run.run_id, done.servers, self._resolver())
+                except (MaterializeError, OSError) as err:
+                    code = getattr(err, "code", type(err).__name__)
+                    _warn("mcp_reference_unavailable", run_id=run.run_id, code=code)
+                    await run.finish(
+                        "failed", reason="adapter_error", summary=cause("mcp_reference_unavailable")
+                    )
+                    return
+            await RunTurn(self._runtime(), state, run).run()
+        finally:
+            if folders is not None:
+                remove_turn_mcp(folders, run.run_id)
+            self._runs.pop(run.run_id, None)
+            self._servers.pop(run.run_id, None)
+            state.close()
+            with contextlib.suppress(OSError):
+                active = {str(r) for r in self._runs}
+                runner = self._ctx.runner
+                retention = runner.config.stream_log_retention if runner else 0.0
+                if runner is not None:
+                    sweep(self._state_dir, retention, active=active)
+
+    async def on_followup(self, inv: Invocation, run: RunHandle) -> None:
+        """A follow-up of a hosted run: held until its turn starts, or offered (09 18.5).
+
+        Args:
+            inv: The ``agent.followup`` invocation.
+            run: The run.
+        """
+        state = self._runs.get(run.run_id)
+        message_id = getattr(inv.payload, "message_id", "")
+        if state is None:
+            _log("followup_not_deliverable", run_id=run.run_id, message_id=message_id)
+            return
+        if state.turn is None:
+            if all(getattr(h.payload, "message_id", None) != message_id for h in state.held):
+                state.held.append(inv)
+            return
+        await state.turn.offer_followup(inv)
+
+    async def on_cancel(self, run: RunHandle, reason: str) -> None:
+        """Stop the turn of a started hosted run (09 18.6).
+
+        Args:
+            run: The run.
+            reason: The request's reason, unchanged.
+        """
+        state = self._runs.get(run.run_id)
+        if state is None:
+            return
+        if state.turn is None:
+            state.stop_reason = state.stop_reason or reason
+            return
+        await state.turn.request_stop(reason)
 
     async def close(self) -> None:
         """Cancel the heartbeats sent for wait reasons."""

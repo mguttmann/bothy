@@ -199,3 +199,17 @@ def test_quoted_too_old_text_is_not_the_cli_answer() -> None:
     end = classify_turn_end(TurnEvidence(init_seen=True, result=result, stderr=LIVE_TOO_OLD))
     assert end.outcome == "runtime_error"
     assert end.required_version is None
+
+
+# ---- A1-05: the cost cap of a hosted definition (26 5.8) --------------------------------------
+
+
+def test_cost_cap_is_recognised_by_the_budget_result_or_the_cost() -> None:
+    from claude_code_runner.failures import BUDGET_SUBTYPE, cost_cap_reached
+
+    assert cost_cap_reached({"subtype": BUDGET_SUBTYPE}, 0.5)
+    assert cost_cap_reached({"subtype": "error_during_execution", "total_cost_usd": 0.5}, 0.5)
+    assert not cost_cap_reached({"subtype": "error_during_execution", "total_cost_usd": 0.4}, 0.5)
+    assert not cost_cap_reached({"subtype": BUDGET_SUBTYPE}, None)
+    assert not cost_cap_reached(None, 0.5)
+    assert not cost_cap_reached({"total_cost_usd": True}, 0.5)

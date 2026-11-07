@@ -5,6 +5,11 @@
 sees it. `class_flags` returns exactly the cell of the class in the table "Class | Flags |
 Effect" of 18.2, split as a shell would split it (R-AG-21, R-AG-23, D-W-16).
 
+A turn of a hosted agent (docs/spec/26-builtin-agents.md 5.3) passes `HostedArgs`: its class
+flags are `hosted_class_flags`, and the hosted additions stand directly after
+``--permission-prompts none``, before ``--add-dir``. Channel skill folders (26 5.9) are one more
+``--plugin-dir`` each, only in a ``host`` turn. Without either the list is that of 18.2.
+
 Examples:
     >>> class_flags("host", [])
     ['--permission-mode', 'bypassPermissions']
@@ -16,6 +21,7 @@ import re
 import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
@@ -24,12 +30,16 @@ from bothy_sdk.generated.types import Unset
 from claude_code_runner.config import check_argument
 
 __all__ = [
+    "SCOPED_BASELINE",
     "ArgumentError",
+    "HostedArgs",
     "SessionChoice",
+    "budget_argument",
     "build_argv",
     "choose_model",
     "choose_session",
     "class_flags",
+    "hosted_class_flags",
     "reported_model",
     "scoped_tools",
 ]
@@ -87,6 +97,105 @@ def class_flags(tool_class: str, tools: Sequence[str]) -> list[str]:
     if tool_class == "host":
         return ["--permission-mode", "bypassPermissions"]
     raise ArgumentError("unknown_tool_class")
+
+
+SCOPED_BASELINE = ("Read", "Grep", "Glob", "Bash")
+"""What 09 18.2 grants every ``scoped`` turn already (``Bash`` limited to read-only commands by
+``dontAsk``): the start of ``--tools`` of a hosted ``scoped`` turn (26 5.3)."""
+
+
+@dataclass(frozen=True)
+class HostedArgs:
+    """The parts of a hosted turn's command line (26 5.3).
+
+    Attributes:
+        settings: ``<control>/settings.json`` of ``--settings``.
+        plugin: ``<control>/plugin`` of ``--plugin-dir``; ``None`` when there are no skills.
+        mcp_config: The per-turn MCP file of ``--mcp-config``; ``None`` without a server.
+        has_skills: The definition has skills, so ``Skill`` is a tool of the turn.
+    """
+
+    settings: Path
+    plugin: Path | None
+    mcp_config: Path | None
+    has_skills: bool
+
+
+def hosted_class_flags(tool_class: str, tools: Sequence[str], *, has_skills: bool) -> list[str]:
+    """Return the tool flags of a hosted turn, exactly the column "Tool flags" of 26 5.3.
+
+    ``dontAsk`` refuses a tool that is not allowed in advance, so ``Skill`` is named in
+    ``--allowedTools`` wherever ``--tools`` carries it.
+
+    Args:
+        tool_class: ``chat``, ``scoped`` or ``host``.
+        tools: The intersected tools of ``scoped`` (26 4.4 item 2), one argument each.
+        has_skills: The definition has skills.
+
+    Returns:
+        The flags; ``host`` keeps those of 09 18.2.
+
+    Raises:
+        ArgumentError: ``unknown_tool_class`` or ``invalid_argument`` (see `class_flags`).
+    """
+    skill = ["Skill"] if has_skills else []
+    if tool_class == "chat":
+        named = ["--allowedTools", "Skill"] if has_skills else []
+        return [
+            "--permission-mode",
+            "dontAsk",
+            "--tools",
+            "Skill" if has_skills else "",
+            *named,
+            "--disallowedTools",
+            "mcp__*",
+        ]
+    if tool_class == "scoped":
+        if not all(check_argument(t) for t in tools):
+            raise ArgumentError("invalid_argument")
+        available = [*SCOPED_BASELINE, *skill]
+        available += [t for t in tools if t not in available]
+        allowed = [*tools, *skill]
+        named = ["--allowedTools", *allowed] if allowed else []
+        return ["--permission-mode", "dontAsk", "--tools", *available, *named]
+    return class_flags(tool_class, tools)
+
+
+def _hosted_additions(
+    tool_class: str, hosted: HostedArgs, plugin_dirs: Sequence[Path]
+) -> list[str]:
+    """The column "Added directly after ``--permission-prompts none``" of 26 5.3."""
+    if tool_class == "host":
+        added = ["--setting-sources", "project,local", "--settings", str(hosted.settings)]
+    else:
+        added = ["--restricted", "--settings", str(hosted.settings)]
+    if hosted.plugin is not None:
+        added += ["--plugin-dir", str(hosted.plugin)]
+    for folder in plugin_dirs:
+        added += ["--plugin-dir", str(folder)]
+    if hosted.mcp_config is not None:
+        if tool_class == "chat":  # 26 4.4 item 3: never an MCP server under chat
+            raise ArgumentError("invalid_argument")
+        added += ["--mcp-config", str(hosted.mcp_config)]
+    # --mcp-config takes several values, so a flag always follows it; --restricted alone would
+    # still start the host user's MCP servers (help text of the pinned CLI).
+    return [*added, "--strict-mcp-config"]
+
+
+def budget_argument(value: float) -> str:
+    """The value of ``--max-budget-usd``: the cost cap as a plain decimal number (26 5.8).
+
+    Args:
+        value: ``settings.max_cost_usd_per_run``.
+
+    Returns:
+        The decimal without an exponent.
+
+    Examples:
+        >>> budget_argument(2.5), budget_argument(1e-07)
+        ('2.5', '0.0000001')
+    """
+    return format(Decimal(repr(value)), "f")
 
 
 def scoped_tools(configured: Sequence[str], binding_allowed: Sequence[str] | None) -> list[str]:
@@ -190,28 +299,43 @@ def build_argv(  # noqa: PLR0913 - every input of the command line is explicit
     tools: Sequence[str],
     add_dir: Path | None,
     system_prompt_file: Path,
+    hosted: HostedArgs | None = None,
+    plugin_dirs: Sequence[Path] = (),
+    max_budget_usd: str | None = None,
 ) -> list[str]:
-    """Build the argument list of one turn in the order of 18.2.
+    """Build the argument list of one turn in the order of 18.2 (and 26 5.3 for a hosted one).
 
     Args:
         claude_bin: The absolute path of the CLI found in the cleaned ``PATH``.
         model: The model (`choose_model`).
         session: The session (`choose_session`).
-        tool_class: ``runner.tool_class``.
+        tool_class: ``runner.tool_class``, or the loaded class of a hosted agent.
         tools: The tools of ``scoped`` (`scoped_tools`).
         add_dir: The thread's incoming folder, only for ``scoped`` and ``host`` with files.
         system_prompt_file: The file of ``--append-system-prompt-file``.
+        hosted: The parts of a hosted turn (26 5.3); ``None`` for the runner's own agent.
+        plugin_dirs: Channel skill folders (26 5.9), only for ``host``.
+        max_budget_usd: The cost cap of a hosted definition (`budget_argument`), if any.
 
     Returns:
         The argument list.
 
     Raises:
-        ArgumentError: An invalid model or tool, or ``add_dir`` under ``chat``.
+        ArgumentError: An invalid model or tool, ``add_dir`` or an MCP file under ``chat``, or
+            a channel skill folder below ``host``.
     """
     if not check_argument(model):
         raise ArgumentError("invalid_argument")
     if add_dir is not None and tool_class == "chat":
         raise ArgumentError("invalid_argument")
+    if plugin_dirs and tool_class != "host":  # 26 5.9: channel skills only in host turns
+        raise ArgumentError("invalid_argument")
+    if hosted is None:
+        flags = class_flags(tool_class, tools)
+        added = [a for folder in plugin_dirs for a in ("--plugin-dir", str(folder))]
+    else:
+        flags = hosted_class_flags(tool_class, tools, has_skills=hosted.has_skills)
+        added = _hosted_additions(tool_class, hosted, plugin_dirs)
     session_flag = "--resume" if session.resume else "--session-id"
     argv = [
         claude_bin,
@@ -226,11 +350,14 @@ def build_argv(  # noqa: PLR0913 - every input of the command line is explicit
         model,
         session_flag,
         session.ref,
-        *class_flags(tool_class, tools),
+        *flags,
         "--permission-prompts",
         "none",
+        *added,
     ]
     if add_dir is not None:
         argv += ["--add-dir", str(add_dir)]
+    if max_budget_usd is not None:
+        argv += ["--max-budget-usd", max_budget_usd]
     argv += ["--append-system-prompt-file", str(system_prompt_file)]
     return argv

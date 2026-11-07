@@ -13,6 +13,11 @@ of a background task's notification is posted. A stop goes through `RunTurn.requ
 run that the server ended stops its turn without a finish. `RunTurn.adopted` follows a turn that
 outlived an earlier runner (design note 12).
 
+A run of a hosted agent (docs/spec/26-builtin-agents.md 5) carries the parts of its command line
+in `RunState` (``hosted``, ``max_budget_usd``); a run stopped by the cost cap ends
+``runtime_error`` with the cause ``cost_cap_reached`` (26 5.8). Channel skill folders of a
+``host`` turn and the live box note of skipped ones come the same way (26 5.9).
+
 The turn record ``turns/<run_id>.json`` is written atomically before the action that depends on
 it: the reference before its process starts, a reply's ``client_msg_id`` before the reply goes
 out. Own and adopted turns read their stream through one loop (`RunTurn._read`), and the
@@ -35,7 +40,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Protocol
 from uuid import UUID, uuid4
 
 import httpx
@@ -87,13 +92,14 @@ from claude_code_runner.attachments import (
 )
 from claude_code_runner.background import BackgroundWork
 from claude_code_runner.causes import ADAPTER_STOPPED, cause, turn_end_cause
-from claude_code_runner.commandline import SessionChoice, build_argv, reported_model
+from claude_code_runner.commandline import HostedArgs, SessionChoice, build_argv, reported_model
 from claude_code_runner.failures import (
     ErrorKind,
     TurnEnd,
     TurnEvidence,
     api_error_text,
     classify_turn_end,
+    cost_cap_reached,
 )
 from claude_code_runner.followups import (
     FollowupCheck,
@@ -158,9 +164,10 @@ from claude_code_runner.usage import (
 )
 
 if TYPE_CHECKING:
-    from claude_code_runner.app import RunnerHandler
+    from claude_code_runner.config import RunnerConfig
+    from claude_code_runner.transcribe import Transcriber
 
-__all__ = ["COMPACT_IN_PRINT_MODE", "RunState", "RunTurn"]
+__all__ = ["COMPACT_IN_PRINT_MODE", "RunState", "RunTurn", "TurnRuntime"]
 
 _LOG = logging.getLogger("claude_code_runner")
 _EXPECTED_KEY_SOURCE = {"organization": "ANTHROPIC_API_KEY", "personal": "none"}
@@ -211,6 +218,39 @@ def _warn(event: str, **ids: object) -> None:
     _LOG.warning(json.dumps({"event": event, **{k: str(v) for k, v in ids.items()}}))
 
 
+class TurnRuntime(Protocol):
+    """What a turn takes from the runner: the runner's handler, or a hosted agent's view of it.
+
+    Attributes:
+        config: The configuration; for a hosted agent its state folder and loaded class.
+        claude_bin: The CLI found in the cleaned ``PATH``.
+        transcriber: The transcriber of 09 18.14.
+    """
+
+    @property
+    def config(self) -> RunnerConfig:
+        """The configuration of the turn."""
+        ...
+
+    @property
+    def claude_bin(self) -> str | None:
+        """The CLI found in the cleaned ``PATH``."""
+        ...
+
+    @property
+    def transcriber(self) -> Transcriber:
+        """The transcriber of 09 18.14."""
+        ...
+
+    async def precheck(self, state: RunState, desired: str, ids: Mapping[str, Any]) -> None:
+        """The pre-check of 18.3 before a process (raises `RunRefused`)."""
+        ...
+
+    async def runtime_too_old(self, required: str | None) -> None:
+        """The API refused the model to the CLI as too old (18.9)."""
+        ...
+
+
 @dataclass
 class RunState:
     """What prepare took for one run; `close` gives it back (one object per run).
@@ -237,6 +277,12 @@ class RunState:
         held: Follow-ups that arrived before the turn started, in event order (note 4 c).
         turn: The turn once ``execute`` started it.
         stop_reason: The reason of a stop request that came before the turn object existed.
+        hosted: The parts of a hosted turn's command line (26 5.3); ``None`` for the runner's
+            own agent.
+        plugin_dirs: Channel skill folders of a ``host`` turn (26 5.9).
+        max_budget_usd: ``--max-budget-usd`` of a hosted definition (26 5.8), if any.
+        cost_cap: The same cap as a number, to recognise a run it stopped.
+        notice: The live box status line once per run (skipped channel skills, 26 5.9).
     """
 
     run_id: UUID
@@ -260,6 +306,11 @@ class RunState:
     held: list[Invocation] = field(default_factory=list)
     turn: RunTurn | None = None
     stop_reason: str | None = None
+    hosted: HostedArgs | None = None
+    plugin_dirs: tuple[Path, ...] = ()
+    max_budget_usd: str | None = None
+    cost_cap: float | None = None
+    notice: str | None = None
 
     def close(self) -> None:
         """Release the slot and the locks (locks in reverse order)."""
@@ -321,7 +372,7 @@ class RunTurn:
     monotonic: Callable[[], float] = staticmethod(time.monotonic)
     """The clock of the stdin window and of the offset saves (a test sets a fake one)."""
 
-    def __init__(self, handler: RunnerHandler, state: RunState, run: RunHandle) -> None:
+    def __init__(self, handler: TurnRuntime, state: RunState, run: RunHandle) -> None:
         """Create the turn of a started run; nothing starts before `run`."""
         self.h = handler
         self.cfg = handler.config
@@ -407,6 +458,8 @@ class RunTurn:
             now=lambda: datetime.now(UTC),
             progress_interval=self.cfg.progress_patch_interval,
         )
+        if self.state.notice:
+            await self._status_line(self.state.notice)
         attempt = _Attempt(resume=self.session.resume)
         worked_before = False
         first = True
@@ -459,6 +512,10 @@ class RunTurn:
                     summary = None
                     if attempt.kind == "turn":
                         summary = turn_end_cause(action.reason, outcome.lost_tasks)
+                    if action.reason == "runtime_error" and cost_cap_reached(
+                        outcome.evidence.result, self.state.cost_cap
+                    ):
+                        summary = cause("cost_cap_reached")
                     await self._fail(action.reason, action.errors, end.exit_label, summary=summary)
                     return
                 next_attempt = await self._recover(action, outcome)
@@ -660,6 +717,9 @@ class RunTurn:
             tools=self.state.tools,
             add_dir=add_dir,
             system_prompt_file=prompt_file,
+            hosted=self.state.hosted,
+            plugin_dirs=self.state.plugin_dirs,
+            max_budget_usd=self.state.max_budget_usd,
         )
         stream_start = _size(paths.stream)
         stderr_start = _size(paths.stderr)

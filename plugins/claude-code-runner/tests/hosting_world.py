@@ -10,6 +10,10 @@ only API token that backend accepts, bound to the runner's DPoP key, and fetchin
 closes the connections of the old one with ``4012``, as the server's revocation path does.
 The runner reaches a backend through the test seam ``hosted_url`` of `Runner`; the real server
 test (``tests/realserver``) runs the same path against one server.
+
+A backend (`HostedFake`) also serves ``getAgentDefinition`` for its agent (A1-02): the current
+definition with its version, ``404`` without one, and `HostedFake.set_definition` appends the
+durable event ``agent.definition_changed`` (26 4.1 item 2, A1-05).
 """
 
 from __future__ import annotations
@@ -42,11 +46,91 @@ TOKEN_TTL = 3600.0
 """``agents.hosted_token_ttl`` of the fake, in seconds of the shared clock."""
 
 
+class HostedFake(FakeServer):
+    """The FakeServer of one hosted agent, with ``getAgentDefinition`` of its own agent."""
+
+    def __init__(self, **kwargs: Any) -> None:
+        """Create the server without a definition."""
+        super().__init__(**kwargs)
+        self.definition: Any = None
+        self.definition_version = 0
+        self.definition_reads = 0
+
+    async def start(self) -> None:
+        """Open the listener with the definition route ahead of the FakeServer's own."""
+        app = web.Application(client_max_size=4 << 20)
+        app.router.add_get(f"{_API}/gateway", self.gateway.handle)
+        app.router.add_get(f"{_API}/agents/{{agent_id}}/definition", self._definition)
+        app.router.add_route("*", "/{tail:.*}", self._http)
+        self._runner = web.AppRunner(app, access_log=None, handle_signals=False)
+        await self._runner.setup()
+        site = web.TCPSite(self._runner, "127.0.0.1", 0)
+        await site.start()
+        host, port = self._runner.addresses[0][:2]
+        self.origin = f"http://{host}:{port}"
+
+    def set_definition(self, definition: Any, *, announce: bool = True) -> int:
+        """Store a new version of the definition and announce ``agent.definition_changed``.
+
+        Args:
+            definition: The ``definition`` member as the server would return it.
+            announce: Append the durable event for the agent.
+
+        Returns:
+            The new version.
+        """
+        self.definition = definition
+        self.definition_version += 1
+        if announce:
+            world = self.world
+            envelope = {
+                "id": str(uuid7()),
+                "type": "agent.definition_changed",
+                "schema_version": 1,
+                "occurred_at": world.now_iso(),
+                "scope": {},
+                "resource": {"kind": "agent", "id": str(self.agent_id)},
+                "permission_version": world.permission_version,
+                "payload": {"definition_version": self.definition_version},
+                "actor": {"id": str(world.robin.id), "kind": "user"},
+                "audience": "self",
+            }
+            world.append("agent.definition_changed", envelope)
+        return self.definition_version
+
+    async def _definition(self, request: web.Request) -> web.Response:
+        path = request.rel_url.raw_path
+        try:
+            self._auth.authenticate(
+                method=request.method,
+                htu=self.origin + path,
+                authorization=request.headers.getall("Authorization", []),
+                proofs=request.headers.getall("DPoP", []),
+            )
+            if UUID(request.match_info["agent_id"]) != self.agent_id:
+                raise FakeProblem("not_found")
+            if self.definition is None:
+                raise FakeProblem("not_found")
+        except (FakeProblem, ValueError) as problem:
+            found = problem if isinstance(problem, FakeProblem) else FakeProblem("not_found")
+            return self._problem(found, path, "getAgentDefinition")
+        self.definition_reads += 1
+        body = {
+            "agent_id": str(self.agent_id),
+            "version": self.definition_version,
+            "origin_kind": "manual",
+            "created_at": self.world.now_iso(),
+            "created_by": str(self.world.robin.id),
+            "definition": self.definition,
+        }
+        return self._respond(200, body, {"ETag": f'"{self.definition_version}"'}, "")
+
+
 @dataclasses.dataclass
 class HostedBackend:
     """One hosted agent: its record on the runner's server and the FakeServer of its own."""
 
-    fake: FakeServer
+    fake: HostedFake
     tool_class: str
     tokens: list[str] = dataclasses.field(default_factory=list)
 
@@ -109,7 +193,7 @@ class HostingServer(FakeServer):
 
     async def add_backend(self, tool_class: str = "scoped") -> HostedBackend:
         """Start the FakeServer of a new hosted agent (not hosted yet, see `host`)."""
-        fake = FakeServer(dpop=True, costs=True, clock=self.clock, tool_class=tool_class)
+        fake = HostedFake(dpop=True, costs=True, clock=self.clock, tool_class=tool_class)
         await fake.start()
         fake.world.instance_id = self.instance_id
         fake.world.issuer.instance_id = self.instance_id
@@ -232,6 +316,16 @@ class HostingWorld(World):
     dpop_file: Path = Path()
 
     @property
+    def agents_root(self) -> Path:
+        """``runner.hosted_agents_root`` of the world (created by the runner's start check)."""
+        return self.root / "agents"
+
+    @property
+    def secrets_dir(self) -> Path:
+        """``runner.hosted_secrets_dir`` of the world (the folders of each agent's secrets)."""
+        return self.root / "hosted-secrets"
+
+    @property
     def server(self) -> HostingServer:
         """The runner's server."""
         assert isinstance(self.fake, HostingServer)
@@ -243,6 +337,8 @@ class HostingWorld(World):
             "dpop_key_ref": f"file:{self.dpop_file}",
             "hosted_agents": True,
             "hosted_max_tool_class": "scoped",
+            "hosted_agents_root": str(self.agents_root),
+            "hosted_secrets_dir": str(self.secrets_dir),
         }
         values.update(runner)
         return super().config(**values)
@@ -285,6 +381,7 @@ async def hosting_world(
 ) -> AsyncIterator[HostingWorld]:
     """Build a `HostingWorld` in ``root`` (like the scenario world, with the runner's key)."""
     root.mkdir(mode=0o700)
+    (root / "hosted-secrets").mkdir(mode=0o700)
     projects = root / "projects"
     (projects / "website" / ".git").mkdir(parents=True)
     home = root / "home"

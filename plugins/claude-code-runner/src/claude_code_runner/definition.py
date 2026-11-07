@@ -1,128 +1,147 @@
 # SPDX-License-Identifier: Apache-2.0
-"""The runner's own copy of the definition rules (docs/spec/26-builtin-agents.md 4.2, 4.3).
+"""The runner's own check of an agent definition (docs/spec/26-builtin-agents.md 4.2 to 4.4).
 
-The closed schema ``agent_definition.v1`` and its refusals, ported from the server's validator
-(``services/server/internal/agents/domain/definition``) with the rulings of
-docs/decisions.d/A1-02.md. It is the one place of these rules in the runner: the builder checks
-its draft with it before it sends one (26 6.2 item 3), and the hosted turns of A1-05 check the
-current definition with it before every turn (26 5.6). The shared corpus ``tests/agent-definitions``
-holds it equal to the server: every fixture gives exactly its expected findings.
+The one place of the definition rules in the runner: a port of the server's validator
+(``services/server/internal/agents/domain/definition``, rulings of ``decisions.d/A1-02.md``)
+held equal to it by the shared corpus ``tests/agent-definitions`` at the repository root. The
+runner repeats the check before every turn of a hosted agent (26 5.6 item 1): a definition that
+fails ends the run with ``tool_class_mismatch`` before ``run.start``. The builder checks its draft
+with `validate_value` before it sends one (26 6.2 item 3).
 
-A finding names a JSON Pointer and a field code, never the submitted value.
+`check` returns every finding as a JSON Pointer and a field code, never the submitted value;
+`parse` also returns the typed `Definition` when there is none. `required_class` is the class a
+definition needs (a ``stdio`` server needs ``host``, 26 4.4 item 4) and `intersect` the tool list
+of a ``scoped`` turn (26 4.4 item 2).
+
+The server's size bounds (``agents.definition.*``) are server keys the runner cannot read; the
+runner checks with `Limits.runner`, which leaves them out and keeps every other rule
+(decisions.d/A1-05.md).
 
 Examples:
-    >>> lim = Limits(64, 4, 300, 64, 2, 2, 8, 50.0, ("npx", "uvx"))
-    >>> doc = ('{"instructions": "Run !`id`", "skills": [], "mcp_servers": [],'
-    ...        ' "settings": {"tool_class_wish": "chat"}, "origin": {"kind": "manual"}}')
-    >>> [(f.pointer, f.code) for f in validate(doc, lim, "chat")]
-    [('/instructions', 'inline_shell')]
+    >>> raw = b'{"instructions": "", "skills": [], "mcp_servers": [], '
+    >>> raw += b'"settings": {"tool_class_wish": "chat"}, "origin": {"kind": "manual"}}'
+    >>> check(raw, Limits.runner(("npx",)), "chat")
+    []
 """
 
 from __future__ import annotations
 
 import json
 import math
-import posixpath
 import re
 import unicodedata
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urlsplit
 
+from claude_code_runner.commandline import scoped_tools
+
 __all__ = [
-    "CODE_INLINE_SHELL",
-    "CODE_SKILL_FRONTMATTER",
-    "CODE_UNKNOWN_MEMBER",
-    "FieldError",
+    "Definition",
+    "Entry",
+    "Finding",
     "Limits",
+    "McpServer",
+    "Settings",
+    "Skill",
+    "SkillFile",
+    "check",
     "has_frontmatter",
     "has_import_outside_folder",
     "has_inline_shell",
+    "intersect",
+    "parse",
+    "required_class",
     "text_rule",
     "validate",
     "validate_value",
 ]
 
-CODE_UNKNOWN_MEMBER = "unknown_member"
-CODE_SKILL_FRONTMATTER = "skill_frontmatter"
-CODE_INLINE_SHELL = "inline_shell"
-CODE_IMPORT_OUTSIDE_FOLDER = "import_outside_folder"
-_SECRET_VALUE = "secret_value_not_allowed"  # noqa: S105 - a field code  # nosec B105
-_ENV_RESERVED = "env_name_reserved"
-_MCP_COMMAND = "mcp_command_not_allowed"
-_MCP_PACKAGE = "mcp_package_unpinned"
-_CLASS_TOO_LOW = "tool_class_too_low"
-_TOO_LONG = "too_long"
-_TOO_MANY = "too_many"
-_INVALID_NAME = "invalid_name"
-_DUPLICATE_NAME = "duplicate_name"
-_REQUIRED = "required"
-_INVALID_TYPE = "invalid_type"
-_INVALID_ENUM = "invalid_enum"
-_INVALID = "invalid"
-_TOO_LARGE = "too_large"
-_TOO_SMALL = "too_small"
+# ---- patterns (26 4.2, decisions.d/A1-02.md D-A1-02-3 to D-A1-02-7) ------------------------
 
-_CLASSES = ("chat", "scoped", "host")
-_ORIGIN_KINDS = ("template", "interview", "manual")
-
-_SKILL_NAME = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
-_FILE_NAME = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}\.md$")
-_ENV_NAME = re.compile(r"^[A-Z_][A-Z0-9_]*$")
-_HEADER_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$")
-_MODEL = re.compile(r"^[A-Za-z0-9._:/@-]+$")
-_BUILTIN_TOOL = re.compile(r"^[A-Za-z][A-Za-z0-9_]*(\([^()]*\))?$")
-_MCP_TOOL = re.compile(r"^[A-Za-z0-9_-]+$")
+_SKILL_NAME = re.compile(r"[a-z0-9][a-z0-9-]{0,63}")
+_FILE_NAME = re.compile(r"[a-z0-9][a-z0-9._-]{0,63}\.md")
+_ENV_NAME = re.compile(r"[A-Z_][A-Z0-9_]*")
+_HEADER_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,127}")
+_MODEL = re.compile(r"[A-Za-z0-9._:/@-]+")
+_BUILTIN_TOOL = re.compile(r"[A-Za-z][A-Za-z0-9_]*(\([^()]*\))?")
+_MCP_TOOL = re.compile(r"[A-Za-z0-9_-]+")
 _PACKAGE = re.compile(
-    r"^(@[a-z0-9][a-z0-9._-]*/)?[A-Za-z0-9][A-Za-z0-9._-]*@"
+    r"(@[a-z0-9][a-z0-9._-]*/)?[A-Za-z0-9][A-Za-z0-9._-]*@"
     r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)"
-    r"(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$"
+    r"(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?"
 )
-_TEMPLATE_VERSION = re.compile(r"^[0-9A-Za-z][0-9A-Za-z.+-]{0,63}$")
-_DRIVE = re.compile(r"^[A-Za-z]:")
+_TEMPLATE_VERSION = re.compile(r"[0-9A-Za-z][0-9A-Za-z.+-]{0,63}")
+_DRIVE = re.compile(r"[A-Za-z]:")
 
-# The white space of a JavaScript regular expression (\s), which the pinned CLI uses in its inline
-# shell pattern; Python's \s holds a different set, so the class is written out like the server's.
 _JS_SPACE = "\t\n\v\f\r \u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff"
-# (?<=^|\s)!`[^`]+` of the pinned CLI with the look-behind written as a group.
-_INLINE_SHELL = re.compile("(?:^|[" + _JS_SPACE + "])!`[^`]+`")
-# An @ token at the start or after white space; a backslash followed by a space continues it.
-_IMPORT = re.compile("(?:^|[" + _JS_SPACE + "])@((?:\\\\ |[^" + _JS_SPACE + "])+)")
+"""White space of a JavaScript regular expression (``\\s``), which the pinned CLI uses."""
+_INLINE_SHELL = re.compile(f"(?:^|[{_JS_SPACE}])!`[^`]+`")
+"""The CLI's ``(?<=^|\\s)!`[^`]+``` with the look-behind written as a group (26 4.3 item 3)."""
+_IMPORT = re.compile(f"(?:^|[{_JS_SPACE}])@((?:\\\\ |[^{_JS_SPACE}])+)")
+"""An ``@<path>`` token; a backslash before a space continues the path (26 4.3 item 4)."""
 _FENCE_SHELL = "```!"
 
-_RESERVED_ENV = (
-    "PATH",
-    "HOME",
-    "USER",
-    "LOGNAME",
-    "SHELL",
-    "TMPDIR",
-    "CLAUDE_CONFIG_DIR",
-    "CLAUDE_PRODUCT_RUN",
-    "NODE_OPTIONS",
+_RESERVED_ENV = frozenset(
+    {
+        "PATH",
+        "HOME",
+        "USER",
+        "LOGNAME",
+        "SHELL",
+        "TMPDIR",
+        "CLAUDE_CONFIG_DIR",
+        "CLAUDE_PRODUCT_RUN",
+        "NODE_OPTIONS",
+    }
 )
 _RESERVED_ENV_PREFIXES = ("ANTHROPIC_", "CLAUDE_CODE_", "LD_", "DYLD_")
 _SECRET_WORDS = ("KEY", "TOKEN", "SECRET", "PASSWORD", "PASSWD", "CREDENTIAL", "AUTH", "COOKIE")
+_BIDI = frozenset({0x061C, 0x200E, 0x200F, *range(0x202A, 0x202F), *range(0x2066, 0x206A)})
 
+_CLASSES = ("chat", "scoped", "host")
+_ORIGINS = ("template", "interview", "manual")
 _HTTP_MEMBERS = ("name", "transport", "url", "headers")
 _STDIO_MEMBERS = ("name", "transport", "command", "package", "args", "env")
 _ALL_MEMBERS = ("name", "transport", "url", "headers", "command", "package", "args", "env")
-_PARTS = ("instructions", "skills", "mcp_servers", "settings", "origin")
-_MCP_PREFIX = "mcp__"
+
+
+# ---- results -------------------------------------------------------------------------------
 
 
 @dataclass(frozen=True)
-class FieldError:
-    """One finding: the JSON Pointer into the definition and the field code."""
+class Finding:
+    """One finding: the JSON Pointer into the definition and the field code, never the value.
+
+    Attributes:
+        pointer: The JSON Pointer (RFC 6901), ``""`` for the root.
+        code: The field code of 26 4.3 or of the shape and text checks.
+    """
 
     pointer: str
     code: str
 
 
+_LIMIT_KEYS = {
+    "agents.definition.instructions_max_bytes": "instructions_max_bytes",
+    "agents.definition.max_skills": "max_skills",
+    "agents.definition.skill_description_max_chars": "skill_description_max_chars",
+    "agents.definition.skill_body_max_bytes": "skill_body_max_bytes",
+    "agents.definition.max_skill_files": "max_skill_files",
+    "agents.definition.max_mcp_servers": "max_mcp_servers",
+    "agents.definition.max_allowed_tools": "max_allowed_tools",
+    "agents.definition.max_cost_usd_per_run": "max_cost_usd_per_run",
+    "agents.mcp_stdio_runners": "stdio_runners",
+}
+"""The configuration key of each field of `Limits` (26 14)."""
+
+
 @dataclass(frozen=True)
 class Limits:
-    """The configured bounds of a definition (26 14), the values of the server's keys.
+    """The bounds a check runs with (26 14).
+
+    ``None`` leaves a size bound out (the runner cannot read the server's keys).
 
     Attributes:
         instructions_max_bytes: ``agents.definition.instructions_max_bytes``.
@@ -133,54 +152,125 @@ class Limits:
         max_mcp_servers: ``agents.definition.max_mcp_servers``.
         max_allowed_tools: ``agents.definition.max_allowed_tools``.
         max_cost_usd_per_run: ``agents.definition.max_cost_usd_per_run``.
-        stdio_runners: ``agents.mcp_stdio_runners``.
+        stdio_runners: The commands a ``stdio`` server may use (``agents.mcp_stdio_runners``
+            on the server, ``runner.mcp_stdio_runners`` in the runner).
     """
 
-    instructions_max_bytes: int
-    max_skills: int
-    skill_description_max_chars: int
-    skill_body_max_bytes: int
-    max_skill_files: int
-    max_mcp_servers: int
-    max_allowed_tools: int
-    max_cost_usd_per_run: float
+    instructions_max_bytes: int | None
+    max_skills: int | None
+    skill_description_max_chars: int | None
+    skill_body_max_bytes: int | None
+    max_skill_files: int | None
+    max_mcp_servers: int | None
+    max_allowed_tools: int | None
+    max_cost_usd_per_run: float | None
     stdio_runners: tuple[str, ...]
 
     @classmethod
     def from_keys(cls, values: Mapping[str, Any]) -> Limits:
-        """Return the limits from a mapping of the server's configuration keys.
+        """Read the limits by configuration key (the form of the corpus' ``limits.json``).
 
         Args:
-            values: ``agents.definition.*`` and ``agents.mcp_stdio_runners`` by key, as in
-                ``tests/agent-definitions/limits.json``.
+            values: Every key of the server's definition limits.
 
         Returns:
             The limits.
 
         Raises:
-            KeyError: A key is missing.
+            ValueError: A key is missing or unknown.
         """
-        p = "agents.definition."
-        return cls(
-            instructions_max_bytes=int(values[p + "instructions_max_bytes"]),
-            max_skills=int(values[p + "max_skills"]),
-            skill_description_max_chars=int(values[p + "skill_description_max_chars"]),
-            skill_body_max_bytes=int(values[p + "skill_body_max_bytes"]),
-            max_skill_files=int(values[p + "max_skill_files"]),
-            max_mcp_servers=int(values[p + "max_mcp_servers"]),
-            max_allowed_tools=int(values[p + "max_allowed_tools"]),
-            max_cost_usd_per_run=float(values[p + "max_cost_usd_per_run"]),
-            stdio_runners=tuple(str(v) for v in values["agents.mcp_stdio_runners"]),
-        )
+        unknown = set(values) - set(_LIMIT_KEYS)
+        if unknown:
+            raise ValueError("unknown limit key")
+        missing = set(_LIMIT_KEYS) - set(values)
+        if missing:
+            raise ValueError("missing limit key")
+        named = {_LIMIT_KEYS[k]: v for k, v in values.items()}
+        named["stdio_runners"] = tuple(named["stdio_runners"])
+        return cls(**named)
+
+    @classmethod
+    def runner(cls, stdio_runners: Sequence[str]) -> Limits:
+        """The limits of the runner's own check: no size bound, its own ``stdio`` commands.
+
+        Args:
+            stdio_runners: ``runner.mcp_stdio_runners``.
+
+        Returns:
+            The limits.
+        """
+        return cls(None, None, None, None, None, None, None, None, tuple(stdio_runners))
+
+
+@dataclass(frozen=True)
+class SkillFile:
+    """An extra file of a skill: a flat, validated name and Markdown content."""
+
+    name: str
+    content: str
+
+
+@dataclass(frozen=True)
+class Skill:
+    """A skill: name, one-line description, Markdown body and extra files."""
+
+    name: str
+    description: str
+    body: str
+    files: tuple[SkillFile, ...] = ()
+
+
+@dataclass(frozen=True)
+class Entry:
+    """A header or environment entry: a plain ``value`` or a ``secret_ref``, never both."""
+
+    name: str
+    value: str | None = field(default=None, repr=False)
+    secret_ref: str | None = field(default=None, repr=False)
+
+
+@dataclass(frozen=True)
+class McpServer:
+    """An MCP server: ``http`` with ``url`` and ``headers``, or ``stdio`` with a pinned package."""
+
+    name: str
+    transport: str
+    url: str = ""
+    headers: tuple[Entry, ...] = ()
+    command: str = ""
+    package: str = ""
+    args: tuple[str, ...] = ()
+    env: tuple[Entry, ...] = ()
+
+
+@dataclass(frozen=True)
+class Settings:
+    """The settings: model, class wish, tool list (``None``: no narrowing) and cost cap."""
+
+    tool_class_wish: str
+    model: str | None = None
+    allowed_tools: tuple[str, ...] | None = None
+    max_cost_usd_per_run: float | None = None
+
+
+@dataclass(frozen=True)
+class Definition:
+    """A definition that passed the check (schema ``agent_definition.v1``)."""
+
+    instructions: str
+    skills: tuple[Skill, ...]
+    mcp_servers: tuple[McpServer, ...]
+    settings: Settings
+    origin_kind: str
+
+
+# ---- the rules as predicates ---------------------------------------------------------------
 
 
 def has_frontmatter(text: str) -> bool:
-    """Tell whether the first line of ``text`` is ``---`` (26 4.3 item 2).
-
-    An optional byte order mark and trailing blanks of the line are ignored.
-    """
-    first = text.removeprefix("\ufeff").split("\n", 1)[0]
-    return first.rstrip(" \t\r") == "---"
+    """Tell whether the first line of ``text`` is ``---`` (26 4.3 item 2)."""
+    line = text.removeprefix("\ufeff").split("\n", 1)[0]
+    return line.rstrip(" \t\r") == "---"
 
 
 def has_inline_shell(text: str) -> bool:
@@ -188,13 +278,15 @@ def has_inline_shell(text: str) -> bool:
     return _FENCE_SHELL in text or _INLINE_SHELL.search(text) is not None
 
 
-def has_import_outside_folder(text: str) -> bool:
-    r"""Tell whether ``text`` holds an ``@`` import that leaves the agent folder (26 4.3 item 4).
+def _outside_folder(path: str) -> bool:
+    if path.startswith(("/", "\\", "~")) or _DRIVE.match(path):
+        return True
+    segments = [s for s in re.split(r"[/\\]", path) if s]
+    return any(s.strip() == ".." for s in segments)
 
-    The path is read as the CLI reads it: an escaped space (``\ ``) becomes a space and everything
-    from ``#`` on is dropped; a leading quote is ignored. It leaves the folder when it is absolute
-    (``/``, ``\`` or a drive), starts with ``~`` or has a ``..`` segment with ``/`` or ``\``.
-    """
+
+def has_import_outside_folder(text: str) -> bool:
+    """Tell whether ``text`` holds an ``@`` import that leaves the agent folder (26 4.3 item 4)."""
     for match in _IMPORT.finditer(text):
         path = match.group(1).replace("\\ ", " ").split("#", 1)[0]
         if _outside_folder(path.lstrip("\"' ")):
@@ -202,10 +294,12 @@ def has_import_outside_folder(text: str) -> bool:
     return False
 
 
-def _outside_folder(path: str) -> bool:
-    if path.startswith(("/", "\\", "~")) or _DRIVE.match(path):
-        return True
-    return any(seg.strip() == ".." for seg in re.split(r"[/\\]", path) if seg)
+def _valid_file_name(name: str) -> bool:
+    return _FILE_NAME.fullmatch(name) is not None and name.lower() != "skill.md"
+
+
+def _reserved_env(name: str) -> bool:
+    return name in _RESERVED_ENV or name.startswith(_RESERVED_ENV_PREFIXES)
 
 
 def _secret_name(name: str) -> bool:
@@ -213,488 +307,564 @@ def _secret_name(name: str) -> bool:
     return any(word in upper for word in _SECRET_WORDS)
 
 
-def _reserved_env(name: str) -> bool:
-    return name in _RESERVED_ENV or name.startswith(_RESERVED_ENV_PREFIXES)
-
-
 def _valid_secret_ref(ref: str) -> bool:
     scheme, sep, rest = ref.partition(":")
     if not sep:
         return False
     if scheme == "env":
-        return _ENV_NAME.match(rest) is not None
+        return _ENV_NAME.fullmatch(rest) is not None
     if scheme == "file":
-        return rest != "/" and rest.startswith("/") and posixpath.normpath(rest) == rest
+        if not rest.startswith("/") or rest == "/":
+            return False
+        return all(p not in ("", ".", "..") for p in rest[1:].split("/"))
     return False
 
 
 def _valid_url(url: str) -> bool:
+    if "#" in url:
+        return False
     try:
         parts = urlsplit(url)
-        host = parts.hostname
+        _ = parts.port  # a port that is not a number is refused like the server's parser
     except ValueError:
         return False
+    host = parts.hostname or ""
     return (
         parts.scheme == "https"
-        and parts.netloc != ""
+        and bool(parts.netloc)
         and bool(host)
         and parts.username is None
-        and "#" not in url
+        and "@" not in parts.netloc
+        and not any(c in host for c in ' \\<>"{}|^`')
     )
 
 
 def _valid_model(model: str) -> bool:
-    return _MODEL.match(model) is not None and not model.startswith("-")
+    return _MODEL.fullmatch(model) is not None and not model.startswith("-")
 
 
-def _valid_tool(tool: str, listed: list[str]) -> bool:
-    if not tool.startswith(_MCP_PREFIX):
-        return _BUILTIN_TOOL.match(tool) is not None
-    server, sep, rest = tool[len(_MCP_PREFIX) :].partition("__")
+def _valid_tool(tool: str, listed: Sequence[str]) -> bool:
+    if not tool.startswith("mcp__"):
+        return _BUILTIN_TOOL.fullmatch(tool) is not None
+    server, sep, rest = tool[len("mcp__") :].partition("__")
     if server not in listed:
         return False
-    return not sep or _MCP_TOOL.match(rest) is not None
+    return not sep or _MCP_TOOL.fullmatch(rest) is not None
 
 
 def text_rule(text: str) -> str | None:
-    """Return the SEC-IN-4 rule a display text breaks, or ``None``.
-
-    The rules are invalid UTF-8 (a lone surrogate), a control character (category Cc, line breaks
-    included) and a bidi control.
-    """
-    for ch in text:
-        cp = ord(ch)
-        if 0xD800 <= cp <= 0xDFFF:
+    """The first character rule ``text`` breaks (SEC-IN-4), or ``None``."""
+    for char in text:
+        point = ord(char)
+        if 0xD800 <= point <= 0xDFFF:  # a lone surrogate is no UTF-8 at all
             return "invalid_utf8"
-        if unicodedata.category(ch) == "Cc":
+        if unicodedata.category(char) == "Cc":
             return "control_character"
-        if cp in (0x061C, 0x200E, 0x200F) or 0x202A <= cp <= 0x202E or 0x2066 <= cp <= 0x2069:
+        if point in _BIDI:
             return "bidi_control"
     return None
 
 
-def _escape(name: str) -> str:
-    return name.replace("~", "~0").replace("/", "~1")
+def _pointer(base: str, name: str | int) -> str:
+    text = str(name).replace("~", "~0").replace("/", "~1")
+    return f"{base}/{text}"
 
 
-def _at(pointer: str, name: str) -> str:
-    return pointer + "/" + _escape(name)
+# ---- the walk ------------------------------------------------------------------------------
 
 
-@dataclass
-class _Names:
-    fold: bool = False
-    seen: set[str] = field(default_factory=set)
-
-    def first(self, name: str) -> bool:
-        key = name.lower() if self.fold else name
-        if key in self.seen:
-            return False
-        self.seen.add(key)
-        return True
-
-
-@dataclass
 class _Checker:
-    lim: Limits
-    tool_class: str
-    found: list[FieldError] = field(default_factory=list)
+    """Walks one decoded definition and collects the findings in document order."""
+
+    def __init__(self, limits: Limits, tool_class: str) -> None:
+        self.lim = limits
+        self.below_host = tool_class not in ("host",)
+        self.found: list[Finding] = []
 
     def add(self, pointer: str, code: str) -> None:
-        self.found.append(FieldError(pointer, code))
+        self.found.append(Finding(pointer, code))
 
-    def below_host(self) -> bool:
-        rank = _CLASSES.index(self.tool_class) if self.tool_class in _CLASSES else -1
-        return rank < _CLASSES.index("host")
-
-    def object(self, pointer: str, value: Any, allowed: tuple[str, ...]) -> dict[str, Any] | None:
+    def object(self, p: str, value: Any, *allowed: str) -> dict[str, Any] | None:
         if not isinstance(value, dict):
-            self.add(pointer, _INVALID_TYPE)
+            self.add(p, "invalid_type")
             return None
         for name in sorted(k for k in value if k not in allowed):
-            self.add(_at(pointer, name), CODE_UNKNOWN_MEMBER)
+            self.add(_pointer(p, name), "unknown_member")
         return value
 
-    def array(self, pointer: str, m: dict[str, Any], name: str, required: bool) -> list[Any] | None:
+    def array(self, p: str, m: Mapping[str, Any], name: str, *, required: bool) -> list[Any] | None:
         if name not in m:
             if required:
-                self.add(_at(pointer, name), _REQUIRED)
+                self.add(_pointer(p, name), "required")
             return None
         value = m[name]
         if not isinstance(value, list):
-            self.add(_at(pointer, name), _INVALID_TYPE)
+            self.add(_pointer(p, name), "invalid_type")
             return None
         return value
 
-    def string(self, pointer: str, m: dict[str, Any], name: str, required: bool) -> str | None:
+    def string(self, p: str, m: Mapping[str, Any], name: str, *, required: bool) -> str | None:
         if name not in m:
             if required:
-                self.add(_at(pointer, name), _REQUIRED)
+                self.add(_pointer(p, name), "required")
             return None
-        return self.string_value(_at(pointer, name), m[name])
+        return self.string_value(_pointer(p, name), m[name])
 
-    def string_value(self, pointer: str, value: Any) -> str | None:
+    def string_value(self, p: str, value: Any) -> str | None:
         if not isinstance(value, str):
-            self.add(pointer, _INVALID_TYPE)
+            self.add(p, "invalid_type")
             return None
         return value
 
-    def display(self, pointer: str, text: str) -> bool:
+    def display(self, p: str, text: str) -> bool:
         rule = text_rule(text)
         if rule is not None:
-            self.add(pointer, rule)
+            self.add(p, rule)
             return False
         return True
 
-    def markdown(self, pointer: str, text: str) -> None:
-        self.display(pointer, text.replace("\n", " ").replace("\r", " "))
+    def markdown(self, p: str, text: str) -> None:
+        self.display(p, text.replace("\n", " ").replace("\r", " "))
 
-    def max_bytes(self, pointer: str, text: str, limit: int) -> None:
-        if len(text.encode("utf-8", errors="surrogatepass")) > limit:
-            self.add(pointer, _TOO_LONG)
+    def max_bytes(self, p: str, text: str, limit: int | None) -> None:
+        if limit is not None and len(text.encode("utf-8", "surrogatepass")) > limit:
+            self.add(p, "too_long")
 
-    def max_items(self, pointer: str, n: int, limit: int) -> None:
-        if n > limit:
-            self.add(pointer, _TOO_MANY)
+    def max_items(self, p: str, count: int, limit: int | None) -> None:
+        if limit is not None and count > limit:
+            self.add(p, "too_many")
 
-    def text_rules(self, pointer: str, text: str, front: bool) -> None:
+    def text_rules(self, p: str, text: str, *, front: bool) -> None:
         if front and has_frontmatter(text):
-            self.add(pointer, CODE_SKILL_FRONTMATTER)
+            self.add(p, "skill_frontmatter")
         if has_inline_shell(text):
-            self.add(pointer, CODE_INLINE_SHELL)
+            self.add(p, "inline_shell")
         if has_import_outside_folder(text):
-            self.add(pointer, CODE_IMPORT_OUTSIDE_FOLDER)
+            self.add(p, "import_outside_folder")
 
     def name(
-        self, pointer: str, m: dict[str, Any], valid: Callable[[str], bool], names: _Names
-    ) -> str | None:
-        text = self.string(pointer, m, "name", True)
+        self, p: str, m: Mapping[str, Any], valid: Callable[[str], bool], seen: set[str]
+    ) -> str:
+        text = self.string(p, m, "name", required=True)
         if text is None:
-            return None
-        np = _at(pointer, "name")
+            return ""
+        np = _pointer(p, "name")
+        key = text.lower() if valid is _valid_header_name else text
         if not self.display(np, text):
             pass
         elif not valid(text):
-            self.add(np, _INVALID_NAME)
-        elif not names.first(text):
-            self.add(np, _DUPLICATE_NAME)
+            self.add(np, "invalid_name")
+        elif key in seen:
+            self.add(np, "duplicate_name")
+        else:
+            seen.add(key)
         return text
 
-    def definition(self, value: Any) -> None:
-        m = self.object("", value, _PARTS)
-        if m is None:
-            return
-        text = self.string("", m, "instructions", True)
-        if text is not None:
-            self.markdown("/instructions", text)
-            self.max_bytes("/instructions", text, self.lim.instructions_max_bytes)
-            self.text_rules("/instructions", text, False)
-        self.skills(m)
-        servers = self.servers(m)
-        self.settings(m, servers)
-        self.origin(m)
+    # -- members --
 
-    def skills(self, m: dict[str, Any]) -> None:
-        items = self.array("", m, "skills", True)
+    def definition(self, value: Any) -> Definition | None:
+        m = self.object("", value, "instructions", "skills", "mcp_servers", "settings", "origin")
+        if m is None:
+            return None
+        instructions = self.string("", m, "instructions", required=True)
+        if instructions is not None:
+            self.markdown("/instructions", instructions)
+            self.max_bytes("/instructions", instructions, self.lim.instructions_max_bytes)
+            self.text_rules("/instructions", instructions, front=False)
+        skills = self.skills(m)
+        servers = self.servers(m)
+        settings = self.settings(m, servers)
+        origin = self.origin(m)
+        return Definition(instructions or "", tuple(skills), tuple(servers), settings, origin)
+
+    def skill_text(self, p: str, text: str) -> None:
+        self.markdown(p, text)
+        self.max_bytes(p, text, self.lim.skill_body_max_bytes)
+        self.text_rules(p, text, front=True)
+
+    def skills(self, m: Mapping[str, Any]) -> list[Skill]:
+        items = self.array("", m, "skills", required=True)
+        out: list[Skill] = []
         if items is None:
-            return
+            return out
         self.max_items("/skills", len(items), self.lim.max_skills)
-        names = _Names()
-        for i, item in enumerate(items):
-            ip = f"/skills/{i}"
-            sm = self.object(ip, item, ("name", "description", "body", "files"))
+        seen: set[str] = set()
+        for i, value in enumerate(items):
+            ip = _pointer("/skills", i)
+            sm = self.object(ip, value, "name", "description", "body", "files")
             if sm is None:
                 continue
-            self.name(ip, sm, lambda n: _SKILL_NAME.match(n) is not None, names)
-            desc = self.string(ip, sm, "description", True)
-            if desc is not None:
-                dp = ip + "/description"
-                if not self.display(dp, desc):
+            name = self.name(ip, sm, _valid_skill_name, seen)
+            description = self.string(ip, sm, "description", required=True)
+            if description is not None:
+                dp = _pointer(ip, "description")
+                limit = self.lim.skill_description_max_chars
+                if not self.display(dp, description):
                     pass
-                elif desc.strip() == "":
-                    self.add(dp, _REQUIRED)
-                elif len(desc) > self.lim.skill_description_max_chars:
-                    self.add(dp, _TOO_LONG)
-            body = self.string(ip, sm, "body", True)
+                elif not description.strip():
+                    self.add(dp, "required")
+                elif limit is not None and len(description) > limit:
+                    self.add(dp, "too_long")
+            body = self.string(ip, sm, "body", required=True)
             if body is not None:
-                self.skill_text(ip + "/body", body)
-            self.files(ip, sm)
+                self.skill_text(_pointer(ip, "body"), body)
+            files = self.files(ip, sm)
+            out.append(Skill(name, description or "", body or "", tuple(files)))
+        return out
 
-    def skill_text(self, pointer: str, text: str) -> None:
-        self.markdown(pointer, text)
-        self.max_bytes(pointer, text, self.lim.skill_body_max_bytes)
-        self.text_rules(pointer, text, True)
-
-    def files(self, pointer: str, m: dict[str, Any]) -> None:
-        items = self.array(pointer, m, "files", False)
+    def files(self, p: str, m: Mapping[str, Any]) -> list[SkillFile]:
+        items = self.array(p, m, "files", required=False)
+        out: list[SkillFile] = []
         if items is None:
-            return
-        fp = pointer + "/files"
+            return out
+        fp = _pointer(p, "files")
         self.max_items(fp, len(items), self.lim.max_skill_files)
-        names = _Names()
-        for i, item in enumerate(items):
-            ip = f"{fp}/{i}"
-            fm = self.object(ip, item, ("name", "content"))
+        seen: set[str] = set()
+        for i, value in enumerate(items):
+            ip = _pointer(fp, i)
+            fm = self.object(ip, value, "name", "content")
             if fm is None:
                 continue
-            self.name(
-                ip,
-                fm,
-                lambda n: _FILE_NAME.match(n) is not None and n.lower() != "skill.md",
-                names,
-            )
-            content = self.string(ip, fm, "content", True)
+            name = self.name(ip, fm, _valid_file_name, seen)
+            content = self.string(ip, fm, "content", required=True)
             if content is not None:
-                self.skill_text(ip + "/content", content)
+                self.skill_text(_pointer(ip, "content"), content)
+            out.append(SkillFile(name, content or ""))
+        return out
 
-    def servers(self, m: dict[str, Any]) -> list[str]:
-        items = self.array("", m, "mcp_servers", True)
-        listed: list[str] = []
+    def servers(self, m: Mapping[str, Any]) -> list[McpServer]:
+        items = self.array("", m, "mcp_servers", required=True)
+        out: list[McpServer] = []
         if items is None:
-            return listed
+            return out
         self.max_items("/mcp_servers", len(items), self.lim.max_mcp_servers)
-        names = _Names()
-        for i, item in enumerate(items):
-            ip = f"/mcp_servers/{i}"
+        seen: set[str] = set()
+        for i, value in enumerate(items):
+            ip = _pointer("/mcp_servers", i)
             members: tuple[str, ...] = _ALL_MEMBERS
-            if isinstance(item, dict):
-                transport = item.get("transport")
+            if isinstance(value, dict):
+                transport = value.get("transport")
                 if transport == "http":
                     members = _HTTP_MEMBERS
                 elif transport == "stdio":
                     members = _STDIO_MEMBERS
-            sm = self.object(ip, item, members)
+            sm = self.object(ip, value, *members)
             if sm is None:
                 continue
-            server_name = self.name(ip, sm, lambda n: _SKILL_NAME.match(n) is not None, names)
-            listed.append(server_name if server_name is not None else "")
-            transport = self.string(ip, sm, "transport", True)
+            name = self.name(ip, sm, _valid_skill_name, seen)
+            transport = self.string(ip, sm, "transport", required=True) or ""
             if transport == "http":
-                self.http_server(ip, sm)
+                out.append(self.http_server(ip, sm, name))
             elif transport == "stdio":
-                self.stdio_server(ip, sm)
-            elif transport is not None:
-                self.add(ip + "/transport", _INVALID_ENUM)
-        return listed
+                out.append(self.stdio_server(ip, sm, name))
+            else:
+                if isinstance(sm.get("transport"), str):
+                    self.add(_pointer(ip, "transport"), "invalid_enum")
+                out.append(McpServer(name, transport))
+        return out
 
-    def http_server(self, pointer: str, m: dict[str, Any]) -> None:
-        url = self.string(pointer, m, "url", True)
-        if url is not None and self.display(pointer + "/url", url) and not _valid_url(url):
-            self.add(pointer + "/url", _INVALID)
-        self.entries(
-            pointer,
-            m,
-            "headers",
-            lambda n: _HEADER_NAME.match(n) is not None,
-            fold=True,
-            reserved=None,
+    def http_server(self, p: str, m: Mapping[str, Any], name: str) -> McpServer:
+        url = self.string(p, m, "url", required=True)
+        if url is not None:
+            up = _pointer(p, "url")
+            if self.display(up, url) and not _valid_url(url):
+                self.add(up, "invalid")
+        headers = self.entries(p, m, "headers", _valid_header_name, None)
+        return McpServer(name, "http", url=url or "", headers=tuple(headers))
+
+    def stdio_server(self, p: str, m: Mapping[str, Any], name: str) -> McpServer:
+        command = self.stdio_member(p, m, "command", "mcp_command_not_allowed")
+        if command and command not in self.lim.stdio_runners:
+            self.add(_pointer(p, "command"), "mcp_command_not_allowed")
+        package = self.stdio_member(p, m, "package", "mcp_package_unpinned")
+        if package and _PACKAGE.fullmatch(package) is None:
+            self.add(_pointer(p, "package"), "mcp_package_unpinned")
+        args: list[str] = []
+        items = self.array(p, m, "args", required=False)
+        if items is not None:
+            ap = _pointer(p, "args")
+            for i, value in enumerate(items):
+                arg = self.string_value(_pointer(ap, i), value)
+                if arg is not None:
+                    self.display(_pointer(ap, i), arg)
+                    args.append(arg)
+        env = self.entries(p, m, "env", _valid_env_name, _reserved_env)
+        if self.below_host:
+            self.add(_pointer(p, "transport"), "tool_class_too_low")
+        return McpServer(
+            name,
+            "stdio",
+            command=command or "",
+            package=package or "",
+            args=tuple(args),
+            env=tuple(env),
         )
 
-    def stdio_server(self, pointer: str, m: dict[str, Any]) -> None:
-        cp = pointer + "/command"
-        if "command" not in m:
-            self.add(cp, _MCP_COMMAND)
-        else:
-            cmd = self.string_value(cp, m["command"])
-            if cmd is not None and self.display(cp, cmd) and cmd not in self.lim.stdio_runners:
-                self.add(cp, _MCP_COMMAND)
-        pp = pointer + "/package"
-        if "package" not in m:
-            self.add(pp, _MCP_PACKAGE)
-        else:
-            pkg = self.string_value(pp, m["package"])
-            if pkg is not None and self.display(pp, pkg) and _PACKAGE.match(pkg) is None:
-                self.add(pp, _MCP_PACKAGE)
-        args = self.array(pointer, m, "args", False)
-        for i, arg in enumerate(args or []):
-            ap = f"{pointer}/args/{i}"
-            text = self.string_value(ap, arg)
-            if text is not None:
-                self.display(ap, text)
-        self.entries(
-            pointer,
-            m,
-            "env",
-            lambda n: _ENV_NAME.match(n) is not None,
-            fold=False,
-            reserved=_reserved_env,
-        )
-        if self.below_host():
-            self.add(pointer + "/transport", _CLASS_TOO_LOW)
+    def stdio_member(self, p: str, m: Mapping[str, Any], name: str, missing: str) -> str | None:
+        """``command`` or ``package``: missing is ``missing``; a usable text, else ``None``."""
+        mp = _pointer(p, name)
+        if name not in m:
+            self.add(mp, missing)
+            return None
+        text = self.string_value(mp, m[name])
+        if text is None or not self.display(mp, text):
+            return None
+        if not text:
+            self.add(mp, missing)
+            return None
+        return text
 
-    def entries(  # noqa: PLR0913 - the parts of one entry list
+    def entries(
         self,
-        pointer: str,
-        m: dict[str, Any],
+        p: str,
+        m: Mapping[str, Any],
         member: str,
         valid: Callable[[str], bool],
-        *,
-        fold: bool,
         reserved: Callable[[str], bool] | None,
-    ) -> None:
-        items = self.array(pointer, m, member, False)
+    ) -> list[Entry]:
+        items = self.array(p, m, member, required=False)
+        out: list[Entry] = []
         if items is None:
-            return
-        lp = _at(pointer, member)
-        names = _Names(fold=fold)
-        for i, item in enumerate(items):
-            ip = f"{lp}/{i}"
-            em = self.object(ip, item, ("name", "value", "secret_ref"))
+            return out
+        lp = _pointer(p, member)
+        seen: set[str] = set()
+        for i, value in enumerate(items):
+            ip = _pointer(lp, i)
+            em = self.object(ip, value, "name", "value", "secret_ref")
             if em is None:
                 continue
-            entry_name = self.name(ip, em, valid, names)
-            if (
-                reserved is not None
-                and entry_name is not None
-                and valid(entry_name)
-                and reserved(entry_name)
-            ):
-                self.add(ip + "/name", _ENV_RESERVED)
-            self.entry_value(ip, em, entry_name or "")
+            name = self.name(ip, em, valid, seen)
+            if reserved is not None and valid(name) and reserved(name):
+                self.add(_pointer(ip, "name"), "env_name_reserved")
+            out.append(self.entry_value(ip, em, name))
+        return out
 
-    def entry_value(self, pointer: str, m: dict[str, Any], name: str) -> None:
+    def entry_value(self, p: str, m: Mapping[str, Any], name: str) -> Entry:
         has_value, has_ref = "value" in m, "secret_ref" in m
         if has_value and has_ref:
-            self.add(pointer, _INVALID)
-            return
+            self.add(p, "invalid")
+            return Entry(name)
         if not has_value and not has_ref:
-            self.add(pointer, _REQUIRED)
-            return
+            self.add(p, "required")
+            return Entry(name)
         if has_value:
-            vp = pointer + "/value"
+            vp = _pointer(p, "value")
             value = self.string_value(vp, m["value"])
             if value is not None:
                 self.display(vp, value)
                 if _secret_name(name):
-                    self.add(vp, _SECRET_VALUE)
-            return
-        rp = pointer + "/secret_ref"
+                    self.add(vp, "secret_value_not_allowed")
+            return Entry(name, value=value)
+        rp = _pointer(p, "secret_ref")
         ref = self.string_value(rp, m["secret_ref"])
         if ref is not None and self.display(rp, ref) and not _valid_secret_ref(ref):
-            self.add(rp, _INVALID)
+            self.add(rp, "invalid")
+        return Entry(name, secret_ref=ref)
 
-    def settings(self, m: dict[str, Any], servers: list[str]) -> None:
+    def settings(self, m: Mapping[str, Any], servers: Sequence[McpServer]) -> Settings:
         if "settings" not in m:
-            self.add("/settings", _REQUIRED)
-            return
+            self.add("/settings", "required")
+            return Settings("")
         sm = self.object(
             "/settings",
             m["settings"],
-            ("model", "tool_class_wish", "allowed_tools", "max_cost_usd_per_run"),
+            "model",
+            "tool_class_wish",
+            "allowed_tools",
+            "max_cost_usd_per_run",
         )
         if sm is None:
-            return
-        model = self.string("/settings", sm, "model", False)
+            return Settings("")
+        model = self.string("/settings", sm, "model", required=False)
         if model is not None and self.display("/settings/model", model) and not _valid_model(model):
-            self.add("/settings/model", _INVALID)
-        wish = self.string("/settings", sm, "tool_class_wish", True)
+            self.add("/settings/model", "invalid")
+        wish = self.string("/settings", sm, "tool_class_wish", required=True)
         if wish is not None and wish not in _CLASSES:
-            self.add("/settings/tool_class_wish", _INVALID_ENUM)
-        self.tools(sm, servers)
-        self.cost(sm)
+            self.add("/settings/tool_class_wish", "invalid_enum")
+        tools = self.tools(sm, [s.name for s in servers])
+        cost = self.cost(sm)
+        return Settings(wish or "", model, tools, cost)
 
-    def tools(self, m: dict[str, Any], servers: list[str]) -> None:
-        items = self.array("/settings", m, "allowed_tools", False)
+    def tools(self, m: Mapping[str, Any], listed: Sequence[str]) -> tuple[str, ...] | None:
+        items = self.array("/settings", m, "allowed_tools", required=False)
         if items is None:
-            return
+            return None
         tp = "/settings/allowed_tools"
         self.max_items(tp, len(items), self.lim.max_allowed_tools)
-        names = _Names()
-        for i, item in enumerate(items):
-            ip = f"{tp}/{i}"
-            tool = self.string_value(ip, item)
+        out: list[str] = []
+        seen: set[str] = set()
+        for i, value in enumerate(items):
+            ip = _pointer(tp, i)
+            tool = self.string_value(ip, value)
             if tool is None:
                 continue
             if not self.display(ip, tool):
-                continue
-            if not _valid_tool(tool, servers):
-                self.add(ip, _INVALID)
-            elif not names.first(tool):
-                self.add(ip, _DUPLICATE_NAME)
+                pass
+            elif not _valid_tool(tool, listed):
+                self.add(ip, "invalid")
+            elif tool in seen:
+                self.add(ip, "duplicate_name")
+            else:
+                seen.add(tool)
+            out.append(tool)
+        return tuple(out)
 
-    def cost(self, m: dict[str, Any]) -> None:
+    def cost(self, m: Mapping[str, Any]) -> float | None:
         if "max_cost_usd_per_run" not in m:
-            return
+            return None
         cp = "/settings/max_cost_usd_per_run"
         value = m["max_cost_usd_per_run"]
         if isinstance(value, bool) or not isinstance(value, int | float):
-            self.add(cp, _INVALID_TYPE)
-            return
-        try:
-            amount = float(value)
-        except OverflowError:
-            # An integer beyond the range of a float (10**400) is no amount, as on the server.
-            self.add(cp, _INVALID)
-            return
-        if math.isinf(amount) or math.isnan(amount):
-            self.add(cp, _INVALID)
-        elif amount <= 0:
-            self.add(cp, _TOO_SMALL)
-        elif amount > self.lim.max_cost_usd_per_run:
-            self.add(cp, _TOO_LARGE)
+            self.add(cp, "invalid_type")
+            return None
+        number = float(value)
+        limit = self.lim.max_cost_usd_per_run
+        if not math.isfinite(number):
+            self.add(cp, "invalid")
+        elif number <= 0:
+            self.add(cp, "too_small")
+        elif limit is not None and number > limit:
+            self.add(cp, "too_large")
+        return number
 
-    def origin(self, m: dict[str, Any]) -> None:
+    def origin(self, m: Mapping[str, Any]) -> str:
         if "origin" not in m:
-            self.add("/origin", _REQUIRED)
-            return
-        om = self.object("/origin", m["origin"], ("kind", "template_slug", "template_version"))
+            self.add("/origin", "required")
+            return ""
+        om = self.object("/origin", m["origin"], "kind", "template_slug", "template_version")
         if om is None:
-            return
-        kind = self.string("/origin", om, "kind", True)
-        if kind is not None and kind not in _ORIGIN_KINDS:
-            self.add("/origin/kind", _INVALID_ENUM)
-        slug = self.string("/origin", om, "template_slug", False)
-        if (
-            slug is not None
-            and self.display("/origin/template_slug", slug)
-            and _SKILL_NAME.match(slug) is None
-        ):
-            self.add("/origin/template_slug", _INVALID)
-        version = self.string("/origin", om, "template_version", False)
+            return ""
+        kind = self.string("/origin", om, "kind", required=True)
+        if kind is not None and kind not in _ORIGINS:
+            self.add("/origin/kind", "invalid_enum")
+        slug = self.string("/origin", om, "template_slug", required=False)
+        sp = "/origin/template_slug"
+        if slug is not None and self.display(sp, slug) and not _valid_skill_name(slug):
+            self.add(sp, "invalid")
+        version = self.string("/origin", om, "template_version", required=False)
+        vp = "/origin/template_version"
         if (
             version is not None
-            and self.display("/origin/template_version", version)
-            and _TEMPLATE_VERSION.match(version) is None
+            and self.display(vp, version)
+            and _TEMPLATE_VERSION.fullmatch(version) is None
         ):
-            self.add("/origin/template_version", _INVALID)
+            self.add(vp, "invalid")
+        return kind or ""
 
 
-def validate_value(value: Any, limits: Limits, tool_class: str) -> list[FieldError]:
-    """Check a decoded definition as ``agent_definition.v1`` for an agent of ``tool_class``.
+def _valid_skill_name(name: str) -> bool:
+    return _SKILL_NAME.fullmatch(name) is not None
+
+
+def _valid_env_name(name: str) -> bool:
+    return _ENV_NAME.fullmatch(name) is not None
+
+
+def _valid_header_name(name: str) -> bool:
+    return _HEADER_NAME.fullmatch(name) is not None
+
+
+def _no_constant(name: str) -> Any:
+    raise ValueError(name)
+
+
+def _decode(raw: bytes) -> tuple[Any, bool]:
+    """One JSON value from ``raw``; ``(None, False)`` for anything else."""
+    try:
+        text = raw.decode("utf-8")
+        return json.loads(text, parse_constant=_no_constant), True
+    except (UnicodeDecodeError, ValueError, RecursionError):
+        return None, False
+
+
+def parse(raw: bytes, limits: Limits, tool_class: str) -> tuple[Definition | None, list[Finding]]:
+    """Check ``raw`` like `check` and return the typed definition when nothing was found.
+
+    Args:
+        raw: The definition as JSON text (the ``definition`` member of ``getAgentDefinition``).
+        limits: The bounds (`Limits.runner` in the runner).
+        tool_class: The class the definition is checked for; below ``host`` every ``stdio``
+            server is ``tool_class_too_low``.
+
+    Returns:
+        The definition (``None`` with a finding) and every finding in document order.
+    """
+    value, ok = _decode(raw)
+    if not ok:
+        return None, [Finding("", "invalid_type")]
+    checker = _Checker(limits, tool_class)
+    definition = checker.definition(value)
+    if checker.found:
+        return None, checker.found
+    return definition, []
+
+
+def check(raw: bytes, limits: Limits, tool_class: str) -> list[Finding]:
+    """Return every finding of ``raw`` against 26 4.2 and 4.3; none means it passes.
+
+    Args:
+        raw: The definition as JSON text.
+        limits: The bounds.
+        tool_class: The class the definition is checked for.
+
+    Returns:
+        The findings in document order.
+    """
+    return parse(raw, limits, tool_class)[1]
+
+
+def validate_value(value: Any, limits: Limits, tool_class: str) -> list[Finding]:
+    """Check an already decoded definition like `check`.
 
     Args:
         value: The definition as decoded from JSON.
-        limits: The bounds of 26 14.
-        tool_class: ``chat``, ``scoped`` or ``host``; a ``stdio`` server below ``host`` is
-            ``tool_class_too_low``.
+        limits: The bounds.
+        tool_class: The class the definition is checked for.
 
     Returns:
-        Every finding in document order; none means the definition passes 26 4.2 and 4.3.
+        The findings in document order.
     """
     checker = _Checker(limits, tool_class)
     checker.definition(value)
     return checker.found
 
 
-def validate(raw: str, limits: Limits, tool_class: str) -> list[FieldError]:
-    """Check the JSON text ``raw`` like `validate_value`.
-
-    A text that is not exactly one JSON value is one ``invalid_type`` finding on the root.
+def validate(raw: str, limits: Limits, tool_class: str) -> list[Finding]:
+    """Check the JSON text ``raw`` like `check`.
 
     Args:
-        raw: The JSON text.
-        limits: The bounds of 26 14.
-        tool_class: ``chat``, ``scoped`` or ``host``.
+        raw: The definition as JSON text.
+        limits: The bounds.
+        tool_class: The class the definition is checked for.
 
     Returns:
-        Every finding.
+        The findings in document order.
     """
-    try:
-        value = json.loads(raw, parse_constant=_no_constant)
-    except ValueError:
-        return [FieldError("", _INVALID_TYPE)]
-    return validate_value(value, limits, tool_class)
+    return check(raw.encode("utf-8", "surrogatepass"), limits, tool_class)
 
 
-def _no_constant(name: str) -> Any:
-    raise ValueError(name)
+def required_class(definition: Definition) -> str:
+    """The lowest class a definition may run with: ``host`` with a ``stdio`` server (26 4.4).
+
+    Args:
+        definition: A checked definition.
+
+    Returns:
+        ``host`` or ``chat``.
+    """
+    if any(s.transport == "stdio" for s in definition.mcp_servers):
+        return "host"
+    return "chat"
+
+
+def intersect(configured: Sequence[str], allowed: Sequence[str] | None) -> list[str]:
+    """The tools of a hosted ``scoped`` turn (26 4.4 item 2, the rule of 09 18.1).
+
+    Args:
+        configured: ``runner.scoped_allowed_tools`` in its order.
+        allowed: ``settings.allowed_tools`` of the definition; ``None`` narrows nothing.
+
+    Returns:
+        The configured tools the definition also names, in the order of the runner key.
+    """
+    return scoped_tools(configured, None if allowed is None else list(allowed))

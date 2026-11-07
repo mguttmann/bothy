@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import pytest
 
-from claude_code_runner.causes import CAUSES, cause, turn_end_cause
+from claude_code_runner.causes import CAUSES, cause, definition_refused, turn_end_cause
 
 
 def test_unbound_forum_names_what_to_do() -> None:
@@ -88,3 +88,29 @@ def test_definition_missing_names_the_built_in_agent() -> None:
         "run ended without a turn. Set up the agent's definition in the app "
         "(`definition_missing`)"
     )
+
+
+# ---- A1-05: hosted turns (26 5.6, 5.8) -------------------------------------------------------
+
+
+def test_cost_cap_names_the_cap_and_what_to_do() -> None:
+    text = cause("cost_cap_reached")
+    assert "cost cap" in text
+    assert text.endswith("(`cost_cap_reached`)")
+
+
+def test_a_refused_definition_names_the_field_codes_never_the_content() -> None:
+    text = definition_refused(["inline_shell", "tool_class_too_low", "inline_shell"])
+    assert "`inline_shell`" in text
+    assert "`tool_class_too_low`" in text
+    assert text.count("inline_shell") == 1
+    assert text.endswith("(`tool_class_mismatch`)")
+    assert chr(0x2013) not in text
+    assert chr(0x2014) not in text
+    assert "/" not in text
+
+
+def test_a_refused_definition_keeps_its_summary_short() -> None:
+    text = definition_refused([f"code_{i}" for i in range(60)])
+    assert len(text.encode()) <= 400
+    assert text.endswith("(`tool_class_mismatch`)")

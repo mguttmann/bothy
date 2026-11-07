@@ -4052,9 +4052,11 @@ Details the build settled (A1-04, `docs/decisions.d/A1-04.md`):
    `<runner.state_dir>/hosted/<agent_id>/` holds its inbox, outbox and thread locks. Its heartbeat
    carries no `project_readiness`, `project_folders` or `project_trash_results`, and `run_slots`
    with the shared totals and `waiting_runs` with its own runs.
-5. Until the runner runs definitions (A1-05), a hosted run takes its thread lock and a shared slot
-   like a turn, then ends `failed` with `adapter_error` and the cause `definition_missing`
-   without `run.start`.
+5. A hosted run takes its thread and session locks under the agent's state folder and a shared
+   slot like a turn, then runs from the agent's definition as in
+   [26-builtin-agents.md](26-builtin-agents.md) 5 (A1-05); an agent without a definition ends
+   `failed` with `adapter_error` and the cause `definition_missing` without `run.start`. The
+   agent's turn records, sessions, streams and scratch places live in its state folder.
 
 ### 18.19 Wake-ups and turn handover
 
