@@ -35,6 +35,8 @@ import asyncio
 import contextlib
 import json
 import logging
+import os
+import signal
 import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
@@ -57,6 +59,7 @@ from bothy_sdk.errors import (
     VersionConflict,
 )
 from bothy_sdk.generated.api.agent_runtime import (
+    check_run_launch,
     finish_run,
     report_agent_session,
     submit_transcript,
@@ -77,6 +80,7 @@ from bothy_sdk.generated.models import (
     RunFinish,
     RunFinishState,
     RunMetrics,
+    RunWakeCheckResult,
     TranscriptSubmit,
 )
 from bothy_sdk.generated.types import Unset
@@ -84,13 +88,13 @@ from bothy_sdk.long_answers import split_for_limit
 from bothy_sdk.outbox import OutboxState
 from bothy_sdk.runs import RunHandle, is_run_ended
 
-from claude_code_runner.adoption import read_identity
+from claude_code_runner.adoption import process_matches, read_identity
 from claude_code_runner.attachments import (
     describe_followup_files,
+    fetch_attachments,
     fetch_followup_files,
     followup_files_final,
 )
-from claude_code_runner.background import BackgroundWork
 from claude_code_runner.causes import ADAPTER_STOPPED, cause, turn_end_cause
 from claude_code_runner.commandline import HostedArgs, SessionChoice, build_argv, reported_model
 from claude_code_runner.failures import (
@@ -107,12 +111,26 @@ from claude_code_runner.followups import (
     PendingFollowups,
     build_followup_line,
     followup_verdict,
-    stdin_close_due,
+)
+from claude_code_runner.launch import (
+    AttemptRecord,
+    KeeperGroup,
+    KeeperStart,
+    LaunchFiles,
+    Settled,
+    prepare_launch,
+    process_identity,
+    read_json,
+    remove_launch_files,
+    settle_launching,
+    start_keeper,
+    wait_for,
 )
 from claude_code_runner.ledger import TurnLedger, is_success
 from claude_code_runner.livebox import LiveBox
 from claude_code_runner.livecost import LiveCost, load_prices
 from claude_code_runner.locks import LockTimeout, SlotPool, acquire, release
+from claude_code_runner.processstate import Decision, ProcessState, replayed_lines
 from claude_code_runner.prompt import context_items, system_prompt, user_line
 from claude_code_runner.recovery import (
     RETRY_HINT,
@@ -124,6 +142,7 @@ from claude_code_runner.recovery import (
     RecoveryState,
     ResumeSameReference,
     Retry,
+    attempt_kind,
     box_note,
     next_action,
 )
@@ -324,13 +343,33 @@ class RunState:
 
 @dataclass(frozen=True)
 class _Attempt:
-    """One process of a run: a turn or the compaction."""
+    """One process of a run: a turn or the compaction.
+
+    ``label`` is the attempt's kind as its ``launching`` record names it (09 18.19.5).
+    """
 
     kind: str = "turn"
     resume: bool = False
     hint: bool = False
     new_reference: bool = False
     bind_failed: bool = False
+    label: str = "first"
+
+
+def _attempt_of(record: AttemptRecord) -> _Attempt:
+    """The process an attempt record describes (to launch it again or to classify its end)."""
+    return _Attempt(
+        kind="compaction" if record.kind == "compaction" else "turn",
+        resume=record.resume,
+        hint=record.hint,
+        new_reference=record.new_reference,
+        bind_failed=record.bind_failed,
+        label=record.kind,
+    )
+
+
+_KEPT_PHASES = ("transcribing", "launching", "process", "compaction_retry")
+"""The phases of a record the next runner continues (09 18.19.6)."""
 
 
 @dataclass
@@ -372,7 +411,11 @@ class RunTurn:
     monotonic: Callable[[], float] = staticmethod(time.monotonic)
     """The clock of the stdin window and of the offset saves (a test sets a fake one)."""
 
-    def __init__(self, handler: TurnRuntime, state: RunState, run: RunHandle) -> None:
+    crash_point: Callable[[str, str], None] | None = None
+    """A test-only hook called after each step of the launch handshake (09 18.19.5) with the
+    step and the attempt's kind; never set in a normal start (AR-T04)."""
+
+    def __init__(self, handler: TurnRuntime, state: RunState, run: RunHandle) -> None:  # noqa: PLR0915 - one attribute per part of a run
         """Create the turn of a started run; nothing starts before `run`."""
         self.h = handler
         self.cfg = handler.config
@@ -394,15 +437,12 @@ class RunTurn:
         self.followups = PendingFollowups()
         # The order of the follow-ups while one waits for files or is transcribed.
         self.followup_order = _FollowupOrder()
-        self.background = BackgroundWork()
-        """The background work of the current process (09 18.5, FIX-runner-responsive-turns)."""
+        self.ps = ProcessState(has_stdin=True)
+        """The stream-derived state of the current process (09 18.19.7): its background work
+        (18.5, FIX-runner-responsive-turns), the failure mark (FIX-runner-auth-failed-held) and
+        the rest the stdin and stop rule reads."""
         self._held_logged = False
-        self._failed_at: float | None = None
-        """When the current process wrote a ``result`` with an error (FIX-runner-auth-failed-held).
-
-        From then on the process gets ``runner.stop_grace`` to end before it is stopped."""
-        self._lost_tasks = 0
-        self.process: Turn | None = None
+        self.process: Turn | KeeperGroup | None = None
         self.phase = "starting"  # starting, open, closed, ended
         self.attempt = _Attempt()
         self.ledger = TurnLedger.begin("turn", 0)
@@ -431,17 +471,56 @@ class RunTurn:
         self.live_cost = LiveCost(load_prices())
         """The run's ``/cost`` while it works (FIX-cost-display)."""
         self._cost_sent = 0
+        # ---- runner.turn_handover (09 18.19.3 to 18.19.7) ----
+        self.handover = bool(getattr(handler, "turn_handover", False))
+        """Every process starts under a keeper through the launch handshake; the record carries
+        the run's phase. Off for the runner without the key and for hosted agents."""
+        self.accepted = True
+        """This runner accepted the run; an adopter calls ``run.launch.check`` before a launch."""
+        self.launch_checked = False
+        self.record_phase = "transcribing"
+        self.launch: AttemptRecord | None = None
+        """The current attempt as its record carries it."""
+        self.keeper_start: KeeperStart | None = None
+        self.attempt_no = 0
+        self.outage = 0
+        """The run's highest outage number reached before the current attempt (18.19.10)."""
+        self.input_write: dict[str, Any] | None = None
+        """The input line being written (``uuid``, ``bytes`` once a handover cut it)."""
+        self.autonomous: set[str] = set()
+        """Input lines written as autonomous inputs (a wake input, 5.8.6)."""
+        self.handed_over = False
+        self.retry_hint = False
+        """The hint of a recorded retry after compaction (phase ``compaction_retry``)."""
+        self.task: asyncio.Task[Any] | None = None
+        self._fed: asyncio.Task[None] | None = None
 
     # ---- the run ---------------------------------------------------------------------------
 
     def _paths(self) -> TurnPaths:
         return turn_paths(self.cfg.state_dir, self.session.ref, str(self.handle.run_id))
 
-    async def run(self) -> None:  # noqa: PLR0911, PLR0912, PLR0915 - one branch per action
+    async def run(self) -> None:
         """Start the first process, follow every process and end the run once."""
         self.state.turn = self
+        self.task = asyncio.current_task()
         paths = self._paths()
         ensure_private_dir(paths.stream.parent)
+        if self.handover:
+            self.record_phase = "transcribing"  # after run.start (18.19.6)
+            self._persist()
+        await self._open_turn()
+        try:
+            await self._drive(_Attempt(resume=self.session.resume), precheck=False)
+        except asyncio.CancelledError:
+            await self._on_cancelled()
+            raise
+        finally:
+            self._end()
+
+    async def _open_turn(self) -> None:
+        """Transcripts, the prompt line and the live box before the first process."""
+        paths = self._paths()
         context = self.state.context
         if context is None:  # pragma: no cover - prepare always loads it
             raise RuntimeError("no context")
@@ -460,82 +539,127 @@ class RunTurn:
         )
         if self.state.notice:
             await self._status_line(self.state.notice)
-        attempt = _Attempt(resume=self.session.resume)
-        worked_before = False
-        first = True
-        try:
-            while True:
+
+    async def _drive(  # noqa: PLR0911, PLR0912 - one branch per action
+        self,
+        attempt: _Attempt,
+        *,
+        precheck: bool,
+        outcome: _Outcome | None = None,
+        repeat: AttemptRecord | None = None,
+    ) -> None:
+        """Run processes until the run ends: classify each end, then recover or finish.
+
+        Args:
+            attempt: The process to start (or whose end ``outcome`` is).
+            precheck: Run the pre-check of M2-34 before the first process too (I3 per process);
+                ``prepare`` ran it for the first process of a run this runner accepted.
+            outcome: The end of an adopted process to classify first (the adoption rule of
+                09 18.19.6); nothing is launched for it.
+            repeat: The recorded attempt to launch again with the next try (18.19.5).
+        """
+        worked_before = self.launch.worked_before if self.launch is not None else False
+        while True:
+            if outcome is None:
                 if self.stop_reason is not None:
                     await self._finish_cancelled()
                     return
-                if not first and not await self._precheck_again():
+                if precheck and not await self._precheck_again():
                     return
                 if self._stop_requested():  # a stop during the pre-check starts nothing
                     await self._finish_cancelled()
                     return
-                first = False
+                if not (self.accepted or self.launch_checked) and not await self._launch_check():
+                    return  # R-AG-48: an adopter launches only on allow
+                self.launch_checked = False
+                precheck = True
                 self.attempt = attempt
-                outcome = await self._run_process(attempt)
+                outcome = await self._run_process(
+                    attempt, repeat=repeat, worked_before=worked_before
+                )
+                repeat = None
                 if outcome is None or outcome.handled:
                     return
-                if self.server_ended:
-                    self._ended_by_server()
-                    return
-                end = classify_turn_end(outcome.evidence)
-                if (
-                    attempt.kind == "compaction"
-                    and end.outcome == "completed"
-                    and not outcome.compacted
+            self._crash("attempt_ended")
+            if self.server_ended:
+                self._ended_by_server()
+                return
+            end = classify_turn_end(outcome.evidence)
+            if (
+                attempt.kind == "compaction"
+                and end.outcome == "completed"
+                and not outcome.compacted
+            ):
+                # The pinned CLI ends a failed compaction with a success result too.
+                end = TurnEnd("runtime_error", exit_label=end.exit_label)
+            if end.outcome == ErrorKind.VERSION_UNSUPPORTED.value:
+                await self.h.runtime_too_old(end.required_version)
+            worked = worked_before if attempt.kind == "compaction" else outcome.worked
+            action = next_action(
+                end,
+                self.recovery,
+                self.state.session_mode,
+                worked=worked,
+                process=attempt.kind,
+                stop_reason=self.stop_reason,
+            )
+            if isinstance(action, Finish):
+                await self._complete()
+                return
+            if isinstance(action, Cancelled):
+                await self._finish_cancelled()
+                return
+            if isinstance(action, Fail):
+                if attempt.kind == "compaction":
+                    await self._box_note("context_compacted", "failed", None)
+                summary = None
+                if attempt.kind == "turn":
+                    summary = turn_end_cause(action.reason, outcome.lost_tasks)
+                if action.reason == "runtime_error" and cost_cap_reached(
+                    outcome.evidence.result, self.state.cost_cap
                 ):
-                    # The pinned CLI ends a failed compaction with a success result too.
-                    end = TurnEnd("runtime_error", exit_label=end.exit_label)
-                if end.outcome == ErrorKind.VERSION_UNSUPPORTED.value:
-                    await self.h.runtime_too_old(end.required_version)
-                worked = worked_before if attempt.kind == "compaction" else outcome.worked
-                action = next_action(
-                    end,
-                    self.recovery,
-                    self.state.session_mode,
-                    worked=worked,
-                    process=attempt.kind,
-                    stop_reason=self.stop_reason,
-                )
-                if isinstance(action, Finish):
-                    await self._complete()
-                    return
-                if isinstance(action, Cancelled):
-                    await self._finish_cancelled()
-                    return
-                if isinstance(action, Fail):
-                    if attempt.kind == "compaction":
-                        await self._box_note("context_compacted", "failed", None)
-                    summary = None
-                    if attempt.kind == "turn":
-                        summary = turn_end_cause(action.reason, outcome.lost_tasks)
-                    if action.reason == "runtime_error" and cost_cap_reached(
-                        outcome.evidence.result, self.state.cost_cap
-                    ):
-                        summary = cause("cost_cap_reached")
-                    await self._fail(action.reason, action.errors, end.exit_label, summary=summary)
-                    return
-                next_attempt = await self._recover(action, outcome)
-                if next_attempt is None:
-                    return
-                if isinstance(action, Compact):
-                    worked_before = outcome.worked
-                attempt = next_attempt
-        except asyncio.CancelledError:
-            # The runner stops (its SDK cancels the run): the turn never outlives it (18.6,
-            # D-AR-1). `_run_process` keeps the handle while a process of the group lives.
-            await self._stop_on_cancel()
-            raise
-        finally:
-            self.phase = "ended"
-            if self.process is None:
-                # Only once no process of the turn is left: a record of a live turn stays for
-                # the next start, which adopts or stops it (18.9).
-                remove_turn_record(paths.record)
-                remove_run_files(self.cfg.state_dir, self.handle.run_id)
+                    summary = cause("cost_cap_reached")
+                await self._fail(action.reason, action.errors, end.exit_label, summary=summary)
+                return
+            next_attempt = await self._recover(action, outcome)
+            if next_attempt is None:
+                return
+            if isinstance(action, Compact):
+                worked_before = outcome.worked
+            attempt = next_attempt
+            outcome = None
+
+    async def _on_cancelled(self) -> None:
+        """The SDK cancels the run: a stop as in 18.6, or nothing at a handover (18.19.3)."""
+        if self.handed_over or self._handing_over():
+            return  # the turn runs on and its record stays for the next runner
+        # The runner stops (its SDK cancels the run): the turn never outlives it (18.6, D-AR-1).
+        # `_run_process` keeps the handle while a process of the group lives.
+        await self._stop_on_cancel()
+
+    def _handing_over(self) -> bool:
+        return bool(getattr(self.h, "handing_over", False))
+
+    def _end(self) -> None:
+        """The run left this runner: remove its record and files once no process is left."""
+        self.phase = "ended"
+        if self._fed is not None:
+            self._fed.cancel()
+        if self.handed_over or self._handing_over():
+            return  # the record and the files of a handed-over run stay (18.19.3)
+        if self.process is None:
+            # Only once no process of the turn is left: a record of a live turn stays for the
+            # next start, which adopts or stops it (18.9).
+            remove_turn_record(self._paths().record)
+            remove_run_files(self.cfg.state_dir, self.handle.run_id)
+            if self.handover:
+                remove_launch_files(self.cfg.state_dir, str(self.handle.run_id))
+
+    def _crash(self, point: str) -> None:
+        """The test-only crash hook after a step of the handshake (`crash_point`)."""
+        hook = type(self).crash_point
+        if hook is not None and self.handover:
+            hook(point, self.launch.kind if self.launch is not None else "")
 
     async def _stop_on_cancel(self) -> None:
         """Stop the live process of a cancelled run as in 18.6, then finish it ``cancelled``.
@@ -632,9 +756,10 @@ class RunTurn:
         if self.ledger.kind == "turn":
             # The inputs of the failed turn that no result answered go to the next turn (12 f 3).
             self.retry_inputs = [(u, self.lines[u]) for u in self.ledger.unanswered()]
+        label = attempt_kind(action)
         if isinstance(action, Compact):
             self.recovery = self.recovery.with_(compacted=True)
-            return _Attempt(kind="compaction", resume=True)
+            return _Attempt(kind="compaction", resume=True, label=label)
         if isinstance(action, Retry) and not self.retry_inputs:
             # Every input was answered before the context filled up: nothing to run again.
             await self._box_note("context_compacted", "completed", None)
@@ -642,10 +767,17 @@ class RunTurn:
             return None
         if isinstance(action, Retry):
             await self._box_note("context_compacted", "completed", None)
-            return _Attempt(resume=True, hint=action.hint)
+            if self.handover:
+                # The recorded retry starts through the handshake; the decision of `_recover`
+                # is not taken again by a next runner (18.19.6).
+                self.record_phase = "compaction_retry"
+                self.retry_hint = action.hint
+                self._persist()
+                self._crash("compaction_retry")
+            return _Attempt(resume=True, hint=action.hint, label=label)
         if isinstance(action, ResumeSameReference):
             self.recovery = self.recovery.with_(session_resumed=True)
-            return _Attempt(resume=True)
+            return _Attempt(resume=True, label=label)
         if isinstance(action, NewSession):
             self.recovery = self.recovery.with_(session_replaced=True)
             if not await self._new_reference():
@@ -654,7 +786,9 @@ class RunTurn:
                 )
                 return None
             await self._box_note("session_missing", "completed", {"mode": self.state.session_mode})
-            return _Attempt(resume=False, new_reference=True, bind_failed=action.bind_failed)
+            return _Attempt(
+                resume=False, new_reference=True, bind_failed=action.bind_failed, label=label
+            )
         raise AssertionError(action)  # pragma: no cover - every action is handled
 
     async def _new_reference(self) -> bool:
@@ -691,9 +825,13 @@ class RunTurn:
 
     def _prompt_file(self, attempt: _Attempt) -> Path:
         paths = self._paths()
-        text = system_prompt(
-            title_request=self.title_request, channel_prompt=self.state.channel_prompt
-        )
+        if not self.accepted and paths.system_prompt.is_file():
+            # An adopter keeps the run's own prompt as the accepting runner wrote it.
+            text = paths.system_prompt.read_text()
+        else:
+            text = system_prompt(
+                title_request=self.title_request, channel_prompt=self.state.channel_prompt
+            )
         if attempt.hint:
             path = paths.system_prompt.with_name(f"{self.handle.run_id}.retry-prompt.md")
             write_private(path, text.rstrip() + "\n\n## Retry\n\n" + RETRY_HINT + "\n")
@@ -701,15 +839,12 @@ class RunTurn:
         write_private(paths.system_prompt, text)
         return paths.system_prompt
 
-    async def _run_process(self, attempt: _Attempt) -> _Outcome | None:
-        paths = self._paths()
-        ensure_private_dir(paths.stream.parent)
-        prompt_file = self._prompt_file(attempt)
+    def _argv(self, attempt: _Attempt, prompt_file: Path) -> list[str]:
         add_dir = None
         if self.cfg.tool_class in ("scoped", "host") and self.state.stored_files:
             add_dir = self.cfg.state_dir / "files" / str(self.state.thread_id)
         session = SessionChoice(ref=self.session.ref, resume=attempt.resume, new=self.session.new)
-        argv = build_argv(
+        return build_argv(
             claude_bin=self.h.claude_bin or self.cfg.claude_bin,
             model=self.state.model,
             session=session,
@@ -721,15 +856,32 @@ class RunTurn:
             plugin_dirs=self.state.plugin_dirs,
             max_budget_usd=self.state.max_budget_usd,
         )
-        stream_start = _size(paths.stream)
-        stderr_start = _size(paths.stderr)
-        cwd = self.state.cwd or self.cfg.projects_root
+
+    async def _rebase_once(self, attempt: _Attempt) -> None:
         if not self.rebased:
             # Only the run's first process: a later one resumes the run's own session, whose
             # stored values already hold what the run saw (D-RUNNER-RESUME-COST-2).
             self.rebased = True
             if attempt.resume:
                 await asyncio.to_thread(self._rebase_usage)
+
+    async def _run_process(
+        self,
+        attempt: _Attempt,
+        *,
+        repeat: AttemptRecord | None = None,
+        worked_before: bool = False,
+    ) -> _Outcome | None:
+        if self.handover:
+            return await self._launch_process(attempt, repeat=repeat, worked_before=worked_before)
+        paths = self._paths()
+        ensure_private_dir(paths.stream.parent)
+        prompt_file = self._prompt_file(attempt)
+        argv = self._argv(attempt, prompt_file)
+        stream_start = _size(paths.stream)
+        stderr_start = _size(paths.stderr)
+        cwd = self.state.cwd or self.cfg.projects_root
+        await self._rebase_once(attempt)
         try:
             process = Turn.start(
                 argv, cwd=cwd, env=self.state.env, paths=paths, pass_fds=self.state.locks
@@ -754,15 +906,28 @@ class RunTurn:
             self.phase = "starting"  # follow-ups wait for the retry (note 4 c)
         else:
             await self._write_inputs(process)
+        return await self._follow(process, attempt, stream_start, stderr_start)
+
+    async def _follow(
+        self,
+        process: Turn | KeeperGroup,
+        attempt: _Attempt,
+        read_from: int,
+        stderr_start: int,
+        *,
+        adopted: bool = False,
+    ) -> _Outcome | None:
+        """Read one process to its end and say how it ended (own or adopted alike)."""
+        paths = self._paths()
         try:
             reader = StreamReader(
-                process.paths.stream,
+                paths.stream,
                 self.cfg.poll_interval,
                 process.alive,
-                offset=stream_start,
+                offset=read_from,
                 until_exit=True,
             )
-            outcome = await self._read(reader, process, attempt)
+            outcome = await self._read(reader, process, attempt, adopted=adopted)
             if outcome is not None:
                 return outcome
             await terminate(
@@ -778,13 +943,18 @@ class RunTurn:
                 init_seen=ledger.init_seen,
                 result=ledger.end_result(),
                 assistant_text=ledger.api_error,
-                stderr=_read_from(process.paths.stderr, stderr_start),
+                stderr=_read_from(paths.stderr, stderr_start),
                 exit_label=process.exit_label(),
             )
+            # The run's highest outage number reached so far goes into the next attempt.
+            self.outage = max(self.outage, self.ps.outage)
             return _Outcome(
                 evidence, self._worked, compacted=ledger.compacted, lost_tasks=self._lost_work()
             )
         finally:
+            if self._fed is not None:
+                self._fed.cancel()
+                self._fed = None
             if not _group_runs(process):
                 # The handle stays while a process of the group lives: a cancellation of the
                 # run stops the group with it (D-AR-1).
@@ -792,20 +962,235 @@ class RunTurn:
             if self.phase != "ended":
                 self.phase = "starting"
 
-    def _reset_process_state(self) -> None:
-        """The per-process state of a new turn process (background work, failed turn)."""
-        self.background = BackgroundWork()
+    # ---- the launch handshake (09 18.19.5) ---------------------------------------------------
+
+    def _initial_inputs(self, attempt: _Attempt) -> list[tuple[str, bytes]]:
+        """The attempt's initial inputs, written by its keeper once (18.19.5 step 1)."""
+        if attempt.kind == "compaction":
+            line, line_uuid = user_line(["/compact"])
+            return [(line_uuid, line.encode("utf-8") + b"\n")]
+        inputs = self.retry_inputs
+        if inputs is None:
+            inputs = [(self.own_uuid, self.prompt_line.encode("utf-8") + b"\n")]
+        return list(inputs)
+
+    async def _launch_process(  # noqa: PLR0915 - the steps of the handshake in order
+        self,
+        attempt: _Attempt,
+        *,
+        repeat: AttemptRecord | None,
+        worked_before: bool,
+    ) -> _Outcome | None:
+        """Start one attempt through the launch handshake and follow it (18.19.4, 18.19.5).
+
+        Each step is persisted before the next starts: the record in ``launching`` before any
+        file, the keeper's identity with ``go_sent`` before the go byte, the CLI's identity in
+        phase ``process`` once ``<launch>.cli`` names it. The keeper writes the initial inputs;
+        follow-ups wait for ``<launch>.fed``.
+        """
+        paths = self._paths()
+        ensure_private_dir(paths.stream.parent)
+        if not self.state.locks and not await self._take_locks():
+            return None  # an adopter takes the locks before it launches
+        prompt_file = self._prompt_file(attempt)
+        argv = self._argv(attempt, prompt_file)
+        stream_start, stderr_start = _size(paths.stream), _size(paths.stderr)
+        await self._rebase_once(attempt)
+        earlier: LaunchFiles | None = None
+        if repeat is not None:
+            number, try_, label, earlier = repeat.number, repeat.try_ + 1, repeat.kind, repeat.files
+            inputs = [(u, self.lines.get(u, b"")) for u in repeat.inputs]
+        else:
+            number, try_, label = self.attempt_no + 1, 1, attempt.label
+            inputs = self._initial_inputs(attempt)
+        # The kind is fixed here (12 f 4); the answers of earlier processes stay known (12 f 2).
+        self.ledger = TurnLedger.begin(attempt.kind, stream_start, self.ledger)
+        for line_uuid, line in inputs:
+            self.lines[line_uuid] = line
+            if attempt.kind == "turn":
+                self.ledger.written(line_uuid)
+        self._store_lines(inputs)
+        self.attempt_no = number
+        files = LaunchFiles.of(self.cfg.state_dir, str(self.handle.run_id), number, try_)
+        launch = AttemptRecord(
+            number=number,
+            kind=label,
+            try_=try_,
+            files=files,
+            resume=attempt.resume,
+            hint=attempt.hint,
+            new_reference=attempt.new_reference,
+            bind_failed=attempt.bind_failed,
+            session_ref=self.session.ref,
+            inputs=[u for u, _ in inputs],
+            outage=self.outage,
+            worked_before=worked_before,
+            stderr_start=stderr_start,
+        )
+        self.launch = launch
+        self.process = None
+        self._identity = {}
+        self.record_phase = "launching"
+        self._persist()  # step 1: the record before any file of the launch
+        self._crash("launching")
+        timeout, poll = self.cfg.cli_probe_timeout, self.cfg.poll_interval
+        spec = {
+            "argv": argv,
+            "env": self.state.env,
+            "cwd": str(self.state.cwd or self.cfg.projects_root),
+            "stdout": str(paths.stream),
+            "stderr": str(paths.stderr),
+            "lock_fds": list(self.state.locks),
+        }
+        try:
+            prepare_launch(files, b"".join(line for _, line in inputs), spec, earlier=earlier)
+            self._crash("prepared")
+            start = start_keeper(
+                files, compaction=attempt.kind == "compaction", lock_fds=self.state.locks
+            )
+        except OSError:
+            files.spec.unlink(missing_ok=True)
+            _warn("turn_start_failed", **self.ids)
+            await self._fail("runtime_error", (), "start_failed")
+            return None
+        self.keeper_start = start
+        self._crash("keeper_started")
+
+        def keeper_runs() -> bool:
+            return start.process.poll() is None
+
+        keeper = await wait_for(files.keeper, keeper_runs, timeout, poll)
+        if keeper is None or self.handed_over:
+            start.close()  # no go byte: the keeper starts no CLI and exits by itself
+            if not self.handed_over:
+                await self._start_failed(start)
+            return None
+        ident = await asyncio.to_thread(process_identity, int(keeper["pid"]), timeout)
+        launch.keeper = {**keeper, **ident}
+        launch.go_sent = True
+        self._persist()  # step 3: the keeper's identity and go_sent before the go byte
+        self._crash("go_recorded")
+        start.go()
+        self._crash("go_sent")
+        cli = await wait_for(files.cli, keeper_runs, timeout, poll)
+        if cli is None:
+            await self._start_failed(start)
+            return None
+        identity = await asyncio.to_thread(process_identity, int(cli["pid"]), timeout)
+        launch.cli = {**cli, **identity}
+        group = KeeperGroup(
+            files,
+            keeper=launch.keeper,
+            cli=launch.cli,
+            session_ref=self.session.ref,
+            timeout=timeout,
+            process=start.process,
+        )
+        self.process = group
+        self._identity = identity
+        self.record_phase = "process"
+        self._reset_process_state(outage=launch.outage)
+        self._persist()  # step 5: the CLI's identity in phase process
+        self._crash("cli_recorded")
+        _log("turn_started", kind=attempt.kind, **self.ids)
+        self.phase = "starting"  # follow-ups wait for <launch>.fed (step 6)
+        if attempt.kind != "compaction":
+            self._fed = asyncio.ensure_future(self._await_fed(group))
+        return await self._follow(group, attempt, stream_start, stderr_start)
+
+    async def _start_failed(self, start: KeeperStart) -> None:
+        """The keeper ended, or named no CLI in time: no CLI runs for this launch."""
+        if start.process.poll() is None:
+            with contextlib.suppress(ProcessLookupError, PermissionError):
+                os.killpg(start.process.pid, signal.SIGKILL)  # our own keeper's group
+        await asyncio.to_thread(start.process.wait)
+        _warn("turn_start_failed", **self.ids)
+        await self._fail("runtime_error", (), "start_failed")
+
+    async def _await_fed(self, group: KeeperGroup) -> None:
+        """Step 6 of 18.19.5: follow-ups and stdin wait for ``<launch>.fed``.
+
+        A keeper that ends without it may have cut an input in the middle of a line: nothing
+        more is written into that pipe, stdin is closed and ``inputs_written`` stays false.
+        """
+        while not group.files.fed.exists():
+            if not group.keeper_alive() and not group.files.fed.exists():
+                await self._close_stdin(group)
+                return
+            await asyncio.sleep(self.cfg.poll_interval)
+        async with self.write_lock:
+            if self.launch is not None:
+                self.launch.inputs_written = True
+            self._persist()
+            if self.phase == "starting" and self.stop_reason is None:
+                self.phase = "open"
+        held, self.state.held = self.state.held, []
+        for inv in held:
+            await self.offer_followup(inv)
+
+    async def _take_locks(self) -> bool:
+        """The thread and session locks of an adopter before it launches (09 18.2)."""
+        locks = self.cfg.state_dir / "locks"
+        taken: list[int] = []
+        try:
+            for name in (f"thread-{self.state.thread_id}", f"session-{self.session.ref}"):
+                taken.append(
+                    await acquire(
+                        locks / f"{name}.lock", self.cfg.session_lock_wait, self.cfg.poll_interval
+                    )
+                )
+        except LockTimeout:
+            for fd in taken:
+                release(fd)
+            _log("session_busy", **self.ids)
+            await self._fail("adapter_error", (), "not_started", summary=cause("session_busy"))
+            return False
+        self.state.locks.extend(taken)
+        return True
+
+    def _store_lines(self, inputs: Sequence[tuple[str, bytes]]) -> None:
+        """Keep input lines in the run's private lines file (a next runner writes them again)."""
+        if not self.handover or not inputs:
+            return
+        path = self.cfg.state_dir / "turns" / f"{self.handle.run_id}.lines"
+        ensure_private_dir(path.parent)
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_APPEND | os.O_NOFOLLOW, 0o600)
+        try:
+            os.write(fd, b"".join(line for _, line in inputs))
+        finally:
+            os.close(fd)
+
+    def _load_lines(self) -> dict[str, bytes]:
+        path = self.cfg.state_dir / "turns" / f"{self.handle.run_id}.lines"
+        out: dict[str, bytes] = {}
+        try:
+            data = path.read_bytes()
+        except OSError:
+            return out
+        for raw in data.split(b"\n"):
+            with contextlib.suppress(ValueError, TypeError, AttributeError):
+                line_uuid = json.loads(raw).get("uuid")
+                if isinstance(line_uuid, str):
+                    out[line_uuid] = raw + b"\n"
+        return out
+
+    @property
+    def background(self) -> Any:
+        """The background work of the current process (`ProcessState.background`)."""
+        return self.ps.background
+
+    def _reset_process_state(self, outage: int = 0) -> None:
+        """The per-process state of a new turn process (`ProcessState`, 09 18.19.7)."""
+        self.ps = ProcessState(has_stdin=True, outage=outage)
         self._held_logged = False
-        self._failed_at = None
-        self._lost_tasks = 0
 
     def _lost_work(self) -> int:
         """The background tasks a process ended with after a failed turn; their steps end."""
-        if self._failed_at is None:
+        if self.ps.failed_at is None:
             return 0
         if self.live is not None and self.ledger.kind == "turn":
             self.live.end_open_tasks()  # its background work ended with the process
-        return self._lost_tasks
+        return self.ps.lost_tasks
 
     async def _write_inputs(self, process: Turn) -> None:
         """The inputs of a turn process, then the held follow-ups (notes 4 c and d, 8 b).
@@ -832,7 +1217,12 @@ class RunTurn:
             await self.offer_followup(inv)
 
     async def _read(  # noqa: PLR0912 - one branch per message kind of 18.4
-        self, reader: StreamReader, group: StoppableGroup, attempt: _Attempt | None
+        self,
+        reader: StreamReader,
+        group: StoppableGroup,
+        attempt: _Attempt | None,
+        *,
+        adopted: bool = False,
     ) -> _Outcome | None:
         """Read one process's stream to its end: the one loop of an own and an adopted turn.
 
@@ -846,18 +1236,17 @@ class RunTurn:
         """
         own = attempt is not None
         self._worked = False
-        last_result_at: float | None = None
         saved_at = self.monotonic()
         interval = self.handle.patch.settings.run_update_min_interval
         async for message in reader.items():
             if message is None:
-                await self._idle(group, last_result_at)
+                await self._idle(group)
                 if self.monotonic() - saved_at >= interval:
                     saved_at = self.monotonic()
                     await self._checkpoint(reader.offset)
                 continue
             self.ledger.line(message, reader.line_offset, reader.offset)
-            self.background.apply(message, self.monotonic())
+            self.ps.apply(message, self.monotonic())
             kind, subtype = message.get("type"), message.get("subtype")
             if kind == "system" and subtype == "init" and attempt is not None:
                 if message.get("apiKeySource") != _EXPECTED_KEY_SOURCE.get(self.state.mode):
@@ -879,16 +1268,8 @@ class RunTurn:
                 if self.live_cost.assistant(message):
                     self._report_cost()
             elif kind == "user" and message.get("isReplay") is True:
-                await self._echo(message.get("uuid"), adopted=not own)
-            elif kind == "command_lifecycle" and message.get("state") == "started":
-                # An input starts a turn of its own: an earlier result does not end it, so the
-                # stdin rule waits for the result of this turn (FIX-runner-hold-background).
-                last_result_at = None
+                await self._echo(message.get("uuid"), adopted=adopted or not own)
             elif kind == "result":
-                if not self.background.input_waiting:
-                    # A result before a queued input started answers no input: it must not
-                    # start the stdin rule for the turn of that input (FIX-runner-hold-background).
-                    last_result_at = self.monotonic()
                 self._settle_cost()
                 if self.ledger.kind == "turn" and is_success(message):
                     await self._answer(message, reader.line_offset)
@@ -896,19 +1277,19 @@ class RunTurn:
                 self.live.apply(message)  # a compaction is never mapped (note 8 b)
                 if self.live.steps_changed:
                     self._persist()  # the step ids before their patches go out (note 12 b)
-            if own and kind == "result" and not is_success(message):
+            if self.ps.has_stdin and kind == "result":
                 # A failed turn absorbs nothing more: stdin closes now, and the follow-ups
-                # without echo go to the next process of a recovery (notes 4 d and 5).
-                if self._failed_at is None:
-                    self._failed_at = self.monotonic()
-                    self._lost_tasks = len(self.background.running)
-                await self._close_stdin(group)
-            elif own and kind == "result":
-                await self._idle(group, last_result_at)
+                # without echo go to the next process of a recovery (notes 4 d and 5); after a
+                # result without error the stdin rule of note 5 runs.
+                await self._idle(group)
         return None
 
-    async def _idle(self, process: StoppableGroup, last_result_at: float | None) -> None:
-        """Checks while a turn runs: a run the server ended, and the stdin rule of note 5."""
+    async def _idle(self, process: StoppableGroup) -> None:
+        """Checks while a turn runs: a run the server ended, and the stdin rule of note 5.
+
+        The stdin and stop rule reads only `ProcessState` (09 18.19.7), the pending follow-ups,
+        the run's stop state and the configuration.
+        """
         if self.handle.patch.ended and not self.server_ended and self.stop_reason is None:
             self.server_ended = True
             _log("run_ended_by_server", **self.ids)
@@ -916,49 +1297,50 @@ class RunTurn:
             # Also a stop that came while this process was being started (note 6 d).
             self._stop_group(process)
             return
-        if (
-            self._failed_at is not None
-            and self.stopping is None
-            and self.monotonic() - self._failed_at >= self.cfg.stop_grace
-        ):
+        decision = self.ps.decide(
+            self.monotonic(),
+            stdin_open=self.phase == "open",
+            pending=len(self.followups.pending()),
+            followup_grace=self.cfg.followup_grace,
+            stop_grace=self.cfg.stop_grace,
+        )
+        if decision is Decision.STOP and self.stopping is None:
             # The CLI keeps a process with background work after its stdin ended; a failed turn
             # must not hold the run open for that work (FIX-runner-auth-failed-held).
-            self._lost_tasks = len(self.background.running)
-            _log("turn_stopped_after_error", background_tasks=self._lost_tasks, **self.ids)
+            lost = self.ps.lost_at_stop()
+            _log("turn_stopped_after_error", background_tasks=lost, **self.ids)
             self._stop_group(process)
-            return
-        if self.phase == "open" and self.background.holds(
-            self.monotonic(), self.cfg.followup_grace
-        ):
+        elif decision is Decision.HOLD:
             # Background work outlives the turn: the CLI stops it when its input ends, so stdin
             # stays open, and every follow-up becomes a turn of its own (09 18.5).
             if self.background.running and self.live is not None:
                 self.live.keepalive()
-            if last_result_at is not None and not self._held_logged:
+            if self.ps.last_result_at is not None and not self._held_logged:
                 self._held_logged = True
                 _log("stdin_held_for_background", **self.ids)
-            return
-        if self.background.input_waiting:
-            # The result came from a turn the CLI ran by itself before it started a queued
-            # input (a stopped task of a lost process on resume): the input's turn is still to
-            # come and may start background work (FIX-runner-hold-background).
-            return
-        pending = len(self.followups.pending())
-        if self.phase == "open" and stdin_close_due(
-            self.monotonic(), last_result_at, pending, self.cfg.followup_grace
-        ):
+        elif decision is Decision.CLOSE:
+            # Also the close at an error result; a queued input (Decision.WAIT) keeps stdin
+            # open for the turn still to come (FIX-runner-hold-background).
             await self._close_stdin(process)
 
     async def _close_stdin(self, process: StoppableGroup) -> None:
         async with self.write_lock:
             if self.phase == "open":
                 self.phase = "closed"
+            self._record_stdin_closed()
             process.close_stdin()
+
+    def _record_stdin_closed(self) -> None:
+        """Every place that closes stdin records ``stdin_closed`` first (09 18.19.7)."""
+        if self.handover and self.launch is not None and not self.launch.stdin_closed:
+            self.launch.stdin_closed = True
+            self._persist()
 
     def _stop_group(self, group: StoppableGroup) -> None:
         if self.stopping is not None:
             return
         self.phase = "closed"
+        self._record_stdin_closed()  # the stop closes stdin too
         self.stopping = asyncio.ensure_future(self._stop(group))
 
     async def _stop(self, group: StoppableGroup) -> None:
@@ -1032,7 +1414,7 @@ class RunTurn:
         finally:
             mine.set()
 
-    async def _write_followup(  # noqa: PLR0911 - one exit per check
+    async def _write_followup(  # noqa: PLR0911, PLR0912 - one exit per check
         self,
         inv: Invocation,
         ids: Mapping[str, Any],
@@ -1076,8 +1458,19 @@ class RunTurn:
             self.followups.add(message_id, line_uuid, line)
             self.lines[line_uuid] = line
             self.ledger.written(line_uuid)
+            if self.handover:
+                # Recorded before it is written, marked written after its last byte (18.19.3).
+                self._store_lines([(line_uuid, line)])
+                self.input_write = {"uuid": line_uuid, "bytes": None}
             self._persist()
-            if not await process.write_bytes(line):
+            written = await process.write_bytes(line)
+            if self.handed_over:
+                return  # the handover recorded the line with its byte count
+            if self.handover:
+                self.input_write = None
+                if written:
+                    self._persist()
+            if not written:
                 del self.followups.by_message[message_id]
                 del self.lines[line_uuid]
                 self.ledger.unwritten(line_uuid)
@@ -1716,12 +2109,45 @@ class RunTurn:
             "steps": self.live.state() if self.live is not None else None,
             "cwd": str(self.state.cwd) if self.state.cwd is not None else None,
         }
+        if self.handover:
+            record.update(self._handover_part())
         if process is not None:
             record.update(pid=process.pid, pgid=process.pgid, identity=self._identity)
-        elif self.adopted_record is not None:
+        elif self.adopted_record is not None and not self.handover:
             for key in ("pid", "pgid", "identity", "started_at"):
                 record[key] = self.adopted_record.get(key)
         write_turn_record(paths.record, record)
+
+    def _handover_part(self) -> dict[str, Any]:
+        """The members of the record with ``runner.turn_handover`` (18.19.5, 18.19.6).
+
+        The phase, the run's parts a next runner needs to build a command line again (never a
+        text, a token or the environment), the current attempt with its launch files and
+        flags, the run's highest outage number, the inputs of a retry and a line in flight.
+        """
+        state = self.state
+        part: dict[str, Any] = {
+            "phase": self.record_phase,
+            "run": {
+                "model": state.model,
+                "tools": list(state.tools),
+                "mode": state.mode,
+                "plugin_dirs": [str(d) for d in state.plugin_dirs],
+                "stored_files": state.stored_files,
+                "own_uuid": self.own_uuid,
+            },
+            "outage": self.outage,
+            "autonomous": sorted(self.autonomous),
+        }
+        if self.launch is not None:
+            part.update(self.launch.to_record())
+        if self.retry_inputs is not None:
+            part["retry_inputs"] = [u for u, _ in self.retry_inputs]
+        if self.record_phase == "compaction_retry":
+            part["retry"] = {"hint": self.retry_hint}
+        if self.input_write is not None:
+            part["input_write"] = dict(self.input_write)
+        return part
 
     async def _checkpoint(self, read_to: int) -> None:
         """Store the offset after the patches of the lines before it went out (12 f 1).
@@ -1737,6 +2163,347 @@ class RunTurn:
             return
         self.ledger.checkpoint(read_to)
         self._persist()
+
+    # ---- handover and adoption with full rights (09 18.19.3 to 18.19.7) ---------------------
+
+    async def offer_input(self, text: str, *, autonomous: bool = False) -> bool:
+        """Write one further input line into an open stdin, like a follow-up (18.19.7).
+
+        The path of a wake input and of a nudge: the line is recorded with its ``uuid`` before
+        it is written and marked written after its last byte (18.19.3). The checks of a wake
+        input (5.8.3) are the caller's.
+
+        Args:
+            text: The text of the user line.
+            autonomous: The line is an autonomous input (counted by `ProcessState`, 5.8.6).
+
+        Returns:
+            True once every byte reached the pipe; False when stdin is not open.
+        """
+        async with self.write_lock:
+            process = self.process
+            if process is None or self.phase != "open" or self.stop_reason is not None:
+                return False
+            line, line_uuid = user_line([text])
+            data = line.encode("utf-8") + b"\n"
+            self.lines[line_uuid] = data
+            self.ledger.written(line_uuid)
+            if autonomous:
+                self.autonomous.add(line_uuid)
+                self.ps.flag_input(line_uuid, autonomous=True)
+            if self.handover:
+                self._store_lines([(line_uuid, data)])
+                self.input_write = {"uuid": line_uuid, "bytes": None}
+            self._persist()
+            written = await process.write_bytes(data)
+            if self.handed_over:
+                return False
+            self.input_write = None
+            if not written:
+                self.ledger.unwritten(line_uuid)
+            self._persist()
+        return written
+
+    def takes_followups(self) -> bool:
+        """Whether this adopted run takes follow-ups into its turn (18.19.7).
+
+        A turn whose stdin was closed and a compaction are adopted with reading rights only:
+        their follow-ups stay ``queued`` and the server defers them (09 7).
+        """
+        if not self.handover or self.phase in ("closed", "ended"):
+            return False
+        launch = self.launch
+        return launch is None or not (launch.stdin_closed or launch.kind == "compaction")
+
+    async def hand_over(self) -> bool:
+        """Leave the run to the next runner at SIGTERM (18.19.3 item 2).
+
+        An input line in flight is finished within ``runner.kill_grace`` or recorded with the
+        count of bytes written (``partial_input``); a launch whose go byte is not recorded gets
+        its launch pipe closed without a go byte; the record stays.
+
+        Returns:
+            True when the record is left for the next runner (phase ``transcribing`` on).
+        """
+        self.handed_over = True
+        process = self.process
+        if isinstance(process, KeeperGroup) and process.writer.in_flight:
+            loop = asyncio.get_running_loop()
+            deadline = loop.time() + self.cfg.kill_grace
+            while process.writer.in_flight and loop.time() < deadline:
+                await asyncio.sleep(self.cfg.poll_interval)
+            if process.writer.in_flight and self.input_write is not None:
+                written = await process.writer.abort()
+                self.input_write = {"uuid": self.input_write.get("uuid"), "bytes": written}
+                _log("partial_input", bytes=written, **self.ids)
+        if self.keeper_start is not None and (self.launch is None or not self.launch.go_sent):
+            self.keeper_start.close()  # before step 3: the keeper starts no CLI
+        if self.phase == "ended" or self.record_phase not in _KEPT_PHASES:
+            return False
+        self._persist()
+        return True
+
+    async def take_over(self, record: dict[str, Any], known_steps: Mapping[str, str]) -> None:
+        """Continue a run that another runner handed over or left by a crash (18.19.5 to 7).
+
+        By phase: ``transcribing`` starts over after the launch check; ``compaction_retry``
+        starts the recorded retry through the handshake; ``launching`` follows the cases of
+        18.19.5 (relaunch the same attempt with the next try, adopt a live CLI, or take the end
+        of one that ran); ``process`` adopts a live CLI with full rights or takes its end. The
+        end of an adopted process is handled like an own one (the adoption rule, R-AG-47), and
+        every launch is preceded by ``run.launch.check`` (R-AG-48).
+
+        Args:
+            record: The turn record.
+            known_steps: The status of each step of the server's run, by step id.
+        """
+        self.state.turn = self
+        self.task = asyncio.current_task()
+        self.accepted = False
+        self.adopted_record = record
+        phase = str(record.get("phase") or "")
+        self._restore(record, known_steps, fresh=phase == "transcribing")
+        try:
+            if self.ledger.finishing is not None:
+                # The previous runner decided the end and may have stored its costs: repeat it.
+                decided = self.ledger.finishing
+                await self._finish(
+                    str(decided["state"]), reason=decided["reason"], summary=decided.get("summary")
+                )
+                return
+            await self._continue_phase(phase, record)
+        except asyncio.CancelledError:
+            await self._on_cancelled()
+            raise
+        finally:
+            self._end()
+
+    async def _continue_phase(self, phase: str, record: Mapping[str, Any]) -> None:
+        if phase == "transcribing":
+            # No CLI ran for the run: started over after the launch check (18.19.6).
+            if not await self._launch_check() or not await self._precheck_again():
+                return
+            self.launch_checked = True  # the check of this start counts for its first launch
+            await self._reload_context()
+            await self._open_turn()
+            await self._drive(_Attempt(resume=self.session.resume), precheck=False)
+            return
+        if phase == "compaction_retry":
+            retry = _Attempt(resume=True, hint=self.retry_hint, label="retry")
+            await self._drive(retry, precheck=True)
+            return
+        launch = AttemptRecord.from_record(record)
+        if launch is None:
+            await self._fail("runtime_error", (), "unknown")
+            return
+        self.launch = launch
+        attempt = _attempt_of(launch)
+        self.attempt = attempt
+        self.session = SessionChoice(
+            ref=launch.session_ref or self.session.ref,
+            resume=launch.resume,
+            new=launch.new_reference,
+        )
+        if phase == "launching":
+            settled = await settle_launching(
+                launch.files,
+                go_sent=launch.go_sent,
+                keeper=launch.keeper,
+                session_ref=self.session.ref,
+                kill_grace=self.cfg.kill_grace,
+                poll=self.cfg.poll_interval,
+                timeout=self.cfg.cli_probe_timeout,
+            )
+            _log("launch_settled", case=settled.value, **self.ids)
+            if settled is Settled.RELAUNCH:
+                await self._drive(attempt, precheck=True, repeat=launch)
+                return
+        outcome = await self._adopt_process(launch, attempt, record)
+        if outcome is None or outcome.handled:
+            return
+        await self._drive(attempt, precheck=True, outcome=outcome)
+
+    def _restore(
+        self, record: Mapping[str, Any], known_steps: Mapping[str, str], *, fresh: bool
+    ) -> None:
+        """The run's state from a record with a named pipe (a takeover)."""
+        self.ledger = TurnLedger.from_record(record)
+        self.title = str(record.get("title") or "")
+        self.title_request = bool(record.get("title_request"))
+        self.cost_baseline = _stored_baseline(record.get("cost_baseline"))
+        self.followups = PendingFollowups.from_record(record.get("followups"))
+        version = record.get("session_version")
+        if isinstance(version, str) and version:
+            self.session_version = version
+        if record.get("stop") and self.stop_reason is None:
+            self.stop_reason = str(record["stop"])
+        self.recovery = RecoveryState.from_record(
+            record.get("recovery"), compact_supported=COMPACT_IN_PRINT_MODE
+        )
+        launch = AttemptRecord.from_record(record)
+        self.attempt_no = launch.number if launch is not None else 0
+        outage = record.get("outage")
+        self.outage = outage if isinstance(outage, int) and outage >= 0 else 0
+        self.lines = self._load_lines()
+        retry = record.get("retry_inputs")
+        if isinstance(retry, list):
+            self.retry_inputs = [(u, self.lines[u]) for u in retry if u in self.lines]
+        hint = record.get("retry")
+        self.retry_hint = isinstance(hint, Mapping) and hint.get("hint") is True
+        autonomous = record.get("autonomous")
+        self.autonomous = {u for u in autonomous if isinstance(u, str)} if autonomous else set()
+        run = record.get("run")
+        if isinstance(run, Mapping) and isinstance(run.get("own_uuid"), str):
+            self.own_uuid = str(run["own_uuid"])
+        self.report_due = False  # the accepting runner reported the session
+        if fresh:
+            return  # started over: the live box and the costs begin as for a new run
+        self.rebased = True  # the run's first process ran already (D-RUNNER-RESUME-COST-2)
+        self.live = LiveBox(
+            self.handle.patch,
+            own_uuid=self.own_uuid,
+            title_requested=False,
+            context_windows={},
+            now=lambda: datetime.now(UTC),
+            progress_interval=self.cfg.progress_patch_interval,
+        )
+        self.live.restore(record.get("steps"), known_steps)
+
+    async def _reload_context(self) -> None:
+        """The context and the attachments of a run started over from ``transcribing``."""
+        self.state.context = await self.handle.load_context()
+        files_dir = self.cfg.state_dir / "files" / str(self.state.thread_id)
+        self.state.file_texts, self.state.stored_files = await fetch_attachments(
+            self.handle.client, self.state.context.trigger_message.attachments, files_dir
+        )
+
+    async def _adopt_process(
+        self, launch: AttemptRecord, attempt: _Attempt, record: Mapping[str, Any]
+    ) -> _Outcome | None:
+        """Adopt the recorded CLI with full rights, or take the end of one that ran (18.19.7).
+
+        The lines from ``process_start`` to the record's ``offset`` are replayed through
+        `ProcessState.apply` with the adoption time (they post, patch and plan nothing), then
+        the stream is read on from ``offset`` as an own turn's. Stdin is taken only for a
+        process that is no compaction and whose stdin was not closed.
+        """
+        files = launch.files
+        cli = dict(launch.cli or read_json(files.cli) or {})
+        keeper = dict(launch.keeper or read_json(files.keeper) or {})
+        keeper.setdefault("pgid", keeper.get("pid"))
+        cli.setdefault("pgid", keeper.get("pid"))
+        identity = record.get("identity")
+        if isinstance(identity, Mapping) and identity.get("lstart") and not cli.get("lstart"):
+            cli["lstart"] = identity["lstart"]
+        group = KeeperGroup(
+            files,
+            keeper=keeper,
+            cli=cli,
+            session_ref=self.session.ref,
+            timeout=self.cfg.cli_probe_timeout,
+            verified=process_matches(record, self.cfg.cli_probe_timeout),
+        )
+        self.process = group
+        self.adopted_group = group
+        self._identity = {k: str(cli[k]) for k in ("lstart", "command") if cli.get(k)}
+        self.record_phase = "process"
+        self.ps = ProcessState(has_stdin=True, outage=launch.outage, autonomous=self.autonomous)
+        self._held_logged = False
+        lines = await replayed_lines(
+            self._paths().stream, self.ledger.process_start, self.ledger.offset
+        )
+        now = self.monotonic()
+        for message, line_start, line_end in lines:
+            self.ledger.line(message, line_start, line_end)  # classification only, no posting
+        replayed = self.ps.replay([m for m, _, _ in lines], now)
+        _log("turn_replayed", lines=replayed, **self.ids)
+        self.phase = "closed"
+        rights = not launch.stdin_closed and launch.kind != "compaction"
+        if rights and group.alive():
+            rights = await self._finish_partial_input(group, record)
+        if rights and group.alive():
+            if launch.inputs_written:
+                self.phase = "open"
+            else:
+                self.phase = "starting"  # step 6 of 18.19.5: wait for <launch>.fed
+                self._fed = asyncio.ensure_future(self._await_fed(group))
+        self._persist()  # every adopter writes process_start again
+        return await self._follow(
+            group, attempt, self.ledger.offset, launch.stderr_start, adopted=True
+        )
+
+    async def _finish_partial_input(self, group: KeeperGroup, record: Mapping[str, Any]) -> bool:
+        """The rest of a line a handover cut, before any other input (18.19.3).
+
+        Returns:
+            True when stdin stays open; False after a crash in the middle of a write (a line
+            marked started without a byte count): then stdin is closed and nothing is written.
+        """
+        pending = record.get("input_write")
+        if not isinstance(pending, Mapping):
+            return True
+        line_uuid, count = pending.get("uuid"), pending.get("bytes")
+        line = self.lines.get(str(line_uuid))
+        if isinstance(count, int) and not isinstance(count, bool) and line is not None:
+            self.input_write = {"uuid": line_uuid, "bytes": count}
+            if await group.write_bytes(line[count:]):
+                self.input_write = None
+                self._persist()
+                return True
+            return False
+        self.input_write = None
+        await self._close_stdin(group)
+        return False
+
+    async def _launch_check(self) -> bool:
+        """``run.launch.check`` before a launch of a run this runner did not accept (R-AG-48).
+
+        On allow the runner compares its own tool class and billing mode with the answer. A
+        refusal launches nothing and finishes the run ``failed`` with the reason (log code
+        ``launch_check_refused``); a refusal because the server already ended the run finishes
+        nothing. When the server cannot be reached, the check is tried again with backoff and
+        the run stays in ``active_runs``.
+
+        Returns:
+            True on allow.
+        """
+        client = self.handle.client
+        settings = self.cfg.sdk
+        tries = 0
+        while True:
+            if self._stop_requested() or self.handed_over or self._handing_over():
+                return False
+            try:
+                result = await client.call_as(
+                    RunWakeCheckResult, check_run_launch.asyncio_detailed, run_id=self.handle.run_id
+                )
+            except (ServerError, RateLimitedError, httpx.TransportError):
+                _log("launch_check_unreachable", **self.ids)
+                await client.clock.sleep(
+                    min(settings.retry_backoff_cap, settings.retry_backoff_base * 2**tries)
+                )
+                tries += 1
+                continue
+            except ProblemError as err:
+                reason = err.reason or err.code
+                _warn("launch_check_refused", reason=reason, **self.ids)
+                if reason in ("run_not_running", "run_inactive"):
+                    self.server_ended = True
+                    self._ended_by_server()
+                    return False
+                await self._fail(reason, (), "not_started")
+                return False
+            mismatch = None
+            if str(getattr(result.tool_class, "value", result.tool_class)) != self.cfg.tool_class:
+                mismatch = "tool_class_mismatch"
+            elif str(getattr(result.billing_mode, "value", result.billing_mode)) != self.state.mode:
+                mismatch = "billing_mode_mismatch"
+            if mismatch is not None:
+                _warn("launch_check_refused", reason=mismatch, **self.ids)
+                await self._fail(mismatch, (), "not_started")
+                return False
+            _log("launch_check_allowed", **self.ids)
+            return True
 
     # ---- adoption (design note 12) ---------------------------------------------------------
 
@@ -1758,6 +2525,7 @@ class RunTurn:
         self.adopted_record = record
         self.adopted_group = group
         self.ledger = TurnLedger.from_record(record)
+        self.ps = ProcessState(has_stdin=False)  # reading rights only (18.9)
         self.phase = "closed"
         self.title = str(record.get("title") or "")
         self.title_request = bool(record.get("title_request"))

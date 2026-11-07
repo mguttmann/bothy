@@ -179,17 +179,27 @@ class World:
         the defaults) and writes its log lines to ``runner-<n>.log`` in the world's directory.
         """
         self.config(**runner)
+        return self.spawn_command(
+            [*self.cli_command(), "run", "--config", str(self.root / "runner.toml")]
+        )
+
+    def cli_command(self) -> list[str]:
+        """The runner's command line (``python -m claude_code_runner``)."""
+        return [sys.executable, "-m", "claude_code_runner"]
+
+    def cli_env(self) -> dict[str, str]:
+        """The environment of a runner process of its own."""
+        return {**self.environ(), "PYTHONPATH": os.pathsep.join(sys.path)}
+
+    def spawn_command(self, argv: list[str]) -> subprocess.Popen[bytes]:
+        """Start ``argv`` as a runner process in its own session, logging to ``runner-<n>.log``.
+
+        The runner is the leader of its own process group, as under a service manager.
+        """
         log = (self.root / f"runner-{len(self.processes)}.log").open("wb")
         process = subprocess.Popen(
-            [
-                sys.executable,
-                "-m",
-                "claude_code_runner",
-                "run",
-                "--config",
-                str(self.root / "runner.toml"),
-            ],
-            env={**self.environ(), "PYTHONPATH": os.pathsep.join(sys.path)},
+            argv,
+            env=self.cli_env(),
             stdin=subprocess.DEVNULL,
             stdout=log,
             stderr=log,
@@ -316,8 +326,14 @@ async def world(
 
 
 def _started_groups(w: World) -> set[int]:
-    groups = {c["pid"] for c in w.calls("turn_start")}
-    return groups | {p.pid for p in w.processes}
+    # A turn's group is its own, or with runner.turn_handover its keeper's (09 18.19.4).
+    groups = {c.get("pgid", c["pid"]) for c in w.calls("turn_start")}
+    keepers = set()
+    turns = w.state / "turns"
+    for path in turns.glob("*.keeper") if turns.is_dir() else []:
+        with contextlib.suppress(OSError, ValueError, KeyError, TypeError):
+            keepers.add(int(json.loads(path.read_text())["pid"]))
+    return groups | keepers | {p.pid for p in w.processes}
 
 
 def _group_alive(pgid: int) -> bool:

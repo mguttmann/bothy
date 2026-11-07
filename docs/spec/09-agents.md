@@ -4192,14 +4192,18 @@ service. The keeper:
 2. writes its identity file and waits for the go of the launch handshake; on the go it forks,
    the child waits on a release pipe from the keeper, the keeper writes the CLI's identity file
    and then releases the child, which restores the default signal handlers and execs the CLI
-   with the read end as stdin, the stream and stderr files of 18.2 as stdout and stderr and the
-   lock descriptors passed on as today; the CLI stays in the keeper's process group; the keeper
-   closes its own copies of the lock descriptors and of the read end after the fork;
-3. writes the attempt's initial inputs from `<launch>.inputs` into its write end, once, with the
-   write end non-blocking in one loop that also watches the CLI's exit (`waitpid` with `WNOHANG`
-   on a `SIGCHLD` wake-up), and only after the last byte writes `<launch>.fed` atomically by
-   rename; for a compaction attempt it then closes its write end; when the CLI ends first (a
-   write fails with `EPIPE`, or the loop sees the exit) it writes no `<launch>.fed`;
+   with the read end of an anonymous pipe as stdin (the keeper holds its write end and relays the
+   named pipe into it, because the pinned CLI does not see the end of input of a named pipe,
+   18.19.12), the stream and stderr files of 18.2 as stdout and stderr and the lock descriptors
+   passed on as today; the CLI stays in the keeper's process group; the keeper closes its own
+   copies of the lock descriptors after the fork; once every write end of the named pipe is
+   closed (its own after item 5 or a compaction, and the runner's), it closes the CLI's stdin;
+3. writes the attempt's initial inputs from `<launch>.inputs` into the CLI's stdin, once, without
+   blocking in one loop that also watches the CLI's exit (`waitpid` with `WNOHANG` on a
+   `SIGCHLD` wake-up), and only after the last byte writes `<launch>.fed` atomically by
+   rename, before it relays any line of the named pipe; for a compaction attempt it then closes
+   its write end of the named pipe; when the CLI ends first (a write fails with `EPIPE`, or the
+   loop sees the exit) it writes no `<launch>.fed`;
 4. ignores SIGINT, SIGTERM, SIGHUP and SIGPIPE, waits for the CLI, writes the CLI's wait status
    to `<launch>.exit` atomically by rename and exits with the CLI's exit code, or 128 plus the
    signal number when a signal ended the CLI; it never outlives the CLI;
@@ -4222,7 +4226,8 @@ current launch again and writes follow-ups and wake inputs into it.
 - Stop (18.6): the runner signals the one group of keeper and CLI. SIGINT and SIGTERM reach the
   CLI and its background tasks (the keeper ignores both), SIGKILL ends all of them, keeper
   included; "no process of the group is left" stays the end condition. A SIGKILL to the keeper
-  alone closes its write end, so the CLI sees end of input once the runner's end is closed too.
+  alone ends the relay, so the CLI sees end of input at once and a line of the runner finds no
+  reader (`ENXIO` or `EPIPE`: the turn is gone).
 - The keeper holds no lock descriptor after the fork; whether the CLI's own children inherit the
   lock descriptors is not read from the CLI and is held by a test of AR-03 against the fake CLI
   and the real-CLI suite.
@@ -4586,7 +4591,7 @@ model call; design note sections 2.3, 3 and 12):
 | Rate-limit scenarios | the strings hold a mock with scenarios such as `session-limit-reached` and `weekly-limit-reached` behind an internal command `mock-limits`; no caller of it is reachable in the released build, so a free real-CLI check cannot use it. AR-06 captures the frame and the `result` against a local stand-in for the API that answers 429 with these headers (the method of `tests/real_cli/captured`), which needs no login and costs nothing |
 | `--disallowedTools` under `bypassPermissions` | `bypassPermissions` "auto-approves every tool call (except explicit deny rules)"; a bare tool name in `--disallowedTools` is a deny rule and removes the tool; AR-05 confirms the tool list of `system/init` against the local API stand-in |
 | `Bash(bothy-wake:*)` with an environment prefix | the CLI strips only a fixed list of safe variables (for example `LANG`, `TZ`, `NO_COLOR`; not `PATH` or `TMPDIR`) before matching a prefix rule; any other prefix makes the command need approval, which `dontAsk` refuses. A safe prefix runs `bothy-wake` itself, so no other program can run under the rule |
-| Named pipe as stdin | not read from the CLI; the probe of the design note 2.4 used a fake CLI. AR-03 runs the pinned CLI with a named pipe against the local API stand-in |
+| Named pipe as stdin | run 2026-11-07 with the pinned CLI 2.1.288 against a local stand-in for the API on loopback (no login, no model call; `tests/real_cli/test_named_pipe.py`): with a named pipe directly as stdin the CLI reads and answers every line, also one a second process wrote after opening the pipe again, but on macOS it does not end when the last write end closes (on an anonymous pipe the same CLI ends at once); hence the keeper's relay into an anonymous pipe (18.19.4 item 2), under which the initial input, a line of the runner and a line of a second process are each echoed and answered in order and closing stdin ends the CLI with exit 0. Linux not run |
 
 The point "whether the CLI's children inherit the lock descriptors" is not read from the CLI
 (18.19.4). Every finding above is checked again when the pin moves (`test_pinned_cli.py`).
