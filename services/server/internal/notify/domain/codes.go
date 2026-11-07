@@ -12,8 +12,9 @@ const KindSync Kind = "sync"
 const codeSync int64 = 9
 
 // KindCode returns the fixed code of k for the argument Kind of the job notify.push_send: 1 to 8
-// for the kinds in the order of NotificationKind and 9 for KindSync. The codes are part of the
-// stored job arguments and are never renumbered (D-M3-19-10).
+// for the first eight kinds in the order of NotificationKind, 9 for KindSync and from 10 on for the
+// kinds added later in their order (wake_ended 10, AR-04). The codes are part of the stored job
+// arguments and are never renumbered (D-M3-19-10), so a later kind skips the code of KindSync.
 //
 // Errors: an internal_error for any other kind.
 //
@@ -26,7 +27,11 @@ func KindCode(k Kind) (int64, error) {
 	}
 	for i, known := range kinds {
 		if known == k {
-			return int64(i + 1), nil
+			code := int64(i + 1)
+			if code >= codeSync {
+				code++
+			}
+			return code, nil
 		}
 	}
 	return 0, invalid("kind")
@@ -34,13 +39,17 @@ func KindCode(k Kind) (int64, error) {
 
 // KindFromCode is the inverse of KindCode.
 //
-// Errors: an internal_error for a code outside 1 to 9.
+// Errors: an internal_error for a code outside 1 to len(Kinds())+1.
 func KindFromCode(code int64) (Kind, error) {
 	if code == codeSync {
 		return KindSync, nil
 	}
-	if code < 1 || code > int64(len(kinds)) {
+	i := code - 1
+	if code > codeSync {
+		i = code - 2
+	}
+	if code < 1 || i >= int64(len(kinds)) {
 		return "", invalid("kind_code")
 	}
-	return kinds[code-1], nil
+	return kinds[i], nil
 }

@@ -142,9 +142,9 @@ type WakeScheduler interface {
 // WakeNotes writes the system note of a wake-up end other than fired and of an ended chain (09
 // 5.8.4) in the caller's unit of work: a message with origin system in the thread, authored by
 // the agent, that names the label and the reason (messaging.Messages.AppendSystemNote). It
-// returns the id of the note.
+// returns the id and the thread_seq of the note.
 type WakeNotes interface {
-	AppendSystemNote(ctx context.Context, threadID, authorID ids.ID, text string) (ids.ID, error)
+	AppendSystemNote(ctx context.Context, threadID, authorID ids.ID, text string) (ids.ID, int64, error)
 }
 
 // Owners answers whether a person is an active owner of the instance at this moment

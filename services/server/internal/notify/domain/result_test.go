@@ -9,11 +9,13 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/notify/domain"
 )
 
-// TestKindCodesStable: the eight kinds in the order of NotificationKind have the codes 1 to 8 and
-// the badge sync 9; KindFromCode inverts them; 0 and 10 are errors (D-M3-19-10).
+// TestKindCodesStable: the first eight kinds in the order of NotificationKind have the codes 1 to
+// 8, the badge sync 9 and wake_ended 10 (AR-04: a later kind never takes a stored code);
+// KindFromCode inverts them; 0 and 11 are errors (D-M3-19-10).
 func TestKindCodesStable(t *testing.T) {
 	t.Parallel()
-	kinds := append(domain.Kinds(), domain.KindSync)
+	first := domain.Kinds()[:8]
+	kinds := append(append(first, domain.KindSync), domain.KindWakeEnded)
 	for i, k := range kinds {
 		code, err := domain.KindCode(k)
 		if err != nil || code != int64(i+1) {
@@ -24,7 +26,7 @@ func TestKindCodesStable(t *testing.T) {
 			t.Fatalf("KindFromCode(%d) = %s, %v; want %s", code, back, err, k)
 		}
 	}
-	for _, c := range []int64{0, 10, -1} {
+	for _, c := range []int64{0, 11, -1} {
 		if _, err := domain.KindFromCode(c); err == nil {
 			t.Fatalf("KindFromCode(%d) accepted", c)
 		}

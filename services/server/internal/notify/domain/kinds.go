@@ -28,9 +28,13 @@ const (
 	// KindAdmin is a reminder of the administration; it has no thread and depends only on the
 	// switch notify.admin_enabled.
 	KindAdmin Kind = "admin"
+	// KindWakeEnded is a wake-up of the person that ended refused, expired or failed, or a run of
+	// the person that ended usage_limited (13 section 2, R-PN-12, stage AR); it points at the note
+	// in the thread, and a usage-limited run gets no second run_failed.
+	KindWakeEnded Kind = "wake_ended"
 )
 
-var kinds = []Kind{KindMessage, KindMention, KindDM, KindRunDone, KindRunFailed, KindInputNeeded, KindSecurity, KindAdmin}
+var kinds = []Kind{KindMessage, KindMention, KindDM, KindRunDone, KindRunFailed, KindInputNeeded, KindSecurity, KindAdmin, KindWakeEnded}
 
 // Kinds returns every kind in the order of NotificationKind; the slice is a fresh copy.
 func Kinds() []Kind { return slices.Clone(kinds) }
@@ -44,8 +48,8 @@ func (k Kind) Valid() bool { return slices.Contains(kinds, k) }
 func (k Kind) HasThread() bool { return k.Valid() && k != KindSecurity && k != KindAdmin }
 
 // Urgent reports whether a hint of this kind goes at once even in an open coalescing window
-// (13 4.5 point 3: mention, dm, input_needed, run_done, run_failed and security). Admin has no
-// window at all, so it is not listed there and is not urgent.
+// (13 4.5 point 3: mention, dm, input_needed, run_done, run_failed and security; wake_ended like
+// run_failed, AR-04). Admin has no window at all, so it is not listed there and is not urgent.
 func (k Kind) Urgent() bool { return k.Valid() && k != KindMessage && k != KindAdmin }
 
 // Level is a notification level, the schema NotificationLevel and the column

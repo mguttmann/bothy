@@ -17,8 +17,11 @@ import (
 // PersonalData is the participant of runs in the privacy requests (M7-06,
 // docs/spec/20-privacy.md sections 2, 4.4 and 5.2). It exports the runs the person triggered into
 // runs.jsonl and the person's interactions into interactions.jsonl. It erases nothing: runs, run
-// steps, follow-ups and components go with their thread or message (20 section 2), and the
-// interactions of a deleted message go with it by their foreign key.
+// steps, follow-ups, wake-ups and components go with their thread or message (20 section 2), the
+// interactions of a deleted message go with it by their foreign key, and the counts of
+// run_autonomy go with the thread or the person (ON DELETE CASCADE, AR-04). Wake-ups are not
+// exported: their label, condition and result are written by the agent from the whole thread,
+// like the status line of a run.
 type PersonalData struct {
 	pool *pg.Pool
 }
@@ -34,7 +37,7 @@ func (*PersonalData) Module() string { return "runs" }
 
 // Tables returns the tables of runs with personal data of 20 section 2.
 func (*PersonalData) Tables() []string {
-	return []string{"runs", "run_steps", "run_followups", "message_components", "interactions"}
+	return []string{"runs", "run_steps", "run_followups", "run_wakes", "run_autonomy", "message_components", "interactions"}
 }
 
 // exportRun is one line of runs.jsonl (docs/api/gdpr-export/v1/lines/runs.schema.json). The

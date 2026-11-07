@@ -69,10 +69,11 @@ type DeliveryOutcome struct {
 
 // InvocationBearing reports whether an event of eventType carries an invocation and therefore
 // passes Delivery.Prepare before every delivery to an agent: agent.invocation, agent.followup,
-// interaction.created and command.invoked (04 15.3, 05 section 6).
+// interaction.created, command.invoked (04 15.3, 05 section 6) and agent.wake_input (04 15.9,
+// AR-04).
 func InvocationBearing(eventType string) bool {
 	switch eventType {
-	case "agent.invocation", "agent.followup", "interaction.created", "command.invoked":
+	case "agent.invocation", "agent.followup", "interaction.created", "command.invoked", "agent.wake_input":
 		return true
 	}
 	return false

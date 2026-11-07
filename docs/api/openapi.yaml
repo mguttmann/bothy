@@ -31330,6 +31330,10 @@ components:
         note_message_id:
           $ref: '#/components/schemas/Uuid'
           description: The note in the thread of an end other than `fired` (09 5.8.4).
+        note_thread_seq:
+          type: integer
+          format: int64
+          description: The `thread_seq` of the note; set with `note_message_id`.
     AgentWakeFacts:
       type: object
       description: The wake-up of a wake run or a wake input; the runner writes its label, reason and result as the input (09 5.8.3).

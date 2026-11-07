@@ -127,7 +127,7 @@ func TestDecide_LevelAndKind(t *testing.T) {
 	t.Parallel()
 	allows := map[domain.Level][]domain.Kind{
 		domain.LevelAll:      threadKinds,
-		domain.LevelMentions: {domain.KindMention, domain.KindDM, domain.KindRunDone, domain.KindRunFailed, domain.KindInputNeeded},
+		domain.LevelMentions: {domain.KindMention, domain.KindDM, domain.KindRunDone, domain.KindRunFailed, domain.KindInputNeeded, domain.KindWakeEnded},
 		domain.LevelMute:     {domain.KindInputNeeded},
 	}
 	for _, level := range domain.Levels() {

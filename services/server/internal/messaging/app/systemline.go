@@ -77,24 +77,24 @@ func (s *Service) AppendSystemLine(ctx context.Context, l messaging.SystemLine) 
 // (origin system, 09 3.2) and creates no hint (13 section 2: origin system); message.created and
 // MessagePosted follow as for every message. The text is the server's own English line (ruling
 // D-AR-04-6: 03 messages.system_code is a closed list of the core contract that has no code with
-// parameters). It returns the id of the note.
+// parameters). It returns the id and the thread_seq of the note.
 //
 // Errors: internal outside a unit of work or for an empty or oversized text; the errors of chat and
 // the store.
 //
 // Example:
 //
-//	id, err := msgs.AppendSystemNote(ctx, thread, agent, "Wake-up 'CI of #123' expired: its deadline passed before it could fire")
-func (s *Service) AppendSystemNote(ctx context.Context, threadID, authorID ids.ID, text string) (ids.ID, error) {
+//	id, seq, err := msgs.AppendSystemNote(ctx, thread, agent, "Wake-up 'CI of #123' expired: its deadline passed before it could fire")
+func (s *Service) AppendSystemNote(ctx context.Context, threadID, authorID ids.ID, text string) (ids.ID, int64, error) {
 	if !txn.InUnit(ctx) {
-		return ids.ID{}, errs.New(errs.CodeInternalError, "messaging: AppendSystemNote runs only inside a unit of work")
+		return ids.ID{}, 0, errs.New(errs.CodeInternalError, "messaging: AppendSystemNote runs only inside a unit of work")
 	}
 	if text == "" || len(text) > s.cfg.MaxContentBytes {
-		return ids.ID{}, errs.New(errs.CodeInternalError, "messaging: a system note is empty or too long")
+		return ids.ID{}, 0, errs.New(errs.CodeInternalError, "messaging: a system note is empty or too long")
 	}
 	author, err := s.author(ctx, authorID)
 	if err != nil {
-		return ids.ID{}, err
+		return ids.ID{}, 0, err
 	}
 	a := actor.Actor{ID: authorID, Kind: actor.Kind(author.Kind)}
 	caller := a
@@ -103,28 +103,28 @@ func (s *Service) AppendSystemNote(ctx context.Context, threadID, authorID ids.I
 	}
 	appended, err := s.d.Threads.AppendToThread(ctx, caller, chat.AppendCmd{ThreadID: threadID})
 	if err != nil {
-		return ids.ID{}, err
+		return ids.ID{}, 0, err
 	}
 	info := appended.Thread
 	note := domain.SystemNote(text, info.ID, info.ChannelID, authorID, appended.Seq)
 	note.CreatedAt = s.now()
 	if note.SearchLanguage, err = s.d.Directory.InstanceSearchLanguage(ctx); err != nil {
-		return ids.ID{}, err
+		return ids.ID{}, 0, err
 	}
 	row, err := s.d.Store.InsertMessage(ctx, note)
 	if errors.Is(err, ErrClientMsgIDTaken) {
-		return ids.ID{}, errs.New(errs.CodeInternalError, "messaging: the client_msg_id of a system note is taken")
+		return ids.ID{}, 0, errs.New(errs.CodeInternalError, "messaging: the client_msg_id of a system note is taken")
 	}
 	if err != nil {
-		return ids.ID{}, err
+		return ids.ID{}, 0, err
 	}
 	s.countCreated(ctx, row)
 	m := view(row, author, nil)
 	if err := s.emitCreated(ctx, info, m, false); err != nil {
-		return ids.ID{}, err
+		return ids.ID{}, 0, err
 	}
 	if err := txn.Publish(ctx, s.posted(a, info, m, false)); err != nil {
-		return ids.ID{}, err
+		return ids.ID{}, 0, err
 	}
-	return m.ID, nil
+	return m.ID, m.ThreadSeq, nil
 }

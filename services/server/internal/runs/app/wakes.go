@@ -278,7 +278,7 @@ func (w *Wakes) afterInsert(ctx context.Context, b *wakeBox, r WakeRow) error {
 	if err := b.d.Schedule.ScheduleWakeDue(ctx, r.ID, r.Deadline); err != nil {
 		return err
 	}
-	return w.s.emitWakeChanged(ctx, r, ids.ID{})
+	return w.s.emitWakeChanged(ctx, r, noteRef{})
 }
 
 // createRefusal returns the reason of 5.8.1 and 5.8.6 that refuses a new wake-up of run, "" for
@@ -433,10 +433,10 @@ func (s *Service) endWake(ctx context.Context, b *wakeBox, r WakeRow, state doma
 // afterEnd writes the note of an end other than fired, appends run.wake_changed and records the
 // end after the commit.
 func (s *Service) afterEnd(ctx context.Context, b *wakeBox, row WakeRow) error {
-	var note ids.ID
+	var note noteRef
 	if row.State != domain.WakeFired {
 		var err error
-		if note, err = b.d.Notes.AppendSystemNote(ctx, row.ThreadID, row.AgentID, domain.WakeNoteText(row.Label, row.State, row.StateReason)); err != nil {
+		if note.id, note.seq, err = b.d.Notes.AppendSystemNote(ctx, row.ThreadID, row.AgentID, domain.WakeNoteText(row.Label, row.State, row.StateReason)); err != nil {
 			return err
 		}
 	}
@@ -448,6 +448,12 @@ func (s *Service) afterEnd(ctx context.Context, b *wakeBox, row WakeRow) error {
 	return nil
 }
 
+// noteRef is the note of a wake-up end: its message and thread_seq; zero for none.
+type noteRef struct {
+	id  ids.ID
+	seq int64
+}
+
 // wakeChangedJSON is RunWakeChangedPayload.
 type wakeChangedJSON struct {
 	WakeID        ids.ID  `json:"wake_id"`
@@ -457,20 +463,21 @@ type wakeChangedJSON struct {
 	State         string  `json:"state"`
 	StateReason   string  `json:"state_reason,omitempty"`
 	NoteMessageID *ids.ID `json:"note_message_id,omitempty"`
+	NoteThreadSeq int64   `json:"note_thread_seq,omitempty"`
 }
 
 // emitWakeChanged appends run.wake_changed for r (09 5.8.2): resource the thread without version,
 // receive action run.wake.read, so the clients that may read the thread and the agent of the
 // wake-up (operator rule, 07 2.9) receive it; the payload carries ids and codes only.
-func (s *Service) emitWakeChanged(ctx context.Context, r WakeRow, note ids.ID) error {
+func (s *Service) emitWakeChanged(ctx context.Context, r WakeRow, note noteRef) error {
 	info, err := s.d.Threads.Info(ctx, r.ThreadID)
 	if err != nil {
 		return err
 	}
 	pl := wakeChangedJSON{WakeID: r.ID, ThreadID: r.ThreadID, AgentID: r.AgentID, TriggeredBy: r.TriggeredBy, State: string(r.State),
 		StateReason: r.StateReason}
-	if !note.IsZero() {
-		pl.NoteMessageID = &note
+	if !note.id.IsZero() {
+		pl.NoteMessageID, pl.NoteThreadSeq = &note.id, note.seq
 	}
 	p, err := encode(pl)
 	if err != nil {
@@ -848,7 +855,7 @@ func (s *Service) reopenWake(ctx context.Context, b *wakeBox, r WakeRow, reason 
 	if !changed {
 		return WakeRow{}, errs.New(errs.CodeInternalError, "runs: a locked wake-up changed")
 	}
-	if err := s.emitWakeChanged(ctx, row, ids.ID{}); err != nil {
+	if err := s.emitWakeChanged(ctx, row, noteRef{}); err != nil {
 		return WakeRow{}, err
 	}
 	return row, b.d.Schedule.ScheduleWakeDue(ctx, row.ID, s.now())
@@ -1245,7 +1252,7 @@ func (s *Service) idleReport(ctx context.Context, row RunRow, before, after []by
 		return false, err
 	}
 	if reached {
-		if _, err := b.d.Notes.AppendSystemNote(ctx, row.ThreadID, row.AgentID, domain.AutonomyNoteText(domain.WakeCodeIdleMax)); err != nil {
+		if _, _, err := b.d.Notes.AppendSystemNote(ctx, row.ThreadID, row.AgentID, domain.AutonomyNoteText(domain.WakeCodeIdleMax)); err != nil {
 			return false, err
 		}
 		m := b.d.Metrics

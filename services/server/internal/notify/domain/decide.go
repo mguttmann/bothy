@@ -234,7 +234,9 @@ func (in RecipientFacts) recipient() bool {
 	switch in.Kind {
 	case KindMessage, KindMention, KindDM:
 		return !in.Author
-	case KindRunDone, KindRunFailed, KindInputNeeded:
+	case KindRunDone, KindRunFailed, KindInputNeeded, KindWakeEnded:
+		// wake_ended goes to the wake-up's person or the usage-limited run's person, which the
+		// consumer marks as RunStarter (13 section 2, AR-04).
 		return in.RunStarter
 	case KindSecurity, KindAdmin:
 		return true

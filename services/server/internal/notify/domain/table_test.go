@@ -246,7 +246,7 @@ func compareLines(t *testing.T, want, got []byte) {
 func TestDecisionTableGolden_Size(t *testing.T) {
 	t.Parallel()
 	all := combos()
-	if want := 8 * 3 * 2 * 2 * 2 * 2 * 2 * 2 * 2; len(all) != want {
+	if want := 9 * 3 * 2 * 2 * 2 * 2 * 2 * 2 * 2; len(all) != want {
 		t.Fatalf("%d combinations, want %d", len(all), want)
 	}
 	seen := map[string]bool{}

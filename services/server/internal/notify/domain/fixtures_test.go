@@ -148,7 +148,7 @@ func assertInternal(t *testing.T, name string, err error) {
 var (
 	threadKinds = []domain.Kind{
 		domain.KindMessage, domain.KindMention, domain.KindDM,
-		domain.KindRunDone, domain.KindRunFailed, domain.KindInputNeeded,
+		domain.KindRunDone, domain.KindRunFailed, domain.KindInputNeeded, domain.KindWakeEnded,
 	}
 	otherKinds = []domain.Kind{domain.KindSecurity, domain.KindAdmin}
 )
