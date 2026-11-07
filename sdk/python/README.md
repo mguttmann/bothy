@@ -138,6 +138,18 @@ cancels `execute` and finishes. A second request for the same run changes nothin
 a run that this process holds but has not started yet reaches `on_followup` too, so a handler can
 keep it until its runtime starts.
 
+Handover at a restart (AR-03, docs/spec/09-agents.md 18.19.3 and 18.19.7): a runtime whose
+processes outlive the adapter process can hand its runs over instead of stopping them.
+`await adapter.stop(hand_over=True)` stops the source, and from then on `send_heartbeat` sends
+nothing; the run tasks that `run` cancels when it returns are cancelled with
+`Adapter.handing_over` set, so the handler leaves its runtime running, and the adapter finishes
+no such run and closes no inbox entry of a started run (also not for a cancel request still in
+flight). The next process takes the runs over itself; `AgentHandler.adopted_run(run_id)` returns
+the `RunHandle` of a run it adopted, and the adapter then hands each follow-up of that run to
+`on_followup` bound to the follow-up's token. Without these hooks nothing changes: `stop()` cancels
+as before and a follow-up of a run this process does not hold is closed. `bothy_sdk.heartbeat`
+accepts the capabilities `turn_handover` and `wakes`, `true` only (09 18.19.1).
+
 Interview of "New agent" (A1-07, docs/spec/26-builtin-agents.md 6.1): on the agent the operator
 names in the server's `agents.builder_agent_id`, the adapter turns `agent.interview_requested` into
 a `bothy_sdk.agent_interview.InterviewRequest` (the turns, `want_draft`, the template catalogue,

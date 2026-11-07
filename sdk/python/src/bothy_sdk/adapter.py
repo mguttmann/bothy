@@ -555,6 +555,23 @@ class AgentHandler:
         """
         return None
 
+    def adopted_run(self, run_id: UUID) -> RunHandle | None:
+        """Return the handle of a run this handler adopted from an earlier process, if any.
+
+        A runtime that outlived the previous adapter process and was taken over by this one
+        (09 18.19.7) takes the follow-ups of its run: the adapter hands each such follow-up to
+        `on_followup` with this handle, bound to the follow-up's token. The default ``None``
+        closes a follow-up of a run this process does not hold, as before.
+
+        Args:
+            run_id: The run of a follow-up.
+
+        Returns:
+            The run's handle, or ``None``.
+        """
+        del run_id
+        return None
+
     async def on_event(self, envelope: Envelope) -> None:
         """Handle an event without an invocation token (for example ``agent.config_changed``).
 
@@ -632,6 +649,7 @@ class Adapter:
         self._run_tokens: dict[UUID, Secret] = {}
         self._tasks: set[asyncio.Task[Any]] = set()
         self._stopping = False
+        self._handing_over = False
         self._degraded: list[str] = []
 
     # ---- lifecycle -----------------------------------------------------------------------
@@ -679,8 +697,23 @@ class Adapter:
             await self._close()
         return self.source.close_reason or CloseReason(1000, "stopped")
 
-    async def stop(self) -> None:
-        """Stop the source; `run` returns after the current delivery."""
+    @property
+    def handing_over(self) -> bool:
+        """Whether `stop` was called with ``hand_over=True`` (09 18.19.3)."""
+        return self._handing_over
+
+    async def stop(self, *, hand_over: bool = False) -> None:
+        """Stop the source; `run` returns after the current delivery.
+
+        Args:
+            hand_over: A handover at a restart (09 18.19.3): from now on no heartbeat goes out
+                (`send_heartbeat` sends nothing), and the run tasks that `run` cancels when it
+                returns are cancelled with `handing_over` set, so the handler leaves its
+                runtime running for the next process; the adapter then finishes no run and
+                closes no inbox entry of a started run. Without it nothing changes.
+        """
+        if hand_over:
+            self._handing_over = True
         self._stopping = True
         if self.source is not None:
             await self.source.close()
@@ -852,6 +885,9 @@ class Adapter:
         For a state change the next regular heartbeat would report too late (for example a
         project that became ready). A failure is logged; the regular heartbeat follows anyway.
         """
+        if self._handing_over:
+            _LOG.info("no heartbeat during a handover")
+            return
         beat = self.heartbeat()
         try:
             with self.client.unbound():
@@ -1090,6 +1126,14 @@ class Adapter:
         run_id = entry.run_id
         state = self._runs.get(run_id) if run_id is not None else None
         if env.type in (_FOLLOWUP, _INTERACTION):
+            adopted = (
+                self.handler.adopted_run(run_id)
+                if state is None and run_id is not None and env.type == _FOLLOWUP
+                else None
+            )
+            if adopted is not None:
+                self._spawn(self._adopted_followup(entry, inv, adopted))
+                return
             if state is None:
                 _LOG.info("event %s for a run this process does not hold", env.id)
                 await self.inbox.set_state(entry.event_id, EntryState.CLOSED)
@@ -1289,7 +1333,8 @@ class Adapter:
                 if not handle.finished and not handle.waiting:
                     await handle.finish("completed")
         except asyncio.CancelledError:
-            if state.cancel_reason is not None and not handle.finished:
+            # A handover leaves the run to the next process, which ends it (09 18.19.3).
+            if state.cancel_reason is not None and not handle.finished and not self._handing_over:
                 with self.client.bind_run(state.run_id, token), contextlib.suppress(ProblemError):
                     await handle.finish("cancelled", reason=state.cancel_reason)
             raise
@@ -1375,6 +1420,17 @@ class Adapter:
                 state.run_id, self._run_tokens.get(state.run_id, entry.token)
             ):
                 await work(inv, state.handle)
+
+    async def _adopted_followup(
+        self, entry: InboxEntry, inv: Invocation, handle: RunHandle
+    ) -> None:
+        """A follow-up of a run the handler adopted (`AgentHandler.adopted_run`, 18.19.7)."""
+        try:
+            if entry.token is not None:
+                with self.client.bind_run(handle.run_id, entry.token):
+                    await self.handler.on_followup(inv, handle)
+        finally:
+            await self.inbox.set_state(entry.event_id, EntryState.CLOSED)
 
     async def _resume(self, state: _RunState, entry: InboxEntry, inv: Invocation) -> Secret | None:
         """``resumeRun`` with the event's token; ``None`` when the run did not resume here.
