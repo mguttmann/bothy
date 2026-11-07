@@ -38,7 +38,11 @@ from hermes_cli.config import (
 from hermes_cli.env_loader import load_hermes_dotenv
 from hermes_cli.runtime_provider import resolve_runtime_provider
 from hermes_cli.tools_config import _get_platform_tools
-from hermes_constants import reset_hermes_home_override, set_hermes_home_override
+from hermes_constants import (
+    get_hermes_home,
+    reset_hermes_home_override,
+    set_hermes_home_override,
+)
 from tools.hook_output_spill import get_spill_config
 
 from bothy_hermes_adapter.runtime import ResolvedCredential
@@ -47,6 +51,7 @@ __all__ = [
     "API_KEY_VARIABLE",
     "OAUTH_VARIABLES",
     "busy_input_mode",
+    "current_home",
     "enabled_toolsets",
     "env_defines",
     "hook_context_limit",
@@ -150,6 +155,15 @@ def profile_home(home: Path) -> Iterator[None]:
         yield
     finally:
         reset_hermes_home_override(token)
+
+
+def current_home() -> Path:
+    """The Hermes home of this process (the profile whose plugins run here).
+
+    Returns:
+        The path Hermes itself uses.
+    """
+    return Path(get_hermes_home())
 
 
 def read_config() -> dict[str, Any]:

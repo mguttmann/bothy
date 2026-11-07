@@ -1,0 +1,27 @@
+# FEAT-hermes-mirror-sessions A Hermes session outside Bothy shows as a chat of its own
+
+Owner goal of 2026-11-07: a Hermes session that is not started from Bothy (a multi-round session
+another program drives over `hermes acp`, a CLI or cron session) must show up in Bothy as its own
+chat, so the owner sees every session of an agent. Until now the plugin entry dropped every hook
+of another platform. Rule: 09 17.13 (R-AG-57), design note
+[hermes-session-mirror.md](../design/hermes-session-mirror.md).
+
+| No | Date | Ruling | Reason |
+|---|---|---|---|
+| D-FHMS-1 | 2026-11-07 | Two keys of the platform section's `extra`, both or neither: `hermes_adapter.mirror_channel` (a forum) and `hermes_adapter.mirror_platforms` (foreign platform keys, a list or a comma separated text). Default off; half a configuration and the adapter's own key are refused with the key's name, like every other key of the adapter. | Generic and explicit per profile; a typo must not fall back to a default. |
+| D-FHMS-2 | 2026-11-07 | The mirror runs in the process of the foreign session (`bothy_hermes_adapter.mirror`, imported at the first hook of a listed platform, never at plugin load): it reads `gateway.platforms.<key>.extra` with Hermes' reader once per process and writes with a client of its own (`hermes-adapter-mirror`). | An ACP, CLI or `cron run` process has no gateway and no adapter loop; this is the path of the standalone sender (17.9). |
+| D-FHMS-3 | 2026-11-07 | Hooks only queue (bounded, `QUEUE_MAX`); one worker thread with its own event loop posts in order. Nothing is buffered on disk; at process exit the worker gets `EXIT_FLUSH_S` seconds. | The foreign session never waits for the server; a disk buffer would keep session content on the host longer than the session and replay stale prompts. |
+| D-FHMS-4 | 2026-11-07 | One forum post per Hermes session ID, titled `<platform>: <first prompt line>`; the map lives in `<profile home>/<platform key>/mirror.sqlite3` (`0600`), shared by the processes of the profile; a session whose `parent_session_id` is mapped (a compression) joins the parent's post. An ACP fork is a new session ID without a parent and gets a post of its own. | Survives a restart of any process and a resume (ACP `session/load` and CLI `--resume` keep the ID, read in the pinned source and measured with `hermes -r <id> -z`). The session title Hermes generates comes only after the first turn. |
+| D-FHMS-5 | 2026-11-07 | The request is an agent message headed `**Request** (<platform> session)` with the prompt quoted; the reply follows with one `Tools: <name> x<count>` line; a turn without a reply posts that it ended without one and why. Tool arguments and results are never posted. | The agent cannot post as the sender; the marker tells request from answer. Arguments can hold secrets and paths. |
+| D-FHMS-6 | 2026-11-07 | No run for a mirrored turn; the tool line is its visible trace. | The server opens runs only for a person's message, a command or an interaction, and a run belongs to the person who triggered it; a mirrored turn has none. Rule 7 of the background-work design (no tool without a run) governs sessions of the adapter's own platform, which a person drives from Bothy; a foreign session is driven by its own program, and the mirror only shows it. An agent-started run kind is a server change outside this ticket. |
+| D-FHMS-7 | 2026-11-07 | A mirror post is read-only: the run a person's message triggers there is answered without Hermes, with the read-only notice the first time per post and without a message after that, and ends `completed`; a skill command runs nothing, a control command posts the notice once instead. No server change. | The foreign session takes no input from Bothy; a Hermes turn there would start a second, unrelated session in the post. One notice informs, more would be noise. The server already lets the operator agent create forum posts (`thread.create` with `write`, as reports do, 17.9). |
+| D-FHMS-8 | 2026-11-07 | Fail open: a hook never raises. A configuration that does not load, a mirror channel that is no forum, or a `403`/`404` on `thread.create` turns the mirror off for the process with one error line; `404`/`410` on a message forgets the post (the next turn opens a new one); any other refusal or an unreachable server drops the event with a line naming the code or the error type, never a content; a full queue drops and counts. | The foreign session runs on whatever the server does; a wrong channel must not cost a request per turn. |
+| D-FHMS-9 | 2026-11-07 | Texts follow the path of messages without a run (09 14): cut to `hermes_adapter.max_message_bytes` with a `(cut)` line; attachments and non-text prompt parts are not mirrored, the request names their count. | A message without a run has no outbox and no upload session in a process without the gateway; the limits stay those of a report. |
+
+Not covered: a turn that fails before `post_llm_call` and without `on_session_end` leaves its
+request unanswered; the post keeps the first prompt's title; a process killed without its exit
+handlers loses the queued events; a root-level `<platform key>:` block that the gateway promotes
+into `extra` is not read by the mirror (the installer writes `gateway.platforms.<key>.extra`).
+
+Deploy note: nothing changes until a profile sets both keys. Mirroring `cron` next to a cron
+job that also delivers to the platform posts its output twice (the report and the mirror).

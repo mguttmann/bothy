@@ -487,6 +487,8 @@ Source: [09-agents.md](../spec/09-agents.md), section 21.
 | `hermes_adapter.background_poll_interval` |  | Hermes adapter |  | `2s` | how often a run that holds background work reads Hermes' registries (17.12) |  |
 | `hermes_adapter.background_settle` |  | Hermes adapter |  | `15s` | how long a run that saw background work stays open after the work ended and no turn of the thread ran, for the turn Hermes starts with the result (17.12) |  |
 | `hermes_adapter.background_progress_interval` |  | Hermes adapter |  | `2m` | while background work runs, `/metrics/progress_events` rises once per interval; must stay below the server's `run.stall_after` (17.12) |  |
+| `hermes_adapter.mirror_channel` |  | Hermes adapter |  | no default (mirror off) | forum of the session mirror; only with `hermes_adapter.mirror_platforms` (17.13) |  |
+| `hermes_adapter.mirror_platforms` |  | Hermes adapter |  | no default (mirror off) | foreign platform keys whose sessions are mirrored, for example `acp`, `cli`, `cron`; never the adapter's own key; only with `hermes_adapter.mirror_channel` (17.13) |  |
 | `runner.claude_bin` |  | Runner |  | `claude` | program, searched in the cleaned `PATH` |  |
 | `runner.git_bin` |  | Runner |  | `git` | program for the folder creation of 18.12, searched in the cleaned `PATH` |  |
 | `runner.provision_timeout` |  | Runner |  | `10m` | time limit of one folder creation (`git init` or `git clone`, 18.12) |  |

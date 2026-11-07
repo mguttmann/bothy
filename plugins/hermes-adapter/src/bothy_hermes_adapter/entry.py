@@ -9,6 +9,10 @@ So this module imports neither Hermes nor the SDK; `bothy_hermes_adapter.platfor
 imports both, is imported when Hermes builds the adapter (docs/DECISIONS.md D-M2-33-13), and
 `bothy_hermes_adapter.reports` when a process without the gateway sends a report.
 
+Session mirror (09 17.13): the hooks of a session of another platform (``acp``, ``cli``,
+``cron``, ...) go to `bothy_hermes_adapter.mirror`, imported at the first such hook; it does
+nothing unless the profile turned the mirror on.
+
 Cron delivery (09 17.9): ``cron_deliver_env_var`` makes ``deliver=<platform key>`` a valid cron
 target (the platform's home channel), ``parse_target_ref_fn`` reads the explicit targets
 ``<platform key>:<channel ID>`` and ``<platform key>:<channel ID>:<thread ID>``
@@ -22,6 +26,7 @@ Examples:
 
 from __future__ import annotations
 
+import logging
 import sys
 from typing import Any, Final
 from uuid import UUID
@@ -36,13 +41,20 @@ HOOKS: Final = (
     "post_api_request",
     "on_session_end",
     "pre_tool_call",
+    "post_llm_call",
+    "post_tool_call",
 )
-"""The Hermes plugin hooks the platform listens to."""
+"""The Hermes plugin hooks the platform and the session mirror listen to."""
 
 _SESSION_SCOPED: Final = frozenset({"pre_tool_call"})
 """Hooks without a ``platform`` argument: the platform tells its own sessions apart itself."""
 
+_MIRROR_ONLY: Final = frozenset({"post_llm_call", "post_tool_call"})
+"""Hooks only the session mirror uses (09 17.13); ``post_tool_call`` has no ``platform``, the
+mirror tells its sessions apart by their ID."""
+
 _PLATFORM_MODULE: Final = "bothy_hermes_adapter.platform"
+_MIRROR_MODULE: Final = "bothy_hermes_adapter.mirror"
 
 
 def parse_target_ref(target_ref: str) -> tuple[str, str | None] | None:
@@ -88,6 +100,21 @@ async def standalone_send(pconfig: Any, chat_id: str, message: str, **kwargs: An
     return await send(pconfig, chat_id, message, **kwargs)
 
 
+def _to_mirror(platform_key: str, name: str, kwargs: dict[str, Any]) -> None:
+    """Pass a hook of a foreign session to the session mirror (09 17.13); never raises.
+
+    The mirror module (and with it the SDK) is imported at the first such hook, never at load.
+    """
+    try:
+        from bothy_hermes_adapter import mirror  # noqa: PLC0415 - see the docstring
+
+        mirror.mirror_hook(platform_key, name, kwargs)
+    except Exception as exc:  # the foreign session never fails because of the mirror
+        logging.getLogger("bothy_hermes_adapter").warning(
+            "mirror: hook %s not passed on: %s", name, type(exc).__name__
+        )
+
+
 def make_register(platform_key: str) -> Any:
     """Build the plugin's ``register(ctx)`` for a platform key (the installer's entry calls it).
 
@@ -105,7 +132,16 @@ def make_register(platform_key: str) -> Any:
 
     def hook(name: str) -> Any:
         def callback(**kwargs: Any) -> Any:
-            if name not in _SESSION_SCOPED and str(kwargs.get("platform") or "") != platform_key:
+            own = str(kwargs.get("platform") or "") == platform_key
+            foreign = not own and name not in _SESSION_SCOPED
+            if name == "post_tool_call":
+                # Counts only for a session whose turn already reached the mirror, which then
+                # is imported; a tool call never imports it.
+                if _MIRROR_MODULE in sys.modules:
+                    _to_mirror(platform_key, name, kwargs)
+            elif foreign:
+                _to_mirror(platform_key, name, kwargs)
+            if foreign or name in _MIRROR_ONLY:
                 return None
             # No platform exists before the factory imported its module; a hook never imports it.
             module = sys.modules.get(_PLATFORM_MODULE)

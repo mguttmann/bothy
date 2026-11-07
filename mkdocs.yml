@@ -212,6 +212,7 @@ nav:
       - Built-in agents: design/builtin-agents.md
       - Autonomous runs: design/autonomous-runs.md
       - Background work of a Hermes run: design/hermes-background-work.md
+      - Mirror of Hermes sessions outside Bothy: design/hermes-session-mirror.md
   - Operations:
       - Configuration: operations/configuration.md
       - Installation with Compose: operations/install-compose.md

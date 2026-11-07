@@ -130,6 +130,7 @@ from bothy_hermes_adapter.media import (
     upload,
     with_transcripts,
 )
+from bothy_hermes_adapter.mirror import MIRROR_READ_ONLY, MirrorMap
 from bothy_hermes_adapter.reports import (
     ReportError,
     direct_send,
@@ -272,6 +273,7 @@ class HermesHandler(AgentHandler):
         busy_mode: Hermes's configured ``busy_input_mode`` (read at connect).
         now: The wall time (for step end times).
         jobs: The registry of external jobs (09 17.12 point 8), ``None`` without one.
+        mirror: The store of the session mirror (09 17.13): its posts are read-only here.
     """
 
     def __init__(
@@ -283,10 +285,14 @@ class HermesHandler(AgentHandler):
         busy_mode: str,
         now: Any = None,
         jobs: JobRegistry | None = None,
+        mirror: MirrorMap | None = None,
     ) -> None:
         """Create the handler; the tool class is read from Hermes at once."""
         self.runtime = runtime
         self._jobs = jobs
+        self._mirror = mirror
+        # Runs in a mirror post (09 17.13): answered without Hermes.
+        self._mirror_runs: set[UUID] = set()
         self.settings = settings
         self.store = store
         self.busy_mode = busy_mode
@@ -408,6 +414,10 @@ class HermesHandler(AgentHandler):
                 command now, which this adapter does not serve.
         """
         payload = inv.payload
+        if self._mirror is not None and await self._in_mirror_post(run.thread_id):
+            self._mirror_runs.add(run.run_id)
+            actual = self.actual_mode()
+            return StartOptions(billing_evidence=BillingEvidence.from_dict(actual.evidence))
         kind = str(getattr(payload, "trigger_kind", "message"))
         skill_text = None
         if kind == "command":
@@ -440,6 +450,40 @@ class HermesHandler(AgentHandler):
             self._inbound[run.run_id] = (ctx, channel)
         actual = self.actual_mode()
         return StartOptions(billing_evidence=BillingEvidence.from_dict(actual.evidence))
+
+    async def _in_mirror_post(self, thread_id: Any) -> bool:
+        """Whether a thread is a post of the session mirror (09 17.13).
+
+        A store that cannot be read counts as no mirror post (logged): the thread then works as
+        any other.
+        """
+        if self._mirror is None or not isinstance(thread_id, UUID):
+            return False
+        try:
+            return await asyncio.to_thread(self._mirror.is_mirror, thread_id)
+        except Exception as exc:
+            _LOG.warning("thread %s: mirror store not readable: %s", thread_id, type(exc).__name__)
+            return False
+
+    async def _first_mirror_notice(self, thread_id: UUID) -> bool:
+        if self._mirror is None:
+            return False
+        try:
+            return await asyncio.to_thread(self._mirror.first_notice, thread_id)
+        except Exception as exc:  # no mark: no notice, the run still ends
+            _LOG.warning("thread %s: mirror notice not marked: %s", thread_id, type(exc).__name__)
+            return False
+
+    async def _answer_mirror_run(self, run: RunHandle) -> None:
+        """A run in a mirror post: the read-only notice once per post, then ``completed``.
+
+        The foreign session takes no input from here, and a Hermes turn would open a second,
+        unrelated session in the post (09 17.13).
+        """
+        _LOG.info("run %s: mirror post, answered without Hermes", run.run_id)
+        if await self._first_mirror_notice(run.thread_id):
+            await run.send(MIRROR_READ_ONLY)
+        await run.finish("completed")
 
     async def _trigger_in_thread(self, payload: Any, run: RunHandle) -> bool:
         """Whether the triggering message lies in the run's thread (09 17.3, answer anchor).
@@ -506,6 +550,10 @@ class HermesHandler(AgentHandler):
             run: The started run.
         """
         payload = inv.payload
+        if run.run_id in self._mirror_runs:
+            self._mirror_runs.discard(run.run_id)
+            await self._answer_mirror_run(run)
+            return
         built = self._prepared.pop(run.run_id, None)
         if built is None:  # prepare ran in a process that no longer exists
             raise PrepareRefused("context")
@@ -1474,6 +1522,12 @@ class HermesHandler(AgentHandler):
         known = COMMAND_CLASSES.get(name, ("", ""))[0] == "control"
         if not getattr(payload, "control", False) or not known or not isinstance(thread_id, UUID):
             _LOG.info("command %s not run: no control command of this adapter", payload.command_id)
+            return
+        if await self._in_mirror_post(thread_id):
+            _LOG.info("command %s not run: mirror post", payload.command_id)
+            if await self._first_mirror_notice(thread_id):
+                with contextlib.suppress(Exception):
+                    await self._post_own(thread_id, MIRROR_READ_ONLY)
             return
         person = getattr(payload, "invoked_by", None)
         request = CommandRequest(

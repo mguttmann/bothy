@@ -23,7 +23,8 @@ installation.
   `BasePlatformAdapter` methods, session per thread, `busy_input_mode`, flow of an invocation,
   access layers, reported mode, tool class).
 - Backend policy: docs/spec/10-backend-policy.md section 10.1.
-- Rulings: docs/decisions.d/M2-33.md (`D-M2-33-*`), docs/decisions.d/HERMES-COMPAT.md and
+- Rulings: docs/decisions.d/M2-33.md (`D-M2-33-*`), docs/decisions.d/HERMES-COMPAT.md,
+  docs/decisions.d/FEAT-hermes-mirror-sessions.md and
   docs/decisions.d/HERMES-CRON-COMMANDS.md.
 
 ## Layout
@@ -39,6 +40,7 @@ installation.
 | `src/bothy_hermes_adapter/media.py` | files of the answer (check, upload session, message kind), the audio attachments to transcribe and the other attachments for Hermes' media cache with the note for one not passed on (17.3, 17.6) |
 | `src/bothy_hermes_adapter/context_format.py` | format rules, channel instructions and the run context for the user side of a turn (17.6) |
 | `src/bothy_hermes_adapter/hermes_commands.py` | the command table of the pinned version, the control and skill commands the adapter declares (17.3) |
+| `src/bothy_hermes_adapter/mirror.py` | the mirror of sessions of other platforms into a forum (17.13), imported at the first such hook |
 | `src/bothy_hermes_adapter/reports.py` | reports without a run: targets, a new forum post or the main thread, the standalone sender (17.9) |
 | `src/bothy_hermes_adapter/live_box.py`, `cards.py`, `store.py`, `heartbeat.py` | live box, cards, resolved callbacks and open cards, heartbeat |
 | `src/bothy_hermes_adapter/config.py`, `defaults.py` | the configuration from `PlatformConfig.extra` and its defaults |
@@ -227,6 +229,35 @@ the host. A live job that no open run covers (its run ended at a gateway restart
 registered outside a run) is posted once in its thread as a message of the agent with the stop
 command above; a later run does not take it over. Linux and macOS only.
 
+## Mirror of sessions outside Bothy
+
+Sessions of the same Hermes profile that do not start in Bothy (a session another program drives
+over `hermes acp`, a `hermes` CLI session, a cron job) can show up in Bothy, each as a post of its
+own in one forum (09 17.13, R-AG-57). Off by default; turn it on with both keys in the platform
+section, then restart the gateway and the processes of the profile:
+
+```yaml
+gateway:
+  platforms:
+    bothy:
+      extra:
+        hermes_adapter.mirror_channel: "<ID of a forum where the agent is operator>"
+        hermes_adapter.mirror_platforms: ["acp", "cli"]   # or "acp, cli"; cron too if wanted
+```
+
+The first turn of a session opens a post titled `<platform>: <first line of the prompt>`; the
+prompt is posted by the agent, marked `**Request** (<platform> session)`, then the agent's reply
+with one line of the tools the turn called (names and counts only). Later turns of the same
+Hermes session go into the same post, also after a restart or a resume; the map lives in
+`<profile home>/<platform key>/mirror.sqlite3`. A mirrored turn has no run. A post is read-only:
+a person who writes there gets a notice once, and nothing reaches the session. The mirror never
+holds the session: the hooks only queue, a worker thread posts; an unreachable server drops the
+events with a log line, a channel that is no forum or a refused post turns the mirror off for
+that process. Texts are cut to `hermes_adapter.max_message_bytes`; attachments are not mirrored.
+Put the forum in a space whose readers may see what these sessions carry. Mirroring `cron`
+next to a cron job that delivers to `bothy` posts its output twice.
+Design: [docs/design/hermes-session-mirror.md](../../docs/design/hermes-session-mirror.md).
+
 ## Configuration keys
 
 In `gateway.platforms.<platform key>.extra`, written by the installer (09 21):
@@ -236,7 +267,9 @@ In `gateway.platforms.<platform key>.extra`, written by the installer (09 21):
 server's `message.max_content_bytes`; a longer answer goes out as one message with its rest as
 one attachment `answer.txt`, and Hermes never splits an answer, M4-47), `hermes_adapter.attachment_text_max_bytes`,
 `hermes_adapter.background_poll_interval` (`2s`), `hermes_adapter.background_settle` (`15s`),
-`hermes_adapter.background_progress_interval` (`2m`, below the server's `run.stall_after`), and the SDK keys
+`hermes_adapter.background_progress_interval` (`2m`, below the server's `run.stall_after`),
+`hermes_adapter.mirror_channel` and `hermes_adapter.mirror_platforms` (the session mirror, off
+by default, set by hand), and the SDK keys
 `adapter.invocation_token_leeway`, `adapter.jwks_refresh_min_interval`, `sdk.http_timeout`,
 `sdk.retry_max_attempts`, `sdk.retry_backoff_base`, `sdk.retry_backoff_cap`. The adapter never
 reads the process environment.
