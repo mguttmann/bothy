@@ -70,18 +70,14 @@ class ConsoleAdmin extends ChangeNotifier {
   /// "New agent" of the agent list (01 6.20 item 1, A1-08): the port over the console's API (the
   /// backend for frontend, never the gateway; 15), a fresh `Idempotency-Key` per request and
   /// `a11y.live_announce_min_interval`. The console has no chats, so a created agent opens its
-  /// card ([onCreated]), also when a channel was created.
+  /// card ([onCreated]), also when a channel was created. The same host edits, restores, moves,
+  /// disables and sets up a built-in agent on its card (A1-09), each write with its own step-up
+  /// purpose.
   NewAgentHost newAgentHost(
     AppLocalizations l, {
     required void Function(NewAgentResult result) onCreated,
   }) => NewAgentHost(
-    port:
-        _newAgentPort ??
-        ApiNewAgentPort(
-          controller.api,
-          purpose: l.stepUpPurposeNewAgent,
-          reason: l.newAgentAuditReason,
-        ),
+    port: _newAgentPort ?? localizedAgentPort(controller.api, l),
     newKey: _keys.next,
     announceMinInterval: config.liveAnnounceMinInterval,
     onCreated: onCreated,
