@@ -89,6 +89,25 @@ def test_register_refuses_a_gone_process_and_bad_input(registry: JobRegistry) ->
     assert registry.records() == []
 
 
+def test_register_refuses_a_start_no_date_shows_and_a_record_too_large(
+    registry: JobRegistry,
+) -> None:
+    for started in (float("nan"), float("inf"), -1.0, 1e20):
+        with pytest.raises(JobError, match="start time"):
+            registry.register(uuid4(), os.getpid(), "x", started_at=started)
+    with pytest.raises(JobError, match="too large"):
+        registry.register(uuid4(), os.getpid(), "x", log_path="\u00e9" * 4000)
+    assert registry.records() == []
+
+
+def test_a_record_with_a_start_no_date_shows_is_skipped(registry: JobRegistry) -> None:
+    good = registry.register(uuid4(), os.getpid(), "good")
+    path = registry.directory / f"{good.job_id}.json"
+    payload = json.loads(path.read_text())
+    path.write_text(json.dumps(payload | {"started_at": 1e20}))
+    assert registry.records() == []
+
+
 def test_register_needs_the_adapters_state_directory(tmp_path: Path) -> None:
     reg = JobRegistry(jobs.jobs_dir(tmp_path / "nowhere", "bothy"))
     with pytest.raises(JobError, match="state directory"):

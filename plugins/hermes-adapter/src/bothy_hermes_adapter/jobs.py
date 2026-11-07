@@ -44,6 +44,7 @@ import contextlib
 import ctypes
 import json
 import logging
+import math
 import os
 import re
 import signal
@@ -76,6 +77,8 @@ TITLE_MAX: Final = 1000
 KILL_GRACE_S: Final = 5.0
 """How long a job has to end after ``SIGTERM`` before its group gets ``SIGKILL``."""
 _RECORD_MAX_BYTES: Final = 16384
+# The latest job start a record may name: the end of year 9999 UTC, the last time a date shows.
+_STARTED_MAX: Final = 253402300799.0
 _JOB_ID: Final = re.compile(r"[0-9a-f]{32}")
 _POLL_S: Final = 0.05
 # macOS: sysctl(CTL_KERN, KERN_PROC, KERN_PROC_PID, pid) fills a ``struct kinfo_proc``; its
@@ -267,8 +270,13 @@ class JobRegistry:
             started_at=time.time() if started_at is None else float(started_at),
             log_path=log_path,
         )
+        if not _valid_start(record.started_at):
+            raise JobError("the start time is no time")
         payload = asdict(record) | {"version": RECORD_VERSION, "thread_id": str(thread_id)}
-        self._write(f"{record.job_id}.json", json.dumps(payload).encode("utf-8"))
+        data = json.dumps(payload).encode("utf-8")
+        if len(data) > _RECORD_MAX_BYTES:
+            raise JobError("the record is too large (shorten the title or the log path)")
+        self._write(f"{record.job_id}.json", data)
         return record
 
     def _write(self, name: str, data: bytes) -> None:
@@ -473,6 +481,8 @@ def _parse(data: bytes, stem: str) -> JobRecord | None:
         return None
     if not isinstance(started, int | float) or isinstance(started, bool):
         return None
+    if not _valid_start(float(started)):
+        return None
     if log is not None and not isinstance(log, str):
         return None
     try:
@@ -480,6 +490,11 @@ def _parse(data: bytes, stem: str) -> JobRecord | None:
     except ValueError:
         return None
     return JobRecord(job_id, thread_id, pid, start, title[:TITLE_MAX], float(started), log)
+
+
+def _valid_start(started: float) -> bool:
+    """Whether a job start is a time a date can show (finite, not before the epoch)."""
+    return math.isfinite(started) and 0.0 <= started <= _STARTED_MAX
 
 
 # ---- command line ------------------------------------------------------------------------------

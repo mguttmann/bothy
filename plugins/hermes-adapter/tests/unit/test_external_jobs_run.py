@@ -348,6 +348,25 @@ async def test_a_live_job_without_an_open_run_is_posted_once(
     assert registry.reported(record.job_id) is True
 
 
+async def test_a_job_whose_mark_fails_is_still_posted_once(
+    tmp_path: Path,
+    registry: JobRegistry,
+    detached: Jobs,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def full_disk(job_id: str) -> None:
+        raise OSError("no space left on device")
+
+    monkeypatch.setattr(registry, "mark_reported", full_disk)
+    async with rig(tmp_path, jobs=registry, **FAST) as r:
+        first = await r.fake.trigger()
+        await r.until(lambda: r.finished(first.run_id), "the first run")
+        registry.register(first.thread_id, detached.spawn().supervisor, TITLE)
+        await r.handler.sweep_jobs()
+        await r.handler.sweep_jobs()
+        assert len([m for m in r.fake.messages if m.get("run_id") is None]) == 1
+
+
 async def test_the_watch_posts_without_being_called(
     tmp_path: Path, registry: JobRegistry, detached: Jobs
 ) -> None:

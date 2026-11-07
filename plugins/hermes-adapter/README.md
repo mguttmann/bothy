@@ -203,8 +203,8 @@ detaches itself into a new session) is invisible to Hermes. It registers itself 
 job of the thread, and the run then holds it like a background process: a `background_job` step
 named `external_job` with the job's title, counted in `/metrics/background_jobs`, until the
 process ends or the record is removed (09 17.12 point 8). Stop and an early end of the run send
-`SIGTERM` (and `SIGKILL` after 5 seconds) to the job's process group, only after the PID's start
-time matched again.
+`SIGTERM` (and `SIGKILL` after the kill grace time `KILL_GRACE_S`) to the job's process group,
+only after the PID's start time matched again.
 
 ```sh
 # In a shell of Hermes' terminal tool: HERMES_HOME and HERMES_SESSION_THREAD_ID are set.

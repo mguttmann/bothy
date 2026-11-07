@@ -3019,8 +3019,8 @@ the adapter). This section mirrors the background work of the runner (18.5) for 
    background work of the run by points 1, 2 and 6: a step `background_job` named
    `external_job` with its title, counted in `/metrics/background_jobs`, with progress against
    the stall notice; its end (the process gone, a different start time, or its record removed)
-   completes the step. Stop and every early end send `SIGTERM` and after 5 seconds `SIGKILL` to
-   the job's process group when the job leads one, else to the process, each only after the
+   completes the step. Stop and every early end send `SIGTERM` and after the kill grace time
+   (`KILL_GRACE_S` of the adapter) `SIGKILL` to the job's process group when the job leads one, else to the process, each only after the
    PID's start time matched again, never to the adapter's own process or group. A run that
    stops its jobs covers them until the stop returns. A live job no open run covers (its run ended at a restart, or it was registered outside a run) is not
    adopted by a later run: the adapter posts it once in its thread as a message of the agent

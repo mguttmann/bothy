@@ -300,6 +300,9 @@ class HermesHandler(AgentHandler):
         # Runs that stop their work now, by thread: the run's start in wall time. Such a run
         # still covers its jobs until they are stopped (09 17.12 point 8).
         self._stopping: dict[UUID, float] = {}
+        # Jobs this process posted without a run; holds the "posted once" rule when the mark
+        # on disk cannot be written (09 17.12 point 8).
+        self._posted_jobs: set[str] = set()
         self._tool_class = self._read_tool_class()
         self._voice_input = self._read_voice_input()
         self._tasks: set[asyncio.Task[Any]] = set()
@@ -1030,13 +1033,17 @@ class HermesHandler(AgentHandler):
         except (JobError, OSError) as exc:
             _LOG.warning("registered jobs not readable: %s", exc)
             return
+        self._posted_jobs &= {record.job_id for record in live}
         for record in live:
             if self._covers(record):
+                continue
+            if record.job_id in self._posted_jobs:
                 continue
             try:
                 if await asyncio.to_thread(jobs.reported, record.job_id):
                     continue
                 if await self._post_job(record):
+                    self._posted_jobs.add(record.job_id)
                     await asyncio.to_thread(jobs.mark_reported, record.job_id)
             except (JobError, OSError) as exc:
                 _LOG.warning("job %s: notice not recorded: %s", record.job_id, exc)
