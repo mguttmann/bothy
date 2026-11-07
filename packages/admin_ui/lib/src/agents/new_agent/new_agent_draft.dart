@@ -354,12 +354,13 @@ final class NewAgentDraft {
     }
   }
 
-  /// The cost cap as a number, null when empty; [double.nan] for text that is no number, so
-  /// the preview can mark it.
+  /// The cost cap as a number, null when empty; [double.nan] for text that is no finite
+  /// number, so the preview can mark it.
   double? get costCapValue {
     final text = costCap.trim();
     if (text.isEmpty) return null;
-    return double.tryParse(text) ?? double.nan;
+    final value = double.tryParse(text);
+    return value != null && value.isFinite ? value : double.nan;
   }
 
   /// Whether a server starts a local process, which needs `host` (26 4.4 item 4).

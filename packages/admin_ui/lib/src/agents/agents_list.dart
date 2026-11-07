@@ -89,7 +89,12 @@ class _AgentsListState extends State<AgentsList> {
       NewAgentOffer? offer;
       final notSetUp = <String>{};
       if (host != null) {
-        offer = await host.port.offer();
+        try {
+          offer = await host.port.offer();
+        } on Object {
+          // A failing offer hides the entry, not the list.
+          offer = null;
+        }
         for (final a in agents) {
           if (a.adapterKind != builtinAdapterKind) continue;
           try {

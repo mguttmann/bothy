@@ -179,6 +179,30 @@ void main() {
   });
 
   test(
+    'hosted_by is required for claude_agent and not allowed otherwise',
+    () async {
+      Future<Object?> code(String kind, String? hostedBy) async {
+        final refused = await problem(
+          agents().createAgent(
+            idempotencyKey: world.nextId(),
+            agentCreate: AgentCreate(
+              (b) => b
+                ..handle = 'notes'
+                ..displayName = 'Notes'
+                ..adapterKind = kind
+                ..hostedBy = hostedBy,
+            ),
+          ),
+        );
+        return ((refused!['errors']! as List).single as Map)['code'];
+      }
+
+      expect(await code('claude_agent', null), 'required');
+      expect(await code('hermes', runner.id), 'not_allowed');
+    },
+  );
+
+  test(
     'templates answer 404 on an older server; the interview falls back',
     () async {
       world.agentTemplates = null;

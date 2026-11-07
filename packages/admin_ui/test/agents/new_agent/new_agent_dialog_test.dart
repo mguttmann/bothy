@@ -118,6 +118,15 @@ void main() {
       },
     );
 
+    testWidgets('a failing offer hides the entry and keeps the list', (
+      tester,
+    ) async {
+      port.failNext['offer'] = StateError('malformed answer');
+      await list(tester);
+      expect(find.byKey(const ValueKey('agents.new')), findsNothing);
+      expect(find.text('Notes'), findsWidgets);
+    });
+
     testWidgets('is shown with an offer and opens the dialog', (tester) async {
       await list(tester);
       await tap(tester, 'agents.new');
@@ -192,6 +201,26 @@ void main() {
         'setToolClass host',
         'putDefinition',
       ]);
+    });
+
+    testWidgets('a pattern_mismatch on the handle shows the handle rule', (
+      tester,
+    ) async {
+      await open(tester);
+      await tap(tester, 'newAgent.way.empty');
+      await type(tester, 'newAgent.name', 'Notes');
+      await type(tester, 'newAgent.handle', 'notes');
+      await type(tester, 'newAgent.instructions', 'Keep the notes of Robin.');
+      port.failNext['createAgent'] = const NewAgentFailure.problem(
+        'validation_failed',
+        errors: [FieldIssue('/handle', 'pattern_mismatch')],
+      );
+      await tap(tester, 'newAgent.create');
+      expect(
+        errorOf(tester, 'newAgent.handle'),
+        'Use lower-case letters, digits, dot, underscore and hyphen, starting with a letter '
+        'or digit.',
+      );
     });
 
     testWidgets('the empty form checks its fields before anything is sent', (

@@ -134,8 +134,9 @@ class FakeNewAgentPort implements NewAgentPort {
   /// The audit rows the server wrote, one per action that changed or created something.
   final List<String> audit = [];
 
-  /// The failures of the next call of an operation, used once each.
-  final Map<String, NewAgentFailure> failNext = {};
+  /// The errors of the next call of an operation, used once each: usually a
+  /// [NewAgentFailure], any other object stands for a malformed answer.
+  final Map<String, Object> failNext = {};
 
   /// The answers of [interview], in order.
   final List<InterviewReply> interviewReplies = [];
@@ -189,7 +190,11 @@ class FakeNewAgentPort implements NewAgentPort {
   }
 
   @override
-  Future<NewAgentOffer?> offer() async => offerValue;
+  Future<NewAgentOffer?> offer() async {
+    final f = failNext.remove('offer');
+    if (f != null) throw f;
+    return offerValue;
+  }
 
   @override
   Future<NewAgentContext> context() async => contextValue;

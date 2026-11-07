@@ -78,9 +78,15 @@ String newAgentFailureText(
   }
 }
 
-/// The sentence of a field error [code] of the server (26 4.3, 7.4; 06 5).
-String newAgentFieldErrorText(AppLocalizations l, String code) =>
-    l.newAgentFieldError(_errorKey(code), code);
+/// The sentence of a field error [code] of the server (26 4.3, 7.4; 06 5); [pointer] picks
+/// the handle rule for a `pattern_mismatch` on the handle.
+String newAgentFieldErrorText(
+  AppLocalizations l,
+  String code, {
+  String? pointer,
+}) => pointer == PreviewField.handle && code == 'pattern_mismatch'
+    ? l.newAgentHandleInvalid
+    : l.newAgentFieldError(_errorKey(code), code);
 
 String _errorKey(String code) => switch (code) {
   'too_many_items' => 'too_many',

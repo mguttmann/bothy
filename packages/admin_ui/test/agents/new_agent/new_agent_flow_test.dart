@@ -430,6 +430,32 @@ void main() {
       expect(port.calls, isEmpty);
       flow.edit((d) => d.costCap = 'two');
       expect(flow.invalidFields, contains(PreviewField.costCap));
+      // A cap that parses to infinity is marked too; JSON has no such number.
+      flow.edit((d) => d.costCap = 'Infinity');
+      expect(flow.invalidFields, contains(PreviewField.costCap));
+      flow.edit((d) => d.costCap = '1e999');
+      expect(flow.invalidFields, contains(PreviewField.costCap));
+    });
+  });
+
+  group('the interview', () {
+    test('an error other than a failure shows as internal_error and returns the answer', () async {
+      port.interviewReplies.add(
+        const InterviewReply(
+          outcome: InterviewOutcome.questions,
+          questions: ['What should the agent do?'],
+        ),
+      );
+      final interview = AgentInterview(port);
+      await interview.start();
+      port.failNext['interview'] = StateError('malformed answer');
+      await interview.answer('Keep the notes');
+      expect(interview.error?.code, 'internal_error');
+      expect(interview.pending, isFalse);
+      expect(
+        [for (final t in interview.turns) t.role],
+        [InterviewRole.builder],
+      );
     });
   });
 }

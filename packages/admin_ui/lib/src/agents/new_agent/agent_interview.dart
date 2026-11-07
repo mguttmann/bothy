@@ -113,8 +113,11 @@ final class AgentInterview extends ChangeNotifier {
           _questions = const [];
           _fallback = reply.fallbackReason ?? 'builder_invalid';
       }
-    } on NewAgentFailure catch (e) {
-      _error = e;
+    } on Object catch (e) {
+      // Any other error (a malformed answer) shows as an internal error, as in the flow.
+      _error = e is NewAgentFailure
+          ? e
+          : const NewAgentFailure.problem('internal_error');
       // The answer that was not taken goes back to the person, who may shorten it.
       if (_turns.isNotEmpty && _turns.last.role == InterviewRole.owner) {
         _turns.removeLast();

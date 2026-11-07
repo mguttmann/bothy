@@ -128,11 +128,14 @@ void registerBuiltinAgentHandlers(
       final kind = body['adapter_kind']! as String;
       final hostedBy = body['hosted_by'] as String?;
       if ((kind == 'claude_agent') != (hostedBy != null)) {
-        throw const FakeProblem(
+        throw FakeProblem(
           400,
           'validation_failed',
           errors: [
-            {'pointer': '/hosted_by', 'code': 'invalid'},
+            {
+              'pointer': '/hosted_by',
+              'code': hostedBy == null ? 'required' : 'not_allowed',
+            },
           ],
         );
       }

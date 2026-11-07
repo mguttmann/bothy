@@ -35,7 +35,9 @@ class NewAgentPreview extends StatelessWidget {
     String? error(String pointer, String clientText) {
       final server = flow.errorsAt(pointer);
       if (server.isNotEmpty) {
-        return server.map((c) => newAgentFieldErrorText(l, c)).join(' ');
+        return server
+            .map((c) => newAgentFieldErrorText(l, c, pointer: pointer))
+            .join(' ');
       }
       return flow.attempted && invalid.contains(pointer) ? clientText : null;
     }
