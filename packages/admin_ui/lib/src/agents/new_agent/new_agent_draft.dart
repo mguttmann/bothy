@@ -4,8 +4,8 @@
 /// docs/spec/26-builtin-agents.md 4.2, 8.2): the agent's identity, the definition of schema
 /// `agent_definition.v1`, the tool class and the channel to create.
 ///
-/// A template, an interview draft and the empty form all become one [NewAgentDraft] (one
-/// preview for every way in, 26 8.2). [NewAgentDraft.definitionJson] writes the definition
+/// A template, an interview draft, the empty form and, for "Edit" and "Restore" (26 8.4), a
+/// stored definition all become one [NewAgentDraft] (one preview for every way in, 26 8.2). [NewAgentDraft.definitionJson] writes the definition
 /// with exactly the members of 26 4.2, optional members only when they carry a value, so the
 /// server's closed schema sees what the preview shows and nothing else.
 library;
@@ -282,6 +282,45 @@ final class NewAgentDraft {
     return d;
   }
 
+  /// The draft of a stored definition [json] (`AgentDefinitionVersion.definition`) for "Edit"
+  /// and "Restore" (26 8.4): the definition with its own origin, the agent's [name], [handle]
+  /// and [description], and the agent's [toolClass] as the class the preview starts from. The
+  /// stored `tool_class_wish` is kept as it is until the person picks a class, so an
+  /// unchanged draft writes the stored definition byte for byte.
+  factory NewAgentDraft.fromStored(
+    Map<String, Object?> json, {
+    required String name,
+    required String handle,
+    required String description,
+    required AgentToolClass toolClass,
+  }) {
+    final origin = json['origin'];
+    final o = origin is Map
+        ? origin.cast<String, Object?>()
+        : const <String, Object?>{};
+    final d =
+        NewAgentDraft._(
+            origin:
+                DraftOrigin.values
+                    .where((x) => x.name == o['kind'])
+                    .firstOrNull ??
+                DraftOrigin.manual,
+            templateSlug: o['template_slug'] as String?,
+            templateVersion: o['template_version'] as String?,
+          )
+          .._readDefinition(json)
+          ..name = name
+          ..handle = handle
+          ..description = description;
+    final settings = json['settings'];
+    d
+      ..toolClassWish = settings is Map
+          ? settings['tool_class_wish'] as String?
+          : null
+      ..toolClass = toolClass;
+    return d;
+  }
+
   /// Where the draft came from.
   final DraftOrigin origin;
 
@@ -317,6 +356,16 @@ final class NewAgentDraft {
 
   /// The tool class the owner picks; preselected from `tool_class_wish` (26 4.4 item 1).
   AgentToolClass toolClass = AgentToolClass.chat;
+
+  /// The stored `tool_class_wish` of an edited definition, written instead of [toolClass]
+  /// until the person picks a class ([pickClass]); null writes [toolClass].
+  String? toolClassWish;
+
+  /// Picks [value] as the tool class; the definition's wish follows the pick.
+  void pickClass(AgentToolClass value) {
+    toolClass = value;
+    toolClassWish = null;
+  }
 
   /// The tool list that narrows `scoped`; null for no narrowing.
   List<String>? allowedTools;
@@ -390,7 +439,7 @@ final class NewAgentDraft {
       'mcp_servers': [for (final s in servers) s.toJson()],
       'settings': {
         if (model.trim().isNotEmpty) 'model': model.trim(),
-        'tool_class_wish': toolClass.wire,
+        'tool_class_wish': toolClassWish ?? toolClass.wire,
         if (allowedTools case final tools?) 'allowed_tools': [...tools],
         if (cap != null && !cap.isNaN) 'max_cost_usd_per_run': cap,
       },

@@ -17542,6 +17542,347 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'End state: {state}'**
   String runEndStateLabel(String state);
+
+  /// Title of the editor of a built-in agent (01 6.20 item 6).
+  ///
+  /// In en, this message translates to:
+  /// **'Edit {name}'**
+  String agentEditTitle(String name);
+
+  /// Title of the dialog of Continue setup of a built-in agent without a definition (26 8.3).
+  ///
+  /// In en, this message translates to:
+  /// **'Set up {name}'**
+  String agentSetupTitle(String name);
+
+  /// Title of the editor opened by Restore of an older definition version (26 8.4).
+  ///
+  /// In en, this message translates to:
+  /// **'Restore version {version} of {name}'**
+  String agentRestoreTitle(int version, String name);
+
+  /// Title of the read-only editor opened by Show of a definition version.
+  ///
+  /// In en, this message translates to:
+  /// **'{name}, version {version}'**
+  String agentViewTitle(String name, int version);
+
+  /// Button that saves an edit of a built-in agent as a new definition version.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get agentEditSave;
+
+  /// Button that continues the setup of a built-in agent without a definition (26 8.3).
+  ///
+  /// In en, this message translates to:
+  /// **'Continue setup'**
+  String get agentEditContinue;
+
+  /// Heading of the list of changed parts above the editor (brief A1-09 Design note 2).
+  ///
+  /// In en, this message translates to:
+  /// **'Changes to the current version'**
+  String get agentEditChangesTitle;
+
+  /// The editor has nothing to save yet.
+  ///
+  /// In en, this message translates to:
+  /// **'No changes yet.'**
+  String get agentEditNoChanges;
+
+  /// Explains when a saved definition takes effect.
+  ///
+  /// In en, this message translates to:
+  /// **'A saved change applies from the next answer of the agent.'**
+  String get agentEditChangesHint;
+
+  /// One changed part of an edit: the kind, the name of the skill, server or setting, or the old and new tool class.
+  ///
+  /// In en, this message translates to:
+  /// **'{kind, select, instructions{Instructions changed} skillAdded{Skill {name} added} skillRemoved{Skill {name} removed} skillChanged{Skill {name} changed} serverAdded{MCP server {name} added} serverRemoved{MCP server {name} removed} serverChanged{MCP server {name} changed} setting{{name} changed} origin{Origin changed} other{Tool class from {from} to {name}}}'**
+  String agentEditChange(String kind, String name, String from);
+
+  /// Name of the setting tool_class_wish in the list of changed parts.
+  ///
+  /// In en, this message translates to:
+  /// **'Preferred tool class'**
+  String get agentEditWish;
+
+  /// Button that reads the current version again after another device changed the agent.
+  ///
+  /// In en, this message translates to:
+  /// **'Reload'**
+  String get agentEditReload;
+
+  /// Failure of a save: 412 version_conflict.
+  ///
+  /// In en, this message translates to:
+  /// **'Another device changed this agent. Reload to start from its current version; the changes here are discarded.'**
+  String get agentEditErrVersion;
+
+  /// Button that removes every local (stdio) MCP server from the editor after definition_needs_host (R-BA-06).
+  ///
+  /// In en, this message translates to:
+  /// **'Remove the local servers'**
+  String get agentEditRemoveLocal;
+
+  /// Purpose shown by the step-up prompt of an edit of a built-in agent.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit the agent {name}'**
+  String stepUpPurposeEditAgent(String name);
+
+  /// Purpose shown by the step-up prompt of Continue setup.
+  ///
+  /// In en, this message translates to:
+  /// **'Set up the agent {name}'**
+  String stepUpPurposeSetUpAgent(String name);
+
+  /// Purpose shown by the step-up prompt of Change runner.
+  ///
+  /// In en, this message translates to:
+  /// **'Move the agent {name} to another runner'**
+  String stepUpPurposeMoveAgent(String name);
+
+  /// Purpose shown by the step-up prompt of Disable of a built-in agent.
+  ///
+  /// In en, this message translates to:
+  /// **'Disable the agent {name}'**
+  String stepUpPurposeDisableAgent(String name);
+
+  /// Reason of the audit entry of the class step of an edit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit agent {name}'**
+  String agentEditAuditReason(String name);
+
+  /// Reason of the audit entries of the steps of Continue setup.
+  ///
+  /// In en, this message translates to:
+  /// **'Set up agent {name}'**
+  String agentSetupAuditReason(String name);
+
+  /// Reason of the audit entry of Change runner.
+  ///
+  /// In en, this message translates to:
+  /// **'Move agent {name}'**
+  String agentMoveAuditReason(String name);
+
+  /// Heading of the section of a built-in agent on its agent card.
+  ///
+  /// In en, this message translates to:
+  /// **'Built-in agent'**
+  String get builtinAgentTitle;
+
+  /// The hosting runner of a built-in agent.
+  ///
+  /// In en, this message translates to:
+  /// **'Runner: {runner}'**
+  String builtinAgentHost(String runner);
+
+  /// The current definition version of a built-in agent.
+  ///
+  /// In en, this message translates to:
+  /// **'Definition version {version}'**
+  String builtinAgentVersion(int version);
+
+  /// Explains Not set up on the agent card (26 8.3).
+  ///
+  /// In en, this message translates to:
+  /// **'This agent has no definition yet and answers nothing. Continue setup stores one.'**
+  String get builtinAgentNotSetUpHint;
+
+  /// A disabled built-in agent on its agent card.
+  ///
+  /// In en, this message translates to:
+  /// **'This agent is disabled.'**
+  String get builtinAgentDisabledHint;
+
+  /// Button that opens the editor of a built-in agent.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get builtinAgentEdit;
+
+  /// Button that opens the definition versions of a built-in agent.
+  ///
+  /// In en, this message translates to:
+  /// **'Versions'**
+  String get builtinAgentVersions;
+
+  /// Button that moves a built-in agent to another runner.
+  ///
+  /// In en, this message translates to:
+  /// **'Change runner'**
+  String get builtinAgentChangeRunner;
+
+  /// Button that disables a built-in agent.
+  ///
+  /// In en, this message translates to:
+  /// **'Disable'**
+  String get builtinAgentDisable;
+
+  /// Notice after an edit was saved.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} is saved as version {version}.'**
+  String builtinAgentSaved(String name, int version);
+
+  /// Notice after Continue setup finished.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} is set up.'**
+  String builtinAgentSetUp(String name);
+
+  /// Notice after Change runner.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} is now on {runner}.'**
+  String builtinAgentMoved(String name, String runner);
+
+  /// Notice after Disable.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} is disabled.'**
+  String builtinAgentDisabled(String name);
+
+  /// Title of the confirmation of Disable of a built-in agent.
+  ///
+  /// In en, this message translates to:
+  /// **'Disable {name}?'**
+  String builtinAgentDisableTitle(String name);
+
+  /// Body of the confirmation of Disable of a built-in agent.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} stops answering: its tokens end and its connections close. The definition and its versions stay.'**
+  String builtinAgentDisableBody(String name);
+
+  /// Title of the list of definition versions (26 8.4).
+  ///
+  /// In en, this message translates to:
+  /// **'Versions of {name}'**
+  String agentVersionsTitle(String name);
+
+  /// One definition version: number, time, author and origin.
+  ///
+  /// In en, this message translates to:
+  /// **'Version {version}, {when}, by {author}, {origin, select, template{from a template} interview{from the interview} other{by hand}}'**
+  String agentVersionLine(
+    int version,
+    String when,
+    String author,
+    String origin,
+  );
+
+  /// Marks the current definition version.
+  ///
+  /// In en, this message translates to:
+  /// **'Current'**
+  String get agentVersionCurrent;
+
+  /// Button that opens a definition version read-only.
+  ///
+  /// In en, this message translates to:
+  /// **'Show'**
+  String get agentVersionShow;
+
+  /// Accessibility label of Show of one version.
+  ///
+  /// In en, this message translates to:
+  /// **'Show version {version}'**
+  String agentVersionShowLabel(int version);
+
+  /// Button that saves an older definition version again as a new version.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore'**
+  String get agentVersionRestore;
+
+  /// Accessibility label of Restore of one version.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore version {version}'**
+  String agentVersionRestoreLabel(int version);
+
+  /// The version list of an agent without a definition.
+  ///
+  /// In en, this message translates to:
+  /// **'No stored version yet.'**
+  String get agentVersionsEmpty;
+
+  /// Title of the dialog Change runner (26 8.4).
+  ///
+  /// In en, this message translates to:
+  /// **'Change runner of {name}'**
+  String agentHostTitle(String name);
+
+  /// Explains what Change runner does (26 3.1 item 4).
+  ///
+  /// In en, this message translates to:
+  /// **'The connections of the agent restart on the new runner; an answer in progress stops.'**
+  String get agentHostBody;
+
+  /// One runner in Change runner with its highest tool class.
+  ///
+  /// In en, this message translates to:
+  /// **'{runner}, loads at most {toolClass}'**
+  String agentHostChoice(String runner, String toolClass);
+
+  /// Change runner without another runner.
+  ///
+  /// In en, this message translates to:
+  /// **'No other runner is available for built-in agents.'**
+  String get agentHostNone;
+
+  /// Button that moves the agent to the chosen runner.
+  ///
+  /// In en, this message translates to:
+  /// **'Move'**
+  String get agentHostConfirm;
+
+  /// Change runner refused with host_tool_class_ceiling.
+  ///
+  /// In en, this message translates to:
+  /// **'{runner} loads at most the tool class {toolClass}, below the class of the agent. Choose another runner, or lower the class of the agent first.'**
+  String agentHostErrCeiling(String runner, String toolClass);
+
+  /// Change runner refused with hosted_holder_mismatch (10 10.3).
+  ///
+  /// In en, this message translates to:
+  /// **'The agent bills Personal, so the new runner must be Personal with the same credential holder. Switch billing to Organization first, or choose such a runner.'**
+  String get agentHostErrHolder;
+
+  /// Button after hosted_holder_mismatch that opens the billing switch of the agent card.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch billing'**
+  String get agentHostSwitchBilling;
+
+  /// Change runner refused with host_not_capable.
+  ///
+  /// In en, this message translates to:
+  /// **'This runner does not take built-in agents right now. Choose another runner.'**
+  String get agentHostErrNotCapable;
+
+  /// Entry under Me on the phone that lists the built-in agents.
+  ///
+  /// In en, this message translates to:
+  /// **'Built-in agents'**
+  String get builtinAgentsEntry;
+
+  /// Second line of the entry Built-in agents on the phone.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit, move and disable'**
+  String get builtinAgentsEntryHint;
+
+  /// The phone list of built-in agents without one.
+  ///
+  /// In en, this message translates to:
+  /// **'No built-in agents yet.'**
+  String get builtinAgentsEmpty;
 }
 
 class _AppLocalizationsDelegate

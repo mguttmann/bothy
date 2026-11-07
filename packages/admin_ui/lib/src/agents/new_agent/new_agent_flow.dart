@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The steps of "New agent" with resume (docs/spec/01-product.md 6.20 item 4;
-/// docs/spec/26-builtin-agents.md 8.2, 8.3, R-BA-11, BA-T16; brief A1-08 Design note 3).
+/// The steps of "New agent" with resume (docs/spec/01-product.md 6.20 items 4 and 6;
+/// docs/spec/26-builtin-agents.md 8.2 to 8.4, R-BA-11, BA-T16; brief A1-08 Design note 3,
+/// brief A1-09 Design notes 2 and 3).
 ///
 /// Each step is its own action with its own audit entry; nothing is rolled back. Whether a step
 /// is done is not a stored flag but a comparison of its target in the edited preview with what
@@ -12,12 +13,36 @@
 /// `If-Match`. A class above the agent's current one is set before the definition, a lower one
 /// after it (26 8.3, 8.4), so a `stdio` server is stored under `host` and a removed one no
 /// longer blocks the way back to `chat` (R-BA-06).
+///
+/// The same flow edits an existing built-in agent ([NewAgentFlow.forAgent], A1-09): "Edit" and
+/// "Restore" ([NewAgentMode.edit]) run only the class and definition steps, the definition
+/// with `If-Match` of the version the edit started from, so a change of another device in
+/// between is `412 version_conflict` and [NewAgentFlow.reload] starts again from the current
+/// version; "Show" ([NewAgentMode.view]) changes nothing; "Continue setup"
+/// ([NewAgentMode.setup]) resumes the steps of 26 8.2 for an agent without a definition.
 library;
 
 import 'package:flutter/foundation.dart';
 
+import 'agent_edit_changes.dart';
 import 'new_agent_draft.dart';
 import 'new_agent_port.dart';
+
+/// What the flow does with the agent.
+enum NewAgentMode {
+  /// "New agent": every step of 26 8.2 from `agent.create` on.
+  create,
+
+  /// "Continue setup" of an agent without a definition: the steps after `agent.create`, with
+  /// the agent's identity and runner fixed (26 8.3).
+  setup,
+
+  /// "Edit" or "Restore": the class and definition steps of 26 8.4.
+  edit,
+
+  /// "Show" of a stored version: read-only, no step.
+  view,
+}
 
 /// The steps of 26 8.2.
 enum NewAgentStep {
@@ -129,10 +154,52 @@ final class NewAgentFlow extends ChangeNotifier {
     required this.offer,
     required this._newKey,
     this._context,
-  }) : _runner = offer.runners.length == 1 ? offer.runners.single : null;
+  }) : mode = NewAgentMode.create,
+       _runner = offer.runners.length == 1 ? offer.runners.single : null;
+
+  /// Creates the flow for the existing built-in [agent] on [runner] (A1-09).
+  ///
+  /// With a current definition [stored] it edits ([NewAgentMode.edit]); [content] is an older
+  /// version to restore, edited against [stored]; [readOnly] shows [content] or [stored]
+  /// without a step ([NewAgentMode.view]). Without [stored] it continues the setup
+  /// ([NewAgentMode.setup]): the person picks a way in, the agent keeps its identity.
+  ///
+  /// Example:
+  /// ```dart
+  /// final flow = NewAgentFlow.forAgent(port: port, offer: offer, newKey: ids.next,
+  ///     agent: await port.agent(id), runner: runner, stored: await port.definition(id));
+  /// flow.edit((d) => d.instructions = 'Keep the notes of Robin.');
+  /// await flow.run(); // putDefinition with If-Match of the stored version
+  /// ```
+  NewAgentFlow.forAgent({
+    required this._port,
+    required this.offer,
+    required this._newKey,
+    required NewAgentState agent,
+    required HostingRunner this._runner,
+    StoredDefinition? stored,
+    Map<String, Object?>? content,
+    bool readOnly = false,
+    this._context,
+  }) : mode = readOnly
+           ? NewAgentMode.view
+           : stored == null && content == null
+           ? NewAgentMode.setup
+           : NewAgentMode.edit,
+       _agent = agent,
+       _stored = stored,
+       _base = stored?.version,
+       _baseJson = stored?.json,
+       _billing = agent.billingMode {
+    final json = content ?? stored?.json;
+    if (json != null) _draft = _draftOf(json, agent);
+  }
 
   final NewAgentPort _port;
   final String Function() _newKey;
+
+  /// What the flow does.
+  final NewAgentMode mode;
 
   /// The templates and runners.
   final NewAgentOffer offer;
@@ -147,6 +214,14 @@ final class NewAgentFlow extends ChangeNotifier {
   String? _channelId;
   bool _operatorSet = false;
   bool _classAfter = false;
+
+  /// The version and content an edit started from: the `If-Match` of its definition write and
+  /// the "before" of [changes].
+  int? _base;
+  Map<String, Object?>? _baseJson;
+  bool _ran = false;
+  bool _classRan = false;
+  bool _definitionRan = false;
 
   String? _createKey;
   String? _createRequest;
@@ -212,10 +287,41 @@ final class NewAgentFlow extends ChangeNotifier {
   void useEmpty() => _use(NewAgentDraft.empty());
 
   void _use(NewAgentDraft draft, {List<FieldIssue> errors = const []}) {
-    if (_agent != null || _busy) return;
+    if (_busy) return;
+    switch (mode) {
+      case NewAgentMode.create:
+        if (_agent != null) return;
+      case NewAgentMode.setup:
+        // The agent exists: a way in gives the content, the identity stays the agent's.
+        if (_ran) return;
+        final a = _agent!;
+        draft
+          ..name = a.name
+          ..handle = a.handle
+          ..description = a.description;
+      case NewAgentMode.edit || NewAgentMode.view:
+        return;
+    }
     _draft = draft;
     _fieldErrors = _group(errors);
     _notify();
+  }
+
+  /// The draft of a stored definition [json] of [agent]; a restored content with a `stdio`
+  /// server preselects `host`, which it needs (26 4.4 item 4).
+  static NewAgentDraft _draftOf(
+    Map<String, Object?> json,
+    NewAgentState agent,
+  ) {
+    final d = NewAgentDraft.fromStored(
+      json,
+      name: agent.name,
+      handle: agent.handle,
+      description: agent.description,
+      toolClass: agent.toolClass,
+    );
+    if (d.hasStdio) d.toolClass = AgentToolClass.host;
+    return d;
   }
 
   /// The interview's cost estimate so far in micro units, or null without an interview.
@@ -229,7 +335,7 @@ final class NewAgentFlow extends ChangeNotifier {
   /// [canEditChannel]); [change] may still touch them, so the locked values are put back.
   void edit(void Function(NewAgentDraft draft) change) {
     final d = _draft;
-    if (d == null || _busy) return;
+    if (d == null || !canEditContent) return;
     final identity = (d.name, d.handle, d.description);
     final channel = (d.channelWanted, d.channelSpaceId, d.channelName);
     change(d);
@@ -260,7 +366,10 @@ final class NewAgentFlow extends ChangeNotifier {
   /// The billing mode to set: `organization` (I1 default) or `personal`.
   String get billing => _billing;
   set billing(String value) {
-    if (_busy) return;
+    // An edit keeps the billing mode; "Switch backend" of the agent card changes it (10 9).
+    if (_busy || mode == NewAgentMode.edit || mode == NewAgentMode.view) {
+      return;
+    }
     if (value == 'personal' && personalOffer != PersonalOffer.offered) return;
     _billing = value;
     _notify();
@@ -284,11 +393,50 @@ final class NewAgentFlow extends ChangeNotifier {
   /// Whether the name, handle and description may change: until the agent exists.
   bool get canEditIdentity => _agent == null && !_busy;
 
-  /// Whether the hosting runner may change: until `agent.create` succeeded (26 8.3).
+  /// Whether the hosting runner may change: until `agent.create` succeeded (26 8.3); an
+  /// existing agent moves with "Change runner" (`agent.host.set`, 26 8.4).
   bool get canEditHost => _agent == null && !_busy;
 
-  /// Whether the channel may change: until it is created.
-  bool get canEditChannel => _channelId == null && !_busy;
+  /// Whether the channel may change: until it is created; an edit creates no channel.
+  bool get canEditChannel =>
+      _channelId == null &&
+      !_busy &&
+      (mode == NewAgentMode.create || mode == NewAgentMode.setup);
+
+  /// Whether the definition, the class and the settings may change: not while a step runs and
+  /// never in [NewAgentMode.view].
+  bool get canEditContent => !_busy && mode != NewAgentMode.view;
+
+  /// The changed parts of an edit against the version it started from, then the class
+  /// (26 8.4); empty outside [NewAgentMode.edit].
+  List<DefinitionChange> get changes {
+    final d = _draft;
+    final before = _baseJson;
+    if (mode != NewAgentMode.edit || d == null || before == null) {
+      return const [];
+    }
+    final from = currentClass;
+    return [
+      ...definitionChanges(before, d.definitionJson()),
+      if (d.toolClass != from)
+        DefinitionChange(
+          DefinitionChangeKind.toolClass,
+          d.toolClass.wire,
+          from.wire,
+        ),
+    ];
+  }
+
+  /// Whether an edit has something to save.
+  bool get hasChanges => changes.isNotEmpty;
+
+  /// Whether the draft has a local (`stdio`) MCP server.
+  bool get hasLocalServers => _draft?.hasStdio ?? false;
+
+  /// Removes every local (`stdio`) MCP server from the draft, the way out of
+  /// `definition_needs_host` (R-BA-06).
+  void removeLocalServers() =>
+      edit((d) => d.servers.removeWhere((s) => s.isStdio));
 
   /// The created agent, or null.
   NewAgentState? get agent => _agent;
@@ -303,8 +451,11 @@ final class NewAgentFlow extends ChangeNotifier {
   /// preview marks the invalid fields from then on.
   bool get attempted => _attempted;
 
-  /// Whether a step ran or runs.
-  bool get started => _agent != null || _busy || _failedStep != null;
+  /// Whether a step ran or runs; for an existing agent, whether "Save" or "Continue setup" was
+  /// pressed.
+  bool get started => mode == NewAgentMode.create
+      ? _agent != null || _busy || _failedStep != null
+      : _ran || _busy || _failedStep != null;
 
   /// The failed step, or null.
   NewAgentStep? get failedStep => _failedStep;
@@ -334,6 +485,20 @@ final class NewAgentFlow extends ChangeNotifier {
     final d = _draft;
     final target = targetClass;
     final current = currentClass;
+    if (mode == NewAgentMode.edit || mode == NewAgentMode.view) {
+      // 26 8.4: only what the edit changes, each a visible step; a raised class before the
+      // definition, a lowered one after it.
+      final classShown = target != current || _classRan;
+      final after =
+          current.isAbove(target) || (target == current && _classAfter);
+      final definitionShown =
+          _definitionRan || !_reached(NewAgentStep.storeDefinition);
+      return [
+        if (classShown && !after) NewAgentStep.setClass,
+        if (definitionShown) NewAgentStep.storeDefinition,
+        if (classShown && after) NewAgentStep.setClass,
+      ];
+    }
     final classShown =
         target != AgentToolClass.chat ||
         current != AgentToolClass.chat ||
@@ -363,8 +528,9 @@ final class NewAgentFlow extends ChangeNotifier {
     return _reached(step) ? NewAgentStepState.done : NewAgentStepState.waiting;
   }
 
-  /// Whether every step is done.
-  bool get finished => _agent != null && !_busy && steps.every(_reached);
+  /// Whether every step is done after "Create", "Save" or "Continue setup".
+  bool get finished =>
+      _ran && _agent != null && !_busy && steps.every(_reached);
 
   /// What the dialog returns once [finished].
   NewAgentResult? get result => finished
@@ -414,12 +580,13 @@ final class NewAgentFlow extends ChangeNotifier {
   /// with [invalidFields] or while it runs.
   Future<void> run() async {
     final d = _draft;
-    if (d == null || _busy || _closed) return;
+    if (d == null || _busy || _closed || mode == NewAgentMode.view) return;
     if (!_attempted) {
       _attempted = true;
       _notify();
     }
     if (invalidFields.isNotEmpty) return;
+    _ran = true;
     _busy = true;
     _failedStep = null;
     _failure = null;
@@ -463,6 +630,45 @@ final class NewAgentFlow extends ChangeNotifier {
       _notify();
     }
   }
+
+  /// Reads the agent and its current definition again and starts the edit from there; the
+  /// edits made here are dropped. The answer to `412 version_conflict` of an edit (06 8: a
+  /// person decides; 26 4.1 item 2). Does nothing outside [NewAgentMode.edit] or while a step
+  /// runs.
+  Future<void> reload() async {
+    final a = _agent;
+    if (a == null || _busy || _closed || mode != NewAgentMode.edit) return;
+    _busy = true;
+    _notify();
+    try {
+      final agent = await _port.agent(a.id);
+      final stored = await _port.definition(a.id);
+      _agent = agent;
+      _stored = stored;
+      _base = stored?.version;
+      _baseJson = stored?.json;
+      if (stored != null) _draft = _draftOf(stored.json, agent);
+      _failedStep = null;
+      _failure = null;
+      _fieldErrors = const {};
+      _ran = false;
+      _attempted = false;
+      _classRan = false;
+      _definitionRan = false;
+      _classAfter = false;
+    } on Object catch (e) {
+      _fail(_failedStep ?? NewAgentStep.storeDefinition, e);
+    } finally {
+      _busy = false;
+      _notify();
+    }
+  }
+
+  AgentChangeKind get _change => switch (mode) {
+    NewAgentMode.setup => AgentChangeKind.setup,
+    NewAgentMode.edit || NewAgentMode.view => AgentChangeKind.edit,
+    NewAgentMode.create => AgentChangeKind.create,
+  };
 
   NewAgentStep? _firstOpen() {
     for (final s in steps) {
@@ -522,17 +728,29 @@ final class NewAgentFlow extends ChangeNotifier {
       case NewAgentStep.setClass:
         // A lower class goes after the definition and stays there in the list once done.
         _classAfter = currentClass.isAbove(d.toolClass);
+        _classRan = true;
         final fresh = await _port.agent(_agent!.id);
         _agent = fresh;
         if (fresh.toolClass == d.toolClass) return;
-        _agent = await _port.setToolClass(fresh, d.toolClass, name: name);
+        _agent = await _port.setToolClass(
+          fresh,
+          d.toolClass,
+          name: name,
+          change: _change,
+        );
       case NewAgentStep.storeDefinition:
+        _definitionRan = true;
         _stored = await _port.putDefinition(
           _agent!.id,
           d.definitionJson(),
-          ifMatch: _stored?.version,
+          // An edit writes against the version it started from, so a change of another device
+          // in between is `412 version_conflict` instead of being overwritten (26 4.1).
+          ifMatch: mode == NewAgentMode.edit ? _base : _stored?.version,
           name: name,
+          change: _change,
         );
+        _base = _stored!.version;
+        _baseJson = _stored!.json;
         // The write raised the agent's version (`agent.updated`); the next `If-Match` needs it.
         _agent = await _port.agent(_agent!.id);
       case NewAgentStep.setBilling:
@@ -541,6 +759,7 @@ final class NewAgentFlow extends ChangeNotifier {
           _billing,
           holderId: _billing == 'personal' ? _runner?.holderId : null,
           name: name,
+          change: _change,
         );
       case NewAgentStep.createChannel:
         final request = [d.channelSpaceId, d.channelName.trim()].join('\n');
@@ -553,9 +772,15 @@ final class NewAgentFlow extends ChangeNotifier {
           d.channelName.trim(),
           idempotencyKey: _channelKey!,
           name: name,
+          change: _change,
         );
       case NewAgentStep.setOperator:
-        await _port.setOperator(_channelId!, _agent!.id, name: name);
+        await _port.setOperator(
+          _channelId!,
+          _agent!.id,
+          name: name,
+          change: _change,
+        );
         _operatorSet = true;
     }
   }

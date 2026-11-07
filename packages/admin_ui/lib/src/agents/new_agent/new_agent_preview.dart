@@ -6,6 +6,10 @@
 /// and what it does not load, billing, model and cost cap, the hosting runner (read-only once
 /// the agent exists) and the channel. A field error of the server shows at its field by JSON
 /// Pointer; one without a field shows in a list below.
+///
+/// The same preview edits an existing built-in agent (A1-09, [NewAgentMode]): the identity
+/// and the runner are the agent's, the billing mode stays (the agent card switches it), an
+/// edit creates no channel, and "Show" of a stored version is read-only.
 library;
 
 import 'package:design_system/design_system.dart';
@@ -109,7 +113,7 @@ class NewAgentPreview extends StatelessWidget {
           initial: d.instructions,
           lines: 6,
           monospace: true,
-          enabled: !flow.busy,
+          enabled: flow.canEditContent,
           error: error('/instructions', ''),
           onChanged: (v) => flow.edit((x) => x.instructions = v),
         ),
@@ -126,7 +130,7 @@ class NewAgentPreview extends StatelessWidget {
           alignment: AlignmentDirectional.centerStart,
           child: TextButton.icon(
             key: const ValueKey('newAgent.skill.add'),
-            onPressed: flow.busy
+            onPressed: !flow.canEditContent
                 ? null
                 : () => flow.edit((x) => x.skills.add(DraftSkill())),
             icon: const Icon(Icons.add),
@@ -146,7 +150,7 @@ class NewAgentPreview extends StatelessWidget {
           alignment: AlignmentDirectional.centerStart,
           child: TextButton.icon(
             key: const ValueKey('newAgent.server.add'),
-            onPressed: flow.busy
+            onPressed: !flow.canEditContent
                 ? null
                 : () => flow.edit((x) => x.servers.add(DraftMcpServer())),
             icon: const Icon(Icons.add),
@@ -163,7 +167,7 @@ class NewAgentPreview extends StatelessWidget {
           initial: d.allowedTools?.join('\n') ?? '',
           lines: 3,
           monospace: true,
-          enabled: !flow.busy,
+          enabled: flow.canEditContent,
           error: error('/settings/allowed_tools', ''),
           onChanged: (v) => flow.edit((x) {
             final tools = [
@@ -178,7 +182,7 @@ class NewAgentPreview extends StatelessWidget {
           label: l.newAgentModel,
           helper: l.newAgentModelHint,
           initial: d.model,
-          enabled: !flow.busy,
+          enabled: flow.canEditContent,
           error: error('/settings/model', ''),
           onChanged: (v) => flow.edit((x) => x.model = v),
         ),
@@ -187,7 +191,7 @@ class NewAgentPreview extends StatelessWidget {
           label: l.newAgentCostCap,
           helper: l.newAgentCostCapHint,
           initial: d.costCap,
-          enabled: !flow.busy,
+          enabled: flow.canEditContent,
           keyboard: const TextInputType.numberWithOptions(decimal: true),
           error:
               error(PreviewField.costCap, l.newAgentCostCapInvalid) ??
@@ -202,8 +206,10 @@ class NewAgentPreview extends StatelessWidget {
           flow: flow,
           error: error(PreviewField.host, l.newAgentHostMissing),
         ),
-        _Section(l.newAgentSectionChannel),
-        _ChannelChoice(flow: flow, error: error),
+        if (flow.canEditChannel || flow.channelId != null) ...[
+          _Section(l.newAgentSectionChannel),
+          _ChannelChoice(flow: flow, error: error),
+        ],
         _OtherErrors(flow: flow),
       ],
     );
@@ -388,7 +394,7 @@ class _SkillEditor extends StatelessWidget {
                 id: '$id.name',
                 label: l.newAgentSkillName,
                 initial: skill.name,
-                enabled: !flow.busy,
+                enabled: flow.canEditContent,
                 error: error('$base/name', ''),
                 onChanged: (v) => flow.edit((_) => skill.name = v.trim()),
               ),
@@ -396,7 +402,7 @@ class _SkillEditor extends StatelessWidget {
             IconButton(
               key: ValueKey('$id.remove'),
               tooltip: l.newAgentSkillRemove(skill.name),
-              onPressed: flow.busy
+              onPressed: !flow.canEditContent
                   ? null
                   : () => flow.edit((x) => x.skills.remove(skill)),
               icon: const Icon(Icons.delete_outline),
@@ -407,7 +413,7 @@ class _SkillEditor extends StatelessWidget {
           id: '$id.description',
           label: l.newAgentSkillDescription,
           initial: skill.description,
-          enabled: !flow.busy,
+          enabled: flow.canEditContent,
           error: error('$base/description', ''),
           onChanged: (v) => flow.edit((_) => skill.description = v),
         ),
@@ -417,7 +423,7 @@ class _SkillEditor extends StatelessWidget {
           initial: skill.body,
           lines: 4,
           monospace: true,
-          enabled: !flow.busy,
+          enabled: flow.canEditContent,
           error: error('$base/body', ''),
           onChanged: (v) => flow.edit((_) => skill.body = v),
         ),
@@ -466,7 +472,7 @@ class _ServerEditor extends StatelessWidget {
                 id: '$id.name',
                 label: l.newAgentServerName,
                 initial: server.name,
-                enabled: !flow.busy,
+                enabled: flow.canEditContent,
                 error: error('$base/name', ''),
                 onChanged: (v) => flow.edit((_) => server.name = v.trim()),
               ),
@@ -474,7 +480,7 @@ class _ServerEditor extends StatelessWidget {
             IconButton(
               key: ValueKey('$id.remove'),
               tooltip: l.newAgentServerRemove(server.name),
-              onPressed: flow.busy
+              onPressed: !flow.canEditContent
                   ? null
                   : () => flow.edit((x) => x.servers.remove(server)),
               icon: const Icon(Icons.delete_outline),
@@ -492,7 +498,7 @@ class _ServerEditor extends StatelessWidget {
                 key: ValueKey('$id.transport.$transport'),
                 label: Text(label),
                 selected: server.transport == transport,
-                onSelected: flow.busy
+                onSelected: !flow.canEditContent
                     ? null
                     : (_) => flow.edit((_) => server.transport = transport),
               ),
@@ -509,7 +515,7 @@ class _ServerEditor extends StatelessWidget {
             id: '$id.url',
             label: l.newAgentServerUrl,
             initial: server.url,
-            enabled: !flow.busy,
+            enabled: flow.canEditContent,
             error: error('$base/url', ''),
             onChanged: (v) => flow.edit((_) => server.url = v.trim()),
           )
@@ -518,7 +524,7 @@ class _ServerEditor extends StatelessWidget {
             id: '$id.command',
             label: l.newAgentServerCommand,
             initial: server.command,
-            enabled: !flow.busy,
+            enabled: flow.canEditContent,
             error: error('$base/command', ''),
             onChanged: (v) => flow.edit((_) => server.command = v.trim()),
           ),
@@ -526,7 +532,7 @@ class _ServerEditor extends StatelessWidget {
             id: '$id.package',
             label: l.newAgentServerPackage,
             initial: server.package,
-            enabled: !flow.busy,
+            enabled: flow.canEditContent,
             error: error('$base/package', ''),
             onChanged: (v) => flow.edit((_) => server.package = v.trim()),
           ),
@@ -536,7 +542,7 @@ class _ServerEditor extends StatelessWidget {
             initial: server.args.join('\n'),
             lines: 2,
             monospace: true,
-            enabled: !flow.busy,
+            enabled: flow.canEditContent,
             error: error('$base/args', ''),
             onChanged: (v) => flow.edit(
               (_) => server.args
@@ -567,7 +573,7 @@ class _ServerEditor extends StatelessWidget {
           alignment: AlignmentDirectional.centerStart,
           child: TextButton.icon(
             key: ValueKey('$id.entry.add'),
-            onPressed: flow.busy
+            onPressed: !flow.canEditContent
                 ? null
                 : () => flow.edit((_) => server.entries.add(DraftEntry())),
             icon: const Icon(Icons.add),
@@ -620,7 +626,7 @@ class _EntryEditor extends StatelessWidget {
             id: '$id.name',
             label: l.newAgentEntryName,
             initial: entry.name,
-            enabled: !flow.busy,
+            enabled: flow.canEditContent,
             error: error('$pointer/name', ''),
             onChanged: (v) => flow.edit((_) => entry.name = v.trim()),
           ),
@@ -634,7 +640,7 @@ class _EntryEditor extends StatelessWidget {
                 ? l.newAgentEntrySecret
                 : l.newAgentEntryValue,
             initial: entry.isSecret ? entry.secretRef : entry.value,
-            enabled: !flow.busy,
+            enabled: flow.canEditContent,
             error:
                 error(
                   '$pointer/${entry.isSecret ? 'secret_ref' : 'value'}',
@@ -657,7 +663,7 @@ class _EntryEditor extends StatelessWidget {
               Switch(
                 key: ValueKey('$id.isSecret'),
                 value: entry.isSecret,
-                onChanged: flow.busy
+                onChanged: !flow.canEditContent
                     ? null
                     : (v) => flow.edit((_) => entry.isSecret = v),
               ),
@@ -667,7 +673,7 @@ class _EntryEditor extends StatelessWidget {
         IconButton(
           key: ValueKey('$id.remove'),
           tooltip: l.newAgentEntryRemove(entry.name),
-          onPressed: flow.busy ? null : onRemove,
+          onPressed: !flow.canEditContent ? null : onRemove,
           icon: const Icon(Icons.close),
         ),
       ],
@@ -730,9 +736,11 @@ class _ClassChoice extends StatelessWidget {
                 key: ValueKey('newAgent.class.${c.wire}'),
                 label: Text(toolClassName(l, c)),
                 selected: target == c,
-                onSelected: flow.busy || (ceiling != null && c.isAbove(ceiling))
+                onSelected:
+                    !flow.canEditContent ||
+                        (ceiling != null && c.isAbove(ceiling))
                     ? null
-                    : (_) => flow.edit((x) => x.toolClass = c),
+                    : (_) => flow.edit((x) => x.pickClass(c)),
               ),
           ],
         ),
@@ -754,6 +762,11 @@ class _ClassChoice extends StatelessWidget {
   }
 }
 
+/// Whether the billing choice may change: not while a step runs and not for an edit, which
+/// keeps the agent's billing mode.
+bool _billingEditable(NewAgentFlow flow) =>
+    flow.canEditContent && flow.mode != NewAgentMode.edit;
+
 /// Organization or personal (10 10.3); personal only when offered, otherwise the reason.
 class _BillingChoice extends StatelessWidget {
   const _BillingChoice({required this.flow});
@@ -764,6 +777,31 @@ class _BillingChoice extends StatelessWidget {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final offer = flow.personalOffer;
+    if (flow.mode == NewAgentMode.edit || flow.mode == NewAgentMode.view) {
+      // An edit keeps the agent's mode; "Switch backend" of the agent card changes it.
+      final personal = flow.billing == 'personal';
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(l.newAgentBilling, style: dsTextStyle(DsType.bodyStrong)),
+          const SizedBox(height: DsSpace.s8),
+          Wrap(
+            children: [
+              ChoiceChip(
+                key: ValueKey('newAgent.billing.${flow.billing}'),
+                label: Text(
+                  personal
+                      ? l.newAgentBillingPersonal
+                      : l.newAgentBillingOrganization,
+                ),
+                selected: true,
+                onSelected: null,
+              ),
+            ],
+          ),
+        ],
+      );
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -776,7 +814,7 @@ class _BillingChoice extends StatelessWidget {
               key: const ValueKey('newAgent.billing.organization'),
               label: Text(l.newAgentBillingOrganization),
               selected: flow.billing == 'organization',
-              onSelected: flow.busy
+              onSelected: !_billingEditable(flow)
                   ? null
                   : (_) => flow.billing = 'organization',
             ),
@@ -785,7 +823,9 @@ class _BillingChoice extends StatelessWidget {
                 key: const ValueKey('newAgent.billing.personal'),
                 label: Text(l.newAgentBillingPersonal),
                 selected: flow.billing == 'personal',
-                onSelected: flow.busy ? null : (_) => flow.billing = 'personal',
+                onSelected: !_billingEditable(flow)
+                    ? null
+                    : (_) => flow.billing = 'personal',
               ),
           ],
         ),

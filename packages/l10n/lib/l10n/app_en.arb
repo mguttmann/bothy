@@ -16266,5 +16266,435 @@
         "type": "String"
       }
     }
+  },
+  "agentEditTitle": "Edit {name}",
+  "@agentEditTitle": {
+    "description": "Title of the editor of a built-in agent (01 6.20 item 6).",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Notes"
+      }
+    }
+  },
+  "agentSetupTitle": "Set up {name}",
+  "@agentSetupTitle": {
+    "description": "Title of the dialog of Continue setup of a built-in agent without a definition (26 8.3).",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Notes"
+      }
+    }
+  },
+  "agentRestoreTitle": "Restore version {version} of {name}",
+  "@agentRestoreTitle": {
+    "description": "Title of the editor opened by Restore of an older definition version (26 8.4).",
+    "placeholders": {
+      "version": {
+        "type": "int",
+        "example": "2"
+      },
+      "name": {
+        "type": "String",
+        "example": "Notes"
+      }
+    }
+  },
+  "agentViewTitle": "{name}, version {version}",
+  "@agentViewTitle": {
+    "description": "Title of the read-only editor opened by Show of a definition version.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Notes"
+      },
+      "version": {
+        "type": "int",
+        "example": "2"
+      }
+    }
+  },
+  "agentEditSave": "Save",
+  "@agentEditSave": {
+    "description": "Button that saves an edit of a built-in agent as a new definition version."
+  },
+  "agentEditContinue": "Continue setup",
+  "@agentEditContinue": {
+    "description": "Button that continues the setup of a built-in agent without a definition (26 8.3)."
+  },
+  "agentEditChangesTitle": "Changes to the current version",
+  "@agentEditChangesTitle": {
+    "description": "Heading of the list of changed parts above the editor (brief A1-09 Design note 2)."
+  },
+  "agentEditNoChanges": "No changes yet.",
+  "@agentEditNoChanges": {
+    "description": "The editor has nothing to save yet."
+  },
+  "agentEditChangesHint": "A saved change applies from the next answer of the agent.",
+  "@agentEditChangesHint": {
+    "description": "Explains when a saved definition takes effect."
+  },
+  "agentEditChange": "{kind, select, instructions{Instructions changed} skillAdded{Skill {name} added} skillRemoved{Skill {name} removed} skillChanged{Skill {name} changed} serverAdded{MCP server {name} added} serverRemoved{MCP server {name} removed} serverChanged{MCP server {name} changed} setting{{name} changed} origin{Origin changed} other{Tool class from {from} to {name}}}",
+  "@agentEditChange": {
+    "description": "One changed part of an edit: the kind, the name of the skill, server or setting, or the old and new tool class.",
+    "placeholders": {
+      "kind": {
+        "type": "String",
+        "example": "skillAdded"
+      },
+      "name": {
+        "type": "String",
+        "example": "summarize"
+      },
+      "from": {
+        "type": "String",
+        "example": "Chat"
+      }
+    }
+  },
+  "agentEditWish": "Preferred tool class",
+  "@agentEditWish": {
+    "description": "Name of the setting tool_class_wish in the list of changed parts."
+  },
+  "agentEditReload": "Reload",
+  "@agentEditReload": {
+    "description": "Button that reads the current version again after another device changed the agent."
+  },
+  "agentEditErrVersion": "Another device changed this agent. Reload to start from its current version; the changes here are discarded.",
+  "@agentEditErrVersion": {
+    "description": "Failure of a save: 412 version_conflict."
+  },
+  "agentEditRemoveLocal": "Remove the local servers",
+  "@agentEditRemoveLocal": {
+    "description": "Button that removes every local (stdio) MCP server from the editor after definition_needs_host (R-BA-06)."
+  },
+  "stepUpPurposeEditAgent": "Edit the agent {name}",
+  "@stepUpPurposeEditAgent": {
+    "description": "Purpose shown by the step-up prompt of an edit of a built-in agent.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Notes"
+      }
+    }
+  },
+  "stepUpPurposeSetUpAgent": "Set up the agent {name}",
+  "@stepUpPurposeSetUpAgent": {
+    "description": "Purpose shown by the step-up prompt of Continue setup.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Notes"
+      }
+    }
+  },
+  "stepUpPurposeMoveAgent": "Move the agent {name} to another runner",
+  "@stepUpPurposeMoveAgent": {
+    "description": "Purpose shown by the step-up prompt of Change runner.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Notes"
+      }
+    }
+  },
+  "stepUpPurposeDisableAgent": "Disable the agent {name}",
+  "@stepUpPurposeDisableAgent": {
+    "description": "Purpose shown by the step-up prompt of Disable of a built-in agent.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Notes"
+      }
+    }
+  },
+  "agentEditAuditReason": "Edit agent {name}",
+  "@agentEditAuditReason": {
+    "description": "Reason of the audit entry of the class step of an edit.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Notes"
+      }
+    }
+  },
+  "agentSetupAuditReason": "Set up agent {name}",
+  "@agentSetupAuditReason": {
+    "description": "Reason of the audit entries of the steps of Continue setup.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Notes"
+      }
+    }
+  },
+  "agentMoveAuditReason": "Move agent {name}",
+  "@agentMoveAuditReason": {
+    "description": "Reason of the audit entry of Change runner.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Notes"
+      }
+    }
+  },
+  "builtinAgentTitle": "Built-in agent",
+  "@builtinAgentTitle": {
+    "description": "Heading of the section of a built-in agent on its agent card."
+  },
+  "builtinAgentHost": "Runner: {runner}",
+  "@builtinAgentHost": {
+    "description": "The hosting runner of a built-in agent.",
+    "placeholders": {
+      "runner": {
+        "type": "String",
+        "example": "Dev runner"
+      }
+    }
+  },
+  "builtinAgentVersion": "Definition version {version}",
+  "@builtinAgentVersion": {
+    "description": "The current definition version of a built-in agent.",
+    "placeholders": {
+      "version": {
+        "type": "int",
+        "example": "3"
+      }
+    }
+  },
+  "builtinAgentNotSetUpHint": "This agent has no definition yet and answers nothing. Continue setup stores one.",
+  "@builtinAgentNotSetUpHint": {
+    "description": "Explains Not set up on the agent card (26 8.3)."
+  },
+  "builtinAgentDisabledHint": "This agent is disabled.",
+  "@builtinAgentDisabledHint": {
+    "description": "A disabled built-in agent on its agent card."
+  },
+  "builtinAgentEdit": "Edit",
+  "@builtinAgentEdit": {
+    "description": "Button that opens the editor of a built-in agent."
+  },
+  "builtinAgentVersions": "Versions",
+  "@builtinAgentVersions": {
+    "description": "Button that opens the definition versions of a built-in agent."
+  },
+  "builtinAgentChangeRunner": "Change runner",
+  "@builtinAgentChangeRunner": {
+    "description": "Button that moves a built-in agent to another runner."
+  },
+  "builtinAgentDisable": "Disable",
+  "@builtinAgentDisable": {
+    "description": "Button that disables a built-in agent."
+  },
+  "builtinAgentSaved": "{name} is saved as version {version}.",
+  "@builtinAgentSaved": {
+    "description": "Notice after an edit was saved.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Notes"
+      },
+      "version": {
+        "type": "int",
+        "example": "3"
+      }
+    }
+  },
+  "builtinAgentSetUp": "{name} is set up.",
+  "@builtinAgentSetUp": {
+    "description": "Notice after Continue setup finished.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Notes"
+      }
+    }
+  },
+  "builtinAgentMoved": "{name} is now on {runner}.",
+  "@builtinAgentMoved": {
+    "description": "Notice after Change runner.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Notes"
+      },
+      "runner": {
+        "type": "String",
+        "example": "Dev runner"
+      }
+    }
+  },
+  "builtinAgentDisabled": "{name} is disabled.",
+  "@builtinAgentDisabled": {
+    "description": "Notice after Disable.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Notes"
+      }
+    }
+  },
+  "builtinAgentDisableTitle": "Disable {name}?",
+  "@builtinAgentDisableTitle": {
+    "description": "Title of the confirmation of Disable of a built-in agent.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Notes"
+      }
+    }
+  },
+  "builtinAgentDisableBody": "{name} stops answering: its tokens end and its connections close. The definition and its versions stay.",
+  "@builtinAgentDisableBody": {
+    "description": "Body of the confirmation of Disable of a built-in agent.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Notes"
+      }
+    }
+  },
+  "agentVersionsTitle": "Versions of {name}",
+  "@agentVersionsTitle": {
+    "description": "Title of the list of definition versions (26 8.4).",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Notes"
+      }
+    }
+  },
+  "agentVersionLine": "Version {version}, {when}, by {author}, {origin, select, template{from a template} interview{from the interview} other{by hand}}",
+  "@agentVersionLine": {
+    "description": "One definition version: number, time, author and origin.",
+    "placeholders": {
+      "version": {
+        "type": "int",
+        "example": "2"
+      },
+      "when": {
+        "type": "String",
+        "example": "today 10:58"
+      },
+      "author": {
+        "type": "String",
+        "example": "Alex"
+      },
+      "origin": {
+        "type": "String",
+        "example": "manual"
+      }
+    }
+  },
+  "agentVersionCurrent": "Current",
+  "@agentVersionCurrent": {
+    "description": "Marks the current definition version."
+  },
+  "agentVersionShow": "Show",
+  "@agentVersionShow": {
+    "description": "Button that opens a definition version read-only."
+  },
+  "agentVersionShowLabel": "Show version {version}",
+  "@agentVersionShowLabel": {
+    "description": "Accessibility label of Show of one version.",
+    "placeholders": {
+      "version": {
+        "type": "int",
+        "example": "2"
+      }
+    }
+  },
+  "agentVersionRestore": "Restore",
+  "@agentVersionRestore": {
+    "description": "Button that saves an older definition version again as a new version."
+  },
+  "agentVersionRestoreLabel": "Restore version {version}",
+  "@agentVersionRestoreLabel": {
+    "description": "Accessibility label of Restore of one version.",
+    "placeholders": {
+      "version": {
+        "type": "int",
+        "example": "2"
+      }
+    }
+  },
+  "agentVersionsEmpty": "No stored version yet.",
+  "@agentVersionsEmpty": {
+    "description": "The version list of an agent without a definition."
+  },
+  "agentHostTitle": "Change runner of {name}",
+  "@agentHostTitle": {
+    "description": "Title of the dialog Change runner (26 8.4).",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Notes"
+      }
+    }
+  },
+  "agentHostBody": "The connections of the agent restart on the new runner; an answer in progress stops.",
+  "@agentHostBody": {
+    "description": "Explains what Change runner does (26 3.1 item 4)."
+  },
+  "agentHostChoice": "{runner}, loads at most {toolClass}",
+  "@agentHostChoice": {
+    "description": "One runner in Change runner with its highest tool class.",
+    "placeholders": {
+      "runner": {
+        "type": "String",
+        "example": "Dev runner"
+      },
+      "toolClass": {
+        "type": "String",
+        "example": "Chat"
+      }
+    }
+  },
+  "agentHostNone": "No other runner is available for built-in agents.",
+  "@agentHostNone": {
+    "description": "Change runner without another runner."
+  },
+  "agentHostConfirm": "Move",
+  "@agentHostConfirm": {
+    "description": "Button that moves the agent to the chosen runner."
+  },
+  "agentHostErrCeiling": "{runner} loads at most the tool class {toolClass}, below the class of the agent. Choose another runner, or lower the class of the agent first.",
+  "@agentHostErrCeiling": {
+    "description": "Change runner refused with host_tool_class_ceiling.",
+    "placeholders": {
+      "runner": {
+        "type": "String",
+        "example": "Dev runner"
+      },
+      "toolClass": {
+        "type": "String",
+        "example": "Chat"
+      }
+    }
+  },
+  "agentHostErrHolder": "The agent bills Personal, so the new runner must be Personal with the same credential holder. Switch billing to Organization first, or choose such a runner.",
+  "@agentHostErrHolder": {
+    "description": "Change runner refused with hosted_holder_mismatch (10 10.3)."
+  },
+  "agentHostSwitchBilling": "Switch billing",
+  "@agentHostSwitchBilling": {
+    "description": "Button after hosted_holder_mismatch that opens the billing switch of the agent card."
+  },
+  "agentHostErrNotCapable": "This runner does not take built-in agents right now. Choose another runner.",
+  "@agentHostErrNotCapable": {
+    "description": "Change runner refused with host_not_capable."
+  },
+  "builtinAgentsEntry": "Built-in agents",
+  "@builtinAgentsEntry": {
+    "description": "Entry under Me on the phone that lists the built-in agents."
+  },
+  "builtinAgentsEntryHint": "Edit, move and disable",
+  "@builtinAgentsEntryHint": {
+    "description": "Second line of the entry Built-in agents on the phone."
+  },
+  "builtinAgentsEmpty": "No built-in agents yet.",
+  "@builtinAgentsEmpty": {
+    "description": "The phone list of built-in agents without one."
   }
 }
