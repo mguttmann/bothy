@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 
 import 'phone/app_lock_test.dart' as app_lock;
+import 'phone/autonomous_runs_phone_test.dart' as autonomous_runs;
 import 'phone/background_test.dart' as background;
 import 'phone/dictation_test.dart' as dictation;
 import 'phone/emergency_test.dart' as emergency;
@@ -37,4 +38,5 @@ void main() {
   group('dictation and inserts', dictation.main);
   group('app lock', app_lock.main);
   group('new agent', new_agent.main);
+  group('autonomous runs', autonomous_runs.main);
 }

@@ -24,6 +24,7 @@ import 'package:local_store/local_store.dart';
 import 'appliers/message_appliers.dart';
 import 'appliers/personal_appliers.dart';
 import 'appliers/thread_appliers.dart';
+import 'appliers/wake_appliers.dart' as wakes;
 import 'backoff.dart';
 import 'connection_state.dart';
 import 'dispatcher.dart';
@@ -640,6 +641,16 @@ final class CatchUpListener implements SessionListener {
   Future<void> onFocus(ThreadId threadId) async {
     if (_wiped || !gaps.pending.containsKey(threadId)) return;
     await _inBackground(() => gaps.fill(_sync, threadId));
+  }
+
+  /// Loads the wake-ups of [id] through REST (`listThreadWakes`, 09 5.8.2) and replaces the
+  /// stored ones, so a thread view shows its pending wake-ups when it opens (01 6.21; AR-08):
+  /// `run.wake_changed` keeps them current afterwards. A thread this device does not hold or
+  /// that was removed is not stored; a server before stage AR (`404`) changes nothing; after a
+  /// wipe nothing happens. Throws what the read throws.
+  Future<void> loadThreadWakes(ThreadId id) async {
+    if (_wiped) return;
+    await wakes.loadThreadWakes(_sync, id);
   }
 
   /// Stores the server message a confirmed write returned (API `Message` of `createMessage`

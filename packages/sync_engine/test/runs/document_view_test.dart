@@ -252,4 +252,36 @@ void main() {
     expect(d.stepsInOrder.single.step.id, 'k');
     expect(d.stepsInOrder.single.step.name, isNull);
   });
+
+  // 01 6.21 items 2 and 4, 09 18.19.11, 03 `runs.metrics` (AR-08).
+  test('reads the end state, the pending wake-up and the wake trigger', () {
+    final d = RunDocument.fromJson({
+      'version': 3,
+      'trigger_kind': 'wake',
+      'triggering_wake_id': _id(9),
+      'metrics': {
+        'end_state': 'waiting',
+        'wake_pending_until': '2026-11-06T17:55:00.000Z',
+      },
+    });
+    expect(d.triggerKind, RunTriggerKind.wake);
+    expect(d.triggeringWakeId, WakeId.parse(_id(9)));
+    expect(d.metrics.endState, RunEndState.waiting);
+    expect(d.metrics.wakePendingUntil, DateTime.utc(2026, 11, 6, 17, 55));
+  });
+
+  test('a run without end state or wake-up reads null; a new code is '
+      'unknown', () {
+    final plain = RunDocument.fromJson({'version': 1});
+    expect(plain.triggerKind, isNull);
+    expect(plain.triggeringWakeId, isNull);
+    expect(plain.metrics.endState, isNull);
+    expect(plain.metrics.wakePendingUntil, isNull);
+    final newer = RunDocument.fromJson({
+      'version': 1,
+      'metrics': {'end_state': 'sleeping', 'wake_pending_until': 'soon'},
+    });
+    expect(newer.metrics.endState, RunEndState.unknown);
+    expect(newer.metrics.wakePendingUntil, isNull);
+  });
 }

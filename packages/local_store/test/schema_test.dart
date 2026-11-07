@@ -46,6 +46,7 @@ const Map<String, List<String>> expected = {
     'created_at',
     'archived_at',
     'version', 'settings_version', 'level', 'capabilities', 'project_bound',
+    'allow_autonomous_runs',
   ],
   // API `ChannelOperator.mode` and 03 `channels.operator_agent_id`.
   'channel_operators': ['channel_id', 'operator_mode', 'operator_agent_id'],
@@ -158,6 +159,22 @@ const Map<String, List<String>> expected = {
     'step_count',
     'duration_ms',
     'queued_at', 'started_at', 'finished_at',
+  ],
+  // 03 `run_wakes` (stage AR, 09 5.8.1): every column, as API `RunWake` carries them (AR-08).
+  'run_wakes': [
+    'id', 'agent_id', 'thread_id', 'source_run_id', 'triggered_by', 'kind', //
+    'condition',
+    'label',
+    'reason',
+    'outage',
+    'not_before',
+    'deadline',
+    'state',
+    'state_reason',
+    'result_text',
+    'fired_run_id',
+    'fired_into_run_id',
+    'created_at', 'ended_at', 'version',
   ],
   // 03 `agents` card plus `principals` display fields.
   'agents': [
@@ -325,8 +342,8 @@ void main() {
     return [for (final r in rows) r.read<String>('name')];
   }
 
-  test('schema version 13 has exactly the tables of 15 6.1', () async {
-    expect(db.schemaVersion, 13);
+  test('schema version 14 has exactly the tables of 15 6.1', () async {
+    expect(db.schemaVersion, 14);
     final rows = await db
         .customSelect(
           "SELECT name FROM sqlite_master WHERE type = 'table' "

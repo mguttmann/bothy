@@ -143,6 +143,141 @@ final class ThreadRunsFamily extends $Family
   String toString() => r'threadRunsProvider';
 }
 
+/// The wake-ups of [threadId] from the local `run_wakes` table in the order they fire (01 6.21,
+/// AR-08); `run.wake_changed` and [wakeLoader] keep the table current.
+
+@ProviderFor(threadWakes)
+final threadWakesProvider = ThreadWakesFamily._();
+
+/// The wake-ups of [threadId] from the local `run_wakes` table in the order they fire (01 6.21,
+/// AR-08); `run.wake_changed` and [wakeLoader] keep the table current.
+
+final class ThreadWakesProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<List<RunWake>>,
+          List<RunWake>,
+          Stream<List<RunWake>>
+        >
+    with $FutureModifier<List<RunWake>>, $StreamProvider<List<RunWake>> {
+  /// The wake-ups of [threadId] from the local `run_wakes` table in the order they fire (01 6.21,
+  /// AR-08); `run.wake_changed` and [wakeLoader] keep the table current.
+  ThreadWakesProvider._({
+    required ThreadWakesFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'threadWakesProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$threadWakesHash();
+
+  @override
+  String toString() {
+    return r'threadWakesProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $StreamProviderElement<List<RunWake>> $createElement(
+    $ProviderPointer pointer,
+  ) => $StreamProviderElement(pointer);
+
+  @override
+  Stream<List<RunWake>> create(Ref ref) {
+    final argument = this.argument as String;
+    return threadWakes(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is ThreadWakesProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$threadWakesHash() => r'2ec35ba63cdc998195b02b2dc915acab14991acb';
+
+/// The wake-ups of [threadId] from the local `run_wakes` table in the order they fire (01 6.21,
+/// AR-08); `run.wake_changed` and [wakeLoader] keep the table current.
+
+final class ThreadWakesFamily extends $Family
+    with $FunctionalFamilyOverride<Stream<List<RunWake>>, String> {
+  ThreadWakesFamily._()
+    : super(
+        retry: null,
+        name: r'threadWakesProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// The wake-ups of [threadId] from the local `run_wakes` table in the order they fire (01 6.21,
+  /// AR-08); `run.wake_changed` and [wakeLoader] keep the table current.
+
+  ThreadWakesProvider call(String threadId) =>
+      ThreadWakesProvider._(argument: threadId, from: this);
+
+  @override
+  String toString() => r'threadWakesProvider';
+}
+
+/// The loader of a thread's wake-ups when its view opens; tests override it.
+
+@ProviderFor(wakeLoader)
+final wakeLoaderProvider = WakeLoaderProvider._();
+
+/// The loader of a thread's wake-ups when its view opens; tests override it.
+
+final class WakeLoaderProvider
+    extends $FunctionalProvider<WakeLoader, WakeLoader, WakeLoader>
+    with $Provider<WakeLoader> {
+  /// The loader of a thread's wake-ups when its view opens; tests override it.
+  WakeLoaderProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'wakeLoaderProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$wakeLoaderHash();
+
+  @$internal
+  @override
+  $ProviderElement<WakeLoader> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  WakeLoader create(Ref ref) {
+    return wakeLoader(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(WakeLoader value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<WakeLoader>(value),
+    );
+  }
+}
+
+String _$wakeLoaderHash() => r'97e5b68adea27b2e03e52362422140e8034bc90b';
+
 /// The run source of the signed-in engine, or null; tests override it.
 
 @ProviderFor(runSource)

@@ -264,6 +264,7 @@ for reconciliation. Fields that can only be read with `manage` (channel prompt, 
 | `my_mentions` | `mentions` | only mentions of the person themselves |
 | `message_components` | same name | state, definition |
 | `runs` | `runs` | summary from `run.state_changed`; document only in memory |
+| `run_wakes` | `run_wakes` | every column (stage AR, AR-08); a thread's list from `listThreadWakes` when its view opens, kept current by `run.wake_changed` ([01](01-product.md) 6.21) |
 | `agents`, `principals` | `principals`, `agents` (card) | display, mode badge, reported presence |
 | `commands` | `commands` | for suggestions offline |
 | `read_states`, `drafts`, `user_settings`, `notification_preferences`, `quiet_hours` | same name | personal sync data |

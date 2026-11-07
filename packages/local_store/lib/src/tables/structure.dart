@@ -166,6 +166,12 @@ class Channels extends Table {
   /// before 6 until the snapshot that the migration asks for (M4-40).
   BoolColumn get projectBound => boolean().withDefault(const Constant(false))();
 
+  /// API `Channel.allow_autonomous_runs` (03 `channels`, 09 5.8.6, stage AR): whether persons
+  /// other than owners may let agents run on alone here. Null from a server before stage AR and
+  /// in a row of a version before 14 until the snapshot the migration asks for; the channel
+  /// menu hides the switch then (01 6.21 item 5, AR-08).
+  BoolColumn get allowAutonomousRuns => boolean().nullable()();
+
   /// API `ChannelView.level`; null until delivered.
   TextColumn get level => text().nullable()();
 

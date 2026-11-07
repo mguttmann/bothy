@@ -30,6 +30,7 @@ part 'world_search.dart';
 part 'world_structure.dart';
 part 'world_terminal.dart';
 part 'world_thread_view.dart';
+part 'world_wakes.dart';
 
 /// A JSON object of the API.
 typedef JsonMap = Map<String, Object?>;
@@ -778,6 +779,9 @@ final class FakeWorld {
   /// Runs (API `Run`, the run document of 04 11.1) by ID.
   final Map<String, JsonMap> runs = {};
 
+  /// The wake-ups by ID (API `RunWake`, 09 5.8; stage AR), see [WakesWorld].
+  final Map<String, JsonMap> wakes = {};
+
   /// Forum tags by ID (API `ForumTag`).
   final Map<String, JsonMap> forumTags = {};
 
@@ -1040,6 +1044,7 @@ final class FakeWorld {
       'sort_key': 'a${channels.length}',
       'operator': _inheritOperator(spaceId),
       'read_only': false,
+      'allow_autonomous_runs': false,
       'project_bound': false,
       'version': 1,
       'settings_version': 1,

@@ -158,6 +158,17 @@ void main() {
   test('Channel.projectBound is false by default', () {
     expect(c.projectBound, isFalse);
   });
+  // 01 6.21 item 5: the channel switch; null is a server before stage AR, which hides it.
+  _value(
+    'Channel.allowAutonomousRuns',
+    c.copyWith(allowAutonomousRuns: true),
+    mkChannel().copyWith(allowAutonomousRuns: true),
+    c.copyWith(allowAutonomousRuns: true).copyWith(),
+    c.copyWith(allowAutonomousRuns: false),
+  );
+  test('Channel.allowAutonomousRuns is null by default (an older server)', () {
+    expect(c.allowAutonomousRuns, isNull);
+  });
 
   ForumTag mkTag() => ForumTag(
     id: ForumTagId.parse(uuid(60)),
@@ -599,4 +610,42 @@ void main() {
     policy,
     const AppLockPolicy(required: true, afterMs: 60001),
   );
+
+  // 09 5.8.1, 03 `run_wakes`: a wake-up as the client mirrors it.
+  RunWake mkWake() => RunWake(
+    id: WakeId.parse(uuid(90)),
+    agentId: sam,
+    threadId: thread2,
+    sourceRunId: RunId.parse(uuid(91)),
+    triggeredBy: alex,
+    kind: RunWakeKind.at,
+    reason: RunWakeReason.agent,
+    label: 'CI of #123',
+    condition: const {'repository': 'example/app', 'number': 123},
+    notBefore: t0,
+    deadline: t0.add(const Duration(days: 7)),
+    state: RunWakeState.pending,
+    resultText: '',
+    createdAt: t0,
+    version: v1,
+  );
+  final wake = mkWake();
+  _value(
+    'RunWake',
+    wake,
+    mkWake(),
+    wake.copyWith(),
+    wake.copyWith(state: RunWakeState.cancelled),
+  );
+  _value(
+    'RunWake.condition',
+    wake,
+    mkWake(),
+    wake.copyWith(),
+    wake.copyWith(condition: const {'command_line': 'make test'}),
+  );
+  test('RunWake.isPending follows the state', () {
+    expect(wake.isPending, isTrue);
+    expect(wake.copyWith(state: RunWakeState.fired).isPending, isFalse);
+  });
 }

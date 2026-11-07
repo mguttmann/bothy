@@ -3,6 +3,8 @@
 /// Rows of runs, agents and principals to domain entities and back.
 library;
 
+import 'dart:convert';
+
 import 'package:domain/domain.dart';
 import 'package:drift/drift.dart';
 
@@ -57,6 +59,57 @@ RunSummary runFromRow(RunRow row) => RunSummary(
   queuedAt: row.queuedAt,
   startedAt: row.startedAt,
   finishedAt: row.finishedAt,
+);
+
+/// The insert companion of [wake].
+RunWakesCompanion wakeToCompanion(RunWake wake) => RunWakesCompanion.insert(
+  id: wake.id.value,
+  agentId: wake.agentId.value,
+  threadId: wake.threadId.value,
+  sourceRunId: wake.sourceRunId.value,
+  triggeredBy: wake.triggeredBy.value,
+  kind: wake.kind.code,
+  condition: jsonEncode(wake.condition),
+  label: wake.label,
+  reason: wake.reason.code,
+  outage: Value(wake.outage),
+  notBefore: wake.notBefore,
+  deadline: wake.deadline,
+  state: wake.state.code,
+  stateReason: Value(wake.stateReason),
+  resultText: wake.resultText,
+  firedRunId: Value(wake.firedRunId?.value),
+  firedIntoRunId: Value(wake.firedIntoRunId?.value),
+  createdAt: wake.createdAt,
+  endedAt: Value(wake.endedAt),
+  version: wake.version.value,
+);
+
+/// The wake-up of [row].
+RunWake wakeFromRow(RunWakeRow row) => RunWake(
+  id: WakeId.parse(row.id),
+  agentId: PrincipalId.parse(row.agentId),
+  threadId: ThreadId.parse(row.threadId),
+  sourceRunId: RunId.parse(row.sourceRunId),
+  triggeredBy: PrincipalId.parse(row.triggeredBy),
+  kind: RunWakeKind.fromCode(row.kind),
+  reason: RunWakeReason.fromCode(row.reason),
+  label: row.label,
+  condition: switch (jsonDecode(row.condition)) {
+    final Map<String, Object?> map => map,
+    _ => const <String, Object?>{},
+  },
+  outage: row.outage,
+  notBefore: row.notBefore,
+  deadline: row.deadline,
+  state: RunWakeState.fromCode(row.state),
+  stateReason: row.stateReason,
+  resultText: row.resultText,
+  firedRunId: optional(row.firedRunId, RunId.parse),
+  firedIntoRunId: optional(row.firedIntoRunId, RunId.parse),
+  createdAt: row.createdAt,
+  endedAt: row.endedAt,
+  version: ResourceVersion(row.version),
 );
 
 /// The insert companion of [card].

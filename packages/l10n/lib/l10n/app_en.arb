@@ -15986,5 +15986,285 @@
         "example": "Notes"
       }
     }
+  },
+  "wakesPendingTitle": "Continues on its own",
+  "@wakesPendingTitle": {
+    "description": "Heading of the list of pending wake-ups above the composer (01 6.21 item 1)."
+  },
+  "wakesPendingItemLabel": "{label}: {condition}, earliest {earliest}, deadline {deadline}",
+  "@wakesPendingItemLabel": {
+    "description": "Screen reader label of one pending wake-up above the composer: its label, its condition, the time it fires at the earliest and its deadline (01 6.21 item 1).",
+    "placeholders": {
+      "label": {
+        "type": "String"
+      },
+      "condition": {
+        "type": "String"
+      },
+      "earliest": {
+        "type": "String"
+      },
+      "deadline": {
+        "type": "String"
+      }
+    }
+  },
+  "wakesUnnamed": "Wake-up",
+  "@wakesUnnamed": {
+    "description": "The name of a wake-up whose agent gave it no label (01 6.21, 09 5.8.1)."
+  },
+  "wakesConditionAt": "at {time}",
+  "@wakesConditionAt": {
+    "description": "Condition of a wake-up that fires at a time (kind at), for example 'at 17:55' (01 6.21 item 1).",
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "wakesConditionPrChecks": "when the checks of #{number} finish",
+  "@wakesConditionPrChecks": {
+    "description": "Condition of a wake-up that waits for the checks of a pull request (kind pr_checks), with its number (01 6.21 item 1).",
+    "placeholders": {
+      "number": {
+        "type": "String"
+      }
+    }
+  },
+  "wakesConditionPrChecksAny": "when the checks of the pull request finish",
+  "@wakesConditionPrChecksAny": {
+    "description": "Condition of a pull request wake-up whose number is unknown (01 6.21 item 1)."
+  },
+  "wakesConditionCommand": "when the command succeeds",
+  "@wakesConditionCommand": {
+    "description": "Condition of a wake-up that waits for a command to exit with code 0 (kind command, 01 6.21 item 1)."
+  },
+  "wakesConditionUnknown": "when its condition is met",
+  "@wakesConditionUnknown": {
+    "description": "Condition of a wake-up of a kind this app does not know (a newer server)."
+  },
+  "wakesEarliest": "earliest {time}",
+  "@wakesEarliest": {
+    "description": "The time a pending wake-up fires at the earliest (01 6.21 item 1).",
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "wakesDeadline": "deadline {time}",
+  "@wakesDeadline": {
+    "description": "The deadline of a pending wake-up, after which it expires (01 6.21 item 1).",
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "wakesCancel": "Cancel",
+  "@wakesCancel": {
+    "description": "Button that cancels a pending wake-up; shown to the wake-up's person and to persons with manage on the channel (07 2.14 item 5)."
+  },
+  "wakesCancelLabel": "Cancel wake-up {label}",
+  "@wakesCancelLabel": {
+    "description": "Screen reader label of the cancel button of a pending wake-up.",
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "wakesCancelRefused": "Not cancelled: {reason}",
+  "@wakesCancelRefused": {
+    "description": "Shown beside a pending wake-up when the server refused its cancel, with the reason.",
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "wakesUsageLimitContinues": "Usage limit of the account reached; continues at {time}",
+  "@wakesUsageLimitContinues": {
+    "description": "Note of the thread while a usage-limit wake-up is pending (01 6.21 item 3, 09 18.19.10).",
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "wakesUsageLimitReplyAfter": "Usage limit of the account reached. Reply after {time} to continue",
+  "@wakesUsageLimitReplyAfter": {
+    "description": "Note of the thread after a run hit the usage limit and may not continue on its own (01 6.21 item 3, 09 18.19.10).",
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "wakesUsageLimitReplyLater": "Usage limit of the account reached. Reply after the reset to continue",
+  "@wakesUsageLimitReplyLater": {
+    "description": "Note of the thread after a run hit the usage limit when the reset time is unknown (01 6.21 item 3, 09 18.19.10)."
+  },
+  "runEndStateDone": "Done",
+  "@runEndStateDone": {
+    "description": "End state of a finished run on its collapsed line: nothing more to do (01 6.21 item 2, 09 18.19.11)."
+  },
+  "runEndStateWaiting": "Waiting",
+  "@runEndStateWaiting": {
+    "description": "End state of a finished run on its collapsed line: more work after something happens (01 6.21 item 2)."
+  },
+  "runEndStateBlocked": "Needs you",
+  "@runEndStateBlocked": {
+    "description": "End state of a finished run on its collapsed line: needs a person (01 6.21 item 2)."
+  },
+  "runContinuesAt": "Continues {day} at {time}",
+  "@runContinuesAt": {
+    "description": "On the collapsed line of a finished run: when the thread continues, from the pending wake-up (01 6.21 item 2).",
+    "placeholders": {
+      "day": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "runWokeUp": "Woke up: {label}",
+  "@runWokeUp": {
+    "description": "Shown at a run started by a wake-up instead of a triggering message, with the wake-up's label (01 6.21 item 4).",
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "runWokeUpUnnamed": "Woke up",
+  "@runWokeUpUnnamed": {
+    "description": "Shown at a run started by a wake-up without a label (01 6.21 item 4)."
+  },
+  "runContinuedAfterLostWork": "Continued after lost work",
+  "@runContinuedAfterLostWork": {
+    "description": "Shown at a recovery run instead of a triggering message (01 6.21 item 4, 09 18.19.9)."
+  },
+  "noteEndedWaiting": "Ended waiting, but nothing will wake this thread",
+  "@noteEndedWaiting": {
+    "description": "Note of the thread when a run ended in the state waiting without a pending wake-up (01 6.21 item 3, 09 18.19.11)."
+  },
+  "noteWakeExpired": "{label} expired: its deadline passed before it could fire",
+  "@noteWakeExpired": {
+    "description": "Note of the thread when a wake-up expired (01 6.21 item 3, 09 5.8.4); label is the wake-up's name.",
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "noteWakeCancelled": "{label} was cancelled",
+  "@noteWakeCancelled": {
+    "description": "Note of the thread when a wake-up was cancelled (01 6.21 item 3, 09 5.8.4).",
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "noteWakeFailed": "{label} failed: its check could not run",
+  "@noteWakeFailed": {
+    "description": "Note of the thread when the check of a wake-up kept failing (01 6.21 item 3, 09 5.8.4).",
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "noteWakeRefused": "{label} was refused: {reason}",
+  "@noteWakeRefused": {
+    "description": "Note of the thread when a check refused a wake-up, with the reason (01 6.21 item 3, 09 5.8.4).",
+    "placeholders": {
+      "label": {
+        "type": "String"
+      },
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "noteWakeRefusedNotAllowed": "{label} was refused: agents may not continue on their own in this channel",
+  "@noteWakeRefusedNotAllowed": {
+    "description": "Note of the thread when a wake-up was refused because the channel does not let agents continue on their own (09 5.8.6).",
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "noteChainCap": "The agent continued on its own as often as allowed. Reply to continue",
+  "@noteChainCap": {
+    "description": "Note of the thread when the chain of autonomous inputs reached its cap (01 6.21 item 3, 09 5.8.6)."
+  },
+  "noteIdleCap": "The agent stopped continuing on its own because nothing happened. Reply to continue",
+  "@noteIdleCap": {
+    "description": "Note of the thread when the idle count of autonomous inputs reached its cap (01 6.21 item 3, 09 5.8.6)."
+  },
+  "noteWakeEnded": "{label} ended",
+  "@noteWakeEnded": {
+    "description": "Note of the thread for a wake-up end this app does not know (a newer server).",
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "noteSemantics": "Note: {text}",
+  "@noteSemantics": {
+    "description": "Screen reader label of a note of the thread, which is never a message of a person (01 6.21 item 3).",
+    "placeholders": {
+      "text": {
+        "type": "String"
+      }
+    }
+  },
+  "autonomousRunsMenu": "Let agents continue on their own...",
+  "@autonomousRunsMenu": {
+    "description": "Entry of the channel menu for persons with manage that opens the channel switch allow_autonomous_runs (01 6.21 item 5)."
+  },
+  "autonomousRunsTitle": "Let agents continue on their own",
+  "@autonomousRunsTitle": {
+    "description": "Title and switch label of the channel setting allow_autonomous_runs (01 6.21 item 5)."
+  },
+  "autonomousRunsExplanation": "Owners may always let agents continue on their own. Everyone else's wake-ups in this channel need this switch.",
+  "@autonomousRunsExplanation": {
+    "description": "The sentence under the channel switch allow_autonomous_runs (01 6.21 item 5, 09 5.8.6)."
+  },
+  "autonomousRunsRefused": "Not changed: {reason}",
+  "@autonomousRunsRefused": {
+    "description": "Shown in the channel switch dialog when the server refused the change, with the reason.",
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "autonomousRunsClose": "Close",
+  "@autonomousRunsClose": {
+    "description": "Button that closes the dialog of the channel switch allow_autonomous_runs."
+  },
+  "wakesNoteName": "Wake-up '{label}'",
+  "@wakesNoteName": {
+    "description": "The name of a wake-up with its label in a note of the thread, for example Wake-up 'CI of #123' (09 5.8.4); label is agent content.",
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "runEndStateLabel": "End state: {state}",
+  "@runEndStateLabel": {
+    "description": "The end state of a finished run under its collapsed line, which already shows the run state; state is Done, Waiting or Needs you (01 6.21 item 2).",
+    "placeholders": {
+      "state": {
+        "type": "String"
+      }
+    }
   }
 }

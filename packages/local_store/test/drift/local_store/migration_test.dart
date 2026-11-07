@@ -13,7 +13,8 @@
 // local-only table `space_view_states`, filled from `user_space_states.collapsed`, and version
 // 11 (M4-49) the column `shell_view_state.code_blocks_unwrapped`, version 12 (M4-51) the
 // column `user_space_states.channel_order` and the mirror table `user_channel_states` with a
-// cleared cursor, version 13 (M4-52) the local-only table `thread_seen_states`; each keeps every row of the mirror. The preserved
+// cleared cursor, version 13 (M4-52) the local-only table `thread_seen_states`, version 14 (AR-08) the mirror table
+// `run_wakes` and the column `channels.allow_autonomous_runs` with a cleared cursor; each keeps every row of the mirror. The preserved
 // tables are checked by
 // `survival_test.dart`.
 
@@ -28,6 +29,7 @@ import 'generated/schema_v10.dart' as v10;
 import 'generated/schema_v11.dart' as v11;
 import 'generated/schema_v12.dart' as v12;
 import 'generated/schema_v13.dart' as v13;
+import 'generated/schema_v14.dart' as v14;
 import 'generated/schema_v2.dart' as v2;
 import 'generated/schema_v3.dart' as v3;
 import 'generated/schema_v4.dart' as v4;
@@ -488,4 +490,75 @@ void main() {
       );
     },
   );
+
+  test('the migration 13 to 14 adds an empty wake-up table, keeps the channels '
+      'without the switch and clears cursor and epoch', () async {
+    const channel = v13.ChannelsData(
+      id: 'c',
+      spaceId: 's',
+      kind: 'forum',
+      name: 'development',
+      topic: '',
+      sortKey: 'a0',
+      readOnly: 0,
+      dmParticipantIds: '[]',
+      createdAt: '2026-11-01T09:00:00.000Z',
+      version: 2,
+      settingsVersion: 1,
+      level: 'trigger',
+      capabilities: '[]',
+      projectBound: 0,
+    );
+    const state = v13.SyncStateData(
+      id: 1,
+      cursor: 812,
+      syncEpoch: 'epoch-3',
+      headSeq: 812,
+      permissionVersion: 7,
+      lastSnapshotAt: 40,
+    );
+    await verifier.testWithDataIntegrity(
+      oldVersion: 13,
+      newVersion: 14,
+      createOld: v13.DatabaseAtV13.new,
+      createNew: v14.DatabaseAtV14.new,
+      openTestedDatabase: LocalDatabase.new,
+      createItems: (batch, oldDb) {
+        batch
+          ..insertAll(oldDb.channels, [channel])
+          ..insertAll(oldDb.syncState, [state]);
+      },
+      validateItems: (newDb) async {
+        expect(await newDb.select(newDb.runWakes).get(), isEmpty);
+        // The switch is unknown until the snapshot of the next connection fills it (null
+        // hides it, as on an older server).
+        expect(await newDb.select(newDb.channels).get(), [
+          const v14.ChannelsData(
+            id: 'c',
+            spaceId: 's',
+            kind: 'forum',
+            name: 'development',
+            topic: '',
+            sortKey: 'a0',
+            readOnly: 0,
+            dmParticipantIds: '[]',
+            createdAt: '2026-11-01T09:00:00.000Z',
+            version: 2,
+            settingsVersion: 1,
+            level: 'trigger',
+            capabilities: '[]',
+            projectBound: 0,
+          ),
+        ]);
+        expect(await newDb.select(newDb.syncState).get(), [
+          const v14.SyncStateData(
+            id: 1,
+            headSeq: 812,
+            permissionVersion: 7,
+            lastSnapshotAt: 40,
+          ),
+        ]);
+      },
+    );
+  });
 }

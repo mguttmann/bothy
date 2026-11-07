@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// Mirror tables of runs and principals (15 6.1: `runs`, `agents`, `principals`).
+/// Mirror tables of runs and principals (15 6.1: `runs`, `run_wakes`, `agents`, `principals`).
 library;
 
 import 'package:drift/drift.dart';
@@ -71,6 +71,78 @@ class Runs extends Table {
 
   /// 03 `runs.finished_at`.
   DateTimeColumn get finishedAt => dateTime().nullable()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+/// 03 `run_wakes` (09 5.8.1, stage AR, AR-08): the wake-ups of the threads this device holds, as
+/// `listThreadWakes` returns them; `run.wake_changed` reloads a thread's list (01 6.21).
+@DataClassName('RunWakeRow')
+@TableIndex(name: 'run_wakes_thread', columns: {#threadId})
+class RunWakes extends Table {
+  @override
+  String get tableName => 'run_wakes';
+
+  /// 03 `run_wakes.id`.
+  TextColumn get id => text()();
+
+  /// 03 `run_wakes.agent_id`.
+  TextColumn get agentId => text()();
+
+  /// 03 `run_wakes.thread_id`.
+  TextColumn get threadId => text()();
+
+  /// 03 `run_wakes.source_run_id`.
+  TextColumn get sourceRunId => text()();
+
+  /// 03 `run_wakes.triggered_by`.
+  TextColumn get triggeredBy => text()();
+
+  /// 03 `run_wakes.kind`.
+  TextColumn get kind => text()();
+
+  /// 03 `run_wakes.condition` as JSON text.
+  TextColumn get condition => text()();
+
+  /// 03 `run_wakes.label`.
+  TextColumn get label => text()();
+
+  /// 03 `run_wakes.reason`.
+  TextColumn get reason => text()();
+
+  /// 03 `run_wakes.outage`.
+  IntColumn get outage => integer().nullable()();
+
+  /// 03 `run_wakes.not_before`.
+  DateTimeColumn get notBefore => dateTime()();
+
+  /// 03 `run_wakes.deadline`.
+  DateTimeColumn get deadline => dateTime()();
+
+  /// 03 `run_wakes.state`.
+  TextColumn get state => text()();
+
+  /// 03 `run_wakes.state_reason`.
+  TextColumn get stateReason => text().nullable()();
+
+  /// 03 `run_wakes.result_text`.
+  TextColumn get resultText => text()();
+
+  /// 03 `run_wakes.fired_run_id`.
+  TextColumn get firedRunId => text().nullable()();
+
+  /// 03 `run_wakes.fired_into_run_id`.
+  TextColumn get firedIntoRunId => text().nullable()();
+
+  /// 03 `run_wakes.created_at`.
+  DateTimeColumn get createdAt => dateTime()();
+
+  /// 03 `run_wakes.ended_at`.
+  DateTimeColumn get endedAt => dateTime().nullable()();
+
+  /// 03 `run_wakes.version`.
+  IntColumn get version => integer()();
 
   @override
   Set<Column<Object>> get primaryKey => {id};

@@ -24,6 +24,7 @@ import 'appliers/run_summary_appliers.dart';
 import 'appliers/status_appliers.dart';
 import 'appliers/structure_appliers.dart';
 import 'appliers/thread_appliers.dart';
+import 'appliers/wake_appliers.dart';
 import 'ephemeral_store.dart';
 import 'fetcher.dart';
 import 'gap_filler.dart';
@@ -265,6 +266,7 @@ final Map<String, Applier> _appliers = {
   ...accessAppliers,
   ...hostAppliers,
   ...statusAppliers,
+  ...wakeAppliers,
 };
 
 /// The event types the dispatcher writes to a local table.

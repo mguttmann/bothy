@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The drift database of the apps, schema version 13 (docs/spec/15-client-architecture.md 6, ADR
+/// The drift database of the apps, schema version 14 (docs/spec/15-client-architecture.md 6, ADR
 /// 0029): the mirror tables of 15 6.1 and the local-only tables, `host_key_pins` (M4-36) and
 /// the sidebar view state `channel_view_states`, `shell_view_state` (M4-40, M4-42) and
 /// `space_view_states` (FIX-device-mirroring-2) included; version 11 adds the code block wrap
 /// choice of `shell_view_state` (M4-49), version 12 the personal channel and thread orders of
 /// the sidebar (`user_space_states.channel_order`, `user_channel_states`, M4-51), version 13 the
-/// seen marks of the sidebar status dots (`thread_seen_states`, M4-52).
+/// seen marks of the sidebar status dots (`thread_seen_states`, M4-52), version 14 the wake-ups
+/// of threads (`run_wakes`) and the channel switch `channels.allow_autonomous_runs` (AR-08).
 library;
 
 import 'dart:io';
@@ -59,6 +60,7 @@ part 'database.g.dart';
     Files,
     MessageAttachments,
     Runs,
+    RunWakes,
     Agents,
     Principals,
     Commands,
@@ -96,7 +98,7 @@ class LocalDatabase extends _$LocalDatabase {
   final DateTime Function() clock;
 
   @override
-  int get schemaVersion => 13;
+  int get schemaVersion => 14;
 
   /// Closes the database and releases its file, also while watched queries come and go.
   ///
@@ -204,6 +206,16 @@ class LocalDatabase extends _$LocalDatabase {
       // Version 13 (M4-52): the local-only table `thread_seen_states` (01 6.17); no row moves
       // and the cursor stays, because nothing of the mirror changes.
       from12To13: (m, schema) => m.createTable(schema.threadSeenStates),
+      // Version 14 (AR-08): the mirror table `run_wakes` and the column
+      // `channels.allow_autonomous_runs`, null (unknown, the switch hidden) in every kept row;
+      // no row moves. The cursor goes, so the next connection loads a whole snapshot that fills
+      // the switch of every channel (04 7.3); wake-ups load per thread when it opens.
+      from13To14: (m, schema) async {
+        await m.createTable(schema.runWakes);
+        await m.createIndex(schema.runWakesThread);
+        await m.addColumn(schema.channels, schema.channels.allowAutonomousRuns);
+        await MigrationRules.resetCursor(m);
+      },
     ),
   );
 
@@ -225,6 +237,7 @@ class LocalDatabase extends _$LocalDatabase {
     files,
     messageAttachments,
     runs,
+    runWakes,
     agents,
     principals,
     commands,
@@ -252,7 +265,7 @@ class LocalDatabase extends _$LocalDatabase {
   /// Messages, reactions, pins, mentions, components, files, attachments, loaded ranges.
   late final MessagesDao messagesDao = MessagesDao(this);
 
-  /// Run summaries.
+  /// Run summaries and the wake-ups of threads.
   late final RunsDao runsDao = RunsDao(this);
 
   /// Principals and agent cards.

@@ -109,6 +109,7 @@ ChannelsCompanion channelToCompanion(Channel channel) =>
       version: channel.version.value,
       settingsVersion: channel.settingsVersion.value,
       projectBound: Value(channel.projectBound),
+      allowAutonomousRuns: Value(channel.allowAutonomousRuns),
     );
 
 /// The operator setting of [channel] for `channel_operators`.
@@ -145,6 +146,7 @@ Channel channelFromRow(ChannelRow row, ChannelOperatorRow? operator) => Channel(
   version: ResourceVersion(row.version),
   settingsVersion: ResourceVersion(row.settingsVersion),
   projectBound: row.projectBound,
+  allowAutonomousRuns: row.allowAutonomousRuns,
 );
 
 /// The insert companion of [tag].

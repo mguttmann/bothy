@@ -101,7 +101,12 @@ final class RunMetricsView {
       subagents = _int(raw['subagents']),
       backgroundJobs = _int(raw['background_jobs']),
       apiRetries = _int(raw['api_retries']),
-      lastApiRetry = _retry(raw['last_api_retry']);
+      lastApiRetry = _retry(raw['last_api_retry']),
+      endState = switch (raw['end_state']) {
+        final String code => RunEndState.fromCode(code),
+        _ => null,
+      },
+      wakePendingUntil = _time(raw['wake_pending_until'])?.toUtc();
 
   /// Used share of the context window in percent.
   final double? contextPct;
@@ -132,6 +137,14 @@ final class RunMetricsView {
 
   /// The last API retry while it is set (`metrics.last_api_retry`).
   final RunApiRetryView? lastApiRetry;
+
+  /// The end state of the run's last answer (`metrics.end_state`, 09 18.19.11); null when the
+  /// runner did not report one, [RunEndState.unknown] for a code of a newer server.
+  final RunEndState? endState;
+
+  /// When the next pending wake-up of the thread fires at the earliest, at the end of the run
+  /// (`metrics.wake_pending_until`, 09 18.19.11); null when none was pending.
+  final DateTime? wakePendingUntil;
 
   static RunApiRetryView? _retry(Object? raw) {
     if (raw is! Map<String, Object?>) return null;
@@ -288,6 +301,23 @@ final class RunDocument {
 
   /// Reason code of the state (09 5.2).
   String? get stateReason => _text(raw['state_reason']);
+
+  /// What started the run (`trigger_kind`); null when the document does not say.
+  RunTriggerKind? get triggerKind => switch (raw['trigger_kind']) {
+    final String code => RunTriggerKind.fromCode(code),
+    _ => null,
+  };
+
+  /// The wake-up that started a wake run (`triggering_wake_id`, 09 5.8.3); null otherwise.
+  WakeId? get triggeringWakeId {
+    final text = _text(raw['triggering_wake_id']);
+    if (text == null) return null;
+    try {
+      return WakeId.parse(text);
+    } on FormatException {
+      return null;
+    }
+  }
 
   /// Current status line.
   String? get statusLine => _text(raw['status_line']);

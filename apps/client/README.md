@@ -62,12 +62,12 @@ SHA-256 of uploads and downloads), and for files and voice (M4-22, docs/DECISION
 | `lib/session_column/` | the frame of the session column with the agent part (M4-21) and the sections "Pinned" (M4-20) and "Files" (M4-22) |
 | `lib/files/` | files (M4-22): the upload executor and the attaching of its files, the part plan and hashing, the composer's attachments (button, drag and drop, paste), attachment tiles and their states, image previews, downloads with `Repr-Digest`, the file cache, ticket players, the file ports and providers |
 | `lib/voice/` | voice messages (M4-22): the recorder port over `record`, the recording bar, the player with speeds and the transcript |
-| `lib/sync/` | the app's outbox executors: `putMySidebarSpace` and `putMySidebarChannel` (`sidebar_ops.dart`, M4-51), `createThread` (`thread_ops.dart`), the thread view's writes (`message_ops_app.dart`), the notification levels and quiet hours (`notify_ops.dart`, M4-33), the interactions, commands and session actions of the agent interface (`agent_ops.dart`, M4-21); the transcript feed of the offline search (`search_index_feed.dart`, M4-23) |
+| `lib/sync/` | the app's outbox executors: `putMySidebarSpace` and `putMySidebarChannel` (`sidebar_ops.dart`, M4-51), `createThread` (`thread_ops.dart`), the thread view's writes (`message_ops_app.dart`), the notification levels and quiet hours (`notify_ops.dart`, M4-33), the interactions, commands and session actions of the agent interface (`agent_ops.dart`, M4-21), the cancel of a wake-up and the channel switch of autonomous runs (`wake_ops.dart`, AR-08); the transcript feed of the offline search (`search_index_feed.dart`, M4-23) |
 | `lib/search/` | search D7 (M4-23): the notation of `from:`, `in:`, `has:file`, `before:` and `after:`, the controller that merges server and local hits, the offline search over the FTS5 index, the segments of the server, the view with its filter column |
 | `lib/switcher/` | the quick switcher D6 (M4-23): local sources and the prefix search of thread titles, the recently visited targets of this device, the overlay with the row that asks the search assistant |
 | `lib/assist/` | the search assistant (14 4.10, D6a): the port over `assistSearch`, the conversation of one popup (kept only while it is open, sent back as `history`), the popup with its hits, notes and deep links |
 | `lib/mentions/` | the view of the own mentions (M4-23) over `listMyMentions` |
-| `lib/agents/` | the agent interface (M4-21): the pinned live box, the collapsed run line, the mappings of runs, trigger states and components, cards and their interactions, follow-ups, the agent's typing line, slash commands (built-ins, suggestions, options, autocomplete, invocation, loader) and the REST reads |
+| `lib/agents/` | the agent interface (M4-21): the pinned live box, the collapsed run line, the mappings of runs, trigger states and components, cards and their interactions, follow-ups, the agent's typing line, slash commands (built-ins, suggestions, options, autocomplete, invocation, loader), the REST reads, and the views of autonomous runs in `wakes/` (AR-08) |
 | `lib/running/` | "Running now" D10 (M4-23): the rows of the active runs, the filters, Stop and the cost sum; the control room cards and the run graph D14 (M4-39); their phone layouts M11 and M12 (M5-14) |
 | `lib/onboarding/` | E1 to E7, the controller of the flow, codes and remaining times |
 | `lib/admin/` | the route of the administration: `AdminRoute`, `adminRepositoryProvider`, the mapping of `AdminLocation` to `/admin/...` |
@@ -1080,6 +1080,30 @@ from `autocompleteCommand` after `ui.autocomplete_debounce`, and a complete comm
 `invokeCommand`. The session column's agent part (`session_column/agent_section.dart`) shows the
 agent card, the backend badge with the warning on a mismatch, model, session, project, context,
 thread cost, runs and earlier sessions (docs/decisions.d/M4-21.md).
+
+### Autonomous runs (AR-08)
+
+The views of 01 6.21 live in `lib/agents/wakes/` on the desktop and the phone alike; the web
+console has no chats and none of them (01 5.5). `PendingWakes` sits between the history and the
+composer: when a thread opens it loads its wake-ups (`WakeLoader`, `listThreadWakes` into the
+local table `run_wakes`), and it lists every pending one with its name, condition, earliest fire
+and deadline, and "Cancel" for the wake-up's person and a person with `manage` (07 2.14 item 5;
+one `cancelRunWake` in the outbox, the refusal shown in the row). `run.wake_changed` changes the
+table, so the list follows at once. At the anchor of a run, `RunTriggerLine` shows "Woke up:
+<label>" for a wake run and "Continued after lost work" for a recovery run; under the collapsed
+line `RunEndLines` shows the end state from the run document (`metrics.end_state`), when the
+thread continues (the newest run, while a wake-up is pending), the note "Ended waiting, but
+nothing will wake this thread" and the usage-limit notice. The server's notes of wake-up ends
+and caps (origin `system`) are drawn by `ThreadNoteLine` (`lib/thread/thread_note.dart`) as notes
+of the thread, translated by `decodeWakeNote`, never as a message of a person. The channel menu
+of a person with `manage` has "Let agents continue on their own..." (`menus/autonomous_runs_dialog.dart`):
+a dialog with the switch and the sentence of 01 6.21 item 5, one `setChannelAutonomousRuns` with
+`If-Match`; it is hidden in a DM, in an archived channel and on a server before stage AR. Every
+view is driven by the server's records: a thread of an agent without `wakes` has no wake-up and
+shows none of it (docs/decisions.d/AR-08.md). Tests: `test/agents/autonomous_runs_test.dart` and
+`test/menus/autonomous_runs_menu_test.dart` per platform, `test/agents/autonomous_runs_fake_server_test.dart`
+headless against the fake server, `integration_test/autonomous_runs_test.dart` (desktop) and the
+group "autonomous runs" of the phone suite.
 
 ## Keyboard shortcuts and focus
 

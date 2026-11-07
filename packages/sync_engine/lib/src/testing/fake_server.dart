@@ -36,6 +36,7 @@ import 'rest/structure_handlers.dart';
 import 'rest/sync_handlers.dart';
 import 'rest/terminal_handlers.dart';
 import 'rest/thread_view_handlers.dart';
+import 'rest/wake_handlers.dart';
 import 'rest_fake.dart';
 import 'schema_validator.dart';
 import 'scripted_agent.dart';
@@ -172,6 +173,7 @@ final class FakeServer {
     registerMessageHandlers(rest);
     registerPersonalHandlers(rest);
     registerRunHandlers(rest);
+    registerWakeHandlers(rest);
     registerSelfHandlers(rest);
     registerFileHandlers(rest);
     final actions = ActionCatalog.load();

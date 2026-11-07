@@ -15,6 +15,7 @@ import '../app/providers/session.dart';
 import '../sidebar/providers.dart';
 import 'agent_reads.dart';
 import 'commands/command_suggestions.dart';
+import 'wakes/wake_loader.dart';
 
 part 'providers.g.dart';
 
@@ -33,6 +34,23 @@ Stream<List<RunSummary>> threadRuns(Ref ref, String threadId) {
   return db == null
       ? Stream.value(const [])
       : db.runsDao.watchForThread(ThreadId.parse(threadId));
+}
+
+/// The wake-ups of [threadId] from the local `run_wakes` table in the order they fire (01 6.21,
+/// AR-08); `run.wake_changed` and [wakeLoader] keep the table current.
+@riverpod
+Stream<List<RunWake>> threadWakes(Ref ref, String threadId) {
+  final db = ref.watch(localDatabaseProvider);
+  return db == null
+      ? Stream.value(const [])
+      : db.runsDao.watchWakesForThread(ThreadId.parse(threadId));
+}
+
+/// The loader of a thread's wake-ups when its view opens; tests override it.
+@riverpod
+WakeLoader wakeLoader(Ref ref) {
+  final engine = ref.watch(syncEngineProvider);
+  return engine == null ? const NoWakeLoader() : EngineWakeLoader(engine);
 }
 
 /// Where the live box reads the document of a run: the engine's run store, at most one state

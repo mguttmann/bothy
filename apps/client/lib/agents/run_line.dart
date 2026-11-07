@@ -24,9 +24,11 @@ import '../thread/providers.dart';
 import '../thread/thread_actions.dart';
 import 'providers.dart';
 import 'run_mapping.dart';
+import 'wakes/run_wake_lines.dart';
 
 /// The line of the run of the anchor [message], or nothing while the run is active or its
-/// summary is not stored yet.
+/// summary is not stored yet. Under the line: the end state and the notes of autonomous runs
+/// ([RunEndLines], 01 6.21).
 class RunLine extends ConsumerWidget {
   /// Creates the line.
   const RunLine({super.key, required this.message});
@@ -52,12 +54,19 @@ class RunLine extends ConsumerWidget {
     final agentName =
         principals[ended.agentId]?.displayName ?? ended.agentId.value;
     final expanded = ref.watch(runExpansionProvider)[runId.value] ?? false;
-    void toggle(bool open) => ref
-        .read(runExpansionProvider.notifier)
-        .set(runId.value, expanded: open);
-    final doc = expanded
-        ? ref.watch(endedRunDocumentProvider(runId.value)).value
-        : null;
+    // The document also carries the end state of the collapsed line (01 6.21 item 2,
+    // 09 18.19.11), so it loads once for every ended run line that is built (D-AR-08-3).
+    final loaded = ref.watch(endedRunDocumentProvider(runId.value));
+    final doc = loaded.value;
+    void toggle(bool open) {
+      // Expanding loads the document again when the first load found none (offline, or the
+      // run was not readable yet), as it did before the line needed it collapsed.
+      if (open && !loaded.isLoading && doc == null) {
+        ref.invalidate(endedRunDocumentProvider(runId.value));
+      }
+      ref.read(runExpansionProvider.notifier).set(runId.value, expanded: open);
+    }
+
     final Widget box;
     if (expanded && doc != null) {
       box = DsLiveBox(
@@ -75,12 +84,19 @@ class RunLine extends ConsumerWidget {
         onExpand: () => toggle(true),
       );
     }
+    final extras = RunEndLines(
+      key: ValueKey('runline.extras.${runId.value}'),
+      run: ended,
+      doc: doc,
+      newest: isNewestRun(ended, runs),
+    );
     if (offersRetry(ended, runs)) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
           box,
+          extras,
           const SizedBox(height: DsSpace.s4),
           _RetryButton(
             key: ValueKey('runline.retry.${runId.value}'),
@@ -92,13 +108,20 @@ class RunLine extends ConsumerWidget {
     }
     // Only the person who triggered the run decides whether to send again (09 5.5).
     final me = ref.watch(myPrincipalIdProvider);
-    if (!offersSendAgain(ended) || ended.triggeredBy != me) return box;
+    if (!offersSendAgain(ended) || ended.triggeredBy != me) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [box, extras],
+      );
+    }
     final l = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
         box,
+        extras,
         const SizedBox(height: DsSpace.s4),
         Row(
           children: [
@@ -118,6 +141,22 @@ class RunLine extends ConsumerWidget {
       ],
     );
   }
+}
+
+/// Whether [run] is the newest run of its thread among [runs] (`queued_at`, then the ID, as the
+/// server orders them) and no run of the thread is active: only its line says when the thread
+/// continues (01 6.21 item 2).
+bool isNewestRun(RunSummary run, List<RunSummary> runs) {
+  for (final other in runs) {
+    if (other.threadId != run.threadId || other.id == run.id) continue;
+    if (isActiveRun(other.state)) return false;
+    final order = other.queuedAt.compareTo(run.queuedAt);
+    if (order > 0 ||
+        (order == 0 && other.id.value.compareTo(run.id.value) > 0)) {
+      return false;
+    }
+  }
+  return true;
 }
 
 /// Whether the line of [run] offers "Retry" (09 5.7): it ended `failed` or `cancelled`, it is the

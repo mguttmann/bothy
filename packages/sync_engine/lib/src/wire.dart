@@ -82,6 +82,14 @@ bool flag(Json j, String key, {bool orElse = false}) {
   throw FormatException('member $key is not a boolean');
 }
 
+/// The member [key] of [j] as a boolean, or null when absent.
+bool? optBool(Json j, String key) {
+  final v = j[key];
+  if (v == null) return null;
+  if (v is bool) return v;
+  throw FormatException('member $key is not a boolean');
+}
+
 /// The member [key] of [j] as a time (RFC 3339).
 DateTime time(Json j, String key) => DateTime.parse(str(j, key)).toUtc();
 
@@ -325,6 +333,8 @@ Channel channelFromJson(Json j) {
     readOnly: flag(j, 'read_only'),
     // R-DM-54: derived by the server; absent in a payload of a server before it (false).
     projectBound: flag(j, 'project_bound'),
+    // 09 5.8.6 (stage AR): absent from a server before it, which has no switch (null).
+    allowAutonomousRuns: optBool(j, 'allow_autonomous_runs'),
     mainThreadId: _opt(optStr(j, 'main_thread_id'), ThreadId.parse),
     dmParticipantIds: [
       for (final p in strList(j, 'dm_participant_ids')) PrincipalId.parse(p),
@@ -481,6 +491,33 @@ RunSummary runFromJson(Json j) {
     finishedAt: optTime(j, 'finished_at'),
   );
 }
+
+/// Maps an API `RunWake` (09 5.8.1, stage AR; AR-08).
+RunWake wakeFromJson(Json j) => RunWake(
+  id: WakeId.parse(str(j, 'id')),
+  agentId: PrincipalId.parse(str(j, 'agent_id')),
+  threadId: ThreadId.parse(str(j, 'thread_id')),
+  sourceRunId: RunId.parse(str(j, 'source_run_id')),
+  triggeredBy: PrincipalId.parse(str(j, 'triggered_by')),
+  kind: RunWakeKind.fromCode(str(j, 'kind')),
+  reason: RunWakeReason.fromCode(str(j, 'reason')),
+  label: optStr(j, 'label') ?? '',
+  condition: Map.unmodifiable(switch (j['condition']) {
+    final Map<String, Object?> c => c,
+    _ => const <String, Object?>{},
+  }),
+  outage: optInt(j, 'outage'),
+  notBefore: time(j, 'not_before'),
+  deadline: time(j, 'deadline'),
+  state: RunWakeState.fromCode(str(j, 'state')),
+  stateReason: optStr(j, 'state_reason'),
+  resultText: optStr(j, 'result_text') ?? '',
+  firedRunId: _opt(optStr(j, 'fired_run_id'), RunId.parse),
+  firedIntoRunId: _opt(optStr(j, 'fired_into_run_id'), RunId.parse),
+  createdAt: time(j, 'created_at'),
+  endedAt: optTime(j, 'ended_at'),
+  version: ResourceVersion(integer(j, 'version')),
+);
 
 /// Maps an API `Command`.
 Command commandFromJson(Json j) => Command(

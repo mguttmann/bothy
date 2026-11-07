@@ -99,6 +99,7 @@ export 'src/wire.dart'
         SnapshotData,
         SpaceWithAccess,
         UnreadThread,
+        channelFromJson,
         channelViewFromJson,
         messageFromJson,
         preferenceFromJson,
@@ -108,4 +109,5 @@ export 'src/wire.dart'
         sidebarFromJson,
         snapshotFromJson,
         spaceViewFromJson,
-        threadFromJson;
+        threadFromJson,
+        wakeFromJson;
