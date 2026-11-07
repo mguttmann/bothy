@@ -96,7 +96,7 @@ class BackgroundKind(StrEnum):
     SUBAGENT = "subagent"
     """An asynchronous delegation unit of ``delegate_task`` (one or more subagents)."""
     JOB = "background_job"
-    """A background process of the ``terminal`` tool."""
+    """A background process of the ``terminal`` tool, or a registered external job."""
 
 
 @dataclass(frozen=True)
@@ -110,6 +110,7 @@ class BackgroundTask:
         state: ``running``, ``completed``, ``failed`` or ``cancelled``.
         open: Whether the unit still holds its run: it runs, or Hermes has not admitted the turn
             that reports its result yet.
+        name: The step name; empty for the name of the kind (``delegate_task``, ``terminal``).
     """
 
     task_id: str
@@ -117,6 +118,7 @@ class BackgroundTask:
     title: str = field(repr=False)
     state: str
     open: bool
+    name: str = ""
 
 
 @dataclass(frozen=True)

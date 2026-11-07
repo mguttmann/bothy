@@ -2,10 +2,12 @@
 
 Status: design of 2026-11-06 for the ticket FIX-hermes-hidden-background, built by the same
 ticket; the end of a turn Hermes starts itself was extended the same day by
-FIX-hermes-result-turn-end. This note explains the decisions; the normative text is in
+FIX-hermes-result-turn-end, and external jobs (section 6) were added on 2026-11-07 by
+FIX-hermes-external-jobs. This note explains the decisions; the normative text is in
 [09-agents.md](../spec/09-agents.md) 17.12 (rule R-AG-44), 14, 17.3 and 17.9. Rulings:
-[decisions.d/FIX-hermes-hidden-background.md](../decisions.d/FIX-hermes-hidden-background.md) and
-[decisions.d/FIX-hermes-result-turn-end.md](../decisions.d/FIX-hermes-result-turn-end.md).
+[decisions.d/FIX-hermes-hidden-background.md](../decisions.d/FIX-hermes-hidden-background.md),
+[decisions.d/FIX-hermes-result-turn-end.md](../decisions.d/FIX-hermes-result-turn-end.md) and
+[decisions.d/FIX-hermes-external-jobs.md](../decisions.d/FIX-hermes-external-jobs.md).
 
 ## 1. Goal
 
@@ -22,6 +24,9 @@ Done means:
 3. Stop cancels the delegations and the processes of the run.
 4. A turn of the thread without a run of the adapter can call no tool: no delegation, no
    scheduled job, no terminal.
+5. A process a tool call starts outside Hermes' registries (a supervisor script that detaches
+   itself) and registers as an external job holds the run like a background process; a live job
+   no open run covers is posted in its thread (section 6).
 
 ## 2. What Hermes does (pinned `v0.22.5`, read and measured)
 
@@ -106,3 +111,38 @@ sequenceDiagram
   only the hooks; there a turn whose `on_session_end` never comes keeps the run open until a stop.
 - Hermes' memory and skill review after a turn runs in the turn's session; while no run is open
   its tool calls are refused by decision 7.
+- A process that leaves Hermes' registries and does not register (section 6) stays invisible: the
+  adapter cannot find an untracked process by itself.
+
+## 6. External jobs (2026-11-07)
+
+Seen in live use: a tool call ran a supervisor script of the profile that starts its supervisor
+in a new session and returns at once; the supervisor (its parent is then the init process) ran a
+job of several hours. Hermes' registries never saw it, so the run ended after 9 seconds and nothing
+in the app showed the job. Owner goal: nothing may run in the background invisibly.
+
+| No | Decision | Reason |
+|---|---|---|
+| 10 | Such a process registers itself as an external job of the thread through the helper `bothy_hermes_adapter.jobs` (a Python call or `python -m bothy_hermes_adapter job register`): thread ID, PID, the process's start time, title, optional log path, start time. It removes the record when the job ends (`job deregister`). | A generic contract any script can keep; the adapter cannot see an untracked process by itself. |
+| 11 | Records are files `0600` in `<profile home>/<platform key>/jobs` (`0700`, the gateway user's, no link); links, foreign owners, open modes, oversized and malformed records are skipped. | The records decide which process the adapter signals. |
+| 12 | A live job of the thread that started after the run started is background work by decisions 1 and 2: a step `background_job` named `external_job` with its title, counted in `/metrics/background_jobs`, with progress against the stall notice; the process gone or its start time changed (a reused PID), or its record removed, completes the step. | Same rules as a process of Hermes' registry. |
+| 13 | Stop and every early end (decision 6) send `SIGTERM`, then `SIGKILL` after the kill grace time `KILL_GRACE_S`, to the job's process group when the job leads one, else to the process; before each signal the PID's start time is read again, and the adapter never signals its own process or group. | A stop ends the supervisor and its worker; a reused PID is never hit. |
+| 14 | A live job no open run covers is posted once in its thread as a message of the agent without a run, with title, PID, start time, job ID and the operator's stop command (`job stop`); a mark keeps the post from repeating after a restart. It is not adopted by a later run, and not killed. Ended jobs' records are removed every `hermes_adapter.background_poll_interval`. A run that stops its jobs covers them until the stop returns. | Visible without holding every later run for hours (decision 1) and without ending work at every gateway restart; matches 17.12 point 7, which posts what a turn without a run says. |
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant P as Hermes adapter
+    participant G as Hermes gateway
+    participant J as Supervisor script
+    G->>J: terminal tool call (in the run's turn)
+    J->>J: start the supervisor in a new session
+    J->>P: job register (record in the jobs folder)
+    G->>P: on_processing_complete
+    loop every background_poll_interval
+        P->>P: read records, check PID and start time
+        P->>P: run.update (step background_job, counts, progress)
+    end
+    J->>P: job deregister (or the process is gone)
+    P->>P: step completed, run finishes after the settle time
+```

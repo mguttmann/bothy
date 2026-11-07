@@ -1,11 +1,13 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Command line: ``python -m bothy_hermes_adapter install|switch-mode|check|thread``.
+"""Command line: ``python -m bothy_hermes_adapter install|switch-mode|check|thread|job``.
 
 Run it with the Python of the Hermes profile (the one that runs the gateway), so Hermes's own
 reader and writer see the profile (09 17.2, 17.5, 17.7). The installer commands print a summary
 without values and name the restart the operator must do; they never restart a process (Design
 note 17). ``thread close|reopen|title`` runs one thread action as the profile's agent
-(`bothy_hermes_adapter.threads`) and prints its result as one JSON line.
+(`bothy_hermes_adapter.threads`) and prints its result as one JSON line. ``job
+register|deregister|list`` registers a process a tool call started outside Hermes' registries as
+a job of a thread (`bothy_hermes_adapter.jobs`, 09 17.12 point 8).
 
 Examples:
     >>> build_parser().parse_args(["check", "--profile-home", "/srv/hermes"]).command
@@ -177,6 +179,30 @@ def run_thread_action(bridge: Any, args: argparse.Namespace) -> int:
     return 0 if result.get("ok") else 1
 
 
+def _install(bridge: _Bridge, args: argparse.Namespace) -> list[str]:
+    """Run ``install``: create the DPoP key when asked, then install; returns the summary."""
+    if args.create_dpop_key:
+        if args.dpop_key_file is None:
+            raise InstallError("--create-dpop-key needs --dpop-key-file")
+        if not args.dpop_key_file.exists():
+            from bothy_sdk.auth import FileDpopKey  # noqa: PLC0415
+
+            FileDpopKey.generate(args.dpop_key_file)
+    request = InstallRequest(
+        server_url=args.server_url,
+        instance_id=args.instance_id,
+        token_file=args.token_file,
+        busy_input_mode=args.busy_input_mode,
+        platform_key=args.platform_key,
+        consumer=args.consumer,
+        dpop_key_file=args.dpop_key_file,
+        report_channel=args.report_channel,
+        report_thread=args.report_thread,
+    )
+    packages = locate_packages(locate, Path(sys.prefix))
+    return install(bridge, request, place_file, packages, copy_package)
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run one command.
 
@@ -184,9 +210,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         argv: The arguments (default ``sys.argv[1:]``).
 
     Returns:
-        ``0`` on success, ``1`` when ``check`` finds an adapter the gateway cannot load or the
-        server refuses a ``thread`` action, ``2`` on a refusal.
+        ``0`` on success, ``1`` when ``check`` finds an adapter the gateway cannot load, the
+        server refuses a ``thread`` action or ``job deregister`` finds no record, ``2`` on a
+        refusal.
     """
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if argv[:1] == ["job"]:
+        from bothy_hermes_adapter import jobs  # noqa: PLC0415 - the standard library only
+
+        return jobs.main(argv[1:], prog="python -m bothy_hermes_adapter job")
     args = build_parser().parse_args(argv)
     home = args.profile_home.resolve()
     bridge = _Bridge(home)
@@ -194,26 +226,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         return run_thread_action(bridge, args)
     try:
         if args.command == "install":
-            if args.create_dpop_key:
-                if args.dpop_key_file is None:
-                    raise InstallError("--create-dpop-key needs --dpop-key-file")
-                if not args.dpop_key_file.exists():
-                    from bothy_sdk.auth import FileDpopKey  # noqa: PLC0415
-
-                    FileDpopKey.generate(args.dpop_key_file)
-            request = InstallRequest(
-                server_url=args.server_url,
-                instance_id=args.instance_id,
-                token_file=args.token_file,
-                busy_input_mode=args.busy_input_mode,
-                platform_key=args.platform_key,
-                consumer=args.consumer,
-                dpop_key_file=args.dpop_key_file,
-                report_channel=args.report_channel,
-                report_thread=args.report_thread,
-            )
-            packages = locate_packages(locate, Path(sys.prefix))
-            lines = install(bridge, request, place_file, packages, copy_package)
+            lines = _install(bridge, args)
         elif args.command == "switch-mode":
             lines = switch_mode(bridge, args.mode, args.credential_holder)
         else:

@@ -46,7 +46,9 @@ of 17.3 to `bothy_hermes_adapter.handler.HermesHandler` on the adapter's event l
   ``pre_llm_call`` and ``on_session_end`` tell the start and end of a turn of a thread, also of
   one Hermes starts by itself with a result; the gateway's running-turn slot of the session
   (``turn_running``) tells its end also where a failed turn skips ``on_session_end``; and
-  ``pre_tool_call`` refuses every tool call of a thread without an open run.
+  ``pre_tool_call`` refuses every tool call of a thread without an open run. External jobs a
+  tool call registered (`bothy_hermes_adapter.jobs`, 17.12 point 8) live in ``jobs`` of the state
+  directory; the handler reads them with the registries and watches them for jobs without a run.
 * Session IDs and usage come from the plugin hooks ``pre_llm_call``, ``on_session_reset`` and
   ``post_api_request`` (``pre_llm_call`` also answers with the turn's user side); the thread of
   a hook or of ``set_status_text`` is the session's thread variable of the turn
@@ -113,6 +115,7 @@ from bothy_hermes_adapter.handler import TOOL_REFUSED, HermesHandler
 from bothy_hermes_adapter.heartbeat import ADAPTER_NAME, RUNTIME_NAME, HermesAdapterLoop
 from bothy_hermes_adapter.hermes_commands import declared_commands
 from bothy_hermes_adapter.installer import CONTROL_SENDER
+from bothy_hermes_adapter.jobs import JOBS_DIR, JobError, JobRegistry
 from bothy_hermes_adapter.media import audio_cache_ext
 from bothy_hermes_adapter.reports import ReportError
 from bothy_hermes_adapter.runtime import (
@@ -278,7 +281,12 @@ class ServerPlatform(BasePlatformAdapter):
             self._sessions[thread] = session_id
             if parent:
                 self._parents[thread] = parent
-        self.handler = HermesHandler(self, settings, store, busy_mode=busy)
+        jobs = JobRegistry(state_dir / JOBS_DIR)
+        try:
+            jobs.prepare()
+        except (JobError, OSError) as exc:  # no folder: a helper's registration is refused
+            _LOG.exception("jobs folder refused: %s", exc)
+        self.handler = HermesHandler(self, settings, store, busy_mode=busy, jobs=jobs)
         config = AdapterConfig(
             base_url=settings.server_url,
             instance_id=settings.instance_id,
@@ -334,8 +342,11 @@ class ServerPlatform(BasePlatformAdapter):
         loop = self._sdk
         if loop is None:
             return
+        watch: asyncio.Task[None] | None = None
         try:
             await self._hermes_ready()
+            if self.handler is not None:
+                watch = self.handler.start_job_watch()
             reason = await loop.run()
             if reason.code == 4015:
                 _LOG.warning("another process took the consumer over; disconnected")
@@ -344,6 +355,8 @@ class ServerPlatform(BasePlatformAdapter):
         except Exception as exc:
             _LOG.error("adapter loop failed: %s", type(exc).__name__)
         finally:
+            if watch is not None:
+                watch.cancel()
             await store.close()
             self._mark_disconnected()
 
