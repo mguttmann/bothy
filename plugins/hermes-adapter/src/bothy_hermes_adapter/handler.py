@@ -18,8 +18,10 @@ SDK's (M2-29); this module decides what Hermes does:
   and costs. Before the end the run holds the background work its turns started (09 17.12,
   R-AG-44): a step per delegation unit and process until they are done, the turns Hermes starts
   with their results inside the run, a follow-up as a turn of its own; a stop or an early end
-  cancels that work. `tool_allowed` answers Hermes' ``pre_tool_call``: no tool runs in a thread
-  without an open run.
+  cancels that work. The work includes the external jobs its tool calls registered
+  (`bothy_hermes_adapter.jobs`, 17.12 point 8); `sweep_jobs` posts a live job no open run covers
+  once, as a message of the agent without a run. `tool_allowed` answers Hermes'
+  ``pre_tool_call``: no tool runs in a thread without an open run.
 * `on_followup` steers a running turn or answers a waiting card; `on_interaction` resolves a
   card's Hermes callback exactly once and answers the interaction.
 * `on_command` runs a control command (``command.invoked``) of
@@ -52,7 +54,7 @@ import time
 import unicodedata
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field, replace
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any, Final
 from uuid import UUID
 
@@ -114,6 +116,7 @@ from bothy_hermes_adapter.hermes_commands import (
     command_text,
     option_values,
 )
+from bothy_hermes_adapter.jobs import JobError, JobRecord, JobRegistry
 from bothy_hermes_adapter.live_box import LiveBox
 from bothy_hermes_adapter.media import (
     NO_TEXT,
@@ -153,7 +156,15 @@ from bothy_hermes_adapter.runtime import (
 from bothy_hermes_adapter.store import CallbackStore
 from bothy_hermes_adapter.tool_class import classify
 
-__all__ = ["DEFAULT_CURRENCY", "TOOL_REFUSED", "BusyMode", "HermesHandler", "PrepareRefused"]
+__all__ = [
+    "DEFAULT_CURRENCY",
+    "EXTERNAL_JOB_STEP",
+    "JOB_WITHOUT_RUN",
+    "TOOL_REFUSED",
+    "BusyMode",
+    "HermesHandler",
+    "PrepareRefused",
+]
 
 _LOG = logging.getLogger("bothy_hermes_adapter")
 
@@ -173,6 +184,17 @@ _STEP_TITLE_MAX: Final = 200
 """Longest title of a background step (the length of a thread title, ``thread.title_max_chars``)."""
 _STEP_NAMES: Final = {BackgroundKind.SUBAGENT: "delegate_task", BackgroundKind.JOB: "terminal"}
 _ENDED_STATES: Final = frozenset({"completed", "failed", "cancelled"})
+EXTERNAL_JOB_STEP: Final = "external_job"
+"""Step name of a registered external job (09 17.12 point 8); its kind is ``background_job``."""
+_JOB_TASK: Final = "job:"
+JOB_WITHOUT_RUN: Final = (
+    "A background job runs in this thread without a run: **{title}** (process {pid}, started "
+    "{since}, job {job_id}). Its run has ended, for example at a restart of the agent, or it was "
+    "started outside a run, so it has no stop button here. The operator of the agent can stop it "
+    "on the host with `python -m bothy_hermes_adapter job stop --profile-home <profile home> "
+    "--job-id {job_id}`."
+)
+"""The message that shows a live registered job no open run covers (09 17.12 point 8)."""
 
 
 class BusyMode:
@@ -249,6 +271,7 @@ class HermesHandler(AgentHandler):
         store: Resolved callbacks and open cards.
         busy_mode: Hermes's configured ``busy_input_mode`` (read at connect).
         now: The wall time (for step end times).
+        jobs: The registry of external jobs (09 17.12 point 8), ``None`` without one.
     """
 
     def __init__(
@@ -259,9 +282,11 @@ class HermesHandler(AgentHandler):
         *,
         busy_mode: str,
         now: Any = None,
+        jobs: JobRegistry | None = None,
     ) -> None:
         """Create the handler; the tool class is read from Hermes at once."""
         self.runtime = runtime
+        self._jobs = jobs
         self.settings = settings
         self.store = store
         self.busy_mode = busy_mode
@@ -815,12 +840,15 @@ class HermesHandler(AgentHandler):
     async def _poll_work(self, turn: _Turn) -> bool:
         """Read the thread's background work and show it; returns whether a unit is open."""
         try:
-            tasks = await self.runtime.background_work(turn.thread_id, turn.started_wall)
+            tasks = list(await self.runtime.background_work(turn.thread_id, turn.started_wall))
         except Exception as exc:  # unreadable registries: nothing to hold (logged)
             _LOG.warning(
                 "run %s: background work not readable: %s", turn.run_id, type(exc).__name__
             )
             return False
+        job_tasks = await self._job_tasks(turn)
+        if job_tasks is not None:
+            tasks += job_tasks
         if turn.dropped:
             return False
         if tasks:
@@ -828,8 +856,56 @@ class HermesHandler(AgentHandler):
         with self._bound(turn):
             for task in tasks:
                 self._show_task(turn, task)
+            if job_tasks is not None:
+                self._end_vanished_jobs(turn, {t.task_id for t in job_tasks})
             self._count_work(turn, tasks)
         return any(task.open for task in tasks)
+
+    async def _job_tasks(self, turn: _Turn) -> list[BackgroundTask] | None:
+        """The run's registered external jobs (17.12 point 8); ``None`` when not readable."""
+        if self._jobs is None:
+            return []
+        try:
+            return await asyncio.to_thread(
+                self._read_jobs, self._jobs, turn.thread_id, turn.started_wall
+            )
+        except (JobError, OSError) as exc:
+            _LOG.warning("run %s: registered jobs not readable: %s", turn.run_id, exc)
+            return None
+
+    @staticmethod
+    def _read_jobs(jobs: JobRegistry, thread_id: UUID, since: float) -> list[BackgroundTask]:
+        """The thread's jobs registered since the run started; live ones are open.
+
+        A job whose process cannot be checked counts as open: it is never hidden.
+        """
+        found = []
+        for record in jobs.records():
+            if record.thread_id != thread_id or record.started_at < since:
+                continue
+            try:
+                alive = jobs.alive(record)
+            except JobError:
+                alive = True
+            found.append(
+                BackgroundTask(
+                    f"{_JOB_TASK}{record.job_id}",
+                    BackgroundKind.JOB,
+                    record.title,
+                    "running" if alive else "completed",
+                    alive,
+                    name=EXTERNAL_JOB_STEP,
+                )
+            )
+        return found
+
+    def _end_vanished_jobs(self, turn: _Turn, seen: set[str]) -> None:
+        """A job whose record was removed (deregistered at its end) completed its step."""
+        for task_id, (step, shown) in list(turn.work_steps.items()):
+            if task_id.startswith(_JOB_TASK) and shown == "running" and task_id not in seen:
+                turn.handle.patch.update_step(step, status="completed", finished_at=self._now())
+                turn.work_steps[task_id] = (step, "completed")
+                _LOG.info("run %s: background %s completed", turn.run_id, BackgroundKind.JOB)
 
     def _show_task(self, turn: _Turn, task: BackgroundTask) -> None:
         """Add or update the step of one unit (``subagent`` or ``background_job``)."""
@@ -839,7 +915,7 @@ class HermesHandler(AgentHandler):
         if known is None:
             step = patch.add_step(
                 str(task.kind),
-                _STEP_NAMES[task.kind],
+                task.name or _STEP_NAMES[task.kind],
                 title=_one_line(task.title, _STEP_TITLE_MAX),
                 status="running",
             )
@@ -873,6 +949,13 @@ class HermesHandler(AgentHandler):
             _LOG.warning(
                 "run %s: background work not cancelled: %s", turn.run_id, type(exc).__name__
             )
+        if self._jobs is not None:
+            try:
+                await asyncio.to_thread(
+                    self._stop_jobs, self._jobs, turn.thread_id, turn.started_wall
+                )
+            except (JobError, OSError) as exc:  # the run still ends; the log names the failure
+                _LOG.warning("run %s: registered jobs not stopped: %s", turn.run_id, exc)
         if turn.dropped or turn.handle.finished:
             return
         with self._bound(turn):
@@ -884,6 +967,86 @@ class HermesHandler(AgentHandler):
                 turn.work_counts = (0, 0)
                 turn.handle.patch.set_metric("subagents", 0)
                 turn.handle.patch.set_metric("background_jobs", 0)
+
+    @staticmethod
+    def _stop_jobs(jobs: JobRegistry, thread_id: UUID, since: float) -> None:
+        """Stop the run's live registered jobs, each after its PID and start time matched."""
+        for record in jobs.records():
+            if record.thread_id == thread_id and record.started_at >= since:
+                jobs.stop(record)
+
+    # ---- registered jobs without an open run (09 17.12 point 8) ------------------------------
+
+    def start_job_watch(self) -> asyncio.Task[None]:
+        """Start `sweep_jobs` every ``background_poll_interval``; the caller cancels the task."""
+        return asyncio.ensure_future(self._watch_jobs())
+
+    async def _watch_jobs(self) -> None:
+        while True:
+            try:
+                await self.sweep_jobs()
+            except Exception as exc:  # the watch goes on; the log names the failure
+                _LOG.warning("registered jobs not swept: %s", type(exc).__name__)
+            await asyncio.sleep(self.settings.background_poll_interval)
+
+    async def sweep_jobs(self) -> None:
+        """Remove the records of ended jobs; post each live job no open run covers, once.
+
+        A run covers a job of its thread that started after the run started. Any other live job
+        (its run ended at a restart, or it was registered outside a run) is not adopted by a
+        later run: it is posted once into its thread as a message of the agent without a run,
+        and the mark that it was posted outlives a restart.
+        """
+        jobs = self._jobs
+        if jobs is None:
+            return
+        try:
+            live = await asyncio.to_thread(jobs.sweep)
+        except (JobError, OSError) as exc:
+            _LOG.warning("registered jobs not readable: %s", exc)
+            return
+        for record in live:
+            if self._covers(record):
+                continue
+            try:
+                if await asyncio.to_thread(jobs.reported, record.job_id):
+                    continue
+                if await self._post_job(record):
+                    await asyncio.to_thread(jobs.mark_reported, record.job_id)
+            except (JobError, OSError) as exc:
+                _LOG.warning("job %s: notice not recorded: %s", record.job_id, exc)
+
+    def _covers(self, record: JobRecord) -> bool:
+        """Whether an open run of the job's thread started before the job (17.12 point 8)."""
+        turn = self._turns.get(record.thread_id)
+        return (
+            turn is not None
+            and self.tool_allowed(record.thread_id)
+            and record.started_at >= turn.started_wall
+        )
+
+    async def _post_job(self, record: JobRecord) -> bool:
+        """Post a live job without a run; returns whether it is done (posted or refused)."""
+        if self._client is None:
+            return False
+        since = datetime.fromtimestamp(record.started_at, UTC).strftime("%Y-%m-%d %H:%M UTC")
+        text = JOB_WITHOUT_RUN.format(
+            title=_one_line(record.title, _STEP_TITLE_MAX),
+            pid=record.pid,
+            since=since,
+            job_id=record.job_id,
+        )
+        try:
+            await self._post_own(record.thread_id, text)
+        except ReportError:
+            # Refused by the server (a thread the agent may not write): not asked again.
+            _LOG.info("job %s: notice refused", record.job_id)
+            return True
+        except (httpx.HTTPError, OSError) as exc:  # a transient failure: the next sweep again
+            _LOG.info("job %s: notice not posted: %s", record.job_id, type(exc).__name__)
+            return False
+        _LOG.info("job %s: posted without a run", record.job_id)
+        return True
 
     def _touch(self, turn: _Turn) -> None:
         """A sign of a turn of the run: the settle time starts again, the hold looks at once."""

@@ -3005,15 +3005,43 @@ the adapter). This section mirrors the background work of the runner (18.5) for 
    such a turn without asking the platform, so the adapter cannot refuse the model call itself;
    the turn can call no tool (no delegation, no scheduled job, no terminal), and its text is
    posted as a report without a run (17.3).
+8. External jobs (addendum of 2026-11-07, FIX-hermes-external-jobs,
+   docs/decisions.d/FIX-hermes-external-jobs.md): a process a tool call started outside Hermes'
+   registries (a script that detaches its supervisor into a new session) registers itself
+   through the adapter's helper `bothy_hermes_adapter.jobs` (`python -m bothy_hermes_adapter job
+   register --profile-home <home> --thread <thread ID> --pid <pid> --title <text> [--log
+   <path>]`, and `job deregister --job-id <ID>` at its end). A record holds the thread, the PID,
+   the process's start time, the title, an optional log path (kept on the host, never sent) and
+   the job's start time; records are files of mode `0600` in `<profile home>/<platform
+   key>/jobs` (mode `0700`, owned by the gateway's user), and a record that is a link, another
+   user's, readable by others or malformed is skipped. A job is live while its PID runs with the
+   registered start time. A live job of the thread that started at or after the run started is
+   background work of the run by points 1, 2 and 6: a step `background_job` named
+   `external_job` with its title, counted in `/metrics/background_jobs`, with progress against
+   the stall notice; its end (the process gone, a different start time, or its record removed)
+   completes the step. Stop and every early end send `SIGTERM` and after 5 seconds `SIGKILL` to
+   the job's process group when the job leads one, else to the process, each only after the
+   PID's start time matched again, never to the adapter's own process or group. A live job no
+   open run covers (its run ended at a restart, or it was registered outside a run) is not
+   adopted by a later run: the adapter posts it once in its thread as a message of the agent
+   without a run (section 14), with its title, PID, start time, job ID and the operator's stop
+   command `job stop --profile-home <home> --job-id <ID>`, and removes the records of ended
+   jobs every `hermes_adapter.background_poll_interval`. Point 7 stays: the registration is part
+   of a tool call of the run.
 
 Limits: a process that never ends keeps its run `running` until a person stops it; a restart of
 the gateway or the adapter ends the hold (the server ends the run `interrupted` or `stale`), and a
 result Hermes replays later runs by point 7. A Hermes without the running-turn slot of point 3
 (read through the gateway runner's `_is_session_running`) leaves only the hooks: a turn whose
-`on_session_end` never comes then keeps the run open until a stop. Evidence:
-`plugins/hermes-adapter/tests/unit/test_background_work.py` and the Fake-Hermes tests
-`tests/fake_hermes/test_background_work.py` and `tests/fake_hermes/test_result_turn_end.py`
-against the pinned version.
+`on_session_end` never comes then keeps the run open until a stop. A process outside Hermes'
+registries that does not register by point 8 stays invisible, and a job's workers outside its
+process group outlive a stop. Evidence:
+`plugins/hermes-adapter/tests/unit/test_background_work.py`,
+`tests/unit/test_external_jobs.py` and `tests/unit/test_external_jobs_run.py` (real detached
+processes) and the Fake-Hermes tests
+`tests/fake_hermes/test_background_work.py` (also a detached job a `terminal` call registers with
+the helper, its thread and profile home taken from the shell Hermes gives the tool) and
+`tests/fake_hermes/test_result_turn_end.py` against the pinned version.
 
 ## 18. Reference adapter: Claude-Code-Runner (development forums)
 
@@ -4635,7 +4663,7 @@ PostgreSQL. Each test asserts what is stored, logged and shown.
 | R-AG-41 | A queued run carries its wait reason in `runs.state_reason` (`invocation_held` from the server, `slots_full` and `thread_busy` from the adapter's heartbeat member `waiting_runs`), the runner reports its slot use as `run_slots`, and clients show an offline agent ahead of a runner reason or no reason, but after `invocation_held` (5.2.1, addendum of 2026-11-04). | In operation: a run showed only "Queued" while running turns held every slot of `runner.max_parallel_runs`; the owner could see neither the reason nor the runs that held the slots (F-WARTESCHLANGE-GRUND). |
 | R-AG-42 | Every adapter hands its runtime the format rules for replies of the Python SDK on every run, as an instruction ([ADR 0074](../adr/0074-format-rules-for-agent-replies-from-the-sdk.md)). | One source for all adapters; the apps render Markdown, and a reply with hard line breaks or a hand-drawn table looks broken there and copies badly (F-AGENT-FORMAT). |
 | R-AG-43 | The Claude Code runner hosts built-in agents (`adapter_kind = 'claude_agent'`) behind `runner.hosted_agents`, reports the capability `hosts_agents` with its class ceiling, and runs their turns from their definitions as 26 says (2.2, 18.18, addendum of 2026-11-06). | Owner request 2026-11-05: an agent created inside Bothy runs on local Claude without a second runtime; the runner already speaks the adapter contract ([ADR 0076](../adr/0076-built-in-agents-hosted-by-the-claude-code-runner.md)). |
-| R-AG-44 | A Hermes run holds the background work its turns started: it stays `running` with a step per delegation unit and process until the work is done, the turn Hermes starts with a result runs inside it, stop cancels the work, and no tool runs in a thread without an open run (17.12, addendum of 2026-11-06). | Owner rule 2026-11-06: nothing an agent does may run without being visible; live use showed subagents working for half an hour and a result turn changing a scheduled job while the app showed no run and no stop button (docs/decisions.d/FIX-hermes-hidden-background.md). |
+| R-AG-44 | A Hermes run holds the background work its turns started: it stays `running` with a step per delegation unit, process and registered external job until the work is done, the turn Hermes starts with a result runs inside it, stop cancels the work, and no tool runs in a thread without an open run (17.12, addendum of 2026-11-06). | Owner rule 2026-11-06: nothing an agent does may run without being visible; live use showed subagents working for half an hour and a result turn changing a scheduled job while the app showed no run and no stop button (docs/decisions.d/FIX-hermes-hidden-background.md; external jobs: docs/decisions.d/FIX-hermes-external-jobs.md, 2026-11-07). |
 | R-AG-45 | A restart of the Claude Code runner never ends a turn unless asked: with `runner.turn_handover` SIGTERM hands every live turn over and exits 75, and only `claude-code-runner stop --turns` or a run stop ends turns (18.19.3, addendum of 2026-11-06). | Owner request 2026-11-06: a session keeps working as long as it has work; an update is routine and must cost nothing ([ADR 0077](../adr/0077-autonomous-runs-wake-ups-and-turn-handover.md)). |
 | R-AG-46 | No CLI starts before the record names its keeper and the keeper's identity file names the CLI; every attempt of a run starts through the launch handshake (18.19.5). | A crash in any window leaves one recorded CLI or none, never a CLI that no record names or an input answered twice. |
 | R-AG-47 | An adopted process ends like an own one: classification, then `_recover` within the once-per-run limits the record proves (18.19.6). | The result must not depend on the moment of a restart. |

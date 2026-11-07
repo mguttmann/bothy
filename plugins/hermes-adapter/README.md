@@ -196,6 +196,37 @@ and a follow-up written meanwhile becomes a turn of its own in the run. Stop int
 open run can call no tool (the hook `pre_tool_call` refuses it); its text is posted as a report.
 Design: [docs/design/hermes-background-work.md](../../docs/design/hermes-background-work.md).
 
+### External jobs
+
+A process that a tool call starts outside Hermes' registries (for example a supervisor script that
+detaches itself into a new session) is invisible to Hermes. It registers itself as an external
+job of the thread, and the run then holds it like a background process: a `background_job` step
+named `external_job` with the job's title, counted in `/metrics/background_jobs`, until the
+process ends or the record is removed (09 17.12 point 8). Stop and an early end of the run send
+`SIGTERM` (and `SIGKILL` after 5 seconds) to the job's process group, only after the PID's start
+time matched again.
+
+```sh
+# In a shell of Hermes' terminal tool: HERMES_HOME and HERMES_SESSION_THREAD_ID are set.
+python -m bothy_hermes_adapter job register --profile-home "$HERMES_HOME" \
+  --thread "$HERMES_SESSION_THREAD_ID" --pid "$SUPERVISOR_PID" --title "Rebuild the index" \
+  --log /path/to/run.log            # prints {"ok": true, "job_id": "..."}
+python -m bothy_hermes_adapter job deregister --profile-home "$HERMES_HOME" --job-id "$JOB_ID"
+python -m bothy_hermes_adapter job list --profile-home "$HERMES_HOME"
+python -m bothy_hermes_adapter job stop --profile-home "$HERMES_HOME" --job-id "$JOB_ID"
+```
+
+Run it with the Python of the profile, or put the plugin's `vendor` folder
+(`<profile home>/plugins/<platform key>/vendor`) on `PYTHONPATH`; the module
+`bothy_hermes_adapter.jobs` needs only the standard library, so a script can also call
+`JobRegistry(jobs_dir(home, "bothy")).register(thread, pid, title)` directly. Register the
+process that leads the job's process group (the one started with `start_new_session`), register
+right after the start, inside the tool call, and remove the record when the job ends. Records are
+files of mode `0600` in `<profile home>/<platform key>/jobs` (mode `0700`); the log path stays on
+the host. A live job that no open run covers (its run ended at a gateway restart, or it was
+registered outside a run) is posted once in its thread as a message of the agent with the stop
+command above; a later run does not take it over. Linux and macOS only.
+
 ## Configuration keys
 
 In `gateway.platforms.<platform key>.extra`, written by the installer (09 21):

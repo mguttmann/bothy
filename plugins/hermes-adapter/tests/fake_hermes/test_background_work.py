@@ -152,3 +152,44 @@ async def test_background_process_is_a_job_of_the_run(world: HermesWorld) -> Non
         [step] = _steps(rig, triggered.run_id, "background_job")
         assert (step["title"], step["status"]) == ("sleep 3", "completed")
         assert [m["run_id"] for m in rig.fake.messages] == [str(triggered.run_id)]
+
+
+async def test_a_detached_job_that_registers_is_a_job_of_the_run(world: HermesWorld) -> None:
+    """09 17.12 point 8: a job a tool call detaches registers itself and holds the run.
+
+    The ``terminal`` call starts a supervisor in a new session (its launcher exits at once, so
+    Hermes' registry never sees it) and registers it with the helper, taking the thread and the
+    profile home from the shell Hermes gives the tool.
+    """
+    launch = (
+        "import subprocess, sys; p = subprocess.Popen([sys.executable, '-c', "
+        "'import time; time.sleep(4)'], start_new_session=True, stdin=subprocess.DEVNULL, "
+        "stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL); print(p.pid)"
+    )
+    python = world.python
+    command = (
+        f'SUP=$({python} -c "{launch}") && {python} -m bothy_hermes_adapter job register '
+        '--profile-home "$HERMES_HOME" --thread "$HERMES_SESSION_THREAD_ID" --pid "$SUP" '
+        '--title "Detached sleep"'
+    )
+    start = {"name": "terminal", "arguments": {"command": command}}
+    script = [
+        ScriptTurn(tool_calls=(start,)),
+        ScriptTurn(text=("The job runs.",), paced=True),
+    ]
+    # No approval card for the shell command: the scenario is about the job, not the approval.
+    profile = Profile(toolsets=PROFILE.toolsets, config={"approvals": {"mode": "off"}})
+    async with hermes_rig(world, script, profile=profile, tool_class="host") as rig:
+        triggered = await rig.fake.trigger("Start the long job.", session_mode="new")
+        try:
+            await rig.until(lambda: _steps(rig, triggered.run_id, "background_job"), "the job step")
+            assert rig.fake.run_state(triggered.run_id).state == "running"
+            [step] = _steps(rig, triggered.run_id, "background_job")
+            assert (step["name"], step["title"]) == ("external_job", "Detached sleep")
+            await rig.until(lambda: rig.finished(triggered.run_id), "the end of the run")
+        except AssertionError:
+            raise AssertionError(gateway_log(rig) + _hermes_log(rig)[-6000:]) from None
+        assert rig.fake.run_state(triggered.run_id).state == "completed", gateway_log(rig)
+        [step] = _steps(rig, triggered.run_id, "background_job")
+        assert step["status"] == "completed"
+        assert [m["run_id"] for m in rig.fake.messages] == [str(triggered.run_id)]
