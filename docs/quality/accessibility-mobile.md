@@ -105,6 +105,7 @@ Every kind of page of the phone router (`PhonePageKind` in
 | `PhonePageKind.settingsSection` | `/settings/<section>` | Pages of the tabs and Me |
 | `PhonePageKind.emergency` | `/admin/emergency` | M13 Emergency |
 | `PhonePageKind.emergencyPerson` | `/admin/emergency/<person>` | M13 Emergency |
+| `PhonePageKind.builtinAgents` | `/admin/agents` | Pages of the tabs and Me (the built-in agents under Me, A1-09) |
 | `PhonePageKind.status` | `/status` | Pages of the tabs and Me |
 | `PhonePageKind.hosts` | `/hosts` | M8 Terminal and M9 Hosts |
 | `PhonePageKind.terminal` | `/hosts/<host>` | M8 Terminal and M9 Hosts |
