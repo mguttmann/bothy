@@ -10358,4 +10358,483 @@ class AppLocalizationsDe extends AppLocalizations {
   ) {
     return '$title, $place, $time: $reason';
   }
+
+  @override
+  String get newAgentEntry => 'Neuer Agent';
+
+  @override
+  String get newAgentTitle => 'Neuer Agent';
+
+  @override
+  String get newAgentCancel => 'Abbrechen';
+
+  @override
+  String get newAgentClose => 'Schließen';
+
+  @override
+  String get newAgentBack => 'Zurück';
+
+  @override
+  String get newAgentCreate => 'Erstellen';
+
+  @override
+  String get newAgentRetry => 'Erneut versuchen';
+
+  @override
+  String get newAgentWayTemplate => 'Aus einer Vorlage';
+
+  @override
+  String get newAgentWayTemplateHint =>
+      'Mit einem vorbereiteten Agenten beginnen und ihn anpassen.';
+
+  @override
+  String get newAgentWayInterview => 'Interview';
+
+  @override
+  String get newAgentWayInterviewHint =>
+      'Der Bau-Agent stellt ein paar Fragen und entwirft den Agenten.';
+
+  @override
+  String get newAgentWayEmpty => 'Leeres Formular';
+
+  @override
+  String get newAgentWayEmptyHint => 'Alles selbst ausfüllen.';
+
+  @override
+  String get newAgentTemplatesEmpty =>
+      'Dieser Server bietet keine Vorlagen an.';
+
+  @override
+  String newAgentTemplateSecrets(String names) {
+    return 'Braucht diese Geheimnisse: $names';
+  }
+
+  @override
+  String get newAgentTemplatePrivate => 'Vorlage dieser Installation';
+
+  @override
+  String get newAgentInterviewIntro =>
+      'Antworte in deinen eigenen Worten. Der Bau-Agent stellt jeweils ein oder zwei Fragen.';
+
+  @override
+  String get newAgentInterviewAnswer => 'Deine Antwort';
+
+  @override
+  String get newAgentInterviewSend => 'Senden';
+
+  @override
+  String get newAgentInterviewUseWhatWeHave => 'Mit dem Bisherigen weiter';
+
+  @override
+  String get newAgentInterviewWaiting => 'Der Bau-Agent antwortet';
+
+  @override
+  String get newAgentInterviewBuilder => 'Bau-Agent';
+
+  @override
+  String get newAgentInterviewYou => 'Du';
+
+  @override
+  String newAgentInterviewCost(String amount) {
+    return 'Kosten des Interviews bisher: $amount, eine Schätzung';
+  }
+
+  @override
+  String newAgentInterviewFallback(String reason) {
+    String _temp0 = intl.Intl.selectLogic(reason, {
+      'builder_not_configured':
+          'Auf diesem Server ist kein Bau-Agent eingerichtet.',
+      'builder_offline': 'Der Bau-Agent ist offline.',
+      'builder_timeout': 'Der Bau-Agent hat nicht rechtzeitig geantwortet.',
+      'other': 'Die Antwort des Bau-Agenten war nicht verwendbar.',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get newAgentInterviewFallbackHint =>
+      'Beginne stattdessen mit einer Vorlage oder dem leeren Formular.';
+
+  @override
+  String get newAgentPreviewIntro =>
+      'Alles hier wird mit Erstellen angelegt; vorher gibt es nichts davon.';
+
+  @override
+  String get newAgentSectionIdentity => 'Identität';
+
+  @override
+  String get newAgentName => 'Name';
+
+  @override
+  String get newAgentNameMissing => 'Gib einen Namen ein.';
+
+  @override
+  String get newAgentHandle => 'Kennung';
+
+  @override
+  String get newAgentHandleHint =>
+      'Kleinbuchstaben, Ziffern, Punkt, Unterstrich und Bindestrich';
+
+  @override
+  String get newAgentHandleInvalid =>
+      'Verwende Kleinbuchstaben, Ziffern, Punkt, Unterstrich und Bindestrich, am Anfang einen Buchstaben oder eine Ziffer.';
+
+  @override
+  String get newAgentDescription => 'Beschreibung';
+
+  @override
+  String get newAgentAvatarNote => 'Der Agent zeigt seine Initialen als Bild.';
+
+  @override
+  String get newAgentSectionInstructions => 'Anweisungen';
+
+  @override
+  String get newAgentInstructionsHint =>
+      'Markdown; wird zur CLAUDE.md des Agenten';
+
+  @override
+  String get newAgentSectionSkills => 'Skills';
+
+  @override
+  String get newAgentSkillAdd => 'Skill hinzufügen';
+
+  @override
+  String newAgentSkillRemove(String name) {
+    return 'Skill $name entfernen';
+  }
+
+  @override
+  String get newAgentSkillName => 'Name des Skills';
+
+  @override
+  String get newAgentSkillDescription => 'Was der Skill tut, in einer Zeile';
+
+  @override
+  String get newAgentSkillBody => 'Text des Skills (Markdown)';
+
+  @override
+  String newAgentSkillFiles(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count weitere Dateien',
+      one: '1 weitere Datei',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get newAgentSectionServers => 'MCP-Server';
+
+  @override
+  String get newAgentServerAdd => 'MCP-Server hinzufügen';
+
+  @override
+  String newAgentServerRemove(String name) {
+    return 'MCP-Server $name entfernen';
+  }
+
+  @override
+  String get newAgentServerName => 'Name des Servers';
+
+  @override
+  String get newAgentServerHttp => 'Entfernt (http)';
+
+  @override
+  String get newAgentServerStdio => 'Lokaler Prozess (stdio)';
+
+  @override
+  String get newAgentServerUrl => 'URL';
+
+  @override
+  String get newAgentServerCommand => 'Befehl';
+
+  @override
+  String get newAgentServerPackage => 'Paket (Name@Version)';
+
+  @override
+  String get newAgentServerArgs => 'Argumente, eines pro Zeile';
+
+  @override
+  String get newAgentServerHeaders => 'Header';
+
+  @override
+  String get newAgentServerEnv => 'Umgebung';
+
+  @override
+  String newAgentServerNotLoaded(String toolClass) {
+    return 'Wird unter der Werkzeugklasse $toolClass nicht geladen.';
+  }
+
+  @override
+  String get newAgentServerNeedsHost =>
+      'Ein lokaler Prozess braucht die Werkzeugklasse Rechner.';
+
+  @override
+  String get newAgentEntryName => 'Name';
+
+  @override
+  String get newAgentEntryValue => 'Wert';
+
+  @override
+  String get newAgentEntrySecret => 'Verweis auf ein Geheimnis';
+
+  @override
+  String get newAgentEntryIsSecret => 'Geheimnis';
+
+  @override
+  String get newAgentEntryAdd => 'Eintrag hinzufügen';
+
+  @override
+  String newAgentEntryRemove(String name) {
+    return 'Eintrag $name entfernen';
+  }
+
+  @override
+  String get newAgentSecretsTitle => 'Geheimnisse für den Rechner des Runners';
+
+  @override
+  String get newAgentSecretsNone => 'Keine Geheimnisse nötig.';
+
+  @override
+  String get newAgentSecretsHint =>
+      'Nur Namen; die Werte gehen nie über den Server.';
+
+  @override
+  String get newAgentSectionSettings => 'Einstellungen';
+
+  @override
+  String get newAgentClass => 'Werkzeugklasse';
+
+  @override
+  String get newAgentClassChat => 'Chat';
+
+  @override
+  String get newAgentClassScoped => 'Eingegrenzt';
+
+  @override
+  String get newAgentClassHost => 'Rechner';
+
+  @override
+  String get newAgentClassChatExplain =>
+      'Antwortet im Chat. Lädt keinen MCP-Server; Skills werden geladen.';
+
+  @override
+  String get newAgentClassScopedExplain =>
+      'Nutzt die Werkzeuge, die der Runner erlaubt, eingegrenzt durch die Liste unten, ohne Freigaben. Lädt nur entfernte (http) MCP-Server.';
+
+  @override
+  String get newAgentClassHostExplain =>
+      'Arbeitet mit den Rechten des Benutzers auf dem Rechner und lädt jeden MCP-Server, auch lokale. Nur Eigentümer können ihn starten.';
+
+  @override
+  String get newAgentClassHostFiles =>
+      'Die eigene CLAUDE.md und die Einstellungen des Benutzers auf dem Rechner werden nie geladen.';
+
+  @override
+  String newAgentClassCeiling(String runner, String toolClass) {
+    return '$runner lädt höchstens die Werkzeugklasse $toolClass.';
+  }
+
+  @override
+  String get newAgentAllowedTools => 'Erlaubte Werkzeuge, eines pro Zeile';
+
+  @override
+  String get newAgentAllowedToolsHint =>
+      'Grenzt unter Eingegrenzt ein, was der Runner erlaubt; leer für keine Eingrenzung';
+
+  @override
+  String get newAgentModel => 'Modell';
+
+  @override
+  String get newAgentModelHint => 'Leer für das Standardmodell des Runners';
+
+  @override
+  String get newAgentCostCap => 'Kostengrenze pro Lauf (USD)';
+
+  @override
+  String get newAgentCostCapHint => 'Leer für keine Grenze';
+
+  @override
+  String get newAgentCostCapInvalid => 'Gib einen Betrag über null ein.';
+
+  @override
+  String get newAgentBilling => 'Abrechnung';
+
+  @override
+  String get newAgentBillingOrganization => 'Organisation';
+
+  @override
+  String get newAgentBillingPersonal => 'Persönlich';
+
+  @override
+  String newAgentPersonalNot(String reason) {
+    String _temp0 = intl.Intl.selectLogic(reason, {
+      'notOnlyOwner':
+          'Persönlich gibt es nur, wenn du der einzige Eigentümer bist.',
+      'runnerNotPersonal':
+          'Persönlich braucht einen Runner mit einem persönlichen Abonnement.',
+      'notHolder':
+          'Persönlich braucht dich als Inhaber der Zugangsdaten des Runners.',
+      'other': 'Der Runner meldet Persönlich nicht.',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get newAgentSectionHost => 'Runner';
+
+  @override
+  String get newAgentHost => 'Runner';
+
+  @override
+  String get newAgentHostMissing => 'Wähle einen Runner.';
+
+  @override
+  String get newAgentHostFixed =>
+      'Der Runner steht fest, seit es den Agenten gibt; Runner wechseln auf der Agentenkarte verschiebt ihn.';
+
+  @override
+  String get newAgentSectionChannel => 'Kanal';
+
+  @override
+  String get newAgentChannelWanted =>
+      'Einen Kanal mit diesem Agenten als Bediener anlegen';
+
+  @override
+  String get newAgentChannelSpace => 'Bereich';
+
+  @override
+  String get newAgentChannelSpaceMissing => 'Wähle einen Bereich.';
+
+  @override
+  String get newAgentChannelName => 'Name des Kanals';
+
+  @override
+  String get newAgentChannelNameMissing => 'Gib einen Namen für den Kanal ein.';
+
+  @override
+  String get newAgentOtherErrors => 'Vom Server nicht angenommen:';
+
+  @override
+  String newAgentFieldError(String rule, String code) {
+    String _temp0 = intl.Intl.selectLogic(rule, {
+      'required': 'Pflichtfeld.',
+      'too_long': 'Zu lang.',
+      'too_many': 'Zu viele Einträge.',
+      'invalid_name': 'Verwende Kleinbuchstaben, Ziffern und Bindestriche.',
+      'duplicate_name': 'Dieser Name kommt zweimal vor.',
+      'skill_frontmatter':
+          'Darf nicht mit einer Zeile aus drei Bindestrichen beginnen.',
+      'inline_shell': 'Darf keine eingebetteten Shell-Befehle enthalten.',
+      'import_outside_folder':
+          'Ein @-Import muss im Ordner des Agenten bleiben.',
+      'secret_value_not_allowed':
+          'Verwende hier einen Verweis auf ein Geheimnis, keinen Klartext.',
+      'env_name_reserved': 'Diesen Namen setzt der Runner selbst.',
+      'mcp_command_not_allowed': 'Der Runner erlaubt diesen Befehl nicht.',
+      'mcp_package_unpinned': 'Lege das Paket auf eine genaue Version fest, zum Beispiel name@1.2.3.',
+      'tool_class_too_low':
+          'Ein lokaler Prozess braucht die Werkzeugklasse Rechner.',
+      'mcp_not_in_catalogue': 'Dieser Server steht nicht im Vorlagenkatalog.',
+      'host_not_capable': 'Dieser Runner beherbergt keine Agenten.',
+      'unknown_member': 'Gehört nicht zu einer Agentendefinition.',
+      'other': 'Nicht angenommen ($code).',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String newAgentStepCreate(String runner) {
+    return 'Agent auf $runner anlegen';
+  }
+
+  @override
+  String newAgentStepClass(String toolClass) {
+    return 'Werkzeugklasse auf $toolClass setzen';
+  }
+
+  @override
+  String get newAgentStepDefinition => 'Definition speichern';
+
+  @override
+  String newAgentStepBilling(String mode) {
+    String _temp0 = intl.Intl.selectLogic(mode, {
+      'personal': 'Abrechnung auf Persönlich setzen',
+      'other': 'Abrechnung auf Organisation setzen',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String newAgentStepChannel(String name) {
+    return 'Kanal $name anlegen';
+  }
+
+  @override
+  String get newAgentStepOperator => 'Agent zum Bediener des Kanals machen';
+
+  @override
+  String newAgentStepState(String step, String state) {
+    String _temp0 = intl.Intl.selectLogic(state, {
+      'waiting': 'wartet',
+      'running': 'läuft',
+      'finished': 'fertig',
+      'other': 'fehlgeschlagen',
+    });
+    return '$step: $_temp0';
+  }
+
+  @override
+  String get newAgentErrStepUp =>
+      'Die Bestätigung wurde abgebrochen. Versuche es erneut, um weiterzumachen.';
+
+  @override
+  String get newAgentErrOffline =>
+      'Der Server ist nicht erreichbar. Versuche es erneut, wenn du online bist.';
+
+  @override
+  String get newAgentErrFields =>
+      'Einige Felder wurden nicht angenommen; sie sind in der Vorschau markiert.';
+
+  @override
+  String get newAgentErrClassTooLow =>
+      'Ein lokaler (stdio) MCP-Server braucht die Werkzeugklasse Rechner. Hebe die Klasse an oder entferne den Server und versuche es erneut.';
+
+  @override
+  String get newAgentErrCeiling =>
+      'Der Runner lädt diese Werkzeugklasse nicht. Senke die Klasse und versuche es erneut, oder schließe und nutze Runner wechseln auf der Agentenkarte.';
+
+  @override
+  String get newAgentErrNeedsHost =>
+      'Die gespeicherte Definition hat noch einen lokalen MCP-Server, deshalb kann die Klasse noch nicht unter Rechner sinken. Entferne zuerst den Server.';
+
+  @override
+  String get newAgentErrHolder =>
+      'Persönlich braucht den Inhaber der Zugangsdaten des Runners. Wähle Organisation und versuche es erneut.';
+
+  @override
+  String get newAgentErrHandleTaken =>
+      'Diese Kennung ist vergeben. Ändere sie und versuche es erneut.';
+
+  @override
+  String get newAgentErrChannelTaken =>
+      'Dieser Bereich hat schon einen Kanal mit diesem Namen. Ändere den Namen und versuche es erneut.';
+
+  @override
+  String get newAgentErrVersion =>
+      'Der Agent wurde inzwischen geändert. Versuche es erneut.';
+
+  @override
+  String get newAgentNotSetUp => 'Nicht eingerichtet';
+
+  @override
+  String newAgentAuditReason(String name) {
+    return 'Neuer Agent $name';
+  }
+
+  @override
+  String stepUpPurposeNewAgent(String name) {
+    return 'Agent $name anlegen';
+  }
 }

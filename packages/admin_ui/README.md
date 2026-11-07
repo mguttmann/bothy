@@ -111,6 +111,29 @@ exporting the audit log have step-up too (`audit.read`, `audit.verify`). The des
 no `saveTarget` yet, so it shows the audit log without the export buttons until a host wires a
 save dialog (docs/DECISIONS.md D-M4-29-3).
 
+## New agent (A1-08)
+
+`NewAgentDialog` creates a built-in agent on the desktop, the phones (`fullScreen`) and the
+console (01 6.20; 26 8). Its ways in are a template of `listAgentTemplates`, the interview of
+`AgentInterview` (`interviewAgent`; the questions and answers as a conversation, the summed cost
+estimate, the fallback with its reason) and the empty form; each fills one `NewAgentDraft`, which
+`NewAgentPreview` edits: identity, instructions, skills, MCP servers with their secret names, the
+tool class with what it does and does not load (26 4.4, 5.7), billing (`personal` only under
+10 10.3, otherwise the reason), model, cost cap, the hosting runner and the channel. Field errors
+of the server show at their field by JSON Pointer.
+
+`NewAgentFlow` runs the steps of 26 8.2 with resume. Whether a step is done is a comparison of
+its target in the preview with what the agent has, read again before "Try again": the class step
+comes before the definition when the class rises and after it when it falls, `createAgent` and
+`createChannel` keep their `Idempotency-Key` while their request is unchanged, and the hosting
+runner and the identity are read-only once the agent exists (26 8.3). `NewAgentSteps` lists the
+steps with their states in words and announces a change at most once per
+`a11y.live_announce_min_interval`. The port `NewAgentPort` (`ApiNewAgentPort`) is REST only, so
+the console uses it through its backend for frontend; `offer()` is null on an older server and
+without a runner that reports `hosts_agents`, which hides the entry. A host passes a
+`NewAgentHost` to `AdminShell` or `AdminBody`; `AgentsList` then shows "New agent" and marks a
+built-in agent without a definition "Not set up". Rulings: docs/decisions.d/A1-08.md.
+
 ## The page "Live" (M6-16)
 
 `LiveScreen` hosts the views of `bothy_viz` for the desktop app (D12, TV mode D13), the phone (M10)
@@ -145,6 +168,7 @@ Further rules checked by `make arch`:
 | `lib/src/grants/`, `lib/src/access/`, `lib/src/data/access_repository.dart` | the permission screens of M4-27 |
 | `lib/src/hosts/`, `lib/src/data/hosts_repository.dart` | screen A8 of M4-37 |
 | `lib/src/agents/`, `lib/src/data/agents_repository.dart` | screen A5 of M4-28 and the guided flow |
+| `lib/src/agents/new_agent/` | "New agent" of A1-08: draft, port, flow with resume, interview, preview, steps, dialog |
 | `lib/src/apps/`, `lib/src/incoming_webhooks/`, `lib/src/secrets/`, `lib/src/data/apps_repository.dart` | apps, outgoing and incoming webhooks and the once-only secret of M6-08 |
 | `test/apps/`, `test/incoming_webhooks/`, `test/secrets/` | the app screens, subscriptions, deliveries, incoming webhooks and the once-only test over the app fake (`test/admin/apps_fake.dart`) |
 | `lib/src/emergency/`, `test/emergency/` | the emergency actions on the phone of M5-09 and their tests over the fake repository |

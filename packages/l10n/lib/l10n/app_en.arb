@@ -15386,5 +15386,605 @@
         "type": "String"
       }
     }
+  },
+  "newAgentEntry": "New agent",
+  "@newAgentEntry": {
+    "description": "Entry of the agent list and the space menu that opens the new agent dialog (01 6.20 item 1)."
+  },
+  "newAgentTitle": "New agent",
+  "@newAgentTitle": {
+    "description": "Title of the new agent dialog."
+  },
+  "newAgentCancel": "Cancel",
+  "@newAgentCancel": {
+    "description": "Closes the new agent dialog before anything was created."
+  },
+  "newAgentClose": "Close",
+  "@newAgentClose": {
+    "description": "Closes the new agent dialog; what was created stays (26 8.3)."
+  },
+  "newAgentBack": "Back",
+  "@newAgentBack": {
+    "description": "Goes back to the three ways of the new agent dialog."
+  },
+  "newAgentCreate": "Create",
+  "@newAgentCreate": {
+    "description": "Starts the steps of the new agent dialog."
+  },
+  "newAgentRetry": "Try again",
+  "@newAgentRetry": {
+    "description": "Runs the steps of the new agent dialog that are not reached yet."
+  },
+  "newAgentWayTemplate": "From a template",
+  "@newAgentWayTemplate": {
+    "description": "Way into the new agent dialog: a template (01 6.20 item 2)."
+  },
+  "newAgentWayTemplateHint": "Start from a prepared agent and adjust it.",
+  "@newAgentWayTemplateHint": {
+    "description": "Hint of the template way."
+  },
+  "newAgentWayInterview": "Interview",
+  "@newAgentWayInterview": {
+    "description": "Way into the new agent dialog: the interview with the builder agent."
+  },
+  "newAgentWayInterviewHint": "The builder agent asks a few questions and drafts the agent.",
+  "@newAgentWayInterviewHint": {
+    "description": "Hint of the interview way."
+  },
+  "newAgentWayEmpty": "Empty form",
+  "@newAgentWayEmpty": {
+    "description": "Way into the new agent dialog: the empty form."
+  },
+  "newAgentWayEmptyHint": "Fill in everything yourself.",
+  "@newAgentWayEmptyHint": {
+    "description": "Hint of the empty form."
+  },
+  "newAgentTemplatesEmpty": "This server offers no templates.",
+  "@newAgentTemplatesEmpty": {
+    "description": "The template list is empty."
+  },
+  "newAgentTemplateSecrets": "Needs these secrets: {names}",
+  "@newAgentTemplateSecrets": {
+    "description": "Line of a template with the names of the secrets it needs.",
+    "placeholders": {
+      "names": {
+        "type": "String",
+        "example": "FILES_TOKEN"
+      }
+    }
+  },
+  "newAgentTemplatePrivate": "Template of this installation",
+  "@newAgentTemplatePrivate": {
+    "description": "Marks a private template (26 7.2)."
+  },
+  "newAgentInterviewIntro": "Answer in your own words. The builder asks one or two questions at a time.",
+  "@newAgentInterviewIntro": {
+    "description": "Introduction of the interview."
+  },
+  "newAgentInterviewAnswer": "Your answer",
+  "@newAgentInterviewAnswer": {
+    "description": "Label of the answer field of the interview."
+  },
+  "newAgentInterviewSend": "Send",
+  "@newAgentInterviewSend": {
+    "description": "Sends the answer of the interview."
+  },
+  "newAgentInterviewUseWhatWeHave": "Use what we have",
+  "@newAgentInterviewUseWhatWeHave": {
+    "description": "Asks the builder for the draft now (want_draft)."
+  },
+  "newAgentInterviewWaiting": "The builder is answering",
+  "@newAgentInterviewWaiting": {
+    "description": "Screen reader text of the spinner while the interview request runs."
+  },
+  "newAgentInterviewBuilder": "Builder",
+  "@newAgentInterviewBuilder": {
+    "description": "Who said a question of the interview."
+  },
+  "newAgentInterviewYou": "You",
+  "@newAgentInterviewYou": {
+    "description": "Who said an answer of the interview."
+  },
+  "newAgentInterviewCost": "Cost of the interview so far: {amount}, an estimate",
+  "@newAgentInterviewCost": {
+    "description": "The summed cost estimate of the interview (26 6.1 item 3).",
+    "placeholders": {
+      "amount": {
+        "type": "String",
+        "example": "USD 0.04"
+      }
+    }
+  },
+  "newAgentInterviewFallback": "{reason, select, builder_not_configured{No builder agent is set up on this server.} builder_offline{The builder agent is offline.} builder_timeout{The builder agent did not answer in time.} other{The answer of the builder agent could not be used.}}",
+  "@newAgentInterviewFallback": {
+    "description": "The reason of an interview fallback (26 6.1 item 4).",
+    "placeholders": {
+      "reason": {
+        "type": "String",
+        "example": "builder_offline"
+      }
+    }
+  },
+  "newAgentInterviewFallbackHint": "Start from a template or the empty form instead.",
+  "@newAgentInterviewFallbackHint": {
+    "description": "Line under the reason of an interview fallback."
+  },
+  "newAgentPreviewIntro": "Everything below is created when you press Create; nothing exists before.",
+  "@newAgentPreviewIntro": {
+    "description": "Introduction of the preview (01 6.20 item 3)."
+  },
+  "newAgentSectionIdentity": "Identity",
+  "@newAgentSectionIdentity": {
+    "description": "Section of the preview: name, handle, description."
+  },
+  "newAgentName": "Name",
+  "@newAgentName": {
+    "description": "Field of the agent's display name."
+  },
+  "newAgentNameMissing": "Enter a name.",
+  "@newAgentNameMissing": {
+    "description": "The name is empty."
+  },
+  "newAgentHandle": "Handle",
+  "@newAgentHandle": {
+    "description": "Field of the agent's handle."
+  },
+  "newAgentHandleHint": "Lower-case letters, digits, dot, underscore and hyphen",
+  "@newAgentHandleHint": {
+    "description": "Helper text of the handle field."
+  },
+  "newAgentHandleInvalid": "Use lower-case letters, digits, dot, underscore and hyphen, starting with a letter or digit.",
+  "@newAgentHandleInvalid": {
+    "description": "The handle does not match its pattern."
+  },
+  "newAgentDescription": "Description",
+  "@newAgentDescription": {
+    "description": "Field of the agent's description."
+  },
+  "newAgentAvatarNote": "The agent shows its initials as its picture.",
+  "@newAgentAvatarNote": {
+    "description": "Note on the avatar: the creation sets no picture."
+  },
+  "newAgentSectionInstructions": "Instructions",
+  "@newAgentSectionInstructions": {
+    "description": "Section and field of the instructions (CLAUDE.md)."
+  },
+  "newAgentInstructionsHint": "Markdown; becomes the agent's CLAUDE.md",
+  "@newAgentInstructionsHint": {
+    "description": "Helper text of the instructions."
+  },
+  "newAgentSectionSkills": "Skills",
+  "@newAgentSectionSkills": {
+    "description": "Section of the skills."
+  },
+  "newAgentSkillAdd": "Add skill",
+  "@newAgentSkillAdd": {
+    "description": "Adds a skill to the preview."
+  },
+  "newAgentSkillRemove": "Remove skill {name}",
+  "@newAgentSkillRemove": {
+    "description": "Removes a skill from the preview.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "summarize"
+      }
+    }
+  },
+  "newAgentSkillName": "Skill name",
+  "@newAgentSkillName": {
+    "description": "Field of a skill's name."
+  },
+  "newAgentSkillDescription": "What the skill does, in one line",
+  "@newAgentSkillDescription": {
+    "description": "Field of a skill's description."
+  },
+  "newAgentSkillBody": "Skill text (Markdown)",
+  "@newAgentSkillBody": {
+    "description": "Field of a skill's body."
+  },
+  "newAgentSkillFiles": "{count, plural, =1{1 extra file} other{{count} extra files}}",
+  "@newAgentSkillFiles": {
+    "description": "The number of extra files of a skill.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "2"
+      }
+    }
+  },
+  "newAgentSectionServers": "MCP servers",
+  "@newAgentSectionServers": {
+    "description": "Section of the MCP servers."
+  },
+  "newAgentServerAdd": "Add MCP server",
+  "@newAgentServerAdd": {
+    "description": "Adds an MCP server to the preview."
+  },
+  "newAgentServerRemove": "Remove MCP server {name}",
+  "@newAgentServerRemove": {
+    "description": "Removes an MCP server from the preview.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "docs"
+      }
+    }
+  },
+  "newAgentServerName": "Server name",
+  "@newAgentServerName": {
+    "description": "Field of an MCP server's name."
+  },
+  "newAgentServerHttp": "Remote (http)",
+  "@newAgentServerHttp": {
+    "description": "Transport http of an MCP server."
+  },
+  "newAgentServerStdio": "Local process (stdio)",
+  "@newAgentServerStdio": {
+    "description": "Transport stdio of an MCP server."
+  },
+  "newAgentServerUrl": "URL",
+  "@newAgentServerUrl": {
+    "description": "Field of the URL of an http MCP server."
+  },
+  "newAgentServerCommand": "Command",
+  "@newAgentServerCommand": {
+    "description": "Field of the command of a stdio MCP server."
+  },
+  "newAgentServerPackage": "Package (name@version)",
+  "@newAgentServerPackage": {
+    "description": "Field of the pinned package of a stdio MCP server."
+  },
+  "newAgentServerArgs": "Arguments, one per line",
+  "@newAgentServerArgs": {
+    "description": "Field of the arguments of a stdio MCP server."
+  },
+  "newAgentServerHeaders": "Headers",
+  "@newAgentServerHeaders": {
+    "description": "Heading of the headers of an http MCP server."
+  },
+  "newAgentServerEnv": "Environment",
+  "@newAgentServerEnv": {
+    "description": "Heading of the environment of a stdio MCP server."
+  },
+  "newAgentServerNotLoaded": "Not loaded under the tool class {toolClass}.",
+  "@newAgentServerNotLoaded": {
+    "description": "An MCP server the chosen tool class does not load (26 4.4 item 3).",
+    "placeholders": {
+      "toolClass": {
+        "type": "String",
+        "example": "Chat"
+      }
+    }
+  },
+  "newAgentServerNeedsHost": "A local process needs the tool class Host.",
+  "@newAgentServerNeedsHost": {
+    "description": "A stdio MCP server below the class host (26 4.4 item 4)."
+  },
+  "newAgentEntryName": "Name",
+  "@newAgentEntryName": {
+    "description": "Field of the name of a header or environment entry."
+  },
+  "newAgentEntryValue": "Value",
+  "@newAgentEntryValue": {
+    "description": "Field of the plain value of an entry."
+  },
+  "newAgentEntrySecret": "Secret reference",
+  "@newAgentEntrySecret": {
+    "description": "Field of the secret reference of an entry."
+  },
+  "newAgentEntryIsSecret": "Secret",
+  "@newAgentEntryIsSecret": {
+    "description": "Switch: the entry is a secret reference."
+  },
+  "newAgentEntryAdd": "Add entry",
+  "@newAgentEntryAdd": {
+    "description": "Adds a header or an environment entry."
+  },
+  "newAgentEntryRemove": "Remove entry {name}",
+  "@newAgentEntryRemove": {
+    "description": "Removes a header or an environment entry.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Authorization"
+      }
+    }
+  },
+  "newAgentSecretsTitle": "Secrets to add on the runner host",
+  "@newAgentSecretsTitle": {
+    "description": "Heading of the secret names the owner adds on the runner host."
+  },
+  "newAgentSecretsNone": "No secrets needed.",
+  "@newAgentSecretsNone": {
+    "description": "No MCP server names a secret."
+  },
+  "newAgentSecretsHint": "Names only; the values never pass through the server.",
+  "@newAgentSecretsHint": {
+    "description": "Line under the secret names."
+  },
+  "newAgentSectionSettings": "Settings",
+  "@newAgentSectionSettings": {
+    "description": "Section of the settings."
+  },
+  "newAgentClass": "Tool class",
+  "@newAgentClass": {
+    "description": "Heading of the tool class choice."
+  },
+  "newAgentClassChat": "Chat",
+  "@newAgentClassChat": {
+    "description": "Tool class chat."
+  },
+  "newAgentClassScoped": "Scoped",
+  "@newAgentClassScoped": {
+    "description": "Tool class scoped."
+  },
+  "newAgentClassHost": "Host",
+  "@newAgentClassHost": {
+    "description": "Tool class host."
+  },
+  "newAgentClassChatExplain": "Answers in the chat. Loads no MCP server; skills load.",
+  "@newAgentClassChatExplain": {
+    "description": "What the class chat does and does not load (26 4.4 item 3)."
+  },
+  "newAgentClassScopedExplain": "Uses the tools the runner allows, narrowed by the list below, without approvals. Loads only remote (http) MCP servers.",
+  "@newAgentClassScopedExplain": {
+    "description": "What the class scoped does and does not load (26 4.4 items 2, 3 and 6)."
+  },
+  "newAgentClassHostExplain": "Works with the rights of the user of the host and loads every MCP server, local ones too. Only owners can start it.",
+  "@newAgentClassHostExplain": {
+    "description": "What the class host does (26 4.4 item 4, SR2)."
+  },
+  "newAgentClassHostFiles": "The own CLAUDE.md and settings of the user of the host are never loaded.",
+  "@newAgentClassHostFiles": {
+    "description": "What no class loads (26 5.7)."
+  },
+  "newAgentClassCeiling": "{runner} loads at most the tool class {toolClass}.",
+  "@newAgentClassCeiling": {
+    "description": "The ceiling of the hosting runner (26 3.1 item 3).",
+    "placeholders": {
+      "runner": {
+        "type": "String",
+        "example": "Dev runner"
+      },
+      "toolClass": {
+        "type": "String",
+        "example": "Scoped"
+      }
+    }
+  },
+  "newAgentAllowedTools": "Allowed tools, one per line",
+  "@newAgentAllowedTools": {
+    "description": "Field of the tool list."
+  },
+  "newAgentAllowedToolsHint": "Narrows what the runner allows under Scoped; empty for no narrowing",
+  "@newAgentAllowedToolsHint": {
+    "description": "Helper text of the tool list."
+  },
+  "newAgentModel": "Model",
+  "@newAgentModel": {
+    "description": "Field of the model."
+  },
+  "newAgentModelHint": "Empty for the default model of the runner",
+  "@newAgentModelHint": {
+    "description": "Helper text of the model."
+  },
+  "newAgentCostCap": "Cost cap per run (USD)",
+  "@newAgentCostCap": {
+    "description": "Field of the cost cap per run."
+  },
+  "newAgentCostCapHint": "Empty for no cap",
+  "@newAgentCostCapHint": {
+    "description": "Helper text of the cost cap."
+  },
+  "newAgentCostCapInvalid": "Enter an amount above zero.",
+  "@newAgentCostCapInvalid": {
+    "description": "The cost cap is no amount above zero."
+  },
+  "newAgentBilling": "Billing",
+  "@newAgentBilling": {
+    "description": "Heading of the billing mode."
+  },
+  "newAgentBillingOrganization": "Organization",
+  "@newAgentBillingOrganization": {
+    "description": "Billing mode organization."
+  },
+  "newAgentBillingPersonal": "Personal",
+  "@newAgentBillingPersonal": {
+    "description": "Billing mode personal."
+  },
+  "newAgentPersonalNot": "{reason, select, notOnlyOwner{Personal is offered only when you are the only owner.} runnerNotPersonal{Personal needs a hosting runner on a personal subscription.} notHolder{Personal needs you to hold the credentials of the runner.} other{The hosting runner does not report Personal.}}",
+  "@newAgentPersonalNot": {
+    "description": "Why the billing mode personal is not offered (10 10.3 item 3).",
+    "placeholders": {
+      "reason": {
+        "type": "String",
+        "example": "notOnlyOwner"
+      }
+    }
+  },
+  "newAgentSectionHost": "Hosting runner",
+  "@newAgentSectionHost": {
+    "description": "Section of the hosting runner."
+  },
+  "newAgentHost": "Runner",
+  "@newAgentHost": {
+    "description": "Field of the hosting runner."
+  },
+  "newAgentHostMissing": "Choose a runner.",
+  "@newAgentHostMissing": {
+    "description": "No hosting runner chosen."
+  },
+  "newAgentHostFixed": "The runner is fixed now that the agent exists; Change runner on the agent card moves it.",
+  "@newAgentHostFixed": {
+    "description": "The hosting runner after agent.create (26 8.3)."
+  },
+  "newAgentSectionChannel": "Channel",
+  "@newAgentSectionChannel": {
+    "description": "Section of the channel to create."
+  },
+  "newAgentChannelWanted": "Create a channel with this agent as its operator",
+  "@newAgentChannelWanted": {
+    "description": "Checkbox: create a channel with the new agent as operator."
+  },
+  "newAgentChannelSpace": "Space",
+  "@newAgentChannelSpace": {
+    "description": "Field of the space of the channel."
+  },
+  "newAgentChannelSpaceMissing": "Choose a space.",
+  "@newAgentChannelSpaceMissing": {
+    "description": "No space chosen for the channel."
+  },
+  "newAgentChannelName": "Channel name",
+  "@newAgentChannelName": {
+    "description": "Field of the channel's name."
+  },
+  "newAgentChannelNameMissing": "Enter a name for the channel.",
+  "@newAgentChannelNameMissing": {
+    "description": "The channel name is empty."
+  },
+  "newAgentOtherErrors": "Not accepted by the server:",
+  "@newAgentOtherErrors": {
+    "description": "Heading of field errors that no field of the preview shows."
+  },
+  "newAgentFieldError": "{rule, select, required{Required.} too_long{Too long.} too_many{Too many entries.} invalid_name{Use lower-case letters, digits and hyphens.} duplicate_name{This name is used twice.} skill_frontmatter{Must not start with a line of three hyphens.} inline_shell{Must not contain inline shell commands.} import_outside_folder{An @ import must stay inside the agent folder.} secret_value_not_allowed{Use a secret reference here, not a plain value.} env_name_reserved{The runner sets this name itself.} mcp_command_not_allowed{The runner does not allow this command.} mcp_package_unpinned{Pin the package to an exact version, for example name@1.2.3.} tool_class_too_low{A local process needs the tool class Host.} mcp_not_in_catalogue{This server is not in the template catalogue.} host_not_capable{This runner does not host agents.} unknown_member{Not part of an agent definition.} other{Not accepted ({code}).}}",
+  "@newAgentFieldError": {
+    "description": "A field error of the server (26 4.3, 7.4; 06 5).",
+    "placeholders": {
+      "rule": {
+        "type": "String",
+        "example": "too_long"
+      },
+      "code": {
+        "type": "String",
+        "example": "too_long"
+      }
+    }
+  },
+  "newAgentStepCreate": "Create the agent on {runner}",
+  "@newAgentStepCreate": {
+    "description": "Step agent.create (26 8.2).",
+    "placeholders": {
+      "runner": {
+        "type": "String",
+        "example": "Dev runner"
+      }
+    }
+  },
+  "newAgentStepClass": "Set the tool class to {toolClass}",
+  "@newAgentStepClass": {
+    "description": "Step agent.tool_class.set (26 8.2).",
+    "placeholders": {
+      "toolClass": {
+        "type": "String",
+        "example": "Host"
+      }
+    }
+  },
+  "newAgentStepDefinition": "Store the definition",
+  "@newAgentStepDefinition": {
+    "description": "Step putAgentDefinition (26 8.2)."
+  },
+  "newAgentStepBilling": "{mode, select, personal{Set billing to Personal} other{Set billing to Organization}}",
+  "@newAgentStepBilling": {
+    "description": "Step agent.billing_mode.set (26 8.2).",
+    "placeholders": {
+      "mode": {
+        "type": "String",
+        "example": "personal"
+      }
+    }
+  },
+  "newAgentStepChannel": "Create the channel {name}",
+  "@newAgentStepChannel": {
+    "description": "Step channel.create (26 8.2).",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "writing"
+      }
+    }
+  },
+  "newAgentStepOperator": "Make the agent the operator of the channel",
+  "@newAgentStepOperator": {
+    "description": "Step channel.operator.set (26 8.2)."
+  },
+  "newAgentStepState": "{step}: {state, select, waiting{waiting} running{running} finished{finished} other{failed}}",
+  "@newAgentStepState": {
+    "description": "Screen reader text of a step of the new agent dialog with its state.",
+    "placeholders": {
+      "step": {
+        "type": "String",
+        "example": "Store the definition"
+      },
+      "state": {
+        "type": "String",
+        "example": "running"
+      }
+    }
+  },
+  "newAgentErrStepUp": "The confirmation was cancelled. Try again to continue.",
+  "@newAgentErrStepUp": {
+    "description": "Failure of a step: the step-up was cancelled."
+  },
+  "newAgentErrOffline": "The server cannot be reached. Try again when you are online.",
+  "@newAgentErrOffline": {
+    "description": "Failure of a step without an answer of the server."
+  },
+  "newAgentErrFields": "Some fields were not accepted; they are marked in the preview.",
+  "@newAgentErrFields": {
+    "description": "Failure of a step with field errors."
+  },
+  "newAgentErrClassTooLow": "A local (stdio) MCP server needs the tool class Host. Raise the class or remove the server, then try again.",
+  "@newAgentErrClassTooLow": {
+    "description": "Failure of the definition step: tool_class_too_low (26 4.3 item 7)."
+  },
+  "newAgentErrCeiling": "The runner does not load this tool class. Lower the class and try again, or close and use Change runner on the agent card.",
+  "@newAgentErrCeiling": {
+    "description": "Failure of the class step: host_tool_class_ceiling (26 3.1 item 3)."
+  },
+  "newAgentErrNeedsHost": "The stored definition still has a local MCP server, so the class cannot go below Host yet. Remove the server first.",
+  "@newAgentErrNeedsHost": {
+    "description": "Failure of the class step: definition_needs_host (R-BA-06)."
+  },
+  "newAgentErrHolder": "Personal needs the credential holder of the runner. Choose Organization and try again.",
+  "@newAgentErrHolder": {
+    "description": "Failure of the billing step: hosted_holder_mismatch (10 10.3)."
+  },
+  "newAgentErrHandleTaken": "This handle is taken. Change it and try again.",
+  "@newAgentErrHandleTaken": {
+    "description": "Failure of agent.create: the handle is taken."
+  },
+  "newAgentErrChannelTaken": "This space has a channel with this name. Change the name and try again.",
+  "@newAgentErrChannelTaken": {
+    "description": "Failure of channel.create: the name is taken."
+  },
+  "newAgentErrVersion": "The agent changed in the meantime. Try again.",
+  "@newAgentErrVersion": {
+    "description": "Failure of a step: version_conflict."
+  },
+  "newAgentNotSetUp": "Not set up",
+  "@newAgentNotSetUp": {
+    "description": "Marks a built-in agent without a definition in the agent list (26 8.3)."
+  },
+  "newAgentAuditReason": "New agent {name}",
+  "@newAgentAuditReason": {
+    "description": "Reason of the audit entries of the class, billing and operator steps.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Notes"
+      }
+    }
+  },
+  "stepUpPurposeNewAgent": "Create the agent {name}",
+  "@stepUpPurposeNewAgent": {
+    "description": "Purpose shown by the step-up prompt of the new agent dialog.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Notes"
+      }
+    }
   }
 }

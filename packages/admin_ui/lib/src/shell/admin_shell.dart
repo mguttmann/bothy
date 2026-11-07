@@ -9,6 +9,7 @@ import 'package:design_system/design_system.dart';
 import 'package:flutter/material.dart';
 import 'package:l10n/l10n.dart';
 
+import '../agents/new_agent/new_agent_dialog.dart' show NewAgentHost;
 import '../apps/manifest_picker.dart';
 import '../audit/audit_export.dart';
 import '../data/admin_repository.dart';
@@ -77,6 +78,7 @@ class AdminShell extends StatefulWidget {
     this.instanceChanges,
     this.openExternal,
     this.statusSource,
+    this.newAgent,
   });
 
   /// The administration's calls.
@@ -124,6 +126,10 @@ class AdminShell extends StatefulWidget {
   /// The source of the status page (the app's `getStatus` with `status.updated` and its
   /// connection state), or null; [AdminBody.statusSource].
   final StatusSource? statusSource;
+
+  /// "New agent" of the agent list (01 6.20 item 1, A1-08), or null for none;
+  /// [AdminBody.newAgent].
+  final NewAgentHost? newAgent;
 
   @override
   State<AdminShell> createState() => _AdminShellState();
@@ -240,6 +246,7 @@ class _AdminShellState extends State<AdminShell> {
               instanceChanges: widget.instanceChanges,
               openExternal: widget.openExternal,
               statusSource: widget.statusSource,
+              newAgent: widget.newAgent,
             ),
           ),
         ],
