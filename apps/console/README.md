@@ -25,7 +25,9 @@ the administration screens A1 to A6 of `packages/admin_ui` (01 5.2), the same sc
 controllers as the desktop app, at the full width of the browser (`AdminBody` with no maximum
 width). A detail adds its ID to the page's path (`/people/<id>`, `/groups/<id>`,
 `/agents/<id>`); the access grants are `/groups/grants`, and their target (a space or channel)
-stays out of the path, because the console has no content route (ADR 0028). Every changing
+stays out of the path, because the console has no content route (ADR 0028). The agent card of a
+built-in agent adds "Edit", "Versions", "Change runner", "Disable" and "Continue setup" (A1-09,
+`ConsoleAdmin.newAgentHost`; docs/decisions.d/A1-09.md), over the console's API only. Every changing
 action shows the confirmation of `admin_ui` first; a `401 step_up_required` answer starts the
 step-up of the action in a dialog (passkey with user verification when the person has one, else
 password with one-time code, else the new OIDC login, which leaves the tab and does not repeat the
