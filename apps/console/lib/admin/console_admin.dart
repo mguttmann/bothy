@@ -12,6 +12,7 @@ import 'package:api_client/api_client.dart';
 import 'package:domain/domain.dart'
     show AppConfig, AppConfigValues, Uuid7Generator;
 import 'package:flutter/foundation.dart';
+import 'package:l10n/l10n.dart';
 
 import '../routes.dart';
 import '../session/console_controller.dart';
@@ -38,15 +39,18 @@ import 'console_route.dart';
 class ConsoleAdmin extends ChangeNotifier {
   /// Creates the administration of [controller]; [repository] replaces the REST source in tests,
   /// [clock] the current time, [config] the client values (the defaults of place `App`, as
-  /// for `ConsoleTerminals`; the console has no other configuration source).
+  /// for `ConsoleTerminals`; the console has no other configuration source), [newAgentPort]
+  /// the server side of "New agent" in tests.
   ConsoleAdmin(
     this.controller, {
     AdminRepository? repository,
     DateTime Function()? clock,
     Random? random,
     AppConfig? config,
+    this._newAgentPort,
   }) : clock = clock ?? DateTime.now,
        config = config ?? AppConfig.defaults(),
+       _keys = _ids(random ?? Random.secure()),
        repository =
            repository ??
            ApiAdminRepository(
@@ -59,6 +63,29 @@ class ConsoleAdmin extends ChangeNotifier {
 
   /// The console's state.
   final ConsoleController controller;
+
+  final NewAgentPort? _newAgentPort;
+  final Uuid7Generator _keys;
+
+  /// "New agent" of the agent list (01 6.20 item 1, A1-08): the port over the console's API (the
+  /// backend for frontend, never the gateway; 15), a fresh `Idempotency-Key` per request and
+  /// `a11y.live_announce_min_interval`. The console has no chats, so a created agent opens its
+  /// card ([onCreated]), also when a channel was created.
+  NewAgentHost newAgentHost(
+    AppLocalizations l, {
+    required void Function(NewAgentResult result) onCreated,
+  }) => NewAgentHost(
+    port:
+        _newAgentPort ??
+        ApiNewAgentPort(
+          controller.api,
+          purpose: l.stepUpPurposeNewAgent,
+          reason: l.newAgentAuditReason,
+        ),
+    newKey: _keys.next,
+    announceMinInterval: config.liveAnnounceMinInterval,
+    onCreated: onCreated,
+  );
 
   /// The calls of the administration.
   final AdminRepository repository;

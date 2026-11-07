@@ -43,6 +43,7 @@ class SpaceNode extends StatefulWidget {
     this.onAdd,
     this.onNewProject,
     this.onAddFolderForums,
+    this.onNewAgent,
     this.selectedNewChat,
     this.onOpenNewChat,
     this.onMoveUp,
@@ -107,6 +108,9 @@ class SpaceNode extends StatefulWidget {
   /// The space menu entry "Add forums for existing folders" (01 6.10 item 1), or null for none.
   final ValueChanged<Space>? onAddFolderForums;
 
+  /// The space menu entry "New agent" (01 6.20 item 1), or null for none.
+  final ValueChanged<Space>? onNewAgent;
+
   /// Wraps the space row so it starts a drag of the space (the list's drag listener), or null.
   final Widget Function(Widget row)? dragHandle;
 
@@ -145,6 +149,7 @@ class _SpaceNodeState extends State<SpaceNode> {
       :onAdd,
       :onNewProject,
       :onAddFolderForums,
+      :onNewAgent,
       :selectedNewChat,
       :onOpenNewChat,
       :onMoveUp,
@@ -200,6 +205,9 @@ class _SpaceNodeState extends State<SpaceNode> {
                   onAddFolderForums: onAddFolderForums == null
                       ? null
                       : () => onAddFolderForums(space),
+                  onNewAgent: onNewAgent == null
+                      ? null
+                      : () => onNewAgent(space),
                   moves: SidebarMoves(
                     up: onMoveUp,
                     down: onMoveDown,

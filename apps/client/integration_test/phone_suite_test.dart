@@ -14,6 +14,7 @@ import 'phone/emergency_test.dart' as emergency;
 import 'phone/login_flow_test.dart' as login_flow;
 import 'phone/mobile_run_graph_test.dart' as mobile_run_graph;
 import 'phone/navigation_flow_test.dart' as navigation_flow;
+import 'phone/new_agent_test.dart' as new_agent;
 import 'phone/offline_test.dart' as offline;
 import 'phone/phone_threads_test.dart' as phone_threads;
 import 'phone/viz_test.dart' as viz;
@@ -35,4 +36,5 @@ void main() {
   group('voice and photos', voice.main);
   group('dictation and inserts', dictation.main);
   group('app lock', app_lock.main);
+  group('new agent', new_agent.main);
 }

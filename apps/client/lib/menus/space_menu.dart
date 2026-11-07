@@ -2,7 +2,8 @@
 
 /// The menu of a space in the sidebar (brief M4-33 Scope): its notification level and "Mute
 /// until" (13 3.1), headed by "New project in" and "Add forums for existing folders" for an
-/// owner (01 6.9 item 1, M4-43; 01 6.10 item 1, M4-44), and ending with "Delete space..." for
+/// owner (01 6.9 item 1, M4-43; 01 6.10 item 1, M4-44) and "New agent" for an owner when a runner
+/// hosts agents (01 6.20 item 1, A1-08), and ending with "Delete space..." for
 /// an owner (01 6.18 item 1, D-DEL-14).
 library;
 
@@ -30,6 +31,7 @@ class SpaceMenu extends StatelessWidget {
     this.newProjectLabel,
     this.onNewProject,
     this.onAddFolderForums,
+    this.onNewAgent,
     this.moves,
   });
 
@@ -48,6 +50,9 @@ class SpaceMenu extends StatelessWidget {
   /// Opens "Add forums for existing folders" of the space, or null for no entry.
   final VoidCallback? onAddFolderForums;
 
+  /// Opens "New agent" (01 6.20 item 1), or null for no entry.
+  final VoidCallback? onNewAgent;
+
   /// The row the menu belongs to.
   final Widget child;
 
@@ -58,6 +63,7 @@ class SpaceMenu extends StatelessWidget {
       final label = newProjectLabel;
       final start = onNewProject;
       final sync = onAddFolderForums;
+      final agent = onNewAgent;
       final session = DeleteSession.watch(ref);
       return [
         if (label != null && start != null)
@@ -71,6 +77,12 @@ class SpaceMenu extends StatelessWidget {
             key: const ValueKey('menu.addFolderForums'),
             onPressed: sync,
             child: Text(AppLocalizations.of(context).spaceMenuAddFolderForums),
+          ),
+        if (agent != null)
+          DsMenuItem(
+            key: const ValueKey('menu.newAgent'),
+            onPressed: agent,
+            child: Text(AppLocalizations.of(context).newAgentEntry),
           ),
         ...levelMenuItems(context, ref, spaceMenuTarget(ref, space)),
         if (moves case final moves?) ...[
