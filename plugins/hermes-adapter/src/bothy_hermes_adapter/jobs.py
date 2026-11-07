@@ -137,11 +137,13 @@ def process_start(pid: int) -> str | None:
     """
     if pid <= 0:
         return None
-    if sys.platform.startswith("linux"):
+    # A plain string, so that mypy checks both branches on either platform's gate.
+    system: str = sys.platform
+    if system.startswith("linux"):
         return _linux_start(pid)
-    if sys.platform == "darwin":
+    if system == "darwin":
         return _darwin_start(pid)
-    raise JobError(f"process start times are not readable on {sys.platform}")
+    raise JobError(f"process start times are not readable on {system}")
 
 
 def _linux_start(pid: int) -> str | None:
