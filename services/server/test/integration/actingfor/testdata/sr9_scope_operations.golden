@@ -17,3 +17,4 @@ listSpaceChannels
 listSpaces
 listThreadMessages
 listThreadRuns
+listThreadWakes

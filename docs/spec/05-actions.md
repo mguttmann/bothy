@@ -235,9 +235,8 @@ machine-readable catalogue carries it per action ([ADR 0049](../adr/0049-machine
 - `access.explain`, `search.query`, `events.catch_up`, `gateway.connect`, `gateway.focus`,
   `typing.start`, `command.autocomplete`, `command.autocomplete.respond`, `search.assist`,
   `search.assist.respond`, `client_metrics.submit`, `console.csp_report`,
-  `push.deliver`, `webhook_out.deliver` and `terminal.read_own`;
-- `run.wake.list_pending` and `run.launch.check` ([07-permissions.md](07-permissions.md) 2.14, R-AZ-37;
-  addendum of 2026-11-06, AR-04).
+  `push.deliver`, `webhook_out.deliver`, `run.wake.list_pending`, `run.launch.check` (07 2.14,
+  R-AZ-37) and `terminal.read_own`.
 
 All others have `write`. Reason for the closed list: a new action without an entry is
 `write` and is blocked in maintenance mode (fail closed); the column "Permission" is not suitable

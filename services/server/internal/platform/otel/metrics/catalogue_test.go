@@ -293,6 +293,8 @@ func TestCatalogue_M1InstrumentSet(t *testing.T) {
 		"bothy.stats.live.subscribers",
 		// M7-08: the requests maintenance mode refused (4.1).
 		"bothy.maintenance.rejected",
+		// AR-04: the wake-up and autonomy instruments of 4.3.
+		"bothy.run.wake.pending", "bothy.run.wake.ended", "bothy.run.autonomy.cap_reached",
 	}
 	slices.Sort(want)
 	var got []string
