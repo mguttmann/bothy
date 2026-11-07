@@ -155,10 +155,13 @@ class InboundMedia:
     Attributes:
         path: The cached file, as Hermes's own platforms put it into ``media_urls``.
         media_type: Its MIME type (``media_types``); ``image/*`` reaches Hermes's vision.
+        text_inlined: Its text stands in the turn's text (``media_text_inlined``), so Hermes's
+            note says the content is included instead of asking the agent to read the file.
     """
 
     path: str = field(repr=False)
     media_type: str
+    text_inlined: bool = False
 
 
 @dataclass(frozen=True)

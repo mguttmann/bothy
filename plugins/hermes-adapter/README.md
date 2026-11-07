@@ -314,7 +314,11 @@ Every other attachment of the triggering message (images, PDFs, text files, vide
 is loaded after the run started and placed in the profile's media cache with Hermes' own
 caching function, and the turn gets it the way Hermes' Discord platform passes attachments:
 images reach Hermes' vision (`agent.image_input_mode` of the profile decides between native image
-parts and its pre-analysis), other files Hermes' own note with the cached path. A message of
+parts and its pre-analysis), other files Hermes' own note with the cached path. A text file
+(`text/*`, JSON, YAML, CSV, a log, a diff, or a text suffix when the type tells nothing, such as
+the `paste.txt` the apps make of a long paste) of at most `hermes_adapter.max_message_bytes` also
+stands in the turn's text as a data block of the user's data, so the agent needs no file tool to
+read it; a longer one gets a note that its content was too large. A message of
 attachments only reaches Hermes as `(The user sent a message with no text content)` with the
 files, never as an empty message. An attachment that cannot be passed on reaches the turn as a
 note with its name, type and reason: the virus scan has not finished, the scan blocked it, it is

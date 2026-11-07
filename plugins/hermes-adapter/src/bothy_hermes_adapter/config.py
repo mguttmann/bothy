@@ -103,7 +103,8 @@ class AdapterSettings:
         instance_id: ``hermes_adapter.instance_id``, the expected ``iss`` of every token.
         token_file: ``hermes_adapter.token_file``, the file with the agent's API token.
         dpop_key_file: ``hermes_adapter.dpop_key_file``, the DPoP key, ``None`` without DPoP.
-        max_message_bytes: ``hermes_adapter.max_message_bytes``, the longest answer.
+        max_message_bytes: ``hermes_adapter.max_message_bytes``, the longest answer
+            and the longest text attachment of the trigger inlined into the turn.
         attachment_text_max_bytes: ``hermes_adapter.attachment_text_max_bytes``, the longest
             attachment text inlined into the context.
         background_poll_interval: ``hermes_adapter.background_poll_interval`` in seconds.

@@ -17,7 +17,11 @@ other attachment of the triggering message (`files_for_hermes`) goes into Hermes
 and reaches the turn as Hermes's own platforms pass it (``media_urls`` and ``media_types``:
 images to its vision, other files as cached paths); one that cannot be passed on reaches the
 turn as a note (`undelivered_note`) instead, and a message of attachments only carries
-`NO_TEXT`, Hermes's own wording on Discord.
+`NO_TEXT`, Hermes's own wording on Discord. A text attachment (`is_text_attachment`) within
+``hermes_adapter.max_message_bytes`` also stands in the turn's text (`inline_text`),
+as Hermes's Discord platform injects one, inside a data block of the user's data; a longer one
+keeps Hermes's file note and gets `too_long_note`
+(docs/decisions.d/FIX-hermes-text-attachment-inline.md).
 
 Nothing here logs or returns a path, a file name or a content (SEC-LOG-2); refusals carry codes.
 """
@@ -31,6 +35,7 @@ import logging
 import mimetypes
 import os
 import re
+import secrets
 import stat
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
@@ -40,6 +45,7 @@ from uuid import UUID
 
 import httpx
 from bothy_sdk.client import Client
+from bothy_sdk.context import DATA_NOTICE
 from bothy_sdk.errors import ProblemError
 from bothy_sdk.generated.api.files import abort_upload, complete_upload, create_upload
 from bothy_sdk.generated.models import (
@@ -62,9 +68,12 @@ __all__ = [
     "audio_cache_ext",
     "audio_to_transcribe",
     "files_for_hermes",
+    "inline_text",
+    "is_text_attachment",
     "problem_reason",
     "read_local_file",
     "scan_refusal",
+    "too_long_note",
     "undelivered_note",
     "upload",
     "with_transcripts",
@@ -93,6 +102,38 @@ _REASONS: Final = {
 #: Problem codes of ``downloadFile`` that name a scan state (12 3.5).
 _PROBLEM_REASONS: Final = {"file_not_ready": "scan_pending", "file_blocked": "scan_blocked"}
 _NAME_MAX: Final = 200
+#: Types that are text besides ``text/*`` (D-FHTAI-2).
+_TEXT_MIMES: Final = frozenset(
+    {
+        "application/json",
+        "application/ld+json",
+        "application/x-ndjson",
+        "application/jsonl",
+        "application/xml",
+        "application/yaml",
+        "application/x-yaml",
+        "application/toml",
+        "application/csv",
+        "application/sql",
+        "application/x-sh",
+        "application/x-diff",
+        "application/x-patch",
+        "application/javascript",
+    }
+)
+#: Types that tell nothing about the content: then the name's suffix decides.
+_UNTYPED: Final = frozenset({"", "application/octet-stream"})
+#: Suffixes of text files when the type tells nothing; the common ones of Hermes's own list of
+#: files its platforms inline (``_TEXT_INJECT_EXTENSIONS`` of ``gateway.platforms.base``).
+_TEXT_SUFFIXES: Final = frozenset(
+    {
+        ".txt", ".md", ".markdown", ".csv", ".tsv", ".log", ".json", ".jsonl", ".ndjson",
+        ".xml", ".yaml", ".yml", ".toml", ".ini", ".cfg", ".conf", ".properties", ".html",
+        ".htm", ".css", ".py", ".js", ".ts", ".sh", ".sql", ".rst", ".tex", ".srt", ".vtt",
+        ".diff", ".patch",
+    }
+)  # fmt: skip
+_BOUNDARY_BYTES: Final = 8
 
 
 def audio_cache_ext(name: str, mime_type: str) -> str:
@@ -346,6 +387,70 @@ def problem_reason(code: str) -> str:
     return _PROBLEM_REASONS.get(code, "unavailable")
 
 
+def _display_name(item: RunContextAttachment) -> str:
+    """The person's file name as Hermes's own platforms write one (at most 200 characters)."""
+    return re.sub(r"[^\w.\- ]", "_", str(item.original_name))[:_NAME_MAX] or "file"
+
+
+def is_text_attachment(item: RunContextAttachment) -> bool:
+    """Whether an attachment is text whose content may stand in the turn (D-FHTAI-2).
+
+    A ``text/*`` type or a known text type such as ``application/json``; for a type that tells
+    nothing (none, ``application/octet-stream``) the name's suffix decides, as for Hermes's own
+    platforms. Images, audio, video and every other type are never text here.
+    """
+    mime = _mime(item)
+    if mime.startswith("text/") or mime in _TEXT_MIMES:
+        return True
+    return mime in _UNTYPED and Path(str(item.original_name)).suffix.lower() in _TEXT_SUFFIXES
+
+
+def inline_text(item: RunContextAttachment, data: bytes) -> str:
+    """The attachment's text for the turn, as user-supplied data (D-FHTAI-3).
+
+    Hermes's Discord heading (``[Content of <name>]:``), then a data block in the format of
+    `bothy_sdk.context` with a random boundary the text does not contain. The bytes are decoded
+    as UTF-8, an invalid sequence becomes U+FFFD.
+
+    Args:
+        item: The attachment.
+        data: Its whole content.
+
+    Returns:
+        The text to put before the person's text.
+    """
+    text = data.decode("utf-8", errors="replace")
+    boundary = secrets.token_hex(_BOUNDARY_BYTES)
+    while boundary in text:
+        boundary = secrets.token_hex(_BOUNDARY_BYTES)
+    return "\n".join(
+        [
+            f"[Content of {_display_name(item)}]:",
+            DATA_NOTICE,
+            f"<<<DATA {boundary} source=file id={item.file_id}>>>",
+            text,
+            f"<<<END DATA {boundary}>>>",
+        ]
+    )
+
+
+def too_long_note(item: RunContextAttachment, size: int, limit: int) -> str:
+    """The line for a text attachment longer than the inline limit (D-FHTAI-4).
+
+    Args:
+        item: The attachment.
+        size: Its byte count.
+        limit: ``hermes_adapter.max_message_bytes``.
+
+    Returns:
+        The note; Hermes's own note with the cached path stays as well.
+    """
+    return (
+        f"[The text of the file '{_display_name(item)}' ({size} bytes) is larger than the "
+        f"inline limit of {limit} bytes, so its content is not included in this message.]"
+    )
+
+
 def undelivered_note(item: RunContextAttachment, reason: str) -> str:
     """The line Hermes gets for an attachment that did not reach it.
 
@@ -359,6 +464,6 @@ def undelivered_note(item: RunContextAttachment, reason: str) -> str:
     Returns:
         The note.
     """
-    name = re.sub(r"[^\w.\- ]", "_", str(item.original_name))[:_NAME_MAX] or "file"
+    name = _display_name(item)
     why = _REASONS.get(reason, _REASONS["unavailable"])
     return f"[The user sent the file '{name}' ({_mime(item)}), but it did not reach you: {why}.]"
