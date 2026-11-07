@@ -482,8 +482,8 @@ Source: [09-agents.md](../spec/09-agents.md), section 21.
 | `hermes_adapter.instance_id` |  | Hermes adapter |  | no default, required | instance ID of the server and the expected `iss` of every token (4.5 point 4) |  |
 | `hermes_adapter.token_file` |  | Hermes adapter |  | no default, required | file with the agent's API token, readable only by the profile's user |  |
 | `hermes_adapter.dpop_key_file` |  | Hermes adapter |  | no default | private key of the DPoP proofs; without it no DPoP |  |
-| `hermes_adapter.max_message_bytes` |  | Hermes adapter |  | `262144` | longest answer text; the rest of a longer answer goes as one attachment of the same message (17.3, 01 6.13); the default equals `message.max_content_bytes`, both change together |  |
-| `hermes_adapter.attachment_text_max_bytes` |  | Hermes adapter |  | `32768` | longest attachment text the adapter inlines as a data block; the default equals `agent.context_message_max_bytes` |  |
+| `hermes_adapter.max_message_bytes` |  | Hermes adapter |  | `262144` | longest answer text; the rest of a longer answer goes as one attachment of the same message (17.3, 01 6.13); also the longest text attachment of the triggering message that stands inline in the turn (17.6, FIX-hermes-text-attachment-inline); the default equals `message.max_content_bytes`, both change together |  |
+| `hermes_adapter.attachment_text_max_bytes` |  | Hermes adapter |  | `32768` | longest attachment text the adapter inlines as a data block of the context; the default equals `agent.context_message_max_bytes` |  |
 | `hermes_adapter.background_poll_interval` |  | Hermes adapter |  | `2s` | how often a run that holds background work reads Hermes' registries (17.12) |  |
 | `hermes_adapter.background_settle` |  | Hermes adapter |  | `15s` | how long a run that saw background work stays open after the work ended and no turn of the thread ran, for the turn Hermes starts with the result (17.12) |  |
 | `hermes_adapter.background_progress_interval` |  | Hermes adapter |  | `2m` | while background work runs, `/metrics/progress_events` rises once per interval; must stay below the server's `run.stall_after` (17.12) |  |

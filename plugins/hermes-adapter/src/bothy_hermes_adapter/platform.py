@@ -31,7 +31,8 @@ of 17.3 to `bothy_hermes_adapter.handler.HermesHandler` on the adapter's event l
   other platforms use). Every other attachment of the triggering message goes into Hermes's
   media cache with ``cache_media_bytes_async`` and into the turn's ``media_urls`` and
   ``media_types`` with the message type of the first one, as Hermes's Discord platform passes
-  attachments: images reach its vision, other files its note with the cached path.
+  attachments: images reach its vision, other files its note with the cached path. A text file
+  whose text the handler put into the turn's text is marked in ``media_text_inlined``.
 * A control command (09 10.4) is ``handle_message`` with ``/<name>`` from the control sender;
   Hermes' reply (``send`` with the command's message as ``reply_to``) is collected for the
   handler instead of being sent. A skill command is a turn whose text is Hermes' own skill
@@ -419,12 +420,23 @@ class ServerPlatform(BasePlatformAdapter):
 
     @staticmethod
     def _attach(event: MessageEvent, media: tuple[InboundMedia, ...]) -> None:
-        """Put cached attachments on a turn's event as Hermes's Discord platform does."""
+        """Put cached attachments on a turn's event as Hermes's Discord platform does.
+
+        ``media_text_inlined`` is true for a file whose text the turn's text carries; Hermes's
+        note then says its content is included. That note speaks of a text document only for a
+        ``text/*`` type, so such a file of another text type (``application/json``) is passed
+        as ``text/plain`` (D-FHTAI-1).
+        """
         if not media:
             return
         event.media_urls = [m.path for m in media]
-        event.media_types = [m.media_type for m in media]
-        event.media_text_inlined = [False] * len(media)
+        event.media_types = [
+            "text/plain"
+            if m.text_inlined and not m.media_type.startswith("text/")
+            else m.media_type
+            for m in media
+        ]
+        event.media_text_inlined = [m.text_inlined for m in media]
         first = media[0].media_type
         if first.startswith("image/"):
             event.message_type = MessageType.PHOTO

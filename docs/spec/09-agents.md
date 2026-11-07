@@ -2788,10 +2788,24 @@ attachment of the triggering message without an `audio/*` type is loaded whole (
 placed in Hermes' media cache of the profile with Hermes' own `cache_media_bytes_async` (images
 in the image cache, video and other files in theirs). The turn's event carries them as Hermes'
 Discord platform passes attachments: `media_urls` (the cached paths), `media_types` (per file),
-`media_text_inlined` false, and the message type of the first file (`photo`, `video` or
-`document`); so images reach Hermes' vision (native image parts or its pre-analysis, as the
+`media_text_inlined` (per file, below), and the message type of the first file (`photo`, `video`
+or `document`); so images reach Hermes' vision (native image parts or its pre-analysis, as the
 profile's `agent.image_input_mode` decides) and every other file Hermes' own note with its
-cached path. An attachment that is not passed on stands as a note before the person's text,
+cached path. A text attachment (FIX-hermes-text-attachment-inline: a `text/*` type or a known
+text type such as `application/json`, `application/yaml`, `application/x-diff`; for a type that
+tells nothing, none or `application/octet-stream`, a text suffix such as `.txt`, `.md`, `.json`,
+`.yaml`, `.csv`, `.log`, `.diff`, `.patch`) of at most `hermes_adapter.max_message_bytes` also
+stands in the turn's text, as Hermes' platforms inline one: `[Content of <name>]:`, the SDK's data
+notice and a data block with a random boundary (4.6), the text decoded as UTF-8 with replacement,
+after the notes and before the person's text in the attachments' order, with a word joiner after
+every `@` that could start one of Hermes' context references (`@file:`, `@url:`, `@diff`, ...), so
+Hermes never expands a reference in file text; the file has
+`media_text_inlined` true and a `text/*` type in `media_types` (`text/plain` for another text
+type), so Hermes' note says its content is included below, and the user side lists it without its
+text. Every other file has `media_text_inlined` false. A longer text attachment keeps Hermes' note
+with the cached path and gets a note before the person's text that its content is larger than the
+inline limit and not included. The turn so never depends on the agent's file tools for a text the
+person sent (a long paste becomes `paste.txt`, 01 6.13). An attachment that is not passed on stands as a note before the person's text,
 with its name and type and the reason: the scan is pending (`scan_status` `pending`, `409
 file_not_ready`), the scan blocked it (any other state, `409 file_blocked`), it is larger than
 Hermes' own limit for incoming media (`gateway.max_inbound_media_bytes`, nothing is loaded),
@@ -4740,7 +4754,7 @@ PostgreSQL. Each test asserts what is stored, logged and shown.
 | R-AG-30 | The Claude Code runner reports the names of the Git work trees directly under `runner.projects_root` in the heartbeat member `project_folders`; the server shows the owner those without a binding (18.13, addendum of 2026-10-29). | The app adds forums for existing folders; only the runner sees the folders, and names carry no path or content (D-M4-44-1 to D-M4-44-4). |
 | R-AG-31 | The Claude Code runner reloads its served channels on `access.changed` and the channel and space structure events, and on a timer as a fallback, not only at start (18.1, addendum of 2026-10-29). | An operator change sends no `agent.config_changed`, so a forum that got the runner as operator stayed not ready until a restart (docs/decisions.d/RUNNER-LIVE-RELOAD.md). |
 | R-AG-32 | The Claude Code runner transcribes audio attachments without a transcript with an optional local program and reports `voice_input` only when one is configured; without it the person gets a note in the thread (18.14, addendum of 2026-10-29). | Claude Code cannot hear audio; a local program keeps the audio on the host, and a note replaces a silent loss (R-AG-16). |
-| R-AG-33 | The Hermes adapter sends the files of Hermes' answer as attachments through the public upload sessions, each within the server's upload limit and after Hermes' own delivery policy, and transcribes voice input with Hermes' own speech to text, delivering the transcript to the server; it passes every other attachment of the triggering message to Hermes as Hermes' own platforms do (images to its vision, files as cached paths) and a note for one it cannot pass on (17.3, 17.6, HERMES-MEDIA, FIX-hermes-inbound-images). | Hermes behaves in a thread as on its other platforms; the server keeps scanning, limits and the owner switch `supports_files_out`, and other people see the transcript (13). |
+| R-AG-33 | The Hermes adapter sends the files of Hermes' answer as attachments through the public upload sessions, each within the server's upload limit and after Hermes' own delivery policy, and transcribes voice input with Hermes' own speech to text, delivering the transcript to the server; it passes every other attachment of the triggering message to Hermes as Hermes' own platforms do (images to its vision, files as cached paths, the text of a text file up to `hermes_adapter.max_message_bytes` inline as a data block) and a note for one it cannot pass on or whose text is too large (17.3, 17.6, HERMES-MEDIA, FIX-hermes-inbound-images, FIX-hermes-text-attachment-inline). | Hermes behaves in a thread as on its other platforms; the server keeps scanning, limits and the owner switch `supports_files_out`, and other people see the transcript (13). |
 | R-AG-34 | Hermes: its built-in-like commands stay the server's built-ins, a closed table offers only control commands without a model call, skills become model commands, and reports without a run go to the report channel, a forum getting one post per report (17.3, 17.9, addendum of 2026-10-29). | A command sent as the adapter's admin sender must never widen what a person may do, and an unknown command of a later Hermes version is refused until the table names it (docs/decisions.d/HERMES-CRON-COMMANDS.md). |
 | R-AG-35 | The Claude Code runner treats Git as optional: a bound folder without `.git` is ready, a forum without a binding works in `runner.default_workspace` when it is set (default off), and every run the runner ends without a turn or with `adapter_error` names its cause in the `summary` of `finishRun`, which the app shows next to the reason (18.1, 18.9, addendum of 2026-10-30). | Owner expectation 2026-10-30: every development forum is a Claude Code chat; forums bound to folders without Git stayed "not ready" and a forum without a binding failed at once with a bare "Error in the adapter" (docs/decisions.d/RUNNER-NO-GIT.md). |
 | R-AG-36 | A fixed thread operator triggers only while it is allowed in the channel: it is the channel's effective operator, has `write` of its own on the channel, has the active run of the thread, or completed a run in the thread; otherwise a message that would trigger it gets `operator_not_in_channel` and no run (3.4 step 4a, addendum of 2026-10-30). | In operation: imported threads carry `planned_operator` (R-IM-08), and a switch-over that left the channel without that operator made every message start a run that failed at once; a thread its operator has worked in keeps its session after an operator change (R-DM-12). |
@@ -4848,8 +4862,8 @@ configuration of the respective program outside the server.
 | `hermes_adapter.instance_id` | Hermes adapter | no default, required | instance ID of the server and the expected `iss` of every token (4.5 point 4) |
 | `hermes_adapter.token_file` | Hermes adapter | no default, required | file with the agent's API token, readable only by the profile's user |
 | `hermes_adapter.dpop_key_file` | Hermes adapter | no default | private key of the DPoP proofs; without it no DPoP |
-| `hermes_adapter.max_message_bytes` | Hermes adapter | `262144` | longest answer text; the rest of a longer answer goes as one attachment of the same message (17.3, 01 6.13); the default equals `message.max_content_bytes`, both change together |
-| `hermes_adapter.attachment_text_max_bytes` | Hermes adapter | `32768` | longest attachment text the adapter inlines as a data block; the default equals `agent.context_message_max_bytes` |
+| `hermes_adapter.max_message_bytes` | Hermes adapter | `262144` | longest answer text; the rest of a longer answer goes as one attachment of the same message (17.3, 01 6.13); also the longest text attachment of the triggering message that stands inline in the turn (17.6, FIX-hermes-text-attachment-inline); the default equals `message.max_content_bytes`, both change together |
+| `hermes_adapter.attachment_text_max_bytes` | Hermes adapter | `32768` | longest attachment text the adapter inlines as a data block of the context; the default equals `agent.context_message_max_bytes` |
 | `hermes_adapter.background_poll_interval` | Hermes adapter | `2s` | how often a run that holds background work reads Hermes' registries (17.12) |
 | `hermes_adapter.background_settle` | Hermes adapter | `15s` | how long a run that saw background work stays open after the work ended and no turn of the thread ran, for the turn Hermes starts with the result (17.12) |
 | `hermes_adapter.background_progress_interval` | Hermes adapter | `2m` | while background work runs, `/metrics/progress_events` rises once per interval; must stay below the server's `run.stall_after` (17.12) |

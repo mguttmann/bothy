@@ -15,9 +15,11 @@ from typing import Any
 from uuid import UUID
 
 import pytest
+import yaml
 from bothy_sdk.ids import uuid7
 from bothy_sdk.testing.fakeserver import ContextFile
 from fake_hermes_kit import (
+    PLATFORM_KEY,
     HermesRig,
     HermesWorld,
     Profile,
@@ -203,6 +205,118 @@ async def test_document_of_the_trigger_reaches_hermes_as_a_file(world: HermesWor
             p for p in (rig.home / "cache").rglob("*plan.pdf") if p.read_bytes() == pdf.content
         ]
         assert cached, gateway_log(rig)
+
+
+def _paste(size: int, tail: str) -> bytes:
+    """A pasted text of exactly ``size`` bytes that ends with ``tail`` (UTF-8, one umlaut)."""
+    head = "Notes about the lake trip, pasted from the editor: ä\n".encode()
+    body = tail.encode()
+    filler = size - len(head) - len(body)
+    return head + (b"line of the paste\n" * (filler // 18 + 1))[:filler] + body
+
+
+def _last_user_text(rig: HermesRig) -> str:
+    """The text of the last user message of the last model request (Hermes's turn)."""
+    request = rig.model.raw[-1]
+    users = [m for m in request.get("messages", []) if m.get("role") == "user"]
+    content = users[-1]["content"]
+    if isinstance(content, list):
+        return "\n".join(str(p.get("text", "")) for p in content if isinstance(p, dict))
+    return str(content)
+
+
+async def test_text_attachment_reaches_the_turn_inline(world: HermesWorld) -> None:
+    """The live case: a long paste the desktop app sends as ``paste.txt`` (text/plain).
+
+    Before the fix the turn held only Hermes's note with the cached path; the text stood in
+    the user side, which Hermes's default hook limit (10,000 characters) left out.
+    """
+    script = [ScriptTurn(text=("I read the paste.",), paced=False)]
+    async with hermes_rig(world, script) as rig:
+        tail = "END-OF-PASTE-7f3a"
+        data = _paste(12430, tail)
+        paste = ContextFile(uuid7(), "paste.txt", "text/plain", data)
+        triggered = await rig.fake.trigger("Summarise this.", files=(paste,))
+        await _done(rig, triggered.run_id)
+        turn = _last_user_text(rig)
+        # The whole text is in the turn, as data of the user, behind Hermes's own note.
+        assert data.decode() in turn, gateway_log(rig)
+        assert "[Content of paste.txt]:" in turn
+        assert "<<<DATA " in turn
+        assert "source=file" in turn
+        assert "Its content has been included below" in turn
+        assert "Summarise this." in turn
+        # Once only: the user side no longer carries the same text.
+        assert turn.count(tail) == 1
+
+
+async def test_too_large_text_attachment_keeps_the_file_note(world: HermesWorld) -> None:
+    script = [ScriptTurn(text=("It is long.",), paced=False)]
+    async with hermes_rig(world, script, start=False) as rig:
+        path = rig.home / "config.yaml"
+        config = yaml.safe_load(path.read_text(encoding="utf-8"))
+        extra = config["gateway"]["platforms"][PLATFORM_KEY]["extra"]
+        extra["hermes_adapter.max_message_bytes"] = 4096
+        path.write_text(yaml.safe_dump(config, sort_keys=True), encoding="utf-8")
+        await _start_gateway(rig)
+        tail = "END-OF-LONG-9c1d"
+        paste = ContextFile(uuid7(), "paste.txt", "text/plain", _paste(5000, tail))
+        triggered = await rig.fake.trigger("Read it.", files=(paste,))
+        await _done(rig, triggered.run_id)
+        turn = _last_user_text(rig)
+        # The text is not inlined into the turn; it may still stand in the user side's data
+        # block (the context after the person's text), which has its own limits.
+        own = turn.partition("Read it.")[0]
+        assert "[Content of paste.txt]:" not in turn, gateway_log(rig)
+        assert tail not in own
+        assert "It is saved at:" in turn
+        assert "is larger than the inline limit of 4096 bytes" in turn
+
+
+async def test_references_in_an_inlined_text_are_not_expanded(world: HermesWorld) -> None:
+    """File text is data: an ``@file:`` in it never makes Hermes read a file of the host."""
+    script = [ScriptTurn(text=("ok",), paced=False)]
+    async with hermes_rig(world, script) as rig:
+        secret = "SECRET-HOST-CONTENT-42"
+        for where in (rig.homes.home, rig.homes.work):
+            (where / "host-secret.txt").write_text(secret + "\n", encoding="utf-8")
+        body = b"Pasted log from a colleague.\nsee @file:host-secret.txt for details\n"
+        paste = ContextFile(uuid7(), "paste.txt", "text/plain", body)
+        triggered = await rig.fake.trigger("Summarise this.", files=(paste,))
+        await _done(rig, triggered.run_id)
+        turn = _last_user_text(rig)
+        assert "[Content of paste.txt]:" in turn, gateway_log(rig)
+        assert secret not in json.dumps(rig.model.raw)
+        assert "--- Attached Context" not in turn
+
+
+async def test_binary_attachment_is_not_inlined(world: HermesWorld) -> None:
+    script = [ScriptTurn(text=("A binary file.",), paced=False)]
+    async with hermes_rig(world, script) as rig:
+        blob = ContextFile(uuid7(), "data.bin", "application/octet-stream", b"\x00\x01binary\xff")
+        triggered = await rig.fake.trigger("What is it?", files=(blob,))
+        await _done(rig, triggered.run_id)
+        turn = _last_user_text(rig)
+        assert "The user sent a document: 'data.bin'" in turn, gateway_log(rig)
+        assert "[Content of" not in turn
+        assert "<<<DATA " not in turn
+
+
+async def test_two_text_attachments_reach_the_turn_inline(world: HermesWorld) -> None:
+    script = [ScriptTurn(text=("Both read.",), paced=False)]
+    async with hermes_rig(world, script) as rig:
+        notes = ContextFile(uuid7(), "notes.md", "text/markdown", b"# Packing list\n- tent\n")
+        config = ContextFile(uuid7(), "trip.json", "application/json", b'{"boat": "Saturday"}\n')
+        triggered = await rig.fake.trigger("", files=(notes, config))
+        await _done(rig, triggered.run_id)
+        turn = _last_user_text(rig)
+        assert "[Content of notes.md]:" in turn, gateway_log(rig)
+        assert "# Packing list\n- tent" in turn
+        assert "[Content of trip.json]:" in turn
+        assert '{"boat": "Saturday"}' in turn
+        # Hermes's note for both says the content is here, not a binary to extract.
+        assert turn.count("Its content has been included below") == 2
+        assert turn.index("notes.md]:") < turn.index("trip.json]:")
 
 
 async def test_undeliverable_image_reaches_hermes_as_a_note(world: HermesWorld) -> None:

@@ -123,9 +123,12 @@ from bothy_hermes_adapter.media import (
     FileRefused,
     audio_to_transcribe,
     files_for_hermes,
+    inline_text,
+    is_text_attachment,
     problem_reason,
     read_local_file,
     scan_refusal,
+    too_long_note,
     undelivered_note,
     upload,
     with_transcripts,
@@ -564,8 +567,9 @@ class HermesHandler(AgentHandler):
             ctx, channel = inbound
             if audio_to_transcribe(ctx):
                 built = await self._transcribed(run, ctx, channel) or built
-            media, notes = await self._media(run, ctx)
-            built = _with_media(built, media, notes)
+            inbound_media = await self._media(run, ctx)
+            media = inbound_media.media
+            built = _with_media(built, inbound_media)
         turn = _Turn(
             run_id=run.run_id,
             thread_id=run.thread_id,
@@ -637,53 +641,67 @@ class HermesHandler(AgentHandler):
         text = f"{prefix}\n\n{built.user_text}" if built.user_text.strip() else prefix
         return BuiltContext(user_side=built.user_side, user_text=text)
 
-    async def _media(
-        self, run: RunHandle, ctx: RunContext
-    ) -> tuple[tuple[InboundMedia, ...], list[str]]:
+    async def _media(self, run: RunHandle, ctx: RunContext) -> _InboundMedia:
         """The trigger's attachments in Hermes's media cache, and a note for each one that is not.
 
         An attachment the server does not serve, one over Hermes's limit, one the server refuses
         to hand out and one Hermes refuses to cache become a note; nothing is loaded for the
-        first two. Logs carry codes only (SEC-LOG-2).
+        first two. A cached text attachment within ``hermes_adapter.max_message_bytes``
+        also stands in the turn's text as data of the user; a longer one gets a note that its
+        content is not included (docs/decisions.d/FIX-hermes-text-attachment-inline.md). Logs
+        carry codes only (SEC-LOG-2).
         """
         try:
             limit = int(self.runtime.media_limit())
         except Exception as exc:  # an unreadable limit is none; the server's upload limit holds
             _LOG.warning("media limit not readable: %s", type(exc).__name__)
             limit = 0
+        text_limit = self.settings.max_message_bytes
         media: list[InboundMedia] = []
         notes: list[str] = []
+        texts: list[str] = []
+        inlined: set[UUID] = set()
         for item in files_for_hermes(ctx):
             reason = scan_refusal(item)
             if reason is None and limit > 0 and int(item.size_bytes) > limit:
                 reason = "too_large"
             if reason is None:
-                cached, reason = await self._cache(run, item)
+                cached, reason, data = await self._cache(run, item)
                 if cached is not None:
+                    if is_text_attachment(item) and len(data) <= text_limit:
+                        texts.append(inline_text(item, data))
+                        inlined.add(item.file_id)
+                        cached = replace(cached, text_inlined=True)
+                    elif is_text_attachment(item):
+                        _LOG.info("run %s: attachment text not inlined code=too_long", run.run_id)
+                        notes.append(too_long_note(item, len(data), text_limit))
                     media.append(cached)
                     continue
             _LOG.info("run %s: attachment not passed on code=%s", run.run_id, reason)
             notes.append(undelivered_note(item, reason or "unavailable"))
-        return tuple(media), notes
+        return _InboundMedia(tuple(media), notes, texts, frozenset(inlined))
 
-    async def _cache(self, run: RunHandle, item: Any) -> tuple[InboundMedia | None, str | None]:
-        """Load one attachment whole and put it into Hermes's media cache."""
+    async def _cache(
+        self, run: RunHandle, item: Any
+    ) -> tuple[InboundMedia | None, str | None, bytes]:
+        """Load one attachment whole and put it into Hermes's media cache (with its bytes)."""
         try:
             result = await run.client.call(download_file.asyncio_detailed, file_id=item.file_id)
         except ProblemError as exc:
-            return None, problem_reason(exc.code)
+            return None, problem_reason(exc.code), b""
         except httpx.TransportError:
-            return None, "unavailable"
+            return None, "unavailable", b""
         if not isinstance(result, File):
-            return None, "unavailable"
+            return None, "unavailable", b""
+        data = bytes(result.payload.read())
         try:
             cached = await self.runtime.cache_media(
-                bytes(result.payload.read()), str(item.original_name), str(item.mime_type)
+                data, str(item.original_name), str(item.mime_type)
             )
         except Exception as exc:  # Hermes refused the bytes (its size cap, a path it rejects)
             _LOG.info("run %s: attachment not cached: %s", run.run_id, type(exc).__name__)
-            return None, "unreadable"
-        return (cached, None) if cached is not None else (None, "unreadable")
+            return None, "unreadable", b""
+        return (cached, None, data) if cached is not None else (None, "unreadable", b"")
 
     async def _download(self, run: RunHandle, file_id: UUID) -> bytes | None:
         try:
@@ -2034,18 +2052,40 @@ def _log_task_failure(task: asyncio.Task[Any]) -> None:
         _LOG.warning("handler task failed: %s", type(exc).__name__)
 
 
-def _with_media(
-    built: BuiltContext, media: tuple[InboundMedia, ...], notes: list[str]
-) -> BuiltContext:
-    """The person's text with the notes of undelivered attachments before it.
+@dataclass(frozen=True)
+class _InboundMedia:
+    """What the trigger's attachments add to a turn; no text appears in ``repr`` (SEC-LOG-2).
 
-    A message whose only content is attachments gets Hermes's own wording for it (`NO_TEXT`),
-    so it never reaches Hermes as an empty message.
+    Attributes:
+        media: The attachments in Hermes's media cache.
+        notes: The notes of attachments not passed on or whose text is too long.
+        texts: The inlined texts of text attachments, as data blocks.
+        inlined: The files whose text ``texts`` carries.
+    """
+
+    media: tuple[InboundMedia, ...]
+    notes: list[str] = field(repr=False)
+    texts: list[str] = field(repr=False)
+    inlined: frozenset[UUID]
+
+
+def _with_media(built: BuiltContext, inbound: _InboundMedia) -> BuiltContext:
+    """The person's text with the notes and the inlined attachment texts before it.
+
+    Notes first, then the texts in the attachments' order (as Hermes's Discord platform puts
+    the injected texts before the person's words). A message whose only content is attachments
+    gets Hermes's own wording for it (`NO_TEXT`), so it never reaches Hermes as an empty
+    message. An inlined text leaves the user side, so the model gets it once (D-FHTAI-3).
     """
     text = built.user_text if built.user_text.strip() else ""
-    if not text and media:
+    if not text and inbound.media:
         text = NO_TEXT
-    if not notes and text == built.user_text:
+    parts = [*inbound.notes, *inbound.texts]
+    if not parts and text == built.user_text:
         return built
-    joined = "\n\n".join([*notes, text] if text else notes)
-    return BuiltContext(user_side=built.user_side, user_text=joined)
+    side = built.user_side
+    if inbound.inlined:
+        kept = {k: v for k, v in side.file_texts.items() if k not in inbound.inlined}
+        side = replace(side, file_texts=kept)
+    joined = "\n\n".join([*parts, text] if text else parts)
+    return BuiltContext(user_side=side, user_text=joined)
