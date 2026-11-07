@@ -134,9 +134,9 @@ GATE_COMPONENT_INPUTS: dict[str, tuple[str, ...]] = {
 # a whole (`docs/spec/$name`, the term table of packages/l10n), the operations guides by the
 # server's tests. tools/ci/tests/test_components.py scans the code of every component for the
 # docs paths it names and fails while one is missing here or in GATE_COMPONENT_INPUTS. Every
-# other file under docs/ (decisions, briefs, design notes, architecture, guides) and the site
-# configuration mkdocs.yml feed only the docs gates and the tools tests, which run on every
-# change: a pull request of only those runs no conditional job.
+# other file under docs/ (decisions other than the Hermes ones, briefs, design notes,
+# architecture, guides) and the site configuration mkdocs.yml feed only the docs gates and the
+# tools tests, which run on every change: a pull request of only those runs no conditional job.
 GATE_COMPONENT_INPUT_PREFIXES: dict[str, tuple[str, ...]] = {
     # The server embeds a copy of the shipped agent templates that `go generate` writes and
     # codegen-check holds equal (docs/spec/26-builtin-agents.md 7.2, A1-06).
@@ -151,7 +151,13 @@ GATE_COMPONENT_INPUT_PREFIXES: dict[str, tuple[str, ...]] = {
     # The panel plugin imports the TypeScript tokens and bundles their fonts (M7-24, M7-25). The
     # Hermes adapter imports the Python SDK from its source tree (M2-33), so an SDK change runs
     # the adapter's tests too.
-    "plugins": ("design/build/ts/", "sdk/python/src/"),
+    "plugins": (
+        "design/build/ts/",
+        "sdk/python/src/",
+        # The pin tests of the Hermes adapter look up the ruling of a pin without a release tag
+        # in the Hermes decision files (plugins/hermes-adapter/tests/pin_rules.py).
+        "docs/decisions.d/HERMES-",
+    ),
 }
 # Self-contained tool folders under tools/ (and single files in them) with the gate components
 # whose gates or tests read them; the longest matching key decides. A tool without a component is

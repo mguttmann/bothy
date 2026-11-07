@@ -101,10 +101,11 @@ def test_pin_references_accept_a_tag_or_a_ruling_that_names_the_commit(
     assert (problems == []) is ok, problems
 
 
-def test_ruling_rows_find_the_rulings_of_both_decision_places() -> None:
+def test_ruling_rows_find_the_rulings_of_the_hermes_decision_files() -> None:
     rows = ruling_rows()
     assert "bf0203a794a07aac3ff764972ab9087baa4e4f4e" in rows["D-HERMES-COMPAT-3"]
-    assert "D-M2-32-3" in rows
+    assert "a8b0bc15053c1d71fb2bfea39007847c9e1c5673" in rows["D-HERMES-MAIN-1"]
+    assert "D-M2-32-3" not in rows
 
 
 def test_load_pin_accepts_a_tagless_pin(tmp_path: Path) -> None:

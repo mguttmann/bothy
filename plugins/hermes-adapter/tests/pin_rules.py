@@ -15,12 +15,14 @@ from hermes_harness.pin import HermesPin
 
 REPO = Path(__file__).resolve().parents[3]
 _RULING = re.compile(r"\bD-[A-Z0-9]+(?:-[A-Z0-9]+)*-[0-9]+\b")
+# The Hermes decision files: only they may rule on the pin. The name prefix selects the component
+# plugins in tools/ci/components.py, so a pull request that changes one runs these tests.
+RULING_FILES = "docs/decisions.d/HERMES-"
 
 
 def ruling_rows() -> dict[str, str]:
-    """Every ruling table row of the decision files, by its ID."""
-    files = [REPO / "docs" / "DECISIONS-FOUNDATION.md"]
-    files += sorted((REPO / "docs" / "decisions.d").glob("*.md"))
+    """Every ruling table row of the Hermes decision files, by its ID."""
+    files = sorted(REPO.glob(RULING_FILES + "*.md"))
     rows: dict[str, str] = {}
     for path in files:
         for line in path.read_text(encoding="utf-8").splitlines():

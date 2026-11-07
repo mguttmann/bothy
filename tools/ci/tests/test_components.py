@@ -930,7 +930,8 @@ def test_every_docs_file_that_component_code_reads_selects_that_component() -> N
     # The real tree: a docs file that a test, build or generator of a component reads must select
     # that component, so that a docs-only pull request never skips a job its diff can break. A
     # reference to a directory (or a path with a variable, `docs/spec/$name`) covers every file
-    # in it. Strings that name no tracked path (test fixtures like "docs/website") are left out.
+    # in it, a name prefix ending in "-" (`docs/decisions.d/HERMES-`) every file it starts.
+    # Strings that name no tracked path (test fixtures like "docs/website") are left out.
     repo = Path(__file__).resolve().parents[3]
     tracked = subprocess.run(
         ["git", "ls-files", "-z"], cwd=repo, capture_output=True, text=True, check=True
@@ -941,6 +942,8 @@ def test_every_docs_file_that_component_code_reads_selects_that_component() -> N
         path = ref.split("$")[0].rstrip("/")
         if "$" not in ref and path in docs:
             covered = [path]
+        elif ref.endswith("-"):
+            covered = [f for f in docs if f.startswith(ref)]
         else:
             covered = [f for f in docs if f.startswith(path + "/")]
         for doc in covered:
@@ -957,6 +960,7 @@ def test_the_reference_scan_finds_the_known_readers() -> None:
         "apps/client/test/a11y/phone/routes_checklist_test.dart",
         "services/server/test/agents/registry_test.go",
         "plugins/hermes-adapter/tests/unit/test_pin.py",
+        "plugins/hermes-adapter/tests/pin_rules.py",
         "packages/admin_ui/test/admin/access_fake.dart",
     ]
     refs = {(f, ref) for f, _, ref in _doc_references(repo, files)}
@@ -967,3 +971,6 @@ def test_the_reference_scan_finds_the_known_readers() -> None:
     assert ("services/server/test/agents/registry_test.go", "docs/PLAN.md") in refs
     assert ("plugins/hermes-adapter/tests/unit/test_pin.py", "docs/spec/09-agents.md") in refs
     assert ("packages/admin_ui/test/admin/access_fake.dart", "docs/spec/$name") in refs
+    assert ("plugins/hermes-adapter/tests/pin_rules.py", "docs/decisions.d/HERMES-") in refs
+    assert components.changed(["docs/decisions.d/HERMES-MAIN-A8B0.md"]) == ["plugins"]
+    assert components.changed(["docs/decisions.d/M2-48.md"]) == []

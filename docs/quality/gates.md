@@ -124,11 +124,11 @@ the root Markdown files, `LICENSE`, `NOTICE`, the site configuration `mkdocs.yml
 conditional job, except the files the map assigns to a component (for example `docs/spec/actions.yaml` to `server`, `templates/agents/` to `server`, whose embedded copy codegen-check holds equal (A1-06), and `infra/compose/` and `infra/otel/` to `server`, whose terminal suite starts that stack, M2-48).
 A file under `docs/` that a test, build or generator of a component reads selects that component
 (docs/decisions.d/CI-SPLIT-MERGE-QUEUE.md D-CSMQ-7): `docs/spec/` selects `server` and `apps`,
-`docs/operations/` selects `server`, and single files such as `docs/operations/configuration.md`
+`docs/operations/` selects `server`, the Hermes decision files `docs/decisions.d/HERMES-*.md` select `plugins` (the pin tests of the Hermes adapter read their rulings), and single files such as `docs/operations/configuration.md`
 (every component), `docs/observability/signals.md`, `docs/PLAN.md` and
 `docs/quality/accessibility-mobile.md` select their readers. `tools/ci/tests/test_components.py`
 scans the code of every component for the docs paths it names and fails while one does not
-select its reader. A pull request of only other documentation (decisions, briefs, design notes,
+select its reader. A pull request of only other documentation (other decisions, briefs, design notes,
 architecture, this file) runs no conditional job: no component test, platform, image or
 end-to-end job, only the jobs of every change. The plan reads the diff
 without rename detection, so a moved file counts for its old and its new path. A build branch
