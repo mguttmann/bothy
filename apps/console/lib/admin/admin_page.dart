@@ -126,6 +126,12 @@ class ConsoleAdminPage extends StatelessWidget {
       onNavigate: controller.openAdmin,
       openExternal: tab?.open,
       statusSource: admin.statusSource,
+      newAgent: admin.newAgentHost(
+        l,
+        onCreated: (result) => controller.openAdmin(
+          AdminLocation(AdminSection.agents, id: result.agentId),
+        ),
+      ),
       onViewAs: (person) => unawaited(
         admin.startViewAs(
           person,

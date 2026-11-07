@@ -389,8 +389,11 @@ void registerAgentHandlers(
     }
   }
 
-  FakeResponse card(FakeAgent a) =>
-      FakeResponse(200, world.agentJson(a), {'ETag': '"${a.version}"'});
+  FakeResponse card(FakeAgent a) => FakeResponse(
+    200,
+    world.agentJson(a, owner: true),
+    {'ETag': '"${a.version}"'},
+  );
 
   /// A holder must be an active person (10 4, I4); `required` without one.
   void validHolder(String? id) {
@@ -422,11 +425,17 @@ void registerAgentHandlers(
       return FakeResponse(200, {
         'items': [
           for (final p in world.people.values)
-            if (p.kind == 'agent') world.agentJson(world.agentOf(p.id)!),
+            if (p.kind == 'agent')
+              world.agentJson(world.agentOf(p.id)!, owner: r.person.isOwner),
         ],
       });
     })
-    ..handle('getAgent', (r) => card(agentOf(r.param('agent_id'))))
+    ..handle('getAgent', (r) {
+      final a = agentOf(r.param('agent_id'));
+      return FakeResponse(200, world.agentJson(a, owner: r.person.isOwner), {
+        'ETag': '"${a.version}"',
+      });
+    })
     ..handle('setAgentBillingMode', (r) {
       owner(r);
       final a = agentOf(r.param('agent_id'));

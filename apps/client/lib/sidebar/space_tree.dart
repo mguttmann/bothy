@@ -37,6 +37,7 @@ class SpaceTree extends StatelessWidget {
     this.onAdd,
     this.onNewProject,
     this.onAddFolderForums,
+    this.onNewAgent,
     this.selectedNewChat,
     this.onOpenNewChat,
     this.arrangement = const SidebarArrangement(),
@@ -100,6 +101,9 @@ class SpaceTree extends StatelessWidget {
   /// The space menu entry "Add forums for existing folders" (01 6.10 item 1), or null for none.
   final ValueChanged<Space>? onAddFolderForums;
 
+  /// The space menu entry "New agent" (01 6.20 item 1), or null for none.
+  final ValueChanged<Space>? onNewAgent;
+
   @override
   Widget build(BuildContext context) {
     if (nodes.isEmpty) {
@@ -146,6 +150,7 @@ class SpaceTree extends StatelessWidget {
               onAdd: onAdd,
               onNewProject: onNewProject,
               onAddFolderForums: onAddFolderForums,
+              onNewAgent: onNewAgent,
               selectedNewChat: selectedNewChat,
               onOpenNewChat: onOpenNewChat,
               onMoveUp: !arranged && i > 0 ? () => onMove(id, i - 1) : null,

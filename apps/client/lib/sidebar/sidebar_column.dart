@@ -18,6 +18,8 @@ import '../admin/admin_route.dart' show adminPathOf;
 import '../app/providers/session.dart';
 import '../app/router.dart' show NewChatLocation;
 import '../forum/new_chat_view.dart' show openNewChat;
+import '../new_agent/new_agent_entry.dart'
+    show newAgentOfferProvider, openNewAgent;
 import '../new_project/new_project_dialog.dart' show showNewProjectDialog;
 import '../new_project/project_sync_dialog.dart' show showProjectSyncDialog;
 import '../notifications_settings/providers.dart' show isOwnerProvider;
@@ -72,6 +74,7 @@ class SidebarView extends StatelessWidget {
     this.onAdd,
     this.onNewProject,
     this.onAddFolderForums,
+    this.onNewAgent,
     this.onHold,
     this.holdMode = SidebarHoldMode.pointer,
     this.selectedNewChat,
@@ -178,6 +181,9 @@ class SidebarView extends StatelessWidget {
   /// The space menu entry "Add forums for existing folders" (01 6.10 item 1), or null for none.
   final ValueChanged<Space>? onAddFolderForums;
 
+  /// The space menu entry "New agent" (01 6.20 item 1), or null for none.
+  final ValueChanged<Space>? onNewAgent;
+
   /// Called with true while the person is in the sidebar ([holdMode]) and with false when the
   /// person left it (01 6.8 item 4: rows that no longer qualify stay until then).
   final ValueChanged<bool>? onHold;
@@ -234,6 +240,7 @@ class SidebarView extends StatelessWidget {
           onAdd: onAdd,
           onNewProject: onNewProject,
           onAddFolderForums: onAddFolderForums,
+          onNewAgent: onNewAgent,
           selectedNewChat: selectedNewChat,
           onOpenNewChat: onOpenNewChat,
           arrangement: arrangement,
@@ -593,6 +600,11 @@ class SidebarColumn extends ConsumerWidget {
       onAddFolderForums: owner
           ? (space) => unawaited(showProjectSyncDialog(context, ref, space))
           : null,
+      // 01 6.20 item 1 (A1-08): owners create a built-in agent from the space menu on the
+      // desktop and the phone, only with an offer of the server (26 8.1).
+      onNewAgent: ref.watch(newAgentOfferProvider).value == null
+          ? null
+          : (_) => unawaited(openNewAgent(context, ref, phone: phone)),
       selectedNewChat: newChat,
       onOpenNewChat: (forum, entry) =>
           context.go(NewChatLocation.pathOf(forum, entry: entry)),

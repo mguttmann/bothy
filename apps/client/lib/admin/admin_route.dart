@@ -19,6 +19,8 @@ import 'package:sync_engine/sync_engine.dart' show EphemeralStore;
 
 import '../app/providers/ports.dart';
 import '../app/providers/session.dart';
+import '../new_agent/new_agent_entry.dart'
+    show newAgentHostOf, openNewAgentResult;
 import '../settings/settings_providers.dart' show personTimeZoneProvider;
 import '../status/status_route.dart' show appStatusSourceProvider;
 import 'manifest_file.dart';
@@ -141,6 +143,15 @@ class AdminRoute extends ConsumerWidget {
           unawaited(ref.read(appPortsProvider).browser.open(url)),
       // The status page follows status.updated and the connection state (M7-21).
       statusSource: ref.watch(appStatusSourceProvider),
+      // "New agent" of the agent list (01 6.20 item 1, A1-08): then the new channel or the
+      // agent card.
+      newAgent: newAgentHostOf(
+        context,
+        ref,
+        phone: false,
+        onCreated: (result) =>
+            openNewAgentResult(context, result, phone: false),
+      ),
       instanceChanges: db == null
           ? null
           : () => db.instanceDao.watch().skip(1).map((_) {}),

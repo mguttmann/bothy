@@ -2707,6 +2707,18 @@ final class FakeWorld {
   // -------------------------------------------------------------------------------------------
   // Agents, operators and I1 (brief M4-28)
 
+  /// The agent templates `listAgentTemplates` answers (`AgentTemplate` JSON, 26 7.3), in the
+  /// order of the server: shipped by slug, then private by slug. A test fills it; null makes
+  /// the operation answer `404` like a server before stage A1 (26 8.1).
+  List<JsonMap>? agentTemplates = [];
+
+  /// The answers `interviewAgent` gives, in order (`AgentInterviewAnswer` JSON, 26 6.1); when
+  /// none is left the answer is the fallback `builder_not_configured`.
+  final List<JsonMap> interviewAnswers = [];
+
+  /// The bodies of every `interviewAgent` request (`AgentInterviewRequest` JSON), oldest first.
+  final List<JsonMap> interviewRequests = [];
+
   /// The agent rows by principal ID. An agent person added with [addPerson] alone has none
   /// until [agentOf] creates it with the defaults (organization), so the worlds of earlier
   /// tickets keep working.
@@ -2714,7 +2726,8 @@ final class FakeWorld {
 
   /// Adds an agent person (through [addPerson], kind `agent`) and its [FakeAgent] with the
   /// given configured and reported values, as if its first heartbeat had just arrived; returns
-  /// the [FakeAgent].
+  /// the [FakeAgent]. [hostsAgents] makes a Claude Code runner that hosts built-in agents up to
+  /// that tool class, [hostedBy] a built-in agent of that runner (26 3.1).
   ///
   /// [credentialHolderId] is stored as given, so a test can build a world that already breaks
   /// I1 (10 5.4) and repair it through the API.
@@ -2728,6 +2741,9 @@ final class FakeWorld {
     String adapterKind = 'hermes',
     String state = 'online',
     String keyType = 'api_key',
+    String toolClass = 'chat',
+    String? hostsAgents,
+    String? hostedBy,
   }) {
     final p = addPerson(
       handle: handle,
@@ -2745,6 +2761,9 @@ final class FakeWorld {
       adapterKind: adapterKind,
       state: state,
       keyType: keyType,
+      toolClass: toolClass,
+      hostsAgents: hostsAgents,
+      hostedBy: hostedBy,
     )..lastHeartbeatAt = stamp();
     a.mismatchAtHeartbeat =
         reportedBillingMode != null && reportedBillingMode != billingMode;
@@ -2851,7 +2870,10 @@ final class FakeWorld {
   /// (`credential_holder_id` only with `personal`) and the presence (`AgentRuntimeStatus`) with
   /// the reported values, `billing_evidence`, `billing_mode_matches` (only with a reported mode)
   /// and the [agentWarnings].
-  JsonMap agentJson(FakeAgent a) {
+  ///
+  /// With [owner] the presence of a runner carries `hosts_agents` (26 8.1, A1-03b: owners only,
+  /// never in an event); `hosted_by` is part of every card of a built-in agent.
+  JsonMap agentJson(FakeAgent a, {bool owner = false}) {
     final p = people[a.id]!;
     final reported = a.reportedBillingMode;
     return {
@@ -2883,8 +2905,10 @@ final class FakeWorld {
           'method': ?a.evidenceMethod,
         },
         'warnings': agentWarnings(a),
+        if (owner) 'hosts_agents': ?a.hostsAgents,
       },
       'operator_config': <String, Object?>{},
+      'hosted_by': ?a.hostedBy,
       'version': a.version,
     };
   }

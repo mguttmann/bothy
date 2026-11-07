@@ -55,6 +55,7 @@ SHA-256 of uploads and downloads), and for files and voice (M4-22, docs/DECISION
 | `lib/app/layout/` | the desktop shell, the four columns and their stored widths |
 | `lib/sidebar/` | the sidebar column (M4-19): head, space tree, channel rows, foot, personal order, `SidebarNavigation` for M4-24; the thread groups with their selection, rows and "All posts" (M4-40) |
 | `lib/forum/` | the forum overview D15 (M4-19, M4-40): head with the kind sentence, "Pin" and filters, rows, Done section, paging, and the new chat view (M4-41) |
+| `lib/new_agent/` | "New agent" (A1-08): the offer of the signed-in owner (`newAgentOfferProvider`), the host part of the shared dialog of `admin_ui` over the session (`newAgentHostOf`) and the entry of the space menu (`openNewAgent`) |
 | `lib/new_project/` | the new project dialog (M4-43): name suggestion and field checks, the steps of `NewProjectFlow`, the port over the API and the outbox, the dialog; forums for existing folders (`ProjectSyncFlow`, its dialog) and the rename of a project forum (M4-44) |
 | `lib/thread/` | the history column (M4-20): header, message list with paging, gaps and jumps, message tiles and actions, outbox rows, dialogs (versions, conflict, delete, reactions, title, move), the D2 layout |
 | `lib/composer/` | the composer (M4-20): send path, draft sync, mention suggestions, templates; long pastes as files and long texts as one message with the rest attached (M4-47, `long_text.dart`, `attachment_chips.dart`) |
@@ -823,6 +824,33 @@ The menu of a forum with a project binding has "Rename project" for a person wit
 and the version of `getChannel` as `If-Match`; the folder and the binding stay. A
 `version_conflict` reads the version again and asks for one more press. Rulings:
 docs/decisions.d/M4-44.md.
+
+### New agent (A1-08)
+
+"New agent" creates a built-in agent (01 6.20; 26 8). The dialog, its preview, the steps and the
+port are the shared parts of `admin_ui` (`NewAgentDialog`, `NewAgentFlow`, `ApiNewAgentPort`), so
+the desktop, the phones and the console run the same code; `lib/new_agent/new_agent_entry.dart`
+wires them to the session. The entry shows only when `newAgentOfferProvider` has an offer: the
+person is an owner, the server answers `listAgentTemplates` and an active runner reports
+`presence.hosts_agents` (26 8.1); on an older server or without such a runner it is hidden. On the
+desktop it is in the agent list of the administration (`/admin/agents`) and in the space menu, on
+the phone in the space menu of the Spaces page, where the dialog fills the screen.
+
+The dialog offers a template, the interview with the builder agent (one request per turn, "Use
+what we have", the cost estimate so far, a fallback with its reason and the ways to the templates
+and the empty form) and the empty form; all three lead to one editable preview of everything that
+is created: name, handle, description, instructions, skills, MCP servers with the secret names to
+add on the runner host, the tool class with what it does and does not load, billing (`personal`
+only under 10 10.3), model, cost cap, the hosting runner and the channel. "Create" runs the steps
+of 26 8.2 (`createAgent` with `hosted_by`, `setAgentToolClass` before `putAgentDefinition` when
+the class rises and after it when it falls, `setAgentBillingMode` for `personal`, `createChannel`
+and `setChannelOperator`), each with its state; the server asks for the step-up where an action
+needs one. A failed step shows one sentence and keeps the preview editable, except the identity
+and the hosting runner once the agent exists; "Try again" reads the agent again and runs the steps
+whose target is not reached, so nothing is created twice; "Close" keeps what exists, and the
+agent list marks a built-in agent without a definition "Not set up". When every step is done the
+dialog opens the new channel, or on the desktop the agent card. Rulings:
+docs/decisions.d/A1-08.md.
 
 ### Project not ready (F-PROJEKT-BEREIT)
 

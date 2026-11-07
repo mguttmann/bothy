@@ -103,6 +103,13 @@
 /// [StatusController], the owner forms ([StatusComponentForm], [StatusIncidentForm],
 /// [StatusUpdateForm]) and the data source [StatusRepository] ([ApiStatusRepository]), which
 /// [AdminRepository] includes; the place [AdminSection.status] lists it for owners.
+///
+/// A1-08 adds "New agent" for owners on the desktop, the phones and the console (01 6.20; 26 8):
+/// the [NewAgentDialog] with its ways in (a template, the [AgentInterview] with the builder
+/// agent, the empty form), the one editable preview of the [NewAgentDraft] and the steps of the
+/// [NewAgentFlow] with resume, over the port [NewAgentPort] ([ApiNewAgentPort]). The entry shows
+/// only with a [NewAgentOffer]; [AgentsList] shows it and marks a built-in agent without a
+/// definition as "Not set up".
 library;
 
 export 'src/access/source_chain.dart';
@@ -117,6 +124,15 @@ export 'src/agents/agents_list.dart';
 export 'src/agents/guided_flow.dart';
 export 'src/agents/holder_dialog.dart';
 export 'src/agents/i1_explanation.dart';
+export 'src/agents/new_agent/agent_interview.dart';
+export 'src/agents/new_agent/new_agent_dialog.dart';
+export 'src/agents/new_agent/new_agent_draft.dart';
+export 'src/agents/new_agent/new_agent_flow.dart';
+export 'src/agents/new_agent/new_agent_interview_view.dart';
+export 'src/agents/new_agent/new_agent_port.dart';
+export 'src/agents/new_agent/new_agent_preview.dart';
+export 'src/agents/new_agent/new_agent_steps.dart';
+export 'src/agents/new_agent/new_agent_texts.dart';
 export 'src/agents/switch_all_dialog.dart';
 export 'src/agents/switch_mode_dialog.dart';
 export 'src/apps/app_labels.dart';

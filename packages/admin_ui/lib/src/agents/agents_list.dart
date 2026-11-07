@@ -14,6 +14,9 @@ import '../data/agents_repository.dart';
 import '../hosts/host_labels.dart' show personName;
 import '../self/self_feedback.dart';
 import 'agent_labels.dart';
+import 'new_agent/new_agent_dialog.dart';
+import 'new_agent/new_agent_flow.dart' show NewAgentResult;
+import 'new_agent/new_agent_port.dart';
 import 'switch_all_dialog.dart';
 
 /// Every agent the server lists (`listAgents`) with the badge "Personal" or "Organization"
@@ -25,6 +28,12 @@ import 'switch_all_dialog.dart';
 /// list never compares the configured with the reported mode (15 1 principle 1). A list the
 /// server refuses shows its reason and nothing else.
 ///
+/// With [newAgent] the list offers "New agent" to owners when the server answers
+/// `listAgentTemplates` and an active runner reports `hosts_agents` (26 8.1; the server shows
+/// both to owners only, so the list decides nothing itself), and marks a built-in agent without
+/// a definition as "Not set up" (26 8.3). Once the dialog created an agent the list loads again
+/// and [NewAgentHost.onCreated] opens it, or [onOpen] opens its card.
+///
 /// Example: `AgentsList(repository: repository, onOpen: (id) => open(id))`.
 class AgentsList extends StatefulWidget {
   /// Creates the list.
@@ -33,7 +42,11 @@ class AgentsList extends StatefulWidget {
     required this.repository,
     required this.onOpen,
     this.onChanged,
+    this.newAgent,
   });
+
+  /// "New agent", or null for no entry.
+  final NewAgentHost? newAgent;
 
   /// The administration's calls.
   final AdminRepository repository;
@@ -51,6 +64,8 @@ class AgentsList extends StatefulWidget {
 class _AgentsListState extends State<AgentsList> {
   List<AgentRecord>? _agents;
   List<AdminPerson> _people = const [];
+  NewAgentOffer? _offer;
+  Set<String> _notSetUp = const {};
   Object? _error;
   SelfNotice? _notice;
 
@@ -70,10 +85,31 @@ class _AgentsListState extends State<AgentsList> {
         // Without the directory the holder shows by its ID.
         people = const [];
       }
+      final host = widget.newAgent;
+      NewAgentOffer? offer;
+      final notSetUp = <String>{};
+      if (host != null) {
+        try {
+          offer = await host.port.offer();
+        } on Object {
+          // A failing offer hides the entry, not the list.
+          offer = null;
+        }
+        for (final a in agents) {
+          if (a.adapterKind != builtinAdapterKind) continue;
+          try {
+            if (await host.port.definition(a.id) == null) notSetUp.add(a.id);
+          } on Object {
+            // Unknown: the row shows no mark rather than a wrong one.
+          }
+        }
+      }
       if (mounted) {
         setState(() {
           _agents = agents;
           _people = people;
+          _offer = offer;
+          _notSetUp = notSetUp;
           _error = null;
         });
       }
@@ -104,11 +140,28 @@ class _AgentsListState extends State<AgentsList> {
     widget.onChanged?.call();
   }
 
+  Future<void> _newAgent(NewAgentHost host, NewAgentOffer offer) async {
+    final NewAgentResult? result = await host.open(context, offer);
+    if (!mounted) return;
+    // A closed dialog may have created an agent that is not set up yet (26 8.3): load again.
+    await _load();
+    widget.onChanged?.call();
+    if (result == null) return;
+    final open = host.onCreated;
+    if (open != null) {
+      open(result);
+    } else {
+      widget.onOpen(result.agentId);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final colors = context.dsColors;
     final agents = _agents;
+    final host = widget.newAgent;
+    final offer = _offer;
     final error = _error;
     final Widget content;
     if (error != null) {
@@ -132,6 +185,14 @@ class _AgentsListState extends State<AgentsList> {
                   ),
                 ),
               ),
+              if (host != null && offer != null) ...[
+                FilledButton(
+                  key: const ValueKey('agents.new'),
+                  onPressed: () => _newAgent(host, offer),
+                  child: Text(l.newAgentEntry),
+                ),
+                const SizedBox(width: DsSpace.s8),
+              ],
               OutlinedButton(
                 key: const ValueKey('agents.switchAll'),
                 onPressed: () => _switchAll(agents),
@@ -161,6 +222,22 @@ class _AgentsListState extends State<AgentsList> {
         ? personName(_people, a.holderId!)
         : null;
     final warnings = a.runtime.warnings.length;
+    // Its own transparent Material: the console hosts the list on a colored box, which would hide
+    // the row's ink and fails the ListTile assertion in debug builds.
+    return Material(
+      type: MaterialType.transparency,
+      child: _tile(l, colors, a, secondary, holder, warnings),
+    );
+  }
+
+  Widget _tile(
+    AppLocalizations l,
+    DsColors colors,
+    AgentRecord a,
+    TextStyle secondary,
+    String? holder,
+    int warnings,
+  ) {
     return ListTile(
       key: ValueKey('agent.${a.id}'),
       contentPadding: EdgeInsets.zero,
@@ -177,6 +254,13 @@ class _AgentsListState extends State<AgentsList> {
               Text(l.adminAgentHolder(holder), style: secondary),
             Text(a.handle, style: secondary),
             if (!a.active) Text(l.adminAgentDisabled, style: secondary),
+            if (_notSetUp.contains(a.id))
+              Text(
+                l.newAgentNotSetUp,
+                key: ValueKey('agent.${a.id}.notSetUp'),
+                style: dsTextStyle(DsType.bodySm)
+                    .copyWith(color: colors.warningFg),
+              ),
             if (warnings > 0)
               Text(
                 l.adminAgentWarningCount(warnings),

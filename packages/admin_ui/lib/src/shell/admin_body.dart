@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import '../access/who_has_access.dart' show AdminViewAs;
 import '../agents/agent_page.dart';
 import '../agents/agents_list.dart';
+import '../agents/new_agent/new_agent_dialog.dart' show NewAgentHost;
 import '../apps/app_page.dart';
 import '../apps/apps_list.dart';
 import '../apps/manifest_picker.dart';
@@ -60,7 +61,7 @@ import 'admin_routes.dart';
 /// link of the statistics outside the app, the system browser on the desktop and a new tab in
 /// the console (null: no link; M6-06); [statusSource] feeds the status page with its changes,
 /// the sync engine's events on the desktop and the interval of the console (null: the page is
-/// read once; M7-21).
+/// read once; M7-21); [newAgent] offers "New agent" in the agent list (null: no entry; A1-08).
 ///
 /// The body holds no permission logic: a screen the server refuses shows the server's reason
 /// (15 1 principle 1). A section without a screen shows the people list, as the shell does.
@@ -96,6 +97,7 @@ class AdminBody extends StatelessWidget {
     this.pickMapping,
     this.openExternal,
     this.statusSource,
+    this.newAgent,
   });
 
   /// The administration's calls.
@@ -150,6 +152,10 @@ class AdminBody extends StatelessWidget {
 
   /// The source of the status page, or null to read it once.
   final StatusSource? statusSource;
+
+  /// "New agent" of the agent list (01 6.20 item 1, A1-08): the port and the host's way to
+  /// open what was created; null shows no entry.
+  final NewAgentHost? newAgent;
 
   Widget _screen() {
     final r = repository;
@@ -222,6 +228,7 @@ class AdminBody extends StatelessWidget {
         repository: r,
         onOpen: (a) => onNavigate(AdminLocation(AdminSection.agents, id: a)),
         onChanged: changed,
+        newAgent: newAgent,
       ),
       AdminSection.apps when id != null => AppPage(
         key: ValueKey('admin.app.$id'),

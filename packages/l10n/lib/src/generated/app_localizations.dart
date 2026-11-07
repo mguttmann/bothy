@@ -16577,6 +16577,726 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{title}, {place}, {time}: {reason}'**
   String assistHitLabel(String title, String place, String time, String reason);
+
+  /// Entry of the agent list and the space menu that opens the new agent dialog (01 6.20 item 1).
+  ///
+  /// In en, this message translates to:
+  /// **'New agent'**
+  String get newAgentEntry;
+
+  /// Title of the new agent dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'New agent'**
+  String get newAgentTitle;
+
+  /// Closes the new agent dialog before anything was created.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get newAgentCancel;
+
+  /// Closes the new agent dialog; what was created stays (26 8.3).
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get newAgentClose;
+
+  /// Goes back to the three ways of the new agent dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get newAgentBack;
+
+  /// Starts the steps of the new agent dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Create'**
+  String get newAgentCreate;
+
+  /// Runs the steps of the new agent dialog that are not reached yet.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get newAgentRetry;
+
+  /// Way into the new agent dialog: a template (01 6.20 item 2).
+  ///
+  /// In en, this message translates to:
+  /// **'From a template'**
+  String get newAgentWayTemplate;
+
+  /// Hint of the template way.
+  ///
+  /// In en, this message translates to:
+  /// **'Start from a prepared agent and adjust it.'**
+  String get newAgentWayTemplateHint;
+
+  /// Way into the new agent dialog: the interview with the builder agent.
+  ///
+  /// In en, this message translates to:
+  /// **'Interview'**
+  String get newAgentWayInterview;
+
+  /// Hint of the interview way.
+  ///
+  /// In en, this message translates to:
+  /// **'The builder agent asks a few questions and drafts the agent.'**
+  String get newAgentWayInterviewHint;
+
+  /// Way into the new agent dialog: the empty form.
+  ///
+  /// In en, this message translates to:
+  /// **'Empty form'**
+  String get newAgentWayEmpty;
+
+  /// Hint of the empty form.
+  ///
+  /// In en, this message translates to:
+  /// **'Fill in everything yourself.'**
+  String get newAgentWayEmptyHint;
+
+  /// The template list is empty.
+  ///
+  /// In en, this message translates to:
+  /// **'This server offers no templates.'**
+  String get newAgentTemplatesEmpty;
+
+  /// Line of a template with the names of the secrets it needs.
+  ///
+  /// In en, this message translates to:
+  /// **'Needs these secrets: {names}'**
+  String newAgentTemplateSecrets(String names);
+
+  /// Marks a private template (26 7.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Template of this installation'**
+  String get newAgentTemplatePrivate;
+
+  /// Introduction of the interview.
+  ///
+  /// In en, this message translates to:
+  /// **'Answer in your own words. The builder asks one or two questions at a time.'**
+  String get newAgentInterviewIntro;
+
+  /// Label of the answer field of the interview.
+  ///
+  /// In en, this message translates to:
+  /// **'Your answer'**
+  String get newAgentInterviewAnswer;
+
+  /// Sends the answer of the interview.
+  ///
+  /// In en, this message translates to:
+  /// **'Send'**
+  String get newAgentInterviewSend;
+
+  /// Asks the builder for the draft now (want_draft).
+  ///
+  /// In en, this message translates to:
+  /// **'Use what we have'**
+  String get newAgentInterviewUseWhatWeHave;
+
+  /// Screen reader text of the spinner while the interview request runs.
+  ///
+  /// In en, this message translates to:
+  /// **'The builder is answering'**
+  String get newAgentInterviewWaiting;
+
+  /// Who said a question of the interview.
+  ///
+  /// In en, this message translates to:
+  /// **'Builder'**
+  String get newAgentInterviewBuilder;
+
+  /// Who said an answer of the interview.
+  ///
+  /// In en, this message translates to:
+  /// **'You'**
+  String get newAgentInterviewYou;
+
+  /// The summed cost estimate of the interview (26 6.1 item 3).
+  ///
+  /// In en, this message translates to:
+  /// **'Cost of the interview so far: {amount}, an estimate'**
+  String newAgentInterviewCost(String amount);
+
+  /// The reason of an interview fallback (26 6.1 item 4).
+  ///
+  /// In en, this message translates to:
+  /// **'{reason, select, builder_not_configured{No builder agent is set up on this server.} builder_offline{The builder agent is offline.} builder_timeout{The builder agent did not answer in time.} other{The answer of the builder agent could not be used.}}'**
+  String newAgentInterviewFallback(String reason);
+
+  /// Line under the reason of an interview fallback.
+  ///
+  /// In en, this message translates to:
+  /// **'Start from a template or the empty form instead.'**
+  String get newAgentInterviewFallbackHint;
+
+  /// Introduction of the preview (01 6.20 item 3).
+  ///
+  /// In en, this message translates to:
+  /// **'Everything below is created when you press Create; nothing exists before.'**
+  String get newAgentPreviewIntro;
+
+  /// Section of the preview: name, handle, description.
+  ///
+  /// In en, this message translates to:
+  /// **'Identity'**
+  String get newAgentSectionIdentity;
+
+  /// Field of the agent's display name.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get newAgentName;
+
+  /// The name is empty.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a name.'**
+  String get newAgentNameMissing;
+
+  /// Field of the agent's handle.
+  ///
+  /// In en, this message translates to:
+  /// **'Handle'**
+  String get newAgentHandle;
+
+  /// Helper text of the handle field.
+  ///
+  /// In en, this message translates to:
+  /// **'Lower-case letters, digits, dot, underscore and hyphen'**
+  String get newAgentHandleHint;
+
+  /// The handle does not match its pattern.
+  ///
+  /// In en, this message translates to:
+  /// **'Use lower-case letters, digits, dot, underscore and hyphen, starting with a letter or digit.'**
+  String get newAgentHandleInvalid;
+
+  /// Field of the agent's description.
+  ///
+  /// In en, this message translates to:
+  /// **'Description'**
+  String get newAgentDescription;
+
+  /// Note on the avatar: the creation sets no picture.
+  ///
+  /// In en, this message translates to:
+  /// **'The agent shows its initials as its picture.'**
+  String get newAgentAvatarNote;
+
+  /// Section and field of the instructions (CLAUDE.md).
+  ///
+  /// In en, this message translates to:
+  /// **'Instructions'**
+  String get newAgentSectionInstructions;
+
+  /// Helper text of the instructions.
+  ///
+  /// In en, this message translates to:
+  /// **'Markdown; becomes the agent\'s CLAUDE.md'**
+  String get newAgentInstructionsHint;
+
+  /// Section of the skills.
+  ///
+  /// In en, this message translates to:
+  /// **'Skills'**
+  String get newAgentSectionSkills;
+
+  /// Adds a skill to the preview.
+  ///
+  /// In en, this message translates to:
+  /// **'Add skill'**
+  String get newAgentSkillAdd;
+
+  /// Removes a skill from the preview.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove skill {name}'**
+  String newAgentSkillRemove(String name);
+
+  /// Field of a skill's name.
+  ///
+  /// In en, this message translates to:
+  /// **'Skill name'**
+  String get newAgentSkillName;
+
+  /// Field of a skill's description.
+  ///
+  /// In en, this message translates to:
+  /// **'What the skill does, in one line'**
+  String get newAgentSkillDescription;
+
+  /// Field of a skill's body.
+  ///
+  /// In en, this message translates to:
+  /// **'Skill text (Markdown)'**
+  String get newAgentSkillBody;
+
+  /// The number of extra files of a skill.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 extra file} other{{count} extra files}}'**
+  String newAgentSkillFiles(int count);
+
+  /// Section of the MCP servers.
+  ///
+  /// In en, this message translates to:
+  /// **'MCP servers'**
+  String get newAgentSectionServers;
+
+  /// Adds an MCP server to the preview.
+  ///
+  /// In en, this message translates to:
+  /// **'Add MCP server'**
+  String get newAgentServerAdd;
+
+  /// Removes an MCP server from the preview.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove MCP server {name}'**
+  String newAgentServerRemove(String name);
+
+  /// Field of an MCP server's name.
+  ///
+  /// In en, this message translates to:
+  /// **'Server name'**
+  String get newAgentServerName;
+
+  /// Transport http of an MCP server.
+  ///
+  /// In en, this message translates to:
+  /// **'Remote (http)'**
+  String get newAgentServerHttp;
+
+  /// Transport stdio of an MCP server.
+  ///
+  /// In en, this message translates to:
+  /// **'Local process (stdio)'**
+  String get newAgentServerStdio;
+
+  /// Field of the URL of an http MCP server.
+  ///
+  /// In en, this message translates to:
+  /// **'URL'**
+  String get newAgentServerUrl;
+
+  /// Field of the command of a stdio MCP server.
+  ///
+  /// In en, this message translates to:
+  /// **'Command'**
+  String get newAgentServerCommand;
+
+  /// Field of the pinned package of a stdio MCP server.
+  ///
+  /// In en, this message translates to:
+  /// **'Package (name@version)'**
+  String get newAgentServerPackage;
+
+  /// Field of the arguments of a stdio MCP server.
+  ///
+  /// In en, this message translates to:
+  /// **'Arguments, one per line'**
+  String get newAgentServerArgs;
+
+  /// Heading of the headers of an http MCP server.
+  ///
+  /// In en, this message translates to:
+  /// **'Headers'**
+  String get newAgentServerHeaders;
+
+  /// Heading of the environment of a stdio MCP server.
+  ///
+  /// In en, this message translates to:
+  /// **'Environment'**
+  String get newAgentServerEnv;
+
+  /// An MCP server the chosen tool class does not load (26 4.4 item 3).
+  ///
+  /// In en, this message translates to:
+  /// **'Not loaded under the tool class {toolClass}.'**
+  String newAgentServerNotLoaded(String toolClass);
+
+  /// A stdio MCP server below the class host (26 4.4 item 4).
+  ///
+  /// In en, this message translates to:
+  /// **'A local process needs the tool class Host.'**
+  String get newAgentServerNeedsHost;
+
+  /// Field of the name of a header or environment entry.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get newAgentEntryName;
+
+  /// Field of the plain value of an entry.
+  ///
+  /// In en, this message translates to:
+  /// **'Value'**
+  String get newAgentEntryValue;
+
+  /// Field of the secret reference of an entry.
+  ///
+  /// In en, this message translates to:
+  /// **'Secret reference'**
+  String get newAgentEntrySecret;
+
+  /// Switch: the entry is a secret reference.
+  ///
+  /// In en, this message translates to:
+  /// **'Secret'**
+  String get newAgentEntryIsSecret;
+
+  /// Adds a header or an environment entry.
+  ///
+  /// In en, this message translates to:
+  /// **'Add entry'**
+  String get newAgentEntryAdd;
+
+  /// Removes a header or an environment entry.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove entry {name}'**
+  String newAgentEntryRemove(String name);
+
+  /// Heading of the secret names the owner adds on the runner host.
+  ///
+  /// In en, this message translates to:
+  /// **'Secrets to add on the runner host'**
+  String get newAgentSecretsTitle;
+
+  /// No MCP server names a secret.
+  ///
+  /// In en, this message translates to:
+  /// **'No secrets needed.'**
+  String get newAgentSecretsNone;
+
+  /// Line under the secret names.
+  ///
+  /// In en, this message translates to:
+  /// **'Names only; the values never pass through the server.'**
+  String get newAgentSecretsHint;
+
+  /// Section of the settings.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get newAgentSectionSettings;
+
+  /// Heading of the tool class choice.
+  ///
+  /// In en, this message translates to:
+  /// **'Tool class'**
+  String get newAgentClass;
+
+  /// Tool class chat.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat'**
+  String get newAgentClassChat;
+
+  /// Tool class scoped.
+  ///
+  /// In en, this message translates to:
+  /// **'Scoped'**
+  String get newAgentClassScoped;
+
+  /// Tool class host.
+  ///
+  /// In en, this message translates to:
+  /// **'Host'**
+  String get newAgentClassHost;
+
+  /// What the class chat does and does not load (26 4.4 item 3).
+  ///
+  /// In en, this message translates to:
+  /// **'Answers in the chat. Loads no MCP server; skills load.'**
+  String get newAgentClassChatExplain;
+
+  /// What the class scoped does and does not load (26 4.4 items 2, 3 and 6).
+  ///
+  /// In en, this message translates to:
+  /// **'Uses the tools the runner allows, narrowed by the list below, without approvals. Loads only remote (http) MCP servers.'**
+  String get newAgentClassScopedExplain;
+
+  /// What the class host does (26 4.4 item 4, SR2).
+  ///
+  /// In en, this message translates to:
+  /// **'Works with the rights of the user of the host and loads every MCP server, local ones too. Only owners can start it.'**
+  String get newAgentClassHostExplain;
+
+  /// What no class loads (26 5.7).
+  ///
+  /// In en, this message translates to:
+  /// **'The own CLAUDE.md and settings of the user of the host are never loaded.'**
+  String get newAgentClassHostFiles;
+
+  /// The ceiling of the hosting runner (26 3.1 item 3).
+  ///
+  /// In en, this message translates to:
+  /// **'{runner} loads at most the tool class {toolClass}.'**
+  String newAgentClassCeiling(String runner, String toolClass);
+
+  /// Field of the tool list.
+  ///
+  /// In en, this message translates to:
+  /// **'Allowed tools, one per line'**
+  String get newAgentAllowedTools;
+
+  /// Helper text of the tool list.
+  ///
+  /// In en, this message translates to:
+  /// **'Narrows what the runner allows under Scoped; empty for no narrowing'**
+  String get newAgentAllowedToolsHint;
+
+  /// Field of the model.
+  ///
+  /// In en, this message translates to:
+  /// **'Model'**
+  String get newAgentModel;
+
+  /// Helper text of the model.
+  ///
+  /// In en, this message translates to:
+  /// **'Empty for the default model of the runner'**
+  String get newAgentModelHint;
+
+  /// Field of the cost cap per run.
+  ///
+  /// In en, this message translates to:
+  /// **'Cost cap per run (USD)'**
+  String get newAgentCostCap;
+
+  /// Helper text of the cost cap.
+  ///
+  /// In en, this message translates to:
+  /// **'Empty for no cap'**
+  String get newAgentCostCapHint;
+
+  /// The cost cap is no amount above zero.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter an amount above zero.'**
+  String get newAgentCostCapInvalid;
+
+  /// Heading of the billing mode.
+  ///
+  /// In en, this message translates to:
+  /// **'Billing'**
+  String get newAgentBilling;
+
+  /// Billing mode organization.
+  ///
+  /// In en, this message translates to:
+  /// **'Organization'**
+  String get newAgentBillingOrganization;
+
+  /// Billing mode personal.
+  ///
+  /// In en, this message translates to:
+  /// **'Personal'**
+  String get newAgentBillingPersonal;
+
+  /// Why the billing mode personal is not offered (10 10.3 item 3).
+  ///
+  /// In en, this message translates to:
+  /// **'{reason, select, notOnlyOwner{Personal is offered only when you are the only owner.} runnerNotPersonal{Personal needs a hosting runner on a personal subscription.} notHolder{Personal needs you to hold the credentials of the runner.} other{The hosting runner does not report Personal.}}'**
+  String newAgentPersonalNot(String reason);
+
+  /// Section of the hosting runner.
+  ///
+  /// In en, this message translates to:
+  /// **'Hosting runner'**
+  String get newAgentSectionHost;
+
+  /// Field of the hosting runner.
+  ///
+  /// In en, this message translates to:
+  /// **'Runner'**
+  String get newAgentHost;
+
+  /// No hosting runner chosen.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a runner.'**
+  String get newAgentHostMissing;
+
+  /// The hosting runner after agent.create (26 8.3).
+  ///
+  /// In en, this message translates to:
+  /// **'The runner is fixed now that the agent exists; Change runner on the agent card moves it.'**
+  String get newAgentHostFixed;
+
+  /// Section of the channel to create.
+  ///
+  /// In en, this message translates to:
+  /// **'Channel'**
+  String get newAgentSectionChannel;
+
+  /// Checkbox: create a channel with the new agent as operator.
+  ///
+  /// In en, this message translates to:
+  /// **'Create a channel with this agent as its operator'**
+  String get newAgentChannelWanted;
+
+  /// Field of the space of the channel.
+  ///
+  /// In en, this message translates to:
+  /// **'Space'**
+  String get newAgentChannelSpace;
+
+  /// No space chosen for the channel.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a space.'**
+  String get newAgentChannelSpaceMissing;
+
+  /// Field of the channel's name.
+  ///
+  /// In en, this message translates to:
+  /// **'Channel name'**
+  String get newAgentChannelName;
+
+  /// The channel name is empty.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a name for the channel.'**
+  String get newAgentChannelNameMissing;
+
+  /// Heading of field errors that no field of the preview shows.
+  ///
+  /// In en, this message translates to:
+  /// **'Not accepted by the server:'**
+  String get newAgentOtherErrors;
+
+  /// A field error of the server (26 4.3, 7.4; 06 5).
+  ///
+  /// In en, this message translates to:
+  /// **'{rule, select, required{Required.} too_long{Too long.} too_many{Too many entries.} invalid_name{Use lower-case letters, digits and hyphens.} duplicate_name{This name is used twice.} skill_frontmatter{Must not start with a line of three hyphens.} inline_shell{Must not contain inline shell commands.} import_outside_folder{An @ import must stay inside the agent folder.} secret_value_not_allowed{Use a secret reference here, not a plain value.} env_name_reserved{The runner sets this name itself.} mcp_command_not_allowed{The runner does not allow this command.} mcp_package_unpinned{Pin the package to an exact version, for example name@1.2.3.} tool_class_too_low{A local process needs the tool class Host.} mcp_not_in_catalogue{This server is not in the template catalogue.} host_not_capable{This runner does not host agents.} unknown_member{Not part of an agent definition.} other{Not accepted ({code}).}}'**
+  String newAgentFieldError(String rule, String code);
+
+  /// Step agent.create (26 8.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Create the agent on {runner}'**
+  String newAgentStepCreate(String runner);
+
+  /// Step agent.tool_class.set (26 8.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Set the tool class to {toolClass}'**
+  String newAgentStepClass(String toolClass);
+
+  /// Step putAgentDefinition (26 8.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Store the definition'**
+  String get newAgentStepDefinition;
+
+  /// Step agent.billing_mode.set (26 8.2).
+  ///
+  /// In en, this message translates to:
+  /// **'{mode, select, personal{Set billing to Personal} other{Set billing to Organization}}'**
+  String newAgentStepBilling(String mode);
+
+  /// Step channel.create (26 8.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Create the channel {name}'**
+  String newAgentStepChannel(String name);
+
+  /// Step channel.operator.set (26 8.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Make the agent the operator of the channel'**
+  String get newAgentStepOperator;
+
+  /// Screen reader text of a step of the new agent dialog with its state.
+  ///
+  /// In en, this message translates to:
+  /// **'{step}: {state, select, waiting{waiting} running{running} finished{finished} other{failed}}'**
+  String newAgentStepState(String step, String state);
+
+  /// Failure of a step: the step-up was cancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'The confirmation was cancelled. Try again to continue.'**
+  String get newAgentErrStepUp;
+
+  /// Failure of a step without an answer of the server.
+  ///
+  /// In en, this message translates to:
+  /// **'The server cannot be reached. Try again when you are online.'**
+  String get newAgentErrOffline;
+
+  /// Failure of a step with field errors.
+  ///
+  /// In en, this message translates to:
+  /// **'Some fields were not accepted; they are marked in the preview.'**
+  String get newAgentErrFields;
+
+  /// Failure of the definition step: tool_class_too_low (26 4.3 item 7).
+  ///
+  /// In en, this message translates to:
+  /// **'A local (stdio) MCP server needs the tool class Host. Raise the class or remove the server, then try again.'**
+  String get newAgentErrClassTooLow;
+
+  /// Failure of the class step: host_tool_class_ceiling (26 3.1 item 3).
+  ///
+  /// In en, this message translates to:
+  /// **'The runner does not load this tool class. Lower the class and try again, or close and use Change runner on the agent card.'**
+  String get newAgentErrCeiling;
+
+  /// Failure of the class step: definition_needs_host (R-BA-06).
+  ///
+  /// In en, this message translates to:
+  /// **'The stored definition still has a local MCP server, so the class cannot go below Host yet. Remove the server first.'**
+  String get newAgentErrNeedsHost;
+
+  /// Failure of the billing step: hosted_holder_mismatch (10 10.3).
+  ///
+  /// In en, this message translates to:
+  /// **'Personal needs the credential holder of the runner. Choose Organization and try again.'**
+  String get newAgentErrHolder;
+
+  /// Failure of agent.create: the handle is taken.
+  ///
+  /// In en, this message translates to:
+  /// **'This handle is taken. Change it and try again.'**
+  String get newAgentErrHandleTaken;
+
+  /// Failure of channel.create: the name is taken.
+  ///
+  /// In en, this message translates to:
+  /// **'This space has a channel with this name. Change the name and try again.'**
+  String get newAgentErrChannelTaken;
+
+  /// Failure of a step: version_conflict.
+  ///
+  /// In en, this message translates to:
+  /// **'The agent changed in the meantime. Try again.'**
+  String get newAgentErrVersion;
+
+  /// Marks a built-in agent without a definition in the agent list (26 8.3).
+  ///
+  /// In en, this message translates to:
+  /// **'Not set up'**
+  String get newAgentNotSetUp;
+
+  /// Reason of the audit entries of the class, billing and operator steps.
+  ///
+  /// In en, this message translates to:
+  /// **'New agent {name}'**
+  String newAgentAuditReason(String name);
+
+  /// Purpose shown by the step-up prompt of the new agent dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Create the agent {name}'**
+  String stepUpPurposeNewAgent(String name);
 }
 
 class _AppLocalizationsDelegate
