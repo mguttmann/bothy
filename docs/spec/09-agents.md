@@ -4299,8 +4299,9 @@ service. The keeper:
    sends SIGUSR1 to the keeper after `process_matches`.
 
 The runner opens its own write end with `O_WRONLY | O_NONBLOCK`; `ENXIO` (no reader) means the
-turn is gone, never a hang. A runner that adopts the turn opens the recorded named pipe of the
-current launch again and writes follow-ups and wake inputs into it.
+turn takes no more input, never a hang; whether the CLI still runs is decided by `process_matches`
+alone. A runner that adopts the turn opens the recorded named pipe of the current launch again and
+writes follow-ups and wake inputs into it.
 
 - Identity: the keeper's PID is its process group and session; the CLI's PID differs and its
   group is the keeper's. The record stores both identities (PID and start time each, plus the one
@@ -4314,8 +4315,9 @@ current launch again and writes follow-ups and wake inputs into it.
 - Stop (18.6): the runner signals the one group of keeper and CLI. SIGINT and SIGTERM reach the
   CLI and its background tasks (the keeper ignores both), SIGKILL ends all of them, keeper
   included; "no process of the group is left" stays the end condition. A SIGKILL to the keeper
-  alone ends the relay, so the CLI sees end of input at once and a line of the runner finds no
-  reader (`ENXIO` or `EPIPE`: the turn is gone).
+  alone ends the relay: the CLI reads what the relay already passed on and then sees end of
+  input, a line not yet relayed is lost, and a line of the runner finds no reader (`ENXIO` or
+  `EPIPE`: the turn takes no more input, while the CLI may still finish its turn).
 - The keeper holds no lock descriptor after the fork; whether the CLI's own children inherit the
   lock descriptors is not read from the CLI and is held by a test of AR-03 against the fake CLI
   and the real-CLI suite.
@@ -4679,7 +4681,7 @@ model call; design note sections 2.3, 3 and 12):
 | Rate-limit scenarios | the strings hold a mock with scenarios such as `session-limit-reached` and `weekly-limit-reached` behind an internal command `mock-limits`; no caller of it is reachable in the released build, so a free real-CLI check cannot use it. AR-06 captures the frame and the `result` against a local stand-in for the API that answers 429 with these headers (the method of `tests/real_cli/captured`), which needs no login and costs nothing |
 | `--disallowedTools` under `bypassPermissions` | `bypassPermissions` "auto-approves every tool call (except explicit deny rules)"; a bare tool name in `--disallowedTools` is a deny rule and removes the tool; AR-05 confirms the tool list of `system/init` against the local API stand-in |
 | `Bash(bothy-wake:*)` with an environment prefix | the CLI strips only a fixed list of safe variables (for example `LANG`, `TZ`, `NO_COLOR`; not `PATH` or `TMPDIR`) before matching a prefix rule; any other prefix makes the command need approval, which `dontAsk` refuses. A safe prefix runs `bothy-wake` itself, so no other program can run under the rule |
-| Named pipe as stdin | run 2026-11-07 with the pinned CLI 2.1.288 against a local stand-in for the API on loopback (no login, no model call; `tests/real_cli/test_named_pipe.py`): with a named pipe directly as stdin the CLI reads and answers every line, also one a second process wrote after opening the pipe again, but on macOS it does not end when the last write end closes (on an anonymous pipe the same CLI ends at once); hence the keeper's relay into an anonymous pipe (18.19.4 item 2), under which the initial input, a line of the runner and a line of a second process are each echoed and answered in order and closing stdin ends the CLI with exit 0. Linux not run |
+| Named pipe as stdin | run 2026-11-07 with the pinned CLI 2.1.288 (https://registry.npmjs.org/@anthropic-ai/claude-code/2.1.288, retrieved 2026-11-07) against a local stand-in for the API on loopback (no login, no model call; `tests/real_cli/test_named_pipe.py`): with a named pipe directly as stdin the CLI reads and answers every line, also one a second process wrote after opening the pipe again, but on macOS it does not end when the last write end closes (on an anonymous pipe the same CLI ends at once); hence the keeper's relay into an anonymous pipe (18.19.4 item 2), under which the initial input, a line of the runner and a line of a second process are each echoed and answered in order and closing stdin ends the CLI with exit 0. Linux not run |
 
 The point "whether the CLI's children inherit the lock descriptors" is not read from the CLI
 (18.19.4). Every finding above is checked again when the pin moves (`test_pinned_cli.py`).

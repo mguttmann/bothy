@@ -193,7 +193,7 @@ async def test_a_line_the_cli_does_not_read_is_aborted_with_its_byte_count(
 async def test_a_gone_reader_is_never_a_hang(tmp_path: Path) -> None:
     fifo = tmp_path / "x.stdin"
     os.mkfifo(fifo, 0o600)
-    assert not await PipeWriter(fifo).write(b"line\n")  # ENXIO: the turn is gone
+    assert not await PipeWriter(fifo).write(b"line\n")  # ENXIO: the turn takes no more input
 
 
 # ---- the cases of a record in phase launching (18.19.5) ----------------------------------------

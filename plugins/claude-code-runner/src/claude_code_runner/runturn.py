@@ -460,6 +460,8 @@ class RunTurn:
         self.retry_inputs: list[tuple[str, bytes]] | None = None
         self._worked = False
         """The current process emitted an ``assistant`` message that was no API error."""
+        self._replayed_worked = False
+        """The replay of an adopted process found such a message before the handover point."""
         self.stopping: asyncio.Task[None] | None = None
         self.adopted_group: StoppableGroup | None = None
         self.adopted_record: dict[str, Any] | None = None
@@ -1235,7 +1237,7 @@ class RunTurn:
             An outcome when the read ended the run itself (the counter-check), else ``None``.
         """
         own = attempt is not None
-        self._worked = False
+        self._worked = adopted and self._replayed_worked
         saved_at = self.monotonic()
         interval = self.handle.patch.settings.run_update_min_interval
         async for message in reader.items():
@@ -2446,8 +2448,7 @@ class RunTurn:
             self._paths().stream, self.ledger.process_start, self.ledger.offset
         )
         now = self.monotonic()
-        for message, line_start, line_end in lines:
-            self.ledger.line(message, line_start, line_end)  # classification only, no posting
+        self._replayed_worked = self._replay_ledger(lines)
         replayed = self.ps.replay([m for m, _, _ in lines], now)
         _log("turn_replayed", lines=replayed, **self.ids)
         self.phase = "closed"
@@ -2464,6 +2465,19 @@ class RunTurn:
         return await self._follow(
             group, attempt, self.ledger.offset, launch.stderr_start, adopted=True
         )
+
+    def _replay_ledger(self, lines: Sequence[tuple[dict[str, Any], int, int]]) -> bool:
+        """Classify the replayed lines in the ledger (no posting); whether the process worked.
+
+        Worked as in `_read`: an ``assistant`` message after ``init`` that is no API error, so a
+        retry after the handover still warns that the earlier attempt may have changed files.
+        """
+        worked = False
+        for message, line_start, line_end in lines:
+            self.ledger.line(message, line_start, line_end)
+            if message.get("type") == "assistant" and self.ledger.init_seen:
+                worked = worked or api_error_text(message) is None
+        return worked
 
     async def _finish_partial_input(self, group: KeeperGroup, record: Mapping[str, Any]) -> bool:
         """The rest of a line a handover cut, before any other input (18.19.3).

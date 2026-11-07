@@ -19,7 +19,8 @@ writes the turn record before each step:
 
 `KeeperGroup` is the group of keeper and CLI as the runner handles it: own (the runner reaps the
 keeper) or adopted (identities polled). It writes input lines into the named pipe through
-`PipeWriter` (``O_WRONLY | O_NONBLOCK``, ``ENXIO`` means the turn is gone, never a hang; the write
+`PipeWriter` (``O_WRONLY | O_NONBLOCK``, ``ENXIO`` means the turn takes no more input, never a
+hang; whether the CLI still runs is the identity check's; the write
 runs off the event loop, counts its bytes and can be aborted at a handover), closes stdin (the
 runner's end, then SIGUSR1 to the keeper after its identity check), and takes ``exit_label`` from
 ``<launch>.exit`` (``unknown`` without it). `settle_launching` decides a record left in phase
@@ -389,7 +390,7 @@ class PipeWriter:
         try:
             self._fd = os.open(self.fifo, os.O_WRONLY | os.O_NONBLOCK | os.O_NOFOLLOW)
         except OSError:
-            return False  # ENXIO: no reader, the turn is gone; or the pipe was removed
+            return False  # ENXIO: no reader, the turn takes no more input; or the pipe was removed
         return True
 
     def _write(self, data: bytes) -> bool:
@@ -418,7 +419,7 @@ class PipeWriter:
             data: One or more complete lines.
 
         Returns:
-            True when every byte reached the pipe; False when the turn is gone, stdin is
+            True when every byte reached the pipe; False when the turn takes no more input, stdin is
             closed or the write was aborted (`abort`).
         """
         self.written = 0
