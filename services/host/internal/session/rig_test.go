@@ -200,12 +200,14 @@ func (r *recorder) endedCount() int {
 	return len(r.ended)
 }
 
-// fakeRunner is the doctor runner of the gate: it returns res and counts the runs.
+// fakeRunner is the doctor runner of the gate: it returns res and counts the runs; left records
+// the time left until the deadline of the context of every RunLightUser (-1: none).
 type fakeRunner struct {
 	mu        sync.Mutex
 	res       *doctor.Result
 	light     int
 	lightUser map[string]int
+	left      []time.Duration
 }
 
 func (f *fakeRunner) RunLight(context.Context) *doctor.Result {
@@ -215,10 +217,15 @@ func (f *fakeRunner) RunLight(context.Context) *doctor.Result {
 	return f.res
 }
 
-func (f *fakeRunner) RunLightUser(_ context.Context, u string) *doctor.Result {
+func (f *fakeRunner) RunLightUser(ctx context.Context, u string) *doctor.Result {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.lightUser[u]++
+	left := time.Duration(-1)
+	if d, ok := ctx.Deadline(); ok {
+		left = time.Until(d)
+	}
+	f.left = append(f.left, left)
 	return f.res
 }
 

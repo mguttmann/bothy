@@ -6,6 +6,8 @@ import (
 	"context"
 	"slices"
 	"sync"
+
+	"github.com/OWNER/bothy/services/host/internal/hostos"
 )
 
 // scanState is the entry scan state of one session user.
@@ -104,7 +106,8 @@ func (r *Runner) scan(ctx context.Context, env Env, user string, req Request) {
 // WaitScans blocks until every started entry scan finished.
 func (r *Runner) WaitScans() { r.wg.Wait() }
 
-// RunLight runs HD1 to HD11 without the entry scan; the findings of earlier scans stay.
+// RunLight runs HD1 to HD11 without the entry scan; the findings of earlier scans stay. A run whose
+// ctx ended before it finished returns nil and changes nothing (also for RunLightUser).
 func (r *Runner) RunLight(ctx context.Context) *Result {
 	return r.light(ctx, "")
 }
@@ -122,6 +125,11 @@ func (r *Runner) light(ctx context.Context, only string) *Result {
 	env.Mode = ModeLight
 	env.Helpers = r.recording(env.Helpers, only)
 	res := RunService(ctx, env)
+	if ctx.Err() != nil {
+		// A run cut short by its context (the opening window of the gate ended) proves nothing:
+		// no result, the last result stays.
+		return nil
+	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.base = r.current(res, env.Declaration)
@@ -150,10 +158,21 @@ func (c cachingHelpers) Check(ctx context.Context, user string, req Request) (He
 		}
 	}
 	res, err := c.h.Check(ctx, user, req)
+	if ctx.Err() != nil {
+		return res, err // an answer of a run cut short is not kept
+	}
 	c.r.mu.Lock()
 	c.r.answers[user] = cachedAnswer{res: res, err: err}
 	c.r.mu.Unlock()
 	return res, err
+}
+
+// WithUsers implements UsersHelpers: the wrapped Helpers gets users when it looks accounts up.
+func (c cachingHelpers) WithUsers(users hostos.Users) Helpers {
+	if h, ok := c.h.(UsersHelpers); ok {
+		c.h = h.WithUsers(users)
+	}
+	return c
 }
 
 func (c cachingHelpers) Scan(ctx context.Context, user string, req Request) (string, error) {

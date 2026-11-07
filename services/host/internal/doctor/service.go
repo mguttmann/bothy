@@ -31,6 +31,15 @@ type Helpers interface {
 	Scan(ctx context.Context, sessionUser string, req Request) (string, error)
 }
 
+// UsersHelpers is a Helpers that looks accounts up itself (the peer check of its channel).
+// RunService gives it the users of the run, so its lookups come from the run's one read of the user
+// database and end with the run.
+type UsersHelpers interface {
+	Helpers
+	// WithUsers returns the Helpers with its lookups answered by users.
+	WithUsers(users hostos.Users) Helpers
+}
+
 // ErrPeerMismatch is the failure of the peer check of a local channel (24 2.2 PTY helper point 3).
 var ErrPeerMismatch = errors.New("doctor: peer of the local channel is not the helper")
 
@@ -152,8 +161,13 @@ type run struct {
 }
 
 // RunService runs HD1 to HD11 as the service user in mode (ModeFull or ModeLight), asking each
-// helper over its channel. The entry scan is not part of it; Runner adds it.
+// helper over its channel. The entry scan is not part of it; Runner adds it. The programs of the
+// run end with ctx, and the run reads each answer of the user database once (hostos.Scope).
 func RunService(ctx context.Context, env Env) *Result {
+	env.Users, env.Security = hostos.Scope(ctx, env.Users, env.Security)
+	if h, ok := env.Helpers.(UsersHelpers); ok {
+		env.Helpers = h.WithUsers(env.Users)
+	}
 	r := &run{env: env, res: &Result{Declaration: env.Declaration, Workdirs: map[string][]Workdir{}}}
 	for _, name := range Checks {
 		r.res.Checks = append(r.res.Checks, CheckResult{Check: name})
@@ -168,7 +182,7 @@ func RunService(ctx context.Context, env Env) *Result {
 	r.hd7Profiles()
 	r.placesForAll()
 	results := r.askHelpers(ctx)
-	r.aggregate(results)
+	r.aggregate(ctx, results)
 	r.ownerAccountWarnings()
 	r.facts.ownerAccount = env.OwnerAccount
 	r.res.facts = r.facts
@@ -759,8 +773,8 @@ func (r *run) askHelpers(ctx context.Context) []helperAnswer {
 	return answers
 }
 
-func (r *run) aggregate(answers []helperAnswer) {
-	if ok, err := r.env.Probe.SudoWithoutPassword(context.Background()); r.env.GOOS != hostos.Windows && (ok || err != nil) {
+func (r *run) aggregate(ctx context.Context, answers []helperAnswer) {
+	if ok, err := r.env.Probe.SudoWithoutPassword(ctx); r.env.GOOS != hostos.Windows && (ok || err != nil) {
 		r.fail(HD3, CodePasswordlessSudo)
 	}
 	r.facts.llm = map[string]LLMFacts{}

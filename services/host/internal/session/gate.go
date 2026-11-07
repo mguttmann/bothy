@@ -159,8 +159,13 @@ func (g *Gate) SetEnforce(f func(context.Context, Policy)) {
 // Admit runs the Light run of the helper of osu and HD11 for the places for all (one RunLightUser),
 // applies the consequences and returns the close_detail that refuses the PTY, "" when admitted.
 // Other helpers are not run per opening: their latest periodic answers hold (D-M2-45 ruling).
+// ctx carries the end of the opening window: a run cut short by it refuses with open_timeout and
+// applies nothing (no report, no end of running sessions).
 func (g *Gate) Admit(ctx context.Context, osu string) string {
 	res := g.runner.RunLightUser(ctx, osu)
+	if ctx.Err() != nil {
+		return DetailOpenTimeout
+	}
 	return g.apply(ctx, res, false).Refusal(osu)
 }
 

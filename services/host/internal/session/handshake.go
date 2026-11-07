@@ -210,7 +210,12 @@ func (h *handshake) open(ctx context.Context, cl Claims, tr *noise.Transport, ki
 		return
 	}
 	if m.d.Gate != nil {
-		if d := m.d.Gate.Admit(ctx, cl.Osu); d != "" {
+		// The gate run ends with the opening window: after it the server has ended the opening
+		// anyway, and a run going on would overlap the next try.
+		gctx, cancel := context.WithTimeout(ctx, h.expires.Sub(m.d.Clock.Now()))
+		d := m.d.Gate.Admit(gctx, cl.Osu)
+		cancel()
+		if d != "" {
 			h.failOpening(ctx, cl, d)
 			return
 		}

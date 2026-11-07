@@ -3,6 +3,7 @@
 package hostos
 
 import (
+	"context"
 	"errors"
 	"os"
 	"strconv"
@@ -44,6 +45,11 @@ func (u LinuxUsers) Groups(name string) ([]Group, error) { return unixGroups(u.R
 
 // Accounts implements Users.
 func (u LinuxUsers) Accounts() ([]Account, error) { return u.accounts() }
+
+// inRun implements usersInRun.
+func (u LinuxUsers) inRun(ctx context.Context) (Users, bool) {
+	return LinuxUsers{Runner: runRunner{ctx: ctx, r: u.Runner}}, true
+}
 
 // LinuxSecurity is the Security of Linux: owner, group, mode and the POSIX ACL.
 type LinuxSecurity struct{}
