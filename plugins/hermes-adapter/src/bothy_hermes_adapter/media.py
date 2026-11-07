@@ -425,7 +425,7 @@ def inline_text(item: RunContextAttachment, data: bytes) -> str:
     Returns:
         The text to put before the person's text.
     """
-    text = _REFERENCE_TRIGGER.sub("@⁠", data.decode("utf-8", errors="replace"))
+    text = _REFERENCE_TRIGGER.sub("@\u2060", data.decode("utf-8", errors="replace"))
     boundary = secrets.token_hex(_BOUNDARY_BYTES)
     while boundary in text:
         boundary = secrets.token_hex(_BOUNDARY_BYTES)

@@ -544,7 +544,7 @@ def test_inline_text_neutralises_hermes_references() -> None:
     out = inline_text(item, text.encode())
     assert not _HERMES_REFERENCE.search(out)
     # Only an invisible word joiner is added; the text reads the same.
-    assert out.replace("⁠", "").split("\n")[3:6] == text.split("\n")
+    assert out.replace("\u2060", "").split("\n")[3:6] == text.split("\n")
     assert "someone@example.org" in out
 
 
