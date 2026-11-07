@@ -1100,7 +1100,7 @@ class RunTurn:
 
     async def _start_failed(self, start: KeeperStart) -> None:
         """The keeper ended, or named no CLI in time: no CLI runs for this launch."""
-        if start.process.poll() is None:
+        if start.process.poll() is None:  # NOSONAR - poll() does not block; wait() runs in a thread
             with contextlib.suppress(ProcessLookupError, PermissionError):
                 os.killpg(start.process.pid, signal.SIGKILL)  # our own keeper's group
         await asyncio.to_thread(start.process.wait)

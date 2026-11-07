@@ -111,7 +111,7 @@ async def hand_over(handler: RunnerHandler, adapter: Adapter | None) -> int:
     """
     handler.handing_over = True
     count = 0
-    turns = [s.turn for s in list(handler._runs.values()) if s.turn is not None]
+    turns = [s.turn for s in handler._runs.values() if s.turn is not None]
     turns += list(handler.adopted.values())
     for turn in turns:
         if await turn.hand_over():
