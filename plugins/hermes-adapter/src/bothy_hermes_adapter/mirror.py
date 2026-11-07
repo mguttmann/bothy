@@ -582,12 +582,30 @@ class _NotPosted(Exception):  # noqa: N818 - an outcome, already logged
 
 # ---- the mirror of this process (the plugin entry's way in) -----------------------------------
 
-_PROCESS: dict[str, Mirror | None] = {}
+# One mirror per profile home and platform key: a Hermes gateway that serves several profiles
+# runs their sessions in one process, so a mirror read once per process would send one profile's
+# sessions to another profile's forum (09 17.13 point 2).
+_PROCESS: dict[tuple[str, str], Mirror | None] = {}
 _PROCESS_LOCK = threading.Lock()
 
 
-def _load_process_mirror(platform_key: str) -> Mirror | None:
-    """The mirror of this process from the profile's platform section, or ``None`` when off."""
+def _process_home() -> Path:
+    """The Hermes home of the profile whose session calls the hook (a context-local value)."""
+    from bothy_hermes_adapter import hermes_config  # noqa: PLC0415 - imports Hermes, at the hook
+
+    return hermes_config.current_home()
+
+
+def _load_process_mirror(home: Path, platform_key: str) -> Mirror | None:
+    """The mirror of a profile from its platform section, or ``None`` when off.
+
+    Args:
+        home: The profile's Hermes home; Hermes points its config reader at it for the session.
+        platform_key: `hermes_adapter.platform_key`.
+
+    Returns:
+        The mirror.
+    """
     from bothy_hermes_adapter import hermes_config  # noqa: PLC0415 - imports Hermes, at the hook
 
     extra = platform_extra(hermes_config.read_config(), platform_key)
@@ -597,7 +615,7 @@ def _load_process_mirror(platform_key: str) -> Mirror | None:
     config = mirror_config(settings)
     if config is None:
         return None
-    state = hermes_config.current_home() / settings.platform_key
+    state = home / settings.platform_key
     state.mkdir(mode=0o700, parents=True, exist_ok=True)
     found = Mirror(settings, config, MirrorMap(state / MIRROR_DB))
     atexit.register(found.close, EXIT_FLUSH_S)
@@ -605,7 +623,7 @@ def _load_process_mirror(platform_key: str) -> Mirror | None:
 
 
 def process_mirror(platform_key: str) -> Mirror | None:
-    """The mirror of this process, read once from the profile; ``None`` when off.
+    """The mirror of the calling profile, read once per profile home; ``None`` when off.
 
     Args:
         platform_key: `hermes_adapter.platform_key`.
@@ -613,16 +631,22 @@ def process_mirror(platform_key: str) -> Mirror | None:
     Returns:
         The mirror.
     """
+    try:
+        home = _process_home()
+    except Exception as exc:  # no profile to read: the mirror is off; the session runs on
+        _LOG.error("mirror: off: the profile home does not resolve: %s", type(exc).__name__)
+        return None
+    key = (str(home), platform_key)
     with _PROCESS_LOCK:
-        if platform_key not in _PROCESS:
+        if key not in _PROCESS:
             try:
-                _PROCESS[platform_key] = _load_process_mirror(platform_key)
+                _PROCESS[key] = _load_process_mirror(home, platform_key)
             except Exception as exc:  # the mirror is off; the session runs on
-                _PROCESS[platform_key] = None
+                _PROCESS[key] = None
                 # A ConfigError names the key only; any other error is named by its type.
                 why = str(exc) if isinstance(exc, ConfigError) else type(exc).__name__
                 _LOG.error("mirror: off: the configuration does not load: %s", why)
-        return _PROCESS[platform_key]
+        return _PROCESS[key]
 
 
 def mirror_hook(platform_key: str, name: str, kwargs: Any) -> None:

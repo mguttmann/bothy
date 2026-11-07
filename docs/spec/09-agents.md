@@ -3063,8 +3063,11 @@ is off unless the profile turns it on.
    of its own). The plugin entry passes the hooks `pre_llm_call`,
    `post_llm_call` and `on_session_end` of a listed platform, and `post_tool_call` of a session
    the mirror follows, to `bothy_hermes_adapter.mirror`, imported at the first such hook. The
-   mirror reads `gateway.platforms.<platform key>.extra` with Hermes' reader once per process and
-   writes with a client of its own (`User-Agent` adapter name `hermes-adapter-mirror`), like the
+   mirror reads `gateway.platforms.<platform key>.extra` with Hermes' reader once per profile home
+   and process, at the hook, from the home Hermes resolves for the turn: a gateway that serves
+   several profiles (multiplex operation) runs their turns in one process, so each profile keeps
+   its own mirror, forum, agent identity and map, and a profile without the mirror stays off beside
+   one with it. The mirror writes with a client of its own (`User-Agent` adapter name `hermes-adapter-mirror`), like the
    standalone sender of 17.9.
 3. Post per session: the first turn of a session opens a new post in the forum (`thread.create`,
    title `<platform>: <first line of the prompt>`, at most `TITLE_CHARS` of the module, cut at a word) with the

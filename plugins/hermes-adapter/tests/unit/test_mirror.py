@@ -10,8 +10,11 @@ while the FakeServer keeps serving on the test's loop.
 from __future__ import annotations
 
 import asyncio
+import contextvars
 import socket
+import sys
 import time
+import types
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
@@ -23,6 +26,7 @@ from bothy_sdk.ids import uuid7
 from bothy_sdk.testing.fakeserver import FakeServer
 from bothy_sdk.testing.faults import Fault
 
+import bothy_hermes_adapter
 from bothy_hermes_adapter import entry, mirror
 from bothy_hermes_adapter.config import ConfigError, load_settings
 from bothy_hermes_adapter.hermes_commands import declared_commands
@@ -472,10 +476,11 @@ def test_the_process_mirror_is_off_when_the_configuration_does_not_load(
 ) -> None:
     calls: list[str] = []
 
-    def broken(platform_key: str) -> Any:
+    def broken(home: Path, platform_key: str) -> Any:
         calls.append(platform_key)
         raise ConfigError("hermes_adapter.server_url: required")
 
+    monkeypatch.setattr(mirror, "_process_home", lambda: Path("/srv/hermes"))
     monkeypatch.setattr(mirror, "_load_process_mirror", broken)
     with captured_logs() as logs:
         for _ in range(3):
@@ -485,9 +490,82 @@ def test_the_process_mirror_is_off_when_the_configuration_does_not_load(
 
 
 def test_the_process_mirror_stays_off_without_mirror_keys(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(mirror, "_load_process_mirror", lambda key: None)
+    monkeypatch.setattr(mirror, "_process_home", lambda: Path("/srv/hermes"))
+    monkeypatch.setattr(mirror, "_load_process_mirror", lambda home, key: None)
     assert mirror.mirror_hook("bothy", "pre_llm_call", {"platform": "acp"}) is None
     assert mirror.process_mirror("bothy") is None
+
+
+def _multiplexed_profiles(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, mirrored: dict[str, bool]
+) -> tuple[contextvars.ContextVar[str], dict[str, str], list[tuple[str, str, str]]]:
+    """Profiles served by one Hermes process: the home is context-local, as Hermes's override.
+
+    Returns the active profile, each profile's forum and the hooks seen as (profile, forum,
+    store).
+    """
+    active: contextvars.ContextVar[str] = contextvars.ContextVar("profile")
+    forums = {name: str(uuid7()) for name in mirrored}
+    configs: dict[str, Any] = {}
+    for name, on in mirrored.items():
+        home = tmp_path / name
+        home.mkdir()
+        (home / "token").write_text("token")
+        extra = _base(**{"hermes_adapter.token_file": str(home / "token")})
+        if on:
+            extra |= {
+                "hermes_adapter.mirror_channel": forums[name],
+                "hermes_adapter.mirror_platforms": ["acp"],
+            }
+        configs[name] = {"gateway": {"platforms": {"bothy": {"extra": extra}}}}
+    fake = types.ModuleType("bothy_hermes_adapter.hermes_config")
+    fake.read_config = lambda: configs[active.get()]  # type: ignore[attr-defined]
+    fake.current_home = lambda: tmp_path / active.get()  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "bothy_hermes_adapter.hermes_config", fake)
+    monkeypatch.setattr(bothy_hermes_adapter, "hermes_config", fake, raising=False)
+    seen: list[tuple[str, str, str]] = []
+
+    def spy(self: Mirror, name: str, kwargs: Any) -> None:
+        seen.append((active.get(), str(self.config.channel), str(self.mapping.path)))
+
+    monkeypatch.setattr(Mirror, "hook", spy)
+    monkeypatch.setattr(Mirror, "start", lambda self: None)
+    return active, forums, seen
+
+
+def test_each_profile_of_a_multiplexed_process_mirrors_into_its_own_forum(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    active, forums, seen = _multiplexed_profiles(monkeypatch, tmp_path, {"a": True, "b": True})
+    for profile in ("a", "b", "a", "b"):
+        active.set(profile)
+        mirror.mirror_hook("bothy", "pre_llm_call", {"platform": "acp", "session_id": profile})
+    assert seen == [
+        (p, forums[p], str(tmp_path / p / "bothy" / mirror.MIRROR_DB)) for p in ("a", "b", "a", "b")
+    ]
+
+
+def test_a_profile_without_a_mirror_stays_off_beside_one_with_a_mirror(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    active, forums, seen = _multiplexed_profiles(monkeypatch, tmp_path, {"a": True, "b": False})
+    active.set("a")
+    mirror.mirror_hook("bothy", "pre_llm_call", {"platform": "acp", "session_id": "a"})
+    active.set("b")
+    mirror.mirror_hook("bothy", "pre_llm_call", {"platform": "acp", "session_id": "b"})
+    assert mirror.process_mirror("bothy") is None
+    assert [p for p, _, _ in seen] == ["a"]
+    assert forums["b"] not in [f for _, f, _ in seen]
+
+
+def test_a_profile_with_a_mirror_starts_after_one_without(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    active, forums, seen = _multiplexed_profiles(monkeypatch, tmp_path, {"a": False, "b": True})
+    for profile in ("a", "b"):
+        active.set(profile)
+        mirror.mirror_hook("bothy", "pre_llm_call", {"platform": "acp", "session_id": profile})
+    assert [(p, f) for p, f, _ in seen] == [("b", forums["b"])]
 
 
 # ---- read-only: people in a mirror post ------------------------------------------------------
