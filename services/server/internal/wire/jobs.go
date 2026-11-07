@@ -157,6 +157,8 @@ type JobModules struct {
 	InvocationHolds runsjobs.Releaser
 	// AppDispatch is the use case of runs.app_dispatch (M2-25); nil only where no job runs.
 	AppDispatch runsjobs.AppDispatcher
+	// WakeDue is the use case of runs.wake_due (AR-04); nil only where no job runs.
+	WakeDue runsjobs.WakeDuer
 	// TerminalSweep is the use case of terminal.sweep (M2-46).
 	TerminalSweep terminaljobs.Sweeper
 	// TerminalSweepInterval is terminal.sweep_interval.
@@ -323,6 +325,9 @@ func registerRunsJobs(reg *jobs.Registry, m *JobModules) error {
 		return err
 	}
 	if err := runsjobs.RegisterHold(reg, m.InvocationHolds); err != nil {
+		return err
+	}
+	if err := runsjobs.RegisterWakeDue(reg, m.WakeDue); err != nil {
 		return err
 	}
 	return runsjobs.RegisterAppDispatch(reg, m.AppDispatch)

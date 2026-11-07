@@ -29,3 +29,24 @@ func (h *ReadOnly) SetChannelReadOnly(ctx context.Context, req rest.SetChannelRe
 	}
 	return rest.SetChannelReadOnly200JSONResponse{Body: channelREST(c), Headers: rest.SetChannelReadOnly200ResponseHeaders{ETag: etag(c.Version)}}, nil
 }
+
+// AutonomousRuns implements setChannelAutonomousRuns (channel.autonomous_runs.set, AR-04) as part
+// of rest.StrictServerInterface. The use case authorizes; the handler only converts.
+type AutonomousRuns struct {
+	sw chat.AutonomousRunsSwitch
+}
+
+// NewAutonomousRuns returns the handler over the switch of autonomous runs of chat.
+func NewAutonomousRuns(sw chat.AutonomousRunsSwitch) *AutonomousRuns { return &AutonomousRuns{sw: sw} }
+
+// SetChannelAutonomousRuns implements rest.StrictServerInterface (PUT
+// /channels/{channel_id}/autonomous-runs).
+func (h *AutonomousRuns) SetChannelAutonomousRuns(ctx context.Context, req rest.SetChannelAutonomousRunsRequestObject) (rest.SetChannelAutonomousRunsResponseObject, error) {
+	c, err := h.sw.SetChannelAutonomousRuns(ctx, principal(ctx), chat.SetAutonomousRunsCmd{
+		ChannelID: ids.ID(req.ChannelId), Allow: req.Body.AllowAutonomousRuns, IfMatch: precondition(req.Params.IfMatch),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return rest.SetChannelAutonomousRuns200JSONResponse{Body: channelREST(c), Headers: rest.SetChannelAutonomousRuns200ResponseHeaders{ETag: etag(c.Version)}}, nil
+}

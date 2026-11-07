@@ -921,6 +921,42 @@ func (stubServer) IssueHostedAgentToken(context.Context, rest.IssueHostedAgentTo
 	return nil, nil
 }
 
+func (stubServer) CancelRunWake(context.Context, rest.CancelRunWakeRequestObject) (rest.CancelRunWakeResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) CheckRunLaunch(context.Context, rest.CheckRunLaunchRequestObject) (rest.CheckRunLaunchResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) CheckRunWake(context.Context, rest.CheckRunWakeRequestObject) (rest.CheckRunWakeResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) CreateRunWake(context.Context, rest.CreateRunWakeRequestObject) (rest.CreateRunWakeResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) FireRunWake(context.Context, rest.FireRunWakeRequestObject) (rest.FireRunWakeResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) ListPendingRunWakes(context.Context, rest.ListPendingRunWakesRequestObject) (rest.ListPendingRunWakesResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) ListThreadWakes(context.Context, rest.ListThreadWakesRequestObject) (rest.ListThreadWakesResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) RecoverRunWake(context.Context, rest.RecoverRunWakeRequestObject) (rest.RecoverRunWakeResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) SetChannelAutonomousRuns(context.Context, rest.SetChannelAutonomousRunsRequestObject) (rest.SetChannelAutonomousRunsResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) InterviewAgent(context.Context, rest.InterviewAgentRequestObject) (rest.InterviewAgentResponseObject, error) {
 	return nil, nil
 }

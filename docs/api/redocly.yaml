@@ -117,6 +117,7 @@ rules:
         - auth.step_up
         - auth.token.refresh
         - channel.archive
+        - channel.autonomous_runs.set
         - channel.behavior.read
         - channel.behavior.update
         - channel.create
@@ -225,11 +226,19 @@ rules:
         - run.context.read
         - run.finish
         - run.followup.create
+        - run.launch.check
         - run.overview.read
         - run.read
         - run.start
         - run.token.renew
         - run.update
+        - run.wake.cancel
+        - run.wake.check
+        - run.wake.create
+        - run.wake.fire
+        - run.wake.list_pending
+        - run.wake.read
+        - run.wake.recover
         - search.assist
         - search.assist.respond
         - search.query
@@ -393,6 +402,7 @@ rules:
         - auth.step_up
         - auth.token.refresh
         - channel.archive
+        - channel.autonomous_runs.set
         - channel.behavior.read
         - channel.behavior.update
         - channel.create
@@ -501,11 +511,19 @@ rules:
         - run.context.read
         - run.finish
         - run.followup.create
+        - run.launch.check
         - run.overview.read
         - run.read
         - run.start
         - run.token.renew
         - run.update
+        - run.wake.cancel
+        - run.wake.check
+        - run.wake.create
+        - run.wake.fire
+        - run.wake.list_pending
+        - run.wake.read
+        - run.wake.recover
         - search.assist
         - search.assist.respond
         - search.query

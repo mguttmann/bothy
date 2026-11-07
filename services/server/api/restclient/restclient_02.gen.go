@@ -179,6 +179,13 @@ type ClientInterface interface {
 	// Corresponds with GET /agents/me/triggerers (the `GetAgentTriggerers` operationId).
 	GetAgentTriggerers(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListPendingRunWakes List the pending wake-ups of this agent
+	//
+	// Every pending wake-up of the calling agent, ascending by id (09 5.8.5): a runner calls it at start and after every reconnect and learns changes in between from `run.wake_changed`. Only the agent itself may call it (agent-self).
+	//
+	// Corresponds with GET /agents/me/wakes (the `ListPendingRunWakes` operationId).
+	ListPendingRunWakes(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetAgent Read an agent with reported state
 	//
 	// Corresponds with GET /agents/{agent_id} (the `GetAgent` operationId).
@@ -887,6 +894,24 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /channels/{channel_id}/archive (the `ArchiveChannel` operationId).
 	ArchiveChannel(ctx context.Context, channelId ChannelIdPath, params *ArchiveChannelParams, body ArchiveChannelJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetChannelAutonomousRunsWithBody Switch autonomous runs of a channel
+	//
+	// Switches `allow_autonomous_runs` (09 5.8.6, 07 2.14 item 1): persons other than owners may let agents run on alone in this channel (wake-ups, recovery and usage-window wake-ups); owners may always. Off by default. Every create and every fire reads the switch at its moment, so switching it off refuses the next fire of a pending wake-up of a person who is no owner. An archived channel is `409 conflict` with `reason` `channel_archived`, a DM `409 conflict` with `reason` `dm_channel`. Audited; the same value answers without a change.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /channels/{channel_id}/autonomous-runs (the `SetChannelAutonomousRuns` operationId).
+	SetChannelAutonomousRunsWithBody(ctx context.Context, channelId ChannelIdPath, params *SetChannelAutonomousRunsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetChannelAutonomousRuns Switch autonomous runs of a channel
+	//
+	// Switches `allow_autonomous_runs` (09 5.8.6, 07 2.14 item 1): persons other than owners may let agents run on alone in this channel (wake-ups, recovery and usage-window wake-ups); owners may always. Off by default. Every create and every fire reads the switch at its moment, so switching it off refuses the next fire of a pending wake-up of a person who is no owner. An archived channel is `409 conflict` with `reason` `channel_archived`, a DM `409 conflict` with `reason` `dm_channel`. Audited; the same value answers without a change.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /channels/{channel_id}/autonomous-runs (the `SetChannelAutonomousRuns` operationId).
+	SetChannelAutonomousRuns(ctx context.Context, channelId ChannelIdPath, params *SetChannelAutonomousRunsParams, body SetChannelAutonomousRunsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetChannelBehavior Read prompt, skills and mention rules
 	//
@@ -3156,6 +3181,13 @@ type ClientInterface interface {
 	// Corresponds with POST /runs/{run_id}/invocation-token (the `RenewInvocationToken` operationId).
 	RenewInvocationToken(ctx context.Context, runId RunIdPath, body RenewInvocationTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// CheckRunLaunch Check a launch by a runner that did not accept the run
+	//
+	// Before a runner launches any process of a run it did not accept itself (a repeated try, the next attempt of an adopted run, the retry of a compaction, a start over), it asks the server (09 18.19.6, R-AG-48): the run is still `running`, its person still has `trigger` on the agent in the channel and the agent is still allowed there, the billing rules of 10 hold, and for tool class `host` the agent's `tool_class` is still `host` and SR2 holds for that person. On allow the answer carries the configured tool class and billing mode, which the runner compares with its own (`compare_actual`). A refusal is `409 conflict` with the reason of the failed check (`run_not_running` or the reason of a refused `agent.invoke`), audited as a denial; the server changes nothing, the runner finishes the run.
+	//
+	// Corresponds with POST /runs/{run_id}/launch-check (the `CheckRunLaunch` operationId).
+	CheckRunLaunch(ctx context.Context, runId RunIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ResumeRunWithBody Resume a run that waited for input
 	//
 	// `waiting_input -> running` with the token of the interaction or follow-up delivery. The consumed start token (its `jti` equals `runs.started_jti`) gets 403 `invocation_token_invalid` with `reason: superseded` (09 section 4.5).
@@ -3227,6 +3259,42 @@ type ClientInterface interface {
 	//
 	// Corresponds with GET /runs/{run_id}/steps (the `ListRunSteps` operationId).
 	ListRunSteps(ctx context.Context, runId RunIdPath, params *ListRunStepsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateRunWakeWithBody Create a wake-up for an active run
+	//
+	// Creates a wake-up of the run's thread for the active run of the calling agent (09 5.8.2, stage AR): kind `at`, `pr_checks` or `command`, reason `agent` (from `bothy-wake`) or `usage_limit`. The wake-up acts for the run's `triggered_by`; it fires no earlier than `run.wake_min_delay` after its creation and no later than its `deadline` (at most `run.wake_max_wait`, for `usage_limit` counted from `not_before`). A `usage_limit` request carries the run's `outage`; a second request with the outage of a pending wake-up moves its `not_before` and answers it with `200`, a new outage gets its own wake-up, at most `run.usage_wake_max` per run. A refusal is `409 conflict` with the reason: `run_not_active`, `autonomous_not_allowed` (the person is no owner and the channel has no `allow_autonomous_runs`), `pr_checks_owner_only`, `tool_class_mismatch` (a `command` of an agent whose tool class is not `host`), `wake_max_pending`, `usage_wake_max`, or the reason of a refused `agent.invoke` of the person (for example `tool_class_owner_only`, `agent_not_reachable`, `channel_read_only`). A refused request stores nothing, except one with `deferred: true` and a refusal with `usage_wake_max`, which are stored in state `refused` with the note in the thread and the notification `wake_ended` (09 5.8.4). A wrong field is `400 validation_failed`. Audited.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /runs/{run_id}/wakes (the `CreateRunWake` operationId).
+	CreateRunWakeWithBody(ctx context.Context, runId RunIdPath, params *CreateRunWakeParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateRunWake Create a wake-up for an active run
+	//
+	// Creates a wake-up of the run's thread for the active run of the calling agent (09 5.8.2, stage AR): kind `at`, `pr_checks` or `command`, reason `agent` (from `bothy-wake`) or `usage_limit`. The wake-up acts for the run's `triggered_by`; it fires no earlier than `run.wake_min_delay` after its creation and no later than its `deadline` (at most `run.wake_max_wait`, for `usage_limit` counted from `not_before`). A `usage_limit` request carries the run's `outage`; a second request with the outage of a pending wake-up moves its `not_before` and answers it with `200`, a new outage gets its own wake-up, at most `run.usage_wake_max` per run. A refusal is `409 conflict` with the reason: `run_not_active`, `autonomous_not_allowed` (the person is no owner and the channel has no `allow_autonomous_runs`), `pr_checks_owner_only`, `tool_class_mismatch` (a `command` of an agent whose tool class is not `host`), `wake_max_pending`, `usage_wake_max`, or the reason of a refused `agent.invoke` of the person (for example `tool_class_owner_only`, `agent_not_reachable`, `channel_read_only`). A refused request stores nothing, except one with `deferred: true` and a refusal with `usage_wake_max`, which are stored in state `refused` with the note in the thread and the notification `wake_ended` (09 5.8.4). A wrong field is `400 validation_failed`. Audited.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /runs/{run_id}/wakes (the `CreateRunWake` operationId).
+	CreateRunWake(ctx context.Context, runId RunIdPath, params *CreateRunWakeParams, body CreateRunWakeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RecoverRunWakeWithBody Create the recovery or usage-limit wake-up of an ended run
+	//
+	// Creates a wake-up of kind `at` with reason `recovery` (lost background work, 09 18.19.9) or `usage_limit` (the usage window ended the run, 18.19.10) for an ended run of the calling agent in state `failed` (which `interrupted` and `stale` runs are), at most one per run and reason: a repetition answers the first one with `200`. A run that did not fail is `409 conflict` with `reason` `run_not_ended`. A refusal of the checks of 09 5.8.6 (`autonomous_not_allowed`, `wake_max_pending`, `usage_wake_max`, a refused `agent.invoke`) stores the wake-up in state `refused` with the note in the thread and the notification `wake_ended`, and answers `409 conflict` with the reason. Audited.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /runs/{run_id}/wakes/recover (the `RecoverRunWake` operationId).
+	RecoverRunWakeWithBody(ctx context.Context, runId RunIdPath, params *RecoverRunWakeParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RecoverRunWake Create the recovery or usage-limit wake-up of an ended run
+	//
+	// Creates a wake-up of kind `at` with reason `recovery` (lost background work, 09 18.19.9) or `usage_limit` (the usage window ended the run, 18.19.10) for an ended run of the calling agent in state `failed` (which `interrupted` and `stale` runs are), at most one per run and reason: a repetition answers the first one with `200`. A run that did not fail is `409 conflict` with `reason` `run_not_ended`. A refusal of the checks of 09 5.8.6 (`autonomous_not_allowed`, `wake_max_pending`, `usage_wake_max`, a refused `agent.invoke`) stores the wake-up in state `refused` with the note in the thread and the notification `wake_ended`, and answers `409 conflict` with the reason. Audited.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /runs/{run_id}/wakes/recover (the `RecoverRunWake` operationId).
+	RecoverRunWake(ctx context.Context, runId RunIdPath, params *RecoverRunWakeParams, body RecoverRunWakeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// Search Full-text search
 	//
@@ -3925,6 +3993,13 @@ type ClientInterface interface {
 	// Corresponds with PUT /threads/{thread_id}/title (the `SetThreadTitle` operationId).
 	SetThreadTitle(ctx context.Context, threadId ThreadIdPath, params *SetThreadTitleParams, body SetThreadTitleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListThreadWakes List the wake-ups of a thread
+	//
+	// The wake-ups of the thread, newest first (09 5.8.2), for everyone who may read the thread: pending ones with their cancel, and the ended ones with their state and reason. Clients show wake-up controls only when the thread's agent reports `wakes`; pending wake-ups stay visible without it (01 6.21).
+	//
+	// Corresponds with GET /threads/{thread_id}/wakes (the `ListThreadWakes` operationId).
+	ListThreadWakes(ctx context.Context, threadId ThreadIdPath, params *ListThreadWakesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// RevokeToken Revoke an API token
 	//
 	// Corresponds with DELETE /tokens/{token_id} (the `RevokeToken` operationId).
@@ -4081,6 +4156,49 @@ type ClientInterface interface {
 	//
 	// Corresponds with GET /users/{user_id}/view-as (the `ViewAsUser` operationId).
 	ViewAsUser(ctx context.Context, userId UserIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CancelRunWakeWithBody Cancel a pending wake-up
+	//
+	// Ends a pending wake-up `cancelled` (09 5.8.2): the agent of the wake-up (for example with `bothy-wake --cancel` or `usage_cleared`), the wake-up's person, or a person with `manage` on the channel. The thread gets the note; a cancel sends no notification (09 5.8.4). A wake-up that already ended answers itself without a change. Audited.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /wakes/{wake_id}/cancel (the `CancelRunWake` operationId).
+	CancelRunWakeWithBody(ctx context.Context, wakeId WakeIdPath, params *CancelRunWakeParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CancelRunWake Cancel a pending wake-up
+	//
+	// Ends a pending wake-up `cancelled` (09 5.8.2): the agent of the wake-up (for example with `bothy-wake --cancel` or `usage_cleared`), the wake-up's person, or a person with `manage` on the channel. The thread gets the note; a cancel sends no notification (09 5.8.4). A wake-up that already ended answers itself without a change. Audited.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /wakes/{wake_id}/cancel (the `CancelRunWake` operationId).
+	CancelRunWake(ctx context.Context, wakeId WakeIdPath, params *CancelRunWakeParams, body CancelRunWakeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CheckRunWake Check the next execution of a pending check
+	//
+	// Before every execution of a pending `command` and every `gh` read of a pending `pr_checks` the runner asks the server (09 5.8.3, R-AG-50): the wake-up is still `pending` and its `not_before` has passed; its person still has `trigger` on the agent in the channel and the agent is still allowed there; the channel is neither archived nor read-only; for `command` the agent's `tool_class` is still `host` and SR2 holds for that person; for `pr_checks` the person is still an owner. On allow the answer carries the configured tool class and billing mode (`compare_actual`). A failed check ends the wake-up `refused` with the reason of the check (for example `agent_not_reachable`, `channel_read_only`, `tool_class_owner_only`, `tool_class_mismatch`, `pr_checks_owner_only`), an audit entry, the note in the thread and the notification `wake_ended`, and answers `409 conflict` with that reason. A wake-up that already ended is `409 conflict` with `reason` `wake_not_pending`, one before its `not_before` `409 conflict` with `reason` `wake_not_due` (the wake-up stays pending).
+	//
+	// Corresponds with POST /wakes/{wake_id}/check (the `CheckRunWake` operationId).
+	CheckRunWake(ctx context.Context, wakeId WakeIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// FireRunWakeWithBody Fire a checked wake-up, end it failed or return a skipped wake input
+	//
+	// The runner reports the outcome of a `pr_checks` or `command` wake-up (09 5.8.2): `fired` with the result text fires it with the checks of a new run, as a wake run when the thread has no active run, as a wake input `agent.wake_input` into the running run of the same person, and keeps it `pending` while another person's run is active; a refused fire ends it `refused` with note and notification. `failed` ends it `failed` with the reason after `runner.wake_check_failures` failures in a row. `input_skipped` reports a delivered wake input the runner did not write (`wake_input_check_failed`): the wake-up returns to `pending` and fires after that run as a wake run. A wake-up that ended is `409 conflict` with `reason` `wake_not_pending`; a fire before `not_before` is `409 conflict` with `reason` `wake_not_due`; an `at` wake-up is fired by the server only (`409 conflict`, `reason` `wake_fired_by_server`). Audited.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /wakes/{wake_id}/fire (the `FireRunWake` operationId).
+	FireRunWakeWithBody(ctx context.Context, wakeId WakeIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// FireRunWake Fire a checked wake-up, end it failed or return a skipped wake input
+	//
+	// The runner reports the outcome of a `pr_checks` or `command` wake-up (09 5.8.2): `fired` with the result text fires it with the checks of a new run, as a wake run when the thread has no active run, as a wake input `agent.wake_input` into the running run of the same person, and keeps it `pending` while another person's run is active; a refused fire ends it `refused` with note and notification. `failed` ends it `failed` with the reason after `runner.wake_check_failures` failures in a row. `input_skipped` reports a delivered wake input the runner did not write (`wake_input_check_failed`): the wake-up returns to `pending` and fires after that run as a wake run. A wake-up that ended is `409 conflict` with `reason` `wake_not_pending`; a fire before `not_before` is `409 conflict` with `reason` `wake_not_due`; an `at` wake-up is fired by the server only (`409 conflict`, `reason` `wake_fired_by_server`). Audited.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /wakes/{wake_id}/fire (the `FireRunWake` operationId).
+	FireRunWake(ctx context.Context, wakeId WakeIdPath, body FireRunWakeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// RedeliverWebhook Deliver an event again
 	//
@@ -4476,6 +4594,23 @@ func (c *Client) IssueHostedAgentToken(ctx context.Context, agentId AgentIdPath,
 // Corresponds with GET /agents/me/triggerers (the `GetAgentTriggerers` operationId).
 func (c *Client) GetAgentTriggerers(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetAgentTriggerersRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListPendingRunWakes List the pending wake-ups of this agent
+//
+// Every pending wake-up of the calling agent, ascending by id (09 5.8.5): a runner calls it at start and after every reconnect and learns changes in between from `run.wake_changed`. Only the agent itself may call it (agent-self).
+//
+// Corresponds with GET /agents/me/wakes (the `ListPendingRunWakes` operationId).
+func (c *Client) ListPendingRunWakes(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListPendingRunWakesRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -6055,6 +6190,44 @@ func (c *Client) ArchiveChannelWithBody(ctx context.Context, channelId ChannelId
 // Corresponds with POST /channels/{channel_id}/archive (the `ArchiveChannel` operationId).
 func (c *Client) ArchiveChannel(ctx context.Context, channelId ChannelIdPath, params *ArchiveChannelParams, body ArchiveChannelJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewArchiveChannelRequest(c.Server, channelId, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SetChannelAutonomousRunsWithBody Switch autonomous runs of a channel
+//
+// Switches `allow_autonomous_runs` (09 5.8.6, 07 2.14 item 1): persons other than owners may let agents run on alone in this channel (wake-ups, recovery and usage-window wake-ups); owners may always. Off by default. Every create and every fire reads the switch at its moment, so switching it off refuses the next fire of a pending wake-up of a person who is no owner. An archived channel is `409 conflict` with `reason` `channel_archived`, a DM `409 conflict` with `reason` `dm_channel`. Audited; the same value answers without a change.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /channels/{channel_id}/autonomous-runs (the `SetChannelAutonomousRuns` operationId).
+func (c *Client) SetChannelAutonomousRunsWithBody(ctx context.Context, channelId ChannelIdPath, params *SetChannelAutonomousRunsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetChannelAutonomousRunsRequestWithBody(c.Server, channelId, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SetChannelAutonomousRuns Switch autonomous runs of a channel
+//
+// Switches `allow_autonomous_runs` (09 5.8.6, 07 2.14 item 1): persons other than owners may let agents run on alone in this channel (wake-ups, recovery and usage-window wake-ups); owners may always. Off by default. Every create and every fire reads the switch at its moment, so switching it off refuses the next fire of a pending wake-up of a person who is no owner. An archived channel is `409 conflict` with `reason` `channel_archived`, a DM `409 conflict` with `reason` `dm_channel`. Audited; the same value answers without a change.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /channels/{channel_id}/autonomous-runs (the `SetChannelAutonomousRuns` operationId).
+func (c *Client) SetChannelAutonomousRuns(ctx context.Context, channelId ChannelIdPath, params *SetChannelAutonomousRunsParams, body SetChannelAutonomousRunsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetChannelAutonomousRunsRequest(c.Server, channelId, params, body)
 	if err != nil {
 		return nil, err
 	}
@@ -11043,6 +11216,23 @@ func (c *Client) RenewInvocationToken(ctx context.Context, runId RunIdPath, body
 	return c.Client.Do(req)
 }
 
+// CheckRunLaunch Check a launch by a runner that did not accept the run
+//
+// Before a runner launches any process of a run it did not accept itself (a repeated try, the next attempt of an adopted run, the retry of a compaction, a start over), it asks the server (09 18.19.6, R-AG-48): the run is still `running`, its person still has `trigger` on the agent in the channel and the agent is still allowed there, the billing rules of 10 hold, and for tool class `host` the agent's `tool_class` is still `host` and SR2 holds for that person. On allow the answer carries the configured tool class and billing mode, which the runner compares with its own (`compare_actual`). A refusal is `409 conflict` with the reason of the failed check (`run_not_running` or the reason of a refused `agent.invoke`), audited as a denial; the server changes nothing, the runner finishes the run.
+//
+// Corresponds with POST /runs/{run_id}/launch-check (the `CheckRunLaunch` operationId).
+func (c *Client) CheckRunLaunch(ctx context.Context, runId RunIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCheckRunLaunchRequest(c.Server, runId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // ResumeRunWithBody Resume a run that waited for input
 //
 // `waiting_input -> running` with the token of the interaction or follow-up delivery. The consumed start token (its `jti` equals `runs.started_jti`) gets 403 `invocation_token_invalid` with `reason: superseded` (09 section 4.5).
@@ -11165,6 +11355,82 @@ func (c *Client) StartRun(ctx context.Context, runId RunIdPath, body StartRunJSO
 // Corresponds with GET /runs/{run_id}/steps (the `ListRunSteps` operationId).
 func (c *Client) ListRunSteps(ctx context.Context, runId RunIdPath, params *ListRunStepsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListRunStepsRequest(c.Server, runId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateRunWakeWithBody Create a wake-up for an active run
+//
+// Creates a wake-up of the run's thread for the active run of the calling agent (09 5.8.2, stage AR): kind `at`, `pr_checks` or `command`, reason `agent` (from `bothy-wake`) or `usage_limit`. The wake-up acts for the run's `triggered_by`; it fires no earlier than `run.wake_min_delay` after its creation and no later than its `deadline` (at most `run.wake_max_wait`, for `usage_limit` counted from `not_before`). A `usage_limit` request carries the run's `outage`; a second request with the outage of a pending wake-up moves its `not_before` and answers it with `200`, a new outage gets its own wake-up, at most `run.usage_wake_max` per run. A refusal is `409 conflict` with the reason: `run_not_active`, `autonomous_not_allowed` (the person is no owner and the channel has no `allow_autonomous_runs`), `pr_checks_owner_only`, `tool_class_mismatch` (a `command` of an agent whose tool class is not `host`), `wake_max_pending`, `usage_wake_max`, or the reason of a refused `agent.invoke` of the person (for example `tool_class_owner_only`, `agent_not_reachable`, `channel_read_only`). A refused request stores nothing, except one with `deferred: true` and a refusal with `usage_wake_max`, which are stored in state `refused` with the note in the thread and the notification `wake_ended` (09 5.8.4). A wrong field is `400 validation_failed`. Audited.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /runs/{run_id}/wakes (the `CreateRunWake` operationId).
+func (c *Client) CreateRunWakeWithBody(ctx context.Context, runId RunIdPath, params *CreateRunWakeParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateRunWakeRequestWithBody(c.Server, runId, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateRunWake Create a wake-up for an active run
+//
+// Creates a wake-up of the run's thread for the active run of the calling agent (09 5.8.2, stage AR): kind `at`, `pr_checks` or `command`, reason `agent` (from `bothy-wake`) or `usage_limit`. The wake-up acts for the run's `triggered_by`; it fires no earlier than `run.wake_min_delay` after its creation and no later than its `deadline` (at most `run.wake_max_wait`, for `usage_limit` counted from `not_before`). A `usage_limit` request carries the run's `outage`; a second request with the outage of a pending wake-up moves its `not_before` and answers it with `200`, a new outage gets its own wake-up, at most `run.usage_wake_max` per run. A refusal is `409 conflict` with the reason: `run_not_active`, `autonomous_not_allowed` (the person is no owner and the channel has no `allow_autonomous_runs`), `pr_checks_owner_only`, `tool_class_mismatch` (a `command` of an agent whose tool class is not `host`), `wake_max_pending`, `usage_wake_max`, or the reason of a refused `agent.invoke` of the person (for example `tool_class_owner_only`, `agent_not_reachable`, `channel_read_only`). A refused request stores nothing, except one with `deferred: true` and a refusal with `usage_wake_max`, which are stored in state `refused` with the note in the thread and the notification `wake_ended` (09 5.8.4). A wrong field is `400 validation_failed`. Audited.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /runs/{run_id}/wakes (the `CreateRunWake` operationId).
+func (c *Client) CreateRunWake(ctx context.Context, runId RunIdPath, params *CreateRunWakeParams, body CreateRunWakeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateRunWakeRequest(c.Server, runId, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RecoverRunWakeWithBody Create the recovery or usage-limit wake-up of an ended run
+//
+// Creates a wake-up of kind `at` with reason `recovery` (lost background work, 09 18.19.9) or `usage_limit` (the usage window ended the run, 18.19.10) for an ended run of the calling agent in state `failed` (which `interrupted` and `stale` runs are), at most one per run and reason: a repetition answers the first one with `200`. A run that did not fail is `409 conflict` with `reason` `run_not_ended`. A refusal of the checks of 09 5.8.6 (`autonomous_not_allowed`, `wake_max_pending`, `usage_wake_max`, a refused `agent.invoke`) stores the wake-up in state `refused` with the note in the thread and the notification `wake_ended`, and answers `409 conflict` with the reason. Audited.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /runs/{run_id}/wakes/recover (the `RecoverRunWake` operationId).
+func (c *Client) RecoverRunWakeWithBody(ctx context.Context, runId RunIdPath, params *RecoverRunWakeParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRecoverRunWakeRequestWithBody(c.Server, runId, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RecoverRunWake Create the recovery or usage-limit wake-up of an ended run
+//
+// Creates a wake-up of kind `at` with reason `recovery` (lost background work, 09 18.19.9) or `usage_limit` (the usage window ended the run, 18.19.10) for an ended run of the calling agent in state `failed` (which `interrupted` and `stale` runs are), at most one per run and reason: a repetition answers the first one with `200`. A run that did not fail is `409 conflict` with `reason` `run_not_ended`. A refusal of the checks of 09 5.8.6 (`autonomous_not_allowed`, `wake_max_pending`, `usage_wake_max`, a refused `agent.invoke`) stores the wake-up in state `refused` with the note in the thread and the notification `wake_ended`, and answers `409 conflict` with the reason. Audited.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /runs/{run_id}/wakes/recover (the `RecoverRunWake` operationId).
+func (c *Client) RecoverRunWake(ctx context.Context, runId RunIdPath, params *RecoverRunWakeParams, body RecoverRunWakeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRecoverRunWakeRequest(c.Server, runId, params, body)
 	if err != nil {
 		return nil, err
 	}
@@ -12762,6 +13028,23 @@ func (c *Client) SetThreadTitle(ctx context.Context, threadId ThreadIdPath, para
 	return c.Client.Do(req)
 }
 
+// ListThreadWakes List the wake-ups of a thread
+//
+// The wake-ups of the thread, newest first (09 5.8.2), for everyone who may read the thread: pending ones with their cancel, and the ended ones with their state and reason. Clients show wake-up controls only when the thread's agent reports `wakes`; pending wake-ups stay visible without it (01 6.21).
+//
+// Corresponds with GET /threads/{thread_id}/wakes (the `ListThreadWakes` operationId).
+func (c *Client) ListThreadWakes(ctx context.Context, threadId ThreadIdPath, params *ListThreadWakesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListThreadWakesRequest(c.Server, threadId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // RevokeToken Revoke an API token
 //
 // Corresponds with DELETE /tokens/{token_id} (the `RevokeToken` operationId).
@@ -13139,6 +13422,99 @@ func (c *Client) ListUserSessions(ctx context.Context, userId UserIdPath, params
 // Corresponds with GET /users/{user_id}/view-as (the `ViewAsUser` operationId).
 func (c *Client) ViewAsUser(ctx context.Context, userId UserIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewViewAsUserRequest(c.Server, userId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CancelRunWakeWithBody Cancel a pending wake-up
+//
+// Ends a pending wake-up `cancelled` (09 5.8.2): the agent of the wake-up (for example with `bothy-wake --cancel` or `usage_cleared`), the wake-up's person, or a person with `manage` on the channel. The thread gets the note; a cancel sends no notification (09 5.8.4). A wake-up that already ended answers itself without a change. Audited.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /wakes/{wake_id}/cancel (the `CancelRunWake` operationId).
+func (c *Client) CancelRunWakeWithBody(ctx context.Context, wakeId WakeIdPath, params *CancelRunWakeParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCancelRunWakeRequestWithBody(c.Server, wakeId, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CancelRunWake Cancel a pending wake-up
+//
+// Ends a pending wake-up `cancelled` (09 5.8.2): the agent of the wake-up (for example with `bothy-wake --cancel` or `usage_cleared`), the wake-up's person, or a person with `manage` on the channel. The thread gets the note; a cancel sends no notification (09 5.8.4). A wake-up that already ended answers itself without a change. Audited.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /wakes/{wake_id}/cancel (the `CancelRunWake` operationId).
+func (c *Client) CancelRunWake(ctx context.Context, wakeId WakeIdPath, params *CancelRunWakeParams, body CancelRunWakeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCancelRunWakeRequest(c.Server, wakeId, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CheckRunWake Check the next execution of a pending check
+//
+// Before every execution of a pending `command` and every `gh` read of a pending `pr_checks` the runner asks the server (09 5.8.3, R-AG-50): the wake-up is still `pending` and its `not_before` has passed; its person still has `trigger` on the agent in the channel and the agent is still allowed there; the channel is neither archived nor read-only; for `command` the agent's `tool_class` is still `host` and SR2 holds for that person; for `pr_checks` the person is still an owner. On allow the answer carries the configured tool class and billing mode (`compare_actual`). A failed check ends the wake-up `refused` with the reason of the check (for example `agent_not_reachable`, `channel_read_only`, `tool_class_owner_only`, `tool_class_mismatch`, `pr_checks_owner_only`), an audit entry, the note in the thread and the notification `wake_ended`, and answers `409 conflict` with that reason. A wake-up that already ended is `409 conflict` with `reason` `wake_not_pending`, one before its `not_before` `409 conflict` with `reason` `wake_not_due` (the wake-up stays pending).
+//
+// Corresponds with POST /wakes/{wake_id}/check (the `CheckRunWake` operationId).
+func (c *Client) CheckRunWake(ctx context.Context, wakeId WakeIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCheckRunWakeRequest(c.Server, wakeId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// FireRunWakeWithBody Fire a checked wake-up, end it failed or return a skipped wake input
+//
+// The runner reports the outcome of a `pr_checks` or `command` wake-up (09 5.8.2): `fired` with the result text fires it with the checks of a new run, as a wake run when the thread has no active run, as a wake input `agent.wake_input` into the running run of the same person, and keeps it `pending` while another person's run is active; a refused fire ends it `refused` with note and notification. `failed` ends it `failed` with the reason after `runner.wake_check_failures` failures in a row. `input_skipped` reports a delivered wake input the runner did not write (`wake_input_check_failed`): the wake-up returns to `pending` and fires after that run as a wake run. A wake-up that ended is `409 conflict` with `reason` `wake_not_pending`; a fire before `not_before` is `409 conflict` with `reason` `wake_not_due`; an `at` wake-up is fired by the server only (`409 conflict`, `reason` `wake_fired_by_server`). Audited.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /wakes/{wake_id}/fire (the `FireRunWake` operationId).
+func (c *Client) FireRunWakeWithBody(ctx context.Context, wakeId WakeIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewFireRunWakeRequestWithBody(c.Server, wakeId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// FireRunWake Fire a checked wake-up, end it failed or return a skipped wake input
+//
+// The runner reports the outcome of a `pr_checks` or `command` wake-up (09 5.8.2): `fired` with the result text fires it with the checks of a new run, as a wake run when the thread has no active run, as a wake input `agent.wake_input` into the running run of the same person, and keeps it `pending` while another person's run is active; a refused fire ends it `refused` with note and notification. `failed` ends it `failed` with the reason after `runner.wake_check_failures` failures in a row. `input_skipped` reports a delivered wake input the runner did not write (`wake_input_check_failed`): the wake-up returns to `pending` and fires after that run as a wake run. A wake-up that ended is `409 conflict` with `reason` `wake_not_pending`; a fire before `not_before` is `409 conflict` with `reason` `wake_not_due`; an `at` wake-up is fired by the server only (`409 conflict`, `reason` `wake_fired_by_server`). Audited.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /wakes/{wake_id}/fire (the `FireRunWake` operationId).
+func (c *Client) FireRunWake(ctx context.Context, wakeId WakeIdPath, body FireRunWakeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewFireRunWakeRequest(c.Server, wakeId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -14003,6 +14379,33 @@ func NewGetAgentTriggerersRequest(server string) (*http.Request, error) {
 	}
 
 	operationPath := fmt.Sprintf("/agents/me/triggerers")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListPendingRunWakesRequest constructs an http.Request for the ListPendingRunWakes method
+func NewListPendingRunWakesRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/agents/me/wakes")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -16838,6 +17241,66 @@ func NewArchiveChannelRequestWithBody(server string, channelId ChannelIdPath, pa
 
 			req.Header.Set("Idempotency-Key", headerParam0)
 		}
+
+	}
+
+	return req, nil
+}
+
+// NewSetChannelAutonomousRunsRequest calls the generic SetChannelAutonomousRuns builder with application/json body
+func NewSetChannelAutonomousRunsRequest(server string, channelId ChannelIdPath, params *SetChannelAutonomousRunsParams, body SetChannelAutonomousRunsJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewSetChannelAutonomousRunsRequestWithBody(server, channelId, params, "application/json", bodyReader)
+}
+
+// NewSetChannelAutonomousRunsRequestWithBody constructs an http.Request for the SetChannelAutonomousRuns method, with any body, and a specified content type
+func NewSetChannelAutonomousRunsRequestWithBody(server string, channelId ChannelIdPath, params *SetChannelAutonomousRunsParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "channel_id", channelId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/channels/%s/autonomous-runs", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		var headerParam0 string
+
+		headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("If-Match", headerParam0)
 
 	}
 
@@ -21265,1230 +21728,4 @@ func NewUpdateHostRequest(server string, hostId HostIdPath, params *UpdateHostPa
 	}
 	bodyReader = bytes.NewReader(buf)
 	return NewUpdateHostRequestWithBody(server, hostId, params, "application/json", bodyReader)
-}
-
-// NewUpdateHostRequestWithBody constructs an http.Request for the UpdateHost method, with any body, and a specified content type
-func NewUpdateHostRequestWithBody(server string, hostId HostIdPath, params *UpdateHostParams, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "host_id", hostId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/hosts/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
-		var headerParam1 string
-
-		headerParam1, err = runtime.StyleParamWithOptions("simple", false, "If-Match", params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
-		if err != nil {
-			return nil, err
-		}
-
-		req.Header.Set("If-Match", headerParam1)
-
-	}
-
-	return req, nil
-}
-
-// NewConfirmHostRequest calls the generic ConfirmHost builder with application/json body
-func NewConfirmHostRequest(server string, hostId HostIdPath, params *ConfirmHostParams, body ConfirmHostJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewConfirmHostRequestWithBody(server, hostId, params, "application/json", bodyReader)
-}
-
-// NewConfirmHostRequestWithBody constructs an http.Request for the ConfirmHost method, with any body, and a specified content type
-func NewConfirmHostRequestWithBody(server string, hostId HostIdPath, params *ConfirmHostParams, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "host_id", hostId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/hosts/%s/confirm", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
-		var headerParam1 string
-
-		headerParam1, err = runtime.StyleParamWithOptions("simple", false, "If-Match", params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
-		if err != nil {
-			return nil, err
-		}
-
-		req.Header.Set("If-Match", headerParam1)
-
-	}
-
-	return req, nil
-}
-
-// NewSetHostLlmCredentialsRequest calls the generic SetHostLlmCredentials builder with application/json body
-func NewSetHostLlmCredentialsRequest(server string, hostId HostIdPath, params *SetHostLlmCredentialsParams, body SetHostLlmCredentialsJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewSetHostLlmCredentialsRequestWithBody(server, hostId, params, "application/json", bodyReader)
-}
-
-// NewSetHostLlmCredentialsRequestWithBody constructs an http.Request for the SetHostLlmCredentials method, with any body, and a specified content type
-func NewSetHostLlmCredentialsRequestWithBody(server string, hostId HostIdPath, params *SetHostLlmCredentialsParams, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "host_id", hostId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/hosts/%s/llm-credentials", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	if params != nil {
-
-		var headerParam0 string
-
-		headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
-		if err != nil {
-			return nil, err
-		}
-
-		req.Header.Set("If-Match", headerParam0)
-
-	}
-
-	return req, nil
-}
-
-// NewIssueHostPairingCodeRequest calls the generic IssueHostPairingCode builder with application/json body
-func NewIssueHostPairingCodeRequest(server string, hostId HostIdPath, params *IssueHostPairingCodeParams, body IssueHostPairingCodeJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewIssueHostPairingCodeRequestWithBody(server, hostId, params, "application/json", bodyReader)
-}
-
-// NewIssueHostPairingCodeRequestWithBody constructs an http.Request for the IssueHostPairingCode method, with any body, and a specified content type
-func NewIssueHostPairingCodeRequestWithBody(server string, hostId HostIdPath, params *IssueHostPairingCodeParams, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "host_id", hostId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/hosts/%s/pairing-code", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
-	}
-
-	return req, nil
-}
-
-// NewSetHostStateRequest calls the generic SetHostState builder with application/json body
-func NewSetHostStateRequest(server string, hostId HostIdPath, params *SetHostStateParams, body SetHostStateJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewSetHostStateRequestWithBody(server, hostId, params, "application/json", bodyReader)
-}
-
-// NewSetHostStateRequestWithBody constructs an http.Request for the SetHostState method, with any body, and a specified content type
-func NewSetHostStateRequestWithBody(server string, hostId HostIdPath, params *SetHostStateParams, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "host_id", hostId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/hosts/%s/state", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
-		var headerParam1 string
-
-		headerParam1, err = runtime.StyleParamWithOptions("simple", false, "If-Match", params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
-		if err != nil {
-			return nil, err
-		}
-
-		req.Header.Set("If-Match", headerParam1)
-
-	}
-
-	return req, nil
-}
-
-// NewOpenTerminalSessionRequest calls the generic OpenTerminalSession builder with application/json body
-func NewOpenTerminalSessionRequest(server string, hostId HostIdPath, body OpenTerminalSessionJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewOpenTerminalSessionRequestWithBody(server, hostId, "application/json", bodyReader)
-}
-
-// NewOpenTerminalSessionRequestWithBody constructs an http.Request for the OpenTerminalSession method, with any body, and a specified content type
-func NewOpenTerminalSessionRequestWithBody(server string, hostId HostIdPath, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "host_id", hostId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/hosts/%s/terminal/sessions", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewListIdentityProvidersRequest constructs an http.Request for the ListIdentityProviders method
-func NewListIdentityProvidersRequest(server string) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/identity-providers")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewCreateIdentityProviderRequest calls the generic CreateIdentityProvider builder with application/json body
-func NewCreateIdentityProviderRequest(server string, params *CreateIdentityProviderParams, body CreateIdentityProviderJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewCreateIdentityProviderRequestWithBody(server, params, "application/json", bodyReader)
-}
-
-// NewCreateIdentityProviderRequestWithBody constructs an http.Request for the CreateIdentityProvider method, with any body, and a specified content type
-func NewCreateIdentityProviderRequestWithBody(server string, params *CreateIdentityProviderParams, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/identity-providers")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
-	}
-
-	return req, nil
-}
-
-// NewDeleteIdentityProviderRequest constructs an http.Request for the DeleteIdentityProvider method
-func NewDeleteIdentityProviderRequest(server string, providerId ProviderIdPath) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "provider_id", providerId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/identity-providers/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewGetIdentityProviderRequest constructs an http.Request for the GetIdentityProvider method
-func NewGetIdentityProviderRequest(server string, providerId ProviderIdPath) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "provider_id", providerId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/identity-providers/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewUpdateIdentityProviderRequest calls the generic UpdateIdentityProvider builder with application/json body
-func NewUpdateIdentityProviderRequest(server string, providerId ProviderIdPath, params *UpdateIdentityProviderParams, body UpdateIdentityProviderJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewUpdateIdentityProviderRequestWithBody(server, providerId, params, "application/json", bodyReader)
-}
-
-// NewUpdateIdentityProviderRequestWithBody constructs an http.Request for the UpdateIdentityProvider method, with any body, and a specified content type
-func NewUpdateIdentityProviderRequestWithBody(server string, providerId ProviderIdPath, params *UpdateIdentityProviderParams, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "provider_id", providerId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/identity-providers/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
-	}
-
-	return req, nil
-}
-
-// NewListImportsRequest constructs an http.Request for the ListImports method
-func NewListImportsRequest(server string, params *ListImportsParams) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/imports")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-		// queryValues collects non-styled parameters (passthrough, JSON)
-		// that are safe to round-trip through url.Values.Encode().
-		queryValues := queryURL.Query()
-		// rawQueryFragments collects pre-encoded query fragments from
-		// styled parameters, preserving literal commas as delimiters
-		// per the OpenAPI spec (e.g. "color=blue,black,brown").
-		var rawQueryFragments []string
-
-		if params.Cursor != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if params.Limit != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if encoded := queryValues.Encode(); encoded != "" {
-			rawQueryFragments = append(rawQueryFragments, encoded)
-		}
-		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewCreateImportRequest calls the generic CreateImport builder with application/json body
-func NewCreateImportRequest(server string, params *CreateImportParams, body CreateImportJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewCreateImportRequestWithBody(server, params, "application/json", bodyReader)
-}
-
-// NewCreateImportRequestWithBody constructs an http.Request for the CreateImport method, with any body, and a specified content type
-func NewCreateImportRequestWithBody(server string, params *CreateImportParams, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/imports")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
-	}
-
-	return req, nil
-}
-
-// NewGetImportRequest constructs an http.Request for the GetImport method
-func NewGetImportRequest(server string, importId ImportIdPath) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "import_id", importId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/imports/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewApplyImportBatchRequest calls the generic ApplyImportBatch builder with application/json body
-func NewApplyImportBatchRequest(server string, importId ImportIdPath, body ApplyImportBatchJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewApplyImportBatchRequestWithBody(server, importId, "application/json", bodyReader)
-}
-
-// NewApplyImportBatchRequestWithBody constructs an http.Request for the ApplyImportBatch method, with any body, and a specified content type
-func NewApplyImportBatchRequestWithBody(server string, importId ImportIdPath, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "import_id", importId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/imports/%s/batches", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewCancelImportRequest constructs an http.Request for the CancelImport method
-func NewCancelImportRequest(server string, importId ImportIdPath, params *CancelImportParams) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "import_id", importId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/imports/%s/cancel", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
-	}
-
-	return req, nil
-}
-
-// NewCompleteImportRequest constructs an http.Request for the CompleteImport method
-func NewCompleteImportRequest(server string, importId ImportIdPath, params *CompleteImportParams) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "import_id", importId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/imports/%s/complete", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
-	}
-
-	return req, nil
-}
-
-// NewSetImportCursorRequest calls the generic SetImportCursor builder with application/json body
-func NewSetImportCursorRequest(server string, importId ImportIdPath, body SetImportCursorJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewSetImportCursorRequestWithBody(server, importId, "application/json", bodyReader)
-}
-
-// NewSetImportCursorRequestWithBody constructs an http.Request for the SetImportCursor method, with any body, and a specified content type
-func NewSetImportCursorRequestWithBody(server string, importId ImportIdPath, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "import_id", importId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/imports/%s/cursor", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewCreateImportFileRequest calls the generic CreateImportFile builder with application/json body
-func NewCreateImportFileRequest(server string, importId ImportIdPath, body CreateImportFileJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewCreateImportFileRequestWithBody(server, importId, "application/json", bodyReader)
-}
-
-// NewCreateImportFileRequestWithBody constructs an http.Request for the CreateImportFile method, with any body, and a specified content type
-func NewCreateImportFileRequestWithBody(server string, importId ImportIdPath, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "import_id", importId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/imports/%s/files", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewCompleteImportFileRequest calls the generic CompleteImportFile builder with application/json body
-func NewCompleteImportFileRequest(server string, importId ImportIdPath, fileId FileIdPath, body CompleteImportFileJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewCompleteImportFileRequestWithBody(server, importId, fileId, "application/json", bodyReader)
-}
-
-// NewCompleteImportFileRequestWithBody constructs an http.Request for the CompleteImportFile method, with any body, and a specified content type
-func NewCompleteImportFileRequestWithBody(server string, importId ImportIdPath, fileId FileIdPath, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "import_id", importId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	var pathParam1 string
-
-	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "file_id", fileId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/imports/%s/files/%s/complete", pathParam0, pathParam1)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewUploadImportFilePartRequestWithBody constructs an http.Request for the UploadImportFilePart method, with any body, and a specified content type
-func NewUploadImportFilePartRequestWithBody(server string, importId ImportIdPath, fileId FileIdPath, partNumber PartNumberPath, params *UploadImportFilePartParams, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "import_id", importId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	var pathParam1 string
-
-	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "file_id", fileId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	var pathParam2 string
-
-	pathParam2, err = runtime.StyleParamWithOptions("simple", false, "part_number", partNumber, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "integer", Format: ""})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/imports/%s/files/%s/parts/%s", pathParam0, pathParam1, pathParam2)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	if params != nil {
-
-		var headerParam0 string
-
-		headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Content-Digest", params.ContentDigest, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
-		if err != nil {
-			return nil, err
-		}
-
-		req.Header.Set("Content-Digest", headerParam0)
-
-	}
-
-	return req, nil
-}
-
-// NewListImportItemsRequest constructs an http.Request for the ListImportItems method
-func NewListImportItemsRequest(server string, importId ImportIdPath, params *ListImportItemsParams) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "import_id", importId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/imports/%s/items", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-		// queryValues collects non-styled parameters (passthrough, JSON)
-		// that are safe to round-trip through url.Values.Encode().
-		queryValues := queryURL.Query()
-		// rawQueryFragments collects pre-encoded query fragments from
-		// styled parameters, preserving literal commas as delimiters
-		// per the OpenAPI spec (e.g. "color=blue,black,brown").
-		var rawQueryFragments []string
-
-		if params.Cursor != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if params.Limit != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if params.State != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "state", *params.State, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if encoded := queryValues.Encode(); encoded != "" {
-			rawQueryFragments = append(rawQueryFragments, encoded)
-		}
-		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewSetImportLeadRequest calls the generic SetImportLead builder with application/json body
-func NewSetImportLeadRequest(server string, importId ImportIdPath, body SetImportLeadJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewSetImportLeadRequestWithBody(server, importId, "application/json", bodyReader)
-}
-
-// NewSetImportLeadRequestWithBody constructs an http.Request for the SetImportLead method, with any body, and a specified content type
-func NewSetImportLeadRequestWithBody(server string, importId ImportIdPath, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "import_id", importId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/imports/%s/leads", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
 }

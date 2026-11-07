@@ -276,6 +276,10 @@ func (a *applier) apply(op Op) error {
 			raw = encodeCanonical(apiRetryJSON(r))
 		}
 		a.setMetric("last_api_retry", raw)
+	case TargetAutonomyLast:
+		if l, ok := op.Value.(AutonomyLast); ok {
+			a.setMetric(metricAutonomyLast, encodeCanonical(map[string]any{"input": l.Input, "idle": l.Idle}))
+		}
 	case TargetCost:
 		if m, ok := op.Value.(Money); ok && m != a.cost {
 			a.emit(OpReplace, "/cost", encodeCanonical(moneyJSON(m)))

@@ -113,8 +113,15 @@ func TestReasonTable(t *testing.T) {
 	if _, ok := domain.ReasonOf("no_such_reason"); ok {
 		t.Error("ReasonOf accepts an unknown code")
 	}
-	if last := table[len(table)-1]; last != (domain.ReasonRow{Code: domain.RunReasonUserDisabled, State: domain.StateCancelled, Setter: domain.SetterServer, AlsoFailed: true}) {
-		t.Errorf("last row = %v, want user_disabled, cancelled, server (D-M2-05-7)", last)
+	if row := table[len(table)-2]; row != (domain.ReasonRow{Code: domain.RunReasonUserDisabled, State: domain.StateCancelled, Setter: domain.SetterServer, AlsoFailed: true}) {
+		t.Errorf("row before the last = %v, want user_disabled, cancelled, server (D-M2-05-7)", row)
+	}
+	// Stage AR (09 5.2, 18.19.10): usage_limited is a failed reason of the adapter, last.
+	if last := table[len(table)-1]; last != (domain.ReasonRow{Code: domain.RunReasonUsageLimited, State: domain.StateFailed, Setter: domain.SetterAdapter}) {
+		t.Errorf("last row = %v, want usage_limited, failed, adapter (AR-04)", last)
+	}
+	if r, orig, err := domain.NormalizeAdapterReason(domain.RunReasonUsageLimited); err != nil || r != domain.RunReasonUsageLimited || orig != "" {
+		t.Errorf("usage_limited from the adapter: %q %q %v", r, orig, err)
 	}
 	table[0].Code = "mutated"
 	if domain.ReasonTable()[0].Code == "mutated" {

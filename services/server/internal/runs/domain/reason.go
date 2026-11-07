@@ -88,6 +88,9 @@ const (
 	RunReasonAdapterStopped = "adapter_stopped"
 	// RunReasonUserDisabled: the triggering person was disabled (user.disable, 02 4.3).
 	RunReasonUserDisabled = "user_disabled"
+	// RunReasonUsageLimited: the usage window of the runtime's account was used up while the run
+	// ran (09 18.19.10, stage AR); the summary names the reset time.
+	RunReasonUsageLimited = "usage_limited"
 )
 
 // ReasonRow is one row of the reason table: a code, the end state it belongs to and who may set
@@ -105,7 +108,8 @@ type ReasonRow struct {
 	AlsoFailed bool
 }
 
-// reasonTable is 09 5.2 in the order of the spec, with user_disabled last (ruling D-M2-05-7).
+// reasonTable is 09 5.2 in the order of the spec: user_disabled (ruling D-M2-05-7), then
+// usage_limited (stage AR, AR-04).
 var reasonTable = []ReasonRow{
 	{RunReasonUserCancelled, StateCancelled, SetterServer, false},
 	{RunReasonAccessRevoked, StateCancelled, SetterServer, true},
@@ -126,6 +130,7 @@ var reasonTable = []ReasonRow{
 	{RunReasonRuntimeNotAuthenticated, StateFailed, SetterAdapter, false},
 	{RunReasonAdapterStopped, StateCancelled, SetterAdapter, false},
 	{RunReasonUserDisabled, StateCancelled, SetterServer, true},
+	{RunReasonUsageLimited, StateFailed, SetterAdapter, false},
 }
 
 // ReasonTable returns the rows of 09 5.2 in the order of the spec, followed by user_disabled

@@ -248,6 +248,13 @@ func renewalInput(row RunRow, c domain.InvocationClaims) (runs.DeliveryInput, er
 		in.Type, in.Payload = domain.EventAgentInvocation, p
 	case domain.TriggerInteraction:
 		return renewalInteraction(in, row, c)
+	case domain.TriggerWake:
+		// The token of a wake run renews like the one of a message run (09 4.5.1); a wake input
+		// starts nothing, so its token is never renewed (AR-04).
+		if row.TriggerKind != triggerKindWake {
+			return runs.DeliveryInput{}, errs.New(errs.CodeInvocationTokenInvalid, "").WithReason("invalid")
+		}
+		in.Type = domain.EventAgentInvocation
 	default:
 		return runs.DeliveryInput{}, errs.New(errs.CodeInternalError, "runs: no renewal for the trigger kind of this token yet")
 	}

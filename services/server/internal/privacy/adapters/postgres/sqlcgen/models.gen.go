@@ -240,6 +240,7 @@ type Channel struct {
 	DeletedAt                pgtype.Timestamptz
 	DeletedBy                pgtype.UUID
 	PurgedAt                 pgtype.Timestamptz
+	AllowAutonomousRuns      bool
 }
 
 type ChannelSkillBinding struct {
@@ -1000,6 +1001,16 @@ type Run struct {
 	FinishedAt              pgtype.Timestamptz
 	DurationMs              pgtype.Int8
 	LastProgressAt          pgtype.Timestamptz
+	TriggeringWakeID        pgtype.UUID
+}
+
+type RunAutonomy struct {
+	ThreadID    pgtype.UUID
+	PersonID    pgtype.UUID
+	ChainCount  int32
+	IdleCount   int32
+	EndedReason pgtype.Text
+	UpdatedAt   pgtype.Timestamptz
 }
 
 type RunFollowup struct {
@@ -1022,6 +1033,29 @@ type RunStep struct {
 	Detail       []byte
 	StartedAt    pgtype.Timestamptz
 	FinishedAt   pgtype.Timestamptz
+}
+
+type RunWake struct {
+	ID             pgtype.UUID
+	AgentID        pgtype.UUID
+	ThreadID       pgtype.UUID
+	SourceRunID    pgtype.UUID
+	TriggeredBy    pgtype.UUID
+	Kind           string
+	Condition      []byte
+	Label          string
+	Reason         string
+	Outage         pgtype.Int4
+	NotBefore      pgtype.Timestamptz
+	Deadline       pgtype.Timestamptz
+	State          string
+	StateReason    pgtype.Text
+	ResultText     string
+	FiredRunID     pgtype.UUID
+	FiredIntoRunID pgtype.UUID
+	CreatedAt      pgtype.Timestamptz
+	EndedAt        pgtype.Timestamptz
+	Version        int64
 }
 
 type SequenceCounter struct {

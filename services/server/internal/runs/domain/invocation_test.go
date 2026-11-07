@@ -177,6 +177,8 @@ func grantOf(kind domain.TriggerKind) domain.InvocationGrant {
 		g.CommandID = ids.New()
 	case domain.TriggerAutocomplete:
 		g.CommandID, g.RunID = ids.New(), ids.ID{}
+	case domain.TriggerWake:
+		g.WakeID = ids.New()
 	}
 	return g
 }
@@ -204,6 +206,7 @@ func TestInvocationClaims_ShapePerTriggerKind(t *testing.T) {
 		domain.TriggerInteraction:  {"run_id", "interaction_id"},
 		domain.TriggerCommand:      {"run_id", "command_id"},
 		domain.TriggerAutocomplete: {"command_id"},
+		domain.TriggerWake:         {"run_id", "wake_id"},
 	}
 	enums := map[string][]string{
 		"level": openapiEnum(t, "Level"), "billing_mode": openapiEnum(t, "BillingMode"), "tool_class": openapiEnum(t, "ToolClass"),
@@ -288,7 +291,7 @@ func brokenGrants() map[string]domain.InvocationGrant {
 		f(&g)
 		out[name] = g
 	}
-	for _, kind := range []domain.TriggerKind{domain.TriggerMessage, domain.TriggerFollowup, domain.TriggerInteraction, domain.TriggerCommand} {
+	for _, kind := range []domain.TriggerKind{domain.TriggerMessage, domain.TriggerFollowup, domain.TriggerInteraction, domain.TriggerCommand, domain.TriggerWake} {
 		mod("no run_id for "+string(kind), kind, func(g *domain.InvocationGrant) { g.RunID = ids.ID{} })
 	}
 	mod("run_id with autocomplete", domain.TriggerAutocomplete, func(g *domain.InvocationGrant) { g.RunID = ids.New() })
@@ -301,6 +304,9 @@ func brokenGrants() map[string]domain.InvocationGrant {
 	mod("wrong object for command", domain.TriggerCommand, func(g *domain.InvocationGrant) { g.CommandID, g.MessageID = ids.ID{}, ids.New() })
 	mod("wrong object for interaction", domain.TriggerInteraction, func(g *domain.InvocationGrant) { g.InteractionID, g.CommandID = ids.ID{}, ids.New() })
 	mod("wrong object for autocomplete", domain.TriggerAutocomplete, func(g *domain.InvocationGrant) { g.CommandID, g.MessageID = ids.ID{}, ids.New() })
+	mod("no wake for wake", domain.TriggerWake, func(g *domain.InvocationGrant) { g.WakeID = ids.ID{} })
+	mod("wake and message", domain.TriggerWake, func(g *domain.InvocationGrant) { g.MessageID = ids.New() })
+	mod("wake_id on a message", domain.TriggerMessage, func(g *domain.InvocationGrant) { g.WakeID = ids.New() })
 	mod("zero thread_id", domain.TriggerMessage, func(g *domain.InvocationGrant) { g.ThreadID = ids.ID{} })
 	mod("zero thread_id for autocomplete", domain.TriggerAutocomplete, func(g *domain.InvocationGrant) { g.ThreadID = ids.ID{} })
 	mod("zero channel_id", domain.TriggerMessage, func(g *domain.InvocationGrant) { g.ChannelID = ids.ID{} })

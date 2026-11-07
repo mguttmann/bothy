@@ -5,6 +5,7 @@ package app
 import (
 	"context"
 	"log/slog"
+	"slices"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
@@ -45,6 +46,8 @@ type patchOutcome struct {
 	// (tool_calls of the own measurement, M6-13).
 	channel   ids.ID
 	toolCalls []finishedToolCall
+	// capReached is the answer's autonomy_cap_reached (09 5.8.6, AR-04).
+	capReached bool
 }
 
 // Patch implements runs.Runs (patchRun and the gateway op run.update, action run.update; M2-10
@@ -91,7 +94,7 @@ func (s *Service) Patch(ctx context.Context, in runs.PatchRun) (runs.PatchResult
 		return runs.PatchResult{}, err
 	}
 	s.afterPatch(ctx, out)
-	return runs.PatchResult{Version: out.version}, nil
+	return runs.PatchResult{Version: out.version, AutonomyCapReached: out.capReached}, nil
 }
 
 // patchLocked runs steps c to g of design note 1 inside the unit of work of ctx.
@@ -128,6 +131,14 @@ func (s *Service) patchLocked(ctx context.Context, a actor.Actor, in runs.PatchR
 	if err != nil {
 		return patchOutcome{}, err
 	}
+	var capReached bool
+	if slices.ContainsFunc(ops, func(o domain.Op) bool { return o.Target == domain.TargetAutonomyLast }) {
+		// The idle flag of an autonomous input counts once per input in the counts of the run's
+		// thread and person (09 5.8.6), in the unit of the patch, after the run row (03 6.3).
+		if capReached, err = s.idleReport(ctx, row, row.Metrics, stored.Metrics); err != nil {
+			return patchOutcome{}, err
+		}
+	}
 	for _, f := range ch.Followups {
 		if err := s.followups().SetState(ctx, row.ID, f.MessageID, f.State); err != nil {
 			return patchOutcome{}, err
@@ -144,7 +155,7 @@ func (s *Service) patchLocked(ctx context.Context, a actor.Actor, in runs.PatchR
 	}
 	payload := s.updatedPayload(row, in.BaseVersion, stored.Version, norm)
 	return patchOutcome{
-		version: stored.Version, added: ch.AddedSteps, agentID: row.AgentID,
+		version: stored.Version, added: ch.AddedSteps, agentID: row.AgentID, capReached: capReached,
 		channel: info.ChannelID, toolCalls: finishedToolCalls(state.Steps, ch.After.Steps),
 		event: eventlog.EphemeralEvent{
 			Type: eventRunUpdated, SchemaVersion: runUpdatedSchemaVersion,

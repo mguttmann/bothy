@@ -38,7 +38,7 @@ func (q *Queries) DefaultOperatedSpaces(ctx context.Context, agentID pgtype.UUID
 }
 
 const lockInheritingChannels = `-- name: LockInheritingChannels :many
-SELECT c.id, c.space_id, c.kind, c.name, c.topic, c.sort_key, c.operator_inherit, c.operator_agent_id, c.require_mention, c.thread_require_mention, c.free_response, c.auto_thread, c.allow_mentioned_agents, c.history_backfill_limit, c.prompt, c.forum_default_sort, c.default_notification_level, c.read_only, c.created_by, c.created_at, c.archived_at, c.version, c.settings_version, c.deleted_at, c.deleted_by, c.purged_at, s.default_operator_agent_id AS space_operator_id,
+SELECT c.id, c.space_id, c.kind, c.name, c.topic, c.sort_key, c.operator_inherit, c.operator_agent_id, c.require_mention, c.thread_require_mention, c.free_response, c.auto_thread, c.allow_mentioned_agents, c.history_backfill_limit, c.prompt, c.forum_default_sort, c.default_notification_level, c.read_only, c.created_by, c.created_at, c.archived_at, c.version, c.settings_version, c.deleted_at, c.deleted_by, c.purged_at, c.allow_autonomous_runs, s.default_operator_agent_id AS space_operator_id,
        (s.archived_at IS NOT NULL)::boolean AS space_archived, t.id AS main_thread_id,
        (pb.channel_id IS NOT NULL)::boolean AS project_bound, coalesce(pb.ready, false)::boolean AS project_ready
 FROM channels c
@@ -97,6 +97,7 @@ func (q *Queries) LockInheritingChannels(ctx context.Context, spaceID pgtype.UUI
 			&i.Channel.DeletedAt,
 			&i.Channel.DeletedBy,
 			&i.Channel.PurgedAt,
+			&i.Channel.AllowAutonomousRuns,
 			&i.SpaceOperatorID,
 			&i.SpaceArchived,
 			&i.MainThreadID,

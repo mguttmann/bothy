@@ -308,3 +308,77 @@ func TestInvocationPayload_Session(t *testing.T) {
 		}
 	}
 }
+
+// TestDeliveryMatrix_WakeInput: agent.wake_input is invocation-bearing; it is checked only for a
+// running run, records no jti and refuses the wake-up on a denial; in every other state it is
+// skipped and its wake-up returns to pending (09 5.8.3, ruling D-AR-04-4).
+func TestDeliveryMatrix_WakeInput(t *testing.T) {
+	t.Parallel()
+	if !domain.InvocationBearing(domain.EventAgentWakeInput) {
+		t.Fatal("agent.wake_input bears an invocation")
+	}
+	r, err := domain.DeliveryMatrix(domain.EventAgentWakeInput, domain.StateRunning)
+	if err != nil || r.Skip || r.Record || r.Denial != domain.DenyRefuseWake || r.ReturnWake {
+		t.Fatalf("running: %+v %v", r, err)
+	}
+	for _, s := range []domain.State{domain.StateQueued, domain.StateWaitingInput, domain.StateCompleted, domain.StateFailed, domain.StateCancelled} {
+		r, err := domain.DeliveryMatrix(domain.EventAgentWakeInput, s)
+		if err != nil || !r.Skip || !r.ReturnWake || r.Record {
+			t.Errorf("%s: %+v %v", s, r, err)
+		}
+	}
+	if r, _ := domain.DeliveryMatrix(domain.EventAgentFollowup, domain.StateCompleted); r.ReturnWake {
+		t.Error("only a wake input returns its wake-up")
+	}
+}
+
+// TestWakePayloadsAndGrant: the wake run's agent.invocation names the wake-up instead of a
+// message, agent.wake_input carries run, thread, wake-up and the facts of the first input, and the
+// grant of both carries wake_id with trigger kind wake (04 15.9).
+func TestWakePayloadsAndGrant(t *testing.T) {
+	t.Parallel()
+	run, thread, channel, wake := ids.New(), ids.New(), ids.New(), ids.New()
+	w := domain.WakeFacts{ID: wake, Kind: domain.WakePRChecks, Reason: domain.WakeReasonAgent, Label: "CI of #12", ResultText: "all green"}
+	p, err := domain.InvocationPayload(domain.InvocationPayloadInput{RunID: run, ThreadID: thread, ChannelID: channel,
+		TriggeredBy: domain.PrincipalRefPayload{ID: ids.New().String(), Kind: "user", Handle: "alex", DisplayName: "Alex"},
+		BillingMode: "organization", TriggerKind: "wake", Wake: &w}, domain.DecideSession(true, nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var m map[string]any
+	if err := json.Unmarshal(p, &m); err != nil {
+		t.Fatal(err)
+	}
+	wm, _ := m["wake"].(map[string]any)
+	if m["trigger_kind"] != "wake" || m["wake_id"] != wake.String() || m["message_id"] != nil || wm["label"] != "CI of #12" ||
+		wm["result_text"] != "all green" || wm["kind"] != "pr_checks" || wm["reason"] != "agent" {
+		t.Fatalf("wake run payload %s", p)
+	}
+	if _, err := domain.InvocationPayload(domain.InvocationPayloadInput{RunID: run, ThreadID: thread, ChannelID: channel,
+		TriggeredBy: domain.PrincipalRefPayload{ID: ids.New().String(), Kind: "user"}, BillingMode: "organization",
+		TriggerKind: "message", MessageID: ids.New(), Wake: &w}, domain.DecideSession(true, nil)); err == nil {
+		t.Fatal("a wake on a message run")
+	}
+	in, err := domain.WakeInputPayload(run, thread, w)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, err := domain.WakeInputWakeID(in); err != nil || got != wake {
+		t.Fatalf("wake input %s: %v %v", in, got, err)
+	}
+	if _, err := domain.WakeInputPayload(run, thread, domain.WakeFacts{}); err == nil {
+		t.Fatal("a wake input without its wake-up")
+	}
+	g, err := domain.DeliveryGrant(domain.DeliveryFacts{EventType: domain.EventAgentWakeInput, RunTriggerKind: "message", RunID: run,
+		AgentID: ids.New(), TriggeredBy: ids.New(), ObjectID: wake, ThreadID: thread, ChannelID: channel, SpaceID: ids.New(),
+		BillingMode: "organization", ToolClass: "host"})
+	if err != nil || g.TriggerKind != domain.TriggerWake || g.WakeID != wake || !g.MessageID.IsZero() {
+		t.Fatalf("wake input grant %+v %v", g, err)
+	}
+	g, err = domain.DeliveryGrant(domain.DeliveryFacts{EventType: domain.EventAgentInvocation, RunTriggerKind: "wake", RunID: run,
+		AgentID: ids.New(), TriggeredBy: ids.New(), ObjectID: wake, ThreadID: thread, ChannelID: channel, SpaceID: ids.New(),
+		BillingMode: "organization", ToolClass: "host"})
+	if err != nil || g.TriggerKind != domain.TriggerWake || g.WakeID != wake {
+		t.Fatalf("wake run grant %+v %v", g, err)
+	}
+}

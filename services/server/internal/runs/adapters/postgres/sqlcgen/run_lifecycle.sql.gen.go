@@ -12,7 +12,7 @@ import (
 )
 
 const lockActiveRunsByAgent = `-- name: LockActiveRunsByAgent :many
-SELECT id, thread_id, agent_id, agent_session_id, trigger_kind, triggering_message_id, triggering_command_id, triggering_interaction_id, triggered_by, state, state_reason, version, billing_mode_expected, billing_mode_used, billing_evidence, invocation_jti, started_jti, renewed_from_jti, dev_environment_id, model, status_line, last_text_excerpt, plan, metrics, cost_micros, currency, cost_is_estimate, summary, stall_warned_at, queued_at, invocation_held_until, started_at, finished_at, duration_ms, last_progress_at FROM runs
+SELECT id, thread_id, agent_id, agent_session_id, trigger_kind, triggering_message_id, triggering_command_id, triggering_interaction_id, triggered_by, state, state_reason, version, billing_mode_expected, billing_mode_used, billing_evidence, invocation_jti, started_jti, renewed_from_jti, dev_environment_id, model, status_line, last_text_excerpt, plan, metrics, cost_micros, currency, cost_is_estimate, summary, stall_warned_at, queued_at, invocation_held_until, started_at, finished_at, duration_ms, last_progress_at, triggering_wake_id FROM runs
 WHERE state IN ('queued', 'running', 'waiting_input') AND agent_id = $1
 ORDER BY id
 FOR UPDATE
@@ -65,6 +65,7 @@ func (q *Queries) LockActiveRunsByAgent(ctx context.Context, agentID pgtype.UUID
 			&i.FinishedAt,
 			&i.DurationMs,
 			&i.LastProgressAt,
+			&i.TriggeringWakeID,
 		); err != nil {
 			return nil, err
 		}
@@ -78,7 +79,7 @@ func (q *Queries) LockActiveRunsByAgent(ctx context.Context, agentID pgtype.UUID
 
 const lockActiveRunsByStarter = `-- name: LockActiveRunsByStarter :many
 
-SELECT id, thread_id, agent_id, agent_session_id, trigger_kind, triggering_message_id, triggering_command_id, triggering_interaction_id, triggered_by, state, state_reason, version, billing_mode_expected, billing_mode_used, billing_evidence, invocation_jti, started_jti, renewed_from_jti, dev_environment_id, model, status_line, last_text_excerpt, plan, metrics, cost_micros, currency, cost_is_estimate, summary, stall_warned_at, queued_at, invocation_held_until, started_at, finished_at, duration_ms, last_progress_at FROM runs
+SELECT id, thread_id, agent_id, agent_session_id, trigger_kind, triggering_message_id, triggering_command_id, triggering_interaction_id, triggered_by, state, state_reason, version, billing_mode_expected, billing_mode_used, billing_evidence, invocation_jti, started_jti, renewed_from_jti, dev_environment_id, model, status_line, last_text_excerpt, plan, metrics, cost_micros, currency, cost_is_estimate, summary, stall_warned_at, queued_at, invocation_held_until, started_at, finished_at, duration_ms, last_progress_at, triggering_wake_id FROM runs
 WHERE state IN ('queued', 'running', 'waiting_input') AND triggered_by = ANY ($1::uuid[])
 ORDER BY id
 FOR UPDATE
@@ -137,6 +138,7 @@ func (q *Queries) LockActiveRunsByStarter(ctx context.Context, principalIds []pg
 			&i.FinishedAt,
 			&i.DurationMs,
 			&i.LastProgressAt,
+			&i.TriggeringWakeID,
 		); err != nil {
 			return nil, err
 		}
@@ -149,7 +151,7 @@ func (q *Queries) LockActiveRunsByStarter(ctx context.Context, principalIds []pg
 }
 
 const lockActiveRunsByThreads = `-- name: LockActiveRunsByThreads :many
-SELECT id, thread_id, agent_id, agent_session_id, trigger_kind, triggering_message_id, triggering_command_id, triggering_interaction_id, triggered_by, state, state_reason, version, billing_mode_expected, billing_mode_used, billing_evidence, invocation_jti, started_jti, renewed_from_jti, dev_environment_id, model, status_line, last_text_excerpt, plan, metrics, cost_micros, currency, cost_is_estimate, summary, stall_warned_at, queued_at, invocation_held_until, started_at, finished_at, duration_ms, last_progress_at FROM runs
+SELECT id, thread_id, agent_id, agent_session_id, trigger_kind, triggering_message_id, triggering_command_id, triggering_interaction_id, triggered_by, state, state_reason, version, billing_mode_expected, billing_mode_used, billing_evidence, invocation_jti, started_jti, renewed_from_jti, dev_environment_id, model, status_line, last_text_excerpt, plan, metrics, cost_micros, currency, cost_is_estimate, summary, stall_warned_at, queued_at, invocation_held_until, started_at, finished_at, duration_ms, last_progress_at, triggering_wake_id FROM runs
 WHERE state IN ('queued', 'running', 'waiting_input') AND thread_id = ANY ($1::uuid[])
 ORDER BY id
 FOR UPDATE
@@ -203,6 +205,7 @@ func (q *Queries) LockActiveRunsByThreads(ctx context.Context, threadIds []pgtyp
 			&i.FinishedAt,
 			&i.DurationMs,
 			&i.LastProgressAt,
+			&i.TriggeringWakeID,
 		); err != nil {
 			return nil, err
 		}
@@ -215,7 +218,7 @@ func (q *Queries) LockActiveRunsByThreads(ctx context.Context, threadIds []pgtyp
 }
 
 const lockQueuedRunsOfAgent = `-- name: LockQueuedRunsOfAgent :many
-SELECT id, thread_id, agent_id, agent_session_id, trigger_kind, triggering_message_id, triggering_command_id, triggering_interaction_id, triggered_by, state, state_reason, version, billing_mode_expected, billing_mode_used, billing_evidence, invocation_jti, started_jti, renewed_from_jti, dev_environment_id, model, status_line, last_text_excerpt, plan, metrics, cost_micros, currency, cost_is_estimate, summary, stall_warned_at, queued_at, invocation_held_until, started_at, finished_at, duration_ms, last_progress_at FROM runs
+SELECT id, thread_id, agent_id, agent_session_id, trigger_kind, triggering_message_id, triggering_command_id, triggering_interaction_id, triggered_by, state, state_reason, version, billing_mode_expected, billing_mode_used, billing_evidence, invocation_jti, started_jti, renewed_from_jti, dev_environment_id, model, status_line, last_text_excerpt, plan, metrics, cost_micros, currency, cost_is_estimate, summary, stall_warned_at, queued_at, invocation_held_until, started_at, finished_at, duration_ms, last_progress_at, triggering_wake_id FROM runs
 WHERE state = 'queued' AND agent_id = $1
 ORDER BY id
 FOR UPDATE
@@ -268,6 +271,7 @@ func (q *Queries) LockQueuedRunsOfAgent(ctx context.Context, agentID pgtype.UUID
 			&i.FinishedAt,
 			&i.DurationMs,
 			&i.LastProgressAt,
+			&i.TriggeringWakeID,
 		); err != nil {
 			return nil, err
 		}
@@ -285,7 +289,7 @@ SET stall_warned_at = $1::timestamptz,
     version = version + 1
 WHERE id = $2 AND version = $3 AND state = 'running'
     AND stall_warned_at IS NULL AND last_progress_at < $4::timestamptz
-RETURNING id, thread_id, agent_id, agent_session_id, trigger_kind, triggering_message_id, triggering_command_id, triggering_interaction_id, triggered_by, state, state_reason, version, billing_mode_expected, billing_mode_used, billing_evidence, invocation_jti, started_jti, renewed_from_jti, dev_environment_id, model, status_line, last_text_excerpt, plan, metrics, cost_micros, currency, cost_is_estimate, summary, stall_warned_at, queued_at, invocation_held_until, started_at, finished_at, duration_ms, last_progress_at
+RETURNING id, thread_id, agent_id, agent_session_id, trigger_kind, triggering_message_id, triggering_command_id, triggering_interaction_id, triggered_by, state, state_reason, version, billing_mode_expected, billing_mode_used, billing_evidence, invocation_jti, started_jti, renewed_from_jti, dev_environment_id, model, status_line, last_text_excerpt, plan, metrics, cost_micros, currency, cost_is_estimate, summary, stall_warned_at, queued_at, invocation_held_until, started_at, finished_at, duration_ms, last_progress_at, triggering_wake_id
 `
 
 type MarkRunStalledParams struct {
@@ -342,12 +346,13 @@ func (q *Queries) MarkRunStalled(ctx context.Context, arg MarkRunStalledParams) 
 		&i.FinishedAt,
 		&i.DurationMs,
 		&i.LastProgressAt,
+		&i.TriggeringWakeID,
 	)
 	return i, err
 }
 
 const orphanCandidates = `-- name: OrphanCandidates :many
-SELECT id, thread_id, agent_id, agent_session_id, trigger_kind, triggering_message_id, triggering_command_id, triggering_interaction_id, triggered_by, state, state_reason, version, billing_mode_expected, billing_mode_used, billing_evidence, invocation_jti, started_jti, renewed_from_jti, dev_environment_id, model, status_line, last_text_excerpt, plan, metrics, cost_micros, currency, cost_is_estimate, summary, stall_warned_at, queued_at, invocation_held_until, started_at, finished_at, duration_ms, last_progress_at FROM runs
+SELECT id, thread_id, agent_id, agent_session_id, trigger_kind, triggering_message_id, triggering_command_id, triggering_interaction_id, triggered_by, state, state_reason, version, billing_mode_expected, billing_mode_used, billing_evidence, invocation_jti, started_jti, renewed_from_jti, dev_environment_id, model, status_line, last_text_excerpt, plan, metrics, cost_micros, currency, cost_is_estimate, summary, stall_warned_at, queued_at, invocation_held_until, started_at, finished_at, duration_ms, last_progress_at, triggering_wake_id FROM runs
 WHERE state IN ('running', 'waiting_input')
 ORDER BY id
 `
@@ -399,6 +404,7 @@ func (q *Queries) OrphanCandidates(ctx context.Context) ([]Run, error) {
 			&i.FinishedAt,
 			&i.DurationMs,
 			&i.LastProgressAt,
+			&i.TriggeringWakeID,
 		); err != nil {
 			return nil, err
 		}
@@ -414,7 +420,7 @@ const setQueuedReason = `-- name: SetQueuedReason :one
 UPDATE runs
 SET state_reason = NULLIF($1::text, ''), version = version + 1
 WHERE id = $2 AND state = 'queued'
-RETURNING id, thread_id, agent_id, agent_session_id, trigger_kind, triggering_message_id, triggering_command_id, triggering_interaction_id, triggered_by, state, state_reason, version, billing_mode_expected, billing_mode_used, billing_evidence, invocation_jti, started_jti, renewed_from_jti, dev_environment_id, model, status_line, last_text_excerpt, plan, metrics, cost_micros, currency, cost_is_estimate, summary, stall_warned_at, queued_at, invocation_held_until, started_at, finished_at, duration_ms, last_progress_at
+RETURNING id, thread_id, agent_id, agent_session_id, trigger_kind, triggering_message_id, triggering_command_id, triggering_interaction_id, triggered_by, state, state_reason, version, billing_mode_expected, billing_mode_used, billing_evidence, invocation_jti, started_jti, renewed_from_jti, dev_environment_id, model, status_line, last_text_excerpt, plan, metrics, cost_micros, currency, cost_is_estimate, summary, stall_warned_at, queued_at, invocation_held_until, started_at, finished_at, duration_ms, last_progress_at, triggering_wake_id
 `
 
 type SetQueuedReasonParams struct {
@@ -463,6 +469,7 @@ func (q *Queries) SetQueuedReason(ctx context.Context, arg SetQueuedReasonParams
 		&i.FinishedAt,
 		&i.DurationMs,
 		&i.LastProgressAt,
+		&i.TriggeringWakeID,
 	)
 	return i, err
 }

@@ -98,6 +98,11 @@ type TriggerChannel struct {
 	// SettingsVersion is channels.settings_version, the member settings_version of
 	// AgentInvocationPayload (M2-08).
 	SettingsVersion int64
+	// AllowAutonomousRuns is channels.allow_autonomous_runs: persons other than owners may let
+	// agents run on alone in the channel (09 5.8.6, AR-04).
+	AllowAutonomousRuns bool
+	// ReadOnly and Archived report a read-only channel and an archived channel or space.
+	ReadOnly, Archived bool
 }
 
 // TriggerFacts is the incoming port of the channel facts of the trigger decision (M2-05). It never

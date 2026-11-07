@@ -38,6 +38,8 @@ type OpenCmd struct {
 	TriggeringCommandID ids.ID
 	// TriggeringInteractionID is the interaction of an interaction run (M2-15); zero otherwise.
 	TriggeringInteractionID ids.ID
+	// TriggeringWakeID is the wake-up of a wake run (09 5.8.3, AR-04); zero otherwise.
+	TriggeringWakeID ids.ID
 	// TriggerKind is message, command or interaction: message needs no command and no
 	// interaction, command needs TriggeringCommandID and interaction TriggeringInteractionID, each
 	// without a message.
@@ -54,7 +56,13 @@ type OpenCmd struct {
 // without a message and without the object of the other (03 runs, the check on the triggering_*
 // columns).
 func openTrigger(cmd OpenCmd) bool {
+	if !cmd.TriggeringWakeID.IsZero() && cmd.TriggerKind != triggerKindWake {
+		return false
+	}
 	switch cmd.TriggerKind {
+	case triggerKindWake:
+		return !cmd.TriggeringWakeID.IsZero() && cmd.TriggeringMessageID.IsZero() && cmd.TriggeringCommandID.IsZero() &&
+			cmd.TriggeringInteractionID.IsZero()
 	case triggerKindMessage:
 		return cmd.TriggeringCommandID.IsZero() && cmd.TriggeringInteractionID.IsZero()
 	case triggerKindCommand:
@@ -161,8 +169,8 @@ func (s *Service) Open(ctx context.Context, cmd OpenCmd) (runs.RunSummary, error
 	row, inserted, err := s.d.Repo.InsertRun(ctx, NewRun{
 		ID: ids.New(), ThreadID: cmd.ThreadID, AgentID: cmd.AgentID, TriggeredBy: cmd.TriggeredBy, TriggerKind: cmd.TriggerKind,
 		TriggeringMessageID: cmd.TriggeringMessageID, TriggeringCommandID: cmd.TriggeringCommandID,
-		TriggeringInteractionID: cmd.TriggeringInteractionID,
-		BillingModeExpected:     cmd.BillingModeExpected, InvocationJTI: ids.New(), QueuedAt: s.now(),
+		TriggeringInteractionID: cmd.TriggeringInteractionID, TriggeringWakeID: cmd.TriggeringWakeID,
+		BillingModeExpected: cmd.BillingModeExpected, InvocationJTI: ids.New(), QueuedAt: s.now(),
 		InvocationHeldUntil: cmd.InvocationHeldUntil, StateReason: domain.HeldReason(cmd.InvocationHeldUntil),
 	})
 	if err != nil {
@@ -196,6 +204,13 @@ func (s *Service) Open(ctx context.Context, cmd OpenCmd) (runs.RunSummary, error
 	// (M2-08 design note 11); every run of this creation function gets the job.
 	if err := s.scheduleExpiry(ctx, row); err != nil {
 		return runs.RunSummary{}, err
+	}
+	// A run of the person that is not a wake run ends the person's chain of autonomous inputs in
+	// the thread (03 run_autonomy, 09 5.8.6), in the transaction that creates it.
+	if row.TriggerKind != triggerKindWake {
+		if err := s.resetAutonomy(ctx, row.ThreadID, row.TriggeredBy); err != nil {
+			return runs.RunSummary{}, err
+		}
 	}
 	return sum, nil
 }

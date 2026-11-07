@@ -581,6 +581,7 @@ const (
 	AgentInvocationPayloadTriggerKindCommand     AgentInvocationPayloadTriggerKind = "command"
 	AgentInvocationPayloadTriggerKindInteraction AgentInvocationPayloadTriggerKind = "interaction"
 	AgentInvocationPayloadTriggerKindMessage     AgentInvocationPayloadTriggerKind = "message"
+	AgentInvocationPayloadTriggerKindWake        AgentInvocationPayloadTriggerKind = "wake"
 )
 
 // Valid indicates whether the value is a known member of the AgentInvocationPayloadTriggerKind enum.
@@ -591,6 +592,8 @@ func (e AgentInvocationPayloadTriggerKind) Valid() bool {
 	case AgentInvocationPayloadTriggerKindInteraction:
 		return true
 	case AgentInvocationPayloadTriggerKindMessage:
+		return true
+	case AgentInvocationPayloadTriggerKindWake:
 		return true
 	default:
 		return false
@@ -786,6 +789,36 @@ const (
 func (e AgentUpdatedEventType) Valid() bool {
 	switch e {
 	case AgentUpdated:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AgentWakeInputEventAudience.
+const (
+	AgentWakeInputEventAudienceSelf AgentWakeInputEventAudience = "self"
+)
+
+// Valid indicates whether the value is a known member of the AgentWakeInputEventAudience enum.
+func (e AgentWakeInputEventAudience) Valid() bool {
+	switch e {
+	case AgentWakeInputEventAudienceSelf:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AgentWakeInputEventType.
+const (
+	AgentWakeInput AgentWakeInputEventType = "agent.wake_input"
+)
+
+// Valid indicates whether the value is a known member of the AgentWakeInputEventType enum.
+func (e AgentWakeInputEventType) Valid() bool {
+	switch e {
+	case AgentWakeInput:
 		return true
 	default:
 		return false
@@ -1829,19 +1862,19 @@ func (e DraftUpdatedEventType) Valid() bool {
 
 // Defines values for EnrollmentCodePurpose.
 const (
-	FirstLogin   EnrollmentCodePurpose = "first_login"
-	IdentityLink EnrollmentCodePurpose = "identity_link"
-	Recovery     EnrollmentCodePurpose = "recovery"
+	EnrollmentCodePurposeFirstLogin   EnrollmentCodePurpose = "first_login"
+	EnrollmentCodePurposeIdentityLink EnrollmentCodePurpose = "identity_link"
+	EnrollmentCodePurposeRecovery     EnrollmentCodePurpose = "recovery"
 )
 
 // Valid indicates whether the value is a known member of the EnrollmentCodePurpose enum.
 func (e EnrollmentCodePurpose) Valid() bool {
 	switch e {
-	case FirstLogin:
+	case EnrollmentCodePurposeFirstLogin:
 		return true
-	case IdentityLink:
+	case EnrollmentCodePurposeIdentityLink:
 		return true
-	case Recovery:
+	case EnrollmentCodePurposeRecovery:
 		return true
 	default:
 		return false
@@ -3448,6 +3481,7 @@ const (
 	NotificationKindRunDone     NotificationKind = "run_done"
 	NotificationKindRunFailed   NotificationKind = "run_failed"
 	NotificationKindSecurity    NotificationKind = "security"
+	NotificationKindWakeEnded   NotificationKind = "wake_ended"
 )
 
 // Valid indicates whether the value is a known member of the NotificationKind enum.
@@ -3468,6 +3502,8 @@ func (e NotificationKind) Valid() bool {
 	case NotificationKindRunFailed:
 		return true
 	case NotificationKindSecurity:
+		return true
+	case NotificationKindWakeEnded:
 		return true
 	default:
 		return false
@@ -3989,6 +4025,7 @@ const (
 	RunTriggerKindCommand     RunTriggerKind = "command"
 	RunTriggerKindInteraction RunTriggerKind = "interaction"
 	RunTriggerKindMessage     RunTriggerKind = "message"
+	RunTriggerKindWake        RunTriggerKind = "wake"
 )
 
 // Valid indicates whether the value is a known member of the RunTriggerKind enum.
@@ -3999,6 +4036,8 @@ func (e RunTriggerKind) Valid() bool {
 	case RunTriggerKindInteraction:
 		return true
 	case RunTriggerKindMessage:
+		return true
+	case RunTriggerKindWake:
 		return true
 	default:
 		return false
@@ -4317,6 +4356,165 @@ const (
 func (e RunUpdatedEventType) Valid() bool {
 	switch e {
 	case RunUpdated:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RunWakeChangedEventAudience.
+const (
+	RunWakeChangedEventAudienceSelf RunWakeChangedEventAudience = "self"
+)
+
+// Valid indicates whether the value is a known member of the RunWakeChangedEventAudience enum.
+func (e RunWakeChangedEventAudience) Valid() bool {
+	switch e {
+	case RunWakeChangedEventAudienceSelf:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RunWakeChangedEventType.
+const (
+	RunWakeChanged RunWakeChangedEventType = "run.wake_changed"
+)
+
+// Valid indicates whether the value is a known member of the RunWakeChangedEventType enum.
+func (e RunWakeChangedEventType) Valid() bool {
+	switch e {
+	case RunWakeChanged:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RunWakeCreateReason.
+const (
+	RunWakeCreateReasonAgent      RunWakeCreateReason = "agent"
+	RunWakeCreateReasonUsageLimit RunWakeCreateReason = "usage_limit"
+)
+
+// Valid indicates whether the value is a known member of the RunWakeCreateReason enum.
+func (e RunWakeCreateReason) Valid() bool {
+	switch e {
+	case RunWakeCreateReasonAgent:
+		return true
+	case RunWakeCreateReasonUsageLimit:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RunWakeFireOutcome.
+const (
+	RunWakeFireOutcomeFailed       RunWakeFireOutcome = "failed"
+	RunWakeFireOutcomeFired        RunWakeFireOutcome = "fired"
+	RunWakeFireOutcomeInputSkipped RunWakeFireOutcome = "input_skipped"
+)
+
+// Valid indicates whether the value is a known member of the RunWakeFireOutcome enum.
+func (e RunWakeFireOutcome) Valid() bool {
+	switch e {
+	case RunWakeFireOutcomeFailed:
+		return true
+	case RunWakeFireOutcomeFired:
+		return true
+	case RunWakeFireOutcomeInputSkipped:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RunWakeKind.
+const (
+	RunWakeKindAt       RunWakeKind = "at"
+	RunWakeKindCommand  RunWakeKind = "command"
+	RunWakeKindPrChecks RunWakeKind = "pr_checks"
+)
+
+// Valid indicates whether the value is a known member of the RunWakeKind enum.
+func (e RunWakeKind) Valid() bool {
+	switch e {
+	case RunWakeKindAt:
+		return true
+	case RunWakeKindCommand:
+		return true
+	case RunWakeKindPrChecks:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RunWakeReason.
+const (
+	RunWakeReasonAgent      RunWakeReason = "agent"
+	RunWakeReasonRecovery   RunWakeReason = "recovery"
+	RunWakeReasonUsageLimit RunWakeReason = "usage_limit"
+)
+
+// Valid indicates whether the value is a known member of the RunWakeReason enum.
+func (e RunWakeReason) Valid() bool {
+	switch e {
+	case RunWakeReasonAgent:
+		return true
+	case RunWakeReasonRecovery:
+		return true
+	case RunWakeReasonUsageLimit:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RunWakeRecoverReason.
+const (
+	RunWakeRecoverReasonRecovery   RunWakeRecoverReason = "recovery"
+	RunWakeRecoverReasonUsageLimit RunWakeRecoverReason = "usage_limit"
+)
+
+// Valid indicates whether the value is a known member of the RunWakeRecoverReason enum.
+func (e RunWakeRecoverReason) Valid() bool {
+	switch e {
+	case RunWakeRecoverReasonRecovery:
+		return true
+	case RunWakeRecoverReasonUsageLimit:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RunWakeState.
+const (
+	RunWakeStateCancelled RunWakeState = "cancelled"
+	RunWakeStateExpired   RunWakeState = "expired"
+	RunWakeStateFailed    RunWakeState = "failed"
+	RunWakeStateFired     RunWakeState = "fired"
+	RunWakeStatePending   RunWakeState = "pending"
+	RunWakeStateRefused   RunWakeState = "refused"
+)
+
+// Valid indicates whether the value is a known member of the RunWakeState enum.
+func (e RunWakeState) Valid() bool {
+	switch e {
+	case RunWakeStateCancelled:
+		return true
+	case RunWakeStateExpired:
+		return true
+	case RunWakeStateFailed:
+		return true
+	case RunWakeStateFired:
+		return true
+	case RunWakeStatePending:
+		return true
+	case RunWakeStateRefused:
 		return true
 	default:
 		return false
@@ -7491,6 +7689,12 @@ type AgentInvocationPayload struct {
 
 	// TriggeredBy Minimal public view of a principal, embedded in other objects.
 	TriggeredBy PrincipalRef `json:"triggered_by"`
+
+	// Wake The wake-up's kind, reason, label and result, which the first input names; set exactly for `trigger_kind = wake`.
+	Wake *AgentWakeFacts `json:"wake,omitempty"`
+
+	// WakeId The wake-up of a wake run; set exactly for `trigger_kind = wake` (09 5.8.3, 5.8.5).
+	WakeId *Uuid `json:"wake_id,omitempty"`
 }
 
 // AgentInvocationPayloadSessionMode `session.mode` of 09, 9.1: `new` creates the external session (with the reference of `agent_session` when present), `resume` continues it, `bind` takes over a session that no run used yet (rebinding, import; 9.5). Present exactly for a run of the thread's operator; a guest run has neither `session_mode` nor `agent_session` (09, 3.6).
@@ -7911,6 +8115,93 @@ type AgentUpdatedEventAudience string
 
 // AgentUpdatedEventType defines model for AgentUpdatedEvent.Type.
 type AgentUpdatedEventType string
+
+// AgentWakeFacts The wake-up of a wake run or a wake input; the runner writes its label, reason and result as the input (09 5.8.3).
+type AgentWakeFacts struct {
+	// Kind What makes a wake-up fire (09 5.8.1); `at` the server job `runs.wake_due`, `pr_checks` and `command` the runner after `run.wake.check`.
+	Kind  RunWakeKind `json:"kind"`
+	Label string      `json:"label"`
+
+	// Reason Why the wake-up exists (09 5.8.1); `agent` from `bothy-wake`, `recovery` after lost background work, `usage_limit` at the reset of the account's usage window.
+	Reason     RunWakeReason `json:"reason"`
+	ResultText string        `json:"result_text"`
+}
+
+// AgentWakeInputEvent Durable event `agent.wake_input`.
+type AgentWakeInputEvent struct {
+	Actor    *EventActor                  `json:"actor,omitempty"`
+	Audience *AgentWakeInputEventAudience `json:"audience,omitempty"`
+
+	// ClientMsgId UUIDv7 (RFC 9562), lowercase canonical form.
+	ClientMsgId *Uuid `json:"client_msg_id,omitempty"`
+
+	// CorrelationId W3C trace ID (16 bytes) of the request, written as a lowercase UUID; not a UUIDv7. Generated by the server.
+	//
+	// Examples: 4bf92f35-77b3-4da6-a3ce-929d0e0e4736
+	CorrelationId *CorrelationId `json:"correlation_id,omitempty"`
+
+	// Id UUIDv7 (RFC 9562), lowercase canonical form.
+	Id Uuid `json:"id"`
+
+	// InvocationToken Fresh invocation token (JWS, I3); only on agent-addressed invocation events.
+	InvocationToken *string `json:"invocation_token,omitempty"`
+
+	// OccurredAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+	OccurredAt Timestamp `json:"occurred_at"`
+
+	// Payload Payload of `agent.wake_input` (04 15.9); the envelope carries a fresh `invocation_token` with `trigger_kind = wake`, `run_id`, `thread_id`, `wake_id` and `sub` per delivery.
+	Payload           AgentWakeInputPayload `json:"payload"`
+	PermissionVersion *int64                `json:"permission_version,omitempty"`
+	Redacted          *bool                 `json:"redacted,omitempty"`
+
+	// Redelivered Set on redelivery to an agent consumer after `agent.ack_timeout`.
+	Redelivered *bool         `json:"redelivered,omitempty"`
+	Resource    EventResource `json:"resource"`
+
+	// SchemaVersion Examples: 1
+	SchemaVersion int `json:"schema_version"`
+
+	// Scope Location of the event. Members are absent where not applicable.
+	Scope EventScope `json:"scope"`
+
+	// Seq Global commit-ordered sequence; absent for ephemeral events.
+	//
+	// Examples: 5301
+	Seq *int64 `json:"seq,omitempty"`
+
+	// SyncEpoch Delivery-only member of outgoing webhooks; the time line of the event log (04, 7.5; ADR 0059). A receiver that sees a new epoch resets its `seq` state.
+	SyncEpoch *Uuid `json:"sync_epoch,omitempty"`
+
+	// TraceContext W3C `traceparent` of the triggering request; only in deliveries to agent adapters and only if the request was recorded.
+	//
+	// Examples: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01
+	TraceContext *string `json:"trace_context,omitempty"`
+
+	// Truncated The payload was cut to `sync.event_payload_max_bytes`; load the resource via REST.
+	Truncated *bool                   `json:"truncated,omitempty"`
+	Type      AgentWakeInputEventType `json:"type"`
+}
+
+// AgentWakeInputEventAudience defines model for AgentWakeInputEvent.Audience.
+type AgentWakeInputEventAudience string
+
+// AgentWakeInputEventType defines model for AgentWakeInputEvent.Type.
+type AgentWakeInputEventType string
+
+// AgentWakeInputPayload Payload of `agent.wake_input` (04 15.9); the envelope carries a fresh `invocation_token` with `trigger_kind = wake`, `run_id`, `thread_id`, `wake_id` and `sub` per delivery.
+type AgentWakeInputPayload struct {
+	// RunId UUIDv7 (RFC 9562), lowercase canonical form.
+	RunId Uuid `json:"run_id"`
+
+	// ThreadId UUIDv7 (RFC 9562), lowercase canonical form.
+	ThreadId Uuid `json:"thread_id"`
+
+	// Wake The wake-up of a wake run or a wake input; the runner writes its label, reason and result as the input (09 5.8.3).
+	Wake AgentWakeFacts `json:"wake"`
+
+	// WakeId UUIDv7 (RFC 9562), lowercase canonical form.
+	WakeId Uuid `json:"wake_id"`
+}
 
 // AlertmanagerAlert One alert of an Alertmanager webhook payload; `status` and `labels` are required (checked with `errors[].code` `required`); other members are ignored (D-M7-20-5).
 type AlertmanagerAlert struct {
@@ -8381,6 +8672,9 @@ type Capability string
 
 // Channel defines model for Channel.
 type Channel struct {
+	// AllowAutonomousRuns Persons other than owners may let agents run on alone here (09 5.8.6); changed with `setChannelAutonomousRuns`. Absent from an older server, which means `false`.
+	AllowAutonomousRuns *bool `json:"allow_autonomous_runs,omitempty"`
+
 	// ArchivedAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 	ArchivedAt *Timestamp `json:"archived_at,omitempty"`
 
@@ -8484,6 +8778,11 @@ type ChannelArchivedEventAudience string
 
 // ChannelArchivedEventType defines model for ChannelArchivedEvent.Type.
 type ChannelArchivedEventType string
+
+// ChannelAutonomousRunsSet defines model for ChannelAutonomousRunsSet.
+type ChannelAutonomousRunsSet struct {
+	AllowAutonomousRuns bool `json:"allow_autonomous_runs"`
+}
 
 // ChannelBehavior Behavior of the operator in a channel. Readable only with `manage`; never in events.
 type ChannelBehavior struct {
@@ -11242,7 +11541,7 @@ type Heartbeat struct {
 	BillingEvidence       *BillingEvidence `json:"billing_evidence,omitempty"`
 	BillingModesSupported *[]BillingMode   `json:"billing_modes_supported,omitempty"`
 
-	// Details Further fields of schema `agent_heartbeat.v1`, a closed object; any other key, also inside `capabilities`, `adapter` and `runtime`, is refused. Keys: `capabilities` (object: `followups` `steer` or `queue`; `components`, `voice_input`, `title`, `files_out` booleans; for Claude Code runners only `hosts_agents` `chat`, `scoped` or `host`, the highest tool class the runner loads for a hosted agent (26 3.1), which a built-in agent's own heartbeat never carries), `active_runs` (distinct run ids), `degraded_reasons` (distinct codes), `adapter` (`name` required, `version` optional), `runtime` (`name` required), `protocol_version` (integer, at least 1). Names match `^[a-z0-9][a-z0-9._-]*$`, versions `^[0-9A-Za-z][0-9A-Za-z.+_-]*$`, codes `^[a-z0-9][a-z0-9_.:-]*$`. No secrets, no content, no paths.
+	// Details Further fields of schema `agent_heartbeat.v1`, a closed object; any other key, also inside `capabilities`, `adapter` and `runtime`, is refused. Keys: `capabilities` (object: `followups` `steer` or `queue`; `components`, `voice_input`, `title`, `files_out` booleans; for Claude Code runners only `hosts_agents` `chat`, `scoped` or `host`, the highest tool class the runner loads for a hosted agent (26 3.1), which a built-in agent's own heartbeat never carries, and `turn_handover` and `wakes`, `true`, sent only while `runner.turn_handover` or `runner.wakes` is on (09 18.19.1)), `active_runs` (distinct run ids), `degraded_reasons` (distinct codes), `adapter` (`name` required, `version` optional), `runtime` (`name` required), `protocol_version` (integer, at least 1). Names match `^[a-z0-9][a-z0-9._-]*$`, versions `^[0-9A-Za-z][0-9A-Za-z.+_-]*$`, codes `^[a-z0-9][a-z0-9_.:-]*$`. No secrets, no content, no paths.
 	Details *JsonObject `json:"details,omitempty"`
 
 	// ProjectFolders Runners only, the folder names directly under the projects root that are Git work trees, sorted, at most `runner.project_folders_max` (09 18.13, M4-44). Applied only when present and different from the last list this server process applied; absent means "unchanged". Names only, never a path.
@@ -14846,7 +15145,9 @@ type Run struct {
 	Summary *string            `json:"summary,omitempty"`
 
 	// ThreadId UUIDv7 (RFC 9562), lowercase canonical form.
-	ThreadId    Uuid            `json:"thread_id"`
+	ThreadId Uuid `json:"thread_id"`
+
+	// TriggerKind `wake` is a run started by a fired wake-up (09 5.8.3); it names the wake-up in `triggering_wake_id`.
 	TriggerKind *RunTriggerKind `json:"trigger_kind,omitempty"`
 
 	// TriggeredBy UUIDv7 (RFC 9562), lowercase canonical form.
@@ -14860,10 +15161,13 @@ type Run struct {
 
 	// TriggeringMessageId UUIDv7 (RFC 9562), lowercase canonical form.
 	TriggeringMessageId *Uuid `json:"triggering_message_id,omitempty"`
-	Version             int64 `json:"version"`
+
+	// TriggeringWakeId The wake-up of a wake run; absent otherwise and after the wake-up was deleted with its thread.
+	TriggeringWakeId *Uuid `json:"triggering_wake_id,omitempty"`
+	Version          int64 `json:"version"`
 }
 
-// RunTriggerKind defines model for Run.TriggerKind.
+// RunTriggerKind `wake` is a run started by a fired wake-up (09 5.8.3); it names the wake-up in `triggering_wake_id`.
 type RunTriggerKind string
 
 // RunApiRetry Last retry of a model API call, shown in the live box while set.
@@ -14879,6 +15183,15 @@ type RunApiRetry struct {
 
 	// RetryDelayMs Examples: 4000
 	RetryDelayMs *int64 `json:"retry_delay_ms,omitempty"`
+}
+
+// RunAutonomyLast The idle flag of the last autonomous input or notification turn (09 5.8.6); the server counts each distinct `input` once in the idle count of the run's thread and person.
+type RunAutonomyLast struct {
+	// Idle True when the input made no tool call other than `bothy-wake` and started no background task.
+	Idle bool `json:"idle"`
+
+	// Input The wake-up id of a wake run or wake input, or the runner's id of a notification turn.
+	Input string `json:"input"`
 }
 
 // RunAwaitInput defines model for RunAwaitInput.
@@ -15156,8 +15469,11 @@ type RunHistoryPage struct {
 
 // RunMetrics Schema `run_metrics.v1`.
 type RunMetrics struct {
-	ApiRetries     *int `json:"api_retries,omitempty"`
-	BackgroundJobs *int `json:"background_jobs,omitempty"`
+	ApiRetries *int `json:"api_retries,omitempty"`
+
+	// AutonomyLast The idle flag of the last autonomous input or notification turn (09 5.8.6); the server counts each distinct `input` once in the idle count of the run's thread and person.
+	AutonomyLast   *RunAutonomyLast `json:"autonomy_last,omitempty"`
+	BackgroundJobs *int             `json:"background_jobs,omitempty"`
 
 	// ContextPct Examples: 37.5
 	ContextPct *float64 `json:"context_pct,omitempty"`
@@ -15188,6 +15504,9 @@ type RunPatch struct {
 
 // RunPatchResult defines model for RunPatchResult.
 type RunPatchResult struct {
+	// AutonomyCapReached Set when the patch's `/metrics/autonomy_last` made the idle count of the run's thread and person reach `run.autonomous_idle_max` (09 5.8.6); the runner closes stdin at that turn's `result`.
+	AutonomyCapReached *bool `json:"autonomy_cap_reached,omitempty"`
+
 	// Version Examples: 8
 	Version int64 `json:"version"`
 }
@@ -15493,6 +15812,278 @@ type RunUpdatedPayload struct {
 	Snapshot *Run  `json:"snapshot,omitempty"`
 	Version  int64 `json:"version"`
 }
+
+// RunWake A wake-up (03 `run_wakes`, 09 5.8.1): a server record that continues a thread later without a new message, on behalf of the person of its source run.
+type RunWake struct {
+	// AgentId UUIDv7 (RFC 9562), lowercase canonical form.
+	AgentId Uuid `json:"agent_id"`
+
+	// Condition Schema `run_wake_condition.v1` (03 `run_wakes`); `repository`, `number` and `head_commit` for `pr_checks`, `command_line` for `command`, nothing for `at`.
+	Condition RunWakeCondition `json:"condition"`
+
+	// CreatedAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+	CreatedAt Timestamp `json:"created_at"`
+
+	// Deadline RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+	Deadline Timestamp `json:"deadline"`
+
+	// EndedAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+	EndedAt *Timestamp `json:"ended_at,omitempty"`
+
+	// FiredIntoRunId The active run it reached as a wake input.
+	FiredIntoRunId *Uuid `json:"fired_into_run_id,omitempty"`
+
+	// FiredRunId The wake run it started.
+	FiredRunId *Uuid `json:"fired_run_id,omitempty"`
+
+	// Id UUIDv7 (RFC 9562), lowercase canonical form.
+	Id Uuid `json:"id"`
+
+	// Kind What makes a wake-up fire (09 5.8.1); `at` the server job `runs.wake_due`, `pr_checks` and `command` the runner after `run.wake.check`.
+	Kind RunWakeKind `json:"kind"`
+
+	// Label Short text of the agent, at most `run.wake_label_max_chars` characters; may be empty.
+	//
+	// Examples: CI of #123
+	Label string `json:"label"`
+
+	// NotBefore RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+	NotBefore Timestamp `json:"not_before"`
+
+	// Outage The run's outage number of a `usage_limit` wake-up of `createRunWake`.
+	Outage *int `json:"outage,omitempty"`
+
+	// Reason Why the wake-up exists (09 5.8.1); `agent` from `bothy-wake`, `recovery` after lost background work, `usage_limit` at the reset of the account's usage window.
+	Reason RunWakeReason `json:"reason"`
+
+	// ResultText The result of a fired check, as the runner cut it.
+	ResultText *string `json:"result_text,omitempty"`
+
+	// SourceRunId The run that asked for it, or the ended run of a recovery or usage-limit wake-up.
+	SourceRunId Uuid `json:"source_run_id"`
+
+	// State State of a wake-up (09 5.8.1); every state other than `pending` is an end, and every end other than `fired` posts a note in the thread (09 5.8.4).
+	State RunWakeState `json:"state"`
+
+	// StateReason Reason code of the last state change (09 5.8.3, 5.8.6), for example `autonomous_chain_max`, `deadline_passed` or `wake_input_skipped`.
+	//
+	// Examples: deadline_passed
+	StateReason *string `json:"state_reason,omitempty"`
+
+	// ThreadId UUIDv7 (RFC 9562), lowercase canonical form.
+	ThreadId Uuid `json:"thread_id"`
+
+	// TriggeredBy The person of the source run; every check uses this person.
+	TriggeredBy Uuid  `json:"triggered_by"`
+	Version     int64 `json:"version"`
+}
+
+// RunWakeCancel defines model for RunWakeCancel.
+type RunWakeCancel struct {
+	// Reason Reason code of a cancel by the agent, for example `usage_cleared`; a person's cancel has `cancelled_by_person`.
+	//
+	// Examples: usage_cleared
+	Reason *string `json:"reason,omitempty"`
+}
+
+// RunWakeChangedEvent Durable event `run.wake_changed`.
+type RunWakeChangedEvent struct {
+	Actor    *EventActor                  `json:"actor,omitempty"`
+	Audience *RunWakeChangedEventAudience `json:"audience,omitempty"`
+
+	// ClientMsgId UUIDv7 (RFC 9562), lowercase canonical form.
+	ClientMsgId *Uuid `json:"client_msg_id,omitempty"`
+
+	// CorrelationId W3C trace ID (16 bytes) of the request, written as a lowercase UUID; not a UUIDv7. Generated by the server.
+	//
+	// Examples: 4bf92f35-77b3-4da6-a3ce-929d0e0e4736
+	CorrelationId *CorrelationId `json:"correlation_id,omitempty"`
+
+	// Id UUIDv7 (RFC 9562), lowercase canonical form.
+	Id Uuid `json:"id"`
+
+	// InvocationToken Fresh invocation token (JWS, I3); only on agent-addressed invocation events.
+	InvocationToken *string `json:"invocation_token,omitempty"`
+
+	// OccurredAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+	OccurredAt Timestamp `json:"occurred_at"`
+
+	// Payload Payload of `run.wake_changed` (09 5.8.2); ids and codes only, never the label, the condition or the result. Clients reload the thread's wake-ups with `listThreadWakes`, a runner with `listPendingRunWakes`.
+	Payload           RunWakeChangedPayload `json:"payload"`
+	PermissionVersion *int64                `json:"permission_version,omitempty"`
+	Redacted          *bool                 `json:"redacted,omitempty"`
+
+	// Redelivered Set on redelivery to an agent consumer after `agent.ack_timeout`.
+	Redelivered *bool         `json:"redelivered,omitempty"`
+	Resource    EventResource `json:"resource"`
+
+	// SchemaVersion Examples: 1
+	SchemaVersion int `json:"schema_version"`
+
+	// Scope Location of the event. Members are absent where not applicable.
+	Scope EventScope `json:"scope"`
+
+	// Seq Global commit-ordered sequence; absent for ephemeral events.
+	//
+	// Examples: 5301
+	Seq *int64 `json:"seq,omitempty"`
+
+	// SyncEpoch Delivery-only member of outgoing webhooks; the time line of the event log (04, 7.5; ADR 0059). A receiver that sees a new epoch resets its `seq` state.
+	SyncEpoch *Uuid `json:"sync_epoch,omitempty"`
+
+	// TraceContext W3C `traceparent` of the triggering request; only in deliveries to agent adapters and only if the request was recorded.
+	//
+	// Examples: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01
+	TraceContext *string `json:"trace_context,omitempty"`
+
+	// Truncated The payload was cut to `sync.event_payload_max_bytes`; load the resource via REST.
+	Truncated *bool                   `json:"truncated,omitempty"`
+	Type      RunWakeChangedEventType `json:"type"`
+}
+
+// RunWakeChangedEventAudience defines model for RunWakeChangedEvent.Audience.
+type RunWakeChangedEventAudience string
+
+// RunWakeChangedEventType defines model for RunWakeChangedEvent.Type.
+type RunWakeChangedEventType string
+
+// RunWakeChangedPayload Payload of `run.wake_changed` (09 5.8.2); ids and codes only, never the label, the condition or the result. Clients reload the thread's wake-ups with `listThreadWakes`, a runner with `listPendingRunWakes`.
+type RunWakeChangedPayload struct {
+	// AgentId UUIDv7 (RFC 9562), lowercase canonical form.
+	AgentId Uuid `json:"agent_id"`
+
+	// NoteMessageId The note in the thread of an end other than `fired` (09 5.8.4).
+	NoteMessageId *Uuid `json:"note_message_id,omitempty"`
+
+	// State State of a wake-up (09 5.8.1); every state other than `pending` is an end, and every end other than `fired` posts a note in the thread (09 5.8.4).
+	State RunWakeState `json:"state"`
+
+	// StateReason Reason code of the change.
+	StateReason *string `json:"state_reason,omitempty"`
+
+	// ThreadId UUIDv7 (RFC 9562), lowercase canonical form.
+	ThreadId Uuid `json:"thread_id"`
+
+	// TriggeredBy UUIDv7 (RFC 9562), lowercase canonical form.
+	TriggeredBy Uuid `json:"triggered_by"`
+
+	// WakeId UUIDv7 (RFC 9562), lowercase canonical form.
+	WakeId Uuid `json:"wake_id"`
+}
+
+// RunWakeCheckResult Allowed; the configured values the runner compares with its own (`compare_actual`).
+type RunWakeCheckResult struct {
+	// BillingMode Backend policy of an agent. `personal` runs on the subscription of exactly one person.
+	BillingMode BillingMode `json:"billing_mode"`
+
+	// ToolClass Tool class of an agent runtime, ordered `chat` < `scoped` < `host` (07, 2.11).
+	ToolClass ToolClass `json:"tool_class"`
+}
+
+// RunWakeCondition Schema `run_wake_condition.v1` (03 `run_wakes`); `repository`, `number` and `head_commit` for `pr_checks`, `command_line` for `command`, nothing for `at`.
+type RunWakeCondition struct {
+	// CommandLine Run with `/bin/sh -c` in the turn's working folder; fires on exit code 0. At most `message.max_content_bytes` bytes, no control or bidi characters except line feed and tab.
+	//
+	// Examples: test -f build/done
+	CommandLine *string `json:"command_line,omitempty"`
+
+	// HeadCommit The head commit of the pull request at the creation.
+	//
+	// Examples: 4f2c9e1
+	HeadCommit *string `json:"head_commit,omitempty"`
+
+	// Number Examples: 123
+	Number *int `json:"number,omitempty"`
+
+	// Repository Examples: example/app
+	Repository *string `json:"repository,omitempty"`
+}
+
+// RunWakeCreate defines model for RunWakeCreate.
+type RunWakeCreate struct {
+	// Condition Schema `run_wake_condition.v1` (03 `run_wakes`); `repository`, `number` and `head_commit` for `pr_checks`, `command_line` for `command`, nothing for `at`.
+	Condition *RunWakeCondition `json:"condition,omitempty"`
+
+	// Deadline At most `run.wake_max_wait` after now, for `usage_limit` after `not_before`; absent means that longest deadline.
+	Deadline *Timestamp `json:"deadline,omitempty"`
+
+	// Deferred Set by the SDK outbox for a request it sends later; a refusal is then stored in state `refused` with the note and the notification (18.19.8).
+	Deferred *bool `json:"deferred,omitempty"`
+
+	// Kind What makes a wake-up fire (09 5.8.1); `at` the server job `runs.wake_due`, `pr_checks` and `command` the runner after `run.wake.check`.
+	Kind RunWakeKind `json:"kind"`
+
+	// Label At most `run.wake_label_max_chars` characters, no control or bidi characters.
+	//
+	// Examples: CI of #123
+	Label *string `json:"label,omitempty"`
+
+	// NotBefore The fire time of an `at` wake-up; never earlier than `run.wake_min_delay` after now. For `usage_limit` the reset time plus `run.wake_min_delay`.
+	NotBefore *Timestamp `json:"not_before,omitempty"`
+
+	// Outage The run's outage number; required exactly for `usage_limit` (18.19.10).
+	Outage *int                `json:"outage,omitempty"`
+	Reason RunWakeCreateReason `json:"reason"`
+}
+
+// RunWakeCreateReason defines model for RunWakeCreate.Reason.
+type RunWakeCreateReason string
+
+// RunWakeFire defines model for RunWakeFire.
+type RunWakeFire struct {
+	Outcome RunWakeFireOutcome `json:"outcome"`
+
+	// Reason The reason of `failed` (the last failure, for example `gh_missing`); absent means `wake_check_failed`.
+	Reason *string `json:"reason,omitempty"`
+
+	// ResultText The result of `fired`; at most `message.max_content_bytes` bytes, no control or bidi characters except line feed and tab.
+	ResultText *string `json:"result_text,omitempty"`
+
+	// RunId The run of a skipped wake input; required for `input_skipped`.
+	RunId *Uuid `json:"run_id,omitempty"`
+}
+
+// RunWakeFireOutcome defines model for RunWakeFire.Outcome.
+type RunWakeFireOutcome string
+
+// RunWakeKind What makes a wake-up fire (09 5.8.1); `at` the server job `runs.wake_due`, `pr_checks` and `command` the runner after `run.wake.check`.
+type RunWakeKind string
+
+// RunWakeList defines model for RunWakeList.
+type RunWakeList struct {
+	Items []RunWake `json:"items"`
+}
+
+// RunWakePage One page. `next_cursor` is absent on the last page.
+type RunWakePage struct {
+	Items []RunWake `json:"items"`
+
+	// NextCursor Opaque pagination cursor. Clients must not parse or build cursors.
+	//
+	// Examples: eyJrIjoiMDE5MmY0YTAtN2IxYy03MDAwLThhMDAtMDAwMDAwMDAwMDAxIn0
+	NextCursor *Cursor `json:"next_cursor,omitempty"`
+}
+
+// RunWakeReason Why the wake-up exists (09 5.8.1); `agent` from `bothy-wake`, `recovery` after lost background work, `usage_limit` at the reset of the account's usage window.
+type RunWakeReason string
+
+// RunWakeRecover defines model for RunWakeRecover.
+type RunWakeRecover struct {
+	// Label At most `run.wake_label_max_chars` characters, no control or bidi characters.
+	//
+	// Examples: Lost background work
+	Label *string `json:"label,omitempty"`
+
+	// NotBefore The earliest fire time, for `usage_limit` the reset plus `run.wake_min_delay`; never earlier than `run.wake_min_delay` after now.
+	NotBefore *Timestamp           `json:"not_before,omitempty"`
+	Reason    RunWakeRecoverReason `json:"reason"`
+}
+
+// RunWakeRecoverReason defines model for RunWakeRecover.Reason.
+type RunWakeRecoverReason string
+
+// RunWakeState State of a wake-up (09 5.8.1); every state other than `pending` is an end, and every end other than `fired` posts a note in the thread (09 5.8.4).
+type RunWakeState string
 
 // SearchAssistAnswer Answer of the assistant agent to `search.assist_requested` (action `search.assist.respond`).
 type SearchAssistAnswer struct {
@@ -18705,6 +19296,9 @@ type UserIdPath = Uuid
 // VariantPath defines model for VariantPath.
 type VariantPath string
 
+// WakeIdPath UUIDv7 (RFC 9562), lowercase canonical form.
+type WakeIdPath = Uuid
+
 // WebhookId UUIDv7 (RFC 9562), lowercase canonical form.
 type WebhookId = Uuid
 
@@ -19122,6 +19716,12 @@ type UpdateChannelParams struct {
 type ArchiveChannelParams struct {
 	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// SetChannelAutonomousRunsParams defines parameters for SetChannelAutonomousRuns.
+type SetChannelAutonomousRunsParams struct {
+	// IfMatch ETag of the version the change is based on, e.g. `"7"`. Mismatch gives 412 `version_conflict`.
+	IfMatch IfMatchRequired `json:"If-Match"`
 }
 
 // PutChannelBehaviorParams defines parameters for PutChannelBehavior.
@@ -19792,6 +20392,18 @@ type ListRunStepsParams struct {
 	Limit *PageLimit `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
+// CreateRunWakeParams defines parameters for CreateRunWake.
+type CreateRunWakeParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// RecoverRunWakeParams defines parameters for RecoverRunWake.
+type RecoverRunWakeParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
 // SearchParams defines parameters for Search.
 type SearchParams struct {
 	// Cursor Cursor from `next_cursor` of the previous page.
@@ -20187,6 +20799,13 @@ type SetThreadTitleParams struct {
 	IfMatch IfMatchRequired `json:"If-Match"`
 }
 
+// ListThreadWakesParams defines parameters for ListThreadWakes.
+type ListThreadWakesParams struct {
+	// Cursor Cursor from `next_cursor` of the previous page.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Limit  *Limit  `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
 // CompleteUploadParams defines parameters for CompleteUpload.
 type CompleteUploadParams struct {
 	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
@@ -20254,6 +20873,12 @@ type ListUserSessionsParams struct {
 	// Cursor Cursor from `next_cursor` of the previous page.
 	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
 	Limit  *Limit  `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// CancelRunWakeParams defines parameters for CancelRunWake.
+type CancelRunWakeParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
 // RedeliverWebhookParams defines parameters for RedeliverWebhook.
@@ -20397,6 +21022,9 @@ type UpdateChannelJSONRequestBody = ChannelUpdate
 
 // ArchiveChannelJSONRequestBody defines body for ArchiveChannel for application/json ContentType.
 type ArchiveChannelJSONRequestBody = ReasonBody
+
+// SetChannelAutonomousRunsJSONRequestBody defines body for SetChannelAutonomousRuns for application/json ContentType.
+type SetChannelAutonomousRunsJSONRequestBody = ChannelAutonomousRunsSet
 
 // PutChannelBehaviorJSONRequestBody defines body for PutChannelBehavior for application/json ContentType.
 type PutChannelBehaviorJSONRequestBody = ChannelBehaviorPut
@@ -20668,6 +21296,12 @@ type ResumeRunJSONRequestBody = RunStart
 // StartRunJSONRequestBody defines body for StartRun for application/json ContentType.
 type StartRunJSONRequestBody = RunStart
 
+// CreateRunWakeJSONRequestBody defines body for CreateRunWake for application/json ContentType.
+type CreateRunWakeJSONRequestBody = RunWakeCreate
+
+// RecoverRunWakeJSONRequestBody defines body for RecoverRunWake for application/json ContentType.
+type RecoverRunWakeJSONRequestBody = RunWakeRecover
+
 // AnswerSearchAssistJSONRequestBody defines body for AnswerSearchAssist for application/json ContentType.
 type AnswerSearchAssistJSONRequestBody = SearchAssistAnswer
 
@@ -20757,6 +21391,12 @@ type DisableUserJSONRequestBody = ReasonBody
 
 // EnableUserJSONRequestBody defines body for EnableUser for application/json ContentType.
 type EnableUserJSONRequestBody = ReasonBody
+
+// CancelRunWakeJSONRequestBody defines body for CancelRunWake for application/json ContentType.
+type CancelRunWakeJSONRequestBody = RunWakeCancel
+
+// FireRunWakeJSONRequestBody defines body for FireRunWake for application/json ContentType.
+type FireRunWakeJSONRequestBody = RunWakeFire
 
 // UpdateWebhookSubscriptionJSONRequestBody defines body for UpdateWebhookSubscription for application/json ContentType.
 type UpdateWebhookSubscriptionJSONRequestBody = WebhookSubscriptionUpdate
@@ -22826,6 +23466,74 @@ func (t *Event) MergeAgentHostingChangedEvent(v AgentHostingChangedEvent) error 
 	return err
 }
 
+// AsRunWakeChangedEvent returns the union data inside the Event as a RunWakeChangedEvent
+func (t Event) AsRunWakeChangedEvent() (RunWakeChangedEvent, error) {
+	var body RunWakeChangedEvent
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRunWakeChangedEvent overwrites any union data inside the Event as the provided RunWakeChangedEvent
+func (t *Event) FromRunWakeChangedEvent(v RunWakeChangedEvent) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"run.wake_changed"}`))
+	t.union = b
+	return err
+}
+
+// MergeRunWakeChangedEvent performs a merge with any union data inside the Event, using the provided RunWakeChangedEvent
+func (t *Event) MergeRunWakeChangedEvent(v RunWakeChangedEvent) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"run.wake_changed"}`))
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsAgentWakeInputEvent returns the union data inside the Event as a AgentWakeInputEvent
+func (t Event) AsAgentWakeInputEvent() (AgentWakeInputEvent, error) {
+	var body AgentWakeInputEvent
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromAgentWakeInputEvent overwrites any union data inside the Event as the provided AgentWakeInputEvent
+func (t *Event) FromAgentWakeInputEvent(v AgentWakeInputEvent) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"agent.wake_input"}`))
+	t.union = b
+	return err
+}
+
+// MergeAgentWakeInputEvent performs a merge with any union data inside the Event, using the provided AgentWakeInputEvent
+func (t *Event) MergeAgentWakeInputEvent(v AgentWakeInputEvent) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"agent.wake_input"}`))
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
 // AsHostUpdatedEvent returns the union data inside the Event as a HostUpdatedEvent
 func (t Event) AsHostUpdatedEvent() (HostUpdatedEvent, error) {
 	var body HostUpdatedEvent
@@ -22924,6 +23632,8 @@ func (t Event) ValueByDiscriminator() (interface{}, error) {
 		return t.AsAgentInvocationEvent()
 	case "agent.updated":
 		return t.AsAgentUpdatedEvent()
+	case "agent.wake_input":
+		return t.AsAgentWakeInputEvent()
 	case "agent_session.changed":
 		return t.AsAgentSessionChangedEvent()
 	case "channel.archived":
@@ -22986,6 +23696,8 @@ func (t Event) ValueByDiscriminator() (interface{}, error) {
 		return t.AsRunCancelRequestedEvent()
 	case "run.state_changed":
 		return t.AsRunStateChangedEvent()
+	case "run.wake_changed":
+		return t.AsRunWakeChangedEvent()
 	case "session.revoked":
 		return t.AsSessionRevokedEvent()
 	case "settings.updated":

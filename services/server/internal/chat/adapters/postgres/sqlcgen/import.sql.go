@@ -11,8 +11,26 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const saveChannelReadOnly = `-- name: SaveChannelReadOnly :exec
+const saveChannelAutonomousRuns = `-- name: SaveChannelAutonomousRuns :exec
 
+UPDATE channels SET allow_autonomous_runs = $1, version = $2 WHERE id = $3
+`
+
+type SaveChannelAutonomousRunsParams struct {
+	AllowAutonomousRuns bool
+	Version             int64
+	ID                  pgtype.UUID
+}
+
+// SPDX-License-Identifier: Apache-2.0
+// Queries of the import structure and the read-only switch (M8-03).
+// channel.autonomous_runs.set writes the switch and the version (AR-04).
+func (q *Queries) SaveChannelAutonomousRuns(ctx context.Context, arg SaveChannelAutonomousRunsParams) error {
+	_, err := q.db.Exec(ctx, saveChannelAutonomousRuns, arg.AllowAutonomousRuns, arg.Version, arg.ID)
+	return err
+}
+
+const saveChannelReadOnly = `-- name: SaveChannelReadOnly :exec
 UPDATE channels SET read_only = $1, version = $2 WHERE id = $3
 `
 
@@ -22,8 +40,6 @@ type SaveChannelReadOnlyParams struct {
 	ID       pgtype.UUID
 }
 
-// SPDX-License-Identifier: Apache-2.0
-// Queries of the import structure and the read-only switch (M8-03).
 // channel.read_only.set and setImportLead write the flag and the version.
 func (q *Queries) SaveChannelReadOnly(ctx context.Context, arg SaveChannelReadOnlyParams) error {
 	_, err := q.db.Exec(ctx, saveChannelReadOnly, arg.ReadOnly, arg.Version, arg.ID)

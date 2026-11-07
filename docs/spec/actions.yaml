@@ -1028,6 +1028,17 @@ actions:
   rights_change: false
   rl_class: rl.admin
   effect: write
+- id: channel.autonomous_runs.set
+  section: structure
+  description: switch `allow_autonomous_runs` of a channel ([09-agents.md](09-agents.md) 5.8.6, AR-04)
+  resource: channel
+  right: manage
+  owner: false
+  step_up: false
+  audit: always
+  rights_change: false
+  rl_class: rl.write
+  effect: write
 - id: channel.archive
   section: structure
   description: archive a channel
@@ -2121,6 +2132,94 @@ actions:
   rights_change: false
   rl_class: rl.message
   effect: write
+- id: run.wake.create
+  section: agents
+  description: create a wake-up for the active run of the calling agent in its thread ([09-agents.md](09-agents.md) 5.8.2, AR-04)
+  resource: run
+  right: agent-self of the run's agent, run active
+  owner: false
+  step_up: false
+  audit: always
+  rights_change: false
+  rl_class: rl.agent_runtime
+  effect: write
+- id: run.wake.recover
+  section: agents
+  description: create a recovery or usage-limit wake-up for an ended run of the calling agent ([09-agents.md](09-agents.md) 5.8.2, AR-04)
+  resource: run
+  right: agent-self of the run's agent, run `interrupted`, `stale` or `failed`
+  owner: false
+  step_up: false
+  audit: always
+  rights_change: false
+  rl_class: rl.agent_runtime
+  effect: write
+- id: run.wake.list_pending
+  section: agents
+  description: list the calling agent's pending wake-ups ([09-agents.md](09-agents.md) 5.8.2, AR-04)
+  resource: agent
+  right: agent-self
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.agent_runtime
+  effect: read
+- id: run.wake.check
+  section: agents
+  description: allow or refuse the next execution of a pending check ([09-agents.md](09-agents.md) 5.8.3, AR-04)
+  resource: run
+  right: agent-self of the wake-up's agent
+  owner: false
+  step_up: false
+  audit: denials
+  rights_change: false
+  rl_class: rl.agent_runtime
+  effect: write
+- id: run.wake.fire
+  section: agents
+  description: fire a checked wake-up with its result, or end it `failed` ([09-agents.md](09-agents.md) 5.8.2, AR-04)
+  resource: run
+  right: agent-self of the wake-up's agent
+  owner: false
+  step_up: false
+  audit: always
+  rights_change: false
+  rl_class: rl.agent_runtime
+  effect: write
+- id: run.wake.cancel
+  section: agents
+  description: cancel a pending wake-up ([09-agents.md](09-agents.md) 5.8.2, AR-04)
+  resource: thread
+  right: agent-self of the wake-up's agent, the wake-up's person, or `manage` on the channel
+  owner: false
+  step_up: false
+  audit: always
+  rights_change: false
+  rl_class: rl.write
+  effect: write
+- id: run.wake.read
+  section: agents
+  description: list the wake-ups of a thread ([09-agents.md](09-agents.md) 5.8.2, AR-04)
+  resource: thread
+  right: '`read` on the thread'
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.read
+  effect: read
+- id: run.launch.check
+  section: agents
+  description: allow or refuse a launch by a runner that did not accept the run ([09-agents.md](09-agents.md) 18.19.6, AR-04)
+  resource: run
+  right: agent-self of the run's agent
+  owner: false
+  step_up: false
+  audit: denials
+  rights_change: false
+  rl_class: rl.agent_runtime
+  effect: read
 - id: component.update
   section: agents
   description: deactivate or change own components
@@ -2772,6 +2871,14 @@ events:
   receive_action: run.read
   note: with summary
   resource_version: true
+- type: run.wake_changed
+  kind: durable
+  resource: thread
+  receive_action: run.wake.read
+  note: a wake-up was created, fired, returned to pending or ended; payload wake-up id, thread, agent, person,
+    state and its reason, never the label or the condition; goes to the clients of the thread and to the
+    adapter of the wake-up's agent ([09-agents.md](09-agents.md) 5.8.2, AR-04)
+  resource_version: false
 - type: space.created
   kind: durable
   resource: space
@@ -2972,6 +3079,16 @@ events:
   receivers: agent
   receive_text: self (agent) and `agent.events.consume`
   note: before delivery, `agent.invoke` for the triggering person
+  resource_version: false
+- type: agent.wake_input
+  kind: durable
+  resource: run
+  receive_action: agent.events.consume
+  audience: self
+  receivers: agent
+  receive_text: self (agent) and `agent.events.consume`
+  note: before delivery, `agent.invoke` for the wake-up's person; a wake-up that fired into the running run
+    of its person ([09-agents.md](09-agents.md) 5.8.3, AR-04)
   resource_version: false
 - type: run.cancel_requested
   kind: durable

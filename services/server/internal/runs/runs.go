@@ -87,11 +87,11 @@ type Run struct {
 	RunSummary
 	// AgentSessionID is the agent session (M2-12); zero for none.
 	AgentSessionID ids.ID
-	// TriggerKind is message, command or interaction.
+	// TriggerKind is message, command, interaction or wake (AR-04).
 	TriggerKind string
-	// TriggeringMessageID, TriggeringCommandID and TriggeringInteractionID name the trigger; zero
-	// for none (at most one is set).
-	TriggeringMessageID, TriggeringCommandID, TriggeringInteractionID ids.ID
+	// TriggeringMessageID, TriggeringCommandID, TriggeringInteractionID and TriggeringWakeID name
+	// the trigger; zero for none (at most one is set).
+	TriggeringMessageID, TriggeringCommandID, TriggeringInteractionID, TriggeringWakeID ids.ID
 	// Model and LastTextExcerpt are "" while unset.
 	Model, LastTextExcerpt string
 	// Metrics is the object run_metrics.v1 as stored; never nil.
@@ -456,8 +456,13 @@ type PatchRun struct {
 	Ops         []PatchOp
 }
 
-// PatchResult carries the new runs.version (schema RunPatchResult).
-type PatchResult struct{ Version int64 }
+// PatchResult carries the new runs.version (schema RunPatchResult) and whether the chain of
+// autonomous inputs of the run's thread and person is ended after the patch's
+// /metrics/autonomy_last (09 5.8.6, AR-04).
+type PatchResult struct {
+	Version            int64
+	AutonomyCapReached bool
+}
 
 // RunUpdated is the payload of the ephemeral event run.updated as runs publishes it after the
 // commit of a patch (schema RunUpdatedPayload, M2-10 design note 8). Ops are the normalized ops

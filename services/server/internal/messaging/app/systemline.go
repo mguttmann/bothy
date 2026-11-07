@@ -9,6 +9,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/chat"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
+	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	"github.com/OWNER/bothy/services/server/internal/messaging"
 	"github.com/OWNER/bothy/services/server/internal/messaging/domain"
@@ -67,4 +68,63 @@ func (s *Service) AppendSystemLine(ctx context.Context, l messaging.SystemLine) 
 		return messaging.Message{}, err
 	}
 	return m, nil
+}
+
+// AppendSystemNote writes the note of a wake-up end or an ended chain of autonomous inputs
+// (docs/spec/09-agents.md 5.8.4, 5.8.6, AR-04) inside the caller's unit of work: a message with
+// origin system and kind text whose content names the label and the reason, silent, authored by
+// the agent, appended like a system line without reopening a closed thread. It never triggers
+// (origin system, 09 3.2) and creates no hint (13 section 2: origin system); message.created and
+// MessagePosted follow as for every message. The text is the server's own English line (ruling
+// D-AR-04-6: 03 messages.system_code is a closed list of the core contract that has no code with
+// parameters). It returns the id of the note.
+//
+// Errors: internal outside a unit of work or for an empty or oversized text; the errors of chat and
+// the store.
+//
+// Example:
+//
+//	id, err := msgs.AppendSystemNote(ctx, thread, agent, "Wake-up 'CI of #123' expired: its deadline passed before it could fire")
+func (s *Service) AppendSystemNote(ctx context.Context, threadID, authorID ids.ID, text string) (ids.ID, error) {
+	if !txn.InUnit(ctx) {
+		return ids.ID{}, errs.New(errs.CodeInternalError, "messaging: AppendSystemNote runs only inside a unit of work")
+	}
+	if text == "" || len(text) > s.cfg.MaxContentBytes {
+		return ids.ID{}, errs.New(errs.CodeInternalError, "messaging: a system note is empty or too long")
+	}
+	author, err := s.author(ctx, authorID)
+	if err != nil {
+		return ids.ID{}, err
+	}
+	a := actor.Actor{ID: authorID, Kind: actor.Kind(author.Kind)}
+	caller := a
+	if p, ok := actor.FromContext(ctx); ok && !p.ID.IsZero() {
+		caller = p
+	}
+	appended, err := s.d.Threads.AppendToThread(ctx, caller, chat.AppendCmd{ThreadID: threadID})
+	if err != nil {
+		return ids.ID{}, err
+	}
+	info := appended.Thread
+	note := domain.SystemNote(text, info.ID, info.ChannelID, authorID, appended.Seq)
+	note.CreatedAt = s.now()
+	if note.SearchLanguage, err = s.d.Directory.InstanceSearchLanguage(ctx); err != nil {
+		return ids.ID{}, err
+	}
+	row, err := s.d.Store.InsertMessage(ctx, note)
+	if errors.Is(err, ErrClientMsgIDTaken) {
+		return ids.ID{}, errs.New(errs.CodeInternalError, "messaging: the client_msg_id of a system note is taken")
+	}
+	if err != nil {
+		return ids.ID{}, err
+	}
+	s.countCreated(ctx, row)
+	m := view(row, author, nil)
+	if err := s.emitCreated(ctx, info, m, false); err != nil {
+		return ids.ID{}, err
+	}
+	if err := txn.Publish(ctx, s.posted(a, info, m, false)); err != nil {
+		return ids.ID{}, err
+	}
+	return m.ID, nil
 }

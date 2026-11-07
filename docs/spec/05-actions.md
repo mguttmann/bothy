@@ -235,7 +235,9 @@ machine-readable catalogue carries it per action ([ADR 0049](../adr/0049-machine
 - `access.explain`, `search.query`, `events.catch_up`, `gateway.connect`, `gateway.focus`,
   `typing.start`, `command.autocomplete`, `command.autocomplete.respond`, `search.assist`,
   `search.assist.respond`, `client_metrics.submit`, `console.csp_report`,
-  `push.deliver`, `webhook_out.deliver` and `terminal.read_own`.
+  `push.deliver`, `webhook_out.deliver` and `terminal.read_own`;
+- `run.wake.list_pending` and `run.launch.check` ([07-permissions.md](07-permissions.md) 2.14, R-AZ-37;
+  addendum of 2026-11-06, AR-04).
 
 All others have `write`. Reason for the closed list: a new action without an entry is
 `write` and is blocked in maintenance mode (fail closed); the column "Permission" is not suitable
@@ -399,6 +401,7 @@ make sure that clients clear their cache and runs end (R-AZ-15).
 | `channel.operator.set` | set the operator or switch on inheritance (I1); optionally `resolve_i1` | channel | owner | yes | yes | yes | yes | `rl.admin` |
 | `channel.project.bind` | set or change the project binding of a forum | channel | owner | yes | yes | yes | no | `rl.admin` |
 | `channel.read_only.set` | set or lift read-only (rule 1.8), with a reason; when it is set, active runs in the channel are cancelled | channel | manage | no | yes | yes | no | `rl.admin` |
+| `channel.autonomous_runs.set` | switch `allow_autonomous_runs` of a channel ([09-agents.md](09-agents.md) 5.8.6, AR-04) | channel | manage | no | no | yes | no | `rl.write` |
 | `channel.archive` | archive a channel | channel | manage | no | yes | yes | yes | `rl.admin` |
 | `channel.delete` | delete a channel or forum with its content; soft with undo until `chat.delete_undo_window`, then purged; moving a project folder to the trash also needs `channel.project.bind` (01 6.18) | channel | manage | no | yes | yes | yes | `rl.admin` |
 | `channel.restore` | undo the deletion of a channel before `undo_until` | channel | manage | no | yes | yes | yes | `rl.admin` |
@@ -528,6 +531,14 @@ make sure that clients clear their cache and runs end (R-AZ-15).
 | `run.finish` | finish a run or let it wait: `completed`, `failed`, `cancelled`, `waiting_input` | run | agent-self | no | no | no | no | `rl.agent_runtime` |
 | `run.cancel` | cancel a run | run | trigger and (triggering person of the run or manage) | no | no | yes | no | `rl.trigger` |
 | `run.followup.create` | follow-up to an active run of the same agent (via `message.create`) | thread | write and `agent.invoke` | no | no | denials | no | `rl.message` |
+| `run.wake.create` | create a wake-up for the active run of the calling agent in its thread ([09-agents.md](09-agents.md) 5.8.2, AR-04) | run | agent-self of the run's agent, run active | no | no | yes | no | `rl.agent_runtime` |
+| `run.wake.recover` | create a recovery or usage-limit wake-up for an ended run of the calling agent ([09-agents.md](09-agents.md) 5.8.2, AR-04) | run | agent-self of the run's agent, run `interrupted`, `stale` or `failed` | no | no | yes | no | `rl.agent_runtime` |
+| `run.wake.list_pending` | list the calling agent's pending wake-ups ([09-agents.md](09-agents.md) 5.8.2, AR-04) | agent | agent-self | no | no | no | no | `rl.agent_runtime` |
+| `run.wake.check` | allow or refuse the next execution of a pending check ([09-agents.md](09-agents.md) 5.8.3, AR-04) | run | agent-self of the wake-up's agent | no | no | denials | no | `rl.agent_runtime` |
+| `run.wake.fire` | fire a checked wake-up with its result, or end it `failed` ([09-agents.md](09-agents.md) 5.8.2, AR-04) | run | agent-self of the wake-up's agent | no | no | yes | no | `rl.agent_runtime` |
+| `run.wake.cancel` | cancel a pending wake-up ([09-agents.md](09-agents.md) 5.8.2, AR-04) | thread | agent-self of the wake-up's agent, the wake-up's person, or `manage` on the channel | no | no | yes | no | `rl.write` |
+| `run.wake.read` | list the wake-ups of a thread ([09-agents.md](09-agents.md) 5.8.2, AR-04) | thread | `read` on the thread | no | no | no | no | `rl.read` |
+| `run.launch.check` | allow or refuse a launch by a runner that did not accept the run ([09-agents.md](09-agents.md) 18.19.6, AR-04) | run | agent-self of the run's agent | no | no | denials | no | `rl.agent_runtime` |
 | `component.update` | deactivate or change own components | component | author of the message (agent-self or app-self) | no | no | no | no | `rl.write` |
 | `interaction.create` | use a component (single-use rule per message); respect `required_capability` and `restricted_to` (`any`, `run_starter`, `owner`); for components of an agent additionally `agent.invoke` | component | trigger | no | no | yes for `approve_actions`, otherwise denials | no | `rl.interaction` |
 | `interaction.respond` | the owner acknowledges or answers an interaction | interaction | agent-self or app-self | no | no | no | no | `rl.agent_runtime` |
@@ -701,9 +712,10 @@ section 3.11). Claims:
 | `aud` | principal ID of the agent |
 | `sub` | principal ID of the triggering person |
 | `jti`, `iat`, `exp` | UUIDv7 of the token, issuance, expiry (`iat + agent.invocation_token_ttl`) |
-| `trigger_kind` | `message`, `followup`, `interaction`, `command` or `autocomplete` |
+| `trigger_kind` | `message`, `followup`, `interaction`, `command`, `autocomplete` or `wake` (a wake run or a wake input, [09-agents.md](09-agents.md) 5.8.3; addendum of 2026-11-06, AR-04) |
 | `run_id` | run; missing for `trigger_kind = autocomplete` and for `command.invoked` when the owner of the control command has no active run in the thread at execution time (`command.invoke`); otherwise payload and token of `command.invoked` carry this run, never the run of another agent (R-AZ-25) |
 | `message_id` or `interaction_id` or `command_id` | triggering object |
+| `wake_id` | the wake-up of `trigger_kind = wake`, instead of a message ([04-sync-protocol.md](04-sync-protocol.md) 15.9; addendum of 2026-11-06, AR-04) |
 | `thread_id`, `channel_id`, `space_id` | location; for `trigger_kind = autocomplete`, `thread_id` is the thread of the request, without one the main timeline of the text channel; in a forum channel without a thread there is no token ([04-sync-protocol.md](04-sync-protocol.md), section 15.7; R-AZ-26) |
 | `level` | effective level of `sub` on the channel at delivery time |
 | `billing_mode` | configured mode from `agents.billing_mode` at delivery time (I3) |
@@ -742,6 +754,7 @@ allows it. Personal events (`audience = self`) go only to the named principal.
 | `thread.moved_out` | channel | `channel.read` | applies to: source channel; receivers without access to the target remove the thread |
 | `agent_session.changed` | thread | `thread.read` | new session, rebinding, binding after an import |
 | `run.state_changed` | run | `run.read` | with summary |
+| `run.wake_changed` | thread | `run.wake.read` | a wake-up was created, fired, returned to pending or ended; payload wake-up id, thread, agent, person, state and its reason, never the label or the condition; goes to the clients of the thread and to the adapter of the wake-up's agent ([09-agents.md](09-agents.md) 5.8.2, AR-04) |
 | `space.created` | space | `space.read` | |
 | `space.updated` | space | `space.read` | name, icon, order, operator; if the default operator changes, a `channel.updated` with a new version follows for each inheriting, non-archived channel, because its effective operator changes |
 | `space.archived` | space | `space.read` | |
@@ -774,6 +787,7 @@ allows it. Personal events (`audience = self`) go only to the named principal.
 | `import.progress` | import_source | `import.read` | |
 | `agent.invocation` | run | self (agent) and `agent.events.consume` | before delivery, `agent.invoke` for the triggering person |
 | `agent.followup` | run | self (agent) and `agent.events.consume` | before delivery, `agent.invoke` for the triggering person |
+| `agent.wake_input` | run | self (agent) and `agent.events.consume` | before delivery, `agent.invoke` for the wake-up's person; a wake-up that fired into the running run of its person ([09-agents.md](09-agents.md) 5.8.3, AR-04) |
 | `run.cancel_requested` | run | self (agent) and `agent.events.consume` | |
 | `interaction.created` | interaction | self (agent or app, owner of the component); agent additionally `agent.events.consume`, app `events:subscribe` | before delivery to agents, `agent.invoke` |
 | `command.invoked` | command | self (agent or app, owner of the command); agent additionally `agent.events.consume`, app `events:subscribe` | before delivery to agents, `agent.invoke` |

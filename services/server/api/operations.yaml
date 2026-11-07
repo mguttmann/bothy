@@ -36,6 +36,9 @@ enabled:             # operationIds that have a handler; sorted ascending
   - bindAgentSession
   - cancelImport
   - cancelRun
+  - cancelRunWake
+  - checkRunLaunch
+  - checkRunWake
   - closePrice
   - closeTerminalSession
   - closeThread
@@ -73,6 +76,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - createPersonalTemplate
   - createPrice
   - createQuietHoursRule
+  - createRunWake
   - createSpace
   - createStatusComponent
   - createStatusIncident
@@ -115,6 +119,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - exportAuditEvents
   - exportChannel
   - finishRun
+  - fireRunWake
   - getAgent
   - getAgentDefinition
   - getAgentTriggerers
@@ -213,6 +218,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - listMySettings
   - listMyTemplates
   - listOwners
+  - listPendingRunWakes
   - listPermissionHints
   - listPins
   - listPrices
@@ -226,6 +232,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - listTerminalSessions
   - listThreadMessages
   - listThreadRuns
+  - listThreadWakes
   - listTokens
   - listUserDevices
   - listUserSessions
@@ -263,6 +270,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - putReadState
   - putThreadDraft
   - reconcileCosts
+  - recoverRunWake
   - redeemEnrollmentCode
   - redeliverWebhook
   - refreshToken
@@ -300,6 +308,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - setAgentToolClass
   - setAllAgentsBillingMode
   - setAppScopes
+  - setChannelAutonomousRuns
   - setChannelOperator
   - setChannelReadOnly
   - setCredentialHolder

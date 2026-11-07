@@ -117,6 +117,24 @@ type SetChannelReadOnlyCmd struct {
 	IfMatch   Precondition
 }
 
+// SetAutonomousRunsCmd is the request of setChannelAutonomousRuns (channel.autonomous_runs.set,
+// 09 5.8.6, AR-04): the channel, the new switch and the If-Match of the request.
+type SetAutonomousRunsCmd struct {
+	ChannelID ids.ID
+	Allow     bool
+	IfMatch   Precondition
+}
+
+// AutonomousRunsSwitch is the incoming port of the channel switch allow_autonomous_runs (07 2.14
+// item 1): manage on the channel, audited; it changes no run and no wake-up, the fire checks read
+// it at their moment. Errors: not_found, forbidden, precondition_required, version_conflict with
+// current, conflict for an archived channel and for a DM.
+type AutonomousRunsSwitch interface {
+	// SetChannelAutonomousRuns switches allow_autonomous_runs; the same value answers the channel
+	// without a change.
+	SetChannelAutonomousRuns(ctx context.Context, a actor.Actor, cmd SetAutonomousRunsCmd) (Channel, error)
+}
+
 // ReadOnlySwitch is the incoming port of the general owner switch of 05 rule 1.8
 // (channel.read_only.set): manage on the channel, step-up, audit with the reason; switching on
 // cancels the active runs of the channel through ChannelReadOnlySet. Errors: not_found, forbidden,

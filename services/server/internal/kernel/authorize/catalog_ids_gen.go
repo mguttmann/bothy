@@ -103,6 +103,8 @@ const (
 	ActionAuthTokenRefresh Action = "auth.token.refresh"
 	// ActionChannelArchive is the action channel.archive.
 	ActionChannelArchive Action = "channel.archive"
+	// ActionChannelAutonomousRunsSet is the action channel.autonomous_runs.set.
+	ActionChannelAutonomousRunsSet Action = "channel.autonomous_runs.set"
 	// ActionChannelBehaviorRead is the action channel.behavior.read.
 	ActionChannelBehaviorRead Action = "channel.behavior.read"
 	// ActionChannelBehaviorUpdate is the action channel.behavior.update.
@@ -331,6 +333,8 @@ const (
 	ActionRunFinish Action = "run.finish"
 	// ActionRunFollowupCreate is the action run.followup.create.
 	ActionRunFollowupCreate Action = "run.followup.create"
+	// ActionRunLaunchCheck is the action run.launch.check.
+	ActionRunLaunchCheck Action = "run.launch.check"
 	// ActionRunOverviewRead is the action run.overview.read.
 	ActionRunOverviewRead Action = "run.overview.read"
 	// ActionRunRead is the action run.read.
@@ -341,6 +345,20 @@ const (
 	ActionRunTokenRenew Action = "run.token.renew"
 	// ActionRunUpdate is the action run.update.
 	ActionRunUpdate Action = "run.update"
+	// ActionRunWakeCancel is the action run.wake.cancel.
+	ActionRunWakeCancel Action = "run.wake.cancel"
+	// ActionRunWakeCheck is the action run.wake.check.
+	ActionRunWakeCheck Action = "run.wake.check"
+	// ActionRunWakeCreate is the action run.wake.create.
+	ActionRunWakeCreate Action = "run.wake.create"
+	// ActionRunWakeFire is the action run.wake.fire.
+	ActionRunWakeFire Action = "run.wake.fire"
+	// ActionRunWakeListPending is the action run.wake.list_pending.
+	ActionRunWakeListPending Action = "run.wake.list_pending"
+	// ActionRunWakeRead is the action run.wake.read.
+	ActionRunWakeRead Action = "run.wake.read"
+	// ActionRunWakeRecover is the action run.wake.recover.
+	ActionRunWakeRecover Action = "run.wake.recover"
 	// ActionSearchAssist is the action search.assist.
 	ActionSearchAssist Action = "search.assist"
 	// ActionSearchAssistRespond is the action search.assist.respond.
@@ -512,6 +530,7 @@ var actionByID = map[string]Action{
 	"auth.step_up":                 ActionAuthStepUp,
 	"auth.token.refresh":           ActionAuthTokenRefresh,
 	"channel.archive":              ActionChannelArchive,
+	"channel.autonomous_runs.set":  ActionChannelAutonomousRunsSet,
 	"channel.behavior.read":        ActionChannelBehaviorRead,
 	"channel.behavior.update":      ActionChannelBehaviorUpdate,
 	"channel.create":               ActionChannelCreate,
@@ -626,11 +645,19 @@ var actionByID = map[string]Action{
 	"run.context.read":             ActionRunContextRead,
 	"run.finish":                   ActionRunFinish,
 	"run.followup.create":          ActionRunFollowupCreate,
+	"run.launch.check":             ActionRunLaunchCheck,
 	"run.overview.read":            ActionRunOverviewRead,
 	"run.read":                     ActionRunRead,
 	"run.start":                    ActionRunStart,
 	"run.token.renew":              ActionRunTokenRenew,
 	"run.update":                   ActionRunUpdate,
+	"run.wake.cancel":              ActionRunWakeCancel,
+	"run.wake.check":               ActionRunWakeCheck,
+	"run.wake.create":              ActionRunWakeCreate,
+	"run.wake.fire":                ActionRunWakeFire,
+	"run.wake.list_pending":        ActionRunWakeListPending,
+	"run.wake.read":                ActionRunWakeRead,
+	"run.wake.recover":             ActionRunWakeRecover,
 	"search.assist":                ActionSearchAssist,
 	"search.assist.respond":        ActionSearchAssistRespond,
 	"search.query":                 ActionSearchQuery,
@@ -741,6 +768,7 @@ var actionList = []Action{
 	ActionAuthStepUp,
 	ActionAuthTokenRefresh,
 	ActionChannelArchive,
+	ActionChannelAutonomousRunsSet,
 	ActionChannelBehaviorRead,
 	ActionChannelBehaviorUpdate,
 	ActionChannelCreate,
@@ -855,11 +883,19 @@ var actionList = []Action{
 	ActionRunContextRead,
 	ActionRunFinish,
 	ActionRunFollowupCreate,
+	ActionRunLaunchCheck,
 	ActionRunOverviewRead,
 	ActionRunRead,
 	ActionRunStart,
 	ActionRunTokenRenew,
 	ActionRunUpdate,
+	ActionRunWakeCancel,
+	ActionRunWakeCheck,
+	ActionRunWakeCreate,
+	ActionRunWakeFire,
+	ActionRunWakeListPending,
+	ActionRunWakeRead,
+	ActionRunWakeRecover,
 	ActionSearchAssist,
 	ActionSearchAssistRespond,
 	ActionSearchQuery,
@@ -961,6 +997,8 @@ const (
 	EventAgentPresenceChanged EventType = "agent.presence_changed"
 	// EventAgentUpdated is the event type agent.updated.
 	EventAgentUpdated EventType = "agent.updated"
+	// EventAgentWakeInput is the event type agent.wake_input.
+	EventAgentWakeInput EventType = "agent.wake_input"
 	// EventAgentSessionChanged is the event type agent_session.changed.
 	EventAgentSessionChanged EventType = "agent_session.changed"
 	// EventChannelArchived is the event type channel.archived.
@@ -1031,6 +1069,8 @@ const (
 	EventRunStateChanged EventType = "run.state_changed"
 	// EventRunUpdated is the event type run.updated.
 	EventRunUpdated EventType = "run.updated"
+	// EventRunWakeChanged is the event type run.wake_changed.
+	EventRunWakeChanged EventType = "run.wake_changed"
 	// EventSearchAssistRequested is the event type search.assist_requested.
 	EventSearchAssistRequested EventType = "search.assist_requested"
 	// EventSessionRevoked is the event type session.revoked.
@@ -1083,6 +1123,7 @@ var eventTypeByID = map[string]EventType{
 	"agent.invocation":               EventAgentInvocation,
 	"agent.presence_changed":         EventAgentPresenceChanged,
 	"agent.updated":                  EventAgentUpdated,
+	"agent.wake_input":               EventAgentWakeInput,
 	"agent_session.changed":          EventAgentSessionChanged,
 	"channel.archived":               EventChannelArchived,
 	"channel.created":                EventChannelCreated,
@@ -1118,6 +1159,7 @@ var eventTypeByID = map[string]EventType{
 	"run.cancel_requested":           EventRunCancelRequested,
 	"run.state_changed":              EventRunStateChanged,
 	"run.updated":                    EventRunUpdated,
+	"run.wake_changed":               EventRunWakeChanged,
 	"search.assist_requested":        EventSearchAssistRequested,
 	"session.revoked":                EventSessionRevoked,
 	"settings.updated":               EventSettingsUpdated,
@@ -1151,6 +1193,7 @@ var eventTypeList = []EventType{
 	EventAgentInvocation,
 	EventAgentPresenceChanged,
 	EventAgentUpdated,
+	EventAgentWakeInput,
 	EventAgentSessionChanged,
 	EventChannelArchived,
 	EventChannelCreated,
@@ -1186,6 +1229,7 @@ var eventTypeList = []EventType{
 	EventRunCancelRequested,
 	EventRunStateChanged,
 	EventRunUpdated,
+	EventRunWakeChanged,
 	EventSearchAssistRequested,
 	EventSessionRevoked,
 	EventSettingsUpdated,

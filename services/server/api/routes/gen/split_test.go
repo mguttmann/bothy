@@ -127,7 +127,7 @@ func TestSplitRest_RejectsInvalidGo(t *testing.T) {
 // TestRealRest_BelowMaxFileKB: each half of the real REST package stays below repo.max_file_kb
 // (1024 KiB, docs/spec/23-quality.md), the limit the hook check-added-large-files holds.
 func TestRealRest_BelowMaxFileKB(t *testing.T) {
-	for _, name := range []string{"models.gen.go", "rest.gen.go", "objects.gen.go", "objects2.gen.go"} {
+	for _, name := range []string{"models.gen.go", "rest.gen.go", "rest2.gen.go", "objects.gen.go", "objects2.gen.go"} {
 		info, err := os.Stat(filepath.Join("..", "..", "rest", name))
 		if err != nil {
 			t.Fatal(err)
@@ -247,5 +247,32 @@ func TestHalveObjects(t *testing.T) {
 	}
 	if _, types, _ := importsOf(t, "objects2.gen.go", empty); len(types) != 0 || len(whole) == 0 {
 		t.Errorf("one group: second types = %v", types)
+	}
+}
+
+// TestHalveServer (AR-04): rest.gen.go is cut at the type StrictServerInterface into two valid
+// files, the std-http server first and the strict interface with its handler second, each with only
+// the imports it uses; a server part without the strict interface keeps everything in the first file
+// and the second holds only the package clause.
+func TestHalveServer(t *testing.T) {
+	_, server, _, err := splitRest([]byte(splitTwoOpsInput))
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, second, err := halveServer(server)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, ft, _ := importsOf(t, "rest.gen.go", first)
+	_, st, _ := importsOf(t, "rest2.gen.go", second)
+	if slices.Contains(ft, "StrictServerInterface") || !slices.Contains(st, "StrictServerInterface") || !slices.Contains(ft, "ServerInterface") {
+		t.Errorf("first types = %v, second types = %v", ft, st)
+	}
+	whole, empty, err := halveServer([]byte("package rest\n\ntype ServerInterface interface{}\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, types, _ := importsOf(t, "rest2.gen.go", empty); len(types) != 0 || len(whole) == 0 {
+		t.Errorf("no strict interface: second types = %v", types)
 	}
 }

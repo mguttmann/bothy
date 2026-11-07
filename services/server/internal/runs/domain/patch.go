@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
@@ -190,6 +191,9 @@ func resolveTop(tok string) (route, string) {
 func resolveMetric(field string) (route, string) {
 	if field == "last_api_retry" {
 		return route{target: TargetLastAPIRetry, ops: opsAll}, ""
+	}
+	if field == metricAutonomyLast {
+		return route{target: TargetAutonomyLast, ops: opsAddReplace}, ""
 	}
 	if slices.Contains(metricFields, field) {
 		return route{target: TargetMetric, field: field, ops: opsAddReplace}, ""
@@ -460,6 +464,8 @@ func checkValue(rt route, v any, ptr string, c *collector) any {
 		return n
 	case TargetLastAPIRetry:
 		return c.apiRetry(v, ptr)
+	case TargetAutonomyLast:
+		return c.autonomyLast(v, ptr)
 	case TargetCost:
 		return c.money(v, ptr)
 	case TargetPlan:
@@ -715,6 +721,42 @@ func (c *collector) apiRetry(v any, ptr string) APIRetry {
 	}
 	c.closed(m, ptr, "attempt", "max_retries", "retry_delay_ms", "error")
 	return r
+}
+
+// metricAutonomyLast is the member of run_metrics.v1 the runner patches with the idle flag of one
+// autonomous input or notification turn (09 5.8.6, 03 runs.metrics).
+const metricAutonomyLast = "autonomy_last"
+
+// autonomyInputMaxChars bounds the id of an input in autonomy_last: a wake-up id or the runner's
+// id of a notification turn, both far below it (a structural bound of the schema, like the
+// pattern of an id, not a tunable limit).
+const autonomyInputMaxChars = 100
+
+// autonomyLast checks the closed object of /metrics/autonomy_last: input a non-empty display text
+// of at most autonomyInputMaxChars characters, idle a boolean (09 5.8.6).
+func (c *collector) autonomyLast(v any, ptr string) AutonomyLast {
+	m, ok := c.object(v, ptr)
+	if !ok {
+		return AutonomyLast{}
+	}
+	var out AutonomyLast
+	if in, p, ok := c.member(m, ptr, "input", true); ok {
+		if s, valid := c.displayText(in, p); valid {
+			if s == "" || utf8.RuneCountInString(s) > autonomyInputMaxChars {
+				c.add(p, fieldInvalid, "input is empty or too long")
+			}
+			out.Input = s
+		}
+	}
+	if idle, p, ok := c.member(m, ptr, "idle", true); ok {
+		b, isBool := idle.(bool)
+		if !isBool {
+			c.add(p, fieldInvalidType, detailType)
+		}
+		out.Idle = b
+	}
+	c.closed(m, ptr, "input", "idle")
+	return out
 }
 
 // money checks the closed object Money of /cost: a reported cost is always an estimate, the

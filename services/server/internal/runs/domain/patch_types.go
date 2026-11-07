@@ -60,6 +60,9 @@ const (
 	TargetStepMember
 	// TargetFollowupState is /followups/<ID>/state.
 	TargetFollowupState
+	// TargetAutonomyLast is /metrics/autonomy_last: the idle flag of the last autonomous input or
+	// notification turn (09 5.8.6, stage AR).
+	TargetAutonomyLast
 )
 
 // Op is one operation after the static checks of ParseOps: its position in the patch, the
@@ -85,6 +88,7 @@ type Op struct {
 	//   TargetStepMember: string (status, title), json.RawMessage (detail, a JSON object not cut
 	//     yet), time.Time (finished_at)
 	//   TargetFollowupState: string (delivered or absorbed)
+	//   TargetAutonomyLast: AutonomyLast
 	Value any
 }
 

@@ -162,6 +162,9 @@ type Store interface {
 	// SaveChannelReadOnly writes read_only and the version of c (channel.read_only.set and the
 	// ownership list of an import, M8-03).
 	SaveChannelReadOnly(ctx context.Context, c domain.Channel) error
+	// SaveChannelAutonomousRuns writes allow_autonomous_runs and the version of c
+	// (channel.autonomous_runs.set, AR-04).
+	SaveChannelAutonomousRuns(ctx context.Context, c domain.Channel) error
 	// SaveChannelOperator writes the operator columns and the version of c (M1-54).
 	SaveChannelOperator(ctx context.Context, c domain.Channel) error
 	// TouchChannel writes only the version of c: an inheriting channel whose space got a new

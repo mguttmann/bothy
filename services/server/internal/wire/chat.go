@@ -84,6 +84,8 @@ type Chat struct {
 	BehaviorHandlers *chathttp.Behavior
 	// ReadOnlyHandlers are the REST handler of setChannelReadOnly (M8-03).
 	ReadOnlyHandlers *chathttp.ReadOnly
+	// AutonomousRunsHandlers is the REST handler of setChannelAutonomousRuns (AR-04).
+	AutonomousRunsHandlers *chathttp.AutonomousRuns
 	// DeletionHandlers are the REST handlers of deleting and restoring spaces, channels and
 	// threads (FEAT-delete-spaces-chats).
 	DeletionHandlers *chathttp.Deletion
@@ -123,7 +125,8 @@ func NewChat(cfg chatapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize
 		return nil, err
 	}
 	return &Chat{Service: svc, Handlers: chathttp.New(svc), ChannelHandlers: chathttp.NewChannels(svc), ThreadHandlers: chathttp.NewThreads(svc),
-		BehaviorHandlers: chathttp.NewBehavior(svc, svc), ReadOnlyHandlers: chathttp.NewReadOnly(svc), DeletionHandlers: chathttp.NewDeletion(svc)}, nil
+		BehaviorHandlers: chathttp.NewBehavior(svc, svc), ReadOnlyHandlers: chathttp.NewReadOnly(svc), DeletionHandlers: chathttp.NewDeletion(svc),
+		AutonomousRunsHandlers: chathttp.NewAutonomousRuns(svc)}, nil
 }
 
 // fillHandlers sets the nil chat handlers of h to the ones c built: spaces and the sidebar
@@ -144,6 +147,9 @@ func (c *Chat) fillHandlers(h *Handlers) {
 	}
 	if h.ReadOnly == nil {
 		h.ReadOnly = c.ReadOnlyHandlers
+	}
+	if c != nil && h.AutonomousRuns == nil {
+		h.AutonomousRuns = c.AutonomousRunsHandlers
 	}
 	if h.Deletion == nil {
 		h.Deletion = c.DeletionHandlers

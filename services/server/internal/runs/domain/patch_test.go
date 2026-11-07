@@ -92,6 +92,8 @@ func TestPathTable(t *testing.T) {
 		{"/steps/" + s + "/detail", `{"file":"export.log"}`, domain.TargetStepMember, "detail", tid(1), []domain.OpKind{rep}},
 		{"/steps/" + s + "/finished_at", `"2026-10-21T10:00:00Z"`, domain.TargetStepMember, "finished_at", tid(1), []domain.OpKind{rep}},
 		{"/followups/" + m + "/state", `"delivered"`, domain.TargetFollowupState, "", tid(2), []domain.OpKind{rep}},
+		// Stage AR (09 5.8.6, AR-04): the idle flag of the last autonomous input.
+		{"/metrics/autonomy_last", `{"input":"w1","idle":true}`, domain.TargetAutonomyLast, "", ids.ID{}, []domain.OpKind{add, rep}},
 	}
 	for _, f := range []string{"context_pct", "tokens_in", "tokens_out", "tokens_cache_read", "tokens_cache_write",
 		"tokens_cache_write_1h", "subagents", "background_jobs", "api_retries"} {
@@ -457,5 +459,33 @@ func TestValuesUnstorable(t *testing.T) {
 	// Numbers within 2^53-1 inside a detail stay as sent.
 	if _, fields := domain.ParseOps([]domain.RawOp{{Op: "replace", Path: step + "/detail", Value: json.RawMessage(`{"n":9007199254740991,"f":-1.5}`)}}); len(fields) != 0 {
 		t.Errorf("safe numbers: %+v", fields)
+	}
+}
+
+// TestParseOps_AutonomyLast: /metrics/autonomy_last is a closed object with a non-empty input and a
+// boolean idle (09 5.8.6, AR-04); every other shape is a field error; Apply stores it in the
+// metrics.
+func TestParseOps_AutonomyLast(t *testing.T) {
+	t.Parallel()
+	for name, v := range map[string]string{
+		"no input": `{"idle":true}`, "empty input": `{"input":"","idle":true}`, "idle not bool": `{"input":"w","idle":"yes"}`,
+		"unknown member": `{"input":"w","idle":false,"tool":"x"}`, "not an object": `true`,
+		"long input": `{"input":"` + strings.Repeat("x", 101) + `","idle":false}`,
+	} {
+		if _, fields := domain.ParseOps([]domain.RawOp{rawOp("add", "/metrics/autonomy_last", v)}); len(fields) == 0 {
+			t.Errorf("%s: accepted %s", name, v)
+		}
+	}
+	ops, fields := domain.ParseOps([]domain.RawOp{rawOp("add", "/metrics/autonomy_last", `{"input":"w1","idle":true}`)})
+	if len(fields) != 0 {
+		t.Fatal(fields)
+	}
+	ch, _, err := domain.Apply(domain.DocumentState{Metrics: json.RawMessage(`{}`), Followups: map[ids.ID]string{}}, ops,
+		domain.Limits{ExcerptMaxChars: 10, MaxStepsPersisted: 10, StepDetailMaxBytes: 1000}, domain.Env{Now: time.Now(), NewID: ids.New})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if last, ok := domain.AutonomyLastOf(ch.Metrics); !ok || last.Input != "w1" || !last.Idle {
+		t.Fatalf("stored metrics %s", ch.Metrics)
 	}
 }

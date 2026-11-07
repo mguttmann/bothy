@@ -327,6 +327,10 @@ func (s *Service) endRun(ctx context.Context, row RunRow, to domain.State, reaso
 	if err := s.DisableRunComponents(ctx, row.ID); err != nil {
 		return Transitioned{}, err
 	}
+	// The thread is free: a wake-up that waited for this run fires now (09 5.8.3, AR-04).
+	if err := s.onThreadFree(ctx, row.ThreadID); err != nil {
+		return Transitioned{}, err
+	}
 	if s.fu == nil {
 		return t, nil
 	}

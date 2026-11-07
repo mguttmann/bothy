@@ -41,8 +41,21 @@ var requirementGroups = []struct {
 	{"agent-self of the runner named in `hosted_by` of the target", AgentSelf, []string{"agent.hosted_token.issue"}},
 	{"agent-self", AgentSelf, []string{
 		"agent.events.consume", "agent.heartbeat", "agent.triggerers.read", "agent_session.report",
-		"channel.project.trash", "run.context.read", "run.finish", "run.update",
+		"channel.project.trash", "run.context.read", "run.finish", "run.update", "run.wake.list_pending",
 	}},
+	// The wake-ups of stage AR (07 2.14, AR-04): the runner acts as the agent of the run or of the
+	// wake-up (the resource's owner is that agent); runs checks the run's state and the checks of
+	// the wake-up's person with agent.invoke, owners and the channel switch.
+	{"agent-self of the run's agent, run active", AgentSelf, []string{"run.wake.create"}},
+	{"agent-self of the run's agent, run `interrupted`, `stale` or `failed`", AgentSelf, []string{"run.wake.recover"}},
+	{"agent-self of the wake-up's agent", AgentSelf, []string{"run.wake.check", "run.wake.fire"}},
+	{"agent-self of the run's agent", AgentSelf, []string{"run.launch.check"}},
+	// run.wake.cancel: runs passes the wake-up's agent as owner for an agent caller and the
+	// wake-up's person for a person, so AgentSelf and Self each name their own subject.
+	{"agent-self of the wake-up's agent, the wake-up's person, or `manage` on the channel", Any(AgentSelf, Self, HasCap(CapManage)), []string{
+		"run.wake.cancel",
+	}},
+	{"`read` on the thread", AtLeast(LevelRead), []string{"run.wake.read"}},
 	{"trigger and rules from 5", AtLeast(LevelTrigger), []string{"agent.invoke"}},
 	{"owner or agent-self or read on a channel that the agent operates", Any(Owner, AgentSelf, ReadOnOperatedChannel), []string{
 		"agent.read",
@@ -77,7 +90,7 @@ var requirementGroups = []struct {
 	{"public (valid refresh token and DPoP proof of the family)", Public, []string{"auth.token.refresh"}},
 	{"manage", HasCap(CapManage), []string{
 		"channel.archive", "channel.behavior.read", "channel.behavior.update", "channel.create",
-		"channel.delete", "channel.read_only.set", "channel.reorder", "channel.restore", "channel.update", "forum_tag.manage", "pin.create",
+		"channel.autonomous_runs.set", "channel.delete", "channel.read_only.set", "channel.reorder", "channel.restore", "channel.update", "forum_tag.manage", "pin.create",
 		"pin.delete", "space.update", "webhook_in.create", "webhook_in.read", "webhook_in.revoke",
 	}},
 	{"human", Human, []string{"client_metrics.submit", "dm.create", "search.assist"}},

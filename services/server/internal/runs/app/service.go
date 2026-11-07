@@ -355,6 +355,8 @@ type Service struct {
 	publisher atomic.Pointer[publisherBox]
 	// fu is the follow-up service over Deps.FollowupRows; nil without them (M2-11).
 	fu *Followups
+	// wakes are the wake-ups of stage AR, bound with BindWakes; nil leaves them off (AR-04).
+	wakes atomic.Pointer[wakeBox]
 }
 
 // publisherBox holds the bound publisher of run.updated.
