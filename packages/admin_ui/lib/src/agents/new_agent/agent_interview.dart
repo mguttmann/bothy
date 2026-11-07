@@ -23,7 +23,7 @@ import 'new_agent_port.dart';
 /// if (interview.draft != null) flow.useInterview(interview.draft!);
 /// ```
 final class AgentInterview extends ChangeNotifier {
-  /// Creates the interview over [port].
+  /// Creates the interview over the given [NewAgentPort].
   AgentInterview(this._port);
 
   final NewAgentPort _port;
