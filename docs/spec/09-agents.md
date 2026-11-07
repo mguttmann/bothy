@@ -63,6 +63,8 @@ keys of the column "Reported" below; any other key is refused.
 | Title suggestion | `supports_title` | `title: true` | Section 12 |
 | Sending files | `supports_files_out` | `files_out: true` | Agent additionally needs `+upload` (an operator holds it by the operator rule, 2.3). If `supports_files_out` is off, the server rejects messages of an agent with attachments with `403 feature_disabled`. |
 | Hosting built-in agents | no key; reported only | `hosts_agents: chat`, `scoped` or `host` (the highest class it loads for a hosted agent) | Only a runner that reports it can be chosen as `hosted_by` ([26-builtin-agents.md](26-builtin-agents.md) 3.1); only a Claude Code runner with `runner.hosted_agents` reports it (addendum of 2026-11-06) |
+| Turn handover | no key; reported only | `turn_handover: true` | The runner hands live turns over at a restart and adopts them with full rights (18.19.3 to 18.19.7); only a Claude Code runner with `runner.turn_handover` reports it (addendum of 2026-11-06, stage AR) |
+| Wake-ups | no key; reported only | `wakes: true` | The runner takes wake-up requests from turns, checks host conditions and takes wake inputs (5.8, 18.19.8); clients show wake-up controls only for an agent that reports it; only a Claude Code runner with `runner.wakes` reports it (addendum of 2026-11-06, stage AR) |
 
 Schema `agent_operator_config.v1` (03, `agents`): a JSON object without further keys
 (`additionalProperties: false`); every key is optional. `operator_config` never contains
@@ -136,6 +138,11 @@ The server sets `origin` from the principal and the inbound path. A client can n
 
 Reason: freedom from loops is a data field, not a text heuristic. Two agents can never
 trigger each other.
+
+Wake runs (addendum of 2026-11-06, stage AR, 5.8): a wake run is started by a wake-up, a server
+record that an agent action created on behalf of the person of its source run and that carries
+that person as `triggered_by`. It is no agent message, so "two agents can never trigger each
+other" still holds; the loop protection for wake-ups is the set of caps of 5.8.6.
 
 ### 3.3 Channel switches
 
@@ -706,7 +713,7 @@ an unknown member):
 
 | Key | Content |
 |---|---|
-| `capabilities` | object, section 2.2: `followups` (`steer` or `queue`), `components`, `voice_input`, `title`, `files_out` (booleans), and for runners only `hosts_agents` (`chat`, `scoped` or `host`, sent only with `runner.hosted_agents`; addendum of 2026-11-06, [26-builtin-agents.md](26-builtin-agents.md) 3.1; a server before stage A1 refuses it as an unknown member, 26 11 item 4) |
+| `capabilities` | object, section 2.2: `followups` (`steer` or `queue`), `components`, `voice_input`, `title`, `files_out` (booleans), and for runners only `hosts_agents` (`chat`, `scoped` or `host`, sent only with `runner.hosted_agents`; addendum of 2026-11-06, [26-builtin-agents.md](26-builtin-agents.md) 3.1; a server before stage A1 refuses it as an unknown member, 26 11 item 4), and for runners only `turn_handover` and `wakes` (`true`, each sent only while `runner.turn_handover` or `runner.wakes` is on; addendum of 2026-11-06, 18.19.1; a server before stage AR refuses them as unknown members) |
 | `active_runs` | distinct ids (UUID, R-DM-01) of the runs in `running` or `waiting_input` the adapter holds |
 | `degraded_reasons` | distinct codes, for example `runtime_unreachable`, `busy_mode_invalid`, `billing_evidence_unknown` |
 | `adapter` | `name` (required, name form), `version` (optional, version form): the adapter's own version ([18-release.md](18-release.md) section 9 point 5) |
@@ -848,6 +855,12 @@ the runtime start, the run is `running` without a runtime and ends as `interrupt
 an invocation runs at most once, never twice. If it crashes between the acknowledgement and `run.start`,
 it picks the run up again from the inbox after the restart (with an expired token through 4.5.1).
 
+With `runner.turn_handover` (addendum of 2026-11-06, 18.19.6) a crash or handover between
+`run.start` and the runtime start, in the phases `transcribing` and `launching`, no longer ends the
+run `interrupted`: the turn record names the phase, the run stays in `active_runs`, and the next
+runner continues it from the record after the launch check. A crash before `run.start`, in
+`preparing` or `waiting_lock`, keeps the inbox restart above unchanged.
+
 ### 4.10 Usage at the end of a run
 
 `run.finish` carries `costs`: a list per model with `provider`, `model`, `tokens_in`,
@@ -979,6 +992,11 @@ stateDiagram-v2
 | `runtime_not_authenticated` | `failed` | Adapter | Runtime has no valid login |
 | `adapter_stopped` | `cancelled` | Adapter | An orderly stop of the adapter (a restart or an update) ended the run's turn (D-AR-1) |
 | `user_disabled` | `cancelled`; `failed` on denial before delivery | Server | The triggering person was disabled (`user.disable`, 02 section 4.3): `cancelled` on revocation, `failed` at delivery |
+
+Stage AR (addendum of 2026-11-06, 18.19.10) adds the reason `usage_limited` (`failed`, set by the
+adapter): the usage window of the runtime's account was used up while the run ran; the `summary`
+names the reset time and whether a wake-up is pending. It enters the table above and the reason
+table of the code with AR-04; until then the server stores it as `adapter_error` by the rule below.
 
 The server stores a `failed` reason of an adapter that this table does not list for the adapter (an
 unknown code, or a server code such as `stale`) as `adapter_error` (D-M2-05-8). It keeps the
@@ -1171,6 +1189,12 @@ interrupted" and a button "Send again", which puts a new message with the text o
 triggering message into the outbox. Reason: the runtime may already have caused side effects
 before the crash; only the person decides whether to retry.
 
+Handed-over turns (addendum of 2026-11-06, 18.19.3): the old runner sends no heartbeat after a
+handover began, and the next runner adopts before its first heartbeat, so a handed-over run is
+never missing from `active_runs` and never ends `interrupted`. After `interrupted` and `stale` a
+recovery run that only informs the agent may follow (18.19.9, R-AG-17 as amended); it never
+repeats the input.
+
 `run.queued_max_age` limits how old a request may be when an adapter comes back after a
 pause. Reason: a request that is executed surprisingly long after it was sent is worse than a
 visible rejection.
@@ -1267,6 +1291,141 @@ triggering message, so the person does not have to write the message again: `ret
    its thread ([01](01-product.md) 6.2); after `interrupted` and `stale` they keep "Send again"
    for the person who triggered (5.5), because the runtime may have caused side effects. Retry is
    no automatic retry: the person decides each time.
+
+### 5.8 Wake-ups and autonomous inputs
+
+Addendum of 2026-11-06 (stage AR, [ADR 0077](../adr/0077-autonomous-runs-wake-ups-and-turn-handover.md)).
+A wake-up is a server record that later continues a thread without a new message: it starts a
+wake run (`trigger_kind = 'wake'`) or, when the thread's run is still active, delivers a wake
+input into it. The runner side (how an agent asks, how host conditions are checked, recovery and
+usage-window wake-ups) is 18.19.
+
+#### 5.8.1 Record
+
+`run_wakes` (03 4.8) holds per wake-up: agent, thread, the run that asked for it
+(`source_run_id`), the person on whose behalf it runs (`triggered_by` of the source run), kind,
+condition, a short label written by the agent, the reason (`agent`, `recovery`, `usage_limit`),
+`not_before` (at least creation plus `run.wake_min_delay`), `deadline`, state (`pending`, `fired`,
+`cancelled`, `expired`, `refused`, `failed`), the reason of the last state change, and the run or
+wake input it produced. For `pr_checks` it also stores the head commit of the pull request at
+creation. The deadline of a `usage_limit` wake-up is at most `run.wake_max_wait` after its
+`not_before` (not after its creation), so a weekly window that resets close to the limit still
+fires; for every other reason it is at most `run.wake_max_wait` after creation.
+
+| Kind | Condition | Evaluated by | Allowed when |
+|---|---|---|---|
+| `at` | a time | server job `runs.wake_due` | always (within 5.8.6) |
+| `pr_checks` | repository and pull request number; fires when the current head has checks and none is pending | runner, with the host user's `gh`, read only (18.19.8) | the source run's person is an owner of the instance; no tool class is required |
+| `command` | a command line run in the turn's working folder; fires on exit code 0 | runner, each execution only after `run.wake.check` allowed it (18.19.8) | tool class `host` (SR2) at create and before every execution |
+
+`pr_checks` is for owners only because it reads GitHub with the owner's `gh` login; a run of
+another person could otherwise read any repository the owner can read. A refused create says
+`pr_checks_owner_only`.
+
+#### 5.8.2 Operations
+
+| Operation (action) | Caller | Effect |
+|---|---|---|
+| `run.wake.create` | adapter with the agent's token, only for an active run of that agent in that thread | creates a wake-up with reason `agent` (from `bothy-wake`) or `usage_limit`; a `usage_limit` request carries the run's outage number as idempotency key, so a repeated request of one outage updates its pending wake-up (`not_before`) and a new outage gets its own, bounded by `run.usage_wake_max`; a refused create stores nothing, except a request the SDK outbox sent later (`deferred: true`, 18.19.8), which is stored directly in state `refused` with the reason so that 5.8.4 posts the note and notifies the person |
+| `run.wake.recover` | adapter with the agent's token | creates a wake-up of kind `at` with reason `recovery` or `usage_limit` for an ended source run of that agent and thread in state `interrupted`, `stale` or `failed`, at most one per source run and reason (idempotency key) |
+| `run.wake.list_pending` | adapter | the agent's pending wake-ups of every kind; called at start and after every reconnect |
+| `run.wake.check` | adapter with the agent's token | before every execution of a `command` check and every read of a `pr_checks` check: allow, or end the wake-up (5.8.3) |
+| `run.wake.fire` | adapter | fires a `pr_checks` or `command` wake-up with a short result text, or ends it `failed` with the reason after `runner.wake_check_failures` |
+| `run.wake.cancel` | the agent, the person of the wake-up, or a person with `manage` on the channel | ends a pending wake-up `cancelled` |
+| `run.wake.read` | a person who may read the thread | the thread's wake-ups for clients |
+| `run.launch.check` | adapter with the agent's token | the checks of 18.19.6 before a launch by a runner that did not accept the run |
+
+The durable event `run.wake_changed` (payload: wake-up id, thread, state) goes to the clients of
+the thread and to the adapter inbox of the wake-up's agent, so a runner learns of new, cancelled
+and expired wake-ups between reads. The actions, columns and the event enter the catalogue with
+AR-04 (07 2.14).
+
+#### 5.8.3 Firing, wake inputs and checks before host executions
+
+Firing re-checks everything a new run needs at that moment, as for a human message: the person
+still has `trigger` on the agent in the channel (3.4), the agent is still allowed there, the
+channel is neither archived nor read-only, the billing mode rules of 10 (I1 to I5), and the
+autonomy rules of 5.8.6. A fired wake-up with no active run in the thread creates a run with
+`trigger_kind = 'wake'`, `triggering_wake_id` and `triggered_by` of the source run; it is
+delivered, tokened, billed, shown and stopped like every run, and the runner resumes the thread's
+session with `--resume` (section 9). Its first input names the wake-up's label, reason and result.
+
+A wake-up that fires while the thread has an active run is a wake input when that run's
+`triggered_by` is the wake-up's person: the server delivers `agent.wake_input` over the follow-up
+channel (04 15.4) with a token whose `trigger_kind` is `wake` and that carries `run_id`,
+`thread_id`, `wake_id` and `sub` (the wake-up's person); there is no message and no author. The
+runner writes the input line (label, reason, result text) only when the token is valid and not
+expired, `trigger_kind` is `wake`, `run_id` and `thread_id` match the active run, `wake_id` is the
+delivered wake-up, `sub` equals the run's `triggered_by`, and billing mode and tool class match
+(`compare_actual`). Otherwise it skips the input (log code `wake_input_check_failed`) and reports
+the skip, and the server puts the wake-up back to `pending`, so it fires after the run as a wake
+run. When the active run belongs to another person the wake-up stays `pending` until that run
+ends. The checks of 5.8.6 run at fire time on both paths, and a wake input counts as one
+autonomous input exactly like a wake run. At most one run per thread stays true (R-DM-14).
+
+Before every execution of a pending `command` and every `gh` read of a pending `pr_checks`, the
+runner calls `run.wake.check`, and the server checks the current state: the wake-up is still
+`pending`; its person still has `trigger` on the agent in the channel and the agent is still
+allowed there; the channel is neither archived nor read-only; for `command`, the agent's
+`tool_class` is still `host` and SR2 holds for that person as at a delivery; for `pr_checks`, the
+person is still an owner. Any failed check ends the wake-up `refused` with the reason of the
+failed check (for example `capability_missing`, `agent_not_reachable`, `channel_read_only`,
+`tool_class_owner_only`, `dev_environment_not_ready`, `tool_class_mismatch`,
+`pr_checks_owner_only`), an audit entry naming the check and the wake-up, the note of 5.8.4 and a
+notification (13); the runner logs `wake_check_refused` and does not run the check. A refused fire
+ends the same way, so a refusal looks the same whether a check or the fire found it.
+
+#### 5.8.4 Visible ends
+
+Every end other than `fired` posts a `system` message in the thread (it never triggers, 3.2) that
+names the label and the reason, for example "Wake-up 'CI of #123' expired after 7 days" or
+"Wake-up refused: you no longer have the right to trigger this agent here". `refused`, `expired`
+and `failed` also notify the wake-up's person (13). A cancel by a person posts the note without a
+notification. The job `runs.wake_due` fires due `at` wake-ups and ends wake-ups past their
+`deadline` `expired`.
+
+#### 5.8.5 Delivery to the runner
+
+A runner learns pending wake-ups from `run.wake.list_pending` at start and after every reconnect
+and from `run.wake_changed` in between; a hosted agent's wake-ups come through that agent's
+connection (18.18). A wake run is delivered as `agent.invocation` like a message run; the run
+context names the wake-up instead of a triggering message. A wake run waits for an offline runner
+like every run (`run.queued_max_age`).
+
+#### 5.8.6 Who may run on alone, and how far
+
+An autonomous input is a wake run, a wake input, or a recovery or usage-window wake-up. It is
+allowed when the source run's person is an owner of the instance, or when the channel has
+`allow_autonomous_runs` (03 `channels`, default `false`, changed with `manage`). The server checks
+this at create and again at fire time; a refusal says `autonomous_not_allowed`.
+
+- Chain count, kept per thread and person (`run_autonomy`, 03 4.8): consecutive autonomous inputs
+  since that person last triggered a run that is not a wake run or wrote a follow-up in the
+  thread. Only such a run or follow-up of that person resets it, so another person's message never extends an owner's chain.
+  When it reaches `run.autonomous_chain_max` (`0` means no chain cap), the next wake-up ends
+  `refused` with the reason `autonomous_chain_max` and a note that a reply of that person
+  continues.
+- Idle count, kept the same way: consecutive autonomous inputs that ended without a tool call
+  other than `bothy-wake` and without starting a background task. The runner reports the idle
+  flag per input with `run.update` as a patch of `/metrics/autonomy_last` (`{input, idle}`, 03
+  `runs.metrics`; the server counts each distinct `input` once): at the `result` that ends a wake
+  input's turns, at the end of a wake run's first turn, and at the end of a notification turn. When the count reaches
+  `run.autonomous_idle_max` (minimum 1, cannot be switched off), the chain ends with the reason
+  `autonomous_idle_max` and a note, also when the chain cap is `0`, and the server refuses further
+  wake inputs into the held run.
+- Notification turns of a held process (a turn the CLI starts after a background task ended) are
+  no autonomous input and do not count in the chain; such a turn counts in the idle count when it
+  made no tool call other than `bothy-wake` and starting background tasks, and one that does other
+  work resets it. When the answer to that patch carries `autonomy_cap_reached`, the runner closes
+  stdin at that turn's `result` and the thread gets the note.
+- Every wake-up fires no earlier than `run.wake_min_delay` after it was created, also `--at` in the
+  past, `--after 0` and a `command` that succeeds at once; the first check of `pr_checks` and
+  `command` happens no earlier either.
+- Pending wake-ups per thread are capped by `run.wake_max_pending`; a further create is refused
+  with the reason `wake_max_pending`.
+
+Two threads that wake each other through shared files or a pull request each count their own
+chain; the idle count stops them when they do nothing else, the chain cap otherwise.
 
 ## 6. Trigger state (`trigger_state`)
 
@@ -1390,6 +1549,10 @@ Rulings of the build (M2-11, `docs/decisions.d/M2-11.md` D-M2-11-2 to D-M2-11-8)
 - Every server-side change of a follow-up of an active run (acceptance, refused delivery, deletion)
   raises `runs.version` without `run.updated`; the next frame of the run reaches focused clients as
   a snapshot (5.4).
+
+Wake inputs (addendum of 2026-11-06, 5.8.3): a wake-up that fires into an active run of its
+person reaches the turn over the follow-up channel as a wake input with its own token and checks;
+it has no message and no author and counts as an autonomous input.
 
 ## 8. Stop
 
@@ -2254,6 +2417,10 @@ Limit: the server checks only where the agent writes, not what it knows. A repor
 contain knowledge from other spaces. Therefore a report channel belongs in a space whose
 readers may see everything the runtime of the agent knows ([19-security.md](19-security.md)).
 
+Relation to wake-ups (addendum of 2026-11-06): a report has no run and no person; a wake-up always
+belongs to a thread and the person of its source run, and continues that thread as a run (5.8). A
+runtime that wants to continue a conversation later uses a wake-up, not a report.
+
 ## 15. Reliability
 
 | Event | Behavior | Basis |
@@ -2991,6 +3158,15 @@ ready own dev environment, [07-permissions.md](07-permissions.md) and
 [21-dev-isolation.md](21-dev-isolation.md)). Runner test: for each class the generated command
 line against this table, with fake Claude.
 
+Stage AR (addendum of 2026-11-06, 18.19): with `runner.turn_handover` the process is started by the
+keeper (18.19.4) after the launch handshake (18.19.5), stdin is the named pipe `<launch>.stdin`,
+and the process group is the keeper's; with `runner.wakes` the `bothy-wake` folder is first on the
+cleaned `PATH`, the environment also holds `BOTHY_WAKE_DIR` and `BOTHY_WAKE_NONCE`, `--allowedTools`
+under `scoped` gains `Bash(bothy-wake:*)`, and `--disallowedTools` gains `CronCreate CronDelete
+CronList ScheduleWakeup RemoteTrigger` (18.19.8); with `runner.cli_bg_wait_ceiling` the environment
+holds `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS` (18.19.12). Without these keys the argument list and
+the environment are exactly as above.
+
 ### 18.3 Reported mode per run
 
 The runner builds the environment for each run according to the desired mode of the token (the
@@ -3140,7 +3316,9 @@ never ends the run (D-M2-35-1). A follow-up of a run whose turn has not started 
 waiting for a lock, a slot, the pre-check, or between the processes of a recovery) is kept and
 written right after the prompt line of the next turn process, in event order; a follow-up written
 to a process that failed without echo is written again, with its original `uuid`, into the next
-process of a recovery; a turn adopted after a restart takes no follow-up (D-M2-35-3).
+process of a recovery; a turn adopted after a restart takes no follow-up (D-M2-35-3), except a turn
+with a named pipe whose stdin is not closed, which an adopter with `runner.turn_handover` serves
+like its own (18.19.7, amended 2026-11-06).
 
 The runner closes stdin only by this rule: at a `result` without written follow-ups lacking an
 echo, stdin closes; at a `result` with such follow-ups it stays open until their echoes or
@@ -3195,6 +3373,11 @@ The runner sets the marker `CLAUDE_PRODUCT_RUN=1` in every turn's environment (1
 user-level hook of personal mode that would keep a headless turn open while background tasks run
 can recognise a product turn and let it end.
 
+With the keys of stage AR (addendum of 2026-11-06): stdin is the keeper's named pipe and "close
+stdin" is the close of 18.19.4 item 5; wake inputs are written like follow-ups after their own
+checks (5.8.3); the end-state check of 18.19.11 runs before stdin closes at a `result`; and an error
+`result` while the usage mark is set closes no stdin and starts no stop (18.19.10).
+
 ### 18.6 Stop
 
 SIGINT to the process group ends the turn cleanly with `result`. Without an end after
@@ -3228,6 +3411,11 @@ outlived the wait of `runner.stop_grace` plus `runner.kill_grace` plus `runner.c
 is stopped by the cancellation in the same way; the runner keeps its handle of the process until
 the group is gone, and if the cancellation itself is interrupted, the record stays for the next
 start (18.9). Adopted turns keep running (18.9).
+
+With `runner.turn_handover` (addendum of 2026-11-06, 18.19.4) the group is the keeper's: keeper and
+CLI share it, SIGINT and SIGTERM reach the CLI and its background tasks (the keeper ignores both),
+SIGKILL ends all of them, and the exit code comes from the keeper or from `<launch>.exit`. Without
+the key an orderly stop of the runner stops live turns this way (18.19.2).
 
 ### 18.7 Costs
 
@@ -3417,6 +3605,14 @@ with its leader; a job of its group that outlives the leader is stopped as in 18
 matched its record after the restart (its group ID is not given to another process while the
 group exists), and is never signalled otherwise. An orderly stop of the runner keeps the records
 of adopted turns for the next start.
+
+For records written with `runner.turn_handover` (addendum of 2026-11-06, 18.19.6, 18.19.7) the
+adoption follows 18.19: the record carries the run's phase and `process_start`, the adopter
+replays the per-turn state and takes follow-ups, wake inputs, the stdin rule and the stop after an
+error, and the end of an adopted process is handled like an own one, with classification and
+`_recover` within the once-per-run limits the record proves. This replaces "finish once by the
+classification above without recovery" and "never a new process for such a run" for those
+records; a record without a named pipe is adopted as above.
 
 ### 18.10 File rules for reply attachments
 
@@ -3860,6 +4056,536 @@ Details the build settled (A1-04, `docs/decisions.d/A1-04.md`):
    like a turn, then ends `failed` with `adapter_error` and the cause `definition_missing`
    without `run.start`.
 
+### 18.19 Wake-ups and turn handover
+
+Addendum of 2026-11-06 (stage AR, [ADR 0077](../adr/0077-autonomous-runs-wake-ups-and-turn-handover.md),
+design note [autonomous-runs.md](../design/autonomous-runs.md), rulings
+[decisions.d/AR-01.md](../decisions.d/AR-01.md)). A session keeps working as long as it has work:
+a runner restart hands live turns over instead of ending them, an agent asks for a wake-up that
+survives its process and the runner, lost background work leads to a recovery run, the usage
+window of the account wakes the thread at its reset, and every run end says whether the agent is
+done, waiting or blocked. The server side of wake-ups and autonomous inputs is 5.8. Every part is
+off until its key is on (18.19.1); without the keys 18.1 to 18.18 apply unchanged, held by the
+byte-equal fixtures of AR-T16.
+
+#### 18.19.1 Keys, capabilities and order
+
+| Key | Turns on | Capability in the heartbeat (4.8) |
+|---|---|---|
+| `runner.turn_handover` | keeper, named pipe, launch handshake, phases in the record, handover at SIGTERM, adoption with full rights (18.19.3 to 18.19.7) | `turn_handover: true`, only while the key is on |
+| `runner.wakes` | `bothy-wake`, condition checks, wake inputs, disallowed CLI timers (18.19.8), recovery and usage-window wake-ups (18.19.9, 18.19.10) | `wakes: true`, only while the key is on |
+| `runner.end_state` | the end-state check of 18.19.11 | none |
+| `runner.cli_bg_wait_ceiling` | `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS` in the turn's environment (18.19.12) | none |
+
+`details.capabilities` is closed (4.8): a server before stage AR refuses `turn_handover` and
+`wakes` as unknown members, and it lacks `run.launch.check` and `run.wake.check`. A runner
+therefore switches `runner.turn_handover` or `runner.wakes` on only against a server that
+accepts both capabilities (16 10.1), and a server rollback below that version turns both keys off
+first. `runner.wakes` needs `runner.turn_handover`; the runner refuses to start with
+`runner.wakes` on and `runner.turn_handover` off and names both keys, because a wake input or a
+recovery run without the handover would be lost at the next restart. Clients show wake-up
+controls only when the thread's agent reports `wakes`; pending wake-ups and their cancel button stay
+visible without it (01 6.21).
+
+#### 18.19.2 Orderly stop without the handover
+
+With `runner.turn_handover` off, an orderly stop of the runner (SIGTERM, SIGINT) never leaves an
+orphan. Built by AR-02 as the addendum of 18.6 says ([AR-02 rulings](../decisions.d/AR-02.md)):
+the runner stops every own turn whose process runs as in 18.6 (SIGINT, SIGTERM, SIGKILL to the
+group, each escalation logged `stop_escalated`) and finishes its run `cancelled` with the reason
+`adapter_stopped` (5.2) and a summary that names the cause, before the SDK shuts down; it waits at
+most `runner.stop_grace` plus `runner.kill_grace` plus `runner.cli_probe_timeout` and logs
+`stop_turns_timeout` when that wait runs out. A turn the stop did not reach or that outlived the
+wait is stopped by the cancel path the same way, which keeps the process handle while a process of
+the group lives; the turn record and the run files are removed only when no process of the group
+is left, and a turn whose cancellation is interrupted keeps its record for the next start (18.9).
+This also holds before stage AR is switched on (R-AG-56).
+
+#### 18.19.3 Handover at a restart
+
+With `runner.turn_handover`, SIGTERM is a handover, not a stop. The runner:
+
+1. stops taking new runs (the inbox stays as it is, 4.9) and sends no further heartbeat;
+2. leaves every live turn running and keeps its record; in-flight input writes are finished or
+   recorded as below; a run in phase `preparing`, `waiting_lock` or `transcribing` is abandoned in
+   memory with its record left (18.19.6); a run in `launching` whose go byte is not recorded gets
+   its launch pipe closed without a go byte;
+3. writes `turn_handed_over` per turn to its log and exits with code 75 (`EX_TEMPFAIL`) when at
+   least one turn was handed over, else 0.
+
+The non-zero code makes a service manager that restarts on failure (launchd `KeepAlive
+{SuccessfulExit: false}`, systemd `Restart=on-failure`) start the next runner after a SIGTERM that
+handed turns over; after exit 0 it does not. The restart and update operation of the service guide
+therefore restarts the runner whatever its exit code (`launchctl kickstart -k`, `systemctl
+restart`, 16 10.1). Only `claude-code-runner stop --turns` (stop every turn as in
+18.6, finish each run `cancelled` with reason `adapter_stopped`, then exit 0) or a stop of a run
+ends a turn on purpose. Unloading the service (`launchctl bootout`, `systemctl disable --now`,
+an uninstall) leaves handed-over turns without a runner; the next start adopts them, and after
+`run.orphan_timeout` adoption stops them and a recovery run follows (18.19.9). The service guide
+(16 10.1) therefore runs `claude-code-runner stop --turns` first.
+
+In-flight input lines (issue of the red team, AR-03): every input line (follow-up, wake input,
+nudge) is recorded with its `uuid` before it is written (ledger rule 3) and marked written after
+its last byte; the write runs off the event loop with the write end non-blocking. At a handover
+the runner waits for an unfinished write at most `runner.kill_grace`; a line that is still not
+complete is recorded with the count of bytes written (`partial_input`), and the next runner
+writes the rest of that line first, before any other input. A runner that crashed in the middle
+of a write leaves a line marked as started without a byte count; the next runner then writes
+nothing into that pipe, closes its write end and signals the keeper to close stdin (the case
+"keeper killed" of 18.19.9), so no half line is ever completed by a different line.
+
+#### 18.19.4 The keeper and the named pipe
+
+With `runner.turn_handover` the runner no longer starts the CLI itself. Per launch it creates a
+named pipe `<launch>.stdin` (mode `0600`; `<launch>` in 18.19.5) and starts the keeper
+`python -m claude_code_runner.keeper` (part of the runner package) with `start_new_session=True`,
+so the keeper leads its own session and process group, outside the process group of the
+service. The keeper:
+
+1. opens the named pipe for reading without blocking, then for writing (it holds this write end
+   for the turn's life), then switches the read end to blocking; a keeper that cannot open its
+   named pipe writes the exit file with the label `not_started` and exits;
+2. writes its identity file and waits for the go of the launch handshake; on the go it forks,
+   the child waits on a release pipe from the keeper, the keeper writes the CLI's identity file
+   and then releases the child, which restores the default signal handlers and execs the CLI
+   with the read end as stdin, the stream and stderr files of 18.2 as stdout and stderr and the
+   lock descriptors passed on as today; the CLI stays in the keeper's process group; the keeper
+   closes its own copies of the lock descriptors and of the read end after the fork;
+3. writes the attempt's initial inputs from `<launch>.inputs` into its write end, once, with the
+   write end non-blocking in one loop that also watches the CLI's exit (`waitpid` with `WNOHANG`
+   on a `SIGCHLD` wake-up), and only after the last byte writes `<launch>.fed` atomically by
+   rename; for a compaction attempt it then closes its write end; when the CLI ends first (a
+   write fails with `EPIPE`, or the loop sees the exit) it writes no `<launch>.fed`;
+4. ignores SIGINT, SIGTERM, SIGHUP and SIGPIPE, waits for the CLI, writes the CLI's wait status
+   to `<launch>.exit` atomically by rename and exits with the CLI's exit code, or 128 plus the
+   signal number when a signal ended the CLI; it never outlives the CLI;
+5. on SIGUSR1 closes its write end. "Close stdin" means: the runner closes its own write end and
+   sends SIGUSR1 to the keeper after `process_matches`.
+
+The runner opens its own write end with `O_WRONLY | O_NONBLOCK`; `ENXIO` (no reader) means the
+turn is gone, never a hang. A runner that adopts the turn opens the recorded named pipe of the
+current launch again and writes follow-ups and wake inputs into it.
+
+- Identity: the keeper's PID is its process group and session; the CLI's PID differs and its
+  group is the keeper's. The record stores both identities (PID and start time each, plus the one
+  group); `process_matches` checks both: the turn lives while the CLI matches, and a matching
+  keeper without a matching CLI is a keeper about to exit.
+- Exit code: the runner that started the keeper reaps it and takes the CLI's code from the
+  keeper's. An adopting runner is no parent; it learns the end by polling the identities and reads
+  the wait status from `<launch>.exit`. `exit_label` and the classification of 18.9 use that file
+  in both cases; when it is missing (keeper killed), `exit_label` is `unknown` and the
+  classification uses the stream alone.
+- Stop (18.6): the runner signals the one group of keeper and CLI. SIGINT and SIGTERM reach the
+  CLI and its background tasks (the keeper ignores both), SIGKILL ends all of them, keeper
+  included; "no process of the group is left" stays the end condition. A SIGKILL to the keeper
+  alone closes its write end, so the CLI sees end of input once the runner's end is closed too.
+- The keeper holds no lock descriptor after the fork; whether the CLI's own children inherit the
+  lock descriptors is not read from the CLI and is held by a test of AR-03 against the fake CLI
+  and the real-CLI suite.
+- The promise holds for a service whose stop signals only its own process group or its main
+  process: launchd without `AbandonProcessGroup`, as probed (design note 2.4). Under systemd the
+  default `KillMode=control-group` kills every process of the service's cgroup, the keeper
+  included, because a new session leaves the process group but not the cgroup; the runner unit
+  therefore needs `KillMode=process` (16 10.1). Without it a restart ends the turns as a crash
+  of the keeper does (18.19.9).
+
+#### 18.19.5 Launch handshake
+
+Every process of a run (an attempt: the first one, the compaction, the retry after it,
+`ResumeSameReference`, `NewSession`) starts through the same handshake, and every identity is
+persisted before the CLI runs. `<launch>` is `<runner.state_dir>/turns/<run_id>.<attempt>.<try>`:
+`<attempt>` counts the processes of the run (the first is 1, each recovery process adds one),
+`<try>` counts the launches of that attempt (a launch repeated after a crash adds one). Every file
+of a launch carries this name, so a slow keeper of an earlier try touches only its own files.
+Each step is persisted before the next starts:
+
+1. The runner computes `process_start` (the stream offset where the new process begins) and
+   writes the record in phase `launching` with: the attempt's number and kind (`first`,
+   `compaction`, `retry`, `resume_same_reference`, `new_session`) and what the kind needs to build
+   the command line again (resume flag, `hint`, the session reference, a new reference,
+   `bind_failed`); `<try>`; `process_start`; the run's recovery flags; the run's highest outage
+   number so far (18.19.10); the paths `<launch>.stdin`, `<launch>.keeper`, `<launch>.cli`,
+   `<launch>.exit` and `<launch>.fed`; the initial inputs with their `uuid` (the prompt line of
+   the first attempt, the `/compact` line of a compaction, the unanswered inputs of a recovery
+   attempt in their order with their original `uuid`); `inputs_written = false`;
+   `stdin_closed = false`; `go_sent = false`. It writes the initial inputs to `<launch>.inputs`
+   atomically, creates the named pipe and removes the named pipe of an earlier try.
+2. It starts the keeper with one extra descriptor, the read end of an anonymous launch pipe whose
+   write end only the runner holds (`pass_fds`, every other descriptor closed). The keeper opens
+   the named pipe, writes `<launch>.keeper` (PID, start time) atomically and blocks on the launch
+   pipe.
+3. The runner reads `<launch>.keeper`, checks it with `process_matches`, writes the record with
+   the keeper's identity and `go_sent = true`, and only then writes the go byte and closes its end.
+4. The keeper forks, writes `<launch>.cli` and releases the child (18.19.4 item 2). No CLI runs
+   before a file names it.
+5. The runner reads `<launch>.cli` and writes the record with the CLI's identity in phase
+   `process`.
+6. The keeper writes the initial inputs and then `<launch>.fed` (18.19.4 item 3). The runner
+   writes no follow-up or wake input and does not close stdin before `<launch>.fed` exists; until
+   then they stay queued in the record (D-M2-35-3). It records `inputs_written = true` only after
+   `<launch>.fed` exists. A keeper that ends without `<launch>.fed` may have cut an input in the
+   middle of a line: the runner writes nothing more into that pipe, closes its write end and
+   records `stdin_closed = true`; `inputs_written` stays `false`, and the end of the process is
+   handled as every process end (18.19.6). A keeper that lives without `<launch>.fed` waits on a
+   CLI that does not read; that is a stalled turn (`run.stall_after`), stopped as in 18.6. The
+   runner never writes an initial input itself.
+
+A launch pipe that ends without a go byte makes the keeper start no CLI, write the exit file with
+the label `not_started` and exit; a child whose release pipe ends without a release exits without
+`exec`. The next runner treats a record in phase `launching` by what the files of the recorded
+try show and always continues exactly the recorded attempt (number, kind, command line and
+initial inputs from the record); it never starts the run over from `preparing`, never takes the
+recovery decision that led to the attempt again and never runs an earlier attempt again. Before
+any launch it passes the launch check of 18.19.6:
+
+- `go_sent = false`: no CLI of this try can run. A keeper named in `<launch>.keeper` is awaited
+  until it exits (at most `runner.kill_grace`, then SIGKILL to its group, which holds no CLI); a
+  keeper that has not written the file sees the launch pipe end and exits `not_started` by
+  itself. The runner removes the named pipe of this try and launches the same attempt with
+  `<try>` plus one from step 1.
+- `go_sent = true` and `<launch>.cli` names a live CLI: the turn is adopted (18.19.7); nothing is
+  launched again. With `inputs_written = false` the adopter follows step 6.
+- `go_sent = true`, `<launch>.cli` present and the CLI gone: the process ran and ended; its end
+  follows the adoption rule of 18.19.6, never a second launch of the attempt.
+- `go_sent = true` and no `<launch>.cli`: while the keeper lives the runner waits for the file or
+  the keeper's exit (at most `runner.kill_grace`), then sends SIGKILL to the keeper's group, and
+  only after the group is gone reads `<launch>.cli` once more; that read decides. A file present
+  now counts as a CLI that may have run (the case above); only a file still absent, or the exit
+  label `not_started`, proves that no CLI started and no input was written, and the same attempt
+  is launched again as for `go_sent = false`.
+
+So a crashed runner leaves, in every window of every attempt, either one recorded CLI that the
+next runner adopts, with its initial inputs delivered exactly once, or no CLI and one repeated
+launch of the same attempt; never a CLI that no record names, two CLIs for one attempt, an input
+answered twice, or a preparation or earlier attempt repeated (R-AG-46). An orderly handover in
+phase `launching` before step 3 closes the launch pipe without a go byte; after step 3 it hands
+the turn over like one in phase `process`.
+
+#### 18.19.6 Phases in the record, adoption rule and launch check
+
+With `runner.turn_handover` the turn record is written when the runner accepts a run and carries
+the run's phase: `preparing`, `waiting_lock` (`thread_busy` or `session_busy` wait),
+`transcribing`, `launching` (18.19.5), `process`, or `compaction_retry` (with the retry's input
+and the new session reference). Every record from `launching` on carries the run's recovery
+flags. `preparing` and `waiting_lock` lie before `run.start` (4.9): the run is `queued`, listed in
+`waiting_runs` while it waits, and its inbox entry is `ACCEPTED`; the phases from `transcribing` on
+lie after `run.start`.
+
+A runner that finds a record treats it by phase:
+
+- `preparing`, `waiting_lock`: the record is removed and never used to start the run; the inbox
+  restart of 4.9 prepares the run again, takes the locks and calls `run.start` once. No launch
+  check runs (the run start does its own).
+- `transcribing`: started over from the record after the launch check (no CLI ran for the run).
+- `launching`: the cases of 18.19.5.
+- `process`: adopted (18.19.7); with `inputs_written = false` the adopter follows step 6 of
+  18.19.5.
+- `compaction_retry`: the recorded retry starts through the handshake after the launch check; the
+  decision of `_recover` is not taken again.
+
+A run from `transcribing` on stays in the first heartbeat's `active_runs`, so the server never
+sees it lost; a run in `preparing` or `waiting_lock` stays `queued` until its single `run.start`;
+a wake run caught in any phase keeps its chain (5.8.6).
+
+Adoption rule (R-AG-47): with `runner.turn_handover`, the end of a process that the runner did not
+start itself is handled exactly like the end of its own, whatever the phase (`launching` with a
+recorded CLI, or `process`), whether the CLI ended while no runner ran or under the adopter, and
+whether the turn came by a handover or after a crash. The runner classifies the end from the
+stream (replayed and read lines) and `<launch>.exit`; then `_recover` may pick the next attempt
+with the next attempt number, within its once-per-run limits (the flags `compacted`,
+`session_replaced`, `session_resumed`), which the record proves: the recovery flags are part of
+the next attempt's `launching` record, written before its keeper starts, so a kind is never used
+twice. When `_recover` picks nothing, the run finishes by the classification, and lost work leads
+to 18.19.9. A runner that died after an attempt ended and before the next `launching` record
+leaves the record in `process` with the CLI gone; the next runner takes the recovery decision
+then. Unchanged: a live turn whose run the server already ended is stopped as in 18.6 without a
+finish and without a new process; an ended process of a run the server already ended gets no
+finish, no `_recover` and no new process, only 18.19.9 through `run.wake.recover`; a record
+without a named pipe (written without `runner.turn_handover`) is adopted as 18.9 says and finished
+once without recovery. The fallback hangs on the record's named pipe, not on `process_start`,
+because every record of the ledger carries `process_start` (issue 556 item 4). This amends 18.9
+for records with a named pipe; "a process keeps its kind, so an adopted compaction is never posted
+and never completes the run" stays true, because the retry after it is a new attempt.
+
+Launch check (R-AG-48): before a runner launches any process of a run it did not accept itself (a
+repeated try, the next attempt by the adoption rule, the retry of `compaction_retry`, a start over
+from `transcribing`), it calls `run.launch.check` (5.8.4), and the server checks the current state:
+the run is still `running`; its person still has `trigger` on the agent in the channel and the
+agent is still allowed there; the billing mode rules of 10; for tool class `host`, the agent's
+`tool_class` is still `host` and SR2 holds for that person. The runner also compares its own
+actual tool class and billing mode with the answer (`compare_actual`). Only on allow does it
+launch; the pre-check of a recovery process (18.9) still runs. A refusal launches nothing,
+finishes the run `failed` with the reason of the failed check (log code `launch_check_refused`),
+and lost work leads to 18.19.9; a refusal because the server already ended the run finishes
+nothing and leads to 18.19.9 through `run.wake.recover`. When the server cannot be reached, nothing
+launches, the check is tried again with backoff, and the run stays in `active_runs`.
+
+#### 18.19.7 Adoption with full rights and the replay of per-turn state
+
+The adopting runner gets stdin of a turn whose record has a named pipe and `stdin_closed =
+false`, and whose process is not a compaction (its stdin closed after `/compact`): it reads the
+stream, keeps the live box, writes follow-ups (the last clause of D-M2-35-3 no longer applies to
+such a turn) and wake inputs, applies the stdin rule of 18.5 and the stop after an error, and at
+the end of the process applies the adoption rule of 18.19.6. Every place that closes stdin
+records `stdin_closed = true` before it closes, so an adopter never accepts follow-ups into a
+closed stdin (issue 556 item 2). A turn with `stdin_closed = true` or a compaction is adopted with
+reading rights only; its follow-ups stay `queued` and the server defers them (section 7).
+
+Every value that the stdin and stop rules read and that stream lines produce lives in one object
+per process, `ProcessState`, whose `apply(message, now)` is the only writer; the live read and
+the replay call the same `apply`. It holds:
+
+- `BackgroundWork`: running tasks with `seen`, `turn_open`, `last_line_at` and queued inputs;
+- `last_result_at`: a `result` without a queued input sets it, `command_lifecycle` `started`
+  clears it;
+- the failure mark with the count of running tasks: set once by an error `result` read while the
+  usage mark is clear; the adopter's read applies it like an own turn's (the `own` gate becomes
+  "the turn has stdin");
+- the task list with each task's id and description from `system/background_tasks_changed`
+  (18.19.9);
+- the usage mark with `resetsAt`, `rateLimitType`, the outage number and whether the outage's
+  wake-up was requested; the usage error mark (18.19.10);
+- the nudge mark (18.19.11): the nudge is an input line whose `uuid` is in the record's input list
+  before it is written, flagged as the nudge, so its echo restores "nudged in this waiting phase";
+- the idle flag and the autonomous-input count of the current input (5.8.6).
+
+The ledger's part of the record (`TurnLedger.to_record` and `from_record`) carries
+`process_start`, set when the process starts and never moved by a checkpoint, so every adopter
+writes it again. The adopter first replays the lines from `process_start` to the record's `offset`
+through `ProcessState.apply` only, then reads on from `offset` as today. The replay posts nothing,
+patches nothing, plans no answer and moves no offset. Replayed lines get the adoption time as
+their read time, so the quiet window of `holds()`, the window of `stdin_close_due` and the stop
+grace after an error start again at the adoption: stdin is held longer, never shorter, and a
+failed turn is stopped at most `runner.stop_grace` later than by the old runner. Lines of earlier
+processes of the run (before `process_start`) are never replayed. The outage number of the
+attempt starts from the value in its `launching` record, in the live read and in the replay alike
+(issue 556 comment). A rule that later reads a new stream-derived value gets it in `ProcessState`
+and is fed by the replay by construction; AR-T02 compares the sequence of stdin and stop decisions
+of the adopter with the old runner's for every recorded fake stream and every checkpoint
+position, so a value kept outside the object fails the test (issue 556 item 3).
+
+#### 18.19.8 Wake-ups from a turn: `bothy-wake`
+
+With `runner.wakes` the runner puts a folder with the command `bothy-wake` first on the turn's
+cleaned `PATH` (owned by the runner user, not writable by group or others) and adds
+`Bash(bothy-wake:*)` to `--allowedTools` under `scoped`; for a hosted agent (18.18) the runner adds
+the entry after the intersection of 26 4.4, because the command is the runner's, not the
+definition's. The turn also gets `--disallowedTools CronCreate CronDelete CronList ScheduleWakeup
+RemoteTrigger` (under `chat` merged into its existing `--disallowedTools` list), so the agent
+cannot set a timer that dies with the process. Tool class `chat` has no Bash and cannot request
+wake-ups; its sessions continue only through recovery and usage-window wake-ups and replies.
+
+Command forms: `bothy-wake --after <duration>`, `--at <time>` (local time of the runner host,
+today or the next day; a full ISO 8601 time is also accepted), `--pr <owner>/<repo>#<number>`,
+`--until-success '<command>'`, each with optional `--label <text>` and `--deadline <duration or
+time>`; `bothy-wake --list` and `bothy-wake --cancel <id>` work on the thread's wake-ups. The
+command writes a request file into the run's request folder
+`<runner.state_dir>/wake-requests/<run_id>/` (mode `0700`, outside every working folder), named
+by a fresh UUID, holding the request and the run's nonce; it learns folder and nonce from the
+variables `BOTHY_WAKE_DIR` and `BOTHY_WAKE_NONCE` that the runner sets for that turn only. The
+runner accepts a request only when the nonce equals the nonce it generated for that run, so one
+turn cannot file wake-ups for another run. The runner sends `run.wake.create` with the run's agent
+token and writes the answer file next to the request; the command waits for it at most
+`runner.wake_request_timeout` and prints the wake-up's id and fire time (exit 0), the refusal
+with its reason (exit 1), or "accepted, not confirmed" when the server could not be reached and
+the request waits in the SDK outbox (exit 0). A request the outbox sends later carries
+`deferred: true`; when the server refuses it (for example because the source run has ended in the
+meantime), it stores the wake-up directly in state `refused` with the reason, so the person sees
+the note and the notification of 5.8.4 although the turn was told "accepted, not confirmed". The
+token never reaches the turn.
+
+Condition checks (`pr_checks`, `command`): the runner learns every pending wake-up of its agents
+from `run.wake.list_pending` at start and after every reconnect, and new, cancelled and expired
+ones from `run.wake_changed` in between (5.8.5). For a hosted agent the runner calls
+`run.wake.list_pending` with that agent's connection. It evaluates each pending `pr_checks` and
+`command` wake-up every `runner.wake_check_interval`, the first time no earlier than its
+`not_before`, with at most `runner.wake_checks_max_parallel` checks at once. Before every
+execution of a `command` and every `gh` read of a `pr_checks` it calls `run.wake.check` and
+compares its own actual tool class with the answer; only on allow does it run the check, once.
+When the server cannot be reached nothing runs, and the attempt counts as a failure.
+
+- `pr_checks`: `gh pr view <number> --repo <owner>/<repo> --json headRefOid` and `gh pr checks`
+  with the host user's `gh` login, read only, with the environment of 18.2. The wake-up fires
+  when the pull request's current head commit has at least one check and none is pending; the
+  result text names the head commit, whether it differs from the head recorded at create, and
+  each check's name and conclusion. A head without checks does not fire (a push may not have
+  registered its checks yet).
+- `command`: the command line runs through `/bin/sh -c` in the turn's working folder (18.1), in
+  its own process group, with the environment of 18.2 for the run's tool class and mode, without
+  the lock descriptors, with stdin from `/dev/null`, at most `runner.wake_check_timeout` (then
+  SIGTERM, after `runner.kill_grace` SIGKILL to its group). Exit code 0 fires the wake-up; the
+  result text is the last `runner.wake_result_max_bytes` of stdout and stderr together, cut at a
+  UTF-8 boundary, without control or bidi characters. Any other end is a normal "not yet".
+- A check that cannot run (`gh` missing or failing, a spawn error, a timeout, the server
+  unreachable) counts as a failure; failures back off from `runner.wake_check_interval` up to ten
+  times that value, and after `runner.wake_check_failures` failures in a row the runner fires
+  nothing and ends the wake-up with `run.wake.fire` outcome `failed` and the reason of the last
+  failure (5.8.3). A successful check resets the count.
+- At a handover or stop the runner stops its running checks (SIGTERM to their groups, SIGKILL
+  after `runner.kill_grace`); the next runner runs them again from the pending list. A check
+  holds no state of its own.
+
+Durable CLI crons (`durable: true`, `.claude/scheduled_tasks.json` in the working folder) written
+by an earlier session are not removed by `--disallowedTools CronCreate`; with `runner.wakes` the
+runner logs `durable_cron_present` once per run when such a file exists in the working folder and
+names it in the live box, and AR-05 decides with a test whether the pinned CLI fires them in a
+print turn.
+
+#### 18.19.9 Lost work and recovery runs
+
+With `runner.wakes`, when a turn ends with background tasks that did not finish, the runner calls
+`run.wake.recover` with reason `recovery` for the run (5.8.4), within the autonomy rules of 5.8.6.
+The cases:
+
+- the next runner finds a recorded turn whose process is gone and starts no further attempt for
+  it (the adoption rule finds no recovery, or the record was written without
+  `runner.turn_handover`); for a run the server still shows `running` and that has no `result` or
+  decided end to finish by, the runner first finishes it `failed` with the cause `runtime_error`
+  and the summary code `turn_lost`, so `run.wake.recover` finds an ended run and the thread does
+  not wait for `agent.presence_timeout`;
+- adoption finds a live turn whose run the server already ended (`stale` after
+  `run.orphan_timeout`, `interrupted`, or ended otherwise) and stops it (18.9);
+- an error `result` was followed by the stop of 18.5;
+- the CLI wrote its background ceiling line ("Background tasks still running after ...");
+- a second `context_full` ended the run;
+- the keeper was killed, or stdin was closed after a broken input write (18.19.3), and the CLI saw
+  end of input.
+
+The recovery run starts with a text that lists each lost task (id, kind, description, how it
+ended) and says that nothing was run again. Without permission (5.8.6) the thread gets the visible
+note instead (log code `recovery_wake`, refused). The recovery run is a new run that only informs
+the agent; the agent decides what to do again (R-AG-17 as amended, R-AG-53).
+
+#### 18.19.10 The usage window of the account
+
+The stream reader knows `rate_limit_event` (added to its known types). A frame whose
+`rate_limit_info.status` is `rejected` while `overageStatus` is neither `allowed` nor
+`allowed_warning` marks the turn usage-limited until the frame's `resetsAt`, with its
+`rateLimitType`; a later frame with `status` `allowed` or `allowed_warning` clears the mark. A
+`status` outside `allowed`, `allowed_warning` and `rejected` is logged (`usage_status_unknown`)
+and treated as allowed. `allowed_warning` changes nothing but the log (`usage_warning`) and a hint
+in the live box. While the mark is set:
+
+- an error `result` is a usage error: it sets the usage error mark, never the failure mark, is
+  classified `usage_limited`, and never leads to the stop of 18.5 after an error, also not after
+  the mark clears; stdin stays open by the background rule, the process stays held, the run stays
+  `running`, and the process ends on its own when its tasks end. An error `result` after the mark
+  cleared is an ordinary error again;
+- each outage gets one wake-up. An outage starts at a `rejected` frame that sets the mark while it
+  is clear and ends when a later frame clears it; the outage number counts per run across attempts
+  (the `launching` record of each attempt carries the highest number reached before it, 18.19.5).
+  At the outage's first such frame the runner calls `run.wake.create` with kind `at`, reason
+  `usage_limit`, `not_before = resetsAt + run.wake_min_delay` and the outage number as
+  idempotency key, within 5.8.6; a later `rejected` frame of the same outage with a later
+  `resetsAt` repeats the call with the same key, which moves `not_before` of the pending wake-up.
+  When the mark clears while the outage's wake-up is pending, the runner cancels it (reason
+  `usage_cleared`). If the process is still held when the wake-up fires, it arrives as a wake
+  input (5.8.3) that tells the agent the window has reset; otherwise it starts a wake run that
+  resumes the session;
+- the live box and the thread show "Usage limit of the account reached; continues at <time>", or,
+  without permission, that a reply after the reset continues;
+- when the process ends while the mark is set, or with a usage error as its last error `result`
+  and no later answer, the run ends `failed` with the reason `usage_limited`, its `summary`
+  carrying `resetsAt` and whether a wake-up is pending. A runner that learns of the mark only
+  after the run ended (a restart in between, the frame read from the stream file) calls
+  `run.wake.recover` with reason `usage_limit` instead.
+
+The classification keys on the frame, not on the `result` text, because the text is built by the
+CLI from parts and is not fixed (18.19.12). A rejected request that ends a turn without a
+preceding `rejected` frame ends `runtime_error` as today, and lost work leads to 18.19.9.
+
+#### 18.19.11 End state of every run
+
+With `runner.end_state` the runner prompt requires a last line `STATE: done`, `STATE: waiting` or
+`STATE: blocked` in every answer, handled like `TITLE:`: the runner removes it from the posted text
+and stores the value in the run's finish summary (`end_state`). `done`: nothing more to do;
+`waiting`: more work after something happens; `blocked`: needs a person. A missing or malformed
+marker counts as `waiting`.
+
+When the runner is about to close stdin at a `result` without error and no task runs, it reads
+the state. For `waiting` with no pending wake-up of the thread (from `run.wake.list_pending` and
+`run.wake_changed`, 18.19.8) it writes one input line into the still open stdin: "You said you
+are waiting, but nothing will wake you: start a background task, request a wake-up with
+bothy-wake, or end with STATE: done or STATE: blocked." If the next `result` still leaves `waiting`
+with nothing pending and no task running, stdin closes and the thread gets the note "Ended
+waiting, but nothing will wake this thread" (log code `continuation_without_wake`). A waiting
+phase starts with an input of a person (the run's prompt or a follow-up) or a wake input; there is
+at most one nudge per phase, and notification turns and the answer to the nudge stay in the phase.
+The answer to the nudge is posted like a follow-up answer. For `chat` the nudge is skipped and the
+note follows at once. Every finished run's summary carries `end_state` and whether a wake-up is
+pending and when (`wake_pending_until`); clients show both (01 6.21).
+
+#### 18.19.12 Time limits and the pinned CLI
+
+The runner itself has no limit on run duration, turns or budget, and the server has none for a
+running run; this stays so. `runner.cli_bg_wait_ceiling`, when set, is passed as
+`CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS` in milliseconds; the environment allow list of 18.2 names
+the variable. With the handover the ceiling applies only when the runner itself closes stdin while
+tasks run, which happens only after an error `result` and is followed by the stop of 18.5 anyway.
+
+Read from the files of the pinned CLI 2.1.288 on 2026-11-06 (strings and `--help`, no session, no
+model call; design note sections 2.3, 3 and 12):
+
+| Point | Finding |
+|---|---|
+| Background ceiling after end of input | `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS`, default 600000 ms, counted from the first idle moment after input closed; `0` waits without a limit; at the ceiling the CLI writes "Background tasks still running after <n>s; terminating." to stderr and stops background shells, agents and workflows |
+| Sweep of background shells | after input closed, with no queued input and no pending notification, the CLI stops background shells after a grace of 5000 ms unless a background agent, a workflow or an armed Monitor also runs; a plain background shell alone is therefore never held to the ceiling (design note backlog item 2) |
+| Session crons and `ScheduleWakeup` | a fire is dropped while input is closed (the fire handler returns, the scheduler counts as loading); recurring tasks expire after 604800000 ms (7 days) by default, firing a last time; durable tasks live in `.claude/scheduled_tasks.json` |
+| Monitor | default timeout 300000 ms, maximum 3600000 ms, or `persistent` for the session's life |
+| Stop hook block cap | `CLAUDE_CODE_STOP_HOOK_BLOCK_CAP`, default 8 consecutive blocks |
+| Bash timeouts | `BASH_DEFAULT_TIMEOUT_MS` default 120000 ms, `BASH_MAX_TIMEOUT_MS` default 600000 ms |
+| Max turns | no limit unless `--max-turns` or `CLAUDE_CODE_MAX_TURNS` is set; the runner sets neither |
+| API timeout | `API_TIMEOUT_MS` default 600000 ms per request |
+| Hooks of the host user | the runner passes no `--setting-sources` and no `--bare`, so the user, project and local settings of the runner's host user load, their hooks included; a hook reaches every runner turn of that user (`CLAUDE_PRODUCT_RUN=1` lets it recognise one, 18.5) |
+| Usage limit frame | `rate_limit_event` is written by a listener on the CLI's rate-limit state, which the CLI updates from the response headers of every request, a refused one included (`anthropic-ratelimit-unified-status: rejected`, with `retry-after` when no overage takes over); the frame is therefore queued when the refused answer is read, before the turn's error `result`. Not run with a real session |
+| Usage limit `result` text | built from parts (for example "You've hit your" with "session limit", "weekly limit", "Opus limit", "Sonnet limit" and the reset time); not a fixed text, so 18.19.10 keys on the frame |
+| Rate-limit scenarios | the strings hold a mock with scenarios such as `session-limit-reached` and `weekly-limit-reached` behind an internal command `mock-limits`; no caller of it is reachable in the released build, so a free real-CLI check cannot use it. AR-06 captures the frame and the `result` against a local stand-in for the API that answers 429 with these headers (the method of `tests/real_cli/captured`), which needs no login and costs nothing |
+| `--disallowedTools` under `bypassPermissions` | `bypassPermissions` "auto-approves every tool call (except explicit deny rules)"; a bare tool name in `--disallowedTools` is a deny rule and removes the tool; AR-05 confirms the tool list of `system/init` against the local API stand-in |
+| `Bash(bothy-wake:*)` with an environment prefix | the CLI strips only a fixed list of safe variables (for example `LANG`, `TZ`, `NO_COLOR`; not `PATH` or `TMPDIR`) before matching a prefix rule; any other prefix makes the command need approval, which `dontAsk` refuses. A safe prefix runs `bothy-wake` itself, so no other program can run under the rule |
+| Named pipe as stdin | not read from the CLI; the probe of the design note 2.4 used a fake CLI. AR-03 runs the pinned CLI with a named pipe against the local API stand-in |
+
+The point "whether the CLI's children inherit the lock descriptors" is not read from the CLI
+(18.19.4). Every finding above is checked again when the pin moves (`test_pinned_cli.py`).
+
+Limits and their decision (design note section 3): the CLI background ceiling and shell sweep
+are made irrelevant (stdin closes only when no task runs, and a restart no longer closes it);
+session crons and `ScheduleWakeup` are replaced by wake-ups and disallowed; the Monitor timeout,
+`runner.followup_grace`, `runner.stop_grace` after an error (except after a usage-window end),
+the compaction once per run (per attempt kind, 18.19.6), `run.queued_max_age`,
+`agent.invocation_token_ttl`, `run.stall_after`, the slot wait and the service's exit timeout are
+kept; `runner.session_lock_wait` is irrelevant for handed-over turns, and a wake-up never starts a
+second run in a thread (5.8.3); `agent.presence_timeout` is kept because the handed-over turn is
+in the next runner's first heartbeat; `run.orphan_timeout` is kept and followed by a recovery run.
+A hosted agent's `--max-budget-usd` (26 5.3) ends a run visibly with its cap; `disableWorkflows`
+of the hosted settings removes workflows and adds no time limit. New limits are named keys and
+visible when they end work: `run.wake_max_pending`, `run.wake_max_wait`, `run.wake_min_delay`,
+`run.usage_wake_max`, `run.autonomous_chain_max`, `run.autonomous_idle_max` (5.8) and
+`runner.wake_check_failures`.
+
+#### 18.19.13 Tests
+
+Runner scenarios with a real runner process and the fake Claude of 16.1; server tests against
+PostgreSQL. Each test asserts what is stored, logged and shown.
+
+| No. | Scenario | Expected |
+|---|---|---|
+| AR-T01 | SIGTERM to a runner with a live turn, `runner.turn_handover` off | the turn is stopped, `stop_escalated` logged, the run ends `cancelled` with `adapter_stopped`; the record is removed only after the process exited; no process of the group is left |
+| AR-T02 | With the key: the runner in its own process group, SIGTERM (exit 75), then SIGKILL to that whole group; a new runner adopts. The fake CLI (`background_survives_eof`) starts a background job whose `background_tasks_changed` lies before the stored offset; after the restart a follow-up and a wake input run while the job runs; then the job's gate opens | keeper and CLI alive; each input is echoed and answered and its `result` leaves stdin open; the fake records no end of input before the job's notification turn; the adopter's stdin and stop decisions equal the old runner's for every recorded fake stream and checkpoint position; nothing replayed is posted again; the run is in the first heartbeat's `active_runs`; no heartbeat after the handover began. Variants: (a) two restarts in a row, `process_start` unchanged; (b) restart inside the quiet window with no later input: stdin closes `runner.followup_grace` after the adoption and the run completes; (c) an error `result` while the job runs before the checkpoint: the adopter stops the group `runner.stop_grace` after the adoption, logs `turn_stopped_after_error` with the lost task; (d) a turn whose stdin was closed before the handover and a compaction process are adopted with reading rights only; macOS variant under a scratch launchd job (AR-09) |
+| AR-T03 | SIGKILL of the runner; SIGKILL of the keeper; the CLI ends on its own in the starting and in an adopting runner | adoption as AR-T02; after the keeper kill the lost tasks are counted and a recovery run or the note follows; the keeper exits with the CLI's code, `<launch>.exit` carries the wait status, `exit_label` and the classification equal today's; the 18.6 stop leaves no process of the group |
+| AR-T04 | Handover in each phase (`preparing`, `waiting_lock`, `transcribing`, `compaction_retry`), and a runner killed at a test-only crash point after every step of 18.19.5 at the launch of every attempt kind, also between an attempt's end and the next `launching` record; a keeper that writes `<launch>.cli` after the runner's last look; a keeper killed before `<launch>.fed`; a CLI that stops reading inside an initial input larger than the pipe buffer; an outage in attempt 2, then a handover | `preparing` and `waiting_lock` restart through the inbox with exactly one `run.start` and no launch check; the fake CLI starts at most once per attempt and exactly once after the run completes; every initial input arrives exactly once with its `uuid` and before any follow-up; no unnamed keeper group is left; an adopted process that fills its context is compacted and retried within the once-per-run limits (a used compaction ends `runtime_error`); a record without a named pipe is adopted as 18.9 says; the adopter requests no new outage number; launch check refusals (tool class lowered, `trigger` lost, run already `stale`) launch nothing and log `launch_check_refused`; with the server unreachable nothing launches |
+| AR-T05 | A runner returns after `run.orphan_timeout` with a live turn | adoption stops it; a recovery run or the note follows through `run.wake.recover` |
+| AR-T06 | `bothy-wake --after`, `--at`, `--pr`, `--until-success` | stored, listed, fired once; the wake run resumes the same session and its first input names label and result |
+| AR-T07 | A wake-up of each kind created before a runner restart and before a crash | fires after it; every pending one is known from `run.wake.list_pending`, so a `waiting` end after the restart gets no nudge; a cancel during the outage arrives through `run.wake_changed` |
+| AR-T08 | Error paths of wake-ups | server unreachable at create ("accepted, not confirmed", sent from the outbox later with `deferred: true`); the source run ends before the outbox sends: the create is refused and stored `refused`, note and notification; create refused (not allowed, pending cap, `command` below `host`, `pr_checks` by a non-owner: nothing stored, exit 1, `wake_refused`); a failing check (`gh` missing) backs off and ends `failed` after `runner.wake_check_failures` with note and notification; `run.wake.check` refused between two executions (person lost `trigger`, tool class below `host`, SR2 fails, channel archived, `pr_checks` person no longer owner): the command does not run again, the wake-up ends `refused` with the reason, audit entry, `wake_check_refused`, note and notification; a `pr_checks` of an owner's `scoped` run passes; server unreachable before an execution: nothing runs; fire refused (`trigger` lost, channel archived, chain cap): `refused`, note, notification; deadline: `expired`, note; runner offline at fire time: the run waits `queued`; cancel by the person: `cancelled`, no run |
+| AR-T09 | A wake-up fires into an active run of the same person; each failed check (run, thread, wake, person, billing mode, tool class, expired token); an active run of another person | one input line with its token; a failed check skips it with `wake_input_check_failed` and the wake-up returns to `pending`; another person's run keeps it `pending` until the run ends |
+| AR-T10 | Command line with `runner.wakes` | the five timer tools in `--disallowedTools`; without the key byte-equal to today's fixture |
+| AR-T11 | Usage window with a synthetic `rejected` frame (`overageStatus` `rejected`), an error `result`, a running task | the task is not stopped, the run stays `running`; `run.wake.create` once with `usage_limit` and `not_before` after `resetsAt`; the run ends `usage_limited` when the task ends; without permission no wake-up and the note. Variants: fire while held (one wake input); `overageStatus: allowed` changes nothing; an unknown `status` logs `usage_status_unknown` and sets no mark; an `allowed` frame clears the mark and cancels the pending wake-up, and no stop follows after `runner.stop_grace`; repeated frames of one outage call once with the same number; a second outage gets a new wake-up; a compaction attempt with a second outage gets the next number; at `run.usage_wake_max` the next is `refused` with the note; the mark found after a restart leads to `run.wake.recover`; a frame before the checkpoint is restored by the replay; `allowed_warning` changes only the log |
+| AR-T12 | End state | `STATE: waiting` with nothing pending gets exactly one nudge; a second such `result` closes stdin with the note and `continuation_without_wake`; a notification turn after the nudge gets no second nudge, a new follow-up or wake input starts a new phase; a handover between nudge and answer keeps the nudge mark; a missing marker is `waiting`; `done` and `blocked` close stdin as today; the summary carries the state; the marker is never posted |
+| AR-T13 | Chain cap | a held run with repeated wake inputs and a sequence of wake runs both stop at the cap, counting inputs; a reply of the same person resets the count, a message of another person does not; `0` means no chain cap |
+| AR-T14 | Idle cap and delay | three autonomous inputs without tool calls other than `bothy-wake` end the chain, also with chain cap `0`, as wake runs and as wake inputs; a held process whose notification turns only restart a background `sleep` stops at the idle cap with stdin closed and the note; `--at` in the past, `--after 0` and `--until-success true` fire no earlier than `run.wake_min_delay` |
+| AR-T15 | `runner.cli_bg_wait_ceiling` | reaches the turn's environment only when set |
+| AR-T16 | None of the new keys set | command line, environment, heartbeat and stdin handling byte-equal to today's fixtures |
+
 ## 19. Decisions of this chapter
 
 | No. | Decision | Reason |
@@ -3881,7 +4607,7 @@ Details the build settled (A1-04, `docs/decisions.d/A1-04.md`):
 | R-AG-14 | Autocomplete never calls a model and answers empty after the timeout. | Typing costs nothing and never hangs. |
 | R-AG-15 | Placeholder detection at creation decides `auto` or `manual`. | Real titles are never overwritten, placeholders are. |
 | R-AG-16 | Voice input: the agent transcribes, otherwise the server port, otherwise a visible rejection. | No silent loss of a voice message. |
-| R-AG-17 | No automatic retry after `interrupted`, `stale`; button "Send again". | Side effects of the runtime must not happen twice. |
+| R-AG-17 | No automatic retry after `interrupted`, `stale`; button "Send again". Amended 2026-11-06 (AR-01, D-AR-01-6): the recovery run of 18.19.9 is a new run that only lists the lost work and repeats nothing; the next attempt of an adopted run by the adoption rule of 18.19.6 is no retry of an `interrupted` or `stale` run (the run is still `running`) and repeats no answered input. | Side effects of the runtime must not happen twice; informing the agent repeats none. |
 | R-AG-18 | Hermes: tool display as run steps, drafts into the box, replies as a message only when finished. | No flood of revisions, one live box instead of progress bubbles. |
 | R-AG-19 | Hermes: allowlist in the adapter from the server; Hermes' own list only with `personal`. | Three layers without a restart on every grant. |
 | R-AG-20 | Runner: reported mode by a pre-check with a controlled environment, `apiKeySource` only as a cross-check. | `apiKeySource = none` does not distinguish subscription and other ways. |
@@ -3908,6 +4634,18 @@ Details the build settled (A1-04, `docs/decisions.d/A1-04.md`):
 | R-AG-42 | Every adapter hands its runtime the format rules for replies of the Python SDK on every run, as an instruction ([ADR 0074](../adr/0074-format-rules-for-agent-replies-from-the-sdk.md)). | One source for all adapters; the apps render Markdown, and a reply with hard line breaks or a hand-drawn table looks broken there and copies badly (F-AGENT-FORMAT). |
 | R-AG-43 | The Claude Code runner hosts built-in agents (`adapter_kind = 'claude_agent'`) behind `runner.hosted_agents`, reports the capability `hosts_agents` with its class ceiling, and runs their turns from their definitions as 26 says (2.2, 18.18, addendum of 2026-11-06). | Owner request 2026-11-05: an agent created inside Bothy runs on local Claude without a second runtime; the runner already speaks the adapter contract ([ADR 0076](../adr/0076-built-in-agents-hosted-by-the-claude-code-runner.md)). |
 | R-AG-44 | A Hermes run holds the background work its turns started: it stays `running` with a step per delegation unit and process until the work is done, the turn Hermes starts with a result runs inside it, stop cancels the work, and no tool runs in a thread without an open run (17.12, addendum of 2026-11-06). | Owner rule 2026-11-06: nothing an agent does may run without being visible; live use showed subagents working for half an hour and a result turn changing a scheduled job while the app showed no run and no stop button (docs/decisions.d/FIX-hermes-hidden-background.md). |
+| R-AG-45 | A restart of the Claude Code runner never ends a turn unless asked: with `runner.turn_handover` SIGTERM hands every live turn over and exits 75, and only `claude-code-runner stop --turns` or a run stop ends turns (18.19.3, addendum of 2026-11-06). | Owner request 2026-11-06: a session keeps working as long as it has work; an update is routine and must cost nothing ([ADR 0077](../adr/0077-autonomous-runs-wake-ups-and-turn-handover.md)). |
+| R-AG-46 | No CLI starts before the record names its keeper and the keeper's identity file names the CLI; every attempt of a run starts through the launch handshake (18.19.5). | A crash in any window leaves one recorded CLI or none, never a CLI that no record names or an input answered twice. |
+| R-AG-47 | An adopted process ends like an own one: classification, then `_recover` within the once-per-run limits the record proves (18.19.6). | The result must not depend on the moment of a restart. |
+| R-AG-48 | A runner that did not accept a run launches no process of it before `run.launch.check` allowed it with the person, tool class, billing mode and SR2 of that moment (18.19.6). | Rights may change while no runner runs. |
+| R-AG-49 | A wake-up is a server record and fires only with the checks of a new run; a fire into an active run of the same person is a wake input with its own token and checks (5.8). | Only the server can start a run, issue its token and apply the trigger and billing rules at fire time; a wake-up has no message to check. |
+| R-AG-50 | A `command` check runs on the host only after the person, tool class and SR2 checks of that moment, a `pr_checks` read only after the person and owner checks of that moment (`run.wake.check`); a refusal ends the wake-up `refused` with note and notification (5.8.3). | A pending check runs agent-supplied code long before the fire. |
+| R-AG-51 | Every end of a wake-up other than `fired` is visible in the thread (5.8.4). | No silent end (design note goal (a)). |
+| R-AG-52 | Autonomous inputs need an owner or the channel switch `allow_autonomous_runs` and stop visibly at the chain cap and the idle cap, counted per thread and person (5.8.6). | Autonomous work spends money or quota without a person present. |
+| R-AG-53 | Lost background work leads to a recovery run that lists it, or to a visible note, never to a silent end (18.19.9). | The owner wants work to go on after a loss; repeating side effects blindly stays forbidden. |
+| R-AG-54 | A usage-window end keeps the run's background work and wakes the thread at the reset (18.19.10). | A session that runs on reaches the window by construction. |
+| R-AG-55 | Every run end carries the agent's end state and whether a wake-up is pending; a `waiting` end with nothing pending gets one nudge and then a visible note (18.19.11). | Freedom from silent ends as a data field, not a text heuristic. |
+| R-AG-56 | Without `runner.turn_handover` an orderly stop of the runner stops its live turns as in 18.6 and finishes their runs `cancelled` with `adapter_stopped`; it never orphans a turn (18.19.2). | Reproduced: SIGTERM left an orphan that held the locks and lost its work at the CLI's background ceiling, against 18.2 "Detachment". |
 
 ## 20. Alignment with the core contract
 
@@ -3961,6 +4699,13 @@ configuration of the respective program outside the server.
 | `component.form_max_fields` | Server | `10` | fields per form |
 | `project.binding_text_max_chars` | Server | `512` | longest `workspace_ref`, `repository_url`, `default_branch`, `runner_config.model` and tool name of a project binding in Unicode characters; 512 characters of at most 4 bytes in UTF-8, also after `lower()`, stay below the PostgreSQL B-tree entry limit of the unique index on `lower(workspace_ref)`, so an over-long reference is a field error, never an internal error (maximum `600`) |
 | `agent.session_ref_max_bytes` | Server | `1024` | longest `external_session_ref` and longest `model` of a session in bytes (bind, report, `run.start`; over it `too_long`); the maximum `2048` keeps an entry of the unique index on `(agent_id, external_session_ref)` within the PostgreSQL B-tree index entry limit, so an over-long reference is a field error, never an internal error |
+| `run.wake_max_pending` | Server | `5` | pending wake-ups per thread; a further create is refused with `wake_max_pending` (5.8.6, stage AR) |
+| `run.wake_max_wait` | Server | `7d` | longest time from creation to the deadline of a wake-up, for a `usage_limit` wake-up from its `not_before`; the expiry posts a note (5.8.1) |
+| `run.wake_min_delay` | Server | `60s` | earliest fire and first check of every wake-up after its creation (5.8.6) |
+| `run.usage_wake_max` | Server | `20` | usage-limit wake-ups per run, every state counted; above it `refused` with a note (18.19.10) |
+| `run.wake_label_max_chars` | Server | `120` | longest label of a wake-up in Unicode characters; longer is `too_long` (5.8.1, 03 `run_wakes`) |
+| `run.autonomous_chain_max` | Server | `25` | consecutive autonomous inputs per thread and person; `0` means no chain cap; at the cap `refused` with a note (5.8.6, ruling D-AR-01-1) |
+| `run.autonomous_idle_max` | Server | `3` | consecutive idle autonomous inputs per thread and person; minimum `1`, cannot be switched off (5.8.6) |
 | `thread.placeholder_titles` | Server | `["Neuer Chat", "Chat", "Ohne Titel", "Test", "New chat", "Untitled"]` | placeholders for the title detection; the empty title is always a placeholder (12 point 2), a list entry is never empty |
 | `adapter.invocation_token_leeway` | Adapter | `10s` | clock tolerance for `exp` and `iat`; at most the server's `auth.clock_leeway` (4.5) |
 | `adapter.jwks_refresh_min_interval` | Adapter | `60s` | reload JWKS at most this often |
@@ -4010,6 +4755,16 @@ configuration of the respective program outside the server.
 | `runner.session_lock_wait` | Runner | `10m` | wait time for a busy session |
 | `runner.max_parallel_runs` | Runner | `4` | concurrent turns |
 | `runner.stream_log_retention` | Runner | `14d` | retention of the recordings |
+| `runner.turn_handover` | Runner | `false` | keeper, named pipe, launch handshake and handover at a restart (18.19.3 to 18.19.7); reports `turn_handover` |
+| `runner.wakes` | Runner | `false` | `bothy-wake`, condition checks, wake inputs, recovery and usage-window wake-ups (18.19.8 to 18.19.10); needs `runner.turn_handover`; reports `wakes` |
+| `runner.end_state` | Runner | `false` | the `STATE:` marker, the nudge and the note of 18.19.11 |
+| `runner.cli_bg_wait_ceiling` | Runner | empty | passed as `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS` when set; empty means the CLI's built-in default (18.19.12) |
+| `runner.wake_check_interval` | Runner | `60s` | interval of the checks of a pending `pr_checks` or `command` wake-up; failures back off up to ten times this value (18.19.8); above zero |
+| `runner.wake_check_timeout` | Runner | `5m` | time limit of one `command` check or `gh` read (18.19.8); above zero |
+| `runner.wake_checks_max_parallel` | Runner | `2` | checks of wake-ups running at once (18.19.8); at least `1` |
+| `runner.wake_check_failures` | Runner | `10` | failures in a row after which a check wake-up ends `failed` with a note and a notification (18.19.8); at least `1` |
+| `runner.wake_result_max_bytes` | Runner | `4096` | longest result text of a fired check (18.19.8) |
+| `runner.wake_request_timeout` | Runner | `30s` | longest wait of `bothy-wake` for the runner's answer (18.19.8) |
 | `runner.attach_allowed_roots` | Runner | `["project", "thread_inbox", "runner_temp"]` | roots for answer attachments, by name only (18.10) |
 | `runner.attach_denied_patterns` | Runner | list in 18.10 | denied patterns for answer attachments; must contain the list of 18.10 |
 

@@ -736,7 +736,10 @@ Checked by go-arch-lint (ADR 0008).
 
 ## Tables
 
-`runs`, `run_steps`, `run_followups`, `message_components`, `interactions`.
+`runs`, `run_steps`, `run_followups`, `run_wakes`, `run_autonomy`, `message_components`, `interactions`.
+
+`run_wakes` and `run_autonomy` (wake-ups and the counts of autonomous inputs, 09 5.8) are
+specified for stage AR and do not exist yet; AR-04 creates them.
 
 Only this module writes and reads these tables via SQL (03-data-model.md, principle 12).
 

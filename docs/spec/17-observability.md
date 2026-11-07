@@ -54,6 +54,15 @@ stored in `event_log.trace_context`; 03, 04 section 2.2).
 
 ![Trace propagation](../observability/diagrams/trace-propagation.svg)
 
+Autonomous runs (addendum of 2026-11-06, stage AR, R-OB-11, [09-agents.md](09-agents.md) 5.8 and
+18.19). The Claude Code runner logs, by code: `turn_handed_over`, `turn_adopted`,
+`launch_check_refused`, `wake_created`, `wake_refused`, `wake_check_failed`, `wake_check_refused`,
+`wake_input_check_failed`, `wake_fired`, `wake_expired`, `recovery_wake`, `usage_limited`,
+`usage_warning`, `usage_status_unknown`, `continuation_without_wake`, `stop_turns_timeout` and
+`durable_cron_present`. The server measures the number of pending wake-ups, wake-ups by end state
+and reason, and the chain and idle counts that reached their cap; AR-04 enters these metrics with
+their code into [signals.md](../observability/signals.md), which stays the only list of names.
+
 ## 4. Privacy
 
 1. Prohibition at the source: instrumentation sets only attributes from the catalogue.
@@ -200,3 +209,4 @@ of this chapter; the views of the apps read only the project's own statistics AP
 | R-OB-08 | Status page and statistics do not depend on the observability stack. | The stack is optional; operational functions of the app are not. |
 | R-OB-09 | Runtime texts in ops artifacts (alert texts, dashboard titles) are English. | Instance operators worldwide; all repository content is English (D-W-94). |
 | R-OB-10 | The apps measure SLIs themselves (own measurement in `stats_minutes`) with boundaries from the Sloth files; Prometheus stays the source for alerts. | R-OB-08 forbids reading from the telemetry; one source for boundaries keeps both paths comparable (ruling T7, [25-visualization.md](25-visualization.md)). |
+| R-OB-11 | Every handover, adoption, wake-up end, usage-window end and silent `waiting` end has its own log code, and pending wake-ups and reached caps are metrics (3, addendum of 2026-11-06). | Autonomous work runs without a person watching; only logs and metrics show a loop or a lost turn. |

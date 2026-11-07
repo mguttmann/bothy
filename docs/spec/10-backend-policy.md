@@ -425,6 +425,17 @@ the environment of each of its turns by 18.3 of [09-agents.md](09-agents.md) fro
 3. The creation flow offers `personal` only when the creating owner is that credential holder and
    the only owner (SR1), and says so otherwise.
 
+### 10.4 Wake runs and wake inputs
+
+Addendum of 2026-11-06 (stage AR, [09-agents.md](09-agents.md) 5.8). A wake run and a wake input
+are billed by the rules of the source run's person at fire time: the dispatch check (I2) and the
+adapter check (I3) apply to the wake run as to a message run, and a wake input carries the
+billing mode of its token, which the runner compares with its actual mode before writing. A
+wake-up of a person who is no longer the credential holder of a `personal` agent is refused at
+fire time like a message of that person. Costs of autonomous inputs are recorded per run as
+every cost (12.1); in `personal` they are information only, which is why the caps of 09 5.8.6
+count inputs, not money.
+
 ## 11. Guided flow "Grant a person access in a personal space"
 
 Starting point: a space is operated by a personal agent. The owner wants to give another person

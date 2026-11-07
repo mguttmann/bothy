@@ -9,10 +9,11 @@ erDiagram
     uuid thread_id FK
     uuid agent_id FK
     uuid agent_session_id FK
-    text trigger_kind "message, command, interaction"
+    text trigger_kind "message, command, interaction, wake"
     uuid triggering_message_id FK
     uuid triggering_command_id FK
     uuid triggering_interaction_id FK
+    uuid triggering_wake_id FK
     uuid triggered_by FK "person who triggered"
     text state "queued, running, waiting_input, completed, failed, cancelled"
     bigint version
@@ -34,6 +35,24 @@ erDiagram
     uuid run_id PK, FK
     uuid message_id PK, FK "UK"
     text state "queued, delivered, absorbed, deferred, discarded"
+  }
+  run_wakes {
+    uuid id PK
+    uuid agent_id FK
+    uuid thread_id FK
+    uuid source_run_id FK
+    uuid triggered_by FK "person of the source run"
+    text kind "at, pr_checks, command"
+    text reason "agent, recovery, usage_limit"
+    text state "pending, fired, cancelled, expired, refused, failed"
+    uuid fired_run_id FK
+    uuid fired_into_run_id FK
+  }
+  run_autonomy {
+    uuid thread_id PK, FK
+    uuid person_id PK, FK
+    integer chain_count
+    integer idle_count
   }
   message_components {
     uuid id PK
@@ -111,6 +130,15 @@ erDiagram
   runs ||--o{ run_steps : "steps"
   run_steps |o--o{ run_steps : "substep"
   runs ||--o{ run_followups : "follow-ups"
+  agents ||--o{ run_wakes : "wakes"
+  threads ||--o{ run_wakes : "continues"
+  runs ||--o{ run_wakes : "asked by"
+  principals ||--o{ run_wakes : "on behalf of"
+  runs |o--o{ run_wakes : "fired as run"
+  runs |o--o{ run_wakes : "fired into run"
+  run_wakes |o--o{ runs : "triggers"
+  threads ||--o{ run_autonomy : "counts"
+  principals ||--o{ run_autonomy : "counted person"
   messages ||--o| run_followups : "is follow-up"
   messages ||--o{ message_components : "components"
   runs |o--o{ message_components : "question"

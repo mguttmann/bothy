@@ -43,9 +43,17 @@ A notification has a kind (`kind`). The kind determines the recipients and the m
 A message in a DM channel gives r the kind `dm` and never `message` or `mention`, also when it
 mentions r: both kinds need the same level and go at once, and DM channels trigger no agent, so
 the run kinds never point at a DM channel either. The decision guards this column: the author
-never gets `message`, `mention` or `dm` for their own message, `run_done`, `run_failed` and
+never gets `message`, `mention` or `dm` for their own message, `run_done`, `run_failed`,
 `input_needed` reach only the person who triggered the run, and a `dm` notification outside a DM channel
 or another kind with thread inside one is invalid input (docs/DECISIONS.md D-M3-17-2).
+
+Stage AR (addendum of 2026-11-06, R-PN-12, [09-agents.md](09-agents.md) 5.8.4 and 18.19.10)
+adds the kind `wake_ended`: trigger, a wake-up of the person ends `refused`, `expired` or `failed`,
+or a run of the person ends `usage_limited`; recipient, the wake-up's person
+(`run_wakes.triggered_by`), for `usage_limited` the run's triggering person; level `mentions`; it
+points to the note in the thread, a cancel by a person sends none, and a usage-limited run gets no
+second `run_failed`. The kind enters the table above, the enum `NotificationKind` and the code
+together with AR-04, which builds the ends it reports.
 
 No notification is created for: edits, deletions, reactions, pins, typing, live box patches,
 messages with `silent = true` and messages with `origin IN ('import','system')`. An edit
@@ -1165,6 +1173,7 @@ tokens, in `Device.push_registrations`.
 | R-PN-09 | Notifications are created in the worker consumer `push` with a cursor from the event log, not as a job in the triggering transaction. | Producers do not know their consumers; cursor and jobs commit together, so exactly one notification per event ([ADR 0051](../adr/0051-worker-consumers-of-the-event-log-with-a-cursor.md)). |
 | R-PN-10 | Central push relay later; every instance uses its own keys. | No collection point for metadata, no service to run in the first milestones. |
 | R-PN-11 | No notification through editing. | Simple, no abuse through mentioning after the fact. |
+| R-PN-12 | The person of a wake-up gets `wake_ended` when the wake-up ends `refused`, `expired` or `failed` and when a run of the person ends `usage_limited`; a usage-limited run gets no second `run_failed` (2, addendum of 2026-11-06). | Autonomous work that stops must reach the person who started it; one notification per end. |
 
 ## 16. Alignment with the core contract
 

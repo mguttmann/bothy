@@ -949,6 +949,19 @@ REST when they display it. At the end of the batch, the server sets `threads.unr
 the end of the batch; imported content therefore counts as unread for nobody (03, `read_states`). Imported messages have `origin = import`, never trigger agents and create
 no notifications.
 
+### 15.9 Wake-ups
+
+Addendum of 2026-11-06 (stage AR, R-SY-30, [09-agents.md](09-agents.md) 5.8). A fired wake-up
+without an active run in its thread creates a run with `trigger_kind = 'wake'` that is delivered
+like a message run (15.3): `agent.invocation` with a token whose claim `trigger_kind` is `wake`
+and which names the wake-up (`wake_id`) instead of a message. A wake-up that fires into an
+active run of its person is delivered as `agent.wake_input` over the follow-up path (15.4) with a
+token whose `trigger_kind` is `wake` and that carries `run_id`, `thread_id`, `wake_id` and `sub`;
+the adapter checks it as 09 5.8.3 says and reports a skipped input, after which the server puts
+the wake-up back to `pending`. The durable event `run.wake_changed` (payload: wake-up id, thread,
+state) goes to the clients that may read the thread and to the adapter inbox of the wake-up's
+agent. The events, payloads and claims enter `asyncapi.yaml` and the catalogue with AR-04.
+
 ## 16. Sequence diagrams
 
 ### 16.1 Send a message, online
@@ -1138,6 +1151,7 @@ sequenceDiagram
 | R-SY-27 | Live details of the control room come through the optional `focus` member `background_thread_ids` within `sync.max_focused_threads`: run document and `run.updated` only, never "Active in the thread"; no overview op and no overview event (addendum of 2026-10-24). | The focus already delivers the whole document and its patches under `run.read`; `idle` is one flag per connection and follows the window state (15 section 10), so card threads need their own list to stay out of the notification rules (13 4.4); a card that nobody sees needs no live data, and a second fan-out path would need its own receive rule. |
 | R-SY-28 | The snapshot carries the active threads of every visible channel (open threads with an active run, open threads unread for the caller, plus open threads active within `sync.snapshot_thread_window`, up to `sync.snapshot_threads_per_channel` per channel); no new event, the client keeps them current from `thread.*` and `message.created` (addendum of 2026-10-27). | The sidebar shows the open sessions of every channel (01 6.8); without titles in the snapshot the client would list the threads of every channel on every connect; unread threads are always included because the sidebar ranks them above newer activity, and a thread the client does not hold gets no row. |
 | R-SY-29 | The navigation state of a device (route, selected row, open columns, collapsed spaces and groups, scroll position) is not personal data of section 14: no event, no setting key, no REST operation of the client; of `sidebar.updated` the client uses the order only (addendum of 2026-10-29). | Owner report 2026-10-29: each device of a person navigates on its own; only data syncs (01 6.7, R-PR-24). The mirroring the owner saw was the synchronized collapse of a space: expanding a space on the Mac to open a chat expanded it on the iPhone at the same moment (docs/decisions.d/FIX-device-mirroring-2.md). |
+| R-SY-30 | A wake run is delivered like a message run with the trigger kind `wake`; a wake input into an active run goes over the follow-up path with its own token (15.9, addendum of 2026-11-06). | One delivery path per run; a wake-up has no message whose author the follow-up check could use. |
 
 ## 18. Configuration values of this chapter
 

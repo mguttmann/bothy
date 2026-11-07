@@ -288,6 +288,49 @@ def test_stage_ticket_fails_on_a_milestone_target_not_in_the_makefile(tmp_path: 
     ]
 
 
+def test_stage_ar_tickets_are_checked_like_the_others(tmp_path: Path) -> None:
+    """Tickets of stage AR (autonomous runs, PLAN section 22) have the ID form `AR-<nn>`."""
+    rows = dict(
+        INDEX_ROWS,
+        **{
+            "A1-02": (1, "none (specification merged)"),
+            "AR-02": (1, "none (specification merged)"),
+            "AR-03": (2, "AR-02"),
+        },
+    )
+    root = _repo(tmp_path, rows=rows, waves=WAVES, edges="  M1_01 --> M1_02\n")
+    assert brief_deps.main(["--root", str(root), "--write"]) == 0
+    text = (root / "docs/briefs/README.md").read_text(encoding="utf-8")
+    assert "| 1 | A1-02, AR-02, M1-01, M1-04 |" in text
+    assert "| 2 | AR-03, M1-02 |" in text
+    blocks = text.split("## Dependency graph")[1].split("```mermaid")[1:]
+    assert len(blocks) == 3
+    assert text.index("Tickets of A1:") < text.index("Tickets of AR:")
+    assert "AR_02 --> AR_03" in blocks[2]
+    assert brief_deps.check(root) == []
+    plan = (root / "docs/PLAN.md").read_text(encoding="utf-8")
+    (root / "docs/PLAN.md").write_text(
+        plan.replace("| AR-03 | Title | AR-02 |", "| AR-03 | Title | none |")
+    )
+    assert any("AR-03: depends on []" in p for p in brief_deps.check(root))
+
+
+def test_stage_ar_ticket_gets_the_milestone_base() -> None:
+    deps = {"M1-01": [], "AR-02": [], "AR-03": ["AR-02"]}
+    assert brief_deps.stage_base(deps, "AR-03") == {"M1-01"}
+    assert brief_deps._ID.findall("AR-03, A1-02 and M1-01") == ["AR-03", "A1-02", "M1-01"]
+
+
+def test_a_decision_id_is_no_ticket() -> None:
+    """`D-AR-12` (a decision of the design note) and `D-M2-35-3` (a ruling) name no ticket."""
+    assert brief_deps._ID.findall("D-AR-12, D-M2-35-3 and R-AR-01, then AR-03") == ["AR-03"]
+
+
+def test_a_longer_number_is_no_ticket() -> None:
+    """A typo such as `AR-030` must not pass as `AR-03`."""
+    assert brief_deps._ID.findall("AR-030, M1-011 and AR-03") == ["AR-03"]
+
+
 def test_milestone_ticket_gets_no_stage_base() -> None:
     deps = {"M1-01": [], "M1-02": ["M1-01"], "A1-02": []}
     assert brief_deps.stage_base(deps, "M1-02") == set()

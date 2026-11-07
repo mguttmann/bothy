@@ -7,7 +7,8 @@ title and file of each ticket. This test holds every brief of the index to that 
 line equals the index row, the status line names the milestone of the ticket, the eleven
 sections stand in their order, the report uses the launcher placeholders, and every brief
 written before M1 closed (milestones M2 and later, D-W-100, D-W-114, D-W-120, D-W-124 and
-D-W-125) and every brief of a stage after the milestones (A1, written before its tickets merge)
+D-W-125) and every brief of a stage after the milestones (A1 and AR, written before their tickets
+merge)
 carries the limit for names that differ from merged code, every M7 brief forbids
 tagging by itself (D-W-125), and every M8 brief forbids live Discord calls (D-W-124).
 Dependencies, waves and make targets are checked by brief_deps.py.
@@ -35,9 +36,10 @@ SECTIONS = [
     "Definition of done",
     "Report",
 ]
-# Milestones M1 to M8 and the stages after them (A1, PLAN section 21) share one brief shape.
-_ROW = re.compile(r"^\| \d+ \| ([MA]\d-\d\d) \| .+? \| `([^`]+)` \|", re.MULTILINE)
-_STATUS = re.compile(r"^Status: ready \| Depends on: [^|]+ \| Milestone: ([MA]\d)$")
+# Milestones M1 to M8 and the stages after them (A1, PLAN section 21; AR, section 22) share one
+# brief shape.
+_ROW = re.compile(r"^\| \d+ \| ((?:[MA]\d|AR)-\d\d) \| .+? \| `([^`]+)` \|", re.MULTILINE)
+_STATUS = re.compile(r"^Status: ready \| Depends on: [^|]+ \| Milestone: ([MA]\d|AR)$")
 BRIEF_GLOBS = ("M*.md", "A*.md")
 
 
@@ -123,3 +125,13 @@ def test_index_lists_every_brief_file() -> None:
     listed = {name for _, name in index_rows()}
     on_disk = {p.name for pattern in BRIEF_GLOBS for p in BRIEFS.glob(pattern)}
     assert on_disk == listed
+
+
+def test_a_stage_ar_status_line_is_read() -> None:
+    """A brief of stage AR (PLAN section 22) names the stage `AR` in its status line."""
+    tid, name = next((t, n) for t, n in index_rows() if t.startswith("A1"))
+    text = (BRIEFS / name).read_text(encoding="utf-8").replace("# A1-", "# AR-", 1)
+    text = re.sub(r"Milestone: A1$", "Milestone: AR", text, count=1, flags=re.MULTILINE)
+    ar_tid = "AR" + tid[2:]
+    assert problems(ar_tid, text) == []
+    assert _ROW.findall("| 1 | AR-02 | Title | `AR-02-x.md` | none |") == [("AR-02", "AR-02-x.md")]

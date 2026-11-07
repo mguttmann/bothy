@@ -26,6 +26,7 @@ Code names are English and apply in API, database and code.
 | Audit checkpoint | `audit_checkpoint` | Signed state of the hash chain of the audit log, additionally stored outside the database. |
 | Audit log | `audit_event` | Append-only, hash-chained log of security-relevant decisions, separate from telemetry. |
 | authorize | `authorize` | The single authorization function `authorize(principal, action, resource) -> Decision` in the module `authz` (B7). |
+| Autonomous input | `autonomous input` | A wake run, a wake input, or a recovery or usage-window wake-up: work an agent does without a new message; allowed for owners or in channels with `allow_autonomous_runs`, capped per thread and person ([09-agents.md](09-agents.md) 5.8.6). |
 | Backend policy | `billing_mode` | Setting per agent of what it runs on: `personal` (subscription of exactly one person) or `organization` (organization API key). |
 | Backup run | `backup_run` | Run of a backup or of an automatic restore test, with a result per check. |
 | Branding | `branding` | Display name, logo and colors of the instance as a setting (`branding.*`). |
@@ -60,6 +61,7 @@ Code names are English and apply in API, database and code.
 | Durable event | `durable event` | Event in the event log with a global sequence; can be caught up until `sync.event_retention`. |
 | Effective level | `effective level` | Highest level of all valid grants of a principal and its groups on the path from the target upward. |
 | Effective operator | `effective operator` | Operator of a channel after resolving the inheritance from the space. |
+| End state | `end_state` | The agent's last word on a run: `done`, `waiting` or `blocked`, from the `STATE:` line of its answer; a `waiting` end with nothing pending is visible (09 18.19.11). |
 | Enrollment code | `enrollment_code` | One-time code of the owner for the first device, for linking an identity or for recovery. |
 | Ephemeral event | `ephemeral event` | Event without storage and without a sequence (typing, live box patch, presence, notification, autocomplete request); delivered at most once. |
 | Event | `event` | Notice of a change with a uniform envelope; durable or ephemeral. |
@@ -102,6 +104,7 @@ Code names are English and apply in API, database and code.
 | Invariant I3 | `I3` | Signed invocation token; the adapter starts only if its reported mode matches the configured mode of the token. |
 | Invariant I6 | `I6` | With `hosts.llm_credentials = personal`, only the holder of the login opens a terminal on the host, not even another owner; checked transactionally and on every opening. |
 | Invocation token | `invocation token` | Short-lived JWS (`typ = agent-invocation+jwt`) that the server signs with EdDSA per delivery, for exactly one agent invocation with trigger, target, level, run, backend policy and tool class (I3). |
+| Keeper | `keeper` | Small program of the Claude Code runner that leads a turn's own session and process group, holds the write end of the turn's named pipe and starts the CLI, so a restart of the runner does not end the turn's input (09 18.19.4). |
 | Key pinning | `key pinning` | A device remembers the Noise key of a host at the first opening and warns hard on a change. |
 | Level | `level` | Ascending permission level of a grant: `read` < `write` < `trigger`. |
 | Level trigger | `trigger` | Highest level: may trigger agents and use components. |
@@ -142,6 +145,7 @@ Code names are English and apply in API, database and code.
 | Read state | `read_state` | Highest read thread sequence of a person per thread; only increases, except through an explicit reset. |
 | Read-only | `read_only` | State of a channel in which no principal, not even an owner, writes; only a running import writes (read mirror). |
 | Receive action | `receive_action` | Action that a receiver needs on the resource of an event in order to get it. |
+| Recovery run | `reason = recovery` | A wake run after lost background work that lists what was lost and repeats nothing (09 18.19.9, R-AG-17). |
 | Redaction | `redaction` | Removal of the payload of an event after deletion; the envelope stays. |
 | Refresh token family | `refresh_token_family` | Chain of rotating refresh tokens of a session, bound to the DPoP key; a reuse outside the grace period `auth.refresh_reuse_grace` revokes the whole family. |
 | Relay | `relay` | Part of the module `terminal` that connects the client and host data connections of a session in the memory of one node, without reading content. |
@@ -179,8 +183,12 @@ Code names are English and apply in API, database and code.
 | Tombstone | `tombstone` | Kept row of a deleted message without content; keeps the thread sequence gapless. |
 | Tool class | `tool_class` | What the runtime of an agent may do: `chat` < `scoped` < `host`; configured on the agent, reported in the heartbeat. |
 | Transcript | `transcript` | Text of a voice message, created by the agent or a transcription service. |
-| Trigger kind | `trigger_kind` | Origin of a run or a token: `message`, `followup`, `interaction`, `command`, `autocomplete`. |
+| Trigger kind | `trigger_kind` | Origin of a run or a token: `message`, `followup`, `interaction`, `command`, `autocomplete`, `wake`. |
 | Trigger state | `trigger_state` | State on the triggering message: `received`, `queued`, `working`, `done`, `failed`, `cancelled`, `followup_delivered`; replaces status emoji; the reason is in `trigger_state_reason`. |
+| Turn handover | `runner.turn_handover` | A restart of the Claude Code runner that leaves live turns running for the next runner to adopt with full rights (09 18.19.3). |
 | TV mode | `tv mode` | Full-screen display of the visualizations without controls, in the session of a person, costs hidden by default. |
 | Typing indicator | `typing` | Ephemeral event that a person is writing in the thread. |
 | Upload session | `file_upload_session` | Resumable upload of a file in parts, the same for both storage drivers. |
+| Wake input | `agent.wake_input` | A wake-up that fires into the active run of its person, written into the running turn with its own token and checks (09 5.8.3). |
+| Wake run | `trigger_kind = 'wake'` | A run started by a fired wake-up on behalf of the person of its source run; it resumes the thread's session (09 5.8.3). |
+| Wake-up | `run_wake` | Server record that continues a thread later without a new message, at a time, when the checks of a pull request finish or when a command succeeds (09 5.8). |

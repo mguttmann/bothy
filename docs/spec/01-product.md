@@ -2196,6 +2196,32 @@ console.
    "Versions" (undo by saving an older version again), "Change runner" and "Disable". An agent
    without a definition shows "Not set up" with "Continue setup".
 
+### 6.21 Autonomous runs in a thread
+
+Addendum of 2026-11-06 (stage AR, R-PR-37, [09-agents.md](09-agents.md) 5.8 and 18.19). Applies to
+the desktop and the phone on a server of stage AR, not to the web console, which has no chats
+(5.5). The wake-up parts apply only for an agent that reports `wakes`, except that pending
+wake-ups and their cancel button stay visible when it no longer does (a runner that turned
+`runner.wakes` off, 16 10.1); the end-state display also applies when the agent does not report
+`wakes`.
+
+1. **Pending wake-ups.** A thread with pending wake-ups shows them above the composer: the label,
+   the condition ("in 20 minutes", "at 17:55", "when the checks of #123 finish", "when the command
+   succeeds"), the time it fires at the earliest, the deadline and a cancel button for the
+   wake-up's person, the agent's owner and a person with `manage` on the channel.
+2. **End of a run.** The collapsed line of a finished run shows its end state ("Done", "Waiting",
+   "Needs you") and, when a wake-up is pending, when the thread continues.
+3. **Notes.** The `system` messages of 09 5.8.4 (refused, expired, failed, cancelled), the note
+   "Ended waiting, but nothing will wake this thread" (09 18.19.11), the chain and idle cap notes
+   with "Reply to continue" (09 5.8.6), and the usage-limit notice "Usage limit of the account
+   reached; continues at <time>" or, without permission, "Reply after <time> to continue" (09
+   18.19.10) are shown as notes of the thread, never as messages of a person.
+4. **Wake runs.** A run started by a wake-up shows "Woke up: <label>" instead of a triggering
+   message; a recovery run shows "Continued after lost work".
+5. **Channel switch.** The channel settings have "Let agents continue on their own" (`allow_autonomous_runs`),
+   shown to persons with `manage`, with the sentence that owners always may and that every other
+   person's wake-ups need this switch.
+
 ## 7. Keyboard shortcuts
 
 Shortcuts apply on desktop. They avoid system assignments (Cmd+H, Cmd+M, Cmd+Q, Alt+F4,
@@ -2465,6 +2491,7 @@ Rules:
 | R-PR-34 | A servable Markdown, text, log, JSON, YAML or CSV attachment opens in an in-app document viewer instead of the system app: Markdown rendered by the renderer of messages, JSON pretty, a small CSV as a table, text raw, with raw and formatted view, search with marks, copy all, Save as, Open in another app, a table of contents, the mouse selection of the desktop and reading keys; a file that is not servable never opens, and web images load only on a click (6.19, addendum of 2026-11-02). | Owner request 2026-11-02: most of what agents send are Markdown files and had to be viewed outside the app (docs/decisions.d/FEAT-markdown-viewer.md). |
 | R-PR-35 | A code block without a language or with a text language (`text`, `plaintext`, `txt`, `markdown`, `md`) also offers "Copy as text", which joins the line breaks inside a paragraph with a space and keeps paragraphs, list items, headings and Markdown hard breaks; a block in a programming language never offers it and "Copy code" stays exact; the toggle of 6.14 reads "Wrap display" with a tooltip that it changes only the display (6.12 item 7, addendum of 2026-11-04). | Owner report 2026-11-04: a reply an agent had written to forward, broken by hand after about 60 to 70 characters in a fenced block, arrived as a packet of short lines in a mail or another chat whether "Wrap lines" was on or off (docs/decisions.d/F-KOPIER-FLIESSTEXT.md). |
 | R-PR-36 | Owners create a built-in agent with "New agent" from a template, an interview with the builder agent or an empty form, see and edit everything in one preview before anything is created, and confirm visible steps with step-up; the entry shows only when a runner hosts agents (6.20, addendum of 2026-11-06). | Owner request 2026-11-05: Bothy should be worth trying without another agent runtime; the preview is the only place where a person sees what a model drafted before it runs on their host ([26-builtin-agents.md](26-builtin-agents.md)). |
+| R-PR-37 | A thread shows its pending wake-ups with cancel, the end state of each finished run, and every end of a wake-up and every cap as a note of the thread (6.21, addendum of 2026-11-06). | A session that runs on alone must never end silently; the person sees what will wake the thread and can stop it. |
 
 ## 14. Configuration values of this chapter
 
