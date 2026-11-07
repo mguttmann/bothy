@@ -29,6 +29,8 @@ import pytest
 from bothy_sdk.testing._patience import PATIENCE
 from bothy_sdk.testing.faults import Fault
 
+from claude_code_runner.statedir import ensure_private_dir
+
 from .conftest import LogLines, World
 
 pytestmark = pytest.mark.anyio
@@ -226,8 +228,7 @@ async def test_handover_while_preparing_restarts_through_the_inbox(world: World)
 
 async def test_handover_while_waiting_for_the_thread_lock(world: World) -> None:
     # waiting_lock: another process holds the thread lock; the run waits thread_busy.
-    lock = world.state / "locks"
-    lock.mkdir(parents=True, mode=0o700, exist_ok=True)
+    lock = ensure_private_dir(world.state / "locks")
     world.scenario(fixture="plain")
     first = world.spawn(turn_handover=True)
     await ready(world)
