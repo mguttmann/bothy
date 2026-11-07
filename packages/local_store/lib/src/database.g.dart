@@ -2491,9 +2491,11 @@ class ChannelRow extends DataClass implements Insertable<ChannelRow> {
   final bool projectBound;
 
   /// API `Channel.allow_autonomous_runs` (03 `channels`, 09 5.8.6, stage AR): whether persons
-  /// other than owners may let agents run on alone here. Null from a server before stage AR and
-  /// in a row of a version before 14 until the snapshot the migration asks for; the channel
-  /// menu hides the switch then (01 6.21 item 5, AR-08).
+  /// other than owners may let agents run on alone here. The sync snapshot and the channel
+  /// events carry no such member, so a channel stored from them keeps the value it had (null
+  /// at first); `getChannel`, `listSpaceChannels` and the switch's answer fill it
+  /// ([StructureDao.putChannelAutonomousRuns]). Null also from a server before stage AR
+  /// (01 6.21 item 5, AR-08).
   final bool? allowAutonomousRuns;
 
   /// API `ChannelView.level`; null until delivered.
