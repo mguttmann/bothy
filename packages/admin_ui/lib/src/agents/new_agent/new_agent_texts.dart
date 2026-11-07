@@ -159,9 +159,8 @@ String agentChangeReason(
   AgentChangeKind.create => l.newAgentAuditReason(name),
   AgentChangeKind.setup => l.agentSetupAuditReason(name),
   AgentChangeKind.host => l.agentMoveAuditReason(name),
-  AgentChangeKind.edit || AgentChangeKind.disable => l.agentEditAuditReason(
-    name,
-  ),
+  AgentChangeKind.edit ||
+  AgentChangeKind.disable => l.agentEditAuditReason(name),
 };
 
 /// The [ApiNewAgentPort] over [api] with the purposes and reasons of every

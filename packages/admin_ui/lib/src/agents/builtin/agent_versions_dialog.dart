@@ -208,54 +208,58 @@ class _AgentVersionsDialogState extends State<AgentVersionsDialog> {
   }) {
     final colors = context.dsColors;
     final author = widget.ownerNames[v.createdBy] ?? v.createdBy;
+    // Text first, the actions below: the row stays readable at a large text scale.
     return Padding(
       key: ValueKey('agentVersions.row.${v.version}'),
       padding: const EdgeInsets.symmetric(vertical: DsSpace.s4),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  l.agentVersionLine(
-                    v.version,
-                    _when(v.createdAt),
-                    author,
-                    v.origin.name,
-                  ),
-                  style: dsTextStyle(DsType.body)
-                      .copyWith(color: colors.textPrimary),
+          Text(
+            l.agentVersionLine(
+              v.version,
+              _when(v.createdAt),
+              author,
+              v.origin.name,
+            ),
+            style: dsTextStyle(DsType.body).copyWith(color: colors.textPrimary),
+          ),
+          if (current)
+            Text(
+              l.agentVersionCurrent,
+              key: ValueKey('agentVersions.current.${v.version}'),
+              style: dsTextStyle(DsType.bodySm)
+                  .copyWith(color: colors.textSecondary),
+            ),
+          Wrap(
+            spacing: DsSpace.s8,
+            children: [
+              TextButton(
+                key: ValueKey('agentVersions.show.${v.version}'),
+                onPressed: _busy
+                    ? null
+                    : () => _open(v.version, restore: false),
+                child: Semantics(
+                  label: l.agentVersionShowLabel(v.version),
+                  excludeSemantics: true,
+                  child: Text(l.agentVersionShow),
                 ),
-                if (current)
-                  Text(
-                    l.agentVersionCurrent,
-                    key: ValueKey('agentVersions.current.${v.version}'),
-                    style: dsTextStyle(DsType.bodySm)
-                        .copyWith(color: colors.textSecondary),
-                  ),
-              ],
-            ),
-          ),
-          TextButton(
-            key: ValueKey('agentVersions.show.${v.version}'),
-            onPressed: _busy ? null : () => _open(v.version, restore: false),
-            child: Semantics(
-              label: l.agentVersionShowLabel(v.version),
-              excludeSemantics: true,
-              child: Text(l.agentVersionShow),
-            ),
-          ),
-          if (!current)
-            TextButton(
-              key: ValueKey('agentVersions.restore.${v.version}'),
-              onPressed: _busy ? null : () => _open(v.version, restore: true),
-              child: Semantics(
-                label: l.agentVersionRestoreLabel(v.version),
-                excludeSemantics: true,
-                child: Text(l.agentVersionRestore),
               ),
-            ),
+              if (!current)
+                TextButton(
+                  key: ValueKey('agentVersions.restore.${v.version}'),
+                  onPressed: _busy
+                      ? null
+                      : () => _open(v.version, restore: true),
+                  child: Semantics(
+                    label: l.agentVersionRestoreLabel(v.version),
+                    excludeSemantics: true,
+                    child: Text(l.agentVersionRestore),
+                  ),
+                ),
+            ],
+          ),
         ],
       ),
     );

@@ -751,12 +751,24 @@ class _ClassChoice extends StatelessWidget {
         ),
         _Hint(l.newAgentClassHostFiles),
         if (ceiling != null && ceiling != AgentToolClass.host)
-          _Hint(
-            l.newAgentClassCeiling(
-              flow.runner!.name,
-              toolClassName(l, ceiling),
+          if (flow.attempted &&
+              flow.invalidFields.contains(PreviewField.toolClass))
+            Text(
+              l.newAgentClassCeiling(
+                flow.runner!.name,
+                toolClassName(l, ceiling),
+              ),
+              key: const ValueKey('newAgent.classAboveCeiling'),
+              style: dsTextStyle(DsType.bodySm)
+                  .copyWith(color: context.dsColors.dangerFg),
+            )
+          else
+            _Hint(
+              l.newAgentClassCeiling(
+                flow.runner!.name,
+                toolClassName(l, ceiling),
+              ),
             ),
-          ),
       ],
     );
   }

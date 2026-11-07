@@ -113,6 +113,9 @@ abstract final class PreviewField {
   /// The hosting runner.
   static const String host = '/hosted_by';
 
+  /// The tool class of the agent, which the hosting runner's ceiling bounds (26 3.1 item 3).
+  static const String toolClass = '/tool_class';
+
   /// The cost cap.
   static const String costCap = '/settings/max_cost_usd_per_run';
 
@@ -566,6 +569,10 @@ final class NewAgentFlow extends ChangeNotifier {
       if (d.name.trim().isEmpty) PreviewField.name,
       if (!_handlePattern.hasMatch(d.handle)) PreviewField.handle,
       if (_runner == null) PreviewField.host,
+      // A class above the runner's ceiling would be refused at the class step after
+      // `agent.create` (D-A1-08-9); a template or a restored version may preselect one.
+      if (_runner case final r? when d.toolClass.isAbove(r.ceiling))
+        PreviewField.toolClass,
       if (cap != null && (cap.isNaN || cap <= 0)) PreviewField.costCap,
       if (d.channelWanted && d.channelSpaceId == null)
         PreviewField.channelSpace,
