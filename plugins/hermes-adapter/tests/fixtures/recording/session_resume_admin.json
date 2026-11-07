@@ -405,11 +405,83 @@
     },
     {
       "args": {
+        "value": false
+      },
+      "method": "read:authorization_is_upstream"
+    },
+    {
+      "args": {
+        "is_first_turn": false,
+        "kwargs": [
+          "conversation_history",
+          "is_first_turn",
+          "model",
+          "parent_session_id",
+          "platform",
+          "sender_id",
+          "session_id",
+          "task_id",
+          "telemetry_schema_version",
+          "turn_id",
+          "user_message"
+        ],
+        "session_id": "<id:4>",
+        "user_message": "sha256:42069384d477d67e018da6d80538e858956d30482b09488a9daf31219f3da392:46"
+      },
+      "method": "hook:pre_llm_call"
+    },
+    {
+      "args": {
         "chat_id": "<id:2>",
-        "content": "sha256:2006eda848df02b62d17d5fddff3855c4044ee3c884ab684b10d862ad03309be:233",
-        "message_id": "<id:15>",
+        "content": "sha256:fa54a5932fd2eb9381262b628c819c24a8186538dd7bd92c170d14aa777864c9:11",
+        "draft_id": "<id:15>",
+        "metadata": {
+          "reply_to_message_id": "<id:14>",
+          "thread_id": "<id:8>"
+        }
+      },
+      "method": "send_draft"
+    },
+    {
+      "args": {
+        "chat_id": "<id:2>",
+        "content": "sha256:784f90cbe1d8c6ac08d6e3a89cb7a095c8fca9c0096a2bfc1408b962b15c9f1e:29",
+        "draft_id": "<id:15>",
+        "metadata": {
+          "reply_to_message_id": "<id:14>",
+          "thread_id": "<id:8>"
+        }
+      },
+      "method": "send_draft"
+    },
+    {
+      "args": {
+        "is_first_turn": null,
+        "kwargs": [
+          "completed",
+          "failed",
+          "interrupted",
+          "model",
+          "platform",
+          "session_id",
+          "task_id",
+          "telemetry_schema_version",
+          "turn_exit_reason",
+          "turn_id"
+        ],
+        "session_id": "<id:4>",
+        "user_message": null
+      },
+      "method": "hook:on_session_end"
+    },
+    {
+      "args": {
+        "chat_id": "<id:2>",
+        "content": "sha256:784f90cbe1d8c6ac08d6e3a89cb7a095c8fca9c0096a2bfc1408b962b15c9f1e:29",
+        "message_id": "<id:16>",
         "metadata": {
           "notify": true,
+          "reply_to_message_id": "<id:14>",
           "thread_id": "<id:8>"
         },
         "reply_to": "<id:14>"
@@ -434,7 +506,7 @@
       "method": "on_processing_complete"
     }
   ],
-  "inputs_sha256": "951e586ff37ce048d2812b708412ebeb1b44b674f09786131c2d01801b6f2bb2",
+  "inputs_sha256": "82f4b1a75243a9cefe2b24c8258975ac23ed1f3d5128c170923b00fff9d1ec25",
   "model_requests": [
     {
       "credential": "none",
@@ -446,7 +518,7 @@
       "credential": "none",
       "model": "fake-model",
       "other_texts": [
-        "sha256:03bd083edfa7a96306ebd852c4906e5ad789c633e261512707f4c4cc2d58044d:5105",
+        "sha256:c6aba168e484ab91e8130390b1744e8f9b2e9c76ad441a87c3a52454ab971118:5038",
         "sha256:354fffcff870d90b48e0469344c0dd645038ce983084ac81086eeb4f70266c04:37"
       ],
       "roles": [
@@ -501,7 +573,7 @@
       "credential": "none",
       "model": "fake-model",
       "other_texts": [
-        "sha256:b96e4720abc6c426f5662875a0f1ad3393c3688df6e45ac6c7902ed389b18230:5105",
+        "sha256:15fabef52f89080637e3ad1e8a4797947931555d208770f2d9ea130cb644348d:5038",
         "sha256:c41adaac7cd28913a340cf4fca202bbe0892719d798fdabd871e94bb3270ce3b:36"
       ],
       "roles": [
@@ -540,6 +612,35 @@
       "tool_call_ids": [],
       "tools": [],
       "turn": null
+    },
+    {
+      "completed": true,
+      "credential": "none",
+      "model": "fake-model",
+      "other_texts": [
+        "sha256:15fabef52f89080637e3ad1e8a4797947931555d208770f2d9ea130cb644348d:5038",
+        "sha256:354fffcff870d90b48e0469344c0dd645038ce983084ac81086eeb4f70266c04:37",
+        "sha256:42069384d477d67e018da6d80538e858956d30482b09488a9daf31219f3da392:46"
+      ],
+      "roles": [
+        "system",
+        "user",
+        "assistant",
+        "user"
+      ],
+      "route": "openai.chat",
+      "scenario_texts": [
+        "Please remember the blue boat.",
+        "The trip to the lake is planned for Saturday morning.",
+        "Which things did I ask you to remember?"
+      ],
+      "scripted": true,
+      "stream": true,
+      "tool_call_ids": [],
+      "tools": [
+        "todo_list"
+      ],
+      "turn": 3
     }
   ],
   "pattern": [
@@ -731,10 +832,23 @@
     {
       "args": {
         "chat_id": "<id:1>",
-        "content": "sha256:2006eda848df02b62d17d5fddff3855c4044ee3c884ab684b10d862ad03309be:233",
-        "message_id": "<id:14>",
+        "content": "sha256:784f90cbe1d8c6ac08d6e3a89cb7a095c8fca9c0096a2bfc1408b962b15c9f1e:29",
+        "draft_id": "<id:14>",
+        "metadata": {
+          "reply_to_message_id": "<id:13>",
+          "thread_id": "<id:7>"
+        }
+      },
+      "method": "send_draft"
+    },
+    {
+      "args": {
+        "chat_id": "<id:1>",
+        "content": "sha256:784f90cbe1d8c6ac08d6e3a89cb7a095c8fca9c0096a2bfc1408b962b15c9f1e:29",
+        "message_id": "<id:15>",
         "metadata": {
           "notify": true,
+          "reply_to_message_id": "<id:13>",
           "thread_id": "<id:7>"
         },
         "reply_to": "<id:13>"
@@ -760,8 +874,8 @@
     }
   ],
   "pin": {
-    "commit": "bf0203a794a07aac3ff764972ab9087baa4e4f4e",
-    "tag": "v0.22.5"
+    "commit": "a8b0bc15053c1d71fb2bfea39007847c9e1c5673",
+    "tag": null
   },
   "scenario": "session_resume_admin"
 }

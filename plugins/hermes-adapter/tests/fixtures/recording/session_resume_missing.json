@@ -357,7 +357,7 @@
       "method": "on_processing_complete"
     }
   ],
-  "inputs_sha256": "951e586ff37ce048d2812b708412ebeb1b44b674f09786131c2d01801b6f2bb2",
+  "inputs_sha256": "82f4b1a75243a9cefe2b24c8258975ac23ed1f3d5128c170923b00fff9d1ec25",
   "model_requests": [
     {
       "credential": "none",
@@ -369,7 +369,7 @@
       "credential": "none",
       "model": "fake-model",
       "other_texts": [
-        "sha256:2ec8dde4233624ad4232b3fce78c3b42538e89cebe21d589612f3ef9399e3c91:5105",
+        "sha256:88bf1ffdf9c389927f614c0a7a47dfdca628aca2a328554f4c8f40dd12fd6dd7:5038",
         "sha256:354fffcff870d90b48e0469344c0dd645038ce983084ac81086eeb4f70266c04:37"
       ],
       "roles": [
@@ -424,7 +424,7 @@
       "credential": "none",
       "model": "fake-model",
       "other_texts": [
-        "sha256:2ec8dde4233624ad4232b3fce78c3b42538e89cebe21d589612f3ef9399e3c91:5105",
+        "sha256:88bf1ffdf9c389927f614c0a7a47dfdca628aca2a328554f4c8f40dd12fd6dd7:5038",
         "sha256:354fffcff870d90b48e0469344c0dd645038ce983084ac81086eeb4f70266c04:37",
         "sha256:42069384d477d67e018da6d80538e858956d30482b09488a9daf31219f3da392:46"
       ],
@@ -622,8 +622,8 @@
     }
   ],
   "pin": {
-    "commit": "bf0203a794a07aac3ff764972ab9087baa4e4f4e",
-    "tag": "v0.22.5"
+    "commit": "a8b0bc15053c1d71fb2bfea39007847c9e1c5673",
+    "tag": null
   },
   "scenario": "session_resume_missing"
 }

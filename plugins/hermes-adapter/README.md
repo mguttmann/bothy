@@ -52,7 +52,8 @@ installation.
 ## Installation into a Hermes profile
 
 The adapter runs on Python 3.11 and newer, in the Python of the profile's gateway; it is tested
-against Hermes Agent `v0.22.5` (the pin, on Python 3.14, the only Python its lock installs).
+against Hermes Agent main commit `a8b0bc15053c` (the pin, no release tag, D-HERMES-MAIN-1, on
+Python 3.14, the only Python its lock installs) and, unchanged, on `v0.22.5`.
 
 Neither this component nor the SDK is packaged before the release chain (M7). Hermes replaces
 the Python environment of a profile on many of its commands (a new environment, the old one is
@@ -329,9 +330,11 @@ cumulative drafts through `send_draft`; `steer` only through the global key and 
 public surface for the credential type; `/stop` via `handle_message` returns `CANCELLED`; `/new`
 with confirmation, `/resume` in the thread, foreign sessions only with `--all` for an admin
 sender, the session ID from the hook `pre_llm_call`; `enforces_own_access_policy` with
-`dm_policy = "allowlist"` works. Recorded again against `v0.22.5` (09 17.10): the own access
-policy needs `authorization_is_upstream` next to it, `/resume --all` does not move a session that
-is live in another thread of the same gateway, and the global `queue` steers. The recording is
+`dm_policy = "allowlist"` works. Recorded again against `v0.22.5` and against `a8b0bc15053c` (09
+17.10): the own access policy needs `authorization_is_upstream` next to it, `/resume --all` did
+not move a session that is live in another thread of the same gateway in `v0.22.5` and moves it
+again in `a8b0bc15053c`; the adapter fails open for such a bind on both (17.4), and the global
+`queue` steers. The recording is
 part of the normal test run and needs the network for the pinned downloads.
 
 The harness guarantees: the checkout of the pinned commit lies read-only in a throwaway

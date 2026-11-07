@@ -131,9 +131,10 @@ async def test_bind_takes_a_session_over_or_fails_open(world: HermesWorld) -> No
         source = await fake.trigger("Remember the boat.", session_mode="new")
         await finish(source, "the first run")
         taken = fake.session_reports(source.thread_id)[-1]["external_session_ref"]
-        # A session that ran in another thread of this gateway process: Hermes v0.22 keeps it
-        # live on that thread's route and pauses every turn of another route on it, so the
-        # adapter fails open instead of binding (09 17.4).
+        # A session that ran in another thread of this gateway process: Hermes v0.22.5 keeps it
+        # on that thread's route, and a8b0bc moves it, but the other thread's next /new ends it
+        # there, so the adapter fails open instead of binding on every version (09 17.4,
+        # D-HERMES-MAIN-4).
         other = await fake.trigger("Hello.", session_mode="new")
         await finish(other, "the second run")
         fake.start_session(other.thread_id, taken, started=True)

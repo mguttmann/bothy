@@ -58,4 +58,5 @@ class MessageEvent:
         reply_expected: bool | None = ...,
         inherit_channel_pin: bool = ...,
         edit_revision: str | None = ...,
+        media_filenames: list[str] = ...,
     ) -> None: ...

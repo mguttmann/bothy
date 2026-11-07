@@ -1700,7 +1700,9 @@ For an imported thread with a previous session, the import creates a previous re
    duplicate report with the old `If-Match` fails and the line is written exactly once.
    `bind_failed` without a started session row of the run gives `409 conflict` with
    `reason` `session_not_bound`. The run continues; the box shows once "Previous session not found, new
-   session started". Reason: a missing history must not block continuing the work.
+   session started". Reason: a missing history must not block continuing the work. The adapter
+   of Hermes takes this path without sending `/resume` also for a session that ran a turn in
+   another thread of the same gateway process since that process started (17.4, D-HERMES-MAIN-4).
 5. An import row is bound only as long as the thread has had no current session since the import;
    a later `agent_session.reset` never binds again.
 
@@ -2527,17 +2529,20 @@ plugin surfaces. Verified basis, retrieved 2026-10-10:
   named in the command reference (`/steer`): https://hermes-agent.nousresearch.com/docs/user-guide/cli
   [verified; `steer` measured in M2-32: it works through the global key and through `/steer`, the
   per-platform key is not read, 17.5 and 17.10 row `steer`]
-- Pinned version for tests: `plugins/hermes-adapter/tests/hermes_pin.toml` (release tag and full
-  commit). The recording of M2-32 proves the mapping of this section against exactly this
+- Pinned version for tests: `plugins/hermes-adapter/tests/hermes_pin.toml` (full commit and its
+  release tag; a commit without a release tag only by a ruling that names it, now
+  D-HERMES-MAIN-1). The recording of M2-32 proves the mapping of this section against exactly this
   version (17.10). Hermes tagged its releases by date up to `v2026.9.24` and by version since
   October 2026 (`v0.22.x`); a version tag is always the newer release (D-HERMES-COMPAT-1).
 - Python: the adapter runs on Python 3.11 and newer, the oldest Python Hermes admits
-  (`requires-python` of `v0.22.5`: `>=3.11,<3.15`); the lock of `v0.22` installs only 3.14, so
+  (`requires-python` of `v0.22.5` and of the pinned `a8b0bc15053c`: `>=3.11,<3.15`); their locks
+  install only 3.14, so
   the Fake-Hermes tests and the recording run on 3.14 and the adapter's own tests on 3.11
   (D-HERMES-COMPAT-2).
 
 Hermes is not part of the product. The adapter pins a version range of Hermes; a
-compatibility test runs against the pinned and the newest version (16.1, fake Hermes).
+compatibility test runs against the pinned and the newest version (16.1, fake Hermes). While the
+pin is a commit without a release tag, the newest release is older than the pin (D-HERMES-MAIN-1).
 
 ### 17.2 Package and registration
 
@@ -2651,11 +2656,17 @@ session and answers with a notice (9.5 item 4).
 Since `v0.22` (measured in the recording and the Fake-Hermes tests of `v0.22.5`): Hermes reports
 `on_processing_complete` of a command before its processing has ended, and a turn sent in that gap
 on the same session key never completes; the adapter therefore waits after every command it sends
-until Hermes' processing of it has ended. A session stays live on the route of the thread whose
-turn ran on it until the gateway restarts: `/resume <ID> --all` from another thread does not move
-it (`session_resume_admin.json`), and the turn of the other thread does not run on it. For a bind of a
-session whose turn ran in another thread of the same gateway process the adapter therefore sends
-no `/resume` and fails open with the new session (9.5 item 4); after a restart the takeover works.
+until Hermes' processing of it has ended. Whether `/resume <ID> --all` from another thread moves a
+session that is live on the route of the thread whose turn ran on it depends on the version
+(`session_resume_admin.json`): `v2026.9.24` moved it, `v0.22.5` did not and paused the other
+thread's turn on it, and `a8b0bc15053c` moves it again (upstream `name_lane`: the chat that names
+the session last holds it, no chat is locked out). In every version a later `/new` in the thread
+that held the session ends that session in Hermes, even when another thread names it now. For a
+bind of a session whose turn ran in another thread of the same gateway process the adapter
+therefore sends no `/resume` and fails open with the new session (9.5 item 4, D-HERMES-MAIN-4), so
+no transcript is shared by two threads and the behaviour is the same on every supported version.
+The adapter knows that thread only while its process runs; after a restart it sends `/resume` and
+the session moves.
 
 ### 17.5 Follow-ups: `busy_input_mode`
 
@@ -2916,9 +2927,11 @@ A notice of background work that a turn started is no report: it belongs to the 
 
 ### 17.10 To check before building
 
-Measured in M2-32 against Hermes Agent `v2026.9.24` (recorded on 2026-10-12) and recorded again
-against `v0.22.5`, commit `bf0203a794a0`, on 2026-10-29 (D-HERMES-COMPAT-3), with a fake model
-(no costs). The table states the `v0.22.5` results and names what changed. Evidence in
+Measured in M2-32 against Hermes Agent `v2026.9.24` (recorded on 2026-10-12), recorded again
+against `v0.22.5`, commit `bf0203a794a0`, on 2026-10-29 (D-HERMES-COMPAT-3), and against the main
+commit `a8b0bc15053c` (no release tag) on 2026-11-07 (D-HERMES-MAIN-1), with a fake model (no
+costs). The table states the `a8b0bc15053c` results and names what changed; a row that names only
+`v0.22.5` holds unchanged for `a8b0bc15053c`. Evidence in
 `plugins/hermes-adapter/tests/fixtures/recording/`; `observations.json` computes the verdict of
 every row from the facts, and a test keeps table and evidence equal.
 
@@ -2928,7 +2941,7 @@ every row from the facts, and a test keeps table and evidence equal.
 | `steer` | adapted: the per-platform key is not read (every value acts like `interrupt`); the global `display.busy_input_mode` with `steer` puts the follow-up into the running turn, with `queue` in `v0.22.5` also into the running turn (in `v2026.9.24` into a new one), and `/steer <text>` also works without configuration. | `busy_steer.json`, `busy_queue.json`, `busy_interrupt.json`, `busy_steer_global.json`, `busy_queue_global.json`, `busy_steer_command.json`, `observations.json` | 17.1, 17.3, 17.5 |
 | `credential_type` | adapted: no public surface; Hermes' internal resolution matches the endpoint in every profile, OAuth takes precedence, the choice applies per turn, a login file of Claude Code is used, and `auth.adopt_external_logins: false` switches that off. | `credential_api_key_only.json`, `credential_oauth_only.json`, `credential_both.json`, `credential_none.json`, `credential_login_file_only.json`, `credential_login_file_optout.json`, `credential_other_provider.json`, `credential_per_turn.json`, `observations.json` | 17.8, 10 10.1 |
 | `interrupt_outcome` | confirmed: `/stop` via `handle_message` ends the turn, `on_processing_complete` reports `CANCELLED`, and the model is not called further; `cancel_session_processing` also reports `CANCELLED`, but lets the agent run on (in `v0.22.5` it also sends an answer). | `interrupt.json`, `interrupt_command.json`, `observations.json` | 8, 17.3 |
-| `session_switch` | adapted: `/new` with the confirmation through `tools.slash_confirm.resolve` starts a new session, `/resume` binds a session of the same thread, and the hook `pre_llm_call` delivers the ID; a missing ID leaves the current session in place. In `v0.22.5` `/resume --all` for an admin sender no longer moves a session that is live in another thread of the same gateway process (in `v2026.9.24` it did). | `session_new.json`, `session_resume.json`, `session_resume_admin.json`, `session_resume_same_thread.json`, `session_resume_missing.json`, `observations.json` | 9.5, 17.3, 17.4 |
+| `session_switch` | confirmed: `/new` with the confirmation through `tools.slash_confirm.resolve` starts a new session, `/resume` binds a session of the same thread, and the hook `pre_llm_call` delivers the ID; a missing ID leaves the current session in place. `/resume --all` for an admin sender moves a session that is live in another thread of the same gateway process again in `a8b0bc15053c` (`v2026.9.24` moved it, `v0.22.5` did not); the adapter does not use that move for a bind (17.4, D-HERMES-MAIN-4). | `session_new.json`, `session_resume.json`, `session_resume_admin.json`, `session_resume_same_thread.json`, `session_resume_missing.json`, `observations.json` | 9.5, 17.3, 17.4 |
 | `own_access_policy` | adapted: in `v0.22.5` `enforces_own_access_policy = True` with `dm_policy = "allowlist"` in `PlatformConfig.extra` no longer lets the message of a person without a Hermes list reach the turn (in `v2026.9.24` it did); together with `authorization_is_upstream = True` it does; without any declaration Hermes holds it back. | `access_policy_own.json`, `access_policy_default.json`, `access_policy_upstream.json`, `observations.json` | 17.7 |
 
 ### 17.11 Tool class
@@ -2947,14 +2960,15 @@ name. Reason: fail closed; a too high report only blocks starts whose token carr
 
 Addendum of 2026-11-06 (FIX-hermes-hidden-background, R-AG-44,
 [design note](../design/hermes-background-work.md), docs/decisions.d/FIX-hermes-hidden-background.md).
-Owner rule: nothing an agent does may run without being visible in the app, and an agent must
-not be able to work in the background without a visible run. In the pinned `v0.22.5` every
-top-level `delegate_task` runs in the background: the tool returns a handle at once and the turn
-ends; a `terminal` call with `background` starts a process that outlives the turn. When a
-delegation unit or a notifying process finishes, the gateway admits an internal event that starts
-a full turn with tools in the thread's session, through the session authority's queue and not
-through the platform's `handle_message` (measured with the Fake-Hermes rig: only the hooks reach
-the adapter). This section mirrors the background work of the runner (18.5) for Hermes:
+Owner rule: nothing an agent does may run without being visible in the app, and an agent must not
+be able to work in the background without a visible run. In `v0.22.5` and in the pinned
+`a8b0bc15053c` (Fake-Hermes tests) every top-level `delegate_task` runs in the background: the
+tool returns a handle at once and the turn ends; a `terminal` call with `background` starts a
+process that outlives the turn. When a delegation unit or a notifying process finishes, the
+gateway admits an internal event that starts a full turn with tools in the thread's session,
+through the session authority's queue and not through the platform's `handle_message` (measured
+with the Fake-Hermes rig: only the hooks reach the adapter). This section mirrors the background
+work of the runner (18.5) for Hermes:
 
 1. Background work of a run: the delegation units (`tools.async_delegation`) and background
    processes (`tools.process_registry`) of the thread's Hermes session that started after the run

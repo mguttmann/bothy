@@ -65,6 +65,7 @@ class ExecApprovalPrompt:
         description: str,
         smart_denied: bool,
         metadata: dict[str, Any] | None = ...,
+        request_id: str | None = ...,
     ) -> None: ...
     @property
     def choices(self) -> list[str]: ...
