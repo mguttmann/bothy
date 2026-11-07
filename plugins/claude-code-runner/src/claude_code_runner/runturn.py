@@ -2302,15 +2302,24 @@ class RunTurn:
         finally:
             self._end()
 
+    async def _restart_transcribing(self) -> None:
+        """No CLI ran for the run: started over after the launch check (18.19.6).
+
+        A stop that came first ends it cancelled; the launch check would return without a finish.
+        """
+        if self._stop_requested():
+            await self._finish_cancelled()
+            return
+        if not await self._launch_check() or not await self._precheck_again():
+            return
+        self.launch_checked = True  # the check of this start counts for its first launch
+        await self._reload_context()
+        await self._open_turn()
+        await self._drive(_Attempt(resume=self.session.resume), precheck=False)
+
     async def _continue_phase(self, phase: str, record: Mapping[str, Any]) -> None:
         if phase == "transcribing":
-            # No CLI ran for the run: started over after the launch check (18.19.6).
-            if not await self._launch_check() or not await self._precheck_again():
-                return
-            self.launch_checked = True  # the check of this start counts for its first launch
-            await self._reload_context()
-            await self._open_turn()
-            await self._drive(_Attempt(resume=self.session.resume), precheck=False)
+            await self._restart_transcribing()
             return
         if phase == "compaction_retry":
             retry = _Attempt(resume=True, hint=self.retry_hint, label="retry")

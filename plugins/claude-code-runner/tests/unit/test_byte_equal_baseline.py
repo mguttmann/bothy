@@ -199,10 +199,16 @@ async def test_stdin_handling(world: World) -> None:
     world.release(gate)
     assert await world.ended(run.run_id) == "completed"
     [turn] = world.turns()
+    calls = [c for c in world.calls("stdin") + world.calls("stdin_eof") if c["pid"] == turn["pid"]]
+    # The fixture holds the parsed lines (their ids and times named); the bytes of each line are
+    # held here: compact JSON, non-ASCII unescaped, members in their order.
+    for c in calls:
+        if c["kind"] == "stdin":
+            raw = c["line"].rstrip("\n")
+            assert raw == json.dumps(json.loads(raw), ensure_ascii=False, separators=(",", ":"))
     events = [
         {"kind": c["kind"], **({"line": json.loads(c["line"])} if c["kind"] == "stdin" else {})}
-        for c in world.calls("stdin") + world.calls("stdin_eof")
-        if c["pid"] == turn["pid"]
+        for c in calls
     ]
     # The FakeServer's clock moves with the machine: the message times are named.
     check("stdin_handling.json", _AT.sub("at=<time>", normalized(events, world)))
