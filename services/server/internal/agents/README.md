@@ -618,8 +618,10 @@ stored.
   handlers). internal/wire builds the interviewer in the agents step (`BindInterview`), binds the
   relay in the gateway step and gives `interviewAgent` the deadline `agents.interview.timeout`
   plus `http.request_timeout` (`InterviewDeadline`). The template catalogue is the
-  `app.CatalogueSource` of the templates of A1-06; until it is bound the catalogue is empty, so
-  every drafted MCP server is `mcp_not_in_catalogue`.
+  `app.CatalogueSource` of the templates of A1-06: the agents step passes the `TemplateService` of
+  `BindTemplates`, so a drafted MCP server passes when it equals a server of a shipped or private
+  template except its name; without a source the catalogue is empty and every drafted MCP server
+  is `mcp_not_in_catalogue`.
 - The rulings are [decisions.d/A1-07.md](../../../../docs/decisions.d/A1-07.md).
 
 ## Templates of built-in agents (A1-06)

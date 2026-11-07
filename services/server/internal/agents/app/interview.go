@@ -60,8 +60,8 @@ type InterviewConfig struct {
 }
 
 // CatalogueSource returns the template catalogue sent with an interview request (26 7.4): the
-// shipped and private templates with their MCP servers. The templates of A1-06 implement it;
-// without one the catalogue is empty.
+// shipped and private templates with their MCP servers. TemplateService implements it, and the
+// start binds the templates of A1-06; without one the catalogue is empty.
 type CatalogueSource interface {
 	// InterviewCatalogue returns the catalogue; errors are storage or read errors.
 	InterviewCatalogue(ctx context.Context) ([]interview.CatalogueEntry, error)
