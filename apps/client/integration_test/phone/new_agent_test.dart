@@ -56,14 +56,21 @@ void main() {
           await type('newAgent.name', 'Notes');
           await type('newAgent.handle', 'notes');
           await type('newAgent.instructions', 'Keep the notes of Robin.');
-          await tap('newAgent.create');
+          // A step that waits for its step-up shows a spinner, so nothing settles after
+          // Create: tap and pump instead of the settling tap.
+          final create = find.byKey(const ValueKey('newAgent.create'));
+          await app.waitFor(create);
+          await tester.ensureVisible(create);
+          await tester.pumpAndSettle();
+          await tester.tap(create);
+          await tester.pump();
           await eventually('the dialog closed', () async {
             if (find
                 .byKey(const ValueKey('stepUp.dialog'))
                 .evaluate()
                 .isNotEmpty) {
               await tester.tap(find.byKey(const ValueKey('stepUp.continue')));
-              await tester.pumpAndSettle();
+              await tester.pump(const Duration(milliseconds: 300));
             }
             await tester.pump();
             return find
