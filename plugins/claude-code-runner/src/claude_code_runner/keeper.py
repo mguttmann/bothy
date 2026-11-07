@@ -218,16 +218,19 @@ class _Keeper:
             if not os.read(release_r, 1):
                 os._exit(_CHILD_FAILED)  # no release: no exec
             os.dup2(stdin, 0)
+            # The spec is the runner's own file in its private launch folder (mode 0600,
+            # D-AR-03-1): its paths and command line are what the runner chose to start, not
+            # outside input (NOSONAR below, D-AR-03-14).
             flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND | os.O_NOFOLLOW
-            os.dup2(os.open(str(spec["stdout"]), flags, 0o600), 1)
-            os.dup2(os.open(str(spec["stderr"]), flags, 0o600), 2)
+            os.dup2(os.open(str(spec["stdout"]), flags, 0o600), 1)  # NOSONAR
+            os.dup2(os.open(str(spec["stderr"]), flags, 0o600), 2)  # NOSONAR
             for fd in locks:
                 os.set_inheritable(fd, True)
-            os.chdir(str(spec["cwd"]))
+            os.chdir(str(spec["cwd"]))  # NOSONAR
             argv = [str(a) for a in spec["argv"]]
             env = {str(k): str(v) for k, v in dict(spec["env"]).items()}
-            os.execvpe(argv[0], argv, env)  # noqa: S606  # nosec B606 - argument list, no shell
-        except BaseException:
+            os.execvpe(argv[0], argv, env)  # noqa: S606  # nosec B606  # NOSONAR - argument list
+        except BaseException:  # NOSONAR - the forked child must never return into the keeper
             os._exit(_CHILD_FAILED)
 
     def reap(self) -> bool:
@@ -329,7 +332,7 @@ class _Keeper:
 def _drain(fd: int) -> None:
     with contextlib.suppress(BlockingIOError, InterruptedError):
         while os.read(fd, 512):
-            pass
+            continue  # discard what is left
 
 
 def run(launch: Path, go_fd: int, *, compaction: bool) -> int:

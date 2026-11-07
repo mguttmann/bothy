@@ -189,7 +189,9 @@ class World:
 
     def cli_env(self) -> dict[str, str]:
         """The environment of a runner process of its own."""
-        return {**self.environ(), "PYTHONPATH": os.pathsep.join(sys.path)}
+        # COVERAGE_*: a coverage run measures the runner process too (patch = subprocess).
+        coverage = {k: v for k, v in os.environ.items() if k.startswith("COVERAGE_")}
+        return {**self.environ(), "PYTHONPATH": os.pathsep.join(sys.path), **coverage}
 
     def spawn_command(self, argv: list[str]) -> subprocess.Popen[bytes]:
         """Start ``argv`` as a runner process in its own session, logging to ``runner-<n>.log``.

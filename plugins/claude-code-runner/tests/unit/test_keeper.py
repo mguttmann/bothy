@@ -151,7 +151,8 @@ def start(
         argv.append("--compaction")
     keeper = subprocess.Popen(
         argv,
-        env={"PATH": "/usr/bin:/bin", "PYTHONPATH": str(SRC)},
+        # COVERAGE_*: a coverage run measures the keeper process too (patch = subprocess).
+        env={"PATH": "/usr/bin:/bin", "PYTHONPATH": str(SRC), **coverage_env()},
         stdin=subprocess.DEVNULL,
         start_new_session=True,
         pass_fds=(go_r, *lock_fds),
@@ -161,6 +162,11 @@ def start(
     launch = Launch(prefix, keeper, go_w, capture)
     launches.append(launch)
     return launch
+
+
+def coverage_env() -> dict[str, str]:
+    """The ``COVERAGE_*`` variables of this process, so that a child process is measured."""
+    return {k: v for k, v in os.environ.items() if k.startswith("COVERAGE_")}
 
 
 def runner_end(launch: Launch) -> int:
