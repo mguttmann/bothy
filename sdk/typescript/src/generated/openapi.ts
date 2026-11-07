@@ -8998,6 +8998,13 @@ export interface components {
             progress_events?: number;
             last_api_retry?: components["schemas"]["RunApiRetry"];
             autonomy_last?: components["schemas"]["RunAutonomyLast"];
+            /**
+             * @description The end state of the run's last answer (09 18.19.11, 03 `runs.metrics`): `done` nothing more to do, `waiting` more work after something happens, `blocked` needs a person. Set at the finish of a run of a runner with `runner.end_state`; absent otherwise. Clients show it on the collapsed line of the run (01 6.21 item 2).
+             * @enum {string}
+             */
+            end_state?: "done" | "waiting" | "blocked";
+            /** @description The time the next pending wake-up of the thread fires at the earliest, at the end of the run (09 18.19.11); absent when no wake-up was pending. Clients show when the thread continues (01 6.21 item 2). */
+            wake_pending_until?: components["schemas"]["Timestamp"];
         };
         /** @description The idle flag of the last autonomous input or notification turn (09 5.8.6); the server counts each distinct `input` once in the idle count of the run's thread and person. */
         RunAutonomyLast: {
