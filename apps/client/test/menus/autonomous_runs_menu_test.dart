@@ -7,6 +7,7 @@
 // channel's version as If-Match into the outbox; it is hidden without `manage`, in a direct
 // message and on a server before stage AR (the channel carries no switch).
 
+import 'package:client/menus/autonomous_runs_dialog.dart';
 import 'package:client/menus/channel_menu.dart';
 import 'package:client/notifications_settings/providers.dart';
 import 'package:client/sync/wake_ops.dart';
@@ -43,6 +44,7 @@ Future<ColumnHost> pumpMenu(
   Channel channel, {
   AccessView access = manage,
   String platform = 'macos',
+  bool? ofServer,
 }) async {
   final host = await ColumnHost.open(tester);
   await tester.runAsync(() async {
@@ -57,6 +59,9 @@ Future<ColumnHost> pumpMenu(
     overrides: [
       isOwnerProvider.overrideWith((ref) async => false),
       myPrincipalIdProvider.overrideWithValue(alex),
+      // What getChannel reports; the snapshot and the channel events carry no switch.
+      autonomousRunsOfServerProvider(channel.id.value)
+          .overrideWith((ref) async => ofServer),
     ],
   );
   return host;
@@ -116,6 +121,31 @@ void main() {
     expect(entry, findsNothing);
     await host.dispose(tester);
   });
+
+  for (final platform in ['macos', 'windows', 'ios', 'android']) {
+    testWidgets('$platform: offered for a channel stored from the snapshot '
+        'once getChannel carries the switch', (tester) async {
+      final host = await pumpMenu(
+        tester,
+        channel(1, name: 'general'),
+        platform: platform,
+        ofServer: false,
+      );
+      await openMenu(tester, platform);
+      expect(entry, findsOneWidget);
+      await tester.tap(entry);
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<Switch>(
+              find.descendant(of: toggle, matching: find.byType(Switch)),
+            )
+            .value,
+        isFalse,
+      );
+      await host.dispose(tester);
+    });
+  }
 
   testWidgets('hidden in a direct message', (tester) async {
     final dm = general.copyWith(kind: ChannelKind.dm, name: '');

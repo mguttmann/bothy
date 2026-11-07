@@ -1326,7 +1326,16 @@ final class FakeWorld {
       'principal': person.ref,
       'is_owner': person.isOwner,
       'spaces': spaceViews(principalId),
-      'channels': channelViews(principalId),
+      // As on the server (`SnapshotChannel`), a snapshot channel carries no
+      // `allow_autonomous_runs`.
+      'channels': [
+        for (final v in channelViews(principalId))
+          {
+            ...v,
+            'channel': {...v['channel']! as JsonMap}
+              ..remove('allow_autonomous_runs'),
+          },
+      ],
       'sidebar': sidebarOf(principalId),
       'sidebar_channels': sidebarChannelsOf(principalId),
       'unread_threads': unread,
@@ -1436,7 +1445,12 @@ final class FakeWorld {
       'permission_version': permissionVersion,
     };
     // A copy: the world keeps changing its objects, a logged event never changes.
-    final event = FakeEvent(_copy(envelope), audience: audience);
+    final logged = _copy(envelope);
+    // As on the server (`channelJSON` of AR-04), a channel in an event payload carries no
+    // `allow_autonomous_runs`; only `getChannel`, `listSpaceChannels` and the switch's answer do.
+    final eventChannel = (logged['payload'] as Map?)?['channel'];
+    if (eventChannel is Map) eventChannel.remove('allow_autonomous_runs');
+    final event = FakeEvent(logged, audience: audience);
     log.add(event);
     for (final hook in List.of(eventHooks)) {
       hook(event);

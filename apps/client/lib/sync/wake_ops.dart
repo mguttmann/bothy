@@ -81,9 +81,18 @@ abstract final class WakeOps {
             data,
           );
           if (json is Map) {
-            await db.structureDao.upsertChannelIfNewer(
-              channelFromJson(json.cast<String, Object?>()),
-            );
+            final channel = channelFromJson(json.cast<String, Object?>());
+            await db.structureDao.upsertChannelIfNewer(channel);
+            // The `channel.updated` of the switch carries no `allow_autonomous_runs` and may
+            // have stored this version first, so the answer's value is written at its version.
+            final allowed = channel.allowAutonomousRuns;
+            if (allowed != null) {
+              await db.structureDao.putChannelAutonomousRuns(
+                channel.id,
+                channel.version,
+                allowed: allowed,
+              );
+            }
           }
         }
         return OutboxResponse(status: response.statusCode, body: data);

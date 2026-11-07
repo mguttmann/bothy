@@ -207,9 +207,10 @@ class LocalDatabase extends _$LocalDatabase {
       // and the cursor stays, because nothing of the mirror changes.
       from12To13: (m, schema) => m.createTable(schema.threadSeenStates),
       // Version 14 (AR-08): the mirror table `run_wakes` and the column
-      // `channels.allow_autonomous_runs`, null (unknown, the switch hidden) in every kept row;
-      // no row moves. The cursor goes, so the next connection loads a whole snapshot that fills
-      // the switch of every channel (04 7.3); wake-ups load per thread when it opens.
+      // `channels.allow_autonomous_runs`, null (unknown) in every kept row; no row moves. The
+      // cursor goes, so the next connection loads a whole snapshot (04 7.3); the switch itself
+      // is filled by `getChannel` when the channel menu asks, and wake-ups load per thread when
+      // it opens.
       from13To14: (m, schema) async {
         await m.createTable(schema.runWakes);
         await m.createIndex(schema.runWakesThread);

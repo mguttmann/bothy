@@ -4,8 +4,9 @@
 // for each platform build of the desktop and the phone (brief AR-08 Tests; 01 6.21, 09 5.8):
 // the thread's wake-ups load into the local table when the view asks, `run.wake_changed` brings
 // an end and its note, a fired wake-up names its wake run, the Cancel of the outbox reaches the
-// server and comes back, and the channel switch is stored with its version; a channel of a
-// server before stage AR stays without the switch. integration_test/autonomous_runs_test.dart
+// server and comes back, and the channel switch, absent from the snapshot and the channel events
+// as on the real server, is filled by getChannel, stored with its version and kept by a later
+// channel.updated; a channel of a server before stage AR stays without the switch. integration_test/autonomous_runs_test.dart
 // drives the same in the desktop app and the phone suite on the devices.
 
 import 'dart:io';
@@ -13,6 +14,7 @@ import 'dart:io';
 import 'package:client/agents/wakes/wake_notes.dart';
 import 'package:client/app/providers/ports.dart';
 import 'package:client/app/providers/session.dart';
+import 'package:client/menus/autonomous_runs_dialog.dart';
 import 'package:client/sync/wake_ops.dart';
 import 'package:design_system/design_system.dart';
 import 'package:domain/domain.dart';
@@ -183,6 +185,17 @@ void main() {
         // The channel switch with manage and the stored version.
         world.channels[w.general]!.capabilities[w.alex.id] = {'manage'};
         final general = ChannelId.parse(w.general);
+        // As from the real server, the snapshot carries no switch: getChannel fills it.
+        expect(
+          (await db.structureDao.channelById(general))!.allowAutonomousRuns,
+          isNull,
+        );
+        expect(
+          await client.container.read(
+            autonomousRunsOfServerProvider(w.general).future,
+          ),
+          isFalse,
+        );
         final before = (await db.structureDao.channelById(general))!;
         expect(before.allowAutonomousRuns, isFalse);
         await enqueueAutonomousRuns(
@@ -202,6 +215,19 @@ void main() {
           world.channels[w.general]!.json['allow_autonomous_runs'],
           isTrue,
         );
+        // A later channel.updated without the member keeps the stored switch.
+        final switched = (await db.structureDao.channelById(general))!.version;
+        world.setProjectBound(w.general, bound: true);
+        await eventually(
+          'the next channel.updated is stored',
+          () async =>
+              (await db.structureDao.channelById(general))!.version.value >
+              switched.value,
+        );
+        expect(
+          (await db.structureDao.channelById(general))!.allowAutonomousRuns,
+          isTrue,
+        );
       });
     });
   }
@@ -215,6 +241,12 @@ void main() {
           ChannelId.parse(w.general),
         );
         expect(general!.allowAutonomousRuns, isNull);
+        expect(
+          await client.container.read(
+            autonomousRunsOfServerProvider(w.general).future,
+          ),
+          isNull,
+        );
         await engine.catchUp.loadThreadWakes(ThreadId.parse(w.releaseNotes));
         expect(await stored(db, w.releaseNotes), isEmpty);
       },

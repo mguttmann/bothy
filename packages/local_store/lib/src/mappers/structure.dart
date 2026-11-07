@@ -109,7 +109,12 @@ ChannelsCompanion channelToCompanion(Channel channel) =>
       version: channel.version.value,
       settingsVersion: channel.settingsVersion.value,
       projectBound: Value(channel.projectBound),
-      allowAutonomousRuns: Value(channel.allowAutonomousRuns),
+      // Absent in the sync snapshot and in channel events of a server of stage AR (only
+      // `getChannel`, `listSpaceChannels` and the switch's answer carry it), so an absent value
+      // keeps what is stored instead of forgetting it (AR-08).
+      allowAutonomousRuns: channel.allowAutonomousRuns == null
+          ? const Value.absent()
+          : Value(channel.allowAutonomousRuns),
     );
 
 /// The operator setting of [channel] for `channel_operators`.

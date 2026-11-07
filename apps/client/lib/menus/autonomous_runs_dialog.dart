@@ -7,7 +7,10 @@
 /// (`setChannelAutonomousRuns` with the stored channel version as `If-Match`). The client has
 /// no other channel settings screen, so the menu is where the switch lives (ruling D-AR-08-4).
 /// Hidden in a direct message (the server refuses `dm_channel`) and on a server before stage
-/// AR, whose channel carries no switch.
+/// AR, whose channel carries no switch. The sync snapshot and the channel events carry no
+/// `allow_autonomous_runs` either, so a channel whose stored value is still unknown asks
+/// `getChannel` when its menu opens ([autonomousRunsOfServer]); the entry shows once the
+/// answer carries the switch.
 library;
 
 import 'dart:async';
@@ -18,6 +21,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:l10n/l10n.dart';
 import 'package:local_store/local_store.dart' show AccessView;
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:sync_engine/sync_engine.dart';
 
 import '../app/providers/session.dart';
@@ -25,12 +29,45 @@ import '../sidebar/providers.dart';
 import '../sync/wake_ops.dart';
 import '../thread/providers.dart';
 
-/// Whether the channel menu of [channel] offers the switch to a person with [access].
-bool offersAutonomousRunsSwitch(Channel channel, AccessView? access) =>
-    channel.allowAutonomousRuns != null &&
+part 'autonomous_runs_dialog.g.dart';
+
+/// Whether the channel menu of [channel] offers the switch to a person with [access]; [known]
+/// is the switch as the server reported it, null while unknown (a server before stage AR).
+bool offersAutonomousRunsSwitch(
+  Channel channel,
+  AccessView? access, {
+  bool? known,
+}) =>
+    (known ?? channel.allowAutonomousRuns) != null &&
     channel.kind != ChannelKind.dm &&
     channel.archivedAt == null &&
     (access?.capabilities.contains(Capability.manage) ?? false);
+
+/// `allow_autonomous_runs` of [channelId] as `getChannel` reports it, stored with the channel's
+/// version; null when the answer carries no switch (a server before stage AR) or the read
+/// failed. The sync snapshot and the channel events of a server of stage AR leave the member
+/// out, so this read is what fills it (AR-08).
+@riverpod
+Future<bool?> autonomousRunsOfServer(Ref ref, String channelId) async {
+  final engine = ref.watch(syncEngineProvider);
+  final db = ref.watch(localDatabaseProvider);
+  if (engine == null || db == null) return null;
+  try {
+    final channel = (await engine.api.getChannelsApi().getChannel(
+      channelId: channelId,
+    )).data?.channel;
+    final allowed = channel?.allowAutonomousRuns;
+    if (channel == null || allowed == null) return null;
+    await db.structureDao.putChannelAutonomousRuns(
+      ChannelId.parse(channelId),
+      ResourceVersion(channel.version),
+      allowed: allowed,
+    );
+    return allowed;
+  } on Object {
+    return null;
+  }
+}
 
 /// The entry "Let agents continue on their own..." of the menu of [channel], or none.
 List<Widget> autonomousRunsMenuItems(
@@ -39,7 +76,15 @@ List<Widget> autonomousRunsMenuItems(
   Channel channel,
 ) {
   final access = ref.watch(channelAccessProvider(channel.id.value)).value;
-  if (!offersAutonomousRunsSwitch(channel, access)) return const [];
+  // Not asked while the stored channel knows the switch or the person may not change it.
+  final known =
+      channel.allowAutonomousRuns ??
+      (offersAutonomousRunsSwitch(channel, access, known: false)
+          ? ref.watch(autonomousRunsOfServerProvider(channel.id.value)).value
+          : null);
+  if (!offersAutonomousRunsSwitch(channel, access, known: known)) {
+    return const [];
+  }
   return [
     DsMenuItem(
       key: const ValueKey('menu.autonomousRuns'),

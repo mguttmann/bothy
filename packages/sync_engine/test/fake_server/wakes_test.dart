@@ -153,7 +153,7 @@ void main() {
   });
 
   test('setChannelAutonomousRuns needs manage and If-Match and sends '
-      'channel.updated', () async {
+      'channel.updated without the switch', () async {
     final channel = world.channels[w.general]!;
     expect(channel.json['allow_autonomous_runs'], isFalse);
     Future<int> set(ApiClient api, int version) => status(
@@ -172,8 +172,23 @@ void main() {
     expect(await set(alexApi, version), 200);
     expect(channel.json['allow_autonomous_runs'], isTrue);
     expect(channel.json['version'], version + 1);
+    // As on the server (`channelJSON`), the event's channel carries no switch; getChannel does.
     final updated = eventsOf('channel.updated').last['payload']! as JsonMap;
-    expect((updated['channel']! as JsonMap)['allow_autonomous_runs'], isTrue);
+    final event = updated['channel']! as JsonMap;
+    expect(event['version'], version + 1);
+    expect(event.containsKey('allow_autonomous_runs'), isFalse);
+    final view = (await alexApi.getChannelsApi().getChannel(
+      channelId: w.general,
+    )).data!;
+    expect(view.channel.allowAutonomousRuns, isTrue);
+    final snapshot = (await alexApi.getSyncApi().getSnapshot()).data!;
+    expect(
+      snapshot.channels
+          .singleWhere((c) => c.channel.id == w.general)
+          .channel
+          .allowAutonomousRuns,
+      isNull,
+    );
   });
 
   test('a channel of an older server has no switch', () {
