@@ -11,7 +11,8 @@ environment of a turn drops every control variable. Commands:
   ``CLAUDE_CONFIG_DIR`` is set) or of ``$HOME/.claude/fake-login``, else ``none``.
 * ``-p --output-format json`` with the system prompt file ``builder.md``: the builder call of the
   interview (26 6.2), see `Fake.builder`; any other such call is the search assistant's.
-* ``-p``: records argv, cwd, environment, the system prompt file and every stdin line, emits
+* ``-p``: records argv, cwd, environment, process group, the system prompt file and every stdin
+  line (after ``stdin_gate`` when set), emits
   ``system/init``, echoes the first stdin line with ``isReplay``, plays the fixture, emits the
   ``result`` and exits after stdin EOF. SIGINT ends it with ``error_during_execution``.
   With ``background_gate`` the turn starts a background job that runs until the test creates
@@ -202,6 +203,8 @@ class Fake:
             env=dict(os.environ),
             system_prompt=system_prompt,
             index=index,
+            # The turn's process group: its own with a pipe, the keeper's with the handover.
+            pgid=os.getpgid(0),
         )
         signal.signal(
             signal.SIGINT, signal.SIG_IGN if self.scenario.get("ignore_sigint") else self.on_sigint
@@ -225,6 +228,7 @@ class Fake:
         refused = self.session_check(resume is not None)
         if refused is not None:
             return refused
+        self.gate("stdin_gate")  # a CLI that does not read yet (AR-T04: keeper killed)
         first = sys.stdin.readline()
         self.record("stdin", line=first.rstrip("\n"))
         if _text_of(first) == "/compact":

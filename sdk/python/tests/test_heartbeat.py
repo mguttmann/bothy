@@ -149,6 +149,8 @@ def test_closed_details_keys() -> None:
         "title",
         "files_out",
         "hosts_agents",
+        "turn_handover",
+        "wakes",
     }
 
     # Required members, types, vocabularies and duplicates.
@@ -442,3 +444,12 @@ def test_capabilities_keep_their_order_without_hosts_agents() -> None:
         "title",
         "files_out",
     ]
+
+
+@pytest.mark.parametrize("key", ["turn_handover", "wakes"])
+def test_stage_ar_capabilities_are_true_only(key: str) -> None:
+    # 09 18.19.1, docs/api: `turn_handover` and `wakes` are `true`, sent only while the key is on.
+    beat = build_heartbeat(details={"capabilities": {"title": True, key: True}})
+    assert beat.to_dict()["details"]["capabilities"] == {"title": True, key: True}
+    with pytest.raises(ValueError, match=f"details.capabilities.{key}"):
+        build_heartbeat(details={"capabilities": {key: False}})

@@ -324,6 +324,21 @@ def test_hosting_keys_default_off(tmp_path: Path) -> None:
     assert cfg.hosted_max_tool_class == "scoped"
 
 
+def test_turn_handover_off_by_default(tmp_path: Path) -> None:
+    # 09 18.19.1, rule 11 of the brief: every key of stage AR is off by default.
+    assert load_config(write(tmp_path)).turn_handover is False
+
+
+def test_turn_handover_read(tmp_path: Path) -> None:
+    assert load_config(write(tmp_path, "turn_handover = true")).turn_handover is True
+
+
+def test_turn_handover_not_a_bool_refused(tmp_path: Path) -> None:
+    with pytest.raises(ConfigError) as err:
+        load_config(write(tmp_path, 'turn_handover = "yes"'))
+    assert err.value.key == "runner.turn_handover"
+
+
 def test_hosting_keys_read(tmp_path: Path) -> None:
     root = tmp_path / "agents"
     runner = (

@@ -191,6 +191,18 @@ def test_capabilities_without_hosting_are_the_ones_before_stage_a1() -> None:
     assert "hosts_agents" not in capabilities(voice_input=True)
 
 
+def test_capability_turn_handover_only_while_the_key_is_on() -> None:
+    # 09 18.19.1: turn_handover: true only while runner.turn_handover is on; off, the member
+    # is missing and the capabilities equal those before stage AR (AR-T16).
+    assert "turn_handover" not in capabilities(voice_input=False)
+    assert "turn_handover" not in capabilities(voice_input=False, turn_handover=False)
+    caps = capabilities(voice_input=False, turn_handover=True)
+    assert caps["turn_handover"] is True
+    assert {k: v for k, v in caps.items() if k != "turn_handover"} == capabilities(
+        voice_input=False
+    )
+
+
 @pytest.mark.parametrize("ceiling", ["chat", "scoped", "host"])
 def test_capabilities_with_hosting_report_the_ceiling(ceiling: str) -> None:
     # 26 3.1 item 3, 09 2.2: hosts_agents carries runner.hosted_max_tool_class.

@@ -22,6 +22,10 @@ adopted turn alike:
    turn whose result names nothing); there is no positional rule.
 4. **Kind.** The kind of the process is fixed when the ledger is made and kept by an adoption.
 
+``process_start`` is where the process's lines begin in the stream file. It is set when the
+process starts, never moved by a checkpoint, and part of the record, so every adopter writes it
+again; an adopter with the handover replays the lines from it to the offset (09 18.19.7).
+
 Examples:
     >>> ledger = TurnLedger.begin("turn", 0)
     >>> ledger.written("p")
@@ -108,6 +112,7 @@ class TurnLedger:
         kind: ``turn`` or ``compaction`` (rule 4).
         offset: The stored offset of the stream file (rule 1).
         answers: The planned answers by the offset of their ``result`` line (rule 2).
+        process_start: Where the process's lines begin (never moved by a checkpoint).
     """
 
     kind: str
@@ -126,6 +131,13 @@ class TurnLedger:
     """The text of the last API error message read (classification only, never stored)."""
     init_seen: bool = False
     compacted: bool = False
+    process_start: int = -1
+    """Where the process's lines begin; ``begin`` sets it to the start offset."""
+
+    def __post_init__(self) -> None:
+        """A ledger made without a start begins at its offset."""
+        if self.process_start < 0:
+            self.process_start = self.offset
 
     @classmethod
     def begin(cls, kind: str, offset: int, previous: TurnLedger | None = None) -> TurnLedger:
@@ -162,10 +174,13 @@ class TurnLedger:
         """
         kind = str(record.get("kind", "turn"))
         offset = record.get("offset")
+        start = record.get("process_start")
         ledger = cls(
             kind if kind in KINDS else "compaction",
             offset if isinstance(offset, int) and offset >= 0 else 0,
         )
+        if isinstance(start, int) and not isinstance(start, bool) and 0 <= start <= ledger.offset:
+            ledger.process_start = start
         for raw in record.get("answers") or []:
             try:
                 ledger.answers[int(raw["line"])] = PlannedAnswer(
@@ -194,11 +209,13 @@ class TurnLedger:
         """The ledger's part of the turn record (no text).
 
         Returns:
-            ``kind``, ``offset``, ``answers``, ``inputs`` and ``cost_result``.
+            ``kind``, ``offset``, ``process_start``, ``answers``, ``inputs`` and
+            ``cost_result``.
         """
         return {
             "kind": self.kind,
             "offset": self.offset,
+            "process_start": self.process_start,
             "cost_result": self.cost_result,
             "finishing": self.finishing,
             "answers": [

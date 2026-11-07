@@ -66,7 +66,9 @@ server at the send (``403 feature_disabled``), so the runner never reads ``opera
 (18.14)."""
 
 
-def capabilities(*, voice_input: bool, hosts_agents: str | None = None) -> dict[str, bool | str]:
+def capabilities(
+    *, voice_input: bool, hosts_agents: str | None = None, turn_handover: bool = False
+) -> dict[str, bool | str]:
     """Return ``details.capabilities`` of one agent's heartbeat (09 2.2, 4.8).
 
     Args:
@@ -75,6 +77,9 @@ def capabilities(*, voice_input: bool, hosts_agents: str | None = None) -> dict[
             ``runner.hosted_agents`` (26 3.1 item 3); ``None`` leaves the member out, as for a
             hosted agent and for a runner without the key, whose capabilities then equal those
             before stage A1 (26 11 item 3).
+        turn_handover: ``runner.turn_handover`` of the runner's own agent: the member
+            ``turn_handover: true`` is reported only while the key is on (09 18.19.1); off, the
+            member is missing, because a server before stage AR refuses it as unknown (4.8).
 
     Returns:
         The capabilities, in the order of `CAPABILITIES`.
@@ -86,6 +91,8 @@ def capabilities(*, voice_input: bool, hosts_agents: str | None = None) -> dict[
     caps: dict[str, bool | str] = {**CAPABILITIES, "voice_input": voice_input}
     if hosts_agents is not None:
         caps["hosts_agents"] = hosts_agents
+    if turn_handover:
+        caps["turn_handover"] = True
     return caps
 
 

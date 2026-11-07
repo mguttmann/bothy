@@ -126,6 +126,7 @@ _ROUTES: tuple[tuple[str, str, str], ...] = (
     ("POST", "/runs/{run_id}/invocation-token", "renewInvocationToken"),
     ("POST", "/runs/{run_id}/await-input", "awaitRunInput"),
     ("POST", "/runs/{run_id}/finish", "finishRun"),
+    ("POST", "/runs/{run_id}/launch-check", "checkRunLaunch"),
     ("POST", "/threads/{thread_id}/messages", "createMessage"),
     ("PATCH", "/components/{component_id}", "updateComponent"),
     ("POST", "/interactions/{interaction_id}/respond", "respondToInteraction"),
@@ -1565,6 +1566,8 @@ class FakeServer:
             return 200, world.await_input(p["run_id"], body), {}
         if op == "finishRun":
             return 200, world.finish(p["run_id"], body), {}
+        if op == "checkRunLaunch":
+            return 200, world.launch_check(p["run_id"]), {}
         if op == "createMessage":
             return self._create_message(p["thread_id"], body)
         if op in _UPLOAD_OPS:

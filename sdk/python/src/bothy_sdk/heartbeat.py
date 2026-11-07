@@ -86,12 +86,24 @@ DETAILS_KEYS = (
 )
 """The closed key set of ``details``."""
 
-CAPABILITY_KEYS = ("followups", "components", "voice_input", "title", "files_out", "hosts_agents")
+CAPABILITY_KEYS = (
+    "followups",
+    "components",
+    "voice_input",
+    "title",
+    "files_out",
+    "hosts_agents",
+    "turn_handover",
+    "wakes",
+)
 """The closed key set of ``details.capabilities`` (09 2.2), in the order they are sent.
 
 ``hosts_agents`` is the highest tool class a Claude Code runner with ``runner.hosted_agents``
-loads for a hosted agent (docs/spec/26-builtin-agents.md 3.1 item 3); every other adapter leaves
-it out, and its capabilities stay as they were."""
+loads for a hosted agent (docs/spec/26-builtin-agents.md 3.1 item 3); ``turn_handover`` and
+``wakes`` are ``true``, sent only while ``runner.turn_handover`` or ``runner.wakes`` is on
+(09 18.19.1). Every other adapter leaves them out, and its capabilities stay as they were."""
+
+_TRUE_ONLY = frozenset({"turn_handover", "wakes"})
 
 _TOOL_CLASSES = frozenset({"chat", "scoped", "host"})
 
@@ -486,6 +498,9 @@ def _capabilities(value: object) -> dict[str, Any]:
         elif key == "hosts_agents":
             if not isinstance(raw[key], str) or raw[key] not in _TOOL_CLASSES:
                 raise ValueError(f"{field}: not one of the allowed values")
+        elif key in _TRUE_ONLY:
+            if raw[key] is not True:
+                raise ValueError(f"{field}: must be true")
         elif not isinstance(raw[key], bool):
             raise ValueError(f"{field}: must be a boolean")
         out[key] = raw[key]

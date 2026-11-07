@@ -2,7 +2,8 @@
 
 These files hold what the Claude Code runner produces without any key of stage A1
 (`runner.hosted_agents` and the later keys of `docs/spec/26-builtin-agents.md` 14). They were
-recorded from the runner before any change of ticket A1-04, and
+recorded from the runner before any change of ticket A1-04 (the two AR-T16 files before any change of
+ticket AR-03, without `runner.turn_handover`), and
 `tests/unit/test_byte_equal_baseline.py` compares the current runner with them byte for byte
 (BA-T20, 26 3.2 item 4 and 11 item 3).
 
@@ -13,6 +14,8 @@ recorded from the runner before any change of ticket A1-04, and
 | `heartbeat_with_run.json` | The heartbeat body while one turn runs |
 | `heartbeat_degraded.json` | The heartbeat body with a CLI below the supported version |
 | `served_channels.json` | `listServedChannels` as the runner's channel cache holds it |
+| `turn_environment.json` | The environment of one turn (the test's API key canary named, variables the host's C library adds left out), AR-T16 |
+| `stdin_handling.json` | The stdin lines of a turn with one follow-up, in order, and the end of input (message times named), AR-T16 |
 
 ## How they were recorded
 

@@ -68,6 +68,7 @@ filterwarnings = ["error"]
 [tool.coverage.run]
 branch = true
 source = ["claude_code_runner"]
+patch = ["subprocess"]
 
 [tool.coverage.report]
 show_missing = true

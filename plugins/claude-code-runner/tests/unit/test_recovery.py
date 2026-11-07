@@ -153,3 +153,22 @@ def test_box_note_shape() -> None:
     assert note["detail"] == {"mode": "bind"}
     with pytest.raises(ValueError, match="unknown box note"):
         box_note("anything", "completed", None, now)
+
+
+def test_attempt_kind_names_each_recovery_process() -> None:
+    # 09 18.19.5: the kinds of an attempt in its launching record.
+    from claude_code_runner.recovery import attempt_kind
+
+    assert attempt_kind(None) == "first"
+    assert attempt_kind(Compact()) == "compaction"
+    assert attempt_kind(Retry(hint=True)) == "retry"
+    assert attempt_kind(ResumeSameReference()) == "resume_same_reference"
+    assert attempt_kind(NewSession(bind_failed=False)) == "new_session"
+
+
+def test_recovery_flags_survive_the_record() -> None:
+    # 18.19.6: the once-per-run limits are proven by the record of the next attempt.
+    state = RecoveryState(compacted=True, session_resumed=True)
+    again = RecoveryState.from_record(state.to_record())
+    assert (again.compacted, again.session_replaced, again.session_resumed) == (True, False, True)
+    assert RecoveryState.from_record(None) == RecoveryState()
