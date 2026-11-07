@@ -2105,6 +2105,19 @@ class $ChannelsTable extends Channels
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _allowAutonomousRunsMeta =
+      const VerificationMeta('allowAutonomousRuns');
+  @override
+  late final GeneratedColumn<bool> allowAutonomousRuns = GeneratedColumn<bool>(
+    'allow_autonomous_runs',
+    aliasedName,
+    true,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("allow_autonomous_runs" IN (0, 1))',
+    ),
+  );
   static const VerificationMeta _levelMeta = const VerificationMeta('level');
   @override
   late final GeneratedColumn<String> level = GeneratedColumn<String>(
@@ -2145,6 +2158,7 @@ class $ChannelsTable extends Channels
     version,
     settingsVersion,
     projectBound,
+    allowAutonomousRuns,
     level,
     capabilities,
   ];
@@ -2300,6 +2314,15 @@ class $ChannelsTable extends Channels
         ),
       );
     }
+    if (data.containsKey('allow_autonomous_runs')) {
+      context.handle(
+        _allowAutonomousRunsMeta,
+        allowAutonomousRuns.isAcceptableOrUnknown(
+          data['allow_autonomous_runs']!,
+          _allowAutonomousRunsMeta,
+        ),
+      );
+    }
     if (data.containsKey('level')) {
       context.handle(
         _levelMeta,
@@ -2392,6 +2415,10 @@ class $ChannelsTable extends Channels
         DriftSqlType.bool,
         data['${effectivePrefix}project_bound'],
       )!,
+      allowAutonomousRuns: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}allow_autonomous_runs'],
+      ),
       level: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}level'],
@@ -2463,6 +2490,14 @@ class ChannelRow extends DataClass implements Insertable<ChannelRow> {
   /// before 6 until the snapshot that the migration asks for (M4-40).
   final bool projectBound;
 
+  /// API `Channel.allow_autonomous_runs` (03 `channels`, 09 5.8.6, stage AR): whether persons
+  /// other than owners may let agents run on alone here. The sync snapshot and the channel
+  /// events carry no such member, so a channel stored from them keeps the value it had (null
+  /// at first); `getChannel`, `listSpaceChannels` and the switch's answer fill it
+  /// ([StructureDao.putChannelAutonomousRuns]). Null also from a server before stage AR
+  /// (01 6.21 item 5, AR-08).
+  final bool? allowAutonomousRuns;
+
   /// API `ChannelView.level`; null until delivered.
   final String? level;
 
@@ -2486,6 +2521,7 @@ class ChannelRow extends DataClass implements Insertable<ChannelRow> {
     required this.version,
     required this.settingsVersion,
     required this.projectBound,
+    this.allowAutonomousRuns,
     this.level,
     required this.capabilities,
   });
@@ -2525,6 +2561,9 @@ class ChannelRow extends DataClass implements Insertable<ChannelRow> {
     map['version'] = Variable<int>(version);
     map['settings_version'] = Variable<int>(settingsVersion);
     map['project_bound'] = Variable<bool>(projectBound);
+    if (!nullToAbsent || allowAutonomousRuns != null) {
+      map['allow_autonomous_runs'] = Variable<bool>(allowAutonomousRuns);
+    }
     if (!nullToAbsent || level != null) {
       map['level'] = Variable<String>(level);
     }
@@ -2563,6 +2602,9 @@ class ChannelRow extends DataClass implements Insertable<ChannelRow> {
       version: Value(version),
       settingsVersion: Value(settingsVersion),
       projectBound: Value(projectBound),
+      allowAutonomousRuns: allowAutonomousRuns == null && nullToAbsent
+          ? const Value.absent()
+          : Value(allowAutonomousRuns),
       level: level == null && nullToAbsent
           ? const Value.absent()
           : Value(level),
@@ -2597,6 +2639,9 @@ class ChannelRow extends DataClass implements Insertable<ChannelRow> {
       version: serializer.fromJson<int>(json['version']),
       settingsVersion: serializer.fromJson<int>(json['settingsVersion']),
       projectBound: serializer.fromJson<bool>(json['projectBound']),
+      allowAutonomousRuns: serializer.fromJson<bool?>(
+        json['allowAutonomousRuns'],
+      ),
       level: serializer.fromJson<String?>(json['level']),
       capabilities: serializer.fromJson<String>(json['capabilities']),
     );
@@ -2626,6 +2671,7 @@ class ChannelRow extends DataClass implements Insertable<ChannelRow> {
       'version': serializer.toJson<int>(version),
       'settingsVersion': serializer.toJson<int>(settingsVersion),
       'projectBound': serializer.toJson<bool>(projectBound),
+      'allowAutonomousRuns': serializer.toJson<bool?>(allowAutonomousRuns),
       'level': serializer.toJson<String?>(level),
       'capabilities': serializer.toJson<String>(capabilities),
     };
@@ -2649,6 +2695,7 @@ class ChannelRow extends DataClass implements Insertable<ChannelRow> {
     int? version,
     int? settingsVersion,
     bool? projectBound,
+    Value<bool?> allowAutonomousRuns = const Value.absent(),
     Value<String?> level = const Value.absent(),
     String? capabilities,
   }) => ChannelRow(
@@ -2675,6 +2722,9 @@ class ChannelRow extends DataClass implements Insertable<ChannelRow> {
     version: version ?? this.version,
     settingsVersion: settingsVersion ?? this.settingsVersion,
     projectBound: projectBound ?? this.projectBound,
+    allowAutonomousRuns: allowAutonomousRuns.present
+        ? allowAutonomousRuns.value
+        : this.allowAutonomousRuns,
     level: level.present ? level.value : this.level,
     capabilities: capabilities ?? this.capabilities,
   );
@@ -2713,6 +2763,9 @@ class ChannelRow extends DataClass implements Insertable<ChannelRow> {
       projectBound: data.projectBound.present
           ? data.projectBound.value
           : this.projectBound,
+      allowAutonomousRuns: data.allowAutonomousRuns.present
+          ? data.allowAutonomousRuns.value
+          : this.allowAutonomousRuns,
       level: data.level.present ? data.level.value : this.level,
       capabilities: data.capabilities.present
           ? data.capabilities.value
@@ -2740,6 +2793,7 @@ class ChannelRow extends DataClass implements Insertable<ChannelRow> {
           ..write('version: $version, ')
           ..write('settingsVersion: $settingsVersion, ')
           ..write('projectBound: $projectBound, ')
+          ..write('allowAutonomousRuns: $allowAutonomousRuns, ')
           ..write('level: $level, ')
           ..write('capabilities: $capabilities')
           ..write(')'))
@@ -2765,6 +2819,7 @@ class ChannelRow extends DataClass implements Insertable<ChannelRow> {
     version,
     settingsVersion,
     projectBound,
+    allowAutonomousRuns,
     level,
     capabilities,
   );
@@ -2789,6 +2844,7 @@ class ChannelRow extends DataClass implements Insertable<ChannelRow> {
           other.version == this.version &&
           other.settingsVersion == this.settingsVersion &&
           other.projectBound == this.projectBound &&
+          other.allowAutonomousRuns == this.allowAutonomousRuns &&
           other.level == this.level &&
           other.capabilities == this.capabilities);
 }
@@ -2811,6 +2867,7 @@ class ChannelsCompanion extends UpdateCompanion<ChannelRow> {
   final Value<int> version;
   final Value<int> settingsVersion;
   final Value<bool> projectBound;
+  final Value<bool?> allowAutonomousRuns;
   final Value<String?> level;
   final Value<String> capabilities;
   final Value<int> rowid;
@@ -2832,6 +2889,7 @@ class ChannelsCompanion extends UpdateCompanion<ChannelRow> {
     this.version = const Value.absent(),
     this.settingsVersion = const Value.absent(),
     this.projectBound = const Value.absent(),
+    this.allowAutonomousRuns = const Value.absent(),
     this.level = const Value.absent(),
     this.capabilities = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -2854,6 +2912,7 @@ class ChannelsCompanion extends UpdateCompanion<ChannelRow> {
     required int version,
     required int settingsVersion,
     this.projectBound = const Value.absent(),
+    this.allowAutonomousRuns = const Value.absent(),
     this.level = const Value.absent(),
     this.capabilities = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -2885,6 +2944,7 @@ class ChannelsCompanion extends UpdateCompanion<ChannelRow> {
     Expression<int>? version,
     Expression<int>? settingsVersion,
     Expression<bool>? projectBound,
+    Expression<bool>? allowAutonomousRuns,
     Expression<String>? level,
     Expression<String>? capabilities,
     Expression<int>? rowid,
@@ -2909,6 +2969,8 @@ class ChannelsCompanion extends UpdateCompanion<ChannelRow> {
       if (version != null) 'version': version,
       if (settingsVersion != null) 'settings_version': settingsVersion,
       if (projectBound != null) 'project_bound': projectBound,
+      if (allowAutonomousRuns != null)
+        'allow_autonomous_runs': allowAutonomousRuns,
       if (level != null) 'level': level,
       if (capabilities != null) 'capabilities': capabilities,
       if (rowid != null) 'rowid': rowid,
@@ -2933,6 +2995,7 @@ class ChannelsCompanion extends UpdateCompanion<ChannelRow> {
     Value<int>? version,
     Value<int>? settingsVersion,
     Value<bool>? projectBound,
+    Value<bool?>? allowAutonomousRuns,
     Value<String?>? level,
     Value<String>? capabilities,
     Value<int>? rowid,
@@ -2957,6 +3020,7 @@ class ChannelsCompanion extends UpdateCompanion<ChannelRow> {
       version: version ?? this.version,
       settingsVersion: settingsVersion ?? this.settingsVersion,
       projectBound: projectBound ?? this.projectBound,
+      allowAutonomousRuns: allowAutonomousRuns ?? this.allowAutonomousRuns,
       level: level ?? this.level,
       capabilities: capabilities ?? this.capabilities,
       rowid: rowid ?? this.rowid,
@@ -3021,6 +3085,9 @@ class ChannelsCompanion extends UpdateCompanion<ChannelRow> {
     if (projectBound.present) {
       map['project_bound'] = Variable<bool>(projectBound.value);
     }
+    if (allowAutonomousRuns.present) {
+      map['allow_autonomous_runs'] = Variable<bool>(allowAutonomousRuns.value);
+    }
     if (level.present) {
       map['level'] = Variable<String>(level.value);
     }
@@ -3053,6 +3120,7 @@ class ChannelsCompanion extends UpdateCompanion<ChannelRow> {
           ..write('version: $version, ')
           ..write('settingsVersion: $settingsVersion, ')
           ..write('projectBound: $projectBound, ')
+          ..write('allowAutonomousRuns: $allowAutonomousRuns, ')
           ..write('level: $level, ')
           ..write('capabilities: $capabilities, ')
           ..write('rowid: $rowid')
@@ -10662,6 +10730,1157 @@ class RunsCompanion extends UpdateCompanion<RunRow> {
           ..write('queuedAt: $queuedAt, ')
           ..write('startedAt: $startedAt, ')
           ..write('finishedAt: $finishedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $RunWakesTable extends RunWakes
+    with TableInfo<$RunWakesTable, RunWakeRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $RunWakesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _agentIdMeta = const VerificationMeta(
+    'agentId',
+  );
+  @override
+  late final GeneratedColumn<String> agentId = GeneratedColumn<String>(
+    'agent_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _threadIdMeta = const VerificationMeta(
+    'threadId',
+  );
+  @override
+  late final GeneratedColumn<String> threadId = GeneratedColumn<String>(
+    'thread_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sourceRunIdMeta = const VerificationMeta(
+    'sourceRunId',
+  );
+  @override
+  late final GeneratedColumn<String> sourceRunId = GeneratedColumn<String>(
+    'source_run_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _triggeredByMeta = const VerificationMeta(
+    'triggeredBy',
+  );
+  @override
+  late final GeneratedColumn<String> triggeredBy = GeneratedColumn<String>(
+    'triggered_by',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _kindMeta = const VerificationMeta('kind');
+  @override
+  late final GeneratedColumn<String> kind = GeneratedColumn<String>(
+    'kind',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _conditionMeta = const VerificationMeta(
+    'condition',
+  );
+  @override
+  late final GeneratedColumn<String> condition = GeneratedColumn<String>(
+    'condition',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _labelMeta = const VerificationMeta('label');
+  @override
+  late final GeneratedColumn<String> label = GeneratedColumn<String>(
+    'label',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _reasonMeta = const VerificationMeta('reason');
+  @override
+  late final GeneratedColumn<String> reason = GeneratedColumn<String>(
+    'reason',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _outageMeta = const VerificationMeta('outage');
+  @override
+  late final GeneratedColumn<int> outage = GeneratedColumn<int>(
+    'outage',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _notBeforeMeta = const VerificationMeta(
+    'notBefore',
+  );
+  @override
+  late final GeneratedColumn<DateTime> notBefore = GeneratedColumn<DateTime>(
+    'not_before',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deadlineMeta = const VerificationMeta(
+    'deadline',
+  );
+  @override
+  late final GeneratedColumn<DateTime> deadline = GeneratedColumn<DateTime>(
+    'deadline',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _stateMeta = const VerificationMeta('state');
+  @override
+  late final GeneratedColumn<String> state = GeneratedColumn<String>(
+    'state',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _stateReasonMeta = const VerificationMeta(
+    'stateReason',
+  );
+  @override
+  late final GeneratedColumn<String> stateReason = GeneratedColumn<String>(
+    'state_reason',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _resultTextMeta = const VerificationMeta(
+    'resultText',
+  );
+  @override
+  late final GeneratedColumn<String> resultText = GeneratedColumn<String>(
+    'result_text',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _firedRunIdMeta = const VerificationMeta(
+    'firedRunId',
+  );
+  @override
+  late final GeneratedColumn<String> firedRunId = GeneratedColumn<String>(
+    'fired_run_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _firedIntoRunIdMeta = const VerificationMeta(
+    'firedIntoRunId',
+  );
+  @override
+  late final GeneratedColumn<String> firedIntoRunId = GeneratedColumn<String>(
+    'fired_into_run_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _endedAtMeta = const VerificationMeta(
+    'endedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> endedAt = GeneratedColumn<DateTime>(
+    'ended_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _versionMeta = const VerificationMeta(
+    'version',
+  );
+  @override
+  late final GeneratedColumn<int> version = GeneratedColumn<int>(
+    'version',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    agentId,
+    threadId,
+    sourceRunId,
+    triggeredBy,
+    kind,
+    condition,
+    label,
+    reason,
+    outage,
+    notBefore,
+    deadline,
+    state,
+    stateReason,
+    resultText,
+    firedRunId,
+    firedIntoRunId,
+    createdAt,
+    endedAt,
+    version,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'run_wakes';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<RunWakeRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('agent_id')) {
+      context.handle(
+        _agentIdMeta,
+        agentId.isAcceptableOrUnknown(data['agent_id']!, _agentIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_agentIdMeta);
+    }
+    if (data.containsKey('thread_id')) {
+      context.handle(
+        _threadIdMeta,
+        threadId.isAcceptableOrUnknown(data['thread_id']!, _threadIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_threadIdMeta);
+    }
+    if (data.containsKey('source_run_id')) {
+      context.handle(
+        _sourceRunIdMeta,
+        sourceRunId.isAcceptableOrUnknown(
+          data['source_run_id']!,
+          _sourceRunIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_sourceRunIdMeta);
+    }
+    if (data.containsKey('triggered_by')) {
+      context.handle(
+        _triggeredByMeta,
+        triggeredBy.isAcceptableOrUnknown(
+          data['triggered_by']!,
+          _triggeredByMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_triggeredByMeta);
+    }
+    if (data.containsKey('kind')) {
+      context.handle(
+        _kindMeta,
+        kind.isAcceptableOrUnknown(data['kind']!, _kindMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_kindMeta);
+    }
+    if (data.containsKey('condition')) {
+      context.handle(
+        _conditionMeta,
+        condition.isAcceptableOrUnknown(data['condition']!, _conditionMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_conditionMeta);
+    }
+    if (data.containsKey('label')) {
+      context.handle(
+        _labelMeta,
+        label.isAcceptableOrUnknown(data['label']!, _labelMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_labelMeta);
+    }
+    if (data.containsKey('reason')) {
+      context.handle(
+        _reasonMeta,
+        reason.isAcceptableOrUnknown(data['reason']!, _reasonMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_reasonMeta);
+    }
+    if (data.containsKey('outage')) {
+      context.handle(
+        _outageMeta,
+        outage.isAcceptableOrUnknown(data['outage']!, _outageMeta),
+      );
+    }
+    if (data.containsKey('not_before')) {
+      context.handle(
+        _notBeforeMeta,
+        notBefore.isAcceptableOrUnknown(data['not_before']!, _notBeforeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_notBeforeMeta);
+    }
+    if (data.containsKey('deadline')) {
+      context.handle(
+        _deadlineMeta,
+        deadline.isAcceptableOrUnknown(data['deadline']!, _deadlineMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_deadlineMeta);
+    }
+    if (data.containsKey('state')) {
+      context.handle(
+        _stateMeta,
+        state.isAcceptableOrUnknown(data['state']!, _stateMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_stateMeta);
+    }
+    if (data.containsKey('state_reason')) {
+      context.handle(
+        _stateReasonMeta,
+        stateReason.isAcceptableOrUnknown(
+          data['state_reason']!,
+          _stateReasonMeta,
+        ),
+      );
+    }
+    if (data.containsKey('result_text')) {
+      context.handle(
+        _resultTextMeta,
+        resultText.isAcceptableOrUnknown(data['result_text']!, _resultTextMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_resultTextMeta);
+    }
+    if (data.containsKey('fired_run_id')) {
+      context.handle(
+        _firedRunIdMeta,
+        firedRunId.isAcceptableOrUnknown(
+          data['fired_run_id']!,
+          _firedRunIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('fired_into_run_id')) {
+      context.handle(
+        _firedIntoRunIdMeta,
+        firedIntoRunId.isAcceptableOrUnknown(
+          data['fired_into_run_id']!,
+          _firedIntoRunIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('ended_at')) {
+      context.handle(
+        _endedAtMeta,
+        endedAt.isAcceptableOrUnknown(data['ended_at']!, _endedAtMeta),
+      );
+    }
+    if (data.containsKey('version')) {
+      context.handle(
+        _versionMeta,
+        version.isAcceptableOrUnknown(data['version']!, _versionMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_versionMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  RunWakeRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return RunWakeRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      agentId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}agent_id'],
+      )!,
+      threadId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}thread_id'],
+      )!,
+      sourceRunId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_run_id'],
+      )!,
+      triggeredBy: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}triggered_by'],
+      )!,
+      kind: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}kind'],
+      )!,
+      condition: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}condition'],
+      )!,
+      label: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}label'],
+      )!,
+      reason: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}reason'],
+      )!,
+      outage: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}outage'],
+      ),
+      notBefore: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}not_before'],
+      )!,
+      deadline: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}deadline'],
+      )!,
+      state: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}state'],
+      )!,
+      stateReason: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}state_reason'],
+      ),
+      resultText: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}result_text'],
+      )!,
+      firedRunId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}fired_run_id'],
+      ),
+      firedIntoRunId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}fired_into_run_id'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      endedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}ended_at'],
+      ),
+      version: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}version'],
+      )!,
+    );
+  }
+
+  @override
+  $RunWakesTable createAlias(String alias) {
+    return $RunWakesTable(attachedDatabase, alias);
+  }
+}
+
+class RunWakeRow extends DataClass implements Insertable<RunWakeRow> {
+  /// 03 `run_wakes.id`.
+  final String id;
+
+  /// 03 `run_wakes.agent_id`.
+  final String agentId;
+
+  /// 03 `run_wakes.thread_id`.
+  final String threadId;
+
+  /// 03 `run_wakes.source_run_id`.
+  final String sourceRunId;
+
+  /// 03 `run_wakes.triggered_by`.
+  final String triggeredBy;
+
+  /// 03 `run_wakes.kind`.
+  final String kind;
+
+  /// 03 `run_wakes.condition` as JSON text.
+  final String condition;
+
+  /// 03 `run_wakes.label`.
+  final String label;
+
+  /// 03 `run_wakes.reason`.
+  final String reason;
+
+  /// 03 `run_wakes.outage`.
+  final int? outage;
+
+  /// 03 `run_wakes.not_before`.
+  final DateTime notBefore;
+
+  /// 03 `run_wakes.deadline`.
+  final DateTime deadline;
+
+  /// 03 `run_wakes.state`.
+  final String state;
+
+  /// 03 `run_wakes.state_reason`.
+  final String? stateReason;
+
+  /// 03 `run_wakes.result_text`.
+  final String resultText;
+
+  /// 03 `run_wakes.fired_run_id`.
+  final String? firedRunId;
+
+  /// 03 `run_wakes.fired_into_run_id`.
+  final String? firedIntoRunId;
+
+  /// 03 `run_wakes.created_at`.
+  final DateTime createdAt;
+
+  /// 03 `run_wakes.ended_at`.
+  final DateTime? endedAt;
+
+  /// 03 `run_wakes.version`.
+  final int version;
+  const RunWakeRow({
+    required this.id,
+    required this.agentId,
+    required this.threadId,
+    required this.sourceRunId,
+    required this.triggeredBy,
+    required this.kind,
+    required this.condition,
+    required this.label,
+    required this.reason,
+    this.outage,
+    required this.notBefore,
+    required this.deadline,
+    required this.state,
+    this.stateReason,
+    required this.resultText,
+    this.firedRunId,
+    this.firedIntoRunId,
+    required this.createdAt,
+    this.endedAt,
+    required this.version,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['agent_id'] = Variable<String>(agentId);
+    map['thread_id'] = Variable<String>(threadId);
+    map['source_run_id'] = Variable<String>(sourceRunId);
+    map['triggered_by'] = Variable<String>(triggeredBy);
+    map['kind'] = Variable<String>(kind);
+    map['condition'] = Variable<String>(condition);
+    map['label'] = Variable<String>(label);
+    map['reason'] = Variable<String>(reason);
+    if (!nullToAbsent || outage != null) {
+      map['outage'] = Variable<int>(outage);
+    }
+    map['not_before'] = Variable<DateTime>(notBefore);
+    map['deadline'] = Variable<DateTime>(deadline);
+    map['state'] = Variable<String>(state);
+    if (!nullToAbsent || stateReason != null) {
+      map['state_reason'] = Variable<String>(stateReason);
+    }
+    map['result_text'] = Variable<String>(resultText);
+    if (!nullToAbsent || firedRunId != null) {
+      map['fired_run_id'] = Variable<String>(firedRunId);
+    }
+    if (!nullToAbsent || firedIntoRunId != null) {
+      map['fired_into_run_id'] = Variable<String>(firedIntoRunId);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    if (!nullToAbsent || endedAt != null) {
+      map['ended_at'] = Variable<DateTime>(endedAt);
+    }
+    map['version'] = Variable<int>(version);
+    return map;
+  }
+
+  RunWakesCompanion toCompanion(bool nullToAbsent) {
+    return RunWakesCompanion(
+      id: Value(id),
+      agentId: Value(agentId),
+      threadId: Value(threadId),
+      sourceRunId: Value(sourceRunId),
+      triggeredBy: Value(triggeredBy),
+      kind: Value(kind),
+      condition: Value(condition),
+      label: Value(label),
+      reason: Value(reason),
+      outage: outage == null && nullToAbsent
+          ? const Value.absent()
+          : Value(outage),
+      notBefore: Value(notBefore),
+      deadline: Value(deadline),
+      state: Value(state),
+      stateReason: stateReason == null && nullToAbsent
+          ? const Value.absent()
+          : Value(stateReason),
+      resultText: Value(resultText),
+      firedRunId: firedRunId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(firedRunId),
+      firedIntoRunId: firedIntoRunId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(firedIntoRunId),
+      createdAt: Value(createdAt),
+      endedAt: endedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(endedAt),
+      version: Value(version),
+    );
+  }
+
+  factory RunWakeRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return RunWakeRow(
+      id: serializer.fromJson<String>(json['id']),
+      agentId: serializer.fromJson<String>(json['agentId']),
+      threadId: serializer.fromJson<String>(json['threadId']),
+      sourceRunId: serializer.fromJson<String>(json['sourceRunId']),
+      triggeredBy: serializer.fromJson<String>(json['triggeredBy']),
+      kind: serializer.fromJson<String>(json['kind']),
+      condition: serializer.fromJson<String>(json['condition']),
+      label: serializer.fromJson<String>(json['label']),
+      reason: serializer.fromJson<String>(json['reason']),
+      outage: serializer.fromJson<int?>(json['outage']),
+      notBefore: serializer.fromJson<DateTime>(json['notBefore']),
+      deadline: serializer.fromJson<DateTime>(json['deadline']),
+      state: serializer.fromJson<String>(json['state']),
+      stateReason: serializer.fromJson<String?>(json['stateReason']),
+      resultText: serializer.fromJson<String>(json['resultText']),
+      firedRunId: serializer.fromJson<String?>(json['firedRunId']),
+      firedIntoRunId: serializer.fromJson<String?>(json['firedIntoRunId']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      endedAt: serializer.fromJson<DateTime?>(json['endedAt']),
+      version: serializer.fromJson<int>(json['version']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'agentId': serializer.toJson<String>(agentId),
+      'threadId': serializer.toJson<String>(threadId),
+      'sourceRunId': serializer.toJson<String>(sourceRunId),
+      'triggeredBy': serializer.toJson<String>(triggeredBy),
+      'kind': serializer.toJson<String>(kind),
+      'condition': serializer.toJson<String>(condition),
+      'label': serializer.toJson<String>(label),
+      'reason': serializer.toJson<String>(reason),
+      'outage': serializer.toJson<int?>(outage),
+      'notBefore': serializer.toJson<DateTime>(notBefore),
+      'deadline': serializer.toJson<DateTime>(deadline),
+      'state': serializer.toJson<String>(state),
+      'stateReason': serializer.toJson<String?>(stateReason),
+      'resultText': serializer.toJson<String>(resultText),
+      'firedRunId': serializer.toJson<String?>(firedRunId),
+      'firedIntoRunId': serializer.toJson<String?>(firedIntoRunId),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'endedAt': serializer.toJson<DateTime?>(endedAt),
+      'version': serializer.toJson<int>(version),
+    };
+  }
+
+  RunWakeRow copyWith({
+    String? id,
+    String? agentId,
+    String? threadId,
+    String? sourceRunId,
+    String? triggeredBy,
+    String? kind,
+    String? condition,
+    String? label,
+    String? reason,
+    Value<int?> outage = const Value.absent(),
+    DateTime? notBefore,
+    DateTime? deadline,
+    String? state,
+    Value<String?> stateReason = const Value.absent(),
+    String? resultText,
+    Value<String?> firedRunId = const Value.absent(),
+    Value<String?> firedIntoRunId = const Value.absent(),
+    DateTime? createdAt,
+    Value<DateTime?> endedAt = const Value.absent(),
+    int? version,
+  }) => RunWakeRow(
+    id: id ?? this.id,
+    agentId: agentId ?? this.agentId,
+    threadId: threadId ?? this.threadId,
+    sourceRunId: sourceRunId ?? this.sourceRunId,
+    triggeredBy: triggeredBy ?? this.triggeredBy,
+    kind: kind ?? this.kind,
+    condition: condition ?? this.condition,
+    label: label ?? this.label,
+    reason: reason ?? this.reason,
+    outage: outage.present ? outage.value : this.outage,
+    notBefore: notBefore ?? this.notBefore,
+    deadline: deadline ?? this.deadline,
+    state: state ?? this.state,
+    stateReason: stateReason.present ? stateReason.value : this.stateReason,
+    resultText: resultText ?? this.resultText,
+    firedRunId: firedRunId.present ? firedRunId.value : this.firedRunId,
+    firedIntoRunId: firedIntoRunId.present
+        ? firedIntoRunId.value
+        : this.firedIntoRunId,
+    createdAt: createdAt ?? this.createdAt,
+    endedAt: endedAt.present ? endedAt.value : this.endedAt,
+    version: version ?? this.version,
+  );
+  RunWakeRow copyWithCompanion(RunWakesCompanion data) {
+    return RunWakeRow(
+      id: data.id.present ? data.id.value : this.id,
+      agentId: data.agentId.present ? data.agentId.value : this.agentId,
+      threadId: data.threadId.present ? data.threadId.value : this.threadId,
+      sourceRunId: data.sourceRunId.present
+          ? data.sourceRunId.value
+          : this.sourceRunId,
+      triggeredBy: data.triggeredBy.present
+          ? data.triggeredBy.value
+          : this.triggeredBy,
+      kind: data.kind.present ? data.kind.value : this.kind,
+      condition: data.condition.present ? data.condition.value : this.condition,
+      label: data.label.present ? data.label.value : this.label,
+      reason: data.reason.present ? data.reason.value : this.reason,
+      outage: data.outage.present ? data.outage.value : this.outage,
+      notBefore: data.notBefore.present ? data.notBefore.value : this.notBefore,
+      deadline: data.deadline.present ? data.deadline.value : this.deadline,
+      state: data.state.present ? data.state.value : this.state,
+      stateReason: data.stateReason.present
+          ? data.stateReason.value
+          : this.stateReason,
+      resultText: data.resultText.present
+          ? data.resultText.value
+          : this.resultText,
+      firedRunId: data.firedRunId.present
+          ? data.firedRunId.value
+          : this.firedRunId,
+      firedIntoRunId: data.firedIntoRunId.present
+          ? data.firedIntoRunId.value
+          : this.firedIntoRunId,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      endedAt: data.endedAt.present ? data.endedAt.value : this.endedAt,
+      version: data.version.present ? data.version.value : this.version,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RunWakeRow(')
+          ..write('id: $id, ')
+          ..write('agentId: $agentId, ')
+          ..write('threadId: $threadId, ')
+          ..write('sourceRunId: $sourceRunId, ')
+          ..write('triggeredBy: $triggeredBy, ')
+          ..write('kind: $kind, ')
+          ..write('condition: $condition, ')
+          ..write('label: $label, ')
+          ..write('reason: $reason, ')
+          ..write('outage: $outage, ')
+          ..write('notBefore: $notBefore, ')
+          ..write('deadline: $deadline, ')
+          ..write('state: $state, ')
+          ..write('stateReason: $stateReason, ')
+          ..write('resultText: $resultText, ')
+          ..write('firedRunId: $firedRunId, ')
+          ..write('firedIntoRunId: $firedIntoRunId, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('endedAt: $endedAt, ')
+          ..write('version: $version')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    agentId,
+    threadId,
+    sourceRunId,
+    triggeredBy,
+    kind,
+    condition,
+    label,
+    reason,
+    outage,
+    notBefore,
+    deadline,
+    state,
+    stateReason,
+    resultText,
+    firedRunId,
+    firedIntoRunId,
+    createdAt,
+    endedAt,
+    version,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is RunWakeRow &&
+          other.id == this.id &&
+          other.agentId == this.agentId &&
+          other.threadId == this.threadId &&
+          other.sourceRunId == this.sourceRunId &&
+          other.triggeredBy == this.triggeredBy &&
+          other.kind == this.kind &&
+          other.condition == this.condition &&
+          other.label == this.label &&
+          other.reason == this.reason &&
+          other.outage == this.outage &&
+          other.notBefore == this.notBefore &&
+          other.deadline == this.deadline &&
+          other.state == this.state &&
+          other.stateReason == this.stateReason &&
+          other.resultText == this.resultText &&
+          other.firedRunId == this.firedRunId &&
+          other.firedIntoRunId == this.firedIntoRunId &&
+          other.createdAt == this.createdAt &&
+          other.endedAt == this.endedAt &&
+          other.version == this.version);
+}
+
+class RunWakesCompanion extends UpdateCompanion<RunWakeRow> {
+  final Value<String> id;
+  final Value<String> agentId;
+  final Value<String> threadId;
+  final Value<String> sourceRunId;
+  final Value<String> triggeredBy;
+  final Value<String> kind;
+  final Value<String> condition;
+  final Value<String> label;
+  final Value<String> reason;
+  final Value<int?> outage;
+  final Value<DateTime> notBefore;
+  final Value<DateTime> deadline;
+  final Value<String> state;
+  final Value<String?> stateReason;
+  final Value<String> resultText;
+  final Value<String?> firedRunId;
+  final Value<String?> firedIntoRunId;
+  final Value<DateTime> createdAt;
+  final Value<DateTime?> endedAt;
+  final Value<int> version;
+  final Value<int> rowid;
+  const RunWakesCompanion({
+    this.id = const Value.absent(),
+    this.agentId = const Value.absent(),
+    this.threadId = const Value.absent(),
+    this.sourceRunId = const Value.absent(),
+    this.triggeredBy = const Value.absent(),
+    this.kind = const Value.absent(),
+    this.condition = const Value.absent(),
+    this.label = const Value.absent(),
+    this.reason = const Value.absent(),
+    this.outage = const Value.absent(),
+    this.notBefore = const Value.absent(),
+    this.deadline = const Value.absent(),
+    this.state = const Value.absent(),
+    this.stateReason = const Value.absent(),
+    this.resultText = const Value.absent(),
+    this.firedRunId = const Value.absent(),
+    this.firedIntoRunId = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.endedAt = const Value.absent(),
+    this.version = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  RunWakesCompanion.insert({
+    required String id,
+    required String agentId,
+    required String threadId,
+    required String sourceRunId,
+    required String triggeredBy,
+    required String kind,
+    required String condition,
+    required String label,
+    required String reason,
+    this.outage = const Value.absent(),
+    required DateTime notBefore,
+    required DateTime deadline,
+    required String state,
+    this.stateReason = const Value.absent(),
+    required String resultText,
+    this.firedRunId = const Value.absent(),
+    this.firedIntoRunId = const Value.absent(),
+    required DateTime createdAt,
+    this.endedAt = const Value.absent(),
+    required int version,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       agentId = Value(agentId),
+       threadId = Value(threadId),
+       sourceRunId = Value(sourceRunId),
+       triggeredBy = Value(triggeredBy),
+       kind = Value(kind),
+       condition = Value(condition),
+       label = Value(label),
+       reason = Value(reason),
+       notBefore = Value(notBefore),
+       deadline = Value(deadline),
+       state = Value(state),
+       resultText = Value(resultText),
+       createdAt = Value(createdAt),
+       version = Value(version);
+  static Insertable<RunWakeRow> custom({
+    Expression<String>? id,
+    Expression<String>? agentId,
+    Expression<String>? threadId,
+    Expression<String>? sourceRunId,
+    Expression<String>? triggeredBy,
+    Expression<String>? kind,
+    Expression<String>? condition,
+    Expression<String>? label,
+    Expression<String>? reason,
+    Expression<int>? outage,
+    Expression<DateTime>? notBefore,
+    Expression<DateTime>? deadline,
+    Expression<String>? state,
+    Expression<String>? stateReason,
+    Expression<String>? resultText,
+    Expression<String>? firedRunId,
+    Expression<String>? firedIntoRunId,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? endedAt,
+    Expression<int>? version,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (agentId != null) 'agent_id': agentId,
+      if (threadId != null) 'thread_id': threadId,
+      if (sourceRunId != null) 'source_run_id': sourceRunId,
+      if (triggeredBy != null) 'triggered_by': triggeredBy,
+      if (kind != null) 'kind': kind,
+      if (condition != null) 'condition': condition,
+      if (label != null) 'label': label,
+      if (reason != null) 'reason': reason,
+      if (outage != null) 'outage': outage,
+      if (notBefore != null) 'not_before': notBefore,
+      if (deadline != null) 'deadline': deadline,
+      if (state != null) 'state': state,
+      if (stateReason != null) 'state_reason': stateReason,
+      if (resultText != null) 'result_text': resultText,
+      if (firedRunId != null) 'fired_run_id': firedRunId,
+      if (firedIntoRunId != null) 'fired_into_run_id': firedIntoRunId,
+      if (createdAt != null) 'created_at': createdAt,
+      if (endedAt != null) 'ended_at': endedAt,
+      if (version != null) 'version': version,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  RunWakesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? agentId,
+    Value<String>? threadId,
+    Value<String>? sourceRunId,
+    Value<String>? triggeredBy,
+    Value<String>? kind,
+    Value<String>? condition,
+    Value<String>? label,
+    Value<String>? reason,
+    Value<int?>? outage,
+    Value<DateTime>? notBefore,
+    Value<DateTime>? deadline,
+    Value<String>? state,
+    Value<String?>? stateReason,
+    Value<String>? resultText,
+    Value<String?>? firedRunId,
+    Value<String?>? firedIntoRunId,
+    Value<DateTime>? createdAt,
+    Value<DateTime?>? endedAt,
+    Value<int>? version,
+    Value<int>? rowid,
+  }) {
+    return RunWakesCompanion(
+      id: id ?? this.id,
+      agentId: agentId ?? this.agentId,
+      threadId: threadId ?? this.threadId,
+      sourceRunId: sourceRunId ?? this.sourceRunId,
+      triggeredBy: triggeredBy ?? this.triggeredBy,
+      kind: kind ?? this.kind,
+      condition: condition ?? this.condition,
+      label: label ?? this.label,
+      reason: reason ?? this.reason,
+      outage: outage ?? this.outage,
+      notBefore: notBefore ?? this.notBefore,
+      deadline: deadline ?? this.deadline,
+      state: state ?? this.state,
+      stateReason: stateReason ?? this.stateReason,
+      resultText: resultText ?? this.resultText,
+      firedRunId: firedRunId ?? this.firedRunId,
+      firedIntoRunId: firedIntoRunId ?? this.firedIntoRunId,
+      createdAt: createdAt ?? this.createdAt,
+      endedAt: endedAt ?? this.endedAt,
+      version: version ?? this.version,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (agentId.present) {
+      map['agent_id'] = Variable<String>(agentId.value);
+    }
+    if (threadId.present) {
+      map['thread_id'] = Variable<String>(threadId.value);
+    }
+    if (sourceRunId.present) {
+      map['source_run_id'] = Variable<String>(sourceRunId.value);
+    }
+    if (triggeredBy.present) {
+      map['triggered_by'] = Variable<String>(triggeredBy.value);
+    }
+    if (kind.present) {
+      map['kind'] = Variable<String>(kind.value);
+    }
+    if (condition.present) {
+      map['condition'] = Variable<String>(condition.value);
+    }
+    if (label.present) {
+      map['label'] = Variable<String>(label.value);
+    }
+    if (reason.present) {
+      map['reason'] = Variable<String>(reason.value);
+    }
+    if (outage.present) {
+      map['outage'] = Variable<int>(outage.value);
+    }
+    if (notBefore.present) {
+      map['not_before'] = Variable<DateTime>(notBefore.value);
+    }
+    if (deadline.present) {
+      map['deadline'] = Variable<DateTime>(deadline.value);
+    }
+    if (state.present) {
+      map['state'] = Variable<String>(state.value);
+    }
+    if (stateReason.present) {
+      map['state_reason'] = Variable<String>(stateReason.value);
+    }
+    if (resultText.present) {
+      map['result_text'] = Variable<String>(resultText.value);
+    }
+    if (firedRunId.present) {
+      map['fired_run_id'] = Variable<String>(firedRunId.value);
+    }
+    if (firedIntoRunId.present) {
+      map['fired_into_run_id'] = Variable<String>(firedIntoRunId.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (endedAt.present) {
+      map['ended_at'] = Variable<DateTime>(endedAt.value);
+    }
+    if (version.present) {
+      map['version'] = Variable<int>(version.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RunWakesCompanion(')
+          ..write('id: $id, ')
+          ..write('agentId: $agentId, ')
+          ..write('threadId: $threadId, ')
+          ..write('sourceRunId: $sourceRunId, ')
+          ..write('triggeredBy: $triggeredBy, ')
+          ..write('kind: $kind, ')
+          ..write('condition: $condition, ')
+          ..write('label: $label, ')
+          ..write('reason: $reason, ')
+          ..write('outage: $outage, ')
+          ..write('notBefore: $notBefore, ')
+          ..write('deadline: $deadline, ')
+          ..write('state: $state, ')
+          ..write('stateReason: $stateReason, ')
+          ..write('resultText: $resultText, ')
+          ..write('firedRunId: $firedRunId, ')
+          ..write('firedIntoRunId: $firedIntoRunId, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('endedAt: $endedAt, ')
+          ..write('version: $version, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -20073,6 +21292,7 @@ abstract class _$LocalDatabase extends GeneratedDatabase {
   late final $MessageAttachmentsTable messageAttachments =
       $MessageAttachmentsTable(this);
   late final $RunsTable runs = $RunsTable(this);
+  late final $RunWakesTable runWakes = $RunWakesTable(this);
   late final $AgentsTable agents = $AgentsTable(this);
   late final $PrincipalsTable principals = $PrincipalsTable(this);
   late final $CommandsTable commands = $CommandsTable(this);
@@ -20143,6 +21363,10 @@ abstract class _$LocalDatabase extends GeneratedDatabase {
     'runs_thread',
     'CREATE INDEX runs_thread ON runs (thread_id)',
   );
+  late final Index runWakesThread = Index(
+    'run_wakes_thread',
+    'CREATE INDEX run_wakes_thread ON run_wakes (thread_id)',
+  );
   late final Index readStatesChannel = Index(
     'read_states_channel',
     'CREATE INDEX read_states_channel ON read_states (channel_id)',
@@ -20180,6 +21404,7 @@ abstract class _$LocalDatabase extends GeneratedDatabase {
     files,
     messageAttachments,
     runs,
+    runWakes,
     agents,
     principals,
     commands,
@@ -20210,6 +21435,7 @@ abstract class _$LocalDatabase extends GeneratedDatabase {
     messageComponentsMessage,
     messageAttachmentsFile,
     runsThread,
+    runWakesThread,
     readStatesChannel,
     draftsChannel,
     outboxThreadCreated,

@@ -10837,4 +10837,177 @@ class AppLocalizationsDe extends AppLocalizations {
   String stepUpPurposeNewAgent(String name) {
     return 'Agent $name anlegen';
   }
+
+  @override
+  String get wakesPendingTitle => 'Geht von selbst weiter';
+
+  @override
+  String wakesPendingItemLabel(
+    String label,
+    String condition,
+    String earliest,
+    String deadline,
+  ) {
+    return '$label: $condition, frühestens $earliest, spätestens $deadline';
+  }
+
+  @override
+  String get wakesUnnamed => 'Weckruf';
+
+  @override
+  String wakesConditionAt(String time) {
+    return 'um $time';
+  }
+
+  @override
+  String wakesConditionPrChecks(String number) {
+    return 'wenn die Checks von #$number fertig sind';
+  }
+
+  @override
+  String get wakesConditionPrChecksAny =>
+      'wenn die Checks des Pull Requests fertig sind';
+
+  @override
+  String get wakesConditionCommand => 'wenn der Befehl gelingt';
+
+  @override
+  String get wakesConditionUnknown => 'wenn seine Bedingung erfüllt ist';
+
+  @override
+  String wakesEarliest(String time) {
+    return 'frühestens $time';
+  }
+
+  @override
+  String wakesDeadline(String time) {
+    return 'spätestens $time';
+  }
+
+  @override
+  String get wakesCancel => 'Abbrechen';
+
+  @override
+  String wakesCancelLabel(String label) {
+    return 'Weckruf $label abbrechen';
+  }
+
+  @override
+  String wakesCancelRefused(String reason) {
+    return 'Nicht abgebrochen: $reason';
+  }
+
+  @override
+  String wakesUsageLimitContinues(String time) {
+    return 'Nutzungslimit des Kontos erreicht; geht um $time weiter';
+  }
+
+  @override
+  String wakesUsageLimitReplyAfter(String time) {
+    return 'Nutzungslimit des Kontos erreicht. Antworte nach $time, damit es weitergeht';
+  }
+
+  @override
+  String get wakesUsageLimitReplyLater =>
+      'Nutzungslimit des Kontos erreicht. Antworte nach dem Zurücksetzen, damit es weitergeht';
+
+  @override
+  String get runEndStateDone => 'Erledigt';
+
+  @override
+  String get runEndStateWaiting => 'Wartet';
+
+  @override
+  String get runEndStateBlocked => 'Braucht dich';
+
+  @override
+  String runContinuesAt(String day, String time) {
+    return 'Geht $day um $time weiter';
+  }
+
+  @override
+  String runWokeUp(String label) {
+    return 'Aufgewacht: $label';
+  }
+
+  @override
+  String get runWokeUpUnnamed => 'Aufgewacht';
+
+  @override
+  String get runContinuedAfterLostWork => 'Nach verlorener Arbeit fortgesetzt';
+
+  @override
+  String get noteEndedWaiting =>
+      'Hat wartend aufgehört, aber nichts weckt diesen Thread';
+
+  @override
+  String noteWakeExpired(String label) {
+    return '$label ist abgelaufen: die Frist verstrich, bevor er auslösen konnte';
+  }
+
+  @override
+  String noteWakeCancelled(String label) {
+    return '$label wurde abgebrochen';
+  }
+
+  @override
+  String noteWakeFailed(String label) {
+    return '$label ist gescheitert: seine Prüfung konnte nicht laufen';
+  }
+
+  @override
+  String noteWakeRefused(String label, String reason) {
+    return '$label wurde abgelehnt: $reason';
+  }
+
+  @override
+  String noteWakeRefusedNotAllowed(String label) {
+    return '$label wurde abgelehnt: Agenten dürfen in diesem Kanal nicht von selbst weitermachen';
+  }
+
+  @override
+  String get noteChainCap =>
+      'Der Agent hat so oft von selbst weitergemacht wie erlaubt. Antworte, damit es weitergeht';
+
+  @override
+  String get noteIdleCap =>
+      'Der Agent macht nicht mehr von selbst weiter, weil nichts passiert ist. Antworte, damit es weitergeht';
+
+  @override
+  String noteWakeEnded(String label) {
+    return '$label wurde beendet';
+  }
+
+  @override
+  String noteSemantics(String text) {
+    return 'Hinweis: $text';
+  }
+
+  @override
+  String get autonomousRunsMenu => 'Agenten von selbst weitermachen lassen...';
+
+  @override
+  String get autonomousRunsTitle => 'Agenten von selbst weitermachen lassen';
+
+  @override
+  String get autonomousRunsExplanation =>
+      'Owner dürfen Agenten immer von selbst weitermachen lassen. Die Weckrufe aller anderen in diesem Kanal brauchen diesen Schalter.';
+
+  @override
+  String autonomousRunsRefused(String reason) {
+    return 'Nicht geändert: $reason';
+  }
+
+  @override
+  String get autonomousRunsClose => 'Schließen';
+
+  @override
+  String wakesNoteName(String label) {
+    return 'Weckruf \'$label\'';
+  }
+
+  @override
+  String runEndStateLabel(String state) {
+    return 'Endstand: $state';
+  }
 }

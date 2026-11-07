@@ -195,6 +195,7 @@ through the `Fetcher` instead.
 | `instance.updated` | `instance` (reloaded with `getInstance`) | seq |
 | `host.updated`, `terminal_session.changed` | none: announced on `hostEvents` after the commit (M4-36, the app reloads through REST) | version |
 | `status.updated` | none: announced on `statusUpdates` after the commit (M7-21, the status view reloads `getStatus`) | seq |
+| `run.wake_changed` | `run_wakes`: the state and reason of a stored wake-up at once, then the thread's list reloaded with `listThreadWakes` after the commit when the thread is stored here (AR-08; the payload carries no label or condition) | seq; the reload by version |
 | `access.changed` | `sync_state.permission_version`, removal, REST structure | seq |
 | `session.revoked` | the whole database (wipe) | seq |
 
@@ -204,8 +205,7 @@ In memory: `typing.started` and `agent.presence_changed` (`EphemeralStore`), `ru
 `access.expiring`, `agent.config_changed`, `agent.definition_changed`, `agent.followup`, `agent.hosting_changed`,
 `agent.invocation`, `agent.wake_input`, `agent_session.changed`, `channel.settings_changed`, `command.invoked`,
 `device.pending`, `gdpr.request_due`, `gdpr.request_updated`, `grant.changed`, `group.changed`, `import.progress`,
-`interaction.created`, `run.cancel_requested`, `run.wake_changed` (wake-ups of stage AR; the clients show them
-with AR-08), and every type the catalogue does not know.
+`interaction.created`, `run.cancel_requested`, and every type the catalogue does not know.
 
 Host events (M4-36): `SyncEngine.hostEvents` (`HostEventsHub`) carries `HostChanged`
 (`host.updated`: ID, version, state, connection, `key_changed`), `HostPresenceChanged`,
@@ -323,6 +323,11 @@ message events name the channel), and `loadThreadPage` stores one page of
 `listChannelThreads` (`openOnly`: only open threads) and returns the next cursor (the paging of
 the post list).
 
+The wake-ups of a thread (AR-08, 09 5.8.2): `CatchUpListener.loadThreadWakes` reads every page of
+`listThreadWakes` (`Fetcher.threadWakes`) and replaces the thread's rows of `run_wakes` when the
+thread is stored here; the thread view calls it when it opens, and `run.wake_changed` reloads the
+list after its commit. A server before stage AR answers `404`, which changes nothing.
+
 ## Run documents (M4-16)
 
 `RunStore` keeps the document (`run_document.v1`, API schema `Run`) of every focused run in
@@ -347,8 +352,9 @@ and throws `RunPatchError` for anything else; the store never applies a patch in
 
 `watch(runId)` publishes at most one state per frame, the newest one (15 7.4). `RunDocument`
 reads the live box fields of 09 5.4 (state, metrics, cost, plan, steps in `ordinal` order with
-children, open subagents, current tool, follow-ups, `stall_warned_at`, times) and keeps unknown
-fields in `raw`.
+children, open subagents, current tool, follow-ups, `stall_warned_at`, times), the trigger kind
+and `triggering_wake_id`, and the end state of 09 18.19.11 (`metrics.end_state`,
+`metrics.wake_pending_until`; AR-08), and keeps unknown fields in `raw`.
 
 Ports (no transport dependency):
 
@@ -466,7 +472,8 @@ the connections that may see them. Test controls: `addPerson`, `addSpace`, `addC
 `412 version_conflict` with `current`, `410 message_deleted`), `deleteMessage` (idempotent
 `204`), `addReaction`, `removeReaction`, `putReadState`, `putThreadDraft`,
 `deleteThreadDraft`, `listMyReadStates`, `listMyDrafts`, `listMySettings`, `putMySetting`,
-`deleteMySetting`, `getRun`, `cancelRun`, `retryRun` (09 5.7); since M4-19 also `getMySidebar`,
+`deleteMySetting`, `getRun`, `cancelRun`, `retryRun` (09 5.7), `listThreadWakes`,
+`cancelRunWake`, `setChannelAutonomousRuns` (AR-08); since M4-19 also `getMySidebar`,
 `putMySidebarSpace` (the `fracindex` check of the server: a `sort_key` outside the fractional
 index is `400 validation_failed` at `/sort_key`; since M4-51 with `channel_order`, a repeated
 ID is `400 validation_failed` with `duplicate`), `putMySidebarChannel` (M4-51: the own thread
@@ -653,6 +660,16 @@ above it (the app under test in the macOS app sandbox, M4-18), it uses the copy 
 - Events: `agent.invocation` and the agent consumer side are not modelled; `device.pending` is
   not written (it is not in the API documents of this base); `typing.stop` has no effect.
 - `cancelRun` ends the run at once with `cancelled`.
+- Wake-ups (AR-08, `world_wakes.dart`, `rest/wake_handlers.dart`; 09 5.8): `listThreadWakes`
+  (every wake-up of a thread the caller sees, newest first, one page), `cancelRunWake` (the
+  wake-up's person or `manage`; an ended one answers itself) and `setChannelAutonomousRuns`
+  (`manage`, `If-Match`, `409 conflict` `dm_channel`). A test makes wake-ups with
+  `world.addWake`, ends them with `endWake` (the note of 09 5.8.4 with origin `system` and the
+  text of `domain.WakeNoteText`), fires them with `fireWake` (a wake run with
+  `triggering_wake_id`), posts a cap note with `autonomyNote` and removes the switch of every
+  channel with `withoutAutonomousRunsSwitch` (a server before stage AR); each change appends
+  `run.wake_changed`. Not modelled: the job `runs.wake_due`, the checks of 5.8.3, the caps and
+  agent callers.
 - `retryRun` knows no thread operator rule (09 3.4 step 4a); `operator_not_in_channel` is scripted
   with `faults.onRequest`.
 - Terminal (M4-36, `rest/terminal_handlers.dart`, `terminal_stream_fake.dart`,

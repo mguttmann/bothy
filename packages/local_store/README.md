@@ -41,14 +41,14 @@ hooks:
       source: sqlite3mc
 ```
 
-## Tables (schema version 13)
+## Tables (schema version 14)
 
 | Group | File | Tables |
 |---|---|---|
-| Structure | `lib/src/tables/structure.dart` | `spaces`, `user_space_states` (with the personal channel order of a space in `channel_order` since version 12, M4-51), `user_channel_states` (version 12, M4-51: the personal thread order of a channel), `channels` (effective operator, caller's `level` and `capabilities`, the derived `project_bound` of the API `Channel` since version 6, M4-40, R-DM-54; no `prompt`), `channel_operators`, `forum_tags` |
+| Structure | `lib/src/tables/structure.dart` | `spaces`, `user_space_states` (with the personal channel order of a space in `channel_order` since version 12, M4-51), `user_channel_states` (version 12, M4-51: the personal thread order of a channel), `channels` (effective operator, caller's `level` and `capabilities`, the derived `project_bound` of the API `Channel` since version 6, M4-40, R-DM-54; `allow_autonomous_runs` since version 14, AR-08, null from a server before stage AR; no `prompt`), `channel_operators`, `forum_tags` |
 | Threads and messages | `lib/src/tables/threads_messages.dart` | `threads` (local `last_accessed_at`), `thread_tags`, `messages` (`trigger_state`, `thread_seq`, tombstone fields, no `client_payload_sha256`), `reactions_summary`, `my_mentions`, `message_components` |
 | Files | `lib/src/tables/files.dart` | `files`, `message_attachments` |
-| Runs and agents | `lib/src/tables/runs_agents.dart` | `runs` (summary of `run.state_changed`), `agents`, `principals` |
+| Runs and agents | `lib/src/tables/runs_agents.dart` | `runs` (summary of `run.state_changed`), `run_wakes` (version 14, AR-08: every column of 03 `run_wakes`, the wake-ups of the threads this device holds, deleted with their thread), `agents`, `principals` |
 | Personal | `lib/src/tables/personal.dart` | `read_states`, `drafts`, `user_settings`, `notification_preferences`, `quiet_hours` |
 | Instance | `lib/src/tables/instance.dart` | `instance` (with the app lock policy of `getInstance` in `app_lock` since version 5, M5-08; null in a row of an earlier version until the next `getInstance`), `commands` |
 | Local only | `lib/src/tables/local_only.dart` | `outbox`, `sync_state`, `loaded_ranges`, `file_cache`, `share_inbox`, `forum_view_states` (version 2, M4-19: the Done section per forum), `recent_targets` (version 3, M4-23: the recently visited spaces, channels and threads of the quick switcher, per device, never synchronized), `host_key_pins` (version 4, M4-36: the pinned Noise keys of the hosts, per device, a trust anchor), `channel_view_states` and `shell_view_state` (version 6, M4-40: the collapsed thread group per channel and the one row with the pinned forum overview, per device, never synchronized; 01 6.8 item 7, D-SB-6; version 7, M4-42: `shell_view_state.channel_column_hidden`, whether the channel column next to an open thread is hidden, 01 D1, D2; version 8, M4-45: `shell_view_state.session_column_hidden` and `text_thread_session_shown`, whether the session column is hidden beside a forum post or main history and shown beside a thread of a text channel, 01 D1, D2; version 9, M4-46: `channel_view_states.posts_shown_in_full`, whether a forum group lists every open post after "Show more", 01 6.8 item 3), `space_view_states` (version 10, FIX-device-mirroring-2: whether a space is collapsed in the sidebar, per device, never synchronized, filled once from `user_space_states.collapsed` on the upgrade; 01 6.7, R-PR-24); version 11, M4-49: `shell_view_state.code_blocks_unwrapped`, whether the code blocks of messages show one line per line with a horizontal scroll instead of wrapping, 01 6.14; `thread_seen_states` (version 13, M4-52: the run and its state each chat showed when the person last had it open, per device, never synchronized, deleted with its thread; 01 6.17) |
@@ -70,6 +70,7 @@ whether it applied (04 9); reactions and pins carry absolute values and leave
 | DAO | Purpose |
 |---|---|
 | `StructureDao`, `ThreadsDao`, `MessagesDao`, `RunsDao`, `PrincipalsDao`, `CommandsDao`, `InstanceDao` | mirror tables; the personal sidebar orders of `StructureDao` (M4-51): `watchUserSpaceStates`, `upsertUserSpaceStateIfNewer` and `putUserSpaceStateLocally` with the optional `channelOrder` (null keeps the stored list, an empty list clears it to the default order), `watchUserChannelStates`, `upsertUserChannelStateIfNewer` and `putUserChannelStateLocally` (the local write at once keeps the version, a missing row starts at 0, so the server state wins by version); `MessagesDao.watchContiguous` emits only the contiguous range of `loaded_ranges` that ends at the newest loaded message plus the first gap |
+| `RunsDao` (wake-ups, AR-08) | `upsertWakeIfNewer`, `replaceThreadWakes` (the whole list of `listThreadWakes` replaces the thread's rows), `applyWakeState` (the state of `run.wake_changed` before the reload, version kept), `watchWakesForThread` (in the order they fire) |
 | `PersonalDao` | read states through `mergeReadState` (monotonic), drafts, settings, notification preferences, quiet hours |
 | `SyncStateDao` | `commitPage` stores a page and the cursor with the sync epoch in one transaction; `saveSession`, `markDisconnected`, `markSnapshot`, `resetCursor`; `clearMirror` for a resync |
 | `OutboxDao` | FIFO per thread by `created_at`, then `id`; `depends_on`; failures with the `current` revision of a `412` |
@@ -80,7 +81,7 @@ whether it applied (04 9); reactions and pins carry absolute values and leave
 ## Removal, wipe and cleanup
 
 - `removeTargets(List<TargetRef>)` deletes spaces, channels and threads with everything below
-  them (messages, attachments, reactions, mentions, components, runs, drafts, read states, loaded
+  them (messages, attachments, reactions, mentions, components, runs, wake-ups, drafts, read states, loaded
   ranges, search rows, file cache rows, recently visited rows, the collapsed thread group and
   the personal thread order of a channel) in one transaction and returns the file cache paths, so
   the caller deletes the bytes (04 8.3). Outbox entries stay; they fail with `404`. Host targets

@@ -625,6 +625,7 @@ Serializers _$serializers =
           ..add(RunHistoryEntry.serializer)
           ..add(RunHistoryPage.serializer)
           ..add(RunMetrics.serializer)
+          ..add(RunMetricsEndStateEnum.serializer)
           ..add(RunPatch.serializer)
           ..add(RunPatchResult.serializer)
           ..add(RunPlan.serializer)

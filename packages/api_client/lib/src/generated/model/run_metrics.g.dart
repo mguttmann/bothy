@@ -6,6 +6,78 @@ part of 'run_metrics.dart';
 // BuiltValueGenerator
 // **************************************************************************
 
+const RunMetricsEndStateEnum _$runMetricsEndStateEnum_done =
+    const RunMetricsEndStateEnum._('done');
+const RunMetricsEndStateEnum _$runMetricsEndStateEnum_waiting =
+    const RunMetricsEndStateEnum._('waiting');
+const RunMetricsEndStateEnum _$runMetricsEndStateEnum_blocked =
+    const RunMetricsEndStateEnum._('blocked');
+const RunMetricsEndStateEnum _$runMetricsEndStateEnum_unknownDefaultOpenApi =
+    const RunMetricsEndStateEnum._('unknownDefaultOpenApi');
+
+RunMetricsEndStateEnum _$runMetricsEndStateEnumValueOf(String name) {
+  switch (name) {
+    case 'done':
+      return _$runMetricsEndStateEnum_done;
+    case 'waiting':
+      return _$runMetricsEndStateEnum_waiting;
+    case 'blocked':
+      return _$runMetricsEndStateEnum_blocked;
+    case 'unknownDefaultOpenApi':
+      return _$runMetricsEndStateEnum_unknownDefaultOpenApi;
+    default:
+      return _$runMetricsEndStateEnum_unknownDefaultOpenApi;
+  }
+}
+
+final BuiltSet<RunMetricsEndStateEnum> _$runMetricsEndStateEnumValues =
+    BuiltSet<RunMetricsEndStateEnum>(const <RunMetricsEndStateEnum>[
+      _$runMetricsEndStateEnum_done,
+      _$runMetricsEndStateEnum_waiting,
+      _$runMetricsEndStateEnum_blocked,
+      _$runMetricsEndStateEnum_unknownDefaultOpenApi,
+    ]);
+
+Serializer<RunMetricsEndStateEnum> _$runMetricsEndStateEnumSerializer =
+    _$RunMetricsEndStateEnumSerializer();
+
+class _$RunMetricsEndStateEnumSerializer
+    implements PrimitiveSerializer<RunMetricsEndStateEnum> {
+  static const Map<String, Object> _toWire = const <String, Object>{
+    'done': 'done',
+    'waiting': 'waiting',
+    'blocked': 'blocked',
+    'unknownDefaultOpenApi': 'unknown_default_open_api',
+  };
+  static const Map<Object, String> _fromWire = const <Object, String>{
+    'done': 'done',
+    'waiting': 'waiting',
+    'blocked': 'blocked',
+    'unknown_default_open_api': 'unknownDefaultOpenApi',
+  };
+
+  @override
+  final Iterable<Type> types = const <Type>[RunMetricsEndStateEnum];
+  @override
+  final String wireName = 'RunMetricsEndStateEnum';
+
+  @override
+  Object serialize(
+    Serializers serializers,
+    RunMetricsEndStateEnum object, {
+    FullType specifiedType = FullType.unspecified,
+  }) => _toWire[object.name] ?? object.name;
+
+  @override
+  RunMetricsEndStateEnum deserialize(
+    Serializers serializers,
+    Object serialized, {
+    FullType specifiedType = FullType.unspecified,
+  }) => RunMetricsEndStateEnum.valueOf(
+    _fromWire[serialized] ?? (serialized is String ? serialized : ''),
+  );
+}
+
 class _$RunMetrics extends RunMetrics {
   @override
   final double? contextPct;
@@ -31,6 +103,10 @@ class _$RunMetrics extends RunMetrics {
   final RunApiRetry? lastApiRetry;
   @override
   final RunAutonomyLast? autonomyLast;
+  @override
+  final RunMetricsEndStateEnum? endState;
+  @override
+  final DateTime? wakePendingUntil;
 
   factory _$RunMetrics([void Function(RunMetricsBuilder)? updates]) =>
       (RunMetricsBuilder()..update(updates))._build();
@@ -48,6 +124,8 @@ class _$RunMetrics extends RunMetrics {
     this.progressEvents,
     this.lastApiRetry,
     this.autonomyLast,
+    this.endState,
+    this.wakePendingUntil,
   }) : super._();
   @override
   RunMetrics rebuild(void Function(RunMetricsBuilder) updates) =>
@@ -71,7 +149,9 @@ class _$RunMetrics extends RunMetrics {
         apiRetries == other.apiRetries &&
         progressEvents == other.progressEvents &&
         lastApiRetry == other.lastApiRetry &&
-        autonomyLast == other.autonomyLast;
+        autonomyLast == other.autonomyLast &&
+        endState == other.endState &&
+        wakePendingUntil == other.wakePendingUntil;
   }
 
   @override
@@ -89,6 +169,8 @@ class _$RunMetrics extends RunMetrics {
     _$hash = $jc(_$hash, progressEvents.hashCode);
     _$hash = $jc(_$hash, lastApiRetry.hashCode);
     _$hash = $jc(_$hash, autonomyLast.hashCode);
+    _$hash = $jc(_$hash, endState.hashCode);
+    _$hash = $jc(_$hash, wakePendingUntil.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -107,7 +189,9 @@ class _$RunMetrics extends RunMetrics {
           ..add('apiRetries', apiRetries)
           ..add('progressEvents', progressEvents)
           ..add('lastApiRetry', lastApiRetry)
-          ..add('autonomyLast', autonomyLast))
+          ..add('autonomyLast', autonomyLast)
+          ..add('endState', endState)
+          ..add('wakePendingUntil', wakePendingUntil))
         .toString();
   }
 }
@@ -172,6 +256,15 @@ class RunMetricsBuilder implements Builder<RunMetrics, RunMetricsBuilder> {
   set autonomyLast(RunAutonomyLastBuilder? autonomyLast) =>
       _$this._autonomyLast = autonomyLast;
 
+  RunMetricsEndStateEnum? _endState;
+  RunMetricsEndStateEnum? get endState => _$this._endState;
+  set endState(RunMetricsEndStateEnum? endState) => _$this._endState = endState;
+
+  DateTime? _wakePendingUntil;
+  DateTime? get wakePendingUntil => _$this._wakePendingUntil;
+  set wakePendingUntil(DateTime? wakePendingUntil) =>
+      _$this._wakePendingUntil = wakePendingUntil;
+
   RunMetricsBuilder() {
     RunMetrics._defaults(this);
   }
@@ -191,6 +284,8 @@ class RunMetricsBuilder implements Builder<RunMetrics, RunMetricsBuilder> {
       _progressEvents = $v.progressEvents;
       _lastApiRetry = $v.lastApiRetry?.toBuilder();
       _autonomyLast = $v.autonomyLast?.toBuilder();
+      _endState = $v.endState;
+      _wakePendingUntil = $v.wakePendingUntil;
       _$v = null;
     }
     return this;
@@ -227,6 +322,8 @@ class RunMetricsBuilder implements Builder<RunMetrics, RunMetricsBuilder> {
             progressEvents: progressEvents,
             lastApiRetry: _lastApiRetry?.build(),
             autonomyLast: _autonomyLast?.build(),
+            endState: endState,
+            wakePendingUntil: wakePendingUntil,
           );
     } catch (_) {
       late String _$failedField;

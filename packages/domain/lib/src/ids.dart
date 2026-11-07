@@ -59,6 +59,13 @@ extension type const RunId._(String value) implements Object {
   factory RunId.parse(String text) => RunId._(canonicalUuid(text, 'run ID'));
 }
 
+/// ID of a wake-up (03 `run_wakes.id`, 09 5.8.1; stage AR).
+extension type const WakeId._(String value) implements Object {
+  /// Parses [text] in either case; throws a [FormatException] for anything but a UUID.
+  factory WakeId.parse(String text) =>
+      WakeId._(canonicalUuid(text, 'wake-up ID'));
+}
+
 /// ID of a principal: person, agent or app (03 `principals.id`).
 extension type const PrincipalId._(String value) implements Object {
   /// Parses [text] in either case; throws a [FormatException] for anything but a UUID.

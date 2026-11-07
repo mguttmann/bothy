@@ -30,6 +30,7 @@ part 'world_search.dart';
 part 'world_structure.dart';
 part 'world_terminal.dart';
 part 'world_thread_view.dart';
+part 'world_wakes.dart';
 
 /// A JSON object of the API.
 typedef JsonMap = Map<String, Object?>;
@@ -778,6 +779,9 @@ final class FakeWorld {
   /// Runs (API `Run`, the run document of 04 11.1) by ID.
   final Map<String, JsonMap> runs = {};
 
+  /// The wake-ups by ID (API `RunWake`, 09 5.8; stage AR), see [WakesWorld].
+  final Map<String, JsonMap> wakes = {};
+
   /// Forum tags by ID (API `ForumTag`).
   final Map<String, JsonMap> forumTags = {};
 
@@ -1040,6 +1044,7 @@ final class FakeWorld {
       'sort_key': 'a${channels.length}',
       'operator': _inheritOperator(spaceId),
       'read_only': false,
+      'allow_autonomous_runs': false,
       'project_bound': false,
       'version': 1,
       'settings_version': 1,
@@ -1321,7 +1326,16 @@ final class FakeWorld {
       'principal': person.ref,
       'is_owner': person.isOwner,
       'spaces': spaceViews(principalId),
-      'channels': channelViews(principalId),
+      // As on the server (`SnapshotChannel`), a snapshot channel carries no
+      // `allow_autonomous_runs`.
+      'channels': [
+        for (final v in channelViews(principalId))
+          {
+            ...v,
+            'channel': {...v['channel']! as JsonMap}
+              ..remove('allow_autonomous_runs'),
+          },
+      ],
       'sidebar': sidebarOf(principalId),
       'sidebar_channels': sidebarChannelsOf(principalId),
       'unread_threads': unread,
@@ -1431,7 +1445,12 @@ final class FakeWorld {
       'permission_version': permissionVersion,
     };
     // A copy: the world keeps changing its objects, a logged event never changes.
-    final event = FakeEvent(_copy(envelope), audience: audience);
+    final logged = _copy(envelope);
+    // As on the server (`channelJSON` of AR-04), a channel in an event payload carries no
+    // `allow_autonomous_runs`; only `getChannel`, `listSpaceChannels` and the switch's answer do.
+    final eventChannel = (logged['payload'] as Map?)?['channel'];
+    if (eventChannel is Map) eventChannel.remove('allow_autonomous_runs');
+    final event = FakeEvent(logged, audience: audience);
     log.add(event);
     for (final hook in List.of(eventHooks)) {
       hook(event);

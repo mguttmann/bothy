@@ -28724,6 +28724,13 @@ components:
           $ref: '#/components/schemas/RunApiRetry'
         autonomy_last:
           $ref: '#/components/schemas/RunAutonomyLast'
+        end_state:
+          type: string
+          enum: [done, waiting, blocked]
+          description: 'The end state of the run''s last answer (09 18.19.11, 03 `runs.metrics`): `done` nothing more to do, `waiting` more work after something happens, `blocked` needs a person. Set at the finish of a run of a runner with `runner.end_state`; absent otherwise. Clients show it on the collapsed line of the run (01 6.21 item 2).'
+        wake_pending_until:
+          $ref: '#/components/schemas/Timestamp'
+          description: The time the next pending wake-up of the thread fires at the earliest, at the end of the run (09 18.19.11); absent when no wake-up was pending. Clients show when the thread continues (01 6.21 item 2).
     RunAutonomyLast:
       type: object
       additionalProperties: false

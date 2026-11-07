@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import datetime
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, Self, TypeVar
 
 from attrs import define as _attrs_define
 
+from ..models.run_metrics_end_state import RunMetricsEndState
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
@@ -35,6 +37,12 @@ class RunMetrics:
         last_api_retry (RunApiRetry | Unset): Last retry of a model API call, shown in the live box while set.
         autonomy_last (RunAutonomyLast | Unset): The idle flag of the last autonomous input or notification turn (09
             5.8.6); the server counts each distinct `input` once in the idle count of the run's thread and person.
+        end_state (RunMetricsEndState | Unset): The end state of the run's last answer (09 18.19.11, 03 `runs.metrics`):
+            `done` nothing more to do, `waiting` more work after something happens, `blocked` needs a person. Set at the
+            finish of a run of a runner with `runner.end_state`; absent otherwise. Clients show it on the collapsed line of
+            the run (01 6.21 item 2).
+        wake_pending_until (datetime.datetime | Unset): RFC 3339 timestamp in UTC with millisecond precision and suffix
+            `Z`.
     """
 
     context_pct: float | Unset = UNSET
@@ -49,6 +57,8 @@ class RunMetrics:
     progress_events: int | Unset = UNSET
     last_api_retry: RunApiRetry | Unset = UNSET
     autonomy_last: RunAutonomyLast | Unset = UNSET
+    end_state: RunMetricsEndState | Unset = UNSET
+    wake_pending_until: datetime.datetime | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         context_pct = self.context_pct
@@ -79,6 +89,14 @@ class RunMetrics:
         if not isinstance(self.autonomy_last, Unset):
             autonomy_last = self.autonomy_last.to_dict()
 
+        end_state: str | Unset = UNSET
+        if not isinstance(self.end_state, Unset):
+            end_state = self.end_state.value
+
+        wake_pending_until: str | Unset = UNSET
+        if not isinstance(self.wake_pending_until, Unset):
+            wake_pending_until = self.wake_pending_until.isoformat()
+
         field_dict: dict[str, Any] = {}
 
         field_dict.update({})
@@ -106,6 +124,10 @@ class RunMetrics:
             field_dict["last_api_retry"] = last_api_retry
         if autonomy_last is not UNSET:
             field_dict["autonomy_last"] = autonomy_last
+        if end_state is not UNSET:
+            field_dict["end_state"] = end_state
+        if wake_pending_until is not UNSET:
+            field_dict["wake_pending_until"] = wake_pending_until
 
         return field_dict
 
@@ -149,6 +171,20 @@ class RunMetrics:
         else:
             autonomy_last = RunAutonomyLast.from_dict(_autonomy_last)
 
+        _end_state = d.pop("end_state", UNSET)
+        end_state: RunMetricsEndState | Unset
+        if isinstance(_end_state, Unset):
+            end_state = UNSET
+        else:
+            end_state = RunMetricsEndState(_end_state)
+
+        _wake_pending_until = d.pop("wake_pending_until", UNSET)
+        wake_pending_until: datetime.datetime | Unset
+        if isinstance(_wake_pending_until, Unset):
+            wake_pending_until = UNSET
+        else:
+            wake_pending_until = datetime.datetime.fromisoformat(_wake_pending_until)
+
         run_metrics = cls(
             context_pct=context_pct,
             tokens_in=tokens_in,
@@ -162,6 +198,8 @@ class RunMetrics:
             progress_events=progress_events,
             last_api_retry=last_api_retry,
             autonomy_last=autonomy_last,
+            end_state=end_state,
+            wake_pending_until=wake_pending_until,
         )
 
         return run_metrics

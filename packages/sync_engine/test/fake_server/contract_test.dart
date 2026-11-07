@@ -289,6 +289,27 @@ void main() {
     final again = await api.getRunsApi().retryRun(runId: run['id']! as String);
     expect(again.data!.id, retried.data!.id);
 
+    // AR-08: the wake-ups of a thread, a cancel and the channel switch (09 5.8.2, 07 2.14).
+    final wake = h.server.world.addWake(
+      threadId: w.releaseNotes,
+      agentId: w.robin.id,
+      sourceRunId: run['id']! as String,
+      triggeredBy: w.alex.id,
+      label: 'CI of #123',
+    );
+    await api.getRunsApi().listThreadWakes(threadId: w.releaseNotes);
+    await api.getRunsApi().cancelRunWake(
+      wakeId: wake['id']! as String,
+      runWakeCancel: RunWakeCancel(),
+    );
+    await api.getChannelsApi().setChannelAutonomousRuns(
+      channelId: w.general,
+      ifMatch: '"${h.server.world.channels[w.general]!.json['version']}"',
+      channelAutonomousRunsSet: ChannelAutonomousRunsSet(
+        (b) => b..allowAutonomousRuns = true,
+      ),
+    );
+
     // A second device of Alex through a pairing.
     final tablet = h.device(keySeed: 2);
     final ticket = await tablet.auth.login.beginPairing();

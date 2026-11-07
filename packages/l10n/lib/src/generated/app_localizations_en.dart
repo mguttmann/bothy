@@ -10778,4 +10778,177 @@ class AppLocalizationsEn extends AppLocalizations {
   String stepUpPurposeNewAgent(String name) {
     return 'Create the agent $name';
   }
+
+  @override
+  String get wakesPendingTitle => 'Continues on its own';
+
+  @override
+  String wakesPendingItemLabel(
+    String label,
+    String condition,
+    String earliest,
+    String deadline,
+  ) {
+    return '$label: $condition, earliest $earliest, deadline $deadline';
+  }
+
+  @override
+  String get wakesUnnamed => 'Wake-up';
+
+  @override
+  String wakesConditionAt(String time) {
+    return 'at $time';
+  }
+
+  @override
+  String wakesConditionPrChecks(String number) {
+    return 'when the checks of #$number finish';
+  }
+
+  @override
+  String get wakesConditionPrChecksAny =>
+      'when the checks of the pull request finish';
+
+  @override
+  String get wakesConditionCommand => 'when the command succeeds';
+
+  @override
+  String get wakesConditionUnknown => 'when its condition is met';
+
+  @override
+  String wakesEarliest(String time) {
+    return 'earliest $time';
+  }
+
+  @override
+  String wakesDeadline(String time) {
+    return 'deadline $time';
+  }
+
+  @override
+  String get wakesCancel => 'Cancel';
+
+  @override
+  String wakesCancelLabel(String label) {
+    return 'Cancel wake-up $label';
+  }
+
+  @override
+  String wakesCancelRefused(String reason) {
+    return 'Not cancelled: $reason';
+  }
+
+  @override
+  String wakesUsageLimitContinues(String time) {
+    return 'Usage limit of the account reached; continues at $time';
+  }
+
+  @override
+  String wakesUsageLimitReplyAfter(String time) {
+    return 'Usage limit of the account reached. Reply after $time to continue';
+  }
+
+  @override
+  String get wakesUsageLimitReplyLater =>
+      'Usage limit of the account reached. Reply after the reset to continue';
+
+  @override
+  String get runEndStateDone => 'Done';
+
+  @override
+  String get runEndStateWaiting => 'Waiting';
+
+  @override
+  String get runEndStateBlocked => 'Needs you';
+
+  @override
+  String runContinuesAt(String day, String time) {
+    return 'Continues $day at $time';
+  }
+
+  @override
+  String runWokeUp(String label) {
+    return 'Woke up: $label';
+  }
+
+  @override
+  String get runWokeUpUnnamed => 'Woke up';
+
+  @override
+  String get runContinuedAfterLostWork => 'Continued after lost work';
+
+  @override
+  String get noteEndedWaiting =>
+      'Ended waiting, but nothing will wake this thread';
+
+  @override
+  String noteWakeExpired(String label) {
+    return '$label expired: its deadline passed before it could fire';
+  }
+
+  @override
+  String noteWakeCancelled(String label) {
+    return '$label was cancelled';
+  }
+
+  @override
+  String noteWakeFailed(String label) {
+    return '$label failed: its check could not run';
+  }
+
+  @override
+  String noteWakeRefused(String label, String reason) {
+    return '$label was refused: $reason';
+  }
+
+  @override
+  String noteWakeRefusedNotAllowed(String label) {
+    return '$label was refused: agents may not continue on their own in this channel';
+  }
+
+  @override
+  String get noteChainCap =>
+      'The agent continued on its own as often as allowed. Reply to continue';
+
+  @override
+  String get noteIdleCap =>
+      'The agent stopped continuing on its own because nothing happened. Reply to continue';
+
+  @override
+  String noteWakeEnded(String label) {
+    return '$label ended';
+  }
+
+  @override
+  String noteSemantics(String text) {
+    return 'Note: $text';
+  }
+
+  @override
+  String get autonomousRunsMenu => 'Let agents continue on their own...';
+
+  @override
+  String get autonomousRunsTitle => 'Let agents continue on their own';
+
+  @override
+  String get autonomousRunsExplanation =>
+      'Owners may always let agents continue on their own. Everyone else\'s wake-ups in this channel need this switch.';
+
+  @override
+  String autonomousRunsRefused(String reason) {
+    return 'Not changed: $reason';
+  }
+
+  @override
+  String get autonomousRunsClose => 'Close';
+
+  @override
+  String wakesNoteName(String label) {
+    return 'Wake-up \'$label\'';
+  }
+
+  @override
+  String runEndStateLabel(String state) {
+    return 'End state: $state';
+  }
 }

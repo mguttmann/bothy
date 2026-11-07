@@ -17297,6 +17297,251 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Create the agent {name}'**
   String stepUpPurposeNewAgent(String name);
+
+  /// Heading of the list of pending wake-ups above the composer (01 6.21 item 1).
+  ///
+  /// In en, this message translates to:
+  /// **'Continues on its own'**
+  String get wakesPendingTitle;
+
+  /// Screen reader label of one pending wake-up above the composer: its label, its condition, the time it fires at the earliest and its deadline (01 6.21 item 1).
+  ///
+  /// In en, this message translates to:
+  /// **'{label}: {condition}, earliest {earliest}, deadline {deadline}'**
+  String wakesPendingItemLabel(
+    String label,
+    String condition,
+    String earliest,
+    String deadline,
+  );
+
+  /// The name of a wake-up whose agent gave it no label (01 6.21, 09 5.8.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Wake-up'**
+  String get wakesUnnamed;
+
+  /// Condition of a wake-up that fires at a time (kind at), for example 'at 17:55' (01 6.21 item 1).
+  ///
+  /// In en, this message translates to:
+  /// **'at {time}'**
+  String wakesConditionAt(String time);
+
+  /// Condition of a wake-up that waits for the checks of a pull request (kind pr_checks), with its number (01 6.21 item 1).
+  ///
+  /// In en, this message translates to:
+  /// **'when the checks of #{number} finish'**
+  String wakesConditionPrChecks(String number);
+
+  /// Condition of a pull request wake-up whose number is unknown (01 6.21 item 1).
+  ///
+  /// In en, this message translates to:
+  /// **'when the checks of the pull request finish'**
+  String get wakesConditionPrChecksAny;
+
+  /// Condition of a wake-up that waits for a command to exit with code 0 (kind command, 01 6.21 item 1).
+  ///
+  /// In en, this message translates to:
+  /// **'when the command succeeds'**
+  String get wakesConditionCommand;
+
+  /// Condition of a wake-up of a kind this app does not know (a newer server).
+  ///
+  /// In en, this message translates to:
+  /// **'when its condition is met'**
+  String get wakesConditionUnknown;
+
+  /// The time a pending wake-up fires at the earliest (01 6.21 item 1).
+  ///
+  /// In en, this message translates to:
+  /// **'earliest {time}'**
+  String wakesEarliest(String time);
+
+  /// The deadline of a pending wake-up, after which it expires (01 6.21 item 1).
+  ///
+  /// In en, this message translates to:
+  /// **'deadline {time}'**
+  String wakesDeadline(String time);
+
+  /// Button that cancels a pending wake-up; shown to the wake-up's person and to persons with manage on the channel (07 2.14 item 5).
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get wakesCancel;
+
+  /// Screen reader label of the cancel button of a pending wake-up.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel wake-up {label}'**
+  String wakesCancelLabel(String label);
+
+  /// Shown beside a pending wake-up when the server refused its cancel, with the reason.
+  ///
+  /// In en, this message translates to:
+  /// **'Not cancelled: {reason}'**
+  String wakesCancelRefused(String reason);
+
+  /// Note of the thread while a usage-limit wake-up is pending (01 6.21 item 3, 09 18.19.10).
+  ///
+  /// In en, this message translates to:
+  /// **'Usage limit of the account reached; continues at {time}'**
+  String wakesUsageLimitContinues(String time);
+
+  /// Note of the thread after a run hit the usage limit and may not continue on its own (01 6.21 item 3, 09 18.19.10).
+  ///
+  /// In en, this message translates to:
+  /// **'Usage limit of the account reached. Reply after {time} to continue'**
+  String wakesUsageLimitReplyAfter(String time);
+
+  /// Note of the thread after a run hit the usage limit when the reset time is unknown (01 6.21 item 3, 09 18.19.10).
+  ///
+  /// In en, this message translates to:
+  /// **'Usage limit of the account reached. Reply after the reset to continue'**
+  String get wakesUsageLimitReplyLater;
+
+  /// End state of a finished run on its collapsed line: nothing more to do (01 6.21 item 2, 09 18.19.11).
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get runEndStateDone;
+
+  /// End state of a finished run on its collapsed line: more work after something happens (01 6.21 item 2).
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting'**
+  String get runEndStateWaiting;
+
+  /// End state of a finished run on its collapsed line: needs a person (01 6.21 item 2).
+  ///
+  /// In en, this message translates to:
+  /// **'Needs you'**
+  String get runEndStateBlocked;
+
+  /// On the collapsed line of a finished run: when the thread continues, from the pending wake-up (01 6.21 item 2).
+  ///
+  /// In en, this message translates to:
+  /// **'Continues {day} at {time}'**
+  String runContinuesAt(String day, String time);
+
+  /// Shown at a run started by a wake-up instead of a triggering message, with the wake-up's label (01 6.21 item 4).
+  ///
+  /// In en, this message translates to:
+  /// **'Woke up: {label}'**
+  String runWokeUp(String label);
+
+  /// Shown at a run started by a wake-up without a label (01 6.21 item 4).
+  ///
+  /// In en, this message translates to:
+  /// **'Woke up'**
+  String get runWokeUpUnnamed;
+
+  /// Shown at a recovery run instead of a triggering message (01 6.21 item 4, 09 18.19.9).
+  ///
+  /// In en, this message translates to:
+  /// **'Continued after lost work'**
+  String get runContinuedAfterLostWork;
+
+  /// Note of the thread when a run ended in the state waiting without a pending wake-up (01 6.21 item 3, 09 18.19.11).
+  ///
+  /// In en, this message translates to:
+  /// **'Ended waiting, but nothing will wake this thread'**
+  String get noteEndedWaiting;
+
+  /// Note of the thread when a wake-up expired (01 6.21 item 3, 09 5.8.4); label is the wake-up's name.
+  ///
+  /// In en, this message translates to:
+  /// **'{label} expired: its deadline passed before it could fire'**
+  String noteWakeExpired(String label);
+
+  /// Note of the thread when a wake-up was cancelled (01 6.21 item 3, 09 5.8.4).
+  ///
+  /// In en, this message translates to:
+  /// **'{label} was cancelled'**
+  String noteWakeCancelled(String label);
+
+  /// Note of the thread when the check of a wake-up kept failing (01 6.21 item 3, 09 5.8.4).
+  ///
+  /// In en, this message translates to:
+  /// **'{label} failed: its check could not run'**
+  String noteWakeFailed(String label);
+
+  /// Note of the thread when a check refused a wake-up, with the reason (01 6.21 item 3, 09 5.8.4).
+  ///
+  /// In en, this message translates to:
+  /// **'{label} was refused: {reason}'**
+  String noteWakeRefused(String label, String reason);
+
+  /// Note of the thread when a wake-up was refused because the channel does not let agents continue on their own (09 5.8.6).
+  ///
+  /// In en, this message translates to:
+  /// **'{label} was refused: agents may not continue on their own in this channel'**
+  String noteWakeRefusedNotAllowed(String label);
+
+  /// Note of the thread when the chain of autonomous inputs reached its cap (01 6.21 item 3, 09 5.8.6).
+  ///
+  /// In en, this message translates to:
+  /// **'The agent continued on its own as often as allowed. Reply to continue'**
+  String get noteChainCap;
+
+  /// Note of the thread when the idle count of autonomous inputs reached its cap (01 6.21 item 3, 09 5.8.6).
+  ///
+  /// In en, this message translates to:
+  /// **'The agent stopped continuing on its own because nothing happened. Reply to continue'**
+  String get noteIdleCap;
+
+  /// Note of the thread for a wake-up end this app does not know (a newer server).
+  ///
+  /// In en, this message translates to:
+  /// **'{label} ended'**
+  String noteWakeEnded(String label);
+
+  /// Screen reader label of a note of the thread, which is never a message of a person (01 6.21 item 3).
+  ///
+  /// In en, this message translates to:
+  /// **'Note: {text}'**
+  String noteSemantics(String text);
+
+  /// Entry of the channel menu for persons with manage that opens the channel switch allow_autonomous_runs (01 6.21 item 5).
+  ///
+  /// In en, this message translates to:
+  /// **'Let agents continue on their own...'**
+  String get autonomousRunsMenu;
+
+  /// Title and switch label of the channel setting allow_autonomous_runs (01 6.21 item 5).
+  ///
+  /// In en, this message translates to:
+  /// **'Let agents continue on their own'**
+  String get autonomousRunsTitle;
+
+  /// The sentence under the channel switch allow_autonomous_runs (01 6.21 item 5, 09 5.8.6).
+  ///
+  /// In en, this message translates to:
+  /// **'Owners may always let agents continue on their own. Everyone else\'s wake-ups in this channel need this switch.'**
+  String get autonomousRunsExplanation;
+
+  /// Shown in the channel switch dialog when the server refused the change, with the reason.
+  ///
+  /// In en, this message translates to:
+  /// **'Not changed: {reason}'**
+  String autonomousRunsRefused(String reason);
+
+  /// Button that closes the dialog of the channel switch allow_autonomous_runs.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get autonomousRunsClose;
+
+  /// The name of a wake-up with its label in a note of the thread, for example Wake-up 'CI of #123' (09 5.8.4); label is agent content.
+  ///
+  /// In en, this message translates to:
+  /// **'Wake-up \'{label}\''**
+  String wakesNoteName(String label);
+
+  /// The end state of a finished run under its collapsed line, which already shows the run state; state is Done, Waiting or Needs you (01 6.21 item 2).
+  ///
+  /// In en, this message translates to:
+  /// **'End state: {state}'**
+  String runEndStateLabel(String state);
 }
 
 class _AppLocalizationsDelegate

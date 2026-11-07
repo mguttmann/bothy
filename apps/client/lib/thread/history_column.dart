@@ -28,6 +28,9 @@ import '../agents/live_box_slot.dart';
 import '../agents/message_card.dart';
 import '../agents/providers.dart';
 import '../agents/run_line.dart';
+import '../agents/wakes/pending_wakes.dart';
+import '../agents/wakes/run_wake_lines.dart';
+import '../agents/wakes/wake_notes.dart';
 import '../app/providers/ports.dart';
 import '../app/providers/session.dart';
 import '../composer/thread_composer.dart';
@@ -64,6 +67,7 @@ import 'retrigger_notice.dart';
 import 'revisions_dialog.dart';
 import 'thread_actions.dart';
 import 'thread_header.dart';
+import 'thread_note.dart';
 import 'title_editor.dart';
 import 'versions_dialog.dart';
 
@@ -607,8 +611,28 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
             DsSpace.s8,
             DsSpace.s2,
           ),
-          child: RunLine(message: message),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 01 6.21 item 4: a wake run names its wake-up instead of a triggering message.
+              if (message.runId case final run?)
+                RunTriggerLine(runId: run, threadId: message.threadId),
+              RunLine(message: message),
+            ],
+          ),
         ),
+      // 01 6.21 item 3: a note of the server (a wake-up end, a cap) is a note of the thread,
+      // never a message of a person (R-PR-37).
+      MessageItem(:final message) when isThreadNote(message) => Padding(
+        key: ValueKey(item.key),
+        padding: EdgeInsets.only(left: context.dsDensity.messageGutter),
+        child: ThreadNoteLine(
+          key: ValueKey('note.${message.id.value}'),
+          text: threadNoteText(l, message),
+          time: time(message.createdAt),
+        ),
+      ),
       MessageItem(:final message, :final continuation, :final started) =>
         _MessageRow(
           key: ValueKey(item.key),
@@ -826,6 +850,11 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
                           },
                         ),
                       ),
+              ),
+              // 01 6.21 item 1: the pending wake-ups above the composer.
+              PendingWakes(
+                threadId: widget.threadId,
+                channelId: thread.channelId,
               ),
               ThreadComposer(
                 key: _composer,

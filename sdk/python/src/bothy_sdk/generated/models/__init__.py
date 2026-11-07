@@ -659,6 +659,7 @@ from .run_followups import RunFollowups
 from .run_history_entry import RunHistoryEntry
 from .run_history_page import RunHistoryPage
 from .run_metrics import RunMetrics
+from .run_metrics_end_state import RunMetricsEndState
 from .run_patch import RunPatch
 from .run_patch_result import RunPatchResult
 from .run_plan import RunPlan
@@ -1553,6 +1554,7 @@ __all__ = (
     "RunHistoryEntry",
     "RunHistoryPage",
     "RunMetrics",
+    "RunMetricsEndState",
     "RunPatch",
     "RunPatchResult",
     "RunPlan",

@@ -57,6 +57,7 @@ import '../sync/notify_ops.dart';
 import '../sync/search_index_feed.dart';
 import '../sync/sidebar_ops.dart';
 import '../sync/thread_ops.dart';
+import '../sync/wake_ops.dart';
 import '../telemetry/client_metrics.dart';
 import '../telemetry/crash_reports.dart';
 import '../telemetry/measurements.dart';
@@ -614,6 +615,8 @@ final class InstanceServices {
         UploadOps.register(executors, api, uploads, baseUrl: instance.address);
         AttachmentMessageOps.wrap(executors, uploads);
         AgentOps.register(executors, api);
+        // AR-08: the cancel of a wake-up and the channel switch of autonomous runs.
+        WakeOps.register(executors, api, database);
       },
     );
     // 14 6: the done transcripts of cached voice messages join the offline search (M4-23).

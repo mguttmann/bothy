@@ -137,6 +137,7 @@ final class Channel {
     this.mainThreadId,
     this.archivedAt,
     this.projectBound = false,
+    this.allowAutonomousRuns,
   });
 
   /// ID.
@@ -193,6 +194,11 @@ final class Channel {
   /// [version] and comes as `channel.updated`. False in a payload of an older server.
   final bool projectBound;
 
+  /// API `Channel.allow_autonomous_runs` (03 `channels`, 09 5.8.6, 01 6.21 item 5): whether
+  /// persons other than owners may let agents run on alone here. Null in a payload of a server
+  /// before stage AR, which has no such switch; the client then hides it.
+  final bool? allowAutonomousRuns;
+
   /// Returns a copy with the given fields replaced; a nullable field cannot be cleared
   /// through it (build a new object for that).
   Channel copyWith({
@@ -212,6 +218,7 @@ final class Channel {
     ResourceVersion? version,
     ResourceVersion? settingsVersion,
     bool? projectBound,
+    bool? allowAutonomousRuns,
   }) => Channel(
     id: id,
     spaceId: spaceId ?? this.spaceId,
@@ -231,6 +238,7 @@ final class Channel {
     version: version ?? this.version,
     settingsVersion: settingsVersion ?? this.settingsVersion,
     projectBound: projectBound ?? this.projectBound,
+    allowAutonomousRuns: allowAutonomousRuns ?? this.allowAutonomousRuns,
   );
 
   @override
@@ -252,7 +260,8 @@ final class Channel {
       other.archivedAt == archivedAt &&
       other.version == version &&
       other.settingsVersion == settingsVersion &&
-      other.projectBound == projectBound;
+      other.projectBound == projectBound &&
+      other.allowAutonomousRuns == allowAutonomousRuns;
 
   @override
   int get hashCode => Object.hash(
@@ -273,6 +282,7 @@ final class Channel {
     version,
     settingsVersion,
     projectBound,
+    allowAutonomousRuns,
   );
 }
 

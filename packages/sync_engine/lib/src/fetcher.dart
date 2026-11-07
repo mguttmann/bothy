@@ -8,6 +8,7 @@ library;
 import 'package:api_client/api_client.dart' as api show ForumSort, ThreadState;
 import 'package:api_client/api_client.dart' show ApiClient, standardSerializers;
 import 'package:built_value/serializer.dart';
+import 'package:dio/dio.dart' show DioException;
 import 'package:domain/domain.dart';
 import 'package:local_store/local_store.dart';
 
@@ -122,6 +123,11 @@ abstract interface class Fetcher {
 
   /// `getAgent`: the agent's card with its reported presence.
   Future<AgentCard> agent(PrincipalId id);
+
+  /// Every wake-up of [threadId] (`listThreadWakes`, all pages; 09 5.8.2, AR-08), or null when
+  /// the server answers `404`: a server before stage AR has no such route, and a thread the
+  /// person cannot read is gone with the next removal anyway.
+  Future<List<RunWake>?> threadWakes(ThreadId threadId);
 }
 
 /// The [Fetcher] over the generated API of `api_client`.
@@ -322,4 +328,29 @@ final class ApiFetcher implements Fetcher {
   Future<AgentCard> agent(PrincipalId id) async => agentFromJson(
     _json((await _client.getAgentsApi().getAgent(agentId: id.value)).data),
   );
+
+  @override
+  Future<List<RunWake>?> threadWakes(ThreadId threadId) async {
+    final wakes = <RunWake>[];
+    String? cursor;
+    do {
+      final Json page;
+      try {
+        page = _json(
+          (await _client.getRunsApi().listThreadWakes(
+            threadId: threadId.value,
+            cursor: cursor,
+          )).data,
+        );
+      } on DioException catch (e) {
+        if (e.response?.statusCode == 404) return null;
+        rethrow;
+      }
+      wakes.addAll([for (final w in objList(page, 'items')) wakeFromJson(w)]);
+      final next = optStr(page, 'next_cursor');
+      // A cursor that does not move would loop for ever; the list ends there.
+      cursor = next == cursor ? null : next;
+    } while (cursor != null);
+    return wakes;
+  }
 }

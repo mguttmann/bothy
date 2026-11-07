@@ -4197,6 +4197,27 @@ func (e RunFollowupState) Valid() bool {
 	}
 }
 
+// Defines values for RunMetricsEndState.
+const (
+	RunMetricsEndStateBlocked RunMetricsEndState = "blocked"
+	RunMetricsEndStateDone    RunMetricsEndState = "done"
+	RunMetricsEndStateWaiting RunMetricsEndState = "waiting"
+)
+
+// Valid indicates whether the value is a known member of the RunMetricsEndState enum.
+func (e RunMetricsEndState) Valid() bool {
+	switch e {
+	case RunMetricsEndStateBlocked:
+		return true
+	case RunMetricsEndStateDone:
+		return true
+	case RunMetricsEndStateWaiting:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for RunPlanItemsStatus.
 const (
 	RunPlanItemsStatusCompleted  RunPlanItemsStatus = "completed"
@@ -15478,6 +15499,9 @@ type RunMetrics struct {
 	// ContextPct Examples: 37.5
 	ContextPct *float64 `json:"context_pct,omitempty"`
 
+	// EndState The end state of the run's last answer (09 18.19.11, 03 `runs.metrics`): `done` nothing more to do, `waiting` more work after something happens, `blocked` needs a person. Set at the finish of a run of a runner with `runner.end_state`; absent otherwise. Clients show it on the collapsed line of the run (01 6.21 item 2).
+	EndState *RunMetricsEndState `json:"end_state,omitempty"`
+
 	// LastApiRetry Last retry of a model API call, shown in the live box while set.
 	LastApiRetry *RunApiRetry `json:"last_api_retry,omitempty"`
 
@@ -15493,7 +15517,13 @@ type RunMetrics struct {
 	TokensCacheWrite1h *int64 `json:"tokens_cache_write_1h,omitempty"`
 	TokensIn           *int64 `json:"tokens_in,omitempty"`
 	TokensOut          *int64 `json:"tokens_out,omitempty"`
+
+	// WakePendingUntil The time the next pending wake-up of the thread fires at the earliest, at the end of the run (09 18.19.11); absent when no wake-up was pending. Clients show when the thread continues (01 6.21 item 2).
+	WakePendingUntil *Timestamp `json:"wake_pending_until,omitempty"`
 }
+
+// RunMetricsEndState The end state of the run's last answer (09 18.19.11, 03 `runs.metrics`): `done` nothing more to do, `waiting` more work after something happens, `blocked` needs a person. Set at the finish of a run of a runner with `runner.end_state`; absent otherwise. Clients show it on the collapsed line of the run (01 6.21 item 2).
+type RunMetricsEndState string
 
 // RunPatch defines model for RunPatch.
 type RunPatch struct {

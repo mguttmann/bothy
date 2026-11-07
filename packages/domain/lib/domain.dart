@@ -22,6 +22,7 @@ export 'src/entities/personal.dart';
 export 'src/entities/principal.dart';
 export 'src/entities/reaction.dart';
 export 'src/entities/run.dart';
+export 'src/entities/run_wake.dart';
 export 'src/entities/space.dart';
 export 'src/entities/thread.dart';
 export 'src/ids.dart';

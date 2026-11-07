@@ -201,6 +201,23 @@ final class StructureDao {
         return applied;
       });
 
+  /// Stores `allow_autonomous_runs` [allowed] of channel [id] as the server reported it at
+  /// [version] (`getChannel` or the answer of `setChannelAutonomousRuns`), also when the row
+  /// already holds [version] from a channel event, which carries no such member (AR-08). A row
+  /// of a newer version keeps a value it already has; a channel that is not stored stays so.
+  Future<void> putChannelAutonomousRuns(
+    ChannelId id,
+    ResourceVersion version, {
+    required bool allowed,
+  }) =>
+      (_db.update(_db.channels)..where(
+            (t) =>
+                t.id.equals(id.value) &
+                (t.version.isSmallerOrEqualValue(version.value) |
+                    t.allowAutonomousRuns.isNull()),
+          ))
+          .write(ChannelsCompanion(allowAutonomousRuns: Value(allowed)));
+
   /// The channel [id], or null.
   Future<Channel?> channelById(ChannelId id) async {
     final rows = await _channelQuery((t) => t.id.equals(id.value)).get();

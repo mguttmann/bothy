@@ -4,6 +4,7 @@
 
 // ignore_for_file: unused_element
 import 'package:api_client/src/generated/model/run_autonomy_last.dart';
+import 'package:built_collection/built_collection.dart';
 import 'package:api_client/src/generated/model/run_api_retry.dart';
 import 'package:built_value/built_value.dart';
 import 'package:built_value/serializer.dart';
@@ -25,6 +26,8 @@ part 'run_metrics.g.dart';
 /// * [progressEvents] - Count of progress messages of the runtime in the current turn that changed nothing visible (for example a long running tool); a patch of it counts as progress against `run.stall_after` (09 5.5, 18.4).
 /// * [lastApiRetry]
 /// * [autonomyLast]
+/// * [endState] - The end state of the run's last answer (09 18.19.11, 03 `runs.metrics`): `done` nothing more to do, `waiting` more work after something happens, `blocked` needs a person. Set at the finish of a run of a runner with `runner.end_state`; absent otherwise. Clients show it on the collapsed line of the run (01 6.21 item 2).
+/// * [wakePendingUntil] - The time the next pending wake-up of the thread fires at the earliest, at the end of the run (09 18.19.11); absent when no wake-up was pending. Clients show when the thread continues (01 6.21 item 2).
 @BuiltValue()
 abstract class RunMetrics implements Built<RunMetrics, RunMetricsBuilder> {
   @BuiltValueField(wireName: r'context_pct')
@@ -65,6 +68,15 @@ abstract class RunMetrics implements Built<RunMetrics, RunMetricsBuilder> {
 
   @BuiltValueField(wireName: r'autonomy_last')
   RunAutonomyLast? get autonomyLast;
+
+  /// The end state of the run's last answer (09 18.19.11, 03 `runs.metrics`): `done` nothing more to do, `waiting` more work after something happens, `blocked` needs a person. Set at the finish of a run of a runner with `runner.end_state`; absent otherwise. Clients show it on the collapsed line of the run (01 6.21 item 2).
+  @BuiltValueField(wireName: r'end_state')
+  RunMetricsEndStateEnum? get endState;
+  // enum endStateEnum {  done,  waiting,  blocked,  };
+
+  /// The time the next pending wake-up of the thread fires at the earliest, at the end of the run (09 18.19.11); absent when no wake-up was pending. Clients show when the thread continues (01 6.21 item 2).
+  @BuiltValueField(wireName: r'wake_pending_until')
+  DateTime? get wakePendingUntil;
 
   RunMetrics._();
 
@@ -171,6 +183,20 @@ class _$RunMetricsSerializer implements PrimitiveSerializer<RunMetrics> {
       yield serializers.serialize(
         object.autonomyLast,
         specifiedType: const FullType(RunAutonomyLast),
+      );
+    }
+    if (object.endState != null) {
+      yield r'end_state';
+      yield serializers.serialize(
+        object.endState,
+        specifiedType: const FullType(RunMetricsEndStateEnum),
+      );
+    }
+    if (object.wakePendingUntil != null) {
+      yield r'wake_pending_until';
+      yield serializers.serialize(
+        object.wakePendingUntil,
+        specifiedType: const FullType(DateTime),
       );
     }
   }
@@ -296,6 +322,22 @@ class _$RunMetricsSerializer implements PrimitiveSerializer<RunMetrics> {
           if (valueDes == null) continue;
           result.autonomyLast.replace(valueDes);
           break;
+        case r'end_state':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(RunMetricsEndStateEnum),
+          ) as RunMetricsEndStateEnum?;
+          if (valueDes == null) continue;
+          result.endState = valueDes;
+          break;
+        case r'wake_pending_until':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(DateTime),
+          ) as DateTime?;
+          if (valueDes == null) continue;
+          result.wakePendingUntil = valueDes;
+          break;
         default:
           unhandled.add(key);
           unhandled.add(value);
@@ -323,4 +365,29 @@ class _$RunMetricsSerializer implements PrimitiveSerializer<RunMetrics> {
     );
     return result.build();
   }
+}
+
+/// The end state of the run's last answer (09 18.19.11, 03 `runs.metrics`): `done` nothing more to do, `waiting` more work after something happens, `blocked` needs a person. Set at the finish of a run of a runner with `runner.end_state`; absent otherwise. Clients show it on the collapsed line of the run (01 6.21 item 2).
+class RunMetricsEndStateEnum extends EnumClass {
+  @BuiltValueEnumConst(wireName: r'done')
+  static const RunMetricsEndStateEnum done = _$runMetricsEndStateEnum_done;
+  @BuiltValueEnumConst(wireName: r'waiting')
+  static const RunMetricsEndStateEnum waiting =
+      _$runMetricsEndStateEnum_waiting;
+  @BuiltValueEnumConst(wireName: r'blocked')
+  static const RunMetricsEndStateEnum blocked =
+      _$runMetricsEndStateEnum_blocked;
+  @BuiltValueEnumConst(wireName: r'unknown_default_open_api', fallback: true)
+  static const RunMetricsEndStateEnum unknownDefaultOpenApi =
+      _$runMetricsEndStateEnum_unknownDefaultOpenApi;
+
+  static Serializer<RunMetricsEndStateEnum> get serializer =>
+      _$runMetricsEndStateEnumSerializer;
+
+  const RunMetricsEndStateEnum._(String name) : super(name);
+
+  static BuiltSet<RunMetricsEndStateEnum> get values =>
+      _$runMetricsEndStateEnumValues;
+  static RunMetricsEndStateEnum valueOf(String name) =>
+      _$runMetricsEndStateEnumValueOf(name);
 }
