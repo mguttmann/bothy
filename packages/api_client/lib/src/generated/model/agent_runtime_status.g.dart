@@ -26,6 +26,8 @@ class _$AgentRuntimeStatus extends AgentRuntimeStatus {
   @override
   final RunSlots? runSlots;
   @override
+  final ToolClass? hostsAgents;
+  @override
   final BillingEvidence? billingEvidence;
   @override
   final BuiltList<String>? warnings;
@@ -44,6 +46,7 @@ class _$AgentRuntimeStatus extends AgentRuntimeStatus {
     this.billingModeMatches,
     this.rateLimit,
     this.runSlots,
+    this.hostsAgents,
     this.billingEvidence,
     this.warnings,
   }) : super._();
@@ -69,6 +72,7 @@ class _$AgentRuntimeStatus extends AgentRuntimeStatus {
         billingModeMatches == other.billingModeMatches &&
         rateLimit == other.rateLimit &&
         runSlots == other.runSlots &&
+        hostsAgents == other.hostsAgents &&
         billingEvidence == other.billingEvidence &&
         warnings == other.warnings;
   }
@@ -85,6 +89,7 @@ class _$AgentRuntimeStatus extends AgentRuntimeStatus {
     _$hash = $jc(_$hash, billingModeMatches.hashCode);
     _$hash = $jc(_$hash, rateLimit.hashCode);
     _$hash = $jc(_$hash, runSlots.hashCode);
+    _$hash = $jc(_$hash, hostsAgents.hashCode);
     _$hash = $jc(_$hash, billingEvidence.hashCode);
     _$hash = $jc(_$hash, warnings.hashCode);
     _$hash = $jf(_$hash);
@@ -103,6 +108,7 @@ class _$AgentRuntimeStatus extends AgentRuntimeStatus {
           ..add('billingModeMatches', billingModeMatches)
           ..add('rateLimit', rateLimit)
           ..add('runSlots', runSlots)
+          ..add('hostsAgents', hostsAgents)
           ..add('billingEvidence', billingEvidence)
           ..add('warnings', warnings))
         .toString();
@@ -158,6 +164,10 @@ class AgentRuntimeStatusBuilder
   RunSlotsBuilder get runSlots => _$this._runSlots ??= RunSlotsBuilder();
   set runSlots(RunSlotsBuilder? runSlots) => _$this._runSlots = runSlots;
 
+  ToolClass? _hostsAgents;
+  ToolClass? get hostsAgents => _$this._hostsAgents;
+  set hostsAgents(ToolClass? hostsAgents) => _$this._hostsAgents = hostsAgents;
+
   BillingEvidenceBuilder? _billingEvidence;
   BillingEvidenceBuilder get billingEvidence =>
       _$this._billingEvidence ??= BillingEvidenceBuilder();
@@ -185,6 +195,7 @@ class AgentRuntimeStatusBuilder
       _billingModeMatches = $v.billingModeMatches;
       _rateLimit = $v.rateLimit?.toBuilder();
       _runSlots = $v.runSlots?.toBuilder();
+      _hostsAgents = $v.hostsAgents;
       _billingEvidence = $v.billingEvidence?.toBuilder();
       _warnings = $v.warnings?.toBuilder();
       _$v = null;
@@ -224,6 +235,7 @@ class AgentRuntimeStatusBuilder
             billingModeMatches: billingModeMatches,
             rateLimit: _rateLimit?.build(),
             runSlots: _runSlots?.build(),
+            hostsAgents: hostsAgents,
             billingEvidence: _billingEvidence?.build(),
             warnings: _warnings?.build(),
           );
@@ -237,6 +249,7 @@ class AgentRuntimeStatusBuilder
         _rateLimit?.build();
         _$failedField = 'runSlots';
         _runSlots?.build();
+
         _$failedField = 'billingEvidence';
         _billingEvidence?.build();
         _$failedField = 'warnings';

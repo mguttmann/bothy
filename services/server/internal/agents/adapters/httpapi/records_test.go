@@ -278,6 +278,59 @@ func TestListAgentsVisibility(t *testing.T) {
 	w.want(w.do("", http.MethodGet, agentsPath, ""), http.StatusUnauthorized, "")
 }
 
+// TestHostsAgentsVisibleToOwners (26 8.1, A1-03b): getAgent and listAgents show the stored
+// capability hosts_agents of a runner as presence.hosts_agents to an owner only; Sam with read on a
+// channel the runner serves, the runner itself and agent.updated see the agent as before, and an
+// agent that reports no hosts_agents carries no member.
+func TestHostsAgentsVisibleToOwners(t *testing.T) {
+	t.Parallel()
+	w := newWorld(t)
+	owner := w.person("owner", "active", true)
+	sam := w.person("sam", "active", false)
+	runner, plain := w.create("runner"), w.create("plain")
+	w.sql(`UPDATE agents SET reported_details = '{"capabilities":{"hosts_agents":"scoped"}}'::jsonb, last_heartbeat_at = now()
+		WHERE principal_id = $1`, runner.String())
+	w.rawGrant(sam, w.channel(runner), "read")
+	w.agentToken("runner", runner, owner)
+	hosts := func(m map[string]any) (any, bool) {
+		v, ok := m["presence"].(map[string]any)["hosts_agents"]
+		return v, ok
+	}
+	if v, ok := hosts(w.want(w.do("owner", http.MethodGet, agentPath(runner), ""), http.StatusOK, "")); !ok || v != "scoped" {
+		t.Fatalf("owner getAgent hosts_agents %v %v", v, ok)
+	}
+	if v, ok := hosts(w.want(w.do("owner", http.MethodGet, agentPath(plain), ""), http.StatusOK, "")); ok {
+		t.Fatalf("an agent without the capability shows %v", v)
+	}
+	seen := map[string]any{}
+	for _, it := range w.want(w.do("owner", http.MethodGet, agentsPath, ""), http.StatusOK, "")["items"].([]any) {
+		m := it.(map[string]any)
+		if v, ok := hosts(m); ok {
+			seen[m["id"].(string)] = v
+		}
+	}
+	if len(seen) != 1 || seen[runner.String()] != "scoped" {
+		t.Fatalf("owner listAgents hosts_agents %v", seen)
+	}
+	for _, name := range []string{"sam", "runner"} {
+		if v, ok := hosts(w.want(w.do(name, http.MethodGet, agentPath(runner), ""), http.StatusOK, "")); ok {
+			t.Fatalf("%s getAgent shows hosts_agents %v", name, v)
+		}
+		for _, it := range w.want(w.do(name, http.MethodGet, agentsPath, ""), http.StatusOK, "")["items"].([]any) {
+			if v, ok := hosts(it.(map[string]any)); ok {
+				t.Fatalf("%s listAgents shows hosts_agents %v", name, v)
+			}
+		}
+	}
+	w.want(w.do("owner", http.MethodPut, agentPath(runner)+"/tool-class", `{"tool_class":"scoped","reason":"Files"}`,
+		ifMatch(w.version(runner))...), http.StatusOK, "")
+	for _, e := range w.updates() {
+		if _, ok := hosts(e.Payload["agent"].(map[string]any)); ok {
+			t.Fatalf("agent.updated carries hosts_agents: %v", e.Payload)
+		}
+	}
+}
+
 // TestAgentUpdatedCarriesBadge: after each switch the payload of agent.updated carries the new
 // billing_mode, and authorize(agent, agent.read, itself) allows its delivery to the agent.
 func TestAgentUpdatedCarriesBadge(t *testing.T) {

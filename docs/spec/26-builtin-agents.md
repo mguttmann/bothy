@@ -557,7 +557,11 @@ internal script of a real installation.
 
 Desktop, phone and web console show "New agent" only to owners and only when the server answers
 the operations of this chapter and at least one active runner reports `hosts_agents`; on an older
-server or without such a runner the entry is hidden.
+server or without such a runner the entry is hidden. The apps read this from the agent list they
+already have: `getAgent` and `listAgents` show an owner the stored capability of each runner as
+`presence.hosts_agents` (`AgentRuntimeStatus`); a runner that does not report it, every other
+caller, `agent.updated` and the heartbeat answer carry no such member (addendum of 2026-11-07,
+A1-03b).
 
 ### 8.2 Steps
 
@@ -631,6 +635,10 @@ Permissions, step-up, audit and rate-limit classes: [07-permissions.md](07-permi
 
 `agent.updated` keeps its meaning and also follows `hosted_by` and a new definition version
 (`agents.version`).
+
+`getAgent` and `listAgents` (`agent.read`) add for an owner the member `hosts_agents` to the
+`presence` of a runner that reports the capability (8.1, A1-03b); the action, its right and every
+other reader stay as they were.
 
 ## 10. Billing
 

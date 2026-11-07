@@ -27,6 +27,7 @@ part 'agent_runtime_status.g.dart';
 /// * [billingModeMatches] - False when the reported mode differs from the configured `billing_mode`.
 /// * [rateLimit]
 /// * [runSlots] - Runners only, the slot use of the last heartbeat (09 4.8); absent when the adapter does not report it.
+/// * [hostsAgents] - Claude Code runners only, the capability `hosts_agents` of the last stored heartbeat, the highest tool class the runner loads for a hosted built-in agent (09 2.2, 26 3.1). Shown only in `getAgent` and `listAgents` to an owner, who offers \"New agent\" when an active runner reports it (26 8.1); absent for every other caller, in every event, in the heartbeat answer and when the runner does not report it.
 /// * [billingEvidence]
 /// * [warnings] - Known values `billing_mode_mismatch` (the reported mode has differed from the configured one for longer than `billing.mismatch_alert_after`), `billing_mode_unsupported` (no reported mode and the configured one is not in `billing_modes_supported`), `billing_evidence_unknown` (`billing_evidence.key_type` is `unknown`) and `tool_class_mismatch` (the reported tool class differs from the configured one). Only while the state is `online` or `degraded`.
 @BuiltValue()
@@ -64,6 +65,11 @@ abstract class AgentRuntimeStatus
   /// Runners only, the slot use of the last heartbeat (09 4.8); absent when the adapter does not report it.
   @BuiltValueField(wireName: r'run_slots')
   RunSlots? get runSlots;
+
+  /// Claude Code runners only, the capability `hosts_agents` of the last stored heartbeat, the highest tool class the runner loads for a hosted built-in agent (09 2.2, 26 3.1). Shown only in `getAgent` and `listAgents` to an owner, who offers \"New agent\" when an active runner reports it (26 8.1); absent for every other caller, in every event, in the heartbeat answer and when the runner does not report it.
+  @BuiltValueField(wireName: r'hosts_agents')
+  ToolClass? get hostsAgents;
+  // enum hostsAgentsEnum {  chat,  scoped,  host,  };
 
   @BuiltValueField(wireName: r'billing_evidence')
   BillingEvidence? get billingEvidence;
@@ -157,6 +163,13 @@ class _$AgentRuntimeStatusSerializer
       yield serializers.serialize(
         object.runSlots,
         specifiedType: const FullType(RunSlots),
+      );
+    }
+    if (object.hostsAgents != null) {
+      yield r'hosts_agents';
+      yield serializers.serialize(
+        object.hostsAgents,
+        specifiedType: const FullType(ToolClass),
       );
     }
     if (object.billingEvidence != null) {
@@ -272,6 +285,14 @@ class _$AgentRuntimeStatusSerializer
           ) as RunSlots?;
           if (valueDes == null) continue;
           result.runSlots.replace(valueDes);
+          break;
+        case r'hosts_agents':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(ToolClass),
+          ) as ToolClass?;
+          if (valueDes == null) continue;
+          result.hostsAgents = valueDes;
           break;
         case r'billing_evidence':
           final valueDes = serializers.deserialize(

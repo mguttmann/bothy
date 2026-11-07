@@ -27721,6 +27721,9 @@ components:
         run_slots:
           $ref: '#/components/schemas/RunSlots'
           description: Runners only, the slot use of the last heartbeat (09 4.8); absent when the adapter does not report it.
+        hosts_agents:
+          $ref: '#/components/schemas/ToolClass'
+          description: Claude Code runners only, the capability `hosts_agents` of the last stored heartbeat, the highest tool class the runner loads for a hosted built-in agent (09 2.2, 26 3.1). Shown only in `getAgent` and `listAgents` to an owner, who offers "New agent" when an active runner reports it (26 8.1); absent for every other caller, in every event, in the heartbeat answer and when the runner does not report it.
         billing_evidence:
           $ref: '#/components/schemas/BillingEvidence'
         warnings:

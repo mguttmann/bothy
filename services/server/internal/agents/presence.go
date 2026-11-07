@@ -74,6 +74,10 @@ type PresenceStatus struct {
 	// RunSlots is the slot use of the last heartbeat (run_slots, 09 4.8, F-WARTESCHLANGE-GRUND);
 	// nil when not reported.
 	RunSlots *RunSlots
+	// HostsAgents is the capability hosts_agents of the last stored heartbeat of a Claude Code
+	// runner (chat, scoped or host, docs/spec/26-builtin-agents.md 3.1); "" when not reported and
+	// in every view but getAgent and listAgents of an owner (26 8.1, A1-03b).
+	HostsAgents string
 	// ProjectTrash are the folder moves the runner owes (HeartbeatAck.project_trash, 09 18.15,
 	// D-DEL-11); set only in the answer to a heartbeat, nil otherwise.
 	ProjectTrash []ProjectTrashRequest
